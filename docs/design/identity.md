@@ -11,7 +11,7 @@ cartographic — an old sea-chart on a drafting table. The two themes are the
 - **Parchment** (light) — an aged sea-chart: warm cream stock, sepia iron-gall
   ink, compass-gold, verdigris seas, burnt-sienna marginalia.
 - **Astral** (dark) — the same chart under the night sky: midnight-indigo paper,
-  a faint starfield and nebula, constellation-gold, aurora-teal.
+  constellation-gold, aurora-teal.
 
 The bridge between them is deliberate: **gold** is the through-line (compass ink
 by day → constellation lines by night), **teal** carries the seas/aurora, and
@@ -25,7 +25,7 @@ Everything is a layer of CSS custom properties — the single source of truth.
 | File                                 | Role                                                                              |
 | ------------------------------------ | --------------------------------------------------------------------------------- |
 | `apps/web/src/styles/tokens.css`     | Semantic tokens for both themes (colour, type, spacing, radius, motion, terrain). |
-| `apps/web/src/styles/base.css`       | Reset, document typography, the table atmosphere (grain / starfield).             |
+| `apps/web/src/styles/base.css`       | Reset, document typography, the flat table background.                            |
 | `apps/web/src/styles/components.css` | Reusable token-driven classes every slice adopts.                                 |
 | `apps/web/src/styles.css`            | Entry point: fonts → tokens → base → components.                                  |
 | `apps/web/src/app/styleguide/`       | The living `/styleguide` reference page.                                          |
@@ -71,8 +71,8 @@ base type of a hex, tuned to read as hand-tinted washes on each theme's canvas.
 - **Spacing** — 4px base: `--space-1` (4px) → `--space-9` (96px).
 - **Radius** — `--radius-sm` (3px) → `--radius-xl` (16px), plus `--radius-full`.
 - **Motion** — durations `--dur-fast/base/slow`; eases `--ease-out`, `--ease-spring`.
-  The shell plays one orchestrated, staggered load (header → rails → canvas → map)
-  and respects `prefers-reduced-motion`.
+  Reserved for interaction (hovers, presses) and theme transitions — no entrance
+  animation on first render. Respects `prefers-reduced-motion`.
 
 ## Theming mechanics
 

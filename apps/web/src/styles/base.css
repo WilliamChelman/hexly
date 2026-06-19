@@ -1,8 +1,8 @@
 /*
  * Hexly base layer
  * ---------------------------------------------------------------------------
- * A small, opinionated reset plus the document-level typography and the
- * atmospheric "table surface" (paper grain at night becomes a starfield).
+ * A small, opinionated reset plus the document-level typography. The table is a
+ * flat, calm surface in each theme — no grain, starfield, or nebula texture.
  */
 
 *,
@@ -28,48 +28,12 @@ body {
   line-height: var(--leading-normal);
   color: var(--ink);
   background-color: var(--bg);
-  /* The table surface: nebula wash beneath, base stock on top. */
-  background-image: var(--nebula);
-  background-attachment: fixed;
   transition:
     background-color var(--dur-slow) var(--ease-out),
     color var(--dur-slow) var(--ease-out);
 }
 
-/* Atmosphere: a fixed, non-interactive texture layer over the whole table.
-   Light → multiplied paper grain. Dark → grain + scattered starlight. */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background-image: var(--starfield), var(--texture-grain);
-  background-repeat: repeat, repeat;
-  opacity: var(--grain-opacity);
-  mix-blend-mode: var(--grain-blend);
-}
-
-/* The starfield wants full opacity; lift it back above the grain dimming. */
-:root[data-theme='dark'] body::before {
-  opacity: 1;
-  mix-blend-mode: normal;
-}
-:root[data-theme='dark'] body::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background-image: var(--texture-grain);
-  opacity: var(--grain-opacity);
-  mix-blend-mode: overlay;
-}
-
-/* Keep real UI above the atmosphere layers. */
 app-root {
-  position: relative;
-  z-index: 1;
   display: block;
   min-height: 100vh;
 }

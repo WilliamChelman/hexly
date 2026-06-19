@@ -128,23 +128,6 @@
   --shadow-3: 0 16px 36px -8px rgba(50, 36, 18, 0.32);
   --shadow-inset: inset 0 1px 2px rgba(60, 44, 22, 0.12);
 
-  /* Atmosphere — grain + nebula are theme-swapped textures */
-  --texture-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  --grain-opacity: 0.06;
-  --grain-blend: multiply;
-  --nebula:
-    radial-gradient(
-      900px 600px at 100% -10%,
-      rgba(154, 106, 22, 0.1),
-      transparent 60%
-    ),
-    radial-gradient(
-      800px 520px at -10% 110%,
-      rgba(47, 111, 106, 0.1),
-      transparent 60%
-    );
-  --starfield: none;
-
   /* Canvas — the infinite hex plane */
   --canvas-bg: #e8dabb;
   --canvas-mat: #ddcaa3;
@@ -165,9 +148,9 @@
 
 /* =========================================================================
  * Dark theme — "Astral"
- * The same chart at night: midnight-indigo paper, a faint starfield and
- * nebula, constellation-gold, aurora-teal. Text stays warm parchment-cream
- * so the two themes read as one identity at different hours.
+ * The same chart at night: midnight-indigo paper, constellation-gold,
+ * aurora-teal. Text stays warm parchment-cream so the two themes read as
+ * one identity at different hours.
  * ======================================================================= */
 :root[data-theme='dark'] {
   --bg: #0d1124; /* the night table                                        */
@@ -210,27 +193,6 @@
   --shadow-2: 0 6px 18px -4px rgba(0, 0, 0, 0.6);
   --shadow-3: 0 22px 48px -10px rgba(0, 0, 0, 0.72);
   --shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.4);
-
-  --grain-opacity: 0.05;
-  --grain-blend: overlay;
-  --nebula:
-    radial-gradient(
-      1000px 680px at 88% -12%,
-      rgba(161, 140, 240, 0.22),
-      transparent 62%
-    ),
-    radial-gradient(
-      820px 560px at -8% 108%,
-      rgba(84, 200, 187, 0.16),
-      transparent 60%
-    ),
-    radial-gradient(
-      600px 600px at 50% 50%,
-      rgba(230, 182, 82, 0.05),
-      transparent 70%
-    );
-  /* Scattered starlight — a tiled field of varied dots */
-  --starfield: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='320'%3E%3Cg fill='%23fbf6e7'%3E%3Ccircle cx='24' cy='38' r='1.1' opacity='.9'/%3E%3Ccircle cx='88' cy='16' r='.7' opacity='.5'/%3E%3Ccircle cx='150' cy='52' r='1.4' opacity='.85'/%3E%3Ccircle cx='212' cy='28' r='.8' opacity='.6'/%3E%3Ccircle cx='286' cy='60' r='1' opacity='.75'/%3E%3Ccircle cx='44' cy='104' r='.8' opacity='.55'/%3E%3Ccircle cx='120' cy='128' r='1.2' opacity='.8'/%3E%3Ccircle cx='190' cy='100' r='.7' opacity='.45'/%3E%3Ccircle cx='260' cy='140' r='1.1' opacity='.7'/%3E%3Ccircle cx='300' cy='112' r='.6' opacity='.4'/%3E%3Ccircle cx='16' cy='178' r='1' opacity='.7'/%3E%3Ccircle cx='76' cy='206' r='.7' opacity='.5'/%3E%3Ccircle cx='138' cy='190' r='1.3' opacity='.9'/%3E%3Ccircle cx='210' cy='216' r='.8' opacity='.55'/%3E%3Ccircle cx='278' cy='196' r='1' opacity='.65'/%3E%3Ccircle cx='40' cy='262' r='1.2' opacity='.8'/%3E%3Ccircle cx='104' cy='286' r='.7' opacity='.5'/%3E%3Ccircle cx='166' cy='258' r='.9' opacity='.6'/%3E%3Ccircle cx='232' cy='284' r='.7' opacity='.45'/%3E%3Ccircle cx='298' cy='262' r='1.1' opacity='.75'/%3E%3Ccircle cx='62' cy='150' r='.6' opacity='.4'/%3E%3Ccircle cx='250' cy='70' r='.6' opacity='.4'/%3E%3Ccircle cx='180' cy='160' r='.6' opacity='.38'/%3E%3C/g%3E%3C/svg%3E");
 
   --canvas-bg: #111634;
   --canvas-mat: #0c1026;

@@ -20,7 +20,6 @@
   background: var(--surface);
   border-bottom: 1px solid var(--line-strong);
   box-shadow: var(--shadow-1);
-  animation: drop-in var(--dur-base) var(--ease-out) both;
 }
 
 .brand {
@@ -86,8 +85,6 @@
   overflow-y: auto;
   background: var(--bg-deep);
   border-right: 1px solid var(--line-strong);
-  animation: slide-right var(--dur-base) var(--ease-out) both;
-  animation-delay: 60ms;
 }
 .tools__group {
   display: flex;
@@ -133,8 +130,6 @@
     var(--canvas-bg),
     var(--canvas-mat)
   );
-  animation: fade-in var(--dur-slow) var(--ease-out) both;
-  animation-delay: 120ms;
 }
 /* The infinite hex grid, drawn as a themed mask so it tints per theme. */
 .canvas__grid {
@@ -154,8 +149,6 @@
   width: min(76%, 640px);
   height: 100%;
   filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.22));
-  animation: rise var(--dur-slow) var(--ease-spring) both;
-  animation-delay: 200ms;
 }
 .canvas__map polygon {
   transition: fill var(--dur-base) var(--ease-out);
@@ -227,8 +220,6 @@
   overflow-y: auto;
   background: var(--surface);
   border-left: 1px solid var(--line-strong);
-  animation: slide-left var(--dur-base) var(--ease-out) both;
-  animation-delay: 60ms;
 }
 .inspector__head {
   display: flex;
@@ -282,8 +273,6 @@
   color: var(--ink-muted);
   background: var(--surface);
   border-top: 1px solid var(--line-strong);
-  animation: drop-in var(--dur-base) var(--ease-out) both;
-  animation-delay: 100ms;
 }
 .status__item {
   display: flex;
@@ -293,37 +282,6 @@
 }
 .status__spacer {
   flex: 1;
-}
-
-/* ===== Entrance choreography ============================================ */
-@keyframes drop-in {
-  from {
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-}
-@keyframes slide-right {
-  from {
-    opacity: 0;
-    transform: translateX(-12px);
-  }
-}
-@keyframes slide-left {
-  from {
-    opacity: 0;
-    transform: translateX(12px);
-  }
-}
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-}
-@keyframes rise {
-  from {
-    opacity: 0;
-    transform: translateY(14px) scale(0.96);
-  }
 }
 
 /* Narrow viewports: collapse the side rails so the canvas stays usable. */
