@@ -21,8 +21,425 @@ interface TypeRow {
 @Component({
   selector: 'app-styleguide',
   imports: [RouterLink],
-  templateUrl: './styleguide.html',
-  styleUrl: './styleguide.css',
+  template: `
+    <div class="guide">
+      <header class="guide__top">
+        <a class="btn btn--ghost btn--sm" routerLink="/">← Back to map</a>
+        <button
+          type="button"
+          class="btn btn--ghost btn--sm"
+          (click)="themeService.toggle()"
+        >
+          {{ theme() === 'dark' ? 'Astral' : 'Parchment' }} · switch
+        </button>
+      </header>
+
+      <!-- Masthead -->
+      <section class="hero">
+        <span class="eyebrow">Hexly design system</span>
+        <h1 class="hero__title">The cartographer’s table,<br />by starlight.</h1>
+        <p class="hero__lede">
+          One identity told at two hours of the day. <strong>Parchment</strong> is
+          the aged sea-chart on the drafting table; <strong>Astral</strong> is the
+          same chart under the night sky. Gold is the through-line — compass ink by
+          day, constellation lines by night — and the text stays warm
+          parchment-cream in both. Everything below is driven by the same CSS
+          custom-property layer that <code>apps/web</code> ships.
+        </p>
+        <div class="hero__meta">
+          <span class="chip chip--gold">Cinzel · display</span>
+          <span class="chip chip--sea">Spectral · body</span>
+          <span class="chip chip--astra">JetBrains Mono · coordinates</span>
+        </div>
+      </section>
+
+      <!-- Colour -->
+      <section class="section">
+        <h2 class="section__title">Palette · semantic roles</h2>
+        <p class="section__note">
+          Slices request a role, never a raw colour. Showing the active theme.
+        </p>
+        <div class="swatches">
+          @for (s of semantic; track s.token) {
+          <figure class="swatchcard">
+            <span
+              class="swatchcard__chip"
+              [style.background]="'var(' + s.token + ')'"
+            ></span>
+            <figcaption>
+              <strong>{{ s.name }}</strong>
+              <code>{{ s.token }}</code>
+            </figcaption>
+          </figure>
+          }
+        </div>
+
+        <h2 class="section__title">Palette · terrain fills</h2>
+        <div class="swatches">
+          @for (s of terrain; track s.token) {
+          <figure class="swatchcard">
+            <span
+              class="swatchcard__chip"
+              [style.background]="'var(' + s.token + ')'"
+            ></span>
+            <figcaption>
+              <strong>{{ s.name }}</strong>
+              <code>{{ s.token }}</code>
+            </figcaption>
+          </figure>
+          }
+        </div>
+      </section>
+
+      <!-- Type -->
+      <section class="section">
+        <h2 class="section__title">Type scale</h2>
+        <div class="typelist panel">
+          @for (t of typeScale; track t.token) {
+          <div class="typerow">
+            <span class="typerow__sample" [style.font-size]="'var(' + t.token + ')'"
+              >{{ t.sample }}</span
+            >
+            <span class="typerow__meta"
+              ><code>{{ t.token }}</code><span>{{ t.size }}</span></span
+            >
+          </div>
+          }
+        </div>
+      </section>
+
+      <!-- Spacing & radii -->
+      <section class="section section--split">
+        <div>
+          <h2 class="section__title">Spacing</h2>
+          <div class="ramp">
+            @for (s of spacing; track s) {
+            <div class="ramp__row">
+              <code>{{ s }}</code>
+              <span class="ramp__bar" [style.width]="'var(' + s + ')'"></span>
+            </div>
+            }
+          </div>
+        </div>
+        <div>
+          <h2 class="section__title">Radii</h2>
+          <div class="radii">
+            @for (r of radii; track r) {
+            <figure class="radiicard">
+              <span
+                class="radiicard__box"
+                [style.border-radius]="'var(' + r + ')'"
+              ></span>
+              <code>{{ r }}</code>
+            </figure>
+            }
+          </div>
+        </div>
+      </section>
+
+      <!-- Components -->
+      <section class="section">
+        <h2 class="section__title">Components</h2>
+        <div class="specimens">
+          <figure class="specimen panel">
+            <figcaption class="eyebrow">Buttons</figcaption>
+            <div class="specimen__row">
+              <button class="btn btn--primary">Share map</button>
+              <button class="btn">Add region</button>
+              <button class="btn btn--ghost">Cancel</button>
+              <button class="btn btn--danger">Clear hex</button>
+              <button class="btn btn--sm">Small</button>
+            </div>
+          </figure>
+
+          <figure class="specimen panel">
+            <figcaption class="eyebrow">Tools</figcaption>
+            <div class="specimen__col">
+              <button class="tool is-active" aria-pressed="true">
+                <span
+                  class="swatch"
+                  style="background: var(--terrain-forest)"
+                ></span>
+                <span class="tool__label">Forest</span><kbd class="kbd">2</kbd>
+              </button>
+              <button class="tool">
+                <span
+                  class="swatch"
+                  style="background: var(--terrain-ocean)"
+                ></span>
+                <span class="tool__label">Ocean</span><kbd class="kbd">3</kbd>
+              </button>
+            </div>
+          </figure>
+
+          <figure class="specimen panel">
+            <figcaption class="eyebrow">Chips & coordinates</figcaption>
+            <div class="specimen__row">
+              <span class="chip">Default</span>
+              <span class="chip chip--gold">Settlement</span>
+              <span class="chip chip--sea">Editing</span>
+              <span class="chip chip--astra">Region</span>
+              <span class="coord">q 12 · r −4</span>
+              <kbd class="kbd">⌘ Z</kbd>
+            </div>
+          </figure>
+
+          <figure class="specimen panel">
+            <figcaption class="eyebrow">Fields</figcaption>
+            <div class="specimen__col">
+              <label class="field">
+                <span class="field__label">Map name</span>
+                <input class="input" value="The Reach of Aldermoor" />
+              </label>
+              <label class="field">
+                <span class="field__label">Note</span>
+                <textarea class="textarea">
+A walled town where the forest road meets the river ford.</textarea
+                >
+              </label>
+            </div>
+          </figure>
+        </div>
+      </section>
+
+      <footer class="guide__foot">
+        <span class="cartouche">Hexly</span>
+        <span>Design tokens · <code>apps/web/src/styles</code></span>
+      </footer>
+    </div>
+  `,
+  styles: `
+    /* Styleguide — layout only; specimens use the global component classes. */
+    :host {
+      display: block;
+    }
+
+    .guide {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: var(--space-5) var(--space-5) var(--space-9);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-8);
+    }
+
+    .guide__top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* ----- Hero ------------------------------------------------------------- */
+    .hero {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-4);
+      padding: var(--space-7) 0 var(--space-5);
+      border-bottom: 1px solid var(--line);
+    }
+    .hero__title {
+      font-size: var(--text-3xl);
+      line-height: 1.06;
+    }
+    .hero__lede {
+      max-width: var(--container-reading);
+      font-size: var(--text-md);
+      line-height: var(--leading-normal);
+      color: var(--ink-muted);
+    }
+    .hero__lede code,
+    .section__note code,
+    figcaption code {
+      font-family: var(--font-mono);
+      font-size: 0.86em;
+      color: var(--gold-strong);
+    }
+    .hero__meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+      margin-top: var(--space-2);
+    }
+
+    /* ----- Sections --------------------------------------------------------- */
+    .section {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-4);
+    }
+    .section--split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-7);
+    }
+    .section__title {
+      font-size: var(--text-lg);
+      padding-bottom: var(--space-2);
+      border-bottom: 1px solid var(--line-faint);
+    }
+    .section__note {
+      margin-top: calc(var(--space-3) * -1);
+      font-size: var(--text-sm);
+      color: var(--ink-muted);
+    }
+
+    /* ----- Colour swatches -------------------------------------------------- */
+    .swatches {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: var(--space-3);
+    }
+    .swatchcard {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+      margin: 0;
+    }
+    .swatchcard__chip {
+      height: 64px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--line-strong);
+      box-shadow: var(--shadow-inset);
+    }
+    .swatchcard figcaption {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      font-size: var(--text-sm);
+    }
+    .swatchcard code {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--ink-faint);
+    }
+
+    /* ----- Type ------------------------------------------------------------- */
+    .typelist {
+      padding: var(--space-2) var(--space-5);
+    }
+    .typerow {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--space-5);
+      padding: var(--space-3) 0;
+      border-bottom: 1px solid var(--line-faint);
+    }
+    .typerow:last-child {
+      border-bottom: 0;
+    }
+    .typerow__sample {
+      font-family: var(--font-display);
+      color: var(--ink-strong);
+      line-height: 1.1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .typerow__meta {
+      display: flex;
+      gap: var(--space-3);
+      flex: none;
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--ink-faint);
+    }
+
+    /* ----- Spacing & radii -------------------------------------------------- */
+    .ramp {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+    }
+    .ramp__row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--ink-muted);
+    }
+    .ramp__row code {
+      width: 7ch;
+      flex: none;
+    }
+    .ramp__bar {
+      height: 14px;
+      background: linear-gradient(90deg, var(--gold), var(--gold-strong));
+      border-radius: var(--radius-sm);
+    }
+    .radii {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-4);
+    }
+    .radiicard {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-2);
+      margin: 0;
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--ink-muted);
+    }
+    .radiicard__box {
+      width: 64px;
+      height: 64px;
+      background: var(--surface-sunken);
+      border: 1px solid var(--gold);
+    }
+
+    /* ----- Component specimens --------------------------------------------- */
+    .specimens {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: var(--space-4);
+    }
+    .specimen {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-4);
+      padding: var(--space-4);
+      margin: 0;
+    }
+    .specimen__row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--space-3);
+    }
+    .specimen__col {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+    }
+
+    /* ----- Footer ----------------------------------------------------------- */
+    .guide__foot {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: var(--space-5);
+      border-top: 1px solid var(--line);
+      font-size: var(--text-sm);
+      color: var(--ink-muted);
+    }
+    .guide__foot .cartouche {
+      font-size: var(--text-md);
+      color: var(--gold);
+    }
+    .guide__foot code {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+    }
+
+    @media (max-width: 720px) {
+      .section--split {
+        grid-template-columns: 1fr;
+      }
+    }
+  `,
 })
 export class Styleguide {
   protected readonly themeService = inject(ThemeService);
