@@ -1,0 +1,105 @@
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { ThemeService } from '../core/theme.service';
+import { ButtonDirective } from '../ui/button';
+import { Icon } from '../ui/icon/icon';
+
+/** The top chrome: brand, map title, and the global actions (theme, share). */
+@Component({
+  selector: 'app-editor-header',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [RouterLink, ButtonDirective, Icon],
+  template: `
+    <div class="brand">
+      <span class="mark"><app-icon name="logo" [size]="26" /></span>
+      <span class="name cartouche">Hexly</span>
+    </div>
+
+    <div class="titlebar">
+      <span class="eyebrow">Hex map</span>
+      <span class="title">The Reach of Aldermoor</span>
+      <span class="chip chip--sea">Editing</span>
+    </div>
+
+    <div class="actions">
+      <a appButton variant="ghost" size="sm" routerLink="/styleguide">Design system</a>
+      <button
+        type="button"
+        appButton
+        variant="ghost"
+        icon
+        (click)="themeService.toggle()"
+        [attr.aria-label]="
+          theme() === 'dark' ? 'Switch to parchment theme' : 'Switch to astral theme'
+        "
+        [title]="theme() === 'dark' ? 'Parchment (light)' : 'Astral (dark)'"
+      >
+        <app-icon [name]="theme() === 'dark' ? 'sun' : 'moon'" [size]="20" />
+      </button>
+      <button type="button" appButton variant="primary" size="sm">
+        <app-icon name="share" [size]="16" />
+        Share
+      </button>
+      <span class="avatar" title="Owner">WC</span>
+    </div>
+  `,
+  styles: `
+    :host {
+      display: flex;
+      align-items: center;
+      gap: var(--space-5);
+      padding: 0 var(--space-4);
+      background: var(--surface);
+      border-bottom: 1px solid var(--line-strong);
+      box-shadow: var(--shadow-1);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    .mark {
+      display: grid;
+      place-items: center;
+      color: var(--gold);
+    }
+    .name {
+      font-size: var(--text-lg);
+      color: var(--ink-strong);
+    }
+    .titlebar {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding-left: var(--space-5);
+      border-left: 1px solid var(--line);
+    }
+    .title {
+      font-family: var(--font-display);
+      font-size: var(--text-md);
+      color: var(--ink);
+    }
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      margin-left: auto;
+    }
+    .avatar {
+      display: grid;
+      place-items: center;
+      width: 32px;
+      height: 32px;
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      color: var(--on-gold);
+      background: linear-gradient(140deg, var(--gold), var(--gold-strong));
+      border-radius: var(--radius-full);
+      box-shadow: var(--shadow-1);
+    }
+  `,
+})
+export class EditorHeader {
+  protected readonly themeService = inject(ThemeService);
+  protected readonly theme = this.themeService.theme;
+}
