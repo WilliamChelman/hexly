@@ -1,0 +1,16 @@
+<main>
+  <h1>Hexly</h1>
+
+  @if (health(); as status) {
+    <p data-testid="health">
+      API health: <strong>{{ status.status }}</strong> ({{ status.service }})
+      @if (healthy()) {
+        <span aria-hidden="true">✓</span>
+      }
+    </p>
+  } @else if (error(); as message) {
+    <p role="alert">{{ message }}</p>
+  } @else {
+    <p>Checking API…</p>
+  }
+</main>
