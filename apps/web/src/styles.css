@@ -5,7 +5,7 @@
  *   1. fonts      — Cinzel (display), Spectral (body), JetBrains Mono (coords)
  *   2. tailwind   — preflight + utilities, processed by @tailwindcss/postcss
  *   3. tokens     — semantic custom properties for both themes (unlayered)
- *   4. base       — reset/typography/atmosphere      → @layer base
+ *   4. base       — reset/typography/table surface  → @layer base
  *   5. components — reusable token-driven classes      → @layer components
  *
  * base & components are wrapped in Tailwind's cascade layers so that utility
