@@ -34,6 +34,19 @@ Everything is a layer of CSS custom properties — the single source of truth.
 hard-code a hex value. Ask for a role (`--ink`, `--gold`, `--terrain-forest`),
 not a colour.
 
+### Tailwind
+
+Tailwind v4 is wired in (`@tailwindcss/postcss`, configured in
+`apps/web/.postcssrc.json`; `@import "tailwindcss"` in `styles.css`). The token
+layer is bridged into Tailwind's theme via `@theme inline`, so the utilities are
+on-brand **and** theme-aware: `bg-surface`, `text-ink`, `text-gold`,
+`border-line-strong`, `font-display`, `rounded-lg`, `bg-terrain-forest` all
+resolve to the same custom properties and re-theme under `[data-theme='dark']`.
+The spacing scale already matches Tailwind's 4px base, so `p-4` == `--space-4`.
+`base.css`/`components.css` are wrapped in Tailwind's `base`/`components` cascade
+layers, so utilities win over `.btn`, `.panel`, … (e.g. `class="btn px-0"`).
+Use utilities for slice layout; reach for the component classes for shared chrome.
+
 ## Typography
 
 | Role               | Family             | Notes                                                                   |
