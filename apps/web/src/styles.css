@@ -1,17 +1,76 @@
 /*
  * Hexly global stylesheet — the entry point the build loads (project.json
- * `styles`). It pulls in the design-token layer in cascade order:
+ * `styles`). Cascade order:
  *
- *   1. fonts   — Cinzel (display), Spectral (body), JetBrains Mono (coords)
- *   2. tokens  — semantic custom properties for both themes
- *   3. base    — reset, document typography, table atmosphere
- *   4. components — reusable token-driven classes for every UI slice
+ *   1. fonts      — Cinzel (display), Spectral (body), JetBrains Mono (coords)
+ *   2. tailwind   — preflight + utilities, processed by @tailwindcss/postcss
+ *   3. tokens     — semantic custom properties for both themes (unlayered)
+ *   4. base       — reset/typography/atmosphere      → @layer base
+ *   5. components — reusable token-driven classes      → @layer components
  *
- * Fonts are also preconnected/linked in index.html; the @import here keeps
- * the stylesheet self-describing for tooling.
+ * base & components are wrapped in Tailwind's cascade layers so that utility
+ * classes (the `utilities` layer) win over `.btn`, `.panel`, … as expected —
+ * e.g. `<button class="btn px-0">` lets `px-0` override the component padding.
  */
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=JetBrains+Mono:wght@400;500&family=Spectral:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
 
+@import 'tailwindcss';
 @import './styles/tokens.css';
-@import './styles/base.css';
-@import './styles/components.css';
+@import './styles/base.css' layer(base);
+@import './styles/components.css' layer(components);
+
+/* Tell Tailwind where to scan for class names (Nx monorepo: be explicit). */
+@source './**/*.{html,ts}';
+
+/*
+ * Bridge Hexly's design tokens into Tailwind's theme so utilities are
+ * on-brand and theme-aware: `bg-surface`, `text-ink`, `text-gold`,
+ * `border-line-strong`, `font-display`, `rounded-lg`, … all resolve to the
+ * same custom properties that re-theme under [data-theme='dark'].
+ *
+ * `inline` makes utilities reference the source variable directly
+ * (`background-color: var(--surface)`), which is what keeps them switching
+ * with the theme. Tailwind's default palette (red-500, etc.) stays available.
+ *
+ * The spacing scale already matches: Tailwind's 4px base means `p-4` == 1rem
+ * == our `--space-4`, so no spacing bridge is needed.
+ */
+@theme inline {
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --font-mono: var(--font-mono);
+
+  --color-bg: var(--bg);
+  --color-bg-deep: var(--bg-deep);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+
+  --color-ink: var(--ink);
+  --color-ink-strong: var(--ink-strong);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-gold: var(--gold);
+  --color-gold-strong: var(--gold-strong);
+  --color-on-gold: var(--on-gold);
+  --color-sea: var(--sea);
+  --color-astra: var(--astra);
+  --color-ember: var(--ember);
+  --color-positive: var(--positive);
+
+  --color-terrain-grass: var(--terrain-grass);
+  --color-terrain-forest: var(--terrain-forest);
+  --color-terrain-ocean: var(--terrain-ocean);
+  --color-terrain-mountain: var(--terrain-mountain);
+  --color-terrain-desert: var(--terrain-desert);
+  --color-terrain-marsh: var(--terrain-marsh);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+}
