@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { ButtonDirective } from '../ui/button';
+import { Coord } from '../ui/coord';
 import { Icon } from '../ui/icon/icon';
 
 /** A single rendered hex in the demo cluster on the canvas frame. */
@@ -28,7 +29,7 @@ const HEX_R = 34;
 @Component({
   selector: 'app-map-canvas',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ButtonDirective, Icon],
+  imports: [ButtonDirective, Coord, Icon],
   template: `
     <div class="grid" aria-hidden="true"></div>
 
@@ -103,7 +104,7 @@ const HEX_R = 34;
 
     <!-- floating canvas instruments -->
     <div class="readout">
-      <span class="coord">q 0 · r 0</span>
+      <app-coord>q 0 · r 0</app-coord>
       <span class="readout-sep">·</span>
       <span class="eyebrow">Forest</span>
     </div>
@@ -116,7 +117,7 @@ const HEX_R = 34;
       <button type="button" appButton icon size="sm" aria-label="Zoom in">
         <app-icon name="plus" [size]="16" />
       </button>
-      <span class="zoom-level coord">100%</span>
+      <app-coord class="zoom-level">100%</app-coord>
       <button type="button" appButton icon size="sm" aria-label="Zoom out">
         <app-icon name="minus" [size]="16" />
       </button>

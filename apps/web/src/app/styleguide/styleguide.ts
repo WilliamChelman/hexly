@@ -1,6 +1,9 @@
 import { Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ThemeService } from '../core/theme.service';
+import { Chip } from '../ui/chip';
+import { Coord } from '../ui/coord';
+import { PanelDirective } from '../ui/panel';
 
 interface Swatch {
   readonly token: string;
@@ -20,7 +23,7 @@ interface TypeRow {
  */
 @Component({
   selector: 'app-styleguide',
-  imports: [RouterLink],
+  imports: [RouterLink, Chip, Coord, PanelDirective],
   template: `
     <div class="guide">
       <header class="guide__top">
@@ -47,9 +50,9 @@ interface TypeRow {
           custom-property layer that <code>apps/web</code> ships.
         </p>
         <div class="hero__meta">
-          <span class="chip chip--gold">Cinzel · display</span>
-          <span class="chip chip--sea">Spectral · body</span>
-          <span class="chip chip--astra">JetBrains Mono · coordinates</span>
+          <app-chip tone="gold">Cinzel · display</app-chip>
+          <app-chip tone="sea">Spectral · body</app-chip>
+          <app-chip tone="astra">JetBrains Mono · coordinates</app-chip>
         </div>
       </section>
 
@@ -94,7 +97,7 @@ interface TypeRow {
       <!-- Type -->
       <section class="section">
         <h2 class="section__title">Type scale</h2>
-        <div class="typelist panel">
+        <div class="typelist" appPanel>
           @for (t of typeScale; track t.token) {
           <div class="typerow">
             <span class="typerow__sample" [style.font-size]="'var(' + t.token + ')'"
@@ -141,7 +144,7 @@ interface TypeRow {
       <section class="section">
         <h2 class="section__title">Components</h2>
         <div class="specimens">
-          <figure class="specimen panel">
+          <figure class="specimen" appPanel>
             <figcaption class="eyebrow">Buttons</figcaption>
             <div class="specimen__row">
               <button class="btn btn--primary">Share map</button>
@@ -152,7 +155,7 @@ interface TypeRow {
             </div>
           </figure>
 
-          <figure class="specimen panel">
+          <figure class="specimen" appPanel>
             <figcaption class="eyebrow">Tools</figcaption>
             <div class="specimen__col">
               <button class="tool is-active" aria-pressed="true">
@@ -172,19 +175,19 @@ interface TypeRow {
             </div>
           </figure>
 
-          <figure class="specimen panel">
+          <figure class="specimen" appPanel>
             <figcaption class="eyebrow">Chips & coordinates</figcaption>
             <div class="specimen__row">
-              <span class="chip">Default</span>
-              <span class="chip chip--gold">Settlement</span>
-              <span class="chip chip--sea">Editing</span>
-              <span class="chip chip--astra">Region</span>
-              <span class="coord">q 12 · r −4</span>
+              <app-chip>Default</app-chip>
+              <app-chip tone="gold">Settlement</app-chip>
+              <app-chip tone="sea">Editing</app-chip>
+              <app-chip tone="astra">Region</app-chip>
+              <app-coord>q 12 · r −4</app-coord>
               <kbd class="kbd">⌘ Z</kbd>
             </div>
           </figure>
 
-          <figure class="specimen panel">
+          <figure class="specimen" appPanel>
             <figcaption class="eyebrow">Fields</figcaption>
             <div class="specimen__col">
               <label class="field">

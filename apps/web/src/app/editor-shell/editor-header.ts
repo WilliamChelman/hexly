@@ -2,13 +2,14 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ThemeService } from '../core/theme.service';
 import { ButtonDirective } from '../ui/button';
+import { Chip } from '../ui/chip';
 import { Icon } from '../ui/icon/icon';
 
 /** The top chrome: brand, map title, and the global actions (theme, share). */
 @Component({
   selector: 'app-editor-header',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, ButtonDirective, Icon],
+  imports: [RouterLink, ButtonDirective, Chip, Icon],
   template: `
     <div class="brand">
       <span class="mark"><app-icon name="logo" [size]="26" /></span>
@@ -18,7 +19,7 @@ import { Icon } from '../ui/icon/icon';
     <div class="titlebar">
       <span class="eyebrow">Hex map</span>
       <span class="title">The Reach of Aldermoor</span>
-      <span class="chip chip--sea">Editing</span>
+      <app-chip tone="sea">Editing</app-chip>
     </div>
 
     <div class="actions">

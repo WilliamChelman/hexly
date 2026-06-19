@@ -8,6 +8,7 @@ import {
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { HealthStatus, isHealthy } from '@hexly/domain';
+import { Coord } from '../ui/coord';
 
 /**
  * The bottom rail. It owns the API health probe it displays — the only piece of
@@ -16,6 +17,7 @@ import { HealthStatus, isHealthy } from '@hexly/domain';
 @Component({
   selector: 'app-status-bar',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [Coord],
   template: `
     <span class="item" data-testid="health">
       @if (health(); as status) {
@@ -28,7 +30,7 @@ import { HealthStatus, isHealthy } from '@hexly/domain';
       }
     </span>
     <span class="spacer"></span>
-    <span class="item"><span class="coord">q 0 · r 0</span></span>
+    <span class="item"><app-coord>q 0 · r 0</app-coord></span>
     <span class="item">13 hexes</span>
     <span class="item">Zoom 100%</span>
     <span class="item cartouche">Astral / Parchment</span>

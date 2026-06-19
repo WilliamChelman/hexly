@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { Icon, IconName } from '../ui/icon/icon';
+import { PanelDirective } from '../ui/panel';
 
 /** A palette entry — one paintable thing, named in the domain's vocabulary. */
 interface Tool {
@@ -21,7 +22,7 @@ interface Tool {
 @Component({
   selector: 'app-tool-palette',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon],
+  imports: [Icon, PanelDirective],
   template: `
     <section class="group">
       <h2 class="eyebrow heading">Terrain</h2>
@@ -65,7 +66,7 @@ interface Tool {
 
     <div class="spacer"></div>
 
-    <section class="group regions panel panel--raised">
+    <section class="group regions" appPanel raised>
       <h2 class="eyebrow">Regions</h2>
       <ul class="legend">
         <li><span class="swatch" style="background: #7c9b86"></span>The Whisperwood</li>
