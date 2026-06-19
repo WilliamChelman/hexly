@@ -1,0 +1,148 @@
+/*
+ * Hexly base layer
+ * ---------------------------------------------------------------------------
+ * A small, opinionated reset plus the document-level typography and the
+ * atmospheric "table surface" (paper grain at night becomes a starfield).
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  min-height: 100vh;
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--ink);
+  background-color: var(--bg);
+  /* The table surface: nebula wash beneath, base stock on top. */
+  background-image: var(--nebula);
+  background-attachment: fixed;
+  transition:
+    background-color var(--dur-slow) var(--ease-out),
+    color var(--dur-slow) var(--ease-out);
+}
+
+/* Atmosphere: a fixed, non-interactive texture layer over the whole table.
+   Light → multiplied paper grain. Dark → grain + scattered starlight. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: var(--starfield), var(--texture-grain);
+  background-repeat: repeat, repeat;
+  opacity: var(--grain-opacity);
+  mix-blend-mode: var(--grain-blend);
+}
+
+/* The starfield wants full opacity; lift it back above the grain dimming. */
+:root[data-theme='dark'] body::before {
+  opacity: 1;
+  mix-blend-mode: normal;
+}
+:root[data-theme='dark'] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: var(--texture-grain);
+  opacity: var(--grain-opacity);
+  mix-blend-mode: overlay;
+}
+
+/* Keep real UI above the atmosphere layers. */
+app-root {
+  position: relative;
+  z-index: 1;
+  display: block;
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-tight);
+  color: var(--ink-strong);
+  letter-spacing: var(--tracking-tight);
+}
+
+a {
+  color: var(--gold-strong);
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 0.18em;
+}
+a:hover {
+  color: var(--gold);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+::selection {
+  background: var(--gold-soft);
+  color: var(--ink-strong);
+}
+
+::placeholder {
+  color: var(--ink-faint);
+}
+
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+
+/* Themed, slender scrollbars that read as drawn rules. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  border-radius: var(--radius-full);
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-faint);
+  background-clip: padding-box;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

@@ -1,0 +1,185 @@
+<div class="guide">
+  <header class="guide__top">
+    <a class="btn btn--ghost btn--sm" routerLink="/">← Back to map</a>
+    <button
+      type="button"
+      class="btn btn--ghost btn--sm"
+      (click)="themeService.toggle()"
+    >
+      {{ theme() === 'dark' ? 'Astral' : 'Parchment' }} · switch
+    </button>
+  </header>
+
+  <!-- Masthead -->
+  <section class="hero">
+    <span class="eyebrow">Hexly design system</span>
+    <h1 class="hero__title">The cartographer’s table,<br />by starlight.</h1>
+    <p class="hero__lede">
+      One identity told at two hours of the day. <strong>Parchment</strong> is
+      the aged sea-chart on the drafting table; <strong>Astral</strong> is the
+      same chart under the night sky. Gold is the through-line — compass ink by
+      day, constellation lines by night — and the text stays warm
+      parchment-cream in both. Everything below is driven by the same CSS
+      custom-property layer that <code>apps/web</code> ships.
+    </p>
+    <div class="hero__meta">
+      <span class="chip chip--gold">Cinzel · display</span>
+      <span class="chip chip--sea">Spectral · body</span>
+      <span class="chip chip--astra">JetBrains Mono · coordinates</span>
+    </div>
+  </section>
+
+  <!-- Colour -->
+  <section class="section">
+    <h2 class="section__title">Palette · semantic roles</h2>
+    <p class="section__note">
+      Slices request a role, never a raw colour. Showing the active theme.
+    </p>
+    <div class="swatches">
+      @for (s of semantic; track s.token) {
+      <figure class="swatchcard">
+        <span
+          class="swatchcard__chip"
+          [style.background]="'var(' + s.token + ')'"
+        ></span>
+        <figcaption>
+          <strong>{{ s.name }}</strong>
+          <code>{{ s.token }}</code>
+        </figcaption>
+      </figure>
+      }
+    </div>
+
+    <h2 class="section__title">Palette · terrain fills</h2>
+    <div class="swatches">
+      @for (s of terrain; track s.token) {
+      <figure class="swatchcard">
+        <span
+          class="swatchcard__chip"
+          [style.background]="'var(' + s.token + ')'"
+        ></span>
+        <figcaption>
+          <strong>{{ s.name }}</strong>
+          <code>{{ s.token }}</code>
+        </figcaption>
+      </figure>
+      }
+    </div>
+  </section>
+
+  <!-- Type -->
+  <section class="section">
+    <h2 class="section__title">Type scale</h2>
+    <div class="typelist panel">
+      @for (t of typeScale; track t.token) {
+      <div class="typerow">
+        <span class="typerow__sample" [style.font-size]="'var(' + t.token + ')'"
+          >{{ t.sample }}</span
+        >
+        <span class="typerow__meta"
+          ><code>{{ t.token }}</code><span>{{ t.size }}</span></span
+        >
+      </div>
+      }
+    </div>
+  </section>
+
+  <!-- Spacing & radii -->
+  <section class="section section--split">
+    <div>
+      <h2 class="section__title">Spacing</h2>
+      <div class="ramp">
+        @for (s of spacing; track s) {
+        <div class="ramp__row">
+          <code>{{ s }}</code>
+          <span class="ramp__bar" [style.width]="'var(' + s + ')'"></span>
+        </div>
+        }
+      </div>
+    </div>
+    <div>
+      <h2 class="section__title">Radii</h2>
+      <div class="radii">
+        @for (r of radii; track r) {
+        <figure class="radiicard">
+          <span
+            class="radiicard__box"
+            [style.border-radius]="'var(' + r + ')'"
+          ></span>
+          <code>{{ r }}</code>
+        </figure>
+        }
+      </div>
+    </div>
+  </section>
+
+  <!-- Components -->
+  <section class="section">
+    <h2 class="section__title">Components</h2>
+    <div class="specimens">
+      <figure class="specimen panel">
+        <figcaption class="eyebrow">Buttons</figcaption>
+        <div class="specimen__row">
+          <button class="btn btn--primary">Share map</button>
+          <button class="btn">Add region</button>
+          <button class="btn btn--ghost">Cancel</button>
+          <button class="btn btn--danger">Clear hex</button>
+          <button class="btn btn--sm">Small</button>
+        </div>
+      </figure>
+
+      <figure class="specimen panel">
+        <figcaption class="eyebrow">Tools</figcaption>
+        <div class="specimen__col">
+          <button class="tool is-active" aria-pressed="true">
+            <span
+              class="swatch"
+              style="background: var(--terrain-forest)"
+            ></span>
+            <span class="tool__label">Forest</span><kbd class="kbd">2</kbd>
+          </button>
+          <button class="tool">
+            <span
+              class="swatch"
+              style="background: var(--terrain-ocean)"
+            ></span>
+            <span class="tool__label">Ocean</span><kbd class="kbd">3</kbd>
+          </button>
+        </div>
+      </figure>
+
+      <figure class="specimen panel">
+        <figcaption class="eyebrow">Chips & coordinates</figcaption>
+        <div class="specimen__row">
+          <span class="chip">Default</span>
+          <span class="chip chip--gold">Settlement</span>
+          <span class="chip chip--sea">Editing</span>
+          <span class="chip chip--astra">Region</span>
+          <span class="coord">q 12 · r −4</span>
+          <kbd class="kbd">⌘ Z</kbd>
+        </div>
+      </figure>
+
+      <figure class="specimen panel">
+        <figcaption class="eyebrow">Fields</figcaption>
+        <div class="specimen__col">
+          <label class="field">
+            <span class="field__label">Map name</span>
+            <input class="input" value="The Reach of Aldermoor" />
+          </label>
+          <label class="field">
+            <span class="field__label">Note</span>
+            <textarea class="textarea">
+A walled town where the forest road meets the river ford.</textarea
+            >
+          </label>
+        </div>
+      </figure>
+    </div>
+  </section>
+
+  <footer class="guide__foot">
+    <span class="cartouche">Hexly</span>
+    <span>Design tokens · <code>apps/web/src/styles</code></span>
+  </footer>
+</div>

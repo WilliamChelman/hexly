@@ -1,35 +1,25 @@
 import { TestBed } from '@angular/core/testing';
-import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
+import { provideRouter } from '@angular/router';
 import { App } from './app';
+import { appRoutes } from './app.routes';
 
 describe('App', () => {
-  let httpMock: HttpTestingController;
-
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [App],
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideRouter(appRoutes)],
     }).compileComponents();
-    httpMock = TestBed.inject(HttpTestingController);
   });
 
-  afterEach(() => httpMock.verify());
-
-  it('renders the health status returned by the API', async () => {
+  it('boots and renders a router outlet', () => {
     const fixture = TestBed.createComponent(App);
-    fixture.detectChanges(); // triggers ngOnInit -> GET /health
-
-    httpMock.expectOne('/health').flush({ status: 'ok', service: 'api' });
-
-    await fixture.whenStable();
     fixture.detectChanges();
 
-    const text = (fixture.nativeElement as HTMLElement).textContent;
-    expect(text).toContain('ok');
-    expect(text).toContain('api');
+    expect(fixture.nativeElement.querySelector('router-outlet')).not.toBeNull();
+  });
+
+  it('applies a theme to the document on boot', () => {
+    TestBed.createComponent(App);
+    expect(document.documentElement.dataset['theme']).toMatch(/^(light|dark)$/);
   });
 });

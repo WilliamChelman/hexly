@@ -1,30 +1,19 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { HealthStatus, isHealthy } from '@hexly/domain';
+import { Component, inject } from '@angular/core';
+import { RouterOutlet } from '@angular/router';
+import { ThemeService } from './core/theme.service';
 
+/**
+ * Application root. It owns no chrome of its own — the editor shell and the
+ * styleguide are routed views — but it eagerly constructs {@link ThemeService}
+ * so the active theme is applied on boot.
+ */
 @Component({
   selector: 'app-root',
+  imports: [RouterOutlet],
   templateUrl: './app.html',
   styleUrl: './app.css',
 })
-export class App implements OnInit {
-  private readonly http = inject(HttpClient);
-
-  /** The API's reported health, or `null` until the call resolves. */
-  protected readonly health = signal<HealthStatus | null>(null);
-  /** Set when the `/health` call fails, so the UI can show a fallback. */
-  protected readonly error = signal<string | null>(null);
-
-  /** Derived via the shared domain helper, proving the lib resolves at runtime. */
-  protected readonly healthy = computed(() => {
-    const status = this.health();
-    return status !== null && isHealthy(status);
-  });
-
-  ngOnInit(): void {
-    this.http.get<HealthStatus>('/health').subscribe({
-      next: (status) => this.health.set(status),
-      error: () => this.error.set('Could not reach the API.'),
-    });
-  }
+export class App {
+  // Eagerly resolve the theme service so `data-theme` is wired up at startup.
+  protected readonly theme = inject(ThemeService);
 }

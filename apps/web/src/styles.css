@@ -1,1 +1,17 @@
-/* You can add global styles to this file, and also import other style files */
+/*
+ * Hexly global stylesheet — the entry point the build loads (project.json
+ * `styles`). It pulls in the design-token layer in cascade order:
+ *
+ *   1. fonts   — Cinzel (display), Spectral (body), JetBrains Mono (coords)
+ *   2. tokens  — semantic custom properties for both themes
+ *   3. base    — reset, document typography, table atmosphere
+ *   4. components — reusable token-driven classes for every UI slice
+ *
+ * Fonts are also preconnected/linked in index.html; the @import here keeps
+ * the stylesheet self-describing for tooling.
+ */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=JetBrains+Mono:wght@400;500&family=Spectral:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
+
+@import './styles/tokens.css';
+@import './styles/base.css';
+@import './styles/components.css';
