@@ -1,0 +1,296 @@
+/* Editor shell — layout only; the look comes from the global token layer. */
+:host {
+  display: block;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.shell {
+  display: grid;
+  grid-template-rows: var(--rail-header) 1fr var(--rail-status);
+  height: 100vh;
+}
+
+/* ===== Header ============================================================ */
+.shell__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding: 0 var(--space-4);
+  background: var(--surface);
+  border-bottom: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-1);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.brand__mark {
+  display: grid;
+  place-items: center;
+  color: var(--gold);
+}
+.brand__name {
+  font-size: var(--text-lg);
+  color: var(--ink-strong);
+}
+
+.titlebar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-left: var(--space-5);
+  border-left: 1px solid var(--line);
+}
+.titlebar__name {
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  color: var(--ink);
+}
+
+.shell__header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--on-gold);
+  background: linear-gradient(140deg, var(--gold), var(--gold-strong));
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-1);
+}
+
+/* ===== Body — tools | canvas | inspector ================================ */
+.shell__body {
+  display: grid;
+  grid-template-columns: var(--rail-tools) 1fr var(--rail-inspector);
+  min-height: 0;
+}
+
+/* ----- Tool palette ----------------------------------------------------- */
+.tools {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  overflow-y: auto;
+  background: var(--bg-deep);
+  border-right: 1px solid var(--line-strong);
+}
+.tools__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.tools__heading {
+  padding: 0 var(--space-2);
+}
+.tools__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.tools__spacer {
+  flex: 1;
+}
+.tools__layers {
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+.layers {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--ink-muted);
+}
+.layers li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* ----- Canvas frame ----------------------------------------------------- */
+.canvas {
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(
+    120% 120% at 50% 0%,
+    var(--canvas-bg),
+    var(--canvas-mat)
+  );
+}
+/* The infinite hex grid, drawn as a themed mask so it tints per theme. */
+.canvas__grid {
+  position: absolute;
+  inset: 0;
+  background: var(--hex-line);
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM3 17.9v12.7l10.99 6.34 11-6.35V17.9l-11-6.34L3 17.9zM0 15l12.98-7.5V0h-2v6.35L0 12.69v2.3zm0 18.5L12.98 41v8h-2v-6.85L0 35.81v-2.3zM15 0v7.5L27.99 15H28v-2.31h-.01L17 6.35V0h-2zm0 49v-8l12.99-7.5H28v2.31h-.01L17 42.15V49h-2z'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM3 17.9v12.7l10.99 6.34 11-6.35V17.9l-11-6.34L3 17.9zM0 15l12.98-7.5V0h-2v6.35L0 12.69v2.3zm0 18.5L12.98 41v8h-2v-6.85L0 35.81v-2.3zM15 0v7.5L27.99 15H28v-2.31h-.01L17 6.35V0h-2zm0 49v-8l12.99-7.5H28v2.31h-.01L17 42.15V49h-2z'/%3E%3C/svg%3E");
+  -webkit-mask-size: 30px 52.5px;
+  mask-size: 30px 52.5px;
+  opacity: 0.6;
+}
+.canvas__map {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: min(76%, 640px);
+  height: 100%;
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.22));
+}
+.canvas__map polygon {
+  transition: fill var(--dur-base) var(--ease-out);
+}
+.canvas__map .is-selected {
+  stroke: var(--gold);
+  stroke-width: 2.4;
+  filter: drop-shadow(0 0 6px var(--gold-soft));
+}
+.canvas__void {
+  opacity: 0.35;
+}
+.canvas__feature {
+  color: var(--ink-strong);
+  pointer-events: none;
+}
+
+/* Floating canvas instruments */
+.canvas__readout {
+  position: absolute;
+  top: var(--space-4);
+  left: var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  background: color-mix(in oklab, var(--surface) 86%, transparent);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-1);
+  backdrop-filter: blur(4px);
+}
+.canvas__readout-sep {
+  color: var(--line-strong);
+}
+.compass {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  color: var(--gold);
+  opacity: 0.85;
+  filter: drop-shadow(var(--shadow-1));
+}
+.zoom {
+  position: absolute;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: color-mix(in oklab, var(--surface) 88%, transparent);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-2);
+  backdrop-filter: blur(4px);
+}
+.zoom__level {
+  min-width: 3.4em;
+  text-align: center;
+}
+
+/* ----- Inspector -------------------------------------------------------- */
+.inspector {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  overflow-y: auto;
+  background: var(--surface);
+  border-left: 1px solid var(--line-strong);
+}
+.inspector__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.inspector__title {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+}
+.inspector__title > div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  align-items: flex-start;
+}
+.inspector__name {
+  font-size: var(--text-md);
+}
+.inspector__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+.inspector__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.inspector__note p {
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--ink);
+}
+.inspector__actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: auto;
+  padding-top: var(--space-2);
+}
+
+/* ===== Status bar ======================================================= */
+.shell__status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 0 var(--space-4);
+  font-size: var(--text-2xs);
+  color: var(--ink-muted);
+  background: var(--surface);
+  border-top: 1px solid var(--line-strong);
+}
+.status__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+.status__spacer {
+  flex: 1;
+}
+
+/* Narrow viewports: collapse the side rails so the canvas stays usable. */
+@media (max-width: 1080px) {
+  .shell__body {
+    grid-template-columns: 1fr;
+  }
+  .tools,
+  .inspector {
+    display: none;
+  }
+}

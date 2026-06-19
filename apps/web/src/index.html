@@ -2,10 +2,44 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>web</title>
+    <title>Hexly — hex-map editor</title>
     <base href="/" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Hexly — a hex-map editor for TTRPG worldbuilding."
+    />
+    <meta
+      name="theme-color"
+      content="#ece0c6"
+      media="(prefers-color-scheme: light)"
+    />
+    <meta
+      name="theme-color"
+      content="#0d1124"
+      media="(prefers-color-scheme: dark)"
+    />
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!--
+      Resolve the theme before first paint to avoid a flash. Mirrors
+      ThemeService: stored choice wins, else follow the OS preference.
+    -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('hexly-theme');
+          var dark =
+            stored === 'dark' ||
+            (!stored &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+        } catch (e) {
+          document.documentElement.dataset.theme = 'light';
+        }
+      })();
+    </script>
   </head>
   <body>
     <app-root></app-root>
