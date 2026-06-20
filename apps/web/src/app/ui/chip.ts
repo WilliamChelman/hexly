@@ -16,9 +16,9 @@ export type ChipTone = 'gold' | 'sea' | 'astra';
   selector: 'app-chip',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
-    '[class.chip--gold]': "tone() === 'gold'",
-    '[class.chip--sea]': "tone() === 'sea'",
-    '[class.chip--astra]': "tone() === 'astra'",
+    '[class.is-gold]': "tone() === 'gold'",
+    '[class.is-sea]': "tone() === 'sea'",
+    '[class.is-astra]': "tone() === 'astra'",
   },
   template: `<ng-content />`,
   styles: `
@@ -36,17 +36,17 @@ export type ChipTone = 'gold' | 'sea' | 'astra';
       border: 1px solid var(--line);
       border-radius: var(--radius-full);
     }
-    :host(.chip--gold) {
+    :host(.is-gold) {
       color: var(--gold-strong);
       background: var(--gold-soft);
       border-color: color-mix(in oklab, var(--gold) 36%, transparent);
     }
-    :host(.chip--sea) {
+    :host(.is-sea) {
       color: var(--sea);
       background: var(--sea-soft);
       border-color: color-mix(in oklab, var(--sea) 36%, transparent);
     }
-    :host(.chip--astra) {
+    :host(.is-astra) {
       color: var(--astra);
       background: var(--astra-soft);
       border-color: color-mix(in oklab, var(--astra) 36%, transparent);

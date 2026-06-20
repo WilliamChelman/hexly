@@ -18,15 +18,15 @@ interface TypeRow {
 /**
  * The living design-system reference. It renders the token layer back to the
  * reader — colours, type, spacing, components — so other UI slices can see
- * exactly what is available and adopt it. It is intentionally built only from
- * the global component classes it documents.
+ * exactly what is available and adopt it. It is built only from the primitives
+ * and global classes it documents.
  */
 @Component({
   selector: 'app-styleguide',
   imports: [RouterLink, Chip, Coord, PanelDirective],
   template: `
     <div class="guide">
-      <header class="guide__top">
+      <header class="guide-top">
         <a class="btn btn--ghost btn--sm" routerLink="/">← Back to map</a>
         <button
           type="button"
@@ -40,8 +40,8 @@ interface TypeRow {
       <!-- Masthead -->
       <section class="hero">
         <span class="eyebrow">Hexly design system</span>
-        <h1 class="hero__title">The cartographer’s table,<br />by starlight.</h1>
-        <p class="hero__lede">
+        <h1 class="hero-title">The cartographer’s table,<br />by starlight.</h1>
+        <p class="hero-lede">
           One identity told at two hours of the day. <strong>Parchment</strong> is
           the aged sea-chart on the drafting table; <strong>Astral</strong> is the
           same chart under the night sky. Gold is the through-line — compass ink by
@@ -49,7 +49,7 @@ interface TypeRow {
           parchment-cream in both. Everything below is driven by the same CSS
           custom-property layer that <code>apps/web</code> ships.
         </p>
-        <div class="hero__meta">
+        <div class="hero-meta">
           <app-chip tone="gold">Cinzel · display</app-chip>
           <app-chip tone="sea">Spectral · body</app-chip>
           <app-chip tone="astra">JetBrains Mono · coordinates</app-chip>
@@ -58,15 +58,15 @@ interface TypeRow {
 
       <!-- Colour -->
       <section class="section">
-        <h2 class="section__title">Palette · semantic roles</h2>
-        <p class="section__note">
+        <h2 class="section-title">Palette · semantic roles</h2>
+        <p class="section-note">
           Slices request a role, never a raw colour. Showing the active theme.
         </p>
         <div class="swatches">
           @for (s of semantic; track s.token) {
           <figure class="swatchcard">
             <span
-              class="swatchcard__chip"
+              class="swatchcard-chip"
               [style.background]="'var(' + s.token + ')'"
             ></span>
             <figcaption>
@@ -77,12 +77,12 @@ interface TypeRow {
           }
         </div>
 
-        <h2 class="section__title">Palette · terrain fills</h2>
+        <h2 class="section-title">Palette · terrain fills</h2>
         <div class="swatches">
           @for (s of terrain; track s.token) {
           <figure class="swatchcard">
             <span
-              class="swatchcard__chip"
+              class="swatchcard-chip"
               [style.background]="'var(' + s.token + ')'"
             ></span>
             <figcaption>
@@ -96,14 +96,14 @@ interface TypeRow {
 
       <!-- Type -->
       <section class="section">
-        <h2 class="section__title">Type scale</h2>
+        <h2 class="section-title">Type scale</h2>
         <div class="typelist" appPanel>
           @for (t of typeScale; track t.token) {
           <div class="typerow">
-            <span class="typerow__sample" [style.font-size]="'var(' + t.token + ')'"
+            <span class="typerow-sample" [style.font-size]="'var(' + t.token + ')'"
               >{{ t.sample }}</span
             >
-            <span class="typerow__meta"
+            <span class="typerow-meta"
               ><code>{{ t.token }}</code><span>{{ t.size }}</span></span
             >
           </div>
@@ -112,25 +112,25 @@ interface TypeRow {
       </section>
 
       <!-- Spacing & radii -->
-      <section class="section section--split">
+      <section class="section is-split">
         <div>
-          <h2 class="section__title">Spacing</h2>
+          <h2 class="section-title">Spacing</h2>
           <div class="ramp">
             @for (s of spacing; track s) {
-            <div class="ramp__row">
+            <div class="ramp-row">
               <code>{{ s }}</code>
-              <span class="ramp__bar" [style.width]="'var(' + s + ')'"></span>
+              <span class="ramp-bar" [style.width]="'var(' + s + ')'"></span>
             </div>
             }
           </div>
         </div>
         <div>
-          <h2 class="section__title">Radii</h2>
+          <h2 class="section-title">Radii</h2>
           <div class="radii">
             @for (r of radii; track r) {
             <figure class="radiicard">
               <span
-                class="radiicard__box"
+                class="radiicard-box"
                 [style.border-radius]="'var(' + r + ')'"
               ></span>
               <code>{{ r }}</code>
@@ -142,11 +142,11 @@ interface TypeRow {
 
       <!-- Components -->
       <section class="section">
-        <h2 class="section__title">Components</h2>
+        <h2 class="section-title">Components</h2>
         <div class="specimens">
           <figure class="specimen" appPanel>
             <figcaption class="eyebrow">Buttons</figcaption>
-            <div class="specimen__row">
+            <div class="specimen-row">
               <button class="btn btn--primary">Share map</button>
               <button class="btn">Add region</button>
               <button class="btn btn--ghost">Cancel</button>
@@ -157,7 +157,7 @@ interface TypeRow {
 
           <figure class="specimen" appPanel>
             <figcaption class="eyebrow">Tools</figcaption>
-            <div class="specimen__col">
+            <div class="specimen-col">
               <button class="tool is-active" aria-pressed="true">
                 <span
                   class="swatch"
@@ -177,7 +177,7 @@ interface TypeRow {
 
           <figure class="specimen" appPanel>
             <figcaption class="eyebrow">Chips & coordinates</figcaption>
-            <div class="specimen__row">
+            <div class="specimen-row">
               <app-chip>Default</app-chip>
               <app-chip tone="gold">Settlement</app-chip>
               <app-chip tone="sea">Editing</app-chip>
@@ -189,7 +189,7 @@ interface TypeRow {
 
           <figure class="specimen" appPanel>
             <figcaption class="eyebrow">Fields</figcaption>
-            <div class="specimen__col">
+            <div class="specimen-col">
               <label class="field">
                 <span class="field__label">Map name</span>
                 <input class="input" value="The Reach of Aldermoor" />
@@ -205,14 +205,14 @@ A walled town where the forest road meets the river ford.</textarea
         </div>
       </section>
 
-      <footer class="guide__foot">
+      <footer class="guide-foot">
         <span class="cartouche">Hexly</span>
         <span>Design tokens · <code>apps/web/src/styles</code></span>
       </footer>
     </div>
   `,
   styles: `
-    /* Styleguide — layout only; specimens use the global component classes. */
+    /* Styleguide — layout only; specimens use the primitives and global classes. */
     :host {
       display: block;
     }
@@ -226,7 +226,7 @@ A walled town where the forest road meets the river ford.</textarea
       gap: var(--space-8);
     }
 
-    .guide__top {
+    .guide-top {
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -240,24 +240,24 @@ A walled town where the forest road meets the river ford.</textarea
       padding: var(--space-7) 0 var(--space-5);
       border-bottom: 1px solid var(--line);
     }
-    .hero__title {
+    .hero-title {
       font-size: var(--text-3xl);
       line-height: 1.06;
     }
-    .hero__lede {
+    .hero-lede {
       max-width: var(--container-reading);
       font-size: var(--text-md);
       line-height: var(--leading-normal);
       color: var(--ink-muted);
     }
-    .hero__lede code,
-    .section__note code,
+    .hero-lede code,
+    .section-note code,
     figcaption code {
       font-family: var(--font-mono);
       font-size: 0.86em;
       color: var(--gold-strong);
     }
-    .hero__meta {
+    .hero-meta {
       display: flex;
       flex-wrap: wrap;
       gap: var(--space-2);
@@ -270,17 +270,17 @@ A walled town where the forest road meets the river ford.</textarea
       flex-direction: column;
       gap: var(--space-4);
     }
-    .section--split {
+    .section.is-split {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: var(--space-7);
     }
-    .section__title {
+    .section-title {
       font-size: var(--text-lg);
       padding-bottom: var(--space-2);
       border-bottom: 1px solid var(--line-faint);
     }
-    .section__note {
+    .section-note {
       margin-top: calc(var(--space-3) * -1);
       font-size: var(--text-sm);
       color: var(--ink-muted);
@@ -298,7 +298,7 @@ A walled town where the forest road meets the river ford.</textarea
       gap: var(--space-2);
       margin: 0;
     }
-    .swatchcard__chip {
+    .swatchcard-chip {
       height: 64px;
       border-radius: var(--radius-md);
       border: 1px solid var(--line-strong);
@@ -331,7 +331,7 @@ A walled town where the forest road meets the river ford.</textarea
     .typerow:last-child {
       border-bottom: 0;
     }
-    .typerow__sample {
+    .typerow-sample {
       font-family: var(--font-display);
       color: var(--ink-strong);
       line-height: 1.1;
@@ -339,7 +339,7 @@ A walled town where the forest road meets the river ford.</textarea
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .typerow__meta {
+    .typerow-meta {
       display: flex;
       gap: var(--space-3);
       flex: none;
@@ -354,7 +354,7 @@ A walled town where the forest road meets the river ford.</textarea
       flex-direction: column;
       gap: var(--space-3);
     }
-    .ramp__row {
+    .ramp-row {
       display: flex;
       align-items: center;
       gap: var(--space-4);
@@ -362,11 +362,11 @@ A walled town where the forest road meets the river ford.</textarea
       font-size: var(--text-2xs);
       color: var(--ink-muted);
     }
-    .ramp__row code {
+    .ramp-row code {
       width: 7ch;
       flex: none;
     }
-    .ramp__bar {
+    .ramp-bar {
       height: 14px;
       background: linear-gradient(90deg, var(--gold), var(--gold-strong));
       border-radius: var(--radius-sm);
@@ -386,7 +386,7 @@ A walled town where the forest road meets the river ford.</textarea
       font-size: var(--text-2xs);
       color: var(--ink-muted);
     }
-    .radiicard__box {
+    .radiicard-box {
       width: 64px;
       height: 64px;
       background: var(--surface-sunken);
@@ -406,20 +406,20 @@ A walled town where the forest road meets the river ford.</textarea
       padding: var(--space-4);
       margin: 0;
     }
-    .specimen__row {
+    .specimen-row {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       gap: var(--space-3);
     }
-    .specimen__col {
+    .specimen-col {
       display: flex;
       flex-direction: column;
       gap: var(--space-3);
     }
 
     /* ----- Footer ----------------------------------------------------------- */
-    .guide__foot {
+    .guide-foot {
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -428,17 +428,17 @@ A walled town where the forest road meets the river ford.</textarea
       font-size: var(--text-sm);
       color: var(--ink-muted);
     }
-    .guide__foot .cartouche {
+    .guide-foot .cartouche {
       font-size: var(--text-md);
       color: var(--gold);
     }
-    .guide__foot code {
+    .guide-foot code {
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
     }
 
     @media (max-width: 720px) {
-      .section--split {
+      .section.is-split {
         grid-template-columns: 1fr;
       }
     }
