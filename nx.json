@@ -39,6 +39,9 @@
     }
   ],
   "analytics": false,
+  "tui": {
+    "enabled": false
+  },
   "targetDefaults": {
     "@nx/js:tsc": {
       "cache": true,
