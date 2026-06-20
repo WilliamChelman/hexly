@@ -1,4 +1,13 @@
-import { Axial, hexCorners, hexesInRect, Layout } from '@hexly/domain';
+import {
+  Axial,
+  coordKey,
+  hexCorners,
+  hexesInRect,
+  HexMap,
+  Layout,
+  terrainPalette,
+  TerrainId,
+} from '@hexly/domain';
 import { Camera } from './camera';
 
 /**
@@ -10,8 +19,8 @@ import { Camera } from './camera';
 export interface MapRenderer {
   /** Match the drawing surface to the given CSS-pixel size. */
   resize(width: number, height: number): void;
-  /** Paint one frame: the culled grid plus an optional hovered hex. */
-  render(camera: Camera, hover: Axial | null): void;
+  /** Paint one frame: the painted hexes, the culled grid, and an optional hover. */
+  render(camera: Camera, doc: HexMap, hover: Axial | null): void;
   /**
    * Re-read the themed colours from CSS. Cheap but not free (a style recalc), so
    * the caller invokes it only when the active theme changes — not per frame.
@@ -24,6 +33,8 @@ interface Palette {
   readonly void: string;
   readonly hover: string;
   readonly line: string;
+  /** One fill colour per terrain id, resolved from its `--terrain-*` token. */
+  readonly terrain: Record<TerrainId, string>;
 }
 
 /**
@@ -60,10 +71,14 @@ export class Canvas2dMapRenderer implements MapRenderer {
     const style = getComputedStyle(this.canvas);
     const read = (name: string, fallback: string): string =>
       style.getPropertyValue(name).trim() || fallback;
+    const terrain = Object.fromEntries(
+      terrainPalette.map((t) => [t.id, read(t.fill, '#888')]),
+    ) as Record<TerrainId, string>;
     return {
       void: read('--canvas-bg', '#1b1b1b'),
       hover: read('--gold-soft', 'rgba(212,175,55,.3)'),
       line: read('--hex-line', '#888'),
+      terrain,
     };
   }
 
@@ -76,7 +91,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
     this.canvas.style.height = `${height}px`;
   }
 
-  render(camera: Camera, hover: Axial | null): void {
+  render(camera: Camera, doc: HexMap, hover: Axial | null): void {
     const ctx = this.ctx;
     if (!ctx || this.width === 0 || this.height === 0) return;
 
@@ -86,9 +101,19 @@ export class Canvas2dMapRenderer implements MapRenderer {
     ctx.fillStyle = this.palette.void;
     ctx.fillRect(0, 0, this.width, this.height);
 
-    const visible = this.visibleWorldRect(camera);
+    const visible = hexesInRect(this.layout, this.visibleWorldRect(camera));
 
-    // Hover highlight first, so the grid lines draw crisply on top of it.
+    // Painted terrain, under the grid lines. Only the visible painted hexes are
+    // drawn — the document is sparse, so this never touches the infinite Void.
+    for (const hex of visible) {
+      const painted = doc.hexes[coordKey(hex)];
+      if (!painted) continue;
+      ctx.fillStyle = this.palette.terrain[painted.terrain];
+      this.tracePath(ctx, camera, hex);
+      ctx.fill();
+    }
+
+    // Hover highlight next, so the grid lines draw crisply on top of it.
     if (hover) {
       ctx.fillStyle = this.palette.hover;
       this.tracePath(ctx, camera, hover);
@@ -97,7 +122,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
 
     ctx.lineWidth = 1;
     ctx.strokeStyle = this.palette.line;
-    for (const hex of hexesInRect(this.layout, visible)) {
+    for (const hex of visible) {
       this.tracePath(ctx, camera, hex);
       ctx.stroke();
     }

@@ -6,13 +6,15 @@ import {
   DestroyRef,
   effect,
   ElementRef,
+  HostListener,
   inject,
   signal,
   untracked,
   viewChild,
 } from '@angular/core';
-import { Axial, Layout, pixelToHex } from '@hexly/domain';
+import { Axial, coordKey, Layout, pixelToHex, terrainPalette } from '@hexly/domain';
 import { ThemeService } from '../core/theme.service';
+import { EditorStore } from './editor-store';
 import { Button } from '../ui/button';
 import { Coord } from '../ui/coord';
 import { Eyebrow } from '../ui/eyebrow';
@@ -69,7 +71,9 @@ const LINE_HEIGHT = 16;
     <div class="readout">
       <app-coord>q {{ hover()?.q ?? 0 }} · r {{ hover()?.r ?? 0 }}</app-coord>
       <span class="readout-sep">·</span>
-      <span appEyebrow>{{ hover() ? 'Void' : 'No hex' }}</span>
+      <span appEyebrow>{{
+        hover() ? (hoverTerrain() ?? 'Void') : 'No hex'
+      }}</span>
     </div>
 
     <div class="compass" title="North">
@@ -202,18 +206,36 @@ export class MapCanvas {
   );
 
   private readonly theme = inject(ThemeService);
+  private readonly store = inject(EditorStore);
   private readonly destroyRef = inject(DestroyRef);
+
+  /** The terrain label under the cursor, or null when the hovered hex is Void. */
+  protected readonly hoverTerrain = computed(() => {
+    const hex = this.hover();
+    if (!hex) return null;
+    const painted = this.store.document().hexes[coordKey(hex)];
+    return painted
+      ? (terrainPalette.find((t) => t.id === painted.terrain)?.label ?? null)
+      : null;
+  });
 
   private renderer: MapRenderer | null = null;
   private centred = false;
   private lastPointer: { x: number; y: number } | null = null;
+  /** True while a primary-button paint/erase stroke is in progress. */
+  private painting = false;
+  /** True while a middle-button pan drag is in progress. */
+  private panning = false;
+  /** The last hex the active stroke touched, so a drag paints each hex once. */
+  private lastStroke: string | null = null;
 
   constructor() {
-    // Repaint whenever pan, zoom, or the hovered hex changes.
+    // Repaint whenever pan, zoom, the painted document, or the hover changes.
     effect(() => {
       const camera = this.camera();
+      const doc = this.store.document();
       const hover = this.hover();
-      this.renderer?.render(camera, hover);
+      this.renderer?.render(camera, doc, hover);
     });
 
     // Re-read the renderer's themed colours and repaint when the theme switches.
@@ -223,7 +245,11 @@ export class MapCanvas {
       this.theme.theme();
       if (!this.renderer) return;
       this.renderer.refreshTheme();
-      this.renderer.render(untracked(this.camera), untracked(this.hover));
+      this.renderer.render(
+        untracked(this.camera),
+        untracked(this.store.document),
+        untracked(this.hover),
+      );
     });
 
     afterNextRender(() => {
@@ -236,30 +262,96 @@ export class MapCanvas {
 
   protected onPointerDown(event: PointerEvent): void {
     (event.target as Element).setPointerCapture?.(event.pointerId);
-    this.dragging.set(true);
-    this.lastPointer = { x: event.clientX, y: event.clientY };
+    const hex = pixelToHex(this.layout, this.toWorld(event));
+    this.hover.set(hex);
+
+    // Middle button pans; the primary button paints/erases the armed tool. Pan
+    // also stays on the wheel, so a mouse-only user is never stuck (ADR-0003).
+    if (event.button === 1) {
+      this.panning = true;
+      this.dragging.set(true);
+      this.lastPointer = { x: event.clientX, y: event.clientY };
+      return;
+    }
+
+    // Only the primary button paints. Right/aux buttons must not lay down a hex
+    // (and steal the right-click context menu along the way).
+    if (event.button !== 0) return;
+
+    this.painting = true;
+    this.lastStroke = null;
+    this.strokeAt(hex);
   }
 
   protected onPointerMove(event: PointerEvent): void {
-    if (this.dragging() && this.lastPointer) {
+    const hex = pixelToHex(this.layout, this.toWorld(event));
+    this.hover.set(hex);
+
+    if (this.panning && this.lastPointer) {
       const dx = event.clientX - this.lastPointer.x;
       const dy = event.clientY - this.lastPointer.y;
       this.lastPointer = { x: event.clientX, y: event.clientY };
       this.camera.update((c) => c.panBy(dx, dy));
+    } else if (this.painting) {
+      this.strokeAt(hex);
     }
-    this.hover.set(pixelToHex(this.layout, this.toWorld(event)));
   }
 
   protected onPointerUp(event: PointerEvent): void {
     (event.target as Element).releasePointerCapture?.(event.pointerId);
-    this.dragging.set(false);
-    this.lastPointer = null;
+    this.endGesture();
   }
 
   protected onPointerLeave(): void {
+    this.endGesture();
+    this.hover.set(null);
+  }
+
+  /** Apply the armed tool to `hex` once per hex, so a drag never double-paints. */
+  private strokeAt(hex: Axial): void {
+    const key = coordKey(hex);
+    if (key === this.lastStroke) return;
+    this.lastStroke = key;
+    this.store.applyAt(hex);
+  }
+
+  private endGesture(): void {
+    this.painting = false;
+    this.panning = false;
     this.dragging.set(false);
     this.lastPointer = null;
-    this.hover.set(null);
+    this.lastStroke = null;
+  }
+
+  /** Keyboard: undo/redo and the terrain/eraser hotkeys shown on the palette. */
+  @HostListener('window:keydown', ['$event'])
+  protected onKeydown(event: KeyboardEvent): void {
+    // Don't hijack keystrokes meant for a text field (a future label/rename
+    // input) — a "5" typed there must not re-arm a terrain.
+    if (this.isEditableTarget(event.target)) return;
+
+    if (event.metaKey || event.ctrlKey) {
+      if (event.key.toLowerCase() !== 'z') return;
+      event.preventDefault();
+      if (event.shiftKey) this.store.redo();
+      else this.store.undo();
+      return;
+    }
+
+    if (event.key.toLowerCase() === 'e') {
+      this.store.selectTool('erase');
+      return;
+    }
+    const terrain = terrainPalette[Number(event.key) - 1];
+    if (terrain) this.store.selectTool(terrain.id);
+  }
+
+  /** Whether `target` is a text input the user is typing into. */
+  private isEditableTarget(target: EventTarget | null): boolean {
+    const el = target as HTMLElement | null;
+    if (!el) return false;
+    const tag = el.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable;
   }
 
   protected onWheel(event: WheelEvent): void {
@@ -374,7 +466,7 @@ export class MapCanvas {
         this.centred = true;
         this.camera.set(Camera.initial().panBy(width / 2, height / 2));
       } else {
-        this.renderer?.render(this.camera(), this.hover());
+        this.renderer?.render(this.camera(), this.store.document(), this.hover());
       }
     };
 

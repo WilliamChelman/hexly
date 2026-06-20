@@ -11,6 +11,7 @@ import { HealthStatus, isHealthy } from '@hexly/domain';
 import { Cartouche } from '../ui/cartouche';
 import { Coord } from '../ui/coord';
 import { Dot } from '../ui/dot';
+import { EditorStore } from './editor-store';
 
 /**
  * The bottom rail. It owns the API health probe it displays — the only piece of
@@ -33,7 +34,7 @@ import { Dot } from '../ui/dot';
     </span>
     <span class="spacer"></span>
     <span class="item"><app-coord>q 0 · r 0</app-coord></span>
-    <span class="item">13 hexes</span>
+    <span class="item">{{ hexCount() }} {{ hexCount() === 1 ? 'hex' : 'hexes' }}</span>
     <span class="item">Zoom 100%</span>
     <span class="item" appCartouche>Astral / Parchment</span>
   `,
@@ -61,6 +62,13 @@ import { Dot } from '../ui/dot';
 })
 export class StatusBar implements OnInit {
   private readonly http = inject(HttpClient);
+  private readonly store = inject(EditorStore);
+
+  /** How many hexes the user has painted — the document is sparse, so this is
+   * exactly the count of records, not a grid area (ADR-0003). */
+  protected readonly hexCount = computed(
+    () => Object.keys(this.store.document().hexes).length,
+  );
 
   /** The API's reported health, or `null` until the call resolves. */
   protected readonly health = signal<HealthStatus | null>(null);
