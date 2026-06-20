@@ -1,5 +1,6 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { computed, Injectable, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { catchError, finalize, Observable, of, tap, throwError } from 'rxjs';
 import { AuthUser } from '@hexly/domain';
 
@@ -13,6 +14,7 @@ import { AuthUser } from '@hexly/domain';
 @Injectable({ providedIn: 'root' })
 export class AuthStore {
   private readonly http = inject(HttpClient);
+  private readonly router = inject(Router);
 
   private readonly _currentUser = signal<AuthUser | null>(null);
   /** The authenticated user, or `null` when not logged in. */
@@ -38,6 +40,19 @@ export class AuthStore {
       catchError(() => of(void 0)),
       finalize(() => this._currentUser.set(null)),
     );
+  }
+
+  /**
+   * End the session and return to sign-in (ADR-0004); the local mirror is
+   * cleared regardless of the server outcome, so the user is never stranded
+   * looking signed in. Navigation fires in `finalize` so we always land on
+   * /login. Owned here so the library and editor header don't each reimplement
+   * the same logout→navigate dance.
+   */
+  signOut(): void {
+    this.logout()
+      .pipe(finalize(() => this.router.navigateByUrl('/login')))
+      .subscribe();
   }
 
   /**

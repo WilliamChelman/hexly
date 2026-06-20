@@ -11,8 +11,10 @@ import { SessionAuthGuard } from './session-auth.guard';
   imports: [DbModule],
   controllers: [AuthController],
   // SessionAuthGuard is a provider (not registered globally) so Nest can inject
-  // AuthService into it; handlers opt in per-route via `@UseGuards`.
+  // AuthService into it; handlers opt in per-route via `@UseGuards`. It is
+  // exported so other feature modules (e.g. MapsModule) can guard their routes
+  // with the same single definition.
   providers: [AuthService, SessionAuthGuard],
-  exports: [AuthService],
+  exports: [AuthService, SessionAuthGuard],
 })
 export class AuthModule {}
