@@ -31,8 +31,17 @@ test('paints a hex, saves, and the hex survives a reload', async ({
   await page.getByRole('img', { name: 'Hex map' }).click();
   await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
 
+  // Wait on the real save round-trip (not just the button text, which rests at
+  // 'Save' and would let the reload below race an in-flight PUT).
+  const saved = page.waitForResponse(
+    (res) =>
+      res.request().method() === 'PUT' &&
+      /\/api\/maps\/[\w-]+$/.test(res.url()) &&
+      res.ok(),
+  );
   await page.getByTestId('save').click();
-  // The button leaves its busy state once the save settles.
+  await saved;
+  // The button has also left its busy state.
   await expect(page.getByTestId('save')).toHaveText('Save');
 
   // The seam under test: a fresh load re-fetches and re-renders the saved map.

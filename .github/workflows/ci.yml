@@ -27,6 +27,16 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # Persist the Nx cache across runs so the e2e job's web+api build can
+      # reuse this job's cached build on a later run, avoiding a redundant rebuild.
+      - uses: actions/cache@v4
+        with:
+          path: .nx/cache
+          key: ${{ runner.os }}-nx-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-nx-${{ hashFiles('pnpm-lock.yaml') }}-
+            ${{ runner.os }}-nx-
+
       - run: pnpm exec nx run-many -t lint test build
 
   e2e:
@@ -44,6 +54,17 @@ jobs:
           cache: 'pnpm'
 
       - run: pnpm install --frozen-lockfile
+
+      # Persist the Nx cache across runs so this job's web+api build (triggered by
+      # the e2e dependsOn) can reuse the main job's cached build on a later run,
+      # avoiding a redundant rebuild.
+      - uses: actions/cache@v4
+        with:
+          path: .nx/cache
+          key: ${{ runner.os }}-nx-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-nx-${{ hashFiles('pnpm-lock.yaml') }}-
+            ${{ runner.os }}-nx-
 
       # Only chromium — the suite is a single-engine seam regression net (ADR-0009).
       - run: pnpm exec playwright install --with-deps chromium

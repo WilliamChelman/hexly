@@ -9,6 +9,9 @@ import { test as base, expect } from '@playwright/test';
  * This is a fixture, not a top-level `beforeEach`: a shared module is evaluated
  * once, so a top-level hook would register against only the first importer's
  * suite — an auto fixture runs per test regardless.
+ *
+ * The reset POST is intentionally unauthenticated and relies on `TestController`
+ * having no guard, so it works even for the logged-out auth journey.
  */
 export const test = base.extend<{ resetDb: void }>({
   resetDb: [

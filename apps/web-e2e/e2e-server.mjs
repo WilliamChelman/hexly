@@ -24,9 +24,9 @@ const webIndex = join(workspaceRoot, 'dist', 'apps', 'web', 'browser', 'index.ht
 const dbPath = join(workspaceRoot, 'tmp', 'web-e2e', 'hexly-e2e.db');
 
 const user = {
-  email: process.env.E2E_USER_EMAIL ?? 'e2e@hexly.test',
-  password: process.env.E2E_USER_PASSWORD ?? 'hexly-e2e-password',
-  name: process.env.E2E_USER_NAME ?? 'E2E Tester',
+  email: process.env.E2E_USER_EMAIL,
+  password: process.env.E2E_USER_PASSWORD,
+  name: process.env.E2E_USER_NAME,
 };
 
 /** Fail loudly with a fix-it hint rather than a cryptic ENOENT mid-run. */
@@ -40,7 +40,17 @@ function requireBuilt(path, what) {
 }
 
 requireBuilt(mainJs, 'API build');
+requireBuilt(seedJs, 'seed build');
 requireBuilt(webIndex, 'web build');
+
+// Credentials come from playwright.config.ts (sourced from test-user.ts); fail
+// loud if they're missing rather than silently re-hardcoding drifting literals.
+if (!user.email || !user.password || !user.name) {
+  console.error(
+    '[e2e-server] Missing E2E_USER_EMAIL/E2E_USER_PASSWORD/E2E_USER_NAME (set by playwright.config.ts from test-user.ts).',
+  );
+  process.exit(1);
+}
 
 // Start from a clean database every run, so a run never inherits stale state
 // (and never touches the real hexly.db).
@@ -50,7 +60,8 @@ for (const suffix of ['', '-wal', '-shm']) rmSync(dbPath + suffix, { force: true
 const childEnv = {
   ...process.env,
   HEXLY_DB_PATH: dbPath,
-  NODE_ENV: process.env.NODE_ENV === 'production' ? 'test' : process.env.NODE_ENV ?? 'test',
+  // Never production (secure cookies break over http), default to test.
+  NODE_ENV: !process.env.NODE_ENV || process.env.NODE_ENV === 'production' ? 'test' : process.env.NODE_ENV,
 };
 
 // Seed the one e2e user before serving (synchronous: the server must not accept
@@ -60,6 +71,10 @@ const seeded = spawnSync(
   [seedJs, user.email, user.password, user.name],
   { env: childEnv, stdio: 'inherit' },
 );
+if (seeded.error) {
+  console.error('[e2e-server] Failed to spawn the seed process:', seeded.error);
+  process.exit(1);
+}
 if (seeded.status !== 0) {
   console.error('[e2e-server] Seeding the test user failed.');
   process.exit(seeded.status ?? 1);
@@ -67,11 +82,15 @@ if (seeded.status !== 0) {
 
 // Serve. HEXLY_E2E=1 mounts the test-reset endpoint (and only here — ADR-0009).
 const server = spawn(process.execPath, [mainJs], {
-  env: { ...childEnv, HEXLY_E2E: '1', PORT: process.env.PORT ?? '3000' },
+  env: { ...childEnv, HEXLY_E2E: '1', PORT: process.env.PORT ?? '3100' },
   stdio: 'inherit',
 });
 
 const stop = () => server.kill('SIGTERM');
 process.on('SIGINT', stop);
 process.on('SIGTERM', stop);
-server.on('exit', (code) => process.exit(code ?? 0));
+server.on('error', (err) => {
+  console.error('[e2e-server] Failed to start the server process:', err);
+  process.exit(1);
+});
+server.on('exit', (code, signal) => process.exit(signal ? 1 : code ?? 0));

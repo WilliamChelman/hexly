@@ -40,19 +40,31 @@ async function bootstrap() {
  */
 function serveWebApp(app: NestExpressApplication): void {
   const webRoot = join(__dirname, '..', 'web', 'browser');
-  if (!existsSync(webRoot)) return;
+  const indexHtml = join(webRoot, 'index.html');
+  // Bail to a no-op unless the SPA bundle is fully present: the build dir AND the
+  // shell it serves. Without `index.html` every client route would 500 in
+  // `res.sendFile`, so a missing shell means we leave the SPA fallback off.
+  if (!existsSync(webRoot) || !existsSync(indexHtml)) return;
 
   // Real, hashed assets (JS/CSS/images) are served straight from disk. `index`
   // is off so the SPA-fallback below — not express.static — owns "/" and every
   // client route, keeping a single source of the shell.
   app.useStaticAssets(webRoot, { index: false });
 
-  const indexHtml = join(webRoot, 'index.html');
   app.use((req: Request, res: Response, next: NextFunction) => {
     // Hand back to the API and to missing-asset 404s; serve the SPA shell for
     // every other GET so a deep link or reload of a client route (e.g.
-    // `/maps/:id`) boots the app instead of 404-ing.
-    if (req.method !== 'GET' || req.path.startsWith('/api') || extname(req.path)) {
+    // `/maps/:id`) boots the app instead of 404-ing. Match the `/api` segment
+    // exactly (not a `startsWith` prefix, which would swallow `/apiary`,
+    // `/api-docs`, …). `extname` lets a missing asset 404 rather than return
+    // HTML — known limit: a client route whose last segment has a dot is treated
+    // as an asset and 404s, acceptable since map ids/routes are `[\w-]+` (no dots).
+    if (
+      req.method !== 'GET' ||
+      req.path === '/api' ||
+      req.path.startsWith('/api/') ||
+      extname(req.path)
+    ) {
       return next();
     }
     res.sendFile(indexHtml);

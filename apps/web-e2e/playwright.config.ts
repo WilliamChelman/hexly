@@ -40,8 +40,9 @@ export default defineConfig({
     command: 'node apps/web-e2e/e2e-server.mjs',
     url: baseURL,
     cwd: workspaceRoot,
-    // Locally, reuse a server you already have running; in CI always start fresh.
-    reuseExistingServer: !process.env.CI,
+    // Always start a fresh server so each run gets a freshly seeded throwaway DB;
+    // opt into reuse locally (never in CI) with E2E_REUSE_SERVER=1 for fast iteration.
+    reuseExistingServer: !process.env.CI && process.env.E2E_REUSE_SERVER === '1',
     timeout: 120_000,
     stdout: 'pipe',
     stderr: 'pipe',
