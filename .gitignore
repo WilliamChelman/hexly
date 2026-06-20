@@ -57,3 +57,11 @@ vitest.config.*.timestamp*
 .angular
 
 __screenshots__/
+
+# Playwright e2e
+/test-results
+/apps/web-e2e/.auth
+/apps/web-e2e/test-results
+/apps/web-e2e/playwright-report
+/apps/web-e2e/blob-report
+/playwright/.cache

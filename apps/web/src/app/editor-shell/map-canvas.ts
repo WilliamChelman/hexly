@@ -60,6 +60,8 @@ const LINE_HEIGHT = 16;
     <canvas
       #canvas
       class="surface"
+      role="img"
+      aria-label="Hex map"
       [class.is-grabbing]="dragging()"
       (pointerdown)="onPointerDown($event)"
       (pointermove)="onPointerMove($event)"

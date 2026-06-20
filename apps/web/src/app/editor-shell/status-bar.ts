@@ -34,7 +34,9 @@ import { EditorStore } from './editor-store';
     </span>
     <span class="spacer"></span>
     <span class="item"><app-coord>q 0 · r 0</app-coord></span>
-    <span class="item">{{ hexCount() }} {{ hexCount() === 1 ? 'hex' : 'hexes' }}</span>
+    <span class="item" data-testid="hex-count"
+      >{{ hexCount() }} {{ hexCount() === 1 ? 'hex' : 'hexes' }}</span
+    >
     <span class="item">Zoom 100%</span>
     <span class="item" appCartouche>Astral / Parchment</span>
   `,
