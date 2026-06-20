@@ -12,11 +12,18 @@ export interface MapRenderer {
   resize(width: number, height: number): void;
   /** Paint one frame: the culled grid plus an optional hovered hex. */
   render(camera: Camera, hover: Axial | null): void;
+  /**
+   * Re-read the themed colours from CSS. Cheap but not free (a style recalc), so
+   * the caller invokes it only when the active theme changes — not per frame.
+   */
+  refreshTheme(): void;
 }
 
-/** Read a themed CSS custom property off an element, trimmed. */
-function cssVar(el: Element, name: string): string {
-  return getComputedStyle(el).getPropertyValue(name).trim();
+/** The themed colours one frame needs, resolved from CSS custom properties. */
+interface Palette {
+  readonly void: string;
+  readonly hover: string;
+  readonly line: string;
 }
 
 /**
@@ -31,11 +38,34 @@ export class Canvas2dMapRenderer implements MapRenderer {
   private height = 0;
   private readonly dpr =
     typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
+  /** The 2D context, fetched once — re-fetching it per frame is wasteful. */
+  private readonly ctx: CanvasRenderingContext2D | null;
+  /** Cached themed colours; refreshed only on a theme switch, not per frame. */
+  private palette: Palette;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
     private readonly layout: Layout,
-  ) {}
+  ) {
+    this.ctx = canvas.getContext('2d');
+    this.palette = this.readPalette();
+  }
+
+  refreshTheme(): void {
+    this.palette = this.readPalette();
+  }
+
+  /** Resolve the themed colours from CSS in a single style read (ADR-0006). */
+  private readPalette(): Palette {
+    const style = getComputedStyle(this.canvas);
+    const read = (name: string, fallback: string): string =>
+      style.getPropertyValue(name).trim() || fallback;
+    return {
+      void: read('--canvas-bg', '#1b1b1b'),
+      hover: read('--gold-soft', 'rgba(212,175,55,.3)'),
+      line: read('--hex-line', '#888'),
+    };
+  }
 
   resize(width: number, height: number): void {
     this.width = width;
@@ -47,26 +77,26 @@ export class Canvas2dMapRenderer implements MapRenderer {
   }
 
   render(camera: Camera, hover: Axial | null): void {
-    const ctx = this.canvas.getContext('2d');
+    const ctx = this.ctx;
     if (!ctx || this.width === 0 || this.height === 0) return;
 
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
 
     // Void: a flat neutral fill across the whole surface (CONTEXT.md → Void).
-    ctx.fillStyle = cssVar(this.canvas, '--canvas-bg') || '#1b1b1b';
+    ctx.fillStyle = this.palette.void;
     ctx.fillRect(0, 0, this.width, this.height);
 
     const visible = this.visibleWorldRect(camera);
 
     // Hover highlight first, so the grid lines draw crisply on top of it.
     if (hover) {
-      ctx.fillStyle = cssVar(this.canvas, '--gold-soft') || 'rgba(212,175,55,.3)';
+      ctx.fillStyle = this.palette.hover;
       this.tracePath(ctx, camera, hover);
       ctx.fill();
     }
 
     ctx.lineWidth = 1;
-    ctx.strokeStyle = cssVar(this.canvas, '--hex-line') || '#888';
+    ctx.strokeStyle = this.palette.line;
     for (const hex of hexesInRect(this.layout, visible)) {
       this.tracePath(ctx, camera, hex);
       ctx.stroke();

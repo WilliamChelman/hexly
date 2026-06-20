@@ -3,12 +3,16 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   effect,
   ElementRef,
+  inject,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { Axial, Layout, pixelToHex } from '@hexly/domain';
+import { ThemeService } from '../core/theme.service';
 import { Button } from '../ui/button';
 import { Coord } from '../ui/coord';
 import { Eyebrow } from '../ui/eyebrow';
@@ -197,6 +201,9 @@ export class MapCanvas {
     Math.round(this.camera().zoom * 100),
   );
 
+  private readonly theme = inject(ThemeService);
+  private readonly destroyRef = inject(DestroyRef);
+
   private renderer: MapRenderer | null = null;
   private centred = false;
   private lastPointer: { x: number; y: number } | null = null;
@@ -207,6 +214,16 @@ export class MapCanvas {
       const camera = this.camera();
       const hover = this.hover();
       this.renderer?.render(camera, hover);
+    });
+
+    // Re-read the renderer's themed colours and repaint when the theme switches.
+    // The renderer caches the palette, so this is the only place it pays for a
+    // style read — the per-frame render path stays free of `getComputedStyle`.
+    effect(() => {
+      this.theme.theme();
+      if (!this.renderer) return;
+      this.renderer.refreshTheme();
+      this.renderer.render(untracked(this.camera), untracked(this.hover));
     });
 
     afterNextRender(() => {
@@ -259,12 +276,12 @@ export class MapCanvas {
         ? ZOOM_SENSITIVITY_TOUCHPAD
         : ZOOM_SENSITIVITY_MOUSE;
       const factor = Math.exp(
-        -this.wheelDeltaPixels(event.deltaY, event) * sensitivity,
+        -this.wheelDeltaPixels(event.deltaY, event, 'y') * sensitivity,
       );
       this.zoomAround(this.localPoint(event), factor);
     } else {
-      const dx = this.wheelDeltaPixels(event.deltaX, event);
-      const dy = this.wheelDeltaPixels(event.deltaY, event);
+      const dx = this.wheelDeltaPixels(event.deltaX, event, 'x');
+      const dy = this.wheelDeltaPixels(event.deltaY, event, 'y');
       // Scrolling down/right moves the content up/left, like scrolling a page.
       this.camera.update((c) => c.panBy(-dx, -dy));
     }
@@ -286,13 +303,22 @@ export class MapCanvas {
     );
   }
 
-  /** A wheel-axis delta normalised to pixels, whatever the `deltaMode`. */
-  private wheelDeltaPixels(delta: number, event: WheelEvent): number {
+  /**
+   * A wheel delta on the given `axis` normalised to pixels, whatever the
+   * `deltaMode`. Page-mode deltas scale by the viewport extent *along that axis*
+   * — width for horizontal, height for vertical.
+   */
+  private wheelDeltaPixels(
+    delta: number,
+    event: WheelEvent,
+    axis: 'x' | 'y',
+  ): number {
     if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) {
       return delta * LINE_HEIGHT;
     }
     if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
-      return delta * (event.currentTarget as HTMLElement).clientHeight;
+      const el = event.currentTarget as HTMLElement;
+      return delta * (axis === 'x' ? el.clientWidth : el.clientHeight);
     }
     return delta;
   }
@@ -354,7 +380,9 @@ export class MapCanvas {
 
     apply();
     if (typeof ResizeObserver !== 'undefined') {
-      new ResizeObserver(apply).observe(canvas);
+      const observer = new ResizeObserver(apply);
+      observer.observe(canvas);
+      this.destroyRef.onDestroy(() => observer.disconnect());
     }
   }
 }
