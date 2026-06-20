@@ -131,6 +131,11 @@ const NEW_MAP_TITLE = 'Untitled map';
             </li>
           }
         </ul>
+      } @else if (loadError()) {
+        <section class="empty" data-testid="load-error" appPanel>
+          <p>Couldn't load your maps.</p>
+          <p class="hint">Something went wrong. Please try again in a moment.</p>
+        </section>
       } @else if (loaded()) {
         <section class="empty" data-testid="empty" appPanel>
           <p>No maps yet.</p>
@@ -254,13 +259,24 @@ export class MapLibrary implements OnInit {
   );
   /** Whether the initial list has resolved — gates the empty state. */
   protected readonly loaded = signal(false);
+  /** Whether the initial list failed — shows an error state, not a blank page. */
+  protected readonly loadError = signal(false);
   /** Whether a create is in flight — disables the New map button. */
   protected readonly creating = signal(false);
 
   ngOnInit(): void {
-    this.maps$.list().subscribe((maps) => {
-      this._maps.set(maps);
-      this.loaded.set(true);
+    // Mark the load resolved on either branch: a failed GET /maps must still
+    // surface something (an error panel) rather than leaving the page blank
+    // forever because `loaded` never flipped.
+    this.maps$.list().subscribe({
+      next: (maps) => {
+        this._maps.set(maps);
+        this.loaded.set(true);
+      },
+      error: () => {
+        this.loaded.set(true);
+        this.loadError.set(true);
+      },
     });
   }
 
@@ -293,9 +309,6 @@ export class MapLibrary implements OnInit {
 
   /** End the session and return to the sign-in screen. */
   protected signOut(): void {
-    this.auth
-      .logout()
-      .pipe(finalize(() => this.router.navigateByUrl('/login')))
-      .subscribe();
+    this.auth.signOut();
   }
 }

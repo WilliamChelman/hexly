@@ -77,6 +77,21 @@ describe('MapLibrary', () => {
     ).toBeNull();
   });
 
+  it('shows an error state when the map list fails to load', () => {
+    const fixture = TestBed.createComponent(MapLibrary);
+    fixture.detectChanges(); // ngOnInit -> GET /maps
+    http
+      .expectOne('/maps')
+      .flush(null, { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+
+    // A failed list surfaces an error panel rather than a permanently blank page.
+    expect(
+      fixture.nativeElement.querySelector('[data-testid=load-error]'),
+    ).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid=empty]')).toBeNull();
+  });
+
   it('creates a new map and opens it in the editor', () => {
     const fixture = renderWith([]);
 

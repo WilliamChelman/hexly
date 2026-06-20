@@ -4,11 +4,14 @@ import {
   CreateMapRequest,
   emptyHexMap,
   HexMap,
+  hexMapSchema,
   MapDetail,
+  MapSaveOutcome,
   MapSummary,
   SaveMapRequest,
+  visibilitySchema,
 } from '@hexly/domain';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
 import { maps } from '../db/schema';
 
@@ -16,15 +19,15 @@ import { maps } from '../db/schema';
 const INITIAL_VERSION = 1;
 
 /**
- * The outcome of a save. `saved` carries the stored map at its new version;
- * `not-found` means no such map for this owner; `conflict` means the base
- * version had moved — `current` is the map as it now stands, so the caller can
- * surface a 409 and offer a re-pull without a second round trip (ADR-0002).
+ * The outcome of a save. The `saved`/`conflict` arms are the client-observable
+ * {@link MapSaveOutcome} shared with the web client (issue #13): `saved` carries
+ * the stored map at its new version; `conflict` means the base version had moved
+ * — `current` is the map as it now stands, so the caller can surface a 409 and
+ * offer a re-pull without a second round trip (ADR-0002). `not-found` is kept
+ * api-local: it maps to a 404, not a JSON body, so it stays out of the shared
+ * union.
  */
-export type SaveResult =
-  | { status: 'saved'; map: MapDetail }
-  | { status: 'not-found' }
-  | { status: 'conflict'; current: MapDetail };
+export type SaveResult = MapSaveOutcome | { status: 'not-found' };
 
 /**
  * The Hex Map persistence domain behind a small interface (ADR-0002): every map
@@ -40,8 +43,19 @@ export class MapsService {
 
   /** The owner's maps as metadata only — the documents are loaded on open. */
   list(ownerId: string): MapSummary[] {
+    // Select only the summary columns: the `document` TEXT can be large and is
+    // discarded by {@link toSummary}, so loading it here is pure waste (issue
+    // #9).
     return this.db
-      .select()
+      .select({
+        id: maps.id,
+        ownerId: maps.ownerId,
+        title: maps.title,
+        visibility: maps.visibility,
+        version: maps.version,
+        createdAt: maps.createdAt,
+        updatedAt: maps.updatedAt,
+      })
       .from(maps)
       .where(eq(maps.ownerId, ownerId))
       .all()
@@ -80,24 +94,47 @@ export class MapsService {
    * still matches the stored version — otherwise the map moved under the caller
    * and the save is a {@link SaveResult conflict} rather than a silent
    * overwrite (ADR-0002, ADR-0004). A successful save bumps the version by one.
+   *
+   * The version guard is enforced atomically by the SQL: the base version is a
+   * predicate in the UPDATE's WHERE clause, so the check and the write are a
+   * single statement and a row that moved between read and write cannot slip
+   * through. A zero-rows-changed result *is* the conflict (issue #8).
    */
   save(ownerId: string, id: string, req: SaveMapRequest): SaveResult {
+    // Read first for the not-found case and to carry the columns a save does not
+    // touch (title, ownerId, createdAt) into the saved/conflict response.
     const row = this.ownedRow(ownerId, id);
     if (!row) return { status: 'not-found' };
-    if (row.version !== req.version)
-      return { status: 'conflict', current: toDetail(row) };
 
     // Set only the columns a save owns (document, version, timestamp) — never
     // the whole row — so a concurrent rename's title is not written back over.
+    // The base version in the WHERE clause makes the concurrency check atomic.
     const document = serialize(req.document);
-    const version = row.version + 1;
+    const version = req.version + 1;
     const updatedAt = Date.now();
-    this.db
+    const res = this.db
       .update(maps)
       .set({ document, version, updatedAt })
-      .where(eq(maps.id, id))
+      .where(
+        and(
+          eq(maps.id, id),
+          eq(maps.ownerId, ownerId),
+          eq(maps.version, req.version),
+        ),
+      )
       .run();
-    return { status: 'saved', map: toDetail({ ...row, document, version, updatedAt }) };
+    if (res.changes === 0) {
+      // The base version had moved (or the row vanished) between the read and the
+      // write: re-read to report the true current state.
+      const current = this.ownedRow(ownerId, id);
+      return current
+        ? { status: 'conflict', current: toDetail(current) }
+        : { status: 'not-found' };
+    }
+    return {
+      status: 'saved',
+      map: toDetail({ ...row, document, version, updatedAt }),
+    };
   }
 
   /**
@@ -121,7 +158,15 @@ export class MapsService {
    * not theirs), which the caller surfaces as 404.
    */
   delete(ownerId: string, id: string): boolean {
-    if (!this.ownedRow(ownerId, id)) return false;
+    // A metadata-only ownership check: delete only needs to know the row exists
+    // and is this owner's, so it reads just `ownerId` rather than pulling the
+    // (potentially large) document through {@link ownedRow} (issue #9).
+    const owner = this.db
+      .select({ ownerId: maps.ownerId })
+      .from(maps)
+      .where(eq(maps.id, id))
+      .get();
+    if (!owner || owner.ownerId !== ownerId) return false;
     this.db.delete(maps).where(eq(maps.id, id)).run();
     return true;
   }
@@ -144,13 +189,20 @@ function serialize(document: HexMap): string {
   return JSON.stringify(document);
 }
 
+/** The metadata columns {@link toSummary} reads — the document-free projection
+ * `list` selects, and a structural subset of a full `$inferSelect` row. */
+type SummaryRow = Omit<typeof maps.$inferSelect, 'document'>;
+
 /** Project a stored row onto the document-free {@link MapSummary} metadata. */
-function toSummary(row: typeof maps.$inferSelect): MapSummary {
+function toSummary(row: SummaryRow): MapSummary {
   return {
     id: row.id,
     ownerId: row.ownerId,
     title: row.title,
-    visibility: row.visibility as MapSummary['visibility'],
+    // Validate visibility against the schema rather than a bare cast: the Zod
+    // schema is the single source of truth and both runtimes check against it
+    // (ADR-0001).
+    visibility: visibilitySchema.parse(row.visibility),
     version: row.version,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -159,5 +211,32 @@ function toSummary(row: typeof maps.$inferSelect): MapSummary {
 
 /** Rehydrate a stored row into the full {@link MapDetail} contract. */
 function toDetail(row: typeof maps.$inferSelect): MapDetail {
-  return { ...toSummary(row), document: JSON.parse(row.document) as HexMap };
+  return { ...toSummary(row), document: parseDocument(row.id, row.document) };
+}
+
+/**
+ * Parse and validate a stored document. ADR-0001 makes the Zod schema the single
+ * source of truth, so we validate the read path too: a row that fails to parse
+ * or schema-validate is exceptional — only reachable via out-of-band corruption
+ * or a botched migration — so we throw a descriptive Error naming the row (a
+ * clear 500) rather than letting a bare cast crash cryptically deep in the
+ * renderer.
+ */
+function parseDocument(id: string, document: string): HexMap {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(document);
+  } catch (cause) {
+    throw new Error(`Stored map ${id} has a document that is not valid JSON`, {
+      cause,
+    });
+  }
+  const result = hexMapSchema.safeParse(parsed);
+  if (!result.success) {
+    throw new Error(
+      `Stored map ${id} has a document that fails the Hex Map schema`,
+      { cause: result.error },
+    );
+  }
+  return result.data;
 }

@@ -148,6 +148,18 @@ describe('EditorHeader', () => {
     http.expectNone('/maps/m1');
   });
 
+  it('disables Save until a map is open', () => {
+    // No openMap() here: with no open map, Save must be disabled so a click can't
+    // flip the session into a stuck "Saving…" state with nothing to save.
+    const fixture = TestBed.createComponent(EditorHeader);
+    fixture.detectChanges();
+
+    const save = fixture.nativeElement.querySelector(
+      '[data-testid=save]',
+    ) as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+  });
+
   it('saves the open map under its base version when Save is clicked', () => {
     openMap(aldermoor);
     const fixture = TestBed.createComponent(EditorHeader);

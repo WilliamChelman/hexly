@@ -21,9 +21,18 @@ export const visibilitySchema = z.enum(['private', 'public']);
 /** A Hex Map's visibility (CONTEXT.md → Public Link). */
 export type Visibility = z.infer<typeof visibilitySchema>;
 
+/**
+ * A map title as the server stores it. The `.trim()` transform runs before
+ * `.min(1)`, so the parsed value is already trimmed (no leading/trailing
+ * whitespace is persisted) and a whitespace-only title collapses to "" and is
+ * rejected — closing the gap a bare `z.string().min(1)` left open (issues #12,
+ * #15). Shared by create and rename so the rule is defined once.
+ */
+const titleSchema = z.string().trim().min(1);
+
 /** The body of `POST /maps`: a new map needs a name; the rest has defaults. */
 export const createMapRequestSchema = z.object({
-  title: z.string().min(1),
+  title: titleSchema,
 });
 
 /** A validated create submission for a Hex Map. */
@@ -36,7 +45,7 @@ export type CreateMapRequest = z.infer<typeof createMapRequestSchema>;
  * optimistic-concurrency check, nor advance it.
  */
 export const renameMapRequestSchema = z.object({
-  title: z.string().min(1),
+  title: titleSchema,
 });
 
 /** A validated rename submission for a Hex Map. */
@@ -61,6 +70,11 @@ export interface MapSummary {
 export interface MapDetail extends MapSummary {
   readonly document: HexMap;
 }
+
+/** The outcome of a save that the client observes: the stored map at its new version, or a 409 conflict carrying the server's current map (issue #6, ADR-0002). */
+export type MapSaveOutcome =
+  | { status: 'saved'; map: MapDetail }
+  | { status: 'conflict'; current: MapDetail };
 
 /**
  * The body of `PUT /maps/:id`: the whole document (ADR-0002 saves the document

@@ -1,17 +1,7 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import { catchError, map, Observable, of, tap, throwError } from 'rxjs';
-import { HexMap, MapDetail, MapSummary } from '@hexly/domain';
-
-/**
- * The result of a save. `saved` carries the stored map at its new version;
- * `conflict` means the base version had moved — `current` is the map as it now
- * stands on the server, so the editor can surface the clash and let the user
- * re-pull rather than lose the edit (issue #6, ADR-0002).
- */
-export type SaveOutcome =
-  | { status: 'saved'; map: MapDetail }
-  | { status: 'conflict'; current: MapDetail };
+import { HexMap, MapDetail, MapSaveOutcome, MapSummary } from '@hexly/domain';
 
 /**
  * The web client's view of the user's Hex Maps (ADR-0002, ADR-0005). It owns the
@@ -48,21 +38,41 @@ export class MapsStore {
   rename(id: string, title: string): Observable<MapDetail> {
     return this.http.patch<MapDetail>(`/maps/${id}`, { title }).pipe(
       tap((updated) => {
-        if (this._current()?.id === updated.id) this._current.set(updated);
+        if (this._current()?.id === updated.id) {
+          this._current.set(updated);
+          // A successful metadata change on the open map clears any stale 409
+          // chip from an earlier save — it no longer reflects the current state.
+          this._conflict.set(null);
+        }
       }),
     );
   }
 
-  /** Delete a map by id. The caller is responsible for any list/open cleanup. */
+  /**
+   * Delete a map by id. The caller is responsible for any list cleanup; if the
+   * deleted map was the open one, its open/conflict state is cleared so nothing
+   * dangling points at a map that no longer exists.
+   */
   delete(id: string): Observable<void> {
-    return this.http.delete<void>(`/maps/${id}`);
+    return this.http.delete<void>(`/maps/${id}`).pipe(
+      tap(() => {
+        if (this._current()?.id === id) {
+          this._current.set(null);
+          this._conflict.set(null);
+        }
+      }),
+    );
   }
 
   /** Create a new, empty map by title and adopt it as the open map. */
   create(title: string): Observable<MapDetail> {
-    return this.http
-      .post<MapDetail>('/maps', { title })
-      .pipe(tap((created) => this._current.set(created)));
+    return this.http.post<MapDetail>('/maps', { title }).pipe(
+      tap((created) => {
+        this._current.set(created);
+        // A freshly created map has no outstanding conflict.
+        this._conflict.set(null);
+      }),
+    );
   }
 
   /**
@@ -84,12 +94,12 @@ export class MapsStore {
    * On success the open map advances to the returned version, so the next save
    * is built on it.
    */
-  save(document: HexMap): Observable<SaveOutcome> {
+  save(document: HexMap): Observable<MapSaveOutcome> {
     const open = this.requireOpen();
     return this.http
       .put<MapDetail>(`/maps/${open.id}`, { document, version: open.version })
       .pipe(
-        map((saved): SaveOutcome => {
+        map((saved): MapSaveOutcome => {
           this._conflict.set(null);
           this._current.set(saved);
           return { status: 'saved', map: saved };
@@ -101,7 +111,7 @@ export class MapsStore {
           if (err instanceof HttpErrorResponse && err.status === 409) {
             const current = err.error as MapDetail;
             this._conflict.set(current);
-            return of<SaveOutcome>({ status: 'conflict', current });
+            return of<MapSaveOutcome>({ status: 'conflict', current });
           }
           return throwError(() => err);
         }),

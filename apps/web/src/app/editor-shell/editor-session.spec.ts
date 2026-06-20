@@ -129,4 +129,42 @@ describe('EditorSession', () => {
 
     expect(session.current()?.title).toBe('The Whisperwood');
   });
+
+  it('reuses the already-open map for openRoute without a redundant GET', () => {
+    openAldermoor();
+
+    // Navigating to the map that is already open (e.g. just created) adopts it
+    // straight away — no second round trip — and loads its document.
+    let opened: MapDetail | undefined;
+    session.openRoute('m1').subscribe((m) => (opened = m));
+
+    http.expectNone('/maps/m1');
+    expect(opened).toEqual(aldermoor);
+    expect(editor.document()).toEqual(forestAt00);
+  });
+
+  it('clears the canvas then fetches when openRoute targets a different map', () => {
+    openAldermoor();
+    editor.paintAt({ q: 5, r: 5 }, 'ocean'); // dirty the canvas
+
+    session.openRoute('m2').subscribe();
+    // The previous map's canvas is cleared to empty while the load is in flight.
+    expect(editor.document()).toEqual({ hexes: {} });
+
+    const other: MapDetail = { ...aldermoor, id: 'm2', document: forestAt00 };
+    http.expectOne('/maps/m2').flush(other);
+    expect(editor.document()).toEqual(forestAt00);
+  });
+
+  it('is a safe no-op with no map open (no request, no throw)', () => {
+    // Save/rename/reload before any map is opened must not hit the server or
+    // throw out of a handler-less subscribe.
+    expect(() => session.save().subscribe()).not.toThrow();
+    expect(() => session.rename('whatever').subscribe()).not.toThrow();
+    expect(() => session.reload().subscribe()).not.toThrow();
+
+    http.expectNone('/maps/m1');
+    // `_saving` was never flipped, so the Save button can't stick on "Saving…".
+    expect(session.saving()).toBe(false);
+  });
 });

@@ -8,8 +8,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
-import { finalize } from 'rxjs';
+import { RouterLink } from '@angular/router';
 import { AuthStore } from '../auth/auth.store';
 import { ThemeService } from '../core/theme.service';
 import { Button } from '../ui/button';
@@ -63,6 +62,7 @@ import { EditorSession } from './editor-session';
           class="title"
           data-testid="title"
           title="Rename map"
+          [disabled]="!hasMap()"
           (click)="startRename()"
         >
           {{ title() }}
@@ -111,7 +111,7 @@ import { EditorSession } from './editor-session';
         variant="ghost"
         size="sm"
         data-testid="save"
-        [disabled]="saving()"
+        [disabled]="saving() || !hasMap()"
         (click)="save()"
       >
         {{ saving() ? 'Saving…' : 'Save' }}
@@ -229,7 +229,6 @@ import { EditorSession } from './editor-session';
 })
 export class EditorHeader {
   private readonly auth = inject(AuthStore);
-  private readonly router = inject(Router);
   private readonly session = inject(EditorSession);
   protected readonly themeService = inject(ThemeService);
   protected readonly theme = this.themeService.theme;
@@ -237,6 +236,8 @@ export class EditorHeader {
   /** The signed-in user, shown in the header; `null` until authenticated. */
   protected readonly user = this.auth.currentUser;
 
+  /** Whether a map is open — gates Save and rename so neither can run with none. */
+  protected readonly hasMap = computed(() => this.session.current() !== null);
   /** The open map's title, or a placeholder before one is opened. */
   protected readonly title = computed(
     () => this.session.current()?.title ?? 'Untitled map',
@@ -302,16 +303,9 @@ export class EditorHeader {
       .join('');
   });
 
-  /**
-   * End the session and return to the login screen (ADR-0004). Navigation
-   * happens in `finalize` so we always land on /login — `logout()` clears the
-   * local session even when the server call fails, so the user is never stranded.
-   */
+  /** End the session and return to the login screen (ADR-0004). */
   protected signOut(): void {
-    this.auth
-      .logout()
-      .pipe(finalize(() => this.router.navigateByUrl('/login')))
-      .subscribe();
+    this.auth.signOut();
   }
 
   /** Persist the current map. A stale-version rejection surfaces as a conflict

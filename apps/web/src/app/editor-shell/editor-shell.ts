@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
+import { catchError, EMPTY, filter, map, switchMap } from 'rxjs';
 import { EditorSession } from './editor-session';
 import { EditorHeader } from './editor-header';
 import { ToolPalette } from './tool-palette';
@@ -60,14 +61,31 @@ import { StatusBar } from './status-bar';
 })
 export class EditorShell {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly session = inject(EditorSession);
 
   constructor() {
     // Open whatever map the URL points at, and reopen it if the id changes
-    // (e.g. navigating between maps without leaving the editor).
-    this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((params) => {
-      const id = params.get('id');
-      if (id) this.session.open(id).subscribe();
-    });
+    // (e.g. navigating between maps without leaving the editor). `switchMap`
+    // cancels an in-flight open when the id changes, so navigating /maps/A then
+    // /maps/B can't let a late A response overwrite B's canvas (#1).
+    this.route.paramMap
+      .pipe(
+        map((params) => params.get('id')),
+        filter((id): id is string => id !== null),
+        switchMap((id) =>
+          this.session.openRoute(id).pipe(
+            // A failed open (404 — a deleted, foreign, or typo'd id) sends the
+            // user back to the library rather than stranding them on a silently
+            // blank editor (#3).
+            catchError(() => {
+              this.router.navigateByUrl('/maps');
+              return EMPTY;
+            }),
+          ),
+        ),
+        takeUntilDestroyed(),
+      )
+      .subscribe();
   }
 }

@@ -62,6 +62,19 @@ describe('Maps endpoints', () => {
     });
   });
 
+  it('trims surrounding whitespace off a created map title', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+
+    const res = await ada
+      .post('/maps')
+      .send({ title: '  The Whisperwood  ' })
+      .expect(201);
+
+    // The schema's `.trim()` runs before the title is stored, so the persisted
+    // title carries no surrounding whitespace (issues #12, #15).
+    expect(res.body.title).toBe('The Whisperwood');
+  });
+
   it('lists the maps the owner created, without their documents', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     await ada.post('/maps').send({ title: 'Aldermoor' }).expect(201);
@@ -217,6 +230,10 @@ describe('Maps endpoints', () => {
 
     // An empty title fails the shared create schema.
     await ada.post('/maps').send({ title: '' }).expect(400);
+
+    // A whitespace-only title trims to "" and is likewise rejected (issues #12,
+    // #15) — the server never stores a blank title.
+    await ada.post('/maps').send({ title: '   ' }).expect(400);
 
     // A save with no base version fails the shared save schema (without it the
     // optimistic-concurrency check is meaningless).

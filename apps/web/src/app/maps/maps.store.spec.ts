@@ -140,6 +140,40 @@ describe('MapsStore', () => {
     expect(store.current()).toEqual(renamed);
   });
 
+  /** Provoke a save conflict on the open map so there is one to clear. */
+  function provokeConflict() {
+    const painted = { hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' as const } } };
+    store.save(painted).subscribe();
+    http
+      .expectOne('/maps/m1')
+      .flush({ ...aldermoor, version: 5 }, { status: 409, statusText: 'Conflict' });
+    expect(store.conflict()).not.toBeNull();
+  }
+
+  it('clears an outstanding conflict when the open map is successfully renamed', () => {
+    openAldermoor();
+    provokeConflict();
+
+    store.rename('m1', 'The Whisperwood').subscribe();
+    http.expectOne('/maps/m1').flush({ ...aldermoor, title: 'The Whisperwood' });
+
+    // A successful metadata change supersedes the stale 409 chip.
+    expect(store.conflict()).toBeNull();
+  });
+
+  it('clears an outstanding conflict when a new map is created', () => {
+    openAldermoor();
+    provokeConflict();
+
+    store.create('A new world').subscribe();
+    http
+      .expectOne('/maps')
+      .flush({ ...aldermoor, id: 'm2', title: 'A new world' });
+
+    // The freshly created map carries no conflict from the previous open map.
+    expect(store.conflict()).toBeNull();
+  });
+
   it('deletes a map by id', () => {
     let completed = false;
     store.delete('m1').subscribe({ complete: () => (completed = true) });
@@ -149,6 +183,18 @@ describe('MapsStore', () => {
     req.flush(null);
 
     expect(completed).toBe(true);
+  });
+
+  it('clears the open map and any conflict when the open map is deleted', () => {
+    openAldermoor();
+    provokeConflict();
+
+    store.delete('m1').subscribe();
+    http.expectOne('/maps/m1').flush(null);
+
+    // Nothing dangling points at a map that no longer exists.
+    expect(store.current()).toBeNull();
+    expect(store.conflict()).toBeNull();
   });
 
   it('lists the maps available to the user', () => {

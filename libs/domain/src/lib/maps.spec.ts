@@ -17,6 +17,18 @@ describe('createMapRequestSchema', () => {
   it('rejects a request with an empty title', () => {
     expect(() => createMapRequestSchema.parse({ title: '' })).toThrow();
   });
+
+  it('rejects a whitespace-only title', () => {
+    // `.trim()` collapses "   " to "" before `.min(1)`, closing the gap a bare
+    // `z.string().min(1)` left open (issues #12, #15).
+    expect(() => createMapRequestSchema.parse({ title: '   ' })).toThrow();
+  });
+
+  it('trims surrounding whitespace off the stored title', () => {
+    expect(createMapRequestSchema.parse({ title: '  Aldermoor  ' }).title).toBe(
+      'Aldermoor',
+    );
+  });
 });
 
 describe('renameMapRequestSchema', () => {
@@ -28,6 +40,10 @@ describe('renameMapRequestSchema', () => {
 
   it('rejects an empty title', () => {
     expect(() => renameMapRequestSchema.parse({ title: '' })).toThrow();
+  });
+
+  it('rejects a whitespace-only title', () => {
+    expect(() => renameMapRequestSchema.parse({ title: '   ' })).toThrow();
   });
 });
 
