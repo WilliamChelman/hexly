@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "esModuleInterop": true,
+    "types": ["node"],
+    "outDir": "../../dist/out-tsc/web-e2e",
+    "sourceMap": false,
+    "allowJs": true
+  },
+  "include": ["src/**/*.ts", "playwright.config.ts", "e2e-server.mjs"],
+  "exclude": ["node_modules", "dist"]
+}
