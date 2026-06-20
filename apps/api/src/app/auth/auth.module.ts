@@ -1,19 +1,18 @@
 import { Module } from '@nestjs/common';
-import { DB, createDb } from '../db/db';
+import { DbModule } from '../db/db.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { SessionAuthGuard } from './session-auth.guard';
 
 @Module({
+  // DbModule provides the shared DB token (ADR-0002). Importing it here keeps
+  // the token resolvable through AuthModule's graph, so the controller spec's
+  // `.overrideProvider(DB)` in-memory swap still takes effect.
+  imports: [DbModule],
   controllers: [AuthController],
-  providers: [
-    AuthService,
-    {
-      // One shared SQLite connection for the process (ADR-0002). Tests override
-      // this provider with an in-memory database.
-      provide: DB,
-      useFactory: () => createDb(process.env.HEXLY_DB_PATH ?? 'hexly.db'),
-    },
-  ],
+  // SessionAuthGuard is a provider (not registered globally) so Nest can inject
+  // AuthService into it; handlers opt in per-route via `@UseGuards`.
+  providers: [AuthService, SessionAuthGuard],
   exports: [AuthService],
 })
 export class AuthModule {}

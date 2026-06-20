@@ -5,6 +5,7 @@ import {
   inject,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
+import { finalize } from 'rxjs';
 import { AuthStore } from '../auth/auth.store';
 import { ThemeService } from '../core/theme.service';
 import { Button } from '../ui/button';
@@ -162,8 +163,15 @@ export class EditorHeader {
       .join('');
   });
 
-  /** End the session and return to the login screen (ADR-0004). */
+  /**
+   * End the session and return to the login screen (ADR-0004). Navigation
+   * happens in `finalize` so we always land on /login — `logout()` clears the
+   * local session even when the server call fails, so the user is never stranded.
+   */
   protected signOut(): void {
-    this.auth.logout().subscribe(() => this.router.navigateByUrl('/login'));
+    this.auth
+      .logout()
+      .pipe(finalize(() => this.router.navigateByUrl('/login')))
+      .subscribe();
   }
 }

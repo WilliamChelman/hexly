@@ -47,7 +47,27 @@ describe('AuthStore', () => {
     expect(store.isAuthenticated()).toBe(false);
   });
 
-  it('resolves to unauthenticated when /auth/me rejects', () => {
+  it('clears the current user even when logout fails', () => {
+    store.login('ada@hexly.test', 'correct horse').subscribe();
+    http.expectOne('/auth/login').flush(ada);
+
+    let completed = false;
+    store.logout().subscribe({
+      error: () => undefined,
+      complete: () => (completed = true),
+    });
+    http
+      .expectOne('/auth/logout')
+      .flush(null, { status: 500, statusText: 'Server Error' });
+
+    // Local session is cleared regardless, so the UI is never stuck signed in...
+    expect(store.currentUser()).toBeNull();
+    expect(store.isAuthenticated()).toBe(false);
+    // ...and the stream still completes so the caller can navigate away.
+    expect(completed).toBe(true);
+  });
+
+  it('resolves to unauthenticated when /auth/me returns 401', () => {
     let resolved: unknown = 'unset';
     store.refresh().subscribe((u) => (resolved = u));
 
@@ -57,5 +77,25 @@ describe('AuthStore', () => {
 
     expect(resolved).toBeNull();
     expect(store.currentUser()).toBeNull();
+  });
+
+  it('does NOT wipe the current user on a transient /auth/me failure', () => {
+    // A known-authenticated user...
+    store.login('ada@hexly.test', 'correct horse').subscribe();
+    http.expectOne('/auth/login').flush(ada);
+
+    let errored = false;
+    store.refresh().subscribe({
+      next: () => undefined,
+      error: () => (errored = true),
+    });
+    http
+      .expectOne('/auth/me')
+      .flush(null, { status: 500, statusText: 'Server Error' });
+
+    // A 5xx is transient, not a logout: rethrow and keep the mirror intact.
+    expect(errored).toBe(true);
+    expect(store.currentUser()).toEqual(ada);
+    expect(store.isAuthenticated()).toBe(true);
   });
 });

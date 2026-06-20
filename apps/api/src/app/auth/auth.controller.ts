@@ -8,16 +8,29 @@ import {
   Req,
   Res,
   UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AuthUser, loginRequestSchema } from '@hexly/domain';
-import { AuthService } from './auth.service';
+import { AuthService, SESSION_TTL_MS } from './auth.service';
+import { SessionAuthGuard } from './session-auth.guard';
+import { CurrentUser } from './current-user.decorator';
 
 /** Name of the HttpOnly cookie carrying the opaque session token. */
 export const SESSION_COOKIE = 'hexly_session';
 
-/** Cookie options for the session: HttpOnly, same-site, app-wide. */
-const COOKIE_OPTS = { httpOnly: true, sameSite: 'lax', path: '/' } as const;
+/**
+ * Cookie options for the session: HttpOnly, same-site, app-wide, with a
+ * lifetime matching the server session (so it survives a browser restart up to
+ * the TTL) and `secure` in production only — left off so local http dev works.
+ */
+const COOKIE_OPTS = {
+  httpOnly: true,
+  sameSite: 'lax',
+  path: '/',
+  maxAge: SESSION_TTL_MS,
+  secure: process.env.NODE_ENV === 'production',
+} as const;
 
 @Controller('auth')
 export class AuthController {
@@ -50,9 +63,8 @@ export class AuthController {
   }
 
   @Get('me')
-  async me(@Req() req: Request): Promise<AuthUser> {
-    const user = await this.auth.authenticate(req.cookies?.[SESSION_COOKIE]);
-    if (!user) throw new UnauthorizedException();
+  @UseGuards(SessionAuthGuard)
+  me(@CurrentUser() user: AuthUser): AuthUser {
     return user;
   }
 }

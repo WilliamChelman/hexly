@@ -1,9 +1,10 @@
 import { Route } from '@angular/router';
-import { authGuard } from './auth/auth.guard';
+import { authGuard, loginGuard } from './auth/auth.guard';
 
 export const appRoutes: Route[] = [
   {
     path: 'login',
+    canActivate: [loginGuard],
     loadComponent: () => import('./auth/login').then((m) => m.Login),
     title: 'Hexly — Sign in',
   },

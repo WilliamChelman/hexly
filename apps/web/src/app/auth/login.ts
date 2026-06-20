@@ -4,7 +4,8 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
+import { finalize } from 'rxjs';
 import { AuthStore } from './auth.store';
 import { Button } from '../ui/button';
 import { Eyebrow } from '../ui/eyebrow';
@@ -116,6 +117,7 @@ import { Panel } from '../ui/panel';
 export class Login {
   private readonly auth = inject(AuthStore);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   protected readonly email = signal('');
   protected readonly password = signal('');
@@ -133,12 +135,20 @@ export class Login {
 
     this.pending.set(true);
     this.error.set(null);
-    this.auth.login(this.email(), this.password()).subscribe({
-      next: () => this.router.navigateByUrl('/'),
-      error: () => {
-        this.pending.set(false);
-        this.error.set('Incorrect email or password.');
-      },
-    });
+    // Trim client-side so the value we send is clean; the server still owns
+    // canonicalization (trim + lowercase), so we deliberately don't lowercase here.
+    this.auth
+      .login(this.email().trim(), this.password())
+      // Always clear pending when the request settles, so a cancelled
+      // navigation can't leave the button stuck on "Signing in…".
+      .pipe(finalize(() => this.pending.set(false)))
+      .subscribe({
+        next: () => {
+          const returnUrl =
+            this.route.snapshot.queryParamMap.get('returnUrl') ?? '/';
+          this.router.navigateByUrl(returnUrl);
+        },
+        error: () => this.error.set('Incorrect email or password.'),
+      });
   }
 }

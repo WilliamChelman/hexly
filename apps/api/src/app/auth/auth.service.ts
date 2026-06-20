@@ -7,12 +7,19 @@ import { DB, Db } from '../db/db';
 import { sessions, users } from '../db/schema';
 
 /** How long a session stays valid before `authenticate` rejects it. */
-const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 /** An unguessable opaque token for a cookie/session id. */
 function newToken(): string {
   return randomBytes(32).toString('base64url');
 }
+
+/**
+ * A precomputed argon2 hash verified against when no user matches, so the
+ * unknown-email path costs roughly the same as the wrong-password path and
+ * response timing cannot be used to enumerate which emails exist.
+ */
+const DUMMY_PASSWORD_HASH = hash('hexly-dummy-password');
 
 /**
  * The auth domain behind a small interface: provisioning members of the closed
@@ -38,7 +45,7 @@ export class AuthService {
       .insert(users)
       .values({
         id: randomUUID(),
-        email,
+        email: normalizeEmail(email),
         displayName,
         passwordHash,
         createdAt: Date.now(),
@@ -49,15 +56,31 @@ export class AuthService {
   /**
    * Verify credentials and open a session. Returns the new session token plus
    * the user on success, or `null` if the email is unknown or the password is
-   * wrong — the caller cannot tell which, by design.
+   * wrong. The two failure paths are timing-equalized: an unknown email still
+   * runs an argon2 verify against a dummy hash, so the caller cannot tell which
+   * failed (nor enumerate emails) by response timing.
    */
   async login(
     email: string,
     password: string,
   ): Promise<{ token: string; user: AuthUser } | null> {
-    const user = this.db.select().from(users).where(eq(users.email, email)).get();
-    if (!user) return null;
-    if (!(await verify(user.passwordHash, password))) return null;
+    const user = this.db
+      .select()
+      .from(users)
+      .where(eq(users.email, normalizeEmail(email)))
+      .get();
+
+    // Verify against the real hash when the email is known, or a constant dummy
+    // hash otherwise, so both paths take comparable time. A throw (e.g. a
+    // malformed stored hash) is treated as an auth failure, never a 500.
+    let passwordOk = false;
+    try {
+      const targetHash = user ? user.passwordHash : await DUMMY_PASSWORD_HASH;
+      passwordOk = await verify(targetHash, password);
+    } catch {
+      return null;
+    }
+    if (!user || !passwordOk) return null;
 
     // Opportunistic sweep: login is the natural low-frequency moment to clear
     // out sessions whose lifetime has passed, so the table can't grow unbounded
@@ -106,6 +129,15 @@ export class AuthService {
   purgeExpiredSessions(): void {
     this.db.delete(sessions).where(lt(sessions.expiresAt, Date.now())).run();
   }
+}
+
+/**
+ * Canonicalize an email for storage and lookup so a user seeded as
+ * `ada@hexly.test` can still log in typing `Ada@hexly.test` or with stray
+ * whitespace.
+ */
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
 }
 
 /** Strip a user row down to the public {@link AuthUser} shape. */

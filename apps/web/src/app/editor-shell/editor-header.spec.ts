@@ -57,4 +57,21 @@ describe('EditorHeader', () => {
 
     expect(navigate).toHaveBeenCalledWith('/login');
   });
+
+  it('returns to login even when the logout request fails', () => {
+    const fixture = TestBed.createComponent(EditorHeader);
+    fixture.detectChanges();
+
+    const signOut = fixture.nativeElement.querySelector(
+      '[data-testid=sign-out]',
+    ) as HTMLButtonElement;
+    signOut.click();
+
+    http
+      .expectOne('/auth/logout')
+      .flush(null, { status: 500, statusText: 'Server Error' });
+
+    // The user is never stranded signed-in: navigation fires regardless.
+    expect(navigate).toHaveBeenCalledWith('/login');
+  });
 });
