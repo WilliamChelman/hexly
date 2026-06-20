@@ -1,8 +1,16 @@
 import { Route } from '@angular/router';
+import { authGuard, loginGuard } from './auth/auth.guard';
 
 export const appRoutes: Route[] = [
   {
+    path: 'login',
+    canActivate: [loginGuard],
+    loadComponent: () => import('./auth/login').then((m) => m.Login),
+    title: 'Hexly — Sign in',
+  },
+  {
     path: '',
+    canActivate: [authGuard],
     loadComponent: () =>
       import('./editor-shell/editor-shell').then((m) => m.EditorShell),
     title: 'Hexly',
