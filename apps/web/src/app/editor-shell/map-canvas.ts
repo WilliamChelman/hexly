@@ -1,4 +1,14 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import {
+  afterNextRender,
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  ElementRef,
+  signal,
+  viewChild,
+} from '@angular/core';
+import { Axial, Layout, pixelToHex } from '@hexly/domain';
 import { Button } from '../ui/button';
 import { Coord } from '../ui/coord';
 import { Eyebrow } from '../ui/eyebrow';
@@ -6,111 +16,56 @@ import { CompassIcon } from '../ui/icon/glyphs/compass';
 import { FitIcon } from '../ui/icon/glyphs/fit';
 import { MinusIcon } from '../ui/icon/glyphs/minus';
 import { PlusIcon } from '../ui/icon/glyphs/plus';
+import { Camera } from './camera';
+import { Canvas2dMapRenderer, MapRenderer } from './map-renderer';
 
-/** A single rendered hex in the demo cluster on the canvas frame. */
-interface DemoHex {
-  readonly q: number;
-  readonly r: number;
-  readonly cx: number;
-  readonly cy: number;
-  readonly points: string;
-  readonly terrain?: string; // a --terrain-* token, or undefined for Void
-  readonly feature?: string; // a marker id placed on the hex
-  readonly selected?: boolean;
-}
-
-/** Flat-top hex radius (centre → corner) for the demo cluster, in SVG units. */
-const HEX_R = 34;
+/** Hex radius (centre→corner) in world pixels at zoom 1. */
+const HEX_SIZE = 40;
+/** Clamp the zoom so the cull never has to draw an unbounded hex count. */
+const MIN_ZOOM = 0.25;
+const MAX_ZOOM = 4;
+/** Multiplier applied per zoom-button press. */
+const ZOOM_STEP = 1.15;
+/**
+ * Wheel-zoom sensitivity: the factor is `e^(-Δy · k)`, so zooming scales with
+ * how far the wheel moved rather than a fixed step per event. Touchpad and mouse
+ * get separate knobs — a trackpad pinch emits a stream of tiny deltas, so it
+ * needs a higher `k` than a mouse's chunky per-notch deltas to feel as fast.
+ */
+const ZOOM_SENSITIVITY_TOUCHPAD = 0.006;
+const ZOOM_SENSITIVITY_MOUSE = 0.002;
+/** Above this per-event |deltaY| (px), a wheel looks like a coarse mouse notch. */
+const MOUSE_NOTCH_THRESHOLD = 40;
+/** Pixels assumed per line, to normalise non-pixel wheel deltas. */
+const LINE_HEIGHT = 16;
 
 /**
- * The map frame — a static SVG illustration standing in for the real Canvas 2D
- * renderer (ADR-0003). Its feature markers live in a local `<defs>`, not as
- * `app-icon-*` components: they are drawn *inside* this SVG, and SVG-in-SVG
- * can't cross into an HTML component. The illustration is itself the "SVG in its
- * own component" (ADR-0007). HTML chrome over the frame (zoom, compass) imports
- * the glyph components it needs directly.
+ * The live map surface: an infinite, pannable, zoomable hex plane on a Canvas
+ * (ADR-0003). The component owns interaction state — the {@link Camera}
+ * transform and the hovered hex — and delegates all drawing to a
+ * {@link MapRenderer} behind its interface. Most of the plane is Void, so this
+ * draws the grid and proves the coordinate system, not painted content yet.
  */
 @Component({
   selector: 'app-map-canvas',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [Button, Coord, Eyebrow, CompassIcon, FitIcon, MinusIcon, PlusIcon],
   template: `
-    <div class="grid" aria-hidden="true"></div>
+    <canvas
+      #canvas
+      class="surface"
+      [class.is-grabbing]="dragging()"
+      (pointerdown)="onPointerDown($event)"
+      (pointermove)="onPointerMove($event)"
+      (pointerup)="onPointerUp($event)"
+      (pointerleave)="onPointerLeave()"
+      (wheel)="onWheel($event)"
+    ></canvas>
 
-    <svg class="map" viewBox="-150 -130 300 260" role="img" aria-label="Hex map preview">
-      <!-- Feature markers, drawn inside the map's own SVG namespace. -->
-      <defs>
-        <symbol
-          id="mc-settlement"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.5"
-          stroke-linejoin="round"
-        >
-          <path d="M5 19v-7l7-5 7 5v7z" />
-          <path d="M10 19v-4h4v4" />
-        </symbol>
-        <symbol
-          id="mc-peak"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.5"
-          stroke-linejoin="round"
-        >
-          <path d="M3 19 10 6l4 7 2-3 5 9z" />
-          <path d="m8.5 9.5 1.5 2.5 1.4-2" />
-        </symbol>
-        <symbol
-          id="mc-ruin"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.5"
-          stroke-linejoin="round"
-        >
-          <path d="M5 20V8l2-2v4l2-2v4l2-2v4l2-2v4l2-2v8z" />
-        </symbol>
-      </defs>
-
-      @for (h of hexes; track h.q + ',' + h.r) {
-        @if (h.terrain) {
-          <polygon
-            [attr.points]="h.points"
-            [attr.fill]="'var(' + h.terrain + ')'"
-            stroke="var(--hex-line)"
-            stroke-width="1"
-            [class.is-selected]="h.selected"
-          />
-          @if (h.feature) {
-            <svg
-              [attr.x]="h.cx - 11"
-              [attr.y]="h.cy - 11"
-              width="22"
-              height="22"
-              class="feature"
-            >
-              <use [attr.href]="'#mc-' + h.feature" />
-            </svg>
-          }
-        } @else {
-          <polygon
-            [attr.points]="h.points"
-            fill="transparent"
-            stroke="var(--hex-line)"
-            stroke-width="1"
-            class="void"
-          />
-        }
-      }
-    </svg>
-
-    <!-- floating canvas instruments -->
     <div class="readout">
-      <app-coord>q 0 · r 0</app-coord>
+      <app-coord>q {{ hover()?.q ?? 0 }} · r {{ hover()?.r ?? 0 }}</app-coord>
       <span class="readout-sep">·</span>
-      <span appEyebrow>Forest</span>
+      <span appEyebrow>{{ hover() ? 'Void' : 'No hex' }}</span>
     </div>
 
     <div class="compass" title="North">
@@ -118,14 +73,35 @@ const HEX_R = 34;
     </div>
 
     <div class="zoom" role="group" aria-label="Zoom">
-      <button type="button" appButton icon size="sm" aria-label="Zoom in">
+      <button
+        type="button"
+        appButton
+        icon
+        size="sm"
+        aria-label="Zoom in"
+        (click)="zoomByStep(1)"
+      >
         <app-icon-plus [size]="16" />
       </button>
-      <app-coord class="zoom-level">100%</app-coord>
-      <button type="button" appButton icon size="sm" aria-label="Zoom out">
+      <app-coord class="zoom-level">{{ zoomPercent() }}%</app-coord>
+      <button
+        type="button"
+        appButton
+        icon
+        size="sm"
+        aria-label="Zoom out"
+        (click)="zoomByStep(-1)"
+      >
         <app-icon-minus [size]="16" />
       </button>
-      <button type="button" appButton icon size="sm" aria-label="Fit map">
+      <button
+        type="button"
+        appButton
+        icon
+        size="sm"
+        aria-label="Fit map"
+        (click)="recenter()"
+      >
         <app-icon-fit [size]="16" />
       </button>
     </div>
@@ -141,39 +117,17 @@ const HEX_R = 34;
         var(--canvas-mat)
       );
     }
-    /* The infinite hex grid, drawn as a themed mask so it tints per theme. */
-    .grid {
+    .surface {
       position: absolute;
       inset: 0;
-      background: var(--hex-line);
-      -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM3 17.9v12.7l10.99 6.34 11-6.35V17.9l-11-6.34L3 17.9zM0 15l12.98-7.5V0h-2v6.35L0 12.69v2.3zm0 18.5L12.98 41v8h-2v-6.85L0 35.81v-2.3zM15 0v7.5L27.99 15H28v-2.31h-.01L17 6.35V0h-2zm0 49v-8l12.99-7.5H28v2.31h-.01L17 42.15V49h-2z'/%3E%3C/svg%3E");
-      mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='49'%3E%3Cpath d='M13.99 9.25l13 7.5v15l-13 7.5L1 31.75v-15l12.99-7.5zM3 17.9v12.7l10.99 6.34 11-6.35V17.9l-11-6.34L3 17.9zM0 15l12.98-7.5V0h-2v6.35L0 12.69v2.3zm0 18.5L12.98 41v8h-2v-6.85L0 35.81v-2.3zM15 0v7.5L27.99 15H28v-2.31h-.01L17 6.35V0h-2zm0 49v-8l12.99-7.5H28v2.31h-.01L17 42.15V49h-2z'/%3E%3C/svg%3E");
-      -webkit-mask-size: 30px 52.5px;
-      mask-size: 30px 52.5px;
-      opacity: 0.6;
-    }
-    .map {
-      position: absolute;
-      inset: 0;
-      margin: auto;
-      width: min(76%, 640px);
+      width: 100%;
       height: 100%;
-      filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.22));
+      display: block;
+      cursor: grab;
+      touch-action: none;
     }
-    .map polygon {
-      transition: fill var(--dur-base) var(--ease-out);
-    }
-    .map .is-selected {
-      stroke: var(--gold);
-      stroke-width: 2.4;
-      filter: drop-shadow(0 0 6px var(--gold-soft));
-    }
-    .void {
-      opacity: 0.35;
-    }
-    .feature {
-      color: var(--ink-strong);
-      pointer-events: none;
+    .surface.is-grabbing {
+      cursor: grabbing;
     }
     .readout {
       position: absolute;
@@ -188,6 +142,7 @@ const HEX_R = 34;
       border-radius: var(--radius-full);
       box-shadow: var(--shadow-1);
       backdrop-filter: blur(4px);
+      pointer-events: none;
     }
     .readout-sep {
       color: var(--line-strong);
@@ -199,6 +154,7 @@ const HEX_R = 34;
       color: var(--gold);
       opacity: 0.85;
       filter: drop-shadow(var(--shadow-1));
+      pointer-events: none;
     }
     .zoom {
       position: absolute;
@@ -221,64 +177,184 @@ const HEX_R = 34;
   `,
 })
 export class MapCanvas {
-  /** The demo hex cluster painted into the canvas frame. */
-  protected readonly hexes: DemoHex[] = this.buildCluster();
+  private readonly canvasRef =
+    viewChild<ElementRef<HTMLCanvasElement>>('canvas');
 
-  /**
-   * Build a small, hand-arranged cluster of flat-top hexes around the origin
-   * so the canvas reads as a real (if frozen) map: terrain washes, a couple of
-   * Features, a selected hex, and surrounding Void.
-   */
-  private buildCluster(): DemoHex[] {
-    const painted: Record<
-      string,
-      { terrain?: string; feature?: string; selected?: boolean }
-    > = {
-      '0,0': { terrain: '--terrain-forest', feature: 'settlement', selected: true },
-      '1,0': { terrain: '--terrain-forest' },
-      '1,-1': { terrain: '--terrain-grass' },
-      '0,1': { terrain: '--terrain-grass' },
-      '2,-1': { terrain: '--terrain-mountain', feature: 'peak' },
-      '2,0': { terrain: '--terrain-mountain' },
-      '-1,1': { terrain: '--terrain-ocean' },
-      '-1,2': { terrain: '--terrain-ocean' },
-      '0,2': { terrain: '--terrain-ocean' },
-      '-2,1': { terrain: '--terrain-grass' },
-      '1,1': { terrain: '--terrain-desert' },
-      '2,1': { terrain: '--terrain-desert' },
-      '-1,0': { terrain: '--terrain-grass', feature: 'ruin' },
-    };
+  /** Per-map orientation; pointy-top by default (ADR-0003). Origin is world 0. */
+  private readonly layout: Layout = {
+    orientation: 'pointy',
+    size: { x: HEX_SIZE, y: HEX_SIZE },
+    origin: { x: 0, y: 0 },
+  };
 
-    const hexes: DemoHex[] = [];
-    for (let q = -2; q <= 2; q++) {
-      for (let r = -2; r <= 2; r++) {
-        const cx = HEX_R * 1.5 * q;
-        const cy = HEX_R * Math.sqrt(3) * (r + q / 2);
-        const cell = painted[`${q},${r}`];
-        hexes.push({
-          q,
-          r,
-          cx,
-          cy,
-          points: this.hexPoints(cx, cy),
-          terrain: cell?.terrain,
-          feature: cell?.feature,
-          selected: cell?.selected,
-        });
-      }
-    }
-    return hexes;
+  /** The viewport transform — the single source of truth for pan and zoom. */
+  protected readonly camera = signal(Camera.initial());
+  /** The hex currently under the cursor, or null when the cursor is outside. */
+  protected readonly hover = signal<Axial | null>(null);
+  protected readonly dragging = signal(false);
+
+  protected readonly zoomPercent = computed(() =>
+    Math.round(this.camera().zoom * 100),
+  );
+
+  private renderer: MapRenderer | null = null;
+  private centred = false;
+  private lastPointer: { x: number; y: number } | null = null;
+
+  constructor() {
+    // Repaint whenever pan, zoom, or the hovered hex changes.
+    effect(() => {
+      const camera = this.camera();
+      const hover = this.hover();
+      this.renderer?.render(camera, hover);
+    });
+
+    afterNextRender(() => {
+      const canvas = this.canvasRef()?.nativeElement;
+      if (!canvas) return;
+      this.renderer = new Canvas2dMapRenderer(canvas, this.layout);
+      this.observeSize(canvas);
+    });
   }
 
-  /** SVG polygon points for a flat-top hexagon centred at (cx, cy). */
-  private hexPoints(cx: number, cy: number): string {
-    const pts: string[] = [];
-    for (let i = 0; i < 6; i++) {
-      const a = (Math.PI / 180) * (60 * i);
-      pts.push(
-        `${(cx + HEX_R * Math.cos(a)).toFixed(2)},${(cy + HEX_R * Math.sin(a)).toFixed(2)}`,
-      );
+  protected onPointerDown(event: PointerEvent): void {
+    (event.target as Element).setPointerCapture?.(event.pointerId);
+    this.dragging.set(true);
+    this.lastPointer = { x: event.clientX, y: event.clientY };
+  }
+
+  protected onPointerMove(event: PointerEvent): void {
+    if (this.dragging() && this.lastPointer) {
+      const dx = event.clientX - this.lastPointer.x;
+      const dy = event.clientY - this.lastPointer.y;
+      this.lastPointer = { x: event.clientX, y: event.clientY };
+      this.camera.update((c) => c.panBy(dx, dy));
     }
-    return pts.join(' ');
+    this.hover.set(pixelToHex(this.layout, this.toWorld(event)));
+  }
+
+  protected onPointerUp(event: PointerEvent): void {
+    (event.target as Element).releasePointerCapture?.(event.pointerId);
+    this.dragging.set(false);
+    this.lastPointer = null;
+  }
+
+  protected onPointerLeave(): void {
+    this.dragging.set(false);
+    this.lastPointer = null;
+    this.hover.set(null);
+  }
+
+  protected onWheel(event: WheelEvent): void {
+    event.preventDefault();
+    // A trackpad pinch arrives as a wheel event with ctrlKey set; the browser
+    // reuses that flag for Ctrl+wheel on a mouse, and macOS mouse users reach
+    // for Cmd (metaKey). Any of them → zoom about the cursor. Plain scroll
+    // (mouse wheel or two-finger swipe) pans both axes.
+    if (event.ctrlKey || event.metaKey) {
+      // Tune zoom speed per device. A pinch and a Ctrl+wheel mouse both report
+      // ctrlKey, so the modifier alone can't tell them apart on Windows/Linux;
+      // the delta shape can. (A Cmd+wheel mac mouse uses metaKey — never a pinch.)
+      const sensitivity = this.isTouchpadGesture(event)
+        ? ZOOM_SENSITIVITY_TOUCHPAD
+        : ZOOM_SENSITIVITY_MOUSE;
+      const factor = Math.exp(
+        -this.wheelDeltaPixels(event.deltaY, event) * sensitivity,
+      );
+      this.zoomAround(this.localPoint(event), factor);
+    } else {
+      const dx = this.wheelDeltaPixels(event.deltaX, event);
+      const dy = this.wheelDeltaPixels(event.deltaY, event);
+      // Scrolling down/right moves the content up/left, like scrolling a page.
+      this.camera.update((c) => c.panBy(-dx, -dy));
+    }
+  }
+
+  /**
+   * Best-effort guess that a wheel event came from a trackpad rather than a
+   * mouse, used only to pick the zoom sensitivity. A mac Cmd+wheel mouse sets
+   * metaKey (never a pinch). Otherwise: line/page granularity is always a mouse
+   * wheel, while a trackpad streams small, often fractional, pixel deltas — a
+   * mouse wheel arrives in coarse integer notches.
+   */
+  private isTouchpadGesture(event: WheelEvent): boolean {
+    if (event.metaKey) return false;
+    if (event.deltaMode !== WheelEvent.DOM_DELTA_PIXEL) return false;
+    return (
+      Math.abs(event.deltaY) < MOUSE_NOTCH_THRESHOLD ||
+      !Number.isInteger(event.deltaY)
+    );
+  }
+
+  /** A wheel-axis delta normalised to pixels, whatever the `deltaMode`. */
+  private wheelDeltaPixels(delta: number, event: WheelEvent): number {
+    if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) {
+      return delta * LINE_HEIGHT;
+    }
+    if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
+      return delta * (event.currentTarget as HTMLElement).clientHeight;
+    }
+    return delta;
+  }
+
+  /** Zoom about the viewport centre by one or more notches (+1 in, -1 out). */
+  protected zoomByStep(direction: 1 | -1): void {
+    const canvas = this.canvasRef()?.nativeElement;
+    if (!canvas) return;
+    const centre = {
+      x: canvas.clientWidth / 2,
+      y: canvas.clientHeight / 2,
+    };
+    this.zoomAround(centre, direction === 1 ? ZOOM_STEP : 1 / ZOOM_STEP);
+  }
+
+  /** Re-centre the world origin in the viewport at zoom 1. */
+  protected recenter(): void {
+    const canvas = this.canvasRef()?.nativeElement;
+    if (!canvas) return;
+    this.camera.set(
+      Camera.initial().panBy(canvas.clientWidth / 2, canvas.clientHeight / 2),
+    );
+  }
+
+  private zoomAround(anchor: { x: number; y: number }, factor: number): void {
+    this.camera.update((c) => {
+      const next = c.zoomAt(anchor, factor);
+      return next.zoom < MIN_ZOOM || next.zoom > MAX_ZOOM ? c : next;
+    });
+  }
+
+  /** Cursor position in the canvas's local CSS-pixel space. */
+  private localPoint(event: PointerEvent | WheelEvent): {
+    x: number;
+    y: number;
+  } {
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  }
+
+  /** Cursor position in world space, accounting for the current camera. */
+  private toWorld(event: PointerEvent) {
+    return this.camera().screenToWorld(this.localPoint(event));
+  }
+
+  private observeSize(canvas: HTMLCanvasElement): void {
+    const apply = () => {
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+      if (width === 0 || height === 0) return;
+      this.renderer?.resize(width, height);
+      if (!this.centred) {
+        this.centred = true;
+        this.camera.set(Camera.initial().panBy(width / 2, height / 2));
+      } else {
+        this.renderer?.render(this.camera(), this.hover());
+      }
+    };
+
+    apply();
+    if (typeof ResizeObserver !== 'undefined') {
+      new ResizeObserver(apply).observe(canvas);
+    }
   }
 }
