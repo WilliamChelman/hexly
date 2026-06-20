@@ -58,7 +58,7 @@ describe('Maps endpoints', () => {
       version: 1,
       createdAt: expect.any(Number),
       updatedAt: expect.any(Number),
-      document: { hexes: {} },
+      document: { hexes: {}, regions: [] },
     });
   });
 
@@ -98,7 +98,7 @@ describe('Maps endpoints', () => {
     const res = await ada.get(`/maps/${created.body.id}`).expect(200);
 
     expect(res.body).toEqual(created.body);
-    expect(res.body.document).toEqual({ hexes: {} });
+    expect(res.body.document).toEqual({ hexes: {}, regions: [] });
   });
 
   it('returns 404 for a map id that does not exist', async () => {
@@ -110,7 +110,7 @@ describe('Maps endpoints', () => {
   it('saves the document against the current version and bumps the version', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const created = await ada.post('/maps').send({ title: 'Aldermoor' });
-    const painted = { hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' } } };
+    const painted = { hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' } }, regions: [] };
 
     const res = await ada
       .put(`/maps/${created.body.id}`)
@@ -130,13 +130,13 @@ describe('Maps endpoints', () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const created = await ada.post('/maps').send({ title: 'Aldermoor' });
     const id = created.body.id;
-    const first = { hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' } } };
+    const first = { hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' } }, regions: [] };
 
     // A first save moves the map from version 1 to version 2.
     await ada.put(`/maps/${id}`).send({ document: first, version: 1 }).expect(200);
 
     // A second save still built on version 1 is stale — it must be rejected.
-    const stale = { hexes: { [coordKey({ q: 9, r: 9 })]: { terrain: 'ocean' } } };
+    const stale = { hexes: { [coordKey({ q: 9, r: 9 })]: { terrain: 'ocean' } }, regions: [] };
     await ada.put(`/maps/${id}`).send({ document: stale, version: 1 }).expect(409);
 
     // The stale write left no trace — the map still holds the first save.
@@ -149,7 +149,7 @@ describe('Maps endpoints', () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const created = await ada.post('/maps').send({ title: 'Untitled map' });
     const id = created.body.id;
-    const painted = { hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' } } };
+    const painted = { hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' } }, regions: [] };
     await ada.put(`/maps/${id}`).send({ document: painted, version: 1 }).expect(200);
 
     const res = await ada
