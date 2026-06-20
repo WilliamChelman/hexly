@@ -28,6 +28,17 @@ export type Tool =
   | { readonly kind: 'clear-feature' };
 
 /**
+ * Whether a stroke keeps applying as the pointer drags across hexes. Terrain,
+ * the eraser, and clear-feature are continuous brushes — sweeping them across a
+ * drag is the intent and idempotent. Placing a Feature is a discrete stamp: a
+ * drag must not mass-place duplicate features, so it applies only on the initial
+ * press (issue #7).
+ */
+export function isContinuousTool(tool: Tool): boolean {
+  return tool.kind !== 'feature';
+}
+
+/**
  * The editor's command/undo stack — the only "store" the editor needs (ADR-0005).
  * It holds the current {@link HexMap} as immutable state in a signal; every
  * mutation runs through Immer's `produceWithPatches`, and the inverse patches go

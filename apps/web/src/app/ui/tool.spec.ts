@@ -41,7 +41,7 @@ describe('Tool', () => {
   });
 
   it('renders a glyph box (not a swatch) for a glyph with no swatch', () => {
-    const btn = render((h) => (h.glyph = 'feature'));
+    const btn = render((h) => (h.glyph = 'overlay'));
     expect(btn.querySelector('[appGlyphBox]')).not.toBeNull();
     expect(btn.querySelector('[appSwatch]')).toBeNull();
   });

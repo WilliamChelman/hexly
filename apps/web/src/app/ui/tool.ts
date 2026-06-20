@@ -5,7 +5,7 @@ import {
   input,
 } from '@angular/core';
 import { GlyphBox } from './glyph-box';
-import { FeatureIcon } from './icon/glyphs/feature';
+import { IconPath } from './icon/icon-path';
 import { LabelIcon } from './icon/glyphs/label';
 import { OverlayIcon } from './icon/glyphs/overlay';
 import { RegionIcon } from './icon/glyphs/region';
@@ -13,7 +13,7 @@ import { Kbd } from './kbd';
 import { Swatch } from './swatch';
 
 /** The content glyphs a palette tool can show (terrain tools use a swatch). */
-export type ToolGlyph = 'feature' | 'overlay' | 'region' | 'label';
+export type ToolGlyph = 'overlay' | 'region' | 'label';
 
 /**
  * A palette tool button — square-ish, full-width, with a leading swatch or
@@ -28,7 +28,7 @@ export type ToolGlyph = 'feature' | 'overlay' | 'region' | 'label';
 @Component({
   selector: 'button[appTool]',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [GlyphBox, FeatureIcon, OverlayIcon, RegionIcon, LabelIcon, Swatch, Kbd],
+  imports: [GlyphBox, IconPath, OverlayIcon, RegionIcon, LabelIcon, Swatch, Kbd],
   host: {
     '[class.is-active]': 'active()',
     '[attr.aria-pressed]': 'active()',
@@ -38,23 +38,10 @@ export type ToolGlyph = 'feature' | 'overlay' | 'region' | 'label';
     @if (swatch()) {
       <span appSwatch [style.background]="'var(' + swatch() + ')'"></span>
     } @else if (iconPath(); as d) {
-      <span appGlyphBox>
-        <svg
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.5"
-          stroke-linejoin="round"
-        >
-          <path [attr.d]="d" />
-        </svg>
-      </span>
+      <span appGlyphBox><app-icon-path [d]="d" /></span>
     } @else if (glyph(); as g) {
       <span appGlyphBox>
         @switch (g) {
-          @case ('feature') { <app-icon-feature [size]="18" /> }
           @case ('overlay') { <app-icon-overlay [size]="18" /> }
           @case ('region') { <app-icon-region [size]="18" /> }
           @case ('label') { <app-icon-label [size]="18" /> }

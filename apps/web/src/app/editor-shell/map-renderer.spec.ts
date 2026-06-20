@@ -161,4 +161,24 @@ describe('Canvas2dMapRenderer feature markers', () => {
     restorePath();
     restoreTheme();
   });
+
+  it('balances save/restore so the round join/cap do not leak to the next frame', () => {
+    const restoreTheme = stubTheme();
+    const restorePath = stubPath2D();
+    const ctx = new FakeContext();
+    const renderer = makeRenderer(ctx);
+    const camera = Camera.initial().panBy(60, 60);
+    const doc: HexMap = {
+      hexes: { '0,0': { terrain: 'forest', feature: { ref: 'settlement' } } },
+    };
+
+    renderer.render(camera, doc, null);
+
+    const saves = ctx.ops.filter((op) => op === 'save').length;
+    const restores = ctx.ops.filter((op) => op === 'restore').length;
+    expect(saves).toBe(restores);
+    expect(saves).toBeGreaterThan(0);
+    restorePath();
+    restoreTheme();
+  });
 });

@@ -1,5 +1,5 @@
 import { emptyHexMap } from '@hexly/domain';
-import { EditorStore } from './editor-store';
+import { EditorStore, isContinuousTool } from './editor-store';
 
 describe('EditorStore', () => {
   it('paints a Hex with the given terrain at the given coordinate', () => {
@@ -256,5 +256,23 @@ describe('EditorStore', () => {
     // A loaded map is a fresh starting point — you cannot undo into the old one.
     expect(store.canUndo()).toBe(false);
     expect(store.canRedo()).toBe(false);
+  });
+});
+
+describe('isContinuousTool', () => {
+  it('treats terrain as a continuous brush', () => {
+    expect(isContinuousTool({ kind: 'terrain', id: 'forest' })).toBe(true);
+  });
+
+  it('treats the eraser as a continuous brush', () => {
+    expect(isContinuousTool({ kind: 'erase' })).toBe(true);
+  });
+
+  it('treats clear-feature as a continuous brush', () => {
+    expect(isContinuousTool({ kind: 'clear-feature' })).toBe(true);
+  });
+
+  it('treats placing a feature as a discrete stamp, not continuous', () => {
+    expect(isContinuousTool({ kind: 'feature', id: 'settlement' })).toBe(false);
   });
 });

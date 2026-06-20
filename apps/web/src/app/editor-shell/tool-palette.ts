@@ -1,9 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { featureLibrary, terrainPalette } from '@hexly/domain';
 import { Button } from '../ui/button';
 import { Eyebrow } from '../ui/eyebrow';
@@ -35,13 +30,14 @@ interface ContentTool {
     <section class="group">
       <h2 class="heading" appEyebrow>Terrain</h2>
       <div class="list" role="group" aria-label="Terrain">
+        @let terrainState = store.tool();
         @for (t of terrainTools; track t.id) {
           <button
             appTool
             [label]="t.label"
             [hint]="t.hint"
             [swatch]="t.swatch"
-            [active]="activeTerrain() === t.id"
+            [active]="terrainState.kind === 'terrain' && terrainState.id === t.id"
             [attr.aria-label]="t.label"
             (click)="store.selectTool({ kind: 'terrain', id: t.id })"
           ></button>
@@ -50,7 +46,7 @@ interface ContentTool {
           appTool
           label="Erase"
           hint="E"
-          [active]="store.tool().kind === 'erase'"
+          [active]="terrainState.kind === 'erase'"
           aria-label="Erase"
           (click)="store.selectTool({ kind: 'erase' })"
         ></button>
@@ -90,12 +86,13 @@ interface ContentTool {
     <section class="group">
       <h2 class="heading" appEyebrow>Features</h2>
       <div class="list" role="group" aria-label="Features">
+        @let featureState = store.tool();
         @for (f of features; track f.id) {
           <button
             appTool
             [label]="f.label"
             [iconPath]="f.path"
-            [active]="activeFeature() === f.id"
+            [active]="featureState.kind === 'feature' && featureState.id === f.id"
             [attr.aria-label]="f.label"
             [attr.data-testid]="'feature-' + f.id"
             (click)="store.selectTool({ kind: 'feature', id: f.id })"
@@ -104,7 +101,7 @@ interface ContentTool {
         <button
           appTool
           label="Clear feature"
-          [active]="store.tool().kind === 'clear-feature'"
+          [active]="featureState.kind === 'clear-feature'"
           aria-label="Clear feature"
           data-testid="clear-feature"
           (click)="store.selectTool({ kind: 'clear-feature' })"
@@ -195,18 +192,6 @@ interface ContentTool {
 })
 export class ToolPalette {
   protected readonly store = inject(EditorStore);
-
-  /** The armed terrain id, or null when a non-terrain tool is armed. */
-  protected readonly activeTerrain = computed(() => {
-    const tool = this.store.tool();
-    return tool.kind === 'terrain' ? tool.id : null;
-  });
-
-  /** The armed feature id, or null when a non-feature tool is armed. */
-  protected readonly activeFeature = computed(() => {
-    const tool = this.store.tool();
-    return tool.kind === 'feature' ? tool.id : null;
-  });
 
   /** The built-in feature library, each placeable from the palette (issue #7). */
   protected readonly features = featureLibrary;

@@ -45,10 +45,17 @@ export const terrainPalette = [
   { id: 'desert', label: 'Desert', fill: '--terrain-desert' },
 ] as const satisfies readonly Terrain[];
 
+/**
+ * Build a Zod enum from a palette's ids. Centralizes the one fragile
+ * non-empty-tuple cast Zod requires so it lives in exactly one place; the
+ * inferred literal types and runtime enum are identical to inlining it.
+ */
+function idEnum<Id extends string>(ids: readonly Id[]) {
+  return z.enum(ids as [Id, ...Id[]]);
+}
+
 /** A terrain id constrained to the built-in palette — the source of truth. */
-export const terrainIdSchema = z.enum(
-  terrainPalette.map((t) => t.id) as [TerrainId, ...TerrainId[]],
-);
+export const terrainIdSchema = idEnum(terrainPalette.map((t) => t.id));
 
 /** A built-in Feature icon: a stable `id`, a `label`, and its marker artwork. */
 export interface Feature {
@@ -57,8 +64,8 @@ export interface Feature {
   /** Human-facing name for the palette (CONTEXT.md → Feature). */
   readonly label: string;
   /**
-   * The SVG path (`d`) of the marker, drawn in a 24×24 box. One source of truth
-   * for both the canvas renderer (as a `Path2D`) and the palette icon — the
+   * The SVG path (`d`) of the marker, drawn in a 24×24 box. The single source
+   * of truth for both the canvas Path2D and the palette/icon component — the
    * Feature analogue of a Terrain's `fill` token (ADR-0006/0007).
    */
   readonly path: string;
@@ -76,9 +83,7 @@ export const featureLibrary = [
 ] as const satisfies readonly Feature[];
 
 /** A feature id constrained to the built-in library — the source of truth. */
-export const featureIdSchema = z.enum(
-  featureLibrary.map((f) => f.id) as [FeatureId, ...FeatureId[]],
-);
+export const featureIdSchema = idEnum(featureLibrary.map((f) => f.id));
 
 /** A feature placed on a Hex: a reference to a built-in library id (issue #7). */
 export const featureRefSchema = z.object({ ref: featureIdSchema });
@@ -104,8 +109,6 @@ export const hexMapSchema = z.object({
 export type TerrainId = (typeof terrainPalette)[number]['id'];
 /** A feature id from the built-in library — the literal union of every id. */
 export type FeatureId = (typeof featureLibrary)[number]['id'];
-/** A reference from a Hex to a built-in Feature (CONTEXT.md → Feature). */
-export type FeatureRef = z.infer<typeof featureRefSchema>;
 /** A single painted hex's content. */
 export type Hex = z.infer<typeof hexSchema>;
 /** The whole document held by the editor and persisted to the backend. */

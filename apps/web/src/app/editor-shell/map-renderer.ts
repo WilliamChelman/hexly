@@ -19,6 +19,12 @@ const FEATURE_BY_ID = new Map(featureLibrary.map((f) => [f.id, f]));
 const MARKER_SCALE = 1.3;
 /** A marker's stroke weight in screen pixels, held constant across zoom. */
 const MARKER_STROKE = 1.6;
+/**
+ * The authoring viewBox the feature `path`s are drawn in: a 24×24 box, matching
+ * the `<svg viewBox="0 0 24 24">` the UI icon components use. The marker is
+ * scaled from this box and translated by its half (12) to centre it on the hex.
+ */
+const ICON_BOX = 24;
 
 /**
  * The seam between the editor and whatever draws the map. There is one Canvas 2D
@@ -120,12 +126,16 @@ export class Canvas2dMapRenderer implements MapRenderer {
 
     // Painted terrain, under the grid lines. Only the visible painted hexes are
     // drawn — the document is sparse, so this never touches the infinite Void.
+    // While here, note which hexes carry a feature so the marker pass below can
+    // walk that short list instead of re-scanning every visible hex.
+    const featured: { hex: Axial; ref: FeatureId }[] = [];
     for (const hex of visible) {
       const painted = doc.hexes[coordKey(hex)];
       if (!painted) continue;
       ctx.fillStyle = this.palette.terrain[painted.terrain];
       this.tracePath(ctx, camera, hex);
       ctx.fill();
+      if (painted.feature) featured.push({ hex, ref: painted.feature.ref });
     }
 
     // Hover highlight next, so the grid lines draw crisply on top of it.
@@ -142,15 +152,21 @@ export class Canvas2dMapRenderer implements MapRenderer {
       ctx.stroke();
     }
 
-    // Feature markers ride on top of the grid (CONTEXT.md → Feature). Like the
-    // terrain pass, only the visible painted hexes are touched, and only those
-    // carrying a feature draw anything.
-    ctx.strokeStyle = this.palette.featureInk;
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    for (const hex of visible) {
-      const feature = doc.hexes[coordKey(hex)]?.feature;
-      if (feature) this.strokeMarker(ctx, camera, hex, feature.ref);
+    // Feature markers ride on top of the grid (CONTEXT.md → Feature). The
+    // join/cap/strokeStyle changes are wrapped in save/restore so they don't
+    // leak into the next frame's grid stroke. The marker scale depends only on
+    // the zoom, so it's computed once here rather than per feature.
+    if (featured.length > 0) {
+      const radius = this.layout.size.y * camera.zoom;
+      const scale = (radius * MARKER_SCALE) / ICON_BOX;
+      ctx.save();
+      ctx.strokeStyle = this.palette.featureInk;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      for (const { hex, ref } of featured) {
+        this.strokeMarker(ctx, camera, hex, ref, scale);
+      }
+      ctx.restore();
     }
   }
 
@@ -164,16 +180,15 @@ export class Canvas2dMapRenderer implements MapRenderer {
     camera: Camera,
     hex: Axial,
     id: FeatureId,
+    scale: number,
   ): void {
     const path = this.markerPath(id);
     if (!path) return;
     const centre = camera.worldToScreen(hexToPixel(this.layout, hex));
-    const radius = this.layout.size.y * camera.zoom;
-    const scale = (radius * MARKER_SCALE) / 24;
     ctx.save();
     ctx.translate(centre.x, centre.y);
     ctx.scale(scale, scale);
-    ctx.translate(-12, -12); // centre the 24×24 viewBox on the hex
+    ctx.translate(-ICON_BOX / 2, -ICON_BOX / 2); // centre the box on the hex
     ctx.lineWidth = MARKER_STROKE / scale; // undo the scale so it stays crisp
     ctx.stroke(path);
     ctx.restore();
