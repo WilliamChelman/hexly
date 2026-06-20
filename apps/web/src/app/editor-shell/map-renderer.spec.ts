@@ -44,9 +44,14 @@ class FakeContext {
   }
   /** Grid strokes pass no path; a feature marker strokes an explicit Path2D. */
   readonly markerStrokes: string[] = [];
+  /** The strokeStyle at each pathless stroke() — grid lines and region borders. */
+  readonly lineStrokes: string[] = [];
   stroke(path?: unknown): void {
     if (path) this.markerStrokes.push(this.strokeStyle);
-    else this.ops.push('stroke');
+    else {
+      this.ops.push('stroke');
+      this.lineStrokes.push(this.strokeStyle);
+    }
   }
   fill(): void {
     this.pathFills.push(this.fillStyle);
@@ -108,7 +113,7 @@ describe('Canvas2dMapRenderer painted terrain', () => {
     const renderer = makeRenderer(ctx);
     // Centre hex (0,0) under the camera so it is on screen.
     const camera = Camera.initial().panBy(60, 60);
-    const doc: HexMap = { hexes: { '0,0': { terrain: 'forest' } } };
+    const doc: HexMap = { hexes: { '0,0': { terrain: 'forest' } }, regions: [] };
 
     renderer.render(camera, doc, null);
 
@@ -122,9 +127,92 @@ describe('Canvas2dMapRenderer painted terrain', () => {
     const renderer = makeRenderer(ctx);
     const camera = Camera.initial().panBy(60, 60);
 
-    renderer.render(camera, { hexes: {} }, null);
+    renderer.render(camera, { hexes: {}, regions: [] }, null);
 
     expect(ctx.pathFills).toEqual([]);
+    restore();
+  });
+});
+
+describe('Canvas2dMapRenderer region borders', () => {
+  it('outlines a region member hex in the region color rather than filling it', () => {
+    const restore = stubTheme();
+    const ctx = new FakeContext();
+    const renderer = makeRenderer(ctx);
+    const camera = Camera.initial().panBy(60, 60);
+    const doc: HexMap = {
+      hexes: {},
+      regions: [
+        { id: 'a', name: 'Avalon', color: '#b08a4e', hexes: { '0,0': true } },
+      ],
+    };
+
+    renderer.render(camera, doc, null);
+
+    // The region reads as a coloured border (a stroke), not a surface tint.
+    expect(ctx.lineStrokes).toContain('#b08a4e');
+    expect(ctx.pathFills.some((f) => f.startsWith('#b08a4e'))).toBe(false);
+    restore();
+  });
+
+  it('draws both regions borders on a hex that belongs to two of them', () => {
+    const restore = stubTheme();
+    const ctx = new FakeContext();
+    const renderer = makeRenderer(ctx);
+    const camera = Camera.initial().panBy(60, 60);
+    const doc: HexMap = {
+      hexes: {},
+      regions: [
+        { id: 'a', name: 'Avalon', color: '#b08a4e', hexes: { '0,0': true } },
+        { id: 'b', name: 'Whisperwood', color: '#7c9b86', hexes: { '0,0': true } },
+      ],
+    };
+
+    renderer.render(camera, doc, null);
+
+    // Each region strokes its own boundary, so overlaps stay legible.
+    expect(ctx.lineStrokes).toContain('#b08a4e');
+    expect(ctx.lineStrokes).toContain('#7c9b86');
+    restore();
+  });
+
+  it('does not stroke a region border for an off-screen member', () => {
+    const restore = stubTheme();
+    const ctx = new FakeContext();
+    const renderer = makeRenderer(ctx);
+    const camera = Camera.initial().panBy(60, 60);
+    const doc: HexMap = {
+      hexes: { '0,0': { terrain: 'forest' } },
+      regions: [
+        { id: 'a', name: 'Avalon', color: '#b08a4e', hexes: { '5,5': true } },
+      ],
+    };
+
+    renderer.render(camera, doc, null);
+
+    expect(ctx.lineStrokes).not.toContain('#b08a4e');
+    restore();
+  });
+
+  it('skips the shared edge between two member hexes, drawing only the outer border', () => {
+    const restore = stubTheme();
+    const ctx = new FakeContext();
+    const renderer = makeRenderer(ctx);
+    const camera = Camera.initial().panBy(60, 60);
+    // Two adjacent members ((0,0) and its east neighbour (1,0)) share one edge.
+    const doc: HexMap = {
+      hexes: {},
+      regions: [
+        { id: 'a', name: 'Avalon', color: '#b08a4e', hexes: { '0,0': true, '1,0': true } },
+      ],
+    };
+
+    renderer.render(camera, doc, null);
+
+    // A lone hex has 6 boundary edges; two adjacent members share one edge, so
+    // its two sides are interior and skipped — 12 - 2 = 10 boundary strokes.
+    const borders = ctx.lineStrokes.filter((c) => c === '#b08a4e');
+    expect(borders).toHaveLength(10);
     restore();
   });
 });
@@ -138,6 +226,7 @@ describe('Canvas2dMapRenderer feature markers', () => {
     const camera = Camera.initial().panBy(60, 60);
     const doc: HexMap = {
       hexes: { '0,0': { terrain: 'forest', feature: { ref: 'settlement' } } },
+      regions: [],
     };
 
     renderer.render(camera, doc, null);
@@ -153,7 +242,7 @@ describe('Canvas2dMapRenderer feature markers', () => {
     const ctx = new FakeContext();
     const renderer = makeRenderer(ctx);
     const camera = Camera.initial().panBy(60, 60);
-    const doc: HexMap = { hexes: { '0,0': { terrain: 'forest' } } };
+    const doc: HexMap = { hexes: { '0,0': { terrain: 'forest' } }, regions: [] };
 
     renderer.render(camera, doc, null);
 
@@ -170,6 +259,7 @@ describe('Canvas2dMapRenderer feature markers', () => {
     const camera = Camera.initial().panBy(60, 60);
     const doc: HexMap = {
       hexes: { '0,0': { terrain: 'forest', feature: { ref: 'settlement' } } },
+      regions: [],
     };
 
     renderer.render(camera, doc, null);

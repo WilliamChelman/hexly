@@ -5,6 +5,7 @@ import {
   emptyHexMap,
   FeatureId,
   HexMap,
+  Region,
   TerrainId,
 } from '@hexly/domain';
 import { applyPatches, enablePatches, Patch, produceWithPatches } from 'immer';
@@ -20,12 +21,14 @@ enablePatches();
  * - `erase` — delete the hex record so the coordinate becomes Void
  * - `feature` — place the built-in feature `id` on an existing hex
  * - `clear-feature` — remove a hex's feature, leaving its terrain
+ * - `region` — add the hovered hex to (or remove it from) region `id`, per `mode`
  */
 export type Tool =
   | { readonly kind: 'terrain'; readonly id: TerrainId }
   | { readonly kind: 'erase' }
   | { readonly kind: 'feature'; readonly id: FeatureId }
-  | { readonly kind: 'clear-feature' };
+  | { readonly kind: 'clear-feature' }
+  | { readonly kind: 'region'; readonly id: string; readonly mode: 'add' | 'remove' };
 
 /**
  * Whether a stroke keeps applying as the pointer drags across hexes. Terrain,
@@ -97,6 +100,10 @@ export class EditorStore {
       case 'clear-feature':
         this.clearFeatureAt(coord);
         break;
+      case 'region':
+        if (tool.mode === 'add') this.addHexToRegion(tool.id, coord);
+        else this.removeHexFromRegion(tool.id, coord);
+        break;
     }
   }
 
@@ -144,6 +151,64 @@ export class EditorStore {
     });
   }
 
+  /**
+   * Create an empty Region with `name` and `color`, appended to the document,
+   * and return its freshly-minted id. Membership starts empty — hexes are
+   * painted in afterwards. Like every edit it goes through `commit`, so undo
+   * removes the region (issue #8).
+   */
+  createRegion(name: string, color: string): string {
+    const id = crypto.randomUUID();
+    this.commit((draft) => {
+      draft.regions.push({ id, name, color, hexes: {} });
+    });
+    return id;
+  }
+
+  /** Rename the region `id`; a no-op (no undo step) if there is no such region. */
+  renameRegion(id: string, name: string): void {
+    this.commit((draft) => {
+      const region = findRegion(draft, id);
+      if (region) region.name = name;
+    });
+  }
+
+  /** Recolor the region `id`; a no-op if there is no such region. */
+  recolorRegion(id: string, color: string): void {
+    this.commit((draft) => {
+      const region = findRegion(draft, id);
+      if (region) region.color = color;
+    });
+  }
+
+  /** Delete the region `id` entirely, along with its membership set. */
+  deleteRegion(id: string): void {
+    this.commit((draft) => {
+      const at = draft.regions.findIndex((r) => r.id === id);
+      if (at !== -1) draft.regions.splice(at, 1);
+    });
+  }
+
+  /**
+   * Add the hex at `coord` to region `id`. Membership is an independent set of
+   * coordinates (a hex need not be painted, and a coordinate may belong to many
+   * regions at once), so this only sets the key. Adding a coordinate already in
+   * the region changes nothing, so `commit` records no undo step.
+   */
+  addHexToRegion(id: string, coord: Axial): void {
+    this.commit((draft) => {
+      const region = findRegion(draft, id);
+      if (region) region.hexes[coordKey(coord)] = true;
+    });
+  }
+
+  /** Remove the hex at `coord` from region `id`; a no-op if it was not a member. */
+  removeHexFromRegion(id: string, coord: Axial): void {
+    this.commit((draft) => {
+      delete findRegion(draft, id)?.hexes[coordKey(coord)];
+    });
+  }
+
   /** Reverse the most recent edit. */
   undo(): void {
     const edit = this.undoStack.pop();
@@ -183,6 +248,11 @@ export class EditorStore {
     this._canUndo.set(this.undoStack.length > 0);
     this._canRedo.set(this.redoStack.length > 0);
   }
+}
+
+/** Find a region by id within a document draft (or `undefined`). */
+function findRegion(doc: HexMap, id: string): Region | undefined {
+  return doc.regions.find((r) => r.id === id);
 }
 
 /** A committed edit, as the forward and inverse Immer patches that effect it. */

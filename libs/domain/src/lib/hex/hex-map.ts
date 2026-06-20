@@ -97,12 +97,36 @@ export const hexSchema = z.object({
   feature: featureRefSchema.optional(),
 });
 
+/** A six-digit `#rrggbb` colour, the form a Region's user-chosen tint is stored in. */
+const hexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+
+/**
+ * A Region: a named, colored grouping of hex coordinates (CONTEXT.md → Region,
+ * issue #8). Membership is a sparse set — `hexes` maps each member coordinate
+ * key to `true`, mirroring how the document stores painted hexes — so a single
+ * coordinate carries `true` in as many regions as own it. Regions overlap
+ * freely, and the set is independent of whether a Hex is painted there.
+ */
+export const regionSchema = z.object({
+  /** Stable identifier the editor mints; referenced by the armed region tool. */
+  id: z.string(),
+  /** Human-facing name (e.g. "The Kingdom of Avalon"). */
+  name: z.string(),
+  /** The translucent tint the renderer fills member hexes with, as `#rrggbb`. */
+  color: hexColorSchema,
+  /** The member coordinate keys, each mapped to `true` — a JSON-friendly set. */
+  hexes: z.record(z.string(), z.literal(true)),
+});
+
 /**
  * The Hex Map document. `hexes` is sparse: a coordinate key (`coordKey`) is
- * present only where the user painted, absent everywhere else (Void).
+ * present only where the user painted, absent everywhere else (Void). `regions`
+ * defaults to empty so documents saved before regions existed still parse and
+ * gain the field on load (issue #8).
  */
 export const hexMapSchema = z.object({
   hexes: z.record(z.string(), hexSchema),
+  regions: z.array(regionSchema).default([]),
 });
 
 /** A terrain id from the built-in palette — the literal union of every id. */
@@ -111,10 +135,12 @@ export type TerrainId = (typeof terrainPalette)[number]['id'];
 export type FeatureId = (typeof featureLibrary)[number]['id'];
 /** A single painted hex's content. */
 export type Hex = z.infer<typeof hexSchema>;
+/** A named, colored grouping of hex coordinates that overlaps others freely. */
+export type Region = z.infer<typeof regionSchema>;
 /** The whole document held by the editor and persisted to the backend. */
 export type HexMap = z.infer<typeof hexMapSchema>;
 
-/** A brand-new map: an empty plane, every coordinate Void. */
+/** A brand-new map: an empty plane, every coordinate Void, with no regions. */
 export function emptyHexMap(): HexMap {
-  return { hexes: {} };
+  return { hexes: {}, regions: [] };
 }

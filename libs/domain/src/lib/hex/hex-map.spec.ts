@@ -4,6 +4,7 @@ import {
   featureLibrary,
   hexMapSchema,
   parseCoordKey,
+  regionSchema,
   terrainPalette,
 } from './hex-map';
 
@@ -25,6 +26,19 @@ describe('featureLibrary', () => {
 
     expect(byId.get('settlement')).toBe('Settlement');
     expect(byId.get('ruin')).toBe('Ruin');
+  });
+});
+
+describe('regionSchema', () => {
+  it('round-trips a named, colored region that owns a set of coordinates', () => {
+    const region = {
+      id: 'r1',
+      name: 'The Whisperwood',
+      color: '#7c9b86',
+      hexes: { '0,0': true, '1,-1': true },
+    };
+
+    expect(regionSchema.parse(region)).toEqual(region);
   });
 });
 
@@ -51,7 +65,34 @@ describe('hexMapSchema', () => {
       },
     };
 
+    expect(hexMapSchema.parse(doc)).toEqual({ ...doc, regions: [] });
+  });
+
+  it('defaults regions to empty for a document saved before regions existed', () => {
+    const legacy = { hexes: { '0,0': { terrain: 'grass' } } };
+
+    expect(hexMapSchema.parse(legacy).regions).toEqual([]);
+  });
+
+  it('round-trips regions, with one coordinate owned by two regions at once', () => {
+    const doc = {
+      hexes: {},
+      regions: [
+        { id: 'a', name: 'Avalon', color: '#b08a4e', hexes: { '0,0': true } },
+        { id: 'b', name: 'Whisperwood', color: '#7c9b86', hexes: { '0,0': true } },
+      ],
+    };
+
     expect(hexMapSchema.parse(doc)).toEqual(doc);
+  });
+
+  it('rejects a region whose color is not a #rrggbb hex color', () => {
+    const doc = {
+      hexes: {},
+      regions: [{ id: 'a', name: 'Avalon', color: 'red', hexes: {} }],
+    };
+
+    expect(() => hexMapSchema.parse(doc)).toThrow();
   });
 
   it('rejects a hex whose terrain is not a known palette id', () => {
@@ -65,7 +106,11 @@ describe('hexMapSchema', () => {
       hexes: { '0,0': { terrain: 'forest', feature: { ref: 'settlement' } } },
     };
 
-    expect(hexMapSchema.parse(doc)).toEqual(doc);
+    expect(hexMapSchema.parse(doc)).toEqual({ ...doc, regions: [] });
+  });
+
+  it('starts a fresh map with no regions', () => {
+    expect(emptyHexMap().regions).toEqual([]);
   });
 
   it('rejects a hex whose feature is not a known library id', () => {

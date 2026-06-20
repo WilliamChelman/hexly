@@ -22,7 +22,7 @@ describe('EditorHeader', () => {
     version: 3,
     createdAt: 1,
     updatedAt: 1,
-    document: { hexes: {} },
+    document: { hexes: {}, regions: [] },
   };
 
   /** Open a map through the real session so the header has one to show/save. */

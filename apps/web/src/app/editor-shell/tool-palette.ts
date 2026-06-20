@@ -4,9 +4,8 @@ import { Button } from '../ui/button';
 import { Eyebrow } from '../ui/eyebrow';
 import { Panel } from '../ui/panel';
 import { Rule } from '../ui/rule';
-import { Swatch } from '../ui/swatch';
 import { Tool as ToolButton, ToolGlyph } from '../ui/tool';
-import { EditorStore } from './editor-store';
+import { EditorStore, Tool } from './editor-store';
 
 /** A content tool — not yet wired to the canvas; shown as a preview for now. */
 interface ContentTool {
@@ -17,6 +16,13 @@ interface ContentTool {
 }
 
 /**
+ * The colours a freshly-created region cycles through, so two new regions look
+ * distinct without the user having to pick a colour first. They can recolour to
+ * anything afterwards — the document stores an arbitrary `#rrggbb` (issue #8).
+ */
+const NEW_REGION_COLORS = ['#7c9b86', '#b08a4e', '#6f7fae', '#a8674f', '#5f8c8c'];
+
+/**
  * The left rail: the terrain palette and the eraser (the armed tool lives in the
  * shared {@link EditorStore} so the canvas paints with it — ADR-0005), plus undo/
  * redo and the region legend. Content tools are previews until their own issues
@@ -25,7 +31,7 @@ interface ContentTool {
 @Component({
   selector: 'app-tool-palette',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Eyebrow, Panel, Rule, Swatch, ToolButton],
+  imports: [Button, Eyebrow, Panel, Rule, ToolButton],
   template: `
     <section class="group">
       <h2 class="heading" appEyebrow>Terrain</h2>
@@ -130,11 +136,71 @@ interface ContentTool {
 
     <section class="group regions" appPanel raised>
       <h2 appEyebrow>Regions</h2>
+      @let armed = store.tool();
       <ul class="legend">
-        <li><span appSwatch style="background: #7c9b86"></span>The Whisperwood</li>
-        <li><span appSwatch style="background: #b08a4e"></span>Aldermoor Reach</li>
-        <li><span appSwatch style="background: #6f7fae"></span>The Drowned Coast</li>
+        @for (r of store.document().regions; track r.id) {
+          <li>
+            <input
+              type="color"
+              class="color"
+              [value]="r.color"
+              [attr.aria-label]="r.name + ' color'"
+              [attr.data-testid]="'region-color-' + r.id"
+              (input)="recolor(r.id, $event)"
+            />
+            <input
+              class="rname"
+              [value]="r.name"
+              [attr.aria-label]="'Region name'"
+              [attr.data-testid]="'region-name-' + r.id"
+              (change)="rename(r.id, $event)"
+            />
+            <button
+              type="button"
+              class="mode"
+              [class.active]="isArmed(armed, r.id, 'add')"
+              [attr.aria-label]="'Paint into ' + r.name"
+              [attr.aria-pressed]="isArmed(armed, r.id, 'add')"
+              [attr.data-testid]="'region-paint-' + r.id"
+              (click)="store.selectTool({ kind: 'region', id: r.id, mode: 'add' })"
+            >
+              Paint
+            </button>
+            <button
+              type="button"
+              class="mode"
+              [class.active]="isArmed(armed, r.id, 'remove')"
+              [attr.aria-label]="'Erase from ' + r.name"
+              [attr.aria-pressed]="isArmed(armed, r.id, 'remove')"
+              [attr.data-testid]="'region-erase-' + r.id"
+              (click)="store.selectTool({ kind: 'region', id: r.id, mode: 'remove' })"
+            >
+              Erase
+            </button>
+            <button
+              type="button"
+              class="remove"
+              [attr.aria-label]="'Delete ' + r.name"
+              [attr.data-testid]="'region-delete-' + r.id"
+              (click)="store.deleteRegion(r.id)"
+            >
+              ×
+            </button>
+          </li>
+        } @empty {
+          <li class="muted">No regions yet.</li>
+        }
       </ul>
+      <button
+        type="button"
+        appButton
+        variant="ghost"
+        size="sm"
+        data-testid="new-region"
+        (click)="createRegion()"
+      >
+        New region
+      </button>
     </section>
   `,
   styles: `
@@ -177,6 +243,7 @@ interface ContentTool {
     .legend {
       list-style: none;
       padding: 0;
+      margin: 0;
       display: flex;
       flex-direction: column;
       gap: var(--space-2);
@@ -187,6 +254,58 @@ interface ContentTool {
       display: flex;
       align-items: center;
       gap: var(--space-2);
+    }
+    .legend .muted {
+      color: var(--ink-muted);
+      font-style: italic;
+    }
+    .color {
+      flex: none;
+      width: 18px;
+      height: 18px;
+      padding: 0;
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius-sm);
+      background: none;
+      cursor: pointer;
+    }
+    .rname {
+      flex: 1;
+      min-width: 0;
+      background: var(--bg-deep);
+      color: var(--ink);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      padding: 2px var(--space-2);
+      font-size: var(--text-sm);
+    }
+    .mode {
+      flex: none;
+      background: none;
+      color: var(--ink-muted);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      padding: 2px var(--space-2);
+      font-size: var(--text-xs);
+      cursor: pointer;
+    }
+    .mode.active {
+      color: var(--ink);
+      border-color: var(--gold);
+      background: var(--gold-soft);
+    }
+    .remove {
+      flex: none;
+      background: none;
+      border: none;
+      color: var(--ink-muted);
+      cursor: pointer;
+      font-size: var(--text-md);
+      line-height: 1;
+      padding: 0 var(--space-1);
+    }
+    .remove:hover {
+      color: var(--ember);
     }
   `,
 })
@@ -206,7 +325,29 @@ export class ToolPalette {
 
   protected readonly contentTools: ContentTool[] = [
     { id: 'overlay', label: 'Overlay', hint: 'O', glyph: 'overlay' },
-    { id: 'region', label: 'Region', hint: 'R', glyph: 'region' },
     { id: 'label', label: 'Label', hint: 'L', glyph: 'label' },
   ];
+
+  /** Create a region with a default name and a cycling colour, then arm it for painting. */
+  protected createRegion(): void {
+    const count = this.store.document().regions.length;
+    const color = NEW_REGION_COLORS[count % NEW_REGION_COLORS.length];
+    const id = this.store.createRegion(`Region ${count + 1}`, color);
+    this.store.selectTool({ kind: 'region', id, mode: 'add' });
+  }
+
+  /** Rename region `id` to the text input's value. */
+  protected rename(id: string, event: Event): void {
+    this.store.renameRegion(id, (event.target as HTMLInputElement).value);
+  }
+
+  /** Recolour region `id` to the colour input's value. */
+  protected recolor(id: string, event: Event): void {
+    this.store.recolorRegion(id, (event.target as HTMLInputElement).value);
+  }
+
+  /** Whether `tool` is the region brush armed for region `id` in `mode`. */
+  protected isArmed(tool: Tool, id: string, mode: 'add' | 'remove'): boolean {
+    return tool.kind === 'region' && tool.id === id && tool.mode === mode;
+  }
 }

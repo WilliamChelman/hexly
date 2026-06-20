@@ -237,13 +237,167 @@ describe('EditorStore', () => {
     expect(store.document().hexes['0,0'].feature).toEqual({ ref: 'settlement' });
   });
 
+  it('creates a region with the given name and color, returning its id', () => {
+    const store = new EditorStore();
+
+    const id = store.createRegion('Avalon', '#b08a4e');
+
+    expect(store.document().regions).toEqual([
+      { id, name: 'Avalon', color: '#b08a4e', hexes: {} },
+    ]);
+  });
+
+  it('adds a hex coordinate to a region', () => {
+    const store = new EditorStore();
+    const id = store.createRegion('Avalon', '#b08a4e');
+
+    store.addHexToRegion(id, { q: 2, r: -1 });
+
+    expect(store.document().regions[0].hexes).toEqual({ '2,-1': true });
+  });
+
+  it('lets a single coordinate belong to two regions at once (overlap)', () => {
+    const store = new EditorStore();
+    const a = store.createRegion('Avalon', '#b08a4e');
+    const b = store.createRegion('Whisperwood', '#7c9b86');
+
+    store.addHexToRegion(a, { q: 0, r: 0 });
+    store.addHexToRegion(b, { q: 0, r: 0 });
+
+    const [ra, rb] = store.document().regions;
+    expect(ra.hexes['0,0']).toBe(true);
+    expect(rb.hexes['0,0']).toBe(true);
+  });
+
+  it('removes a hex coordinate from a region', () => {
+    const store = new EditorStore();
+    const id = store.createRegion('Avalon', '#b08a4e');
+    store.addHexToRegion(id, { q: 0, r: 0 });
+
+    store.removeHexFromRegion(id, { q: 0, r: 0 });
+
+    expect('0,0' in store.document().regions[0].hexes).toBe(false);
+  });
+
+  it('treats adding a coordinate already in the region as a no-op', () => {
+    const store = new EditorStore();
+    const id = store.createRegion('Avalon', '#b08a4e');
+    store.addHexToRegion(id, { q: 0, r: 0 });
+
+    store.addHexToRegion(id, { q: 0, r: 0 }); // already a member → records nothing
+
+    // A single undo clears the membership: the second add left no extra step.
+    store.undo();
+    expect(store.document().regions[0].hexes).toEqual({});
+  });
+
+  it('treats removing a coordinate not in the region as a no-op with no undo step', () => {
+    const store = new EditorStore();
+    const id = store.createRegion('Avalon', '#b08a4e');
+
+    store.removeHexFromRegion(id, { q: 5, r: 5 }); // not a member → records nothing
+
+    // The only undo step is the region's creation; the remove added none.
+    store.undo();
+    expect(store.document().regions).toEqual([]);
+  });
+
+  it('undo reverses creating a region', () => {
+    const store = new EditorStore();
+    store.createRegion('Avalon', '#b08a4e');
+
+    store.undo();
+
+    expect(store.document().regions).toEqual([]);
+  });
+
+  it('undo reverses adding a hex to a region', () => {
+    const store = new EditorStore();
+    const id = store.createRegion('Avalon', '#b08a4e');
+    store.addHexToRegion(id, { q: 0, r: 0 });
+
+    store.undo();
+
+    expect(store.document().regions[0].hexes).toEqual({});
+  });
+
+  it('renames a region', () => {
+    const store = new EditorStore();
+    const id = store.createRegion('Avalon', '#b08a4e');
+
+    store.renameRegion(id, 'The Kingdom of Avalon');
+
+    expect(store.document().regions[0].name).toBe('The Kingdom of Avalon');
+  });
+
+  it('recolors a region', () => {
+    const store = new EditorStore();
+    const id = store.createRegion('Avalon', '#b08a4e');
+
+    store.recolorRegion(id, '#6f7fae');
+
+    expect(store.document().regions[0].color).toBe('#6f7fae');
+  });
+
+  it('deletes a region', () => {
+    const store = new EditorStore();
+    const id = store.createRegion('Avalon', '#b08a4e');
+
+    store.deleteRegion(id);
+
+    expect(store.document().regions).toEqual([]);
+  });
+
+  it('undo restores a deleted region with its membership', () => {
+    const store = new EditorStore();
+    const id = store.createRegion('Avalon', '#b08a4e');
+    store.addHexToRegion(id, { q: 1, r: 1 });
+
+    store.deleteRegion(id);
+    store.undo();
+
+    expect(store.document().regions[0].hexes).toEqual({ '1,1': true });
+  });
+
+  it('applyAt adds the hovered hex to the armed region', () => {
+    const store = new EditorStore();
+    const id = store.createRegion('Avalon', '#b08a4e');
+
+    store.selectTool({ kind: 'region', id, mode: 'add' });
+    store.applyAt({ q: 3, r: 3 });
+
+    expect(store.document().regions[0].hexes['3,3']).toBe(true);
+  });
+
+  it('applyAt removes the hovered hex when the region tool is in remove mode', () => {
+    const store = new EditorStore();
+    const id = store.createRegion('Avalon', '#b08a4e');
+    store.addHexToRegion(id, { q: 3, r: 3 });
+
+    store.selectTool({ kind: 'region', id, mode: 'remove' });
+    store.applyAt({ q: 3, r: 3 });
+
+    expect('3,3' in store.document().regions[0].hexes).toBe(false);
+  });
+
+  it('keeps region membership when the underlying terrain is erased', () => {
+    const store = new EditorStore();
+    const id = store.createRegion('Avalon', '#b08a4e');
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.addHexToRegion(id, { q: 0, r: 0 });
+
+    store.eraseAt({ q: 0, r: 0 }); // region membership is independent of the hex
+
+    expect(store.document().regions[0].hexes['0,0']).toBe(true);
+  });
+
   it('loads a document, replacing whatever was being edited', () => {
     const store = new EditorStore();
     store.paintAt({ q: 0, r: 0 }, 'grass');
 
-    store.load({ hexes: { '2,3': { terrain: 'ocean' } } });
+    store.load({ hexes: { '2,3': { terrain: 'ocean' } }, regions: [] });
 
-    expect(store.document()).toEqual({ hexes: { '2,3': { terrain: 'ocean' } } });
+    expect(store.document()).toEqual({ hexes: { '2,3': { terrain: 'ocean' } }, regions: [] });
   });
 
   it('clears undo/redo history when a document is loaded', () => {
@@ -274,5 +428,9 @@ describe('isContinuousTool', () => {
 
   it('treats placing a feature as a discrete stamp, not continuous', () => {
     expect(isContinuousTool({ kind: 'feature', id: 'settlement' })).toBe(false);
+  });
+
+  it('treats painting a region as a continuous brush', () => {
+    expect(isContinuousTool({ kind: 'region', id: 'r1', mode: 'add' })).toBe(true);
   });
 });
