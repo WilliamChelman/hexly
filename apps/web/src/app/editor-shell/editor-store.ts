@@ -3,8 +3,8 @@ import {
   Axial,
   coordKey,
   emptyHexMap,
+  FeatureId,
   HexMap,
-  terrainPalette,
   TerrainId,
 } from '@hexly/domain';
 import { applyPatches, enablePatches, Patch, produceWithPatches } from 'immer';
@@ -12,13 +12,31 @@ import { applyPatches, enablePatches, Patch, produceWithPatches } from 'immer';
 // Immer only records patches once this is enabled; it underpins undo/redo.
 enablePatches();
 
-/** The eraser pseudo-tool: a stroke that deletes hex records (CONTEXT.md → Void). */
-export const ERASER = 'erase';
+/**
+ * What a canvas stroke does, as a tagged union so terrain, the eraser, and the
+ * two Feature actions are siblings the store dispatches on (issue #7):
+ *
+ * - `terrain` — paint the built-in terrain `id` (creates or replaces a hex)
+ * - `erase` — delete the hex record so the coordinate becomes Void
+ * - `feature` — place the built-in feature `id` on an existing hex
+ * - `clear-feature` — remove a hex's feature, leaving its terrain
+ */
+export type Tool =
+  | { readonly kind: 'terrain'; readonly id: TerrainId }
+  | { readonly kind: 'erase' }
+  | { readonly kind: 'feature'; readonly id: FeatureId }
+  | { readonly kind: 'clear-feature' };
 
-/** What a stroke does: lay down one of the built-in terrains, or erase. */
-export type Tool = TerrainId | typeof ERASER;
-
-const TERRAIN_IDS = new Set<string>(terrainPalette.map((t) => t.id));
+/**
+ * Whether a stroke keeps applying as the pointer drags across hexes. Terrain,
+ * the eraser, and clear-feature are continuous brushes — sweeping them across a
+ * drag is the intent and idempotent. Placing a Feature is a discrete stamp: a
+ * drag must not mass-place duplicate features, so it applies only on the initial
+ * press (issue #7).
+ */
+export function isContinuousTool(tool: Tool): boolean {
+  return tool.kind !== 'feature';
+}
 
 /**
  * The editor's command/undo stack — the only "store" the editor needs (ADR-0005).
@@ -33,8 +51,8 @@ export class EditorStore {
   /** The live document. Read-only to everyone but this store. */
   readonly document = this._document.asReadonly();
 
-  /** The armed tool a canvas stroke applies — a terrain or the eraser. */
-  readonly tool = signal<Tool>('forest');
+  /** The armed tool a canvas stroke applies — terrain, eraser, or a feature. */
+  readonly tool = signal<Tool>({ kind: 'terrain', id: 'forest' });
 
   /** Committed edits, newest last — popped to undo, then parked on `redoStack`. */
   private readonly undoStack: Edit[] = [];
@@ -46,7 +64,7 @@ export class EditorStore {
   readonly canUndo = this._canUndo.asReadonly();
   readonly canRedo = this._canRedo.asReadonly();
 
-  /** Arm a tool (a terrain id or {@link ERASER}) for the next strokes. */
+  /** Arm a {@link Tool} for the next strokes. */
   selectTool(tool: Tool): void {
     this.tool.set(tool);
   }
@@ -63,17 +81,59 @@ export class EditorStore {
     this.syncHistory();
   }
 
-  /** Apply the armed tool at `coord`: erase if the eraser is armed, else paint. */
+  /** Apply the armed tool at `coord`, dispatching on its kind. */
   applyAt(coord: Axial): void {
     const tool = this.tool();
-    if (tool === ERASER) this.eraseAt(coord);
-    else if (TERRAIN_IDS.has(tool)) this.paintAt(coord, tool);
+    switch (tool.kind) {
+      case 'terrain':
+        this.paintAt(coord, tool.id);
+        break;
+      case 'erase':
+        this.eraseAt(coord);
+        break;
+      case 'feature':
+        this.placeFeatureAt(coord, tool.id);
+        break;
+      case 'clear-feature':
+        this.clearFeatureAt(coord);
+        break;
+    }
   }
 
-  /** Paint `terrain` onto the hex at `coord`, creating or replacing its record. */
+  /**
+   * Paint `terrain` onto the hex at `coord`, creating its record or replacing
+   * only the terrain of an existing one. Terrain and Feature are independent
+   * layers (CONTEXT.md), so a terrain stroke must not wipe a placed feature —
+   * which matters because painting is a drag that sweeps across hexes.
+   */
   paintAt(coord: Axial, terrain: TerrainId): void {
     this.commit((draft) => {
-      draft.hexes[coordKey(coord)] = { terrain };
+      const hex = draft.hexes[coordKey(coord)];
+      if (hex) hex.terrain = terrain;
+      else draft.hexes[coordKey(coord)] = { terrain };
+    });
+  }
+
+  /**
+   * Place (or replace) `feature` on the hex at `coord`. A Feature rides on an
+   * existing Hex (CONTEXT.md), so placing on Void is a no-op — paint terrain
+   * first. The recipe changing nothing means `commit` records no undo step.
+   */
+  placeFeatureAt(coord: Axial, feature: FeatureId): void {
+    this.commit((draft) => {
+      const hex = draft.hexes[coordKey(coord)];
+      if (hex) hex.feature = { ref: feature };
+    });
+  }
+
+  /**
+   * Remove the feature from the hex at `coord`, leaving its terrain intact. A
+   * hex with no feature, or a Void coordinate, is left untouched — `commit`
+   * records no undo step when nothing changes.
+   */
+  clearFeatureAt(coord: Axial): void {
+    this.commit((draft) => {
+      delete draft.hexes[coordKey(coord)]?.feature;
     });
   }
 

@@ -1,8 +1,15 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { featureLibrary } from '@hexly/domain';
+
+/** The single source of truth for the settlement marker art (ADR-0006/0007). */
+const SETTLEMENT_PATH =
+  featureLibrary.find((f) => f.id === 'settlement')?.path ?? '';
 
 /**
  * The settlement feature glyph. One `<svg>` drawn in `currentColor`, sized by
- * `size`. Reached by name through `app-icon`, or directly. See ADR-0007.
+ * `size`. Its path comes from `featureLibrary` so the inspector placeholder and
+ * the canvas marker share ONE source of truth and cannot drift. Reached by name
+ * through `app-icon`, or directly. See ADR-0007.
  */
 @Component({
   selector: 'app-icon-settlement',
@@ -17,12 +24,13 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
       stroke="currentColor"
       stroke-width="1.5"
       stroke-linejoin="round"
+      stroke-linecap="round"
     >
-      <path d="M5 19v-7l7-5 7 5v7z" />
-      <path d="M10 19v-4h4v4" />
+      <path [attr.d]="path" />
     </svg>
   `,
 })
 export class SettlementIcon {
   readonly size = input(24);
+  protected readonly path = SETTLEMENT_PATH;
 }

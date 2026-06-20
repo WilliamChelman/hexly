@@ -1,5 +1,5 @@
 import { emptyHexMap } from '@hexly/domain';
-import { EditorStore } from './editor-store';
+import { EditorStore, isContinuousTool } from './editor-store';
 
 describe('EditorStore', () => {
   it('paints a Hex with the given terrain at the given coordinate', () => {
@@ -124,7 +124,7 @@ describe('EditorStore', () => {
 
   it('applyAt paints the armed terrain', () => {
     const store = new EditorStore();
-    store.selectTool('ocean');
+    store.selectTool({ kind: 'terrain', id: 'ocean' });
 
     store.applyAt({ q: 0, r: 0 });
 
@@ -135,10 +135,106 @@ describe('EditorStore', () => {
     const store = new EditorStore();
     store.paintAt({ q: 0, r: 0 }, 'ocean');
 
-    store.selectTool('erase');
+    store.selectTool({ kind: 'erase' });
     store.applyAt({ q: 0, r: 0 });
 
     expect('0,0' in store.document().hexes).toBe(false);
+  });
+
+  it('applyAt places the armed feature on the hex', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'grass');
+
+    store.selectTool({ kind: 'feature', id: 'ruin' });
+    store.applyAt({ q: 0, r: 0 });
+
+    expect(store.document().hexes['0,0'].feature).toEqual({ ref: 'ruin' });
+  });
+
+  it('applyAt clears the feature once the clear-feature tool is armed', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'grass');
+    store.placeFeatureAt({ q: 0, r: 0 }, 'ruin');
+
+    store.selectTool({ kind: 'clear-feature' });
+    store.applyAt({ q: 0, r: 0 });
+
+    expect(store.document().hexes['0,0']).toEqual({ terrain: 'grass' });
+  });
+
+  it('places a feature on an already-painted hex, keeping its terrain', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 1, r: 1 }, 'forest');
+
+    store.placeFeatureAt({ q: 1, r: 1 }, 'settlement');
+
+    expect(store.document().hexes['1,1']).toEqual({
+      terrain: 'forest',
+      feature: { ref: 'settlement' },
+    });
+  });
+
+  it('replaces the feature when placing on a hex that already has one', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'grass');
+    store.placeFeatureAt({ q: 0, r: 0 }, 'settlement');
+
+    store.placeFeatureAt({ q: 0, r: 0 }, 'ruin');
+
+    expect(store.document().hexes['0,0'].feature).toEqual({ ref: 'ruin' });
+  });
+
+  it('ignores placing a feature on Void — a feature rides on an existing hex', () => {
+    const store = new EditorStore();
+
+    store.placeFeatureAt({ q: 4, r: 4 }, 'settlement');
+
+    expect('4,4' in store.document().hexes).toBe(false);
+    expect(store.canUndo()).toBe(false);
+  });
+
+  it('keeps an existing feature when its hex is repainted with new terrain', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.placeFeatureAt({ q: 0, r: 0 }, 'settlement');
+
+    store.paintAt({ q: 0, r: 0 }, 'grass'); // a terrain stroke must not wipe the feature
+
+    expect(store.document().hexes['0,0']).toEqual({
+      terrain: 'grass',
+      feature: { ref: 'settlement' },
+    });
+  });
+
+  it('clears a hex feature without disturbing its terrain', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.placeFeatureAt({ q: 0, r: 0 }, 'settlement');
+
+    store.clearFeatureAt({ q: 0, r: 0 });
+
+    expect(store.document().hexes['0,0']).toEqual({ terrain: 'forest' });
+  });
+
+  it('undo reverses placing a feature, leaving the bare terrain', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+
+    store.placeFeatureAt({ q: 0, r: 0 }, 'settlement');
+    store.undo();
+
+    expect(store.document().hexes['0,0']).toEqual({ terrain: 'forest' });
+  });
+
+  it('undo restores a feature that was cleared', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.placeFeatureAt({ q: 0, r: 0 }, 'settlement');
+
+    store.clearFeatureAt({ q: 0, r: 0 });
+    store.undo();
+
+    expect(store.document().hexes['0,0'].feature).toEqual({ ref: 'settlement' });
   });
 
   it('loads a document, replacing whatever was being edited', () => {
@@ -160,5 +256,23 @@ describe('EditorStore', () => {
     // A loaded map is a fresh starting point — you cannot undo into the old one.
     expect(store.canUndo()).toBe(false);
     expect(store.canRedo()).toBe(false);
+  });
+});
+
+describe('isContinuousTool', () => {
+  it('treats terrain as a continuous brush', () => {
+    expect(isContinuousTool({ kind: 'terrain', id: 'forest' })).toBe(true);
+  });
+
+  it('treats the eraser as a continuous brush', () => {
+    expect(isContinuousTool({ kind: 'erase' })).toBe(true);
+  });
+
+  it('treats clear-feature as a continuous brush', () => {
+    expect(isContinuousTool({ kind: 'clear-feature' })).toBe(true);
+  });
+
+  it('treats placing a feature as a discrete stamp, not continuous', () => {
+    expect(isContinuousTool({ kind: 'feature', id: 'settlement' })).toBe(false);
   });
 });

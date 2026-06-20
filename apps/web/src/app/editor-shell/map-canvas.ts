@@ -14,7 +14,7 @@ import {
 } from '@angular/core';
 import { Axial, coordKey, Layout, pixelToHex, terrainPalette } from '@hexly/domain';
 import { ThemeService } from '../core/theme.service';
-import { EditorStore } from './editor-store';
+import { EditorStore, isContinuousTool } from './editor-store';
 import { Button } from '../ui/button';
 import { Coord } from '../ui/coord';
 import { Eyebrow } from '../ui/eyebrow';
@@ -226,6 +226,12 @@ export class MapCanvas {
   private lastPointer: { x: number; y: number } | null = null;
   /** True while a primary-button paint/erase stroke is in progress. */
   private painting = false;
+  /**
+   * Whether the armed stroke keeps applying as the pointer drags. Continuous for
+   * terrain/erase/clear-feature; false for placing a Feature, which stamps once
+   * on the initial press so a drag never mass-places duplicates (issue #7).
+   */
+  private continuousStroke = false;
   /** True while a middle-button pan drag is in progress. */
   private panning = false;
   /** The last hex the active stroke touched, so a drag paints each hex once. */
@@ -281,6 +287,7 @@ export class MapCanvas {
     if (event.button !== 0) return;
 
     this.painting = true;
+    this.continuousStroke = isContinuousTool(this.store.tool());
     this.lastStroke = null;
     this.strokeAt(hex);
   }
@@ -294,7 +301,7 @@ export class MapCanvas {
       const dy = event.clientY - this.lastPointer.y;
       this.lastPointer = { x: event.clientX, y: event.clientY };
       this.camera.update((c) => c.panBy(dx, dy));
-    } else if (this.painting) {
+    } else if (this.painting && this.continuousStroke) {
       this.strokeAt(hex);
     }
   }
@@ -319,6 +326,7 @@ export class MapCanvas {
 
   private endGesture(): void {
     this.painting = false;
+    this.continuousStroke = false;
     this.panning = false;
     this.dragging.set(false);
     this.lastPointer = null;
@@ -341,11 +349,11 @@ export class MapCanvas {
     }
 
     if (event.key.toLowerCase() === 'e') {
-      this.store.selectTool('erase');
+      this.store.selectTool({ kind: 'erase' });
       return;
     }
     const terrain = terrainPalette[Number(event.key) - 1];
-    if (terrain) this.store.selectTool(terrain.id);
+    if (terrain) this.store.selectTool({ kind: 'terrain', id: terrain.id });
   }
 
   /** Whether `target` is a text input the user is typing into. */

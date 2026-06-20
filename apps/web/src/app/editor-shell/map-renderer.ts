@@ -1,14 +1,30 @@
 import {
   Axial,
   coordKey,
+  FeatureId,
+  featureLibrary,
   hexCorners,
   hexesInRect,
+  hexToPixel,
   HexMap,
   Layout,
   terrainPalette,
   TerrainId,
 } from '@hexly/domain';
 import { Camera } from './camera';
+
+/** The built-in features keyed by id, for a marker's path lookup. */
+const FEATURE_BY_ID = new Map(featureLibrary.map((f) => [f.id, f]));
+/** A marker's drawn size as a fraction of the on-screen hex radius. */
+const MARKER_SCALE = 1.3;
+/** A marker's stroke weight in screen pixels, held constant across zoom. */
+const MARKER_STROKE = 1.6;
+/**
+ * The authoring viewBox the feature `path`s are drawn in: a 24×24 box, matching
+ * the `<svg viewBox="0 0 24 24">` the UI icon components use. The marker is
+ * scaled from this box and translated by its half (12) to centre it on the hex.
+ */
+const ICON_BOX = 24;
 
 /**
  * The seam between the editor and whatever draws the map. There is one Canvas 2D
@@ -33,6 +49,8 @@ interface Palette {
   readonly void: string;
   readonly hover: string;
   readonly line: string;
+  /** The ink a feature marker is stroked in, from `--feature-ink`. */
+  readonly featureInk: string;
   /** One fill colour per terrain id, resolved from its `--terrain-*` token. */
   readonly terrain: Record<TerrainId, string>;
 }
@@ -53,6 +71,8 @@ export class Canvas2dMapRenderer implements MapRenderer {
   private readonly ctx: CanvasRenderingContext2D | null;
   /** Cached themed colours; refreshed only on a theme switch, not per frame. */
   private palette: Palette;
+  /** Lazily-built `Path2D` per feature id — the geometry is constant, so cache it. */
+  private readonly markerPaths = new Map<FeatureId, Path2D>();
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -78,6 +98,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
       void: read('--canvas-bg', '#1b1b1b'),
       hover: read('--gold-soft', 'rgba(212,175,55,.3)'),
       line: read('--hex-line', '#888'),
+      featureInk: read('--feature-ink', '#f4ecd8'),
       terrain,
     };
   }
@@ -105,12 +126,16 @@ export class Canvas2dMapRenderer implements MapRenderer {
 
     // Painted terrain, under the grid lines. Only the visible painted hexes are
     // drawn — the document is sparse, so this never touches the infinite Void.
+    // While here, note which hexes carry a feature so the marker pass below can
+    // walk that short list instead of re-scanning every visible hex.
+    const featured: { hex: Axial; ref: FeatureId }[] = [];
     for (const hex of visible) {
       const painted = doc.hexes[coordKey(hex)];
       if (!painted) continue;
       ctx.fillStyle = this.palette.terrain[painted.terrain];
       this.tracePath(ctx, camera, hex);
       ctx.fill();
+      if (painted.feature) featured.push({ hex, ref: painted.feature.ref });
     }
 
     // Hover highlight next, so the grid lines draw crisply on top of it.
@@ -126,6 +151,60 @@ export class Canvas2dMapRenderer implements MapRenderer {
       this.tracePath(ctx, camera, hex);
       ctx.stroke();
     }
+
+    // Feature markers ride on top of the grid (CONTEXT.md → Feature). The
+    // join/cap/strokeStyle changes are wrapped in save/restore so they don't
+    // leak into the next frame's grid stroke. The marker scale depends only on
+    // the zoom, so it's computed once here rather than per feature.
+    if (featured.length > 0) {
+      const radius = this.layout.size.y * camera.zoom;
+      const scale = (radius * MARKER_SCALE) / ICON_BOX;
+      ctx.save();
+      ctx.strokeStyle = this.palette.featureInk;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      for (const { hex, ref } of featured) {
+        this.strokeMarker(ctx, camera, hex, ref, scale);
+      }
+      ctx.restore();
+    }
+  }
+
+  /**
+   * Stroke a feature's icon, centred on `hex`. The library art is authored in a
+   * 24×24 box; this scales it to a fraction of the on-screen hex and keeps the
+   * stroke a constant screen weight whatever the zoom.
+   */
+  private strokeMarker(
+    ctx: CanvasRenderingContext2D,
+    camera: Camera,
+    hex: Axial,
+    id: FeatureId,
+    scale: number,
+  ): void {
+    const path = this.markerPath(id);
+    if (!path) return;
+    const centre = camera.worldToScreen(hexToPixel(this.layout, hex));
+    ctx.save();
+    ctx.translate(centre.x, centre.y);
+    ctx.scale(scale, scale);
+    ctx.translate(-ICON_BOX / 2, -ICON_BOX / 2); // centre the box on the hex
+    ctx.lineWidth = MARKER_STROKE / scale; // undo the scale so it stays crisp
+    ctx.stroke(path);
+    ctx.restore();
+  }
+
+  /** The marker `Path2D` for a feature, built once and cached (or null if it can't be). */
+  private markerPath(id: FeatureId): Path2D | null {
+    if (typeof Path2D === 'undefined') return null;
+    let path = this.markerPaths.get(id);
+    if (!path) {
+      const feature = FEATURE_BY_ID.get(id);
+      if (!feature) return null;
+      path = new Path2D(feature.path);
+      this.markerPaths.set(id, path);
+    }
+    return path;
   }
 
   /** The world-space rectangle currently visible through the camera. */

@@ -45,14 +45,56 @@ export const terrainPalette = [
   { id: 'desert', label: 'Desert', fill: '--terrain-desert' },
 ] as const satisfies readonly Terrain[];
 
-/** A terrain id constrained to the built-in palette — the source of truth. */
-export const terrainIdSchema = z.enum(
-  terrainPalette.map((t) => t.id) as [TerrainId, ...TerrainId[]],
-);
+/**
+ * Build a Zod enum from a palette's ids. Centralizes the one fragile
+ * non-empty-tuple cast Zod requires so it lives in exactly one place; the
+ * inferred literal types and runtime enum are identical to inlining it.
+ */
+function idEnum<Id extends string>(ids: readonly Id[]) {
+  return z.enum(ids as [Id, ...Id[]]);
+}
 
-/** A painted Hex. Carries exactly one Terrain for now (CONTEXT.md → Hex). */
+/** A terrain id constrained to the built-in palette — the source of truth. */
+export const terrainIdSchema = idEnum(terrainPalette.map((t) => t.id));
+
+/** A built-in Feature icon: a stable `id`, a `label`, and its marker artwork. */
+export interface Feature {
+  /** Stable identifier a Hex references; stored in documents, never shown. */
+  readonly id: string;
+  /** Human-facing name for the palette (CONTEXT.md → Feature). */
+  readonly label: string;
+  /**
+   * The SVG path (`d`) of the marker, drawn in a 24×24 box. The single source
+   * of truth for both the canvas Path2D and the palette/icon component — the
+   * Feature analogue of a Terrain's `fill` token (ADR-0006/0007).
+   */
+  readonly path: string;
+}
+
+/**
+ * The built-in Feature library: the fixed icon set a user can place for now
+ * (no uploads — issue #7). Ids are stable (stored in documents); labels and
+ * paths are presentation. `as const satisfies` keeps the ids as literals so
+ * {@link FeatureId} is a real union, not `string`.
+ */
+export const featureLibrary = [
+  { id: 'settlement', label: 'Settlement', path: 'M5 19v-7l7-5 7 5v7z M10 19v-4h4v4' },
+  { id: 'ruin', label: 'Ruin', path: 'M5 20V9l3 2V7l3 2V6l3 3 3-3v14z' },
+] as const satisfies readonly Feature[];
+
+/** A feature id constrained to the built-in library — the source of truth. */
+export const featureIdSchema = idEnum(featureLibrary.map((f) => f.id));
+
+/** A feature placed on a Hex: a reference to a built-in library id (issue #7). */
+export const featureRefSchema = z.object({ ref: featureIdSchema });
+
+/**
+ * A painted Hex. Carries exactly one Terrain, plus at most one Feature
+ * (CONTEXT.md → Hex). `feature` is optional and absent unless one is placed.
+ */
 export const hexSchema = z.object({
   terrain: terrainIdSchema,
+  feature: featureRefSchema.optional(),
 });
 
 /**
@@ -65,6 +107,8 @@ export const hexMapSchema = z.object({
 
 /** A terrain id from the built-in palette — the literal union of every id. */
 export type TerrainId = (typeof terrainPalette)[number]['id'];
+/** A feature id from the built-in library — the literal union of every id. */
+export type FeatureId = (typeof featureLibrary)[number]['id'];
 /** A single painted hex's content. */
 export type Hex = z.infer<typeof hexSchema>;
 /** The whole document held by the editor and persisted to the backend. */
