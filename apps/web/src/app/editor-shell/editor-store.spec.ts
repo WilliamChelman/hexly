@@ -348,6 +348,16 @@ describe('EditorStore', () => {
     expect(store.document().regions).toEqual([]);
   });
 
+  it('resets the armed tool to the default terrain when its region is deleted', () => {
+    const store = new EditorStore();
+    const id = store.createRegion('Avalon', '#b08a4e');
+    store.selectTool({ kind: 'region', id, mode: 'add' });
+
+    store.deleteRegion(id); // the armed region no longer exists
+
+    expect(store.tool()).toEqual({ kind: 'terrain', id: 'forest' });
+  });
+
   it('undo restores a deleted region with its membership', () => {
     const store = new EditorStore();
     const id = store.createRegion('Avalon', '#b08a4e');

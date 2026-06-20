@@ -106,7 +106,7 @@ describe('ToolPalette regions', () => {
       `[data-testid=region-color-${id}]`,
     ) as HTMLInputElement;
     input.value = '#6f7fae';
-    input.dispatchEvent(new Event('input'));
+    input.dispatchEvent(new Event('change'));
 
     expect(store.document().regions[0].color).toBe('#6f7fae');
   });

@@ -158,7 +158,7 @@ export class EditorStore {
    * removes the region (issue #8).
    */
   createRegion(name: string, color: string): string {
-    const id = crypto.randomUUID();
+    const id = mintId();
     this.commit((draft) => {
       draft.regions.push({ id, name, color, hexes: {} });
     });
@@ -167,17 +167,15 @@ export class EditorStore {
 
   /** Rename the region `id`; a no-op (no undo step) if there is no such region. */
   renameRegion(id: string, name: string): void {
-    this.commit((draft) => {
-      const region = findRegion(draft, id);
-      if (region) region.name = name;
+    this.updateRegion(id, (region) => {
+      region.name = name;
     });
   }
 
   /** Recolor the region `id`; a no-op if there is no such region. */
   recolorRegion(id: string, color: string): void {
-    this.commit((draft) => {
-      const region = findRegion(draft, id);
-      if (region) region.color = color;
+    this.updateRegion(id, (region) => {
+      region.color = color;
     });
   }
 
@@ -186,6 +184,24 @@ export class EditorStore {
     this.commit((draft) => {
       const at = draft.regions.findIndex((r) => r.id === id);
       if (at !== -1) draft.regions.splice(at, 1);
+    });
+    // The armed region tool now points at nothing — every subsequent stroke would
+    // silently no-op. Fall back to the default terrain tool so the canvas stays live.
+    const tool = this.tool();
+    if (tool.kind === 'region' && tool.id === id) {
+      this.tool.set({ kind: 'terrain', id: 'forest' });
+    }
+  }
+
+  /**
+   * Run `mutate` against the region `id` through `commit`; a no-op (no undo step)
+   * if there is no such region. The shared find-and-guard for the per-field region
+   * edits (rename, recolor).
+   */
+  private updateRegion(id: string, mutate: (region: Region) => void): void {
+    this.commit((draft) => {
+      const region = findRegion(draft, id);
+      if (region) mutate(region);
     });
   }
 
@@ -253,6 +269,12 @@ export class EditorStore {
 /** Find a region by id within a document draft (or `undefined`). */
 function findRegion(doc: HexMap, id: string): Region | undefined {
   return doc.regions.find((r) => r.id === id);
+}
+
+/** A unique id, preferring crypto.randomUUID but falling back where it is unavailable (insecure contexts). */
+function mintId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  return 'r-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 }
 
 /** A committed edit, as the forward and inverse Immer patches that effect it. */

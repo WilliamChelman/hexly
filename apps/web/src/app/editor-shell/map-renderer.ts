@@ -9,6 +9,8 @@ import {
   HexMap,
   Layout,
   neighbors,
+  parseCoordKey,
+  Point,
   terrainPalette,
   TerrainId,
 } from '@hexly/domain';
@@ -83,8 +85,9 @@ export class Canvas2dMapRenderer implements MapRenderer {
   /**
    * For each hex edge (corner `i` → corner `i+1`), the {@link neighbors}
    * direction index of the hex across it. Lets the region pass tell a boundary
-   * edge (neighbour outside the region) from an interior one. Derived from the
-   * layout once, so it holds for either orientation.
+   * edge (neighbour outside the region) from an interior one. The mapping is
+   * purely combinatorial — derived once in isotropic space — so it holds for
+   * either orientation and any (possibly anisotropic) layout size.
    */
   private readonly edgeNeighborDir: readonly number[];
 
@@ -99,13 +102,21 @@ export class Canvas2dMapRenderer implements MapRenderer {
 
   /**
    * Match each hex edge to the neighbour sharing it: the edge's outward midpoint
-   * direction agrees most closely with that neighbour's centre direction. Pure
-   * geometry on hex (0,0), so it depends only on the layout.
+   * direction agrees most closely with that neighbour's centre direction. The
+   * mapping is derived in an *isotropic* unit layout (size 1×1, origin 0), so it
+   * depends only on the orientation — never on the layout's size. That keeps the
+   * dot-product a true bijection even for anisotropic hexes (size.x != size.y),
+   * where matching in the real per-axis layout would break the topology.
    */
   private computeEdgeNeighborDirs(): number[] {
+    const unit: Layout = {
+      orientation: this.layout.orientation,
+      size: { x: 1, y: 1 },
+      origin: { x: 0, y: 0 },
+    };
     const origin: Axial = { q: 0, r: 0 };
-    const centre = hexToPixel(this.layout, origin);
-    const corners = hexCorners(this.layout, origin);
+    const centre = hexToPixel(unit, origin);
+    const corners = hexCorners(unit, origin);
     const ns = neighbors(origin);
     return corners.map((a, i) => {
       const b = corners[(i + 1) % 6];
@@ -113,7 +124,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
       let best = 0;
       let bestDot = -Infinity;
       ns.forEach((n, d) => {
-        const nc = hexToPixel(this.layout, n);
+        const nc = hexToPixel(unit, n);
         const dot = mid.x * (nc.x - centre.x) + mid.y * (nc.y - centre.y);
         if (dot > bestDot) {
           bestDot = dot;
@@ -197,16 +208,23 @@ export class Canvas2dMapRenderer implements MapRenderer {
     // Region borders ride above the grid: each region strokes only its boundary
     // edges (those whose neighbour is outside the region) in its own colour, so
     // it reads as a coloured outline and overlapping regions stay legible
-    // (issue #8). Interior edges between two members are skipped.
+    // (issue #8). Interior edges between two members are skipped. Each boundary
+    // edge is its own single-segment subpath, so lineJoin never fires; lineCap
+    // 'round' is what rounds the butt ends and fills the notches at corners.
+    // Work is proportional to region membership, not the viewport: we intersect
+    // each region's own members with the visible set rather than re-scanning
+    // every visible hex per region.
     if (doc.regions.length > 0) {
+      const visibleKeys = new Set(visible.map(coordKey));
       ctx.save();
       ctx.lineWidth = REGION_BORDER_WIDTH;
       ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
       for (const region of doc.regions) {
         ctx.strokeStyle = region.color;
-        for (const hex of visible) {
-          if (!region.hexes[coordKey(hex)]) continue;
-          this.strokeRegionBorder(ctx, camera, hex, region.hexes);
+        for (const key of Object.keys(region.hexes)) {
+          if (!visibleKeys.has(key)) continue;
+          this.strokeRegionBorder(ctx, camera, parseCoordKey(key), region.hexes);
         }
       }
       ctx.restore();
@@ -291,9 +309,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
     hex: Axial,
     members: Record<string, true>,
   ): void {
-    const corners = hexCorners(this.layout, hex).map((c) =>
-      camera.worldToScreen(c),
-    );
+    const corners = this.screenCorners(camera, hex);
     const ns = neighbors(hex);
     for (let i = 0; i < 6; i++) {
       if (members[coordKey(ns[this.edgeNeighborDir[i]])]) continue; // interior edge
@@ -306,15 +322,18 @@ export class Canvas2dMapRenderer implements MapRenderer {
     }
   }
 
+  /** The six hex corners in screen space, under the current camera. */
+  private screenCorners(camera: Camera, hex: Axial): Point[] {
+    return hexCorners(this.layout, hex).map((c) => camera.worldToScreen(c));
+  }
+
   /** Lay down the screen-space polygon path for one hex (no fill/stroke). */
   private tracePath(
     ctx: CanvasRenderingContext2D,
     camera: Camera,
     hex: Axial,
   ): void {
-    const corners = hexCorners(this.layout, hex).map((c) =>
-      camera.worldToScreen(c),
-    );
+    const corners = this.screenCorners(camera, hex);
     ctx.beginPath();
     corners.forEach((p, i) =>
       i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y),

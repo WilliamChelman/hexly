@@ -8,12 +8,11 @@ import { GlyphBox } from './glyph-box';
 import { IconPath } from './icon/icon-path';
 import { LabelIcon } from './icon/glyphs/label';
 import { OverlayIcon } from './icon/glyphs/overlay';
-import { RegionIcon } from './icon/glyphs/region';
 import { Kbd } from './kbd';
 import { Swatch } from './swatch';
 
 /** The content glyphs a palette tool can show (terrain tools use a swatch). */
-export type ToolGlyph = 'overlay' | 'region' | 'label';
+export type ToolGlyph = 'overlay' | 'label';
 
 /**
  * A palette tool button — square-ish, full-width, with a leading swatch or
@@ -28,7 +27,7 @@ export type ToolGlyph = 'overlay' | 'region' | 'label';
 @Component({
   selector: 'button[appTool]',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [GlyphBox, IconPath, OverlayIcon, RegionIcon, LabelIcon, Swatch, Kbd],
+  imports: [GlyphBox, IconPath, OverlayIcon, LabelIcon, Swatch, Kbd],
   host: {
     '[class.is-active]': 'active()',
     '[attr.aria-pressed]': 'active()',
@@ -43,7 +42,6 @@ export type ToolGlyph = 'overlay' | 'region' | 'label';
       <span appGlyphBox>
         @switch (g) {
           @case ('overlay') { <app-icon-overlay [size]="18" /> }
-          @case ('region') { <app-icon-region [size]="18" /> }
           @case ('label') { <app-icon-label [size]="18" /> }
         }
       </span>

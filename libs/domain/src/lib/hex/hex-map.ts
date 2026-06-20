@@ -97,7 +97,7 @@ export const hexSchema = z.object({
   feature: featureRefSchema.optional(),
 });
 
-/** A six-digit `#rrggbb` colour, the form a Region's user-chosen tint is stored in. */
+/** A six-digit `#rrggbb` colour, the form a Region's user-chosen border colour is stored in. */
 const hexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 
 /**
@@ -112,7 +112,7 @@ export const regionSchema = z.object({
   id: z.string(),
   /** Human-facing name (e.g. "The Kingdom of Avalon"). */
   name: z.string(),
-  /** The translucent tint the renderer fills member hexes with, as `#rrggbb`. */
+  /** The `#rrggbb` colour the renderer strokes the region's perimeter border in. */
   color: hexColorSchema,
   /** The member coordinate keys, each mapped to `true` — a JSON-friendly set. */
   hexes: z.record(z.string(), z.literal(true)),
