@@ -1,52 +1,52 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
-import { ButtonDirective } from '../ui/button';
+import { Button } from '../ui/button';
 import { Chip } from '../ui/chip';
 import { Coord } from '../ui/coord';
+import { Eyebrow } from '../ui/eyebrow';
+import { Field } from '../ui/field';
 import { Icon } from '../ui/icon/icon';
+import { Swatch } from '../ui/swatch';
 
 /** The right rail: the selected hex's identity, terrain, regions and Note. */
 @Component({
   selector: 'app-inspector',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ButtonDirective, Chip, Coord, Icon],
+  imports: [Button, Chip, Coord, Eyebrow, Field, Icon, Swatch],
   template: `
     <header class="head">
-      <span class="eyebrow">Selected hex</span>
+      <span appEyebrow>Selected hex</span>
       <app-coord>q 0 · r 0</app-coord>
     </header>
 
     <div class="title">
-      <span class="tool__glyph"><app-icon name="settlement" [size]="18" /></span>
+      <span class="glyph"><app-icon name="settlement" [size]="18" /></span>
       <div>
         <h3 class="name">Caer Aldermoor</h3>
         <app-chip tone="gold">Settlement</app-chip>
       </div>
     </div>
 
-    <div class="field">
-      <span class="field__label">Terrain</span>
+    <div appField label="Terrain">
       <div class="row">
-        <span class="swatch" style="background: var(--terrain-forest)"></span>
+        <span appSwatch style="background: var(--terrain-forest)"></span>
         <span>Forest</span>
       </div>
     </div>
 
-    <div class="field">
-      <span class="field__label">Regions</span>
+    <div appField label="Regions">
       <div class="chips">
         <app-chip
-          ><span class="swatch" style="background: #7c9b86; width: 11px; height: 11px"></span
+          ><span appSwatch style="background: #7c9b86; width: 11px; height: 11px"></span
           >The Whisperwood</app-chip
         >
         <app-chip
-          ><span class="swatch" style="background: #b08a4e; width: 11px; height: 11px"></span
+          ><span appSwatch style="background: #b08a4e; width: 11px; height: 11px"></span
           >Aldermoor Reach</app-chip
         >
       </div>
     </div>
 
-    <div class="field note">
-      <span class="field__label">Note</span>
+    <div appField label="Note" class="note">
       <p>
         A walled town where the forest road meets the river ford. The
         <em>Lanternwrights' Guild</em> keeps the old beacon lit — sailors on the
@@ -78,6 +78,17 @@ import { Icon } from '../ui/icon/icon';
       display: flex;
       gap: var(--space-3);
       align-items: center;
+    }
+    .glyph {
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      flex: none;
+      border-radius: var(--radius-sm);
+      background: var(--surface-sunken);
+      border: 1px solid var(--line);
+      color: var(--ink-muted);
     }
     .title > div {
       display: flex;

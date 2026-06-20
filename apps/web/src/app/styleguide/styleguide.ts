@@ -1,11 +1,19 @@
 import { Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ThemeService } from '../core/theme.service';
+import { Button } from '../ui/button';
+import { Cartouche } from '../ui/cartouche';
 import { Chip } from '../ui/chip';
 import { Coord } from '../ui/coord';
-import { PanelDirective } from '../ui/panel';
+import { Eyebrow } from '../ui/eyebrow';
+import { Field } from '../ui/field';
+import { Input } from '../ui/input';
+import { Kbd } from '../ui/kbd';
+import { Panel } from '../ui/panel';
+import { Textarea } from '../ui/textarea';
+import { Tool } from '../ui/tool';
 
-interface Swatch {
+interface SwatchRow {
   readonly token: string;
   readonly name: string;
 }
@@ -23,14 +31,29 @@ interface TypeRow {
  */
 @Component({
   selector: 'app-styleguide',
-  imports: [RouterLink, Chip, Coord, PanelDirective],
+  imports: [
+    RouterLink,
+    Button,
+    Cartouche,
+    Chip,
+    Coord,
+    Eyebrow,
+    Field,
+    Input,
+    Kbd,
+    Panel,
+    Textarea,
+    Tool,
+  ],
   template: `
     <div class="guide">
       <header class="guide-top">
-        <a class="btn btn--ghost btn--sm" routerLink="/">← Back to map</a>
+        <a appButton variant="ghost" size="sm" routerLink="/">← Back to map</a>
         <button
           type="button"
-          class="btn btn--ghost btn--sm"
+          appButton
+          variant="ghost"
+          size="sm"
           (click)="themeService.toggle()"
         >
           {{ theme() === 'dark' ? 'Astral' : 'Parchment' }} · switch
@@ -39,7 +62,7 @@ interface TypeRow {
 
       <!-- Masthead -->
       <section class="hero">
-        <span class="eyebrow">Hexly design system</span>
+        <span appEyebrow>Hexly design system</span>
         <h1 class="hero-title">The cartographer’s table,<br />by starlight.</h1>
         <p class="hero-lede">
           One identity told at two hours of the day. <strong>Parchment</strong> is
@@ -145,58 +168,57 @@ interface TypeRow {
         <h2 class="section-title">Components</h2>
         <div class="specimens">
           <figure class="specimen" appPanel>
-            <figcaption class="eyebrow">Buttons</figcaption>
+            <figcaption appEyebrow>Buttons</figcaption>
             <div class="specimen-row">
-              <button class="btn btn--primary">Share map</button>
-              <button class="btn">Add region</button>
-              <button class="btn btn--ghost">Cancel</button>
-              <button class="btn btn--danger">Clear hex</button>
-              <button class="btn btn--sm">Small</button>
+              <button appButton variant="primary">Share map</button>
+              <button appButton>Add region</button>
+              <button appButton variant="ghost">Cancel</button>
+              <button appButton danger>Clear hex</button>
+              <button appButton size="sm">Small</button>
             </div>
           </figure>
 
           <figure class="specimen" appPanel>
-            <figcaption class="eyebrow">Tools</figcaption>
+            <figcaption appEyebrow>Tools</figcaption>
             <div class="specimen-col">
-              <button class="tool is-active" aria-pressed="true">
-                <span
-                  class="swatch"
-                  style="background: var(--terrain-forest)"
-                ></span>
-                <span class="tool__label">Forest</span><kbd class="kbd">2</kbd>
-              </button>
-              <button class="tool">
-                <span
-                  class="swatch"
-                  style="background: var(--terrain-ocean)"
-                ></span>
-                <span class="tool__label">Ocean</span><kbd class="kbd">3</kbd>
-              </button>
+              <button
+                appTool
+                label="Forest"
+                hint="2"
+                swatch="--terrain-forest"
+                active
+                aria-label="Forest"
+              ></button>
+              <button
+                appTool
+                label="Ocean"
+                hint="3"
+                swatch="--terrain-ocean"
+                aria-label="Ocean"
+              ></button>
             </div>
           </figure>
 
           <figure class="specimen" appPanel>
-            <figcaption class="eyebrow">Chips & coordinates</figcaption>
+            <figcaption appEyebrow>Chips & coordinates</figcaption>
             <div class="specimen-row">
               <app-chip>Default</app-chip>
               <app-chip tone="gold">Settlement</app-chip>
               <app-chip tone="sea">Editing</app-chip>
               <app-chip tone="astra">Region</app-chip>
               <app-coord>q 12 · r −4</app-coord>
-              <kbd class="kbd">⌘ Z</kbd>
+              <kbd appKbd>⌘ Z</kbd>
             </div>
           </figure>
 
           <figure class="specimen" appPanel>
-            <figcaption class="eyebrow">Fields</figcaption>
+            <figcaption appEyebrow>Fields</figcaption>
             <div class="specimen-col">
-              <label class="field">
-                <span class="field__label">Map name</span>
-                <input class="input" value="The Reach of Aldermoor" />
+              <label appField label="Map name">
+                <input appInput value="The Reach of Aldermoor" />
               </label>
-              <label class="field">
-                <span class="field__label">Note</span>
-                <textarea class="textarea">
+              <label appField label="Note">
+                <textarea appTextarea>
 A walled town where the forest road meets the river ford.</textarea
                 >
               </label>
@@ -206,7 +228,7 @@ A walled town where the forest road meets the river ford.</textarea
       </section>
 
       <footer class="guide-foot">
-        <span class="cartouche">Hexly</span>
+        <span class="brand" appCartouche>Hexly</span>
         <span>Design tokens · <code>apps/web/src/styles</code></span>
       </footer>
     </div>
@@ -428,7 +450,7 @@ A walled town where the forest road meets the river ford.</textarea
       font-size: var(--text-sm);
       color: var(--ink-muted);
     }
-    .guide-foot .cartouche {
+    .guide-foot .brand {
       font-size: var(--text-md);
       color: var(--gold);
     }
@@ -448,7 +470,7 @@ export class Styleguide {
   protected readonly themeService = inject(ThemeService);
   protected readonly theme = this.themeService.theme;
 
-  protected readonly semantic: Swatch[] = [
+  protected readonly semantic: SwatchRow[] = [
     { token: '--bg', name: 'Table' },
     { token: '--surface', name: 'Paper' },
     { token: '--surface-raised', name: 'Pinned note' },
@@ -463,7 +485,7 @@ export class Styleguide {
     { token: '--line-strong', name: 'Drawn rule' },
   ];
 
-  protected readonly terrain: Swatch[] = [
+  protected readonly terrain: SwatchRow[] = [
     { token: '--terrain-grass', name: 'Grassland' },
     { token: '--terrain-forest', name: 'Forest' },
     { token: '--terrain-ocean', name: 'Ocean' },

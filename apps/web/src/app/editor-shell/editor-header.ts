@@ -1,23 +1,25 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ThemeService } from '../core/theme.service';
-import { ButtonDirective } from '../ui/button';
+import { Button } from '../ui/button';
+import { Cartouche } from '../ui/cartouche';
 import { Chip } from '../ui/chip';
+import { Eyebrow } from '../ui/eyebrow';
 import { Icon } from '../ui/icon/icon';
 
 /** The top chrome: brand, map title, and the global actions (theme, share). */
 @Component({
   selector: 'app-editor-header',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, ButtonDirective, Chip, Icon],
+  imports: [RouterLink, Button, Cartouche, Chip, Eyebrow, Icon],
   template: `
     <div class="brand">
       <span class="mark"><app-icon name="logo" [size]="26" /></span>
-      <span class="name cartouche">Hexly</span>
+      <span class="name" appCartouche>Hexly</span>
     </div>
 
     <div class="titlebar">
-      <span class="eyebrow">Hex map</span>
+      <span appEyebrow>Hex map</span>
       <span class="title">The Reach of Aldermoor</span>
       <app-chip tone="sea">Editing</app-chip>
     </div>

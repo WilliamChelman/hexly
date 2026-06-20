@@ -8,7 +8,9 @@ import {
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { HealthStatus, isHealthy } from '@hexly/domain';
+import { Cartouche } from '../ui/cartouche';
 import { Coord } from '../ui/coord';
+import { Dot } from '../ui/dot';
 
 /**
  * The bottom rail. It owns the API health probe it displays — the only piece of
@@ -17,23 +19,23 @@ import { Coord } from '../ui/coord';
 @Component({
   selector: 'app-status-bar',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Coord],
+  imports: [Cartouche, Coord, Dot],
   template: `
     <span class="item" data-testid="health">
       @if (health(); as status) {
-        <span class="dot" [class.dot--positive]="healthy()"></span>
+        <span appDot [positive]="healthy()"></span>
         API {{ status.status }} · {{ status.service }}
       } @else if (error(); as message) {
-        <span class="dot"></span>{{ message }}
+        <span appDot></span>{{ message }}
       } @else {
-        <span class="dot"></span>Connecting…
+        <span appDot></span>Connecting…
       }
     </span>
     <span class="spacer"></span>
     <span class="item"><app-coord>q 0 · r 0</app-coord></span>
     <span class="item">13 hexes</span>
     <span class="item">Zoom 100%</span>
-    <span class="item cartouche">Astral / Parchment</span>
+    <span class="item" appCartouche>Astral / Parchment</span>
   `,
   styles: `
     :host {

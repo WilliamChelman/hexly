@@ -1,6 +1,10 @@
 import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
-import { Icon, IconName } from '../ui/icon/icon';
-import { PanelDirective } from '../ui/panel';
+import { IconName } from '../ui/icon/icon';
+import { Eyebrow } from '../ui/eyebrow';
+import { Panel } from '../ui/panel';
+import { Rule } from '../ui/rule';
+import { Swatch } from '../ui/swatch';
+import { Tool as ToolButton } from '../ui/tool';
 
 /** A palette entry — one paintable thing, named in the domain's vocabulary. */
 interface Tool {
@@ -22,44 +26,40 @@ interface Tool {
 @Component({
   selector: 'app-tool-palette',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, PanelDirective],
+  imports: [Eyebrow, Panel, Rule, Swatch, ToolButton],
   template: `
     <section class="group">
-      <h2 class="eyebrow heading">Terrain</h2>
+      <h2 class="heading" appEyebrow>Terrain</h2>
       <div class="list" role="group" aria-label="Terrain">
         @for (t of terrainTools; track t.id) {
           <button
-            type="button"
-            class="tool"
-            [class.is-active]="activeTool() === t.id"
-            [attr.aria-pressed]="activeTool() === t.id"
+            appTool
+            [label]="t.label"
+            [hint]="t.hint"
+            [swatch]="t.swatch"
+            [active]="activeTool() === t.id"
+            [attr.aria-label]="t.label"
             (click)="setTool(t.id)"
-          >
-            <span class="swatch" [style.background]="'var(' + t.swatch + ')'"></span>
-            <span class="tool__label">{{ t.label }}</span>
-            <kbd class="kbd">{{ t.hint }}</kbd>
-          </button>
+          ></button>
         }
       </div>
     </section>
 
-    <hr class="rule" />
+    <hr appRule />
 
     <section class="group">
-      <h2 class="eyebrow heading">Content</h2>
+      <h2 class="heading" appEyebrow>Content</h2>
       <div class="list" role="group" aria-label="Content">
         @for (t of contentTools; track t.id) {
           <button
-            type="button"
-            class="tool"
-            [class.is-active]="activeTool() === t.id"
-            [attr.aria-pressed]="activeTool() === t.id"
+            appTool
+            [label]="t.label"
+            [hint]="t.hint"
+            [glyph]="t.glyph"
+            [active]="activeTool() === t.id"
+            [attr.aria-label]="t.label"
             (click)="setTool(t.id)"
-          >
-            <span class="tool__glyph"><app-icon [name]="t.glyph!" [size]="18" /></span>
-            <span class="tool__label">{{ t.label }}</span>
-            <kbd class="kbd">{{ t.hint }}</kbd>
-          </button>
+          ></button>
         }
       </div>
     </section>
@@ -67,11 +67,11 @@ interface Tool {
     <div class="spacer"></div>
 
     <section class="group regions" appPanel raised>
-      <h2 class="eyebrow">Regions</h2>
+      <h2 appEyebrow>Regions</h2>
       <ul class="legend">
-        <li><span class="swatch" style="background: #7c9b86"></span>The Whisperwood</li>
-        <li><span class="swatch" style="background: #b08a4e"></span>Aldermoor Reach</li>
-        <li><span class="swatch" style="background: #6f7fae"></span>The Drowned Coast</li>
+        <li><span appSwatch style="background: #7c9b86"></span>The Whisperwood</li>
+        <li><span appSwatch style="background: #b08a4e"></span>Aldermoor Reach</li>
+        <li><span appSwatch style="background: #6f7fae"></span>The Drowned Coast</li>
       </ul>
     </section>
   `,

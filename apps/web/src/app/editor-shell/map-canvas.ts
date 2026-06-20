@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
-import { ButtonDirective } from '../ui/button';
+import { Button } from '../ui/button';
 import { Coord } from '../ui/coord';
+import { Eyebrow } from '../ui/eyebrow';
 import { Icon } from '../ui/icon/icon';
 
 /** A single rendered hex in the demo cluster on the canvas frame. */
@@ -29,7 +30,7 @@ const HEX_R = 34;
 @Component({
   selector: 'app-map-canvas',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ButtonDirective, Coord, Icon],
+  imports: [Button, Coord, Eyebrow, Icon],
   template: `
     <div class="grid" aria-hidden="true"></div>
 
@@ -106,7 +107,7 @@ const HEX_R = 34;
     <div class="readout">
       <app-coord>q 0 · r 0</app-coord>
       <span class="readout-sep">·</span>
-      <span class="eyebrow">Forest</span>
+      <span appEyebrow>Forest</span>
     </div>
 
     <div class="compass" title="North">
