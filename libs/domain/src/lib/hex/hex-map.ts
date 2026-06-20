@@ -33,18 +33,21 @@ export interface Terrain {
 /**
  * The built-in terrain palette: the fixed set a user can paint with for now.
  * Ids are stable (stored in documents); labels and fills are presentation.
+ * `as const satisfies` keeps the ids as literals — so {@link TerrainId} is a
+ * real union, not `string` — while still checking each entry against
+ * {@link Terrain}.
  */
-export const terrainPalette: readonly Terrain[] = [
+export const terrainPalette = [
   { id: 'grass', label: 'Grassland', fill: '--terrain-grass' },
   { id: 'forest', label: 'Forest', fill: '--terrain-forest' },
   { id: 'ocean', label: 'Ocean', fill: '--terrain-ocean' },
   { id: 'mountain', label: 'Mountains', fill: '--terrain-mountain' },
   { id: 'desert', label: 'Desert', fill: '--terrain-desert' },
-];
+] as const satisfies readonly Terrain[];
 
 /** A terrain id constrained to the built-in palette — the source of truth. */
 export const terrainIdSchema = z.enum(
-  terrainPalette.map((t) => t.id) as [string, ...string[]],
+  terrainPalette.map((t) => t.id) as [TerrainId, ...TerrainId[]],
 );
 
 /** A painted Hex. Carries exactly one Terrain for now (CONTEXT.md → Hex). */
@@ -60,8 +63,8 @@ export const hexMapSchema = z.object({
   hexes: z.record(z.string(), hexSchema),
 });
 
-/** A terrain id from the built-in palette. */
-export type TerrainId = z.infer<typeof terrainIdSchema>;
+/** A terrain id from the built-in palette — the literal union of every id. */
+export type TerrainId = (typeof terrainPalette)[number]['id'];
 /** A single painted hex's content. */
 export type Hex = z.infer<typeof hexSchema>;
 /** The whole document held by the editor and persisted to the backend. */

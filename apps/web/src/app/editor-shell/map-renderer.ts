@@ -20,7 +20,7 @@ export interface MapRenderer {
   /** Match the drawing surface to the given CSS-pixel size. */
   resize(width: number, height: number): void;
   /** Paint one frame: the painted hexes, the culled grid, and an optional hover. */
-  render(camera: Camera, document: HexMap, hover: Axial | null): void;
+  render(camera: Camera, doc: HexMap, hover: Axial | null): void;
   /**
    * Re-read the themed colours from CSS. Cheap but not free (a style recalc), so
    * the caller invokes it only when the active theme changes — not per frame.
@@ -91,7 +91,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
     this.canvas.style.height = `${height}px`;
   }
 
-  render(camera: Camera, document: HexMap, hover: Axial | null): void {
+  render(camera: Camera, doc: HexMap, hover: Axial | null): void {
     const ctx = this.ctx;
     if (!ctx || this.width === 0 || this.height === 0) return;
 
@@ -106,7 +106,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
     // Painted terrain, under the grid lines. Only the visible painted hexes are
     // drawn — the document is sparse, so this never touches the infinite Void.
     for (const hex of visible) {
-      const painted = document.hexes[coordKey(hex)];
+      const painted = doc.hexes[coordKey(hex)];
       if (!painted) continue;
       ctx.fillStyle = this.palette.terrain[painted.terrain];
       this.tracePath(ctx, camera, hex);

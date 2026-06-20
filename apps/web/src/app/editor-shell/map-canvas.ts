@@ -233,9 +233,9 @@ export class MapCanvas {
     // Repaint whenever pan, zoom, the painted document, or the hover changes.
     effect(() => {
       const camera = this.camera();
-      const document = this.store.document();
+      const doc = this.store.document();
       const hover = this.hover();
-      this.renderer?.render(camera, document, hover);
+      this.renderer?.render(camera, doc, hover);
     });
 
     // Re-read the renderer's themed colours and repaint when the theme switches.
@@ -273,6 +273,10 @@ export class MapCanvas {
       this.lastPointer = { x: event.clientX, y: event.clientY };
       return;
     }
+
+    // Only the primary button paints. Right/aux buttons must not lay down a hex
+    // (and steal the right-click context menu along the way).
+    if (event.button !== 0) return;
 
     this.painting = true;
     this.lastStroke = null;
@@ -322,6 +326,10 @@ export class MapCanvas {
   /** Keyboard: undo/redo and the terrain/eraser hotkeys shown on the palette. */
   @HostListener('window:keydown', ['$event'])
   protected onKeydown(event: KeyboardEvent): void {
+    // Don't hijack keystrokes meant for a text field (a future label/rename
+    // input) — a "5" typed there must not re-arm a terrain.
+    if (this.isEditableTarget(event.target)) return;
+
     if (event.metaKey || event.ctrlKey) {
       if (event.key.toLowerCase() !== 'z') return;
       event.preventDefault();
@@ -336,6 +344,14 @@ export class MapCanvas {
     }
     const terrain = terrainPalette[Number(event.key) - 1];
     if (terrain) this.store.selectTool(terrain.id);
+  }
+
+  /** Whether `target` is a text input the user is typing into. */
+  private isEditableTarget(target: EventTarget | null): boolean {
+    const el = target as HTMLElement | null;
+    if (!el) return false;
+    const tag = el.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable;
   }
 
   protected onWheel(event: WheelEvent): void {
