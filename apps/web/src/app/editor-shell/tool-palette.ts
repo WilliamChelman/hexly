@@ -1,12 +1,17 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { terrainPalette } from '@hexly/domain';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+} from '@angular/core';
+import { featureLibrary, terrainPalette } from '@hexly/domain';
 import { Button } from '../ui/button';
 import { Eyebrow } from '../ui/eyebrow';
 import { Panel } from '../ui/panel';
 import { Rule } from '../ui/rule';
 import { Swatch } from '../ui/swatch';
 import { Tool as ToolButton, ToolGlyph } from '../ui/tool';
-import { EditorStore, ERASER } from './editor-store';
+import { EditorStore } from './editor-store';
 
 /** A content tool — not yet wired to the canvas; shown as a preview for now. */
 interface ContentTool {
@@ -36,18 +41,18 @@ interface ContentTool {
             [label]="t.label"
             [hint]="t.hint"
             [swatch]="t.swatch"
-            [active]="store.tool() === t.id"
+            [active]="activeTerrain() === t.id"
             [attr.aria-label]="t.label"
-            (click)="store.selectTool(t.id)"
+            (click)="store.selectTool({ kind: 'terrain', id: t.id })"
           ></button>
         }
         <button
           appTool
           label="Erase"
           hint="E"
-          [active]="store.tool() === eraser"
+          [active]="store.tool().kind === 'erase'"
           aria-label="Erase"
-          (click)="store.selectTool(eraser)"
+          (click)="store.selectTool({ kind: 'erase' })"
         ></button>
       </div>
     </section>
@@ -81,6 +86,31 @@ interface ContentTool {
     </section>
 
     <hr appRule />
+
+    <section class="group">
+      <h2 class="heading" appEyebrow>Features</h2>
+      <div class="list" role="group" aria-label="Features">
+        @for (f of features; track f.id) {
+          <button
+            appTool
+            [label]="f.label"
+            [iconPath]="f.path"
+            [active]="activeFeature() === f.id"
+            [attr.aria-label]="f.label"
+            [attr.data-testid]="'feature-' + f.id"
+            (click)="store.selectTool({ kind: 'feature', id: f.id })"
+          ></button>
+        }
+        <button
+          appTool
+          label="Clear feature"
+          [active]="store.tool().kind === 'clear-feature'"
+          aria-label="Clear feature"
+          data-testid="clear-feature"
+          (click)="store.selectTool({ kind: 'clear-feature' })"
+        ></button>
+      </div>
+    </section>
 
     <section class="group">
       <h2 class="heading" appEyebrow>Content</h2>
@@ -165,7 +195,21 @@ interface ContentTool {
 })
 export class ToolPalette {
   protected readonly store = inject(EditorStore);
-  protected readonly eraser = ERASER;
+
+  /** The armed terrain id, or null when a non-terrain tool is armed. */
+  protected readonly activeTerrain = computed(() => {
+    const tool = this.store.tool();
+    return tool.kind === 'terrain' ? tool.id : null;
+  });
+
+  /** The armed feature id, or null when a non-feature tool is armed. */
+  protected readonly activeFeature = computed(() => {
+    const tool = this.store.tool();
+    return tool.kind === 'feature' ? tool.id : null;
+  });
+
+  /** The built-in feature library, each placeable from the palette (issue #7). */
+  protected readonly features = featureLibrary;
 
   /** The built-in terrain palette, with a 1-based number key per entry. */
   protected readonly terrainTools = terrainPalette.map((t, i) => ({
@@ -176,7 +220,6 @@ export class ToolPalette {
   }));
 
   protected readonly contentTools: ContentTool[] = [
-    { id: 'feature', label: 'Feature', hint: 'F', glyph: 'feature' },
     { id: 'overlay', label: 'Overlay', hint: 'O', glyph: 'overlay' },
     { id: 'region', label: 'Region', hint: 'R', glyph: 'region' },
     { id: 'label', label: 'Label', hint: 'L', glyph: 'label' },

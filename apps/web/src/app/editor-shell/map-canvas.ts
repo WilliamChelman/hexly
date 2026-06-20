@@ -341,11 +341,11 @@ export class MapCanvas {
     }
 
     if (event.key.toLowerCase() === 'e') {
-      this.store.selectTool('erase');
+      this.store.selectTool({ kind: 'erase' });
       return;
     }
     const terrain = terrainPalette[Number(event.key) - 1];
-    if (terrain) this.store.selectTool(terrain.id);
+    if (terrain) this.store.selectTool({ kind: 'terrain', id: terrain.id });
   }
 
   /** Whether `target` is a text input the user is typing into. */

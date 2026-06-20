@@ -37,6 +37,20 @@ export type ToolGlyph = 'feature' | 'overlay' | 'region' | 'label';
   template: `
     @if (swatch()) {
       <span appSwatch [style.background]="'var(' + swatch() + ')'"></span>
+    } @else if (iconPath(); as d) {
+      <span appGlyphBox>
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linejoin="round"
+        >
+          <path [attr.d]="d" />
+        </svg>
+      </span>
     } @else if (glyph(); as g) {
       <span appGlyphBox>
         @switch (g) {
@@ -96,5 +110,7 @@ export class Tool {
   readonly swatch = input<string>();
   /** A content glyph; renders a leading glyph box (used when no swatch). */
   readonly glyph = input<ToolGlyph>();
+  /** An SVG path (`d`) for a library icon; renders in the glyph box by path. */
+  readonly iconPath = input<string>();
   readonly active = input(false, { transform: booleanAttribute });
 }
