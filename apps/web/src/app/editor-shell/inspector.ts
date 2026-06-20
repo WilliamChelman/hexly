@@ -4,14 +4,15 @@ import { Chip } from '../ui/chip';
 import { Coord } from '../ui/coord';
 import { Eyebrow } from '../ui/eyebrow';
 import { Field } from '../ui/field';
-import { Icon } from '../ui/icon/icon';
+import { GlyphBox } from '../ui/glyph-box';
+import { SettlementIcon } from '../ui/icon/glyphs/settlement';
 import { Swatch } from '../ui/swatch';
 
 /** The right rail: the selected hex's identity, terrain, regions and Note. */
 @Component({
   selector: 'app-inspector',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Chip, Coord, Eyebrow, Field, Icon, Swatch],
+  imports: [Button, Chip, Coord, Eyebrow, Field, GlyphBox, SettlementIcon, Swatch],
   template: `
     <header class="head">
       <span appEyebrow>Selected hex</span>
@@ -19,7 +20,7 @@ import { Swatch } from '../ui/swatch';
     </header>
 
     <div class="title">
-      <span class="glyph"><app-icon name="settlement" [size]="18" /></span>
+      <span appGlyphBox><app-icon-settlement [size]="18" /></span>
       <div>
         <h3 class="name">Caer Aldermoor</h3>
         <app-chip tone="gold">Settlement</app-chip>
@@ -78,17 +79,6 @@ import { Swatch } from '../ui/swatch';
       display: flex;
       gap: var(--space-3);
       align-items: center;
-    }
-    .glyph {
-      display: grid;
-      place-items: center;
-      width: 30px;
-      height: 30px;
-      flex: none;
-      border-radius: var(--radius-sm);
-      background: var(--surface-sunken);
-      border: 1px solid var(--line);
-      color: var(--ink-muted);
     }
     .title > div {
       display: flex;

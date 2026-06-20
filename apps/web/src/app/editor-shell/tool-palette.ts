@@ -1,10 +1,9 @@
 import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
-import { IconName } from '../ui/icon/icon';
 import { Eyebrow } from '../ui/eyebrow';
 import { Panel } from '../ui/panel';
 import { Rule } from '../ui/rule';
 import { Swatch } from '../ui/swatch';
-import { Tool as ToolButton } from '../ui/tool';
+import { Tool as ToolButton, ToolGlyph } from '../ui/tool';
 
 /** A palette entry — one paintable thing, named in the domain's vocabulary. */
 interface Tool {
@@ -13,8 +12,8 @@ interface Tool {
   readonly hint: string; // keyboard shortcut
   /** A terrain swatch colour token, when this tool paints a Terrain. */
   readonly swatch?: string;
-  /** An icon glyph, for non-terrain tools. */
-  readonly glyph?: IconName;
+  /** A content glyph, for non-terrain tools. */
+  readonly glyph?: ToolGlyph;
 }
 
 /**

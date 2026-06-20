@@ -2,7 +2,10 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { Button } from '../ui/button';
 import { Coord } from '../ui/coord';
 import { Eyebrow } from '../ui/eyebrow';
-import { Icon } from '../ui/icon/icon';
+import { CompassIcon } from '../ui/icon/glyphs/compass';
+import { FitIcon } from '../ui/icon/glyphs/fit';
+import { MinusIcon } from '../ui/icon/glyphs/minus';
+import { PlusIcon } from '../ui/icon/glyphs/plus';
 
 /** A single rendered hex in the demo cluster on the canvas frame. */
 interface DemoHex {
@@ -22,15 +25,15 @@ const HEX_R = 34;
 /**
  * The map frame — a static SVG illustration standing in for the real Canvas 2D
  * renderer (ADR-0003). Its feature markers live in a local `<defs>`, not as
- * `app-icon` components: they are drawn *inside* this SVG, and SVG-in-SVG can't
- * cross into an HTML component. The illustration is itself the "SVG in its own
- * component" (ADR-0007). HTML chrome over the frame (zoom, compass) uses the
- * shared icon primitive.
+ * `app-icon-*` components: they are drawn *inside* this SVG, and SVG-in-SVG
+ * can't cross into an HTML component. The illustration is itself the "SVG in its
+ * own component" (ADR-0007). HTML chrome over the frame (zoom, compass) imports
+ * the glyph components it needs directly.
  */
 @Component({
   selector: 'app-map-canvas',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Coord, Eyebrow, Icon],
+  imports: [Button, Coord, Eyebrow, CompassIcon, FitIcon, MinusIcon, PlusIcon],
   template: `
     <div class="grid" aria-hidden="true"></div>
 
@@ -111,19 +114,19 @@ const HEX_R = 34;
     </div>
 
     <div class="compass" title="North">
-      <app-icon name="compass" [size]="40" />
+      <app-icon-compass [size]="40" />
     </div>
 
     <div class="zoom" role="group" aria-label="Zoom">
       <button type="button" appButton icon size="sm" aria-label="Zoom in">
-        <app-icon name="plus" [size]="16" />
+        <app-icon-plus [size]="16" />
       </button>
       <app-coord class="zoom-level">100%</app-coord>
       <button type="button" appButton icon size="sm" aria-label="Zoom out">
-        <app-icon name="minus" [size]="16" />
+        <app-icon-minus [size]="16" />
       </button>
       <button type="button" appButton icon size="sm" aria-label="Fit map">
-        <app-icon name="fit" [size]="16" />
+        <app-icon-fit [size]="16" />
       </button>
     </div>
   `,

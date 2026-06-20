@@ -4,9 +4,16 @@ import {
   booleanAttribute,
   input,
 } from '@angular/core';
-import { Icon, IconName } from './icon/icon';
+import { GlyphBox } from './glyph-box';
+import { FeatureIcon } from './icon/glyphs/feature';
+import { LabelIcon } from './icon/glyphs/label';
+import { OverlayIcon } from './icon/glyphs/overlay';
+import { RegionIcon } from './icon/glyphs/region';
 import { Kbd } from './kbd';
 import { Swatch } from './swatch';
+
+/** The content glyphs a palette tool can show (terrain tools use a swatch). */
+export type ToolGlyph = 'feature' | 'overlay' | 'region' | 'label';
 
 /**
  * A palette tool button — square-ish, full-width, with a leading swatch or
@@ -21,7 +28,7 @@ import { Swatch } from './swatch';
 @Component({
   selector: 'button[appTool]',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, Swatch, Kbd],
+  imports: [GlyphBox, FeatureIcon, OverlayIcon, RegionIcon, LabelIcon, Swatch, Kbd],
   host: {
     '[class.is-active]': 'active()',
     '[attr.aria-pressed]': 'active()',
@@ -30,8 +37,15 @@ import { Swatch } from './swatch';
   template: `
     @if (swatch()) {
       <span appSwatch [style.background]="'var(' + swatch() + ')'"></span>
-    } @else if (glyph()) {
-      <span class="glyph"><app-icon [name]="glyph()!" [size]="18" /></span>
+    } @else if (glyph(); as g) {
+      <span appGlyphBox>
+        @switch (g) {
+          @case ('feature') { <app-icon-feature [size]="18" /> }
+          @case ('overlay') { <app-icon-overlay [size]="18" /> }
+          @case ('region') { <app-icon-region [size]="18" /> }
+          @case ('label') { <app-icon-label [size]="18" /> }
+        }
+      </span>
     }
     <span class="label">{{ label() }}</span>
     @if (hint()) {
@@ -65,18 +79,7 @@ import { Swatch } from './swatch';
       border-color: var(--gold);
       color: var(--ink-strong);
     }
-    .glyph {
-      display: grid;
-      place-items: center;
-      width: 30px;
-      height: 30px;
-      flex: none;
-      border-radius: var(--radius-sm);
-      background: var(--surface-sunken);
-      border: 1px solid var(--line);
-      color: var(--ink-muted);
-    }
-    :host(.is-active) .glyph {
+    :host(.is-active) [appGlyphBox] {
       color: var(--gold);
       border-color: var(--gold);
     }
@@ -91,7 +94,7 @@ export class Tool {
   readonly hint = input<string>();
   /** A `--terrain-*` colour token; renders a leading swatch. */
   readonly swatch = input<string>();
-  /** An icon glyph; renders a leading glyph box (used when no swatch). */
-  readonly glyph = input<IconName>();
+  /** A content glyph; renders a leading glyph box (used when no swatch). */
+  readonly glyph = input<ToolGlyph>();
   readonly active = input(false, { transform: booleanAttribute });
 }

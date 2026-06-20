@@ -5,16 +5,29 @@ import { Button } from '../ui/button';
 import { Cartouche } from '../ui/cartouche';
 import { Chip } from '../ui/chip';
 import { Eyebrow } from '../ui/eyebrow';
-import { Icon } from '../ui/icon/icon';
+import { LogoIcon } from '../ui/icon/glyphs/logo';
+import { MoonIcon } from '../ui/icon/glyphs/moon';
+import { ShareIcon } from '../ui/icon/glyphs/share';
+import { SunIcon } from '../ui/icon/glyphs/sun';
 
 /** The top chrome: brand, map title, and the global actions (theme, share). */
 @Component({
   selector: 'app-editor-header',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, Button, Cartouche, Chip, Eyebrow, Icon],
+  imports: [
+    RouterLink,
+    Button,
+    Cartouche,
+    Chip,
+    Eyebrow,
+    LogoIcon,
+    MoonIcon,
+    ShareIcon,
+    SunIcon,
+  ],
   template: `
     <div class="brand">
-      <span class="mark"><app-icon name="logo" [size]="26" /></span>
+      <span class="mark"><app-icon-logo [size]="26" /></span>
       <span class="name" appCartouche>Hexly</span>
     </div>
 
@@ -37,10 +50,14 @@ import { Icon } from '../ui/icon/icon';
         "
         [title]="theme() === 'dark' ? 'Parchment (light)' : 'Astral (dark)'"
       >
-        <app-icon [name]="theme() === 'dark' ? 'sun' : 'moon'" [size]="20" />
+        @if (theme() === 'dark') {
+          <app-icon-sun [size]="20" />
+        } @else {
+          <app-icon-moon [size]="20" />
+        }
       </button>
       <button type="button" appButton variant="primary" size="sm">
-        <app-icon name="share" [size]="16" />
+        <app-icon-share [size]="16" />
         Share
       </button>
       <span class="avatar" title="Owner">WC</span>

@@ -27,7 +27,7 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
       min-height: 5rem;
       line-height: var(--leading-snug);
     }
-    :host(:focus) {
+    :host(:focus-visible) {
       border-color: var(--gold);
     }
   `,

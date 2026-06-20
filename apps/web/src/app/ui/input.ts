@@ -24,7 +24,7 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
       box-shadow: var(--shadow-inset);
       transition: border-color var(--dur-fast) var(--ease-out);
     }
-    :host(:focus) {
+    :host(:focus-visible) {
       border-color: var(--gold);
     }
   `,
