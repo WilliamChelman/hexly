@@ -1,5 +1,11 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+} from '@angular/core';
+import { Router, RouterLink } from '@angular/router';
+import { AuthStore } from '../auth/auth.store';
 import { ThemeService } from '../core/theme.service';
 import { Button } from '../ui/button';
 import { Cartouche } from '../ui/cartouche';
@@ -60,7 +66,20 @@ import { SunIcon } from '../ui/icon/glyphs/sun';
         <app-icon-share [size]="16" />
         Share
       </button>
-      <span class="avatar" title="Owner">WC</span>
+      @if (user(); as u) {
+        <span class="avatar" [title]="u.displayName">{{ initials() }}</span>
+        <span class="who">{{ u.displayName }}</span>
+        <button
+          type="button"
+          appButton
+          variant="ghost"
+          size="sm"
+          data-testid="sign-out"
+          (click)="signOut()"
+        >
+          Sign out
+        </button>
+      }
     </div>
   `,
   styles: `
@@ -117,9 +136,34 @@ import { SunIcon } from '../ui/icon/glyphs/sun';
       border-radius: var(--radius-full);
       box-shadow: var(--shadow-1);
     }
+    .who {
+      font-size: var(--text-sm);
+      color: var(--ink);
+    }
   `,
 })
 export class EditorHeader {
+  private readonly auth = inject(AuthStore);
+  private readonly router = inject(Router);
   protected readonly themeService = inject(ThemeService);
   protected readonly theme = this.themeService.theme;
+
+  /** The signed-in user, shown in the header; `null` until authenticated. */
+  protected readonly user = this.auth.currentUser;
+
+  /** The user's initials for the avatar (e.g. "Ada Lovelace" → "AL"). */
+  protected readonly initials = computed(() => {
+    const name = this.user()?.displayName ?? '';
+    return name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? '')
+      .join('');
+  });
+
+  /** End the session and return to the login screen (ADR-0004). */
+  protected signOut(): void {
+    this.auth.logout().subscribe(() => this.router.navigateByUrl('/login'));
+  }
 }
