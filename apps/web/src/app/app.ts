@@ -10,8 +10,13 @@ import { ThemeService } from './core/theme.service';
 @Component({
   selector: 'app-root',
   imports: [RouterOutlet],
-  templateUrl: './app.html',
-  styleUrl: './app.css',
+  template: `<router-outlet />`,
+  styles: `
+    :host {
+      display: block;
+      min-height: 100vh;
+    }
+  `,
 })
 export class App {
   // Eagerly resolve the theme service so `data-theme` is wired up at startup.

@@ -46,7 +46,7 @@ describe('EditorShell', () => {
     httpMock.expectOne('/health').flush({ status: 'ok', service: 'api' });
 
     const active = (fixture.nativeElement as HTMLElement).querySelector(
-      '.tool.is-active .tool__label',
+      'button[appTool].is-active',
     );
     expect(active?.textContent).toContain('Forest');
   });
