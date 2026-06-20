@@ -51,6 +51,18 @@ export class EditorStore {
     this.tool.set(tool);
   }
 
+  /**
+   * Adopt `document` as the map being edited — used when a map is opened from
+   * the backend (issue #6). This is a fresh starting point, not an edit, so the
+   * undo/redo history is cleared: you cannot undo back into the previous map.
+   */
+  load(document: HexMap): void {
+    this._document.set(document);
+    this.undoStack.length = 0;
+    this.redoStack.length = 0;
+    this.syncHistory();
+  }
+
   /** Apply the armed tool at `coord`: erase if the eraser is armed, else paint. */
   applyAt(coord: Axial): void {
     const tool = this.tool();

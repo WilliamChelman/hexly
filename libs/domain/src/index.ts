@@ -5,3 +5,4 @@ export * from './lib/hex/layout';
 export * from './lib/hex/edges';
 export * from './lib/hex/culling';
 export * from './lib/hex/hex-map';
+export * from './lib/maps';

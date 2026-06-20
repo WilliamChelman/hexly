@@ -1,9 +1,5 @@
 {
-  "/health": {
-    "target": "http://localhost:3000",
-    "secure": false
-  },
-  "/auth": {
+  "/api": {
     "target": "http://localhost:3000",
     "secure": false
   }

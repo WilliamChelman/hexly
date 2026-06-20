@@ -1,4 +1,7 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute } from '@angular/router';
+import { EditorSession } from './editor-session';
 import { EditorHeader } from './editor-header';
 import { ToolPalette } from './tool-palette';
 import { MapCanvas } from './map-canvas';
@@ -8,7 +11,9 @@ import { StatusBar } from './status-bar';
 /**
  * The editor's layout orchestrator. It owns no chrome of its own — each region
  * (header, tool palette, canvas, inspector, status bar) is its own component —
- * only the three-row / three-column frame that arranges them. See ADR-0007.
+ * only the three-row / three-column frame that arranges them (ADR-0007), plus
+ * the one piece of routing it is responsible for: opening the map named by the
+ * `:id` route param into the {@link EditorSession} so a reload restores it.
  */
 @Component({
   selector: 'app-editor-shell',
@@ -53,4 +58,16 @@ import { StatusBar } from './status-bar';
     }
   `,
 })
-export class EditorShell {}
+export class EditorShell {
+  private readonly route = inject(ActivatedRoute);
+  private readonly session = inject(EditorSession);
+
+  constructor() {
+    // Open whatever map the URL points at, and reopen it if the id changes
+    // (e.g. navigating between maps without leaving the editor).
+    this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((params) => {
+      const id = params.get('id');
+      if (id) this.session.open(id).subscribe();
+    });
+  }
+}

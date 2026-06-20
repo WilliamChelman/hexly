@@ -49,6 +49,18 @@ export function createDb(path: string): Db {
     );
     -- Speeds up the expired-session sweep that runs on every login.
     CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
+    CREATE TABLE IF NOT EXISTS maps (
+      id TEXT PRIMARY KEY,
+      owner_id TEXT NOT NULL REFERENCES users(id),
+      title TEXT NOT NULL,
+      visibility TEXT NOT NULL,
+      version INTEGER NOT NULL,
+      document TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    -- The list endpoint and every access check filter by owner.
+    CREATE INDEX IF NOT EXISTS idx_maps_owner_id ON maps(owner_id);
   `);
   return drizzle(sqlite, { schema });
 }

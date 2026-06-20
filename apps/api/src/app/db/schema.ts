@@ -38,3 +38,31 @@ export const sessions = sqliteTable(
     index('idx_sessions_expires_at').on(table.expiresAt),
   ]
 );
+
+/**
+ * A Hex Map stored as a single JSON document (ADR-0002). The relational columns
+ * are the metadata the list view and access checks need; `document` holds the
+ * whole map as JSON text. `version` is the optimistic-concurrency counter — a
+ * save carries the base version it was built on and is rejected (409) if it has
+ * since moved.
+ */
+export const maps = sqliteTable(
+  'maps',
+  {
+    id: text('id').primaryKey(),
+    ownerId: text('owner_id')
+      .notNull()
+      .references(() => users.id),
+    title: text('title').notNull(),
+    visibility: text('visibility').notNull(),
+    version: integer('version').notNull(),
+    // The serialized Hex Map document (hexMapSchema), parsed/validated at the edge.
+    document: text('document').notNull(),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [
+    // The list endpoint and every access check filter by owner.
+    index('idx_maps_owner_id').on(table.ownerId),
+  ]
+);

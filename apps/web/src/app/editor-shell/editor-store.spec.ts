@@ -1,3 +1,4 @@
+import { emptyHexMap } from '@hexly/domain';
 import { EditorStore } from './editor-store';
 
 describe('EditorStore', () => {
@@ -138,5 +139,26 @@ describe('EditorStore', () => {
     store.applyAt({ q: 0, r: 0 });
 
     expect('0,0' in store.document().hexes).toBe(false);
+  });
+
+  it('loads a document, replacing whatever was being edited', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'grass');
+
+    store.load({ hexes: { '2,3': { terrain: 'ocean' } } });
+
+    expect(store.document()).toEqual({ hexes: { '2,3': { terrain: 'ocean' } } });
+  });
+
+  it('clears undo/redo history when a document is loaded', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'grass');
+    store.undo(); // there is now a redo to make
+
+    store.load(emptyHexMap());
+
+    // A loaded map is a fresh starting point — you cannot undo into the old one.
+    expect(store.canUndo()).toBe(false);
+    expect(store.canRedo()).toBe(false);
   });
 });
