@@ -49,6 +49,13 @@ test('drags a hex under Select to a new coordinate, and the move survives a relo
   // The hex moved rather than duplicated: still exactly one hex on the map.
   await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
 
+  // In-page proof the move actually landed — a no-op gesture (selected but never
+  // moved) would also leave the count at 1, so assert the destination directly:
+  // completing the drag keeps the moved hex selected, now at a coordinate other
+  // than the q0·r0 origin, and the inspector still shows it as Forest.
+  await expect(page.getByTestId('entity-detail')).toHaveText('Forest');
+  await expect(page.getByTestId('entity-coord')).not.toContainText('q 0 · r 0');
+
   // Save and wait on the real round-trip so the reload below can't race the PUT.
   const saved = page.waitForResponse(
     (res) =>
@@ -116,6 +123,10 @@ test('Escape cancels an in-progress Hex drag, leaving the hex at its origin', as
   await page.mouse.move(cx + 40, cy);
   await page.mouse.move(cx + dx, cy);
   await page.keyboard.press('Escape');
+  // Keep dragging *after* Escape with the pointer still held: the cancelled
+  // gesture must not resume, so neither this continued travel nor the release
+  // after it may start a fresh move.
+  await page.mouse.move(cx + dx + 40, cy);
   await page.mouse.up();
 
   // The move never committed: still one hex. Cancelling a drag keeps the entity

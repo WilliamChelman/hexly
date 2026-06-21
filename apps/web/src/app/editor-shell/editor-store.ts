@@ -398,16 +398,25 @@ export class EditorStore {
     const fromKey = coordKey(from);
     const toKey = coordKey(to);
     if (fromKey === toKey) return;
+    // Snapshot the origin's content from the live (immutable) document. Moving
+    // Void carries nothing, so bail before `commit` records an empty step.
+    const content = this._document().hexes[fromKey];
+    if (!content) return;
     this.commit((draft) => {
-      const hex = draft.hexes[fromKey];
-      if (!hex) return; // moving Void: nothing to carry
-      // Copy the content into the destination (overwriting it) and clear the
-      // origin. A fresh object avoids aliasing the same draft node at two keys.
-      draft.hexes[toKey] = hex.feature
-        ? { terrain: hex.terrain, feature: { ref: hex.feature.ref } }
-        : { terrain: hex.terrain };
+      // Deep-clone the snapshot into the destination (overwriting it) and clear
+      // the origin. Cloning the immutable source — rather than rebuilding the Hex
+      // field-by-field — avoids aliasing a draft node at two keys *and* carries
+      // every field along, so a future Hex field is never silently dropped.
+      draft.hexes[toKey] = structuredClone(content);
       delete draft.hexes[fromKey];
     });
+    // The content moved, so a selection that pointed at the origin rides along to
+    // the destination — completing a move keeps the moved Hex selected, matching
+    // the Label-drag path (and the Escape-cancel path, which leaves it put).
+    const sel = this._selection();
+    if (sel?.kind === 'cell' && coordKey(sel.coord) === fromKey) {
+      this._selection.set({ kind: 'cell', coord: to });
+    }
   }
 
   /**
@@ -509,13 +518,17 @@ export class EditorStore {
 
   /** Select the Label `id` for editing in the inspector, or `null` to clear it. */
   selectLabel(id: string | null): void {
-    this._selection.set(id === null ? null : { kind: 'label', id });
+    if (id === null) this.deselect();
+    else this._selection.set({ kind: 'label', id });
   }
 
   /**
    * Clear the selection, if any — the inspector falls back to its empty state.
-   * The deliberate deselect gesture (Escape, issue #30), distinct from the
-   * incidental clear a click on a Void coordinate produces in {@link select}.
+   * The one canonical clear: the deliberate Escape gesture (issue #30) calls it,
+   * and the internal teardown paths ({@link selectLabel} with `null`,
+   * {@link deleteLabel}, {@link deleteSelected}) route through it too. Distinct
+   * from the incidental clear a click on a Void coordinate produces in
+   * {@link select}, which sets `null` inline.
    */
   deselect(): void {
     this._selection.set(null);
@@ -578,7 +591,7 @@ export class EditorStore {
       if (at !== -1) draft.labels.splice(at, 1);
     });
     const sel = this._selection();
-    if (sel?.kind === 'label' && sel.id === id) this._selection.set(null);
+    if (sel?.kind === 'label' && sel.id === id) this.deselect();
   }
 
   /**
@@ -596,7 +609,7 @@ export class EditorStore {
     if (sel.kind === 'label') this.deleteLabel(sel.id);
     else if (sel.kind === 'feature') this.clearFeatureAt(sel.coord);
     else this.eraseAt(sel.coord);
-    this._selection.set(null);
+    this.deselect();
   }
 
   /**

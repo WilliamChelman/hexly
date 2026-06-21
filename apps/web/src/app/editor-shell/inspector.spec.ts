@@ -116,11 +116,13 @@ describe('Inspector hex and feature selection', () => {
     store.paintAt({ q: 0, r: 0 }, 'grass');
     store.select({ q: 0, r: 0 }, null);
 
-    (
-      render().nativeElement.querySelector(
-        '[data-testid=entity-delete]',
-      ) as HTMLButtonElement
-    ).click();
+    const del = render().nativeElement.querySelector(
+      '[data-testid=entity-delete]',
+    ) as HTMLButtonElement;
+    // The affordance must be live, not the disabled placeholder it used to render
+    // — a programmatic click fires even on a disabled button, so assert it first.
+    expect(del.disabled).toBe(false);
+    del.click();
 
     expect('0,0' in store.document().hexes).toBe(false);
     expect(store.selection()).toBeNull();

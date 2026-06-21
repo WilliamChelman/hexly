@@ -982,4 +982,39 @@ describe('EditorStore moveHex', () => {
     expect(store.canUndo()).toBe(false);
     expect(store.document().hexes).toEqual({});
   });
+
+  it('moves a terrain-only hex without inventing a feature on the destination', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest'); // bare terrain, no feature
+
+    store.moveHex({ q: 0, r: 0 }, { q: 2, r: -1 });
+
+    // The clone carries exactly what the origin held — no `feature` key appears.
+    expect(store.document().hexes['2,-1']).toEqual({ terrain: 'forest' });
+    expect('feature' in store.document().hexes['2,-1']).toBe(false);
+  });
+
+  it('keeps the moved hex selected, following the selection to the destination', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.select({ q: 0, r: 0 }, null); // the bare Hex is selected
+
+    store.moveHex({ q: 0, r: 0 }, { q: 2, r: -1 });
+
+    // Completing a move keeps the moved content selected at its new coordinate,
+    // matching the Label-drag path rather than silently deselecting.
+    expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 2, r: -1 } });
+  });
+
+  it('leaves a selection elsewhere untouched when a different hex is moved', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.paintAt({ q: 3, r: 3 }, 'ocean');
+    store.select({ q: 3, r: 3 }, null); // a different hex is selected
+
+    store.moveHex({ q: 0, r: 0 }, { q: 2, r: -1 });
+
+    // Only a selection that pointed at the moved origin follows; this one stays.
+    expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 3, r: 3 } });
+  });
 });

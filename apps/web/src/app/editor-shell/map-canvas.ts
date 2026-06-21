@@ -84,6 +84,7 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
       (pointerdown)="onPointerDown($event)"
       (pointermove)="onPointerMove($event)"
       (pointerup)="onPointerUp($event)"
+      (pointercancel)="onPointerCancel($event)"
       (pointerleave)="onPointerLeave()"
       (wheel)="onWheel($event)"
     ></canvas>
@@ -267,6 +268,15 @@ export class MapCanvas {
   private hexDragPress: { from: Axial; clientX: number; clientY: number } | null =
     null;
 
+  /**
+   * The `pointerId` that owns the canvas for the duration of one gesture, or
+   * `null` between gestures. A gesture (paint, pan, or a Select press/drag)
+   * claims it on pointer-down and releases it on up/cancel; events from any
+   * other pointer are ignored while it is held, so a second touch cannot hijack
+   * the drag origin or destination behind the active one.
+   */
+  private activePointerId: number | null = null;
+
   private readonly theme = inject(ThemeService);
   private readonly store = inject(EditorStore);
   private readonly destroyRef = inject(DestroyRef);
@@ -335,6 +345,11 @@ export class MapCanvas {
   }
 
   protected onPointerDown(event: PointerEvent): void {
+    // One gesture owns the canvas at a time: a second pointer (e.g. another
+    // finger) while one is already active is ignored, so it cannot overwrite the
+    // active drag's origin or destination behind it.
+    if (this.activePointerId !== null && event.pointerId !== this.activePointerId)
+      return;
     (event.target as Element).setPointerCapture?.(event.pointerId);
     const hex = pixelToHex(this.layout, this.toWorld(event));
     this.hover.set(hex);
@@ -342,6 +357,12 @@ export class MapCanvas {
     // Middle button pans; the primary button paints/erases the armed tool. Pan
     // also stays on the wheel, so a mouse-only user is never stuck (ADR-0003).
     if (event.button === 1) {
+      // A pan supersedes any armed/live Select drag (e.g. a held left button over
+      // a selected hex), so the gesture pans instead of getting stuck re-targeting
+      // a hex move under the pointer-move drag branch.
+      this.hexDragPress = null;
+      this.hexDrag.set(null);
+      this.activePointerId = event.pointerId;
       this.panning = true;
       this.dragging.set(true);
       this.lastPointer = { x: event.clientX, y: event.clientY };
@@ -349,8 +370,10 @@ export class MapCanvas {
     }
 
     // Only the primary button paints. Right/aux buttons must not lay down a hex
-    // (and steal the right-click context menu along the way).
+    // (and steal the right-click context menu along the way) — and they do not
+    // claim the gesture, so a right-click never blocks a real drag.
     if (event.button !== 0) return;
+    this.activePointerId = event.pointerId;
 
     const world = this.toWorld(event);
 
@@ -401,6 +424,10 @@ export class MapCanvas {
   }
 
   protected onPointerMove(event: PointerEvent): void {
+    // While a gesture is active, only its owning pointer drives it — a stray
+    // second pointer never moves the hover or re-targets the drag.
+    if (this.activePointerId !== null && event.pointerId !== this.activePointerId)
+      return;
     const hex = pixelToHex(this.layout, this.toWorld(event));
     this.hover.set(hex);
 
@@ -445,8 +472,25 @@ export class MapCanvas {
   }
 
   protected onPointerUp(event: PointerEvent): void {
+    // Only the owning pointer ends the gesture; a non-owning pointer's release
+    // must not commit the active drag out from under it.
+    if (this.activePointerId !== null && event.pointerId !== this.activePointerId)
+      return;
     (event.target as Element).releasePointerCapture?.(event.pointerId);
     this.endGesture();
+  }
+
+  /**
+   * A pointer the OS/browser took away mid-gesture (touch interruption, a
+   * context menu, an alt-tab): abandon the gesture without committing, so a drag
+   * never lands at a stale destination and no override is left stranded.
+   */
+  protected onPointerCancel(event: PointerEvent): void {
+    if (this.activePointerId !== null && event.pointerId !== this.activePointerId)
+      return;
+    (event.target as Element).releasePointerCapture?.(event.pointerId);
+    this.cancelDrag();
+    this.resetGesture();
   }
 
   protected onPointerLeave(): void {
@@ -479,12 +523,18 @@ export class MapCanvas {
       this.store.moveHex(hexDrag.from, hexDrag.to);
       this.hexDrag.set(null);
     }
+    this.resetGesture();
+  }
+
+  /** Drop all per-gesture interaction state and release the owning pointer. */
+  private resetGesture(): void {
     this.hexDragPress = null;
     this.painting = false;
     this.panning = false;
     this.dragging.set(false);
     this.lastPointer = null;
     this.lastStroke = null;
+    this.activePointerId = null;
   }
 
   /**
@@ -539,8 +589,15 @@ export class MapCanvas {
     // Delete/Backspace remove the selected entity through the store's single
     // delete gesture (issue #29). Suppressed above while a text field is focused,
     // so Backspace edits text there rather than deleting a hex behind it.
+    // `preventDefault` keeps a stray Backspace from triggering browser
+    // back-navigation when no field is focused.
     if (event.key === 'Delete' || event.key === 'Backspace') {
-      this.store.deleteSelected();
+      event.preventDefault();
+      // Mid-drag, abort the move rather than deleting behind it — otherwise the
+      // origin would be erased while the drag stays armed and the move silently
+      // no-ops on release. With no live drag, `cancelDrag` is a harmless reset
+      // (it also clears any sub-threshold armed press) and the delete proceeds.
+      if (!this.cancelDrag()) this.store.deleteSelected();
       return;
     }
 
