@@ -142,6 +142,22 @@ export class EditorStore {
   readonly region = this._region.asReadonly();
 
   /**
+   * The membership-paint direction the Inspector's Add ⇄ Remove toggle reflects:
+   * `add` paints a hex into the inspected Region, `remove` erases it. Derived from
+   * the armed Region Subtool's `mode` — the *same* state {@link applyAt} paints by
+   * — so the toggle is a single source of truth and can never disagree with what a
+   * stroke actually does, no matter which path armed the Region (the palette
+   * legend, the number keys, or {@link armRegionDirection}). Cold-starts at `add`
+   * whenever no Region is armed: a fresh store, a reloaded map, or after the armed
+   * Region is deleted. In-memory, session-only editor state in the same category
+   * as the armed Tool — never part of the `HexMap` document, never undone, saved,
+   * or restored across reloads (issue #37).
+   */
+  readonly regionDirection = computed<'add' | 'remove'>(
+    () => this._region()?.mode ?? 'add',
+  );
+
+  /**
    * Whether the armed Tool keeps applying as the pointer drags across hexes.
    * Terrain, Erase, Region, and the feature Clear Subtool are continuous brushes
    * — sweeping them is the intent and idempotent. Placing a Feature is a discrete
@@ -293,6 +309,21 @@ export class EditorStore {
   }
 
   /**
+   * Engage the Inspector's Add ⇄ Remove toggle in `direction`: arm the Region tool
+   * on the currently-selected Region with it, collapsing select-then-edit into one
+   * gesture (issue #37). This is the first control outside the palette permitted to
+   * arm a Tool — Select itself still never paints. A no-op when nothing, or a
+   * non-Region, is selected: the toggle only appears in the Region editor, but
+   * guarding here keeps the action honest for every caller. Arming is the single
+   * write that moves the toggle: {@link regionDirection} is derived from the armed
+   * Subtool's mode, so there is no separate direction to keep in sync.
+   */
+  armRegionDirection(direction: 'add' | 'remove'): void {
+    const region = this.selectedRegion();
+    if (region) this.armRegion(region.id, direction);
+  }
+
+  /**
    * Pick the `n`-th (1-based) Subtool of the currently armed Tool — the keyboard
    * `1`–`9` binding (issue #27). The Subtool set is relative to the armed Tool:
    * Terrain → the terrain palette, Feature → the feature library then Clear,
@@ -345,6 +376,8 @@ export class EditorStore {
     this._terrain.set(DEFAULT_TERRAIN);
     this._feature.set(DEFAULT_FEATURE);
     this._region.set(null);
+    // The membership direction is derived from the armed Region Subtool, so
+    // clearing `_region` above already cold-starts `regionDirection` back to `add`.
   }
 
   /** Apply the armed Tool (and its Subtool) at `coord`, dispatching on the Tool. */

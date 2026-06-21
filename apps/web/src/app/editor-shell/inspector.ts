@@ -9,6 +9,16 @@ import { inputValue } from './dom';
 import { EditorStore } from './editor-store';
 import { RegionFields } from './region-fields';
 
+/**
+ * The membership-paint directions, as the Inspector's Add/Remove toggle pair —
+ * the same two modes the palette legend renders, kept in one data table so the
+ * two buttons can't drift (mirrors {@link tool-palette}'s `REGION_MODES`).
+ */
+const DIRECTIONS = [
+  { direction: 'add', label: 'Add', testid: 'region-add' },
+  { direction: 'remove', label: 'Remove', testid: 'region-remove' },
+] as const;
+
 /** A selected Hex or Feature resolved for display: its coordinate and identity. */
 interface SelectedEntity {
   readonly kind: 'hex' | 'feature';
@@ -116,6 +126,31 @@ interface SelectedEntity {
 
       <app-region-fields [region]="region" />
 
+      <!--
+        Engaging either button auto-arms the Region tool on this Region with the
+        chosen membership direction (issue #37) — the only control outside the
+        palette permitted to arm a Tool. The pair mirrors the palette legend's
+        armed-mode affordance (the .mode/.active class + aria-pressed), driven from
+        the same store.regionDirection() the brush paints by so the active one reads
+        as set and can never disagree with the stroke.
+      -->
+      <div appField label="Membership">
+        <div class="direction" role="group" aria-label="Membership direction">
+          @for (d of directions; track d.direction) {
+            <button
+              type="button"
+              class="mode"
+              [class.active]="store.regionDirection() === d.direction"
+              [attr.aria-pressed]="store.regionDirection() === d.direction"
+              [attr.data-testid]="d.testid"
+              (click)="store.armRegionDirection(d.direction)"
+            >
+              {{ d.label }}
+            </button>
+          }
+        </div>
+      </div>
+
       <div class="actions">
         <button
           type="button"
@@ -189,6 +224,29 @@ interface SelectedEntity {
       display: flex;
       gap: var(--space-3);
     }
+    .direction {
+      display: flex;
+      gap: var(--space-2);
+    }
+    /* The armed-mode affordance shared with the palette legend (tool-palette.ts):
+       a quiet outline that fills gold-soft when active, not the global primary
+       call-to-action variant. Stretched to share the row. */
+    .mode {
+      flex: 1;
+      background: none;
+      color: var(--ink-muted);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      padding: var(--space-1) var(--space-3);
+      font-size: var(--text-xs);
+      font-weight: var(--weight-semibold);
+      cursor: pointer;
+    }
+    .mode.active {
+      color: var(--ink);
+      border-color: var(--gold);
+      background: var(--gold-soft);
+    }
     .pos > div {
       flex: 1;
       min-width: 0;
@@ -212,6 +270,9 @@ interface SelectedEntity {
 })
 export class Inspector {
   protected readonly store = inject(EditorStore);
+
+  /** The Add/Remove membership-direction toggle pair, for the template `@for`. */
+  protected readonly directions = DIRECTIONS;
 
   /**
    * The selected Hex or Feature resolved for display, or `null` when the
