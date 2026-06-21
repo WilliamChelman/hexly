@@ -1,5 +1,5 @@
 import { emptyHexMap } from '@hexly/domain';
-import { EditorStore, isContinuousTool } from './editor-store';
+import { EditorStore } from './editor-store';
 
 describe('EditorStore', () => {
   it('paints a Hex with the given terrain at the given coordinate', () => {
@@ -122,9 +122,19 @@ describe('EditorStore', () => {
     expect(store.canRedo()).toBe(true);
   });
 
+  it('applyAt does nothing when the Select tool is armed', () => {
+    const store = new EditorStore();
+
+    // A fresh map boots armed with Select; a click must paint nothing (issue #27).
+    store.applyAt({ q: 0, r: 0 });
+
+    expect(store.document().hexes).toEqual({});
+    expect(store.canUndo()).toBe(false);
+  });
+
   it('applyAt paints the armed terrain', () => {
     const store = new EditorStore();
-    store.selectTool({ kind: 'terrain', id: 'ocean' });
+    store.armTerrain('ocean');
 
     store.applyAt({ q: 0, r: 0 });
 
@@ -135,7 +145,7 @@ describe('EditorStore', () => {
     const store = new EditorStore();
     store.paintAt({ q: 0, r: 0 }, 'ocean');
 
-    store.selectTool({ kind: 'erase' });
+    store.armTool('erase');
     store.applyAt({ q: 0, r: 0 });
 
     expect('0,0' in store.document().hexes).toBe(false);
@@ -145,18 +155,18 @@ describe('EditorStore', () => {
     const store = new EditorStore();
     store.paintAt({ q: 0, r: 0 }, 'grass');
 
-    store.selectTool({ kind: 'feature', id: 'ruin' });
+    store.armFeature('ruin');
     store.applyAt({ q: 0, r: 0 });
 
     expect(store.document().hexes['0,0'].feature).toEqual({ ref: 'ruin' });
   });
 
-  it('applyAt clears the feature once the clear-feature tool is armed', () => {
+  it('applyAt clears the feature once the Clear feature Subtool is armed', () => {
     const store = new EditorStore();
     store.paintAt({ q: 0, r: 0 }, 'grass');
     store.placeFeatureAt({ q: 0, r: 0 }, 'ruin');
 
-    store.selectTool({ kind: 'clear-feature' });
+    store.armFeature('clear');
     store.applyAt({ q: 0, r: 0 });
 
     expect(store.document().hexes['0,0']).toEqual({ terrain: 'grass' });
@@ -348,14 +358,15 @@ describe('EditorStore', () => {
     expect(store.document().regions).toEqual([]);
   });
 
-  it('resets the armed tool to the default terrain when its region is deleted', () => {
+  it('falls back to Select and forgets the Region Subtool when its region is deleted', () => {
     const store = new EditorStore();
     const id = store.createRegion('Avalon', '#b08a4e');
-    store.selectTool({ kind: 'region', id, mode: 'add' });
+    store.armRegion(id, 'add');
 
     store.deleteRegion(id); // the armed region no longer exists
 
-    expect(store.tool()).toEqual({ kind: 'terrain', id: 'forest' });
+    expect(store.tool()).toBe('select');
+    expect(store.region()).toBeNull();
   });
 
   it('undo restores a deleted region with its membership', () => {
@@ -373,7 +384,7 @@ describe('EditorStore', () => {
     const store = new EditorStore();
     const id = store.createRegion('Avalon', '#b08a4e');
 
-    store.selectTool({ kind: 'region', id, mode: 'add' });
+    store.armRegion(id, 'add');
     store.applyAt({ q: 3, r: 3 });
 
     expect(store.document().regions[0].hexes['3,3']).toBe(true);
@@ -384,7 +395,7 @@ describe('EditorStore', () => {
     const id = store.createRegion('Avalon', '#b08a4e');
     store.addHexToRegion(id, { q: 3, r: 3 });
 
-    store.selectTool({ kind: 'region', id, mode: 'remove' });
+    store.armRegion(id, 'remove');
     store.applyAt({ q: 3, r: 3 });
 
     expect('3,3' in store.document().regions[0].hexes).toBe(false);
@@ -549,28 +560,160 @@ describe('EditorStore', () => {
   });
 });
 
-describe('isContinuousTool', () => {
-  it('treats terrain as a continuous brush', () => {
-    expect(isContinuousTool({ kind: 'terrain', id: 'forest' })).toBe(true);
+describe('EditorStore two-level armed state', () => {
+  it('cold-starts armed with Select and the default Subtools', () => {
+    const store = new EditorStore();
+
+    // Select armed; Terrain → forest, Feature → first library feature, Region → none.
+    expect(store.tool()).toBe('select');
+    expect(store.terrain()).toBe('forest');
+    expect(store.feature()).toBe('settlement');
+    expect(store.region()).toBeNull();
   });
 
-  it('treats the eraser as a continuous brush', () => {
-    expect(isContinuousTool({ kind: 'erase' })).toBe(true);
+  it('arms a Tool and sets its Subtool together when a Subtool is picked', () => {
+    const store = new EditorStore();
+
+    store.armTerrain('ocean');
+    expect(store.tool()).toBe('terrain');
+    expect(store.terrain()).toBe('ocean');
+
+    store.armFeature('ruin');
+    expect(store.tool()).toBe('feature');
+    expect(store.feature()).toBe('ruin');
   });
 
-  it('treats clear-feature as a continuous brush', () => {
-    expect(isContinuousTool({ kind: 'clear-feature' })).toBe(true);
+  it('remembers each Tool’s last Subtool and restores it on re-arm', () => {
+    const store = new EditorStore();
+    store.armTerrain('ocean'); // remember a non-default terrain
+    store.armFeature('ruin'); // switch Tools — terrain memory must survive
+
+    store.armTool('terrain'); // re-arm Terrain
+
+    expect(store.tool()).toBe('terrain');
+    expect(store.terrain()).toBe('ocean');
+    // And the restored Subtool is what a stroke applies.
+    store.applyAt({ q: 0, r: 0 });
+    expect(store.document().hexes['0,0']).toEqual({ terrain: 'ocean' });
   });
 
-  it('treats placing a feature as a discrete stamp, not continuous', () => {
-    expect(isContinuousTool({ kind: 'feature', id: 'settlement' })).toBe(false);
+  it('keeps Subtool memory out of the document, the undo stack, and reloads', () => {
+    const store = new EditorStore();
+
+    store.armTerrain('ocean');
+    store.armFeature('clear');
+    store.armTool('select');
+
+    // Subtool memory is session-only editor state (ADR-0010): arming records no
+    // edit and leaves the document untouched.
+    expect(store.document()).toEqual(emptyHexMap());
+    expect(store.canUndo()).toBe(false);
   });
 
-  it('treats painting a region as a continuous brush', () => {
-    expect(isContinuousTool({ kind: 'region', id: 'r1', mode: 'add' })).toBe(true);
+  it('picks the nth Terrain Subtool by index when Terrain is armed', () => {
+    const store = new EditorStore();
+    store.armTool('terrain');
+
+    store.armSubtoolByIndex(3); // 3rd terrain in the palette is Ocean
+
+    expect(store.terrain()).toBe('ocean');
   });
 
-  it('treats placing a label as a discrete stamp, not continuous', () => {
-    expect(isContinuousTool({ kind: 'label' })).toBe(false);
+  it('picks the nth Feature Subtool by index, with Clear in the last slot', () => {
+    const store = new EditorStore();
+    store.armTool('feature');
+
+    store.armSubtoolByIndex(1);
+    expect(store.feature()).toBe('settlement');
+
+    store.armSubtoolByIndex(3); // after the two library features comes Clear
+    expect(store.feature()).toBe('clear');
+  });
+
+  it('picks the nth Region Subtool by index, keeping the current brush mode', () => {
+    const store = new EditorStore();
+    const a = store.createRegion('Avalon', '#b08a4e');
+    const b = store.createRegion('Whisperwood', '#7c9b86');
+    store.armRegion(a, 'remove');
+
+    store.armSubtoolByIndex(2); // the 2nd region
+
+    expect(store.region()).toEqual({ id: b, mode: 'remove' });
+  });
+
+  it('treats an out-of-range Subtool index as a no-op', () => {
+    const store = new EditorStore();
+    store.armTerrain('ocean');
+
+    store.armSubtoolByIndex(99);
+
+    expect(store.terrain()).toBe('ocean');
+  });
+
+  it('ignores a Subtool index for a Tool that has no Subtools', () => {
+    const store = new EditorStore();
+    store.armTool('select');
+
+    store.armSubtoolByIndex(1); // Select has no Subtools
+
+    expect(store.tool()).toBe('select');
+  });
+
+  it('arms Select and resets Subtool memory when a document is loaded', () => {
+    const store = new EditorStore();
+    store.armTerrain('ocean');
+    const id = store.createRegion('Avalon', '#b08a4e');
+    store.armRegion(id, 'add');
+
+    store.load(emptyHexMap());
+
+    expect(store.tool()).toBe('select');
+    expect(store.terrain()).toBe('forest');
+    expect(store.feature()).toBe('settlement');
+    expect(store.region()).toBeNull();
+  });
+});
+
+describe('EditorStore continuous', () => {
+  it('treats Terrain as a continuous brush', () => {
+    const store = new EditorStore();
+    store.armTerrain('forest');
+    expect(store.continuous()).toBe(true);
+  });
+
+  it('treats Erase as a continuous brush', () => {
+    const store = new EditorStore();
+    store.armTool('erase');
+    expect(store.continuous()).toBe(true);
+  });
+
+  it('treats the Clear feature Subtool as a continuous brush', () => {
+    const store = new EditorStore();
+    store.armFeature('clear');
+    expect(store.continuous()).toBe(true);
+  });
+
+  it('treats placing a Feature as a discrete stamp, not continuous', () => {
+    const store = new EditorStore();
+    store.armFeature('settlement');
+    expect(store.continuous()).toBe(false);
+  });
+
+  it('treats painting a Region as a continuous brush', () => {
+    const store = new EditorStore();
+    const id = store.createRegion('Avalon', '#b08a4e');
+    store.armRegion(id, 'add');
+    expect(store.continuous()).toBe(true);
+  });
+
+  it('treats placing a Label as a discrete stamp, not continuous', () => {
+    const store = new EditorStore();
+    store.armTool('label');
+    expect(store.continuous()).toBe(false);
+  });
+
+  it('treats Select as non-continuous', () => {
+    const store = new EditorStore();
+    expect(store.continuous()).toBe(false);
   });
 });

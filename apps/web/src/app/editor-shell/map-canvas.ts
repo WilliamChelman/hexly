@@ -14,7 +14,7 @@ import {
 } from '@angular/core';
 import { Axial, coordKey, Layout, pixelToHex, Point, terrainPalette } from '@hexly/domain';
 import { ThemeService } from '../core/theme.service';
-import { EditorStore, isContinuousTool } from './editor-store';
+import { EditorStore, ToolId } from './editor-store';
 import { Button } from '../ui/button';
 import { Coord } from '../ui/coord';
 import { Eyebrow } from '../ui/eyebrow';
@@ -46,6 +46,16 @@ const MOUSE_NOTCH_THRESHOLD = 40;
 const LINE_HEIGHT = 16;
 /** The placeholder text a freshly-dropped Label carries until it is edited. */
 const NEW_LABEL_TEXT = 'Label';
+
+/** The letter that arms each top-level Tool from the keyboard (issue #27). */
+const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
+  s: 'select',
+  t: 'terrain',
+  f: 'feature',
+  r: 'region',
+  l: 'label',
+  e: 'erase',
+};
 
 /**
  * The live map surface: an infinite, pannable, zoomable hex plane on a Canvas
@@ -253,9 +263,10 @@ export class MapCanvas {
   /** True while a primary-button paint/erase stroke is in progress. */
   private painting = false;
   /**
-   * Whether the armed stroke keeps applying as the pointer drags. Continuous for
-   * terrain/erase/clear-feature; false for placing a Feature, which stamps once
-   * on the initial press so a drag never mass-places duplicates (issue #7).
+   * Whether the armed stroke keeps applying as the pointer drags. Snapshotted
+   * from the store's {@link EditorStore.continuous} at press time: continuous for
+   * terrain/erase/region/clear; false for placing a Feature, which stamps once on
+   * the initial press so a drag never mass-places duplicates (issue #7).
    */
   private continuousStroke = false;
   /** True while a middle-button pan drag is in progress. */
@@ -337,13 +348,13 @@ export class MapCanvas {
     }
 
     // The label tool drops a new, selected label at the clicked world point.
-    if (this.store.tool().kind === 'label') {
+    if (this.store.tool() === 'label') {
       this.store.selectLabel(this.store.addLabel(NEW_LABEL_TEXT, world));
       return;
     }
 
     this.painting = true;
-    this.continuousStroke = isContinuousTool(this.store.tool());
+    this.continuousStroke = this.store.continuous();
     this.lastStroke = null;
     this.strokeAt(hex);
   }
@@ -409,11 +420,16 @@ export class MapCanvas {
     this.lastStroke = null;
   }
 
-  /** Keyboard: undo/redo and the terrain/eraser hotkeys shown on the palette. */
+  /**
+   * Keyboard (issue #27): letters arm top-level Tools (`S` Select, `T` Terrain,
+   * `F` Feature, `R` Region, `L` Label, `E` Erase), and `1`–`9` pick the nth
+   * Subtool of the armed Tool. Undo/redo stay on Cmd/Ctrl+Z. All are suppressed
+   * while a text field is focused so a typed key never re-arms a tool.
+   */
   @HostListener('window:keydown', ['$event'])
   protected onKeydown(event: KeyboardEvent): void {
-    // Don't hijack keystrokes meant for a text field (a future label/rename
-    // input) — a "5" typed there must not re-arm a terrain.
+    // Don't hijack keystrokes meant for a text field (a label/rename input) — a
+    // "5" or "t" typed there must not arm a tool.
     if (this.isEditableTarget(event.target)) return;
 
     if (event.metaKey || event.ctrlKey) {
@@ -424,16 +440,16 @@ export class MapCanvas {
       return;
     }
 
-    if (event.key.toLowerCase() === 'e') {
-      this.store.selectTool({ kind: 'erase' });
+    const tool = TOOL_HOTKEYS[event.key.toLowerCase()];
+    if (tool) {
+      this.store.armTool(tool);
       return;
     }
-    if (event.key.toLowerCase() === 'l') {
-      this.store.selectTool({ kind: 'label' });
-      return;
+    // `1`–`9` pick the nth Subtool of the armed Tool (relative to it, not
+    // hardwired to terrain). Digit 0 has no Subtool slot.
+    if (event.key >= '1' && event.key <= '9') {
+      this.store.armSubtoolByIndex(Number(event.key));
     }
-    const terrain = terrainPalette[Number(event.key) - 1];
-    if (terrain) this.store.selectTool({ kind: 'terrain', id: terrain.id });
   }
 
   /** Whether `target` is a text input the user is typing into. */

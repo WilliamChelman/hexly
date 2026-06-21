@@ -60,15 +60,16 @@ describe('EditorShell', () => {
     expect(health?.textContent).toContain('api');
   });
 
-  it('arms the painted terrain tool by default', () => {
+  it('arms the non-destructive Select tool by default', () => {
     const fixture = TestBed.createComponent(EditorShell);
     fixture.detectChanges();
     httpMock.expectOne('/health').flush({ status: 'ok', service: 'api' });
 
+    // A map opens armed with Select so a stray first click never paints (issue #27).
     const active = (fixture.nativeElement as HTMLElement).querySelector(
       'button[appTool].is-active',
     );
-    expect(active?.textContent).toContain('Forest');
+    expect(active?.textContent).toContain('Select');
   });
 
   it('opens the map named by the route id, loading its document into the editor', () => {

@@ -21,9 +21,11 @@ test('paints a region onto a hex, saves, and the region survives a reload', asyn
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
 
-  // Creating a region arms its paint brush, so clicking the centre hex (the
-  // canvas centres the world origin on load, so a plain click lands on (0,0))
-  // adds that coordinate to the region — no terrain needed.
+  // A map opens armed with Select (issue #27), so arm the Region tool to reveal
+  // its legend. Creating a region then arms its paint brush, so clicking the
+  // centre hex (the canvas centres the world origin on load, so a plain click
+  // lands on (0,0)) adds that coordinate to the region — no terrain needed.
+  await page.getByTestId('tool-region').click();
   await page.getByTestId('new-region').click();
 
   // Prove the region exists (and is named 'Region 1') before we paint, so a
@@ -62,6 +64,10 @@ test('paints a region onto a hex, saves, and the region survives a reload', asyn
   expect(detail.document.regions).toHaveLength(1);
   expect(detail.document.regions[0].hexes).toEqual({ '0,0': true });
 
+  // The reloaded map boots in Select (issue #27), so the region legend is hidden
+  // until the Region tool is armed — arm it, then assert the legend re-rendered
+  // THAT region by its stable id.
+  await page.getByTestId('tool-region').click();
   const id = detail.document.regions[0].id;
   await expect(page.getByTestId('region-name-' + id)).toHaveValue('Region 1');
 });

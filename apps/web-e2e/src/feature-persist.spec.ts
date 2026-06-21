@@ -20,12 +20,16 @@ test('places a feature on a hex, saves, and the feature survives a reload', asyn
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
 
-  // A Feature rides on an existing Hex, so paint the centre hex first (the
+  // A Feature rides on an existing Hex, so paint the centre hex first. A map opens
+  // armed with Select (issue #27), so arm the Terrain tool before painting (the
   // canvas centres the world origin on load, so a plain click lands on (0,0)).
+  await page.getByTestId('tool-terrain').click();
   await canvas.click();
   await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
 
-  // Arm the Settlement feature from the library and place it on that same hex.
+  // Arm the Feature tool to reveal its library, pick Settlement, and place it on
+  // that same hex.
+  await page.getByTestId('tool-feature').click();
   await page
     .getByRole('group', { name: 'Features' })
     .getByRole('button', { name: 'Settlement' })

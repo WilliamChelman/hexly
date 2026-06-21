@@ -65,3 +65,21 @@ Every piece of map content sits in exactly one of three placement modes:
 - **Hex-locked** — snapped to a hex coordinate: Terrain, Feature.
 - **Edge/vertex** — riding on the boundaries between hexes: Overlay (rivers, roads, borders).
 - **Free-positioned** — at an arbitrary point, off the grid: Label.
+
+## Editing tools
+
+**Tool**:
+A top-level editing mode armed in the palette — Select, Terrain, Feature, Region, Label, Erase. Exactly one is armed at a time, and a canvas gesture applies it. A map opens armed with Select.
+_Avoid_: Mode, brush, instrument
+
+**Subtool**:
+A mutually-exclusive variant *within* a Tool — the Terrain tool's individual terrains, the Feature tool's individual features (and its Clear variant), the Region tool's individual regions. Tools that have Subtools remember the last one used for the session. Select, Label, and Erase have no Subtools.
+_Avoid_: Sub-mode, option, variant
+
+**Select**:
+The one non-destructive Tool: click to select the topmost entity under the cursor (Label, then Feature, then Hex), inspect it, delete it, or drag to move a Label or a whole Hex. The only way to select and manipulate existing content — painting Tools never select.
+_Avoid_: Pointer, move tool, arrow
+
+**Erase**:
+The Tool that deletes a whole Hex record (its terrain *and* feature), turning the coordinate back into Void. Distinct from the Feature tool's Clear Subtool, which removes only the feature and leaves the terrain.
+_Avoid_: Delete, clear, remove

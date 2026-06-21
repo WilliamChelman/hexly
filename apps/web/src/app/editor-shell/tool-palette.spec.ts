@@ -2,43 +2,108 @@ import { TestBed } from '@angular/core/testing';
 import { EditorStore } from './editor-store';
 import { ToolPalette } from './tool-palette';
 
-describe('ToolPalette feature group', () => {
+function setup() {
+  const fixture = TestBed.createComponent(ToolPalette);
+  const store = TestBed.inject(EditorStore);
+  fixture.detectChanges();
+  return { fixture, store };
+}
+
+/** Click the element with `data-testid`, re-rendering first so it is in the DOM. */
+function click(
+  fixture: ReturnType<typeof TestBed.createComponent>,
+  testid: string,
+): void {
+  fixture.detectChanges();
+  const el = fixture.nativeElement.querySelector(
+    `[data-testid=${testid}]`,
+  ) as HTMLButtonElement | null;
+  if (!el) throw new Error(`no element with data-testid="${testid}"`);
+  el.click();
+  fixture.detectChanges();
+}
+
+function has(
+  fixture: ReturnType<typeof TestBed.createComponent>,
+  testid: string,
+): boolean {
+  fixture.detectChanges();
+  return !!fixture.nativeElement.querySelector(`[data-testid=${testid}]`);
+}
+
+describe('ToolPalette primary Tool row', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({ imports: [ToolPalette] }).compileComponents();
   });
 
-  function click(fixture: ReturnType<typeof TestBed.createComponent>, testid: string): void {
-    fixture.detectChanges();
-    (
-      fixture.nativeElement.querySelector(`[data-testid=${testid}]`) as HTMLButtonElement
-    ).click();
-  }
+  it('arms each top-level Tool from the primary row', () => {
+    const { fixture, store } = setup();
 
-  it('arms a feature tool from the built-in library when a feature is picked', () => {
-    const fixture = TestBed.createComponent(ToolPalette);
+    click(fixture, 'tool-terrain');
+    expect(store.tool()).toBe('terrain');
 
-    click(fixture, 'feature-settlement');
+    click(fixture, 'tool-feature');
+    expect(store.tool()).toBe('feature');
 
-    expect(TestBed.inject(EditorStore).tool()).toEqual({
-      kind: 'feature',
-      id: 'settlement',
-    });
-  });
-
-  it('arms the clear-feature tool when Clear feature is picked', () => {
-    const fixture = TestBed.createComponent(ToolPalette);
-
-    click(fixture, 'clear-feature');
-
-    expect(TestBed.inject(EditorStore).tool()).toEqual({ kind: 'clear-feature' });
-  });
-
-  it('arms the label tool when Label is picked', () => {
-    const fixture = TestBed.createComponent(ToolPalette);
+    click(fixture, 'tool-region');
+    expect(store.tool()).toBe('region');
 
     click(fixture, 'tool-label');
+    expect(store.tool()).toBe('label');
 
-    expect(TestBed.inject(EditorStore).tool()).toEqual({ kind: 'label' });
+    click(fixture, 'tool-erase');
+    expect(store.tool()).toBe('erase');
+
+    click(fixture, 'tool-select');
+    expect(store.tool()).toBe('select');
+  });
+});
+
+describe('ToolPalette contextual Subtool panel', () => {
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({ imports: [ToolPalette] }).compileComponents();
+  });
+
+  it('shows no Subtool strip while Select is armed (the cold-start tool)', () => {
+    const { fixture } = setup();
+
+    // A fresh map boots in Select, which has no Subtools (CONTEXT.md → Subtool).
+    // The terrain swatch buttons (e.g. "Ocean") only render under the Terrain
+    // tool — querying for one avoids colliding with the primary Terrain button.
+    expect(has(fixture, 'feature-settlement')).toBe(false);
+    expect(fixture.nativeElement.querySelector('[aria-label=Ocean]')).toBeNull();
+  });
+
+  it('shows terrain swatches and arms a terrain when Terrain is armed', () => {
+    const { fixture, store } = setup();
+    store.armTool('terrain');
+
+    fixture.detectChanges();
+    const ocean = fixture.nativeElement.querySelector(
+      '[aria-label=Ocean]',
+    ) as HTMLButtonElement;
+    ocean.click();
+
+    expect(store.tool()).toBe('terrain');
+    expect(store.terrain()).toBe('ocean');
+  });
+
+  it('shows feature icons and Clear, and arms them, when Feature is armed', () => {
+    const { fixture, store } = setup();
+    store.armTool('feature');
+
+    click(fixture, 'feature-settlement');
+    expect(store.feature()).toBe('settlement');
+
+    click(fixture, 'clear-feature');
+    expect(store.feature()).toBe('clear');
+  });
+
+  it('shows no feature strip while Feature is not armed', () => {
+    const { fixture } = setup();
+
+    expect(has(fixture, 'feature-settlement')).toBe(false);
+    expect(has(fixture, 'clear-feature')).toBe(false);
   });
 });
 
@@ -47,24 +112,33 @@ describe('ToolPalette regions', () => {
     await TestBed.configureTestingModule({ imports: [ToolPalette] }).compileComponents();
   });
 
-  it('creates a region and arms it for painting when New region is clicked', () => {
-    const fixture = TestBed.createComponent(ToolPalette);
-    const store = TestBed.inject(EditorStore);
-    fixture.detectChanges();
+  it('shows the region legend only while Region is armed', () => {
+    const { fixture, store } = setup();
+    store.createRegion('Avalon', '#b08a4e');
 
-    (
-      fixture.nativeElement.querySelector('[data-testid=new-region]') as HTMLButtonElement
-    ).click();
+    // Region is not armed yet → no legend.
+    expect(has(fixture, 'new-region')).toBe(false);
+
+    store.armTool('region');
+    expect(has(fixture, 'new-region')).toBe(true);
+  });
+
+  it('creates a region and arms it for painting when New region is clicked', () => {
+    const { fixture, store } = setup();
+    store.armTool('region');
+
+    click(fixture, 'new-region');
 
     const regions = store.document().regions;
     expect(regions).toHaveLength(1);
-    expect(store.tool()).toEqual({ kind: 'region', id: regions[0].id, mode: 'add' });
+    expect(store.tool()).toBe('region');
+    expect(store.region()).toEqual({ id: regions[0].id, mode: 'add' });
   });
 
   it('lists each region in the document by name', () => {
-    const store = TestBed.inject(EditorStore);
+    const { fixture, store } = setup();
     store.createRegion('The Whisperwood', '#7c9b86');
-    const fixture = TestBed.createComponent(ToolPalette);
+    store.armTool('region');
     fixture.detectChanges();
 
     const id = store.document().regions[0].id;
@@ -75,24 +149,19 @@ describe('ToolPalette regions', () => {
   });
 
   it('arms the erase brush for a region when its Erase is clicked', () => {
-    const store = TestBed.inject(EditorStore);
+    const { fixture, store } = setup();
     const id = store.createRegion('Avalon', '#b08a4e');
-    const fixture = TestBed.createComponent(ToolPalette);
-    fixture.detectChanges();
+    store.armTool('region');
 
-    (
-      fixture.nativeElement.querySelector(
-        `[data-testid=region-erase-${id}]`,
-      ) as HTMLButtonElement
-    ).click();
+    click(fixture, `region-erase-${id}`);
 
-    expect(store.tool()).toEqual({ kind: 'region', id, mode: 'remove' });
+    expect(store.region()).toEqual({ id, mode: 'remove' });
   });
 
   it('renames a region when its name field changes', () => {
-    const store = TestBed.inject(EditorStore);
+    const { fixture, store } = setup();
     const id = store.createRegion('Avalon', '#b08a4e');
-    const fixture = TestBed.createComponent(ToolPalette);
+    store.armTool('region');
     fixture.detectChanges();
 
     const input = fixture.nativeElement.querySelector(
@@ -105,9 +174,9 @@ describe('ToolPalette regions', () => {
   });
 
   it('recolors a region when its color field changes', () => {
-    const store = TestBed.inject(EditorStore);
+    const { fixture, store } = setup();
     const id = store.createRegion('Avalon', '#b08a4e');
-    const fixture = TestBed.createComponent(ToolPalette);
+    store.armTool('region');
     fixture.detectChanges();
 
     const input = fixture.nativeElement.querySelector(
@@ -120,16 +189,11 @@ describe('ToolPalette regions', () => {
   });
 
   it('deletes a region when its delete control is clicked', () => {
-    const store = TestBed.inject(EditorStore);
+    const { fixture, store } = setup();
     const id = store.createRegion('Avalon', '#b08a4e');
-    const fixture = TestBed.createComponent(ToolPalette);
-    fixture.detectChanges();
+    store.armTool('region');
 
-    (
-      fixture.nativeElement.querySelector(
-        `[data-testid=region-delete-${id}]`,
-      ) as HTMLButtonElement
-    ).click();
+    click(fixture, `region-delete-${id}`);
 
     expect(store.document().regions).toEqual([]);
   });
