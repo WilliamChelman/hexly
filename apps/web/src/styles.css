@@ -13,7 +13,39 @@
  * Tailwind's cascade layer so that utility classes (the `utilities` layer) win
  * over reset/typography as expected.
  */
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=JetBrains+Mono:wght@400;500&family=Spectral:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap');
+/*
+ * Fonts are self-hosted via @fontsource so the app renders identically with
+ * no network (no Google Fonts request). We import only the weights the design
+ * uses and only the latin + latin-ext subsets (matching what Google served via
+ * unicode-range); each file is one `font-display: swap` @font-face whose woff2
+ * the bundler resolves and emits locally.
+ *
+ *   Cinzel        — display       — 500 / 600 / 700
+ *   Spectral      — body          — 400 / 500 / 600 / 700 + 400 italic
+ *   JetBrains Mono — coords/mono  — 400 / 500
+ */
+@import '@fontsource/cinzel/latin-500.css';
+@import '@fontsource/cinzel/latin-600.css';
+@import '@fontsource/cinzel/latin-700.css';
+@import '@fontsource/cinzel/latin-ext-500.css';
+@import '@fontsource/cinzel/latin-ext-600.css';
+@import '@fontsource/cinzel/latin-ext-700.css';
+
+@import '@fontsource/spectral/latin-400.css';
+@import '@fontsource/spectral/latin-500.css';
+@import '@fontsource/spectral/latin-600.css';
+@import '@fontsource/spectral/latin-700.css';
+@import '@fontsource/spectral/latin-400-italic.css';
+@import '@fontsource/spectral/latin-ext-400.css';
+@import '@fontsource/spectral/latin-ext-500.css';
+@import '@fontsource/spectral/latin-ext-600.css';
+@import '@fontsource/spectral/latin-ext-700.css';
+@import '@fontsource/spectral/latin-ext-400-italic.css';
+
+@import '@fontsource/jetbrains-mono/latin-400.css';
+@import '@fontsource/jetbrains-mono/latin-500.css';
+@import '@fontsource/jetbrains-mono/latin-ext-400.css';
+@import '@fontsource/jetbrains-mono/latin-ext-500.css';
 
 @import 'tailwindcss';
 @import './styles/tokens.css';
