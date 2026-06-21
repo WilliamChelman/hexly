@@ -12,7 +12,7 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
-import { Axial, coordKey, Layout, pixelToHex, Point, terrainPalette } from '@hexly/domain';
+import { Axial, coordKey, Layout, pixelToHex, Point, terrainLabel } from '@hexly/domain';
 import { ThemeService } from '../core/theme.service';
 import { EditorStore, ToolId } from './editor-store';
 import { Button } from '../ui/button';
@@ -252,9 +252,7 @@ export class MapCanvas {
     const hex = this.hover();
     if (!hex) return null;
     const painted = this.store.document().hexes[coordKey(hex)];
-    return painted
-      ? (terrainPalette.find((t) => t.id === painted.terrain)?.label ?? null)
-      : null;
+    return painted ? (terrainLabel(painted.terrain) ?? null) : null;
   });
 
   private renderer: MapRenderer | null = null;
@@ -269,28 +267,21 @@ export class MapCanvas {
 
   constructor() {
     // Repaint whenever pan, zoom, the painted document, a label drag, or the
-    // hover changes. The live label-drag override previews the dragged label
-    // without cloning the document each frame.
-    effect(() => {
-      const camera = this.camera();
-      const doc = this.store.document();
-      const hover = this.hover();
-      const labelDrag = this.labelDragOverride();
-      this.renderer?.render(camera, doc, hover, labelDrag);
-    });
+    // selection changes. Reading the signals inside renderFrame() registers them
+    // as dependencies; the label-drag override previews the dragged label without
+    // cloning the document each frame.
+    effect(() => this.renderFrame());
 
     // Re-read the renderer's themed colours and repaint when the theme switches.
     // The renderer caches the palette, so this is the only place it pays for a
     // style read — the per-frame render path stays free of `getComputedStyle`.
+    // The render inputs are read untracked so only an actual theme switch (not a
+    // pan/paint/selection change) drives this costlier path.
     effect(() => {
       this.theme.theme();
       if (!this.renderer) return;
       this.renderer.refreshTheme();
-      this.renderer.render(
-        untracked(this.camera),
-        untracked(this.store.document),
-        untracked(this.hover),
-      );
+      untracked(() => this.renderFrame());
     });
 
     afterNextRender(() => {
@@ -299,6 +290,23 @@ export class MapCanvas {
       this.renderer = new Canvas2dMapRenderer(canvas, this.layout);
       this.observeSize(canvas);
     });
+  }
+
+  /**
+   * Paint one frame from the current signal values — the single render call site.
+   * Read every signal into a local *before* the null-guarded `render` call: under
+   * `this.renderer?.render(...)` the optional chaining would skip evaluating the
+   * arguments while the renderer is still null (the effect's first run, before
+   * `afterNextRender`), so the signals would go untracked and the effect would
+   * never repaint again.
+   */
+  private renderFrame(): void {
+    const camera = this.camera();
+    const doc = this.store.document();
+    const hover = this.hover();
+    const labelDrag = this.labelDragOverride();
+    const selection = this.store.selection();
+    this.renderer?.render(camera, doc, hover, labelDrag, selection);
   }
 
   protected onPointerDown(event: PointerEvent): void {
@@ -321,28 +329,30 @@ export class MapCanvas {
 
     const world = this.toWorld(event);
 
-    // Select is the only selection path (ADR-0010): a click on an existing label
-    // selects it and starts a drag. Painting Tools no longer select — a Label is
-    // inert to them — so this is gated to Select; under a painting Tool the same
-    // click falls through and paints the hex beneath the label. The grab offset
-    // keeps the label from jumping to the cursor.
+    // Select is the only selection path (ADR-0010): it selects the topmost entity
+    // under the cursor and, for a Label, starts a drag. Painting Tools no longer
+    // select — a Label is inert to them — so this is gated to Select; under a
+    // painting Tool the same click falls through and paints the hex beneath the
+    // label. Precedence (Label → Feature → Hex, clear on empty) lives in the
+    // store: the canvas only supplies the geometric inputs — the hex under the
+    // pointer and the label hit — and hands them over (issue #28).
     if (this.store.tool() === 'select') {
       const hitId = this.renderer?.labelAt(this.localPoint(event)) ?? null;
-      if (hitId) {
-        // `labelAt` already proved the label exists and `selectLabel` set it, so
-        // read it straight back rather than re-scanning the document (issue #7).
-        this.store.selectLabel(hitId);
+      const selection = this.store.select(hex, hitId);
+      // A selected Label can be dragged to reposition it; the grab offset keeps
+      // it from jumping to the cursor. Hex/Feature drag-to-move is a later slice
+      // (ADR-0010), so a selected Hex/Feature is otherwise inert on press. Only a
+      // label selection needs the document lookup for its position.
+      if (selection?.kind === 'label') {
         const label = this.store.selectedLabel();
         if (label) {
           this.labelDrag.set({
-            id: hitId,
+            id: label.id,
             offset: { x: label.position.x - world.x, y: label.position.y - world.y },
             position: label.position,
           });
         }
       }
-      // Select is otherwise inert for now: the universal hex/feature select-and-
-      // drag is a later slice (issue #27, ADR-0010), so a press paints nothing.
       return;
     }
 
@@ -573,12 +583,7 @@ export class MapCanvas {
         this.centred = true;
         this.camera.set(Camera.initial().panBy(width / 2, height / 2));
       } else {
-        this.renderer?.render(
-          this.camera(),
-          this.store.document(),
-          this.hover(),
-          this.labelDragOverride(),
-        );
+        this.renderFrame();
       }
     };
 
