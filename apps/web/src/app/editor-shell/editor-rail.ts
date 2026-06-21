@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { RegionIcon } from '../ui/icon/glyphs/region';
+import { IconButton } from '../ui/icon-button';
 import { EditorStore } from './editor-store';
 
-/** The shared right column's panel identity (mirrors {@link EditorStore.rightPanel}). */
+/** The right panel's identity a rail entry can open (mirrors {@link EditorStore.rightPanel}). */
 type RightPanel = 'inspector' | 'regions';
 
 /** A declarative rail entry: which panel it owns plus its icon-only button chrome. */
@@ -13,35 +13,32 @@ interface RailEntry {
 }
 
 /**
- * The right-edge icon rail — a narrow vertical strip pinned to the right edge
- * whose entries open management panels into the shared right column (ADR-0011,
- * issue #39). It is built to take further entries later; only the Regions entry
- * ships now. The Regions entry toggles the shared column to the Regions panel
- * ({@link EditorStore.toggleRegionsPanel}); it reads as active while that list is
- * showing, and clicking it again yields the column back to the Inspector.
+ * The right-edge icon rail — a narrow floating strip pinned top-right whose
+ * entries open management panels into the dismissible right panel (ADR-0011,
+ * ADR-0013, issue #39). It is built to take further entries later; only the
+ * Regions entry ships now. The Regions entry toggles the panel between the
+ * Regions list and closed ({@link EditorStore.toggleRegionsPanel}); it reads as
+ * active while that list is showing, and clicking it again reclaims the map.
  *
  * Entries are declarative ({@link RAIL_ENTRIES}) so a second entry is a data
- * change, not copied markup; per ADR-0007 each glyph stays its own component, so
- * the @for keeps the Regions glyph inline and a new entry brings its own glyph.
+ * change, not copied markup; each is a shared {@link IconButton} carrying a
+ * `title` tooltip, per ADR-0013's "every widget is a primitive."
  */
 @Component({
   selector: 'app-editor-rail',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RegionIcon],
+  imports: [IconButton],
   template: `
     @for (entry of entries; track entry.id) {
       <button
-        type="button"
-        class="entry"
-        [class.is-active]="store.rightPanel() === entry.id"
-        [attr.aria-pressed]="store.rightPanel() === entry.id"
+        appIconButton
+        glyph="region"
+        [active]="store.rightPanel() === entry.id"
         [title]="entry.title"
         [attr.aria-label]="entry.title"
         [attr.data-testid]="entry.testid"
         (click)="store.toggleRegionsPanel()"
-      >
-        <app-icon-region [size]="20" />
-      </button>
+      ></button>
     }
   `,
   styles: `
@@ -50,35 +47,11 @@ interface RailEntry {
       flex-direction: column;
       align-items: center;
       gap: var(--space-2);
-      padding: var(--space-2) 0;
-      overflow-y: auto;
-      background: var(--bg-deep);
-      border-left: 1px solid var(--line-strong);
-    }
-    .entry {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: var(--space-7);
-      height: var(--space-7);
-      color: var(--ink-muted);
-      background: transparent;
-      border: 1px solid transparent;
-      border-radius: var(--radius-md);
-      cursor: pointer;
-      transition:
-        background-color var(--dur-fast) var(--ease-out),
-        border-color var(--dur-fast) var(--ease-out),
-        color var(--dur-fast) var(--ease-out);
-    }
-    .entry:hover {
-      color: var(--ink);
-      background: var(--gold-soft);
-    }
-    .entry.is-active {
-      color: var(--gold);
-      background: var(--gold-soft);
-      border-color: var(--gold);
+      padding: var(--space-2);
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-1);
     }
   `,
 })

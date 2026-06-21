@@ -1534,11 +1534,12 @@ describe('EditorStore New Region (from the Regions panel)', () => {
 });
 
 describe('EditorStore shared right column', () => {
-  it('shows the Inspector by default and flips to the Regions list on demand', () => {
+  it('is closed by default and opens the Regions list on demand', () => {
     const store = new EditorStore();
 
-    // The right column is shared with the Inspector (ADR-0011); a map opens on it.
-    expect(store.rightPanel()).toBe('inspector');
+    // The right panel is closed by default (ADR-0013): nothing covers the map until
+    // there is something to show — a selection (Inspector) or Regions toggled on.
+    expect(store.rightPanel()).toBeNull();
 
     store.showRegionsPanel();
 
@@ -1560,15 +1561,16 @@ describe('EditorStore shared right column', () => {
     expect(store.rightPanel()).toBe('inspector');
   });
 
-  it('resets the shared column to the Inspector when a map is opened', () => {
+  it('resets the right panel closed when a map is opened', () => {
     const store = new EditorStore();
     store.showRegionsPanel();
 
-    // Opening a map is a fresh start (like the tool and selection reset in load),
-    // so it must not strand the reopened map on the previous session's list view.
+    // Opening a map is a fresh start (like the tool and selection reset in load), so
+    // the reopened map shows a clear right side — closed, not the previous session's
+    // list view, and not an empty Inspector (ADR-0013, story 20).
     store.load(emptyHexMap());
 
-    expect(store.rightPanel()).toBe('inspector');
+    expect(store.rightPanel()).toBeNull();
   });
 
   it('flips the shared column back to the Inspector when a canvas selection is made', () => {
@@ -1629,16 +1631,42 @@ describe('EditorStore shared right column', () => {
     expect(store.region()).toEqual({ id: a, mode: 'remove' });
   });
 
-  it('toggles the shared column between the Regions panel and the Inspector', () => {
+  it('toggles the right panel between the Regions list and closed', () => {
     const store = new EditorStore();
 
-    // A map opens on the Inspector; the rail entry's click toggles it.
-    expect(store.rightPanel()).toBe('inspector');
+    // The panel is closed by default; the rail entry's click opens the Regions list.
+    expect(store.rightPanel()).toBeNull();
 
     store.toggleRegionsPanel();
     expect(store.rightPanel()).toBe('regions');
 
+    // Clicking the active entry again closes the panel — its off-state is closed,
+    // not the Inspector (ADR-0013, story 18).
     store.toggleRegionsPanel();
+    expect(store.rightPanel()).toBeNull();
+  });
+
+  it('opens the Inspector from the closed default when an entity is selected', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    expect(store.rightPanel()).toBeNull(); // closed boot state
+
+    // Selecting an entity opens the Inspector so it can be edited (story 16) — the
+    // selection-opens-for-editing contract holds even when the panel was closed.
+    store.select({ q: 0, r: 0 }, null);
+
     expect(store.rightPanel()).toBe('inspector');
+  });
+
+  it('opens the Regions list from the Inspector when the rail entry is toggled', () => {
+    const store = new EditorStore();
+    const id = store.addLabel('Pick me', { x: 0, y: 0 });
+    store.selectLabel(id); // a selection opens the Inspector
+    expect(store.rightPanel()).toBe('inspector');
+
+    // Toggling Regions while the Inspector is open switches to the list (the
+    // toggle's on-state is `regions` regardless of what the panel currently shows).
+    store.toggleRegionsPanel();
+    expect(store.rightPanel()).toBe('regions');
   });
 });

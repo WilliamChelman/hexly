@@ -214,7 +214,6 @@ interface SelectedEntity {
       padding: var(--space-4);
       overflow-y: auto;
       background: var(--surface);
-      border-left: 1px solid var(--line-strong);
     }
     .head {
       display: flex;

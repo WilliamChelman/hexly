@@ -15,9 +15,18 @@ import { StatusBar } from './status-bar';
 /**
  * The editor's layout orchestrator. It owns no chrome of its own — each region
  * (header, tool palette, canvas, inspector, status bar) is its own component —
- * only the three-row / three-column frame that arranges them (ADR-0007), plus
- * the one piece of routing it is responsible for: opening the map named by the
- * `:id` route param into the {@link EditorSession} so a reload restores it.
+ * only the frame that arranges them, plus the one piece of routing it is
+ * responsible for: opening the map named by the `:id` route param into the
+ * {@link EditorSession} so a reload restores it.
+ *
+ * The body is a **full-bleed canvas** with the side chrome floating over it as
+ * absolutely-positioned cards (ADR-0013, reversing ADR-0007's column grid and
+ * ADR-0011's always-present right column): the tool palette anchors top-left, the
+ * edge rail top-right, and the dismissible right panel (Inspector / Regions) to
+ * the rail's left — rendered only when {@link EditorStore.rightPanel} is open, so
+ * nothing covers the map by default. The header and status bar stay docked as
+ * full-width rows. The editor renders identically at every width — the old
+ * narrow-viewport rail-hiding is gone.
  */
 @Component({
   selector: 'app-editor-shell',
@@ -35,19 +44,25 @@ import { StatusBar } from './status-bar';
     <div class="shell">
       <app-editor-header />
       <div class="body">
-        <app-tool-palette />
+        <!-- Full-bleed canvas; all side chrome floats over it (ADR-0013). -->
         <app-map-canvas />
+        <app-tool-palette />
         <!--
-          The shared right column (ADR-0011): the right-edge rail flips it between
-          the live Inspector and the Regions panel's list; selecting a Region flips
-          it back to the Inspector. The rail itself stays pinned to the edge.
+          The right dock: the dismissible panel (Inspector / Regions) and the edge
+          rail laid out as one flex row, so the panel always sits just left of the
+          rail with a consistent gap — no hand-computed offsets (ADR-0013). The
+          rail toggles the Regions list on and off; selecting an entity or a Region
+          opens the Inspector. When the panel is closed (rightPanel is null) only
+          the bare rail shows, so the map is clear.
         -->
-        @if (store.rightPanel() === 'regions') {
-          <app-regions-panel />
-        } @else {
-          <app-inspector />
-        }
-        <app-editor-rail />
+        <div class="right-dock">
+          @if (store.rightPanel() === 'regions') {
+            <app-regions-panel />
+          } @else if (store.rightPanel() === 'inspector') {
+            <app-inspector />
+          }
+          <app-editor-rail />
+        </div>
       </div>
       <app-status-bar />
     </div>
@@ -63,40 +78,55 @@ import { StatusBar } from './status-bar';
       grid-template-rows: var(--rail-header) 1fr var(--rail-status);
       height: 100vh;
     }
+    /* The body is the floating-chrome stacking context; the canvas fills it. */
     .body {
-      display: grid;
-      grid-template-columns: var(--rail-tools) 1fr var(--rail-inspector) var(--rail-edge);
+      position: relative;
       min-height: 0;
     }
+    .body app-map-canvas {
+      position: absolute;
+      inset: 0;
+    }
+    /* Tool palette anchored top-left; rail top-right; panel to the rail's left. */
+    .body app-tool-palette {
+      position: absolute;
+      top: var(--space-3);
+      left: var(--space-3);
+      max-height: calc(100% - 2 * var(--space-3));
+      z-index: 1;
+    }
     /*
-      Narrow viewports: collapse the left tool palette so the canvas stays
-      usable, but KEEP the right-edge rail beside the canvas — it is the only
-      way to open the Regions panel now that the palette tool and canvas
-      create-and-paint are gone (FIX 5). The active right column (Inspector or
-      Regions list) can't fit a column at this width, so it overlays the canvas
-      area instead; the rail's Regions entry toggles it open/closed.
+      The right dock floats top-right and lays the panel + rail out as a row. It
+      spans the body's height (top..bottom) so the panel can cap its height and
+      scroll internally (story 22); pointer-events pass through its empty area so
+      the canvas stays interactive below a short panel.
     */
-    @media (max-width: 1080px) {
-      .body {
-        /* canvas takes the remaining width; the thin rail stays pinned beside it */
-        grid-template-columns: 1fr var(--rail-edge);
-        position: relative;
-      }
-      .body app-tool-palette {
-        display: none;
-      }
-      /*
-        The active side panel floats over the canvas (not the rail), filling the
-        body so it's actually usable, and is dismissed via the rail toggle.
-      */
-      .body app-inspector,
-      .body app-regions-panel {
-        position: absolute;
-        inset: 0 var(--rail-edge) 0 0;
-        z-index: 1;
-        overflow: auto;
-        background: var(--surface, #fff);
-      }
+    .right-dock {
+      position: absolute;
+      top: var(--space-3);
+      right: var(--space-3);
+      bottom: var(--space-3);
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-2);
+      z-index: 1;
+      pointer-events: none;
+    }
+    .right-dock > * {
+      pointer-events: auto;
+    }
+    /*
+      The floating Inspector / Regions card sits just left of the rail, capped to
+      the dock height and scrolling internally, with full card chrome (edge,
+      radius, shadow) over the map.
+    */
+    .right-dock app-inspector,
+    .right-dock app-regions-panel {
+      width: var(--rail-inspector);
+      max-height: 100%;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-2);
     }
   `,
 })

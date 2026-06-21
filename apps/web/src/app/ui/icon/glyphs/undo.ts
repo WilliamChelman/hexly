@@ -1,11 +1,12 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 
 /**
- * The compass glyph. One `<svg>` drawn in `currentColor`, sized by `size`.
- * Reached by name through `app-icon`, or directly. See ADR-0007.
+ * The undo glyph (a curved arrow looping back to the left). One `<svg>` drawn in
+ * `currentColor`, sized by `size`. Reached by name through `app-icon`, or
+ * directly. See ADR-0007.
  */
 @Component({
-  selector: 'app-icon-compass',
+  selector: 'app-icon-undo',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: ':host { display: inline-flex; line-height: 0; }',
   template: `
@@ -15,18 +16,15 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      stroke-width="1.3"
+      stroke-width="1.5"
+      stroke-linejoin="round"
+      stroke-linecap="round"
     >
-      <circle cx="12" cy="12" r="9" />
-      <path
-        d="m12 4 2 8 8 2-8 2-2 8-2-8-8-2 8-2z"
-        fill="currentColor"
-        stroke="none"
-        opacity=".85"
-      />
+      <path d="M9 7H15a5 5 0 0 1 0 10H8" />
+      <path d="M9 3 5 7l4 4" />
     </svg>
   `,
 })
-export class CompassIcon {
+export class UndoIcon {
   readonly size = input(24);
 }

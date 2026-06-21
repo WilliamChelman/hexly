@@ -18,7 +18,6 @@ import { EditorStore, ToolId } from './editor-store';
 import { Button } from '../ui/button';
 import { Coord } from '../ui/coord';
 import { Eyebrow } from '../ui/eyebrow';
-import { CompassIcon } from '../ui/icon/glyphs/compass';
 import { FitIcon } from '../ui/icon/glyphs/fit';
 import { MinusIcon } from '../ui/icon/glyphs/minus';
 import { PlusIcon } from '../ui/icon/glyphs/plus';
@@ -76,7 +75,7 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
 @Component({
   selector: 'app-map-canvas',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Coord, Eyebrow, CompassIcon, FitIcon, MinusIcon, PlusIcon],
+  imports: [Button, Coord, Eyebrow, FitIcon, MinusIcon, PlusIcon],
   template: `
     <canvas
       #canvas
@@ -98,10 +97,6 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
       <span appEyebrow>{{
         hover() ? (hoverTerrain() ?? 'Void') : 'No hex'
       }}</span>
-    </div>
-
-    <div class="compass" title="North">
-      <app-icon-compass [size]="40" />
     </div>
 
     <div class="zoom" role="group" aria-label="Zoom">
@@ -161,9 +156,14 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
     .surface.is-grabbing {
       cursor: grabbing;
     }
+    /*
+      Bottom-left: the floating tool strip now owns the top-left of the canvas
+      (ADR-0013), so the hover coordinate readout drops to the opposite-free
+      corner rather than sitting under the palette.
+    */
     .readout {
       position: absolute;
-      top: var(--space-4);
+      bottom: var(--space-4);
       left: var(--space-4);
       display: flex;
       align-items: center;
@@ -178,15 +178,6 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
     }
     .readout-sep {
       color: var(--line-strong);
-    }
-    .compass {
-      position: absolute;
-      top: var(--space-4);
-      right: var(--space-4);
-      color: var(--gold);
-      opacity: 0.85;
-      filter: drop-shadow(var(--shadow-1));
-      pointer-events: none;
     }
     .zoom {
       position: absolute;
