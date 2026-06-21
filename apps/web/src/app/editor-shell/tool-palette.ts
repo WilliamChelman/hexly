@@ -1,13 +1,34 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+} from '@angular/core';
 import { featureLibrary, terrainPalette } from '@hexly/domain';
 import { Button } from '../ui/button';
 import { Eyebrow } from '../ui/eyebrow';
 import { Input } from '../ui/input';
+import { Kbd } from '../ui/kbd';
 import { Panel } from '../ui/panel';
 import { Rule } from '../ui/rule';
 import { Tool as ToolButton, ToolGlyph } from '../ui/tool';
 import { inputValue } from './dom';
-import { EditorStore, RegionSubtool, ToolId } from './editor-store';
+import {
+  EditorStore,
+  featureSubtools,
+  RegionSubtool,
+  ToolId,
+} from './editor-store';
+
+/**
+ * The one-line hint shown for a Tool that has no Subtool strip (issue #27). Keyed
+ * by the no-Subtool Tools; any other Tool renders its own Subtool panel instead.
+ */
+const SUBTOOL_HINTS: Partial<Record<ToolId, string>> = {
+  select: 'Click an entity to select it.',
+  label: 'Click the map to place a label.',
+  erase: 'Click a hex to erase it.',
+};
 
 /** A top-level Tool button in the primary selector row (issue #27). */
 interface ToolDef {
@@ -55,7 +76,7 @@ const REGION_MODES = [
 @Component({
   selector: 'app-tool-palette',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Eyebrow, Input, Panel, Rule, ToolButton],
+  imports: [Button, Eyebrow, Input, Kbd, Panel, Rule, ToolButton],
   template: `
     <section class="group">
       <h2 class="heading" appEyebrow>Tools</h2>
@@ -129,8 +150,11 @@ const REGION_MODES = [
           <h2 appEyebrow>Regions</h2>
           @let armed = store.region();
           <ul class="legend">
-        @for (r of store.document().regions; track r.id) {
+        @for (r of store.document().regions; track r.id; let i = $index) {
           <li>
+            @if (i < 9) {
+              <kbd appKbd>{{ i + 1 }}</kbd>
+            }
             <input
               type="color"
               class="color"
@@ -341,20 +365,20 @@ export class ToolPalette {
   /** The primary Tool selector buttons, in palette order (issue #27). */
   protected readonly tools = TOOLS;
 
-  /** The built-in feature library, each placeable from the palette, with a 1-based key. */
-  protected readonly features = featureLibrary.map((f, i) => ({
+  /**
+   * The built-in feature library, each placeable from the palette. The keycap is
+   * the feature's slot in {@link featureSubtools}, the shared ordering the
+   * keyboard indexes — so the hint can never disagree with what its key arms.
+   */
+  protected readonly features = featureLibrary.map((f) => ({
     id: f.id,
     label: f.label,
     path: f.path,
-    hint: String(i + 1),
+    hint: String(featureSubtools.indexOf(f.id) + 1),
   }));
 
-  /**
-   * The keycap hint for the Clear feature Subtool — the slot after the library
-   * features, mirroring `armSubtoolByIndex` where Clear is the last Feature
-   * Subtool (issue #27).
-   */
-  protected readonly clearHint = String(featureLibrary.length + 1);
+  /** The keycap hint for the Clear feature Subtool — its slot in {@link featureSubtools}. */
+  protected readonly clearHint = String(featureSubtools.indexOf('clear') + 1);
 
   /** The built-in terrain palette, with a 1-based number key per entry. */
   protected readonly terrainTools = terrainPalette.map((t, i) => ({
@@ -403,16 +427,7 @@ export class ToolPalette {
   }
 
   /** The one-line hint shown for a Tool that has no Subtool strip (issue #27). */
-  protected subtoolHint(): string {
-    switch (this.store.tool()) {
-      case 'select':
-        return 'Click an entity to select it.';
-      case 'label':
-        return 'Click the map to place a label.';
-      case 'erase':
-        return 'Click a hex to erase it.';
-      default:
-        return '';
-    }
-  }
+  protected readonly subtoolHint = computed(
+    () => SUBTOOL_HINTS[this.store.tool()] ?? '',
+  );
 }

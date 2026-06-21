@@ -56,6 +56,21 @@ export interface RegionSubtool {
   readonly mode: 'add' | 'remove';
 }
 
+/**
+ * The Feature Tool's Subtools in palette/keyboard order: each library feature,
+ * then the Clear Subtool last. The single source of truth for the index→Subtool
+ * mapping the keyboard ({@link EditorStore.armSubtoolByIndex}) and the palette
+ * keycaps share, so the two cannot drift (issue #27, ADR-0010).
+ */
+export const featureSubtools: readonly FeatureSubtool[] = [
+  ...featureLibrary.map((f) => f.id),
+  'clear',
+];
+
+/** Cold-start Subtool defaults — the state a fresh map and a reloaded map share. */
+const DEFAULT_TERRAIN: TerrainId = 'forest';
+const DEFAULT_FEATURE: FeatureSubtool = featureLibrary[0].id;
+
 /** The default world-pixel height a freshly-placed Label is drawn at (issue #10). */
 export const DEFAULT_LABEL_SIZE = 28;
 
@@ -87,8 +102,8 @@ export class EditorStore {
    * Re-arming a Tool restores its remembered Subtool. Cold-start defaults:
    * Terrain → `forest`, Feature → the first library feature, Region → none.
    */
-  private readonly _terrain = signal<TerrainId>('forest');
-  private readonly _feature = signal<FeatureSubtool>(featureLibrary[0].id);
+  private readonly _terrain = signal<TerrainId>(DEFAULT_TERRAIN);
+  private readonly _feature = signal<FeatureSubtool>(DEFAULT_FEATURE);
   private readonly _region = signal<RegionSubtool | null>(null);
 
   /** The remembered Terrain Subtool — the terrain a Terrain stroke paints. */
@@ -153,6 +168,14 @@ export class EditorStore {
    * switching Tools never disturbs it (issue #27).
    */
   armTool(id: ToolId): void {
+    // Arming Region with no remembered Subtool but regions to paint would leave
+    // the tool inert (every stroke a silent no-op) behind a live-looking legend.
+    // Default to the first region so the tool is immediately usable; a genuinely
+    // region-less document still arms nothing, per "Region → none" (issue #27).
+    if (id === 'region' && !this._region()) {
+      const first = this._document().regions[0];
+      if (first) this._region.set({ id: first.id, mode: 'add' });
+    }
     this._tool.set(id);
   }
 
@@ -195,11 +218,7 @@ export class EditorStore {
         break;
       }
       case 'feature': {
-        const subtools: FeatureSubtool[] = [
-          ...featureLibrary.map((f) => f.id),
-          'clear',
-        ];
-        const sub = subtools[n - 1];
+        const sub = featureSubtools[n - 1];
         if (sub) this.armFeature(sub);
         break;
       }
@@ -224,12 +243,18 @@ export class EditorStore {
     this.redoStack.length = 0;
     this.syncHistory();
     // A freshly opened map arms the non-destructive Select tool so a stray click
-    // never paints (issue #27). The Region Subtool referenced a region in the
-    // previous document, so reset Subtool memory to the cold-start defaults
-    // rather than leaving a dangling region id behind.
+    // never paints (issue #27). The Subtool memory (and the selected label) all
+    // referenced the previous document, so reset them to the cold-start defaults
+    // rather than leaving a dangling region or label id behind.
     this._tool.set('select');
-    this._terrain.set('forest');
-    this._feature.set(featureLibrary[0].id);
+    this.resetSubtoolMemory();
+    this._selectedLabelId.set(null);
+  }
+
+  /** Restore the cold-start Subtool memory shared by a fresh store and a reload. */
+  private resetSubtoolMemory(): void {
+    this._terrain.set(DEFAULT_TERRAIN);
+    this._feature.set(DEFAULT_FEATURE);
     this._region.set(null);
   }
 

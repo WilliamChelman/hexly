@@ -262,13 +262,6 @@ export class MapCanvas {
   private lastPointer: { x: number; y: number } | null = null;
   /** True while a primary-button paint/erase stroke is in progress. */
   private painting = false;
-  /**
-   * Whether the armed stroke keeps applying as the pointer drags. Snapshotted
-   * from the store's {@link EditorStore.continuous} at press time: continuous for
-   * terrain/erase/region/clear; false for placing a Feature, which stamps once on
-   * the initial press so a drag never mass-places duplicates (issue #7).
-   */
-  private continuousStroke = false;
   /** True while a middle-button pan drag is in progress. */
   private panning = false;
   /** The last hex the active stroke touched, so a drag paints each hex once. */
@@ -328,22 +321,28 @@ export class MapCanvas {
 
     const world = this.toWorld(event);
 
-    // A click on an existing label selects it and starts a drag — whatever tool
-    // is armed (labels are sparse and ride on top, so grabbing one is the
-    // intent). The grab offset keeps the label from jumping to the cursor.
-    const hitId = this.renderer?.labelAt(this.localPoint(event)) ?? null;
-    if (hitId) {
-      // `labelAt` already proved the label exists and `selectLabel` set it, so
-      // read it straight back rather than re-scanning the document (issue #7).
-      this.store.selectLabel(hitId);
-      const label = this.store.selectedLabel();
-      if (label) {
-        this.labelDrag.set({
-          id: hitId,
-          offset: { x: label.position.x - world.x, y: label.position.y - world.y },
-          position: label.position,
-        });
+    // Select is the only selection path (ADR-0010): a click on an existing label
+    // selects it and starts a drag. Painting Tools no longer select — a Label is
+    // inert to them — so this is gated to Select; under a painting Tool the same
+    // click falls through and paints the hex beneath the label. The grab offset
+    // keeps the label from jumping to the cursor.
+    if (this.store.tool() === 'select') {
+      const hitId = this.renderer?.labelAt(this.localPoint(event)) ?? null;
+      if (hitId) {
+        // `labelAt` already proved the label exists and `selectLabel` set it, so
+        // read it straight back rather than re-scanning the document (issue #7).
+        this.store.selectLabel(hitId);
+        const label = this.store.selectedLabel();
+        if (label) {
+          this.labelDrag.set({
+            id: hitId,
+            offset: { x: label.position.x - world.x, y: label.position.y - world.y },
+            position: label.position,
+          });
+        }
       }
+      // Select is otherwise inert for now: the universal hex/feature select-and-
+      // drag is a later slice (issue #27, ADR-0010), so a press paints nothing.
       return;
     }
 
@@ -354,7 +353,6 @@ export class MapCanvas {
     }
 
     this.painting = true;
-    this.continuousStroke = this.store.continuous();
     this.lastStroke = null;
     this.strokeAt(hex);
   }
@@ -380,7 +378,11 @@ export class MapCanvas {
       const dy = event.clientY - this.lastPointer.y;
       this.lastPointer = { x: event.clientX, y: event.clientY };
       this.camera.update((c) => c.panBy(dx, dy));
-    } else if (this.painting && this.continuousStroke) {
+    } else if (this.painting && this.store.continuous()) {
+      // Read continuity live, not from a press-time snapshot: the armed Tool can
+      // change mid-drag (a keyboard hotkey), and `applyAt` already dispatches on
+      // the live Tool — so a stroke that becomes a discrete Feature stops sweeping
+      // instead of mass-stamping it (issue #7, issue #27).
       this.strokeAt(hex);
     }
   }
@@ -413,7 +415,6 @@ export class MapCanvas {
       this.labelDrag.set(null);
     }
     this.painting = false;
-    this.continuousStroke = false;
     this.panning = false;
     this.dragging.set(false);
     this.lastPointer = null;

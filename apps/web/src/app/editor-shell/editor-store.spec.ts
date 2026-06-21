@@ -1,4 +1,4 @@
-import { emptyHexMap } from '@hexly/domain';
+import { emptyHexMap, HexMap } from '@hexly/domain';
 import { EditorStore } from './editor-store';
 
 describe('EditorStore', () => {
@@ -671,6 +671,60 @@ describe('EditorStore two-level armed state', () => {
     expect(store.terrain()).toBe('forest');
     expect(store.feature()).toBe('settlement');
     expect(store.region()).toBeNull();
+  });
+
+  it('auto-arms the first region when Region is armed with none remembered', () => {
+    const store = new EditorStore();
+    const a = store.createRegion('Avalon', '#b08a4e');
+    store.createRegion('Whisperwood', '#7c9b86');
+
+    // No Subtool picked yet — arming Region must land on a live region, not leave
+    // the tool inert behind a populated legend (issue #27).
+    store.armTool('region');
+
+    expect(store.tool()).toBe('region');
+    expect(store.region()).toEqual({ id: a, mode: 'add' });
+  });
+
+  it('arms no region Subtool when Region is armed on a region-less map', () => {
+    const store = new EditorStore();
+
+    store.armTool('region');
+
+    expect(store.tool()).toBe('region');
+    expect(store.region()).toBeNull();
+  });
+
+  it('restores the remembered region Subtool on re-arm rather than auto-picking', () => {
+    const store = new EditorStore();
+    store.createRegion('Avalon', '#b08a4e');
+    const b = store.createRegion('Whisperwood', '#7c9b86');
+    store.armRegion(b, 'remove'); // remember a non-first region in 'remove'
+    store.armTool('select');
+
+    store.armTool('region'); // re-arm must restore memory, not auto-pick the first
+
+    expect(store.region()).toEqual({ id: b, mode: 'remove' });
+  });
+
+  it('clears the selected label when a document is loaded', () => {
+    const store = new EditorStore();
+    const first: HexMap = {
+      ...emptyHexMap(),
+      labels: [{ id: 'L1', text: 'A', position: { x: 0, y: 0 }, size: 28 }],
+    };
+    store.load(first);
+    store.selectLabel('L1');
+    expect(store.selectedLabel()?.id).toBe('L1');
+
+    // Loading a different document that reuses the id must not keep the stale
+    // selection — load() forgets it rather than relying on the id not colliding.
+    const second: HexMap = {
+      ...emptyHexMap(),
+      labels: [{ id: 'L1', text: 'B', position: { x: 5, y: 5 }, size: 28 }],
+    };
+    store.load(second);
+    expect(store.selectedLabel()).toBeNull();
   });
 });
 

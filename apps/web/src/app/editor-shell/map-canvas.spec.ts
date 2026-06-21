@@ -67,13 +67,20 @@ describe('MapCanvas keyboard', () => {
   });
 
   it('suppresses tool hotkeys while a text field is focused', () => {
+    // Arm a non-default Tool first so this proves suppression rather than the
+    // cold-start default: a 't' that leaked through would arm Terrain, flipping
+    // the value away from 'region'.
+    store.armTool('region');
     const input = document.createElement('input');
     document.body.appendChild(input);
+    input.focus();
 
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 't', bubbles: true }));
 
-    // A "t" typed into a field must not arm the Terrain tool.
-    expect(store.tool()).toBe('select');
+    // A "t" typed into a field must not re-arm a tool. Remove before asserting so
+    // a failure can't leak the input into later tests.
+    const armed = store.tool();
     input.remove();
+    expect(armed).toBe('region');
   });
 });

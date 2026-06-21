@@ -123,6 +123,18 @@ describe('ToolPalette regions', () => {
     expect(has(fixture, 'new-region')).toBe(true);
   });
 
+  it('shows a number keycap per region mirroring the keyboard Subtool index', () => {
+    const { fixture, store } = setup();
+    store.createRegion('Avalon', '#b08a4e');
+    store.armTool('region');
+    fixture.detectChanges();
+
+    // The legend's first region carries the '1' keycap that armSubtoolByIndex(1)
+    // maps to, so the keyboard binding is discoverable (issue #27).
+    const kbd = fixture.nativeElement.querySelector('.legend kbd');
+    expect(kbd?.textContent?.trim()).toBe('1');
+  });
+
   it('creates a region and arms it for painting when New region is clicked', () => {
     const { fixture, store } = setup();
     store.armTool('region');
