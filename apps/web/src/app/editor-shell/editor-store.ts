@@ -229,6 +229,18 @@ export class EditorStore {
     return this._document().labels.find((l) => l.id === sel.id) ?? null;
   });
 
+  /**
+   * The currently-selected {@link Region} resolved from the live document, or
+   * `null` when the selection is not a Region (or its id is gone after an undo).
+   * Peer to {@link selectedLabel}: the Inspector binds to this to edit the
+   * Region's name, color, and deletion (issue #36).
+   */
+  readonly selectedRegion = computed<Region | null>(() => {
+    const sel = this.selection();
+    if (sel?.kind !== 'region') return null;
+    return regionById(this._document(), sel.id) ?? null;
+  });
+
   /** Committed edits, newest last — popped to undo, then parked on `redoStack`. */
   private readonly undoStack: Edit[] = [];
   private readonly redoStack: Edit[] = [];
@@ -483,19 +495,33 @@ export class EditorStore {
     });
   }
 
-  /** Delete the region `id` entirely, along with its membership set. */
+  /**
+   * Delete the region `id` entirely, along with its membership set, clearing the
+   * selection if it pointed at it. Peer to {@link deleteLabel}: it owns its own
+   * selection teardown, so every caller — the Inspector and palette Delete
+   * buttons, and {@link deleteSelected} — gets correct, single-step undo without
+   * re-deriving the cleanup at the call site (issue #36).
+   */
   deleteRegion(id: string): void {
-    this.commit((draft) => {
+    const committed = this.commit((draft) => {
       const at = draft.regions.findIndex((r) => r.id === id);
       if (at !== -1) draft.regions.splice(at, 1);
     });
+    const sel = this._selection();
+    if (sel?.kind === 'region' && sel.id === id) this.deselect();
     // The Region Subtool now points at a region that no longer exists. Forget it,
     // and if the Region tool is armed, fall back to the non-destructive Select so
-    // the canvas stays inert rather than silently no-opping every stroke.
+    // the canvas stays inert rather than silently no-opping every stroke. This
+    // disarm is session-only tool state (issue #27, ADR-0010), so — unlike the
+    // document and selection above — it is deliberately NOT part of the undoable
+    // edit: undoing the deletion restores the Region but leaves the tool on Select.
     if (this._region()?.id === id) {
       this._region.set(null);
       if (this._tool() === 'region') this._tool.set('select');
     }
+    // Record the cleared selection on the edit (only if one was actually made) so
+    // undo restores it with the region and redo clears it again.
+    if (committed) this.trackSelectionOnLastEdit();
   }
 
   /**
@@ -689,16 +715,22 @@ export class EditorStore {
   deleteSelected(): void {
     const sel = this.selection();
     if (!sel) return;
-    if (sel.kind === 'label') this.deleteLabel(sel.id);
-    else if (sel.kind === 'feature') this.clearFeatureAt(sel.coord);
-    else if (sel.kind === 'hex') this.eraseAt(sel.coord);
-    // A selected Region is left untouched: Region deletion is the Inspector's job
-    // (issue #36), so Delete is a deliberate no-op here rather than erasing a hex.
-    else return;
+    // Label and Region have self-cleaning deletes — they clear the selection and
+    // stamp the edit themselves (the same paths the Inspector's Delete buttons
+    // use), so routing through them finishes the gesture. A selected Region is
+    // destroyed through that single-step `deleteRegion` (issue #36) — membership
+    // trimming never destroys a Region, so this and `deleteRegion` are the only
+    // two ways one ceases to be.
+    if (sel.kind === 'label') return this.deleteLabel(sel.id);
+    if (sel.kind === 'region') return this.deleteRegion(sel.id);
+    // A Hex/Feature erases through the general-purpose tool methods, which leave
+    // the selection alone (a tool stroke must not deselect). The erase recorded a
+    // step (the selection resolved an entity that existed), so clear the selection
+    // and stamp it on that edit, so undo restores both the entity and its
+    // selection together.
+    if (sel.kind === 'feature') this.clearFeatureAt(sel.coord);
+    else this.eraseAt(sel.coord);
     this.deselect();
-    // The dispatched edit erased an entity that existed (the selection resolved
-    // it), so a step was recorded; stamp the now-cleared selection on it, so undo
-    // restores both the entity and its selection together.
     this.trackSelectionOnLastEdit();
   }
 

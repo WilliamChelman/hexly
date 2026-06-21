@@ -7,6 +7,7 @@ import { Field } from '../ui/field';
 import { Input } from '../ui/input';
 import { inputValue } from './dom';
 import { EditorStore } from './editor-store';
+import { RegionFields } from './region-fields';
 
 /** A selected Hex or Feature resolved for display: its coordinate and identity. */
 interface SelectedEntity {
@@ -22,19 +23,22 @@ interface SelectedEntity {
 /**
  * The right rail. It reflects the single selection (issue #28): a selected Label
  * gets its full editor — text, size, rotation and world position, plus Delete
- * (issue #10) — while a selected Hex or Feature gets a minimal panel showing its
- * identity and a Delete action. Delete dispatches through the store's single
+ * (issue #10); a selected Region gets a name, color, and Delete editor (issue
+ * #36) — the only place a Region's details are edited (CONTEXT.md → Inspector);
+ * while a selected Hex or Feature gets a minimal panel showing its identity and a
+ * Delete action. The entity panel's Delete dispatches through the store's single
  * {@link EditorStore.deleteSelected} gesture (issue #29): a Hex erases the whole
- * record, a Feature clears only its feature, a Label is removed. Every label
- * field commits through the {@link EditorStore}, so each edit is undoable and
- * persists. With nothing selected it shows a hint instead.
+ * record, a Feature clears only its feature, a Label is removed, a Region is
+ * destroyed. Every field commits through the {@link EditorStore}, so each edit is
+ * undoable and persists. With nothing selected it shows a hint instead.
  */
 @Component({
   selector: 'app-inspector',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Coord, Eyebrow, Field, Input],
+  imports: [Button, Coord, Eyebrow, Field, Input, RegionFields],
   template: `
     @let label = store.selectedLabel();
+    @let region = store.selectedRegion();
     @let entity = selectedEntity();
     @if (label) {
       <header class="head">
@@ -103,6 +107,26 @@ interface SelectedEntity {
           (click)="store.deleteLabel(label.id)"
         >
           Delete label
+        </button>
+      </div>
+    } @else if (region) {
+      <header class="head">
+        <span appEyebrow>Selected region</span>
+      </header>
+
+      <app-region-fields [region]="region" />
+
+      <div class="actions">
+        <button
+          type="button"
+          appButton
+          variant="ghost"
+          size="sm"
+          danger
+          data-testid="region-delete"
+          (click)="store.deleteRegion(region.id)"
+        >
+          Delete region
         </button>
       </div>
     } @else if (entity) {

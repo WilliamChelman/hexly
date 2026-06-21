@@ -380,6 +380,54 @@ describe('EditorStore', () => {
     expect(store.document().regions[0].hexes).toEqual({ '1,1': true });
   });
 
+  it('deleteSelected destroys a selected Region as one undoable step, restoring its membership and selection on undo', () => {
+    const store = new EditorStore();
+    const id = 'reg-avalon';
+    // `load` clears history, so the deletion is the one and only edit on the stack
+    // — a single undo that fully restores the Region then proves it is one step.
+    store.load({
+      hexes: {},
+      regions: [{ id, name: 'Avalon', color: '#b08a4e', hexes: { '1,1': true } }],
+      labels: [],
+    });
+    store.select({ q: 1, r: 1 }, null); // the only candidate there: the Region
+
+    store.deleteSelected(); // the Delete/Backspace path
+    expect(store.document().regions).toEqual([]);
+    expect(store.selection()).toBeNull();
+
+    store.undo(); // a single step brings the Region — membership and all — back
+    expect(store.document().regions[0].hexes).toEqual({ '1,1': true });
+    expect(store.selection()).toEqual({ kind: 'region', id });
+    expect(store.canUndo()).toBe(false); // it really was one step, not two
+  });
+
+  it('disarms the Region tool when its armed Region is deleted, and undo does not re-arm it', () => {
+    const store = new EditorStore();
+    const id = 'reg-avalon';
+    store.load({
+      hexes: {},
+      regions: [{ id, name: 'Avalon', color: '#b08a4e', hexes: { '1,1': true } }],
+      labels: [],
+    });
+    store.armRegion(id, 'add'); // arm the Region tool on it…
+    store.select({ q: 1, r: 1 }, null); // …and select it
+
+    store.deleteSelected();
+    expect(store.document().regions).toEqual([]);
+    // The now-dangling Region tool falls back to the inert Select.
+    expect(store.tool()).toBe('select');
+    expect(store.region()).toBeNull();
+
+    store.undo(); // restores the document and selection — but NOT the tool arming:
+    expect(store.document().regions[0].id).toBe(id);
+    expect(store.selection()).toEqual({ kind: 'region', id });
+    // Tool/subtool memory is session-only state (issue #27), never part of an
+    // undoable edit, so it stays on Select rather than re-arming the Region tool.
+    expect(store.tool()).toBe('select');
+    expect(store.region()).toBeNull();
+  });
+
   it('applyAt adds the hovered hex to the armed region', () => {
     const store = new EditorStore();
     const id = store.createRegion('Avalon', '#b08a4e');
@@ -939,17 +987,17 @@ describe('EditorStore Region selection cycle', () => {
     expect(store.selection()).toBeNull();
   });
 
-  it('leaves a selected Region untouched on deleteSelected (Region deletion is the Inspector\'s job)', () => {
+  it('destroys a selected Region on deleteSelected, clearing the selection (issue #36)', () => {
     const store = new EditorStore();
     const id = store.createRegion('Avalon', '#b08a4e');
     store.addHexToRegion(id, { q: 0, r: 0 });
     store.select({ q: 0, r: 0 }, null);
     expect(store.selection()).toEqual({ kind: 'region', id });
 
-    store.deleteSelected(); // Delete/Backspace on a Region is a deliberate no-op here
+    store.deleteSelected(); // Delete/Backspace destroys the Region via the shared path
 
-    expect(store.document().regions[0].id).toBe(id);
-    expect(store.selection()).toEqual({ kind: 'region', id });
+    expect(store.document().regions).toEqual([]);
+    expect(store.selection()).toBeNull();
   });
 
   it('restarts the cycle at the top after a non-click path changed the selection', () => {

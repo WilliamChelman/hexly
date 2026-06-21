@@ -161,3 +161,87 @@ describe('Inspector hex and feature selection', () => {
     );
   });
 });
+
+describe('Inspector region editing', () => {
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({ imports: [Inspector] }).compileComponents();
+  });
+
+  /** Create the inspector with a Region selected, and return both. The member is a
+   * Void coordinate so the Region is the only selection candidate there. */
+  function withSelectedRegion(name = 'Region 3', color = '#b08a4e') {
+    const store = TestBed.inject(EditorStore);
+    const id = store.createRegion(name, color);
+    store.addHexToRegion(id, { q: 0, r: 0 });
+    store.select({ q: 0, r: 0 }, null);
+    const fixture = TestBed.createComponent(Inspector);
+    fixture.detectChanges();
+    return { store, id, fixture };
+  }
+
+  function field(fixture: ReturnType<typeof TestBed.createComponent>, testid: string) {
+    return fixture.nativeElement.querySelector(`[data-testid=${testid}]`) as HTMLInputElement;
+  }
+
+  it('renders the region editor for a selected Region, with no hex/label panels', () => {
+    const { fixture } = withSelectedRegion('The Whisperwood');
+
+    expect(field(fixture, 'region-name').value).toBe('The Whisperwood');
+    expect(fixture.nativeElement.querySelector('[data-testid=label-text]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid=entity-coord]')).toBeNull();
+  });
+
+  it('renames the region when the name field changes (e.g. "Region 3" → "The Whisperwood")', () => {
+    const { store, id, fixture } = withSelectedRegion('Region 3');
+
+    const input = field(fixture, 'region-name');
+    input.value = 'The Whisperwood';
+    input.dispatchEvent(new Event('change'));
+
+    expect(store.document().regions[0].name).toBe('The Whisperwood');
+    // The edit is reflected live through the same selection the inspector binds to.
+    expect(store.selectedRegion()?.name).toBe('The Whisperwood');
+    expect(id).toBe(store.document().regions[0].id);
+  });
+
+  it('recolors the region when the color field changes, updating its border color', () => {
+    const { store, fixture } = withSelectedRegion('Avalon', '#b08a4e');
+
+    const input = field(fixture, 'region-color');
+    input.value = '#6f7fae';
+    input.dispatchEvent(new Event('change'));
+
+    expect(store.document().regions[0].color).toBe('#6f7fae');
+    expect(store.selectedRegion()?.color).toBe('#6f7fae');
+  });
+
+  it('deletes the region when its Delete button is clicked, clearing the selection', () => {
+    const { store, fixture } = withSelectedRegion();
+
+    const del = field(fixture, 'region-delete') as unknown as HTMLButtonElement;
+    // A programmatic click fires even on a disabled button, so assert it is live.
+    expect(del.disabled).toBe(false);
+    del.click();
+
+    expect(store.document().regions).toEqual([]);
+    expect(store.selection()).toBeNull();
+  });
+
+  it('deletes the region as one undoable step, restoring it and the selection on undo', () => {
+    // The Inspector's Delete uses a different store path (deleteRegion direct)
+    // than the keyboard Delete (deleteSelected); both must honour ADR-0011's
+    // "each one undoable step". This pins the Inspector-button path.
+    const { store, id, fixture } = withSelectedRegion('Avalon', '#b08a4e');
+
+    (field(fixture, 'region-delete') as unknown as HTMLButtonElement).click();
+    expect(store.document().regions).toEqual([]);
+    expect(store.selection()).toBeNull();
+
+    // A single undo fully restores the Region — name, membership, and selection.
+    // Were the deletion two steps, one undo would leave it half-restored.
+    store.undo();
+    expect(store.document().regions[0].hexes).toEqual({ '0,0': true });
+    expect(store.selectedRegion()?.name).toBe('Avalon');
+    expect(store.selection()).toEqual({ kind: 'region', id });
+  });
+});

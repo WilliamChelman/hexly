@@ -7,18 +7,17 @@ import {
 import { featureLibrary, terrainPalette } from '@hexly/domain';
 import { Button } from '../ui/button';
 import { Eyebrow } from '../ui/eyebrow';
-import { Input } from '../ui/input';
 import { Kbd } from '../ui/kbd';
 import { Panel } from '../ui/panel';
 import { Rule } from '../ui/rule';
 import { Tool as ToolButton, ToolGlyph } from '../ui/tool';
-import { inputValue } from './dom';
 import {
   EditorStore,
   featureSubtools,
   RegionSubtool,
   ToolId,
 } from './editor-store';
+import { RegionFields } from './region-fields';
 
 /**
  * The one-line hint shown for a Tool that has no Subtool strip (issue #27). Keyed
@@ -76,7 +75,7 @@ const REGION_MODES = [
 @Component({
   selector: 'app-tool-palette',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Eyebrow, Input, Kbd, Panel, Rule, ToolButton],
+  imports: [Button, Eyebrow, Kbd, Panel, RegionFields, Rule, ToolButton],
   template: `
     <section class="group">
       <h2 class="heading" appEyebrow>Tools</h2>
@@ -155,27 +154,7 @@ const REGION_MODES = [
             @if (i < 9) {
               <kbd appKbd>{{ i + 1 }}</kbd>
             }
-            <input
-              type="color"
-              class="color"
-              [value]="r.color"
-              [attr.aria-label]="r.name + ' color'"
-              [attr.data-testid]="'region-color-' + r.id"
-              (change)="recolor(r.id, $event)"
-            />
-            <!--
-              One-way [value] with (change): an OnPush re-render mid-edit could
-              re-apply the bound name, but any in-app action that re-renders also
-              blurs (and thus commits) this field, so that race is unreachable.
-            -->
-            <input
-              appInput
-              class="rname"
-              [value]="r.name"
-              [attr.aria-label]="r.name + ' name'"
-              [attr.data-testid]="'region-name-' + r.id"
-              (change)="rename(r.id, $event)"
-            />
+            <app-region-fields [region]="r" [compact]="true" [suffix]="'-' + r.id" />
             @for (b of regionModes; track b.mode) {
               <button
                 type="button"
@@ -314,21 +293,6 @@ const REGION_MODES = [
       color: var(--ink-muted);
       font-style: italic;
     }
-    .color {
-      flex: none;
-      width: 18px;
-      height: 18px;
-      padding: 0;
-      border: 1px solid var(--line-strong);
-      border-radius: var(--radius-sm);
-      background: none;
-      cursor: pointer;
-    }
-    .rname {
-      /* Layout only — field styling comes from appInput. */
-      flex: 1;
-      min-width: 0;
-    }
     .mode {
       flex: none;
       background: none;
@@ -405,16 +369,6 @@ export class ToolPalette {
     const color = NEW_REGION_COLORS[(n - 1) % NEW_REGION_COLORS.length];
     const id = this.store.createRegion(`Region ${n}`, color);
     this.store.armRegion(id, 'add');
-  }
-
-  /** Rename region `id` to the text input's value. */
-  protected rename(id: string, event: Event): void {
-    this.store.renameRegion(id, inputValue(event));
-  }
-
-  /** Recolour region `id` to the colour input's value. */
-  protected recolor(id: string, event: Event): void {
-    this.store.recolorRegion(id, inputValue(event));
   }
 
   /** Whether the Region Subtool `region` is armed for region `id` in `mode`. */
