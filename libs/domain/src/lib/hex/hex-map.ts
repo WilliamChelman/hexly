@@ -185,3 +185,13 @@ export type HexMap = z.infer<typeof hexMapSchema>;
 export function emptyHexMap(): HexMap {
   return { hexes: {}, regions: [], labels: [] };
 }
+
+/**
+ * The {@link Region} with `id` in `map`, or `undefined` if none has it. The one
+ * region-by-id lookup the store (selection self-heal, membership edits) and the
+ * renderer (selection highlight) share, so "find a region" lives in one place
+ * rather than being re-derived as `regions.find(...)` at each call site.
+ */
+export function regionById(map: HexMap, id: string): Region | undefined {
+  return map.regions.find((r) => r.id === id);
+}

@@ -198,9 +198,11 @@ export class Inspector {
    */
   protected readonly selectedEntity = computed<SelectedEntity | null>(() => {
     const sel = this.store.selection();
-    // A Region selection has its own Inspector editor (issue #36); a Label has the
-    // label editor. Only a Hex/Feature selection drives this identity panel.
-    if (!sel || sel.kind === 'label' || sel.kind === 'region') return null;
+    // Only a Hex/Feature selection drives this identity panel: a Label has the
+    // label editor and a Region its own Inspector editor (issue #36). A positive
+    // check keeps any future Selection kind out of this panel by default and
+    // narrows `sel` to the coordinate-bearing variants used just below.
+    if (sel?.kind !== 'hex' && sel?.kind !== 'feature') return null;
     const hex = this.store.document().hexes[coordKey(sel.coord)];
     if (!hex) return null;
     const terrain = terrainLabel(hex.terrain) ?? hex.terrain;

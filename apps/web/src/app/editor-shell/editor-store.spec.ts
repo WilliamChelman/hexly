@@ -951,6 +951,45 @@ describe('EditorStore Region selection cycle', () => {
     expect(store.document().regions[0].id).toBe(id);
     expect(store.selection()).toEqual({ kind: 'region', id });
   });
+
+  it('restarts the cycle at the top after a non-click path changed the selection', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    const id = store.createRegion('Avalon', '#b08a4e');
+    store.addHexToRegion(id, { q: 0, r: 0 });
+
+    store.select({ q: 0, r: 0 }, null); // top of the stack: the bare Hex
+    expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 0, r: 0 } });
+
+    // The selection is moved to a Label through a non-click path (the Label tool
+    // drop / Inspector) — no deselect, so the cycle anchor still names {0,0}.
+    const labelId = store.addLabel('Avalon', { x: 5, y: 5 });
+    store.selectLabel(labelId);
+    expect(store.selection()).toEqual({ kind: 'label', id: labelId });
+
+    // Clicking the same coordinate must restart at the top (the Hex), not resume
+    // the stale descent into the Region: the cycle position is derived from where
+    // the *live* selection sits in the stack, and the Label isn't a candidate here.
+    store.select({ q: 0, r: 0 }, null);
+    expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 0, r: 0 } });
+  });
+
+  it('re-derives the descent from the live selection when the stack changes under the anchor', () => {
+    const store = new EditorStore();
+    const id = store.createRegion('Avalon', '#b08a4e');
+    store.addHexToRegion(id, { q: 0, r: 0 }); // a Void member: the stack is [Region]
+
+    store.select({ q: 0, r: 0 }, null);
+    expect(store.selection()).toEqual({ kind: 'region', id });
+
+    // Painting the cell grows the stack to [Hex, Region] without a deselect. The
+    // next click at the same anchor descends from the still-selected Region (the
+    // last candidate) and wraps to the new top (the Hex), rather than reusing a
+    // stale index that would re-pick the Region.
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.select({ q: 0, r: 0 }, null);
+    expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 0, r: 0 } });
+  });
 });
 
 describe('EditorStore deleteSelected', () => {

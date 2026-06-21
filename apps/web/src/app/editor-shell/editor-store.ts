@@ -9,6 +9,7 @@ import {
   Label,
   Point,
   Region,
+  regionById,
   TerrainId,
   terrainPalette,
 } from '@hexly/domain';
@@ -169,16 +170,23 @@ export class EditorStore {
   private readonly _selection = signal<SelectionRef | null>(null);
 
   /**
-   * The per-coordinate selection cycle (CONTEXT.md → Select, ADR-0011). A click
-   * resolves a stack of candidates at one coordinate — `Label → Feature → Hex →
-   * each containing Region in document order` — and repeated clicks at the *same*
-   * coordinate descend through it, wrapping after the last. The anchor encodes the
-   * coordinate (and the label hit) the cycle is running at; a click on a different
-   * coordinate or label fails to match it, so the index resets to the top. Both
-   * are transient editor state — never in the document, undone, or persisted.
+   * The anchor of the per-coordinate selection cycle (CONTEXT.md → Select,
+   * ADR-0011): the `coordKey|labelHit` of the click the cycle is running at, or
+   * `null` when no cycle is in progress. A click resolves a stack of candidates
+   * at one coordinate — `Label → Feature → Hex → each containing Region in
+   * document order` — and *repeated* clicks at the same anchor descend through it,
+   * wrapping after the last; a click on a different coordinate or label fails to
+   * match and resets to the top.
+   *
+   * Only the anchor is stored — never an index. The descent position is *derived*
+   * each click from where the live {@link _selection} sits in the freshly-resolved
+   * stack (see {@link select}), so it can't go stale: any path that changes the
+   * selection out from under the cycle (a label drop, a Hex move, an undo, a
+   * document edit that adds/removes a candidate) is absorbed rather than leaving a
+   * dangling integer that mis-targets the next click (issues #28, #35). Transient
+   * editor state — never in the document, undone, or persisted.
    */
   private cycleAnchor: string | null = null;
-  private cycleIndex = 0;
 
   /**
    * What is currently selected, or `null`, resolved against the live document so
@@ -199,7 +207,7 @@ export class EditorStore {
     if (ref.kind === 'region') {
       // A Region selection self-heals: once its region is gone (deleted, undone),
       // the selection resolves to nothing rather than dangling (issue #35).
-      return this._document().regions.some((r) => r.id === ref.id)
+      return regionById(this._document(), ref.id)
         ? { kind: 'region', id: ref.id }
         : null;
     }
@@ -497,7 +505,7 @@ export class EditorStore {
    */
   private updateRegion(id: string, mutate: (region: Region) => void): void {
     this.commit((draft) => {
-      const region = findRegion(draft, id);
+      const region = regionById(draft, id);
       if (region) mutate(region);
     });
   }
@@ -510,7 +518,7 @@ export class EditorStore {
    */
   addHexToRegion(id: string, coord: Axial): void {
     this.commit((draft) => {
-      const region = findRegion(draft, id);
+      const region = regionById(draft, id);
       if (region) region.hexes[coordKey(coord)] = true;
     });
   }
@@ -518,7 +526,7 @@ export class EditorStore {
   /** Remove the hex at `coord` from region `id`; a no-op if it was not a member. */
   removeHexFromRegion(id: string, coord: Axial): void {
     this.commit((draft) => {
-      delete findRegion(draft, id)?.hexes[coordKey(coord)];
+      delete regionById(draft, id)?.hexes[coordKey(coord)];
     });
   }
 
@@ -542,13 +550,25 @@ export class EditorStore {
       return null;
     }
     // The cycle descends only while clicks land on the same coordinate (and label
-    // hit); anything else fails the anchor match and resets to the top of the
-    // stack. Wrapping past the last candidate returns to the first (issue #35).
+    // hit); a different anchor resets to the top. When the anchor repeats, the
+    // *next* candidate is the one after wherever the live selection sits in the
+    // freshly-resolved stack — so the descent position is derived from current
+    // state, not a stored index that other selection changes (a label drop, a Hex
+    // move, an undo, a candidate added/removed) could leave stale (issue #35).
+    // A selection that is no longer a candidate here (it moved, or vanished)
+    // starts the cycle fresh at the top; wrapping past the last returns to the
+    // first.
     const anchor = `${coordKey(coord)}|${labelHit ?? ''}`;
-    this.cycleIndex =
-      anchor === this.cycleAnchor ? (this.cycleIndex + 1) % stack.length : 0;
+    let index = 0;
+    if (anchor === this.cycleAnchor) {
+      const current = this._selection();
+      const at = current
+        ? stack.findIndex((ref) => sameSelectionRef(ref, current))
+        : -1;
+      if (at !== -1) index = (at + 1) % stack.length;
+    }
     this.cycleAnchor = anchor;
-    this._selection.set(stack[this.cycleIndex]);
+    this._selection.set(stack[index]);
     return this.selection();
   }
 
@@ -592,7 +612,6 @@ export class EditorStore {
     // Forget the cycle so a click that re-selects the same coordinate later starts
     // from the top of the stack rather than resuming a stale descent (issue #35).
     this.cycleAnchor = null;
-    this.cycleIndex = 0;
   }
 
   /**
@@ -759,9 +778,19 @@ export class EditorStore {
   }
 }
 
-/** Find a region by id within a document draft (or `undefined`). */
-function findRegion(doc: HexMap, id: string): Region | undefined {
-  return doc.regions.find((r) => r.id === id);
+/**
+ * Whether two selection references point at the same entity: a cell by its
+ * coordinate, a label or a region by its id. Lets {@link EditorStore.select}
+ * locate the live selection within a freshly-resolved candidate stack to derive
+ * the cycle's descent position, rather than tracking a separate index (issue #35).
+ */
+function sameSelectionRef(a: SelectionRef, b: SelectionRef): boolean {
+  if (a.kind === 'cell' && b.kind === 'cell') {
+    return coordKey(a.coord) === coordKey(b.coord);
+  }
+  if (a.kind === 'label' && b.kind === 'label') return a.id === b.id;
+  if (a.kind === 'region' && b.kind === 'region') return a.id === b.id;
+  return false;
 }
 
 /** A unique id, preferring crypto.randomUUID but falling back where it is unavailable (insecure contexts). */

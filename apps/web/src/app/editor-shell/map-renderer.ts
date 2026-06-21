@@ -12,6 +12,7 @@ import {
   neighbors,
   parseCoordKey,
   Point,
+  regionById,
   terrainPalette,
   TerrainId,
 } from '@hexly/domain';
@@ -269,6 +270,10 @@ export class Canvas2dMapRenderer implements MapRenderer {
     ctx.fillRect(0, 0, this.width, this.height);
 
     const visible = hexesInRect(this.layout, this.visibleWorldRect(camera));
+    // The visible hexes keyed for membership lookups — shared by the region
+    // border pass and the selected-region fill so neither walks off-screen cells
+    // and the Set is built once per frame.
+    const visibleKeys = new Set(visible.map(coordKey));
 
     // A whole-Hex drag previews the move without touching the document: the
     // origin draws as Void and its content (terrain + feature) draws at the
@@ -321,7 +326,6 @@ export class Canvas2dMapRenderer implements MapRenderer {
     // each region's own members with the visible set rather than re-scanning
     // every visible hex per region.
     if (doc.regions.length > 0) {
-      const visibleKeys = new Set(visible.map(coordKey));
       ctx.save();
       ctx.lineWidth = REGION_BORDER_WIDTH;
       ctx.lineJoin = 'round';
@@ -390,6 +394,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
         ctx,
         camera,
         doc,
+        visibleKeys,
         tracking ? { ...selection, coord: drag.to } : selection,
       );
     }
@@ -422,12 +427,13 @@ export class Canvas2dMapRenderer implements MapRenderer {
     ctx: CanvasRenderingContext2D,
     camera: Camera,
     doc: HexMap,
+    visibleKeys: Set<string>,
     selection: Selection,
   ): void {
     // A Region is highlighted by tinting its member hexes, not by an accent
     // outline — its boundary stroke already comes from the regions pass (#35).
     if (selection.kind === 'region') {
-      this.fillRegionMembers(ctx, camera, doc, selection.id);
+      this.fillRegionMembers(ctx, camera, doc, visibleKeys, selection.id);
       return;
     }
     ctx.save();
@@ -461,19 +467,24 @@ export class Canvas2dMapRenderer implements MapRenderer {
    * the regions pass (which strokes every region); this only adds the interior
    * wash, so an unselected region stays border-only (ADR-0011, issue #35). A
    * region that no longer exists (deleted between resolve and draw) tints nothing.
+   * Off-screen members are skipped via `visibleKeys`, so the work is proportional
+   * to the visible membership — matching the region border pass, not the region's
+   * total size.
    */
   private fillRegionMembers(
     ctx: CanvasRenderingContext2D,
     camera: Camera,
     doc: HexMap,
+    visibleKeys: Set<string>,
     id: string,
   ): void {
-    const region = doc.regions.find((r) => r.id === id);
+    const region = regionById(doc, id);
     if (!region) return;
     ctx.save();
     ctx.globalAlpha = SELECTION_FILL_ALPHA;
     ctx.fillStyle = region.color;
     for (const key of Object.keys(region.hexes)) {
+      if (!visibleKeys.has(key)) continue;
       this.tracePath(ctx, camera, parseCoordKey(key));
       ctx.fill();
     }
