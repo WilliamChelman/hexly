@@ -7,17 +7,9 @@ import {
 import { featureLibrary, terrainPalette } from '@hexly/domain';
 import { Button } from '../ui/button';
 import { Eyebrow } from '../ui/eyebrow';
-import { Kbd } from '../ui/kbd';
-import { Panel } from '../ui/panel';
 import { Rule } from '../ui/rule';
 import { Tool as ToolButton, ToolGlyph } from '../ui/tool';
-import {
-  EditorStore,
-  featureSubtools,
-  RegionSubtool,
-  ToolId,
-} from './editor-store';
-import { RegionFields } from './region-fields';
+import { EditorStore, featureSubtools, ToolId } from './editor-store';
 
 /**
  * The one-line hint shown for a Tool that has no Subtool strip (issue #27). Keyed
@@ -25,6 +17,7 @@ import { RegionFields } from './region-fields';
  */
 const SUBTOOL_HINTS: Partial<Record<ToolId, string>> = {
   select: 'Click an entity to select it.',
+  region: 'Click the map to create or paint a region.',
   label: 'Click the map to place a label.',
   erase: 'Click a hex to erase it.',
 };
@@ -52,30 +45,17 @@ const TOOLS: readonly ToolDef[] = [
 ];
 
 /**
- * The colours a freshly-created region cycles through, so two new regions look
- * distinct without the user having to pick a colour first. They can recolour to
- * anything afterwards — the document stores an arbitrary `#rrggbb` (issue #8).
- */
-const NEW_REGION_COLORS = ['#7c9b86', '#b08a4e', '#6f7fae', '#a8674f', '#5f8c8c'];
-
-/** The two region brush modes, rendered as a Paint/Erase button pair per region. */
-const REGION_MODES = [
-  { mode: 'add', label: 'Paint', verb: 'Paint into', testid: 'paint' },
-  { mode: 'remove', label: 'Erase', verb: 'Erase from', testid: 'erase' },
-] as const;
-
-/**
  * The left rail: a primary Tool selector row (Select, Terrain, Feature, Region,
  * Label, Erase) plus a contextual panel showing only the armed Tool's Subtools —
- * terrain swatches, feature icons + Clear, or the region legend — and undo/redo
- * (issue #27, ADR-0010). The armed Tool and its Subtools live in the shared
- * {@link EditorStore} so the canvas applies them (ADR-0005). The region legend is
- * no longer always on screen: it is the Region tool's Subtool area.
+ * terrain swatches, or feature icons + Clear — and undo/redo (issue #27, ADR-0010).
+ * The armed Tool and its Subtools live in the shared {@link EditorStore} so the
+ * canvas applies them (ADR-0005). The Region tool has no Subtools: it create-and-
+ * paints from the canvas, and its details are edited in the Inspector (issue #38).
  */
 @Component({
   selector: 'app-tool-palette',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Eyebrow, Kbd, Panel, RegionFields, Rule, ToolButton],
+  imports: [Button, Eyebrow, Rule, ToolButton],
   template: `
     <section class="group">
       <h2 class="heading" appEyebrow>Tools</h2>
@@ -144,58 +124,10 @@ const REGION_MODES = [
           </div>
         </section>
       }
-      @case ('region') {
-        <section class="group regions" appPanel raised>
-          <h2 appEyebrow>Regions</h2>
-          @let armed = store.region();
-          <ul class="legend">
-        @for (r of store.document().regions; track r.id; let i = $index) {
-          <li>
-            @if (i < 9) {
-              <kbd appKbd>{{ i + 1 }}</kbd>
-            }
-            <app-region-fields [region]="r" [compact]="true" [suffix]="'-' + r.id" />
-            @for (b of regionModes; track b.mode) {
-              <button
-                type="button"
-                class="mode"
-                [class.active]="isArmed(armed, r.id, b.mode)"
-                [attr.aria-label]="b.verb + ' ' + r.name"
-                [attr.aria-pressed]="isArmed(armed, r.id, b.mode)"
-                [attr.data-testid]="'region-' + b.testid + '-' + r.id"
-                (click)="store.armRegion(r.id, b.mode)"
-              >
-                {{ b.label }}
-              </button>
-            }
-            <button
-              type="button"
-              class="remove"
-              [attr.aria-label]="'Delete ' + r.name"
-              [attr.data-testid]="'region-delete-' + r.id"
-              (click)="store.deleteRegion(r.id)"
-            >
-              ×
-            </button>
-          </li>
-        } @empty {
-          <li class="muted">No regions yet.</li>
-        }
-      </ul>
-          <button
-            type="button"
-            appButton
-            variant="ghost"
-            size="sm"
-            data-testid="new-region"
-            (click)="createRegion()"
-          >
-            New region
-          </button>
-        </section>
-      }
       @default {
-        <!-- Select, Label, and Erase have no Subtools (CONTEXT.md → Subtool). -->
+        <!-- Select, Region, Label, and Erase have no Subtools (CONTEXT.md →
+        Subtool). Region create-and-paints from the canvas (issue #38); its details
+        are edited in the Inspector (#36). -->
         <p class="hint">{{ subtoolHint() }}</p>
       }
     }
@@ -270,57 +202,6 @@ const REGION_MODES = [
     .spacer {
       flex: 1;
     }
-    .regions {
-      gap: var(--space-3);
-      padding: var(--space-3) var(--space-4);
-    }
-    .legend {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-2);
-      font-size: var(--text-sm);
-      color: var(--ink-muted);
-    }
-    .legend li {
-      display: flex;
-      align-items: center;
-      gap: var(--space-2);
-    }
-    .legend .muted {
-      color: var(--ink-muted);
-      font-style: italic;
-    }
-    .mode {
-      flex: none;
-      background: none;
-      color: var(--ink-muted);
-      border: 1px solid var(--line);
-      border-radius: var(--radius-sm);
-      padding: 2px var(--space-2);
-      font-size: var(--text-xs);
-      cursor: pointer;
-    }
-    .mode.active {
-      color: var(--ink);
-      border-color: var(--gold);
-      background: var(--gold-soft);
-    }
-    .remove {
-      flex: none;
-      background: none;
-      border: none;
-      color: var(--ink-muted);
-      cursor: pointer;
-      font-size: var(--text-md);
-      line-height: 1;
-      padding: 0 var(--space-1);
-    }
-    .remove:hover {
-      color: var(--ember);
-    }
   `,
 })
 export class ToolPalette {
@@ -351,34 +232,6 @@ export class ToolPalette {
     swatch: t.fill,
     hint: String(i + 1),
   }));
-
-  protected readonly regionModes = REGION_MODES;
-
-  /**
-   * Create a region with a default name and a cycling colour, then arm it for
-   * painting. The default number is the next unused "Region N" (max existing + 1,
-   * or 1 when none) rather than the region count, so a name/colour freed by a
-   * deletion isn't immediately reused.
-   */
-  protected createRegion(): void {
-    const used = this.store.document().regions.flatMap((r) => {
-      const match = /^Region (\d+)$/.exec(r.name);
-      return match ? [Number(match[1])] : [];
-    });
-    const n = used.length ? Math.max(...used) + 1 : 1;
-    const color = NEW_REGION_COLORS[(n - 1) % NEW_REGION_COLORS.length];
-    const id = this.store.createRegion(`Region ${n}`, color);
-    this.store.armRegion(id, 'add');
-  }
-
-  /** Whether the Region Subtool `region` is armed for region `id` in `mode`. */
-  protected isArmed(
-    region: RegionSubtool | null,
-    id: string,
-    mode: 'add' | 'remove',
-  ): boolean {
-    return region?.id === id && region.mode === mode;
-  }
 
   /** The one-line hint shown for a Tool that has no Subtool strip (issue #27). */
   protected readonly subtoolHint = computed(

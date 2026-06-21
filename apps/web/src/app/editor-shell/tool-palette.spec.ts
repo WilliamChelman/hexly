@@ -112,115 +112,30 @@ describe('ToolPalette regions', () => {
     await TestBed.configureTestingModule({ imports: [ToolPalette] }).compileComponents();
   });
 
-  it('shows the region legend only while Region is armed', () => {
+  it('shows no Region Subtool legend while Region is armed', () => {
     const { fixture, store } = setup();
-    store.createRegion('Avalon', '#b08a4e');
+    const id = store.createRegion('Avalon', '#b08a4e');
+    store.armTool('region');
+    fixture.detectChanges();
 
-    // Region is not armed yet → no legend.
+    // The Region tool joins Select/Label/Erase with no Subtools (issue #38): the old
+    // legend — its New Region action, per-region rows, keycaps, paint/erase, and
+    // delete — is gone (Region details now live in the Inspector, #36).
     expect(has(fixture, 'new-region')).toBe(false);
-
-    store.armTool('region');
-    expect(has(fixture, 'new-region')).toBe(true);
+    expect(fixture.nativeElement.querySelector('.legend')).toBeNull();
+    expect(has(fixture, `region-paint-${id}`)).toBe(false);
+    expect(has(fixture, `region-erase-${id}`)).toBe(false);
+    expect(has(fixture, `region-delete-${id}`)).toBe(false);
+    expect(has(fixture, `region-name-${id}`)).toBe(false);
   });
 
-  it('shows a number keycap per region mirroring the keyboard Subtool index', () => {
+  it('shows the no-Subtool hint while Region is armed', () => {
     const { fixture, store } = setup();
-    store.createRegion('Avalon', '#b08a4e');
     store.armTool('region');
     fixture.detectChanges();
 
-    // The legend's first region carries the '1' keycap that armSubtoolByIndex(1)
-    // maps to, so the keyboard binding is discoverable (issue #27).
-    const kbd = fixture.nativeElement.querySelector('.legend kbd');
-    expect(kbd?.textContent?.trim()).toBe('1');
-  });
-
-  it('creates a region and arms it for painting when New region is clicked', () => {
-    const { fixture, store } = setup();
-    store.armTool('region');
-
-    click(fixture, 'new-region');
-
-    const regions = store.document().regions;
-    expect(regions).toHaveLength(1);
-    expect(store.tool()).toBe('region');
-    expect(store.region()).toEqual({ id: regions[0].id, mode: 'add' });
-  });
-
-  it('lists each region in the document by name', () => {
-    const { fixture, store } = setup();
-    store.createRegion('The Whisperwood', '#7c9b86');
-    store.armTool('region');
-    fixture.detectChanges();
-
-    const id = store.document().regions[0].id;
-    const nameInput = fixture.nativeElement.querySelector(
-      `[data-testid=region-name-${id}]`,
-    ) as HTMLInputElement;
-    expect(nameInput.value).toBe('The Whisperwood');
-  });
-
-  it('arms the erase brush for a region when its Erase is clicked', () => {
-    const { fixture, store } = setup();
-    const id = store.createRegion('Avalon', '#b08a4e');
-    store.armTool('region');
-
-    click(fixture, `region-erase-${id}`);
-
-    expect(store.region()).toEqual({ id, mode: 'remove' });
-  });
-
-  it('renames a region when its name field changes', () => {
-    const { fixture, store } = setup();
-    const id = store.createRegion('Avalon', '#b08a4e');
-    store.armTool('region');
-    fixture.detectChanges();
-
-    const input = fixture.nativeElement.querySelector(
-      `[data-testid=region-name-${id}]`,
-    ) as HTMLInputElement;
-    input.value = 'The Kingdom of Avalon';
-    input.dispatchEvent(new Event('change'));
-
-    expect(store.document().regions[0].name).toBe('The Kingdom of Avalon');
-  });
-
-  it('recolors a region when its color field changes', () => {
-    const { fixture, store } = setup();
-    const id = store.createRegion('Avalon', '#b08a4e');
-    store.armTool('region');
-    fixture.detectChanges();
-
-    const input = fixture.nativeElement.querySelector(
-      `[data-testid=region-color-${id}]`,
-    ) as HTMLInputElement;
-    input.value = '#6f7fae';
-    input.dispatchEvent(new Event('change'));
-
-    expect(store.document().regions[0].color).toBe('#6f7fae');
-  });
-
-  it('deletes a region when its delete control is clicked', () => {
-    const { fixture, store } = setup();
-    const id = store.createRegion('Avalon', '#b08a4e');
-    store.armTool('region');
-
-    click(fixture, `region-delete-${id}`);
-
-    expect(store.document().regions).toEqual([]);
-  });
-
-  it('clears the selection when the deleted region was the selected one', () => {
-    const { fixture, store } = setup();
-    const id = store.createRegion('Avalon', '#b08a4e');
-    store.addHexToRegion(id, { q: 0, r: 0 });
-    store.select({ q: 0, r: 0 }, null); // the only candidate there: the Region
-    store.armTool('region'); // render the regions legend (and its Delete control)
-    expect(store.selection()).toEqual({ kind: 'region', id });
-
-    click(fixture, `region-delete-${id}`);
-
-    expect(store.document().regions).toEqual([]);
-    expect(store.selection()).toBeNull();
+    // Region falls into the same no-Subtool hint branch as Select/Label/Erase.
+    const hint = fixture.nativeElement.querySelector('.hint');
+    expect(hint?.textContent?.trim()).toBeTruthy();
   });
 });
