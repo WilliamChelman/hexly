@@ -116,6 +116,39 @@ interface SelectedEntity {
 
       <app-region-fields [region]="region" />
 
+      <!--
+        Engaging either button auto-arms the Region tool on this Region with the
+        chosen membership direction (issue #37) — the only control outside the
+        palette permitted to arm a Tool. aria-pressed (a radio-like toggle group)
+        reflects the store's remembered direction so the active one reads as set.
+      -->
+      <div appField label="Membership">
+        <div class="direction" role="group" aria-label="Membership direction">
+          <button
+            type="button"
+            appButton
+            size="sm"
+            [variant]="store.regionDirection() === 'add' ? 'primary' : 'default'"
+            [attr.aria-pressed]="store.regionDirection() === 'add'"
+            data-testid="region-add"
+            (click)="store.armRegionDirection('add')"
+          >
+            Add
+          </button>
+          <button
+            type="button"
+            appButton
+            size="sm"
+            [variant]="store.regionDirection() === 'remove' ? 'primary' : 'default'"
+            [attr.aria-pressed]="store.regionDirection() === 'remove'"
+            data-testid="region-remove"
+            (click)="store.armRegionDirection('remove')"
+          >
+            Remove
+          </button>
+        </div>
+      </div>
+
       <div class="actions">
         <button
           type="button"
@@ -188,6 +221,13 @@ interface SelectedEntity {
     .pos {
       display: flex;
       gap: var(--space-3);
+    }
+    .direction {
+      display: flex;
+      gap: var(--space-2);
+    }
+    .direction > button {
+      flex: 1;
     }
     .pos > div {
       flex: 1;

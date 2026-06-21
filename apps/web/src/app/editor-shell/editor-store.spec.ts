@@ -712,6 +712,9 @@ describe('EditorStore two-level armed state', () => {
     store.armTerrain('ocean');
     const id = store.createRegion('Avalon', '#b08a4e');
     store.armRegion(id, 'add');
+    store.addHexToRegion(id, { q: 0, r: 0 });
+    store.select({ q: 0, r: 0 }, null); // select the Region so the toggle can engage
+    store.armRegionDirection('remove'); // move the membership direction off cold-start
 
     store.load(emptyHexMap());
 
@@ -719,6 +722,9 @@ describe('EditorStore two-level armed state', () => {
     expect(store.terrain()).toBe('forest');
     expect(store.feature()).toBe('settlement');
     expect(store.region()).toBeNull();
+    // A reloaded map matches a fresh store, so the membership direction cold-starts
+    // back at Add rather than carrying the previous map's toggle choice.
+    expect(store.regionDirection()).toBe('add');
   });
 
   it('auto-arms the first region when Region is armed with none remembered', () => {
@@ -1269,5 +1275,98 @@ describe('EditorStore moveHex', () => {
     // selected at the destination again — no stale origin reference resolving null.
     expect(store.document().hexes['2,-1']).toEqual({ terrain: 'forest' });
     expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 2, r: -1 } });
+  });
+});
+
+describe('EditorStore region direction', () => {
+  /**
+   * Select a fresh Region (its single member at a Void coordinate, so the Region
+   * is the only candidate there) and return the store and the region id.
+   */
+  function withSelectedRegion() {
+    const store = new EditorStore();
+    const id = store.createRegion('Avalon', '#b08a4e');
+    store.addHexToRegion(id, { q: 0, r: 0 });
+    store.select({ q: 0, r: 0 }, null);
+    return { store, id };
+  }
+
+  it('arms the Region tool on the selected Region in the Add direction', () => {
+    const { store, id } = withSelectedRegion();
+
+    store.armRegionDirection('add');
+
+    expect(store.tool()).toBe('region');
+    expect(store.region()).toEqual({ id, mode: 'add' });
+    expect(store.regionDirection()).toBe('add');
+  });
+
+  it('arms the Region tool on the selected Region in the Remove direction', () => {
+    const { store, id } = withSelectedRegion();
+
+    store.armRegionDirection('remove');
+
+    expect(store.tool()).toBe('region');
+    expect(store.region()).toEqual({ id, mode: 'remove' });
+    expect(store.regionDirection()).toBe('remove');
+  });
+
+  it('cold-starts the membership direction at Add', () => {
+    const store = new EditorStore();
+
+    expect(store.regionDirection()).toBe('add');
+  });
+
+  it('does not arm the Region tool when no Region is selected', () => {
+    const store = new EditorStore();
+    store.createRegion('Avalon', '#b08a4e'); // exists, but is not selected
+
+    store.armRegionDirection('add');
+
+    // Nothing is inspected, so there is no Region to arm on — the tool stays on
+    // the non-destructive Select and no Region Subtool is armed.
+    expect(store.tool()).toBe('select');
+    expect(store.region()).toBeNull();
+  });
+
+  it('paints a hex into the selected Region when armed in Add and applied', () => {
+    const { store, id } = withSelectedRegion();
+
+    store.armRegionDirection('add');
+    store.applyAt({ q: 5, r: 5 });
+
+    expect(store.document().regions[0].hexes['5,5']).toBe(true);
+    expect(id).toBe(store.document().regions[0].id);
+  });
+
+  it('erases a member hex from the selected Region when armed in Remove and applied', () => {
+    const { store } = withSelectedRegion(); // member at 0,0
+
+    store.armRegionDirection('remove');
+    store.applyAt({ q: 0, r: 0 });
+
+    expect('0,0' in store.document().regions[0].hexes).toBe(false);
+  });
+
+  it('leaves an empty Region present when its last member is erased — never auto-deletes it', () => {
+    const { store, id } = withSelectedRegion(); // its only member is 0,0
+
+    store.armRegionDirection('remove');
+    store.applyAt({ q: 0, r: 0 });
+
+    // The Region survives with empty membership; trimming never destroys a Region.
+    expect(store.document().regions).toHaveLength(1);
+    expect(store.document().regions[0].id).toBe(id);
+    expect(store.document().regions[0].hexes).toEqual({});
+  });
+
+  it('makes membership painting undoable', () => {
+    const { store } = withSelectedRegion();
+
+    store.armRegionDirection('add');
+    store.applyAt({ q: 5, r: 5 });
+    store.undo();
+
+    expect('5,5' in store.document().regions[0].hexes).toBe(false);
   });
 });

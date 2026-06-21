@@ -215,6 +215,48 @@ describe('Inspector region editing', () => {
     expect(store.selectedRegion()?.color).toBe('#6f7fae');
   });
 
+  it('shows an Add ⇄ Remove direction toggle with Add reflected as the current direction', () => {
+    const { fixture } = withSelectedRegion();
+
+    const add = fixture.nativeElement.querySelector('[data-testid=region-add]') as HTMLButtonElement;
+    const remove = fixture.nativeElement.querySelector('[data-testid=region-remove]') as HTMLButtonElement;
+    expect(add).not.toBeNull();
+    expect(remove).not.toBeNull();
+    // The store cold-starts the direction at Add, so the toggle reflects it.
+    expect(add.getAttribute('aria-pressed')).toBe('true');
+    expect(remove.getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('arms the Region tool on the inspected Region in Add when the Add control is clicked', () => {
+    const { store, id, fixture } = withSelectedRegion();
+
+    (fixture.nativeElement.querySelector('[data-testid=region-add]') as HTMLButtonElement).click();
+
+    expect(store.tool()).toBe('region');
+    expect(store.region()).toEqual({ id, mode: 'add' });
+  });
+
+  it('arms the Region tool on the inspected Region in Remove when the Remove control is clicked', () => {
+    const { store, id, fixture } = withSelectedRegion();
+
+    (fixture.nativeElement.querySelector('[data-testid=region-remove]') as HTMLButtonElement).click();
+
+    expect(store.tool()).toBe('region');
+    expect(store.region()).toEqual({ id, mode: 'remove' });
+  });
+
+  it('reflects the chosen direction in the toggle after Remove is engaged', () => {
+    const { fixture } = withSelectedRegion();
+
+    (fixture.nativeElement.querySelector('[data-testid=region-remove]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    const add = fixture.nativeElement.querySelector('[data-testid=region-add]') as HTMLButtonElement;
+    const remove = fixture.nativeElement.querySelector('[data-testid=region-remove]') as HTMLButtonElement;
+    expect(remove.getAttribute('aria-pressed')).toBe('true');
+    expect(add.getAttribute('aria-pressed')).toBe('false');
+  });
+
   it('deletes the region when its Delete button is clicked, clearing the selection', () => {
     const { store, fixture } = withSelectedRegion();
 
