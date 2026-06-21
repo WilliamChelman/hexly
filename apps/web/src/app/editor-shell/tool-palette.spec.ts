@@ -32,6 +32,14 @@ describe('ToolPalette feature group', () => {
 
     expect(TestBed.inject(EditorStore).tool()).toEqual({ kind: 'clear-feature' });
   });
+
+  it('arms the label tool when Label is picked', () => {
+    const fixture = TestBed.createComponent(ToolPalette);
+
+    click(fixture, 'tool-label');
+
+    expect(TestBed.inject(EditorStore).tool()).toEqual({ kind: 'label' });
+  });
 });
 
 describe('ToolPalette regions', () => {

@@ -7,6 +7,7 @@ import {
   hexesInRect,
   hexToPixel,
   HexMap,
+  Label,
   Layout,
   neighbors,
   parseCoordKey,
@@ -34,6 +35,12 @@ const MARKER_STROKE = 1.6;
  * scaled from this box and translated by its half (12) to centre it on the hex.
  */
 const ICON_BOX = 24;
+/**
+ * The serif stack a Label is drawn in — a cartographic look that sets Labels
+ * apart from the sans-serif UI chrome. Falls back through common serifs so it
+ * renders without a bundled webfont (issue #10).
+ */
+const LABEL_FONT = 'Georgia, "Times New Roman", serif';
 
 /**
  * The seam between the editor and whatever draws the map. There is one Canvas 2D
@@ -47,10 +54,25 @@ export interface MapRenderer {
   /** Paint one frame: the painted hexes, the culled grid, and an optional hover. */
   render(camera: Camera, doc: HexMap, hover: Axial | null): void;
   /**
+   * The id of the Label drawn under screen `point` (topmost wins), or `null`.
+   * Reflects the most recent {@link render}, so the canvas can hit-test clicks
+   * against what the user sees — used to select and drag labels (issue #10).
+   */
+  labelAt(point: Point): string | null;
+  /**
    * Re-read the themed colours from CSS. Cheap but not free (a style recalc), so
    * the caller invokes it only when the active theme changes — not per frame.
    */
   refreshTheme(): void;
+}
+
+/** A Label's axis-aligned screen-space box, recorded each frame for hit-testing. */
+interface LabelBox {
+  readonly id: string;
+  readonly minX: number;
+  readonly minY: number;
+  readonly maxX: number;
+  readonly maxY: number;
 }
 
 /** The themed colours one frame needs, resolved from CSS custom properties. */
@@ -60,6 +82,8 @@ interface Palette {
   readonly line: string;
   /** The ink a feature marker is stroked in, from `--feature-ink`. */
   readonly featureInk: string;
+  /** The ink a Label's text is filled in, from `--label-ink`. */
+  readonly labelInk: string;
   /** One fill colour per terrain id, resolved from its `--terrain-*` token. */
   readonly terrain: Record<TerrainId, string>;
 }
@@ -82,6 +106,12 @@ export class Canvas2dMapRenderer implements MapRenderer {
   private palette: Palette;
   /** Lazily-built `Path2D` per feature id — the geometry is constant, so cache it. */
   private readonly markerPaths = new Map<FeatureId, Path2D>();
+  /**
+   * Each Label's screen-space box from the most recent frame, in draw order, so
+   * {@link labelAt} can hit-test a click against what the user sees. Labels move
+   * with the camera, so this is rebuilt every render rather than cached.
+   */
+  private labelBoxes: LabelBox[] = [];
   /**
    * For each hex edge (corner `i` → corner `i+1`), the {@link neighbors}
    * direction index of the hex across it. Lets the region pass tell a boundary
@@ -152,6 +182,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
       hover: read('--gold-soft', 'rgba(212,175,55,.3)'),
       line: read('--hex-line', '#888'),
       featureInk: read('--feature-ink', '#f4ecd8'),
+      labelInk: read('--label-ink', '#f4ecd8'),
       terrain,
     };
   }
@@ -246,6 +277,66 @@ export class Canvas2dMapRenderer implements MapRenderer {
       }
       ctx.restore();
     }
+
+    // Labels ride on top of everything: free-positioned cartographic text, not
+    // snapped to the grid (CONTEXT.md → Label, issue #10). Each frame records the
+    // text's screen box so `labelAt` can hit-test clicks for select/drag. The
+    // box is rebuilt here (not cached) because labels move with the camera.
+    this.labelBoxes = [];
+    if (doc.labels.length > 0) {
+      ctx.save();
+      ctx.fillStyle = this.palette.labelInk;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (const label of doc.labels) {
+        this.drawLabel(ctx, camera, label);
+      }
+      ctx.restore();
+    }
+  }
+
+  labelAt(point: Point): string | null {
+    // Topmost (last drawn) wins, so iterate the recorded boxes in reverse.
+    for (let i = this.labelBoxes.length - 1; i >= 0; i--) {
+      const box = this.labelBoxes[i];
+      if (
+        point.x >= box.minX &&
+        point.x <= box.maxX &&
+        point.y >= box.minY &&
+        point.y <= box.maxY
+      ) {
+        return box.id;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Draw one Label's text centred on its world `position`, scaled so `size` is a
+   * world measure (it zooms with the map) and rotated by its optional `rotation`.
+   * Records an axis-aligned screen box for hit-testing; the box ignores rotation
+   * (a close-enough bound that keeps click-to-select cheap and predictable).
+   */
+  private drawLabel(ctx: CanvasRenderingContext2D, camera: Camera, label: Label): void {
+    const centre = camera.worldToScreen(label.position);
+    const fontPx = label.size * camera.zoom;
+    ctx.save();
+    ctx.translate(centre.x, centre.y);
+    if (label.rotation) ctx.rotate((label.rotation * Math.PI) / 180);
+    ctx.font = `${fontPx}px ${LABEL_FONT}`;
+    const width = ctx.measureText(label.text).width;
+    ctx.fillText(label.text, 0, 0);
+    ctx.restore();
+
+    const halfW = width / 2;
+    const halfH = fontPx / 2;
+    this.labelBoxes.push({
+      id: label.id,
+      minX: centre.x - halfW,
+      maxX: centre.x + halfW,
+      minY: centre.y - halfH,
+      maxY: centre.y + halfH,
+    });
   }
 
   /**

@@ -125,6 +125,17 @@ const REGION_MODES = [
     <section class="group">
       <h2 class="heading" appEyebrow>Content</h2>
       <div class="list" role="group" aria-label="Content">
+        @let contentState = store.tool();
+        <button
+          appTool
+          label="Label"
+          hint="L"
+          glyph="label"
+          [active]="contentState.kind === 'label'"
+          aria-label="Label"
+          data-testid="tool-label"
+          (click)="store.selectTool({ kind: 'label' })"
+        ></button>
         @for (t of contentTools; track t.id) {
           <button
             appTool
@@ -324,7 +335,6 @@ export class ToolPalette {
 
   protected readonly contentTools: ContentTool[] = [
     { id: 'overlay', label: 'Overlay', hint: 'O', glyph: 'overlay' },
-    { id: 'label', label: 'Label', hint: 'L', glyph: 'label' },
   ];
 
   protected readonly regionModes = REGION_MODES;

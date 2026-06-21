@@ -1,10 +1,12 @@
-import { Injectable, signal } from '@angular/core';
+import { computed, Injectable, signal } from '@angular/core';
 import {
   Axial,
   coordKey,
   emptyHexMap,
   FeatureId,
   HexMap,
+  Label,
+  Point,
   Region,
   TerrainId,
 } from '@hexly/domain';
@@ -22,23 +24,28 @@ enablePatches();
  * - `feature` — place the built-in feature `id` on an existing hex
  * - `clear-feature` — remove a hex's feature, leaving its terrain
  * - `region` — add the hovered hex to (or remove it from) region `id`, per `mode`
+ * - `label` — drop a free-positioned Label at the clicked world point (issue #10)
  */
 export type Tool =
   | { readonly kind: 'terrain'; readonly id: TerrainId }
   | { readonly kind: 'erase' }
   | { readonly kind: 'feature'; readonly id: FeatureId }
   | { readonly kind: 'clear-feature' }
-  | { readonly kind: 'region'; readonly id: string; readonly mode: 'add' | 'remove' };
+  | { readonly kind: 'region'; readonly id: string; readonly mode: 'add' | 'remove' }
+  | { readonly kind: 'label' };
+
+/** The default world-pixel height a freshly-placed Label is drawn at (issue #10). */
+export const DEFAULT_LABEL_SIZE = 28;
 
 /**
  * Whether a stroke keeps applying as the pointer drags across hexes. Terrain,
  * the eraser, and clear-feature are continuous brushes — sweeping them across a
  * drag is the intent and idempotent. Placing a Feature is a discrete stamp: a
  * drag must not mass-place duplicate features, so it applies only on the initial
- * press (issue #7).
+ * press (issue #7). Placing a Label is likewise a discrete stamp (issue #10).
  */
 export function isContinuousTool(tool: Tool): boolean {
-  return tool.kind !== 'feature';
+  return tool.kind !== 'feature' && tool.kind !== 'label';
 }
 
 /**
@@ -56,6 +63,25 @@ export class EditorStore {
 
   /** The armed tool a canvas stroke applies — terrain, eraser, or a feature. */
   readonly tool = signal<Tool>({ kind: 'terrain', id: 'forest' });
+
+  private readonly _selectedLabelId = signal<string | null>(null);
+  /**
+   * The id of the Label currently selected for editing (or `null`). This is
+   * transient editor state — not part of the document, so it is neither undone
+   * nor persisted (issue #10). The inspector edits whichever label this names.
+   */
+  readonly selectedLabelId = this._selectedLabelId.asReadonly();
+
+  /**
+   * The currently-selected {@link Label} resolved from the live document, or
+   * `null` when nothing is selected or the selected id no longer exists (e.g.
+   * after an undo removed it). The inspector binds to this to edit the label.
+   */
+  readonly selectedLabel = computed<Label | null>(() => {
+    const id = this._selectedLabelId();
+    if (id === null) return null;
+    return this._document().labels.find((l) => l.id === id) ?? null;
+  });
 
   /** Committed edits, newest last — popped to undo, then parked on `redoStack`. */
   private readonly undoStack: Edit[] = [];
@@ -103,6 +129,11 @@ export class EditorStore {
       case 'region':
         if (tool.mode === 'add') this.addHexToRegion(tool.id, coord);
         else this.removeHexFromRegion(tool.id, coord);
+        break;
+      case 'label':
+        // Labels are free-positioned at a world point, not a hex coordinate
+        // (CONTEXT.md → Label), so the canvas places them via `addLabel` — there
+        // is nothing to do on the hex-coordinate stroke path (issue #10).
         break;
     }
   }
@@ -222,6 +253,74 @@ export class EditorStore {
   removeHexFromRegion(id: string, coord: Axial): void {
     this.commit((draft) => {
       delete findRegion(draft, id)?.hexes[coordKey(coord)];
+    });
+  }
+
+  /** Select the Label `id` for editing in the inspector, or `null` to clear it. */
+  selectLabel(id: string | null): void {
+    this._selectedLabelId.set(id);
+  }
+
+  /**
+   * Add a free-positioned Label with `text` anchored at world `position`, at the
+   * default size, and return its freshly-minted id (issue #10). Like every edit
+   * it goes through `commit`, so undo removes the label. The caller (the canvas)
+   * typically selects the returned id so the inspector opens on it.
+   */
+  addLabel(text: string, position: Point): string {
+    const id = mintId();
+    this.commit((draft) => {
+      draft.labels.push({ id, text, position: { x: position.x, y: position.y }, size: DEFAULT_LABEL_SIZE });
+    });
+    return id;
+  }
+
+  /** Replace the text of Label `id`; a no-op (no undo step) if there is no such label. */
+  editLabelText(id: string, text: string): void {
+    this.updateLabel(id, (label) => {
+      label.text = text;
+    });
+  }
+
+  /** Move Label `id` to world `position`; a no-op if there is no such label. */
+  moveLabel(id: string, position: Point): void {
+    this.updateLabel(id, (label) => {
+      label.position = { x: position.x, y: position.y };
+    });
+  }
+
+  /** Resize Label `id` to `size` world pixels; a no-op if there is no such label. */
+  resizeLabel(id: string, size: number): void {
+    this.updateLabel(id, (label) => {
+      label.size = size;
+    });
+  }
+
+  /** Rotate Label `id` to `rotation` degrees; a no-op if there is no such label. */
+  rotateLabel(id: string, rotation: number): void {
+    this.updateLabel(id, (label) => {
+      label.rotation = rotation;
+    });
+  }
+
+  /** Delete Label `id` entirely, clearing the selection if it pointed at it. */
+  deleteLabel(id: string): void {
+    this.commit((draft) => {
+      const at = draft.labels.findIndex((l) => l.id === id);
+      if (at !== -1) draft.labels.splice(at, 1);
+    });
+    if (this._selectedLabelId() === id) this._selectedLabelId.set(null);
+  }
+
+  /**
+   * Run `mutate` against Label `id` through `commit`; a no-op (no undo step) if
+   * there is no such label. The shared find-and-guard for the per-field label
+   * edits (text, position, size, rotation).
+   */
+  private updateLabel(id: string, mutate: (label: Label) => void): void {
+    this.commit((draft) => {
+      const label = draft.labels.find((l) => l.id === id);
+      if (label) mutate(label);
     });
   }
 

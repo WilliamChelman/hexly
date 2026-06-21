@@ -3,6 +3,7 @@ import {
   emptyHexMap,
   featureLibrary,
   hexMapSchema,
+  labelSchema,
   parseCoordKey,
   regionSchema,
   terrainPalette,
@@ -42,6 +43,32 @@ describe('regionSchema', () => {
   });
 });
 
+describe('labelSchema', () => {
+  it('round-trips a free-positioned label with text, size and rotation', () => {
+    const label = {
+      id: 'l1',
+      text: 'The Whisperwood',
+      position: { x: 120, y: -40 },
+      size: 28,
+      rotation: 15,
+    };
+
+    expect(labelSchema.parse(label)).toEqual(label);
+  });
+
+  it('accepts a label with no rotation (an unrotated label)', () => {
+    const label = { id: 'l2', text: 'Open Sea', position: { x: 0, y: 0 }, size: 32 };
+
+    expect(labelSchema.parse(label)).toEqual(label);
+  });
+
+  it('rejects a label whose size is not positive', () => {
+    const label = { id: 'l3', text: 'x', position: { x: 0, y: 0 }, size: 0 };
+
+    expect(() => labelSchema.parse(label)).toThrow();
+  });
+});
+
 describe('coordKey', () => {
   it('round-trips an axial coordinate through its document key', () => {
     const coord = { q: 3, r: -2 };
@@ -65,7 +92,7 @@ describe('hexMapSchema', () => {
       },
     };
 
-    expect(hexMapSchema.parse(doc)).toEqual({ ...doc, regions: [] });
+    expect(hexMapSchema.parse(doc)).toEqual({ ...doc, regions: [], labels: [] });
   });
 
   it('defaults regions to empty for a document saved before regions existed', () => {
@@ -83,7 +110,7 @@ describe('hexMapSchema', () => {
       ],
     };
 
-    expect(hexMapSchema.parse(doc)).toEqual(doc);
+    expect(hexMapSchema.parse(doc)).toEqual({ ...doc, labels: [] });
   });
 
   it('rejects a region whose color is not a #rrggbb hex color', () => {
@@ -106,11 +133,31 @@ describe('hexMapSchema', () => {
       hexes: { '0,0': { terrain: 'forest', feature: { ref: 'settlement' } } },
     };
 
-    expect(hexMapSchema.parse(doc)).toEqual({ ...doc, regions: [] });
+    expect(hexMapSchema.parse(doc)).toEqual({ ...doc, regions: [], labels: [] });
   });
 
   it('starts a fresh map with no regions', () => {
     expect(emptyHexMap().regions).toEqual([]);
+  });
+
+  it('defaults labels to empty for a document saved before labels existed', () => {
+    const legacy = { hexes: { '0,0': { terrain: 'grass' } } };
+
+    expect(hexMapSchema.parse(legacy).labels).toEqual([]);
+  });
+
+  it('starts a fresh map with no labels', () => {
+    expect(emptyHexMap().labels).toEqual([]);
+  });
+
+  it('round-trips a free-positioned label held on the document', () => {
+    const doc = {
+      hexes: {},
+      regions: [],
+      labels: [{ id: 'l1', text: 'The Whisperwood', position: { x: 80, y: -20 }, size: 28 }],
+    };
+
+    expect(hexMapSchema.parse(doc)).toEqual(doc);
   });
 
   it('rejects a hex whose feature is not a known library id', () => {

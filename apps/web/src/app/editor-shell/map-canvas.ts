@@ -12,7 +12,7 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
-import { Axial, coordKey, Layout, pixelToHex, terrainPalette } from '@hexly/domain';
+import { Axial, coordKey, Layout, pixelToHex, Point, terrainPalette } from '@hexly/domain';
 import { ThemeService } from '../core/theme.service';
 import { EditorStore, isContinuousTool } from './editor-store';
 import { Button } from '../ui/button';
@@ -44,6 +44,8 @@ const ZOOM_SENSITIVITY_MOUSE = 0.002;
 const MOUSE_NOTCH_THRESHOLD = 40;
 /** Pixels assumed per line, to normalise non-pixel wheel deltas. */
 const LINE_HEIGHT = 16;
+/** The placeholder text a freshly-dropped Label carries until it is edited. */
+const NEW_LABEL_TEXT = 'Label';
 
 /**
  * The live map surface: an infinite, pannable, zoomable hex plane on a Canvas
@@ -207,6 +209,35 @@ export class MapCanvas {
     Math.round(this.camera().zoom * 100),
   );
 
+  /**
+   * The in-progress label drag: the label `id`, the grab `offset` (label anchor
+   * minus the grab point, so the label doesn't jump to the cursor), and the live
+   * `position` shown while dragging. `null` when no drag is active. The move is
+   * committed once on release, so a drag is a single undo step (issue #10).
+   */
+  private readonly labelDrag = signal<{
+    readonly id: string;
+    readonly offset: Point;
+    readonly position: Point;
+  } | null>(null);
+
+  /**
+   * The document to render: the live store document, but with a dragged label
+   * shown at its live drag position. Overriding here keeps the drag preview out
+   * of the undo history — the store only sees the final position on release.
+   */
+  protected readonly renderDoc = computed(() => {
+    const drag = this.labelDrag();
+    const doc = this.store.document();
+    if (!drag) return doc;
+    return {
+      ...doc,
+      labels: doc.labels.map((l) =>
+        l.id === drag.id ? { ...l, position: drag.position } : l,
+      ),
+    };
+  });
+
   private readonly theme = inject(ThemeService);
   private readonly store = inject(EditorStore);
   private readonly destroyRef = inject(DestroyRef);
@@ -238,10 +269,11 @@ export class MapCanvas {
   private lastStroke: string | null = null;
 
   constructor() {
-    // Repaint whenever pan, zoom, the painted document, or the hover changes.
+    // Repaint whenever pan, zoom, the painted document, a label drag, or the
+    // hover changes. `renderDoc` folds in the live label-drag position.
     effect(() => {
       const camera = this.camera();
-      const doc = this.store.document();
+      const doc = this.renderDoc();
       const hover = this.hover();
       this.renderer?.render(camera, doc, hover);
     });
@@ -286,6 +318,31 @@ export class MapCanvas {
     // (and steal the right-click context menu along the way).
     if (event.button !== 0) return;
 
+    const world = this.toWorld(event);
+
+    // A click on an existing label selects it and starts a drag — whatever tool
+    // is armed (labels are sparse and ride on top, so grabbing one is the
+    // intent). The grab offset keeps the label from jumping to the cursor.
+    const hitId = this.renderer?.labelAt(this.localPoint(event)) ?? null;
+    if (hitId) {
+      const label = this.store.document().labels.find((l) => l.id === hitId);
+      this.store.selectLabel(hitId);
+      if (label) {
+        this.labelDrag.set({
+          id: hitId,
+          offset: { x: label.position.x - world.x, y: label.position.y - world.y },
+          position: label.position,
+        });
+      }
+      return;
+    }
+
+    // The label tool drops a new, selected label at the clicked world point.
+    if (this.store.tool().kind === 'label') {
+      this.store.selectLabel(this.store.addLabel(NEW_LABEL_TEXT, world));
+      return;
+    }
+
     this.painting = true;
     this.continuousStroke = isContinuousTool(this.store.tool());
     this.lastStroke = null;
@@ -295,6 +352,18 @@ export class MapCanvas {
   protected onPointerMove(event: PointerEvent): void {
     const hex = pixelToHex(this.layout, this.toWorld(event));
     this.hover.set(hex);
+
+    // A live label drag wins over painting/panning: track the cursor, applying
+    // the grab offset, and let `renderDoc` show the label there until release.
+    const drag = this.labelDrag();
+    if (drag) {
+      const world = this.toWorld(event);
+      this.labelDrag.set({
+        ...drag,
+        position: { x: world.x + drag.offset.x, y: world.y + drag.offset.y },
+      });
+      return;
+    }
 
     if (this.panning && this.lastPointer) {
       const dx = event.clientX - this.lastPointer.x;
@@ -325,6 +394,14 @@ export class MapCanvas {
   }
 
   private endGesture(): void {
+    // Commit a label drag as a single edit: `moveLabel` to the final position.
+    // A plain click (no movement) lands the label back on its anchor, so the
+    // commit changes nothing and records no undo step.
+    const drag = this.labelDrag();
+    if (drag) {
+      this.store.moveLabel(drag.id, drag.position);
+      this.labelDrag.set(null);
+    }
     this.painting = false;
     this.continuousStroke = false;
     this.panning = false;
@@ -350,6 +427,10 @@ export class MapCanvas {
 
     if (event.key.toLowerCase() === 'e') {
       this.store.selectTool({ kind: 'erase' });
+      return;
+    }
+    if (event.key.toLowerCase() === 'l') {
+      this.store.selectTool({ kind: 'label' });
       return;
     }
     const terrain = terrainPalette[Number(event.key) - 1];
@@ -476,7 +557,7 @@ export class MapCanvas {
         this.centred = true;
         this.camera.set(Camera.initial().panBy(width / 2, height / 2));
       } else {
-        this.renderer?.render(this.camera(), this.store.document(), this.hover());
+        this.renderer?.render(this.camera(), this.renderDoc(), this.hover());
       }
     };
 

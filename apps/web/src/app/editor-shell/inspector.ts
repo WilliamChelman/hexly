@@ -1,64 +1,100 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { Button } from '../ui/button';
-import { Chip } from '../ui/chip';
-import { Coord } from '../ui/coord';
 import { Eyebrow } from '../ui/eyebrow';
 import { Field } from '../ui/field';
-import { GlyphBox } from '../ui/glyph-box';
-import { SettlementIcon } from '../ui/icon/glyphs/settlement';
-import { Swatch } from '../ui/swatch';
+import { Input } from '../ui/input';
+import { EditorStore } from './editor-store';
 
-/** The right rail: the selected hex's identity, terrain, regions and Note. */
+/**
+ * The right rail. When a Label is selected it becomes that label's editor —
+ * text, size, rotation and world position, plus Delete (issue #10). Every field
+ * commits through the {@link EditorStore}, so each edit is undoable and persists.
+ * With nothing selected it shows a hint instead.
+ */
 @Component({
   selector: 'app-inspector',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Chip, Coord, Eyebrow, Field, GlyphBox, SettlementIcon, Swatch],
+  imports: [Button, Eyebrow, Field, Input],
   template: `
-    <header class="head">
-      <span appEyebrow>Selected hex</span>
-      <app-coord>q 0 · r 0</app-coord>
-    </header>
+    @let label = store.selectedLabel();
+    @if (label) {
+      <header class="head">
+        <span appEyebrow>Selected label</span>
+      </header>
 
-    <div class="title">
-      <span appGlyphBox><app-icon-settlement [size]="18" /></span>
-      <div>
-        <h3 class="name">Caer Aldermoor</h3>
-        <app-chip tone="gold">Settlement</app-chip>
+      <div appField label="Text">
+        <input
+          appInput
+          data-testid="label-text"
+          [value]="label.text"
+          (change)="onText($event)"
+        />
       </div>
-    </div>
 
-    <div appField label="Terrain">
-      <div class="row">
-        <span appSwatch style="background: var(--terrain-forest)"></span>
-        <span>Forest</span>
+      <div appField label="Size">
+        <input
+          appInput
+          type="number"
+          min="1"
+          data-testid="label-size"
+          [value]="label.size"
+          (change)="onSize($event)"
+        />
       </div>
-    </div>
 
-    <div appField label="Regions">
-      <div class="chips">
-        <app-chip
-          ><span appSwatch style="background: #7c9b86; width: 11px; height: 11px"></span
-          >The Whisperwood</app-chip
+      <div appField label="Rotation (°)">
+        <input
+          appInput
+          type="number"
+          data-testid="label-rotation"
+          [value]="label.rotation ?? 0"
+          (change)="onRotation($event)"
+        />
+      </div>
+
+      <div class="pos">
+        <div appField label="X">
+          <input
+            appInput
+            type="number"
+            data-testid="label-x"
+            [value]="label.position.x"
+            (change)="onX($event)"
+          />
+        </div>
+        <div appField label="Y">
+          <input
+            appInput
+            type="number"
+            data-testid="label-y"
+            [value]="label.position.y"
+            (change)="onY($event)"
+          />
+        </div>
+      </div>
+
+      <div class="actions">
+        <button
+          type="button"
+          appButton
+          variant="ghost"
+          size="sm"
+          danger
+          data-testid="label-delete"
+          (click)="store.deleteLabel(label.id)"
         >
-        <app-chip
-          ><span appSwatch style="background: #b08a4e; width: 11px; height: 11px"></span
-          >Aldermoor Reach</app-chip
-        >
+          Delete label
+        </button>
       </div>
-    </div>
-
-    <div appField label="Note" class="note">
-      <p>
-        A walled town where the forest road meets the river ford. The
-        <em>Lanternwrights' Guild</em> keeps the old beacon lit — sailors on the
-        Drowned Coast still steer by it on clear nights.
+    } @else {
+      <header class="head">
+        <span appEyebrow>Inspector</span>
+      </header>
+      <p class="muted">
+        Place a Label with the Label tool, then select it here to edit its text,
+        size, rotation and position.
       </p>
-    </div>
-
-    <div class="actions">
-      <button type="button" appButton size="sm" style="flex: 1">Edit note</button>
-      <button type="button" appButton variant="ghost" size="sm" danger>Clear hex</button>
-    </div>
+    }
   `,
   styles: `
     :host {
@@ -75,35 +111,18 @@ import { Swatch } from '../ui/swatch';
       align-items: center;
       justify-content: space-between;
     }
-    .title {
+    .pos {
       display: flex;
       gap: var(--space-3);
-      align-items: center;
     }
-    .title > div {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-1);
-      align-items: flex-start;
+    .pos > div {
+      flex: 1;
+      min-width: 0;
     }
-    .name {
-      font-size: var(--text-md);
-    }
-    .row {
-      display: flex;
-      align-items: center;
-      gap: var(--space-2);
-      font-size: var(--text-sm);
-    }
-    .chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--space-2);
-    }
-    .note p {
+    .muted {
       font-size: var(--text-sm);
       line-height: var(--leading-normal);
-      color: var(--ink);
+      color: var(--ink-muted);
     }
     .actions {
       display: flex;
@@ -113,4 +132,40 @@ import { Swatch } from '../ui/swatch';
     }
   `,
 })
-export class Inspector {}
+export class Inspector {
+  protected readonly store = inject(EditorStore);
+
+  /** The label currently being edited, asserted non-null by the template guard. */
+  private requireSelected() {
+    const label = this.store.selectedLabel();
+    if (!label) throw new Error('No label selected');
+    return label;
+  }
+
+  protected onText(event: Event): void {
+    this.store.editLabelText(this.requireSelected().id, value(event));
+  }
+
+  protected onSize(event: Event): void {
+    this.store.resizeLabel(this.requireSelected().id, Number(value(event)));
+  }
+
+  protected onRotation(event: Event): void {
+    this.store.rotateLabel(this.requireSelected().id, Number(value(event)));
+  }
+
+  protected onX(event: Event): void {
+    const label = this.requireSelected();
+    this.store.moveLabel(label.id, { x: Number(value(event)), y: label.position.y });
+  }
+
+  protected onY(event: Event): void {
+    const label = this.requireSelected();
+    this.store.moveLabel(label.id, { x: label.position.x, y: Number(value(event)) });
+  }
+}
+
+/** The current value of the input that raised `event`. */
+function value(event: Event): string {
+  return (event.target as HTMLInputElement).value;
+}

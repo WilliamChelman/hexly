@@ -13,7 +13,7 @@ describe('EditorSession', () => {
   let editor: EditorStore;
   let http: HttpTestingController;
 
-  const forestAt00 = { hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' as const } }, regions: [] };
+  const forestAt00 = { hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' as const } }, regions: [], labels: [] };
   const aldermoor: MapDetail = {
     id: 'm1',
     ownerId: 'u1',
@@ -79,7 +79,7 @@ describe('EditorSession', () => {
     const serverCurrent: MapDetail = {
       ...aldermoor,
       version: 7,
-      document: { hexes: { [coordKey({ q: 9, r: 9 })]: { terrain: 'desert' } }, regions: [] },
+      document: { hexes: { [coordKey({ q: 9, r: 9 })]: { terrain: 'desert' } }, regions: [], labels: [] },
     };
 
     let outcome: unknown;
@@ -101,7 +101,7 @@ describe('EditorSession', () => {
     const serverCurrent: MapDetail = {
       ...aldermoor,
       version: 7,
-      document: { hexes: { [coordKey({ q: 9, r: 9 })]: { terrain: 'desert' } }, regions: [] },
+      document: { hexes: { [coordKey({ q: 9, r: 9 })]: { terrain: 'desert' } }, regions: [], labels: [] },
     };
     session.save().subscribe();
     http
@@ -149,7 +149,7 @@ describe('EditorSession', () => {
 
     session.openRoute('m2').subscribe();
     // The previous map's canvas is cleared to empty while the load is in flight.
-    expect(editor.document()).toEqual({ hexes: {}, regions: [] });
+    expect(editor.document()).toEqual({ hexes: {}, regions: [], labels: [] });
 
     const other: MapDetail = { ...aldermoor, id: 'm2', document: forestAt00 };
     http.expectOne('/maps/m2').flush(other);
