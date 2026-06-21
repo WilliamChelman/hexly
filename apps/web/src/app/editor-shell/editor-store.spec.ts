@@ -1017,4 +1017,50 @@ describe('EditorStore moveHex', () => {
     // Only a selection that pointed at the moved origin follows; this one stays.
     expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 3, r: 3 } });
   });
+
+  it('moves the selection back to the origin when the move is undone', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.select({ q: 0, r: 0 }, null);
+
+    store.moveHex({ q: 0, r: 0 }, { q: 2, r: -1 });
+    expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 2, r: -1 } });
+
+    store.undo();
+
+    // Undo restores the document AND the selection in lockstep: the hex is back at
+    // the origin and selected there, not a stale reference to the empty destination.
+    expect('2,-1' in store.document().hexes).toBe(false);
+    expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 0, r: 0 } });
+  });
+
+  it('does not leave the selection highlighting clobbered content after an undo', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.paintAt({ q: 1, r: 0 }, 'ocean'); // destination content that gets clobbered
+    store.select({ q: 0, r: 0 }, null); // the origin hex is selected
+
+    store.moveHex({ q: 0, r: 0 }, { q: 1, r: 0 });
+    store.undo();
+
+    // The destination's ocean is restored, but the selection follows the moved hex
+    // back to its origin rather than silently highlighting the recovered ocean.
+    expect(store.document().hexes['1,0']).toEqual({ terrain: 'ocean' });
+    expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 0, r: 0 } });
+  });
+
+  it('follows the selection back to the destination when the move is redone', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.select({ q: 0, r: 0 }, null);
+
+    store.moveHex({ q: 0, r: 0 }, { q: 2, r: -1 });
+    store.undo();
+    store.redo();
+
+    // Redo re-applies the move and its resulting selection, so the moved hex is
+    // selected at the destination again — no stale origin reference resolving null.
+    expect(store.document().hexes['2,-1']).toEqual({ terrain: 'forest' });
+    expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 2, r: -1 } });
+  });
 });

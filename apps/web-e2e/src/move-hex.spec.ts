@@ -51,10 +51,12 @@ test('drags a hex under Select to a new coordinate, and the move survives a relo
 
   // In-page proof the move actually landed — a no-op gesture (selected but never
   // moved) would also leave the count at 1, so assert the destination directly:
-  // completing the drag keeps the moved hex selected, now at a coordinate other
-  // than the q0·r0 origin, and the inspector still shows it as Forest.
+  // completing the drag keeps the moved hex selected, at the specific destination
+  // it landed on — a +100px drag at zoom 1 lands on q1·r0, well inside the
+  // rounding margin — and the inspector still shows it as Forest. Pinning the
+  // exact coordinate catches a move to the wrong hex, not merely "not the origin".
   await expect(page.getByTestId('entity-detail')).toHaveText('Forest');
-  await expect(page.getByTestId('entity-coord')).not.toContainText('q 0 · r 0');
+  await expect(page.getByTestId('entity-coord')).toContainText('q 1 · r 0');
 
   // Save and wait on the real round-trip so the reload below can't race the PUT.
   const saved = page.waitForResponse(
@@ -75,7 +77,7 @@ test('drags a hex under Select to a new coordinate, and the move survives a relo
   const hexes = detail.document.hexes as Record<string, { terrain: string }>;
   expect(Object.keys(hexes)).toHaveLength(1);
   expect(hexes['0,0']).toBeUndefined();
-  expect(Object.values(hexes)[0].terrain).toBe('forest');
+  expect(hexes['1,0']).toEqual({ terrain: 'forest' });
 
   // The seam under test: a fresh load re-fetches and re-renders the moved map.
   // The origin is now Void (a click there selects nothing), and the destination
@@ -83,10 +85,16 @@ test('drags a hex under Select to a new coordinate, and the move survives a relo
   await page.reload();
   await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
 
-  await canvas.click({ position: { x: box.width / 2, y: box.height / 2 } });
+  // Re-read the canvas box after the reload: its size and origin-centering are
+  // re-applied on the fresh layout, so the pre-reload `box` may not match — using
+  // it for the destination offset could round to a neighbouring hex.
+  const box2 = await canvas.boundingBox();
+  if (!box2) throw new Error('canvas not laid out after reload');
+
+  await canvas.click({ position: { x: box2.width / 2, y: box2.height / 2 } });
   await expect(page.getByTestId('entity-coord')).toHaveCount(0);
 
-  await canvas.click({ position: { x: box.width / 2 + dx, y: box.height / 2 } });
+  await canvas.click({ position: { x: box2.width / 2 + dx, y: box2.height / 2 } });
   await expect(page.getByTestId('entity-detail')).toHaveText('Forest');
 });
 

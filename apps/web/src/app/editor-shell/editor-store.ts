@@ -407,16 +407,22 @@ export class EditorStore {
       // the origin. Cloning the immutable source — rather than rebuilding the Hex
       // field-by-field — avoids aliasing a draft node at two keys *and* carries
       // every field along, so a future Hex field is never silently dropped.
-      draft.hexes[toKey] = structuredClone(content);
+      draft.hexes[toKey] = deepClone(content);
       delete draft.hexes[fromKey];
     });
     // The content moved, so a selection that pointed at the origin rides along to
     // the destination — completing a move keeps the moved Hex selected, matching
-    // the Label-drag path (and the Escape-cancel path, which leaves it put).
+    // the Label-drag path (and the Escape-cancel path, which leaves it put). Copy
+    // the coordinate rather than aliasing the caller's `to`, so a coord the caller
+    // later mutates (e.g. a reused hover object) can't retarget the selection.
     const sel = this._selection();
     if (sel?.kind === 'cell' && coordKey(sel.coord) === fromKey) {
-      this._selection.set({ kind: 'cell', coord: to });
+      this._selection.set({ kind: 'cell', coord: { q: to.q, r: to.r } });
     }
+    // Stamp the post-move selection onto the edit so undo restores it to the
+    // origin and redo follows it back to the destination, in lockstep with the
+    // document — the move's `commit` always records a step, so an edit exists.
+    this.trackSelectionOnLastEdit();
   }
 
   /**
@@ -509,9 +515,11 @@ export class EditorStore {
       this._selection.set({ kind: 'label', id: labelHit });
     } else {
       // A painted cell selects it (Feature vs Hex is derived in `selection`); a
-      // Void coordinate with no label hit is a click on empty space → deselect.
+      // Void coordinate with no label hit is a click on empty space → deselect
+      // through the one canonical clear so it shares any teardown `deselect` does.
       const hex = this._document().hexes[coordKey(coord)];
-      this._selection.set(hex ? { kind: 'cell', coord } : null);
+      if (hex) this._selection.set({ kind: 'cell', coord });
+      else this.deselect();
     }
     return this.selection();
   }
@@ -524,11 +532,10 @@ export class EditorStore {
 
   /**
    * Clear the selection, if any — the inspector falls back to its empty state.
-   * The one canonical clear: the deliberate Escape gesture (issue #30) calls it,
-   * and the internal teardown paths ({@link selectLabel} with `null`,
-   * {@link deleteLabel}, {@link deleteSelected}) route through it too. Distinct
-   * from the incidental clear a click on a Void coordinate produces in
-   * {@link select}, which sets `null` inline.
+   * The one canonical clear that every clearing path routes through: the
+   * deliberate Escape gesture (issue #30), the internal teardown paths
+   * ({@link selectLabel} with `null`, {@link deleteLabel}, {@link deleteSelected}),
+   * and the incidental clear when {@link select} lands on a Void coordinate.
    */
   deselect(): void {
     this._selection.set(null);
@@ -586,12 +593,15 @@ export class EditorStore {
 
   /** Delete Label `id` entirely, clearing the selection if it pointed at it. */
   deleteLabel(id: string): void {
-    this.commit((draft) => {
+    const committed = this.commit((draft) => {
       const at = draft.labels.findIndex((l) => l.id === id);
       if (at !== -1) draft.labels.splice(at, 1);
     });
     const sel = this._selection();
     if (sel?.kind === 'label' && sel.id === id) this.deselect();
+    // Record the cleared selection on the edit (only if one was actually made) so
+    // undo restores it with the label and redo clears it again.
+    if (committed) this.trackSelectionOnLastEdit();
   }
 
   /**
@@ -610,6 +620,10 @@ export class EditorStore {
     else if (sel.kind === 'feature') this.clearFeatureAt(sel.coord);
     else this.eraseAt(sel.coord);
     this.deselect();
+    // The dispatched edit erased an entity that existed (the selection resolved
+    // it), so a step was recorded; stamp the now-cleared selection on it, so undo
+    // restores both the entity and its selection together.
+    this.trackSelectionOnLastEdit();
   }
 
   /**
@@ -624,38 +638,61 @@ export class EditorStore {
     });
   }
 
-  /** Reverse the most recent edit. */
+  /** Reverse the most recent edit, restoring the selection it was made under. */
   undo(): void {
     const edit = this.undoStack.pop();
     if (!edit) return;
     this._document.set(applyPatches(this._document(), edit.undo));
+    // Move the selection back in lockstep with the document, so undoing a move
+    // re-selects the hex at its origin rather than leaving a stale reference at
+    // the (now-reverted) destination.
+    this._selection.set(edit.selectionBefore);
     this.redoStack.push(edit);
     this.syncHistory();
   }
 
-  /** Re-apply the most recently undone edit. */
+  /** Re-apply the most recently undone edit, restoring its resulting selection. */
   redo(): void {
     const edit = this.redoStack.pop();
     if (!edit) return;
     this._document.set(applyPatches(this._document(), edit.redo));
+    this._selection.set(edit.selectionAfter);
     this.undoStack.push(edit);
     this.syncHistory();
   }
 
   /**
    * Run `recipe` through Immer and adopt the result, recording the forward and
-   * inverse patches so the edit can be undone and redone.
+   * inverse patches so the edit can be undone and redone. Returns whether a step
+   * was actually recorded — callers that re-point the selection afterwards use it
+   * to know an edit exists to {@link trackSelectionOnLastEdit stamp} it onto.
    */
-  private commit(recipe: (draft: HexMap) => void): void {
+  private commit(recipe: (draft: HexMap) => void): boolean {
+    // Snapshot the selection as it stood before the edit; undo restores it.
+    const selectionBefore = this._selection();
     const [next, redo, undo] = produceWithPatches(this._document(), recipe);
     // No patches means the recipe changed nothing (e.g. erasing Void). Recording
     // it would leave empty undo steps and needlessly discard the redo branch.
-    if (redo.length === 0) return;
+    if (redo.length === 0) return false;
     this._document.set(next);
-    this.undoStack.push({ redo, undo });
+    // `selectionAfter` defaults to the before-state; the few edits that re-point
+    // or clear the selection update it via trackSelectionOnLastEdit.
+    this.undoStack.push({ redo, undo, selectionBefore, selectionAfter: selectionBefore });
     // A fresh edit forks history: the old redo branch can no longer be reached.
     this.redoStack.length = 0;
     this.syncHistory();
+    return true;
+  }
+
+  /**
+   * Stamp the current selection onto the most recent edit as its `selectionAfter`,
+   * so redo restores it. Called by the edits that re-point or clear the selection
+   * after committing (a Hex move, a delete); every other edit leaves it equal to
+   * `selectionBefore`, which is already correct.
+   */
+  private trackSelectionOnLastEdit(): void {
+    const edit = this.undoStack[this.undoStack.length - 1];
+    if (edit) edit.selectionAfter = this._selection();
   }
 
   /** Mirror the stack depths into the reactive availability signals. */
@@ -676,8 +713,24 @@ function mintId(): string {
   return 'r-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 }
 
+/**
+ * Deep-clone a JSON-shaped value, preferring `structuredClone` but falling back
+ * to a JSON round-trip where it is unavailable (older runtimes, some SSR/test
+ * shims) — the same defensive pattern as {@link mintId}'s `crypto.randomUUID`
+ * guard. The document is JSON-serializable (it is persisted as JSON), so the
+ * fallback is faithful for every value a Hex can hold.
+ */
+function deepClone<T>(value: T): T {
+  if (typeof structuredClone === 'function') return structuredClone(value);
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
 /** A committed edit, as the forward and inverse Immer patches that effect it. */
 interface Edit {
   readonly redo: Patch[];
   readonly undo: Patch[];
+  /** The selection just before this edit — restored on undo so it tracks the document. */
+  readonly selectionBefore: SelectionRef | null;
+  /** The selection just after this edit (and any post-commit re-point) — restored on redo. */
+  selectionAfter: SelectionRef | null;
 }

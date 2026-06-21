@@ -108,6 +108,24 @@ describe('MapCanvas keyboard', () => {
     expect(survived).toBe(true);
   });
 
+  it('suppresses Delete/Backspace while a non-canvas control is focused', () => {
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.select({ q: 0, r: 0 }, null);
+    const button = document.createElement('button');
+    document.body.appendChild(button);
+    button.focus();
+
+    // Delete right after clicking, say, a tool button must not erase the selection
+    // behind the focused control — only the canvas owns the destructive shortcut.
+    button.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }),
+    );
+
+    const survived = '0,0' in store.document().hexes;
+    button.remove();
+    expect(survived).toBe(true);
+  });
+
   it('suppresses tool hotkeys while a text field is focused', () => {
     // Arm a non-default Tool first so this proves suppression rather than the
     // cold-start default: a 't' that leaked through would arm Terrain, flipping
