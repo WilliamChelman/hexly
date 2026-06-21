@@ -157,15 +157,24 @@ export class EditorStore {
    * the armed Region's `mode` — the *same* state {@link applyAt} paints by — so the
    * toggle is a single source of truth and can never disagree with what a stroke
    * actually does, no matter which path armed the Region ({@link armRegionDirection}
-   * or {@link createAndPaintRegion}). Cold-starts at `add` whenever no Region is
-   * armed: a fresh store, a reloaded map, or after the armed Region is deleted.
-   * In-memory, session-only editor state in the same category
-   * as the armed Tool — never part of the `HexMap` document, never undone, saved,
-   * or restored across reloads (issue #37).
+   * or {@link createAndPaintRegion}).
+   *
+   * Scoped to the *selected* Region: the toggle belongs to the Inspector, which
+   * edits the selection, and {@link applyAt} now paints the selected Region — so the
+   * mode only counts while the armed Region IS the selected one. When the armed
+   * Region is a stale, different one (a Region armed in Remove, then a *different*
+   * Region selected), this falls back to `add` so a freshly-selected Region never
+   * silently inherits the previous Region's direction (issue #38). Cold-starts at
+   * `add` whenever no Region is armed too: a fresh store, a reloaded map, or after
+   * the armed Region is deleted. In-memory, session-only editor state in the same
+   * category as the armed Tool — never part of the `HexMap` document, never undone,
+   * saved, or restored across reloads (issue #37).
    */
-  readonly regionDirection = computed<'add' | 'remove'>(
-    () => this._region()?.mode ?? 'add',
-  );
+  readonly regionDirection = computed<'add' | 'remove'>(() => {
+    const armed = this._region();
+    if (!armed) return 'add';
+    return armed.id === this.selectedRegion()?.id ? armed.mode : 'add';
+  });
 
   /**
    * Whether the armed Tool keeps applying as the pointer drags across hexes.

@@ -1327,6 +1327,29 @@ describe('EditorStore region direction', () => {
     expect(store.regionDirection()).toBe('add');
   });
 
+  it('does not inherit a stale Region\'s direction when a different Region is selected', () => {
+    const store = new EditorStore();
+    const a = store.createRegion('Avalon', '#b08a4e');
+    const b = store.createRegion('Brevoy', '#7c9b86');
+    store.addHexToRegion(a, { q: 0, r: 0 });
+    store.addHexToRegion(b, { q: 1, r: 1 });
+
+    // Arm A in Remove (the non-default direction), then select a *different* Region B
+    // through the Select tool — which moves the selection but leaves the armed Subtool
+    // pointing at A. The toggle and brush must reflect B, not A's stale 'remove'.
+    store.select({ q: 0, r: 0 }, null); // selects A, the only candidate there
+    store.armRegionDirection('remove'); // _region = { a, 'remove' }
+    store.armTool('select');
+    store.select({ q: 1, r: 1 }, null); // selects B; _region still points at A
+
+    // The direction falls back to Add rather than inheriting A's 'remove', so a stroke
+    // on the freshly-selected B adds — it never silently erases membership.
+    expect(store.regionDirection()).toBe('add');
+    store.armTool('region');
+    store.applyAt({ q: 2, r: 2 });
+    expect(store.document().regions.find((r) => r.id === b)?.hexes['2,2']).toBe(true);
+  });
+
   it('arms and paints the selected Region — not merely the first — when several exist', () => {
     const store = new EditorStore();
     const first = store.createRegion('First', '#7c9b86');
