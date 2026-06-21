@@ -41,6 +41,14 @@ const ICON_BOX = 24;
  * renders without a bundled webfont (issue #10).
  */
 const LABEL_FONT = 'Georgia, "Times New Roman", serif';
+/**
+ * The minimum clickable half-width (in screen px) every Label's hit-box gets,
+ * tied to the font size. An empty or one-glyph label measures ~0 wide, which
+ * would orphan it — invisible *and* unclickable — so it could never be
+ * re-selected to give it text back. Flooring the box to the font px keeps such
+ * a label grabbable (issue #2). Drawing is unchanged; only the box is widened.
+ */
+const MIN_LABEL_HALF_WIDTH_FACTOR = 1;
 
 /**
  * The seam between the editor and whatever draws the map. There is one Canvas 2D
@@ -48,11 +56,30 @@ const LABEL_FONT = 'Georgia, "Times New Roman", serif';
  * later without touching the rest of the app (ADR-0003). A renderer owns its
  * drawing surface and paints one frame on demand for a given camera transform.
  */
+/**
+ * A live label-drag preview: render `id` at `position` instead of its stored
+ * one. Passed straight to {@link MapRenderer.render} so the canvas can preview a
+ * drag without cloning the document each frame (issue #6).
+ */
+export interface LabelDragOverride {
+  readonly id: string;
+  readonly position: Point;
+}
+
 export interface MapRenderer {
   /** Match the drawing surface to the given CSS-pixel size. */
   resize(width: number, height: number): void;
-  /** Paint one frame: the painted hexes, the culled grid, and an optional hover. */
-  render(camera: Camera, doc: HexMap, hover: Axial | null): void;
+  /**
+   * Paint one frame: the painted hexes, the culled grid, and an optional hover.
+   * An optional `labelDrag` previews one dragged label at a live position
+   * without the caller rebuilding the document each frame (issue #6).
+   */
+  render(
+    camera: Camera,
+    doc: HexMap,
+    hover: Axial | null,
+    labelDrag?: LabelDragOverride | null,
+  ): void;
   /**
    * The id of the Label drawn under screen `point` (topmost wins), or `null`.
    * Reflects the most recent {@link render}, so the canvas can hit-test clicks
@@ -196,7 +223,12 @@ export class Canvas2dMapRenderer implements MapRenderer {
     this.canvas.style.height = `${height}px`;
   }
 
-  render(camera: Camera, doc: HexMap, hover: Axial | null): void {
+  render(
+    camera: Camera,
+    doc: HexMap,
+    hover: Axial | null,
+    labelDrag: LabelDragOverride | null = null,
+  ): void {
     const ctx = this.ctx;
     if (!ctx || this.width === 0 || this.height === 0) return;
 
@@ -289,7 +321,12 @@ export class Canvas2dMapRenderer implements MapRenderer {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       for (const label of doc.labels) {
-        this.drawLabel(ctx, camera, label);
+        // Preview a dragged label at its live position without cloning the doc.
+        const position =
+          labelDrag && labelDrag.id === label.id
+            ? labelDrag.position
+            : label.position;
+        this.drawLabel(ctx, camera, label, position);
       }
       ctx.restore();
     }
@@ -312,13 +349,19 @@ export class Canvas2dMapRenderer implements MapRenderer {
   }
 
   /**
-   * Draw one Label's text centred on its world `position`, scaled so `size` is a
+   * Draw one Label's text centred on the given world `position` (which may be a
+   * live drag override, not the stored `label.position`), scaled so `size` is a
    * world measure (it zooms with the map) and rotated by its optional `rotation`.
    * Records an axis-aligned screen box for hit-testing; the box ignores rotation
    * (a close-enough bound that keeps click-to-select cheap and predictable).
    */
-  private drawLabel(ctx: CanvasRenderingContext2D, camera: Camera, label: Label): void {
-    const centre = camera.worldToScreen(label.position);
+  private drawLabel(
+    ctx: CanvasRenderingContext2D,
+    camera: Camera,
+    label: Label,
+    position: Point,
+  ): void {
+    const centre = camera.worldToScreen(position);
     const fontPx = label.size * camera.zoom;
     ctx.save();
     ctx.translate(centre.x, centre.y);
@@ -328,7 +371,8 @@ export class Canvas2dMapRenderer implements MapRenderer {
     ctx.fillText(label.text, 0, 0);
     ctx.restore();
 
-    const halfW = width / 2;
+    // Floor the hit-box width so an empty/short label stays clickable (issue #2).
+    const halfW = Math.max(width, fontPx * MIN_LABEL_HALF_WIDTH_FACTOR) / 2;
     const halfH = fontPx / 2;
     this.labelBoxes.push({
       id: label.id,

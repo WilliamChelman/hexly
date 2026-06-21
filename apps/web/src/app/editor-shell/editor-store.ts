@@ -64,13 +64,13 @@ export class EditorStore {
   /** The armed tool a canvas stroke applies — terrain, eraser, or a feature. */
   readonly tool = signal<Tool>({ kind: 'terrain', id: 'forest' });
 
-  private readonly _selectedLabelId = signal<string | null>(null);
   /**
    * The id of the Label currently selected for editing (or `null`). This is
    * transient editor state — not part of the document, so it is neither undone
-   * nor persisted (issue #10). The inspector edits whichever label this names.
+   * nor persisted (issue #10). Read it through the {@link selectedLabel} computed,
+   * which resolves it against the live document.
    */
-  readonly selectedLabelId = this._selectedLabelId.asReadonly();
+  private readonly _selectedLabelId = signal<string | null>(null);
 
   /**
    * The currently-selected {@link Label} resolved from the live document, or
@@ -289,8 +289,16 @@ export class EditorStore {
     });
   }
 
-  /** Resize Label `id` to `size` world pixels; a no-op if there is no such label. */
+  /**
+   * Resize Label `id` to `size` world pixels; a no-op if there is no such label.
+   * The document's `size` must be a positive, finite number (`labelSchema.size`
+   * is `z.number().positive()`), or the map fails save/load validation. The UI
+   * can send `0` (a cleared field is `Number('') === 0`) or a negative, so the
+   * store is the deep guard: a non-finite or non-positive `size` is a no-op and,
+   * like every recipe that changes nothing, records no undo step (issue #10).
+   */
   resizeLabel(id: string, size: number): void {
+    if (!Number.isFinite(size) || size <= 0) return;
     this.updateLabel(id, (label) => {
       label.size = size;
     });

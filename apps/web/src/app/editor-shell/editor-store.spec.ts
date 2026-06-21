@@ -447,6 +447,25 @@ describe('EditorStore', () => {
     expect(store.document().labels[0].size).toBe(64);
   });
 
+  it('ignores a non-positive resize, leaving the size unchanged and adding no undo step', () => {
+    const store = new EditorStore();
+    const id = store.addLabel('Big', { x: 0, y: 0 });
+    store.resizeLabel(id, 64);
+
+    // 0 (a cleared field is Number('') === 0) and negatives would fail
+    // labelSchema.size (z.number().positive()) on save/load, so the store
+    // drops them as no-ops rather than letting the document hold them.
+    store.resizeLabel(id, 0);
+    store.resizeLabel(id, -10);
+
+    expect(store.document().labels[0].size).toBe(64);
+    // addLabel + the valid resize are the only undo steps; the dropped resizes add none.
+    expect(store.canUndo()).toBe(true);
+    store.undo(); // undo the valid resize-to-64
+    store.undo(); // undo the addLabel
+    expect(store.canUndo()).toBe(false);
+  });
+
   it('rotates a label', () => {
     const store = new EditorStore();
     const id = store.addLabel('Tilted', { x: 0, y: 0 });
@@ -484,10 +503,10 @@ describe('EditorStore', () => {
     const id = store.addLabel('Pick me', { x: 0, y: 0 });
 
     store.selectLabel(id);
-    expect(store.selectedLabelId()).toBe(id);
+    expect(store.selectedLabel()?.id).toBe(id);
 
     store.selectLabel(null);
-    expect(store.selectedLabelId()).toBeNull();
+    expect(store.selectedLabel()).toBeNull();
   });
 
   it('clears the selection when the selected label is deleted', () => {
@@ -497,7 +516,7 @@ describe('EditorStore', () => {
 
     store.deleteLabel(id);
 
-    expect(store.selectedLabelId()).toBeNull();
+    expect(store.selectedLabel()).toBeNull();
   });
 
   it('treats editing a label that does not exist as a no-op with no undo step', () => {

@@ -1,8 +1,10 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { Label } from '@hexly/domain';
 import { Button } from '../ui/button';
 import { Eyebrow } from '../ui/eyebrow';
 import { Field } from '../ui/field';
 import { Input } from '../ui/input';
+import { inputValue } from './dom';
 import { EditorStore } from './editor-store';
 
 /**
@@ -27,7 +29,7 @@ import { EditorStore } from './editor-store';
           appInput
           data-testid="label-text"
           [value]="label.text"
-          (change)="onText($event)"
+          (change)="onText(label.id, $event)"
         />
       </div>
 
@@ -38,7 +40,7 @@ import { EditorStore } from './editor-store';
           min="1"
           data-testid="label-size"
           [value]="label.size"
-          (change)="onSize($event)"
+          (change)="onSize(label.id, $event)"
         />
       </div>
 
@@ -48,7 +50,7 @@ import { EditorStore } from './editor-store';
           type="number"
           data-testid="label-rotation"
           [value]="label.rotation ?? 0"
-          (change)="onRotation($event)"
+          (change)="onRotation(label.id, $event)"
         />
       </div>
 
@@ -59,7 +61,7 @@ import { EditorStore } from './editor-store';
             type="number"
             data-testid="label-x"
             [value]="label.position.x"
-            (change)="onX($event)"
+            (change)="onX(label, $event)"
           />
         </div>
         <div appField label="Y">
@@ -68,7 +70,7 @@ import { EditorStore } from './editor-store';
             type="number"
             data-testid="label-y"
             [value]="label.position.y"
-            (change)="onY($event)"
+            (change)="onY(label, $event)"
           />
         </div>
       </div>
@@ -135,37 +137,23 @@ import { EditorStore } from './editor-store';
 export class Inspector {
   protected readonly store = inject(EditorStore);
 
-  /** The label currently being edited, asserted non-null by the template guard. */
-  private requireSelected() {
-    const label = this.store.selectedLabel();
-    if (!label) throw new Error('No label selected');
-    return label;
+  protected onText(id: string, event: Event): void {
+    this.store.editLabelText(id, inputValue(event));
   }
 
-  protected onText(event: Event): void {
-    this.store.editLabelText(this.requireSelected().id, value(event));
+  protected onSize(id: string, event: Event): void {
+    this.store.resizeLabel(id, Number(inputValue(event)));
   }
 
-  protected onSize(event: Event): void {
-    this.store.resizeLabel(this.requireSelected().id, Number(value(event)));
+  protected onRotation(id: string, event: Event): void {
+    this.store.rotateLabel(id, Number(inputValue(event)));
   }
 
-  protected onRotation(event: Event): void {
-    this.store.rotateLabel(this.requireSelected().id, Number(value(event)));
+  protected onX(label: Label, event: Event): void {
+    this.store.moveLabel(label.id, { x: Number(inputValue(event)), y: label.position.y });
   }
 
-  protected onX(event: Event): void {
-    const label = this.requireSelected();
-    this.store.moveLabel(label.id, { x: Number(value(event)), y: label.position.y });
+  protected onY(label: Label, event: Event): void {
+    this.store.moveLabel(label.id, { x: label.position.x, y: Number(inputValue(event)) });
   }
-
-  protected onY(event: Event): void {
-    const label = this.requireSelected();
-    this.store.moveLabel(label.id, { x: label.position.x, y: Number(value(event)) });
-  }
-}
-
-/** The current value of the input that raised `event`. */
-function value(event: Event): string {
-  return (event.target as HTMLInputElement).value;
 }

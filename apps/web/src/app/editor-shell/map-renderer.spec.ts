@@ -342,6 +342,25 @@ describe('Canvas2dMapRenderer labels', () => {
     restore();
   });
 
+  it('keeps an empty-text label clickable at its centre', () => {
+    const restore = stubTheme();
+    const ctx = new FakeContext();
+    const renderer = makeRenderer(ctx);
+    // (0,0) world is at screen (60,60) under this camera — the label's centre.
+    const camera = Camera.initial().panBy(60, 60);
+    // Empty text measures 0 wide; the box must still floor to a clickable size
+    // so the label can be re-selected to give it text back (issue #2).
+    const doc: HexMap = {
+      hexes: {},
+      regions: [],
+      labels: [{ id: 'l1', text: '', position: { x: 0, y: 0 }, size: 28 }],
+    };
+    renderer.render(camera, doc, null);
+
+    expect(renderer.labelAt({ x: 60, y: 60 })).toBe('l1');
+    restore();
+  });
+
   it('hit-tests to null where no label was drawn', () => {
     const restore = stubTheme();
     const ctx = new FakeContext();

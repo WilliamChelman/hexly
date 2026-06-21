@@ -6,6 +6,7 @@ import { Input } from '../ui/input';
 import { Panel } from '../ui/panel';
 import { Rule } from '../ui/rule';
 import { Tool as ToolButton, ToolGlyph } from '../ui/tool';
+import { inputValue } from './dom';
 import { EditorStore, Tool } from './editor-store';
 
 /** A content tool — not yet wired to the canvas; shown as a preview for now. */
@@ -358,12 +359,12 @@ export class ToolPalette {
 
   /** Rename region `id` to the text input's value. */
   protected rename(id: string, event: Event): void {
-    this.store.renameRegion(id, (event.target as HTMLInputElement).value);
+    this.store.renameRegion(id, inputValue(event));
   }
 
   /** Recolour region `id` to the colour input's value. */
   protected recolor(id: string, event: Event): void {
-    this.store.recolorRegion(id, (event.target as HTMLInputElement).value);
+    this.store.recolorRegion(id, inputValue(event));
   }
 
   /** Whether `tool` is the region brush armed for region `id` in `mode`. */

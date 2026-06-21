@@ -222,20 +222,15 @@ export class MapCanvas {
   } | null>(null);
 
   /**
-   * The document to render: the live store document, but with a dragged label
-   * shown at its live drag position. Overriding here keeps the drag preview out
-   * of the undo history — the store only sees the final position on release.
+   * The live label-drag mapped to the renderer's override shape, or null. The
+   * renderer previews the dragged label at this position without the document
+   * being rebuilt each frame, which keeps the drag preview out of the undo
+   * history (the store only sees the final position on release) and avoids
+   * cloning the labels array per pointer-move frame (issue #6).
    */
-  protected readonly renderDoc = computed(() => {
+  protected readonly labelDragOverride = computed(() => {
     const drag = this.labelDrag();
-    const doc = this.store.document();
-    if (!drag) return doc;
-    return {
-      ...doc,
-      labels: doc.labels.map((l) =>
-        l.id === drag.id ? { ...l, position: drag.position } : l,
-      ),
-    };
+    return drag ? { id: drag.id, position: drag.position } : null;
   });
 
   private readonly theme = inject(ThemeService);
@@ -270,12 +265,14 @@ export class MapCanvas {
 
   constructor() {
     // Repaint whenever pan, zoom, the painted document, a label drag, or the
-    // hover changes. `renderDoc` folds in the live label-drag position.
+    // hover changes. The live label-drag override previews the dragged label
+    // without cloning the document each frame.
     effect(() => {
       const camera = this.camera();
-      const doc = this.renderDoc();
+      const doc = this.store.document();
       const hover = this.hover();
-      this.renderer?.render(camera, doc, hover);
+      const labelDrag = this.labelDragOverride();
+      this.renderer?.render(camera, doc, hover, labelDrag);
     });
 
     // Re-read the renderer's themed colours and repaint when the theme switches.
@@ -325,8 +322,10 @@ export class MapCanvas {
     // intent). The grab offset keeps the label from jumping to the cursor.
     const hitId = this.renderer?.labelAt(this.localPoint(event)) ?? null;
     if (hitId) {
-      const label = this.store.document().labels.find((l) => l.id === hitId);
+      // `labelAt` already proved the label exists and `selectLabel` set it, so
+      // read it straight back rather than re-scanning the document (issue #7).
       this.store.selectLabel(hitId);
+      const label = this.store.selectedLabel();
       if (label) {
         this.labelDrag.set({
           id: hitId,
@@ -354,7 +353,7 @@ export class MapCanvas {
     this.hover.set(hex);
 
     // A live label drag wins over painting/panning: track the cursor, applying
-    // the grab offset, and let `renderDoc` show the label there until release.
+    // the grab offset; the render effect previews it there until release.
     const drag = this.labelDrag();
     if (drag) {
       const world = this.toWorld(event);
@@ -557,7 +556,12 @@ export class MapCanvas {
         this.centred = true;
         this.camera.set(Camera.initial().panBy(width / 2, height / 2));
       } else {
-        this.renderer?.render(this.camera(), this.renderDoc(), this.hover());
+        this.renderer?.render(
+          this.camera(),
+          this.store.document(),
+          this.hover(),
+          this.labelDragOverride(),
+        );
       }
     };
 
