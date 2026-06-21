@@ -113,6 +113,46 @@ describe('ToolPalette contextual Subtool panel', () => {
   });
 });
 
+describe('ToolPalette history', () => {
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({ imports: [ToolPalette] }).compileComponents();
+  });
+
+  it('renders Undo and Redo, disabled when there is nothing to undo or redo', () => {
+    const { fixture, store } = setup();
+    const undo = () =>
+      fixture.nativeElement.querySelector('[data-testid=undo]') as HTMLButtonElement;
+    const redo = () =>
+      fixture.nativeElement.querySelector('[data-testid=redo]') as HTMLButtonElement;
+
+    // The history controls live at the bottom of the strip (story 13).
+    expect(undo()).not.toBeNull();
+    expect(redo()).not.toBeNull();
+
+    // A fresh map has nothing to undo or redo, so both are disabled (story 14).
+    expect(undo().disabled).toBe(true);
+    expect(redo().disabled).toBe(true);
+
+    // An edit enables Undo but not yet Redo.
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    fixture.detectChanges();
+    expect(undo().disabled).toBe(false);
+    expect(redo().disabled).toBe(true);
+  });
+
+  it('drives the store history when Undo and Redo are clicked', () => {
+    const { fixture, store } = setup();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+
+    click(fixture, 'undo');
+    expect(store.canUndo()).toBe(false);
+    expect(store.canRedo()).toBe(true);
+
+    click(fixture, 'redo');
+    expect(store.document().hexes['0,0']).toEqual({ terrain: 'forest' });
+  });
+});
+
 describe('ToolPalette regions', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({ imports: [ToolPalette] }).compileComponents();
@@ -136,13 +176,44 @@ describe('ToolPalette regions', () => {
     expect(has(fixture, `region-name-${id}`)).toBe(false);
   });
 
-  it('shows the no-Subtool hint while the Region brush is armed', () => {
+  it('highlights no Tool and shows no flyout while the Region brush is armed', () => {
     const { fixture, store } = setup();
-    store.armTool('region');
+    store.createRegion('Avalon', '#b08a4e');
+    store.armTool('region'); // the internal brush state the Inspector arms (ADR-0012)
     fixture.detectChanges();
 
-    // The Region brush falls into the same no-Subtool hint branch as Select/Label/Erase.
-    const hint = fixture.nativeElement.querySelector('.hint');
-    expect(hint?.textContent?.trim()).toBeTruthy();
+    // Story 25: while the membership brush is armed the active affordance is the
+    // Inspector's Add/Remove, so the strip highlights no Tool and opens no flyout.
+    expect(fixture.nativeElement.querySelector('.flyout')).toBeNull();
+    expect(fixture.nativeElement.querySelector('button.is-active')).toBeNull();
+  });
+});
+
+describe('ToolPalette flyout binding', () => {
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({ imports: [ToolPalette] }).compileComponents();
+  });
+
+  it('opens no flyout for Select, Label, or Erase (no Subtools)', () => {
+    const { fixture, store } = setup();
+
+    for (const tool of ['select', 'label', 'erase'] as const) {
+      store.armTool(tool);
+      fixture.detectChanges();
+      // Tools without Subtools render no flyout at all, keeping the map clear (story 10).
+      expect(fixture.nativeElement.querySelector('.flyout')).toBeNull();
+    }
+  });
+
+  it('opens a flyout bound to the armed painting Tool', () => {
+    const { fixture, store } = setup();
+
+    store.armTool('terrain');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.flyout')).not.toBeNull();
+
+    store.armTool('feature');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.flyout')).not.toBeNull();
   });
 });

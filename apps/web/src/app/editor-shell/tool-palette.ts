@@ -1,240 +1,228 @@
+import { NgComponentOutlet } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
-  computed,
   inject,
+  Type,
 } from '@angular/core';
 import { featureLibrary, terrainPalette } from '@hexly/domain';
-import { Button } from '../ui/button';
-import { Eyebrow } from '../ui/eyebrow';
+import { IconButton } from '../ui/icon-button';
+import { IconPath } from '../ui/icon/icon-path';
+import { EraseIcon } from '../ui/icon/glyphs/erase';
+import { LabelIcon } from '../ui/icon/glyphs/label';
+import { MinusIcon } from '../ui/icon/glyphs/minus';
+import { RedoIcon } from '../ui/icon/glyphs/redo';
+import { SelectIcon } from '../ui/icon/glyphs/select';
+import { SettlementIcon } from '../ui/icon/glyphs/settlement';
+import { TerrainIcon } from '../ui/icon/glyphs/terrain';
+import { UndoIcon } from '../ui/icon/glyphs/undo';
+import { Panel } from '../ui/panel';
 import { Rule } from '../ui/rule';
-import { Tool as ToolButton, ToolGlyph } from '../ui/tool';
+import { Swatch } from '../ui/swatch';
 import { EditorStore, featureSubtools, ToolId } from './editor-store';
 
-/**
- * The one-line hint shown for a Tool that has no Subtool strip (issue #27). Keyed
- * by the no-Subtool Tools; any other Tool renders its own Subtool panel instead.
- */
-const SUBTOOL_HINTS: Partial<Record<ToolId, string>> = {
-  select: 'Click an entity to select it.',
-  region: 'Click the map to paint the selected region.',
-  label: 'Click the map to place a label.',
-  erase: 'Click a hex to erase it.',
-};
-
-/** A top-level Tool button in the primary selector row (issue #27). */
+/** A top-level Tool button in the floating icon strip (issue #27, ADR-0013). */
 interface ToolDef {
   readonly id: ToolId;
   readonly label: string;
-  readonly hint: string;
-  readonly glyph: ToolGlyph;
+  /** The keycap that arms this Tool — surfaced in the tooltip (`Terrain (T)`). */
+  readonly key: string;
+  /** The glyph component projected into the button (ADR-0007); rendered via outlet. */
+  readonly glyph: Type<unknown>;
 }
 
 /**
- * The primary Tool selector, in palette order. Each arms a top-level Tool; the
- * contextual panel below then shows only that Tool's Subtools (issue #27). The
- * keycap hints mirror the keyboard bindings in {@link map-canvas}.
+ * The floating tool strip's Tools, in palette order. Each arms a top-level Tool;
+ * the flyout then shows only that Tool's Subtools (issue #27). The keycaps mirror
+ * the keyboard bindings in {@link map-canvas} and are surfaced in the tooltips.
  */
 const TOOLS: readonly ToolDef[] = [
-  { id: 'select', label: 'Select', hint: 'S', glyph: 'select' },
-  { id: 'terrain', label: 'Terrain', hint: 'T', glyph: 'terrain' },
-  { id: 'feature', label: 'Feature', hint: 'F', glyph: 'feature' },
-  { id: 'label', label: 'Label', hint: 'L', glyph: 'label' },
-  { id: 'erase', label: 'Erase', hint: 'E', glyph: 'erase' },
+  { id: 'select', label: 'Select', key: 'S', glyph: SelectIcon },
+  { id: 'terrain', label: 'Terrain', key: 'T', glyph: TerrainIcon },
+  { id: 'feature', label: 'Feature', key: 'F', glyph: SettlementIcon },
+  { id: 'label', label: 'Label', key: 'L', glyph: LabelIcon },
+  { id: 'erase', label: 'Erase', key: 'E', glyph: EraseIcon },
 ];
 
 /**
- * The left rail: a primary Tool selector row (Select, Terrain, Feature, Label,
- * Erase) plus a contextual panel showing only the armed Tool's Subtools — terrain
- * swatches, or feature icons + Clear — and undo/redo (issue #27, ADR-0010). The
- * armed Tool and its Subtools live in the shared {@link EditorStore} so the canvas
- * applies them (ADR-0005). Region is no longer a palette Tool (ADR-0012): Regions
- * are created in the Regions panel and their membership is painted via the
- * Inspector's Add/Remove brush, so the palette never arms `region`.
+ * The floating tool palette: a compact icon strip in the top-left of the map —
+ * one icon button per Tool (Select, Terrain, Feature, Label, Erase), plus Undo
+ * and Redo below a divider — and a contextual flyout to its right that shows the
+ * armed Tool's Subtools as an icon grid (terrain swatches, or feature icons +
+ * Clear). The strip and flyout float as cards over the full-bleed canvas; the
+ * shell positions this component top-left (ADR-0013).
+ *
+ * The flyout is bound to the armed Tool: it opens **only** for the Tools that
+ * have Subtools (Terrain, Feature) and is absent for Select, Label, and Erase —
+ * which have none — so the map stays maximally clear with nothing to configure.
+ * Region is not a palette Tool (ADR-0012): while the membership brush is armed
+ * (internal `region` state), the strip highlights no Tool and opens no flyout —
+ * the active affordance is the Inspector's Add/Remove (issue #38, story 25).
+ *
+ * The armed Tool and its Subtools live in the shared {@link EditorStore} so the
+ * canvas applies them (ADR-0005). Discoverability moves from inline labels to
+ * `title` tooltips of the form `Terrain (T)` (name + keycap), per ADR-0013.
  */
 @Component({
   selector: 'app-tool-palette',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Eyebrow, Rule, ToolButton],
+  imports: [
+    IconButton,
+    IconPath,
+    MinusIcon,
+    NgComponentOutlet,
+    RedoIcon,
+    Swatch,
+    UndoIcon,
+    Panel,
+    Rule,
+  ],
   template: `
-    <section class="group">
-      <h2 class="heading" appEyebrow>Tools</h2>
-      <div class="list" role="group" aria-label="Tools">
-        @for (t of tools; track t.id) {
-          <button
-            appTool
-            [label]="t.label"
-            [hint]="t.hint"
-            [glyph]="t.glyph"
-            [active]="store.tool() === t.id"
-            [attr.aria-label]="t.label"
-            [attr.data-testid]="'tool-' + t.id"
-            (click)="store.armTool(t.id)"
-          ></button>
-        }
-      </div>
-    </section>
+    <div class="strip" appPanel role="group" aria-label="Tools">
+      @for (t of tools; track t.id) {
+        <button
+          appIconButton
+          toggle
+          [active]="store.tool() === t.id"
+          [title]="t.label + ' (' + t.key + ')'"
+          [attr.aria-label]="t.label"
+          [attr.data-testid]="'tool-' + t.id"
+          (click)="store.armTool(t.id)"
+        >
+          <ng-container *ngComponentOutlet="t.glyph; inputs: glyphInputs" />
+        </button>
+      }
 
-    <hr appRule />
+      <hr appRule />
+
+      <button
+        appIconButton
+        title="Undo"
+        aria-label="Undo"
+        data-testid="undo"
+        [disabled]="!store.canUndo()"
+        (click)="store.undo()"
+      >
+        <app-icon-undo [size]="20" />
+      </button>
+      <button
+        appIconButton
+        title="Redo"
+        aria-label="Redo"
+        data-testid="redo"
+        [disabled]="!store.canRedo()"
+        (click)="store.redo()"
+      >
+        <app-icon-redo [size]="20" />
+      </button>
+    </div>
 
     @switch (store.tool()) {
       @case ('terrain') {
-        <section class="group">
-          <h2 class="heading" appEyebrow>Terrain</h2>
-          <div class="list" role="group" aria-label="Terrain">
-            @for (t of terrainTools; track t.id) {
-              <button
-                appTool
-                [label]="t.label"
-                [hint]="t.hint"
-                [swatch]="t.swatch"
-                [active]="store.terrain() === t.id"
-                [attr.aria-label]="t.label"
-                (click)="store.armTerrain(t.id)"
-              ></button>
-            }
-          </div>
-        </section>
+        <div class="flyout" appPanel role="group" aria-label="Terrain">
+          @for (t of terrainTools; track t.id) {
+            <button
+              appIconButton
+              toggle
+              [active]="store.terrain() === t.id"
+              [title]="t.label + ' (' + t.key + ')'"
+              [attr.aria-label]="t.label"
+              (click)="store.armTerrain(t.id)"
+            >
+              <span appSwatch [style.background]="'var(' + t.swatch + ')'"></span>
+            </button>
+          }
+        </div>
       }
       @case ('feature') {
-        <section class="group">
-          <h2 class="heading" appEyebrow>Features</h2>
-          <div class="list" role="group" aria-label="Features">
-            @for (f of features; track f.id) {
-              <button
-                appTool
-                [label]="f.label"
-                [iconPath]="f.path"
-                [hint]="f.hint"
-                [active]="store.feature() === f.id"
-                [attr.aria-label]="f.label"
-                [attr.data-testid]="'feature-' + f.id"
-                (click)="store.armFeature(f.id)"
-              ></button>
-            }
+        <div class="flyout" appPanel role="group" aria-label="Features">
+          @for (f of features; track f.id) {
             <button
-              appTool
-              label="Clear feature"
-              [hint]="clearHint"
-              [active]="store.feature() === 'clear'"
-              aria-label="Clear feature"
-              data-testid="clear-feature"
-              (click)="store.armFeature('clear')"
-            ></button>
-          </div>
-        </section>
-      }
-      @default {
-        <!-- Select, Label, and Erase have no Subtools (CONTEXT.md → Subtool). The
-        Region membership brush (armed from the Inspector, ADR-0012) also has none;
-        its details are edited in the Inspector (#36), creation in the panel (#39). -->
-        <p class="hint">{{ subtoolHint() }}</p>
+              appIconButton
+              toggle
+              [active]="store.feature() === f.id"
+              [title]="f.label + ' (' + f.key + ')'"
+              [attr.aria-label]="f.label"
+              [attr.data-testid]="'feature-' + f.id"
+              (click)="store.armFeature(f.id)"
+            >
+              <app-icon-path [d]="f.path" [size]="20" />
+            </button>
+          }
+          <button
+            appIconButton
+            toggle
+            [active]="store.feature() === 'clear'"
+            [title]="'Clear feature (' + clearKey + ')'"
+            aria-label="Clear feature"
+            data-testid="clear-feature"
+            (click)="store.armFeature('clear')"
+          >
+            <app-icon-minus [size]="20" />
+          </button>
+        </div>
       }
     }
-
-    <div class="spacer"></div>
-
-    <hr appRule />
-
-    <section class="group">
-      <h2 class="heading" appEyebrow>History</h2>
-      <div class="history">
-        <button
-          type="button"
-          appButton
-          variant="ghost"
-          size="sm"
-          [disabled]="!store.canUndo()"
-          (click)="store.undo()"
-        >
-          Undo
-        </button>
-        <button
-          type="button"
-          appButton
-          variant="ghost"
-          size="sm"
-          [disabled]="!store.canRedo()"
-          (click)="store.redo()"
-        >
-          Redo
-        </button>
-      </div>
-    </section>
   `,
   styles: `
     :host {
       display: flex;
-      flex-direction: column;
-      gap: var(--space-4);
-      padding: var(--space-4);
-      overflow-y: auto;
-      background: var(--bg-deep);
-      border-right: 1px solid var(--line-strong);
-    }
-    .group {
-      display: flex;
-      flex-direction: column;
+      align-items: flex-start;
       gap: var(--space-2);
     }
-    .heading {
-      padding: 0 var(--space-2);
-    }
-    .hint {
-      margin: 0;
-      padding: 0 var(--space-2);
-      font-size: var(--text-sm);
-      font-style: italic;
-      color: var(--ink-muted);
-    }
-    .list {
+    .strip {
       display: flex;
       flex-direction: column;
       gap: 2px;
+      padding: var(--space-2);
+      /* Cap to the host (the shell bounds it to the body) and scroll if a short
+         viewport can't fit the whole strip, matching the flyout. */
+      min-height: 0;
+      max-height: 100%;
+      overflow-y: auto;
     }
-    .history {
-      display: flex;
-      gap: var(--space-2);
+    .flyout {
+      display: grid;
+      grid-template-columns: repeat(2, auto);
+      gap: 2px;
+      padding: var(--space-2);
+      max-height: 100%;
+      overflow-y: auto;
     }
-    .history button {
-      flex: 1;
-    }
-    .spacer {
-      flex: 1;
+    hr[appRule] {
+      width: 100%;
     }
   `,
 })
 export class ToolPalette {
   protected readonly store = inject(EditorStore);
 
-  /** The primary Tool selector buttons, in palette order (issue #27). */
+  /** The floating strip's Tool buttons, in palette order (issue #27). */
   protected readonly tools = TOOLS;
 
+  /** Inputs for each outlet-rendered Tool glyph; matches the 20px icon-only chrome. */
+  protected readonly glyphInputs = { size: 20 };
+
   /**
-   * The built-in feature library, each placeable from the palette. The keycap is
+   * The built-in feature library, each placeable from the flyout. The keycap is
    * the feature's slot in {@link featureSubtools}, the shared ordering the
-   * keyboard indexes — so the hint can never disagree with what its key arms.
+   * keyboard indexes — so the tooltip can never disagree with what its key arms.
    */
   protected readonly features = featureLibrary.map((f) => ({
     id: f.id,
     label: f.label,
     path: f.path,
-    hint: String(featureSubtools.indexOf(f.id) + 1),
+    key: String(featureSubtools.indexOf(f.id) + 1),
   }));
 
-  /** The keycap hint for the Clear feature Subtool — its slot in {@link featureSubtools}. */
-  protected readonly clearHint = String(featureSubtools.indexOf('clear') + 1);
+  /** The keycap for the Clear feature Subtool — its slot in {@link featureSubtools}. */
+  protected readonly clearKey = String(featureSubtools.indexOf('clear') + 1);
 
   /** The built-in terrain palette, with a 1-based number key per entry. */
   protected readonly terrainTools = terrainPalette.map((t, i) => ({
     id: t.id,
     label: t.label,
     swatch: t.fill,
-    hint: String(i + 1),
+    key: String(i + 1),
   }));
-
-  /** The one-line hint shown for a Tool that has no Subtool strip (issue #27). */
-  protected readonly subtoolHint = computed(
-    () => SUBTOOL_HINTS[this.store.tool()] ?? '',
-  );
 }

@@ -1,11 +1,12 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 
 /**
- * The overlay glyph (stacked waves). One `<svg>` drawn in `currentColor`, sized
- * by `size`. Reached by name through `app-icon`, or directly. See ADR-0007.
+ * The undo glyph (a curved arrow looping back to the left). One `<svg>` drawn in
+ * `currentColor`, sized by `size`. Imported directly by the consumer that shows
+ * it (there is no `app-icon` dispatcher). See ADR-0007.
  */
 @Component({
-  selector: 'app-icon-overlay',
+  selector: 'app-icon-undo',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: ':host { display: inline-flex; line-height: 0; }',
   template: `
@@ -16,14 +17,14 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
       fill="none"
       stroke="currentColor"
       stroke-width="1.5"
+      stroke-linejoin="round"
       stroke-linecap="round"
     >
-      <path
-        d="M3 8c3 0 3 3 6 3s3-3 6-3 3 3 6 3M3 15c3 0 3 3 6 3s3-3 6-3 3 3 6 3"
-      />
+      <path d="M9 7H15a5 5 0 0 1 0 10H8" />
+      <path d="M9 3 5 7l4 4" />
     </svg>
   `,
 })
-export class OverlayIcon {
+export class UndoIcon {
   readonly size = input(24);
 }

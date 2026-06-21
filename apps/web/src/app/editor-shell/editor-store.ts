@@ -146,15 +146,17 @@ export class EditorStore {
   private readonly _region = signal<RegionSubtool | null>(null);
 
   /**
-   * Which view occupies the editor's shared right column: the live {@link Inspector}
-   * (the default a map opens on) or the Regions panel's list. The right-edge rail
-   * flips it to `regions`; selecting a Region — from the list or the canvas — flips
-   * it back to `inspector` so the selection opens for editing (ADR-0011, issue #39).
-   * Transient, session-only view state in the same category as the armed Tool and
-   * the selection: never part of the `HexMap` document, never undone, saved, or
-   * restored across reloads (a reopened map resets it via {@link load}).
+   * Which view floats in the editor's dismissible right panel: the live
+   * {@link Inspector}, the Regions panel's list, or `null` when the panel is
+   * **closed** (ADR-0013). It is closed by default so nothing covers the map until
+   * there is something to show: selecting an entity or a Region opens it to
+   * `inspector` (the selection-opens-for-editing contract, ADR-0011, issue #39);
+   * the right-edge rail toggles it between `regions` and closed. Transient,
+   * session-only view state in the same category as the armed Tool and the
+   * selection: never part of the `HexMap` document, never undone, saved, or
+   * restored across reloads (a reopened map resets it closed via {@link load}).
    */
-  private readonly _rightPanel = signal<'inspector' | 'regions'>('inspector');
+  private readonly _rightPanel = signal<'inspector' | 'regions' | null>(null);
   readonly rightPanel = this._rightPanel.asReadonly();
 
   /** The remembered Terrain Subtool — the terrain a Terrain stroke paints. */
@@ -328,9 +330,15 @@ export class EditorStore {
     this._rightPanel.set('regions');
   }
 
-  /** Toggle the shared right column between the Regions panel and the Inspector — the rail entry's click (issue #39). */
+  /**
+   * Toggle the floating right panel between the Regions list and closed — the
+   * rail entry's click (issue #39, ADR-0013). Its off-state is **closed** (`null`),
+   * not the Inspector: clicking the active Regions entry reclaims the right of the
+   * map. From any other state (closed, or the Inspector showing a selection) it
+   * opens the Regions list.
+   */
   toggleRegionsPanel(): void {
-    this._rightPanel.set(this._rightPanel() === 'regions' ? 'inspector' : 'regions');
+    this._rightPanel.set(this._rightPanel() === 'regions' ? null : 'regions');
   }
 
   /** Arm the Terrain tool with terrain `id`, remembering it as the Terrain Subtool. */
@@ -414,9 +422,9 @@ export class EditorStore {
     this._tool.set('select');
     this.resetSubtoolMemory();
     this.deselect(); // clears the selection and forgets the per-coordinate cycle
-    // A reopened map starts on the Inspector, not whatever view the previous
-    // session's rail had flipped the shared column to (issue #39).
-    this._rightPanel.set('inspector');
+    // A reopened map shows a clear right side: the panel resets closed, not the
+    // previous session's list view nor an empty Inspector (ADR-0013, issue #39).
+    this._rightPanel.set(null);
   }
 
   /** Restore the cold-start Subtool memory shared by a fresh store and a reload. */
@@ -787,17 +795,22 @@ export class EditorStore {
   }
 
   /**
-   * Clear the selection, if any — the inspector falls back to its empty state.
-   * The one canonical clear that every clearing path routes through: the
-   * deliberate Escape gesture (issue #30), the internal teardown paths
-   * ({@link selectLabel} with `null`, {@link deleteLabel}, {@link deleteSelected}),
-   * and the incidental clear when {@link select} lands on a Void coordinate.
+   * Clear the selection, if any. The one canonical clear that every clearing path
+   * routes through: the deliberate Escape gesture (issue #30), the internal
+   * teardown paths ({@link selectLabel} with `null`, {@link deleteLabel},
+   * {@link deleteSelected}), and the incidental clear when {@link select} lands on
+   * a Void coordinate.
    */
   deselect(): void {
     this._selection.set(null);
     // Forget the cycle so a click that re-selects the same coordinate later starts
     // from the top of the stack rather than resuming a stale descent (issue #35).
     this.cycleAnchor = null;
+    // Reclaim the map: the Inspector only floats while it has a selection to show,
+    // so clearing the selection closes it — the mirror of the selection that opened
+    // it, keeping the closed-by-default contract (ADR-0013). A Regions list opened
+    // via the rail is not selection-driven, so it is left showing.
+    if (this._rightPanel() === 'inspector') this._rightPanel.set(null);
   }
 
   /**

@@ -7,11 +7,15 @@ import { Chip } from '../ui/chip';
 import { Coord } from '../ui/coord';
 import { Eyebrow } from '../ui/eyebrow';
 import { Field } from '../ui/field';
+import { IconButton } from '../ui/icon-button';
+import { SelectIcon } from '../ui/icon/glyphs/select';
+import { TerrainIcon } from '../ui/icon/glyphs/terrain';
+import { UndoIcon } from '../ui/icon/glyphs/undo';
 import { Input } from '../ui/input';
 import { Kbd } from '../ui/kbd';
 import { Panel } from '../ui/panel';
+import { Swatch } from '../ui/swatch';
 import { Textarea } from '../ui/textarea';
-import { Tool } from '../ui/tool';
 
 interface SwatchRow {
   readonly token: string;
@@ -40,10 +44,14 @@ interface TypeRow {
     Eyebrow,
     Field,
     Input,
+    IconButton,
+    SelectIcon,
+    TerrainIcon,
+    UndoIcon,
+    Swatch,
     Kbd,
     Panel,
     Textarea,
-    Tool,
   ],
   template: `
     <div class="guide">
@@ -179,23 +187,36 @@ interface TypeRow {
           </figure>
 
           <figure class="specimen" appPanel>
-            <figcaption appEyebrow>Tools</figcaption>
-            <div class="specimen-col">
+            <figcaption appEyebrow>Icon buttons</figcaption>
+            <div class="specimen-row">
               <button
-                appTool
-                label="Forest"
-                hint="2"
-                swatch="--terrain-forest"
+                appIconButton
+                toggle
                 active
-                aria-label="Forest"
-              ></button>
+                title="Select (S)"
+                aria-label="Select"
+              >
+                <app-icon-select [size]="20" />
+              </button>
               <button
-                appTool
-                label="Ocean"
-                hint="3"
-                swatch="--terrain-ocean"
-                aria-label="Ocean"
-              ></button>
+                appIconButton
+                toggle
+                title="Terrain (T)"
+                aria-label="Terrain"
+              >
+                <app-icon-terrain [size]="20" />
+              </button>
+              <button
+                appIconButton
+                toggle
+                title="Forest (2)"
+                aria-label="Forest"
+              >
+                <span appSwatch [style.background]="'var(--terrain-forest)'"></span>
+              </button>
+              <button appIconButton title="Undo" aria-label="Undo">
+                <app-icon-undo [size]="20" />
+              </button>
             </div>
           </figure>
 
