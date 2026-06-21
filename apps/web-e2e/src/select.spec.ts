@@ -10,7 +10,8 @@ import { expect, test } from './fixtures';
  * persisted document (ADR-0009).
  *
  * The canvas centres the world origin on load, so a plain `canvas.click()` lands
- * on hex (0,0); a click near a corner lands on a far, Void coordinate.
+ * on hex (0,0); {@link clickVoid} lands on a far, Void coordinate clear of the
+ * floating chrome.
  */
 
 /** A new map, opened in its editor; returns the canvas locator and the map id. */
@@ -21,6 +22,20 @@ async function newMap(page: import('@playwright/test').Page) {
   const mapId = page.url().split('/').pop() as string;
   const canvas = page.getByRole('img', { name: 'Hex map' });
   return { canvas, mapId };
+}
+
+/**
+ * Click a far, Void coordinate with no label hit, to deselect. The canvas is
+ * full-bleed with the chrome floating over it (ADR-0013), so the corners are no
+ * longer empty: the tool palette sits top-left, the rail/inspector top-right, the
+ * coordinate readout bottom-left and the zoom controls bottom-right. The
+ * top-centre strip is clear, and far above the centred origin, so a click there
+ * lands on the canvas (not a button) and on a Void hex.
+ */
+async function clickVoid(canvas: import('@playwright/test').Locator) {
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('canvas not laid out');
+  await canvas.click({ position: { x: box.width / 2, y: 24 } });
 }
 
 test('under Select, clicking a painted Hex inspects it and clicking empty space clears it', async ({
@@ -44,7 +59,7 @@ test('under Select, clicking a painted Hex inspects it and clicking empty space 
 
   // Clicking a far, Void coordinate with no label hit deselects (the inspector
   // falls back to its empty-state hint).
-  await canvas.click({ position: { x: 24, y: 24 } });
+  await clickVoid(canvas);
   await expect(page.getByTestId('entity-coord')).toHaveCount(0);
 });
 
@@ -88,7 +103,7 @@ test('under Select, clicking a Label floating over a painted hex selects the Lab
   // under Select. Label wins the precedence over the painted hex beneath it, so
   // the Label editor — not the Hex panel — opens.
   await page.getByTestId('tool-select').click();
-  await canvas.click({ position: { x: 24, y: 24 } });
+  await clickVoid(canvas);
   await expect(page.getByTestId('label-text')).toHaveCount(0);
 
   await canvas.click();
@@ -115,7 +130,7 @@ test('a painting Tool over a floating Label paints the hex beneath instead of gr
 
   // Clear the auto-selection so a stray Label editor can't mask the result.
   await page.getByTestId('tool-select').click();
-  await canvas.click({ position: { x: 24, y: 24 } });
+  await clickVoid(canvas);
   await expect(page.getByTestId('label-text')).toHaveCount(0);
 
   // Arm Terrain → Ocean and click right where the Label floats. The Label is
@@ -163,7 +178,7 @@ test('under Select, dragging a selected Label repositions it', async ({ page }) 
   const startX = Number(await page.getByTestId('label-x').inputValue());
   const startY = Number(await page.getByTestId('label-y').inputValue());
   await page.getByTestId('tool-select').click();
-  await canvas.click({ position: { x: 24, y: 24 } });
+  await clickVoid(canvas);
   await expect(page.getByTestId('label-x')).toHaveCount(0);
 
   // Press on the label and drag it ~120px to the right across the canvas. At
