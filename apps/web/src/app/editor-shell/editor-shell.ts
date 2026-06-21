@@ -68,16 +68,34 @@ import { StatusBar } from './status-bar';
       grid-template-columns: var(--rail-tools) 1fr var(--rail-inspector) var(--rail-edge);
       min-height: 0;
     }
-    /* Narrow viewports: collapse the side rails so the canvas stays usable. */
+    /*
+      Narrow viewports: collapse the left tool palette so the canvas stays
+      usable, but KEEP the right-edge rail beside the canvas — it is the only
+      way to open the Regions panel now that the palette tool and canvas
+      create-and-paint are gone (FIX 5). The active right column (Inspector or
+      Regions list) can't fit a column at this width, so it overlays the canvas
+      area instead; the rail's Regions entry toggles it open/closed.
+    */
     @media (max-width: 1080px) {
       .body {
-        grid-template-columns: 1fr;
+        /* canvas takes the remaining width; the thin rail stays pinned beside it */
+        grid-template-columns: 1fr var(--rail-edge);
+        position: relative;
       }
-      .body app-tool-palette,
-      .body app-inspector,
-      .body app-regions-panel,
-      .body app-editor-rail {
+      .body app-tool-palette {
         display: none;
+      }
+      /*
+        The active side panel floats over the canvas (not the rail), filling the
+        body so it's actually usable, and is dismissed via the rail toggle.
+      */
+      .body app-inspector,
+      .body app-regions-panel {
+        position: absolute;
+        inset: 0 var(--rail-edge) 0 0;
+        z-index: 1;
+        overflow: auto;
+        background: var(--surface, #fff);
       }
     }
   `,

@@ -36,16 +36,25 @@ import { EditorStore } from './editor-store';
       </button>
     </header>
 
-    @for (region of store.document().regions; track region.id) {
+    @for (region of store.regions(); track region.id) {
       <button
         type="button"
         class="row"
         data-testid="region-item"
+        [class.is-active]="store.selectedRegion()?.id === region.id"
+        [attr.aria-current]="
+          store.selectedRegion()?.id === region.id ? 'true' : null
+        "
         (click)="store.selectRegion(region.id)"
       >
         <span appSwatch [style.background]="region.color"></span>
         <span class="name">{{ region.name }}</span>
       </button>
+    } @empty {
+      <p class="muted">
+        No regions yet. Use New Region to mint one, then paint its member hexes
+        from the Inspector.
+      </p>
     }
   `,
   styles: `
@@ -80,6 +89,16 @@ import { EditorStore } from './editor-store';
     }
     .row:hover {
       background: var(--gold-soft);
+    }
+    .row.is-active {
+      background: var(--gold-soft);
+      border-color: var(--gold);
+      color: var(--ink-strong);
+    }
+    .muted {
+      font-size: var(--text-sm);
+      line-height: var(--leading-normal);
+      color: var(--ink-muted);
     }
     .name {
       flex: 1;

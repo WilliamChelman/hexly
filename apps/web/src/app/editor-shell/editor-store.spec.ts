@@ -1441,7 +1441,6 @@ describe('EditorStore Region tool (membership brush only)', () => {
   it('paints the selected Region\'s membership on a stroke (the only remaining job)', () => {
     const store = new EditorStore();
     const id = store.createRegion('Avalon', '#b08a4e');
-    store.select({ q: 0, r: 0 }, null); // a Void coord — but the Region must be picked by id
     store.selectRegion(id);
     store.armRegion(id, 'add'); // the Inspector's Add/Remove path arms the brush
 
@@ -1569,6 +1568,77 @@ describe('EditorStore shared right column', () => {
     // so it must not strand the reopened map on the previous session's list view.
     store.load(emptyHexMap());
 
+    expect(store.rightPanel()).toBe('inspector');
+  });
+
+  it('flips the shared column back to the Inspector when a canvas selection is made', () => {
+    const store = new EditorStore();
+    const id = store.createRegion('Avalon', '#b08a4e');
+    store.addHexToRegion(id, { q: 0, r: 0 }); // a member coordinate to click
+    store.showRegionsPanel(); // the user is on the Regions list
+    expect(store.rightPanel()).toBe('regions');
+
+    // A canvas selection opens the picked entity for editing, so the shared column
+    // flips back to the Inspector (the _rightPanel contract, issue #39).
+    store.select({ q: 0, r: 0 }, null);
+
+    expect(store.rightPanel()).toBe('inspector');
+    expect(store.selection()).toEqual({ kind: 'region', id });
+  });
+
+  it('flips the shared column back to the Inspector when a Label is selected', () => {
+    const store = new EditorStore();
+    const id = store.addLabel('Pick me', { x: 0, y: 0 });
+    store.showRegionsPanel();
+    expect(store.rightPanel()).toBe('regions');
+
+    store.selectLabel(id);
+
+    expect(store.rightPanel()).toBe('inspector');
+    expect(store.selectedLabel()?.id).toBe(id);
+  });
+
+  it('disarms a membership brush armed on a different Region when one is selected from the list', () => {
+    const store = new EditorStore();
+    const a = store.createRegion('Avalon', '#b08a4e');
+    const b = store.createRegion('Brevoy', '#7c9b86');
+    store.armRegion(a, 'add'); // the brush is armed on A
+    expect(store.tool()).toBe('region');
+
+    // Selecting a *different* Region B from the list must disarm the stale brush, so
+    // the next canvas stroke does not silently paint into B (the brush is armed only
+    // via the Inspector's Add/Remove, ADR-0012).
+    store.selectRegion(b);
+
+    expect(store.tool()).toBe('select');
+    expect(store.region()).toBeNull();
+
+    // A subsequent stroke paints nothing into B (the tool is Select, a no-op).
+    store.applyAt({ q: 2, r: 2 });
+    expect(store.document().regions.find((r) => r.id === b)?.hexes).toEqual({});
+  });
+
+  it('leaves the brush armed when the Region it targets is the one selected', () => {
+    const store = new EditorStore();
+    const a = store.createRegion('Avalon', '#b08a4e');
+    store.armRegion(a, 'remove'); // armed on A…
+
+    store.selectRegion(a); // …and A is the one being selected, so the brush stays
+
+    expect(store.tool()).toBe('region');
+    expect(store.region()).toEqual({ id: a, mode: 'remove' });
+  });
+
+  it('toggles the shared column between the Regions panel and the Inspector', () => {
+    const store = new EditorStore();
+
+    // A map opens on the Inspector; the rail entry's click toggles it.
+    expect(store.rightPanel()).toBe('inspector');
+
+    store.toggleRegionsPanel();
+    expect(store.rightPanel()).toBe('regions');
+
+    store.toggleRegionsPanel();
     expect(store.rightPanel()).toBe('inspector');
   });
 });

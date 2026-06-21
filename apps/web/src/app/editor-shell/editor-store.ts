@@ -28,7 +28,8 @@ enablePatches();
  * - `select` — the non-destructive Tool; a click does nothing yet (issue #27)
  * - `terrain` — paint the remembered terrain (creates or replaces a hex)
  * - `feature` — place the remembered feature, or Clear it (see FeatureSubtool)
- * - `region` — paint the selected region's membership, or mint one (issue #38)
+ * - `region` — paint the *selected* region's membership; a no-op with none
+ *   selected (creation moved to the Regions panel, ADR-0012)
  * - `label` — drop a free-positioned Label at the clicked world point (issue #10)
  * - `erase` — delete the whole hex record so the coordinate becomes Void
  */
@@ -160,7 +161,11 @@ export class EditorStore {
   readonly terrain = this._terrain.asReadonly();
   /** The remembered Feature Subtool — a library feature to place, or `'clear'`. */
   readonly feature = this._feature.asReadonly();
-  /** The Region tool's target — the painted region and brush mode, or `null`. */
+  /**
+   * The armed membership brush's target — which region it paints and the brush
+   * mode, or `null`. Armed via the Inspector's Add/Remove on the selected Region
+   * (ADR-0012), not a palette Region tool.
+   */
   readonly region = this._region.asReadonly();
 
   /**
@@ -288,6 +293,9 @@ export class EditorStore {
     return regionById(this._document(), sel.id) ?? null;
   });
 
+  /** The document's Regions — a narrow view so consumers (the Regions panel) needn't subscribe to the whole document. */
+  readonly regions = computed<Region[]>(() => this._document().regions);
+
   /** Committed edits, newest last — popped to undo, then parked on `redoStack`. */
   private readonly undoStack: Edit[] = [];
   private readonly redoStack: Edit[] = [];
@@ -318,6 +326,11 @@ export class EditorStore {
    */
   showRegionsPanel(): void {
     this._rightPanel.set('regions');
+  }
+
+  /** Toggle the shared right column between the Regions panel and the Inspector — the rail entry's click (issue #39). */
+  toggleRegionsPanel(): void {
+    this._rightPanel.set(this._rightPanel() === 'regions' ? 'inspector' : 'regions');
   }
 
   /** Arm the Terrain tool with terrain `id`, remembering it as the Terrain Subtool. */
@@ -709,6 +722,10 @@ export class EditorStore {
     }
     this.cycleAnchor = anchor;
     this._selection.set(stack[index]);
+    // A canvas selection flips the shared column back to the Inspector so the
+    // picked entity opens for editing (the _rightPanel contract, issue #39) — but
+    // only on a real selection, never the empty-stack/deselect branch above.
+    this._rightPanel.set('inspector');
     return this.selection();
   }
 
@@ -747,12 +764,26 @@ export class EditorStore {
   selectRegion(id: string): void {
     this._selection.set({ kind: 'region', id });
     this._rightPanel.set('inspector');
+    // A membership brush armed on a *different* Region would otherwise stay armed,
+    // so the next canvas stroke would silently paint into that stale Region rather
+    // than this freshly-selected one (the brush is armed only via the Inspector's
+    // Add/Remove, ADR-0012). Disarm it the same way deleteRegion does. When the
+    // armed Region IS the one being selected, leave the brush armed.
+    if (this._region()?.id !== id) {
+      this._region.set(null);
+      if (this._tool() === 'region') this._tool.set('select');
+    }
   }
 
   /** Select the Label `id` for editing in the inspector, or `null` to clear it. */
   selectLabel(id: string | null): void {
     if (id === null) this.deselect();
-    else this._selection.set({ kind: 'label', id });
+    else {
+      this._selection.set({ kind: 'label', id });
+      // Selecting flips the shared column back to the Inspector to open the label
+      // for editing (the _rightPanel contract, issue #39).
+      this._rightPanel.set('inspector');
+    }
   }
 
   /**

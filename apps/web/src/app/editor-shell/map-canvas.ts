@@ -586,7 +586,7 @@ export class MapCanvas {
 
   /**
    * Keyboard (issue #27): letters arm top-level Tools (`S` Select, `T` Terrain,
-   * `F` Feature, `R` Region, `L` Label, `E` Erase), and `1`–`9` pick the nth
+   * `F` Feature, `L` Label, `E` Erase), and `1`–`9` pick the nth
    * Subtool of the armed Tool. `Delete`/`Backspace` remove the current selection
    * (issue #29), and `Escape` cancels an in-progress drag — or clears the
    * selection when nothing is being dragged (issue #30). Undo/redo stay on
