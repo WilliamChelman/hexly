@@ -1,8 +1,24 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { NgComponentOutlet } from '@angular/common';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  inject,
+  Type,
+} from '@angular/core';
 import { featureLibrary, terrainPalette } from '@hexly/domain';
-import { IconButton, IconButtonGlyph } from '../ui/icon-button';
+import { IconButton } from '../ui/icon-button';
+import { IconPath } from '../ui/icon/icon-path';
+import { EraseIcon } from '../ui/icon/glyphs/erase';
+import { LabelIcon } from '../ui/icon/glyphs/label';
+import { MinusIcon } from '../ui/icon/glyphs/minus';
+import { RedoIcon } from '../ui/icon/glyphs/redo';
+import { SelectIcon } from '../ui/icon/glyphs/select';
+import { SettlementIcon } from '../ui/icon/glyphs/settlement';
+import { TerrainIcon } from '../ui/icon/glyphs/terrain';
+import { UndoIcon } from '../ui/icon/glyphs/undo';
 import { Panel } from '../ui/panel';
 import { Rule } from '../ui/rule';
+import { Swatch } from '../ui/swatch';
 import { EditorStore, featureSubtools, ToolId } from './editor-store';
 
 /** A top-level Tool button in the floating icon strip (issue #27, ADR-0013). */
@@ -11,7 +27,8 @@ interface ToolDef {
   readonly label: string;
   /** The keycap that arms this Tool — surfaced in the tooltip (`Terrain (T)`). */
   readonly key: string;
-  readonly glyph: IconButtonGlyph;
+  /** The glyph component projected into the button (ADR-0007); rendered via outlet. */
+  readonly glyph: Type<unknown>;
 }
 
 /**
@@ -20,11 +37,11 @@ interface ToolDef {
  * the keyboard bindings in {@link map-canvas} and are surfaced in the tooltips.
  */
 const TOOLS: readonly ToolDef[] = [
-  { id: 'select', label: 'Select', key: 'S', glyph: 'select' },
-  { id: 'terrain', label: 'Terrain', key: 'T', glyph: 'terrain' },
-  { id: 'feature', label: 'Feature', key: 'F', glyph: 'feature' },
-  { id: 'label', label: 'Label', key: 'L', glyph: 'label' },
-  { id: 'erase', label: 'Erase', key: 'E', glyph: 'erase' },
+  { id: 'select', label: 'Select', key: 'S', glyph: SelectIcon },
+  { id: 'terrain', label: 'Terrain', key: 'T', glyph: TerrainIcon },
+  { id: 'feature', label: 'Feature', key: 'F', glyph: SettlementIcon },
+  { id: 'label', label: 'Label', key: 'L', glyph: LabelIcon },
+  { id: 'erase', label: 'Erase', key: 'E', glyph: EraseIcon },
 ];
 
 /**
@@ -49,42 +66,55 @@ const TOOLS: readonly ToolDef[] = [
 @Component({
   selector: 'app-tool-palette',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IconButton, Panel, Rule],
+  imports: [
+    IconButton,
+    IconPath,
+    MinusIcon,
+    NgComponentOutlet,
+    RedoIcon,
+    Swatch,
+    UndoIcon,
+    Panel,
+    Rule,
+  ],
   template: `
     <div class="strip" appPanel role="group" aria-label="Tools">
       @for (t of tools; track t.id) {
         <button
           appIconButton
           toggle
-          [glyph]="t.glyph"
           [active]="store.tool() === t.id"
           [title]="t.label + ' (' + t.key + ')'"
           [attr.aria-label]="t.label"
           [attr.data-testid]="'tool-' + t.id"
           (click)="store.armTool(t.id)"
-        ></button>
+        >
+          <ng-container *ngComponentOutlet="t.glyph; inputs: glyphInputs" />
+        </button>
       }
 
       <hr appRule />
 
       <button
         appIconButton
-        glyph="undo"
         title="Undo"
         aria-label="Undo"
         data-testid="undo"
         [disabled]="!store.canUndo()"
         (click)="store.undo()"
-      ></button>
+      >
+        <app-icon-undo [size]="20" />
+      </button>
       <button
         appIconButton
-        glyph="redo"
         title="Redo"
         aria-label="Redo"
         data-testid="redo"
         [disabled]="!store.canRedo()"
         (click)="store.redo()"
-      ></button>
+      >
+        <app-icon-redo [size]="20" />
+      </button>
     </div>
 
     @switch (store.tool()) {
@@ -94,12 +124,13 @@ const TOOLS: readonly ToolDef[] = [
             <button
               appIconButton
               toggle
-              [swatch]="t.swatch"
               [active]="store.terrain() === t.id"
               [title]="t.label + ' (' + t.key + ')'"
               [attr.aria-label]="t.label"
               (click)="store.armTerrain(t.id)"
-            ></button>
+            >
+              <span appSwatch [style.background]="'var(' + t.swatch + ')'"></span>
+            </button>
           }
         </div>
       }
@@ -109,24 +140,26 @@ const TOOLS: readonly ToolDef[] = [
             <button
               appIconButton
               toggle
-              [iconPath]="f.path"
               [active]="store.feature() === f.id"
               [title]="f.label + ' (' + f.key + ')'"
               [attr.aria-label]="f.label"
               [attr.data-testid]="'feature-' + f.id"
               (click)="store.armFeature(f.id)"
-            ></button>
+            >
+              <app-icon-path [d]="f.path" [size]="20" />
+            </button>
           }
           <button
             appIconButton
             toggle
-            glyph="minus"
             [active]="store.feature() === 'clear'"
             [title]="'Clear feature (' + clearKey + ')'"
             aria-label="Clear feature"
             data-testid="clear-feature"
             (click)="store.armFeature('clear')"
-          ></button>
+          >
+            <app-icon-minus [size]="20" />
+          </button>
         </div>
       }
     }
@@ -166,6 +199,9 @@ export class ToolPalette {
 
   /** The floating strip's Tool buttons, in palette order (issue #27). */
   protected readonly tools = TOOLS;
+
+  /** Inputs for each outlet-rendered Tool glyph; matches the 20px icon-only chrome. */
+  protected readonly glyphInputs = { size: 20 };
 
   /**
    * The built-in feature library, each placeable from the flyout. The keycap is

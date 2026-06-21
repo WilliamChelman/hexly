@@ -8,9 +8,13 @@ import { Coord } from '../ui/coord';
 import { Eyebrow } from '../ui/eyebrow';
 import { Field } from '../ui/field';
 import { IconButton } from '../ui/icon-button';
+import { SelectIcon } from '../ui/icon/glyphs/select';
+import { TerrainIcon } from '../ui/icon/glyphs/terrain';
+import { UndoIcon } from '../ui/icon/glyphs/undo';
 import { Input } from '../ui/input';
 import { Kbd } from '../ui/kbd';
 import { Panel } from '../ui/panel';
+import { Swatch } from '../ui/swatch';
 import { Textarea } from '../ui/textarea';
 
 interface SwatchRow {
@@ -41,6 +45,10 @@ interface TypeRow {
     Field,
     Input,
     IconButton,
+    SelectIcon,
+    TerrainIcon,
+    UndoIcon,
+    Swatch,
     Kbd,
     Panel,
     Textarea,
@@ -184,31 +192,31 @@ interface TypeRow {
               <button
                 appIconButton
                 toggle
-                glyph="select"
                 active
                 title="Select (S)"
                 aria-label="Select"
-              ></button>
+              >
+                <app-icon-select [size]="20" />
+              </button>
               <button
                 appIconButton
                 toggle
-                glyph="terrain"
                 title="Terrain (T)"
                 aria-label="Terrain"
-              ></button>
+              >
+                <app-icon-terrain [size]="20" />
+              </button>
               <button
                 appIconButton
                 toggle
-                swatch="--terrain-forest"
                 title="Forest (2)"
                 aria-label="Forest"
-              ></button>
-              <button
-                appIconButton
-                glyph="undo"
-                title="Undo"
-                aria-label="Undo"
-              ></button>
+              >
+                <span appSwatch [style.background]="'var(--terrain-forest)'"></span>
+              </button>
+              <button appIconButton title="Undo" aria-label="Undo">
+                <app-icon-undo [size]="20" />
+              </button>
             </div>
           </figure>
 

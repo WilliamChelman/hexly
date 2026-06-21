@@ -1,5 +1,12 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { IconButton, IconButtonGlyph } from '../ui/icon-button';
+import { NgComponentOutlet } from '@angular/common';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  inject,
+  Type,
+} from '@angular/core';
+import { IconButton } from '../ui/icon-button';
+import { RegionIcon } from '../ui/icon/glyphs/region';
 import { EditorStore } from './editor-store';
 
 /** The right panel's identity a rail entry can open (mirrors {@link EditorStore.rightPanel}). */
@@ -10,7 +17,8 @@ interface RailEntry {
   readonly id: RightPanel;
   readonly testid: string;
   readonly title: string;
-  readonly glyph: IconButtonGlyph;
+  /** The glyph component projected into the button (ADR-0007); rendered via outlet. */
+  readonly glyph: Type<unknown>;
 }
 
 /**
@@ -30,19 +38,20 @@ interface RailEntry {
 @Component({
   selector: 'app-editor-rail',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IconButton],
+  imports: [IconButton, NgComponentOutlet],
   template: `
     @for (entry of entries; track entry.id) {
       <button
         appIconButton
         toggle
-        [glyph]="entry.glyph"
         [active]="store.rightPanel() === entry.id"
         [title]="entry.title"
         [attr.aria-label]="entry.title"
         [attr.data-testid]="entry.testid"
         (click)="store.toggleRegionsPanel()"
-      ></button>
+      >
+        <ng-container *ngComponentOutlet="entry.glyph; inputs: glyphInputs" />
+      </button>
     }
   `,
   styles: `
@@ -62,8 +71,16 @@ interface RailEntry {
 export class EditorRail {
   protected readonly store = inject(EditorStore);
 
+  /** Inputs for each outlet-rendered glyph; matches the 20px icon-only chrome. */
+  protected readonly glyphInputs = { size: 20 };
+
   /** Rail entries rendered top-to-bottom; only Regions ships now (issue #39). */
   protected readonly entries: readonly RailEntry[] = [
-    { id: 'regions', testid: 'rail-regions', title: 'Regions', glyph: 'region' },
+    {
+      id: 'regions',
+      testid: 'rail-regions',
+      title: 'Regions',
+      glyph: RegionIcon,
+    },
   ];
 }
