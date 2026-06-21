@@ -384,6 +384,33 @@ export class EditorStore {
   }
 
   /**
+   * Move a whole Hex's content — terrain *and* feature — from `from` to `to`
+   * (issue #30, ADR-0010). The origin becomes Void and an occupied destination
+   * is overwritten, so the move never silently duplicates a hex. Region
+   * memberships at both coordinates are left untouched: a Region is a location
+   * overlay keyed by coordinate, not a property of the painted cell, so it stays
+   * put while the content slides out from under it. The whole move is one
+   * `commit`, so a single undo restores both ends — the origin and any clobbered
+   * destination. Moving Void, or onto the same coordinate, changes nothing and
+   * records no undo step.
+   */
+  moveHex(from: Axial, to: Axial): void {
+    const fromKey = coordKey(from);
+    const toKey = coordKey(to);
+    if (fromKey === toKey) return;
+    this.commit((draft) => {
+      const hex = draft.hexes[fromKey];
+      if (!hex) return; // moving Void: nothing to carry
+      // Copy the content into the destination (overwriting it) and clear the
+      // origin. A fresh object avoids aliasing the same draft node at two keys.
+      draft.hexes[toKey] = hex.feature
+        ? { terrain: hex.terrain, feature: { ref: hex.feature.ref } }
+        : { terrain: hex.terrain };
+      delete draft.hexes[fromKey];
+    });
+  }
+
+  /**
    * Create an empty Region with `name` and `color`, appended to the document,
    * and return its freshly-minted id. Membership starts empty — hexes are
    * painted in afterwards. Like every edit it goes through `commit`, so undo
@@ -486,6 +513,15 @@ export class EditorStore {
   }
 
   /**
+   * Clear the selection, if any — the inspector falls back to its empty state.
+   * The deliberate deselect gesture (Escape, issue #30), distinct from the
+   * incidental clear a click on a Void coordinate produces in {@link select}.
+   */
+  deselect(): void {
+    this._selection.set(null);
+  }
+
+  /**
    * Add a free-positioned Label with `text` anchored at world `position`, at the
    * default size, and return its freshly-minted id (issue #10). Like every edit
    * it goes through `commit`, so undo removes the label. The caller (the canvas)
@@ -543,6 +579,24 @@ export class EditorStore {
     });
     const sel = this._selection();
     if (sel?.kind === 'label' && sel.id === id) this._selection.set(null);
+  }
+
+  /**
+   * Delete the current selection, dispatching on what is selected (issue #29):
+   * a Label is removed; a Feature has only its feature cleared (its terrain
+   * stays); a Hex has its whole record erased (back to Void), as if the Erase
+   * Tool were applied there. Nothing selected is a no-op. Like every edit it
+   * goes through `commit`, so the deletion is undoable. The selection is cleared
+   * afterwards so the inspector never shows a stale selection — the single
+   * delete gesture behind `Delete`/`Backspace` and the inspector's Delete action.
+   */
+  deleteSelected(): void {
+    const sel = this.selection();
+    if (!sel) return;
+    if (sel.kind === 'label') this.deleteLabel(sel.id);
+    else if (sel.kind === 'feature') this.clearFeatureAt(sel.coord);
+    else this.eraseAt(sel.coord);
+    this._selection.set(null);
   }
 
   /**

@@ -23,7 +23,7 @@ import { FitIcon } from '../ui/icon/glyphs/fit';
 import { MinusIcon } from '../ui/icon/glyphs/minus';
 import { PlusIcon } from '../ui/icon/glyphs/plus';
 import { Camera } from './camera';
-import { Canvas2dMapRenderer, MapRenderer } from './map-renderer';
+import { Canvas2dMapRenderer, HexDragOverride, MapRenderer } from './map-renderer';
 
 /** Hex radius (centre→corner) in world pixels at zoom 1. */
 const HEX_SIZE = 40;
@@ -46,6 +46,12 @@ const MOUSE_NOTCH_THRESHOLD = 40;
 const LINE_HEIGHT = 16;
 /** The placeholder text a freshly-dropped Label carries until it is edited. */
 const NEW_LABEL_TEXT = 'Label';
+/**
+ * Screen-pixel travel a press must exceed before it counts as a drag rather than
+ * a click (issue #30). Under the threshold a release is a plain selection; past
+ * it, a whole-Hex move begins with a live preview, committed once on release.
+ */
+const HEX_DRAG_THRESHOLD = 4;
 
 /** The letter that arms each top-level Tool from the keyboard (issue #27). */
 const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
@@ -243,6 +249,24 @@ export class MapCanvas {
     return drag ? { id: drag.id, position: drag.position } : null;
   });
 
+  /**
+   * The in-progress whole-Hex drag: the `from` origin (the selected hex) and the
+   * `to` coordinate currently under the cursor. `null` until a press over a
+   * selected Hex/Feature crosses {@link HEX_DRAG_THRESHOLD}. The renderer previews
+   * the move at this destination; the store only sees the final `moveHex` on
+   * release, so the drag is a single undo step (issue #30).
+   */
+  private readonly hexDrag = signal<HexDragOverride | null>(null);
+
+  /**
+   * A press that *may* become a Hex drag: the origin coordinate and the press
+   * point in client pixels, recorded on pointer-down over a selected Hex/Feature.
+   * Stays a plain field (not a signal) — it gates the move gesture but never the
+   * render. `null` when no such press is armed (issue #30).
+   */
+  private hexDragPress: { from: Axial; clientX: number; clientY: number } | null =
+    null;
+
   private readonly theme = inject(ThemeService);
   private readonly store = inject(EditorStore);
   private readonly destroyRef = inject(DestroyRef);
@@ -306,7 +330,8 @@ export class MapCanvas {
     const hover = this.hover();
     const labelDrag = this.labelDragOverride();
     const selection = this.store.selection();
-    this.renderer?.render(camera, doc, hover, labelDrag, selection);
+    const hexDrag = this.hexDrag();
+    this.renderer?.render(camera, doc, hover, labelDrag, selection, hexDrag);
   }
 
   protected onPointerDown(event: PointerEvent): void {
@@ -339,10 +364,12 @@ export class MapCanvas {
     if (this.store.tool() === 'select') {
       const hitId = this.renderer?.labelAt(this.localPoint(event)) ?? null;
       const selection = this.store.select(hex, hitId);
-      // A selected Label can be dragged to reposition it; the grab offset keeps
-      // it from jumping to the cursor. Hex/Feature drag-to-move is a later slice
-      // (ADR-0010), so a selected Hex/Feature is otherwise inert on press. Only a
-      // label selection needs the document lookup for its position.
+      // A press over a selected entity arms a *potential* drag (issue #30). A
+      // Label drags via the existing `moveLabel` path — the grab offset keeps it
+      // from jumping to the cursor. A Hex/Feature arms a whole-Hex move: the press
+      // already selected it, and crossing the threshold in `onPointerMove` turns
+      // it into a `moveHex`. A release before the threshold is a plain click —
+      // selection only, no move (issue #30, ADR-0010).
       if (selection?.kind === 'label') {
         const label = this.store.selectedLabel();
         if (label) {
@@ -352,6 +379,12 @@ export class MapCanvas {
             position: label.position,
           });
         }
+      } else if (selection?.kind === 'hex' || selection?.kind === 'feature') {
+        this.hexDragPress = {
+          from: selection.coord,
+          clientX: event.clientX,
+          clientY: event.clientY,
+        };
       }
       return;
     }
@@ -380,6 +413,20 @@ export class MapCanvas {
         ...drag,
         position: { x: world.x + drag.offset.x, y: world.y + drag.offset.y },
       });
+      return;
+    }
+
+    // An armed Hex press becomes a move once the pointer travels past the
+    // threshold; thereafter every move re-targets the destination hex under the
+    // cursor and the renderer previews the content there (issue #30).
+    const press = this.hexDragPress;
+    if (press) {
+      const moved =
+        Math.hypot(event.clientX - press.clientX, event.clientY - press.clientY) >=
+        HEX_DRAG_THRESHOLD;
+      if (this.hexDrag() || moved) {
+        this.hexDrag.set({ from: press.from, to: hex });
+      }
       return;
     }
 
@@ -424,6 +471,15 @@ export class MapCanvas {
       this.store.moveLabel(drag.id, drag.position);
       this.labelDrag.set(null);
     }
+    // Commit a whole-Hex drag as a single edit: `moveHex` to the destination
+    // under the cursor. A press that never crossed the threshold leaves `hexDrag`
+    // null, so it is a plain click — selection only, no move recorded (issue #30).
+    const hexDrag = this.hexDrag();
+    if (hexDrag) {
+      this.store.moveHex(hexDrag.from, hexDrag.to);
+      this.hexDrag.set(null);
+    }
+    this.hexDragPress = null;
     this.painting = false;
     this.panning = false;
     this.dragging.set(false);
@@ -432,10 +488,28 @@ export class MapCanvas {
   }
 
   /**
+   * Discard any in-progress or armed drag without committing it: the label/hex
+   * preview overrides are cleared (the render effect snaps the entity back to its
+   * stored position) and the pending press is forgotten, so a still-held pointer
+   * cannot resume the cancelled gesture. Returns whether a live drag was actually
+   * showing — the keyboard handler only swallows Escape when it cancelled one.
+   */
+  private cancelDrag(): boolean {
+    const wasDragging = this.labelDrag() !== null || this.hexDrag() !== null;
+    this.labelDrag.set(null);
+    this.hexDrag.set(null);
+    this.hexDragPress = null;
+    return wasDragging;
+  }
+
+  /**
    * Keyboard (issue #27): letters arm top-level Tools (`S` Select, `T` Terrain,
    * `F` Feature, `R` Region, `L` Label, `E` Erase), and `1`–`9` pick the nth
-   * Subtool of the armed Tool. Undo/redo stay on Cmd/Ctrl+Z. All are suppressed
-   * while a text field is focused so a typed key never re-arms a tool.
+   * Subtool of the armed Tool. `Delete`/`Backspace` remove the current selection
+   * (issue #29), and `Escape` cancels an in-progress drag — or clears the
+   * selection when nothing is being dragged (issue #30). Undo/redo stay on
+   * Cmd/Ctrl+Z. All are suppressed while a text field is focused so a typed key
+   * never re-arms a tool or deletes behind it.
    */
   @HostListener('window:keydown', ['$event'])
   protected onKeydown(event: KeyboardEvent): void {
@@ -443,11 +517,30 @@ export class MapCanvas {
     // "5" or "t" typed there must not arm a tool.
     if (this.isEditableTarget(event.target)) return;
 
+    // Escape aborts an in-progress drag: the live move is discarded and nothing
+    // is committed, so the entity stays where it was — and stays selected (issue
+    // #30). The pointer may still be held — clearing the press state too means
+    // continued movement until release does not re-start the cancelled drag. With
+    // no drag to cancel, Escape clears the selection instead.
+    if (event.key === 'Escape') {
+      if (this.cancelDrag()) event.preventDefault();
+      else this.store.deselect();
+      return;
+    }
+
     if (event.metaKey || event.ctrlKey) {
       if (event.key.toLowerCase() !== 'z') return;
       event.preventDefault();
       if (event.shiftKey) this.store.redo();
       else this.store.undo();
+      return;
+    }
+
+    // Delete/Backspace remove the selected entity through the store's single
+    // delete gesture (issue #29). Suppressed above while a text field is focused,
+    // so Backspace edits text there rather than deleting a hex behind it.
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      this.store.deleteSelected();
       return;
     }
 

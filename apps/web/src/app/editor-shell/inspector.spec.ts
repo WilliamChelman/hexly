@@ -111,17 +111,35 @@ describe('Inspector hex and feature selection', () => {
     expect(el.querySelector('[data-testid=label-text]')).toBeNull();
   });
 
-  it('renders a Delete affordance for a selected Hex, disabled until wiring lands', () => {
+  it('deletes a selected Hex when its Delete action is clicked, clearing the selection', () => {
     const store = TestBed.inject(EditorStore);
     store.paintAt({ q: 0, r: 0 }, 'grass');
     store.select({ q: 0, r: 0 }, null);
 
-    const del = render().nativeElement.querySelector(
-      '[data-testid=entity-delete]',
-    ) as HTMLButtonElement;
+    (
+      render().nativeElement.querySelector(
+        '[data-testid=entity-delete]',
+      ) as HTMLButtonElement
+    ).click();
 
-    expect(del).not.toBeNull();
-    expect(del.disabled).toBe(true);
+    expect('0,0' in store.document().hexes).toBe(false);
+    expect(store.selection()).toBeNull();
+  });
+
+  it('deletes a selected Feature by clearing only its feature when Delete is clicked', () => {
+    const store = TestBed.inject(EditorStore);
+    store.paintAt({ q: 1, r: 1 }, 'forest');
+    store.placeFeatureAt({ q: 1, r: 1 }, 'settlement');
+    store.select({ q: 1, r: 1 }, null); // the Feature
+
+    (
+      render().nativeElement.querySelector(
+        '[data-testid=entity-delete]',
+      ) as HTMLButtonElement
+    ).click();
+
+    expect(store.document().hexes['1,1']).toEqual({ terrain: 'forest' });
+    expect(store.selection()).toBeNull();
   });
 
   it('shows a selected Feature\'s identity, labelled as a feature', () => {

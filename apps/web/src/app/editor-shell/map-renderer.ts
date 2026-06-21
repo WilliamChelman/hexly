@@ -71,6 +71,18 @@ export interface LabelDragOverride {
   readonly position: Point;
 }
 
+/**
+ * A live whole-Hex drag preview: render the content of the hex at `from` as
+ * though it sat at `to` instead — the origin reads as Void and the destination
+ * shows the moved terrain + feature (issue #30). Passed straight to
+ * {@link MapRenderer.render} so the move previews without mutating or cloning
+ * the document each frame, the same discipline as {@link LabelDragOverride}.
+ */
+export interface HexDragOverride {
+  readonly from: Axial;
+  readonly to: Axial;
+}
+
 export interface MapRenderer {
   /** Match the drawing surface to the given CSS-pixel size. */
   resize(width: number, height: number): void;
@@ -85,6 +97,7 @@ export interface MapRenderer {
     hover: Axial | null,
     labelDrag?: LabelDragOverride | null,
     selection?: Selection | null,
+    hexDrag?: HexDragOverride | null,
   ): void;
   /**
    * The id of the Label drawn under screen `point` (topmost wins), or `null`.
@@ -238,6 +251,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
     hover: Axial | null,
     labelDrag: LabelDragOverride | null = null,
     selection: Selection | null = null,
+    hexDrag: HexDragOverride | null = null,
   ): void {
     const ctx = this.ctx;
     if (!ctx || this.width === 0 || this.height === 0) return;
@@ -250,13 +264,26 @@ export class Canvas2dMapRenderer implements MapRenderer {
 
     const visible = hexesInRect(this.layout, this.visibleWorldRect(camera));
 
+    // A whole-Hex drag previews the move without touching the document: the
+    // origin draws as Void and its content (terrain + feature) draws at the
+    // destination instead. Ignore a drag that hasn't left its origin (from === to)
+    // so the hex never blinks out while the cursor is still on it.
+    const drag =
+      hexDrag && coordKey(hexDrag.from) !== coordKey(hexDrag.to) ? hexDrag : null;
+    const fromKey = drag ? coordKey(drag.from) : null;
+    const toKey = drag ? coordKey(drag.to) : null;
+    const dragged = fromKey ? doc.hexes[fromKey] : undefined;
+
     // Painted terrain, under the grid lines. Only the visible painted hexes are
     // drawn — the document is sparse, so this never touches the infinite Void.
     // While here, note which hexes carry a feature so the marker pass below can
     // walk that short list instead of re-scanning every visible hex.
     const featured: { hex: Axial; ref: FeatureId }[] = [];
     for (const hex of visible) {
-      const painted = doc.hexes[coordKey(hex)];
+      const key = coordKey(hex);
+      if (key === fromKey) continue; // origin reads as Void mid-drag
+      // The destination previews the dragged content, overwriting whatever it held.
+      const painted = key === toKey && dragged ? dragged : doc.hexes[key];
       if (!painted) continue;
       ctx.fillStyle = this.palette.terrain[painted.terrain];
       this.tracePath(ctx, camera, hex);
@@ -344,8 +371,17 @@ export class Canvas2dMapRenderer implements MapRenderer {
     // The selection highlight rides on top of everything (issue #28): a Hex or
     // Feature gets a strong outline on its hex; a Label gets a bounds rectangle
     // around the box `drawLabel` just recorded. Drawn last so it sits above the
-    // grid, markers, and label text it points at.
-    if (selection) this.drawSelection(ctx, camera, selection);
+    // grid, markers, and label text it points at. While a Hex drag is live the
+    // highlight follows the previewed content to the destination (issue #30).
+    if (selection) {
+      const tracking =
+        drag && selection.kind !== 'label' && coordKey(selection.coord) === fromKey;
+      this.drawSelection(
+        ctx,
+        camera,
+        tracking ? { ...selection, coord: drag.to } : selection,
+      );
+    }
   }
 
   labelAt(point: Point): string | null {

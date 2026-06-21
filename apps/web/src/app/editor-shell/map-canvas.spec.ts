@@ -66,6 +66,48 @@ describe('MapCanvas keyboard', () => {
     expect(store.document().hexes['0,0']).toEqual({ terrain: 'forest' });
   });
 
+  it('deletes the selected entity on Delete and on Backspace', () => {
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.select({ q: 0, r: 0 }, null); // a bare Hex is selected
+
+    press('Delete');
+    expect('0,0' in store.document().hexes).toBe(false);
+    expect(store.selection()).toBeNull();
+
+    // Backspace is the second, equivalent gesture (issue #29).
+    store.paintAt({ q: 1, r: 1 }, 'forest');
+    store.select({ q: 1, r: 1 }, null);
+    press('Backspace');
+    expect('1,1' in store.document().hexes).toBe(false);
+  });
+
+  it('clears the selection on Escape when nothing is being dragged', () => {
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.select({ q: 0, r: 0 }, null);
+    expect(store.selection()).not.toBeNull();
+
+    press('Escape');
+
+    expect(store.selection()).toBeNull();
+  });
+
+  it('suppresses Delete/Backspace while a text field is focused', () => {
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.select({ q: 0, r: 0 }, null);
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    input.focus();
+
+    // Backspace in a label/rename field must edit the text, never delete the hex.
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true }),
+    );
+
+    const survived = '0,0' in store.document().hexes;
+    input.remove();
+    expect(survived).toBe(true);
+  });
+
   it('suppresses tool hotkeys while a text field is focused', () => {
     // Arm a non-default Tool first so this proves suppression rather than the
     // cold-start default: a 't' that leaked through would arm Terrain, flipping
