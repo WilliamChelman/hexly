@@ -160,6 +160,19 @@ describe('Inspector hex and feature selection', () => {
       'feature',
     );
   });
+
+  it('shows no membership direction toggle for a Hex selection', () => {
+    const store = TestBed.inject(EditorStore);
+    store.paintAt({ q: 0, r: 0 }, 'grass');
+    store.select({ q: 0, r: 0 }, null);
+
+    // The toggle lives only inside the Region editor branch (it arms a Region tool),
+    // so a Hex/Feature selection must not render it — clicking it would arm a Region
+    // with no inspected Region behind it.
+    const el = render().nativeElement;
+    expect(el.querySelector('[data-testid=region-add]')).toBeNull();
+    expect(el.querySelector('[data-testid=region-remove]')).toBeNull();
+  });
 });
 
 describe('Inspector region editing', () => {

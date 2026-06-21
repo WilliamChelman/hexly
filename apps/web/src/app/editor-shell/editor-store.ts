@@ -143,15 +143,19 @@ export class EditorStore {
 
   /**
    * The membership-paint direction the Inspector's Add ⇄ Remove toggle reflects:
-   * `add` paints a hex into the inspected Region, `remove` erases it. In-memory,
-   * session-only editor state in the same category as the armed Tool — never part
-   * of the `HexMap` document, never undone, saved, or restored across reloads
-   * (issue #37). Persists as the toggle's remembered choice the way the armed Tool
-   * does, independent of which Region is currently selected; cold-start is `add`.
+   * `add` paints a hex into the inspected Region, `remove` erases it. Derived from
+   * the armed Region Subtool's `mode` — the *same* state {@link applyAt} paints by
+   * — so the toggle is a single source of truth and can never disagree with what a
+   * stroke actually does, no matter which path armed the Region (the palette
+   * legend, the number keys, or {@link armRegionDirection}). Cold-starts at `add`
+   * whenever no Region is armed: a fresh store, a reloaded map, or after the armed
+   * Region is deleted. In-memory, session-only editor state in the same category
+   * as the armed Tool — never part of the `HexMap` document, never undone, saved,
+   * or restored across reloads (issue #37).
    */
-  private readonly _regionDirection = signal<'add' | 'remove'>('add');
-  /** The remembered membership-paint direction the Inspector toggle reflects. */
-  readonly regionDirection = this._regionDirection.asReadonly();
+  readonly regionDirection = computed<'add' | 'remove'>(
+    () => this._region()?.mode ?? 'add',
+  );
 
   /**
    * Whether the armed Tool keeps applying as the pointer drags across hexes.
@@ -305,18 +309,16 @@ export class EditorStore {
   }
 
   /**
-   * Engage the Inspector's Add ⇄ Remove toggle in `direction`: remember the
-   * direction and arm the Region tool on the currently-selected Region with it,
-   * collapsing select-then-edit into one gesture (issue #37). This is the first
-   * control outside the palette permitted to arm a Tool — Select itself still
-   * never paints. A no-op when nothing, or a non-Region, is selected: the toggle
-   * only appears in the Region editor, but guarding here keeps the action honest
-   * for every caller. The remembered {@link regionDirection} updates regardless of
-   * the selection, so the toggle reflects the chosen direction the way the armed
-   * Tool persists.
+   * Engage the Inspector's Add ⇄ Remove toggle in `direction`: arm the Region tool
+   * on the currently-selected Region with it, collapsing select-then-edit into one
+   * gesture (issue #37). This is the first control outside the palette permitted to
+   * arm a Tool — Select itself still never paints. A no-op when nothing, or a
+   * non-Region, is selected: the toggle only appears in the Region editor, but
+   * guarding here keeps the action honest for every caller. Arming is the single
+   * write that moves the toggle: {@link regionDirection} is derived from the armed
+   * Subtool's mode, so there is no separate direction to keep in sync.
    */
   armRegionDirection(direction: 'add' | 'remove'): void {
-    this._regionDirection.set(direction);
     const region = this.selectedRegion();
     if (region) this.armRegion(region.id, direction);
   }
@@ -374,7 +376,8 @@ export class EditorStore {
     this._terrain.set(DEFAULT_TERRAIN);
     this._feature.set(DEFAULT_FEATURE);
     this._region.set(null);
-    this._regionDirection.set('add');
+    // The membership direction is derived from the armed Region Subtool, so
+    // clearing `_region` above already cold-starts `regionDirection` back to `add`.
   }
 
   /** Apply the armed Tool (and its Subtool) at `coord`, dispatching on the Tool. */
