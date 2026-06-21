@@ -84,3 +84,58 @@ describe('Inspector label editing', () => {
     expect(fixture.nativeElement.querySelector('[data-testid=label-text]')).toBeNull();
   });
 });
+
+describe('Inspector hex and feature selection', () => {
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({ imports: [Inspector] }).compileComponents();
+  });
+
+  function render() {
+    const fixture = TestBed.createComponent(Inspector);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  it('shows a selected Hex\'s coordinate and terrain, with no label editor', () => {
+    const store = TestBed.inject(EditorStore);
+    store.paintAt({ q: 2, r: -1 }, 'ocean');
+    store.select({ q: 2, r: -1 }, null);
+
+    const el = render().nativeElement;
+
+    expect(el.querySelector('[data-testid=entity-coord]').textContent).toContain('2');
+    expect(el.querySelector('[data-testid=entity-coord]').textContent).toContain('-1');
+    expect(el.querySelector('[data-testid=entity-detail]').textContent).toContain('Ocean');
+    expect(el.querySelector('[data-testid=label-text]')).toBeNull();
+  });
+
+  it('renders a Delete affordance for a selected Hex, disabled until wiring lands', () => {
+    const store = TestBed.inject(EditorStore);
+    store.paintAt({ q: 0, r: 0 }, 'grass');
+    store.select({ q: 0, r: 0 }, null);
+
+    const del = render().nativeElement.querySelector(
+      '[data-testid=entity-delete]',
+    ) as HTMLButtonElement;
+
+    expect(del).not.toBeNull();
+    expect(del.disabled).toBe(true);
+  });
+
+  it('shows a selected Feature\'s identity, labelled as a feature', () => {
+    const store = TestBed.inject(EditorStore);
+    store.paintAt({ q: 1, r: 1 }, 'grass');
+    store.placeFeatureAt({ q: 1, r: 1 }, 'settlement');
+    store.select({ q: 1, r: 1 }, null);
+
+    const el = render().nativeElement;
+
+    expect(el.querySelector('header').textContent).toContain('feature');
+    expect(el.querySelector('[data-testid=entity-detail]').textContent).toContain(
+      'Settlement',
+    );
+    expect(el.querySelector('[data-testid=entity-delete]').textContent).toContain(
+      'feature',
+    );
+  });
+});

@@ -276,7 +276,8 @@ export class MapCanvas {
       const doc = this.store.document();
       const hover = this.hover();
       const labelDrag = this.labelDragOverride();
-      this.renderer?.render(camera, doc, hover, labelDrag);
+      const selection = this.store.selection();
+      this.renderer?.render(camera, doc, hover, labelDrag, selection);
     });
 
     // Re-read the renderer's themed colours and repaint when the theme switches.
@@ -290,6 +291,8 @@ export class MapCanvas {
         untracked(this.camera),
         untracked(this.store.document),
         untracked(this.hover),
+        untracked(this.labelDragOverride),
+        untracked(this.store.selection),
       );
     });
 
@@ -321,28 +324,27 @@ export class MapCanvas {
 
     const world = this.toWorld(event);
 
-    // Select is the only selection path (ADR-0010): a click on an existing label
-    // selects it and starts a drag. Painting Tools no longer select — a Label is
-    // inert to them — so this is gated to Select; under a painting Tool the same
-    // click falls through and paints the hex beneath the label. The grab offset
-    // keeps the label from jumping to the cursor.
+    // Select is the only selection path (ADR-0010): it selects the topmost entity
+    // under the cursor and, for a Label, starts a drag. Painting Tools no longer
+    // select — a Label is inert to them — so this is gated to Select; under a
+    // painting Tool the same click falls through and paints the hex beneath the
+    // label. Precedence (Label → Feature → Hex, clear on empty) lives in the
+    // store: the canvas only supplies the geometric inputs — the hex under the
+    // pointer and the label hit — and hands them over (issue #28).
     if (this.store.tool() === 'select') {
       const hitId = this.renderer?.labelAt(this.localPoint(event)) ?? null;
-      if (hitId) {
-        // `labelAt` already proved the label exists and `selectLabel` set it, so
-        // read it straight back rather than re-scanning the document (issue #7).
-        this.store.selectLabel(hitId);
-        const label = this.store.selectedLabel();
-        if (label) {
-          this.labelDrag.set({
-            id: hitId,
-            offset: { x: label.position.x - world.x, y: label.position.y - world.y },
-            position: label.position,
-          });
-        }
+      this.store.select(hex, hitId);
+      // A selected Label can be dragged to reposition it; the grab offset keeps
+      // it from jumping to the cursor. Hex/Feature drag-to-move is a later slice
+      // (ADR-0010), so a selected Hex/Feature is otherwise inert on press.
+      const label = this.store.selectedLabel();
+      if (label) {
+        this.labelDrag.set({
+          id: label.id,
+          offset: { x: label.position.x - world.x, y: label.position.y - world.y },
+          position: label.position,
+        });
       }
-      // Select is otherwise inert for now: the universal hex/feature select-and-
-      // drag is a later slice (issue #27, ADR-0010), so a press paints nothing.
       return;
     }
 
@@ -578,6 +580,7 @@ export class MapCanvas {
           this.store.document(),
           this.hover(),
           this.labelDragOverride(),
+          this.store.selection(),
         );
       }
     };

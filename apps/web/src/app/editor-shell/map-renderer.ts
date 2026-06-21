@@ -49,6 +49,10 @@ const LABEL_FONT = 'Georgia, "Times New Roman", serif';
  * a label grabbable (issue #2). Drawing is unchanged; only the box is widened.
  */
 const MIN_LABEL_HALF_WIDTH_FACTOR = 1;
+/** A selection highlight's stroke weight in screen pixels, constant across zoom. */
+const SELECTION_STROKE = 3;
+/** Screen-pixel padding around a selected Label's text box, so the bounds clear the glyphs. */
+const SELECTION_LABEL_PAD = 4;
 
 /**
  * The seam between the editor and whatever draws the map. There is one Canvas 2D
@@ -66,6 +70,17 @@ export interface LabelDragOverride {
   readonly position: Point;
 }
 
+/**
+ * What the renderer highlights as selected (issue #28): a Label by id, drawn as
+ * a bounds indicator; or a Hex/Feature by coordinate, drawn as an outline on the
+ * hex. Structurally a superset of the store's `Selection`, so `store.selection()`
+ * passes straight through — the renderer collapses Hex and Feature to the same
+ * outline.
+ */
+export type SelectionHighlight =
+  | { readonly kind: 'label'; readonly id: string }
+  | { readonly kind: 'hex' | 'feature'; readonly coord: Axial };
+
 export interface MapRenderer {
   /** Match the drawing surface to the given CSS-pixel size. */
   resize(width: number, height: number): void;
@@ -79,6 +94,7 @@ export interface MapRenderer {
     doc: HexMap,
     hover: Axial | null,
     labelDrag?: LabelDragOverride | null,
+    selection?: SelectionHighlight | null,
   ): void;
   /**
    * The id of the Label drawn under screen `point` (topmost wins), or `null`.
@@ -111,6 +127,8 @@ interface Palette {
   readonly featureInk: string;
   /** The ink a Label's text is filled in, from `--label-ink`. */
   readonly labelInk: string;
+  /** The accent a selection highlight is stroked in, from `--gold-strong`. */
+  readonly selected: string;
   /** One fill colour per terrain id, resolved from its `--terrain-*` token. */
   readonly terrain: Record<TerrainId, string>;
 }
@@ -210,6 +228,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
       line: read('--hex-line', '#888'),
       featureInk: read('--feature-ink', '#f4ecd8'),
       labelInk: read('--label-ink', '#f4ecd8'),
+      selected: read('--gold-strong', '#7e560f'),
       terrain,
     };
   }
@@ -228,6 +247,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
     doc: HexMap,
     hover: Axial | null,
     labelDrag: LabelDragOverride | null = null,
+    selection: SelectionHighlight | null = null,
   ): void {
     const ctx = this.ctx;
     if (!ctx || this.width === 0 || this.height === 0) return;
@@ -330,6 +350,12 @@ export class Canvas2dMapRenderer implements MapRenderer {
       }
       ctx.restore();
     }
+
+    // The selection highlight rides on top of everything (issue #28): a Hex or
+    // Feature gets a strong outline on its hex; a Label gets a bounds rectangle
+    // around the box `drawLabel` just recorded. Drawn last so it sits above the
+    // grid, markers, and label text it points at.
+    if (selection) this.drawSelection(ctx, camera, selection);
   }
 
   labelAt(point: Point): string | null {
@@ -346,6 +372,43 @@ export class Canvas2dMapRenderer implements MapRenderer {
       }
     }
     return null;
+  }
+
+  /**
+   * Draw the selection highlight in the accent ink: an outline tracing the
+   * selected Hex/Feature's hex, or a padded bounds rectangle around the selected
+   * Label's most-recently-recorded box. A label whose box is absent (off-screen,
+   * or no labels drawn) highlights nothing. Wrapped in save/restore so the stroke
+   * settings never leak into the next frame.
+   */
+  private drawSelection(
+    ctx: CanvasRenderingContext2D,
+    camera: Camera,
+    selection: SelectionHighlight,
+  ): void {
+    ctx.save();
+    ctx.strokeStyle = this.palette.selected;
+    ctx.lineWidth = SELECTION_STROKE;
+    ctx.lineJoin = 'round';
+    if (selection.kind === 'label') {
+      const box = this.labelBoxes.find((b) => b.id === selection.id);
+      // Trace the padded box as a closed path and stroke it (rather than
+      // `strokeRect`) so it draws like every other outline — one stroke pass.
+      if (box) {
+        const p = SELECTION_LABEL_PAD;
+        ctx.beginPath();
+        ctx.moveTo(box.minX - p, box.minY - p);
+        ctx.lineTo(box.maxX + p, box.minY - p);
+        ctx.lineTo(box.maxX + p, box.maxY + p);
+        ctx.lineTo(box.minX - p, box.maxY + p);
+        ctx.closePath();
+        ctx.stroke();
+      }
+    } else {
+      this.tracePath(ctx, camera, selection.coord);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   /**

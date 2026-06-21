@@ -57,6 +57,18 @@ export interface RegionSubtool {
 }
 
 /**
+ * The single selected entity, or `null` when nothing is selected. Select is the
+ * one selection path (CONTEXT.md → Select, ADR-0010): it references a Label by
+ * id, or a Feature / Hex by the coordinate it sits on. At most one is selected
+ * at a time. The store applies the precedence (Label → Feature → Hex) that turns
+ * a click's geometric inputs into one of these — see {@link EditorStore.select}.
+ */
+export type Selection =
+  | { readonly kind: 'label'; readonly id: string }
+  | { readonly kind: 'feature'; readonly coord: Axial }
+  | { readonly kind: 'hex'; readonly coord: Axial };
+
+/**
  * The Feature Tool's Subtools in palette/keyboard order: each library feature,
  * then the Clear Subtool last. The single source of truth for the index→Subtool
  * mapping the keyboard ({@link EditorStore.armSubtoolByIndex}) and the palette
@@ -134,22 +146,30 @@ export class EditorStore {
   });
 
   /**
-   * The id of the Label currently selected for editing (or `null`). This is
-   * transient editor state — not part of the document, so it is neither undone
-   * nor persisted (issue #10). Read it through the {@link selectedLabel} computed,
-   * which resolves it against the live document.
+   * The single selected entity (or `null`). Transient editor state — not part of
+   * the document, so it is neither undone nor persisted (issues #10, #28). Read a
+   * selected Label through the {@link selectedLabel} computed, which resolves it
+   * against the live document; read a selected Hex/Feature's coordinate from the
+   * {@link selection} value directly.
    */
-  private readonly _selectedLabelId = signal<string | null>(null);
+  private readonly _selection = signal<Selection | null>(null);
+
+  /**
+   * What is currently selected, or `null`. The inspector and renderer read this
+   * to show and highlight the selection; the canvas hands a click's geometric
+   * inputs to {@link select}, which sets it under the precedence rule.
+   */
+  readonly selection = this._selection.asReadonly();
 
   /**
    * The currently-selected {@link Label} resolved from the live document, or
-   * `null` when nothing is selected or the selected id no longer exists (e.g.
+   * `null` when the selection is not a Label, or its id no longer exists (e.g.
    * after an undo removed it). The inspector binds to this to edit the label.
    */
   readonly selectedLabel = computed<Label | null>(() => {
-    const id = this._selectedLabelId();
-    if (id === null) return null;
-    return this._document().labels.find((l) => l.id === id) ?? null;
+    const sel = this._selection();
+    if (sel?.kind !== 'label') return null;
+    return this._document().labels.find((l) => l.id === sel.id) ?? null;
   });
 
   /** Committed edits, newest last — popped to undo, then parked on `redoStack`. */
@@ -248,7 +268,7 @@ export class EditorStore {
     // rather than leaving a dangling region or label id behind.
     this._tool.set('select');
     this.resetSubtoolMemory();
-    this._selectedLabelId.set(null);
+    this._selection.set(null);
   }
 
   /** Restore the cold-start Subtool memory shared by a fresh store and a reload. */
@@ -411,9 +431,32 @@ export class EditorStore {
     });
   }
 
+  /**
+   * Select the topmost entity given a click's geometric inputs (issue #28): the
+   * hex `coord` under the pointer and the `labelHit` from `renderer.labelAt`
+   * (the id of the Label drawn there, or `null`). Precedence lives here, at the
+   * store seam, so it stays unit-testable: a Label hit wins; otherwise the hex's
+   * Feature wins over the bare Hex; a Void coordinate with no label hit clears
+   * the selection (CONTEXT.md → Select, ADR-0010).
+   */
+  select(coord: Axial, labelHit: string | null): void {
+    if (labelHit !== null) {
+      this._selection.set({ kind: 'label', id: labelHit });
+      return;
+    }
+    const hex = this._document().hexes[coordKey(coord)];
+    if (hex?.feature) {
+      this._selection.set({ kind: 'feature', coord });
+      return;
+    }
+    // A painted Hex with no Feature selects the Hex; a Void coordinate (no hex
+    // record) with no label hit is a click on empty space, which deselects.
+    this._selection.set(hex ? { kind: 'hex', coord } : null);
+  }
+
   /** Select the Label `id` for editing in the inspector, or `null` to clear it. */
   selectLabel(id: string | null): void {
-    this._selectedLabelId.set(id);
+    this._selection.set(id === null ? null : { kind: 'label', id });
   }
 
   /**
@@ -472,7 +515,8 @@ export class EditorStore {
       const at = draft.labels.findIndex((l) => l.id === id);
       if (at !== -1) draft.labels.splice(at, 1);
     });
-    if (this._selectedLabelId() === id) this._selectedLabelId.set(null);
+    const sel = this._selection();
+    if (sel?.kind === 'label' && sel.id === id) this._selection.set(null);
   }
 
   /**

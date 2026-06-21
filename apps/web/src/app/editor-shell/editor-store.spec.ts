@@ -771,3 +771,53 @@ describe('EditorStore continuous', () => {
     expect(store.continuous()).toBe(false);
   });
 });
+
+describe('EditorStore selection precedence', () => {
+  it('selects the Label under the cursor over the hex beneath it (Label wins)', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    const id = store.addLabel('Open Sea', { x: 5, y: 5 });
+
+    store.select({ q: 0, r: 0 }, id);
+
+    expect(store.selection()).toEqual({ kind: 'label', id });
+  });
+
+  it('selects the Feature on a hex that carries one, not the Hex beneath it', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 1, r: 2 }, 'forest');
+    store.placeFeatureAt({ q: 1, r: 2 }, 'settlement');
+
+    store.select({ q: 1, r: 2 }, null);
+
+    expect(store.selection()).toEqual({ kind: 'feature', coord: { q: 1, r: 2 } });
+  });
+
+  it('selects a painted Hex that carries no Feature', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: -3, r: 4 }, 'ocean');
+
+    store.select({ q: -3, r: 4 }, null);
+
+    expect(store.selection()).toEqual({ kind: 'hex', coord: { q: -3, r: 4 } });
+  });
+
+  it('clears the selection on a Void coordinate with no label hit', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'grass');
+    store.select({ q: 0, r: 0 }, null); // something selected first
+
+    store.select({ q: 9, r: 9 }, null); // Void, no label → deselect
+
+    expect(store.selection()).toBeNull();
+  });
+
+  it('does not resolve a selected Hex as a Label (selectedLabel stays null)', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'grass');
+
+    store.select({ q: 0, r: 0 }, null);
+
+    expect(store.selectedLabel()).toBeNull();
+  });
+});

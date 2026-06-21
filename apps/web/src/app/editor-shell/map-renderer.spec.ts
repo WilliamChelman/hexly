@@ -97,6 +97,7 @@ const LAYOUT: Layout = {
 const FOREST = 'rgb(1, 2, 3)';
 const FEATURE_INK = 'rgb(9, 9, 9)';
 const LABEL_INK = 'rgb(7, 7, 7)';
+const SELECT_INK = 'rgb(5, 5, 5)';
 
 /** Drive the colour resolution so terrain fills are deterministic. */
 function stubTheme(): () => void {
@@ -105,6 +106,7 @@ function stubTheme(): () => void {
     '--terrain-forest': FOREST,
     '--feature-ink': FEATURE_INK,
     '--label-ink': LABEL_INK,
+    '--gold-strong': SELECT_INK,
   };
   window.getComputedStyle = (() => ({
     getPropertyValue: (name: string) => colours[name] ?? '',
@@ -392,6 +394,53 @@ describe('Canvas2dMapRenderer labels', () => {
     renderer.render(camera, doc, null);
 
     expect(ctx.ops).toContain('rotate');
+    restore();
+  });
+});
+
+describe('Canvas2dMapRenderer selection highlight', () => {
+  it('outlines a selected hex in the selection colour', () => {
+    const restore = stubTheme();
+    const ctx = new FakeContext();
+    const renderer = makeRenderer(ctx);
+    const camera = Camera.initial().panBy(60, 60);
+    const doc: HexMap = { hexes: { '0,0': { terrain: 'forest' } }, regions: [], labels: [] };
+
+    renderer.render(camera, doc, null, null, { kind: 'hex', coord: { q: 0, r: 0 } });
+
+    // The selected hex reads as a strong outline in the accent ink, distinct
+    // from the soft hover fill and the thin grid line.
+    expect(ctx.lineStrokes).toContain(SELECT_INK);
+    restore();
+  });
+
+  it('draws a bounds outline around a selected label in the selection colour', () => {
+    const restore = stubTheme();
+    const ctx = new FakeContext();
+    const renderer = makeRenderer(ctx);
+    const camera = Camera.initial().panBy(60, 60);
+    const doc: HexMap = {
+      hexes: {},
+      regions: [],
+      labels: [{ id: 'l1', text: 'Open Sea', position: { x: 0, y: 0 }, size: 28 }],
+    };
+
+    renderer.render(camera, doc, null, null, { kind: 'label', id: 'l1' });
+
+    expect(ctx.lineStrokes).toContain(SELECT_INK);
+    restore();
+  });
+
+  it('draws no selection outline when nothing is selected', () => {
+    const restore = stubTheme();
+    const ctx = new FakeContext();
+    const renderer = makeRenderer(ctx);
+    const camera = Camera.initial().panBy(60, 60);
+    const doc: HexMap = { hexes: { '0,0': { terrain: 'forest' } }, regions: [], labels: [] };
+
+    renderer.render(camera, doc, null, null, null);
+
+    expect(ctx.lineStrokes).not.toContain(SELECT_INK);
     restore();
   });
 });
