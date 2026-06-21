@@ -134,6 +134,7 @@
   --hex-line: rgba(120, 96, 56, 0.5); /* grid ink                          */
   --void: #e2d3b2; /* untouched space — a Void coordinate                  */
   --feature-ink: #4a3a1e; /* a placed Feature's marker — sepia ink         */
+  --label-ink: #2f2416; /* free-positioned Label text — iron-gall ink      */
 
   /* Terrain fills — the base type of a hex. Tuned to read as hand-tinted
      washes on aged paper; the dark theme deepens them for the night chart. */
@@ -200,6 +201,7 @@
   --hex-line: rgba(170, 188, 255, 0.16);
   --void: #0e1330;
   --feature-ink: #f4ecd8; /* a placed Feature's marker — parchment cream */
+  --label-ink: #f4ecd8; /* free-positioned Label text — parchment cream  */
 
   --terrain-grass: #7e8a55;
   --terrain-forest: #4f7355;

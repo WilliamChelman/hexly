@@ -118,15 +118,39 @@ export const regionSchema = z.object({
   hexes: z.record(z.string(), z.literal(true)),
 });
 
+/** A point in world/pixel space — the anchor a free-positioned Label sits at. */
+const pointSchema = z.object({ x: z.number(), y: z.number() });
+
+/**
+ * A Label: free-positioned cartographic text drawn on the map, *not* snapped to
+ * the hex grid (CONTEXT.md → Label, issue #10). Anchored at a world-space
+ * `position`, drawn at `size` (world pixels at zoom 1), with an optional
+ * `rotation` in degrees. Distinct from an entity's `name`, which the renderer
+ * may draw but which is not a Label.
+ */
+export const labelSchema = z.object({
+  /** Stable identifier the editor mints; referenced by selection and edits. */
+  id: z.string(),
+  /** The text drawn on the map (e.g. "The Whisperwood"). */
+  text: z.string(),
+  /** The world-space point the text is anchored (and centred) on. */
+  position: pointSchema,
+  /** The drawn text height in world pixels at zoom 1; must be positive. */
+  size: z.number().positive(),
+  /** Clockwise rotation in degrees; absent (treated as 0) when unrotated. */
+  rotation: z.number().optional(),
+});
+
 /**
  * The Hex Map document. `hexes` is sparse: a coordinate key (`coordKey`) is
  * present only where the user painted, absent everywhere else (Void). `regions`
- * defaults to empty so documents saved before regions existed still parse and
- * gain the field on load (issue #8).
+ * and `labels` default to empty so documents saved before they existed still
+ * parse and gain the fields on load (issues #8, #10).
  */
 export const hexMapSchema = z.object({
   hexes: z.record(z.string(), hexSchema),
   regions: z.array(regionSchema).default([]),
+  labels: z.array(labelSchema).default([]),
 });
 
 /** A terrain id from the built-in palette — the literal union of every id. */
@@ -137,10 +161,12 @@ export type FeatureId = (typeof featureLibrary)[number]['id'];
 export type Hex = z.infer<typeof hexSchema>;
 /** A named, colored grouping of hex coordinates that overlaps others freely. */
 export type Region = z.infer<typeof regionSchema>;
+/** A free-positioned text element drawn on the map, off the hex grid. */
+export type Label = z.infer<typeof labelSchema>;
 /** The whole document held by the editor and persisted to the backend. */
 export type HexMap = z.infer<typeof hexMapSchema>;
 
-/** A brand-new map: an empty plane, every coordinate Void, with no regions. */
+/** A brand-new map: an empty plane, every coordinate Void, no regions or labels. */
 export function emptyHexMap(): HexMap {
-  return { hexes: {}, regions: [] };
+  return { hexes: {}, regions: [], labels: [] };
 }

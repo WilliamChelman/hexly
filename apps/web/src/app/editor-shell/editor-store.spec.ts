@@ -401,13 +401,139 @@ describe('EditorStore', () => {
     expect(store.document().regions[0].hexes['0,0']).toBe(true);
   });
 
+  it('adds a free-positioned label with text at a world point, returning its id', () => {
+    const store = new EditorStore();
+
+    const id = store.addLabel('The Whisperwood', { x: 120, y: -40 });
+
+    expect(store.document().labels).toEqual([
+      { id, text: 'The Whisperwood', position: { x: 120, y: -40 }, size: expect.any(Number) },
+    ]);
+  });
+
+  it('undo removes an added label', () => {
+    const store = new EditorStore();
+    store.addLabel('Open Sea', { x: 0, y: 0 });
+
+    store.undo();
+
+    expect(store.document().labels).toEqual([]);
+  });
+
+  it('edits the text of a label', () => {
+    const store = new EditorStore();
+    const id = store.addLabel('Draft', { x: 10, y: 10 });
+
+    store.editLabelText(id, 'The Drowned Coast');
+
+    expect(store.document().labels[0].text).toBe('The Drowned Coast');
+  });
+
+  it('moves a label to a new world position', () => {
+    const store = new EditorStore();
+    const id = store.addLabel('Here', { x: 0, y: 0 });
+
+    store.moveLabel(id, { x: 200, y: -75 });
+
+    expect(store.document().labels[0].position).toEqual({ x: 200, y: -75 });
+  });
+
+  it('resizes a label', () => {
+    const store = new EditorStore();
+    const id = store.addLabel('Big', { x: 0, y: 0 });
+
+    store.resizeLabel(id, 64);
+
+    expect(store.document().labels[0].size).toBe(64);
+  });
+
+  it('ignores a non-positive resize, leaving the size unchanged and adding no undo step', () => {
+    const store = new EditorStore();
+    const id = store.addLabel('Big', { x: 0, y: 0 });
+    store.resizeLabel(id, 64);
+
+    // 0 (a cleared field is Number('') === 0) and negatives would fail
+    // labelSchema.size (z.number().positive()) on save/load, so the store
+    // drops them as no-ops rather than letting the document hold them.
+    store.resizeLabel(id, 0);
+    store.resizeLabel(id, -10);
+
+    expect(store.document().labels[0].size).toBe(64);
+    // addLabel + the valid resize are the only undo steps; the dropped resizes add none.
+    expect(store.canUndo()).toBe(true);
+    store.undo(); // undo the valid resize-to-64
+    store.undo(); // undo the addLabel
+    expect(store.canUndo()).toBe(false);
+  });
+
+  it('rotates a label', () => {
+    const store = new EditorStore();
+    const id = store.addLabel('Tilted', { x: 0, y: 0 });
+
+    store.rotateLabel(id, 30);
+
+    expect(store.document().labels[0].rotation).toBe(30);
+  });
+
+  it('deletes a label', () => {
+    const store = new EditorStore();
+    const id = store.addLabel('Doomed', { x: 0, y: 0 });
+
+    store.deleteLabel(id);
+
+    expect(store.document().labels).toEqual([]);
+  });
+
+  it('undo restores a deleted label with its text and position', () => {
+    const store = new EditorStore();
+    const id = store.addLabel('The Whisperwood', { x: 80, y: -20 });
+
+    store.deleteLabel(id);
+    store.undo();
+
+    expect(store.document().labels[0]).toMatchObject({
+      id,
+      text: 'The Whisperwood',
+      position: { x: 80, y: -20 },
+    });
+  });
+
+  it('selects a label for editing, and clears the selection', () => {
+    const store = new EditorStore();
+    const id = store.addLabel('Pick me', { x: 0, y: 0 });
+
+    store.selectLabel(id);
+    expect(store.selectedLabel()?.id).toBe(id);
+
+    store.selectLabel(null);
+    expect(store.selectedLabel()).toBeNull();
+  });
+
+  it('clears the selection when the selected label is deleted', () => {
+    const store = new EditorStore();
+    const id = store.addLabel('Gone', { x: 0, y: 0 });
+    store.selectLabel(id);
+
+    store.deleteLabel(id);
+
+    expect(store.selectedLabel()).toBeNull();
+  });
+
+  it('treats editing a label that does not exist as a no-op with no undo step', () => {
+    const store = new EditorStore();
+
+    store.editLabelText('no-such-label', 'ignored');
+
+    expect(store.canUndo()).toBe(false);
+  });
+
   it('loads a document, replacing whatever was being edited', () => {
     const store = new EditorStore();
     store.paintAt({ q: 0, r: 0 }, 'grass');
 
-    store.load({ hexes: { '2,3': { terrain: 'ocean' } }, regions: [] });
+    store.load({ hexes: { '2,3': { terrain: 'ocean' } }, regions: [], labels: [] });
 
-    expect(store.document()).toEqual({ hexes: { '2,3': { terrain: 'ocean' } }, regions: [] });
+    expect(store.document()).toEqual({ hexes: { '2,3': { terrain: 'ocean' } }, regions: [], labels: [] });
   });
 
   it('clears undo/redo history when a document is loaded', () => {
@@ -442,5 +568,9 @@ describe('isContinuousTool', () => {
 
   it('treats painting a region as a continuous brush', () => {
     expect(isContinuousTool({ kind: 'region', id: 'r1', mode: 'add' })).toBe(true);
+  });
+
+  it('treats placing a label as a discrete stamp, not continuous', () => {
+    expect(isContinuousTool({ kind: 'label' })).toBe(false);
   });
 });

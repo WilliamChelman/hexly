@@ -19,7 +19,7 @@ describe('MapsStore', () => {
     version: 1,
     createdAt: 1,
     updatedAt: 1,
-    document: { hexes: {}, regions: [] },
+    document: { hexes: {}, regions: [], labels: [] },
   };
 
   beforeEach(() => {
@@ -61,7 +61,7 @@ describe('MapsStore', () => {
 
   it('saves the open document against its base version and advances it', () => {
     openAldermoor();
-    const painted = { hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' as const } }, regions: [] };
+    const painted = { hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' as const } }, regions: [], labels: [] };
 
     let outcome: unknown;
     store.save(painted).subscribe((o) => (outcome = o));
@@ -80,13 +80,13 @@ describe('MapsStore', () => {
 
   it('surfaces a 409 as a conflict and leaves the open map untouched', () => {
     openAldermoor();
-    const painted = { hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' as const } }, regions: [] };
+    const painted = { hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' as const } }, regions: [], labels: [] };
 
     // The server's current map has moved past our base version.
     const serverCurrent: MapDetail = {
       ...aldermoor,
       version: 5,
-      document: { hexes: { [coordKey({ q: 9, r: 9 })]: { terrain: 'ocean' } }, regions: [] },
+      document: { hexes: { [coordKey({ q: 9, r: 9 })]: { terrain: 'ocean' } }, regions: [], labels: [] },
     };
 
     let outcome: unknown;
@@ -106,7 +106,7 @@ describe('MapsStore', () => {
 
   it('clears an outstanding conflict when a fresh load succeeds (re-pull)', () => {
     openAldermoor();
-    const painted = { hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' as const } }, regions: [] };
+    const painted = { hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' as const } }, regions: [], labels: [] };
     const serverCurrent: MapDetail = { ...aldermoor, version: 5 };
 
     // Provoke a conflict so there is one to clear.
@@ -142,7 +142,7 @@ describe('MapsStore', () => {
 
   /** Provoke a save conflict on the open map so there is one to clear. */
   function provokeConflict() {
-    const painted = { hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' as const } }, regions: [] };
+    const painted = { hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' as const } }, regions: [], labels: [] };
     store.save(painted).subscribe();
     http
       .expectOne('/maps/m1')

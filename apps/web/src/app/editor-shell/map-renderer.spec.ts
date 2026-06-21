@@ -42,6 +42,22 @@ class FakeContext {
   scale(): void {
     this.ops.push('scale');
   }
+  rotate(): void {
+    this.ops.push('rotate');
+  }
+  /** The current font, textAlign and textBaseline — set before `fillText`. */
+  font = '';
+  textAlign = '';
+  textBaseline = '';
+  /** Each (text, fillStyle) drawn — only the asserted ones need inspecting. */
+  readonly textFills: { text: string; fill: string }[] = [];
+  fillText(text: string): void {
+    this.textFills.push({ text, fill: this.fillStyle });
+  }
+  /** A deterministic width: half the font's pixel size per character. */
+  measureText(text: string): { width: number } {
+    return { width: text.length * (parseFloat(this.font) || 10) * 0.5 };
+  }
   /** Grid strokes pass no path; a feature marker strokes an explicit Path2D. */
   readonly markerStrokes: string[] = [];
   /** The strokeStyle at each pathless stroke() — grid lines and region borders. */
@@ -80,6 +96,7 @@ const LAYOUT: Layout = {
 
 const FOREST = 'rgb(1, 2, 3)';
 const FEATURE_INK = 'rgb(9, 9, 9)';
+const LABEL_INK = 'rgb(7, 7, 7)';
 
 /** Drive the colour resolution so terrain fills are deterministic. */
 function stubTheme(): () => void {
@@ -87,6 +104,7 @@ function stubTheme(): () => void {
   const colours: Record<string, string> = {
     '--terrain-forest': FOREST,
     '--feature-ink': FEATURE_INK,
+    '--label-ink': LABEL_INK,
   };
   window.getComputedStyle = (() => ({
     getPropertyValue: (name: string) => colours[name] ?? '',
@@ -113,7 +131,7 @@ describe('Canvas2dMapRenderer painted terrain', () => {
     const renderer = makeRenderer(ctx);
     // Centre hex (0,0) under the camera so it is on screen.
     const camera = Camera.initial().panBy(60, 60);
-    const doc: HexMap = { hexes: { '0,0': { terrain: 'forest' } }, regions: [] };
+    const doc: HexMap = { hexes: { '0,0': { terrain: 'forest' } }, regions: [], labels: [] };
 
     renderer.render(camera, doc, null);
 
@@ -127,7 +145,7 @@ describe('Canvas2dMapRenderer painted terrain', () => {
     const renderer = makeRenderer(ctx);
     const camera = Camera.initial().panBy(60, 60);
 
-    renderer.render(camera, { hexes: {}, regions: [] }, null);
+    renderer.render(camera, { hexes: {}, regions: [], labels: [] }, null);
 
     expect(ctx.pathFills).toEqual([]);
     restore();
@@ -145,6 +163,7 @@ describe('Canvas2dMapRenderer region borders', () => {
       regions: [
         { id: 'a', name: 'Avalon', color: '#b08a4e', hexes: { '0,0': true } },
       ],
+      labels: [],
     };
 
     renderer.render(camera, doc, null);
@@ -166,6 +185,7 @@ describe('Canvas2dMapRenderer region borders', () => {
         { id: 'a', name: 'Avalon', color: '#b08a4e', hexes: { '0,0': true } },
         { id: 'b', name: 'Whisperwood', color: '#7c9b86', hexes: { '0,0': true } },
       ],
+      labels: [],
     };
 
     renderer.render(camera, doc, null);
@@ -186,6 +206,7 @@ describe('Canvas2dMapRenderer region borders', () => {
       regions: [
         { id: 'a', name: 'Avalon', color: '#b08a4e', hexes: { '5,5': true } },
       ],
+      labels: [],
     };
 
     renderer.render(camera, doc, null);
@@ -205,6 +226,7 @@ describe('Canvas2dMapRenderer region borders', () => {
       regions: [
         { id: 'a', name: 'Avalon', color: '#b08a4e', hexes: { '0,0': true, '1,0': true } },
       ],
+      labels: [],
     };
 
     renderer.render(camera, doc, null);
@@ -226,7 +248,7 @@ describe('Canvas2dMapRenderer feature markers', () => {
     const camera = Camera.initial().panBy(60, 60);
     const doc: HexMap = {
       hexes: { '0,0': { terrain: 'forest', feature: { ref: 'settlement' } } },
-      regions: [],
+      regions: [], labels: [],
     };
 
     renderer.render(camera, doc, null);
@@ -242,7 +264,7 @@ describe('Canvas2dMapRenderer feature markers', () => {
     const ctx = new FakeContext();
     const renderer = makeRenderer(ctx);
     const camera = Camera.initial().panBy(60, 60);
-    const doc: HexMap = { hexes: { '0,0': { terrain: 'forest' } }, regions: [] };
+    const doc: HexMap = { hexes: { '0,0': { terrain: 'forest' } }, regions: [], labels: [] };
 
     renderer.render(camera, doc, null);
 
@@ -259,7 +281,7 @@ describe('Canvas2dMapRenderer feature markers', () => {
     const camera = Camera.initial().panBy(60, 60);
     const doc: HexMap = {
       hexes: { '0,0': { terrain: 'forest', feature: { ref: 'settlement' } } },
-      regions: [],
+      regions: [], labels: [],
     };
 
     renderer.render(camera, doc, null);
@@ -270,5 +292,106 @@ describe('Canvas2dMapRenderer feature markers', () => {
     expect(saves).toBeGreaterThan(0);
     restorePath();
     restoreTheme();
+  });
+});
+
+describe('Canvas2dMapRenderer labels', () => {
+  it('draws a label\'s text in the label ink at its world position', () => {
+    const restore = stubTheme();
+    const ctx = new FakeContext();
+    const renderer = makeRenderer(ctx);
+    const camera = Camera.initial().panBy(60, 60);
+    const doc: HexMap = {
+      hexes: {},
+      regions: [],
+      labels: [{ id: 'l1', text: 'The Whisperwood', position: { x: 0, y: 0 }, size: 28 }],
+    };
+
+    renderer.render(camera, doc, null);
+
+    expect(ctx.textFills).toContainEqual({ text: 'The Whisperwood', fill: LABEL_INK });
+    restore();
+  });
+
+  it('draws no label text when the map has none', () => {
+    const restore = stubTheme();
+    const ctx = new FakeContext();
+    const renderer = makeRenderer(ctx);
+    const camera = Camera.initial().panBy(60, 60);
+
+    renderer.render(camera, { hexes: {}, regions: [], labels: [] }, null);
+
+    expect(ctx.textFills).toEqual([]);
+    restore();
+  });
+
+  it('hit-tests a screen point to the label drawn there', () => {
+    const restore = stubTheme();
+    const ctx = new FakeContext();
+    const renderer = makeRenderer(ctx);
+    // (0,0) world is at screen (60,60) under this camera — the label's centre.
+    const camera = Camera.initial().panBy(60, 60);
+    const doc: HexMap = {
+      hexes: {},
+      regions: [],
+      labels: [{ id: 'l1', text: 'Open Sea', position: { x: 0, y: 0 }, size: 28 }],
+    };
+    renderer.render(camera, doc, null);
+
+    expect(renderer.labelAt({ x: 60, y: 60 })).toBe('l1');
+    restore();
+  });
+
+  it('keeps an empty-text label clickable at its centre', () => {
+    const restore = stubTheme();
+    const ctx = new FakeContext();
+    const renderer = makeRenderer(ctx);
+    // (0,0) world is at screen (60,60) under this camera — the label's centre.
+    const camera = Camera.initial().panBy(60, 60);
+    // Empty text measures 0 wide; the box must still floor to a clickable size
+    // so the label can be re-selected to give it text back (issue #2).
+    const doc: HexMap = {
+      hexes: {},
+      regions: [],
+      labels: [{ id: 'l1', text: '', position: { x: 0, y: 0 }, size: 28 }],
+    };
+    renderer.render(camera, doc, null);
+
+    expect(renderer.labelAt({ x: 60, y: 60 })).toBe('l1');
+    restore();
+  });
+
+  it('hit-tests to null where no label was drawn', () => {
+    const restore = stubTheme();
+    const ctx = new FakeContext();
+    const renderer = makeRenderer(ctx);
+    const camera = Camera.initial().panBy(60, 60);
+    const doc: HexMap = {
+      hexes: {},
+      regions: [],
+      labels: [{ id: 'l1', text: 'Open Sea', position: { x: 0, y: 0 }, size: 28 }],
+    };
+    renderer.render(camera, doc, null);
+
+    // Far from the label's centre at (60,60).
+    expect(renderer.labelAt({ x: 600, y: 600 })).toBeNull();
+    restore();
+  });
+
+  it('rotates a label drawn with a rotation', () => {
+    const restore = stubTheme();
+    const ctx = new FakeContext();
+    const renderer = makeRenderer(ctx);
+    const camera = Camera.initial().panBy(60, 60);
+    const doc: HexMap = {
+      hexes: {},
+      regions: [],
+      labels: [{ id: 'l1', text: 'Tilted', position: { x: 0, y: 0 }, size: 28, rotation: 30 }],
+    };
+
+    renderer.render(camera, doc, null);
+
+    expect(ctx.ops).toContain('rotate');
+    restore();
   });
 });

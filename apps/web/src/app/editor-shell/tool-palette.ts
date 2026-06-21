@@ -6,6 +6,7 @@ import { Input } from '../ui/input';
 import { Panel } from '../ui/panel';
 import { Rule } from '../ui/rule';
 import { Tool as ToolButton, ToolGlyph } from '../ui/tool';
+import { inputValue } from './dom';
 import { EditorStore, Tool } from './editor-store';
 
 /** A content tool — not yet wired to the canvas; shown as a preview for now. */
@@ -125,6 +126,17 @@ const REGION_MODES = [
     <section class="group">
       <h2 class="heading" appEyebrow>Content</h2>
       <div class="list" role="group" aria-label="Content">
+        @let contentState = store.tool();
+        <button
+          appTool
+          label="Label"
+          hint="L"
+          glyph="label"
+          [active]="contentState.kind === 'label'"
+          aria-label="Label"
+          data-testid="tool-label"
+          (click)="store.selectTool({ kind: 'label' })"
+        ></button>
         @for (t of contentTools; track t.id) {
           <button
             appTool
@@ -324,7 +336,6 @@ export class ToolPalette {
 
   protected readonly contentTools: ContentTool[] = [
     { id: 'overlay', label: 'Overlay', hint: 'O', glyph: 'overlay' },
-    { id: 'label', label: 'Label', hint: 'L', glyph: 'label' },
   ];
 
   protected readonly regionModes = REGION_MODES;
@@ -348,12 +359,12 @@ export class ToolPalette {
 
   /** Rename region `id` to the text input's value. */
   protected rename(id: string, event: Event): void {
-    this.store.renameRegion(id, (event.target as HTMLInputElement).value);
+    this.store.renameRegion(id, inputValue(event));
   }
 
   /** Recolour region `id` to the colour input's value. */
   protected recolor(id: string, event: Event): void {
-    this.store.recolorRegion(id, (event.target as HTMLInputElement).value);
+    this.store.recolorRegion(id, inputValue(event));
   }
 
   /** Whether `tool` is the region brush armed for region `id` in `mode`. */

@@ -19,6 +19,7 @@ import { LogoIcon } from '../ui/icon/glyphs/logo';
 import { MoonIcon } from '../ui/icon/glyphs/moon';
 import { ShareIcon } from '../ui/icon/glyphs/share';
 import { SunIcon } from '../ui/icon/glyphs/sun';
+import { inputValue } from './dom';
 import { EditorSession } from './editor-session';
 
 /** The top chrome: brand, map title, and the global actions (theme, share). */
@@ -263,10 +264,8 @@ export class EditorHeader {
     });
   }
 
-  /** Read the current value out of an input event. */
-  protected inputValue(event: Event): string {
-    return (event.target as HTMLInputElement).value;
-  }
+  /** Read the current value out of an input event (template-visible alias). */
+  protected readonly inputValue = inputValue;
 
   /** Enter inline edit, seeded with the current title. */
   protected startRename(): void {
