@@ -16,6 +16,7 @@ import {
   TerrainId,
 } from '@hexly/domain';
 import { Camera } from './camera';
+import type { Selection } from './editor-store';
 
 /** The built-in features keyed by id, for a marker's path lookup. */
 const FEATURE_BY_ID = new Map(featureLibrary.map((f) => [f.id, f]));
@@ -70,17 +71,6 @@ export interface LabelDragOverride {
   readonly position: Point;
 }
 
-/**
- * What the renderer highlights as selected (issue #28): a Label by id, drawn as
- * a bounds indicator; or a Hex/Feature by coordinate, drawn as an outline on the
- * hex. Structurally a superset of the store's `Selection`, so `store.selection()`
- * passes straight through — the renderer collapses Hex and Feature to the same
- * outline.
- */
-export type SelectionHighlight =
-  | { readonly kind: 'label'; readonly id: string }
-  | { readonly kind: 'hex' | 'feature'; readonly coord: Axial };
-
 export interface MapRenderer {
   /** Match the drawing surface to the given CSS-pixel size. */
   resize(width: number, height: number): void;
@@ -94,7 +84,7 @@ export interface MapRenderer {
     doc: HexMap,
     hover: Axial | null,
     labelDrag?: LabelDragOverride | null,
-    selection?: SelectionHighlight | null,
+    selection?: Selection | null,
   ): void;
   /**
    * The id of the Label drawn under screen `point` (topmost wins), or `null`.
@@ -247,7 +237,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
     doc: HexMap,
     hover: Axial | null,
     labelDrag: LabelDragOverride | null = null,
-    selection: SelectionHighlight | null = null,
+    selection: Selection | null = null,
   ): void {
     const ctx = this.ctx;
     if (!ctx || this.width === 0 || this.height === 0) return;
@@ -384,7 +374,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
   private drawSelection(
     ctx: CanvasRenderingContext2D,
     camera: Camera,
-    selection: SelectionHighlight,
+    selection: Selection,
   ): void {
     ctx.save();
     ctx.strokeStyle = this.palette.selected;

@@ -103,8 +103,10 @@ describe('Inspector hex and feature selection', () => {
 
     const el = render().nativeElement;
 
-    expect(el.querySelector('[data-testid=entity-coord]').textContent).toContain('2');
-    expect(el.querySelector('[data-testid=entity-coord]').textContent).toContain('-1');
+    // Assert q and r land in their own fields, so a q/r transposition fails too.
+    const coord = el.querySelector('[data-testid=entity-coord]').textContent;
+    expect(coord).toContain('q 2');
+    expect(coord).toContain('r -1');
     expect(el.querySelector('[data-testid=entity-detail]').textContent).toContain('Ocean');
     expect(el.querySelector('[data-testid=label-text]')).toBeNull();
   });

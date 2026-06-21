@@ -69,6 +69,18 @@ export type Selection =
   | { readonly kind: 'hex'; readonly coord: Axial };
 
 /**
+ * The internal selection reference the store actually stores: a Label by id, or
+ * a map cell by coordinate. Whether a cell reads as a Feature or a bare Hex is
+ * *derived* from the live document (see {@link EditorStore.selection}), not baked
+ * in here — so the selection self-heals when the document changes under it (a
+ * feature placed on or cleared from the cell, the hex erased, an undo), rather
+ * than going stale (issue #28).
+ */
+type SelectionRef =
+  | { readonly kind: 'label'; readonly id: string }
+  | { readonly kind: 'cell'; readonly coord: Axial };
+
+/**
  * The Feature Tool's Subtools in palette/keyboard order: each library feature,
  * then the Clear Subtool last. The single source of truth for the index→Subtool
  * mapping the keyboard ({@link EditorStore.armSubtoolByIndex}) and the palette
@@ -146,20 +158,35 @@ export class EditorStore {
   });
 
   /**
-   * The single selected entity (or `null`). Transient editor state — not part of
-   * the document, so it is neither undone nor persisted (issues #10, #28). Read a
-   * selected Label through the {@link selectedLabel} computed, which resolves it
-   * against the live document; read a selected Hex/Feature's coordinate from the
-   * {@link selection} value directly.
+   * The selection reference (or `null`). Transient editor state — not part of the
+   * document, so it is neither undone nor persisted (issues #10, #28). This holds
+   * only the reference (a label id, or a cell coordinate); the live {@link kind}
+   * and existence are resolved from the document by {@link selection}.
    */
-  private readonly _selection = signal<Selection | null>(null);
+  private readonly _selection = signal<SelectionRef | null>(null);
 
   /**
-   * What is currently selected, or `null`. The inspector and renderer read this
-   * to show and highlight the selection; the canvas hands a click's geometric
-   * inputs to {@link select}, which sets it under the precedence rule.
+   * What is currently selected, or `null`, resolved against the live document so
+   * it never goes stale: a cell with a Feature reads as `feature`, a cell with a
+   * bare Hex as `hex`, and a cell whose hex was erased (or a label whose id is
+   * gone) resolves to `null`. The inspector and renderer read this to show and
+   * highlight the selection; the canvas hands a click's geometric inputs to
+   * {@link select}, which sets the reference under the precedence rule (issue #28).
    */
-  readonly selection = this._selection.asReadonly();
+  readonly selection = computed<Selection | null>(() => {
+    const ref = this._selection();
+    if (!ref) return null;
+    if (ref.kind === 'label') {
+      return this._document().labels.some((l) => l.id === ref.id)
+        ? { kind: 'label', id: ref.id }
+        : null;
+    }
+    const hex = this._document().hexes[coordKey(ref.coord)];
+    if (!hex) return null;
+    return hex.feature
+      ? { kind: 'feature', coord: ref.coord }
+      : { kind: 'hex', coord: ref.coord };
+  });
 
   /**
    * The currently-selected {@link Label} resolved from the live document, or
@@ -167,7 +194,7 @@ export class EditorStore {
    * after an undo removed it). The inspector binds to this to edit the label.
    */
   readonly selectedLabel = computed<Label | null>(() => {
-    const sel = this._selection();
+    const sel = this.selection();
     if (sel?.kind !== 'label') return null;
     return this._document().labels.find((l) => l.id === sel.id) ?? null;
   });
@@ -435,23 +462,22 @@ export class EditorStore {
    * Select the topmost entity given a click's geometric inputs (issue #28): the
    * hex `coord` under the pointer and the `labelHit` from `renderer.labelAt`
    * (the id of the Label drawn there, or `null`). Precedence lives here, at the
-   * store seam, so it stays unit-testable: a Label hit wins; otherwise the hex's
-   * Feature wins over the bare Hex; a Void coordinate with no label hit clears
-   * the selection (CONTEXT.md → Select, ADR-0010).
+   * store seam, so it stays unit-testable: a Label hit wins; otherwise a painted
+   * cell is selected (it reads as a Feature or a bare Hex per the live document);
+   * a Void coordinate with no label hit clears the selection (CONTEXT.md →
+   * Select, ADR-0010). Returns the resolved {@link Selection} so the caller can
+   * branch on it (e.g. start a label drag) without re-scanning the document.
    */
-  select(coord: Axial, labelHit: string | null): void {
+  select(coord: Axial, labelHit: string | null): Selection | null {
     if (labelHit !== null) {
       this._selection.set({ kind: 'label', id: labelHit });
-      return;
+    } else {
+      // A painted cell selects it (Feature vs Hex is derived in `selection`); a
+      // Void coordinate with no label hit is a click on empty space → deselect.
+      const hex = this._document().hexes[coordKey(coord)];
+      this._selection.set(hex ? { kind: 'cell', coord } : null);
     }
-    const hex = this._document().hexes[coordKey(coord)];
-    if (hex?.feature) {
-      this._selection.set({ kind: 'feature', coord });
-      return;
-    }
-    // A painted Hex with no Feature selects the Hex; a Void coordinate (no hex
-    // record) with no label hit is a click on empty space, which deselects.
-    this._selection.set(hex ? { kind: 'hex', coord } : null);
+    return this.selection();
   }
 
   /** Select the Label `id` for editing in the inspector, or `null` to clear it. */

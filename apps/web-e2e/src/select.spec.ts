@@ -108,6 +108,11 @@ test('a painting Tool over a floating Label paints the hex beneath instead of gr
   await page.getByTestId('tool-label').click();
   await canvas.click();
 
+  // Record where the label landed (it auto-selects on drop) so we can later prove
+  // the painting Tool left it exactly where it was — never grabbed or nudged it.
+  const labelX = Number(await page.getByTestId('label-x').inputValue());
+  const labelY = Number(await page.getByTestId('label-y').inputValue());
+
   // Clear the auto-selection so a stray Label editor can't mask the result.
   await page.getByTestId('tool-select').click();
   await canvas.click({ position: { x: 24, y: 24 } });
@@ -141,7 +146,11 @@ test('a painting Tool over a floating Label paints the hex beneath instead of gr
   const hexes = Object.values(detail.document.hexes) as Array<{ terrain: string }>;
   expect(hexes).toHaveLength(1);
   expect(hexes[0].terrain).toBe('ocean');
-  expect(detail.document.labels).toHaveLength(1);
+  // The Label survived AND stayed put: a painting Tool over it must not move it.
+  const labels = detail.document.labels as Array<{ position: { x: number; y: number } }>;
+  expect(labels).toHaveLength(1);
+  expect(labels[0].position.x).toBeCloseTo(labelX, 1);
+  expect(labels[0].position.y).toBeCloseTo(labelY, 1);
 });
 
 test('under Select, dragging a selected Label repositions it', async ({ page }) => {
@@ -152,6 +161,7 @@ test('under Select, dragging a selected Label repositions it', async ({ page }) 
   await page.getByTestId('tool-label').click();
   await canvas.click();
   const startX = Number(await page.getByTestId('label-x').inputValue());
+  const startY = Number(await page.getByTestId('label-y').inputValue());
   await page.getByTestId('tool-select').click();
   await canvas.click({ position: { x: 24, y: 24 } });
   await expect(page.getByTestId('label-x')).toHaveCount(0);
@@ -174,9 +184,17 @@ test('under Select, dragging a selected Label repositions it', async ({ page }) 
   // The press grabbed the label (it is selected again) and the drag moved it.
   // Poll the inspector's X field: the move commits in the pointerup handler and
   // the inspector reflects it on the next change-detection tick, so a one-shot
-  // read can race ahead of that update.
+  // read can race ahead of that update. The pointer moved +120px in X only, so X
+  // should land near +120 (not merely "more than half") and Y must not budge.
   await expect(page.getByTestId('label-x')).toHaveCount(1);
   await expect
     .poll(async () => Number(await page.getByTestId('label-x').inputValue()))
-    .toBeGreaterThan(startX + 50);
+    .toBeGreaterThan(startX + 100);
+  expect(Number(await page.getByTestId('label-x').inputValue())).toBeLessThan(
+    startX + 140,
+  );
+  expect(Number(await page.getByTestId('label-y').inputValue())).toBeCloseTo(
+    startY,
+    0,
+  );
 });

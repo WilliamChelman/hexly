@@ -157,6 +157,20 @@ export const hexMapSchema = z.object({
 export type TerrainId = (typeof terrainPalette)[number]['id'];
 /** A feature id from the built-in library — the literal union of every id. */
 export type FeatureId = (typeof featureLibrary)[number]['id'];
+
+/**
+ * The human label for a terrain id, or `undefined` if it is not a built-in. The
+ * single resolver for the palette lookup callers used to inline; each caller
+ * applies its own fallback (e.g. the raw id, or `null` for "no hex").
+ */
+export function terrainLabel(id: TerrainId): string | undefined {
+  return terrainPalette.find((t) => t.id === id)?.label;
+}
+
+/** The human label for a feature id, or `undefined` if it is not a built-in. */
+export function featureLabel(id: FeatureId): string | undefined {
+  return featureLibrary.find((f) => f.id === id)?.label;
+}
 /** A single painted hex's content. */
 export type Hex = z.infer<typeof hexSchema>;
 /** A named, colored grouping of hex coordinates that overlaps others freely. */

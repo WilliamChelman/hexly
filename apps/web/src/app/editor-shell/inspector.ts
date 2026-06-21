@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
-import { coordKey, featureLibrary, Label, terrainPalette } from '@hexly/domain';
+import { coordKey, featureLabel, Label, terrainLabel } from '@hexly/domain';
 import { Button } from '../ui/button';
 import { Coord } from '../ui/coord';
 import { Eyebrow } from '../ui/eyebrow';
@@ -106,9 +106,7 @@ interface SelectedEntity {
       </div>
     } @else if (entity) {
       <header class="head">
-        <span appEyebrow
-          >Selected {{ entity.kind === 'feature' ? 'feature' : 'hex' }}</span
-        >
+        <span appEyebrow>Selected {{ entity.kind }}</span>
       </header>
 
       <div appField label="Coordinate">
@@ -133,7 +131,7 @@ interface SelectedEntity {
           disabled
           data-testid="entity-delete"
         >
-          Delete {{ entity.kind === 'feature' ? 'feature' : 'hex' }}
+          Delete {{ entity.kind }}
         </button>
       </div>
     } @else {
@@ -202,11 +200,9 @@ export class Inspector {
     if (!sel || sel.kind === 'label') return null;
     const hex = this.store.document().hexes[coordKey(sel.coord)];
     if (!hex) return null;
-    const terrain =
-      terrainPalette.find((t) => t.id === hex.terrain)?.label ?? hex.terrain;
+    const terrain = terrainLabel(hex.terrain) ?? hex.terrain;
     const feature = hex.feature
-      ? (featureLibrary.find((f) => f.id === hex.feature?.ref)?.label ??
-        hex.feature.ref)
+      ? (featureLabel(hex.feature.ref) ?? hex.feature.ref)
       : null;
     return { kind: sel.kind, q: sel.coord.q, r: sel.coord.r, terrain, feature };
   });
