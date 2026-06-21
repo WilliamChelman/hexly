@@ -52,6 +52,12 @@ const LABEL_FONT = 'Georgia, "Times New Roman", serif';
 const MIN_LABEL_HALF_WIDTH_FACTOR = 1;
 /** A selection highlight's stroke weight in screen pixels, constant across zoom. */
 const SELECTION_STROKE = 3;
+/**
+ * The opacity a selected Region's member-hex fill is drawn at. Translucent so the
+ * terrain (and the region's own border) stay legible beneath the tint, while
+ * still making membership readable cell-by-cell during editing (ADR-0011).
+ */
+const SELECTION_FILL_ALPHA = 0.25;
 /** Screen-pixel padding around a selected Label's text box, so the bounds clear the glyphs. */
 const SELECTION_LABEL_PAD = 4;
 
@@ -374,11 +380,16 @@ export class Canvas2dMapRenderer implements MapRenderer {
     // grid, markers, and label text it points at. While a Hex drag is live the
     // highlight follows the previewed content to the destination (issue #30).
     if (selection) {
+      // Only a hex/feature selection tracks a live Hex drag to its destination; a
+      // Label or Region selection is never the dragged content (issues #30, #35).
       const tracking =
-        drag && selection.kind !== 'label' && coordKey(selection.coord) === fromKey;
+        drag &&
+        (selection.kind === 'hex' || selection.kind === 'feature') &&
+        coordKey(selection.coord) === fromKey;
       this.drawSelection(
         ctx,
         camera,
+        doc,
         tracking ? { ...selection, coord: drag.to } : selection,
       );
     }
@@ -410,8 +421,15 @@ export class Canvas2dMapRenderer implements MapRenderer {
   private drawSelection(
     ctx: CanvasRenderingContext2D,
     camera: Camera,
+    doc: HexMap,
     selection: Selection,
   ): void {
+    // A Region is highlighted by tinting its member hexes, not by an accent
+    // outline — its boundary stroke already comes from the regions pass (#35).
+    if (selection.kind === 'region') {
+      this.fillRegionMembers(ctx, camera, doc, selection.id);
+      return;
+    }
     ctx.save();
     ctx.strokeStyle = this.palette.selected;
     ctx.lineWidth = SELECTION_STROKE;
@@ -433,6 +451,31 @@ export class Canvas2dMapRenderer implements MapRenderer {
     } else {
       this.tracePath(ctx, camera, selection.coord);
       ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /**
+   * Highlight the selected Region by tinting each of its member hexes with a
+   * translucent fill in the region's own colour. The boundary stroke is left to
+   * the regions pass (which strokes every region); this only adds the interior
+   * wash, so an unselected region stays border-only (ADR-0011, issue #35). A
+   * region that no longer exists (deleted between resolve and draw) tints nothing.
+   */
+  private fillRegionMembers(
+    ctx: CanvasRenderingContext2D,
+    camera: Camera,
+    doc: HexMap,
+    id: string,
+  ): void {
+    const region = doc.regions.find((r) => r.id === id);
+    if (!region) return;
+    ctx.save();
+    ctx.globalAlpha = SELECTION_FILL_ALPHA;
+    ctx.fillStyle = region.color;
+    for (const key of Object.keys(region.hexes)) {
+      this.tracePath(ctx, camera, parseCoordKey(key));
+      ctx.fill();
     }
     ctx.restore();
   }

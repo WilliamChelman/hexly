@@ -58,27 +58,30 @@ export interface RegionSubtool {
 
 /**
  * The single selected entity, or `null` when nothing is selected. Select is the
- * one selection path (CONTEXT.md → Select, ADR-0010): it references a Label by
- * id, or a Feature / Hex by the coordinate it sits on. At most one is selected
- * at a time. The store applies the precedence (Label → Feature → Hex) that turns
- * a click's geometric inputs into one of these — see {@link EditorStore.select}.
+ * one selection path (CONTEXT.md → Select, ADR-0010/0011): it references a Label
+ * or a Region by id, or a Feature / Hex by the coordinate it sits on. At most one
+ * is selected at a time. The store resolves a click's geometric inputs into one
+ * of these by walking a per-coordinate stack — `Label → Feature → Hex → each
+ * containing Region (document order)` — see {@link EditorStore.select}.
  */
 export type Selection =
   | { readonly kind: 'label'; readonly id: string }
   | { readonly kind: 'feature'; readonly coord: Axial }
-  | { readonly kind: 'hex'; readonly coord: Axial };
+  | { readonly kind: 'hex'; readonly coord: Axial }
+  | { readonly kind: 'region'; readonly id: string };
 
 /**
- * The internal selection reference the store actually stores: a Label by id, or
- * a map cell by coordinate. Whether a cell reads as a Feature or a bare Hex is
- * *derived* from the live document (see {@link EditorStore.selection}), not baked
- * in here — so the selection self-heals when the document changes under it (a
- * feature placed on or cleared from the cell, the hex erased, an undo), rather
- * than going stale (issue #28).
+ * The internal selection reference the store actually stores: a Label or a Region
+ * by id, or a map cell by coordinate. Whether a cell reads as a Feature or a bare
+ * Hex is *derived* from the live document (see {@link EditorStore.selection}), as
+ * is whether a referenced Region still exists — so the selection self-heals when
+ * the document changes under it (a feature placed/cleared, the hex erased, the
+ * region deleted, an undo) rather than going stale (issues #28, #35).
  */
 type SelectionRef =
   | { readonly kind: 'label'; readonly id: string }
-  | { readonly kind: 'cell'; readonly coord: Axial };
+  | { readonly kind: 'cell'; readonly coord: Axial }
+  | { readonly kind: 'region'; readonly id: string };
 
 /**
  * The Feature Tool's Subtools in palette/keyboard order: each library feature,
@@ -166,6 +169,18 @@ export class EditorStore {
   private readonly _selection = signal<SelectionRef | null>(null);
 
   /**
+   * The per-coordinate selection cycle (CONTEXT.md → Select, ADR-0011). A click
+   * resolves a stack of candidates at one coordinate — `Label → Feature → Hex →
+   * each containing Region in document order` — and repeated clicks at the *same*
+   * coordinate descend through it, wrapping after the last. The anchor encodes the
+   * coordinate (and the label hit) the cycle is running at; a click on a different
+   * coordinate or label fails to match it, so the index resets to the top. Both
+   * are transient editor state — never in the document, undone, or persisted.
+   */
+  private cycleAnchor: string | null = null;
+  private cycleIndex = 0;
+
+  /**
    * What is currently selected, or `null`, resolved against the live document so
    * it never goes stale: a cell with a Feature reads as `feature`, a cell with a
    * bare Hex as `hex`, and a cell whose hex was erased (or a label whose id is
@@ -179,6 +194,13 @@ export class EditorStore {
     if (ref.kind === 'label') {
       return this._document().labels.some((l) => l.id === ref.id)
         ? { kind: 'label', id: ref.id }
+        : null;
+    }
+    if (ref.kind === 'region') {
+      // A Region selection self-heals: once its region is gone (deleted, undone),
+      // the selection resolves to nothing rather than dangling (issue #35).
+      return this._document().regions.some((r) => r.id === ref.id)
+        ? { kind: 'region', id: ref.id }
         : null;
     }
     const hex = this._document().hexes[coordKey(ref.coord)];
@@ -295,7 +317,7 @@ export class EditorStore {
     // rather than leaving a dangling region or label id behind.
     this._tool.set('select');
     this.resetSubtoolMemory();
-    this._selection.set(null);
+    this.deselect(); // clears the selection and forgets the per-coordinate cycle
   }
 
   /** Restore the cold-start Subtool memory shared by a fresh store and a reload. */
@@ -511,17 +533,45 @@ export class EditorStore {
    * branch on it (e.g. start a label drag) without re-scanning the document.
    */
   select(coord: Axial, labelHit: string | null): Selection | null {
-    if (labelHit !== null) {
-      this._selection.set({ kind: 'label', id: labelHit });
-    } else {
-      // A painted cell selects it (Feature vs Hex is derived in `selection`); a
-      // Void coordinate with no label hit is a click on empty space → deselect
-      // through the one canonical clear so it shares any teardown `deselect` does.
-      const hex = this._document().hexes[coordKey(coord)];
-      if (hex) this._selection.set({ kind: 'cell', coord });
-      else this.deselect();
+    const stack = this.candidatesAt(coord, labelHit);
+    // Empty stack = a click on empty space (Void in no Region, no label hit) →
+    // deselect through the one canonical clear so it shares `deselect`'s teardown
+    // (which also forgets the cycle, so the next click starts fresh) (issue #35).
+    if (stack.length === 0) {
+      this.deselect();
+      return null;
     }
+    // The cycle descends only while clicks land on the same coordinate (and label
+    // hit); anything else fails the anchor match and resets to the top of the
+    // stack. Wrapping past the last candidate returns to the first (issue #35).
+    const anchor = `${coordKey(coord)}|${labelHit ?? ''}`;
+    this.cycleIndex =
+      anchor === this.cycleAnchor ? (this.cycleIndex + 1) % stack.length : 0;
+    this.cycleAnchor = anchor;
+    this._selection.set(stack[this.cycleIndex]);
     return this.selection();
+  }
+
+  /**
+   * The selection candidates under a click, deepest-last, as the references the
+   * cycle steps through: the Label hit (if any), then the painted cell (if any),
+   * then every Region whose membership contains the coordinate in document order.
+   * Whether the cell reads as a Feature or a bare Hex is left to {@link selection}
+   * to derive; this only records that the cell is a candidate (issue #35).
+   */
+  private candidatesAt(coord: Axial, labelHit: string | null): SelectionRef[] {
+    const refs: SelectionRef[] = [];
+    if (labelHit !== null) refs.push({ kind: 'label', id: labelHit });
+    // Copy the coordinate rather than aliasing the caller's object, so a coord it
+    // later mutates (e.g. a reused hover object) can't retarget the selection.
+    const key = coordKey(coord);
+    if (this._document().hexes[key]) {
+      refs.push({ kind: 'cell', coord: { q: coord.q, r: coord.r } });
+    }
+    for (const region of this._document().regions) {
+      if (region.hexes[key]) refs.push({ kind: 'region', id: region.id });
+    }
+    return refs;
   }
 
   /** Select the Label `id` for editing in the inspector, or `null` to clear it. */
@@ -539,6 +589,10 @@ export class EditorStore {
    */
   deselect(): void {
     this._selection.set(null);
+    // Forget the cycle so a click that re-selects the same coordinate later starts
+    // from the top of the stack rather than resuming a stale descent (issue #35).
+    this.cycleAnchor = null;
+    this.cycleIndex = 0;
   }
 
   /**
@@ -618,7 +672,10 @@ export class EditorStore {
     if (!sel) return;
     if (sel.kind === 'label') this.deleteLabel(sel.id);
     else if (sel.kind === 'feature') this.clearFeatureAt(sel.coord);
-    else this.eraseAt(sel.coord);
+    else if (sel.kind === 'hex') this.eraseAt(sel.coord);
+    // A selected Region is left untouched: Region deletion is the Inspector's job
+    // (issue #36), so Delete is a deliberate no-op here rather than erasing a hex.
+    else return;
     this.deselect();
     // The dispatched edit erased an entity that existed (the selection resolved
     // it), so a step was recorded; stamp the now-cleared selection on it, so undo

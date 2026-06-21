@@ -7,10 +7,14 @@ class FakeContext {
   fillStyle = '';
   strokeStyle = '';
   lineWidth = 0;
+  /** The current global alpha — 1 is opaque; a region highlight fills under < 1. */
+  globalAlpha = 1;
   /** Every drawing call, in order — only the asserted ones need inspecting. */
   readonly ops: string[] = [];
   /** The fillStyle in effect at each `fill()` (path fills, not `fillRect`). */
   readonly pathFills: string[] = [];
+  /** The globalAlpha in effect at each `fill()`, parallel to {@link pathFills}. */
+  readonly pathFillAlphas: number[] = [];
 
   setTransform(): void {
     this.ops.push('setTransform');
@@ -71,6 +75,7 @@ class FakeContext {
   }
   fill(): void {
     this.pathFills.push(this.fillStyle);
+    this.pathFillAlphas.push(this.globalAlpha);
   }
 }
 
@@ -441,6 +446,55 @@ describe('Canvas2dMapRenderer selection highlight', () => {
     renderer.render(camera, doc, null, null, null);
 
     expect(ctx.lineStrokes).not.toContain(SELECT_INK);
+    restore();
+  });
+});
+
+describe('Canvas2dMapRenderer region selection highlight', () => {
+  it('fills a selected region\'s member hex translucently in the region colour', () => {
+    const restore = stubTheme();
+    const ctx = new FakeContext();
+    const renderer = makeRenderer(ctx);
+    const camera = Camera.initial().panBy(60, 60);
+    const doc: HexMap = {
+      hexes: {},
+      regions: [
+        { id: 'a', name: 'Avalon', color: '#b08a4e', hexes: { '0,0': true } },
+      ],
+      labels: [],
+    };
+
+    renderer.render(camera, doc, null, null, { kind: 'region', id: 'a' });
+
+    // The selected region tints its member hex: a path fill in the region colour
+    // (unlike unselected regions, which only stroke a border)…
+    const at = ctx.pathFills.indexOf('#b08a4e');
+    expect(at).toBeGreaterThanOrEqual(0);
+    // …and the fill is translucent, so the terrain stays legible beneath it.
+    expect(ctx.pathFillAlphas[at]).toBeLessThan(1);
+    restore();
+  });
+
+  it('leaves an unselected region border-only while another region is selected', () => {
+    const restore = stubTheme();
+    const ctx = new FakeContext();
+    const renderer = makeRenderer(ctx);
+    const camera = Camera.initial().panBy(60, 60);
+    const doc: HexMap = {
+      hexes: {},
+      regions: [
+        { id: 'a', name: 'Avalon', color: '#b08a4e', hexes: { '0,0': true } },
+        { id: 'b', name: 'Whisperwood', color: '#7c9b86', hexes: { '0,0': true } },
+      ],
+      labels: [],
+    };
+
+    renderer.render(camera, doc, null, null, { kind: 'region', id: 'a' });
+
+    // Only the selected region is filled; the other stays a coloured outline so
+    // the map isn't washed in colour (ADR-0011).
+    expect(ctx.pathFills).toContain('#b08a4e');
+    expect(ctx.pathFills).not.toContain('#7c9b86');
     restore();
   });
 });

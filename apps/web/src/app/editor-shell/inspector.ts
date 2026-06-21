@@ -198,7 +198,9 @@ export class Inspector {
    */
   protected readonly selectedEntity = computed<SelectedEntity | null>(() => {
     const sel = this.store.selection();
-    if (!sel || sel.kind === 'label') return null;
+    // A Region selection has its own Inspector editor (issue #36); a Label has the
+    // label editor. Only a Hex/Feature selection drives this identity panel.
+    if (!sel || sel.kind === 'label' || sel.kind === 'region') return null;
     const hex = this.store.document().hexes[coordKey(sel.coord)];
     if (!hex) return null;
     const terrain = terrainLabel(hex.terrain) ?? hex.terrain;
