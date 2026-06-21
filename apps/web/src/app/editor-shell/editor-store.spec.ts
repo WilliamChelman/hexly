@@ -428,27 +428,6 @@ describe('EditorStore', () => {
     expect(store.region()).toBeNull();
   });
 
-  it('applyAt adds the hovered hex to the armed region', () => {
-    const store = new EditorStore();
-    const id = store.createRegion('Avalon', '#b08a4e');
-
-    store.armRegion(id, 'add');
-    store.applyAt({ q: 3, r: 3 });
-
-    expect(store.document().regions[0].hexes['3,3']).toBe(true);
-  });
-
-  it('applyAt removes the hovered hex when the region tool is in remove mode', () => {
-    const store = new EditorStore();
-    const id = store.createRegion('Avalon', '#b08a4e');
-    store.addHexToRegion(id, { q: 3, r: 3 });
-
-    store.armRegion(id, 'remove');
-    store.applyAt({ q: 3, r: 3 });
-
-    expect('3,3' in store.document().regions[0].hexes).toBe(false);
-  });
-
   it('keeps region membership when the underlying terrain is erased', () => {
     const store = new EditorStore();
     const id = store.createRegion('Avalon', '#b08a4e');
@@ -678,15 +657,16 @@ describe('EditorStore two-level armed state', () => {
     expect(store.feature()).toBe('clear');
   });
 
-  it('picks the nth Region Subtool by index, keeping the current brush mode', () => {
+  it('ignores a Subtool index while the Region tool is armed (no Subtools)', () => {
     const store = new EditorStore();
     const a = store.createRegion('Avalon', '#b08a4e');
-    const b = store.createRegion('Whisperwood', '#7c9b86');
-    store.armRegion(a, 'remove');
+    store.createRegion('Whisperwood', '#7c9b86');
+    store.armRegion(a, 'remove'); // armed on Avalon
 
-    store.armSubtoolByIndex(2); // the 2nd region
+    store.armSubtoolByIndex(2); // the Region tool has no Subtools, so 1–9 do nothing
 
-    expect(store.region()).toEqual({ id: b, mode: 'remove' });
+    // The armed Region is untouched — the index neither switched regions nor mode.
+    expect(store.region()).toEqual({ id: a, mode: 'remove' });
   });
 
   it('treats an out-of-range Subtool index as a no-op', () => {
@@ -727,17 +707,18 @@ describe('EditorStore two-level armed state', () => {
     expect(store.regionDirection()).toBe('add');
   });
 
-  it('auto-arms the first region when Region is armed with none remembered', () => {
+  it('does not auto-arm a region when Region is armed with none remembered', () => {
     const store = new EditorStore();
-    const a = store.createRegion('Avalon', '#b08a4e');
+    store.createRegion('Avalon', '#b08a4e');
     store.createRegion('Whisperwood', '#7c9b86');
 
-    // No Subtool picked yet — arming Region must land on a live region, not leave
-    // the tool inert behind a populated legend (issue #27).
     store.armTool('region');
 
+    // Create-and-paint replaces the old auto-arm-first-region (issue #27 → #38): the
+    // tool arms with no Region, so the first canvas stroke mints a new one rather
+    // than silently painting an arbitrary existing region.
     expect(store.tool()).toBe('region');
-    expect(store.region()).toEqual({ id: a, mode: 'add' });
+    expect(store.region()).toBeNull();
   });
 
   it('arms no region Subtool when Region is armed on a region-less map', () => {
@@ -1418,5 +1399,81 @@ describe('EditorStore region direction', () => {
 
     store.redo();
     expect('0,0' in store.document().regions[0].hexes).toBe(false);
+  });
+});
+
+describe('EditorStore Region create-and-paint', () => {
+  it('mints a Region, adds the clicked hex, and selects it when armed with no Region selected', () => {
+    const store = new EditorStore();
+    store.armTool('region'); // armed, but nothing is selected
+
+    store.applyAt({ q: 2, r: 3 });
+
+    const regions = store.document().regions;
+    expect(regions).toHaveLength(1);
+    expect(regions[0].hexes).toEqual({ '2,3': true });
+    expect(store.selection()).toEqual({ kind: 'region', id: regions[0].id });
+  });
+
+  it('keeps the minted Region selected and armed in Add, so continued clicks add to it', () => {
+    const store = new EditorStore();
+    store.armTool('region');
+
+    store.applyAt({ q: 0, r: 0 }); // mints a Region and selects it
+    store.applyAt({ q: 1, r: 0 }); // a continued stroke adds to the same Region
+
+    const regions = store.document().regions;
+    expect(regions).toHaveLength(1); // not a second freshly-minted Region
+    expect(regions[0].hexes).toEqual({ '0,0': true, '1,0': true });
+    expect(store.tool()).toBe('region');
+    expect(store.regionDirection()).toBe('add');
+    expect(store.selection()).toEqual({ kind: 'region', id: regions[0].id });
+  });
+
+  it('auto-names minted Regions "Region N" with the next palette colour', () => {
+    const store = new EditorStore();
+    store.armTool('region');
+
+    store.applyAt({ q: 0, r: 0 }); // mints Region 1, leaving it selected
+    store.deselect(); // drop the selection so the next stroke mints again
+    store.applyAt({ q: 5, r: 5 }); // mints Region 2
+
+    const regions = store.document().regions;
+    expect(regions.map((r) => r.name)).toEqual(['Region 1', 'Region 2']);
+    // The first two colours of the new-region palette, in order.
+    expect(regions.map((r) => r.color)).toEqual(['#7c9b86', '#b08a4e']);
+  });
+
+  it('numbers a minted Region by the next unused "Region N", not the region count', () => {
+    const store = new EditorStore();
+    store.armTool('region');
+
+    store.applyAt({ q: 0, r: 0 }); // Region 1
+    store.deselect();
+    store.applyAt({ q: 5, r: 5 }); // Region 2
+    store.deleteRegion(store.document().regions[0].id); // delete Region 1
+    store.deselect();
+    store.applyAt({ q: 9, r: 9 }); // mints again
+
+    // "Region 1" is free again, but the next number is max(existing)+1 = 3, so a
+    // name/colour freed by a deletion is not immediately reused.
+    const names = store.document().regions.map((r) => r.name);
+    expect(names).toEqual(['Region 2', 'Region 3']);
+  });
+
+  it('makes the mint-and-paint first stroke a single undoable step', () => {
+    const store = new EditorStore();
+    store.armTool('region');
+
+    store.applyAt({ q: 2, r: 3 }); // mint + first hex, recorded as one step
+    const id = store.document().regions[0].id;
+
+    store.undo(); // one undo removes the whole new Region and clears the selection
+    expect(store.document().regions).toEqual([]);
+    expect(store.selection()).toBeNull();
+
+    store.redo(); // redo brings the Region back, selected
+    expect(store.document().regions[0].hexes).toEqual({ '2,3': true });
+    expect(store.selection()).toEqual({ kind: 'region', id });
   });
 });

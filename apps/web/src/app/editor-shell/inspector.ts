@@ -10,9 +10,10 @@ import { EditorStore } from './editor-store';
 import { RegionFields } from './region-fields';
 
 /**
- * The membership-paint directions, as the Inspector's Add/Remove toggle pair —
- * the same two modes the palette legend renders, kept in one data table so the
- * two buttons can't drift (mirrors {@link tool-palette}'s `REGION_MODES`).
+ * The membership-paint directions, as the Inspector's Add/Remove toggle pair,
+ * kept in one data table so the two buttons can't drift. The Inspector is the
+ * only place a Region's membership direction is set now that the Region tool's
+ * legend is gone (issue #38).
  */
 const DIRECTIONS = [
   { direction: 'add', label: 'Add', testid: 'region-add' },
@@ -129,10 +130,10 @@ interface SelectedEntity {
       <!--
         Engaging either button auto-arms the Region tool on this Region with the
         chosen membership direction (issue #37) — the only control outside the
-        palette permitted to arm a Tool. The pair mirrors the palette legend's
-        armed-mode affordance (the .mode/.active class + aria-pressed), driven from
-        the same store.regionDirection() the brush paints by so the active one reads
-        as set and can never disagree with the stroke.
+        palette permitted to arm a Tool. The active button (the .active class +
+        aria-pressed) is driven from the same store.regionDirection() the brush
+        paints by, so the active one reads as set and can never disagree with the
+        stroke.
       -->
       <div appField label="Membership">
         <div class="direction" role="group" aria-label="Membership direction">
@@ -228,9 +229,8 @@ interface SelectedEntity {
       display: flex;
       gap: var(--space-2);
     }
-    /* The armed-mode affordance shared with the palette legend (tool-palette.ts):
-       a quiet outline that fills gold-soft when active, not the global primary
-       call-to-action variant. Stretched to share the row. */
+    /* The armed-mode affordance: a quiet outline that fills gold-soft when active,
+       not the global primary call-to-action variant. Stretched to share the row. */
     .mode {
       flex: 1;
       background: none;

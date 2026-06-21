@@ -28,7 +28,7 @@ enablePatches();
  * - `select` — the non-destructive Tool; a click does nothing yet (issue #27)
  * - `terrain` — paint the remembered terrain (creates or replaces a hex)
  * - `feature` — place the remembered feature, or Clear it (see FeatureSubtool)
- * - `region` — add/remove the hovered hex to/from the remembered region
+ * - `region` — paint the selected region's membership, or mint one (issue #38)
  * - `label` — drop a free-positioned Label at the clicked world point (issue #10)
  * - `erase` — delete the whole hex record so the coordinate becomes Void
  */
@@ -48,9 +48,11 @@ export type ToolId =
 export type FeatureSubtool = FeatureId | 'clear';
 
 /**
- * The Region tool's Subtool: which region the brush targets, and whether it
- * paints (`add`) or erases (`remove`) membership. `null` until a region is
- * picked — the Region tool then applies nothing.
+ * The Region tool's target: which region the brush paints, and whether it adds
+ * (`add`) or removes (`remove`) membership. `null` until a Region is selected and a
+ * direction engaged (issue #37); with none, the Region tool create-and-paints a
+ * fresh Region on the next stroke instead (issue #38). It is no longer a Subtool —
+ * the Region tool has none — but keeps the historical name for the `region()` API.
  */
 export interface RegionSubtool {
   readonly id: string;
@@ -95,6 +97,14 @@ export const featureSubtools: readonly FeatureSubtool[] = [
   'clear',
 ];
 
+/**
+ * The colours a create-and-painted Region cycles through, so two new Regions look
+ * distinct without the user picking a colour first; they can recolour to anything
+ * afterwards (the document stores an arbitrary `#rrggbb`). Keyed by the Region's
+ * "Region N" number so the colour tracks the name (issue #8, #38).
+ */
+const NEW_REGION_COLORS = ['#7c9b86', '#b08a4e', '#6f7fae', '#a8674f', '#5f8c8c'];
+
 /** Cold-start Subtool defaults — the state a fresh map and a reloaded map share. */
 const DEFAULT_TERRAIN: TerrainId = 'forest';
 const DEFAULT_FEATURE: FeatureSubtool = featureLibrary[0].id;
@@ -138,18 +148,18 @@ export class EditorStore {
   readonly terrain = this._terrain.asReadonly();
   /** The remembered Feature Subtool — a library feature to place, or `'clear'`. */
   readonly feature = this._feature.asReadonly();
-  /** The remembered Region Subtool — the targeted region and brush mode, or `null`. */
+  /** The Region tool's target — the painted region and brush mode, or `null`. */
   readonly region = this._region.asReadonly();
 
   /**
    * The membership-paint direction the Inspector's Add ⇄ Remove toggle reflects:
    * `add` paints a hex into the inspected Region, `remove` erases it. Derived from
-   * the armed Region Subtool's `mode` — the *same* state {@link applyAt} paints by
-   * — so the toggle is a single source of truth and can never disagree with what a
-   * stroke actually does, no matter which path armed the Region (the palette
-   * legend, the number keys, or {@link armRegionDirection}). Cold-starts at `add`
-   * whenever no Region is armed: a fresh store, a reloaded map, or after the armed
-   * Region is deleted. In-memory, session-only editor state in the same category
+   * the armed Region's `mode` — the *same* state {@link applyAt} paints by — so the
+   * toggle is a single source of truth and can never disagree with what a stroke
+   * actually does, no matter which path armed the Region ({@link armRegionDirection}
+   * or {@link createAndPaintRegion}). Cold-starts at `add` whenever no Region is
+   * armed: a fresh store, a reloaded map, or after the armed Region is deleted.
+   * In-memory, session-only editor state in the same category
    * as the armed Tool — never part of the `HexMap` document, never undone, saved,
    * or restored across reloads (issue #37).
    */
@@ -270,17 +280,11 @@ export class EditorStore {
   /**
    * Arm the top-level Tool `id` for the next gestures. Re-arming a Tool restores
    * its remembered Subtool implicitly — the Subtool memory is held separately, so
-   * switching Tools never disturbs it (issue #27).
+   * switching Tools never disturbs it (issue #27). Arming Region never auto-picks a
+   * region: with none selected, the first stroke mints one (create-and-paint,
+   * issue #38) rather than silently painting an arbitrary existing region.
    */
   armTool(id: ToolId): void {
-    // Arming Region with no remembered Subtool but regions to paint would leave
-    // the tool inert (every stroke a silent no-op) behind a live-looking legend.
-    // Default to the first region so the tool is immediately usable; a genuinely
-    // region-less document still arms nothing, per "Region → none" (issue #27).
-    if (id === 'region' && !this._region()) {
-      const first = this._document().regions[0];
-      if (first) this._region.set({ id: first.id, mode: 'add' });
-    }
     this._tool.set(id);
   }
 
@@ -326,9 +330,10 @@ export class EditorStore {
   /**
    * Pick the `n`-th (1-based) Subtool of the currently armed Tool — the keyboard
    * `1`–`9` binding (issue #27). The Subtool set is relative to the armed Tool:
-   * Terrain → the terrain palette, Feature → the feature library then Clear,
-   * Region → the document's regions (keeping the current brush mode). Out-of-range
-   * indices and Tools without Subtools (Select, Label, Erase) are no-ops.
+   * Terrain → the terrain palette, Feature → the feature library then Clear.
+   * Out-of-range indices and Tools without Subtools (Select, Region, Label, Erase)
+   * are no-ops — the Region tool create-and-paints rather than choosing a region by
+   * index (issue #38).
    */
   armSubtoolByIndex(n: number): void {
     switch (this._tool()) {
@@ -340,11 +345,6 @@ export class EditorStore {
       case 'feature': {
         const sub = featureSubtools[n - 1];
         if (sub) this.armFeature(sub);
-        break;
-      }
-      case 'region': {
-        const r = this._document().regions[n - 1];
-        if (r) this.armRegion(r.id, this._region()?.mode ?? 'add');
         break;
       }
       default:
@@ -400,10 +400,16 @@ export class EditorStore {
         break;
       }
       case 'region': {
-        const region = this._region();
-        if (!region) break; // no region picked yet → nothing to apply
-        if (region.mode === 'add') this.addHexToRegion(region.id, coord);
-        else this.removeHexFromRegion(region.id, coord);
+        // The Region tool dispatches on whether a Region is *selected* (issue #38):
+        // with one selected, a stroke paints its membership per the direction; with
+        // none, the first stroke mints a Region and paints onto it (create-and-paint).
+        const selected = this.selectedRegion();
+        if (!selected) {
+          this.createAndPaintRegion(coord);
+          break;
+        }
+        if (this.regionDirection() === 'add') this.addHexToRegion(selected.id, coord);
+        else this.removeHexFromRegion(selected.id, coord);
         break;
       }
       case 'label':
@@ -512,6 +518,38 @@ export class EditorStore {
       draft.regions.push({ id, name, color, hexes: {} });
     });
     return id;
+  }
+
+  /**
+   * Create-and-paint: mint a fresh "Region N" with the next palette colour, seed it
+   * with the clicked `coord`, select it, and arm the Region tool on it in Add — so
+   * continued strokes keep adding to it (issue #38). The mint and its first hex are a
+   * single `commit`, so one undo removes the whole new Region and clears the selection
+   * (and redo brings it back selected). The number is the next unused "Region N" (max
+   * existing + 1, or 1 when none), so a name/colour freed by a deletion is not reused.
+   */
+  private createAndPaintRegion(coord: Axial): void {
+    const used = this._document().regions.flatMap((r) => {
+      const match = /^Region (\d+)$/.exec(r.name);
+      return match ? [Number(match[1])] : [];
+    });
+    const n = used.length ? Math.max(...used) + 1 : 1;
+    const color = NEW_REGION_COLORS[(n - 1) % NEW_REGION_COLORS.length];
+    const id = mintId();
+    this.commit((draft) => {
+      draft.regions.push({
+        id,
+        name: `Region ${n}`,
+        color,
+        hexes: { [coordKey(coord)]: true },
+      });
+    });
+    // Select the new Region and arm Add so the next stroke keeps painting onto it.
+    this._selection.set({ kind: 'region', id });
+    this.armRegion(id, 'add');
+    // Stamp the post-mint selection onto the edit so undo clears it with the Region
+    // and redo restores it — the mint always records a step, so an edit exists.
+    this.trackSelectionOnLastEdit();
   }
 
   /** Rename the region `id`; a no-op (no undo step) if there is no such region. */
