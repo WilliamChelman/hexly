@@ -402,6 +402,32 @@ describe('EditorStore', () => {
     expect(store.canUndo()).toBe(false); // it really was one step, not two
   });
 
+  it('disarms the Region tool when its armed Region is deleted, and undo does not re-arm it', () => {
+    const store = new EditorStore();
+    const id = 'reg-avalon';
+    store.load({
+      hexes: {},
+      regions: [{ id, name: 'Avalon', color: '#b08a4e', hexes: { '1,1': true } }],
+      labels: [],
+    });
+    store.armRegion(id, 'add'); // arm the Region tool on it…
+    store.select({ q: 1, r: 1 }, null); // …and select it
+
+    store.deleteSelected();
+    expect(store.document().regions).toEqual([]);
+    // The now-dangling Region tool falls back to the inert Select.
+    expect(store.tool()).toBe('select');
+    expect(store.region()).toBeNull();
+
+    store.undo(); // restores the document and selection — but NOT the tool arming:
+    expect(store.document().regions[0].id).toBe(id);
+    expect(store.selection()).toEqual({ kind: 'region', id });
+    // Tool/subtool memory is session-only state (issue #27), never part of an
+    // undoable edit, so it stays on Select rather than re-arming the Region tool.
+    expect(store.tool()).toBe('select');
+    expect(store.region()).toBeNull();
+  });
+
   it('applyAt adds the hovered hex to the armed region', () => {
     const store = new EditorStore();
     const id = store.createRegion('Avalon', '#b08a4e');

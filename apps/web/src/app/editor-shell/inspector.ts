@@ -7,6 +7,7 @@ import { Field } from '../ui/field';
 import { Input } from '../ui/input';
 import { inputValue } from './dom';
 import { EditorStore } from './editor-store';
+import { RegionFields } from './region-fields';
 
 /** A selected Hex or Feature resolved for display: its coordinate and identity. */
 interface SelectedEntity {
@@ -34,7 +35,7 @@ interface SelectedEntity {
 @Component({
   selector: 'app-inspector',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Coord, Eyebrow, Field, Input],
+  imports: [Button, Coord, Eyebrow, Field, Input, RegionFields],
   template: `
     @let label = store.selectedLabel();
     @let region = store.selectedRegion();
@@ -113,23 +114,7 @@ interface SelectedEntity {
         <span appEyebrow>Selected region</span>
       </header>
 
-      <div appField label="Name">
-        <input
-          appInput
-          data-testid="region-name"
-          [value]="region.name"
-          (change)="onRegionName(region.id, $event)"
-        />
-      </div>
-
-      <div appField label="Color">
-        <input
-          type="color"
-          data-testid="region-color"
-          [value]="region.color"
-          (change)="onRegionColor(region.id, $event)"
-        />
-      </div>
+      <app-region-fields [region]="region" />
 
       <div class="actions">
         <button
@@ -250,14 +235,6 @@ export class Inspector {
       : null;
     return { kind: sel.kind, q: sel.coord.q, r: sel.coord.r, terrain, feature };
   });
-
-  protected onRegionName(id: string, event: Event): void {
-    this.store.renameRegion(id, inputValue(event));
-  }
-
-  protected onRegionColor(id: string, event: Event): void {
-    this.store.recolorRegion(id, inputValue(event));
-  }
 
   protected onText(id: string, event: Event): void {
     this.store.editLabelText(id, inputValue(event));

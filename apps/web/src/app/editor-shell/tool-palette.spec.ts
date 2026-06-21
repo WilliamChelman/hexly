@@ -209,4 +209,18 @@ describe('ToolPalette regions', () => {
 
     expect(store.document().regions).toEqual([]);
   });
+
+  it('clears the selection when the deleted region was the selected one', () => {
+    const { fixture, store } = setup();
+    const id = store.createRegion('Avalon', '#b08a4e');
+    store.addHexToRegion(id, { q: 0, r: 0 });
+    store.select({ q: 0, r: 0 }, null); // the only candidate there: the Region
+    store.armTool('region'); // render the regions legend (and its Delete control)
+    expect(store.selection()).toEqual({ kind: 'region', id });
+
+    click(fixture, `region-delete-${id}`);
+
+    expect(store.document().regions).toEqual([]);
+    expect(store.selection()).toBeNull();
+  });
 });
