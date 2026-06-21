@@ -43,6 +43,7 @@ export const terrainPalette = [
   { id: 'ocean', label: 'Ocean', fill: '--terrain-ocean' },
   { id: 'mountain', label: 'Mountains', fill: '--terrain-mountain' },
   { id: 'desert', label: 'Desert', fill: '--terrain-desert' },
+  { id: 'sky', label: 'Sky', fill: '--terrain-sky' },
 ] as const satisfies readonly Terrain[];
 
 /**
