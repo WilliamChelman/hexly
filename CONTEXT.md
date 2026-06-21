@@ -73,13 +73,21 @@ A top-level editing mode armed in the palette — Select, Terrain, Feature, Regi
 _Avoid_: Mode, brush, instrument
 
 **Subtool**:
-A mutually-exclusive variant *within* a Tool — the Terrain tool's individual terrains, the Feature tool's individual features (and its Clear variant), the Region tool's individual regions. Tools that have Subtools remember the last one used for the session. Select, Label, and Erase have no Subtools.
+A mutually-exclusive variant *within* a Tool — the Terrain tool's individual terrains, the Feature tool's individual features (and its Clear variant). Tools that have Subtools remember the last one used for the session. Select, Region, Label, and Erase have no Subtools.
 _Avoid_: Sub-mode, option, variant
 
 **Select**:
-The one non-destructive Tool: click to select the topmost entity under the cursor (Label, then Feature, then Hex), inspect it, delete it, or drag to move a Label or a whole Hex. The only way to select and manipulate existing content — painting Tools never select.
+The one non-destructive Tool: click to select the topmost entity under the cursor, inspect it, delete it, or drag to move a Label or a whole Hex. Repeated clicks at the same coordinate cycle *deeper* through the stack — `Label → Feature → Hex → each Region containing that coordinate (document order) → wrap` — so an overlapped or interior Region becomes reachable. Painting Tools never select; Select itself never paints.
 _Avoid_: Pointer, move tool, arrow
 
 **Erase**:
 The Tool that deletes a whole Hex record (its terrain *and* feature), turning the coordinate back into Void. Distinct from the Feature tool's Clear Subtool, which removes only the feature and leaves the terrain.
 _Avoid_: Delete, clear, remove
+
+**Inspector**:
+The surface that shows and edits the currently selected entity. For a Label it edits text/size/rotation/position; for a Region it edits name, color, deletion, and the Add/Remove membership direction — the *only* place Region details are edited (the Region tool has no Subtools). Engaging a Region's Add/Remove here arms the Region tool on that Region.
+_Avoid_: Side panel, details pane, properties
+
+**Regions panel**:
+A list of every Region (named, colored, including ones currently empty and so invisible on the map), plus a New Region action. Selecting a Region here is equivalent to selecting it on the canvas. Shares its on-screen home with the Inspector.
+_Avoid_: Region legend, layers, list
