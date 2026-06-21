@@ -820,4 +820,247 @@ describe('EditorStore selection precedence', () => {
 
     expect(store.selectedLabel()).toBeNull();
   });
+
+  it('deselect clears the current selection', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'grass');
+    store.select({ q: 0, r: 0 }, null);
+    expect(store.selection()).not.toBeNull();
+
+    store.deselect();
+
+    expect(store.selection()).toBeNull();
+  });
+});
+
+describe('EditorStore deleteSelected', () => {
+  it('deletes the selected Label and clears the selection', () => {
+    const store = new EditorStore();
+    const id = store.addLabel('Doomed', { x: 0, y: 0 });
+    store.selectLabel(id);
+
+    store.deleteSelected();
+
+    expect(store.document().labels).toEqual([]);
+    expect(store.selection()).toBeNull();
+  });
+
+  it('deletes a selected Feature by clearing only the feature, leaving the terrain', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 1, r: 1 }, 'forest');
+    store.placeFeatureAt({ q: 1, r: 1 }, 'settlement');
+    store.select({ q: 1, r: 1 }, null); // selects the Feature (precedence)
+
+    store.deleteSelected();
+
+    expect(store.document().hexes['1,1']).toEqual({ terrain: 'forest' });
+    expect(store.selection()).toBeNull();
+  });
+
+  it('deletes a selected Hex by erasing its whole record, back to Void', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: -3, r: 4 }, 'ocean');
+    store.placeFeatureAt({ q: -3, r: 4 }, 'ruin');
+    // Selecting a hex that carries a feature selects the Feature, so clear the
+    // feature first to get a bare-Hex selection (precedence: Feature wins).
+    store.clearFeatureAt({ q: -3, r: 4 });
+    store.select({ q: -3, r: 4 }, null);
+
+    store.deleteSelected();
+
+    expect('-3,4' in store.document().hexes).toBe(false);
+    expect(store.selection()).toBeNull();
+  });
+
+  it('treats deleteSelected with nothing selected as a no-op with no undo step', () => {
+    const store = new EditorStore();
+
+    store.deleteSelected();
+
+    expect(store.canUndo()).toBe(false);
+  });
+
+  it('records a single undoable step for a delete', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.placeFeatureAt({ q: 0, r: 0 }, 'settlement');
+    store.select({ q: 0, r: 0 }, null); // the Feature
+
+    store.deleteSelected();
+    store.undo();
+
+    // One undo restores the feature exactly — the delete was a single commit.
+    expect(store.document().hexes['0,0']).toEqual({
+      terrain: 'forest',
+      feature: { ref: 'settlement' },
+    });
+  });
+});
+
+describe('EditorStore moveHex', () => {
+  it('moves a hex\'s content to the destination, leaving the origin Void', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.placeFeatureAt({ q: 0, r: 0 }, 'settlement');
+
+    store.moveHex({ q: 0, r: 0 }, { q: 2, r: -1 });
+
+    expect(store.document().hexes['2,-1']).toEqual({
+      terrain: 'forest',
+      feature: { ref: 'settlement' },
+    });
+    expect('0,0' in store.document().hexes).toBe(false);
+  });
+
+  it('overwrites an already-occupied destination', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.paintAt({ q: 1, r: 0 }, 'ocean'); // the destination is already painted
+
+    store.moveHex({ q: 0, r: 0 }, { q: 1, r: 0 });
+
+    expect(store.document().hexes['1,0']).toEqual({ terrain: 'forest' });
+    expect('0,0' in store.document().hexes).toBe(false);
+  });
+
+  it('leaves region memberships at both the origin and destination untouched', () => {
+    const store = new EditorStore();
+    const id = store.createRegion('Avalon', '#b08a4e');
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.addHexToRegion(id, { q: 0, r: 0 }); // origin is a region member
+    store.addHexToRegion(id, { q: 1, r: 0 }); // so is the destination coordinate
+
+    // A Region is a location overlay keyed by coordinate, not a property of the
+    // painted cell, so moving content must not drag membership with it.
+    store.moveHex({ q: 0, r: 0 }, { q: 1, r: 0 });
+
+    expect(store.document().regions[0].hexes).toEqual({ '0,0': true, '1,0': true });
+  });
+
+  it('restores both the origin and the overwritten destination with a single undo', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.placeFeatureAt({ q: 0, r: 0 }, 'settlement');
+    store.paintAt({ q: 1, r: 0 }, 'ocean'); // destination content that gets clobbered
+
+    store.moveHex({ q: 0, r: 0 }, { q: 1, r: 0 });
+    store.undo();
+
+    // One undo step puts both ends back: the origin returns and the destination
+    // recovers what it was before the overwrite — no silent loss (ADR-0010).
+    expect(store.document().hexes['0,0']).toEqual({
+      terrain: 'forest',
+      feature: { ref: 'settlement' },
+    });
+    expect(store.document().hexes['1,0']).toEqual({ terrain: 'ocean' });
+  });
+
+  it('treats moving onto the same coordinate as a no-op with no undo step', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+
+    store.moveHex({ q: 0, r: 0 }, { q: 0, r: 0 });
+
+    expect(store.document().hexes['0,0']).toEqual({ terrain: 'forest' });
+    // The paint is the only undo step: a single undo empties the map, proving the
+    // self-move recorded nothing.
+    store.undo();
+    expect(store.canUndo()).toBe(false);
+    expect(store.document().hexes).toEqual({});
+  });
+
+  it('treats moving a Void origin as a no-op with no undo step', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 1, r: 0 }, 'ocean'); // a painted destination
+
+    store.moveHex({ q: 5, r: 5 }, { q: 1, r: 0 }); // origin is Void → nothing moves
+
+    expect(store.document().hexes['1,0']).toEqual({ terrain: 'ocean' });
+    expect('5,5' in store.document().hexes).toBe(false);
+    // Only the paint recorded a step; undoing it leaves nothing further to undo.
+    store.undo();
+    expect(store.canUndo()).toBe(false);
+    expect(store.document().hexes).toEqual({});
+  });
+
+  it('moves a terrain-only hex without inventing a feature on the destination', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest'); // bare terrain, no feature
+
+    store.moveHex({ q: 0, r: 0 }, { q: 2, r: -1 });
+
+    // The clone carries exactly what the origin held — no `feature` key appears.
+    expect(store.document().hexes['2,-1']).toEqual({ terrain: 'forest' });
+    expect('feature' in store.document().hexes['2,-1']).toBe(false);
+  });
+
+  it('keeps the moved hex selected, following the selection to the destination', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.select({ q: 0, r: 0 }, null); // the bare Hex is selected
+
+    store.moveHex({ q: 0, r: 0 }, { q: 2, r: -1 });
+
+    // Completing a move keeps the moved content selected at its new coordinate,
+    // matching the Label-drag path rather than silently deselecting.
+    expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 2, r: -1 } });
+  });
+
+  it('leaves a selection elsewhere untouched when a different hex is moved', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.paintAt({ q: 3, r: 3 }, 'ocean');
+    store.select({ q: 3, r: 3 }, null); // a different hex is selected
+
+    store.moveHex({ q: 0, r: 0 }, { q: 2, r: -1 });
+
+    // Only a selection that pointed at the moved origin follows; this one stays.
+    expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 3, r: 3 } });
+  });
+
+  it('moves the selection back to the origin when the move is undone', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.select({ q: 0, r: 0 }, null);
+
+    store.moveHex({ q: 0, r: 0 }, { q: 2, r: -1 });
+    expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 2, r: -1 } });
+
+    store.undo();
+
+    // Undo restores the document AND the selection in lockstep: the hex is back at
+    // the origin and selected there, not a stale reference to the empty destination.
+    expect('2,-1' in store.document().hexes).toBe(false);
+    expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 0, r: 0 } });
+  });
+
+  it('does not leave the selection highlighting clobbered content after an undo', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.paintAt({ q: 1, r: 0 }, 'ocean'); // destination content that gets clobbered
+    store.select({ q: 0, r: 0 }, null); // the origin hex is selected
+
+    store.moveHex({ q: 0, r: 0 }, { q: 1, r: 0 });
+    store.undo();
+
+    // The destination's ocean is restored, but the selection follows the moved hex
+    // back to its origin rather than silently highlighting the recovered ocean.
+    expect(store.document().hexes['1,0']).toEqual({ terrain: 'ocean' });
+    expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 0, r: 0 } });
+  });
+
+  it('follows the selection back to the destination when the move is redone', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.select({ q: 0, r: 0 }, null);
+
+    store.moveHex({ q: 0, r: 0 }, { q: 2, r: -1 });
+    store.undo();
+    store.redo();
+
+    // Redo re-applies the move and its resulting selection, so the moved hex is
+    // selected at the destination again — no stale origin reference resolving null.
+    expect(store.document().hexes['2,-1']).toEqual({ terrain: 'forest' });
+    expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 2, r: -1 } });
+  });
 });

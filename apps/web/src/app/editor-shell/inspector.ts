@@ -23,10 +23,11 @@ interface SelectedEntity {
  * The right rail. It reflects the single selection (issue #28): a selected Label
  * gets its full editor — text, size, rotation and world position, plus Delete
  * (issue #10) — while a selected Hex or Feature gets a minimal panel showing its
- * identity and a Delete affordance (the deletion wiring is a later slice, so the
- * button renders disabled). Every label field commits through the
- * {@link EditorStore}, so each edit is undoable and persists. With nothing
- * selected it shows a hint instead.
+ * identity and a Delete action. Delete dispatches through the store's single
+ * {@link EditorStore.deleteSelected} gesture (issue #29): a Hex erases the whole
+ * record, a Feature clears only its feature, a Label is removed. Every label
+ * field commits through the {@link EditorStore}, so each edit is undoable and
+ * persists. With nothing selected it shows a hint instead.
  */
 @Component({
   selector: 'app-inspector',
@@ -128,8 +129,8 @@ interface SelectedEntity {
           variant="ghost"
           size="sm"
           danger
-          disabled
           data-testid="entity-delete"
+          (click)="store.deleteSelected()"
         >
           Delete {{ entity.kind }}
         </button>

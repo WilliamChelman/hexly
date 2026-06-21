@@ -23,7 +23,7 @@ import { FitIcon } from '../ui/icon/glyphs/fit';
 import { MinusIcon } from '../ui/icon/glyphs/minus';
 import { PlusIcon } from '../ui/icon/glyphs/plus';
 import { Camera } from './camera';
-import { Canvas2dMapRenderer, MapRenderer } from './map-renderer';
+import { Canvas2dMapRenderer, HexDragOverride, MapRenderer } from './map-renderer';
 
 /** Hex radius (centre→corner) in world pixels at zoom 1. */
 const HEX_SIZE = 40;
@@ -46,6 +46,12 @@ const MOUSE_NOTCH_THRESHOLD = 40;
 const LINE_HEIGHT = 16;
 /** The placeholder text a freshly-dropped Label carries until it is edited. */
 const NEW_LABEL_TEXT = 'Label';
+/**
+ * Screen-pixel travel a press must exceed before it counts as a drag rather than
+ * a click (issue #30). Under the threshold a release is a plain selection; past
+ * it, a whole-Hex move begins with a live preview, committed once on release.
+ */
+const HEX_DRAG_THRESHOLD = 4;
 
 /** The letter that arms each top-level Tool from the keyboard (issue #27). */
 const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
@@ -78,7 +84,8 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
       (pointerdown)="onPointerDown($event)"
       (pointermove)="onPointerMove($event)"
       (pointerup)="onPointerUp($event)"
-      (pointerleave)="onPointerLeave()"
+      (pointercancel)="onPointerCancel($event)"
+      (pointerleave)="onPointerLeave($event)"
       (wheel)="onWheel($event)"
     ></canvas>
 
@@ -243,6 +250,33 @@ export class MapCanvas {
     return drag ? { id: drag.id, position: drag.position } : null;
   });
 
+  /**
+   * The in-progress whole-Hex drag: the `from` origin (the selected hex) and the
+   * `to` coordinate currently under the cursor. `null` until a press over a
+   * selected Hex/Feature crosses {@link HEX_DRAG_THRESHOLD}. The renderer previews
+   * the move at this destination; the store only sees the final `moveHex` on
+   * release, so the drag is a single undo step (issue #30).
+   */
+  private readonly hexDrag = signal<HexDragOverride | null>(null);
+
+  /**
+   * A press that *may* become a Hex drag: the origin coordinate and the press
+   * point in client pixels, recorded on pointer-down over a selected Hex/Feature.
+   * Stays a plain field (not a signal) — it gates the move gesture but never the
+   * render. `null` when no such press is armed (issue #30).
+   */
+  private hexDragPress: { from: Axial; clientX: number; clientY: number } | null =
+    null;
+
+  /**
+   * The `pointerId` that owns the canvas for the duration of one gesture, or
+   * `null` between gestures. A gesture (paint, pan, or a Select press/drag)
+   * claims it on pointer-down and releases it on up/cancel; events from any
+   * other pointer are ignored while it is held, so a second touch cannot hijack
+   * the drag origin or destination behind the active one.
+   */
+  private activePointerId: number | null = null;
+
   private readonly theme = inject(ThemeService);
   private readonly store = inject(EditorStore);
   private readonly destroyRef = inject(DestroyRef);
@@ -306,17 +340,27 @@ export class MapCanvas {
     const hover = this.hover();
     const labelDrag = this.labelDragOverride();
     const selection = this.store.selection();
-    this.renderer?.render(camera, doc, hover, labelDrag, selection);
+    const hexDrag = this.hexDrag();
+    this.renderer?.render(camera, doc, hover, labelDrag, selection, hexDrag);
   }
 
   protected onPointerDown(event: PointerEvent): void {
-    (event.target as Element).setPointerCapture?.(event.pointerId);
+    // One gesture owns the canvas at a time: a second pointer (e.g. another
+    // finger) while one is already active is ignored, so it cannot overwrite the
+    // active drag's origin or destination behind it.
+    if (this.foreignPointer(event)) return;
     const hex = pixelToHex(this.layout, this.toWorld(event));
     this.hover.set(hex);
 
     // Middle button pans; the primary button paints/erases the armed tool. Pan
     // also stays on the wheel, so a mouse-only user is never stuck (ADR-0003).
     if (event.button === 1) {
+      // A pan supersedes any armed/live Select drag (e.g. a held left button over
+      // a selected hex), so the gesture pans instead of getting stuck re-targeting
+      // a hex move under the pointer-move drag branch.
+      this.hexDragPress = null;
+      this.hexDrag.set(null);
+      this.claimGesture(event);
       this.panning = true;
       this.dragging.set(true);
       this.lastPointer = { x: event.clientX, y: event.clientY };
@@ -324,8 +368,11 @@ export class MapCanvas {
     }
 
     // Only the primary button paints. Right/aux buttons must not lay down a hex
-    // (and steal the right-click context menu along the way).
+    // (and steal the right-click context menu along the way) — and they neither
+    // claim the gesture nor capture the pointer, so a right-click never blocks a
+    // real drag nor strands a captured-but-unowned pointer.
     if (event.button !== 0) return;
+    this.claimGesture(event);
 
     const world = this.toWorld(event);
 
@@ -339,10 +386,12 @@ export class MapCanvas {
     if (this.store.tool() === 'select') {
       const hitId = this.renderer?.labelAt(this.localPoint(event)) ?? null;
       const selection = this.store.select(hex, hitId);
-      // A selected Label can be dragged to reposition it; the grab offset keeps
-      // it from jumping to the cursor. Hex/Feature drag-to-move is a later slice
-      // (ADR-0010), so a selected Hex/Feature is otherwise inert on press. Only a
-      // label selection needs the document lookup for its position.
+      // A press over a selected entity arms a *potential* drag (issue #30). A
+      // Label drags via the existing `moveLabel` path — the grab offset keeps it
+      // from jumping to the cursor. A Hex/Feature arms a whole-Hex move: the press
+      // already selected it, and crossing the threshold in `onPointerMove` turns
+      // it into a `moveHex`. A release before the threshold is a plain click —
+      // selection only, no move (issue #30, ADR-0010).
       if (selection?.kind === 'label') {
         const label = this.store.selectedLabel();
         if (label) {
@@ -352,6 +401,12 @@ export class MapCanvas {
             position: label.position,
           });
         }
+      } else if (selection?.kind === 'hex' || selection?.kind === 'feature') {
+        this.hexDragPress = {
+          from: selection.coord,
+          clientX: event.clientX,
+          clientY: event.clientY,
+        };
       }
       return;
     }
@@ -368,6 +423,9 @@ export class MapCanvas {
   }
 
   protected onPointerMove(event: PointerEvent): void {
+    // While a gesture is active, only its owning pointer drives it — a stray
+    // second pointer never moves the hover or re-targets the drag.
+    if (this.foreignPointer(event)) return;
     const hex = pixelToHex(this.layout, this.toWorld(event));
     this.hover.set(hex);
 
@@ -380,6 +438,20 @@ export class MapCanvas {
         ...drag,
         position: { x: world.x + drag.offset.x, y: world.y + drag.offset.y },
       });
+      return;
+    }
+
+    // An armed Hex press becomes a move once the pointer travels past the
+    // threshold; thereafter every move re-targets the destination hex under the
+    // cursor and the renderer previews the content there (issue #30).
+    const press = this.hexDragPress;
+    if (press) {
+      const moved =
+        Math.hypot(event.clientX - press.clientX, event.clientY - press.clientY) >=
+        HEX_DRAG_THRESHOLD;
+      if (this.hexDrag() || moved) {
+        this.hexDrag.set({ from: press.from, to: hex });
+      }
       return;
     }
 
@@ -398,13 +470,39 @@ export class MapCanvas {
   }
 
   protected onPointerUp(event: PointerEvent): void {
+    // Only the owning pointer ends the gesture; a non-owning pointer's release
+    // must not commit the active drag out from under it.
+    if (this.foreignPointer(event)) return;
     (event.target as Element).releasePointerCapture?.(event.pointerId);
     this.endGesture();
   }
 
-  protected onPointerLeave(): void {
-    this.endGesture();
+  /**
+   * A pointer the OS/browser took away mid-gesture (touch interruption, a
+   * context menu, an alt-tab): abandon the gesture without committing, so a drag
+   * never lands at a stale destination and no override is left stranded.
+   */
+  protected onPointerCancel(event: PointerEvent): void {
+    if (this.foreignPointer(event)) return;
+    (event.target as Element).releasePointerCapture?.(event.pointerId);
+    this.cancelDrag();
+    this.resetGesture();
+  }
+
+  /**
+   * The cursor left the surface. A non-owning pointer's leave must not disturb
+   * the active gesture (it carries no commit decision for the pointer that owns
+   * it). For the owning pointer — or a plain hover with no gesture — drop the
+   * hover and *abandon* any in-progress drag without committing, matching
+   * {@link onPointerCancel}: a move is only ever committed by an explicit
+   * release, never by the pointer wandering off the canvas. Pan and paint have
+   * nothing to commit, so this simply tears the gesture down.
+   */
+  protected onPointerLeave(event: PointerEvent): void {
+    if (this.foreignPointer(event)) return;
     this.hover.set(null);
+    this.cancelDrag();
+    this.resetGesture();
   }
 
   /** Apply the armed tool to `hex` once per hex, so a drag never double-paints. */
@@ -424,18 +522,73 @@ export class MapCanvas {
       this.store.moveLabel(drag.id, drag.position);
       this.labelDrag.set(null);
     }
+    // Commit a whole-Hex drag as a single edit: `moveHex` to the destination
+    // under the cursor. A press that never crossed the threshold leaves `hexDrag`
+    // null, so it is a plain click — selection only, no move recorded (issue #30).
+    const hexDrag = this.hexDrag();
+    if (hexDrag) {
+      this.store.moveHex(hexDrag.from, hexDrag.to);
+      this.hexDrag.set(null);
+    }
+    this.resetGesture();
+  }
+
+  /** Drop all per-gesture interaction state and release the owning pointer. */
+  private resetGesture(): void {
+    this.hexDragPress = null;
     this.painting = false;
     this.panning = false;
     this.dragging.set(false);
     this.lastPointer = null;
     this.lastStroke = null;
+    this.activePointerId = null;
+  }
+
+  /** Claim the canvas for this pointer and capture it so its moves keep arriving. */
+  private claimGesture(event: PointerEvent): void {
+    this.activePointerId = event.pointerId;
+    (event.target as Element).setPointerCapture?.(event.pointerId);
+  }
+
+  /**
+   * Whether an active gesture is owned by a pointer other than `event`'s — the
+   * one ownership test every pointer handler shares, so a second pointer can
+   * never disturb the gesture in flight. `false` when no gesture is active.
+   */
+  private foreignPointer(event: PointerEvent): boolean {
+    return (
+      this.activePointerId !== null && event.pointerId !== this.activePointerId
+    );
+  }
+
+  /**
+   * Discard any pending Select gesture without committing it: a live drag or an
+   * armed (sub-threshold) press. The label/hex preview overrides are cleared (the
+   * render effect snaps the entity back to its stored position) and the pending
+   * press is forgotten, so a still-held pointer cannot resume the cancelled
+   * gesture. Returns whether anything was actually pending — the keyboard handler
+   * uses it to decide between aborting the gesture and the plain key action
+   * (clear selection / delete), and to swallow Escape only when it cancelled one.
+   */
+  private cancelDrag(): boolean {
+    const pending =
+      this.labelDrag() !== null ||
+      this.hexDrag() !== null ||
+      this.hexDragPress !== null;
+    this.labelDrag.set(null);
+    this.hexDrag.set(null);
+    this.hexDragPress = null;
+    return pending;
   }
 
   /**
    * Keyboard (issue #27): letters arm top-level Tools (`S` Select, `T` Terrain,
    * `F` Feature, `R` Region, `L` Label, `E` Erase), and `1`–`9` pick the nth
-   * Subtool of the armed Tool. Undo/redo stay on Cmd/Ctrl+Z. All are suppressed
-   * while a text field is focused so a typed key never re-arms a tool.
+   * Subtool of the armed Tool. `Delete`/`Backspace` remove the current selection
+   * (issue #29), and `Escape` cancels an in-progress drag — or clears the
+   * selection when nothing is being dragged (issue #30). Undo/redo stay on
+   * Cmd/Ctrl+Z. All are suppressed while a text field is focused so a typed key
+   * never re-arms a tool or deletes behind it.
    */
   @HostListener('window:keydown', ['$event'])
   protected onKeydown(event: KeyboardEvent): void {
@@ -443,11 +596,46 @@ export class MapCanvas {
     // "5" or "t" typed there must not arm a tool.
     if (this.isEditableTarget(event.target)) return;
 
+    // Escape aborts a pending Select gesture (a live drag or an armed press): the
+    // move is discarded and nothing is committed, so the entity stays where it was
+    // — and stays selected (issue #30). `resetGesture` releases the gesture owner
+    // and clears the press, so a still-held — or never-released — pointer can
+    // neither resume the cancelled gesture nor wedge the canvas behind a stuck
+    // owner. With nothing pending, Escape clears the selection instead.
+    if (event.key === 'Escape') {
+      if (this.cancelDrag()) {
+        event.preventDefault();
+        this.resetGesture();
+      } else {
+        this.store.deselect();
+      }
+      return;
+    }
+
     if (event.metaKey || event.ctrlKey) {
       if (event.key.toLowerCase() !== 'z') return;
       event.preventDefault();
       if (event.shiftKey) this.store.redo();
       else this.store.undo();
+      return;
+    }
+
+    // Delete/Backspace remove the selected entity through the store's single
+    // delete gesture (issue #29). Suppressed above while a text field is focused,
+    // so Backspace edits text there rather than deleting a hex behind it; and
+    // suppressed here behind any other focused control (e.g. a tool button the
+    // user just clicked), so the destructive shortcut belongs only to the canvas.
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      if (this.isInteractiveTarget(event.target)) return;
+      // `preventDefault` keeps a stray Backspace from triggering browser
+      // back-navigation when no field is focused.
+      event.preventDefault();
+      // Mid-gesture (a live drag or an armed press), abort it rather than deleting
+      // behind it — otherwise the origin would be erased while the gesture stays
+      // armed and the move silently no-ops on release; `resetGesture` releases the
+      // still-held pointer too. With nothing pending, the delete proceeds.
+      if (this.cancelDrag()) this.resetGesture();
+      else this.store.deleteSelected();
       return;
     }
 
@@ -469,6 +657,26 @@ export class MapCanvas {
     if (!el) return false;
     const tag = el.tagName;
     return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable;
+  }
+
+  /**
+   * Whether `target` is a focusable UI control (a button, link, or native form
+   * control) rather than the bare canvas/body. The destructive Delete/Backspace
+   * shortcut bails on these so a key pressed right after clicking, say, a tool
+   * button does not delete the selection behind the focused control.
+   */
+  private isInteractiveTarget(target: EventTarget | null): boolean {
+    const el = target as HTMLElement | null;
+    if (!el || !el.tagName) return false;
+    const tag = el.tagName;
+    return (
+      tag === 'BUTTON' ||
+      tag === 'A' ||
+      tag === 'SELECT' ||
+      tag === 'INPUT' ||
+      tag === 'TEXTAREA' ||
+      el.isContentEditable
+    );
   }
 
   protected onWheel(event: WheelEvent): void {

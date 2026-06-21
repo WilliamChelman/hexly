@@ -144,6 +144,7 @@
   --terrain-mountain: #b9a489;
   --terrain-desert: #e0c98c;
   --terrain-marsh: #93a87f;
+  --terrain-sky: #a9c4d4; /* open air — a daylit pale cerulean */
 
   color-scheme: light;
 }
@@ -209,6 +210,7 @@
   --terrain-mountain: #6f6a82;
   --terrain-desert: #b09a64;
   --terrain-marsh: #5d7361;
+  --terrain-sky: #45527d; /* open air — deep twilight indigo for the night chart */
 
   color-scheme: dark;
 }
