@@ -53,12 +53,15 @@ const NEW_LABEL_TEXT = 'Label';
  */
 const HEX_DRAG_THRESHOLD = 4;
 
-/** The letter that arms each top-level Tool from the keyboard (issue #27). */
+/**
+ * The letter that arms each top-level Tool from the keyboard (issue #27). Region is
+ * not here: it left the palette (ADR-0012), so there is no key to arm it — Regions
+ * are created in the Regions panel and painted via the Inspector's Add/Remove brush.
+ */
 const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
   s: 'select',
   t: 'terrain',
   f: 'feature',
-  r: 'region',
   l: 'label',
   e: 'erase',
 };

@@ -72,6 +72,24 @@ describe('EditorShell', () => {
     expect(active?.textContent).toContain('Select');
   });
 
+  it('flips the shared right column from the Inspector to the Regions panel via the rail', () => {
+    const fixture = TestBed.createComponent(EditorShell);
+    fixture.detectChanges();
+    httpMock.expectOne('/health').flush({ status: 'ok', service: 'api' });
+
+    const el = fixture.nativeElement as HTMLElement;
+    // The column opens on the Inspector (its empty-state hint), with the list hidden.
+    expect(el.querySelector('app-inspector')).not.toBeNull();
+    expect(el.querySelector('app-regions-panel')).toBeNull();
+
+    // The right-edge rail's first entry opens the Regions panel into the shared column.
+    (el.querySelector('[data-testid=rail-regions]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(el.querySelector('app-regions-panel')).not.toBeNull();
+    expect(el.querySelector('app-inspector')).toBeNull();
+  });
+
   it('opens the map named by the route id, loading its document into the editor', () => {
     routeParams = of(convertToParamMap({ id: 'm1' }));
 

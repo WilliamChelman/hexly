@@ -29,14 +29,20 @@ describe('MapCanvas keyboard', () => {
     expect(store.tool()).toBe('terrain');
     press('f');
     expect(store.tool()).toBe('feature');
-    press('r');
-    expect(store.tool()).toBe('region');
     press('l');
     expect(store.tool()).toBe('label');
     press('e');
     expect(store.tool()).toBe('erase');
     press('s');
     expect(store.tool()).toBe('select');
+  });
+
+  it('has no key for the departed Region tool', () => {
+    store.armTool('terrain');
+
+    press('r'); // Region left the palette (ADR-0012): 'r' arms nothing
+
+    expect(store.tool()).toBe('terrain');
   });
 
   it('picks the nth Subtool of the armed Tool with the number keys', () => {
@@ -129,8 +135,8 @@ describe('MapCanvas keyboard', () => {
   it('suppresses tool hotkeys while a text field is focused', () => {
     // Arm a non-default Tool first so this proves suppression rather than the
     // cold-start default: a 't' that leaked through would arm Terrain, flipping
-    // the value away from 'region'.
-    store.armTool('region');
+    // the value away from 'erase'.
+    store.armTool('erase');
     const input = document.createElement('input');
     document.body.appendChild(input);
     input.focus();
@@ -141,6 +147,6 @@ describe('MapCanvas keyboard', () => {
     // a failure can't leak the input into later tests.
     const armed = store.tool();
     input.remove();
-    expect(armed).toBe('region');
+    expect(armed).toBe('erase');
   });
 });

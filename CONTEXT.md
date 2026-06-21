@@ -69,11 +69,11 @@ Every piece of map content sits in exactly one of three placement modes:
 ## Editing tools
 
 **Tool**:
-A top-level editing mode armed in the palette — Select, Terrain, Feature, Region, Label, Erase. Exactly one is armed at a time, and a canvas gesture applies it. A map opens armed with Select.
+A top-level editing mode armed in the palette — Select, Terrain, Feature, Label, Erase. Exactly one is armed at a time, and a canvas gesture applies it. A map opens armed with Select. Region is *not* a palette Tool: Regions are created in the Regions panel and their membership is painted via the Inspector's Add/Remove brush (ADR-0012).
 _Avoid_: Mode, brush, instrument
 
 **Subtool**:
-A mutually-exclusive variant *within* a Tool — the Terrain tool's individual terrains, the Feature tool's individual features (and its Clear variant). Tools that have Subtools remember the last one used for the session. Select, Region, Label, and Erase have no Subtools.
+A mutually-exclusive variant *within* a Tool — the Terrain tool's individual terrains, the Feature tool's individual features (and its Clear variant). Tools that have Subtools remember the last one used for the session. Select, Label, and Erase have no Subtools.
 _Avoid_: Sub-mode, option, variant
 
 **Select**:
@@ -85,7 +85,7 @@ The Tool that deletes a whole Hex record (its terrain *and* feature), turning th
 _Avoid_: Delete, clear, remove
 
 **Inspector**:
-The surface that shows and edits the currently selected entity. For a Label it edits text/size/rotation/position; for a Region it edits name, color, deletion, and the Add/Remove membership direction — the *only* place Region details are edited (the Region tool has no Subtools). Engaging a Region's Add/Remove here arms the Region tool on that Region.
+The surface that shows and edits the currently selected entity. For a Label it edits text/size/rotation/position; for a Region it edits name, color, deletion, and the Add/Remove membership direction — the *only* place Region details are edited. Engaging a Region's Add/Remove here arms the Region membership brush on that Region — the only way to arm it, now that Region is not a palette Tool (ADR-0012).
 _Avoid_: Side panel, details pane, properties
 
 **Regions panel**:

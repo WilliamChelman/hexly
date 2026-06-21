@@ -48,11 +48,11 @@ export type ToolId =
 export type FeatureSubtool = FeatureId | 'clear';
 
 /**
- * The Region tool's target: which region the brush paints, and whether it adds
- * (`add`) or removes (`remove`) membership. `null` until a Region is selected and a
- * direction engaged (issue #37); with none, the Region tool create-and-paints a
- * fresh Region on the next stroke instead (issue #38). It is no longer a Subtool —
- * the Region tool has none — but keeps the historical name for the `region()` API.
+ * The Region membership brush's target: which region the brush paints, and whether
+ * it adds (`add`) or removes (`remove`) membership. `null` until a Region is selected
+ * and a direction engaged via the Inspector's Add/Remove (issue #37); with none, a
+ * Region stroke is a no-op (creation moved to the Regions panel, ADR-0012). It keeps
+ * the historical `RegionSubtool`/`region()` name though Region is no longer a Tool.
  */
 export interface RegionSubtool {
   readonly id: string;
@@ -98,10 +98,10 @@ export const featureSubtools: readonly FeatureSubtool[] = [
 ];
 
 /**
- * The colours a create-and-painted Region cycles through, so two new Regions look
+ * The colours a freshly-created Region cycles through, so two new Regions look
  * distinct without the user picking a colour first; they can recolour to anything
  * afterwards (the document stores an arbitrary `#rrggbb`). Keyed by the Region's
- * "Region N" number so the colour tracks the name (issue #8, #38).
+ * "Region N" number so the colour tracks the name (issue #8, #38, #39).
  */
 const NEW_REGION_COLORS = ['#7c9b86', '#b08a4e', '#6f7fae', '#a8674f', '#5f8c8c'];
 
@@ -144,6 +144,18 @@ export class EditorStore {
   private readonly _feature = signal<FeatureSubtool>(DEFAULT_FEATURE);
   private readonly _region = signal<RegionSubtool | null>(null);
 
+  /**
+   * Which view occupies the editor's shared right column: the live {@link Inspector}
+   * (the default a map opens on) or the Regions panel's list. The right-edge rail
+   * flips it to `regions`; selecting a Region — from the list or the canvas — flips
+   * it back to `inspector` so the selection opens for editing (ADR-0011, issue #39).
+   * Transient, session-only view state in the same category as the armed Tool and
+   * the selection: never part of the `HexMap` document, never undone, saved, or
+   * restored across reloads (a reopened map resets it via {@link load}).
+   */
+  private readonly _rightPanel = signal<'inspector' | 'regions'>('inspector');
+  readonly rightPanel = this._rightPanel.asReadonly();
+
   /** The remembered Terrain Subtool — the terrain a Terrain stroke paints. */
   readonly terrain = this._terrain.asReadonly();
   /** The remembered Feature Subtool — a library feature to place, or `'clear'`. */
@@ -156,8 +168,8 @@ export class EditorStore {
    * `add` paints a hex into the inspected Region, `remove` erases it. Derived from
    * the armed Region's `mode` — the *same* state {@link applyAt} paints by — so the
    * toggle is a single source of truth and can never disagree with what a stroke
-   * actually does, no matter which path armed the Region ({@link armRegionDirection}
-   * or {@link createAndPaintRegion}).
+   * actually does. The Inspector's Add/Remove ({@link armRegionDirection}) is now the
+   * only path that arms the Region brush (ADR-0012).
    *
    * Scoped to the *selected* Region: the toggle belongs to the Inspector, which
    * edits the selection, and {@link applyAt} now paints the selected Region — so the
@@ -289,12 +301,23 @@ export class EditorStore {
   /**
    * Arm the top-level Tool `id` for the next gestures. Re-arming a Tool restores
    * its remembered Subtool implicitly — the Subtool memory is held separately, so
-   * switching Tools never disturbs it (issue #27). Arming Region never auto-picks a
-   * region: with none selected, the first stroke mints one (create-and-paint,
-   * issue #38) rather than silently painting an arbitrary existing region.
+   * switching Tools never disturbs it (issue #27). The palette never passes `region`
+   * (Region left the palette, ADR-0012); the Region membership brush is armed via the
+   * Inspector's {@link armRegionDirection} on the selected Region.
    */
   armTool(id: ToolId): void {
     this._tool.set(id);
+  }
+
+  /**
+   * Flip the shared right column to the Regions panel's list — the right-edge rail's
+   * Regions entry (issue #39, ADR-0011). The reverse flip (back to the Inspector) is
+   * not a separate command: it happens whenever a Region is selected, through
+   * {@link selectRegion} and {@link newRegion}, so the list always yields to the
+   * selection it produced.
+   */
+  showRegionsPanel(): void {
+    this._rightPanel.set('regions');
   }
 
   /** Arm the Terrain tool with terrain `id`, remembering it as the Terrain Subtool. */
@@ -340,9 +363,9 @@ export class EditorStore {
    * Pick the `n`-th (1-based) Subtool of the currently armed Tool — the keyboard
    * `1`–`9` binding (issue #27). The Subtool set is relative to the armed Tool:
    * Terrain → the terrain palette, Feature → the feature library then Clear.
-   * Out-of-range indices and Tools without Subtools (Select, Region, Label, Erase)
-   * are no-ops — the Region tool create-and-paints rather than choosing a region by
-   * index (issue #38).
+   * Out-of-range indices and Tools without Subtools (Select, Label, Erase) are
+   * no-ops; `region`, when armed as the membership brush, has no indexed Subtool
+   * either (its target is the selected Region, ADR-0012).
    */
   armSubtoolByIndex(n: number): void {
     switch (this._tool()) {
@@ -378,6 +401,9 @@ export class EditorStore {
     this._tool.set('select');
     this.resetSubtoolMemory();
     this.deselect(); // clears the selection and forgets the per-coordinate cycle
+    // A reopened map starts on the Inspector, not whatever view the previous
+    // session's rail had flipped the shared column to (issue #39).
+    this._rightPanel.set('inspector');
   }
 
   /** Restore the cold-start Subtool memory shared by a fresh store and a reload. */
@@ -409,14 +435,12 @@ export class EditorStore {
         break;
       }
       case 'region': {
-        // The Region tool dispatches on whether a Region is *selected* (issue #38):
-        // with one selected, a stroke paints its membership per the direction; with
-        // none, the first stroke mints a Region and paints onto it (create-and-paint).
+        // The Region tool is a membership brush only now (ADR-0012): it paints the
+        // *selected* Region's membership per the Add/Remove direction. Creation moved
+        // to the Regions panel's New Region, so a stroke with no Region selected mints
+        // nothing — it is a no-op rather than the old create-and-paint.
         const selected = this.selectedRegion();
-        if (!selected) {
-          this.createAndPaintRegion(coord);
-          break;
-        }
+        if (!selected) break;
         if (this.regionDirection() === 'add') this.addHexToRegion(selected.id, coord);
         else this.removeHexFromRegion(selected.id, coord);
         break;
@@ -530,35 +554,45 @@ export class EditorStore {
   }
 
   /**
-   * Create-and-paint: mint a fresh "Region N" with the next palette colour, seed it
-   * with the clicked `coord`, select it, and arm the Region tool on it in Add — so
-   * continued strokes keep adding to it (issue #38). The mint and its first hex are a
-   * single `commit`, so one undo removes the whole new Region and clears the selection
-   * (and redo brings it back selected). The number is the next unused "Region N" (max
-   * existing + 1, or 1 when none), so a name/colour freed by a deletion is not reused.
+   * Create a fresh empty "Region N" with the next palette colour from the Regions
+   * panel's New Region action — the *only* way to create a Region now (ADR-0012). It
+   * mints no member hexes, so the new Region is invisible on the canvas and lives only
+   * in the Regions panel until hexes are painted into it; the panel must not assume
+   * non-empty membership (ADR-0011). It then selects the new Region (opening the
+   * Inspector to name it) and arms the Region brush on it in Add, so the next stroke
+   * adds straight into it — the fast create-then-draw flow, in one creation path.
+   * Returns the new id. Like every edit it goes through `commit`, so undo removes it.
    */
-  private createAndPaintRegion(coord: Axial): void {
+  newRegion(): string {
+    const { name, color } = this.nextRegionIdentity();
+    const id = this.createRegion(name, color);
+    // Select the new Region so the Inspector opens on it to be named, flipping the
+    // shared column from the list back to the Inspector — the same routing a list
+    // pick uses (selectRegion).
+    this.selectRegion(id);
+    // Arm the Region brush on it in Add so the next stroke paints hexes straight into
+    // it (ADR-0012). The mint itself still adds no hex, so the Region is created
+    // without painting; the canvas stroke is what fills it.
+    this.armRegion(id, 'add');
+    // Stamp the post-mint selection onto the edit so undo clears it with the Region
+    // and redo restores it — the mint always records a step, so an edit exists.
+    this.trackSelectionOnLastEdit();
+    return id;
+  }
+
+  /**
+   * The name and palette colour the next minted Region takes, used by
+   * {@link newRegion}. The number is the next unused "Region N" (max existing + 1, or
+   * 1 when none), so a name/colour freed by a deletion is not immediately reused; the
+   * colour is keyed by that number so it tracks the name (issue #8, #38, #39).
+   */
+  private nextRegionIdentity(): { name: string; color: string } {
     const used = this._document().regions.flatMap((r) => {
       const match = /^Region (\d+)$/.exec(r.name);
       return match ? [Number(match[1])] : [];
     });
     const n = used.length ? Math.max(...used) + 1 : 1;
-    const color = NEW_REGION_COLORS[(n - 1) % NEW_REGION_COLORS.length];
-    const id = mintId();
-    this.commit((draft) => {
-      draft.regions.push({
-        id,
-        name: `Region ${n}`,
-        color,
-        hexes: { [coordKey(coord)]: true },
-      });
-    });
-    // Select the new Region and arm Add so the next stroke keeps painting onto it.
-    this._selection.set({ kind: 'region', id });
-    this.armRegion(id, 'add');
-    // Stamp the post-mint selection onto the edit so undo clears it with the Region
-    // and redo restores it — the mint always records a step, so an edit exists.
-    this.trackSelectionOnLastEdit();
+    return { name: `Region ${n}`, color: NEW_REGION_COLORS[(n - 1) % NEW_REGION_COLORS.length] };
   }
 
   /** Rename the region `id`; a no-op (no undo step) if there is no such region. */
@@ -698,6 +732,21 @@ export class EditorStore {
       if (region.hexes[key]) refs.push({ kind: 'region', id: region.id });
     }
     return refs;
+  }
+
+  /**
+   * Select the Region `id` directly — by id, not by a clicked coordinate — and flip
+   * the shared right column back to the Inspector so the selection opens for editing
+   * (issue #39). This is the Regions panel's selection path and the *only* way to
+   * reach an empty Region (one with no member hex, so no coordinate to click): it
+   * routes through the same `_selection` the canvas uses, so a list pick highlights
+   * on the canvas and opens in the Inspector exactly like a canvas pick (ADR-0011).
+   * Peer to {@link selectLabel}. Selecting is transient view state, not an edit, so
+   * it records no undo step.
+   */
+  selectRegion(id: string): void {
+    this._selection.set({ kind: 'region', id });
+    this._rightPanel.set('inspector');
   }
 
   /** Select the Label `id` for editing in the inspector, or `null` to clear it. */

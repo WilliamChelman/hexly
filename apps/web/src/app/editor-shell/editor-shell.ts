@@ -3,10 +3,13 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { catchError, EMPTY, filter, map, switchMap } from 'rxjs';
 import { EditorSession } from './editor-session';
+import { EditorStore } from './editor-store';
 import { EditorHeader } from './editor-header';
 import { ToolPalette } from './tool-palette';
 import { MapCanvas } from './map-canvas';
 import { Inspector } from './inspector';
+import { RegionsPanel } from './regions-panel';
+import { EditorRail } from './editor-rail';
 import { StatusBar } from './status-bar';
 
 /**
@@ -19,14 +22,32 @@ import { StatusBar } from './status-bar';
 @Component({
   selector: 'app-editor-shell',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [EditorHeader, ToolPalette, MapCanvas, Inspector, StatusBar],
+  imports: [
+    EditorHeader,
+    ToolPalette,
+    MapCanvas,
+    Inspector,
+    RegionsPanel,
+    EditorRail,
+    StatusBar,
+  ],
   template: `
     <div class="shell">
       <app-editor-header />
       <div class="body">
         <app-tool-palette />
         <app-map-canvas />
-        <app-inspector />
+        <!--
+          The shared right column (ADR-0011): the right-edge rail flips it between
+          the live Inspector and the Regions panel's list; selecting a Region flips
+          it back to the Inspector. The rail itself stays pinned to the edge.
+        -->
+        @if (store.rightPanel() === 'regions') {
+          <app-regions-panel />
+        } @else {
+          <app-inspector />
+        }
+        <app-editor-rail />
       </div>
       <app-status-bar />
     </div>
@@ -44,7 +65,7 @@ import { StatusBar } from './status-bar';
     }
     .body {
       display: grid;
-      grid-template-columns: var(--rail-tools) 1fr var(--rail-inspector);
+      grid-template-columns: var(--rail-tools) 1fr var(--rail-inspector) var(--rail-edge);
       min-height: 0;
     }
     /* Narrow viewports: collapse the side rails so the canvas stays usable. */
@@ -53,7 +74,9 @@ import { StatusBar } from './status-bar';
         grid-template-columns: 1fr;
       }
       .body app-tool-palette,
-      .body app-inspector {
+      .body app-inspector,
+      .body app-regions-panel,
+      .body app-editor-rail {
         display: none;
       }
     }
@@ -63,6 +86,8 @@ export class EditorShell {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly session = inject(EditorSession);
+  /** Drives which view occupies the shared right column (Inspector vs Regions list). */
+  protected readonly store = inject(EditorStore);
 
   constructor() {
     // Open whatever map the URL points at, and reopen it if the id changes

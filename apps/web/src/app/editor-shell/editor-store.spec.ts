@@ -1425,78 +1425,150 @@ describe('EditorStore region direction', () => {
   });
 });
 
-describe('EditorStore Region create-and-paint', () => {
-  it('mints a Region, adds the clicked hex, and selects it when armed with no Region selected', () => {
+describe('EditorStore Region tool (membership brush only)', () => {
+  it('does not mint a Region on a stroke when armed with none selected', () => {
     const store = new EditorStore();
     store.armTool('region'); // armed, but nothing is selected
 
     store.applyAt({ q: 2, r: 3 });
 
+    // Creation is panel-only now (ADR-0012): a Region stroke with no selected Region
+    // paints nothing and mints nothing — there is no create-and-paint anymore.
+    expect(store.document().regions).toEqual([]);
+    expect(store.selection()).toBeNull();
+  });
+
+  it('paints the selected Region\'s membership on a stroke (the only remaining job)', () => {
+    const store = new EditorStore();
+    const id = store.createRegion('Avalon', '#b08a4e');
+    store.select({ q: 0, r: 0 }, null); // a Void coord — but the Region must be picked by id
+    store.selectRegion(id);
+    store.armRegion(id, 'add'); // the Inspector's Add/Remove path arms the brush
+
+    store.applyAt({ q: 2, r: 3 });
+
+    expect(store.document().regions[0].hexes).toEqual({ '2,3': true });
+  });
+});
+
+describe('EditorStore New Region (from the Regions panel)', () => {
+  it('creates an empty "Region 1" with the first palette colour, without painting', () => {
+    const store = new EditorStore();
+
+    const id = store.newRegion();
+
     const regions = store.document().regions;
     expect(regions).toHaveLength(1);
-    expect(regions[0].hexes).toEqual({ '2,3': true });
-    expect(store.selection()).toEqual({ kind: 'region', id: regions[0].id });
+    expect(regions[0].id).toBe(id);
+    expect(regions[0].name).toBe('Region 1');
+    expect(regions[0].color).toBe('#7c9b86');
+    // "without painting": the new Region starts with no member hexes (the panel
+    // lists it as an empty, canvas-invisible Region).
+    expect(regions[0].hexes).toEqual({});
   });
 
-  it('keeps the minted Region selected and armed in Add, so continued clicks add to it', () => {
+  it('selects the new Region and opens it in the Inspector, even from the list', () => {
     const store = new EditorStore();
-    store.armTool('region');
+    store.showRegionsPanel(); // the user is on the Regions list when they click New
 
-    store.applyAt({ q: 0, r: 0 }); // mints a Region and selects it
-    store.applyAt({ q: 1, r: 0 }); // a continued stroke adds to the same Region
+    const id = store.newRegion();
 
-    const regions = store.document().regions;
-    expect(regions).toHaveLength(1); // not a second freshly-minted Region
-    expect(regions[0].hexes).toEqual({ '0,0': true, '1,0': true });
+    // The fresh Region is selected so the Inspector opens on it to be named, and the
+    // shared column flips from the list back to the Inspector to show that editor.
+    expect(store.selection()).toEqual({ kind: 'region', id });
+    expect(store.rightPanel()).toBe('inspector');
+  });
+
+  it('arms the Region tool on the new Region in Add, so the next stroke paints into it', () => {
+    const store = new EditorStore();
+
+    const id = store.newRegion();
+
+    // A freshly-created Region is ready to receive hexes: the Region membership brush
+    // is armed on it in Add (issue #39, ADR-0012). No hex is painted yet.
     expect(store.tool()).toBe('region');
+    expect(store.region()).toEqual({ id, mode: 'add' });
     expect(store.regionDirection()).toBe('add');
-    expect(store.selection()).toEqual({ kind: 'region', id: regions[0].id });
+    expect(store.document().regions[0].hexes).toEqual({});
   });
 
-  it('auto-names minted Regions "Region N" with the next palette colour', () => {
+  it('creates as one undoable step that restores name, selection on redo', () => {
     const store = new EditorStore();
-    store.armTool('region');
 
-    store.applyAt({ q: 0, r: 0 }); // mints Region 1, leaving it selected
-    store.deselect(); // drop the selection so the next stroke mints again
-    store.applyAt({ q: 5, r: 5 }); // mints Region 2
+    const id = store.newRegion();
 
-    const regions = store.document().regions;
-    expect(regions.map((r) => r.name)).toEqual(['Region 1', 'Region 2']);
-    // The first two colours of the new-region palette, in order.
-    expect(regions.map((r) => r.color)).toEqual(['#7c9b86', '#b08a4e']);
-  });
-
-  it('numbers a minted Region by the next unused "Region N", not the region count', () => {
-    const store = new EditorStore();
-    store.armTool('region');
-
-    store.applyAt({ q: 0, r: 0 }); // Region 1
-    store.deselect();
-    store.applyAt({ q: 5, r: 5 }); // Region 2
-    store.deleteRegion(store.document().regions[0].id); // delete Region 1
-    store.deselect();
-    store.applyAt({ q: 9, r: 9 }); // mints again
-
-    // "Region 1" is free again, but the next number is max(existing)+1 = 3, so a
-    // name/colour freed by a deletion is not immediately reused.
-    const names = store.document().regions.map((r) => r.name);
-    expect(names).toEqual(['Region 2', 'Region 3']);
-  });
-
-  it('makes the mint-and-paint first stroke a single undoable step', () => {
-    const store = new EditorStore();
-    store.armTool('region');
-
-    store.applyAt({ q: 2, r: 3 }); // mint + first hex, recorded as one step
-    const id = store.document().regions[0].id;
-
-    store.undo(); // one undo removes the whole new Region and clears the selection
+    store.undo(); // one undo removes the new Region and clears its selection
     expect(store.document().regions).toEqual([]);
     expect(store.selection()).toBeNull();
 
-    store.redo(); // redo brings the Region back, selected
-    expect(store.document().regions[0].hexes).toEqual({ '2,3': true });
+    store.redo(); // redo brings it back, selected
+    expect(store.document().regions[0].name).toBe('Region 1');
     expect(store.selection()).toEqual({ kind: 'region', id });
+  });
+
+  it('numbers and colours successive New Regions through the palette in order', () => {
+    const store = new EditorStore();
+
+    store.newRegion(); // Region 1
+    store.newRegion(); // Region 2
+
+    const regions = store.document().regions;
+    expect(regions.map((r) => r.name)).toEqual(['Region 1', 'Region 2']);
+    expect(regions.map((r) => r.color)).toEqual(['#7c9b86', '#b08a4e']);
+  });
+
+  it('numbers a New Region by the next unused "Region N", not the region count', () => {
+    const store = new EditorStore();
+
+    store.newRegion(); // Region 1
+    store.newRegion(); // Region 2
+    store.deleteRegion(store.document().regions[0].id); // delete Region 1
+    store.newRegion(); // mints again
+
+    // "Region 1" is free again, but the next number is max(existing)+1 = 3, so a
+    // name/colour freed by a deletion is not immediately reused.
+    expect(store.document().regions.map((r) => r.name)).toEqual([
+      'Region 2',
+      'Region 3',
+    ]);
+  });
+});
+
+describe('EditorStore shared right column', () => {
+  it('shows the Inspector by default and flips to the Regions list on demand', () => {
+    const store = new EditorStore();
+
+    // The right column is shared with the Inspector (ADR-0011); a map opens on it.
+    expect(store.rightPanel()).toBe('inspector');
+
+    store.showRegionsPanel();
+
+    expect(store.rightPanel()).toBe('regions');
+  });
+
+  it('selects a Region by id — even an empty one — and flips back to the Inspector', () => {
+    const store = new EditorStore();
+    // An empty Region has no member hex, so it cannot be reached by select(coord);
+    // selecting it from the list must go by id. This is the "emptied Regions stay
+    // reachable" case the Regions panel must support (ADR-0011).
+    const id = store.createRegion('The Whisperwood', '#6f7fae');
+    store.showRegionsPanel();
+
+    store.selectRegion(id);
+
+    expect(store.selection()).toEqual({ kind: 'region', id });
+    expect(store.selectedRegion()?.name).toBe('The Whisperwood');
+    expect(store.rightPanel()).toBe('inspector');
+  });
+
+  it('resets the shared column to the Inspector when a map is opened', () => {
+    const store = new EditorStore();
+    store.showRegionsPanel();
+
+    // Opening a map is a fresh start (like the tool and selection reset in load),
+    // so it must not strand the reopened map on the previous session's list view.
+    store.load(emptyHexMap());
+
+    expect(store.rightPanel()).toBe('inspector');
   });
 });
