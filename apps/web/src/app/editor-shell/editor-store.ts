@@ -4,11 +4,13 @@ import {
   coordKey,
   emptyHexMap,
   FeatureId,
+  featureLibrary,
   HexMap,
   Label,
   Point,
   Region,
   TerrainId,
+  terrainPalette,
 } from '@hexly/domain';
 import { applyPatches, enablePatches, Patch, produceWithPatches } from 'immer';
 
@@ -16,37 +18,61 @@ import { applyPatches, enablePatches, Patch, produceWithPatches } from 'immer';
 enablePatches();
 
 /**
- * What a canvas stroke does, as a tagged union so terrain, the eraser, and the
- * two Feature actions are siblings the store dispatches on (issue #7):
+ * A top-level Tool armed in the palette (CONTEXT.md → Tool). Exactly one is
+ * armed at a time, and a canvas gesture applies it. Tools that have variants
+ * carry a current Subtool tracked separately ({@link FeatureSubtool},
+ * {@link RegionSubtool}, and the terrain id). Issue #27 split the old flat
+ * tagged union into this two-level model:
  *
- * - `terrain` — paint the built-in terrain `id` (creates or replaces a hex)
- * - `erase` — delete the hex record so the coordinate becomes Void
- * - `feature` — place the built-in feature `id` on an existing hex
- * - `clear-feature` — remove a hex's feature, leaving its terrain
- * - `region` — add the hovered hex to (or remove it from) region `id`, per `mode`
+ * - `select` — the non-destructive Tool; a click does nothing yet (issue #27)
+ * - `terrain` — paint the remembered terrain (creates or replaces a hex)
+ * - `feature` — place the remembered feature, or Clear it (see FeatureSubtool)
+ * - `region` — add/remove the hovered hex to/from the remembered region
  * - `label` — drop a free-positioned Label at the clicked world point (issue #10)
+ * - `erase` — delete the whole hex record so the coordinate becomes Void
  */
-export type Tool =
-  | { readonly kind: 'terrain'; readonly id: TerrainId }
-  | { readonly kind: 'erase' }
-  | { readonly kind: 'feature'; readonly id: FeatureId }
-  | { readonly kind: 'clear-feature' }
-  | { readonly kind: 'region'; readonly id: string; readonly mode: 'add' | 'remove' }
-  | { readonly kind: 'label' };
+export type ToolId =
+  | 'select'
+  | 'terrain'
+  | 'feature'
+  | 'region'
+  | 'label'
+  | 'erase';
+
+/**
+ * The Feature tool's Subtool: a built-in library feature to place, or `'clear'`
+ * to remove a hex's feature (leaving its terrain). Clear lives among the feature
+ * Subtools because it is scoped to the feature layer (issue #27, ADR-0010).
+ */
+export type FeatureSubtool = FeatureId | 'clear';
+
+/**
+ * The Region tool's Subtool: which region the brush targets, and whether it
+ * paints (`add`) or erases (`remove`) membership. `null` until a region is
+ * picked — the Region tool then applies nothing.
+ */
+export interface RegionSubtool {
+  readonly id: string;
+  readonly mode: 'add' | 'remove';
+}
+
+/**
+ * The Feature Tool's Subtools in palette/keyboard order: each library feature,
+ * then the Clear Subtool last. The single source of truth for the index→Subtool
+ * mapping the keyboard ({@link EditorStore.armSubtoolByIndex}) and the palette
+ * keycaps share, so the two cannot drift (issue #27, ADR-0010).
+ */
+export const featureSubtools: readonly FeatureSubtool[] = [
+  ...featureLibrary.map((f) => f.id),
+  'clear',
+];
+
+/** Cold-start Subtool defaults — the state a fresh map and a reloaded map share. */
+const DEFAULT_TERRAIN: TerrainId = 'forest';
+const DEFAULT_FEATURE: FeatureSubtool = featureLibrary[0].id;
 
 /** The default world-pixel height a freshly-placed Label is drawn at (issue #10). */
 export const DEFAULT_LABEL_SIZE = 28;
-
-/**
- * Whether a stroke keeps applying as the pointer drags across hexes. Terrain,
- * the eraser, and clear-feature are continuous brushes — sweeping them across a
- * drag is the intent and idempotent. Placing a Feature is a discrete stamp: a
- * drag must not mass-place duplicate features, so it applies only on the initial
- * press (issue #7). Placing a Label is likewise a discrete stamp (issue #10).
- */
-export function isContinuousTool(tool: Tool): boolean {
-  return tool.kind !== 'feature' && tool.kind !== 'label';
-}
 
 /**
  * The editor's command/undo stack — the only "store" the editor needs (ADR-0005).
@@ -61,8 +87,51 @@ export class EditorStore {
   /** The live document. Read-only to everyone but this store. */
   readonly document = this._document.asReadonly();
 
-  /** The armed tool a canvas stroke applies — terrain, eraser, or a feature. */
-  readonly tool = signal<Tool>({ kind: 'terrain', id: 'forest' });
+  /**
+   * The armed top-level {@link ToolId} a canvas gesture applies. A map opens
+   * armed with the non-destructive `select` so a stray first click never paints
+   * (issue #27).
+   */
+  private readonly _tool = signal<ToolId>('select');
+  readonly tool = this._tool.asReadonly();
+
+  /**
+   * Per-Tool Subtool memory — in-memory, session-only editor state in the same
+   * category as the armed Tool itself: never part of the `HexMap` document,
+   * never undone, saved, or restored across reloads (issue #27, ADR-0010).
+   * Re-arming a Tool restores its remembered Subtool. Cold-start defaults:
+   * Terrain → `forest`, Feature → the first library feature, Region → none.
+   */
+  private readonly _terrain = signal<TerrainId>(DEFAULT_TERRAIN);
+  private readonly _feature = signal<FeatureSubtool>(DEFAULT_FEATURE);
+  private readonly _region = signal<RegionSubtool | null>(null);
+
+  /** The remembered Terrain Subtool — the terrain a Terrain stroke paints. */
+  readonly terrain = this._terrain.asReadonly();
+  /** The remembered Feature Subtool — a library feature to place, or `'clear'`. */
+  readonly feature = this._feature.asReadonly();
+  /** The remembered Region Subtool — the targeted region and brush mode, or `null`. */
+  readonly region = this._region.asReadonly();
+
+  /**
+   * Whether the armed Tool keeps applying as the pointer drags across hexes.
+   * Terrain, Erase, Region, and the feature Clear Subtool are continuous brushes
+   * — sweeping them is the intent and idempotent. Placing a Feature is a discrete
+   * stamp (a drag must not mass-place duplicates, issue #7); Label is likewise a
+   * discrete stamp (issue #10); Select paints nothing. (issue #27)
+   */
+  readonly continuous = computed<boolean>(() => {
+    switch (this._tool()) {
+      case 'terrain':
+      case 'erase':
+      case 'region':
+        return true;
+      case 'feature':
+        return this._feature() === 'clear';
+      default:
+        return false;
+    }
+  });
 
   /**
    * The id of the Label currently selected for editing (or `null`). This is
@@ -93,9 +162,74 @@ export class EditorStore {
   readonly canUndo = this._canUndo.asReadonly();
   readonly canRedo = this._canRedo.asReadonly();
 
-  /** Arm a {@link Tool} for the next strokes. */
-  selectTool(tool: Tool): void {
-    this.tool.set(tool);
+  /**
+   * Arm the top-level Tool `id` for the next gestures. Re-arming a Tool restores
+   * its remembered Subtool implicitly — the Subtool memory is held separately, so
+   * switching Tools never disturbs it (issue #27).
+   */
+  armTool(id: ToolId): void {
+    // Arming Region with no remembered Subtool but regions to paint would leave
+    // the tool inert (every stroke a silent no-op) behind a live-looking legend.
+    // Default to the first region so the tool is immediately usable; a genuinely
+    // region-less document still arms nothing, per "Region → none" (issue #27).
+    if (id === 'region' && !this._region()) {
+      const first = this._document().regions[0];
+      if (first) this._region.set({ id: first.id, mode: 'add' });
+    }
+    this._tool.set(id);
+  }
+
+  /** Arm the Terrain tool with terrain `id`, remembering it as the Terrain Subtool. */
+  armTerrain(id: TerrainId): void {
+    this._terrain.set(id);
+    this._tool.set('terrain');
+  }
+
+  /**
+   * Arm the Feature tool with `subtool` — a library feature to place, or `'clear'`
+   * to remove a hex's feature — remembering it as the Feature Subtool.
+   */
+  armFeature(subtool: FeatureSubtool): void {
+    this._feature.set(subtool);
+    this._tool.set('feature');
+  }
+
+  /**
+   * Arm the Region tool targeting region `id` in `mode`, remembering it as the
+   * Region Subtool.
+   */
+  armRegion(id: string, mode: 'add' | 'remove'): void {
+    this._region.set({ id, mode });
+    this._tool.set('region');
+  }
+
+  /**
+   * Pick the `n`-th (1-based) Subtool of the currently armed Tool — the keyboard
+   * `1`–`9` binding (issue #27). The Subtool set is relative to the armed Tool:
+   * Terrain → the terrain palette, Feature → the feature library then Clear,
+   * Region → the document's regions (keeping the current brush mode). Out-of-range
+   * indices and Tools without Subtools (Select, Label, Erase) are no-ops.
+   */
+  armSubtoolByIndex(n: number): void {
+    switch (this._tool()) {
+      case 'terrain': {
+        const t = terrainPalette[n - 1];
+        if (t) this.armTerrain(t.id);
+        break;
+      }
+      case 'feature': {
+        const sub = featureSubtools[n - 1];
+        if (sub) this.armFeature(sub);
+        break;
+      }
+      case 'region': {
+        const r = this._document().regions[n - 1];
+        if (r) this.armRegion(r.id, this._region()?.mode ?? 'add');
+        break;
+      }
+      default:
+        break;
+    }
   }
 
   /**
@@ -108,28 +242,48 @@ export class EditorStore {
     this.undoStack.length = 0;
     this.redoStack.length = 0;
     this.syncHistory();
+    // A freshly opened map arms the non-destructive Select tool so a stray click
+    // never paints (issue #27). The Subtool memory (and the selected label) all
+    // referenced the previous document, so reset them to the cold-start defaults
+    // rather than leaving a dangling region or label id behind.
+    this._tool.set('select');
+    this.resetSubtoolMemory();
+    this._selectedLabelId.set(null);
   }
 
-  /** Apply the armed tool at `coord`, dispatching on its kind. */
+  /** Restore the cold-start Subtool memory shared by a fresh store and a reload. */
+  private resetSubtoolMemory(): void {
+    this._terrain.set(DEFAULT_TERRAIN);
+    this._feature.set(DEFAULT_FEATURE);
+    this._region.set(null);
+  }
+
+  /** Apply the armed Tool (and its Subtool) at `coord`, dispatching on the Tool. */
   applyAt(coord: Axial): void {
-    const tool = this.tool();
-    switch (tool.kind) {
+    switch (this._tool()) {
+      case 'select':
+        // Select is non-destructive; its click behaviour is out of scope for
+        // this slice — a click does nothing yet (issue #27, ADR-0010).
+        break;
       case 'terrain':
-        this.paintAt(coord, tool.id);
+        this.paintAt(coord, this._terrain());
         break;
       case 'erase':
         this.eraseAt(coord);
         break;
-      case 'feature':
-        this.placeFeatureAt(coord, tool.id);
+      case 'feature': {
+        const subtool = this._feature();
+        if (subtool === 'clear') this.clearFeatureAt(coord);
+        else this.placeFeatureAt(coord, subtool);
         break;
-      case 'clear-feature':
-        this.clearFeatureAt(coord);
+      }
+      case 'region': {
+        const region = this._region();
+        if (!region) break; // no region picked yet → nothing to apply
+        if (region.mode === 'add') this.addHexToRegion(region.id, coord);
+        else this.removeHexFromRegion(region.id, coord);
         break;
-      case 'region':
-        if (tool.mode === 'add') this.addHexToRegion(tool.id, coord);
-        else this.removeHexFromRegion(tool.id, coord);
-        break;
+      }
       case 'label':
         // Labels are free-positioned at a world point, not a hex coordinate
         // (CONTEXT.md → Label), so the canvas places them via `addLabel` — there
@@ -216,11 +370,12 @@ export class EditorStore {
       const at = draft.regions.findIndex((r) => r.id === id);
       if (at !== -1) draft.regions.splice(at, 1);
     });
-    // The armed region tool now points at nothing — every subsequent stroke would
-    // silently no-op. Fall back to the default terrain tool so the canvas stays live.
-    const tool = this.tool();
-    if (tool.kind === 'region' && tool.id === id) {
-      this.tool.set({ kind: 'terrain', id: 'forest' });
+    // The Region Subtool now points at a region that no longer exists. Forget it,
+    // and if the Region tool is armed, fall back to the non-destructive Select so
+    // the canvas stays inert rather than silently no-opping every stroke.
+    if (this._region()?.id === id) {
+      this._region.set(null);
+      if (this._tool() === 'region') this._tool.set('select');
     }
   }
 

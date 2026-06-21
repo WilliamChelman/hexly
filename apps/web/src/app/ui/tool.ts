@@ -6,13 +6,28 @@ import {
 } from '@angular/core';
 import { GlyphBox } from './glyph-box';
 import { IconPath } from './icon/icon-path';
+import { EraseIcon } from './icon/glyphs/erase';
 import { LabelIcon } from './icon/glyphs/label';
 import { OverlayIcon } from './icon/glyphs/overlay';
+import { RegionIcon } from './icon/glyphs/region';
+import { SelectIcon } from './icon/glyphs/select';
+import { SettlementIcon } from './icon/glyphs/settlement';
+import { TerrainIcon } from './icon/glyphs/terrain';
 import { Kbd } from './kbd';
 import { Swatch } from './swatch';
 
-/** The content glyphs a palette tool can show (terrain tools use a swatch). */
-export type ToolGlyph = 'overlay' | 'label';
+/**
+ * The glyphs a palette tool can show (terrain Subtools use a swatch instead).
+ * The six top-level Tools each have one; `overlay` remains for a future Tool.
+ */
+export type ToolGlyph =
+  | 'select'
+  | 'terrain'
+  | 'feature'
+  | 'region'
+  | 'label'
+  | 'erase'
+  | 'overlay';
 
 /**
  * A palette tool button — square-ish, full-width, with a leading swatch or
@@ -27,7 +42,19 @@ export type ToolGlyph = 'overlay' | 'label';
 @Component({
   selector: 'button[appTool]',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [GlyphBox, IconPath, OverlayIcon, LabelIcon, Swatch, Kbd],
+  imports: [
+    GlyphBox,
+    IconPath,
+    SelectIcon,
+    TerrainIcon,
+    SettlementIcon,
+    RegionIcon,
+    LabelIcon,
+    EraseIcon,
+    OverlayIcon,
+    Swatch,
+    Kbd,
+  ],
   host: {
     '[class.is-active]': 'active()',
     '[attr.aria-pressed]': 'active()',
@@ -41,8 +68,13 @@ export type ToolGlyph = 'overlay' | 'label';
     } @else if (glyph(); as g) {
       <span appGlyphBox>
         @switch (g) {
-          @case ('overlay') { <app-icon-overlay [size]="18" /> }
+          @case ('select') { <app-icon-select [size]="18" /> }
+          @case ('terrain') { <app-icon-terrain [size]="18" /> }
+          @case ('feature') { <app-icon-settlement [size]="18" /> }
+          @case ('region') { <app-icon-region [size]="18" /> }
           @case ('label') { <app-icon-label [size]="18" /> }
+          @case ('erase') { <app-icon-erase [size]="18" /> }
+          @case ('overlay') { <app-icon-overlay [size]="18" /> }
         }
       </span>
     }

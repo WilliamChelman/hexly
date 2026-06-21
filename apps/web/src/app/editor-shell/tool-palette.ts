@@ -1,21 +1,56 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+} from '@angular/core';
 import { featureLibrary, terrainPalette } from '@hexly/domain';
 import { Button } from '../ui/button';
 import { Eyebrow } from '../ui/eyebrow';
 import { Input } from '../ui/input';
+import { Kbd } from '../ui/kbd';
 import { Panel } from '../ui/panel';
 import { Rule } from '../ui/rule';
 import { Tool as ToolButton, ToolGlyph } from '../ui/tool';
 import { inputValue } from './dom';
-import { EditorStore, Tool } from './editor-store';
+import {
+  EditorStore,
+  featureSubtools,
+  RegionSubtool,
+  ToolId,
+} from './editor-store';
 
-/** A content tool — not yet wired to the canvas; shown as a preview for now. */
-interface ContentTool {
-  readonly id: string;
+/**
+ * The one-line hint shown for a Tool that has no Subtool strip (issue #27). Keyed
+ * by the no-Subtool Tools; any other Tool renders its own Subtool panel instead.
+ */
+const SUBTOOL_HINTS: Partial<Record<ToolId, string>> = {
+  select: 'Click an entity to select it.',
+  label: 'Click the map to place a label.',
+  erase: 'Click a hex to erase it.',
+};
+
+/** A top-level Tool button in the primary selector row (issue #27). */
+interface ToolDef {
+  readonly id: ToolId;
   readonly label: string;
   readonly hint: string;
   readonly glyph: ToolGlyph;
 }
+
+/**
+ * The primary Tool selector, in palette order. Each arms a top-level Tool; the
+ * contextual panel below then shows only that Tool's Subtools (issue #27). The
+ * keycap hints mirror the keyboard bindings in {@link map-canvas}.
+ */
+const TOOLS: readonly ToolDef[] = [
+  { id: 'select', label: 'Select', hint: 'S', glyph: 'select' },
+  { id: 'terrain', label: 'Terrain', hint: 'T', glyph: 'terrain' },
+  { id: 'feature', label: 'Feature', hint: 'F', glyph: 'feature' },
+  { id: 'region', label: 'Region', hint: 'R', glyph: 'region' },
+  { id: 'label', label: 'Label', hint: 'L', glyph: 'label' },
+  { id: 'erase', label: 'Erase', hint: 'E', glyph: 'erase' },
+];
 
 /**
  * The colours a freshly-created region cycles through, so two new regions look
@@ -31,134 +66,95 @@ const REGION_MODES = [
 ] as const;
 
 /**
- * The left rail: the terrain palette and the eraser (the armed tool lives in the
- * shared {@link EditorStore} so the canvas paints with it — ADR-0005), plus undo/
- * redo and the region legend. Content tools are previews until their own issues
- * land.
+ * The left rail: a primary Tool selector row (Select, Terrain, Feature, Region,
+ * Label, Erase) plus a contextual panel showing only the armed Tool's Subtools —
+ * terrain swatches, feature icons + Clear, or the region legend — and undo/redo
+ * (issue #27, ADR-0010). The armed Tool and its Subtools live in the shared
+ * {@link EditorStore} so the canvas applies them (ADR-0005). The region legend is
+ * no longer always on screen: it is the Region tool's Subtool area.
  */
 @Component({
   selector: 'app-tool-palette',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Eyebrow, Input, Panel, Rule, ToolButton],
+  imports: [Button, Eyebrow, Input, Kbd, Panel, Rule, ToolButton],
   template: `
     <section class="group">
-      <h2 class="heading" appEyebrow>Terrain</h2>
-      <div class="list" role="group" aria-label="Terrain">
-        @let terrainState = store.tool();
-        @for (t of terrainTools; track t.id) {
+      <h2 class="heading" appEyebrow>Tools</h2>
+      <div class="list" role="group" aria-label="Tools">
+        @for (t of tools; track t.id) {
           <button
             appTool
-            [label]="t.label"
-            [hint]="t.hint"
-            [swatch]="t.swatch"
-            [active]="terrainState.kind === 'terrain' && terrainState.id === t.id"
-            [attr.aria-label]="t.label"
-            (click)="store.selectTool({ kind: 'terrain', id: t.id })"
-          ></button>
-        }
-        <button
-          appTool
-          label="Erase"
-          hint="E"
-          [active]="terrainState.kind === 'erase'"
-          aria-label="Erase"
-          (click)="store.selectTool({ kind: 'erase' })"
-        ></button>
-      </div>
-    </section>
-
-    <hr appRule />
-
-    <section class="group">
-      <h2 class="heading" appEyebrow>History</h2>
-      <div class="history">
-        <button
-          type="button"
-          appButton
-          variant="ghost"
-          size="sm"
-          [disabled]="!store.canUndo()"
-          (click)="store.undo()"
-        >
-          Undo
-        </button>
-        <button
-          type="button"
-          appButton
-          variant="ghost"
-          size="sm"
-          [disabled]="!store.canRedo()"
-          (click)="store.redo()"
-        >
-          Redo
-        </button>
-      </div>
-    </section>
-
-    <hr appRule />
-
-    <section class="group">
-      <h2 class="heading" appEyebrow>Features</h2>
-      <div class="list" role="group" aria-label="Features">
-        @let featureState = store.tool();
-        @for (f of features; track f.id) {
-          <button
-            appTool
-            [label]="f.label"
-            [iconPath]="f.path"
-            [active]="featureState.kind === 'feature' && featureState.id === f.id"
-            [attr.aria-label]="f.label"
-            [attr.data-testid]="'feature-' + f.id"
-            (click)="store.selectTool({ kind: 'feature', id: f.id })"
-          ></button>
-        }
-        <button
-          appTool
-          label="Clear feature"
-          [active]="featureState.kind === 'clear-feature'"
-          aria-label="Clear feature"
-          data-testid="clear-feature"
-          (click)="store.selectTool({ kind: 'clear-feature' })"
-        ></button>
-      </div>
-    </section>
-
-    <section class="group">
-      <h2 class="heading" appEyebrow>Content</h2>
-      <div class="list" role="group" aria-label="Content">
-        @let contentState = store.tool();
-        <button
-          appTool
-          label="Label"
-          hint="L"
-          glyph="label"
-          [active]="contentState.kind === 'label'"
-          aria-label="Label"
-          data-testid="tool-label"
-          (click)="store.selectTool({ kind: 'label' })"
-        ></button>
-        @for (t of contentTools; track t.id) {
-          <button
-            appTool
-            disabled
             [label]="t.label"
             [hint]="t.hint"
             [glyph]="t.glyph"
-            [attr.aria-label]="t.label + ' (coming soon)'"
-            title="Coming soon"
+            [active]="store.tool() === t.id"
+            [attr.aria-label]="t.label"
+            [attr.data-testid]="'tool-' + t.id"
+            (click)="store.armTool(t.id)"
           ></button>
         }
       </div>
     </section>
 
-    <div class="spacer"></div>
+    <hr appRule />
 
-    <section class="group regions" appPanel raised>
-      <h2 appEyebrow>Regions</h2>
-      @let armed = store.tool();
-      <ul class="legend">
-        @for (r of store.document().regions; track r.id) {
+    @switch (store.tool()) {
+      @case ('terrain') {
+        <section class="group">
+          <h2 class="heading" appEyebrow>Terrain</h2>
+          <div class="list" role="group" aria-label="Terrain">
+            @for (t of terrainTools; track t.id) {
+              <button
+                appTool
+                [label]="t.label"
+                [hint]="t.hint"
+                [swatch]="t.swatch"
+                [active]="store.terrain() === t.id"
+                [attr.aria-label]="t.label"
+                (click)="store.armTerrain(t.id)"
+              ></button>
+            }
+          </div>
+        </section>
+      }
+      @case ('feature') {
+        <section class="group">
+          <h2 class="heading" appEyebrow>Features</h2>
+          <div class="list" role="group" aria-label="Features">
+            @for (f of features; track f.id) {
+              <button
+                appTool
+                [label]="f.label"
+                [iconPath]="f.path"
+                [hint]="f.hint"
+                [active]="store.feature() === f.id"
+                [attr.aria-label]="f.label"
+                [attr.data-testid]="'feature-' + f.id"
+                (click)="store.armFeature(f.id)"
+              ></button>
+            }
+            <button
+              appTool
+              label="Clear feature"
+              [hint]="clearHint"
+              [active]="store.feature() === 'clear'"
+              aria-label="Clear feature"
+              data-testid="clear-feature"
+              (click)="store.armFeature('clear')"
+            ></button>
+          </div>
+        </section>
+      }
+      @case ('region') {
+        <section class="group regions" appPanel raised>
+          <h2 appEyebrow>Regions</h2>
+          @let armed = store.region();
+          <ul class="legend">
+        @for (r of store.document().regions; track r.id; let i = $index) {
           <li>
+            @if (i < 9) {
+              <kbd appKbd>{{ i + 1 }}</kbd>
+            }
             <input
               type="color"
               class="color"
@@ -188,7 +184,7 @@ const REGION_MODES = [
                 [attr.aria-label]="b.verb + ' ' + r.name"
                 [attr.aria-pressed]="isArmed(armed, r.id, b.mode)"
                 [attr.data-testid]="'region-' + b.testid + '-' + r.id"
-                (click)="store.selectTool({ kind: 'region', id: r.id, mode: b.mode })"
+                (click)="store.armRegion(r.id, b.mode)"
               >
                 {{ b.label }}
               </button>
@@ -207,16 +203,52 @@ const REGION_MODES = [
           <li class="muted">No regions yet.</li>
         }
       </ul>
-      <button
-        type="button"
-        appButton
-        variant="ghost"
-        size="sm"
-        data-testid="new-region"
-        (click)="createRegion()"
-      >
-        New region
-      </button>
+          <button
+            type="button"
+            appButton
+            variant="ghost"
+            size="sm"
+            data-testid="new-region"
+            (click)="createRegion()"
+          >
+            New region
+          </button>
+        </section>
+      }
+      @default {
+        <!-- Select, Label, and Erase have no Subtools (CONTEXT.md → Subtool). -->
+        <p class="hint">{{ subtoolHint() }}</p>
+      }
+    }
+
+    <div class="spacer"></div>
+
+    <hr appRule />
+
+    <section class="group">
+      <h2 class="heading" appEyebrow>History</h2>
+      <div class="history">
+        <button
+          type="button"
+          appButton
+          variant="ghost"
+          size="sm"
+          [disabled]="!store.canUndo()"
+          (click)="store.undo()"
+        >
+          Undo
+        </button>
+        <button
+          type="button"
+          appButton
+          variant="ghost"
+          size="sm"
+          [disabled]="!store.canRedo()"
+          (click)="store.redo()"
+        >
+          Redo
+        </button>
+      </div>
     </section>
   `,
   styles: `
@@ -236,6 +268,13 @@ const REGION_MODES = [
     }
     .heading {
       padding: 0 var(--space-2);
+    }
+    .hint {
+      margin: 0;
+      padding: 0 var(--space-2);
+      font-size: var(--text-sm);
+      font-style: italic;
+      color: var(--ink-muted);
     }
     .list {
       display: flex;
@@ -323,8 +362,23 @@ const REGION_MODES = [
 export class ToolPalette {
   protected readonly store = inject(EditorStore);
 
-  /** The built-in feature library, each placeable from the palette (issue #7). */
-  protected readonly features = featureLibrary;
+  /** The primary Tool selector buttons, in palette order (issue #27). */
+  protected readonly tools = TOOLS;
+
+  /**
+   * The built-in feature library, each placeable from the palette. The keycap is
+   * the feature's slot in {@link featureSubtools}, the shared ordering the
+   * keyboard indexes — so the hint can never disagree with what its key arms.
+   */
+  protected readonly features = featureLibrary.map((f) => ({
+    id: f.id,
+    label: f.label,
+    path: f.path,
+    hint: String(featureSubtools.indexOf(f.id) + 1),
+  }));
+
+  /** The keycap hint for the Clear feature Subtool — its slot in {@link featureSubtools}. */
+  protected readonly clearHint = String(featureSubtools.indexOf('clear') + 1);
 
   /** The built-in terrain palette, with a 1-based number key per entry. */
   protected readonly terrainTools = terrainPalette.map((t, i) => ({
@@ -333,10 +387,6 @@ export class ToolPalette {
     swatch: t.fill,
     hint: String(i + 1),
   }));
-
-  protected readonly contentTools: ContentTool[] = [
-    { id: 'overlay', label: 'Overlay', hint: 'O', glyph: 'overlay' },
-  ];
 
   protected readonly regionModes = REGION_MODES;
 
@@ -354,7 +404,7 @@ export class ToolPalette {
     const n = used.length ? Math.max(...used) + 1 : 1;
     const color = NEW_REGION_COLORS[(n - 1) % NEW_REGION_COLORS.length];
     const id = this.store.createRegion(`Region ${n}`, color);
-    this.store.selectTool({ kind: 'region', id, mode: 'add' });
+    this.store.armRegion(id, 'add');
   }
 
   /** Rename region `id` to the text input's value. */
@@ -367,8 +417,17 @@ export class ToolPalette {
     this.store.recolorRegion(id, inputValue(event));
   }
 
-  /** Whether `tool` is the region brush armed for region `id` in `mode`. */
-  protected isArmed(tool: Tool, id: string, mode: 'add' | 'remove'): boolean {
-    return tool.kind === 'region' && tool.id === id && tool.mode === mode;
+  /** Whether the Region Subtool `region` is armed for region `id` in `mode`. */
+  protected isArmed(
+    region: RegionSubtool | null,
+    id: string,
+    mode: 'add' | 'remove',
+  ): boolean {
+    return region?.id === id && region.mode === mode;
   }
+
+  /** The one-line hint shown for a Tool that has no Subtool strip (issue #27). */
+  protected readonly subtoolHint = computed(
+    () => SUBTOOL_HINTS[this.store.tool()] ?? '',
+  );
 }

@@ -18,8 +18,14 @@ test('paints a hex, saves, and the hex survives a reload', async ({
   await expect(page).toHaveURL(/\/maps\/[\w-]+$/);
   const mapId = page.url().split('/').pop();
 
-  // Arm a non-default terrain so the saved document proves our selection rather
-  // than the default ('forest').
+  // A map opens armed with the non-destructive Select tool, so a stray first
+  // click never paints (issue #27).
+  await page.getByRole('img', { name: 'Hex map' }).click();
+  await expect(page.getByTestId('hex-count')).toHaveText('0 hexes');
+
+  // Arm the Terrain tool to reveal its swatches, then pick a non-default terrain
+  // so the saved document proves our selection rather than the default ('forest').
+  await page.getByTestId('tool-terrain').click();
   await page
     .getByRole('group', { name: 'Terrain' })
     .getByRole('button', { name: 'Ocean' })
