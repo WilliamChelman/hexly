@@ -1669,4 +1669,45 @@ describe('EditorStore shared right column', () => {
     store.toggleRegionsPanel();
     expect(store.rightPanel()).toBe('regions');
   });
+
+  it('closes the Inspector when the selection that opened it is cleared', () => {
+    const store = new EditorStore();
+    const id = store.addLabel('Pick me', { x: 0, y: 0 });
+    store.selectLabel(id); // a selection opens the Inspector
+    expect(store.rightPanel()).toBe('inspector');
+
+    // Clearing the selection reclaims the map: the Inspector only floats while it
+    // has a selection to show, so a deselect closes it — the mirror of the
+    // selection that opened it (ADR-0013, story 20). Nothing left covering the map.
+    store.deselect();
+
+    expect(store.rightPanel()).toBeNull();
+  });
+
+  it('closes the Inspector when the inspected entity is deleted', () => {
+    const store = new EditorStore();
+    const id = store.addLabel('Doomed', { x: 0, y: 0 });
+    store.selectLabel(id);
+    expect(store.rightPanel()).toBe('inspector');
+
+    // Deleting the inspected entity clears the selection (the deletion paths route
+    // through deselect), so the panel returns to closed rather than stranding an
+    // empty-state Inspector over the map.
+    store.deleteSelected();
+
+    expect(store.rightPanel()).toBeNull();
+  });
+
+  it('leaves the Regions list open when a canvas click deselects', () => {
+    const store = new EditorStore();
+    store.showRegionsPanel();
+    expect(store.rightPanel()).toBe('regions');
+
+    // A Void-coordinate click deselects, but the Regions list is not selection-driven
+    // (the user opened it via the rail), so it stays open — only the Inspector closes
+    // on deselect.
+    store.select({ q: 9, r: 9 }, null);
+
+    expect(store.rightPanel()).toBe('regions');
+  });
 });

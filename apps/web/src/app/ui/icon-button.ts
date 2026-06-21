@@ -8,7 +8,6 @@ import { IconPath } from './icon/icon-path';
 import { EraseIcon } from './icon/glyphs/erase';
 import { LabelIcon } from './icon/glyphs/label';
 import { MinusIcon } from './icon/glyphs/minus';
-import { OverlayIcon } from './icon/glyphs/overlay';
 import { RedoIcon } from './icon/glyphs/redo';
 import { RegionIcon } from './icon/glyphs/region';
 import { SelectIcon } from './icon/glyphs/select';
@@ -18,9 +17,9 @@ import { UndoIcon } from './icon/glyphs/undo';
 import { Swatch } from './swatch';
 
 /**
- * The glyphs an {@link IconButton} can show. A superset of {@link ToolGlyph}: it
- * adds `undo`/`redo` for the history controls, since the floating tool strip
- * renders those as icon buttons too (ADR-0013).
+ * The named glyphs an {@link IconButton} can show: one per top-level Tool, plus
+ * `minus` (the Clear-feature mark) and `undo`/`redo` for the history controls,
+ * since the floating tool strip renders those as icon buttons too (ADR-0013).
  */
 export type IconButtonGlyph =
   | 'select'
@@ -29,7 +28,6 @@ export type IconButtonGlyph =
   | 'region'
   | 'label'
   | 'erase'
-  | 'overlay'
   | 'minus'
   | 'undo'
   | 'redo';
@@ -44,7 +42,11 @@ export type IconButtonGlyph =
  * pattern. Uses an attribute selector on the native `<button>`, so `disabled`,
  * `type`, and focus/a11y come for free.
  *
- *   <button appIconButton glyph="terrain" [active]="armed()"
+ * A button that represents an on/off or selected state opts into toggle
+ * semantics with `toggle`, which emits `aria-pressed` from `active`. Momentary
+ * action buttons (undo/redo) leave it off so they aren't announced as toggles.
+ *
+ *   <button appIconButton glyph="terrain" toggle [active]="armed()"
  *           title="Terrain (T)" aria-label="Terrain" (click)="arm()"></button>
  */
 @Component({
@@ -58,7 +60,6 @@ export type IconButtonGlyph =
     RegionIcon,
     LabelIcon,
     EraseIcon,
-    OverlayIcon,
     MinusIcon,
     UndoIcon,
     RedoIcon,
@@ -66,7 +67,7 @@ export type IconButtonGlyph =
   ],
   host: {
     '[class.is-active]': 'active()',
-    '[attr.aria-pressed]': 'active()',
+    '[attr.aria-pressed]': 'toggle() ? active() : null',
     '[attr.type]': '"button"',
   },
   template: `
@@ -82,7 +83,6 @@ export type IconButtonGlyph =
         @case ('region') { <app-icon-region [size]="20" /> }
         @case ('label') { <app-icon-label [size]="20" /> }
         @case ('erase') { <app-icon-erase [size]="20" /> }
-        @case ('overlay') { <app-icon-overlay [size]="20" /> }
         @case ('minus') { <app-icon-minus [size]="20" /> }
         @case ('undo') { <app-icon-undo [size]="20" /> }
         @case ('redo') { <app-icon-redo [size]="20" /> }
@@ -128,5 +128,11 @@ export class IconButton {
   readonly iconPath = input<string>();
   /** A named content glyph (a Tool, or undo/redo); rendered directly. */
   readonly glyph = input<IconButtonGlyph>();
+  /** The selected/armed highlight; also feeds `aria-pressed` when `toggle` is set. */
   readonly active = input(false, { transform: booleanAttribute });
+  /**
+   * Marks this button as a toggle so it exposes `aria-pressed` (from `active`).
+   * Off by default: a momentary action (undo/redo) must not read as a toggle.
+   */
+  readonly toggle = input(false, { transform: booleanAttribute });
 }

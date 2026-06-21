@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { IconButton } from '../ui/icon-button';
+import { IconButton, IconButtonGlyph } from '../ui/icon-button';
 import { EditorStore } from './editor-store';
 
 /** The right panel's identity a rail entry can open (mirrors {@link EditorStore.rightPanel}). */
@@ -10,6 +10,7 @@ interface RailEntry {
   readonly id: RightPanel;
   readonly testid: string;
   readonly title: string;
+  readonly glyph: IconButtonGlyph;
 }
 
 /**
@@ -20,9 +21,11 @@ interface RailEntry {
  * Regions list and closed ({@link EditorStore.toggleRegionsPanel}); it reads as
  * active while that list is showing, and clicking it again reclaims the map.
  *
- * Entries are declarative ({@link RAIL_ENTRIES}) so a second entry is a data
- * change, not copied markup; each is a shared {@link IconButton} carrying a
- * `title` tooltip, per ADR-0013's "every widget is a primitive."
+ * Each entry's chrome — its glyph, tooltip, and active state — is data ({@link
+ * entries}) rendered by a shared {@link IconButton}, so a second entry brings its
+ * own glyph without copied markup, per ADR-0013's "every widget is a primitive."
+ * (Its panel-specific toggle is the one piece still wired in the template; only
+ * the Regions entry ships, so there is a single handler today.)
  */
 @Component({
   selector: 'app-editor-rail',
@@ -32,7 +35,8 @@ interface RailEntry {
     @for (entry of entries; track entry.id) {
       <button
         appIconButton
-        glyph="region"
+        toggle
+        [glyph]="entry.glyph"
         [active]="store.rightPanel() === entry.id"
         [title]="entry.title"
         [attr.aria-label]="entry.title"
@@ -60,6 +64,6 @@ export class EditorRail {
 
   /** Rail entries rendered top-to-bottom; only Regions ships now (issue #39). */
   protected readonly entries: readonly RailEntry[] = [
-    { id: 'regions', testid: 'rail-regions', title: 'Regions' },
+    { id: 'regions', testid: 'rail-regions', title: 'Regions', glyph: 'region' },
   ];
 }

@@ -183,10 +183,8 @@ describe('ToolPalette regions', () => {
     fixture.detectChanges();
 
     // Story 25: while the membership brush is armed the active affordance is the
-    // Inspector's Add/Remove, so the strip highlights no Tool and opens no flyout —
-    // and the old one-line usage hints are gone entirely (ADR-0013).
+    // Inspector's Add/Remove, so the strip highlights no Tool and opens no flyout.
     expect(fixture.nativeElement.querySelector('.flyout')).toBeNull();
-    expect(fixture.nativeElement.querySelector('.hint')).toBeNull();
     expect(fixture.nativeElement.querySelector('button.is-active')).toBeNull();
   });
 });

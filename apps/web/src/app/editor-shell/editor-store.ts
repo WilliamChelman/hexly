@@ -795,17 +795,22 @@ export class EditorStore {
   }
 
   /**
-   * Clear the selection, if any — the inspector falls back to its empty state.
-   * The one canonical clear that every clearing path routes through: the
-   * deliberate Escape gesture (issue #30), the internal teardown paths
-   * ({@link selectLabel} with `null`, {@link deleteLabel}, {@link deleteSelected}),
-   * and the incidental clear when {@link select} lands on a Void coordinate.
+   * Clear the selection, if any. The one canonical clear that every clearing path
+   * routes through: the deliberate Escape gesture (issue #30), the internal
+   * teardown paths ({@link selectLabel} with `null`, {@link deleteLabel},
+   * {@link deleteSelected}), and the incidental clear when {@link select} lands on
+   * a Void coordinate.
    */
   deselect(): void {
     this._selection.set(null);
     // Forget the cycle so a click that re-selects the same coordinate later starts
     // from the top of the stack rather than resuming a stale descent (issue #35).
     this.cycleAnchor = null;
+    // Reclaim the map: the Inspector only floats while it has a selection to show,
+    // so clearing the selection closes it — the mirror of the selection that opened
+    // it, keeping the closed-by-default contract (ADR-0013). A Regions list opened
+    // via the rail is not selection-driven, so it is left showing.
+    if (this._rightPanel() === 'inspector') this._rightPanel.set(null);
   }
 
   /**

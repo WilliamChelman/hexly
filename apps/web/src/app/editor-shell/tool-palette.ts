@@ -55,6 +55,7 @@ const TOOLS: readonly ToolDef[] = [
       @for (t of tools; track t.id) {
         <button
           appIconButton
+          toggle
           [glyph]="t.glyph"
           [active]="store.tool() === t.id"
           [title]="t.label + ' (' + t.key + ')'"
@@ -92,6 +93,7 @@ const TOOLS: readonly ToolDef[] = [
           @for (t of terrainTools; track t.id) {
             <button
               appIconButton
+              toggle
               [swatch]="t.swatch"
               [active]="store.terrain() === t.id"
               [title]="t.label + ' (' + t.key + ')'"
@@ -106,6 +108,7 @@ const TOOLS: readonly ToolDef[] = [
           @for (f of features; track f.id) {
             <button
               appIconButton
+              toggle
               [iconPath]="f.path"
               [active]="store.feature() === f.id"
               [title]="f.label + ' (' + f.key + ')'"
@@ -116,6 +119,7 @@ const TOOLS: readonly ToolDef[] = [
           }
           <button
             appIconButton
+            toggle
             glyph="minus"
             [active]="store.feature() === 'clear'"
             [title]="'Clear feature (' + clearKey + ')'"
@@ -138,6 +142,11 @@ const TOOLS: readonly ToolDef[] = [
       flex-direction: column;
       gap: 2px;
       padding: var(--space-2);
+      /* Cap to the host (the shell bounds it to the body) and scroll if a short
+         viewport can't fit the whole strip, matching the flyout. */
+      min-height: 0;
+      max-height: 100%;
+      overflow-y: auto;
     }
     .flyout {
       display: grid;

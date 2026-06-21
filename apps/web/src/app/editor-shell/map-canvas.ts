@@ -179,10 +179,16 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
     .readout-sep {
       color: var(--line-strong);
     }
+    /*
+      Bottom-right, and lifted above the floating right dock (z-index 1, ADR-0013):
+      a tall open Inspector/Regions card reaches this corner, so the zoom/fit
+      controls must stay on top and clickable rather than be covered by the panel.
+    */
     .zoom {
       position: absolute;
       right: var(--space-4);
       bottom: var(--space-4);
+      z-index: 2;
       display: flex;
       align-items: center;
       gap: var(--space-1);

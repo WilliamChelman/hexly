@@ -2,8 +2,9 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 
 /**
  * The redo glyph (a curved arrow looping forward to the right) — the mirror of
- * {@link UndoIcon}. One `<svg>` drawn in `currentColor`, sized by `size`. Reached
- * by name through `app-icon`, or directly. See ADR-0007.
+ * {@link UndoIcon}. One `<svg>` drawn in `currentColor`, sized by `size`.
+ * Imported directly by the consumer that shows it (there is no `app-icon`
+ * dispatcher). See ADR-0007.
  */
 @Component({
   selector: 'app-icon-redo',
