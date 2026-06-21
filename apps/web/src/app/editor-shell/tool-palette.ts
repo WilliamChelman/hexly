@@ -17,7 +17,7 @@ import { EditorStore, featureSubtools, ToolId } from './editor-store';
  */
 const SUBTOOL_HINTS: Partial<Record<ToolId, string>> = {
   select: 'Click an entity to select it.',
-  region: 'Click the map to create or paint a region.',
+  region: 'Click the map to paint the selected region.',
   label: 'Click the map to place a label.',
   erase: 'Click a hex to erase it.',
 };
@@ -39,18 +39,18 @@ const TOOLS: readonly ToolDef[] = [
   { id: 'select', label: 'Select', hint: 'S', glyph: 'select' },
   { id: 'terrain', label: 'Terrain', hint: 'T', glyph: 'terrain' },
   { id: 'feature', label: 'Feature', hint: 'F', glyph: 'feature' },
-  { id: 'region', label: 'Region', hint: 'R', glyph: 'region' },
   { id: 'label', label: 'Label', hint: 'L', glyph: 'label' },
   { id: 'erase', label: 'Erase', hint: 'E', glyph: 'erase' },
 ];
 
 /**
- * The left rail: a primary Tool selector row (Select, Terrain, Feature, Region,
- * Label, Erase) plus a contextual panel showing only the armed Tool's Subtools —
- * terrain swatches, or feature icons + Clear — and undo/redo (issue #27, ADR-0010).
- * The armed Tool and its Subtools live in the shared {@link EditorStore} so the
- * canvas applies them (ADR-0005). The Region tool has no Subtools: it create-and-
- * paints from the canvas, and its details are edited in the Inspector (issue #38).
+ * The left rail: a primary Tool selector row (Select, Terrain, Feature, Label,
+ * Erase) plus a contextual panel showing only the armed Tool's Subtools — terrain
+ * swatches, or feature icons + Clear — and undo/redo (issue #27, ADR-0010). The
+ * armed Tool and its Subtools live in the shared {@link EditorStore} so the canvas
+ * applies them (ADR-0005). Region is no longer a palette Tool (ADR-0012): Regions
+ * are created in the Regions panel and their membership is painted via the
+ * Inspector's Add/Remove brush, so the palette never arms `region`.
  */
 @Component({
   selector: 'app-tool-palette',
@@ -125,9 +125,9 @@ const TOOLS: readonly ToolDef[] = [
         </section>
       }
       @default {
-        <!-- Select, Region, Label, and Erase have no Subtools (CONTEXT.md →
-        Subtool). Region create-and-paints from the canvas (issue #38); its details
-        are edited in the Inspector (#36). -->
+        <!-- Select, Label, and Erase have no Subtools (CONTEXT.md → Subtool). The
+        Region membership brush (armed from the Inspector, ADR-0012) also has none;
+        its details are edited in the Inspector (#36), creation in the panel (#39). -->
         <p class="hint">{{ subtoolHint() }}</p>
       }
     }

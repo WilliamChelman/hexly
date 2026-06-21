@@ -45,9 +45,6 @@ describe('ToolPalette primary Tool row', () => {
     click(fixture, 'tool-feature');
     expect(store.tool()).toBe('feature');
 
-    click(fixture, 'tool-region');
-    expect(store.tool()).toBe('region');
-
     click(fixture, 'tool-label');
     expect(store.tool()).toBe('label');
 
@@ -56,6 +53,15 @@ describe('ToolPalette primary Tool row', () => {
 
     click(fixture, 'tool-select');
     expect(store.tool()).toBe('select');
+  });
+
+  it('offers no Region tool — Regions are created and edited elsewhere', () => {
+    const { fixture } = setup();
+
+    // Region left the palette (ADR-0012): creation is the Regions panel's New Region,
+    // and membership is painted via the Inspector's Add/Remove. There is no Region
+    // button (and no `R` hotkey) to arm `region` from the palette.
+    expect(has(fixture, 'tool-region')).toBe(false);
   });
 });
 
@@ -112,15 +118,16 @@ describe('ToolPalette regions', () => {
     await TestBed.configureTestingModule({ imports: [ToolPalette] }).compileComponents();
   });
 
-  it('shows no Region Subtool legend while Region is armed', () => {
+  it('shows no Region Subtool legend while the Region brush is armed', () => {
     const { fixture, store } = setup();
     const id = store.createRegion('Avalon', '#b08a4e');
-    store.armTool('region');
+    store.armTool('region'); // the internal brush state the Inspector arms (ADR-0012)
     fixture.detectChanges();
 
-    // The Region tool joins Select/Label/Erase with no Subtools (issue #38): the old
+    // The Region brush has no Subtools and no legend (issue #38, ADR-0012): the old
     // legend — its New Region action, per-region rows, keycaps, paint/erase, and
-    // delete — is gone (Region details now live in the Inspector, #36).
+    // delete — is gone (Region details live in the Inspector, #36; creation in the
+    // Regions panel, #39).
     expect(has(fixture, 'new-region')).toBe(false);
     expect(fixture.nativeElement.querySelector('.legend')).toBeNull();
     expect(has(fixture, `region-paint-${id}`)).toBe(false);
@@ -129,12 +136,12 @@ describe('ToolPalette regions', () => {
     expect(has(fixture, `region-name-${id}`)).toBe(false);
   });
 
-  it('shows the no-Subtool hint while Region is armed', () => {
+  it('shows the no-Subtool hint while the Region brush is armed', () => {
     const { fixture, store } = setup();
     store.armTool('region');
     fixture.detectChanges();
 
-    // Region falls into the same no-Subtool hint branch as Select/Label/Erase.
+    // The Region brush falls into the same no-Subtool hint branch as Select/Label/Erase.
     const hint = fixture.nativeElement.querySelector('.hint');
     expect(hint?.textContent?.trim()).toBeTruthy();
   });
