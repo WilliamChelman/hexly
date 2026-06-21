@@ -229,6 +229,18 @@ export class EditorStore {
     return this._document().labels.find((l) => l.id === sel.id) ?? null;
   });
 
+  /**
+   * The currently-selected {@link Region} resolved from the live document, or
+   * `null` when the selection is not a Region (or its id is gone after an undo).
+   * Peer to {@link selectedLabel}: the Inspector binds to this to edit the
+   * Region's name, color, and deletion (issue #36).
+   */
+  readonly selectedRegion = computed<Region | null>(() => {
+    const sel = this.selection();
+    if (sel?.kind !== 'region') return null;
+    return regionById(this._document(), sel.id) ?? null;
+  });
+
   /** Committed edits, newest last — popped to undo, then parked on `redoStack`. */
   private readonly undoStack: Edit[] = [];
   private readonly redoStack: Edit[] = [];
@@ -692,9 +704,10 @@ export class EditorStore {
     if (sel.kind === 'label') this.deleteLabel(sel.id);
     else if (sel.kind === 'feature') this.clearFeatureAt(sel.coord);
     else if (sel.kind === 'hex') this.eraseAt(sel.coord);
-    // A selected Region is left untouched: Region deletion is the Inspector's job
-    // (issue #36), so Delete is a deliberate no-op here rather than erasing a hex.
-    else return;
+    // A selected Region is destroyed through the same single-step `deleteRegion`
+    // the Inspector's Delete uses (issue #36) — membership trimming never destroys
+    // a Region, so this and `deleteRegion` are the only two ways one ceases to be.
+    else if (sel.kind === 'region') this.deleteRegion(sel.id);
     this.deselect();
     // The dispatched edit erased an entity that existed (the selection resolved
     // it), so a step was recorded; stamp the now-cleared selection on it, so undo
