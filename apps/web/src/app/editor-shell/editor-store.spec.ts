@@ -833,6 +833,165 @@ describe('EditorStore selection precedence', () => {
   });
 });
 
+describe('EditorStore Region selection cycle', () => {
+  it('cycles from the Hex to the Region containing it on a repeated click', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    const id = store.createRegion('Avalon', '#b08a4e');
+    store.addHexToRegion(id, { q: 0, r: 0 });
+
+    store.select({ q: 0, r: 0 }, null); // first click: the bare Hex
+    expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 0, r: 0 } });
+
+    store.select({ q: 0, r: 0 }, null); // same coordinate again: descend to the Region
+    expect(store.selection()).toEqual({ kind: 'region', id });
+  });
+
+  it('cycles Label → Feature → Region → wrap at a coordinate carrying all three', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.placeFeatureAt({ q: 0, r: 0 }, 'settlement'); // a Feature rides the hex
+    const id = store.createRegion('Avalon', '#b08a4e');
+    store.addHexToRegion(id, { q: 0, r: 0 });
+    const labelId = store.addLabel('Avalon', { x: 5, y: 5 }); // a Label hit there too
+
+    // The label hit wins first; repeated clicks at the same coordinate descend.
+    expect(store.select({ q: 0, r: 0 }, labelId)).toEqual({ kind: 'label', id: labelId });
+    expect(store.select({ q: 0, r: 0 }, labelId)).toEqual({ kind: 'feature', coord: { q: 0, r: 0 } });
+    expect(store.select({ q: 0, r: 0 }, labelId)).toEqual({ kind: 'region', id });
+    // Past the last candidate the cycle wraps back to the top of the stack.
+    expect(store.select({ q: 0, r: 0 }, labelId)).toEqual({ kind: 'label', id: labelId });
+  });
+
+  it('resets to the top of the stack when the next click lands on a different coordinate', () => {
+    const store = new EditorStore();
+    const id = store.createRegion('Avalon', '#b08a4e');
+    store.addHexToRegion(id, { q: 0, r: 0 }); // a Void member coordinate
+    store.paintAt({ q: 1, r: 0 }, 'forest');
+    store.addHexToRegion(id, { q: 1, r: 0 }); // a painted member of the same region
+
+    store.select({ q: 0, r: 0 }, null); // descends to the Region (its only candidate)
+    expect(store.selection()).toEqual({ kind: 'region', id });
+
+    // A click on a *different* coordinate starts a fresh cycle at the top — the
+    // painted Hex — rather than resuming the descent and skipping past it, even
+    // though the same Region is also a candidate at the new coordinate.
+    store.select({ q: 1, r: 0 }, null);
+    expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 1, r: 0 } });
+  });
+
+  it('resets the cycle when the next click at the same coordinate hits a different label', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    const first = store.addLabel('First', { x: 1, y: 1 });
+    const second = store.addLabel('Second', { x: 2, y: 2 });
+
+    store.select({ q: 0, r: 0 }, first); // cycle anchored on the first label
+    expect(store.selection()).toEqual({ kind: 'label', id: first });
+
+    // A different label hit at the same coordinate is a different target, so the
+    // cycle restarts at that label rather than descending to the Hex beneath.
+    store.select({ q: 0, r: 0 }, second);
+    expect(store.selection()).toEqual({ kind: 'label', id: second });
+  });
+
+  it('selects the first containing Region (document order) on a Void coordinate, cycling through the rest', () => {
+    const store = new EditorStore();
+    const a = store.createRegion('Avalon', '#b08a4e');
+    const b = store.createRegion('Whisperwood', '#7c9b86');
+    store.addHexToRegion(a, { q: 4, r: 4 }); // a is added first → first in document order
+    store.addHexToRegion(b, { q: 4, r: 4 });
+
+    // The coordinate is Void (never painted), yet two Regions contain it: rather
+    // than deselecting, the first in document order is selected, then the cycle
+    // steps through the rest and wraps.
+    store.select({ q: 4, r: 4 }, null);
+    expect(store.selection()).toEqual({ kind: 'region', id: a });
+
+    store.select({ q: 4, r: 4 }, null);
+    expect(store.selection()).toEqual({ kind: 'region', id: b });
+
+    store.select({ q: 4, r: 4 }, null);
+    expect(store.selection()).toEqual({ kind: 'region', id: a });
+  });
+
+  it('deselects on a Void coordinate that no Region contains', () => {
+    const store = new EditorStore();
+    const id = store.createRegion('Avalon', '#b08a4e');
+    store.addHexToRegion(id, { q: 0, r: 0 });
+    store.select({ q: 0, r: 0 }, null); // something selected first
+
+    // An empty coordinate outside every Region is a click on nothing → deselect.
+    expect(store.select({ q: 9, r: 9 }, null)).toBeNull();
+    expect(store.selection()).toBeNull();
+  });
+
+  it('clears a Region selection when that Region is deleted', () => {
+    const store = new EditorStore();
+    const id = store.createRegion('Avalon', '#b08a4e');
+    store.addHexToRegion(id, { q: 0, r: 0 });
+    store.select({ q: 0, r: 0 }, null); // the Region (its only candidate)
+    expect(store.selection()).toEqual({ kind: 'region', id });
+
+    store.deleteRegion(id); // the selection resolves against the live document…
+
+    // …so a deleted Region leaves nothing selected rather than a dangling id.
+    expect(store.selection()).toBeNull();
+  });
+
+  it('leaves a selected Region untouched on deleteSelected (Region deletion is the Inspector\'s job)', () => {
+    const store = new EditorStore();
+    const id = store.createRegion('Avalon', '#b08a4e');
+    store.addHexToRegion(id, { q: 0, r: 0 });
+    store.select({ q: 0, r: 0 }, null);
+    expect(store.selection()).toEqual({ kind: 'region', id });
+
+    store.deleteSelected(); // Delete/Backspace on a Region is a deliberate no-op here
+
+    expect(store.document().regions[0].id).toBe(id);
+    expect(store.selection()).toEqual({ kind: 'region', id });
+  });
+
+  it('restarts the cycle at the top after a non-click path changed the selection', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    const id = store.createRegion('Avalon', '#b08a4e');
+    store.addHexToRegion(id, { q: 0, r: 0 });
+
+    store.select({ q: 0, r: 0 }, null); // top of the stack: the bare Hex
+    expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 0, r: 0 } });
+
+    // The selection is moved to a Label through a non-click path (the Label tool
+    // drop / Inspector) — no deselect, so the cycle anchor still names {0,0}.
+    const labelId = store.addLabel('Avalon', { x: 5, y: 5 });
+    store.selectLabel(labelId);
+    expect(store.selection()).toEqual({ kind: 'label', id: labelId });
+
+    // Clicking the same coordinate must restart at the top (the Hex), not resume
+    // the stale descent into the Region: the cycle position is derived from where
+    // the *live* selection sits in the stack, and the Label isn't a candidate here.
+    store.select({ q: 0, r: 0 }, null);
+    expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 0, r: 0 } });
+  });
+
+  it('re-derives the descent from the live selection when the stack changes under the anchor', () => {
+    const store = new EditorStore();
+    const id = store.createRegion('Avalon', '#b08a4e');
+    store.addHexToRegion(id, { q: 0, r: 0 }); // a Void member: the stack is [Region]
+
+    store.select({ q: 0, r: 0 }, null);
+    expect(store.selection()).toEqual({ kind: 'region', id });
+
+    // Painting the cell grows the stack to [Hex, Region] without a deselect. The
+    // next click at the same anchor descends from the still-selected Region (the
+    // last candidate) and wraps to the new top (the Hex), rather than reusing a
+    // stale index that would re-pick the Region.
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.select({ q: 0, r: 0 }, null);
+    expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 0, r: 0 } });
+  });
+});
+
 describe('EditorStore deleteSelected', () => {
   it('deletes the selected Label and clears the selection', () => {
     const store = new EditorStore();
