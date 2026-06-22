@@ -1,0 +1,17 @@
+{
+  "auth": {
+    "tabTitle": "Hexly — Sign in",
+    "heading": "Sign in",
+    "email": "Email",
+    "password": "Password",
+    "signIn": "Sign in",
+    "signingIn": "Signing in…",
+    "invalidCredentials": "Incorrect email or password."
+  },
+  "common": {
+    "language": "Language",
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close"
+  }
+}

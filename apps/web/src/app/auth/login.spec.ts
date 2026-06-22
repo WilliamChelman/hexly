@@ -5,7 +5,9 @@ import {
 } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
+import { TranslocoService } from '@jsverse/transloco';
 import { HeaderService } from '../shell/header.service';
+import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { Login } from './login';
 
 describe('Login', () => {
@@ -17,7 +19,7 @@ describe('Login', () => {
     navigate = vi.fn().mockResolvedValue(true);
     queryParams = {};
     await TestBed.configureTestingModule({
-      imports: [Login],
+      imports: [Login, provideTranslocoTesting()],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -127,6 +129,41 @@ describe('Login', () => {
       .flush({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada' });
 
     expect(navigate).toHaveBeenCalledWith('/atlas/42');
+  });
+
+  it('renders the whole screen in French when French is the active language', () => {
+    const fixture = TestBed.createComponent(Login);
+    const el = fixture.nativeElement as HTMLElement;
+    fixture.detectChanges();
+
+    // No reload: flipping the active language re-renders the live component.
+    TestBed.inject(TranslocoService).setActiveLang('fr');
+    fixture.detectChanges();
+
+    expect(el.querySelector('h1')?.textContent).toContain('Se connecter');
+    expect(el.textContent).toContain('E-mail');
+    expect(el.textContent).toContain('Mot de passe');
+    const button = el.querySelector('button[type=submit]') as HTMLButtonElement;
+    expect(button.textContent).toContain('Se connecter');
+    expect(button.textContent).not.toContain('Sign in');
+  });
+
+  it('shows the rejection error translated when French is active', () => {
+    const fixture = TestBed.createComponent(Login);
+    const el = fixture.nativeElement as HTMLElement;
+    fixture.detectChanges();
+    TestBed.inject(TranslocoService).setActiveLang('fr');
+    fixture.detectChanges();
+
+    typeInto(el, 'input[type=email]', 'ada@hexly.test');
+    typeInto(el, 'input[type=password]', 'wrong');
+    el.querySelector('form')!.dispatchEvent(new Event('submit'));
+    http
+      .expectOne('/auth/login')
+      .flush(null, { status: 401, statusText: 'Unauthorized' });
+    fixture.detectChanges();
+
+    expect(el.textContent).toContain('E-mail ou mot de passe incorrect');
   });
 
   it('shows an error and stays put when the credentials are rejected', () => {
