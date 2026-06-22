@@ -50,7 +50,7 @@ import { HeaderService } from './header.service';
           <span appEyebrow>{{ e }}</span>
         }
         @if (title(); as t) {
-          <span class="title">{{ t }}</span>
+          <h1 class="title">{{ t }}</h1>
         }
       </div>
     }
@@ -127,8 +127,10 @@ import { HeaderService } from './header.service';
       border-left: 1px solid var(--line);
     }
     .title {
+      margin: 0;
       font-family: var(--font-display);
       font-size: var(--text-md);
+      font-weight: normal;
       color: var(--ink-strong);
     }
     .actions {

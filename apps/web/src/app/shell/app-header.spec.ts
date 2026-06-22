@@ -143,6 +143,17 @@ describe('AppHeader', () => {
     expect(headline.textContent).toContain('Your maps');
   });
 
+  it('renders the declarative title as a heading', () => {
+    // The page's title is its heading, wherever it is drawn — assistive tech and
+    // the e2e suite both find it by role.
+    TestBed.inject(HeaderService).set({ title: 'Your maps' });
+    const fixture = TestBed.createComponent(AppHeader);
+    fixture.detectChanges();
+
+    const heading = fixture.nativeElement.querySelector('h1');
+    expect(heading?.textContent).toContain('Your maps');
+  });
+
   it('hosts a named header outlet for a route to project rich content into', () => {
     const fixture = TestBed.createComponent(AppHeader);
     fixture.detectChanges();
