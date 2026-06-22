@@ -519,6 +519,23 @@ export class EditorStore {
   }
 
   /**
+   * Set the name on the hex at `coord` (ADR-0016). A name is a field on a Hex,
+   * so naming a Void coordinate is a no-op — paint terrain first. A blank or
+   * whitespace-only name clears the field entirely rather than leaving an empty
+   * string, keeping the document minimal (the renderer draws nothing either way).
+   * Like every edit it goes through `commit`, so a rename is a single undoable step.
+   */
+  editHexName(coord: Axial, name: string): void {
+    const trimmed = name.trim();
+    this.commit((draft) => {
+      const hex = draft.hexes[coordKey(coord)];
+      if (!hex) return;
+      if (trimmed) hex.name = trimmed;
+      else delete hex.name;
+    });
+  }
+
+  /**
    * Move a whole Hex's content — terrain *and* feature — from `from` to `to`
    * (issue #30, ADR-0010). The origin becomes Void and an occupied destination
    * is overwritten, so the move never silently duplicates a hex. Region

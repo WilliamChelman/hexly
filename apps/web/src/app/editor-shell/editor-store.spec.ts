@@ -1259,6 +1259,87 @@ describe('EditorStore moveHex', () => {
   });
 });
 
+describe('EditorStore hex name', () => {
+  it('names a painted hex', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+
+    store.editHexName({ q: 0, r: 0 }, 'Riverbend');
+
+    expect(store.document().hexes['0,0']).toEqual({
+      terrain: 'forest',
+      name: 'Riverbend',
+    });
+  });
+
+  it('undo reverses a rename', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.editHexName({ q: 0, r: 0 }, 'Riverbend');
+
+    store.undo();
+
+    expect(store.document().hexes['0,0']).toEqual({ terrain: 'forest' });
+  });
+
+  it('naming a Void coordinate is a no-op that paints no hex and records no undo step', () => {
+    const store = new EditorStore();
+
+    store.editHexName({ q: 0, r: 0 }, 'Riverbend');
+
+    expect('0,0' in store.document().hexes).toBe(false);
+    expect(store.canUndo()).toBe(false);
+  });
+
+  it('clearing the name to blank removes the field rather than leaving an empty string', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.editHexName({ q: 0, r: 0 }, 'Riverbend');
+
+    store.editHexName({ q: 0, r: 0 }, '   ');
+
+    expect(store.document().hexes['0,0']).toEqual({ terrain: 'forest' });
+  });
+
+  it('clearing the feature leaves the name intact', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.placeFeatureAt({ q: 0, r: 0 }, 'settlement');
+    store.editHexName({ q: 0, r: 0 }, 'Riverbend');
+
+    store.clearFeatureAt({ q: 0, r: 0 });
+
+    expect(store.document().hexes['0,0']).toEqual({
+      terrain: 'forest',
+      name: 'Riverbend',
+    });
+  });
+
+  it('erasing the hex removes the name with the rest of the record', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.editHexName({ q: 0, r: 0 }, 'Riverbend');
+
+    store.eraseAt({ q: 0, r: 0 });
+
+    expect('0,0' in store.document().hexes).toBe(false);
+  });
+
+  it('carries the name with the hex on a single-hex move', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.editHexName({ q: 0, r: 0 }, 'Riverbend');
+
+    store.moveHex({ q: 0, r: 0 }, { q: 2, r: -1 });
+
+    expect(store.document().hexes['2,-1']).toEqual({
+      terrain: 'forest',
+      name: 'Riverbend',
+    });
+    expect('0,0' in store.document().hexes).toBe(false);
+  });
+});
+
 describe('EditorStore region direction', () => {
   /**
    * Select a fresh Region (its single member at a Void coordinate, so the Region

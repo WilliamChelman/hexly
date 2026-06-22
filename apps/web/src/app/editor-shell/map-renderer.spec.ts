@@ -103,6 +103,7 @@ const FOREST = 'rgb(1, 2, 3)';
 const FEATURE_INK = 'rgb(9, 9, 9)';
 const LABEL_INK = 'rgb(7, 7, 7)';
 const SELECT_INK = 'rgb(5, 5, 5)';
+const NAME_INK = 'rgb(3, 3, 3)';
 
 /** Drive the colour resolution so terrain fills are deterministic. */
 function stubTheme(): () => void {
@@ -111,6 +112,7 @@ function stubTheme(): () => void {
     '--terrain-forest': FOREST,
     '--feature-ink': FEATURE_INK,
     '--label-ink': LABEL_INK,
+    '--name-ink': NAME_INK,
     '--gold-strong': SELECT_INK,
   };
   window.getComputedStyle = (() => ({
@@ -299,6 +301,55 @@ describe('Canvas2dMapRenderer feature markers', () => {
     expect(saves).toBeGreaterThan(0);
     restorePath();
     restoreTheme();
+  });
+});
+
+describe('Canvas2dMapRenderer hex names', () => {
+  it('draws a non-empty hex name in the name ink, anchored to the hex', () => {
+    const restore = stubTheme();
+    const ctx = new FakeContext();
+    const renderer = makeRenderer(ctx);
+    const camera = Camera.initial().panBy(60, 60);
+    const doc: HexMap = {
+      hexes: { '0,0': { terrain: 'forest', name: 'Riverbend' } },
+      regions: [],
+      labels: [],
+    };
+
+    renderer.render(camera, doc, null);
+
+    expect(ctx.textFills).toContainEqual({ text: 'Riverbend', fill: NAME_INK });
+    restore();
+  });
+
+  it('draws nothing for a painted hex with no name', () => {
+    const restore = stubTheme();
+    const ctx = new FakeContext();
+    const renderer = makeRenderer(ctx);
+    const camera = Camera.initial().panBy(60, 60);
+    const doc: HexMap = { hexes: { '0,0': { terrain: 'forest' } }, regions: [], labels: [] };
+
+    renderer.render(camera, doc, null);
+
+    expect(ctx.textFills).toEqual([]);
+    restore();
+  });
+
+  it('draws nothing for an empty hex name', () => {
+    const restore = stubTheme();
+    const ctx = new FakeContext();
+    const renderer = makeRenderer(ctx);
+    const camera = Camera.initial().panBy(60, 60);
+    const doc: HexMap = {
+      hexes: { '0,0': { terrain: 'forest', name: '' } },
+      regions: [],
+      labels: [],
+    };
+
+    renderer.render(camera, doc, null);
+
+    expect(ctx.textFills).toEqual([]);
+    restore();
   });
 });
 
