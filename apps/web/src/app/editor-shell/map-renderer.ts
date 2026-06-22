@@ -12,6 +12,7 @@ import {
   neighbors,
   parseCoordKey,
   Point,
+  rectFromCorners,
   Region,
   terrainPalette,
   TerrainId,
@@ -76,6 +77,10 @@ const SELECTION_STROKE = 3;
 const SELECTION_FILL_ALPHA = 0.25;
 /** Screen-pixel padding around a selected Label's text box, so the bounds clear the glyphs. */
 const SELECTION_LABEL_PAD = 4;
+/** A live marquee rectangle's stroke weight in screen pixels, constant across zoom. */
+const MARQUEE_STROKE = 1.5;
+/** The marquee's dash pattern (screen pixels on/off) — the one dashed stroke in the renderer. */
+const MARQUEE_DASH: readonly number[] = [5, 4];
 
 /**
  * The seam between the editor and whatever draws the map. There is one Canvas 2D
@@ -105,21 +110,52 @@ export interface HexDragOverride {
   readonly to: Axial;
 }
 
+/**
+ * A live marquee box: the two world-space corners (`a` the drag origin, `b` the
+ * cursor) of the rectangle the Marquee Subtool is dragging (ADR-0017). Passed to
+ * {@link MapRenderer.render} so the box previews live without touching the
+ * document, the same discipline as the label/hex drag overrides. World-space so
+ * it tracks the content under pan/zoom; the renderer normalises and projects it.
+ */
+export interface MarqueeOverride {
+  readonly a: Point;
+  readonly b: Point;
+}
+
+/**
+ * The optional, per-frame inputs to {@link MapRenderer.render} beyond the camera,
+ * document, and hover: the Selection set to highlight, plus the live *preview*
+ * overrides that each ride on top of the committed document without mutating it
+ * (issues #6, #30, ADR-0017). Bundled into one object so the render seam stays a
+ * stable `camera, doc, hover, overrides` shape as new previews are added, rather
+ * than growing another positional argument each time. All optional — omit the
+ * ones a frame doesn't need.
+ */
+export interface RenderOverrides {
+  /** Preview one dragged Label at a live position without cloning the doc (issue #6). */
+  readonly labelDrag?: LabelDragOverride | null;
+  /** The Selection set to highlight — the committed set, or a marquee's live preview. */
+  readonly selections?: readonly Selection[];
+  /** Preview a whole-Hex move at its destination (issue #30). */
+  readonly hexDrag?: HexDragOverride | null;
+  /** Preview the live marquee rectangle being dragged (ADR-0017). */
+  readonly marquee?: MarqueeOverride | null;
+}
+
 export interface MapRenderer {
   /** Match the drawing surface to the given CSS-pixel size. */
   resize(width: number, height: number): void;
   /**
-   * Paint one frame: the painted hexes, the culled grid, and an optional hover.
-   * An optional `labelDrag` previews one dragged label at a live position
-   * without the caller rebuilding the document each frame (issue #6).
+   * Paint one frame: the painted hexes, the culled grid, an optional hover, and
+   * the optional {@link RenderOverrides} (the selection highlight plus the live
+   * label/hex/marquee previews) — each previewed without the caller rebuilding
+   * the document each frame (issues #6, #30, ADR-0017).
    */
   render(
     camera: Camera,
     doc: HexMap,
     hover: Axial | null,
-    labelDrag?: LabelDragOverride | null,
-    selections?: readonly Selection[],
-    hexDrag?: HexDragOverride | null,
+    overrides?: RenderOverrides,
   ): void;
   /**
    * The id of the Label drawn under screen `point` (topmost wins), or `null`.
@@ -274,10 +310,14 @@ export class Canvas2dMapRenderer implements MapRenderer {
     camera: Camera,
     doc: HexMap,
     hover: Axial | null,
-    labelDrag: LabelDragOverride | null = null,
-    selections: readonly Selection[] = [],
-    hexDrag: HexDragOverride | null = null,
+    overrides: RenderOverrides = {},
   ): void {
+    const {
+      labelDrag = null,
+      selections = [],
+      hexDrag = null,
+      marquee = null,
+    } = overrides;
     const ctx = this.ctx;
     if (!ctx || this.width === 0 || this.height === 0) return;
 
@@ -454,6 +494,46 @@ export class Canvas2dMapRenderer implements MapRenderer {
         tracking ? { ...selection, coord: drag.to } : selection,
       );
     }
+
+    // The live marquee rectangle rides on top of everything: a dashed accent
+    // outline of the box being dragged (ADR-0017), previewed straight from its
+    // world corners without touching the document.
+    if (marquee) this.drawMarquee(ctx, camera, marquee);
+  }
+
+  /**
+   * Stroke the live marquee box as a dashed accent rectangle. The two world
+   * corners project to screen via the camera (a scale+translate, so an
+   * axis-aligned world box stays axis-aligned on screen) and are normalised to
+   * min/max so the outline is correct whichever way the drag runs. The dash and
+   * stroke settings are wrapped in save/restore so they never leak into the next
+   * frame's grid stroke.
+   */
+  private drawMarquee(
+    ctx: CanvasRenderingContext2D,
+    camera: Camera,
+    marquee: MarqueeOverride,
+  ): void {
+    // Project both world corners to screen, then normalise via the shared
+    // two-corner→Rect helper so the outline matches the canvas's hit-test box
+    // exactly (one definition of "rect from two corners", in the domain).
+    const { minX, minY, maxX, maxY } = rectFromCorners(
+      camera.worldToScreen(marquee.a),
+      camera.worldToScreen(marquee.b),
+    );
+    ctx.save();
+    ctx.strokeStyle = this.palette.selected;
+    ctx.lineWidth = MARQUEE_STROKE;
+    ctx.lineJoin = 'round';
+    ctx.setLineDash([...MARQUEE_DASH]);
+    ctx.beginPath();
+    ctx.moveTo(minX, minY);
+    ctx.lineTo(maxX, minY);
+    ctx.lineTo(maxX, maxY);
+    ctx.lineTo(minX, maxY);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
   }
 
   labelAt(point: Point): string | null {

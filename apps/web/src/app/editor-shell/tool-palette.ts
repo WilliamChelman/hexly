@@ -11,6 +11,7 @@ import { IconButton } from '../ui/icon-button';
 import { IconPath } from '../ui/icon/icon-path';
 import { EraseIcon } from '../ui/icon/glyphs/erase';
 import { LabelIcon } from '../ui/icon/glyphs/label';
+import { MarqueeIcon } from '../ui/icon/glyphs/marquee';
 import { MinusIcon } from '../ui/icon/glyphs/minus';
 import { RedoIcon } from '../ui/icon/glyphs/redo';
 import { SelectIcon } from '../ui/icon/glyphs/select';
@@ -21,7 +22,13 @@ import { Panel } from '../ui/panel';
 import { Rule } from '../ui/rule';
 import { Swatch } from '../ui/swatch';
 import { featureKey, terrainKey } from './catalog-keys';
-import { EditorStore, featureSubtools, ToolId } from './editor-store';
+import {
+  EditorStore,
+  featureSubtools,
+  SelectSubtool,
+  selectSubtools,
+  ToolId,
+} from './editor-store';
 
 /** A top-level Tool button in the floating icon strip (issue #27, ADR-0013). */
 interface ToolDef {
@@ -47,6 +54,11 @@ const TOOLS: readonly ToolDef[] = [
   { id: 'erase', key: 'E', glyph: EraseIcon },
 ];
 
+/** The glyph for a Select Subtool: the arrow cursor for Pick, a dashed box for Marquee. */
+function glyphFor(subtool: SelectSubtool): Type<unknown> {
+  return subtool === 'marquee' ? MarqueeIcon : SelectIcon;
+}
+
 /**
  * The floating tool palette: a compact icon strip in the top-left of the map —
  * one icon button per Tool (Select, Terrain, Feature, Label, Erase), plus Undo
@@ -56,8 +68,9 @@ const TOOLS: readonly ToolDef[] = [
  * shell positions this component top-left (ADR-0013).
  *
  * The flyout is bound to the armed Tool: it opens **only** for the Tools that
- * have Subtools (Terrain, Feature) and is absent for Select, Label, and Erase —
- * which have none — so the map stays maximally clear with nothing to configure.
+ * have Subtools (Select with Pick/Marquee, Terrain, and Feature — ADR-0017) and
+ * is absent for Label and Erase, which have none — so the map stays maximally
+ * clear with nothing to configure.
  * Region is not a palette Tool (ADR-0012): while the membership brush is armed
  * (internal `region` state), the strip highlights no Tool and opens no flyout —
  * the active affordance is the Inspector's Add/Remove (issue #38, story 25).
@@ -128,6 +141,29 @@ const TOOLS: readonly ToolDef[] = [
     </div>
 
     @switch (store.tool()) {
+      @case ('select') {
+        <div
+          class="flyout"
+          appPanel
+          role="group"
+          [attr.aria-label]="'editorShell.toolPalette.selectGroup' | transloco"
+        >
+          @for (s of selectTools; track s.id) {
+            @let subName = s.nameKey | transloco;
+            <button
+              appIconButton
+              toggle
+              [active]="store.selectSubtool() === s.id"
+              [title]="subName + ' (' + s.key + ')'"
+              [attr.aria-label]="subName"
+              [attr.data-testid]="'select-' + s.id"
+              (click)="store.armSelectSubtool(s.id)"
+            >
+              <ng-container *ngComponentOutlet="s.glyph; inputs: glyphInputs" />
+            </button>
+          }
+        </div>
+      }
       @case ('terrain') {
         <div
           class="flyout"
@@ -227,6 +263,21 @@ export class ToolPalette {
 
   /** Inputs for each outlet-rendered Tool glyph; matches the 20px icon-only chrome. */
   protected readonly glyphInputs = { size: 20 };
+
+  /**
+   * The Select tool's Subtools — Pick then Marquee — each placeable from the
+   * Select flyout (ADR-0017). The keycap is the Subtool's slot in
+   * {@link selectSubtools}, the shared ordering the keyboard `1`/`2` indexes — so
+   * the tooltip can never disagree with what its key arms. The glyph is the arrow
+   * cursor for Pick, a dashed box for Marquee; the name resolves from the stable
+   * id (`editorShell.toolPalette.<id>`, ADR-0014).
+   */
+  protected readonly selectTools = selectSubtools.map((id, i) => ({
+    id,
+    nameKey: `editorShell.toolPalette.${id}`,
+    glyph: glyphFor(id),
+    key: String(i + 1),
+  }));
 
   /**
    * The built-in feature library, each placeable from the flyout. The keycap is

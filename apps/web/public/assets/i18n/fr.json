@@ -38,6 +38,8 @@
     "toolPalette": {
       "tools": "Outils",
       "select": "Sélection",
+      "pick": "Pointer",
+      "marquee": "Rectangle",
       "terrain": "Terrain",
       "feature": "Caractéristique",
       "label": "Étiquette",
@@ -46,7 +48,8 @@
       "redo": "Rétablir",
       "terrainGroup": "Terrain",
       "featureGroup": "Caractéristiques",
-      "clearFeature": "Retirer la caractéristique"
+      "clearFeature": "Retirer la caractéristique",
+      "selectGroup": "Sélection"
     },
     "inspector": {
       "title": "Inspecteur",

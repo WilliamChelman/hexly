@@ -10,6 +10,22 @@ export interface Rect {
 }
 
 /**
+ * The axis-aligned {@link Rect} spanning two corner points, in whichever order —
+ * a drag from bottom-right to top-left yields the same rect as top-left to
+ * bottom-right. The single place two-corner→Rect normalisation lives, shared by
+ * the marquee's world-space hit-test (the canvas) and its screen-space outline
+ * (the renderer) so the box geometry is defined once and the two can't drift.
+ */
+export function rectFromCorners(a: Point, b: Point): Rect {
+  return {
+    minX: Math.min(a.x, b.x),
+    minY: Math.min(a.y, b.y),
+    maxX: Math.max(a.x, b.x),
+    maxY: Math.max(a.y, b.y),
+  };
+}
+
+/**
  * Every hex intersecting the rectangle — the viewport-culling query the renderer
  * runs each frame so it paints only what's on screen, not the infinite plane
  * (ADR-0003). Over-includes by at most a one-hex margin (cheap and safe); never

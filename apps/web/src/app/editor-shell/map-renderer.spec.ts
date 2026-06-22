@@ -77,6 +77,12 @@ class FakeContext {
     this.pathFills.push(this.fillStyle);
     this.pathFillAlphas.push(this.globalAlpha);
   }
+  /** Each dash pattern set, in order — the marquee is the only dashed stroke. */
+  readonly dashes: number[][] = [];
+  setLineDash(pattern: number[]): void {
+    this.dashes.push(pattern);
+    this.ops.push('setLineDash');
+  }
 }
 
 /** Stand-in for `Path2D`, absent in the test DOM — records the SVG path it got. */
@@ -462,7 +468,9 @@ describe('Canvas2dMapRenderer selection highlight', () => {
     const camera = Camera.initial().panBy(60, 60);
     const doc: HexMap = { hexes: { '0,0': { terrain: 'forest' } }, regions: [], labels: [] };
 
-    renderer.render(camera, doc, null, null, [{ kind: 'hex', coord: { q: 0, r: 0 } }]);
+    renderer.render(camera, doc, null, {
+      selections: [{ kind: 'hex', coord: { q: 0, r: 0 } }],
+    });
 
     // The selected hex reads as a strong outline in the accent ink, distinct
     // from the soft hover fill and the thin grid line.
@@ -481,7 +489,9 @@ describe('Canvas2dMapRenderer selection highlight', () => {
       labels: [{ id: 'l1', text: 'Open Sea', position: { x: 0, y: 0 }, size: 28 }],
     };
 
-    renderer.render(camera, doc, null, null, [{ kind: 'label', id: 'l1' }]);
+    renderer.render(camera, doc, null, {
+      selections: [{ kind: 'label', id: 'l1' }],
+    });
 
     expect(ctx.lineStrokes).toContain(SELECT_INK);
     restore();
@@ -500,10 +510,12 @@ describe('Canvas2dMapRenderer selection highlight', () => {
 
     // Both a Hex and a Label are selected at once: the renderer outlines each in
     // the accent ink — two distinct highlight strokes, not a single one.
-    renderer.render(camera, doc, null, null, [
-      { kind: 'hex', coord: { q: 0, r: 0 } },
-      { kind: 'label', id: 'l1' },
-    ]);
+    renderer.render(camera, doc, null, {
+      selections: [
+        { kind: 'hex', coord: { q: 0, r: 0 } },
+        { kind: 'label', id: 'l1' },
+      ],
+    });
 
     const highlights = ctx.lineStrokes.filter((s) => s === SELECT_INK);
     expect(highlights.length).toBeGreaterThanOrEqual(2);
@@ -517,7 +529,7 @@ describe('Canvas2dMapRenderer selection highlight', () => {
     const camera = Camera.initial().panBy(60, 60);
     const doc: HexMap = { hexes: { '0,0': { terrain: 'forest' } }, regions: [], labels: [] };
 
-    renderer.render(camera, doc, null, null, []);
+    renderer.render(camera, doc, null, { selections: [] });
 
     expect(ctx.lineStrokes).not.toContain(SELECT_INK);
     restore();
@@ -538,7 +550,9 @@ describe('Canvas2dMapRenderer region selection highlight', () => {
       labels: [],
     };
 
-    renderer.render(camera, doc, null, null, [{ kind: 'region', id: 'a' }]);
+    renderer.render(camera, doc, null, {
+      selections: [{ kind: 'region', id: 'a' }],
+    });
 
     // The selected region tints its member hex: a path fill in the region colour
     // (unlike unselected regions, which only stroke a border)…
@@ -563,12 +577,46 @@ describe('Canvas2dMapRenderer region selection highlight', () => {
       labels: [],
     };
 
-    renderer.render(camera, doc, null, null, [{ kind: 'region', id: 'a' }]);
+    renderer.render(camera, doc, null, {
+      selections: [{ kind: 'region', id: 'a' }],
+    });
 
     // Only the selected region is filled; the other stays a coloured outline so
     // the map isn't washed in colour (ADR-0011).
     expect(ctx.pathFills).toContain('#b08a4e');
     expect(ctx.pathFills).not.toContain('#7c9b86');
+    restore();
+  });
+});
+
+describe('Canvas2dMapRenderer marquee rectangle', () => {
+  it('strokes a dashed rectangle while a marquee drag is active', () => {
+    const restore = stubTheme();
+    const ctx = new FakeContext();
+    const renderer = makeRenderer(ctx);
+    const camera = Camera.initial().panBy(60, 60);
+    const doc: HexMap = { hexes: {}, regions: [], labels: [] };
+
+    // A live marquee, given as its two world-space corners.
+    renderer.render(camera, doc, null, {
+      marquee: { a: { x: -20, y: -20 }, b: { x: 30, y: 25 } },
+    });
+
+    // The marquee is the only dashed stroke the renderer ever lays down.
+    expect(ctx.dashes.some((d) => d.length > 0)).toBe(true);
+    restore();
+  });
+
+  it('draws no marquee rectangle when none is active', () => {
+    const restore = stubTheme();
+    const ctx = new FakeContext();
+    const renderer = makeRenderer(ctx);
+    const camera = Camera.initial().panBy(60, 60);
+    const doc: HexMap = { hexes: { '0,0': { terrain: 'forest' } }, regions: [], labels: [] };
+
+    renderer.render(camera, doc, null);
+
+    expect(ctx.dashes.some((d) => d.length > 0)).toBe(false);
     restore();
   });
 });

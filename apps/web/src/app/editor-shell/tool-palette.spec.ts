@@ -72,14 +72,31 @@ describe('ToolPalette contextual Subtool panel', () => {
     await TestBed.configureTestingModule({ imports: [ToolPalette, provideTranslocoTesting()] }).compileComponents();
   });
 
-  it('shows no Subtool strip while Select is armed (the cold-start tool)', () => {
+  it('shows the Select Subtools Pick and Marquee, with Pick active at cold-start', () => {
     const { fixture } = setup();
 
-    // A fresh map boots in Select, which has no Subtools (CONTEXT.md → Subtool).
-    // The terrain swatch buttons (e.g. "Ocean") only render under the Terrain
-    // tool — querying for one avoids colliding with the primary Terrain button.
+    // A fresh map boots in Select, which now has two Subtools (ADR-0017): the
+    // flyout shows Pick and Marquee, with Pick (the boot default) active.
+    expect(has(fixture, 'select-pick')).toBe(true);
+    expect(has(fixture, 'select-marquee')).toBe(true);
+    const pick = fixture.nativeElement.querySelector(
+      '[data-testid=select-pick]',
+    ) as HTMLButtonElement;
+    expect(pick.classList.contains('is-active')).toBe(true);
+    // The painting Tools' Subtools stay scoped to their own flyouts.
     expect(has(fixture, 'feature-settlement')).toBe(false);
     expect(fixture.nativeElement.querySelector('[aria-label=Ocean]')).toBeNull();
+  });
+
+  it('arms the Pick and Marquee Subtools from the Select flyout', () => {
+    const { fixture, store } = setup();
+
+    click(fixture, 'select-marquee');
+    expect(store.tool()).toBe('select');
+    expect(store.selectSubtool()).toBe('marquee');
+
+    click(fixture, 'select-pick');
+    expect(store.selectSubtool()).toBe('pick');
   });
 
   it('shows terrain swatches and arms a terrain when Terrain is armed', () => {
@@ -196,10 +213,10 @@ describe('ToolPalette flyout binding', () => {
     await TestBed.configureTestingModule({ imports: [ToolPalette, provideTranslocoTesting()] }).compileComponents();
   });
 
-  it('opens no flyout for Select, Label, or Erase (no Subtools)', () => {
+  it('opens no flyout for Label or Erase (no Subtools)', () => {
     const { fixture, store } = setup();
 
-    for (const tool of ['select', 'label', 'erase'] as const) {
+    for (const tool of ['label', 'erase'] as const) {
       store.armTool(tool);
       fixture.detectChanges();
       // Tools without Subtools render no flyout at all, keeping the map clear (story 10).
@@ -207,8 +224,13 @@ describe('ToolPalette flyout binding', () => {
     }
   });
 
-  it('opens a flyout bound to the armed painting Tool', () => {
+  it('opens a flyout bound to the armed Tool — Select, Terrain, and Feature', () => {
     const { fixture, store } = setup();
+
+    // Select now carries Pick/Marquee Subtools, so it opens a flyout too (ADR-0017).
+    store.armTool('select');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.flyout')).not.toBeNull();
 
     store.armTool('terrain');
     fixture.detectChanges();

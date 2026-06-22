@@ -49,6 +49,19 @@ export type ToolId =
 export type FeatureSubtool = FeatureId | 'clear';
 
 /**
+ * The Select tool's Subtool (ADR-0017, amending ADR-0010): `pick` is the
+ * click/cycle/move picker (the boot default, so a freshly-opened map behaves
+ * exactly as before), `marquee` drags a rectangle to box-select the Hexes and
+ * Labels within it. Like every Subtool it is session-only memory, never in the
+ * document. The two are ordered `pick`, `marquee` so the keyboard `1`/`2` and
+ * the palette keycaps index them from one source of truth.
+ */
+export type SelectSubtool = 'pick' | 'marquee';
+
+/** The Select tool's Subtools in palette/keyboard order — Pick first (the default). */
+export const selectSubtools: readonly SelectSubtool[] = ['pick', 'marquee'];
+
+/**
  * The Region membership brush's target: which region the brush paints, and whether
  * it adds (`add`) or removes (`remove`) membership. `null` until a Region is selected
  * and a direction engaged via the Inspector's Add/Remove (issue #37); with none, a
@@ -213,6 +226,7 @@ export class EditorStore {
   private readonly _terrain = signal<TerrainId>(DEFAULT_TERRAIN);
   private readonly _feature = signal<FeatureSubtool>(DEFAULT_FEATURE);
   private readonly _region = signal<RegionSubtool | null>(null);
+  private readonly _selectSubtool = signal<SelectSubtool>('pick');
 
   /**
    * Which view floats in the editor's dismissible right panel: the live
@@ -228,6 +242,12 @@ export class EditorStore {
   private readonly _rightPanel = signal<'inspector' | 'regions' | null>(null);
   readonly rightPanel = this._rightPanel.asReadonly();
 
+  /**
+   * The remembered Select Subtool — `pick` (click/cycle/move) or `marquee`
+   * (box-select). Boots at `pick` so a freshly-opened map behaves exactly as
+   * before (ADR-0017). The canvas reads this to choose its Select gesture.
+   */
+  readonly selectSubtool = this._selectSubtool.asReadonly();
   /** The remembered Terrain Subtool — the terrain a Terrain stroke paints. */
   readonly terrain = this._terrain.asReadonly();
   /** The remembered Feature Subtool — a library feature to place, or `'clear'`. */
@@ -414,6 +434,16 @@ export class EditorStore {
     this._rightPanel.set(this._rightPanel() === 'regions' ? null : 'regions');
   }
 
+  /**
+   * Arm the Select tool with `subtool` — `pick` or `marquee` — remembering it as
+   * the Select Subtool (ADR-0017). Peer to {@link armTerrain}/{@link armFeature};
+   * the palette keycaps and keyboard `1`/`2` route through here.
+   */
+  armSelectSubtool(subtool: SelectSubtool): void {
+    this._selectSubtool.set(subtool);
+    this._tool.set('select');
+  }
+
   /** Arm the Terrain tool with terrain `id`, remembering it as the Terrain Subtool. */
   armTerrain(id: TerrainId): void {
     this._terrain.set(id);
@@ -463,6 +493,11 @@ export class EditorStore {
    */
   armSubtoolByIndex(n: number): void {
     switch (this._tool()) {
+      case 'select': {
+        const sub = selectSubtools[n - 1];
+        if (sub) this.armSelectSubtool(sub);
+        break;
+      }
       case 'terrain': {
         const t = terrainPalette[n - 1];
         if (t) this.armTerrain(t.id);
@@ -502,6 +537,7 @@ export class EditorStore {
 
   /** Restore the cold-start Subtool memory shared by a fresh store and a reload. */
   private resetSubtoolMemory(): void {
+    this._selectSubtool.set('pick');
     this._terrain.set(DEFAULT_TERRAIN);
     this._feature.set(DEFAULT_FEATURE);
     this._region.set(null);
@@ -883,11 +919,11 @@ export class EditorStore {
    */
   private addRefs(refs: SelectionRef[]): void {
     const current = this._selections();
-    // Build the membership index once so the per-ref test is O(1) — the set keeps
-    // its order; the Set is only an auxiliary index, never the stored selection.
-    const present = new Set(current.map(refKey));
-    const missing = refs.filter((ref) => !present.has(refKey(ref)));
-    if (missing.length) this._selections.set([...current, ...missing]);
+    // Dedup-preserving union via the shared {@link mergeRefs}. Only write when it
+    // grew — mergeRefs only ever appends, so an unchanged length means every ref
+    // was already present — keeping the no-op add cheap and signal-quiet.
+    const merged = mergeRefs(current, refs);
+    if (merged.length !== current.length) this._selections.set(merged);
   }
 
   /** Toggle each of `refs` in or out of the set: drop it if present, append it if absent. */
@@ -978,6 +1014,62 @@ export class EditorStore {
       this._region.set(null);
       if (this._tool() === 'region') this._tool.set('select');
     }
+  }
+
+  /**
+   * Fold a marquee box-selection into the Selection set (CONTEXT.md → Marquee,
+   * ADR-0017): the `hexes` and `labelIds` the canvas resolved from the dragged
+   * rectangle via the pure {@link marqueeHits} helper. A plain marquee
+   * (`additive` false) *replaces* the set with exactly these; a Shift/Cmd marquee
+   * (`additive` true) *adds* them, so several boxes accumulate, never removing an
+   * already-selected member. Regions are never passed — they have no single
+   * position, so the marquee can't reach them. Selecting opens the Inspector on
+   * the result; a plain marquee that hit nothing clears the set like an empty
+   * click. Transient view state — records no undo step.
+   */
+  marqueeSelect(hexes: Axial[], labelIds: string[], additive: boolean): void {
+    const refs = marqueeRefs(hexes, labelIds);
+    // A marquee isn't a per-coordinate click cycle, so forget any cycle anchor —
+    // a later plain click starts fresh at the top of its stack (issue #35).
+    this.cycleAnchor = null;
+    if (additive) this.addRefs(refs);
+    else this._selections.set(refs);
+    // Open the Inspector on the result, mirroring a click select; an empty plain
+    // marquee leaves nothing selected, so tear down to the closed state instead.
+    if (this._selections().length > 0) this._rightPanel.set('inspector');
+    else this.deselect();
+  }
+
+  /**
+   * The Selection set a marquee {@link marqueeSelect commit} *would* produce for
+   * the given `hexes`/`labelIds`, resolved against the live document — without
+   * mutating anything. The canvas reads this each frame of a marquee drag to
+   * highlight the contained elements live, so the box previews exactly what
+   * releasing it would select (a featured cell shows as a Feature, just as the
+   * commit would). A plain box previews only its own contents; an additive box
+   * (Shift/Cmd) previews the committed set unioned with the box, the same merge
+   * {@link addRefs} performs on release. A pure query — records no edit, opens no
+   * panel, touches no signal.
+   */
+  marqueePreview(
+    hexes: Axial[],
+    labelIds: string[],
+    additive: boolean,
+  ): Selection[] {
+    const refs = marqueeRefs(hexes, labelIds);
+    // Additive previews build on the committed set (box refs appended, deduped via
+    // the same {@link mergeRefs} the additive commit uses, so the preview can never
+    // disagree with what release accumulates); a plain preview shows only the box,
+    // since release replaces the set.
+    const base = additive ? this._selections() : [];
+    const merged = mergeRefs(base, refs);
+    // Resolve against the live document, dropping any stale member — the same
+    // self-heal {@link selections} applies, so the preview can't show a ghost.
+    const doc = this._document();
+    return merged.flatMap((ref) => {
+      const resolved = resolveRef(doc, ref);
+      return resolved ? [resolved] : [];
+    });
   }
 
   /** Select the Label `id` for editing in the inspector, or `null` to clear it. */
@@ -1230,6 +1322,50 @@ function sameSelectionRef(a: SelectionRef, b: SelectionRef): boolean {
  * Lets the sweep-time membership tests build an O(1) `Set` index once rather than
  * re-scanning the growing set per swept hex (a quadratic over a long drag).
  */
+/**
+ * Build the {@link SelectionRef}s a marquee box denotes from its resolved
+ * `hexes` and `labelIds` (CONTEXT.md → Marquee): a cell ref per hex coordinate,
+ * a label ref per id. The shared ref-builder behind both {@link
+ * EditorStore.marqueeSelect} (which commits them) and {@link
+ * EditorStore.marqueePreview} (which resolves them for the live highlight), so
+ * the previewed box can never disagree with what releasing it selects. Each
+ * coordinate is copied, never aliased, so a caller's reused hover object can't
+ * retarget a ref later.
+ */
+function marqueeRefs(hexes: Axial[], labelIds: string[]): SelectionRef[] {
+  return [
+    ...hexes.map((coord) => ({
+      kind: 'cell' as const,
+      coord: { q: coord.q, r: coord.r },
+    })),
+    ...labelIds.map((id) => ({ kind: 'label' as const, id })),
+  ];
+}
+
+/**
+ * Append `refs` to `base`, skipping any whose entity is already present (by
+ * {@link refKey} identity) — the dedup-preserving union shared by the additive
+ * select path ({@link EditorStore.addRefs}, which commits it) and the marquee
+ * preview ({@link EditorStore.marqueePreview}, which resolves it for the live
+ * highlight), so an additive box's live preview can never disagree with what
+ * releasing it accumulates. Returns a fresh array; `base` is never mutated, and
+ * its order is preserved with the new members appended after it.
+ */
+function mergeRefs(
+  base: readonly SelectionRef[],
+  refs: readonly SelectionRef[],
+): SelectionRef[] {
+  const present = new Set(base.map(refKey));
+  const merged = [...base];
+  for (const ref of refs) {
+    const key = refKey(ref);
+    if (present.has(key)) continue;
+    present.add(key);
+    merged.push(ref);
+  }
+  return merged;
+}
+
 function refKey(ref: SelectionRef): string {
   switch (ref.kind) {
     case 'label':

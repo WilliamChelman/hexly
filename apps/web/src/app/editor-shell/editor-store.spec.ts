@@ -680,16 +680,18 @@ describe('EditorStore two-level armed state', () => {
 
   it('ignores a Subtool index for a Tool that has no Subtools', () => {
     const store = new EditorStore();
-    store.armTool('select');
+    store.armTool('label'); // Label has no Subtools (nor does Erase)
 
-    store.armSubtoolByIndex(1); // Select has no Subtools
+    store.armSubtoolByIndex(1);
 
-    expect(store.tool()).toBe('select');
+    // The index neither armed anything nor disturbed the Tool.
+    expect(store.tool()).toBe('label');
   });
 
   it('arms Select and resets Subtool memory when a document is loaded', () => {
     const store = new EditorStore();
     store.armTerrain('ocean');
+    store.armSelectSubtool('marquee'); // move the Select Subtool off its boot default
     const id = store.createRegion('Avalon', '#b08a4e');
     store.armRegion(id, 'add');
     store.addHexToRegion(id, { q: 0, r: 0 });
@@ -699,6 +701,7 @@ describe('EditorStore two-level armed state', () => {
     store.load(emptyHexMap());
 
     expect(store.tool()).toBe('select');
+    expect(store.selectSubtool()).toBe('pick');
     expect(store.terrain()).toBe('forest');
     expect(store.feature()).toBe('settlement');
     expect(store.region()).toBeNull();
@@ -760,6 +763,54 @@ describe('EditorStore two-level armed state', () => {
     };
     store.load(second);
     expect(store.selectedLabel()).toBeNull();
+  });
+});
+
+describe('EditorStore Select Subtools (Pick/Marquee)', () => {
+  it('cold-starts the Select Subtool at Pick so boot behaviour is unchanged', () => {
+    const store = new EditorStore();
+
+    expect(store.selectSubtool()).toBe('pick');
+  });
+
+  it('arms Select and sets its Subtool together when one is picked', () => {
+    const store = new EditorStore();
+    store.armTool('terrain'); // start on another Tool
+
+    store.armSelectSubtool('marquee');
+
+    expect(store.tool()).toBe('select');
+    expect(store.selectSubtool()).toBe('marquee');
+  });
+
+  it('remembers the Select Subtool across a Tool switch and restores it on re-arm', () => {
+    const store = new EditorStore();
+    store.armSelectSubtool('marquee');
+
+    store.armTool('terrain'); // leave Select — its Subtool memory must survive
+    store.armTool('select'); // re-arm Select
+
+    expect(store.selectSubtool()).toBe('marquee');
+  });
+
+  it('picks Pick and Marquee by Subtool index 1 and 2 while Select is armed', () => {
+    const store = new EditorStore();
+    store.armTool('select');
+
+    store.armSubtoolByIndex(2);
+    expect(store.selectSubtool()).toBe('marquee');
+
+    store.armSubtoolByIndex(1);
+    expect(store.selectSubtool()).toBe('pick');
+  });
+
+  it('treats an out-of-range Select Subtool index as a no-op', () => {
+    const store = new EditorStore();
+    store.armSelectSubtool('marquee');
+
+    store.armSubtoolByIndex(3); // Select has only two Subtools
+
+    expect(store.selectSubtool()).toBe('marquee');
   });
 });
 
@@ -1024,6 +1075,139 @@ describe('EditorStore Region selection cycle', () => {
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.select({ q: 0, r: 0 }, null);
     expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 0, r: 0 } });
+  });
+});
+
+describe('EditorStore marqueeSelect', () => {
+  it('replaces the selection with the marquee’s hexes and labels on a plain marquee', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.paintAt({ q: 1, r: 0 }, 'ocean');
+    const labelId = store.addLabel('Avalon', { x: 5, y: 5 });
+    store.select({ q: 5, r: 5 }, null); // a prior selection the marquee must replace
+    store.paintAt({ q: 5, r: 5 }, 'grass');
+    store.select({ q: 5, r: 5 }, null);
+
+    store.marqueeSelect([{ q: 0, r: 0 }, { q: 1, r: 0 }], [labelId], false);
+
+    expect(store.selections()).toEqual([
+      { kind: 'hex', coord: { q: 0, r: 0 } },
+      { kind: 'hex', coord: { q: 1, r: 0 } },
+      { kind: 'label', id: labelId },
+    ]);
+  });
+
+  it('accumulates across boxes on an additive marquee, never dropping a member', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.paintAt({ q: 1, r: 0 }, 'ocean');
+    store.paintAt({ q: 2, r: 0 }, 'grass');
+
+    store.marqueeSelect([{ q: 0, r: 0 }], [], false); // first box
+    store.marqueeSelect([{ q: 1, r: 0 }, { q: 2, r: 0 }], [], true); // add a second box
+
+    expect(store.selections()).toEqual([
+      { kind: 'hex', coord: { q: 0, r: 0 } },
+      { kind: 'hex', coord: { q: 1, r: 0 } },
+      { kind: 'hex', coord: { q: 2, r: 0 } },
+    ]);
+  });
+
+  it('does not re-add a hex an additive marquee already holds', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.paintAt({ q: 1, r: 0 }, 'ocean');
+
+    store.marqueeSelect([{ q: 0, r: 0 }], [], false);
+    store.marqueeSelect([{ q: 0, r: 0 }, { q: 1, r: 0 }], [], true); // overlaps the first box
+
+    expect(store.selections()).toEqual([
+      { kind: 'hex', coord: { q: 0, r: 0 } },
+      { kind: 'hex', coord: { q: 1, r: 0 } },
+    ]);
+  });
+
+  it('clears the set when a plain marquee hits nothing, but an additive one leaves it', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.marqueeSelect([{ q: 0, r: 0 }], [], false);
+
+    store.marqueeSelect([], [], true); // empty additive box — keeps the selection
+    expect(store.selections()).toHaveLength(1);
+
+    store.marqueeSelect([], [], false); // empty plain box — clears it
+    expect(store.selections()).toEqual([]);
+  });
+
+  it('opens the Inspector on a marquee that selects something', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+
+    store.marqueeSelect([{ q: 0, r: 0 }], [], false);
+
+    expect(store.rightPanel()).toBe('inspector');
+  });
+});
+
+describe('EditorStore marqueePreview', () => {
+  it('previews the box’s hexes and labels without committing them (plain)', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.paintAt({ q: 1, r: 0 }, 'ocean');
+    const labelId = store.addLabel('Avalon', { x: 5, y: 5 });
+    // A prior selection the live preview of a *plain* marquee must not include.
+    store.paintAt({ q: 9, r: 9 }, 'grass');
+    store.select({ q: 9, r: 9 }, null);
+
+    const preview = store.marqueePreview(
+      [{ q: 0, r: 0 }, { q: 1, r: 0 }],
+      [labelId],
+      false,
+    );
+
+    expect(preview).toEqual([
+      { kind: 'hex', coord: { q: 0, r: 0 } },
+      { kind: 'hex', coord: { q: 1, r: 0 } },
+      { kind: 'label', id: labelId },
+    ]);
+    // It is a pure query: the committed selection is untouched by the preview.
+    expect(store.selections()).toEqual([{ kind: 'hex', coord: { q: 9, r: 9 } }]);
+  });
+
+  it('previews a featured cell as a Feature, matching what release would select', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.placeFeatureAt({ q: 0, r: 0 }, 'settlement');
+
+    const preview = store.marqueePreview([{ q: 0, r: 0 }], [], false);
+
+    expect(preview).toEqual([{ kind: 'feature', coord: { q: 0, r: 0 } }]);
+  });
+
+  it('unions the committed selection with the box on an additive preview', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.paintAt({ q: 1, r: 0 }, 'ocean');
+    store.marqueeSelect([{ q: 0, r: 0 }], [], false); // committed: hex 0,0
+
+    const preview = store.marqueePreview([{ q: 1, r: 0 }], [], true);
+
+    expect(preview).toEqual([
+      { kind: 'hex', coord: { q: 0, r: 0 } },
+      { kind: 'hex', coord: { q: 1, r: 0 } },
+    ]);
+    // Still a pure query — the committed set did not grow.
+    expect(store.selections()).toEqual([{ kind: 'hex', coord: { q: 0, r: 0 } }]);
+  });
+
+  it('does not duplicate an already-selected hex in an additive preview', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.marqueeSelect([{ q: 0, r: 0 }], [], false);
+
+    const preview = store.marqueePreview([{ q: 0, r: 0 }], [], true);
+
+    expect(preview).toEqual([{ kind: 'hex', coord: { q: 0, r: 0 } }]);
   });
 });
 

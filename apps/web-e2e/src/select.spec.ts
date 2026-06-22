@@ -304,3 +304,95 @@ test('under Select, dragging a selected Label repositions it', async ({ page }) 
     0,
   );
 });
+
+/**
+ * The Marquee Subtool journey (issue #63, ADR-0017). It crosses the one seam the
+ * store/renderer unit tests cannot reach: the real canvas drag, where a press in
+ * select+marquee draws a live rectangle and the release runs the pure marquee
+ * hit-test over the document and folds the contained Hexes and Labels into the
+ * Selection. Marquee works *over painted hexes* — where a pick-drag would instead
+ * move a hex — so the box here starts on a painted hex and must select, never move.
+ */
+test('Marquee box-selects the hexes and a label inside it, dragging over painted hexes', async ({
+  page,
+}) => {
+  const { canvas } = await newMap(page);
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('canvas not laid out');
+  const cx = box.x + box.width / 2;
+  const cy = box.y + box.height / 2;
+
+  // Paint the centre hex (0,0) and its east neighbour (~70px right at zoom 1).
+  await page.getByTestId('tool-terrain').click();
+  await canvas.click({ position: { x: box.width / 2, y: box.height / 2 } });
+  await canvas.click({ position: { x: box.width / 2 + 70, y: box.height / 2 } });
+  await expect(page.getByTestId('hex-count')).toHaveText('2 hexes');
+
+  // Float a Label between them, inside the box-to-come. The drop auto-selects it.
+  await page.getByTestId('tool-label').click();
+  await canvas.click({ position: { x: box.width / 2 + 35, y: box.height / 2 } });
+
+  // Arm Select → Marquee, then drag a box from over the painted centre hex down
+  // and to the right, enclosing both hexes and the label. Starting ~8px up-left
+  // of the exact centre keeps the painted (0,0) safely inside the rectangle while
+  // still pressing down on painted terrain — a Pick press here would move the hex.
+  await page.getByTestId('tool-select').click();
+  await page.getByTestId('select-marquee').click();
+  await page.mouse.move(cx - 8, cy - 8);
+  await page.mouse.down();
+  await page.mouse.move(cx + 55, cy + 5);
+  await page.mouse.move(cx + 110, cy + 20);
+  await page.mouse.up();
+
+  // The release selected all three — two Hexes and the Label — so the Inspector
+  // switches to the multi-selection count + Delete all (ADR-0017).
+  await expect(page.getByTestId('selection-count')).toContainText('3');
+  await expect(page.getByTestId('selection-delete-all')).toBeVisible();
+
+  // And the marquee selected rather than moved: still exactly two hexes, neither
+  // dragged off its coordinate (a Pick press over the hex would have moved it).
+  await expect(page.getByTestId('hex-count')).toHaveText('2 hexes');
+});
+
+/**
+ * A Shift-marquee adds its box to the Selection instead of replacing it, so
+ * several boxes accumulate (issue #63, ADR-0017). A plain marquee first selects
+ * one hex; a Shift-marquee over the other two grows the set to all three.
+ */
+test('Shift-marquee adds a second box to the Selection rather than replacing it', async ({
+  page,
+}) => {
+  const { canvas } = await newMap(page);
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('canvas not laid out');
+  const cx = box.x + box.width / 2;
+  const cy = box.y + box.height / 2;
+
+  // Paint a row of three adjacent hexes (centre and its two east neighbours).
+  await page.getByTestId('tool-terrain').click();
+  await canvas.click({ position: { x: box.width / 2, y: box.height / 2 } });
+  await canvas.click({ position: { x: box.width / 2 + 70, y: box.height / 2 } });
+  await canvas.click({ position: { x: box.width / 2 + 140, y: box.height / 2 } });
+  await expect(page.getByTestId('hex-count')).toHaveText('3 hexes');
+
+  // Arm Select → Marquee. A plain box tight around the first hex selects just it,
+  // so the single-entity Inspector opens (its coordinate is shown).
+  await page.getByTestId('tool-select').click();
+  await page.getByTestId('select-marquee').click();
+  await page.mouse.move(cx - 30, cy - 30);
+  await page.mouse.down();
+  await page.mouse.move(cx + 30, cy + 30);
+  await page.mouse.up();
+  await expect(page.getByTestId('entity-coord')).toContainText('q 0');
+
+  // A second box over the other two hexes, with Shift held, *adds* them rather
+  // than replacing — so all three end up selected (the count reads 3).
+  await page.keyboard.down('Shift');
+  await page.mouse.move(cx + 45, cy - 30);
+  await page.mouse.down();
+  await page.mouse.move(cx + 170, cy + 30);
+  await page.mouse.up();
+  await page.keyboard.up('Shift');
+
+  await expect(page.getByTestId('selection-count')).toContainText('3');
+});
