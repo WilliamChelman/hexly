@@ -37,8 +37,9 @@ jobs:
             ${{ runner.os }}-nx-${{ hashFiles('pnpm-lock.yaml') }}-
             ${{ runner.os }}-nx-
 
-      # i18n-sync is the en/fr key-drift gate (issue #50): run-many invokes it
-      # for the one project that defines it (web), failing the build on drift.
+      # i18n-sync is the key-drift gate (issue #50): it type-checks the tool then
+      # diffs every locale catalog against en.json. run-many invokes it for the
+      # one project that defines it (web), failing the build on drift.
       - run: pnpm exec nx run-many -t lint test build i18n-sync
 
   e2e:

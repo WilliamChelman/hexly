@@ -66,14 +66,20 @@
     },
     "i18n-sync": {
       "executor": "nx:run-commands",
+      "cache": true,
       "inputs": [
         "{projectRoot}/public/assets/i18n/**/*.json",
         "{projectRoot}/tools/check-locale-sync.ts",
+        "{projectRoot}/tools/tsconfig.json",
         "{projectRoot}/src/app/core/i18n/locale-key-sync.ts"
       ],
       "options": {
-        "command": "jiti apps/web/tools/check-locale-sync.ts",
-        "cwd": "{workspaceRoot}"
+        "commands": [
+          "tsc -p apps/web/tools/tsconfig.json --noEmit",
+          "jiti apps/web/tools/check-locale-sync.ts"
+        ],
+        "cwd": "{workspaceRoot}",
+        "parallel": false
       }
     },
     "test": {
