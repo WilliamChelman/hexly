@@ -32,9 +32,13 @@ export const appRoutes: Route[] = [
     // the editor's interactive header into AppHeader's named `header` outlet.
     path: 'maps/:id',
     canActivate: [authGuard],
-    // A translation key resolved by TranslationTitleStrategy; its value is the
-    // bare "Hexly" brand, untranslated in every language (ADR-0014).
+    // The tab title is the open map's name composed with the brand
+    // ("Aldermoor — Hexly"): TranslationTitleStrategy fills `documentTitleKey`'s
+    // `{{name}}` slot from the open document. `title` is the fallback shown until
+    // the map loads — the bare "Hexly" brand, untranslated in every language
+    // (ADR-0014).
     title: 'editorShell.tabTitle',
+    data: { documentTitleKey: 'editorShell.tabTitleNamed' },
     children: [
       {
         path: '',
