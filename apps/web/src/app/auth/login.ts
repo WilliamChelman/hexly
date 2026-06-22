@@ -26,8 +26,9 @@ import { Panel } from '../ui/panel';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [Panel, Field, Input, Button],
   template: `
-    <main>
+    <div class="page">
       <section class="card" appPanel raised>
+        <h1 class="sr-only">Sign in</h1>
         <form (submit)="submit($event)">
           <label appField label="Email">
             <input
@@ -64,10 +65,10 @@ import { Panel } from '../ui/panel';
           </button>
         </form>
       </section>
-    </main>
+    </div>
   `,
   styles: `
-    main {
+    .page {
       display: grid;
       place-items: center;
       min-height: 100%;

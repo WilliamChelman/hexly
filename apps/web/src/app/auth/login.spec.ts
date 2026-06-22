@@ -52,6 +52,14 @@ describe('Login', () => {
     expect(TestBed.inject(HeaderService).title()).toBe('Sign in');
   });
 
+  it('owns its page heading in the main content', () => {
+    const fixture = TestBed.createComponent(Login);
+    fixture.detectChanges();
+
+    const heading = fixture.nativeElement.querySelector('h1');
+    expect(heading?.textContent).toContain('Sign in');
+  });
+
   it('clears its heading from the app header when it leaves', () => {
     const fixture = TestBed.createComponent(Login);
     fixture.detectChanges();

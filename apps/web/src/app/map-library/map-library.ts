@@ -31,7 +31,8 @@ const NEW_MAP_TITLE = 'Untitled map';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [Button, Panel, PlusIcon],
   template: `
-    <main>
+    <div class="page">
+      <h1 class="sr-only">Your maps</h1>
       <div class="head">
         <button
           type="button"
@@ -86,7 +87,7 @@ const NEW_MAP_TITLE = 'Untitled map';
           <p class="hint">Create your first map to start painting a world.</p>
         </section>
       }
-    </main>
+    </div>
   `,
   styles: `
     :host {
@@ -94,7 +95,7 @@ const NEW_MAP_TITLE = 'Untitled map';
       min-height: 100%;
       background: var(--surface-sunken);
     }
-    main {
+    .page {
       max-width: 60rem;
       margin: 0 auto;
       padding: var(--space-6) var(--space-5);

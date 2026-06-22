@@ -13,9 +13,9 @@ import { AppHeader } from './shell/app-header';
   imports: [RouterOutlet, AppHeader],
   template: `
     <app-header />
-    <div class="outlet">
+    <main class="outlet">
       <router-outlet />
-    </div>
+    </main>
   `,
   styles: `
     :host {

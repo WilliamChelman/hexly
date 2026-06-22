@@ -110,3 +110,22 @@ textarea {
     transition-duration: 0.001ms !important;
   }
 }
+
+/*
+  Visually hidden, but present in the accessibility tree and the document
+  outline. Used for a page's real heading when the visible title is drawn as
+  chrome in the app header instead (ADR-0015). Must stay clip-based, not
+  `display: none`, so screen readers and role-based queries still find it.
+*/
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

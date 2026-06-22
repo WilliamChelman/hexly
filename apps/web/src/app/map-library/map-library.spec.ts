@@ -65,6 +65,15 @@ describe('MapLibrary', () => {
     expect(header.title()).toBe('Your maps');
   });
 
+  it('owns its page heading in the main content', () => {
+    const fixture = renderWith([]);
+
+    // The visible title is drawn as chrome in the app header; the document's
+    // real heading lives here in the page (sr-only) so the outline is correct.
+    const heading = fixture.nativeElement.querySelector('h1');
+    expect(heading?.textContent).toContain('Your maps');
+  });
+
   it('clears its heading from the app header when it leaves', () => {
     const fixture = renderWith([]);
 

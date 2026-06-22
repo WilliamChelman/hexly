@@ -143,15 +143,22 @@ describe('AppHeader', () => {
     expect(headline.textContent).toContain('Your maps');
   });
 
-  it('renders the declarative title as a heading', () => {
-    // The page's title is its heading, wherever it is drawn — assistive tech and
-    // the e2e suite both find it by role.
+  it('renders the declarative title as chrome, not a document heading', () => {
+    // The visible title in the bar is contextual chrome; the page's real <h1>
+    // lives in <main> (sr-only). The banner must not own the document heading.
     TestBed.inject(HeaderService).set({ title: 'Your maps' });
     const fixture = TestBed.createComponent(AppHeader);
     fixture.detectChanges();
 
-    const heading = fixture.nativeElement.querySelector('h1');
-    expect(heading?.textContent).toContain('Your maps');
+    expect(fixture.nativeElement.textContent).toContain('Your maps');
+    expect(fixture.nativeElement.querySelector('h1')).toBeNull();
+  });
+
+  it('marks itself as the banner landmark', () => {
+    const fixture = TestBed.createComponent(AppHeader);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.getAttribute('role')).toBe('banner');
   });
 
   it('hosts a named header outlet for a route to project rich content into', () => {
