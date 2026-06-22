@@ -1,10 +1,12 @@
 import { TestBed } from '@angular/core/testing';
+import { TranslocoService } from '@jsverse/transloco';
+import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { EditorStore } from './editor-store';
 import { RegionsPanel } from './regions-panel';
 
 describe('RegionsPanel', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [RegionsPanel] }).compileComponents();
+    await TestBed.configureTestingModule({ imports: [RegionsPanel, provideTranslocoTesting()] }).compileComponents();
   });
 
   function render() {
@@ -55,6 +57,31 @@ describe('RegionsPanel', () => {
     expect(store.document().regions[0].name).toBe('Region 1');
     expect(store.document().regions[0].hexes).toEqual({});
     expect(items(fixture.nativeElement)).toHaveLength(1);
+  });
+
+  it('renders its chrome and empty state in French when French is the active language', () => {
+    const fixture = render(); // no regions → empty state
+    TestBed.inject(TranslocoService).setActiveLang('fr');
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(el.querySelector('header')?.textContent).toContain('Régions');
+    expect(el.querySelector('[data-testid=new-region]')?.textContent).toContain(
+      'Nouvelle région',
+    );
+    expect(el.querySelector('.muted')?.textContent).toContain(
+      'Aucune région pour le moment.',
+    );
+  });
+
+  it('never translates a user-typed Region name, even one that collides with UI copy', () => {
+    const store = TestBed.inject(EditorStore);
+    store.createRegion('Terrain', '#6f7fae'); // collides with a UI label
+    const fixture = render();
+    TestBed.inject(TranslocoService).setActiveLang('fr');
+    fixture.detectChanges();
+
+    expect(items(fixture.nativeElement)[0].textContent?.trim()).toBe('Terrain');
   });
 
   it('routes a list selection through the shared store selection, even for an empty Region', () => {

@@ -20,6 +20,92 @@
     "emptyTitle": "No maps yet.",
     "emptyHint": "Create your first map to start painting a world."
   },
+  "editorShell": {
+    "hexMap": "Hex map",
+    "mapTitleLabel": "Map title",
+    "renameMap": "Rename map",
+    "editing": "Editing",
+    "reload": "Reload",
+    "allMaps": "All maps",
+    "designSystem": "Design system",
+    "saving": "Saving…",
+    "share": "Share",
+    "save": {
+      "conflict": "Newer version on server"
+    },
+    "toolPalette": {
+      "tools": "Tools",
+      "select": "Select",
+      "terrain": "Terrain",
+      "feature": "Feature",
+      "label": "Label",
+      "erase": "Erase",
+      "undo": "Undo",
+      "redo": "Redo",
+      "terrainGroup": "Terrain",
+      "featureGroup": "Features",
+      "clearFeature": "Clear feature"
+    },
+    "inspector": {
+      "title": "Inspector",
+      "selectedLabel": "Selected label",
+      "selectedRegion": "Selected region",
+      "selectedHex": "Selected hex",
+      "selectedFeature": "Selected feature",
+      "text": "Text",
+      "size": "Size",
+      "rotation": "Rotation (°)",
+      "x": "X",
+      "y": "Y",
+      "coordinate": "Coordinate",
+      "terrain": "Terrain",
+      "feature": "Feature",
+      "name": "Name",
+      "color": "Color",
+      "membership": "Membership",
+      "membershipDirection": "Membership direction",
+      "add": "Add",
+      "remove": "Remove",
+      "deleteLabel": "Delete label",
+      "deleteRegion": "Delete region",
+      "deleteHex": "Delete hex",
+      "deleteFeature": "Delete feature",
+      "emptyHint": "Pick the Select tool and click a Hex, Feature, or Label to inspect it. Place a Label with the Label tool, then select it here to edit its text, size, rotation and position."
+    },
+    "regionsPanel": {
+      "title": "Regions",
+      "newRegion": "New Region",
+      "emptyHint": "No regions yet. Use New Region to mint one, then paint its member hexes from the Inspector."
+    },
+    "statusBar": {
+      "connecting": "Connecting…",
+      "apiError": "Could not reach the API.",
+      "hex": "hex",
+      "hexes": "hexes"
+    },
+    "canvas": {
+      "void": "Void",
+      "noHex": "No hex",
+      "zoom": "Zoom",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "fit": "Fit map"
+    }
+  },
+  "domain": {
+    "terrain": {
+      "grass": "Grassland",
+      "forest": "Forest",
+      "ocean": "Ocean",
+      "mountain": "Mountains",
+      "desert": "Desert",
+      "sky": "Sky"
+    },
+    "feature": {
+      "settlement": "Settlement",
+      "ruin": "Ruin"
+    }
+  },
   "common": {
     "language": "Language",
     "save": "Save",

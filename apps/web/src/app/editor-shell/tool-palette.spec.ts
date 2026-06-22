@@ -1,4 +1,6 @@
 import { TestBed } from '@angular/core/testing';
+import { TranslocoService } from '@jsverse/transloco';
+import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { EditorStore } from './editor-store';
 import { ToolPalette } from './tool-palette';
 
@@ -33,7 +35,7 @@ function has(
 
 describe('ToolPalette primary Tool row', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [ToolPalette] }).compileComponents();
+    await TestBed.configureTestingModule({ imports: [ToolPalette, provideTranslocoTesting()] }).compileComponents();
   });
 
   it('arms each top-level Tool from the primary row', () => {
@@ -67,7 +69,7 @@ describe('ToolPalette primary Tool row', () => {
 
 describe('ToolPalette contextual Subtool panel', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [ToolPalette] }).compileComponents();
+    await TestBed.configureTestingModule({ imports: [ToolPalette, provideTranslocoTesting()] }).compileComponents();
   });
 
   it('shows no Subtool strip while Select is armed (the cold-start tool)', () => {
@@ -115,7 +117,7 @@ describe('ToolPalette contextual Subtool panel', () => {
 
 describe('ToolPalette history', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [ToolPalette] }).compileComponents();
+    await TestBed.configureTestingModule({ imports: [ToolPalette, provideTranslocoTesting()] }).compileComponents();
   });
 
   it('renders Undo and Redo, disabled when there is nothing to undo or redo', () => {
@@ -155,7 +157,7 @@ describe('ToolPalette history', () => {
 
 describe('ToolPalette regions', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [ToolPalette] }).compileComponents();
+    await TestBed.configureTestingModule({ imports: [ToolPalette, provideTranslocoTesting()] }).compileComponents();
   });
 
   it('shows no Region Subtool legend while the Region brush is armed', () => {
@@ -191,7 +193,7 @@ describe('ToolPalette regions', () => {
 
 describe('ToolPalette flyout binding', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [ToolPalette] }).compileComponents();
+    await TestBed.configureTestingModule({ imports: [ToolPalette, provideTranslocoTesting()] }).compileComponents();
   });
 
   it('opens no flyout for Select, Label, or Erase (no Subtools)', () => {
@@ -215,5 +217,51 @@ describe('ToolPalette flyout binding', () => {
     store.armTool('feature');
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.flyout')).not.toBeNull();
+  });
+});
+
+describe('ToolPalette localization', () => {
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [ToolPalette, provideTranslocoTesting()],
+    }).compileComponents();
+  });
+
+  it('names the top-level Tools in French when French is the active language', () => {
+    const { fixture } = setup();
+    TestBed.inject(TranslocoService).setActiveLang('fr');
+    fixture.detectChanges();
+
+    // Each Tool button carries its name on aria-label; the built-in catalog and
+    // tool names reflow live on a switch (ADR-0014).
+    const labelOf = (testid: string) =>
+      (
+        fixture.nativeElement.querySelector(
+          `[data-testid=${testid}]`,
+        ) as HTMLElement
+      ).getAttribute('aria-label');
+    expect(labelOf('tool-select')).toBe('Sélection');
+    expect(labelOf('tool-feature')).toBe('Caractéristique');
+    expect(labelOf('tool-erase')).toBe('Effacer');
+  });
+
+  it('names the built-in terrains and features in French via their stable id', () => {
+    const { fixture, store } = setup();
+    TestBed.inject(TranslocoService).setActiveLang('fr');
+
+    // Terrain swatches render under the Terrain tool; their aria-label is keyed
+    // by id (domain.terrain.ocean), not the English domain label.
+    store.armTool('terrain');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('[aria-label=Océan]')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('[aria-label=Ocean]')).toBeNull();
+
+    // Feature icons likewise key by id (domain.feature.settlement → Colonie).
+    store.armTool('feature');
+    fixture.detectChanges();
+    const settlement = fixture.nativeElement.querySelector(
+      '[data-testid=feature-settlement]',
+    ) as HTMLElement;
+    expect(settlement.getAttribute('aria-label')).toBe('Colonie');
   });
 });

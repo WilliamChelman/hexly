@@ -5,6 +5,7 @@ import {
   inject,
   Type,
 } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { IconButton } from '../ui/icon-button';
 import { RegionIcon } from '../ui/icon/glyphs/region';
 import { EditorStore } from './editor-store';
@@ -16,7 +17,8 @@ type RightPanel = 'inspector' | 'regions';
 interface RailEntry {
   readonly id: RightPanel;
   readonly testid: string;
-  readonly title: string;
+  /** Translation key for the entry's name, shown on its tooltip/aria-label (ADR-0014). */
+  readonly titleKey: string;
   /** The glyph component projected into the button (ADR-0007); rendered via outlet. */
   readonly glyph: Type<unknown>;
 }
@@ -38,15 +40,15 @@ interface RailEntry {
 @Component({
   selector: 'app-editor-rail',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IconButton, NgComponentOutlet],
+  imports: [IconButton, NgComponentOutlet, TranslocoPipe],
   template: `
     @for (entry of entries; track entry.id) {
       <button
         appIconButton
         toggle
         [active]="store.rightPanel() === entry.id"
-        [title]="entry.title"
-        [attr.aria-label]="entry.title"
+        [title]="entry.titleKey | transloco"
+        [attr.aria-label]="entry.titleKey | transloco"
         [attr.data-testid]="entry.testid"
         (click)="store.toggleRegionsPanel()"
       >
@@ -79,7 +81,7 @@ export class EditorRail {
     {
       id: 'regions',
       testid: 'rail-regions',
-      title: 'Regions',
+      titleKey: 'editorShell.regionsPanel.title',
       glyph: RegionIcon,
     },
   ];

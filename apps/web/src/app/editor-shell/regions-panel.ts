@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { Button } from '../ui/button';
 import { Eyebrow } from '../ui/eyebrow';
 import { Swatch } from '../ui/swatch';
@@ -20,10 +21,10 @@ import { EditorStore } from './editor-store';
 @Component({
   selector: 'app-regions-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Eyebrow, Swatch],
+  imports: [Button, Eyebrow, Swatch, TranslocoPipe],
   template: `
     <header class="head">
-      <span appEyebrow>Regions</span>
+      <span appEyebrow>{{ 'editorShell.regionsPanel.title' | transloco }}</span>
       <button
         type="button"
         appButton
@@ -32,7 +33,7 @@ import { EditorStore } from './editor-store';
         data-testid="new-region"
         (click)="store.newRegion()"
       >
-        New Region
+        {{ 'editorShell.regionsPanel.newRegion' | transloco }}
       </button>
     </header>
 
@@ -51,10 +52,7 @@ import { EditorStore } from './editor-store';
         <span class="name">{{ region.name }}</span>
       </button>
     } @empty {
-      <p class="muted">
-        No regions yet. Use New Region to mint one, then paint its member hexes
-        from the Inspector.
-      </p>
+      <p class="muted">{{ 'editorShell.regionsPanel.emptyHint' | transloco }}</p>
     }
   `,
   styles: `

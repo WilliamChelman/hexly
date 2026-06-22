@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { Region } from '@hexly/domain';
 import { Field } from '../ui/field';
 import { Input } from '../ui/input';
@@ -16,7 +17,7 @@ import { EditorStore } from './editor-store';
 @Component({
   selector: 'app-region-fields',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Field, Input],
+  imports: [Field, Input, TranslocoPipe],
   template: `
     @let r = region();
     <!--
@@ -24,7 +25,7 @@ import { EditorStore } from './editor-store';
       the bound value, but any in-app action that re-renders also blurs (and thus
       commits) these fields, so that race is unreachable.
     -->
-    <div appField label="Name">
+    <div appField [label]="'editorShell.inspector.name' | transloco">
       <input
         appInput
         [value]="r.name"
@@ -33,7 +34,7 @@ import { EditorStore } from './editor-store';
       />
     </div>
 
-    <div appField label="Color">
+    <div appField [label]="'editorShell.inspector.color' | transloco">
       <input
         type="color"
         [value]="r.color"

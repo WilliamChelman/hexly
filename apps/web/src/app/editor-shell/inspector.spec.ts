@@ -1,10 +1,12 @@
 import { TestBed } from '@angular/core/testing';
+import { TranslocoService } from '@jsverse/transloco';
+import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { EditorStore } from './editor-store';
 import { Inspector } from './inspector';
 
 describe('Inspector label editing', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [Inspector] }).compileComponents();
+    await TestBed.configureTestingModule({ imports: [Inspector, provideTranslocoTesting()] }).compileComponents();
   });
 
   /** Create the inspector with a label already selected, and return both. */
@@ -25,6 +27,33 @@ describe('Inspector label editing', () => {
     const { fixture } = withSelectedLabel('Open Sea');
 
     expect(field(fixture, 'label-text').value).toBe('Open Sea');
+  });
+
+  it('renders the label editor’s field labels and Delete in French', () => {
+    const { fixture } = withSelectedLabel('Open Sea');
+    TestBed.inject(TranslocoService).setActiveLang('fr');
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(el.querySelector('header')?.textContent).toContain('Étiquette sélectionnée');
+    expect(el.textContent).toContain('Texte');
+    expect(el.textContent).toContain('Taille');
+    expect(el.querySelector('[data-testid=label-delete]')?.textContent).toContain(
+      'Supprimer l’étiquette',
+    );
+    // The user's label text is content — left exactly as typed.
+    expect(field(fixture, 'label-text').value).toBe('Open Sea');
+  });
+
+  it('renders the empty-state hint in French when nothing is selected', () => {
+    const fixture = TestBed.createComponent(Inspector);
+    fixture.detectChanges();
+    TestBed.inject(TranslocoService).setActiveLang('fr');
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(el.querySelector('header')?.textContent).toContain('Inspecteur');
+    expect(el.querySelector('.muted')?.textContent).toContain('Choisissez l’outil');
   });
 
   it('edits the label text when the text field changes', () => {
@@ -87,7 +116,7 @@ describe('Inspector label editing', () => {
 
 describe('Inspector hex and feature selection', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [Inspector] }).compileComponents();
+    await TestBed.configureTestingModule({ imports: [Inspector, provideTranslocoTesting()] }).compileComponents();
   });
 
   function render() {
@@ -161,6 +190,48 @@ describe('Inspector hex and feature selection', () => {
     );
   });
 
+  it('renders a selected Feature in French — built-in label keyed by id, chrome translated', () => {
+    const store = TestBed.inject(EditorStore);
+    store.paintAt({ q: 1, r: 1 }, 'ocean');
+    store.placeFeatureAt({ q: 1, r: 1 }, 'settlement');
+    store.select({ q: 1, r: 1 }, null);
+
+    const fixture = render();
+    TestBed.inject(TranslocoService).setActiveLang('fr');
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    // The built-in Feature label renders via domain.feature.settlement → Colonie,
+    // not the English domain label.
+    expect(el.querySelector('[data-testid=entity-detail]')?.textContent).toContain(
+      'Colonie',
+    );
+    expect(el.querySelector('[data-testid=entity-detail]')?.textContent).not.toContain(
+      'Settlement',
+    );
+    // The selected-kind eyebrow and the Delete action translate too.
+    expect(el.querySelector('header')?.textContent).toContain(
+      'Caractéristique sélectionnée',
+    );
+    expect(el.querySelector('[data-testid=entity-delete]')?.textContent).toContain(
+      'Supprimer la caractéristique',
+    );
+  });
+
+  it('renders a selected Hex’s terrain in French, keyed by its id', () => {
+    const store = TestBed.inject(EditorStore);
+    store.paintAt({ q: 0, r: 0 }, 'ocean');
+    store.select({ q: 0, r: 0 }, null);
+
+    const fixture = render();
+    TestBed.inject(TranslocoService).setActiveLang('fr');
+    fixture.detectChanges();
+
+    expect(
+      fixture.nativeElement.querySelector('[data-testid=entity-detail]')?.textContent,
+    ).toContain('Océan');
+  });
+
   it('shows no membership direction toggle for a Hex selection', () => {
     const store = TestBed.inject(EditorStore);
     store.paintAt({ q: 0, r: 0 }, 'grass');
@@ -177,7 +248,7 @@ describe('Inspector hex and feature selection', () => {
 
 describe('Inspector region editing', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [Inspector] }).compileComponents();
+    await TestBed.configureTestingModule({ imports: [Inspector, provideTranslocoTesting()] }).compileComponents();
   });
 
   /** Create the inspector with a Region selected, and return both. The member is a
@@ -202,6 +273,32 @@ describe('Inspector region editing', () => {
     expect(field(fixture, 'region-name').value).toBe('The Whisperwood');
     expect(fixture.nativeElement.querySelector('[data-testid=label-text]')).toBeNull();
     expect(fixture.nativeElement.querySelector('[data-testid=entity-coord]')).toBeNull();
+  });
+
+  it('translates the region editor’s chrome in French, but never the user’s name', () => {
+    // Name the Region "Add" — colliding with the Membership control's label — to
+    // prove the user's content is left verbatim while the chrome translates.
+    const { fixture } = withSelectedRegion('Add', '#b08a4e');
+    TestBed.inject(TranslocoService).setActiveLang('fr');
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(el.querySelector('header')?.textContent).toContain('Région sélectionnée');
+    // Field labels (region-fields + Inspector) and the direction toggle translate.
+    expect(el.textContent).toContain('Nom');
+    expect(el.textContent).toContain('Couleur');
+    expect(el.textContent).toContain('Appartenance');
+    expect(
+      (el.querySelector('[data-testid=region-add]') as HTMLElement).textContent,
+    ).toContain('Ajouter');
+    expect(
+      (el.querySelector('[data-testid=region-remove]') as HTMLElement).textContent,
+    ).toContain('Retirer');
+    expect(el.querySelector('[data-testid=region-delete]')?.textContent).toContain(
+      'Supprimer la région',
+    );
+    // The user's Region name stays their word, not swapped for the French "Ajouter".
+    expect(field(fixture, 'region-name').value).toBe('Add');
   });
 
   it('renames the region when the name field changes (e.g. "Region 3" → "The Whisperwood")', () => {

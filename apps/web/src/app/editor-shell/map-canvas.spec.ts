@@ -1,4 +1,6 @@
 import { TestBed } from '@angular/core/testing';
+import { TranslocoService } from '@jsverse/transloco';
+import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { EditorStore } from './editor-store';
 import { MapCanvas } from './map-canvas';
 
@@ -13,7 +15,9 @@ describe('MapCanvas keyboard', () => {
   let store: EditorStore;
 
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [MapCanvas] }).compileComponents();
+    await TestBed.configureTestingModule({
+      imports: [MapCanvas, provideTranslocoTesting()],
+    }).compileComponents();
     const fixture = TestBed.createComponent(MapCanvas);
     fixture.detectChanges();
     store = TestBed.inject(EditorStore);
@@ -148,5 +152,29 @@ describe('MapCanvas keyboard', () => {
     const armed = store.tool();
     input.remove();
     expect(armed).toBe('erase');
+  });
+});
+
+describe('MapCanvas localization', () => {
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [MapCanvas, provideTranslocoTesting()],
+    }).compileComponents();
+  });
+
+  it('renders the readout and chrome in French when French is the active language', () => {
+    const fixture = TestBed.createComponent(MapCanvas);
+    fixture.detectChanges();
+    TestBed.inject(TranslocoService).setActiveLang('fr');
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    // With no hovered coordinate the readout reads the "no hex" fallback, and the
+    // canvas/zoom chrome carries translated aria-labels.
+    expect(el.querySelector('.readout')?.textContent).toContain('Aucun hex');
+    expect(el.querySelector('canvas')?.getAttribute('aria-label')).toBe(
+      'Carte hexagonale',
+    );
+    expect(el.querySelector('[aria-label="Zoom avant"]')).not.toBeNull();
   });
 });

@@ -1,4 +1,6 @@
 import { TestBed } from '@angular/core/testing';
+import { TranslocoService } from '@jsverse/transloco';
+import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { EditorStore } from './editor-store';
 import { EditorRail } from './editor-rail';
 
@@ -15,7 +17,7 @@ function setup() {
 
 describe('EditorRail', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [EditorRail] }).compileComponents();
+    await TestBed.configureTestingModule({ imports: [EditorRail, provideTranslocoTesting()] }).compileComponents();
   });
 
   it('renders the Regions entry inactive while the panel is closed', () => {
@@ -25,6 +27,16 @@ describe('EditorRail', () => {
     // the entry reads inactive (ADR-0013).
     expect(regions()).not.toBeNull();
     expect(regions().getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('labels the Regions entry in French when French is the active language', () => {
+    const { fixture, regions } = setup();
+    TestBed.inject(TranslocoService).setActiveLang('fr');
+    fixture.detectChanges();
+
+    // The icon-only entry carries its name on aria-label/title for assistive tech.
+    expect(regions().getAttribute('aria-label')).toBe('Régions');
+    expect(regions().getAttribute('title')).toBe('Régions');
   });
 
   it('opens the Regions panel and marks the entry active when clicked', () => {
