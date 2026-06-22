@@ -1,5 +1,7 @@
 # Two-level Tools (Tool → Subtool) and a universal Select tool
 
+> **Amended by ADR-0017** on two points: Select *does* gain Subtools (Pick, Marquee), and a Hex move now **swaps** with an occupied destination rather than overwriting it.
+
 The editor's armed state was a flat tagged union (`terrain`/`erase`/`feature`/`clear-feature`/`region`/`label`), rendered as one long palette with every terrain, feature, and region as a sibling button. We are restructuring it into a **two-level model**: a top-level **Tool** (Select, Terrain, Feature, Region, Label, Erase) plus, for Tools that have them, a **Subtool** (which terrain, which feature, which region). See `CONTEXT.md → Editing tools`.
 
 ## What we decided

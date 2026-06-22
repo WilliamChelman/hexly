@@ -9,7 +9,7 @@ The top-level document a user creates and edits: a grid of hexes plus overlays a
 _Avoid_: Map document, board, canvas
 
 **Hex**:
-A cell the user has given content to, stored at its coordinate. The map is an infinite plane, so a Hex exists *only* where painted — there is no bounded grid of pre-existing cells. Carries at most one terrain, plus optional content (e.g. a feature, a label).
+A cell the user has given content to, stored at its coordinate. The map is an infinite plane, so a Hex exists *only* where painted — there is no bounded grid of pre-existing cells. Carries exactly one terrain, plus optional content: at most one feature and an optional name.
 _Avoid_: Cell, tile, square
 
 **Void**:
@@ -35,6 +35,10 @@ _Avoid_: Area, zone, territory, group
 **Note**:
 Longer prose attached to an entity (Hex, Feature, Region, or the Hex Map), stored as Markdown and shown in a side panel when the entity is selected. Not drawn on the map. The lore, description, and secrets.
 _Avoid_: Description, comment, annotation, lore
+
+**Name**:
+A short identifying title carried by an entity — a Hex (e.g. a village's name) or a Region. On a Hex it is optional, and only a painted Hex can hold one; it travels with the Hex's content when moved or swapped. The renderer draws it minimally, anchored to the hex. Distinct from a Label (free, hand-placed typography) and a Note (longer prose).
+_Avoid_: Title, caption, label
 
 **Label**:
 A free-positioned text element drawn on the map (a point + text + size + optional rotation), not snapped to the hex grid — used for cartographic typography like region or ocean names. Distinct from an entity's `name` field, which the renderer may draw but which is not a Label.
@@ -69,16 +73,28 @@ Every piece of map content sits in exactly one of three placement modes:
 ## Editing tools
 
 **Tool**:
-A top-level editing mode armed in the palette — Select, Terrain, Feature, Label, Erase. Exactly one is armed at a time, and a canvas gesture applies it. A map opens armed with Select. Region is *not* a palette Tool: Regions are created in the Regions panel and their membership is painted via the Inspector's Add/Remove brush (ADR-0012).
+A top-level editing mode armed in the palette — Select, Terrain, Feature, Label, Erase. Exactly one is armed at a time, and a canvas gesture applies it. A map opens armed with Select (its Pick Subtool). Region is *not* a palette Tool: Regions are created in the Regions panel and their membership is painted via the Inspector's Add/Remove brush (ADR-0012).
 _Avoid_: Mode, brush, instrument
 
 **Subtool**:
-A mutually-exclusive variant *within* a Tool — the Terrain tool's individual terrains, the Feature tool's individual features (and its Clear variant). Tools that have Subtools remember the last one used for the session. Select, Label, and Erase have no Subtools.
+A mutually-exclusive variant *within* a Tool — the Terrain tool's individual terrains, the Feature tool's individual features (and its Clear variant), and the Select tool's **Pick** and **Marquee**. Tools that have Subtools remember the last one used for the session. Label and Erase have no Subtools.
 _Avoid_: Sub-mode, option, variant
 
 **Select**:
-The one non-destructive Tool: click to select the topmost entity under the cursor, inspect it, delete it, or drag to move a Label or a whole Hex. Repeated clicks at the same coordinate cycle *deeper* through the stack — `Label → Feature → Hex → each Region containing that coordinate (document order) → wrap` — so an overlapped or interior Region becomes reachable. Painting Tools never select; Select itself never paints.
+The one non-destructive Tool, holding a **Selection** and split into two Subtools, **Pick** and **Marquee**. Painting Tools never select; Select itself never paints.
 _Avoid_: Pointer, move tool, arrow
+
+**Selection**:
+The set of entities (Hexes, Features, Labels, Regions) currently picked out — zero, one, or many. Shown in the Inspector and moved together by a drag. Built by Select's clicks and modifiers; not part of the document, so never undone or persisted.
+_Avoid_: Highlight, focus, active item
+
+**Pick**:
+The default Select Subtool: click selects the topmost entity under the cursor and drag moves the whole Selection. Repeated plain clicks at one coordinate cycle *deeper* through the stack — `Label → Feature → Hex → each Region containing that coordinate (document order) → wrap` — so an overlapped or interior Region becomes reachable. A plain click replaces the Selection; Cmd/Ctrl-click toggles the topmost entity in it; Shift-click toggles the whole stack at that coordinate; a click on empty space clears it.
+_Avoid_: Move tool, arrow
+
+**Marquee**:
+The Select Subtool that drags a rectangle to select every Hex and Label within it. Regions are not marquee-selectable — they have no single position.
+_Avoid_: Rubber band, lasso, box select
 
 **Erase**:
 The Tool that deletes a whole Hex record (its terrain *and* feature), turning the coordinate back into Void. Distinct from the Feature tool's Clear Subtool, which removes only the feature and leaves the terrain.
