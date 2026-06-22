@@ -1,6 +1,6 @@
 import { Axial } from './coordinates';
-import { Rect } from './culling';
-import { HexMap, parseCoordKey } from './hex-map';
+import { hexesInRect, Rect } from './culling';
+import { coordKey, HexMap } from './hex-map';
 import { hexToPixel, Layout, Point } from './layout';
 
 /**
@@ -29,13 +29,16 @@ function inRect(rect: Rect, point: Point): boolean {
  * `layout` (CONTEXT.md → Marquee). A Hex counts when its pixel centre falls
  * inside the rect; a Label when its anchor `position` does. Pure: no canvas
  * dependency, so the canvas can box-select by feeding the dragged rect through
- * here. Only painted hexes exist on the sparse plane, so this walks the
- * document's hexes — never the infinite Void. Regions are never returned.
+ * here. Walks only the hexes the `rect` could contain — the same
+ * viewport-bounded cull the renderer runs each frame ({@link hexesInRect}) —
+ * keeping the painted ones whose centre is actually inside, so a live marquee
+ * drag costs the box's area rather than the whole (possibly huge) document.
+ * Regions are never returned.
  */
 export function marqueeHits(layout: Layout, doc: HexMap, rect: Rect): MarqueeHits {
   const hexes: Axial[] = [];
-  for (const key of Object.keys(doc.hexes)) {
-    const coord = parseCoordKey(key);
+  for (const coord of hexesInRect(layout, rect)) {
+    if (!doc.hexes[coordKey(coord)]) continue; // skip Void — only painted hexes select
     if (inRect(rect, hexToPixel(layout, coord))) hexes.push(coord);
   }
   const labels = doc.labels

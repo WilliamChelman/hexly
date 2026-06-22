@@ -12,6 +12,7 @@ import {
   neighbors,
   parseCoordKey,
   Point,
+  rectFromCorners,
   Region,
   terrainPalette,
   TerrainId,
@@ -121,22 +122,40 @@ export interface MarqueeOverride {
   readonly b: Point;
 }
 
+/**
+ * The optional, per-frame inputs to {@link MapRenderer.render} beyond the camera,
+ * document, and hover: the Selection set to highlight, plus the live *preview*
+ * overrides that each ride on top of the committed document without mutating it
+ * (issues #6, #30, ADR-0017). Bundled into one object so the render seam stays a
+ * stable `camera, doc, hover, overrides` shape as new previews are added, rather
+ * than growing another positional argument each time. All optional — omit the
+ * ones a frame doesn't need.
+ */
+export interface RenderOverrides {
+  /** Preview one dragged Label at a live position without cloning the doc (issue #6). */
+  readonly labelDrag?: LabelDragOverride | null;
+  /** The Selection set to highlight — the committed set, or a marquee's live preview. */
+  readonly selections?: readonly Selection[];
+  /** Preview a whole-Hex move at its destination (issue #30). */
+  readonly hexDrag?: HexDragOverride | null;
+  /** Preview the live marquee rectangle being dragged (ADR-0017). */
+  readonly marquee?: MarqueeOverride | null;
+}
+
 export interface MapRenderer {
   /** Match the drawing surface to the given CSS-pixel size. */
   resize(width: number, height: number): void;
   /**
-   * Paint one frame: the painted hexes, the culled grid, and an optional hover.
-   * An optional `labelDrag` previews one dragged label at a live position
-   * without the caller rebuilding the document each frame (issue #6).
+   * Paint one frame: the painted hexes, the culled grid, an optional hover, and
+   * the optional {@link RenderOverrides} (the selection highlight plus the live
+   * label/hex/marquee previews) — each previewed without the caller rebuilding
+   * the document each frame (issues #6, #30, ADR-0017).
    */
   render(
     camera: Camera,
     doc: HexMap,
     hover: Axial | null,
-    labelDrag?: LabelDragOverride | null,
-    selections?: readonly Selection[],
-    hexDrag?: HexDragOverride | null,
-    marquee?: MarqueeOverride | null,
+    overrides?: RenderOverrides,
   ): void;
   /**
    * The id of the Label drawn under screen `point` (topmost wins), or `null`.
@@ -291,11 +310,14 @@ export class Canvas2dMapRenderer implements MapRenderer {
     camera: Camera,
     doc: HexMap,
     hover: Axial | null,
-    labelDrag: LabelDragOverride | null = null,
-    selections: readonly Selection[] = [],
-    hexDrag: HexDragOverride | null = null,
-    marquee: MarqueeOverride | null = null,
+    overrides: RenderOverrides = {},
   ): void {
+    const {
+      labelDrag = null,
+      selections = [],
+      hexDrag = null,
+      marquee = null,
+    } = overrides;
     const ctx = this.ctx;
     if (!ctx || this.width === 0 || this.height === 0) return;
 
@@ -492,12 +514,13 @@ export class Canvas2dMapRenderer implements MapRenderer {
     camera: Camera,
     marquee: MarqueeOverride,
   ): void {
-    const a = camera.worldToScreen(marquee.a);
-    const b = camera.worldToScreen(marquee.b);
-    const minX = Math.min(a.x, b.x);
-    const minY = Math.min(a.y, b.y);
-    const maxX = Math.max(a.x, b.x);
-    const maxY = Math.max(a.y, b.y);
+    // Project both world corners to screen, then normalise via the shared
+    // two-corner→Rect helper so the outline matches the canvas's hit-test box
+    // exactly (one definition of "rect from two corners", in the domain).
+    const { minX, minY, maxX, maxY } = rectFromCorners(
+      camera.worldToScreen(marquee.a),
+      camera.worldToScreen(marquee.b),
+    );
     ctx.save();
     ctx.strokeStyle = this.palette.selected;
     ctx.lineWidth = MARQUEE_STROKE;

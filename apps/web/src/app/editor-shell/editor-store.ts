@@ -919,11 +919,11 @@ export class EditorStore {
    */
   private addRefs(refs: SelectionRef[]): void {
     const current = this._selections();
-    // Build the membership index once so the per-ref test is O(1) — the set keeps
-    // its order; the Set is only an auxiliary index, never the stored selection.
-    const present = new Set(current.map(refKey));
-    const missing = refs.filter((ref) => !present.has(refKey(ref)));
-    if (missing.length) this._selections.set([...current, ...missing]);
+    // Dedup-preserving union via the shared {@link mergeRefs}. Only write when it
+    // grew — mergeRefs only ever appends, so an unchanged length means every ref
+    // was already present — keeping the no-op add cheap and signal-quiet.
+    const merged = mergeRefs(current, refs);
+    if (merged.length !== current.length) this._selections.set(merged);
   }
 
   /** Toggle each of `refs` in or out of the set: drop it if present, append it if absent. */
@@ -1057,16 +1057,12 @@ export class EditorStore {
     additive: boolean,
   ): Selection[] {
     const refs = marqueeRefs(hexes, labelIds);
-    // Additive previews build on the committed set (box refs appended, deduped);
-    // a plain preview shows only the box, since release replaces the set.
+    // Additive previews build on the committed set (box refs appended, deduped via
+    // the same {@link mergeRefs} the additive commit uses, so the preview can never
+    // disagree with what release accumulates); a plain preview shows only the box,
+    // since release replaces the set.
     const base = additive ? this._selections() : [];
-    const seen = new Set(base.map(refKey));
-    const merged = [...base];
-    for (const ref of refs) {
-      if (seen.has(refKey(ref))) continue;
-      seen.add(refKey(ref));
-      merged.push(ref);
-    }
+    const merged = mergeRefs(base, refs);
     // Resolve against the live document, dropping any stale member — the same
     // self-heal {@link selections} applies, so the preview can't show a ghost.
     const doc = this._document();
@@ -1344,6 +1340,30 @@ function marqueeRefs(hexes: Axial[], labelIds: string[]): SelectionRef[] {
     })),
     ...labelIds.map((id) => ({ kind: 'label' as const, id })),
   ];
+}
+
+/**
+ * Append `refs` to `base`, skipping any whose entity is already present (by
+ * {@link refKey} identity) — the dedup-preserving union shared by the additive
+ * select path ({@link EditorStore.addRefs}, which commits it) and the marquee
+ * preview ({@link EditorStore.marqueePreview}, which resolves it for the live
+ * highlight), so an additive box's live preview can never disagree with what
+ * releasing it accumulates. Returns a fresh array; `base` is never mutated, and
+ * its order is preserved with the new members appended after it.
+ */
+function mergeRefs(
+  base: readonly SelectionRef[],
+  refs: readonly SelectionRef[],
+): SelectionRef[] {
+  const present = new Set(base.map(refKey));
+  const merged = [...base];
+  for (const ref of refs) {
+    const key = refKey(ref);
+    if (present.has(key)) continue;
+    present.add(key);
+    merged.push(ref);
+  }
+  return merged;
 }
 
 function refKey(ref: SelectionRef): string {

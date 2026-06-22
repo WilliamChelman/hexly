@@ -68,8 +68,9 @@ function glyphFor(subtool: SelectSubtool): Type<unknown> {
  * shell positions this component top-left (ADR-0013).
  *
  * The flyout is bound to the armed Tool: it opens **only** for the Tools that
- * have Subtools (Terrain, Feature) and is absent for Select, Label, and Erase —
- * which have none — so the map stays maximally clear with nothing to configure.
+ * have Subtools (Select with Pick/Marquee, Terrain, and Feature — ADR-0017) and
+ * is absent for Label and Erase, which have none — so the map stays maximally
+ * clear with nothing to configure.
  * Region is not a palette Tool (ADR-0012): while the membership brush is armed
  * (internal `region` state), the strip highlights no Tool and opens no flyout —
  * the active affordance is the Inspector's Add/Remove (issue #38, story 25).

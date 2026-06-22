@@ -20,7 +20,7 @@ import {
   marqueeHits,
   pixelToHex,
   Point,
-  Rect,
+  rectFromCorners,
 } from '@hexly/domain';
 import { ThemeService } from '../core/theme.service';
 import { terrainKey } from './catalog-keys';
@@ -416,15 +416,12 @@ export class MapCanvas {
         marqueeState.additive,
       );
     }
-    this.renderer?.render(
-      camera,
-      doc,
-      hover,
+    this.renderer?.render(camera, doc, hover, {
       labelDrag,
       selections,
       hexDrag,
       marquee,
-    );
+    });
   }
 
   protected onPointerDown(event: PointerEvent): void {
@@ -639,7 +636,7 @@ export class MapCanvas {
     // the gesture ends it.
     if (this.gestureButton !== null && event.button !== this.gestureButton) return;
     (event.target as Element).releasePointerCapture?.(event.pointerId);
-    this.endGesture();
+    this.endGesture(event);
   }
 
   /**
@@ -678,7 +675,7 @@ export class MapCanvas {
     this.store.applyAt(hex);
   }
 
-  private endGesture(): void {
+  private endGesture(event: PointerEvent): void {
     // Commit a label drag as a single edit: `moveLabel` to the final position.
     // A plain click (no movement) lands the label back on its anchor, so the
     // commit changes nothing and records no undo step.
@@ -703,7 +700,13 @@ export class MapCanvas {
     if (marquee) {
       const rect = rectFromCorners(marquee.a, marquee.b);
       const hits = marqueeHits(this.layout, this.store.document(), rect);
-      this.store.marqueeSelect(hits.hexes, hits.labels, marquee.additive);
+      // Decide replace-vs-add from the modifier held at *release*, not the
+      // press/last-move snapshot in `marquee.additive`: a Shift/Cmd toggled after
+      // the final pointer-move (without nudging the cursor) must still take, so the
+      // commit honours what is actually held now — matching the live re-read in
+      // onPointerMove rather than a stale flag.
+      const additive = event.shiftKey || event.metaKey || event.ctrlKey;
+      this.store.marqueeSelect(hits.hexes, hits.labels, additive);
       this.marquee.set(null);
     }
     this.resetGesture();
@@ -989,18 +992,4 @@ export class MapCanvas {
       this.destroyRef.onDestroy(() => observer.disconnect());
     }
   }
-}
-
-/**
- * Normalise two world-space corners of a marquee drag into an axis-aligned
- * {@link Rect}, so the box is correct whichever direction the drag runs. Feeds
- * the pure {@link marqueeHits} helper on release.
- */
-function rectFromCorners(a: Point, b: Point): Rect {
-  return {
-    minX: Math.min(a.x, b.x),
-    minY: Math.min(a.y, b.y),
-    maxX: Math.max(a.x, b.x),
-    maxY: Math.max(a.y, b.y),
-  };
 }
