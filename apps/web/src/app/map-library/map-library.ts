@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  OnDestroy,
   OnInit,
   computed,
   inject,
@@ -9,17 +10,11 @@ import {
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { MapSummary } from '@hexly/domain';
-import { AuthStore } from '../auth/auth.store';
 import { MapsStore } from '../maps/maps.store';
-import { ThemeService } from '../core/theme.service';
+import { HeaderService } from '../shell/header.service';
 import { Button } from '../ui/button';
-import { Cartouche } from '../ui/cartouche';
-import { Eyebrow } from '../ui/eyebrow';
 import { Panel } from '../ui/panel';
-import { LogoIcon } from '../ui/icon/glyphs/logo';
-import { MoonIcon } from '../ui/icon/glyphs/moon';
 import { PlusIcon } from '../ui/icon/glyphs/plus';
-import { SunIcon } from '../ui/icon/glyphs/sun';
 
 /** The title every freshly created map is given (the user renames later). */
 const NEW_MAP_TITLE = 'Untitled map';
@@ -34,61 +29,10 @@ const NEW_MAP_TITLE = 'Untitled map';
 @Component({
   selector: 'app-map-library',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    Button,
-    Cartouche,
-    Eyebrow,
-    Panel,
-    LogoIcon,
-    MoonIcon,
-    PlusIcon,
-    SunIcon,
-  ],
+  imports: [Button, Panel, PlusIcon],
   template: `
-    <header class="topbar">
-      <div class="brand">
-        <span class="mark"><app-icon-logo [size]="26" /></span>
-        <span appCartouche>Hexly</span>
-      </div>
-      <div class="account">
-        <button
-          type="button"
-          appButton
-          variant="ghost"
-          icon
-          (click)="themeService.toggle()"
-          [attr.aria-label]="
-            theme() === 'dark' ? 'Switch to parchment theme' : 'Switch to astral theme'
-          "
-        >
-          @if (theme() === 'dark') {
-            <app-icon-sun [size]="20" />
-          } @else {
-            <app-icon-moon [size]="20" />
-          }
-        </button>
-        @if (user(); as u) {
-          <span class="who">{{ u.displayName }}</span>
-        }
-        <button
-          type="button"
-          appButton
-          variant="ghost"
-          size="sm"
-          data-testid="sign-out"
-          (click)="signOut()"
-        >
-          Sign out
-        </button>
-      </div>
-    </header>
-
     <main>
       <div class="head">
-        <div>
-          <span appEyebrow>Library</span>
-          <h1>Your maps</h1>
-        </div>
         <button
           type="button"
           appButton
@@ -147,38 +91,8 @@ const NEW_MAP_TITLE = 'Untitled map';
   styles: `
     :host {
       display: block;
-      min-height: 100vh;
+      min-height: 100%;
       background: var(--surface-sunken);
-    }
-    .topbar {
-      display: flex;
-      align-items: center;
-      gap: var(--space-5);
-      padding: 0 var(--space-5);
-      height: var(--rail-header);
-      background: var(--surface);
-      border-bottom: 1px solid var(--line-strong);
-      box-shadow: var(--shadow-1);
-    }
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: var(--space-2);
-    }
-    .mark {
-      display: grid;
-      place-items: center;
-      color: var(--gold);
-    }
-    .account {
-      display: flex;
-      align-items: center;
-      gap: var(--space-2);
-      margin-left: auto;
-    }
-    .who {
-      font-size: var(--text-sm);
-      color: var(--ink);
     }
     main {
       max-width: 60rem;
@@ -188,15 +102,9 @@ const NEW_MAP_TITLE = 'Untitled map';
     .head {
       display: flex;
       align-items: flex-end;
-      justify-content: space-between;
+      justify-content: flex-end;
       gap: var(--space-4);
       margin-bottom: var(--space-5);
-    }
-    h1 {
-      margin: var(--space-1) 0 0;
-      font-family: var(--font-display);
-      font-size: var(--text-xl);
-      color: var(--ink-strong);
     }
     .grid {
       display: grid;
@@ -242,15 +150,10 @@ const NEW_MAP_TITLE = 'Untitled map';
     }
   `,
 })
-export class MapLibrary implements OnInit {
+export class MapLibrary implements OnInit, OnDestroy {
   private readonly maps$ = inject(MapsStore);
-  private readonly auth = inject(AuthStore);
   private readonly router = inject(Router);
-  protected readonly themeService = inject(ThemeService);
-  protected readonly theme = this.themeService.theme;
-
-  /** The signed-in user, shown in the top bar. */
-  protected readonly user = this.auth.currentUser;
+  private readonly header = inject(HeaderService);
 
   private readonly _maps = signal<MapSummary[]>([]);
   /** The user's maps, newest first. */
@@ -265,6 +168,9 @@ export class MapLibrary implements OnInit {
   protected readonly creating = signal(false);
 
   ngOnInit(): void {
+    // Contribute this page's heading to the single app header (ADR-0015).
+    this.header.set({ eyebrow: 'Library', title: 'Your maps' });
+
     // Mark the load resolved on either branch: a failed GET /maps must still
     // surface something (an error panel) rather than leaving the page blank
     // forever because `loaded` never flipped.
@@ -278,6 +184,14 @@ export class MapLibrary implements OnInit {
         this.loadError.set(true);
       },
     });
+  }
+
+  ngOnDestroy(): void {
+    // Withdraw our heading as we leave, so a page that contributes none (the
+    // editor projects its own through the named outlet) doesn't inherit it.
+    // Reused across same-route navigation, the component isn't destroyed, so a
+    // brand-link round-trip back to /maps keeps the heading intact.
+    this.header.clear();
   }
 
   /** Create an empty map and open it straight in the editor. */
@@ -305,10 +219,5 @@ export class MapLibrary implements OnInit {
   /** Format a map's last-edited time for display. */
   protected editedOn(map: MapSummary): string {
     return new Date(map.updatedAt).toLocaleDateString();
-  }
-
-  /** End the session and return to the sign-in screen. */
-  protected signOut(): void {
-    this.auth.signOut();
   }
 }

@@ -7,6 +7,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { MapSummary } from '@hexly/domain';
 import { AuthStore } from '../auth/auth.store';
+import { HeaderService } from '../shell/header.service';
 import { MapLibrary } from './map-library';
 
 describe('MapLibrary', () => {
@@ -55,6 +56,23 @@ describe('MapLibrary', () => {
     fixture.detectChanges();
     return fixture;
   }
+
+  it('contributes its heading to the app header while open', () => {
+    renderWith([]);
+
+    const header = TestBed.inject(HeaderService);
+    expect(header.eyebrow()).toBe('Library');
+    expect(header.title()).toBe('Your maps');
+  });
+
+  it('clears its heading from the app header when it leaves', () => {
+    const fixture = renderWith([]);
+
+    fixture.destroy();
+
+    const header = TestBed.inject(HeaderService);
+    expect(header.title()).toBeNull();
+  });
 
   it('lists the maps the user owns, newest first', () => {
     const fixture = renderWith([

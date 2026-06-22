@@ -1,6 +1,5 @@
-import { Component, inject } from '@angular/core';
+import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { ThemeService } from '../core/theme.service';
 import { Button } from '../ui/button';
 import { Cartouche } from '../ui/cartouche';
 import { Chip } from '../ui/chip';
@@ -57,15 +56,6 @@ interface TypeRow {
     <div class="guide">
       <header class="guide-top">
         <a appButton variant="ghost" size="sm" routerLink="/">← Back to map</a>
-        <button
-          type="button"
-          appButton
-          variant="ghost"
-          size="sm"
-          (click)="themeService.toggle()"
-        >
-          {{ theme() === 'dark' ? 'Astral' : 'Parchment' }} · switch
-        </button>
       </header>
 
       <!-- Masthead -->
@@ -488,9 +478,6 @@ A walled town where the forest road meets the river ford.</textarea
   `,
 })
 export class Styleguide {
-  protected readonly themeService = inject(ThemeService);
-  protected readonly theme = this.themeService.theme;
-
   protected readonly semantic: SwatchRow[] = [
     { token: '--bg', name: 'Table' },
     { token: '--surface', name: 'Paper' },

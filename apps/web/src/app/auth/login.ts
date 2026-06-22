@@ -1,16 +1,16 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  OnDestroy,
   inject,
   signal,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { AuthStore } from './auth.store';
+import { HeaderService } from '../shell/header.service';
 import { Button } from '../ui/button';
-import { Eyebrow } from '../ui/eyebrow';
 import { Field } from '../ui/field';
-import { LogoIcon } from '../ui/icon/glyphs/logo';
 import { Input } from '../ui/input';
 import { Panel } from '../ui/panel';
 
@@ -24,16 +24,10 @@ import { Panel } from '../ui/panel';
 @Component({
   selector: 'app-login',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Panel, Field, Input, Button, Eyebrow, LogoIcon],
+  imports: [Panel, Field, Input, Button],
   template: `
     <main>
       <section class="card" appPanel raised>
-        <div class="head">
-          <span class="mark"><app-icon-logo [size]="32" /></span>
-          <span appEyebrow>Hexly</span>
-          <h1>Sign in</h1>
-        </div>
-
         <form (submit)="submit($event)">
           <label appField label="Email">
             <input
@@ -76,7 +70,7 @@ import { Panel } from '../ui/panel';
     main {
       display: grid;
       place-items: center;
-      min-height: 100vh;
+      min-height: 100%;
       padding: var(--space-5);
       background: var(--surface-sunken);
     }
@@ -84,23 +78,6 @@ import { Panel } from '../ui/panel';
       width: 100%;
       max-width: 22rem;
       padding: var(--space-6);
-    }
-    .head {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: var(--space-1);
-      margin-bottom: var(--space-5);
-    }
-    .mark {
-      color: var(--gold);
-      margin-bottom: var(--space-2);
-    }
-    h1 {
-      margin: 0;
-      font-family: var(--font-display);
-      font-size: var(--text-lg);
-      color: var(--ink-strong);
     }
     form {
       display: flex;
@@ -114,15 +91,26 @@ import { Panel } from '../ui/panel';
     }
   `,
 })
-export class Login {
+export class Login implements OnDestroy {
   private readonly auth = inject(AuthStore);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly header = inject(HeaderService);
 
   protected readonly email = signal('');
   protected readonly password = signal('');
   protected readonly pending = signal(false);
   protected readonly error = signal<string | null>(null);
+
+  constructor() {
+    // Contribute the sign-in heading to the single app header (ADR-0015).
+    this.header.set({ title: 'Sign in' });
+  }
+
+  ngOnDestroy(): void {
+    // Withdraw our heading as we leave so the next page starts from a clean slate.
+    this.header.clear();
+  }
 
   /** Read the current value out of an input event. */
   protected value(event: Event): string {
