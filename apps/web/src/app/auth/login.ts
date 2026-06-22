@@ -2,7 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
-  effect,
+  computed,
   inject,
   signal,
 } from '@angular/core';
@@ -113,13 +113,14 @@ export class Login {
   protected readonly error = signal<string | null>(null);
 
   constructor() {
-    // Contribute the sign-in heading to the single app header (ADR-0015),
-    // re-contributing whenever the active language changes so the chrome title
-    // tracks the switch live. It is withdrawn automatically when this page is
+    // Contribute the sign-in heading to the single app header (ADR-0015) as a
+    // computed, so the chrome title tracks a live language switch — HeaderService
+    // owns the subscription. It is withdrawn automatically when this page is
     // destroyed.
-    effect(() => {
-      this.header.set({ title: this.heading() }, this.destroyRef);
-    });
+    this.header.set(
+      computed(() => ({ title: this.heading() })),
+      this.destroyRef,
+    );
   }
 
   /** Read the current value out of an input event. */

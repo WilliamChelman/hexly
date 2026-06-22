@@ -9,6 +9,11 @@ import {
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs';
+import {
+  translateSignal,
+  TranslocoPipe,
+  TranslocoService,
+} from '@jsverse/transloco';
 import { MapSummary } from '@hexly/domain';
 import { MapsStore } from '../maps/maps.store';
 import { HeaderService } from '../shell/header.service';
@@ -20,6 +25,21 @@ import { PlusIcon } from '../ui/icon/glyphs/plus';
 const NEW_MAP_TITLE = 'Untitled map';
 
 /**
+ * Format an epoch-millis timestamp for `lang` using native `Intl` (ADR-0014 — no
+ * DatePipe/registerLocaleData). Falls back to the runtime default if `lang` is
+ * somehow not a valid BCP-47 tag, so a misconfigured locale can't throw and take
+ * the whole card list's render down with it.
+ */
+function formatEdited(updatedAt: number, lang: string): string {
+  const date = new Date(updatedAt);
+  try {
+    return date.toLocaleDateString(lang);
+  } catch {
+    return date.toLocaleDateString();
+  }
+}
+
+/**
  * The map library: the landing surface where a user sees every Hex Map they own,
  * opens one into the editor, creates a new one, or deletes one (issue #6 — the
  * "map list / open / create flow"). It holds the list as local state and keeps
@@ -29,10 +49,10 @@ const NEW_MAP_TITLE = 'Untitled map';
 @Component({
   selector: 'app-map-library',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Panel, PlusIcon],
+  imports: [Button, Panel, PlusIcon, TranslocoPipe],
   template: `
     <div class="page">
-      <h1 class="sr-only">{{ pageTitle }}</h1>
+      <h1 class="sr-only">{{ pageTitle() }}</h1>
       <div class="head">
         <button
           type="button"
@@ -43,23 +63,25 @@ const NEW_MAP_TITLE = 'Untitled map';
           (click)="newMap()"
         >
           <app-icon-plus [size]="16" />
-          {{ creating() ? 'Creating…' : 'New map' }}
+          {{ (creating() ? 'mapLibrary.creating' : 'mapLibrary.newMap') | transloco }}
         </button>
       </div>
 
-      @if (maps().length > 0) {
+      @if (cards().length > 0) {
         <ul class="grid">
-          @for (map of maps(); track map.id) {
+          @for (card of cards(); track card.id) {
             <li>
               <section class="card" appPanel>
                 <button
                   type="button"
                   class="open"
-                  [attr.data-testid]="'open-' + map.id"
-                  (click)="open(map.id)"
+                  [attr.data-testid]="'open-' + card.id"
+                  (click)="open(card.id)"
                 >
-                  <span class="map-title" data-testid="map-title">{{ map.title }}</span>
-                  <span class="meta">Edited {{ editedOn(map) }}</span>
+                  <span class="map-title" data-testid="map-title">{{ card.title }}</span>
+                  <span class="meta">{{
+                    'mapLibrary.edited' | transloco: { date: card.edited }
+                  }}</span>
                 </button>
                 <button
                   type="button"
@@ -67,10 +89,10 @@ const NEW_MAP_TITLE = 'Untitled map';
                   variant="ghost"
                   size="sm"
                   danger
-                  [attr.data-testid]="'delete-' + map.id"
-                  (click)="remove(map.id)"
+                  [attr.data-testid]="'delete-' + card.id"
+                  (click)="remove(card.id)"
                 >
-                  Delete
+                  {{ 'common.delete' | transloco }}
                 </button>
               </section>
             </li>
@@ -78,13 +100,13 @@ const NEW_MAP_TITLE = 'Untitled map';
         </ul>
       } @else if (loadError()) {
         <section class="empty" data-testid="load-error" appPanel>
-          <p>Couldn't load your maps.</p>
-          <p class="hint">Something went wrong. Please try again in a moment.</p>
+          <p>{{ 'mapLibrary.loadErrorTitle' | transloco }}</p>
+          <p class="hint">{{ 'mapLibrary.loadErrorHint' | transloco }}</p>
         </section>
       } @else if (loaded()) {
         <section class="empty" data-testid="empty" appPanel>
-          <p>No maps yet.</p>
-          <p class="hint">Create your first map to start painting a world.</p>
+          <p>{{ 'mapLibrary.emptyTitle' | transloco }}</p>
+          <p class="hint">{{ 'mapLibrary.emptyHint' | transloco }}</p>
         </section>
       }
     </div>
@@ -154,17 +176,31 @@ export class MapLibrary implements OnInit {
   private readonly router = inject(Router);
   private readonly header = inject(HeaderService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly transloco = inject(TranslocoService);
 
-  /** The page heading, shown both as the document's <h1> (sr-only) and the
-   * header chrome title — declared once so the two can't drift. */
-  protected readonly pageTitle = 'Your maps';
-  private readonly pageEyebrow = 'Library';
+  /** The translated page heading, shown both as the document's <h1> (sr-only)
+   * and the header chrome title — sourced from one key so the two can't drift
+   * and both re-render live when the language changes. */
+  protected readonly pageTitle = translateSignal('mapLibrary.heading');
+  private readonly pageEyebrow = translateSignal('mapLibrary.eyebrow');
 
   private readonly _maps = signal<MapSummary[]>([]);
   /** The user's maps, newest first. */
   protected readonly maps = computed(() =>
     [...this._maps()].sort((a, b) => b.updatedAt - a.updatedAt),
   );
+  /** The maps as view rows, with the last-edited date pre-formatted for the
+   * active language (ADR-0014). Keyed on `maps` and the active lang, so each date
+   * formats once per list/language change and reflows live on a switch — not on
+   * every change-detection pass, as a template method call would. */
+  protected readonly cards = computed(() => {
+    const lang = this.transloco.activeLang();
+    return this.maps().map((map) => ({
+      id: map.id,
+      title: map.title,
+      edited: formatEdited(map.updatedAt, lang),
+    }));
+  });
   /** Whether the initial list has resolved — gates the empty state. */
   protected readonly loaded = signal(false);
   /** Whether the initial list failed — shows an error state, not a blank page. */
@@ -173,12 +209,14 @@ export class MapLibrary implements OnInit {
   protected readonly creating = signal(false);
 
   constructor() {
-    // Contribute this page's heading to the single app header (ADR-0015); it is
-    // withdrawn automatically when this page is destroyed. Set in the
-    // constructor (not ngOnInit) so a same-route brand-link round-trip
-    // (/maps → / → /maps) that reuses the component keeps the heading intact.
+    // Contribute this page's heading to the single app header (ADR-0015) as a
+    // computed, so the chrome tracks a live language switch — HeaderService owns
+    // the subscription. It is withdrawn automatically when this page is
+    // destroyed. Set in the constructor (not ngOnInit) so a same-route brand-link
+    // round-trip (/maps → / → /maps) that reuses the component keeps the heading
+    // intact.
     this.header.set(
-      { eyebrow: this.pageEyebrow, title: this.pageTitle },
+      computed(() => ({ eyebrow: this.pageEyebrow(), title: this.pageTitle() })),
       this.destroyRef,
     );
   }
@@ -219,10 +257,5 @@ export class MapLibrary implements OnInit {
     this.maps$
       .delete(id)
       .subscribe(() => this._maps.update((maps) => maps.filter((m) => m.id !== id)));
-  }
-
-  /** Format a map's last-edited time for display. */
-  protected editedOn(map: MapSummary): string {
-    return new Date(map.updatedAt).toLocaleDateString();
   }
 }

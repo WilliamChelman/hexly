@@ -1,4 +1,4 @@
-import { DestroyRef } from '@angular/core';
+import { ApplicationRef, DestroyRef, computed, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { HeaderService } from './header.service';
 
@@ -70,5 +70,52 @@ describe('HeaderService', () => {
     // The current owner leaving does clear it.
     second.destroy();
     expect(header.content()).toBeNull();
+  });
+
+  it('tracks reactive content and reflows it on change', () => {
+    const header = service();
+    const page = fakeDestroyRef();
+    const title = signal('Your maps');
+
+    // A Signal contributor (e.g. a translated heading): the service owns the
+    // subscription, so the slot reflows when the source changes.
+    TestBed.runInInjectionContext(() =>
+      header.set(
+        computed(() => ({ title: title() })),
+        page.ref,
+      ),
+    );
+    TestBed.inject(ApplicationRef).tick();
+    expect(header.content()).toEqual({ title: 'Your maps' });
+
+    title.set('Vos cartes');
+    TestBed.inject(ApplicationRef).tick();
+    expect(header.content()).toEqual({ title: 'Vos cartes' });
+
+    page.destroy();
+    expect(header.content()).toBeNull();
+  });
+
+  it('a superseded reactive contributor cannot clobber its successor', () => {
+    const header = service();
+    const first = fakeDestroyRef();
+    const firstTitle = signal('Your maps');
+
+    TestBed.runInInjectionContext(() =>
+      header.set(
+        computed(() => ({ title: firstTitle() })),
+        first.ref,
+      ),
+    );
+    TestBed.inject(ApplicationRef).tick();
+
+    // A second page takes the slot before the first is destroyed.
+    header.set({ title: 'Sign in' }, fakeDestroyRef().ref);
+
+    // The first page's source still changes (e.g. a language flip), but its
+    // effect must not overwrite the successor's content.
+    firstTitle.set('Vos cartes');
+    TestBed.inject(ApplicationRef).tick();
+    expect(header.content()).toEqual({ title: 'Sign in' });
   });
 });

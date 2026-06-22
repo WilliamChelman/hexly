@@ -1,4 +1,11 @@
-import { DestroyRef, Injectable, Signal, signal } from '@angular/core';
+import {
+  DestroyRef,
+  Injectable,
+  Signal,
+  effect,
+  isSignal,
+  signal,
+} from '@angular/core';
 
 /** Simple declarative content a page contributes to the single {@link AppHeader}. */
 export interface HeaderContent {
@@ -35,14 +42,34 @@ export class HeaderService {
   private owner: object | null = null;
 
   /**
-   * Contribute the active page's declarative header content. The content is
-   * cleared automatically when `destroyRef` fires (the page is destroyed), and a
+   * Contribute the active page's declarative header content. Pass a plain
+   * {@link HeaderContent} for static text, or a `Signal<HeaderContent>` (e.g. a
+   * `computed` over translated headings) for content that should track a live
+   * language switch — the service owns the subscription so each page contributes
+   * once instead of wiring its own effect, and exactly one teardown is
+   * registered however often the content changes. The content is cleared
+   * automatically when `destroyRef` fires (the page is destroyed), and a
    * superseded page's teardown is ignored.
+   *
+   * When a `Signal` is passed, call this from an injection context (a page
+   * constructor): the reactive subscription is an `effect` tied to that
+   * context's lifetime.
    */
-  set(content: HeaderContent, destroyRef: DestroyRef): void {
+  set(content: HeaderContent | Signal<HeaderContent>, destroyRef: DestroyRef): void {
     const token = {};
     this.owner = token;
-    this._content.set(content);
+
+    if (isSignal(content)) {
+      // Read the signal in an effect so the slot re-renders on a language flip.
+      // The ownership guard keeps a not-yet-destroyed predecessor's effect from
+      // clobbering a successor that has already taken the slot.
+      effect(() => {
+        const value = content();
+        if (this.owner === token) this._content.set(value);
+      });
+    } else {
+      this._content.set(content);
+    }
 
     destroyRef.onDestroy(() => {
       if (this.owner === token) {

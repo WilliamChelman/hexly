@@ -8,10 +8,23 @@
     "signingIn": "Connexion…",
     "invalidCredentials": "E-mail ou mot de passe incorrect."
   },
+  "mapLibrary": {
+    "tabTitle": "Hexly — Vos cartes",
+    "eyebrow": "Bibliothèque",
+    "heading": "Vos cartes",
+    "newMap": "Nouvelle carte",
+    "creating": "Création…",
+    "edited": "Modifié le {{date}}",
+    "loadErrorTitle": "Impossible de charger vos cartes.",
+    "loadErrorHint": "Une erreur est survenue. Veuillez réessayer dans un instant.",
+    "emptyTitle": "Aucune carte pour le moment.",
+    "emptyHint": "Créez votre première carte pour commencer à peindre un monde."
+  },
   "common": {
     "language": "Langue",
     "save": "Enregistrer",
     "cancel": "Annuler",
-    "close": "Fermer"
+    "close": "Fermer",
+    "delete": "Supprimer"
   }
 }
