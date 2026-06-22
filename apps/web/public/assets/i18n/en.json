@@ -38,6 +38,8 @@
     "toolPalette": {
       "tools": "Tools",
       "select": "Select",
+      "pick": "Pick",
+      "marquee": "Marquee",
       "terrain": "Terrain",
       "feature": "Feature",
       "label": "Label",
@@ -46,7 +48,8 @@
       "redo": "Redo",
       "terrainGroup": "Terrain",
       "featureGroup": "Features",
-      "clearFeature": "Clear feature"
+      "clearFeature": "Clear feature",
+      "selectGroup": "Select"
     },
     "inspector": {
       "title": "Inspector",

@@ -66,6 +66,16 @@ describe('MapCanvas keyboard', () => {
     expect(store.feature()).toBe('settlement');
   });
 
+  it('picks the Select Subtools Pick and Marquee with 1 and 2', () => {
+    store.armTool('select');
+
+    press('2');
+    expect(store.selectSubtool()).toBe('marquee');
+
+    press('1');
+    expect(store.selectSubtool()).toBe('pick');
+  });
+
   it('undoes and redoes with Cmd/Ctrl+Z', () => {
     store.paintAt({ q: 0, r: 0 }, 'forest');
 

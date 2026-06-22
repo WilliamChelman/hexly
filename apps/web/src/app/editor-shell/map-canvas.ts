@@ -13,7 +13,15 @@ import {
   viewChild,
 } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { Axial, coordKey, Layout, pixelToHex, Point } from '@hexly/domain';
+import {
+  Axial,
+  coordKey,
+  Layout,
+  marqueeHits,
+  pixelToHex,
+  Point,
+  Rect,
+} from '@hexly/domain';
 import { ThemeService } from '../core/theme.service';
 import { terrainKey } from './catalog-keys';
 import { EditorStore, SelectMode, ToolId } from './editor-store';
@@ -24,7 +32,12 @@ import { FitIcon } from '../ui/icon/glyphs/fit';
 import { MinusIcon } from '../ui/icon/glyphs/minus';
 import { PlusIcon } from '../ui/icon/glyphs/plus';
 import { Camera } from './camera';
-import { Canvas2dMapRenderer, HexDragOverride, MapRenderer } from './map-renderer';
+import {
+  Canvas2dMapRenderer,
+  HexDragOverride,
+  MapRenderer,
+  MarqueeOverride,
+} from './map-renderer';
 
 /** Hex radius (centre→corner) in world pixels at zoom 1. */
 const HEX_SIZE = 40;
@@ -264,6 +277,21 @@ export class MapCanvas {
   private readonly hexDrag = signal<HexDragOverride | null>(null);
 
   /**
+   * The in-progress marquee box-selection (Select's Marquee Subtool, ADR-0017):
+   * the drag origin `a` and the cursor `b` in world space, plus whether the drag
+   * is `additive` (Shift/Cmd held — accumulate into the set rather than replace).
+   * `null` until a press starts under select+marquee. The renderer previews the
+   * live rectangle from `a`/`b`; on release the box is run through the pure
+   * {@link marqueeHits} helper and folded into the selection. World-space so the
+   * box tracks the content under pan/zoom mid-drag, like the other overrides.
+   */
+  private readonly marquee = signal<{
+    readonly a: Point;
+    readonly b: Point;
+    readonly additive: boolean;
+  } | null>(null);
+
+  /**
    * A press that *may* become a Hex drag: the origin coordinate and the press
    * point in client pixels, recorded on pointer-down over a selected Hex/Feature.
    * Stays a plain field (not a signal) — it gates the move gesture but never the
@@ -369,9 +397,34 @@ export class MapCanvas {
     const doc = this.store.document();
     const hover = this.hover();
     const labelDrag = this.labelDragOverride();
-    const selections = this.store.selections();
     const hexDrag = this.hexDrag();
-    this.renderer?.render(camera, doc, hover, labelDrag, selections, hexDrag);
+    // While a marquee is dragging, highlight the elements it currently encloses —
+    // a *live* preview of what releasing it would select, resolved by the store
+    // against the document (so a featured cell reads as a Feature, exactly as the
+    // commit will). The committed set is read unconditionally so this effect still
+    // repaints on a normal selection change; the marquee path then overrides it.
+    const marqueeState = this.marquee();
+    let selections = this.store.selections();
+    let marquee: MarqueeOverride | null = null;
+    if (marqueeState) {
+      marquee = { a: marqueeState.a, b: marqueeState.b };
+      const rect = rectFromCorners(marqueeState.a, marqueeState.b);
+      const hits = marqueeHits(this.layout, doc, rect);
+      selections = this.store.marqueePreview(
+        hits.hexes,
+        hits.labels,
+        marqueeState.additive,
+      );
+    }
+    this.renderer?.render(
+      camera,
+      doc,
+      hover,
+      labelDrag,
+      selections,
+      hexDrag,
+      marquee,
+    );
   }
 
   protected onPointerDown(event: PointerEvent): void {
@@ -392,8 +445,9 @@ export class MapCanvas {
       this.hexDrag.set(null);
       // A live select-sweep also yields to the pan: onPointerMove checks the sweep
       // branch before the pan branch, so a sweep left armed here would swallow the
-      // pan moves.
+      // pan moves. A live marquee likewise yields, committing nothing.
       this.selectSweep = null;
+      this.marquee.set(null);
       this.claimGesture(event);
       this.panning = true;
       this.dragging.set(true);
@@ -418,6 +472,18 @@ export class MapCanvas {
     // store: the canvas only supplies the geometric inputs — the hex under the
     // pointer and the label hit — and hands them over (issue #28).
     if (this.store.tool() === 'select') {
+      // The Marquee Subtool drags a box anywhere — including over painted hexes,
+      // where there is no empty space for a pick-drag to begin (ADR-0017). Start
+      // the live rectangle at the press point; the pick logic below is skipped.
+      // Shift/Cmd makes it additive (accumulate boxes); a plain box replaces.
+      if (this.store.selectSubtool() === 'marquee') {
+        this.marquee.set({
+          a: world,
+          b: world,
+          additive: event.shiftKey || event.metaKey || event.ctrlKey,
+        });
+        return;
+      }
       const hitId = this.renderer?.labelAt(this.localPoint(event)) ?? null;
       // Modifiers fold the click into the Selection set (ADR-0017): Shift toggles
       // the whole stack at the coordinate, Cmd/Ctrl the topmost entity; a plain
@@ -487,6 +553,19 @@ export class MapCanvas {
     if (this.foreignPointer(event)) return;
     const hex = pixelToHex(this.layout, this.toWorld(event));
     this.hover.set(hex);
+
+    // A live marquee drag re-targets its far corner to the cursor each move and
+    // re-reads the modifier (so toggling Shift/Cmd mid-drag flips additive). The
+    // renderer previews the rectangle there; the selection only changes on release.
+    const marquee = this.marquee();
+    if (marquee) {
+      this.marquee.set({
+        a: marquee.a,
+        b: this.toWorld(event),
+        additive: event.shiftKey || event.metaKey || event.ctrlKey,
+      });
+      return;
+    }
 
     // A modifier select-sweep folds each newly-entered hex into the set as the
     // pointer passes over it (ADR-0017). Add it once per hex — re-entering the
@@ -616,6 +695,17 @@ export class MapCanvas {
       this.store.moveHex(hexDrag.from, hexDrag.to);
       this.hexDrag.set(null);
     }
+    // Commit a marquee box: run its world rectangle through the pure hit-test and
+    // fold the contained hexes + labels into the selection (replace, or add when
+    // the drag was additive). A plain box that hit nothing clears the set, like a
+    // click on empty space; an additive empty box leaves it (handled by the store).
+    const marquee = this.marquee();
+    if (marquee) {
+      const rect = rectFromCorners(marquee.a, marquee.b);
+      const hits = marqueeHits(this.layout, this.store.document(), rect);
+      this.store.marqueeSelect(hits.hexes, hits.labels, marquee.additive);
+      this.marquee.set(null);
+    }
     this.resetGesture();
   }
 
@@ -664,10 +754,14 @@ export class MapCanvas {
       this.labelDrag() !== null ||
       this.hexDrag() !== null ||
       this.hexDragPress !== null ||
-      this.selectSweep !== null;
+      this.selectSweep !== null ||
+      this.marquee() !== null;
     this.labelDrag.set(null);
     this.hexDrag.set(null);
     this.hexDragPress = null;
+    // A marquee abandoned mid-drag (Escape, pointer leaves/cancels) commits
+    // nothing — the selection is only ever changed by an explicit release.
+    this.marquee.set(null);
     // A select-sweep accumulates the selection live, so abandoning it just stops
     // adding more — the entities already swept in stay selected.
     this.selectSweep = null;
@@ -895,4 +989,18 @@ export class MapCanvas {
       this.destroyRef.onDestroy(() => observer.disconnect());
     }
   }
+}
+
+/**
+ * Normalise two world-space corners of a marquee drag into an axis-aligned
+ * {@link Rect}, so the box is correct whichever direction the drag runs. Feeds
+ * the pure {@link marqueeHits} helper on release.
+ */
+function rectFromCorners(a: Point, b: Point): Rect {
+  return {
+    minX: Math.min(a.x, b.x),
+    minY: Math.min(a.y, b.y),
+    maxX: Math.max(a.x, b.x),
+    maxY: Math.max(a.y, b.y),
+  };
 }

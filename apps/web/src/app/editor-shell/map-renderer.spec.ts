@@ -77,6 +77,12 @@ class FakeContext {
     this.pathFills.push(this.fillStyle);
     this.pathFillAlphas.push(this.globalAlpha);
   }
+  /** Each dash pattern set, in order — the marquee is the only dashed stroke. */
+  readonly dashes: number[][] = [];
+  setLineDash(pattern: number[]): void {
+    this.dashes.push(pattern);
+    this.ops.push('setLineDash');
+  }
 }
 
 /** Stand-in for `Path2D`, absent in the test DOM — records the SVG path it got. */
@@ -569,6 +575,39 @@ describe('Canvas2dMapRenderer region selection highlight', () => {
     // the map isn't washed in colour (ADR-0011).
     expect(ctx.pathFills).toContain('#b08a4e');
     expect(ctx.pathFills).not.toContain('#7c9b86');
+    restore();
+  });
+});
+
+describe('Canvas2dMapRenderer marquee rectangle', () => {
+  it('strokes a dashed rectangle while a marquee drag is active', () => {
+    const restore = stubTheme();
+    const ctx = new FakeContext();
+    const renderer = makeRenderer(ctx);
+    const camera = Camera.initial().panBy(60, 60);
+    const doc: HexMap = { hexes: {}, regions: [], labels: [] };
+
+    // A live marquee, given as its two world-space corners.
+    renderer.render(camera, doc, null, null, [], null, {
+      a: { x: -20, y: -20 },
+      b: { x: 30, y: 25 },
+    });
+
+    // The marquee is the only dashed stroke the renderer ever lays down.
+    expect(ctx.dashes.some((d) => d.length > 0)).toBe(true);
+    restore();
+  });
+
+  it('draws no marquee rectangle when none is active', () => {
+    const restore = stubTheme();
+    const ctx = new FakeContext();
+    const renderer = makeRenderer(ctx);
+    const camera = Camera.initial().panBy(60, 60);
+    const doc: HexMap = { hexes: { '0,0': { terrain: 'forest' } }, regions: [], labels: [] };
+
+    renderer.render(camera, doc, null, null, [], null, null);
+
+    expect(ctx.dashes.some((d) => d.length > 0)).toBe(false);
     restore();
   });
 });
