@@ -14,4 +14,4 @@ Self-serve signup and OAuth (Discord was the runner-up, given the TTRPG audience
 ## Consequences
 
 - The public-link fetch (`GET /public/:token`) is the sole unauthenticated endpoint and must be treated as such (read-only, token-scoped, rotatable/revocable).
-- Multi-editor conflicts are resolved by the optimistic version check, not real-time merging.
+- Multi-editor conflicts are resolved by the optimistic version check, not real-time merging. Real-time co-editing is **deferred, not precluded** — see ADR-0019. Sharing later generalized from Hex Map to Entity (ADR-0018).

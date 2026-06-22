@@ -1,11 +1,37 @@
 # Hexly
 
-A web application for creating and editing hex maps for TTRPG games and worldbuilding. Maps are persisted to user accounts and can be shared.
+A web application for TTRPG worldbuilding: authoring interlinked **Entities** — prose pages and hex maps — persisted to user accounts and shared.
+
+## Entities
+
+**Entity**:
+The top-level thing a user creates, owns, and shares. Carries an `id`, a `name`, a `type`, `tags`, created/modified timestamps, and a rich-text **Content** body. A **Hex Map** is one kind of Entity. The unit of ownership, sharing, and saving.
+_Avoid_: Document, page, record, object
+
+**Entity Type**:
+A closed, code-known enum that decides an Entity's shape: `note` (Content only) and `hexmap` (Content plus a hex grid). User- and plugin-defined types are a long-term goal, not a launch concept.
+_Avoid_: Kind, category, class
+
+**Content**:
+The rich-text body every Entity carries — the result of block-based editing (TipTap; see ADR-0019). Stored as an opaque, format-tagged snapshot the domain never parses, so the editor can change without touching the Entity model. Replaces the old per-element "Note".
+_Avoid_: Body, rich text, document, prose
+
+**Tag**:
+A free-text label on an Entity, for flavour and informal grouping (e.g. "deity", "ruined", "northern reach"). Carries no behaviour; distinct from the structured Entity Type.
+_Avoid_: Keyword, category, label
+
+**Entity Link**:
+An optional reference from a Map element (Hex, Feature, or Region — not a Label) to an Entity by id: e.g. a settlement Feature pointing at the town's `note`, or at another `hexmap`. A link to a missing or inaccessible Entity renders non-navigable rather than erroring; ids are not referentially enforced.
+_Avoid_: Reference, relation, backlink
+
+**Map element**:
+A placed thing *within* a Hex Map — a Hex, Feature, Region, or Label — that can be selected and moved, and (except a Label) can carry an Entity Link. The in-map counterpart to a top-level Entity. (Formerly called "entity" informally; renamed to free that word for the top-level type.)
+_Avoid_: Entity, item, object
 
 ## Language
 
 **Hex Map**:
-The top-level document a user creates and edits: a grid of hexes plus overlays and metadata. The unit of saving, ownership, and sharing.
+An **Entity** of type `hexmap`: its Content (lore) plus a grid of hexes, overlays, regions, and labels. The grid is an infinite sparse plane — a Hex exists only where painted (ADR-0003). Ownership, sharing, and saving are properties of the Entity, not the grid.
 _Avoid_: Map document, board, canvas
 
 **Hex**:
@@ -33,11 +59,11 @@ A named, colored grouping of hex coordinates with optional notes (e.g. "The King
 _Avoid_: Area, zone, territory, group
 
 **Note**:
-Longer prose attached to an entity (Hex, Feature, Region, or the Hex Map), stored as Markdown and shown in a side panel when the entity is selected. Not drawn on the map. The lore, description, and secrets.
+An Entity of type `note`: a prose worldbuilding page (a character, a faction, a place, a bit of history) whose substance is its Content. The lore, description, and secrets — now a first-class Entity that Map elements link to, not text attached to a single Map element.
 _Avoid_: Description, comment, annotation, lore
 
 **Name**:
-A short identifying title carried by an entity — a Hex (e.g. a village's name) or a Region. On a Hex it is optional, and only a painted Hex can hold one; it travels with the Hex's content when moved or swapped. The renderer draws it minimally, anchored to the hex. Distinct from a Label (free, hand-placed typography) and a Note (longer prose).
+A short identifying title carried by a Map element — a Hex (e.g. a village's name) or a Region. On a Hex it is optional, and only a painted Hex can hold one; it travels with the Hex's content when moved or swapped. The renderer draws it minimally, anchored to the hex. Distinct from a Label (free, hand-placed typography) and from a linked Entity's own `name`.
 _Avoid_: Title, caption, label
 
 **Label**:
@@ -46,20 +72,22 @@ _Avoid_: Text, caption, title, annotation
 
 ## Sharing
 
+Sharing is per **Entity** — each note or hexmap is owned and shared on its own. A "World" container that shares a whole graph of linked Entities at once is a deferred concept (ADR-0018).
+
 **Owner**:
-The user who created a Hex Map. Full control, including granting roles to others and managing the public link. Exactly one per map.
+The user who created an Entity. Full control, including granting roles to others and managing the public link. Exactly one per Entity.
 _Avoid_: Admin, creator
 
 **Editor**:
-A named user granted permission to edit a Hex Map. Edits are asynchronous and last-write-wins, guarded by the map's version (a stale save is rejected). No real-time co-editing.
+A named user granted permission to edit an Entity. Edits are asynchronous and last-write-wins, guarded by the Entity's version (a stale save is rejected). Real-time co-editing is deferred, not precluded (ADR-0019).
 _Avoid_: Collaborator, contributor
 
 **Viewer**:
-A named user granted read-only access to a Hex Map.
+A named user granted read-only access to an Entity.
 _Avoid_: Reader, guest
 
 **Public Link**:
-An unguessable, unlisted URL that grants read-only access to a Hex Map without an account. The way a world is shown to people outside the closed user set.
+An unguessable, unlisted URL that grants read-only access to an Entity without an account. The way a world is shown to people outside the closed user set.
 _Avoid_: Share link, public URL, share token
 
 ## Placement modes
@@ -85,7 +113,7 @@ The one non-destructive Tool, holding a **Selection** and split into two Subtool
 _Avoid_: Pointer, move tool, arrow
 
 **Selection**:
-The set of entities (Hexes, Features, Labels, Regions) currently picked out — zero, one, or many. Shown in the Inspector and moved together by a drag. Built by Select's clicks and modifiers; not part of the document, so never undone or persisted.
+The set of Map elements (Hexes, Features, Labels, Regions) currently picked out — zero, one, or many. Shown in the Inspector and moved together by a drag. Built by Select's clicks and modifiers; not part of the document, so never undone or persisted.
 _Avoid_: Highlight, focus, active item
 
 **Pick**:
@@ -101,7 +129,7 @@ The Tool that deletes a whole Hex record (its terrain *and* feature), turning th
 _Avoid_: Delete, clear, remove
 
 **Inspector**:
-The surface that shows and edits the currently selected entity. For a Label it edits text/size/rotation/position; for a Region it edits name, color, deletion, and the Add/Remove membership direction — the *only* place Region details are edited. Engaging a Region's Add/Remove here arms the Region membership brush on that Region — the only way to arm it, now that Region is not a palette Tool (ADR-0012).
+The surface that shows and edits the currently selected Map element, including its Entity Link. For a Label it edits text/size/rotation/position; for a Region it edits name, color, deletion, and the Add/Remove membership direction — the *only* place Region details are edited. Engaging a Region's Add/Remove here arms the Region membership brush on that Region — the only way to arm it, now that Region is not a palette Tool (ADR-0012).
 _Avoid_: Side panel, details pane, properties
 
 **Regions panel**:
