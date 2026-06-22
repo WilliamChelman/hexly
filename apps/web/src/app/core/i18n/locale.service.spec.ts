@@ -1,6 +1,14 @@
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import {
+  HttpTestingController,
+  provideHttpClientTesting,
+} from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { TranslocoService } from '@jsverse/transloco';
+import { provideTransloco, TranslocoService } from '@jsverse/transloco';
+import { apiPrefixInterceptor } from '../api-prefix.interceptor';
 import { provideTranslocoTesting } from './transloco-testing';
+import { TranslocoHttpLoader } from './transloco-http.loader';
+import { translocoAppConfig } from './transloco.config';
 import { LocaleService } from './locale.service';
 
 describe('LocaleService', () => {
@@ -65,5 +73,49 @@ describe('LocaleService', () => {
     expect(transloco.getActiveLang()).toBe('fr');
     // Remembered: persisted so the next visit reads it back.
     expect(localStorage.getItem('hexly-locale')).toBe('fr');
+  });
+
+  /**
+   * The real app has no preload (only the test harness does), so the first
+   * synchronous translate would render a raw key before the catalog arrived.
+   * `init()` is wired to `provideAppInitializer` to close that race; this drives
+   * the genuine HTTP loader — deliberately NOT the preloading harness — so the
+   * gap can't regress behind a preloaded TestBed.
+   */
+  describe('init (real HTTP loader, no preload)', () => {
+    it('loads the active catalog so a later synchronous translate resolves', async () => {
+      localStorage.setItem('hexly-locale', 'fr');
+      TestBed.configureTestingModule({
+        providers: [
+          provideHttpClient(withInterceptors([apiPrefixInterceptor])),
+          provideHttpClientTesting(),
+          provideTransloco({
+            config: translocoAppConfig,
+            loader: TranslocoHttpLoader,
+          }),
+        ],
+      });
+      const locale = TestBed.inject(LocaleService);
+      const transloco = TestBed.inject(TranslocoService);
+      const http = TestBed.inject(HttpTestingController);
+
+      // Nothing is loaded yet: a bare translate (as the title strategy does)
+      // would return the raw key.
+      expect(transloco.translate('auth.signIn')).toBe('auth.signIn');
+
+      // Loading French also pulls the English fallback (forkJoin), so both
+      // catalogs are requested; flush both to let init() resolve.
+      const ready = locale.init();
+      http
+        .expectOne('assets/i18n/fr.json')
+        .flush({ auth: { signIn: 'Se connecter' } });
+      http
+        .expectOne('assets/i18n/en.json')
+        .flush({ auth: { signIn: 'Sign in' } });
+      await ready;
+
+      expect(transloco.translate('auth.signIn')).toBe('Se connecter');
+      http.verify();
+    });
   });
 });

@@ -9,6 +9,7 @@
     "invalidCredentials": "E-mail ou mot de passe incorrect."
   },
   "common": {
+    "language": "Langue",
     "save": "Enregistrer",
     "cancel": "Annuler",
     "close": "Fermer"

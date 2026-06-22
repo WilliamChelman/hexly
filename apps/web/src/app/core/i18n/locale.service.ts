@@ -1,10 +1,11 @@
-import { inject, Injectable, signal } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import { TranslocoService } from '@jsverse/transloco';
+import { persistedPreference } from '../persisted-preference';
+import { LOCALES } from './transloco.config';
 
 /** The languages Hexly ships (ADR-0014). English is the source and fallback. */
-export type Locale = 'en' | 'fr';
-
-const STORAGE_KEY = 'hexly-locale';
+export type Locale = (typeof LOCALES)[number];
 
 /**
  * Owns the active {@link Locale} for every actor — signed-in users and
@@ -12,40 +13,46 @@ const STORAGE_KEY = 'hexly-locale';
  * On first visit it follows the browser language (French when `navigator.language`
  * starts with `fr`, else English); thereafter a remembered choice wins. {@link set}
  * flips the active Transloco language so the UI updates live, and persists the
- * choice to `localStorage` so it survives reloads.
+ * choice. It shares the detect/remember/apply mechanism with {@link ThemeService}
+ * through {@link persistedPreference}.
  */
 @Injectable({ providedIn: 'root' })
 export class LocaleService {
   private readonly transloco = inject(TranslocoService);
 
-  /** The active locale, readable by the UI (e.g. to mark the switcher). */
-  readonly lang = signal<Locale>(this.initial());
-
-  constructor() {
+  private readonly pref = persistedPreference<Locale>({
+    storageKey: 'hexly-locale',
+    values: LOCALES,
+    detect: () => {
+      const browser =
+        typeof navigator !== 'undefined' ? navigator.language : 'en';
+      return browser?.toLowerCase().startsWith('fr') ? 'fr' : 'en';
+    },
     // Reflect the resolved locale onto Transloco so the first paint is correct.
-    this.transloco.setActiveLang(this.lang());
-  }
+    apply: (lang) => this.transloco.setActiveLang(lang),
+  });
+
+  /** The active locale, readable by the UI (e.g. to mark the switcher). */
+  readonly lang = this.pref.value;
 
   /** Switch the UI language live and remember it for the next visit. */
   set(lang: Locale): void {
-    this.lang.set(lang);
-    this.transloco.setActiveLang(lang);
-    try {
-      localStorage.setItem(STORAGE_KEY, lang);
-    } catch {
-      /* storage may be unavailable (private mode); the in-memory value holds */
-    }
+    this.pref.set(lang);
   }
 
-  private initial(): Locale {
+  /**
+   * Load the active language's catalog before the app bootstraps. Wired through
+   * `provideAppInitializer` (which blocks initial navigation until it resolves),
+   * this guarantees the first *synchronous* translation — notably the route
+   * title resolved by {@link TranslationTitleStrategy} — sees a populated
+   * catalog instead of rendering the raw key (ADR-0014). A failed fetch must not
+   * white-screen the app, so it degrades to Transloco's missing-key fallback.
+   */
+  async init(): Promise<void> {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored === 'en' || stored === 'fr') return stored;
+      await firstValueFrom(this.transloco.load(this.lang()));
     } catch {
-      /* fall through to browser detection */
+      /* a missing catalog degrades to the fallback rather than blocking boot */
     }
-    const browser =
-      typeof navigator !== 'undefined' ? navigator.language : 'en';
-    return browser?.toLowerCase().startsWith('fr') ? 'fr' : 'en';
   }
 }

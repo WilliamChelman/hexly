@@ -9,6 +9,7 @@
     "invalidCredentials": "Incorrect email or password."
   },
   "common": {
+    "language": "Language",
     "save": "Save",
     "cancel": "Cancel",
     "close": "Close"

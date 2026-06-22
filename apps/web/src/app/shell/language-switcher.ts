@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { Locale, LocaleService } from '../core/i18n/locale.service';
 import { LOCALES } from '../core/i18n/transloco.config';
 import { Button } from '../ui/button';
@@ -13,9 +14,13 @@ import { Button } from '../ui/button';
 @Component({
   selector: 'app-language-switcher',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button],
+  imports: [Button, TranslocoPipe],
   template: `
-    <div class="group" role="group" aria-label="Language">
+    <div
+      class="group"
+      role="group"
+      [attr.aria-label]="'common.language' | transloco"
+    >
       @for (locale of locales; track locale) {
         <button
           type="button"
