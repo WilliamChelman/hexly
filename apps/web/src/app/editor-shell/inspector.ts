@@ -1,11 +1,12 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { coordKey, featureLabel, Label, terrainLabel } from '@hexly/domain';
+import { coordKey, Label } from '@hexly/domain';
 import { Button } from '../ui/button';
 import { Coord } from '../ui/coord';
 import { Eyebrow } from '../ui/eyebrow';
 import { Field } from '../ui/field';
 import { Input } from '../ui/input';
+import { featureKey, terrainKey } from './catalog-keys';
 import { inputValue } from './dom';
 import { EditorStore } from './editor-store';
 import { RegionFields } from './region-fields';
@@ -310,16 +311,11 @@ export class Inspector {
     if (!hex) return null;
     // Resolve the built-in catalog label at the UI layer, keyed by stable id
     // (ADR-0014). A Feature selection shows the feature's label, else the hex's
-    // terrain. `terrainLabel`/`featureLabel` confirm the id is a built-in; an
-    // unknown id (unreachable under the schema) falls back to the raw id so the
-    // panel still shows something rather than a dangling key.
+    // terrain; the ids are schema-constrained to the built-ins, so the key
+    // always resolves.
     const detailKey = hex.feature
-      ? featureLabel(hex.feature.ref)
-        ? `domain.feature.${hex.feature.ref}`
-        : hex.feature.ref
-      : terrainLabel(hex.terrain)
-        ? `domain.terrain.${hex.terrain}`
-        : hex.terrain;
+      ? featureKey(hex.feature.ref)
+      : terrainKey(hex.terrain);
     return { kind: sel.kind, q: sel.coord.q, r: sel.coord.r, detailKey };
   });
 

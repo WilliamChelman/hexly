@@ -13,8 +13,9 @@ import {
   viewChild,
 } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { Axial, coordKey, Layout, pixelToHex, Point, terrainLabel } from '@hexly/domain';
+import { Axial, coordKey, Layout, pixelToHex, Point } from '@hexly/domain';
 import { ThemeService } from '../core/theme.service';
+import { terrainKey } from './catalog-keys';
 import { EditorStore, ToolId } from './editor-store';
 import { Button } from '../ui/button';
 import { Coord } from '../ui/coord';
@@ -288,17 +289,15 @@ export class MapCanvas {
    * The translation key for the hover readout: the painted hex's built-in terrain
    * keyed by id (`domain.terrain.<id>`, ADR-0014) when one is under the cursor, the
    * "Void" key when the hovered coordinate is unpainted, or the "no hex" key when
-   * the pointer is off the canvas entirely. An unknown terrain id (unreachable
-   * under the schema) falls back to the raw id rather than a dangling key.
+   * the pointer is off the canvas entirely. The terrain id is schema-constrained
+   * to the built-ins, so the key always resolves.
    */
   protected readonly readoutKey = computed(() => {
     const hex = this.hover();
     if (!hex) return 'editorShell.canvas.noHex';
     const painted = this.store.document().hexes[coordKey(hex)];
     if (!painted) return 'editorShell.canvas.void';
-    return terrainLabel(painted.terrain)
-      ? `domain.terrain.${painted.terrain}`
-      : painted.terrain;
+    return terrainKey(painted.terrain);
   });
 
   private renderer: MapRenderer | null = null;

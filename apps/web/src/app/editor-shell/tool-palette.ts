@@ -20,6 +20,7 @@ import { UndoIcon } from '../ui/icon/glyphs/undo';
 import { Panel } from '../ui/panel';
 import { Rule } from '../ui/rule';
 import { Swatch } from '../ui/swatch';
+import { featureKey, terrainKey } from './catalog-keys';
 import { EditorStore, featureSubtools, ToolId } from './editor-store';
 
 /** A top-level Tool button in the floating icon strip (issue #27, ADR-0013). */
@@ -135,7 +136,7 @@ const TOOLS: readonly ToolDef[] = [
           [attr.aria-label]="'editorShell.toolPalette.terrainGroup' | transloco"
         >
           @for (t of terrainTools; track t.id) {
-            @let terrainName = 'domain.terrain.' + t.id | transloco;
+            @let terrainName = t.nameKey | transloco;
             <button
               appIconButton
               toggle
@@ -157,7 +158,7 @@ const TOOLS: readonly ToolDef[] = [
           [attr.aria-label]="'editorShell.toolPalette.featureGroup' | transloco"
         >
           @for (f of features; track f.id) {
-            @let featureName = 'domain.feature.' + f.id | transloco;
+            @let featureName = f.nameKey | transloco;
             <button
               appIconButton
               toggle
@@ -234,6 +235,7 @@ export class ToolPalette {
    */
   protected readonly features = featureLibrary.map((f) => ({
     id: f.id,
+    nameKey: featureKey(f.id),
     path: f.path,
     key: String(featureSubtools.indexOf(f.id) + 1),
   }));
@@ -242,9 +244,10 @@ export class ToolPalette {
   protected readonly clearKey = String(featureSubtools.indexOf('clear') + 1);
 
   /** The built-in terrain palette, with a 1-based number key per entry. The name
-   * is resolved in the template from the id (`domain.terrain.<id>`, ADR-0014). */
+   * is resolved from the id (`domain.terrain.<id>`, ADR-0014). */
   protected readonly terrainTools = terrainPalette.map((t, i) => ({
     id: t.id,
+    nameKey: terrainKey(t.id),
     swatch: t.fill,
     key: String(i + 1),
   }));
