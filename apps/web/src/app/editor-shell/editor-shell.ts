@@ -1,7 +1,14 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  effect,
+  inject,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { catchError, EMPTY, filter, map, switchMap } from 'rxjs';
+import { TitleService } from '../core/i18n/title.service';
 import { EditorSession } from './editor-session';
 import { EditorStore } from './editor-store';
 import { ToolPalette } from './tool-palette';
@@ -131,10 +138,17 @@ export class EditorShell {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly session = inject(EditorSession);
+  private readonly title = inject(TitleService);
   /** Drives which view occupies the shared right column (Inspector vs Regions list). */
   protected readonly store = inject(EditorStore);
 
   constructor() {
+    // The editor owns its tab title: push the open map's name so it reads
+    // "{map} — Hexly" and tracks loads and renames, and clear it on the way out
+    // so a stale name never shadows the next page's title.
+    effect(() => this.title.setDocumentName(this.session.current()?.title ?? null));
+    inject(DestroyRef).onDestroy(() => this.title.setDocumentName(null));
+
     // Open whatever map the URL points at, and reopen it if the id changes
     // (e.g. navigating between maps without leaving the editor). `switchMap`
     // cancels an in-flight open when the id changes, so navigating /maps/A then

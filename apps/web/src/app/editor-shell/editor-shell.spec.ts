@@ -12,6 +12,7 @@ import {
 } from '@angular/router';
 import { Observable, of } from 'rxjs';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
+import { TitleService } from '../core/i18n/title.service';
 import { EditorStore } from './editor-store';
 import { EditorShell } from './editor-shell';
 
@@ -130,5 +131,34 @@ describe('EditorShell', () => {
     expect(TestBed.inject(EditorStore).document()).toEqual({
       hexes: { '0,0': { terrain: 'forest' } },
     });
+  });
+
+  it('titles the tab with the open map name, and clears it when it leaves', async () => {
+    routeParams = of(convertToParamMap({ id: 'm1' }));
+
+    const fixture = TestBed.createComponent(EditorShell);
+    fixture.detectChanges();
+    httpMock.expectOne('/health').flush({ status: 'ok', service: 'api' });
+
+    httpMock.expectOne('/maps/m1').flush({
+      id: 'm1',
+      ownerId: 'u1',
+      title: 'Aldermoor',
+      visibility: 'private',
+      version: 2,
+      createdAt: 1,
+      updatedAt: 1,
+      document: { hexes: {} },
+    });
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    // The editor pushes the open map's name so the tab reads "Aldermoor — Hexly".
+    const titles = TestBed.inject(TitleService);
+    expect(titles.documentName()).toBe('Aldermoor');
+
+    // Leaving the editor clears the name so it can't shadow the next page's title.
+    fixture.destroy();
+    expect(titles.documentName()).toBeNull();
   });
 });

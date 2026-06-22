@@ -1,44 +1,47 @@
 import { inject, Injectable } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Title } from '@angular/platform-browser';
-import { RouterStateSnapshot, TitleStrategy } from '@angular/router';
-import { TranslocoService } from '@jsverse/transloco';
+import {
+  ActivatedRouteSnapshot,
+  RouterStateSnapshot,
+  TitleStrategy,
+} from '@angular/router';
+import { TitleService } from './title.service';
 
 /**
- * Resolves a route's `title` as a translation key rather than a literal string
- * (ADR-0014), so tab titles localize. The key's value carries the "Hexly" brand
- * wherever the page wants it (`"Hexly — Sign in"`), so the product name is the
- * same untranslated token in every language. The title re-resolves on a live
- * language switch, with no navigation.
+ * The router's title hook (ADR-0014). It does no rendering itself — it reads the
+ * active route's title intent and hands it to {@link TitleService}, the single
+ * owner of the tab title. A route's `title` is a translation key (so titles
+ * localize); a route may additionally derive its title from the open document by
+ * declaring `data.documentTitleKey`, a brand template with a `{{name}}` slot the
+ * page fills via {@link TitleService.setDocumentName} (the editor reads
+ * `"Aldermoor — Hexly"`).
  *
- * A route still carrying a literal title resolves to itself (a missing key
- * falls back to the key text), so unmigrated routes keep working until they
- * adopt keys.
+ * A route with no `title` leaves the current tab title untouched, and a literal
+ * (unmigrated) title resolves to itself (a missing key falls back to the key
+ * text), so routes keep working until they adopt keys.
  */
 @Injectable()
 export class TranslationTitleStrategy extends TitleStrategy {
-  private readonly title = inject(Title);
-  private readonly transloco = inject(TranslocoService);
-
-  /**
-   * The most recent route state, kept so a language switch can re-resolve the
-   * current title without injecting the Router (which would form a DI cycle,
-   * since the Router itself depends on the TitleStrategy).
-   */
-  private latest?: RouterStateSnapshot;
-
-  constructor() {
-    super();
-    this.transloco.langChanges$.pipe(takeUntilDestroyed()).subscribe(() => {
-      if (this.latest) this.updateTitle(this.latest);
-    });
-  }
+  private readonly titles = inject(TitleService);
 
   override updateTitle(snapshot: RouterStateSnapshot): void {
-    this.latest = snapshot;
     const key = this.buildTitle(snapshot);
-    if (key !== undefined) {
-      this.title.setTitle(this.transloco.translate(key));
+    if (key === undefined) return;
+    this.titles.setRouteTitle({ key, namedKey: this.documentTitleKey(snapshot) });
+  }
+
+  /**
+   * The `documentTitleKey` declared by a route in the activated primary chain,
+   * or `undefined` when none opts its title into the open document's name.
+   */
+  private documentTitleKey(snapshot: RouterStateSnapshot): string | undefined {
+    for (
+      let route: ActivatedRouteSnapshot | null = snapshot.root;
+      route;
+      route = route.firstChild
+    ) {
+      const key = route.data['documentTitleKey'];
+      if (typeof key === 'string') return key;
     }
+    return undefined;
   }
 }
