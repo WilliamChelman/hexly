@@ -17,7 +17,9 @@ export const appRoutes: Route[] = [
     canActivate: [authGuard],
     loadComponent: () =>
       import('./map-library/map-library').then((m) => m.MapLibrary),
-    title: 'Hexly — Your maps',
+    // A translation key resolved by TranslationTitleStrategy; the value carries
+    // the untranslated "Hexly" brand (ADR-0014).
+    title: 'mapLibrary.tabTitle',
   },
   {
     // The editor for a specific map. The id is in the URL so a reload reopens

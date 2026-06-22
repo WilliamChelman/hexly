@@ -4,11 +4,18 @@ import {
   DestroyRef,
   OnInit,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs';
+import {
+  translateSignal,
+  TranslocoPipe,
+  TranslocoService,
+} from '@jsverse/transloco';
 import { MapSummary } from '@hexly/domain';
 import { MapsStore } from '../maps/maps.store';
 import { HeaderService } from '../shell/header.service';
@@ -29,10 +36,10 @@ const NEW_MAP_TITLE = 'Untitled map';
 @Component({
   selector: 'app-map-library',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Panel, PlusIcon],
+  imports: [Button, Panel, PlusIcon, TranslocoPipe],
   template: `
     <div class="page">
-      <h1 class="sr-only">{{ pageTitle }}</h1>
+      <h1 class="sr-only">{{ pageTitle() }}</h1>
       <div class="head">
         <button
           type="button"
@@ -43,7 +50,7 @@ const NEW_MAP_TITLE = 'Untitled map';
           (click)="newMap()"
         >
           <app-icon-plus [size]="16" />
-          {{ creating() ? 'Creating…' : 'New map' }}
+          {{ (creating() ? 'mapLibrary.creating' : 'mapLibrary.newMap') | transloco }}
         </button>
       </div>
 
@@ -59,7 +66,9 @@ const NEW_MAP_TITLE = 'Untitled map';
                   (click)="open(map.id)"
                 >
                   <span class="map-title" data-testid="map-title">{{ map.title }}</span>
-                  <span class="meta">Edited {{ editedOn(map) }}</span>
+                  <span class="meta">{{
+                    'mapLibrary.edited' | transloco: { date: editedOn(map) }
+                  }}</span>
                 </button>
                 <button
                   type="button"
@@ -70,7 +79,7 @@ const NEW_MAP_TITLE = 'Untitled map';
                   [attr.data-testid]="'delete-' + map.id"
                   (click)="remove(map.id)"
                 >
-                  Delete
+                  {{ 'common.delete' | transloco }}
                 </button>
               </section>
             </li>
@@ -78,13 +87,13 @@ const NEW_MAP_TITLE = 'Untitled map';
         </ul>
       } @else if (loadError()) {
         <section class="empty" data-testid="load-error" appPanel>
-          <p>Couldn't load your maps.</p>
-          <p class="hint">Something went wrong. Please try again in a moment.</p>
+          <p>{{ 'mapLibrary.loadErrorTitle' | transloco }}</p>
+          <p class="hint">{{ 'mapLibrary.loadErrorHint' | transloco }}</p>
         </section>
       } @else if (loaded()) {
         <section class="empty" data-testid="empty" appPanel>
-          <p>No maps yet.</p>
-          <p class="hint">Create your first map to start painting a world.</p>
+          <p>{{ 'mapLibrary.emptyTitle' | transloco }}</p>
+          <p class="hint">{{ 'mapLibrary.emptyHint' | transloco }}</p>
         </section>
       }
     </div>
@@ -154,11 +163,19 @@ export class MapLibrary implements OnInit {
   private readonly router = inject(Router);
   private readonly header = inject(HeaderService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly transloco = inject(TranslocoService);
 
-  /** The page heading, shown both as the document's <h1> (sr-only) and the
-   * header chrome title — declared once so the two can't drift. */
-  protected readonly pageTitle = 'Your maps';
-  private readonly pageEyebrow = 'Library';
+  /** The active Transloco language, as a signal — so the locale-sensitive
+   * `Edited <date>` reflows when the user switches language (ADR-0014). */
+  private readonly lang = toSignal(this.transloco.langChanges$, {
+    initialValue: this.transloco.getActiveLang(),
+  });
+
+  /** The translated page heading, shown both as the document's <h1> (sr-only)
+   * and the header chrome title — sourced from one key so the two can't drift
+   * and both re-render live when the language changes. */
+  protected readonly pageTitle = translateSignal('mapLibrary.heading');
+  private readonly pageEyebrow = translateSignal('mapLibrary.eyebrow');
 
   private readonly _maps = signal<MapSummary[]>([]);
   /** The user's maps, newest first. */
@@ -173,14 +190,18 @@ export class MapLibrary implements OnInit {
   protected readonly creating = signal(false);
 
   constructor() {
-    // Contribute this page's heading to the single app header (ADR-0015); it is
-    // withdrawn automatically when this page is destroyed. Set in the
-    // constructor (not ngOnInit) so a same-route brand-link round-trip
-    // (/maps → / → /maps) that reuses the component keeps the heading intact.
-    this.header.set(
-      { eyebrow: this.pageEyebrow, title: this.pageTitle },
-      this.destroyRef,
-    );
+    // Contribute this page's heading to the single app header (ADR-0015),
+    // re-contributing whenever the active language changes so the chrome tracks
+    // the switch live. It is withdrawn automatically when this page is
+    // destroyed. Driven by an effect (not a one-shot set in the constructor) so
+    // a same-route brand-link round-trip (/maps → / → /maps) that reuses the
+    // component keeps the heading intact, and a language flip re-renders it.
+    effect(() => {
+      this.header.set(
+        { eyebrow: this.pageEyebrow(), title: this.pageTitle() },
+        this.destroyRef,
+      );
+    });
   }
 
   ngOnInit(): void {
@@ -221,8 +242,11 @@ export class MapLibrary implements OnInit {
       .subscribe(() => this._maps.update((maps) => maps.filter((m) => m.id !== id)));
   }
 
-  /** Format a map's last-edited time for display. */
+  /** Format a map's last-edited time for the active language. Uses native
+   * `Intl` driven by the Transloco lang (not the browser default) so the date
+   * matches the rest of the UI; reading the `lang` signal makes it reflow live
+   * on a language switch (ADR-0014 — no DatePipe/registerLocaleData). */
   protected editedOn(map: MapSummary): string {
-    return new Date(map.updatedAt).toLocaleDateString();
+    return new Date(map.updatedAt).toLocaleDateString(this.lang());
   }
 }

@@ -8,10 +8,23 @@
     "signingIn": "Signing in…",
     "invalidCredentials": "Incorrect email or password."
   },
+  "mapLibrary": {
+    "tabTitle": "Hexly — Your maps",
+    "eyebrow": "Library",
+    "heading": "Your maps",
+    "newMap": "New map",
+    "creating": "Creating…",
+    "edited": "Edited {{date}}",
+    "loadErrorTitle": "Couldn't load your maps.",
+    "loadErrorHint": "Something went wrong. Please try again in a moment.",
+    "emptyTitle": "No maps yet.",
+    "emptyHint": "Create your first map to start painting a world."
+  },
   "common": {
     "language": "Language",
     "save": "Save",
     "cancel": "Cancel",
-    "close": "Close"
+    "close": "Close",
+    "delete": "Delete"
   }
 }
