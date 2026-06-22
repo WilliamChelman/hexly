@@ -34,6 +34,8 @@ interface SelectedEntity {
    * is localized at this UI layer, not in the framework-agnostic domain lib.
    */
   readonly detailKey: string;
+  /** The hex's current name, or `''` when unnamed — what the Name input shows. */
+  readonly name: string;
 }
 
 /**
@@ -202,6 +204,15 @@ interface SelectedEntity {
         }}</span>
       </div>
 
+      <div appField [label]="'editorShell.inspector.name' | transloco">
+        <input
+          appInput
+          data-testid="entity-name"
+          [value]="entity.name"
+          (change)="onName(entity, $event)"
+        />
+      </div>
+
       <div class="actions">
         <button
           type="button"
@@ -316,8 +327,12 @@ export class Inspector {
     const detailKey = hex.feature
       ? featureKey(hex.feature.ref)
       : terrainKey(hex.terrain);
-    return { kind: sel.kind, q: sel.coord.q, r: sel.coord.r, detailKey };
+    return { kind: sel.kind, q: sel.coord.q, r: sel.coord.r, detailKey, name: hex.name ?? '' };
   });
+
+  protected onName(entity: SelectedEntity, event: Event): void {
+    this.store.editHexName({ q: entity.q, r: entity.r }, inputValue(event));
+  }
 
   protected onText(id: string, event: Event): void {
     this.store.editLabelText(id, inputValue(event));

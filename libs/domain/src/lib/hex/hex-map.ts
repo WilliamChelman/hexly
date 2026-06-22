@@ -90,12 +90,16 @@ export const featureIdSchema = idEnum(featureLibrary.map((f) => f.id));
 export const featureRefSchema = z.object({ ref: featureIdSchema });
 
 /**
- * A painted Hex. Carries exactly one Terrain, plus at most one Feature
- * (CONTEXT.md → Hex). `feature` is optional and absent unless one is placed.
+ * A painted Hex. Carries exactly one Terrain, plus at most one Feature and an
+ * optional name (CONTEXT.md → Hex; ADR-0016). `feature` and `name` are optional
+ * and absent unless set, so a document saved before either existed parses
+ * unchanged. The name is structured metadata bound to the coordinate — it
+ * travels with the Hex on move/swap — distinct from a free-positioned Label.
  */
 export const hexSchema = z.object({
   terrain: terrainIdSchema,
   feature: featureRefSchema.optional(),
+  name: z.string().optional(),
 });
 
 /** A six-digit `#rrggbb` colour, the form a Region's user-chosen border colour is stored in. */

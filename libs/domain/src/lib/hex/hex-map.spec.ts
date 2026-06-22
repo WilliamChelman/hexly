@@ -136,6 +136,14 @@ describe('hexMapSchema', () => {
     expect(hexMapSchema.parse(doc)).toEqual({ ...doc, regions: [], labels: [] });
   });
 
+  it('round-trips a hex that carries a name', () => {
+    const doc = {
+      hexes: { '0,0': { terrain: 'forest', name: 'Riverbend' } },
+    };
+
+    expect(hexMapSchema.parse(doc)).toEqual({ ...doc, regions: [], labels: [] });
+  });
+
   it('starts a fresh map with no regions', () => {
     expect(emptyHexMap().regions).toEqual([]);
   });

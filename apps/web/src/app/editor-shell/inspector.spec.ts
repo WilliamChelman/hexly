@@ -244,6 +244,52 @@ describe('Inspector hex and feature selection', () => {
     expect(el.querySelector('[data-testid=region-add]')).toBeNull();
     expect(el.querySelector('[data-testid=region-remove]')).toBeNull();
   });
+
+  it('prefills the name field with a selected Hex\'s current name', () => {
+    const store = TestBed.inject(EditorStore);
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.editHexName({ q: 0, r: 0 }, 'Riverbend');
+    store.select({ q: 0, r: 0 }, null);
+
+    const input = render().nativeElement.querySelector(
+      '[data-testid=entity-name]',
+    ) as HTMLInputElement;
+
+    expect(input.value).toBe('Riverbend');
+  });
+
+  it('commits a rename when the name field changes', () => {
+    const store = TestBed.inject(EditorStore);
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.select({ q: 0, r: 0 }, null);
+
+    const input = render().nativeElement.querySelector(
+      '[data-testid=entity-name]',
+    ) as HTMLInputElement;
+    input.value = 'Riverbend';
+    input.dispatchEvent(new Event('change'));
+
+    expect(store.document().hexes['0,0']).toEqual({ terrain: 'forest', name: 'Riverbend' });
+  });
+
+  it('offers the name field for a selected Feature too', () => {
+    const store = TestBed.inject(EditorStore);
+    store.paintAt({ q: 1, r: 1 }, 'forest');
+    store.placeFeatureAt({ q: 1, r: 1 }, 'settlement');
+    store.select({ q: 1, r: 1 }, null);
+
+    const input = render().nativeElement.querySelector(
+      '[data-testid=entity-name]',
+    ) as HTMLInputElement;
+    input.value = 'Riverbend';
+    input.dispatchEvent(new Event('change'));
+
+    expect(store.document().hexes['1,1']).toEqual({
+      terrain: 'forest',
+      feature: { ref: 'settlement' },
+      name: 'Riverbend',
+    });
+  });
 });
 
 describe('Inspector region editing', () => {

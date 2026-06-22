@@ -44,6 +44,21 @@ const ICON_BOX = 24;
  */
 const LABEL_FONT = 'Georgia, "Times New Roman", serif';
 /**
+ * A Hex name's font — a quiet sans-serif, deliberately set apart from the serif
+ * a Label uses (ADR-0016). The name is structured metadata bound to the hex, not
+ * cartographic typography, so it must never read as a second Label system.
+ */
+const NAME_FONT =
+  'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+/** A Hex name's text height as a fraction of the on-screen hex radius — kept small. */
+const NAME_SCALE = 0.34;
+/**
+ * How far below the hex centre a name sits when the hex carries a Feature, as a
+ * fraction of the hex radius, so the name clears the marker rather than colliding
+ * with it. A bare named hex draws its name on the centre instead (ADR-0016).
+ */
+const NAME_FEATURE_OFFSET = 0.78;
+/**
  * The minimum clickable half-width (in screen px) every Label's hit-box gets,
  * tied to the font size. An empty or one-glyph label measures ~0 wide, which
  * would orphan it — invisible *and* unclickable — so it could never be
@@ -137,6 +152,8 @@ interface Palette {
   readonly featureInk: string;
   /** The ink a Label's text is filled in, from `--label-ink`. */
   readonly labelInk: string;
+  /** The ink a Hex name is filled in, from `--name-ink` (ADR-0016). */
+  readonly nameInk: string;
   /** The accent a selection highlight is stroked in, from `--gold-strong`. */
   readonly selected: string;
   /** One fill colour per terrain id, resolved from its `--terrain-*` token. */
@@ -238,6 +255,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
       line: read('--hex-line', '#888'),
       featureInk: read('--feature-ink', '#f4ecd8'),
       labelInk: read('--label-ink', '#f4ecd8'),
+      nameInk: read('--name-ink', '#f4ecd8'),
       selected: read('--gold-strong', '#7e560f'),
       terrain,
     };
@@ -290,6 +308,9 @@ export class Canvas2dMapRenderer implements MapRenderer {
     // While here, note which hexes carry a feature so the marker pass below can
     // walk that short list instead of re-scanning every visible hex.
     const featured: { hex: Axial; ref: FeatureId }[] = [];
+    // The named hexes, noting whether each also carries a feature so the name pass
+    // can anchor the text below the marker (or on the centre for a bare hex).
+    const named: { hex: Axial; name: string; hasFeature: boolean }[] = [];
     for (const hex of visible) {
       const key = coordKey(hex);
       if (key === fromKey) continue; // origin reads as Void mid-drag
@@ -300,6 +321,8 @@ export class Canvas2dMapRenderer implements MapRenderer {
       this.tracePath(ctx, camera, hex);
       ctx.fill();
       if (painted.feature) featured.push({ hex, ref: painted.feature.ref });
+      // An absent or empty name draws nothing (ADR-0016).
+      if (painted.name) named.push({ hex, name: painted.name, hasFeature: !!painted.feature });
     }
 
     // Hover highlight next, so the grid lines draw crisply on top of it.
@@ -353,6 +376,23 @@ export class Canvas2dMapRenderer implements MapRenderer {
       ctx.lineCap = 'round';
       for (const { hex, ref } of featured) {
         this.strokeMarker(ctx, camera, hex, ref, scale);
+      }
+      ctx.restore();
+    }
+
+    // Hex names ride above their content: small text bound to the coordinate,
+    // always visible — not only when selected (ADR-0016). Drawn after the markers
+    // so a named feature's name sits below its icon, and before Labels so free
+    // typography stays on top. The font/baseline are set once for the whole pass.
+    if (named.length > 0) {
+      const radius = this.layout.size.y * camera.zoom;
+      ctx.save();
+      ctx.fillStyle = this.palette.nameInk;
+      ctx.font = `${radius * NAME_SCALE}px ${NAME_FONT}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (const { hex, name, hasFeature } of named) {
+        this.drawHexName(ctx, camera, hex, name, hasFeature ? radius * NAME_FEATURE_OFFSET : 0);
       }
       ctx.restore();
     }
@@ -524,6 +564,22 @@ export class Canvas2dMapRenderer implements MapRenderer {
       minY: centre.y - halfH,
       maxY: centre.y + halfH,
     });
+  }
+
+  /**
+   * Draw a Hex's `name` anchored to `hex`, dropped `offsetY` screen pixels below
+   * the centre (so it clears a feature marker, or sits on the centre when there is
+   * none). The font, fill, and alignment are set by the caller's pass (ADR-0016).
+   */
+  private drawHexName(
+    ctx: CanvasRenderingContext2D,
+    camera: Camera,
+    hex: Axial,
+    name: string,
+    offsetY: number,
+  ): void {
+    const centre = camera.worldToScreen(hexToPixel(this.layout, hex));
+    ctx.fillText(name, centre.x, centre.y + offsetY);
   }
 
   /**
