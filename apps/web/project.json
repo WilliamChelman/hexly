@@ -64,6 +64,18 @@
     "lint": {
       "executor": "@nx/eslint:lint"
     },
+    "i18n-sync": {
+      "executor": "nx:run-commands",
+      "inputs": [
+        "{projectRoot}/public/assets/i18n/**/*.json",
+        "{projectRoot}/tools/check-locale-sync.ts",
+        "{projectRoot}/src/app/core/i18n/locale-key-sync.ts"
+      ],
+      "options": {
+        "command": "jiti apps/web/tools/check-locale-sync.ts",
+        "cwd": "{workspaceRoot}"
+      }
+    },
     "test": {
       "executor": "@angular/build:unit-test",
       "options": {
