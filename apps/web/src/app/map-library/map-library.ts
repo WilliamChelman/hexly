@@ -4,11 +4,9 @@ import {
   DestroyRef,
   OnInit,
   computed,
-  effect,
   inject,
   signal,
 } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import {
@@ -25,6 +23,21 @@ import { PlusIcon } from '../ui/icon/glyphs/plus';
 
 /** The title every freshly created map is given (the user renames later). */
 const NEW_MAP_TITLE = 'Untitled map';
+
+/**
+ * Format an epoch-millis timestamp for `lang` using native `Intl` (ADR-0014 — no
+ * DatePipe/registerLocaleData). Falls back to the runtime default if `lang` is
+ * somehow not a valid BCP-47 tag, so a misconfigured locale can't throw and take
+ * the whole card list's render down with it.
+ */
+function formatEdited(updatedAt: number, lang: string): string {
+  const date = new Date(updatedAt);
+  try {
+    return date.toLocaleDateString(lang);
+  } catch {
+    return date.toLocaleDateString();
+  }
+}
 
 /**
  * The map library: the landing surface where a user sees every Hex Map they own,
@@ -54,20 +67,20 @@ const NEW_MAP_TITLE = 'Untitled map';
         </button>
       </div>
 
-      @if (maps().length > 0) {
+      @if (cards().length > 0) {
         <ul class="grid">
-          @for (map of maps(); track map.id) {
+          @for (card of cards(); track card.id) {
             <li>
               <section class="card" appPanel>
                 <button
                   type="button"
                   class="open"
-                  [attr.data-testid]="'open-' + map.id"
-                  (click)="open(map.id)"
+                  [attr.data-testid]="'open-' + card.id"
+                  (click)="open(card.id)"
                 >
-                  <span class="map-title" data-testid="map-title">{{ map.title }}</span>
+                  <span class="map-title" data-testid="map-title">{{ card.title }}</span>
                   <span class="meta">{{
-                    'mapLibrary.edited' | transloco: { date: editedOn(map) }
+                    'mapLibrary.edited' | transloco: { date: card.edited }
                   }}</span>
                 </button>
                 <button
@@ -76,8 +89,8 @@ const NEW_MAP_TITLE = 'Untitled map';
                   variant="ghost"
                   size="sm"
                   danger
-                  [attr.data-testid]="'delete-' + map.id"
-                  (click)="remove(map.id)"
+                  [attr.data-testid]="'delete-' + card.id"
+                  (click)="remove(card.id)"
                 >
                   {{ 'common.delete' | transloco }}
                 </button>
@@ -165,12 +178,6 @@ export class MapLibrary implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   private readonly transloco = inject(TranslocoService);
 
-  /** The active Transloco language, as a signal — so the locale-sensitive
-   * `Edited <date>` reflows when the user switches language (ADR-0014). */
-  private readonly lang = toSignal(this.transloco.langChanges$, {
-    initialValue: this.transloco.getActiveLang(),
-  });
-
   /** The translated page heading, shown both as the document's <h1> (sr-only)
    * and the header chrome title — sourced from one key so the two can't drift
    * and both re-render live when the language changes. */
@@ -182,6 +189,18 @@ export class MapLibrary implements OnInit {
   protected readonly maps = computed(() =>
     [...this._maps()].sort((a, b) => b.updatedAt - a.updatedAt),
   );
+  /** The maps as view rows, with the last-edited date pre-formatted for the
+   * active language (ADR-0014). Keyed on `maps` and the active lang, so each date
+   * formats once per list/language change and reflows live on a switch — not on
+   * every change-detection pass, as a template method call would. */
+  protected readonly cards = computed(() => {
+    const lang = this.transloco.activeLang();
+    return this.maps().map((map) => ({
+      id: map.id,
+      title: map.title,
+      edited: formatEdited(map.updatedAt, lang),
+    }));
+  });
   /** Whether the initial list has resolved — gates the empty state. */
   protected readonly loaded = signal(false);
   /** Whether the initial list failed — shows an error state, not a blank page. */
@@ -190,18 +209,16 @@ export class MapLibrary implements OnInit {
   protected readonly creating = signal(false);
 
   constructor() {
-    // Contribute this page's heading to the single app header (ADR-0015),
-    // re-contributing whenever the active language changes so the chrome tracks
-    // the switch live. It is withdrawn automatically when this page is
-    // destroyed. Driven by an effect (not a one-shot set in the constructor) so
-    // a same-route brand-link round-trip (/maps → / → /maps) that reuses the
-    // component keeps the heading intact, and a language flip re-renders it.
-    effect(() => {
-      this.header.set(
-        { eyebrow: this.pageEyebrow(), title: this.pageTitle() },
-        this.destroyRef,
-      );
-    });
+    // Contribute this page's heading to the single app header (ADR-0015) as a
+    // computed, so the chrome tracks a live language switch — HeaderService owns
+    // the subscription. It is withdrawn automatically when this page is
+    // destroyed. Set in the constructor (not ngOnInit) so a same-route brand-link
+    // round-trip (/maps → / → /maps) that reuses the component keeps the heading
+    // intact.
+    this.header.set(
+      computed(() => ({ eyebrow: this.pageEyebrow(), title: this.pageTitle() })),
+      this.destroyRef,
+    );
   }
 
   ngOnInit(): void {
@@ -240,13 +257,5 @@ export class MapLibrary implements OnInit {
     this.maps$
       .delete(id)
       .subscribe(() => this._maps.update((maps) => maps.filter((m) => m.id !== id)));
-  }
-
-  /** Format a map's last-edited time for the active language. Uses native
-   * `Intl` driven by the Transloco lang (not the browser default) so the date
-   * matches the rest of the UI; reading the `lang` signal makes it reflow live
-   * on a language switch (ADR-0014 — no DatePipe/registerLocaleData). */
-  protected editedOn(map: MapSummary): string {
-    return new Date(map.updatedAt).toLocaleDateString(this.lang());
   }
 }
