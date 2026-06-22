@@ -7,6 +7,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { MapSummary } from '@hexly/domain';
 import { AuthStore } from '../auth/auth.store';
+import { HeaderService } from '../shell/header.service';
 import { MapLibrary } from './map-library';
 
 describe('MapLibrary', () => {
@@ -55,6 +56,32 @@ describe('MapLibrary', () => {
     fixture.detectChanges();
     return fixture;
   }
+
+  it('contributes its heading to the app header while open', () => {
+    renderWith([]);
+
+    const header = TestBed.inject(HeaderService);
+    expect(header.content()?.eyebrow).toBe('Library');
+    expect(header.content()?.title).toBe('Your maps');
+  });
+
+  it('owns its page heading in the main content', () => {
+    const fixture = renderWith([]);
+
+    // The visible title is drawn as chrome in the app header; the document's
+    // real heading lives here in the page (sr-only) so the outline is correct.
+    const heading = fixture.nativeElement.querySelector('h1');
+    expect(heading?.textContent).toContain('Your maps');
+  });
+
+  it('clears its heading from the app header when it leaves', () => {
+    const fixture = renderWith([]);
+
+    fixture.destroy();
+
+    const header = TestBed.inject(HeaderService);
+    expect(header.content()).toBeNull();
+  });
 
   it('lists the maps the user owns, newest first', () => {
     const fixture = renderWith([

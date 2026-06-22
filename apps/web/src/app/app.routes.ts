@@ -22,11 +22,26 @@ export const appRoutes: Route[] = [
     // the same map (issue #6). This does not collide with the API: the backend
     // lives under `/api/*` (only `/api` is proxied), so `/maps/:id` is a pure
     // client route served by the SPA shell.
+    //
+    // A component-less route with two empty-path children fills the root shell's
+    // two outlets at once (ADR-0015): EditorShell into the primary outlet, and
+    // the editor's interactive header into AppHeader's named `header` outlet.
     path: 'maps/:id',
     canActivate: [authGuard],
-    loadComponent: () =>
-      import('./editor-shell/editor-shell').then((m) => m.EditorShell),
     title: 'Hexly',
+    children: [
+      {
+        path: '',
+        loadComponent: () =>
+          import('./editor-shell/editor-shell').then((m) => m.EditorShell),
+      },
+      {
+        path: '',
+        outlet: 'header',
+        loadComponent: () =>
+          import('./editor-shell/editor-header').then((m) => m.EditorHeader),
+      },
+    ],
   },
   // Landing goes to the library.
   { path: '', pathMatch: 'full', redirectTo: 'maps' },

@@ -4,7 +4,6 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { catchError, EMPTY, filter, map, switchMap } from 'rxjs';
 import { EditorSession } from './editor-session';
 import { EditorStore } from './editor-store';
-import { EditorHeader } from './editor-header';
 import { ToolPalette } from './tool-palette';
 import { MapCanvas } from './map-canvas';
 import { Inspector } from './inspector';
@@ -32,7 +31,6 @@ import { StatusBar } from './status-bar';
   selector: 'app-editor-shell',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    EditorHeader,
     ToolPalette,
     MapCanvas,
     Inspector,
@@ -42,7 +40,6 @@ import { StatusBar } from './status-bar';
   ],
   template: `
     <div class="shell">
-      <app-editor-header />
       <div class="body">
         <!-- Full-bleed canvas; all side chrome floats over it (ADR-0013). -->
         <app-map-canvas />
@@ -70,13 +67,13 @@ import { StatusBar } from './status-bar';
   styles: `
     :host {
       display: block;
-      height: 100vh;
+      height: 100%;
       overflow: hidden;
     }
     .shell {
       display: grid;
-      grid-template-rows: var(--rail-header) 1fr var(--rail-status);
-      height: 100vh;
+      grid-template-rows: 1fr var(--rail-status);
+      height: 100%;
     }
     /* The body is the floating-chrome stacking context; the canvas fills it. */
     .body {

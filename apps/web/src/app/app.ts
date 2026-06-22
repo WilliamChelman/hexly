@@ -1,20 +1,35 @@
 import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { ThemeService } from './core/theme.service';
+import { AppHeader } from './shell/app-header';
 
 /**
- * Application root. It owns no chrome of its own — the editor shell and the
- * styleguide are routed views — but it eagerly constructs {@link ThemeService}
- * so the active theme is applied on boot.
+ * Application root and shell. It owns the single, always-present
+ * {@link AppHeader} (ADR-0015) above the routed outlet, and eagerly constructs
+ * {@link ThemeService} so the active theme is applied on boot.
  */
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet],
-  template: `<router-outlet />`,
+  imports: [RouterOutlet, AppHeader],
+  template: `
+    <app-header />
+    <main class="outlet">
+      <router-outlet />
+    </main>
+  `,
   styles: `
     :host {
-      display: block;
-      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    .outlet {
+      flex: 1;
+      min-height: 0;
+      /* The outlet is the scroll container, so the always-present header stays
+         fixed above it while long pages (the library, the styleguide) scroll.
+         The editor fills the outlet exactly and manages its own overflow. */
+      overflow: auto;
     }
   `,
 })

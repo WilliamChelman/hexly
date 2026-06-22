@@ -9,40 +9,25 @@ import {
   viewChild,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { AuthStore } from '../auth/auth.store';
-import { ThemeService } from '../core/theme.service';
 import { Button } from '../ui/button';
-import { Cartouche } from '../ui/cartouche';
 import { Chip } from '../ui/chip';
 import { Eyebrow } from '../ui/eyebrow';
-import { LogoIcon } from '../ui/icon/glyphs/logo';
-import { MoonIcon } from '../ui/icon/glyphs/moon';
 import { ShareIcon } from '../ui/icon/glyphs/share';
-import { SunIcon } from '../ui/icon/glyphs/sun';
 import { inputValue } from './dom';
 import { EditorSession } from './editor-session';
 
-/** The top chrome: brand, map title, and the global actions (theme, share). */
+/**
+ * The editor's interactive header content, projected into the single
+ * {@link AppHeader}'s named `header` outlet (ADR-0015): the editable map title,
+ * the Editing/conflict chip, and the map-scoped actions (Save, Share, and the
+ * navigation back to the library / styleguide). The global chrome — brand, theme
+ * toggle, user identity + Sign out — lives in {@link AppHeader}, not here.
+ */
 @Component({
   selector: 'app-editor-header',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    RouterLink,
-    Button,
-    Cartouche,
-    Chip,
-    Eyebrow,
-    LogoIcon,
-    MoonIcon,
-    ShareIcon,
-    SunIcon,
-  ],
+  imports: [RouterLink, Button, Chip, Eyebrow, ShareIcon],
   template: `
-    <div class="brand">
-      <span class="mark"><app-icon-logo [size]="26" /></span>
-      <span class="name" appCartouche>Hexly</span>
-    </div>
-
     <div class="titlebar">
       <span appEyebrow>Hex map</span>
       @if (editing()) {
@@ -93,23 +78,6 @@ import { EditorSession } from './editor-session';
         type="button"
         appButton
         variant="ghost"
-        icon
-        (click)="themeService.toggle()"
-        [attr.aria-label]="
-          theme() === 'dark' ? 'Switch to parchment theme' : 'Switch to astral theme'
-        "
-        [title]="theme() === 'dark' ? 'Parchment (light)' : 'Astral (dark)'"
-      >
-        @if (theme() === 'dark') {
-          <app-icon-sun [size]="20" />
-        } @else {
-          <app-icon-moon [size]="20" />
-        }
-      </button>
-      <button
-        type="button"
-        appButton
-        variant="ghost"
         size="sm"
         data-testid="save"
         [disabled]="saving() || !hasMap()"
@@ -121,45 +89,14 @@ import { EditorSession } from './editor-session';
         <app-icon-share [size]="16" />
         Share
       </button>
-      @if (user(); as u) {
-        <span class="avatar" [title]="u.displayName">{{ initials() }}</span>
-        <span class="who">{{ u.displayName }}</span>
-        <button
-          type="button"
-          appButton
-          variant="ghost"
-          size="sm"
-          data-testid="sign-out"
-          (click)="signOut()"
-        >
-          Sign out
-        </button>
-      }
     </div>
   `,
   styles: `
     :host {
       display: flex;
+      flex: 1;
       align-items: center;
       gap: var(--space-5);
-      padding: 0 var(--space-4);
-      background: var(--surface);
-      border-bottom: 1px solid var(--line-strong);
-      box-shadow: var(--shadow-1);
-    }
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: var(--space-2);
-    }
-    .mark {
-      display: grid;
-      place-items: center;
-      color: var(--gold);
-    }
-    .name {
-      font-size: var(--text-lg);
-      color: var(--ink-strong);
     }
     .titlebar {
       display: flex;
@@ -200,22 +137,6 @@ import { EditorSession } from './editor-session';
       gap: var(--space-2);
       margin-left: auto;
     }
-    .avatar {
-      display: grid;
-      place-items: center;
-      width: 32px;
-      height: 32px;
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--on-gold);
-      background: linear-gradient(140deg, var(--gold), var(--gold-strong));
-      border-radius: var(--radius-full);
-      box-shadow: var(--shadow-1);
-    }
-    .who {
-      font-size: var(--text-sm);
-      color: var(--ink);
-    }
     .conflict-reload {
       margin-left: var(--space-2);
       padding: 0;
@@ -229,13 +150,7 @@ import { EditorSession } from './editor-session';
   `,
 })
 export class EditorHeader {
-  private readonly auth = inject(AuthStore);
   private readonly session = inject(EditorSession);
-  protected readonly themeService = inject(ThemeService);
-  protected readonly theme = this.themeService.theme;
-
-  /** The signed-in user, shown in the header; `null` until authenticated. */
-  protected readonly user = this.auth.currentUser;
 
   /** Whether a map is open — gates Save and rename so neither can run with none. */
   protected readonly hasMap = computed(() => this.session.current() !== null);
@@ -289,22 +204,6 @@ export class EditorHeader {
   /** Abandon the edit, leaving the title unchanged. */
   protected cancelRename(): void {
     this.editing.set(false);
-  }
-
-  /** The user's initials for the avatar (e.g. "Ada Lovelace" → "AL"). */
-  protected readonly initials = computed(() => {
-    const name = this.user()?.displayName ?? '';
-    return name
-      .split(/\s+/)
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((part) => part[0]?.toUpperCase() ?? '')
-      .join('');
-  });
-
-  /** End the session and return to the login screen (ADR-0004). */
-  protected signOut(): void {
-    this.auth.signOut();
   }
 
   /** Persist the current map. A stale-version rejection surfaces as a conflict

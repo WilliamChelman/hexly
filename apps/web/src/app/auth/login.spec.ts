@@ -5,6 +5,7 @@ import {
 } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
+import { HeaderService } from '../shell/header.service';
 import { Login } from './login';
 
 describe('Login', () => {
@@ -43,6 +44,30 @@ describe('Login', () => {
     input.value = value;
     input.dispatchEvent(new Event('input'));
   }
+
+  it('contributes its heading to the app header while open', () => {
+    const fixture = TestBed.createComponent(Login);
+    fixture.detectChanges();
+
+    expect(TestBed.inject(HeaderService).content()?.title).toBe('Sign in');
+  });
+
+  it('owns its page heading in the main content', () => {
+    const fixture = TestBed.createComponent(Login);
+    fixture.detectChanges();
+
+    const heading = fixture.nativeElement.querySelector('h1');
+    expect(heading?.textContent).toContain('Sign in');
+  });
+
+  it('clears its heading from the app header when it leaves', () => {
+    const fixture = TestBed.createComponent(Login);
+    fixture.detectChanges();
+
+    fixture.destroy();
+
+    expect(TestBed.inject(HeaderService).content()).toBeNull();
+  });
 
   it('submits the typed credentials and enters the app on success', () => {
     const fixture = TestBed.createComponent(Login);
