@@ -42,10 +42,8 @@ import { EditorStore } from './editor-store';
         type="button"
         class="row"
         data-testid="region-item"
-        [class.is-active]="store.selectedRegion()?.id === region.id"
-        [attr.aria-current]="
-          store.selectedRegion()?.id === region.id ? 'true' : null
-        "
+        [class.is-active]="isRegionSelected(region.id)"
+        [attr.aria-current]="isRegionSelected(region.id) ? 'true' : null"
         (click)="store.selectRegion(region.id)"
       >
         <span appSwatch [style.background]="region.color"></span>
@@ -108,4 +106,16 @@ import { EditorStore } from './editor-store';
 })
 export class RegionsPanel {
   protected readonly store = inject(EditorStore);
+
+  /**
+   * Whether a Region is part of the *live selection set* — the source of truth the
+   * canvas highlights from. Reading the set (not the single {@link EditorStore.selection}
+   * view, which is null whenever 2+ entities are selected) keeps the row's active
+   * state in sync during a multi-selection, e.g. when Shift-clicking a hex inside a
+   * Region adds both the hex and the Region. A sole selected Region is still in the
+   * set, so single-selection behaviour is unchanged.
+   */
+  protected isRegionSelected(id: string): boolean {
+    return this.store.selections().some((s) => s.kind === 'region' && s.id === id);
+  }
 }

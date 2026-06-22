@@ -13,15 +13,19 @@ import { RegionFields } from './region-fields';
 
 /**
  * The Selection kinds in the order the multi-selection breakdown lists them, each
- * paired with the plural translation key its row reads. A single table so the
- * breakdown can't list a kind the set never holds, nor drift from the labels
- * (ADR-0017).
+ * paired with its singular and plural translation keys so a row of count 1 reads
+ * "1 hex" not "1 hexes". A single table so the breakdown can't list a kind the
+ * set never holds, nor drift from the labels (ADR-0017).
  */
-const SELECTION_KINDS: readonly { kind: Selection['kind']; labelKey: string }[] = [
-  { kind: 'hex', labelKey: 'editorShell.inspector.kindHexes' },
-  { kind: 'feature', labelKey: 'editorShell.inspector.kindFeatures' },
-  { kind: 'region', labelKey: 'editorShell.inspector.kindRegions' },
-  { kind: 'label', labelKey: 'editorShell.inspector.kindLabels' },
+const SELECTION_KINDS: readonly {
+  kind: Selection['kind'];
+  oneKey: string;
+  manyKey: string;
+}[] = [
+  { kind: 'hex', oneKey: 'editorShell.inspector.kindHex', manyKey: 'editorShell.inspector.kindHexes' },
+  { kind: 'feature', oneKey: 'editorShell.inspector.kindFeature', manyKey: 'editorShell.inspector.kindFeatures' },
+  { kind: 'region', oneKey: 'editorShell.inspector.kindRegion', manyKey: 'editorShell.inspector.kindRegions' },
+  { kind: 'label', oneKey: 'editorShell.inspector.kindLabel', manyKey: 'editorShell.inspector.kindLabels' },
 ];
 
 /**
@@ -260,8 +264,11 @@ interface SelectedEntity {
       </p>
 
       <ul class="breakdown" data-testid="selection-breakdown">
-        @for (group of multi.groups; track group.labelKey) {
-          <li>{{ group.count }} {{ group.labelKey | transloco }}</li>
+        @for (group of multi.groups; track group.manyKey) {
+          <li>
+            {{ group.count }}
+            {{ (group.count === 1 ? group.oneKey : group.manyKey) | transloco }}
+          </li>
         }
       </ul>
 
@@ -403,8 +410,9 @@ export class Inspector {
   protected readonly selectionSummary = computed(() => {
     const sels = this.store.selections();
     if (sels.length < 2) return null;
-    const groups = SELECTION_KINDS.map(({ kind, labelKey }) => ({
-      labelKey,
+    const groups = SELECTION_KINDS.map(({ kind, oneKey, manyKey }) => ({
+      oneKey,
+      manyKey,
       count: sels.filter((s) => s.kind === kind).length,
     })).filter((g) => g.count > 0);
     return { count: sels.length, groups };

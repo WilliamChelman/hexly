@@ -75,9 +75,13 @@
       "emptyHint": "Choisissez l’outil Sélection et cliquez sur un Hex, une Caractéristique ou une Étiquette pour l’inspecter. Placez une Étiquette avec l’outil Étiquette, puis sélectionnez-la ici pour modifier son texte, sa taille, sa rotation et sa position.",
       "multiTitle": "Sélection",
       "selectedCount": "sélectionnés",
+      "kindHex": "hexagone",
       "kindHexes": "hexagones",
+      "kindFeature": "caractéristique",
       "kindFeatures": "caractéristiques",
+      "kindRegion": "région",
       "kindRegions": "régions",
+      "kindLabel": "étiquette",
       "kindLabels": "étiquettes",
       "deleteAll": "Tout supprimer"
     },

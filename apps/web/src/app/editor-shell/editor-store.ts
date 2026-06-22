@@ -131,6 +131,32 @@ function resolveRef(doc: HexMap, ref: SelectionRef): Selection | null {
 }
 
 /**
+ * The draft-mutation recipes the delete paths share, factored out so the single
+ * deletes ({@link EditorStore.deleteLabel}, {@link EditorStore.deleteRegion},
+ * {@link EditorStore.clearFeatureAt}, {@link EditorStore.eraseAt}) and the
+ * batched {@link EditorStore.deleteSelected} cannot drift apart. Each takes the
+ * Immer draft and mutates it in place; deciding when to wrap them in a `commit`
+ * (one step each vs. one step for the whole set) stays with the callers.
+ */
+function removeLabelFrom(draft: HexMap, id: string): void {
+  const at = draft.labels.findIndex((l) => l.id === id);
+  if (at !== -1) draft.labels.splice(at, 1);
+}
+
+function removeRegionFrom(draft: HexMap, id: string): void {
+  const at = draft.regions.findIndex((r) => r.id === id);
+  if (at !== -1) draft.regions.splice(at, 1);
+}
+
+function clearFeatureFrom(draft: HexMap, coord: Axial): void {
+  delete draft.hexes[coordKey(coord)]?.feature;
+}
+
+function eraseHexFrom(draft: HexMap, coord: Axial): void {
+  delete draft.hexes[coordKey(coord)];
+}
+
+/**
  * The Feature Tool's Subtools in palette/keyboard order: each library feature,
  * then the Clear Subtool last. The single source of truth for the index→Subtool
  * mapping the keyboard ({@link EditorStore.armSubtoolByIndex}) and the palette
@@ -553,16 +579,12 @@ export class EditorStore {
    * records no undo step when nothing changes.
    */
   clearFeatureAt(coord: Axial): void {
-    this.commit((draft) => {
-      delete draft.hexes[coordKey(coord)]?.feature;
-    });
+    this.commit((draft) => clearFeatureFrom(draft, coord));
   }
 
   /** Erase the hex at `coord`, deleting its record so the coordinate is Void. */
   eraseAt(coord: Axial): void {
-    this.commit((draft) => {
-      delete draft.hexes[coordKey(coord)];
-    });
+    this.commit((draft) => eraseHexFrom(draft, coord));
   }
 
   /**
@@ -620,8 +642,15 @@ export class EditorStore {
     );
     if (at !== -1) {
       const next = refs.slice();
-      next[at] = { kind: 'cell', coord: { q: to.q, r: to.r } };
-      this._selections.set(next);
+      const moved: SelectionRef = { kind: 'cell', coord: { q: to.q, r: to.r } };
+      next[at] = moved;
+      // The destination may already be in the set as its own cell ref; re-pointing
+      // the origin onto it would leave the same cell twice. Drop every OTHER copy of
+      // the moved ref, keeping the one we just re-pointed at index `at`.
+      const deduped = next.filter(
+        (ref, i) => i === at || !sameSelectionRef(ref, moved),
+      );
+      this._selections.set(deduped);
     }
     // Stamp the post-move selection onto the edit so undo restores it to the
     // origin and redo follows it back to the destination, in lockstep with the
@@ -707,10 +736,7 @@ export class EditorStore {
    * re-deriving the cleanup at the call site (issue #36).
    */
   deleteRegion(id: string): void {
-    const committed = this.commit((draft) => {
-      const at = draft.regions.findIndex((r) => r.id === id);
-      if (at !== -1) draft.regions.splice(at, 1);
-    });
+    const committed = this.commit((draft) => removeRegionFrom(draft, id));
     this.dropSelections((ref) => ref.kind === 'region' && ref.id === id);
     // The Region Subtool now points at a region that no longer exists. Forget it,
     // and if the Region tool is armed, fall back to the non-destructive Select so
@@ -857,9 +883,10 @@ export class EditorStore {
    */
   private addRefs(refs: SelectionRef[]): void {
     const current = this._selections();
-    const missing = refs.filter(
-      (ref) => !current.some((s) => sameSelectionRef(s, ref)),
-    );
+    // Build the membership index once so the per-ref test is O(1) — the set keeps
+    // its order; the Set is only an auxiliary index, never the stored selection.
+    const present = new Set(current.map(refKey));
+    const missing = refs.filter((ref) => !present.has(refKey(ref)));
     if (missing.length) this._selections.set([...current, ...missing]);
   }
 
@@ -882,12 +909,13 @@ export class EditorStore {
    */
   private toggleStack(stack: SelectionRef[]): void {
     const current = this._selections();
-    const has = (ref: SelectionRef) =>
-      current.some((s) => sameSelectionRef(s, ref));
+    // One O(1) membership index over the current set; the set stays an ordered
+    // array, so the filter/concat below preserve selection order.
+    const present = new Set(current.map(refKey));
+    const has = (ref: SelectionRef) => present.has(refKey(ref));
     if (stack.every(has)) {
-      this._selections.set(
-        current.filter((s) => !stack.some((ref) => sameSelectionRef(ref, s))),
-      );
+      const stackKeys = new Set(stack.map(refKey));
+      this._selections.set(current.filter((s) => !stackKeys.has(refKey(s))));
     } else {
       this._selections.set([...current, ...stack.filter((ref) => !has(ref))]);
     }
@@ -1049,10 +1077,7 @@ export class EditorStore {
 
   /** Delete Label `id` entirely, clearing the selection if it pointed at it. */
   deleteLabel(id: string): void {
-    const committed = this.commit((draft) => {
-      const at = draft.labels.findIndex((l) => l.id === id);
-      if (at !== -1) draft.labels.splice(at, 1);
-    });
+    const committed = this.commit((draft) => removeLabelFrom(draft, id));
     this.dropSelections((ref) => ref.kind === 'label' && ref.id === id);
     // Record the cleared selection on the edit (only if one was actually made) so
     // undo restores it with the label and redo clears it again.
@@ -1075,23 +1100,19 @@ export class EditorStore {
     const committed = this.commit((draft) => {
       for (const sel of sels) {
         switch (sel.kind) {
-          case 'label': {
-            const at = draft.labels.findIndex((l) => l.id === sel.id);
-            if (at !== -1) draft.labels.splice(at, 1);
+          case 'label':
+            removeLabelFrom(draft, sel.id);
             break;
-          }
-          case 'region': {
-            const at = draft.regions.findIndex((r) => r.id === sel.id);
-            if (at !== -1) draft.regions.splice(at, 1);
+          case 'region':
+            removeRegionFrom(draft, sel.id);
             break;
-          }
           case 'feature':
             // Clear only the feature, leaving the terrain (as the Feature Clear Subtool).
-            delete draft.hexes[coordKey(sel.coord)]?.feature;
+            clearFeatureFrom(draft, sel.coord);
             break;
           case 'hex':
             // Erase the whole record, back to Void (as the Erase Tool).
-            delete draft.hexes[coordKey(sel.coord)];
+            eraseHexFrom(draft, sel.coord);
             break;
         }
       }
@@ -1201,6 +1222,23 @@ function sameSelectionRef(a: SelectionRef, b: SelectionRef): boolean {
   if (a.kind === 'label' && b.kind === 'label') return a.id === b.id;
   if (a.kind === 'region' && b.kind === 'region') return a.id === b.id;
   return false;
+}
+
+/**
+ * A stable string key for a {@link SelectionRef}, consistent with
+ * {@link sameSelectionRef} (two refs share a key iff they are the same entity).
+ * Lets the sweep-time membership tests build an O(1) `Set` index once rather than
+ * re-scanning the growing set per swept hex (a quadratic over a long drag).
+ */
+function refKey(ref: SelectionRef): string {
+  switch (ref.kind) {
+    case 'label':
+      return `label:${ref.id}`;
+    case 'region':
+      return `region:${ref.id}`;
+    case 'cell':
+      return `cell:${coordKey(ref.coord)}`;
+  }
 }
 
 /** A unique id, preferring crypto.randomUUID but falling back where it is unavailable (insecure contexts). */

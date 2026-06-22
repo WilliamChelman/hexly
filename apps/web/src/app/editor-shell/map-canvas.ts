@@ -291,6 +291,15 @@ export class MapCanvas {
    */
   private activePointerId: number | null = null;
 
+  /**
+   * The mouse `button` that claimed the active gesture (0 primary, 1 middle), or
+   * `null` between gestures. A mouse reports the same `pointerId` for every
+   * button, so the pointerId test alone can't tell a left-button sweep from a
+   * stray right/middle release during it; this lets onPointerUp ignore a release
+   * from any button other than the one that owns the gesture.
+   */
+  private gestureButton: number | null = null;
+
   private readonly theme = inject(ThemeService);
   private readonly store = inject(EditorStore);
   private readonly destroyRef = inject(DestroyRef);
@@ -381,6 +390,10 @@ export class MapCanvas {
       // a hex move under the pointer-move drag branch.
       this.hexDragPress = null;
       this.hexDrag.set(null);
+      // A live select-sweep also yields to the pan: onPointerMove checks the sweep
+      // branch before the pan branch, so a sweep left armed here would swallow the
+      // pan moves.
+      this.selectSweep = null;
       this.claimGesture(event);
       this.panning = true;
       this.dragging.set(true);
@@ -414,16 +427,23 @@ export class MapCanvas {
         : event.metaKey || event.ctrlKey
           ? 'toggle-top'
           : 'replace';
+      const before = this.store.selections().length;
       const selection = this.store.select(hex, hitId, mode);
+      const grew = this.store.selections().length > before;
       // A modifier-held press becomes a select-sweep instead of a move: the click
       // already folded this hex in, and dragging now *adds* each further hex via
       // the add-only counterpart (so the sweep never toggles a hex back off).
-      // Moving the selected set itself is out of scope for now (ADR-0017).
+      // Moving the selected set itself is out of scope for now (ADR-0017). Only
+      // arm the sweep when the press *grew* the set: a modifier press that toggled
+      // an entity off (Cmd-click a selected hex, Shift-click a full stack) or hit
+      // empty Void must not start a drag that re-adds or mass-selects from nothing.
       if (mode !== 'replace') {
-        this.selectSweep = {
-          mode: mode === 'toggle-stack' ? 'add-stack' : 'add-top',
-          last: coordKey(hex),
-        };
+        if (grew) {
+          this.selectSweep = {
+            mode: mode === 'toggle-stack' ? 'add-stack' : 'add-top',
+            last: coordKey(hex),
+          };
+        }
         return;
       }
       // A plain click arms a *potential* drag (issue #30). A Label drags via the
@@ -473,6 +493,14 @@ export class MapCanvas {
     // last one does nothing — via the same add-only path the store exposes.
     const sweep = this.selectSweep;
     if (sweep) {
+      // Read the modifier live: releasing Cmd/Ctrl/Shift mid-drag ends the sweep
+      // so it stops adding more (the entities already swept in stay selected),
+      // rather than keeping the frozen press-time mode going.
+      const stillHeld = event.shiftKey || event.metaKey || event.ctrlKey;
+      if (!stillHeld) {
+        this.selectSweep = null;
+        return;
+      }
       const key = coordKey(hex);
       if (key !== sweep.last) {
         sweep.last = key;
@@ -526,6 +554,11 @@ export class MapCanvas {
     // Only the owning pointer ends the gesture; a non-owning pointer's release
     // must not commit the active drag out from under it.
     if (this.foreignPointer(event)) return;
+    // A mouse fires pointerup with the same pointerId for every button, so a
+    // right/middle release during a left-button sweep would otherwise end the
+    // gesture while the left button is still held. Only the button that claimed
+    // the gesture ends it.
+    if (this.gestureButton !== null && event.button !== this.gestureButton) return;
     (event.target as Element).releasePointerCapture?.(event.pointerId);
     this.endGesture();
   }
@@ -596,11 +629,13 @@ export class MapCanvas {
     this.lastPointer = null;
     this.lastStroke = null;
     this.activePointerId = null;
+    this.gestureButton = null;
   }
 
   /** Claim the canvas for this pointer and capture it so its moves keep arriving. */
   private claimGesture(event: PointerEvent): void {
     this.activePointerId = event.pointerId;
+    this.gestureButton = event.button;
     (event.target as Element).setPointerCapture?.(event.pointerId);
   }
 

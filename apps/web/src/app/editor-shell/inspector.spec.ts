@@ -323,13 +323,17 @@ describe('Inspector multi-selection', () => {
 
   it('breaks the selection down by kind', () => {
     const { fixture } = withThreeSelected();
-    const breakdown = (fixture.nativeElement as HTMLElement).querySelector(
+    // Collapse the inter-token whitespace the multi-line template leaves between
+    // the count and its word, so the kind-bound substrings match.
+    const breakdown = ((fixture.nativeElement as HTMLElement).querySelector(
       '[data-testid=selection-breakdown]',
-    )?.textContent ?? '';
+    )?.textContent ?? '').replace(/\s+/g, ' ').trim();
 
-    // Two hexes and one label, each kind counted.
-    expect(breakdown).toMatch(/2/);
-    expect(breakdown).toMatch(/1/);
+    // Two hexes and one label, each count bound to its kind — and the count-1 row
+    // reads the singular "label", not "1 labels" (the \b stops "1 label" matching
+    // a stray "1 labels").
+    expect(breakdown).toContain('2 hexes');
+    expect(breakdown).toMatch(/\b1 label\b/);
   });
 
   it('deletes the whole set in one step when Delete all is clicked', () => {
