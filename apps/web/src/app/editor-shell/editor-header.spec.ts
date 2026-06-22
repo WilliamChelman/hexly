@@ -5,7 +5,9 @@ import {
 } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { TranslocoService } from '@jsverse/transloco';
 import { MapDetail } from '@hexly/domain';
+import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { EditorSession } from './editor-session';
 import { EditorHeader } from './editor-header';
 
@@ -31,7 +33,7 @@ describe('EditorHeader', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [EditorHeader],
+      imports: [EditorHeader, provideTranslocoTesting()],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -123,6 +125,66 @@ describe('EditorHeader', () => {
     expect(req.request.method).toBe('PUT');
     expect(req.request.body.version).toBe(3);
     req.flush({ ...aldermoor, version: 4 });
+  });
+
+  it('renders its chrome and actions in French when French is the active language', () => {
+    openMap(aldermoor);
+    const fixture = TestBed.createComponent(EditorHeader);
+    fixture.detectChanges();
+
+    // No reload: flipping the active language re-renders the live component.
+    TestBed.inject(TranslocoService).setActiveLang('fr');
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    // The Editing chip and the map-scoped actions translate; the map title stays
+    // the user's words (asserted separately below).
+    expect(el.textContent).toContain('Édition');
+    expect(el.textContent).toContain('Partager');
+    expect(el.textContent).not.toContain('Editing');
+    const save = el.querySelector('[data-testid=save]') as HTMLButtonElement;
+    expect(save.textContent).toContain('Enregistrer');
+    expect(save.textContent).not.toContain('Save');
+  });
+
+  it('keeps the user’s map title verbatim — never translated — under French', () => {
+    openMap({ ...aldermoor, title: 'Save' }); // collides with a UI action label
+    const fixture = TestBed.createComponent(EditorHeader);
+    fixture.detectChanges();
+
+    TestBed.inject(TranslocoService).setActiveLang('fr');
+    fixture.detectChanges();
+
+    const title = fixture.nativeElement.querySelector(
+      '[data-testid=title]',
+    ) as HTMLButtonElement;
+    expect(title.textContent?.trim()).toBe('Save');
+  });
+
+  it('surfaces a 409 save conflict as a translated message', () => {
+    openMap(aldermoor);
+    const fixture = TestBed.createComponent(EditorHeader);
+    fixture.detectChanges();
+
+    // English (the default lang): the conflict chip resolves its key to the
+    // English copy, proving the 409 maps to editorShell.save.conflict.
+    (
+      fixture.nativeElement.querySelector('[data-testid=save]') as HTMLButtonElement
+    ).click();
+    http
+      .expectOne('/maps/m1')
+      .flush({ ...aldermoor, version: 9 }, { status: 409, statusText: 'Conflict' });
+    fixture.detectChanges();
+
+    const conflict = () =>
+      fixture.nativeElement.querySelector('[data-testid=conflict]') as HTMLElement;
+    expect(conflict().textContent).toContain('Newer version on server');
+
+    // ...and it reflows to French live on a language switch.
+    TestBed.inject(TranslocoService).setActiveLang('fr');
+    fixture.detectChanges();
+    expect(conflict().textContent).toContain('Version plus récente sur le serveur');
+    expect(conflict().textContent).not.toContain('Newer version on server');
   });
 
   it('surfaces a save conflict and re-pulls when the user reloads', () => {

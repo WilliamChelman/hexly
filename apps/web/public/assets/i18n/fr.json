@@ -20,6 +20,92 @@
     "emptyTitle": "Aucune carte pour le moment.",
     "emptyHint": "Créez votre première carte pour commencer à peindre un monde."
   },
+  "editorShell": {
+    "hexMap": "Carte hexagonale",
+    "mapTitleLabel": "Titre de la carte",
+    "renameMap": "Renommer la carte",
+    "editing": "Édition",
+    "reload": "Recharger",
+    "allMaps": "Toutes les cartes",
+    "designSystem": "Système de design",
+    "saving": "Enregistrement…",
+    "share": "Partager",
+    "save": {
+      "conflict": "Version plus récente sur le serveur"
+    },
+    "toolPalette": {
+      "tools": "Outils",
+      "select": "Sélection",
+      "terrain": "Terrain",
+      "feature": "Caractéristique",
+      "label": "Étiquette",
+      "erase": "Effacer",
+      "undo": "Annuler",
+      "redo": "Rétablir",
+      "terrainGroup": "Terrain",
+      "featureGroup": "Caractéristiques",
+      "clearFeature": "Retirer la caractéristique"
+    },
+    "inspector": {
+      "title": "Inspecteur",
+      "selectedLabel": "Étiquette sélectionnée",
+      "selectedRegion": "Région sélectionnée",
+      "selectedHex": "Hex sélectionné",
+      "selectedFeature": "Caractéristique sélectionnée",
+      "text": "Texte",
+      "size": "Taille",
+      "rotation": "Rotation (°)",
+      "x": "X",
+      "y": "Y",
+      "coordinate": "Coordonnée",
+      "terrain": "Terrain",
+      "feature": "Caractéristique",
+      "name": "Nom",
+      "color": "Couleur",
+      "membership": "Appartenance",
+      "membershipDirection": "Direction d’appartenance",
+      "add": "Ajouter",
+      "remove": "Retirer",
+      "deleteLabel": "Supprimer l’étiquette",
+      "deleteRegion": "Supprimer la région",
+      "deleteHex": "Supprimer le hex",
+      "deleteFeature": "Supprimer la caractéristique",
+      "emptyHint": "Choisissez l’outil Sélection et cliquez sur un Hex, une Caractéristique ou une Étiquette pour l’inspecter. Placez une Étiquette avec l’outil Étiquette, puis sélectionnez-la ici pour modifier son texte, sa taille, sa rotation et sa position."
+    },
+    "regionsPanel": {
+      "title": "Régions",
+      "newRegion": "Nouvelle région",
+      "emptyHint": "Aucune région pour le moment. Utilisez Nouvelle région pour en créer une, puis peignez ses hex membres depuis l’Inspecteur."
+    },
+    "statusBar": {
+      "connecting": "Connexion…",
+      "apiError": "Impossible de joindre l’API.",
+      "hex": "hex",
+      "hexes": "hex"
+    },
+    "canvas": {
+      "void": "Vide",
+      "noHex": "Aucun hex",
+      "zoom": "Zoom",
+      "zoomIn": "Zoom avant",
+      "zoomOut": "Zoom arrière",
+      "fit": "Ajuster la carte"
+    }
+  },
+  "domain": {
+    "terrain": {
+      "grass": "Prairie",
+      "forest": "Forêt",
+      "ocean": "Océan",
+      "mountain": "Montagnes",
+      "desert": "Désert",
+      "sky": "Ciel"
+    },
+    "feature": {
+      "settlement": "Colonie",
+      "ruin": "Ruine"
+    }
+  },
   "common": {
     "language": "Langue",
     "save": "Enregistrer",

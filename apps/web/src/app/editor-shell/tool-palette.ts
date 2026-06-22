@@ -5,6 +5,7 @@ import {
   inject,
   Type,
 } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { featureLibrary, terrainPalette } from '@hexly/domain';
 import { IconButton } from '../ui/icon-button';
 import { IconPath } from '../ui/icon/icon-path';
@@ -19,12 +20,12 @@ import { UndoIcon } from '../ui/icon/glyphs/undo';
 import { Panel } from '../ui/panel';
 import { Rule } from '../ui/rule';
 import { Swatch } from '../ui/swatch';
+import { featureKey, terrainKey } from './catalog-keys';
 import { EditorStore, featureSubtools, ToolId } from './editor-store';
 
 /** A top-level Tool button in the floating icon strip (issue #27, ADR-0013). */
 interface ToolDef {
   readonly id: ToolId;
-  readonly label: string;
   /** The keycap that arms this Tool — surfaced in the tooltip (`Terrain (T)`). */
   readonly key: string;
   /** The glyph component projected into the button (ADR-0007); rendered via outlet. */
@@ -35,13 +36,15 @@ interface ToolDef {
  * The floating tool strip's Tools, in palette order. Each arms a top-level Tool;
  * the flyout then shows only that Tool's Subtools (issue #27). The keycaps mirror
  * the keyboard bindings in {@link map-canvas} and are surfaced in the tooltips.
+ * The visible name is resolved at the UI layer from the Tool's stable `id`
+ * (`editorShell.toolPalette.<id>`, ADR-0014), so it can localize.
  */
 const TOOLS: readonly ToolDef[] = [
-  { id: 'select', label: 'Select', key: 'S', glyph: SelectIcon },
-  { id: 'terrain', label: 'Terrain', key: 'T', glyph: TerrainIcon },
-  { id: 'feature', label: 'Feature', key: 'F', glyph: SettlementIcon },
-  { id: 'label', label: 'Label', key: 'L', glyph: LabelIcon },
-  { id: 'erase', label: 'Erase', key: 'E', glyph: EraseIcon },
+  { id: 'select', key: 'S', glyph: SelectIcon },
+  { id: 'terrain', key: 'T', glyph: TerrainIcon },
+  { id: 'feature', key: 'F', glyph: SettlementIcon },
+  { id: 'label', key: 'L', glyph: LabelIcon },
+  { id: 'erase', key: 'E', glyph: EraseIcon },
 ];
 
 /**
@@ -76,16 +79,23 @@ const TOOLS: readonly ToolDef[] = [
     UndoIcon,
     Panel,
     Rule,
+    TranslocoPipe,
   ],
   template: `
-    <div class="strip" appPanel role="group" aria-label="Tools">
+    <div
+      class="strip"
+      appPanel
+      role="group"
+      [attr.aria-label]="'editorShell.toolPalette.tools' | transloco"
+    >
       @for (t of tools; track t.id) {
+        @let toolName = 'editorShell.toolPalette.' + t.id | transloco;
         <button
           appIconButton
           toggle
           [active]="store.tool() === t.id"
-          [title]="t.label + ' (' + t.key + ')'"
-          [attr.aria-label]="t.label"
+          [title]="toolName + ' (' + t.key + ')'"
+          [attr.aria-label]="toolName"
           [attr.data-testid]="'tool-' + t.id"
           (click)="store.armTool(t.id)"
         >
@@ -97,8 +107,8 @@ const TOOLS: readonly ToolDef[] = [
 
       <button
         appIconButton
-        title="Undo"
-        aria-label="Undo"
+        [title]="'editorShell.toolPalette.undo' | transloco"
+        [attr.aria-label]="'editorShell.toolPalette.undo' | transloco"
         data-testid="undo"
         [disabled]="!store.canUndo()"
         (click)="store.undo()"
@@ -107,8 +117,8 @@ const TOOLS: readonly ToolDef[] = [
       </button>
       <button
         appIconButton
-        title="Redo"
-        aria-label="Redo"
+        [title]="'editorShell.toolPalette.redo' | transloco"
+        [attr.aria-label]="'editorShell.toolPalette.redo' | transloco"
         data-testid="redo"
         [disabled]="!store.canRedo()"
         (click)="store.redo()"
@@ -119,14 +129,20 @@ const TOOLS: readonly ToolDef[] = [
 
     @switch (store.tool()) {
       @case ('terrain') {
-        <div class="flyout" appPanel role="group" aria-label="Terrain">
+        <div
+          class="flyout"
+          appPanel
+          role="group"
+          [attr.aria-label]="'editorShell.toolPalette.terrainGroup' | transloco"
+        >
           @for (t of terrainTools; track t.id) {
+            @let terrainName = t.nameKey | transloco;
             <button
               appIconButton
               toggle
               [active]="store.terrain() === t.id"
-              [title]="t.label + ' (' + t.key + ')'"
-              [attr.aria-label]="t.label"
+              [title]="terrainName + ' (' + t.key + ')'"
+              [attr.aria-label]="terrainName"
               (click)="store.armTerrain(t.id)"
             >
               <span appSwatch [style.background]="'var(' + t.swatch + ')'"></span>
@@ -135,14 +151,20 @@ const TOOLS: readonly ToolDef[] = [
         </div>
       }
       @case ('feature') {
-        <div class="flyout" appPanel role="group" aria-label="Features">
+        <div
+          class="flyout"
+          appPanel
+          role="group"
+          [attr.aria-label]="'editorShell.toolPalette.featureGroup' | transloco"
+        >
           @for (f of features; track f.id) {
+            @let featureName = f.nameKey | transloco;
             <button
               appIconButton
               toggle
               [active]="store.feature() === f.id"
-              [title]="f.label + ' (' + f.key + ')'"
-              [attr.aria-label]="f.label"
+              [title]="featureName + ' (' + f.key + ')'"
+              [attr.aria-label]="featureName"
               [attr.data-testid]="'feature-' + f.id"
               (click)="store.armFeature(f.id)"
             >
@@ -153,8 +175,11 @@ const TOOLS: readonly ToolDef[] = [
             appIconButton
             toggle
             [active]="store.feature() === 'clear'"
-            [title]="'Clear feature (' + clearKey + ')'"
-            aria-label="Clear feature"
+            [title]="
+              ('editorShell.toolPalette.clearFeature' | transloco) +
+              ' (' + clearKey + ')'
+            "
+            [attr.aria-label]="'editorShell.toolPalette.clearFeature' | transloco"
             data-testid="clear-feature"
             (click)="store.armFeature('clear')"
           >
@@ -210,7 +235,7 @@ export class ToolPalette {
    */
   protected readonly features = featureLibrary.map((f) => ({
     id: f.id,
-    label: f.label,
+    nameKey: featureKey(f.id),
     path: f.path,
     key: String(featureSubtools.indexOf(f.id) + 1),
   }));
@@ -218,10 +243,11 @@ export class ToolPalette {
   /** The keycap for the Clear feature Subtool — its slot in {@link featureSubtools}. */
   protected readonly clearKey = String(featureSubtools.indexOf('clear') + 1);
 
-  /** The built-in terrain palette, with a 1-based number key per entry. */
+  /** The built-in terrain palette, with a 1-based number key per entry. The name
+   * is resolved from the id (`domain.terrain.<id>`, ADR-0014). */
   protected readonly terrainTools = terrainPalette.map((t, i) => ({
     id: t.id,
-    label: t.label,
+    nameKey: terrainKey(t.id),
     swatch: t.fill,
     key: String(i + 1),
   }));

@@ -9,6 +9,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { Button } from '../ui/button';
 import { Chip } from '../ui/chip';
 import { Eyebrow } from '../ui/eyebrow';
@@ -26,15 +27,15 @@ import { EditorSession } from './editor-session';
 @Component({
   selector: 'app-editor-header',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, Button, Chip, Eyebrow, ShareIcon],
+  imports: [RouterLink, Button, Chip, Eyebrow, ShareIcon, TranslocoPipe],
   template: `
     <div class="titlebar">
-      <span appEyebrow>Hex map</span>
+      <span appEyebrow>{{ 'editorShell.hexMap' | transloco }}</span>
       @if (editing()) {
         <input
           class="title-input"
           data-testid="title-input"
-          aria-label="Map title"
+          [attr.aria-label]="'editorShell.mapTitleLabel' | transloco"
           [value]="draft()"
           (input)="draft.set(inputValue($event))"
           (keydown.enter)="commitRename()"
@@ -47,7 +48,7 @@ import { EditorSession } from './editor-session';
           type="button"
           class="title"
           data-testid="title"
-          title="Rename map"
+          [title]="'editorShell.renameMap' | transloco"
           [disabled]="!hasMap()"
           (click)="startRename()"
         >
@@ -56,24 +57,28 @@ import { EditorSession } from './editor-session';
       }
       @if (conflict()) {
         <app-chip tone="gold" data-testid="conflict">
-          Newer version on server
+          {{ 'editorShell.save.conflict' | transloco }}
           <button
             type="button"
             class="conflict-reload"
             data-testid="conflict-reload"
             (click)="reload()"
           >
-            Reload
+            {{ 'editorShell.reload' | transloco }}
           </button>
         </app-chip>
       } @else {
-        <app-chip tone="sea">Editing</app-chip>
+        <app-chip tone="sea">{{ 'editorShell.editing' | transloco }}</app-chip>
       }
     </div>
 
     <div class="actions">
-      <a appButton variant="ghost" size="sm" routerLink="/maps">All maps</a>
-      <a appButton variant="ghost" size="sm" routerLink="/styleguide">Design system</a>
+      <a appButton variant="ghost" size="sm" routerLink="/maps">{{
+        'editorShell.allMaps' | transloco
+      }}</a>
+      <a appButton variant="ghost" size="sm" routerLink="/styleguide">{{
+        'editorShell.designSystem' | transloco
+      }}</a>
       <button
         type="button"
         appButton
@@ -83,11 +88,11 @@ import { EditorSession } from './editor-session';
         [disabled]="saving() || !hasMap()"
         (click)="save()"
       >
-        {{ saving() ? 'Saving…' : 'Save' }}
+        {{ (saving() ? 'editorShell.saving' : 'common.save') | transloco }}
       </button>
       <button type="button" appButton variant="primary" size="sm">
         <app-icon-share [size]="16" />
-        Share
+        {{ 'editorShell.share' | transloco }}
       </button>
     </div>
   `,

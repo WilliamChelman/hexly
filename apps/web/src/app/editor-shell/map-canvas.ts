@@ -12,8 +12,10 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
-import { Axial, coordKey, Layout, pixelToHex, Point, terrainLabel } from '@hexly/domain';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { Axial, coordKey, Layout, pixelToHex, Point } from '@hexly/domain';
 import { ThemeService } from '../core/theme.service';
+import { terrainKey } from './catalog-keys';
 import { EditorStore, ToolId } from './editor-store';
 import { Button } from '../ui/button';
 import { Coord } from '../ui/coord';
@@ -75,13 +77,13 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
 @Component({
   selector: 'app-map-canvas',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Coord, Eyebrow, FitIcon, MinusIcon, PlusIcon],
+  imports: [Button, Coord, Eyebrow, FitIcon, MinusIcon, PlusIcon, TranslocoPipe],
   template: `
     <canvas
       #canvas
       class="surface"
       role="img"
-      aria-label="Hex map"
+      [attr.aria-label]="'editorShell.hexMap' | transloco"
       [class.is-grabbing]="dragging()"
       (pointerdown)="onPointerDown($event)"
       (pointermove)="onPointerMove($event)"
@@ -94,18 +96,20 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
     <div class="readout">
       <app-coord>q {{ hover()?.q ?? 0 }} · r {{ hover()?.r ?? 0 }}</app-coord>
       <span class="readout-sep">·</span>
-      <span appEyebrow>{{
-        hover() ? (hoverTerrain() ?? 'Void') : 'No hex'
-      }}</span>
+      <span appEyebrow>{{ readoutKey() | transloco }}</span>
     </div>
 
-    <div class="zoom" role="group" aria-label="Zoom">
+    <div
+      class="zoom"
+      role="group"
+      [attr.aria-label]="'editorShell.canvas.zoom' | transloco"
+    >
       <button
         type="button"
         appButton
         icon
         size="sm"
-        aria-label="Zoom in"
+        [attr.aria-label]="'editorShell.canvas.zoomIn' | transloco"
         (click)="zoomByStep(1)"
       >
         <app-icon-plus [size]="16" />
@@ -116,7 +120,7 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
         appButton
         icon
         size="sm"
-        aria-label="Zoom out"
+        [attr.aria-label]="'editorShell.canvas.zoomOut' | transloco"
         (click)="zoomByStep(-1)"
       >
         <app-icon-minus [size]="16" />
@@ -126,7 +130,7 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
         appButton
         icon
         size="sm"
-        aria-label="Fit map"
+        [attr.aria-label]="'editorShell.canvas.fit' | transloco"
         (click)="recenter()"
       >
         <app-icon-fit [size]="16" />
@@ -281,12 +285,19 @@ export class MapCanvas {
   private readonly store = inject(EditorStore);
   private readonly destroyRef = inject(DestroyRef);
 
-  /** The terrain label under the cursor, or null when the hovered hex is Void. */
-  protected readonly hoverTerrain = computed(() => {
+  /**
+   * The translation key for the hover readout: the painted hex's built-in terrain
+   * keyed by id (`domain.terrain.<id>`, ADR-0014) when one is under the cursor, the
+   * "Void" key when the hovered coordinate is unpainted, or the "no hex" key when
+   * the pointer is off the canvas entirely. The terrain id is schema-constrained
+   * to the built-ins, so the key always resolves.
+   */
+  protected readonly readoutKey = computed(() => {
     const hex = this.hover();
-    if (!hex) return null;
+    if (!hex) return 'editorShell.canvas.noHex';
     const painted = this.store.document().hexes[coordKey(hex)];
-    return painted ? (terrainLabel(painted.terrain) ?? null) : null;
+    if (!painted) return 'editorShell.canvas.void';
+    return terrainKey(painted.terrain);
   });
 
   private renderer: MapRenderer | null = null;

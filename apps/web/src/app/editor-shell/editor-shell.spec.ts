@@ -11,6 +11,7 @@ import {
   provideRouter,
 } from '@angular/router';
 import { Observable, of } from 'rxjs';
+import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { EditorStore } from './editor-store';
 import { EditorShell } from './editor-shell';
 
@@ -22,7 +23,7 @@ describe('EditorShell', () => {
   beforeEach(async () => {
     routeParams = of(convertToParamMap({}));
     await TestBed.configureTestingModule({
-      imports: [EditorShell],
+      imports: [EditorShell, provideTranslocoTesting()],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),

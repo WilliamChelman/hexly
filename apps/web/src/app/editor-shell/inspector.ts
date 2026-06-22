@@ -1,10 +1,12 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
-import { coordKey, featureLabel, Label, terrainLabel } from '@hexly/domain';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { coordKey, Label } from '@hexly/domain';
 import { Button } from '../ui/button';
 import { Coord } from '../ui/coord';
 import { Eyebrow } from '../ui/eyebrow';
 import { Field } from '../ui/field';
 import { Input } from '../ui/input';
+import { featureKey, terrainKey } from './catalog-keys';
 import { inputValue } from './dom';
 import { EditorStore } from './editor-store';
 import { RegionFields } from './region-fields';
@@ -16,8 +18,8 @@ import { RegionFields } from './region-fields';
  * legend is gone (issue #38).
  */
 const DIRECTIONS = [
-  { direction: 'add', label: 'Add', testid: 'region-add' },
-  { direction: 'remove', label: 'Remove', testid: 'region-remove' },
+  { direction: 'add', labelKey: 'editorShell.inspector.add', testid: 'region-add' },
+  { direction: 'remove', labelKey: 'editorShell.inspector.remove', testid: 'region-remove' },
 ] as const;
 
 /** A selected Hex or Feature resolved for display: its coordinate and identity. */
@@ -25,10 +27,13 @@ interface SelectedEntity {
   readonly kind: 'hex' | 'feature';
   readonly q: number;
   readonly r: number;
-  /** The terrain's human label (e.g. "Ocean"). */
-  readonly terrain: string;
-  /** The feature's human label (e.g. "Settlement"), only for a Feature selection. */
-  readonly feature: string | null;
+  /**
+   * The translation key for the entity's built-in catalog label, keyed by its
+   * stable id (`domain.terrain.<id>` / `domain.feature.<id>`, ADR-0014): the
+   * Feature's key for a Feature selection, else the Terrain's. The catalog label
+   * is localized at this UI layer, not in the framework-agnostic domain lib.
+   */
+  readonly detailKey: string;
 }
 
 /**
@@ -46,17 +51,17 @@ interface SelectedEntity {
 @Component({
   selector: 'app-inspector',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Coord, Eyebrow, Field, Input, RegionFields],
+  imports: [Button, Coord, Eyebrow, Field, Input, RegionFields, TranslocoPipe],
   template: `
     @let label = store.selectedLabel();
     @let region = store.selectedRegion();
     @let entity = selectedEntity();
     @if (label) {
       <header class="head">
-        <span appEyebrow>Selected label</span>
+        <span appEyebrow>{{ 'editorShell.inspector.selectedLabel' | transloco }}</span>
       </header>
 
-      <div appField label="Text">
+      <div appField [label]="'editorShell.inspector.text' | transloco">
         <input
           appInput
           data-testid="label-text"
@@ -65,7 +70,7 @@ interface SelectedEntity {
         />
       </div>
 
-      <div appField label="Size">
+      <div appField [label]="'editorShell.inspector.size' | transloco">
         <input
           appInput
           type="number"
@@ -76,7 +81,7 @@ interface SelectedEntity {
         />
       </div>
 
-      <div appField label="Rotation (°)">
+      <div appField [label]="'editorShell.inspector.rotation' | transloco">
         <input
           appInput
           type="number"
@@ -87,7 +92,7 @@ interface SelectedEntity {
       </div>
 
       <div class="pos">
-        <div appField label="X">
+        <div appField [label]="'editorShell.inspector.x' | transloco">
           <input
             appInput
             type="number"
@@ -96,7 +101,7 @@ interface SelectedEntity {
             (change)="onX(label, $event)"
           />
         </div>
-        <div appField label="Y">
+        <div appField [label]="'editorShell.inspector.y' | transloco">
           <input
             appInput
             type="number"
@@ -117,12 +122,12 @@ interface SelectedEntity {
           data-testid="label-delete"
           (click)="store.deleteLabel(label.id)"
         >
-          Delete label
+          {{ 'editorShell.inspector.deleteLabel' | transloco }}
         </button>
       </div>
     } @else if (region) {
       <header class="head">
-        <span appEyebrow>Selected region</span>
+        <span appEyebrow>{{ 'editorShell.inspector.selectedRegion' | transloco }}</span>
       </header>
 
       <app-region-fields [region]="region" />
@@ -135,8 +140,12 @@ interface SelectedEntity {
         paints by, so the active one reads as set and can never disagree with the
         stroke.
       -->
-      <div appField label="Membership">
-        <div class="direction" role="group" aria-label="Membership direction">
+      <div appField [label]="'editorShell.inspector.membership' | transloco">
+        <div
+          class="direction"
+          role="group"
+          [attr.aria-label]="'editorShell.inspector.membershipDirection' | transloco"
+        >
           @for (d of directions; track d.direction) {
             <button
               type="button"
@@ -146,7 +155,7 @@ interface SelectedEntity {
               [attr.data-testid]="d.testid"
               (click)="store.armRegionDirection(d.direction)"
             >
-              {{ d.label }}
+              {{ d.labelKey | transloco }}
             </button>
           }
         </div>
@@ -162,23 +171,34 @@ interface SelectedEntity {
           data-testid="region-delete"
           (click)="store.deleteRegion(region.id)"
         >
-          Delete region
+          {{ 'editorShell.inspector.deleteRegion' | transloco }}
         </button>
       </div>
     } @else if (entity) {
       <header class="head">
-        <span appEyebrow>Selected {{ entity.kind }}</span>
+        <span appEyebrow>{{
+          (entity.kind === 'feature'
+            ? 'editorShell.inspector.selectedFeature'
+            : 'editorShell.inspector.selectedHex') | transloco
+        }}</span>
       </header>
 
-      <div appField label="Coordinate">
+      <div appField [label]="'editorShell.inspector.coordinate' | transloco">
         <app-coord data-testid="entity-coord"
           >q {{ entity.q }} · r {{ entity.r }}</app-coord
         >
       </div>
 
-      <div appField [label]="entity.kind === 'feature' ? 'Feature' : 'Terrain'">
+      <div
+        appField
+        [label]="
+          (entity.kind === 'feature'
+            ? 'editorShell.inspector.feature'
+            : 'editorShell.inspector.terrain') | transloco
+        "
+      >
         <span class="detail" data-testid="entity-detail">{{
-          entity.feature ?? entity.terrain
+          entity.detailKey | transloco
         }}</span>
       </div>
 
@@ -192,18 +212,18 @@ interface SelectedEntity {
           data-testid="entity-delete"
           (click)="store.deleteSelected()"
         >
-          Delete {{ entity.kind }}
+          {{
+            (entity.kind === 'feature'
+              ? 'editorShell.inspector.deleteFeature'
+              : 'editorShell.inspector.deleteHex') | transloco
+          }}
         </button>
       </div>
     } @else {
       <header class="head">
-        <span appEyebrow>Inspector</span>
+        <span appEyebrow>{{ 'editorShell.inspector.title' | transloco }}</span>
       </header>
-      <p class="muted">
-        Pick the Select tool and click a Hex, Feature, or Label to inspect it.
-        Place a Label with the Label tool, then select it here to edit its text,
-        size, rotation and position.
-      </p>
+      <p class="muted">{{ 'editorShell.inspector.emptyHint' | transloco }}</p>
     }
   `,
   styles: `
@@ -289,11 +309,14 @@ export class Inspector {
     if (sel?.kind !== 'hex' && sel?.kind !== 'feature') return null;
     const hex = this.store.document().hexes[coordKey(sel.coord)];
     if (!hex) return null;
-    const terrain = terrainLabel(hex.terrain) ?? hex.terrain;
-    const feature = hex.feature
-      ? (featureLabel(hex.feature.ref) ?? hex.feature.ref)
-      : null;
-    return { kind: sel.kind, q: sel.coord.q, r: sel.coord.r, terrain, feature };
+    // Resolve the built-in catalog label at the UI layer, keyed by stable id
+    // (ADR-0014). A Feature selection shows the feature's label, else the hex's
+    // terrain; the ids are schema-constrained to the built-ins, so the key
+    // always resolves.
+    const detailKey = hex.feature
+      ? featureKey(hex.feature.ref)
+      : terrainKey(hex.terrain);
+    return { kind: sel.kind, q: sel.coord.q, r: sel.coord.r, detailKey };
   });
 
   protected onText(id: string, event: Event): void {
