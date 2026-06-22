@@ -118,7 +118,7 @@ export interface MapRenderer {
     doc: HexMap,
     hover: Axial | null,
     labelDrag?: LabelDragOverride | null,
-    selection?: Selection | null,
+    selections?: readonly Selection[],
     hexDrag?: HexDragOverride | null,
   ): void;
   /**
@@ -275,7 +275,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
     doc: HexMap,
     hover: Axial | null,
     labelDrag: LabelDragOverride | null = null,
-    selection: Selection | null = null,
+    selections: readonly Selection[] = [],
     hexDrag: HexDragOverride | null = null,
   ): void {
     const ctx = this.ctx;
@@ -418,12 +418,14 @@ export class Canvas2dMapRenderer implements MapRenderer {
       ctx.restore();
     }
 
-    // The selection highlight rides on top of everything (issue #28): a Hex or
-    // Feature gets a strong outline on its hex; a Label gets a bounds rectangle
-    // around the box `drawLabel` just recorded. Drawn last so it sits above the
-    // grid, markers, and label text it points at. While a Hex drag is live the
-    // highlight follows the previewed content to the destination (issue #30).
-    if (selection) {
+    // The selection highlight rides on top of everything (issue #28): every member
+    // of the Selection set is highlighted (ADR-0017) — a Hex or Feature gets a
+    // strong outline on its hex, a Label a bounds rectangle around the box
+    // `drawLabel` just recorded, a Region a translucent member-fill. Drawn last so
+    // it sits above the grid, markers, and label text it points at. While a Hex
+    // drag is live, a selected hex/feature at the drag origin follows the previewed
+    // content to the destination (issue #30).
+    for (const selection of selections) {
       // Only a hex/feature selection tracks a live Hex drag to its destination; a
       // Label or Region selection is never the dragged content (issues #30, #35).
       const tracking =

@@ -61,12 +61,13 @@ export interface RegionSubtool {
 }
 
 /**
- * The single selected entity, or `null` when nothing is selected. Select is the
- * one selection path (CONTEXT.md → Select, ADR-0010/0011): it references a Label
- * or a Region by id, or a Feature / Hex by the coordinate it sits on. At most one
- * is selected at a time. The store resolves a click's geometric inputs into one
- * of these by walking a per-coordinate stack — `Label → Feature → Hex → each
- * containing Region (document order)` — see {@link EditorStore.select}.
+ * One selected entity (CONTEXT.md → Selection, ADR-0010/0011/0017): a Label or a
+ * Region by id, or a Feature / Hex by the coordinate it sits on. The Selection is
+ * a *set* of these — zero, one, or many — exposed as {@link EditorStore.selections}
+ * (with {@link EditorStore.selection} the "exactly one" view). The store resolves a
+ * click's geometric inputs into candidates by walking a per-coordinate stack —
+ * `Label → Feature → Hex → each containing Region (document order)` — which a plain
+ * click cycles through and the modifiers fold into the set; see {@link EditorStore.select}.
  */
 export type Selection =
   | { readonly kind: 'label'; readonly id: string }
@@ -86,6 +87,48 @@ type SelectionRef =
   | { readonly kind: 'label'; readonly id: string }
   | { readonly kind: 'cell'; readonly coord: Axial }
   | { readonly kind: 'region'; readonly id: string };
+
+/**
+ * How a Select gesture folds into the Selection set (CONTEXT.md → Pick, ADR-0017):
+ *
+ * - `replace` — a plain click: replace the set with the topmost entity, and on a
+ *   repeat at the same coordinate cycle deeper through the stack.
+ * - `toggle-top` — Cmd/Ctrl-click: toggle just the topmost entity in or out.
+ * - `toggle-stack` — Shift-click: toggle the whole stack at the coordinate (add
+ *   the missing members, or remove them all when the pile is already fully in).
+ * - `add-top` / `add-stack` — a modifier-held *drag*: the add-only counterparts of
+ *   the toggles, used while sweeping the pointer across hexes so each one it enters
+ *   accumulates into the set and re-entering a hex never removes it.
+ */
+export type SelectMode =
+  | 'replace'
+  | 'toggle-top'
+  | 'toggle-stack'
+  | 'add-top'
+  | 'add-stack';
+
+/**
+ * Resolve one internal {@link SelectionRef} against the live document into the
+ * public {@link Selection} it currently denotes, or `null` when it has gone stale
+ * (its label/region id is gone, or its cell was erased). A cell reads as a
+ * Feature when its hex carries one, else a bare Hex. This is the single place the
+ * ref→Selection self-healing lives, shared by every selected member (issue #28).
+ */
+function resolveRef(doc: HexMap, ref: SelectionRef): Selection | null {
+  if (ref.kind === 'label') {
+    return doc.labels.some((l) => l.id === ref.id)
+      ? { kind: 'label', id: ref.id }
+      : null;
+  }
+  if (ref.kind === 'region') {
+    return regionById(doc, ref.id) ? { kind: 'region', id: ref.id } : null;
+  }
+  const hex = doc.hexes[coordKey(ref.coord)];
+  if (!hex) return null;
+  return hex.feature
+    ? { kind: 'feature', coord: ref.coord }
+    : { kind: 'hex', coord: ref.coord };
+}
 
 /**
  * The Feature Tool's Subtools in palette/keyboard order: each library feature,
@@ -216,12 +259,15 @@ export class EditorStore {
   });
 
   /**
-   * The selection reference (or `null`). Transient editor state — not part of the
-   * document, so it is neither undone nor persisted (issues #10, #28). This holds
-   * only the reference (a label id, or a cell coordinate); the live {@link kind}
-   * and existence are resolved from the document by {@link selection}.
+   * The Selection as a *set* of references, in selection order (ADR-0017): zero,
+   * one, or many entities picked out by Select's clicks and modifiers. Transient
+   * editor state — not part of the document, so it is neither undone nor persisted
+   * (issues #10, #28). It holds only the references (a label/region id, or a cell
+   * coordinate); the live {@link Selection.kind} and existence of each are resolved
+   * from the document by {@link selections}, so the set self-heals member-by-member
+   * when the document changes under it rather than going stale (issues #28, #35).
    */
-  private readonly _selection = signal<SelectionRef | null>(null);
+  private readonly _selections = signal<readonly SelectionRef[]>([]);
 
   /**
    * The anchor of the per-coordinate selection cycle (CONTEXT.md → Select,
@@ -233,8 +279,8 @@ export class EditorStore {
    * match and resets to the top.
    *
    * Only the anchor is stored — never an index. The descent position is *derived*
-   * each click from where the live {@link _selection} sits in the freshly-resolved
-   * stack (see {@link select}), so it can't go stale: any path that changes the
+   * each click from where the live single {@link _selections selection} sits in the
+   * freshly-resolved stack (see {@link select}), so it can't go stale: any path that changes the
    * selection out from under the cycle (a label drop, a Hex move, an undo, a
    * document edit that adds/removes a candidate) is absorbed rather than leaving a
    * dangling integer that mis-targets the next click (issues #28, #35). Transient
@@ -250,26 +296,27 @@ export class EditorStore {
    * highlight the selection; the canvas hands a click's geometric inputs to
    * {@link select}, which sets the reference under the precedence rule (issue #28).
    */
+  readonly selections = computed<Selection[]>(() => {
+    const doc = this._document();
+    // Resolve every member against the live document, dropping any that have gone
+    // stale (a label/region deleted, a cell erased, an undo) — the set self-heals
+    // member-by-member rather than dangling (issues #28, #35).
+    return this._selections().flatMap((ref) => {
+      const resolved = resolveRef(doc, ref);
+      return resolved ? [resolved] : [];
+    });
+  });
+
+  /**
+   * The single selected entity, or `null` when zero or two-or-more are selected —
+   * the "exactly one" view the single-entity Inspector, {@link selectedLabel},
+   * {@link selectedRegion}, and the single-Hex drag read. The renderer and the
+   * multi-selection Inspector read the whole {@link selections} set instead. Like
+   * the set it resolves against the live document, so it never goes stale.
+   */
   readonly selection = computed<Selection | null>(() => {
-    const ref = this._selection();
-    if (!ref) return null;
-    if (ref.kind === 'label') {
-      return this._document().labels.some((l) => l.id === ref.id)
-        ? { kind: 'label', id: ref.id }
-        : null;
-    }
-    if (ref.kind === 'region') {
-      // A Region selection self-heals: once its region is gone (deleted, undone),
-      // the selection resolves to nothing rather than dangling (issue #35).
-      return regionById(this._document(), ref.id)
-        ? { kind: 'region', id: ref.id }
-        : null;
-    }
-    const hex = this._document().hexes[coordKey(ref.coord)];
-    if (!hex) return null;
-    return hex.feature
-      ? { kind: 'feature', coord: ref.coord }
-      : { kind: 'hex', coord: ref.coord };
+    const all = this.selections();
+    return all.length === 1 ? all[0] : null;
   });
 
   /**
@@ -567,9 +614,14 @@ export class EditorStore {
     // the Label-drag path (and the Escape-cancel path, which leaves it put). Copy
     // the coordinate rather than aliasing the caller's `to`, so a coord the caller
     // later mutates (e.g. a reused hover object) can't retarget the selection.
-    const sel = this._selection();
-    if (sel?.kind === 'cell' && coordKey(sel.coord) === fromKey) {
-      this._selection.set({ kind: 'cell', coord: { q: to.q, r: to.r } });
+    const refs = this._selections();
+    const at = refs.findIndex(
+      (ref) => ref.kind === 'cell' && coordKey(ref.coord) === fromKey,
+    );
+    if (at !== -1) {
+      const next = refs.slice();
+      next[at] = { kind: 'cell', coord: { q: to.q, r: to.r } };
+      this._selections.set(next);
     }
     // Stamp the post-move selection onto the edit so undo restores it to the
     // origin and redo follows it back to the destination, in lockstep with the
@@ -659,8 +711,7 @@ export class EditorStore {
       const at = draft.regions.findIndex((r) => r.id === id);
       if (at !== -1) draft.regions.splice(at, 1);
     });
-    const sel = this._selection();
-    if (sel?.kind === 'region' && sel.id === id) this.deselect();
+    this.dropSelections((ref) => ref.kind === 'region' && ref.id === id);
     // The Region Subtool now points at a region that no longer exists. Forget it,
     // and if the Region tool is armed, fall back to the non-destructive Select so
     // the canvas stays inert rather than silently no-opping every stroke. This
@@ -718,40 +769,140 @@ export class EditorStore {
    * Select, ADR-0010). Returns the resolved {@link Selection} so the caller can
    * branch on it (e.g. start a label drag) without re-scanning the document.
    */
-  select(coord: Axial, labelHit: string | null): Selection | null {
+  select(
+    coord: Axial,
+    labelHit: string | null,
+    mode: SelectMode = 'replace',
+  ): Selection | null {
     const stack = this.candidatesAt(coord, labelHit);
-    // Empty stack = a click on empty space (Void in no Region, no label hit) →
-    // deselect through the one canonical clear so it shares `deselect`'s teardown
-    // (which also forgets the cycle, so the next click starts fresh) (issue #35).
+    if (mode === 'replace') return this.selectReplace(coord, labelHit, stack);
+
+    // Modifier gestures fold into the set rather than cycling, so the per-coordinate
+    // cycle is forgotten — a later plain click at the same coordinate starts fresh
+    // at the top of the stack rather than resuming a stale descent (issue #35).
+    this.cycleAnchor = null;
+    // A modifier click/drag on empty space (Void in no Region, no label hit) adds
+    // nothing and leaves the set — and the panel — exactly as they were; only a
+    // *plain* click on empty space clears (CONTEXT.md → Pick).
+    if (stack.length === 0) return this.selection();
+    switch (mode) {
+      case 'toggle-top':
+        this.toggleRefs([stack[0]]);
+        break;
+      case 'toggle-stack':
+        this.toggleStack(stack);
+        break;
+      case 'add-top':
+        this.addRefs([stack[0]]);
+        break;
+      case 'add-stack':
+        this.addRefs(stack);
+        break;
+    }
+    this.openOrCloseAfterModifierSelect();
+    return this.selection();
+  }
+
+  /**
+   * The plain-click path: replace the set with the topmost entity under the click,
+   * cycling deeper on a repeat at the same anchor. Empty space clears the whole
+   * set through the one canonical {@link deselect}. The cycle descends only while
+   * clicks land on the same coordinate (and label hit); a different anchor resets
+   * to the top. The descent position is *derived* from where the live single
+   * selection sits in the freshly-resolved stack — never a stored index — so a
+   * label drop, a Hex move, an undo, or a candidate added/removed cannot leave it
+   * stale (issue #35). A selection that is no longer a candidate (it moved, or
+   * vanished, or the set holds more than one) starts the cycle fresh at the top.
+   */
+  private selectReplace(
+    coord: Axial,
+    labelHit: string | null,
+    stack: SelectionRef[],
+  ): Selection | null {
     if (stack.length === 0) {
       this.deselect();
       return null;
     }
-    // The cycle descends only while clicks land on the same coordinate (and label
-    // hit); a different anchor resets to the top. When the anchor repeats, the
-    // *next* candidate is the one after wherever the live selection sits in the
-    // freshly-resolved stack — so the descent position is derived from current
-    // state, not a stored index that other selection changes (a label drop, a Hex
-    // move, an undo, a candidate added/removed) could leave stale (issue #35).
-    // A selection that is no longer a candidate here (it moved, or vanished)
-    // starts the cycle fresh at the top; wrapping past the last returns to the
-    // first.
     const anchor = `${coordKey(coord)}|${labelHit ?? ''}`;
     let index = 0;
     if (anchor === this.cycleAnchor) {
-      const current = this._selection();
+      // The cycle only ever runs on a single-entity selection, so a set of two or
+      // more (built by modifiers) restarts the descent at the top.
+      const current = this.singleRef();
       const at = current
         ? stack.findIndex((ref) => sameSelectionRef(ref, current))
         : -1;
       if (at !== -1) index = (at + 1) % stack.length;
     }
     this.cycleAnchor = anchor;
-    this._selection.set(stack[index]);
+    this._selections.set([stack[index]]);
     // A canvas selection flips the shared column back to the Inspector so the
     // picked entity opens for editing (the _rightPanel contract, issue #39) — but
     // only on a real selection, never the empty-stack/deselect branch above.
     this._rightPanel.set('inspector');
     return this.selection();
+  }
+
+  /** The single selection ref when exactly one is selected, else `null` — the cycle's anchor of comparison. */
+  private singleRef(): SelectionRef | null {
+    const refs = this._selections();
+    return refs.length === 1 ? refs[0] : null;
+  }
+
+  /**
+   * Add each of `refs` to the set if absent, never removing — the accumulating
+   * counterpart to {@link toggleRefs} that a modifier-held select-sweep uses, so
+   * re-entering an already-selected hex mid-drag leaves it put rather than flicking
+   * it off (ADR-0017).
+   */
+  private addRefs(refs: SelectionRef[]): void {
+    const current = this._selections();
+    const missing = refs.filter(
+      (ref) => !current.some((s) => sameSelectionRef(s, ref)),
+    );
+    if (missing.length) this._selections.set([...current, ...missing]);
+  }
+
+  /** Toggle each of `refs` in or out of the set: drop it if present, append it if absent. */
+  private toggleRefs(refs: SelectionRef[]): void {
+    const next = this._selections().slice();
+    for (const ref of refs) {
+      const at = next.findIndex((s) => sameSelectionRef(s, ref));
+      if (at !== -1) next.splice(at, 1);
+      else next.push(ref);
+    }
+    this._selections.set(next);
+  }
+
+  /**
+   * Toggle a whole stack at once (Shift-click): remove every member when the pile
+   * is already fully selected, otherwise add just the missing ones. So Shift-click
+   * grows a heterogeneous pile into the set, and a second Shift-click on the same
+   * fully-selected pile clears it back out (ADR-0017).
+   */
+  private toggleStack(stack: SelectionRef[]): void {
+    const current = this._selections();
+    const has = (ref: SelectionRef) =>
+      current.some((s) => sameSelectionRef(s, ref));
+    if (stack.every(has)) {
+      this._selections.set(
+        current.filter((s) => !stack.some((ref) => sameSelectionRef(ref, s))),
+      );
+    } else {
+      this._selections.set([...current, ...stack.filter((ref) => !has(ref))]);
+    }
+  }
+
+  /**
+   * After a modifier select (toggle or add), open the Inspector when the set still
+   * holds something, or tear down to the closed/cycle-forgotten state when a toggle
+   * emptied it — the same routing a plain selection and {@link deselect} use, so a
+   * toggle that removes the last member behaves exactly like clearing it. (Add-only
+   * sweeps never empty the set, so they always open it.)
+   */
+  private openOrCloseAfterModifierSelect(): void {
+    if (this._selections().length > 0) this._rightPanel.set('inspector');
+    else this.deselect();
   }
 
   /**
@@ -781,13 +932,14 @@ export class EditorStore {
    * the shared right column back to the Inspector so the selection opens for editing
    * (issue #39). This is the Regions panel's selection path and the *only* way to
    * reach an empty Region (one with no member hex, so no coordinate to click): it
-   * routes through the same `_selection` the canvas uses, so a list pick highlights
-   * on the canvas and opens in the Inspector exactly like a canvas pick (ADR-0011).
+   * routes through the same `_selections` set the canvas uses, replacing it with
+   * just this Region, so a list pick highlights on the canvas and opens in the
+   * Inspector exactly like a plain canvas pick (ADR-0011).
    * Peer to {@link selectLabel}. Selecting is transient view state, not an edit, so
    * it records no undo step.
    */
   selectRegion(id: string): void {
-    this._selection.set({ kind: 'region', id });
+    this._selections.set([{ kind: 'region', id }]);
     this._rightPanel.set('inspector');
     // A membership brush armed on a *different* Region would otherwise stay armed,
     // so the next canvas stroke would silently paint into that stale Region rather
@@ -804,7 +956,7 @@ export class EditorStore {
   selectLabel(id: string | null): void {
     if (id === null) this.deselect();
     else {
-      this._selection.set({ kind: 'label', id });
+      this._selections.set([{ kind: 'label', id }]);
       // Selecting flips the shared column back to the Inspector to open the label
       // for editing (the _rightPanel contract, issue #39).
       this._rightPanel.set('inspector');
@@ -819,7 +971,7 @@ export class EditorStore {
    * a Void coordinate.
    */
   deselect(): void {
-    this._selection.set(null);
+    this._selections.set([]);
     // Forget the cycle so a click that re-selects the same coordinate later starts
     // from the top of the stack rather than resuming a stale descent (issue #35).
     this.cycleAnchor = null;
@@ -828,6 +980,21 @@ export class EditorStore {
     // it, keeping the closed-by-default contract (ADR-0013). A Regions list opened
     // via the rail is not selection-driven, so it is left showing.
     if (this._rightPanel() === 'inspector') this._rightPanel.set(null);
+  }
+
+  /**
+   * Drop every selection member matching `match` from the set, leaving the rest.
+   * When that empties the set, the same panel/cycle teardown as {@link deselect}
+   * runs so the Inspector closes and the cycle is forgotten; with members still
+   * selected the panel stays open on the smaller set. The single-member delete
+   * paths ({@link deleteLabel}, {@link deleteRegion}) route their selection
+   * cleanup through here so removing one entity never strands the whole set.
+   */
+  private dropSelections(match: (ref: SelectionRef) => boolean): void {
+    const remaining = this._selections().filter((ref) => !match(ref));
+    if (remaining.length === this._selections().length) return;
+    if (remaining.length === 0) this.deselect();
+    else this._selections.set(remaining);
   }
 
   /**
@@ -886,42 +1053,63 @@ export class EditorStore {
       const at = draft.labels.findIndex((l) => l.id === id);
       if (at !== -1) draft.labels.splice(at, 1);
     });
-    const sel = this._selection();
-    if (sel?.kind === 'label' && sel.id === id) this.deselect();
+    this.dropSelections((ref) => ref.kind === 'label' && ref.id === id);
     // Record the cleared selection on the edit (only if one was actually made) so
     // undo restores it with the label and redo clears it again.
     if (committed) this.trackSelectionOnLastEdit();
   }
 
   /**
-   * Delete the current selection, dispatching on what is selected (issue #29):
-   * a Label is removed; a Feature has only its feature cleared (its terrain
-   * stays); a Hex has its whole record erased (back to Void), as if the Erase
-   * Tool were applied there. Nothing selected is a no-op. Like every edit it
-   * goes through `commit`, so the deletion is undoable. The selection is cleared
-   * afterwards so the inspector never shows a stale selection — the single
-   * delete gesture behind `Delete`/`Backspace` and the inspector's Delete action.
+   * Delete the whole Selection set, each member per its kind (issue #29, ADR-0017):
+   * a Label is removed, a Region destroyed (with its membership), a Feature has
+   * only its feature cleared (its terrain stays), a Hex has its whole record erased
+   * (back to Void). An empty set is a no-op. The entire set is removed in a single
+   * {@link commit}, so however many entities are selected the deletion is *one*
+   * undoable step — the single delete gesture behind `Delete`/`Backspace` and the
+   * Inspector's Delete (single) / Delete all (multi) action. The set is resolved
+   * against the live document first, so stale members delete nothing.
    */
   deleteSelected(): void {
-    const sel = this.selection();
-    if (!sel) return;
-    // Label and Region have self-cleaning deletes — they clear the selection and
-    // stamp the edit themselves (the same paths the Inspector's Delete buttons
-    // use), so routing through them finishes the gesture. A selected Region is
-    // destroyed through that single-step `deleteRegion` (issue #36) — membership
-    // trimming never destroys a Region, so this and `deleteRegion` are the only
-    // two ways one ceases to be.
-    if (sel.kind === 'label') return this.deleteLabel(sel.id);
-    if (sel.kind === 'region') return this.deleteRegion(sel.id);
-    // A Hex/Feature erases through the general-purpose tool methods, which leave
-    // the selection alone (a tool stroke must not deselect). The erase recorded a
-    // step (the selection resolved an entity that existed), so clear the selection
-    // and stamp it on that edit, so undo restores both the entity and its
-    // selection together.
-    if (sel.kind === 'feature') this.clearFeatureAt(sel.coord);
-    else this.eraseAt(sel.coord);
+    const sels = this.selections();
+    if (sels.length === 0) return;
+    const committed = this.commit((draft) => {
+      for (const sel of sels) {
+        switch (sel.kind) {
+          case 'label': {
+            const at = draft.labels.findIndex((l) => l.id === sel.id);
+            if (at !== -1) draft.labels.splice(at, 1);
+            break;
+          }
+          case 'region': {
+            const at = draft.regions.findIndex((r) => r.id === sel.id);
+            if (at !== -1) draft.regions.splice(at, 1);
+            break;
+          }
+          case 'feature':
+            // Clear only the feature, leaving the terrain (as the Feature Clear Subtool).
+            delete draft.hexes[coordKey(sel.coord)]?.feature;
+            break;
+          case 'hex':
+            // Erase the whole record, back to Void (as the Erase Tool).
+            delete draft.hexes[coordKey(sel.coord)];
+            break;
+        }
+      }
+    });
+    // A membership brush armed on any now-destroyed Region would dangle, so disarm
+    // it and fall back to the inert Select — session-only tool state that, like in
+    // `deleteRegion`, is deliberately kept out of the undoable edit (issue #27).
+    for (const sel of sels) {
+      if (sel.kind === 'region' && this._region()?.id === sel.id) {
+        this._region.set(null);
+        if (this._tool() === 'region') this._tool.set('select');
+      }
+    }
+    // Clear the set so the Inspector never shows a stale selection, and stamp the
+    // cleared set onto the edit so undo restores both the entities and the
+    // selection together (only if a step was actually recorded).
     this.deselect();
-    this.trackSelectionOnLastEdit();
+    if (committed) this.trackSelectionOnLastEdit();
   }
 
   /**
@@ -944,7 +1132,7 @@ export class EditorStore {
     // Move the selection back in lockstep with the document, so undoing a move
     // re-selects the hex at its origin rather than leaving a stale reference at
     // the (now-reverted) destination.
-    this._selection.set(edit.selectionBefore);
+    this._selections.set(edit.selectionBefore);
     this.redoStack.push(edit);
     this.syncHistory();
   }
@@ -954,7 +1142,7 @@ export class EditorStore {
     const edit = this.redoStack.pop();
     if (!edit) return;
     this._document.set(applyPatches(this._document(), edit.redo));
-    this._selection.set(edit.selectionAfter);
+    this._selections.set(edit.selectionAfter);
     this.undoStack.push(edit);
     this.syncHistory();
   }
@@ -966,8 +1154,8 @@ export class EditorStore {
    * to know an edit exists to {@link trackSelectionOnLastEdit stamp} it onto.
    */
   private commit(recipe: (draft: HexMap) => void): boolean {
-    // Snapshot the selection as it stood before the edit; undo restores it.
-    const selectionBefore = this._selection();
+    // Snapshot the selection set as it stood before the edit; undo restores it.
+    const selectionBefore = this._selections();
     const [next, redo, undo] = produceWithPatches(this._document(), recipe);
     // No patches means the recipe changed nothing (e.g. erasing Void). Recording
     // it would leave empty undo steps and needlessly discard the redo branch.
@@ -990,7 +1178,7 @@ export class EditorStore {
    */
   private trackSelectionOnLastEdit(): void {
     const edit = this.undoStack[this.undoStack.length - 1];
-    if (edit) edit.selectionAfter = this._selection();
+    if (edit) edit.selectionAfter = this._selections();
   }
 
   /** Mirror the stack depths into the reactive availability signals. */
@@ -1037,8 +1225,8 @@ function deepClone<T>(value: T): T {
 interface Edit {
   readonly redo: Patch[];
   readonly undo: Patch[];
-  /** The selection just before this edit — restored on undo so it tracks the document. */
-  readonly selectionBefore: SelectionRef | null;
-  /** The selection just after this edit (and any post-commit re-point) — restored on redo. */
-  selectionAfter: SelectionRef | null;
+  /** The selection set just before this edit — restored on undo so it tracks the document. */
+  readonly selectionBefore: readonly SelectionRef[];
+  /** The selection set just after this edit (and any post-commit re-point) — restored on redo. */
+  selectionAfter: readonly SelectionRef[];
 }

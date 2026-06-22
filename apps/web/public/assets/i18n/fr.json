@@ -72,7 +72,14 @@
       "deleteRegion": "Supprimer la région",
       "deleteHex": "Supprimer le hex",
       "deleteFeature": "Supprimer la caractéristique",
-      "emptyHint": "Choisissez l’outil Sélection et cliquez sur un Hex, une Caractéristique ou une Étiquette pour l’inspecter. Placez une Étiquette avec l’outil Étiquette, puis sélectionnez-la ici pour modifier son texte, sa taille, sa rotation et sa position."
+      "emptyHint": "Choisissez l’outil Sélection et cliquez sur un Hex, une Caractéristique ou une Étiquette pour l’inspecter. Placez une Étiquette avec l’outil Étiquette, puis sélectionnez-la ici pour modifier son texte, sa taille, sa rotation et sa position.",
+      "multiTitle": "Sélection",
+      "selectedCount": "sélectionnés",
+      "kindHexes": "hexagones",
+      "kindFeatures": "caractéristiques",
+      "kindRegions": "régions",
+      "kindLabels": "étiquettes",
+      "deleteAll": "Tout supprimer"
     },
     "regionsPanel": {
       "title": "Régions",

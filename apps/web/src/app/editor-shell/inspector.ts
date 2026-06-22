@@ -8,8 +8,21 @@ import { Field } from '../ui/field';
 import { Input } from '../ui/input';
 import { featureKey, terrainKey } from './catalog-keys';
 import { inputValue } from './dom';
-import { EditorStore } from './editor-store';
+import { EditorStore, Selection } from './editor-store';
 import { RegionFields } from './region-fields';
+
+/**
+ * The Selection kinds in the order the multi-selection breakdown lists them, each
+ * paired with the plural translation key its row reads. A single table so the
+ * breakdown can't list a kind the set never holds, nor drift from the labels
+ * (ADR-0017).
+ */
+const SELECTION_KINDS: readonly { kind: Selection['kind']; labelKey: string }[] = [
+  { kind: 'hex', labelKey: 'editorShell.inspector.kindHexes' },
+  { kind: 'feature', labelKey: 'editorShell.inspector.kindFeatures' },
+  { kind: 'region', labelKey: 'editorShell.inspector.kindRegions' },
+  { kind: 'label', labelKey: 'editorShell.inspector.kindLabels' },
+];
 
 /**
  * The membership-paint directions, as the Inspector's Add/Remove toggle pair,
@@ -58,6 +71,7 @@ interface SelectedEntity {
     @let label = store.selectedLabel();
     @let region = store.selectedRegion();
     @let entity = selectedEntity();
+    @let multi = selectionSummary();
     @if (label) {
       <header class="head">
         <span appEyebrow>{{ 'editorShell.inspector.selectedLabel' | transloco }}</span>
@@ -230,6 +244,40 @@ interface SelectedEntity {
           }}
         </button>
       </div>
+    } @else if (multi) {
+      <!--
+        Two or more selected: no single-entity editor fits, so the Inspector shows
+        the set's size and a per-kind breakdown plus a Delete all action that
+        removes the whole set in one undo step (ADR-0017). Bulk field editing
+        across the set is deliberately out of scope.
+      -->
+      <header class="head">
+        <span appEyebrow>{{ 'editorShell.inspector.multiTitle' | transloco }}</span>
+      </header>
+
+      <p class="count" data-testid="selection-count">
+        {{ multi.count }} {{ 'editorShell.inspector.selectedCount' | transloco }}
+      </p>
+
+      <ul class="breakdown" data-testid="selection-breakdown">
+        @for (group of multi.groups; track group.labelKey) {
+          <li>{{ group.count }} {{ group.labelKey | transloco }}</li>
+        }
+      </ul>
+
+      <div class="actions">
+        <button
+          type="button"
+          appButton
+          variant="ghost"
+          size="sm"
+          danger
+          data-testid="selection-delete-all"
+          (click)="store.deleteSelected()"
+        >
+          {{ 'editorShell.inspector.deleteAll' | transloco }}
+        </button>
+      </div>
     } @else {
       <header class="head">
         <span appEyebrow>{{ 'editorShell.inspector.title' | transloco }}</span>
@@ -286,6 +334,20 @@ interface SelectedEntity {
       line-height: var(--leading-normal);
       color: var(--ink-muted);
     }
+    .count {
+      font-size: var(--text-sm);
+      font-weight: var(--weight-semibold);
+      color: var(--ink);
+    }
+    .breakdown {
+      margin: 0;
+      padding-left: var(--space-4);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-1);
+      font-size: var(--text-sm);
+      color: var(--ink-muted);
+    }
     .detail {
       font-size: var(--text-sm);
       color: var(--ink);
@@ -328,6 +390,24 @@ export class Inspector {
       ? featureKey(hex.feature.ref)
       : terrainKey(hex.terrain);
     return { kind: sel.kind, q: sel.coord.q, r: sel.coord.r, detailKey, name: hex.name ?? '' };
+  });
+
+  /**
+   * The multi-selection summary — the set's size and a per-kind breakdown — or
+   * `null` when fewer than two entities are selected (a single selection has its
+   * own editor; an empty selection the hint). Resolved from the live
+   * {@link EditorStore.selections} set, so it self-heals as members drop out
+   * (ADR-0017). Kinds the set doesn't hold are filtered away, so the breakdown
+   * lists only what is actually selected.
+   */
+  protected readonly selectionSummary = computed(() => {
+    const sels = this.store.selections();
+    if (sels.length < 2) return null;
+    const groups = SELECTION_KINDS.map(({ kind, labelKey }) => ({
+      labelKey,
+      count: sels.filter((s) => s.kind === kind).length,
+    })).filter((g) => g.count > 0);
+    return { count: sels.length, groups };
   });
 
   protected onName(entity: SelectedEntity, event: Event): void {

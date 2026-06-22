@@ -16,7 +16,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { Axial, coordKey, Layout, pixelToHex, Point } from '@hexly/domain';
 import { ThemeService } from '../core/theme.service';
 import { terrainKey } from './catalog-keys';
-import { EditorStore, ToolId } from './editor-store';
+import { EditorStore, SelectMode, ToolId } from './editor-store';
 import { Button } from '../ui/button';
 import { Coord } from '../ui/coord';
 import { Eyebrow } from '../ui/eyebrow';
@@ -273,6 +273,16 @@ export class MapCanvas {
     null;
 
   /**
+   * An in-progress modifier select-sweep (ADR-0017): holding Cmd/Ctrl (`add-top`)
+   * or Shift (`add-stack`) and dragging adds each hex the pointer enters to the
+   * Selection set. `last` is the coordKey most recently folded in, so a hex is
+   * added once per sweep and re-entering it doesn't churn. `null` when no sweep is
+   * active. Selection is transient view state, so a sweep records no undo step;
+   * unlike a label/hex move it commits live as it goes rather than on release.
+   */
+  private selectSweep: { mode: SelectMode; last: string } | null = null;
+
+  /**
    * The `pointerId` that owns the canvas for the duration of one gesture, or
    * `null` between gestures. A gesture (paint, pan, or a Select press/drag)
    * claims it on pointer-down and releases it on up/cancel; events from any
@@ -350,9 +360,9 @@ export class MapCanvas {
     const doc = this.store.document();
     const hover = this.hover();
     const labelDrag = this.labelDragOverride();
-    const selection = this.store.selection();
+    const selections = this.store.selections();
     const hexDrag = this.hexDrag();
-    this.renderer?.render(camera, doc, hover, labelDrag, selection, hexDrag);
+    this.renderer?.render(camera, doc, hover, labelDrag, selections, hexDrag);
   }
 
   protected onPointerDown(event: PointerEvent): void {
@@ -396,13 +406,31 @@ export class MapCanvas {
     // pointer and the label hit — and hands them over (issue #28).
     if (this.store.tool() === 'select') {
       const hitId = this.renderer?.labelAt(this.localPoint(event)) ?? null;
-      const selection = this.store.select(hex, hitId);
-      // A press over a selected entity arms a *potential* drag (issue #30). A
-      // Label drags via the existing `moveLabel` path — the grab offset keeps it
-      // from jumping to the cursor. A Hex/Feature arms a whole-Hex move: the press
-      // already selected it, and crossing the threshold in `onPointerMove` turns
-      // it into a `moveHex`. A release before the threshold is a plain click —
-      // selection only, no move (issue #30, ADR-0010).
+      // Modifiers fold the click into the Selection set (ADR-0017): Shift toggles
+      // the whole stack at the coordinate, Cmd/Ctrl the topmost entity; a plain
+      // click replaces (and cycles). Cmd/Ctrl wins if both are somehow held.
+      const mode: SelectMode = event.shiftKey
+        ? 'toggle-stack'
+        : event.metaKey || event.ctrlKey
+          ? 'toggle-top'
+          : 'replace';
+      const selection = this.store.select(hex, hitId, mode);
+      // A modifier-held press becomes a select-sweep instead of a move: the click
+      // already folded this hex in, and dragging now *adds* each further hex via
+      // the add-only counterpart (so the sweep never toggles a hex back off).
+      // Moving the selected set itself is out of scope for now (ADR-0017).
+      if (mode !== 'replace') {
+        this.selectSweep = {
+          mode: mode === 'toggle-stack' ? 'add-stack' : 'add-top',
+          last: coordKey(hex),
+        };
+        return;
+      }
+      // A plain click arms a *potential* drag (issue #30). A Label drags via the
+      // existing `moveLabel` path — the grab offset keeps it from jumping to the
+      // cursor. A Hex/Feature arms a whole-Hex move: the press already selected it,
+      // and crossing the threshold in `onPointerMove` turns it into a `moveHex`. A
+      // release before the threshold is a plain click — selection only, no move.
       if (selection?.kind === 'label') {
         const label = this.store.selectedLabel();
         if (label) {
@@ -439,6 +467,20 @@ export class MapCanvas {
     if (this.foreignPointer(event)) return;
     const hex = pixelToHex(this.layout, this.toWorld(event));
     this.hover.set(hex);
+
+    // A modifier select-sweep folds each newly-entered hex into the set as the
+    // pointer passes over it (ADR-0017). Add it once per hex — re-entering the
+    // last one does nothing — via the same add-only path the store exposes.
+    const sweep = this.selectSweep;
+    if (sweep) {
+      const key = coordKey(hex);
+      if (key !== sweep.last) {
+        sweep.last = key;
+        const hitId = this.renderer?.labelAt(this.localPoint(event)) ?? null;
+        this.store.select(hex, hitId, sweep.mode);
+      }
+      return;
+    }
 
     // A live label drag wins over painting/panning: track the cursor, applying
     // the grab offset; the render effect previews it there until release.
@@ -547,6 +589,7 @@ export class MapCanvas {
   /** Drop all per-gesture interaction state and release the owning pointer. */
   private resetGesture(): void {
     this.hexDragPress = null;
+    this.selectSweep = null;
     this.painting = false;
     this.panning = false;
     this.dragging.set(false);
@@ -585,10 +628,14 @@ export class MapCanvas {
     const pending =
       this.labelDrag() !== null ||
       this.hexDrag() !== null ||
-      this.hexDragPress !== null;
+      this.hexDragPress !== null ||
+      this.selectSweep !== null;
     this.labelDrag.set(null);
     this.hexDrag.set(null);
     this.hexDragPress = null;
+    // A select-sweep accumulates the selection live, so abandoning it just stops
+    // adding more — the entities already swept in stay selected.
+    this.selectSweep = null;
     return pending;
   }
 
