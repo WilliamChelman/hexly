@@ -33,11 +33,6 @@ body {
     color var(--dur-slow) var(--ease-out);
 }
 
-app-root {
-  display: block;
-  min-height: 100vh;
-}
-
 h1,
 h2,
 h3,

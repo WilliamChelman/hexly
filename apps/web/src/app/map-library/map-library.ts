@@ -1,7 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  OnDestroy,
+  DestroyRef,
   OnInit,
   computed,
   inject,
@@ -32,7 +32,7 @@ const NEW_MAP_TITLE = 'Untitled map';
   imports: [Button, Panel, PlusIcon],
   template: `
     <div class="page">
-      <h1 class="sr-only">Your maps</h1>
+      <h1 class="sr-only">{{ pageTitle }}</h1>
       <div class="head">
         <button
           type="button"
@@ -102,9 +102,7 @@ const NEW_MAP_TITLE = 'Untitled map';
     }
     .head {
       display: flex;
-      align-items: flex-end;
       justify-content: flex-end;
-      gap: var(--space-4);
       margin-bottom: var(--space-5);
     }
     .grid {
@@ -151,10 +149,16 @@ const NEW_MAP_TITLE = 'Untitled map';
     }
   `,
 })
-export class MapLibrary implements OnInit, OnDestroy {
+export class MapLibrary implements OnInit {
   private readonly maps$ = inject(MapsStore);
   private readonly router = inject(Router);
   private readonly header = inject(HeaderService);
+  private readonly destroyRef = inject(DestroyRef);
+
+  /** The page heading, shown both as the document's <h1> (sr-only) and the
+   * header chrome title — declared once so the two can't drift. */
+  protected readonly pageTitle = 'Your maps';
+  private readonly pageEyebrow = 'Library';
 
   private readonly _maps = signal<MapSummary[]>([]);
   /** The user's maps, newest first. */
@@ -168,10 +172,18 @@ export class MapLibrary implements OnInit, OnDestroy {
   /** Whether a create is in flight — disables the New map button. */
   protected readonly creating = signal(false);
 
-  ngOnInit(): void {
-    // Contribute this page's heading to the single app header (ADR-0015).
-    this.header.set({ eyebrow: 'Library', title: 'Your maps' });
+  constructor() {
+    // Contribute this page's heading to the single app header (ADR-0015); it is
+    // withdrawn automatically when this page is destroyed. Set in the
+    // constructor (not ngOnInit) so a same-route brand-link round-trip
+    // (/maps → / → /maps) that reuses the component keeps the heading intact.
+    this.header.set(
+      { eyebrow: this.pageEyebrow, title: this.pageTitle },
+      this.destroyRef,
+    );
+  }
 
+  ngOnInit(): void {
     // Mark the load resolved on either branch: a failed GET /maps must still
     // surface something (an error panel) rather than leaving the page blank
     // forever because `loaded` never flipped.
@@ -185,14 +197,6 @@ export class MapLibrary implements OnInit, OnDestroy {
         this.loadError.set(true);
       },
     });
-  }
-
-  ngOnDestroy(): void {
-    // Withdraw our heading as we leave, so a page that contributes none (the
-    // editor projects its own through the named outlet) doesn't inherit it.
-    // Reused across same-route navigation, the component isn't destroyed, so a
-    // brand-link round-trip back to /maps keeps the heading intact.
-    this.header.clear();
   }
 
   /** Create an empty map and open it straight in the editor. */

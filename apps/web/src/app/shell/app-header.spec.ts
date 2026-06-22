@@ -3,12 +3,19 @@ import {
   HttpTestingController,
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
+import { DestroyRef } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { AuthStore } from '../auth/auth.store';
 import { ThemeService } from '../core/theme.service';
 import { AppHeader } from './app-header';
 import { HeaderService } from './header.service';
+
+/** A DestroyRef that never fires — these tests assert what a set() renders. */
+const noopDestroyRef = {
+  destroyed: false,
+  onDestroy: () => () => undefined,
+} as DestroyRef;
 
 describe('AppHeader', () => {
   let http: HttpTestingController;
@@ -129,10 +136,13 @@ describe('AppHeader', () => {
   });
 
   it('renders the declarative eyebrow and title a page sets', () => {
-    TestBed.inject(HeaderService).set({
-      eyebrow: 'Library',
-      title: 'Your maps',
-    });
+    TestBed.inject(HeaderService).set(
+      {
+        eyebrow: 'Library',
+        title: 'Your maps',
+      },
+      noopDestroyRef,
+    );
     const fixture = TestBed.createComponent(AppHeader);
     fixture.detectChanges();
 
@@ -146,7 +156,7 @@ describe('AppHeader', () => {
   it('renders the declarative title as chrome, not a document heading', () => {
     // The visible title in the bar is contextual chrome; the page's real <h1>
     // lives in <main> (sr-only). The banner must not own the document heading.
-    TestBed.inject(HeaderService).set({ title: 'Your maps' });
+    TestBed.inject(HeaderService).set({ title: 'Your maps' }, noopDestroyRef);
     const fixture = TestBed.createComponent(AppHeader);
     fixture.detectChanges();
 

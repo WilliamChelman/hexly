@@ -49,7 +49,7 @@ describe('Login', () => {
     const fixture = TestBed.createComponent(Login);
     fixture.detectChanges();
 
-    expect(TestBed.inject(HeaderService).title()).toBe('Sign in');
+    expect(TestBed.inject(HeaderService).content()?.title).toBe('Sign in');
   });
 
   it('owns its page heading in the main content', () => {
@@ -66,7 +66,7 @@ describe('Login', () => {
 
     fixture.destroy();
 
-    expect(TestBed.inject(HeaderService).title()).toBeNull();
+    expect(TestBed.inject(HeaderService).content()).toBeNull();
   });
 
   it('submits the typed credentials and enters the app on success', () => {

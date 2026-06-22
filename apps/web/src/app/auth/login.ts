@@ -1,7 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  OnDestroy,
+  DestroyRef,
   inject,
   signal,
 } from '@angular/core';
@@ -28,7 +28,7 @@ import { Panel } from '../ui/panel';
   template: `
     <div class="page">
       <section class="card" appPanel raised>
-        <h1 class="sr-only">Sign in</h1>
+        <h1 class="sr-only">{{ pageTitle }}</h1>
         <form (submit)="submit($event)">
           <label appField label="Email">
             <input
@@ -92,11 +92,16 @@ import { Panel } from '../ui/panel';
     }
   `,
 })
-export class Login implements OnDestroy {
+export class Login {
   private readonly auth = inject(AuthStore);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly header = inject(HeaderService);
+  private readonly destroyRef = inject(DestroyRef);
+
+  /** The page heading, shown both as the document's <h1> (sr-only) and the
+   * header chrome title — declared once so the two can't drift. */
+  protected readonly pageTitle = 'Sign in';
 
   protected readonly email = signal('');
   protected readonly password = signal('');
@@ -104,13 +109,9 @@ export class Login implements OnDestroy {
   protected readonly error = signal<string | null>(null);
 
   constructor() {
-    // Contribute the sign-in heading to the single app header (ADR-0015).
-    this.header.set({ title: 'Sign in' });
-  }
-
-  ngOnDestroy(): void {
-    // Withdraw our heading as we leave so the next page starts from a clean slate.
-    this.header.clear();
+    // Contribute the sign-in heading to the single app header (ADR-0015); it is
+    // withdrawn automatically when this page is destroyed.
+    this.header.set({ title: this.pageTitle }, this.destroyRef);
   }
 
   /** Read the current value out of an input event. */

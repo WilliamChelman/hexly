@@ -26,6 +26,10 @@ import { AppHeader } from './shell/app-header';
     .outlet {
       flex: 1;
       min-height: 0;
+      /* The outlet is the scroll container, so the always-present header stays
+         fixed above it while long pages (the library, the styleguide) scroll.
+         The editor fills the outlet exactly and manages its own overflow. */
+      overflow: auto;
     }
   `,
 })

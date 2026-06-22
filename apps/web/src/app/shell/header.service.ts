@@ -1,4 +1,4 @@
-import { Injectable, signal } from '@angular/core';
+import { DestroyRef, Injectable, Signal, signal } from '@angular/core';
 
 /** Simple declarative content a page contributes to the single {@link AppHeader}. */
 export interface HeaderContent {
@@ -11,28 +11,44 @@ export interface HeaderContent {
 /**
  * The stateful, signal-based half of the header's hybrid content mechanism
  * (ADR-0015): a page sets simple declarative text on activation and the
- * {@link AppHeader} reads it back through signals. Rich, interactive header
+ * {@link AppHeader} reads it back through a signal. Rich, interactive header
  * content goes through the named `header` router-outlet instead.
+ *
+ * A page hands its own {@link DestroyRef} to {@link set}, so the content is
+ * withdrawn automatically when the page is destroyed — no page has to remember a
+ * matching `clear()` in `ngOnDestroy`. The single content slot is owned by the
+ * last setter: a page that has already been superseded never clears its
+ * successor's content on the way out, so the header stays correct regardless of
+ * the order in which Angular activates and destroys routed components.
  */
 @Injectable({ providedIn: 'root' })
 export class HeaderService {
-  private readonly _eyebrow = signal<string | null>(null);
-  private readonly _title = signal<string | null>(null);
+  private readonly _content = signal<HeaderContent | null>(null);
+  /** The active page's declarative content, or `null` when none. */
+  readonly content: Signal<HeaderContent | null> = this._content.asReadonly();
 
-  /** The eyebrow the active page set, or `null` when none. */
-  readonly eyebrow = this._eyebrow.asReadonly();
-  /** The title the active page set, or `null` when none. */
-  readonly title = this._title.asReadonly();
+  /**
+   * Identifies the page that currently owns the slot. A destroy callback only
+   * clears the content if its page is still the owner, so a late teardown can't
+   * wipe content a newer page has since set.
+   */
+  private owner: object | null = null;
 
-  /** Set the header's declarative content; omitted fields reset to empty. */
-  set(content: HeaderContent): void {
-    this._eyebrow.set(content.eyebrow ?? null);
-    this._title.set(content.title ?? null);
-  }
+  /**
+   * Contribute the active page's declarative header content. The content is
+   * cleared automatically when `destroyRef` fires (the page is destroyed), and a
+   * superseded page's teardown is ignored.
+   */
+  set(content: HeaderContent, destroyRef: DestroyRef): void {
+    const token = {};
+    this.owner = token;
+    this._content.set(content);
 
-  /** Clear all declarative content (a page is leaving). */
-  clear(): void {
-    this._eyebrow.set(null);
-    this._title.set(null);
+    destroyRef.onDestroy(() => {
+      if (this.owner === token) {
+        this.owner = null;
+        this._content.set(null);
+      }
+    });
   }
 }

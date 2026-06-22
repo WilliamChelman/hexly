@@ -61,8 +61,8 @@ describe('MapLibrary', () => {
     renderWith([]);
 
     const header = TestBed.inject(HeaderService);
-    expect(header.eyebrow()).toBe('Library');
-    expect(header.title()).toBe('Your maps');
+    expect(header.content()?.eyebrow).toBe('Library');
+    expect(header.content()?.title).toBe('Your maps');
   });
 
   it('owns its page heading in the main content', () => {
@@ -80,7 +80,7 @@ describe('MapLibrary', () => {
     fixture.destroy();
 
     const header = TestBed.inject(HeaderService);
-    expect(header.title()).toBeNull();
+    expect(header.content()).toBeNull();
   });
 
   it('lists the maps the user owns, newest first', () => {

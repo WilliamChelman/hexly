@@ -45,12 +45,12 @@ import { HeaderService } from './header.service';
       text through HeaderService, or a route projects a rich interactive component
       through the named header outlet. Both render here, between brand and actions.
     -->
-    @if (eyebrow() || title()) {
+    @if (content(); as c) {
       <div class="headline" data-testid="header-headline">
-        @if (eyebrow(); as e) {
+        @if (c.eyebrow; as e) {
           <span appEyebrow>{{ e }}</span>
         }
-        @if (title(); as t) {
+        @if (c.title; as t) {
           <span class="title">{{ t }}</span>
         }
       </div>
@@ -163,8 +163,7 @@ export class AppHeader {
   protected readonly theme = this.themeService.theme;
 
   /** Declarative content the active page contributed through {@link HeaderService}. */
-  protected readonly eyebrow = this.header.eyebrow;
-  protected readonly title = this.header.title;
+  protected readonly content = this.header.content;
 
   /** The signed-in user, shown whenever authenticated; `null` otherwise. */
   protected readonly user = this.auth.currentUser;
