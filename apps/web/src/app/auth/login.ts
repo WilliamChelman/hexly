@@ -2,11 +2,13 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  effect,
   inject,
   signal,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { finalize } from 'rxjs';
+import { translateSignal, TranslocoPipe } from '@jsverse/transloco';
 import { AuthStore } from './auth.store';
 import { HeaderService } from '../shell/header.service';
 import { Button } from '../ui/button';
@@ -24,13 +26,13 @@ import { Panel } from '../ui/panel';
 @Component({
   selector: 'app-login',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Panel, Field, Input, Button],
+  imports: [Panel, Field, Input, Button, TranslocoPipe],
   template: `
     <div class="page">
       <section class="card" appPanel raised>
-        <h1 class="sr-only">{{ pageTitle }}</h1>
+        <h1 class="sr-only">{{ heading() }}</h1>
         <form (submit)="submit($event)">
-          <label appField label="Email">
+          <label appField [label]="'auth.email' | transloco">
             <input
               appInput
               type="email"
@@ -40,7 +42,7 @@ import { Panel } from '../ui/panel';
               (input)="email.set(value($event))"
             />
           </label>
-          <label appField label="Password">
+          <label appField [label]="'auth.password' | transloco">
             <input
               appInput
               type="password"
@@ -51,8 +53,8 @@ import { Panel } from '../ui/panel';
             />
           </label>
 
-          @if (error()) {
-            <p class="error" role="alert">{{ error() }}</p>
+          @if (error(); as e) {
+            <p class="error" role="alert">{{ e | transloco }}</p>
           }
 
           <button
@@ -61,7 +63,7 @@ import { Panel } from '../ui/panel';
             type="submit"
             [disabled]="pending()"
           >
-            {{ pending() ? 'Signing in…' : 'Sign in' }}
+            {{ (pending() ? 'auth.signingIn' : 'auth.signIn') | transloco }}
           </button>
         </form>
       </section>
@@ -99,19 +101,25 @@ export class Login {
   private readonly header = inject(HeaderService);
   private readonly destroyRef = inject(DestroyRef);
 
-  /** The page heading, shown both as the document's <h1> (sr-only) and the
-   * header chrome title — declared once so the two can't drift. */
-  protected readonly pageTitle = 'Sign in';
+  /** The translated page heading, shown both as the document's <h1> (sr-only)
+   * and the header chrome title — sourced from one key so the two can't drift
+   * and both re-render live when the language changes. */
+  protected readonly heading = translateSignal('auth.heading');
 
   protected readonly email = signal('');
   protected readonly password = signal('');
   protected readonly pending = signal(false);
+  /** A translation key for the active error, or `null` when there is none. */
   protected readonly error = signal<string | null>(null);
 
   constructor() {
-    // Contribute the sign-in heading to the single app header (ADR-0015); it is
-    // withdrawn automatically when this page is destroyed.
-    this.header.set({ title: this.pageTitle }, this.destroyRef);
+    // Contribute the sign-in heading to the single app header (ADR-0015),
+    // re-contributing whenever the active language changes so the chrome title
+    // tracks the switch live. It is withdrawn automatically when this page is
+    // destroyed.
+    effect(() => {
+      this.header.set({ title: this.heading() }, this.destroyRef);
+    });
   }
 
   /** Read the current value out of an input event. */
@@ -138,7 +146,7 @@ export class Login {
             this.route.snapshot.queryParamMap.get('returnUrl') ?? '/';
           this.router.navigateByUrl(returnUrl);
         },
-        error: () => this.error.set('Incorrect email or password.'),
+        error: () => this.error.set('auth.invalidCredentials'),
       });
   }
 }

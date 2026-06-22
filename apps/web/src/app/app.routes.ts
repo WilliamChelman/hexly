@@ -6,7 +6,9 @@ export const appRoutes: Route[] = [
     path: 'login',
     canActivate: [loginGuard],
     loadComponent: () => import('./auth/login').then((m) => m.Login),
-    title: 'Hexly — Sign in',
+    // A translation key resolved by TranslationTitleStrategy; the value carries
+    // the untranslated "Hexly" brand (ADR-0014).
+    title: 'auth.tabTitle',
   },
   {
     // The library: every map the user owns, plus open / create / delete.

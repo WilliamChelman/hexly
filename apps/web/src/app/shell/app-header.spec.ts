@@ -6,8 +6,11 @@ import {
 import { DestroyRef } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
+import { TranslocoService } from '@jsverse/transloco';
 import { AuthStore } from '../auth/auth.store';
 import { ThemeService } from '../core/theme.service';
+import { LocaleService } from '../core/i18n/locale.service';
+import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { AppHeader } from './app-header';
 import { HeaderService } from './header.service';
 
@@ -21,8 +24,9 @@ describe('AppHeader', () => {
   let http: HttpTestingController;
 
   beforeEach(async () => {
+    localStorage.clear();
     await TestBed.configureTestingModule({
-      imports: [AppHeader],
+      imports: [AppHeader, provideTranslocoTesting()],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -31,6 +35,8 @@ describe('AppHeader', () => {
     }).compileComponents();
     http = TestBed.inject(HttpTestingController);
   });
+
+  afterEach(() => localStorage.clear());
 
   afterEach(() => http.verify());
 
@@ -162,6 +168,27 @@ describe('AppHeader', () => {
 
     expect(fixture.nativeElement.textContent).toContain('Your maps');
     expect(fixture.nativeElement.querySelector('h1')).toBeNull();
+  });
+
+  it('flips the language live and remembers it from the header', () => {
+    const locale = TestBed.inject(LocaleService);
+    const transloco = TestBed.inject(TranslocoService);
+    const fixture = TestBed.createComponent(AppHeader);
+    fixture.detectChanges();
+
+    expect(locale.lang()).toBe('en');
+
+    const toFrench = fixture.nativeElement.querySelector(
+      '[data-testid=lang-fr]',
+    ) as HTMLButtonElement;
+    toFrench.click();
+    fixture.detectChanges();
+
+    // Live: both the service and the active Transloco language flip with no reload.
+    expect(locale.lang()).toBe('fr');
+    expect(transloco.getActiveLang()).toBe('fr');
+    // Remembered across visits.
+    expect(localStorage.getItem('hexly-locale')).toBe('fr');
   });
 
   it('marks itself as the banner landmark', () => {

@@ -14,6 +14,7 @@ import { LogoIcon } from '../ui/icon/glyphs/logo';
 import { MoonIcon } from '../ui/icon/glyphs/moon';
 import { SunIcon } from '../ui/icon/glyphs/sun';
 import { HeaderService } from './header.service';
+import { LanguageSwitcher } from './language-switcher';
 
 /**
  * The single, always-present application header (ADR-0015). It owns the global
@@ -33,6 +34,7 @@ import { HeaderService } from './header.service';
     LogoIcon,
     MoonIcon,
     SunIcon,
+    LanguageSwitcher,
   ],
   template: `
     <a class="brand" routerLink="/">
@@ -58,7 +60,7 @@ import { HeaderService } from './header.service';
     <router-outlet name="header" />
 
     <div class="actions">
-      <!-- The language switcher lands here in the next slice (ADR-0014). -->
+      <app-language-switcher />
       <button
         type="button"
         appButton

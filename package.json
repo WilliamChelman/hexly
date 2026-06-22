@@ -88,6 +88,7 @@
     "@fontsource/cinzel": "5.2.8",
     "@fontsource/jetbrains-mono": "5.2.8",
     "@fontsource/spectral": "5.2.8",
+    "@jsverse/transloco": "^8.4.0",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
