@@ -168,6 +168,97 @@ test('a painting Tool over a floating Label paints the hex beneath instead of gr
   expect(labels[0].position.y).toBeCloseTo(labelY, 1);
 });
 
+test('Cmd/Ctrl-click adds a second entity to the Selection, shown in the Inspector', async ({
+  page,
+}) => {
+  const { canvas } = await newMap(page);
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('canvas not laid out');
+  const cx = box.width / 2;
+  const cy = box.height / 2;
+
+  // Paint the centre hex (0,0) and its east neighbour (~70px right at zoom 1).
+  await page.getByTestId('tool-terrain').click();
+  await canvas.click({ position: { x: cx, y: cy } });
+  await canvas.click({ position: { x: cx + 70, y: cy } });
+  await expect(page.getByTestId('hex-count')).toHaveText('2 hexes');
+
+  // Arm Select and plain-click the first hex: the single-entity Inspector opens.
+  await page.getByTestId('tool-select').click();
+  await canvas.click({ position: { x: cx, y: cy } });
+  await expect(page.getByTestId('entity-coord')).toBeVisible();
+
+  // Cmd/Ctrl-click the second hex: the Selection becomes a set, so the Inspector
+  // switches from the single-entity editor to the count + Delete all (ADR-0017).
+  await canvas.click({
+    position: { x: cx + 70, y: cy },
+    modifiers: ['ControlOrMeta'],
+  });
+  await expect(page.getByTestId('selection-count')).toContainText('2');
+  await expect(page.getByTestId('selection-delete-all')).toBeVisible();
+  await expect(page.getByTestId('entity-coord')).toHaveCount(0);
+});
+
+test('holding Cmd/Ctrl and dragging sweeps several hexes into the Selection', async ({
+  page,
+}) => {
+  const { canvas } = await newMap(page);
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('canvas not laid out');
+  const cx = box.x + box.width / 2;
+  const cy = box.y + box.height / 2;
+
+  // Paint a row of three adjacent hexes (centre and its two east neighbours).
+  await page.getByTestId('tool-terrain').click();
+  await canvas.click({ position: { x: box.width / 2, y: box.height / 2 } });
+  await canvas.click({ position: { x: box.width / 2 + 70, y: box.height / 2 } });
+  await canvas.click({ position: { x: box.width / 2 + 140, y: box.height / 2 } });
+  await expect(page.getByTestId('hex-count')).toHaveText('3 hexes');
+
+  // Arm Select, then hold Cmd/Ctrl and drag across the row — each hex the pointer
+  // enters is swept into the set, no discrete clicks needed (ADR-0017).
+  await page.getByTestId('tool-select').click();
+  await page.keyboard.down('ControlOrMeta');
+  await page.mouse.move(cx, cy);
+  await page.mouse.down();
+  await page.mouse.move(cx + 70, cy);
+  await page.mouse.move(cx + 140, cy);
+  await page.mouse.up();
+  await page.keyboard.up('ControlOrMeta');
+
+  // All three hexes ended up selected: the Inspector shows the multi-selection count.
+  await expect(page.getByTestId('selection-count')).toContainText('3');
+});
+
+test('Delete removes the whole multi-selection in one gesture', async ({
+  page,
+}) => {
+  const { canvas } = await newMap(page);
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('canvas not laid out');
+  const cx = box.width / 2;
+  const cy = box.height / 2;
+
+  // Paint two hexes and build a two-entity Selection over them.
+  await page.getByTestId('tool-terrain').click();
+  await canvas.click({ position: { x: cx, y: cy } });
+  await canvas.click({ position: { x: cx + 70, y: cy } });
+  await expect(page.getByTestId('hex-count')).toHaveText('2 hexes');
+
+  await page.getByTestId('tool-select').click();
+  await canvas.click({ position: { x: cx, y: cy } });
+  await canvas.click({
+    position: { x: cx + 70, y: cy },
+    modifiers: ['ControlOrMeta'],
+  });
+  await expect(page.getByTestId('selection-count')).toContainText('2');
+
+  // Delete erases every selected hex at once, back to an empty map — one gesture,
+  // the whole set (the Inspector's Delete all does the same through the store).
+  await page.keyboard.press('Delete');
+  await expect(page.getByTestId('hex-count')).toHaveText('0 hexes');
+});
+
 test('under Select, dragging a selected Label repositions it', async ({ page }) => {
   const { canvas } = await newMap(page);
 

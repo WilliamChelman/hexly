@@ -12,7 +12,7 @@ import {
   neighbors,
   parseCoordKey,
   Point,
-  regionById,
+  Region,
   terrainPalette,
   TerrainId,
 } from '@hexly/domain';
@@ -118,7 +118,7 @@ export interface MapRenderer {
     doc: HexMap,
     hover: Axial | null,
     labelDrag?: LabelDragOverride | null,
-    selection?: Selection | null,
+    selections?: readonly Selection[],
     hexDrag?: HexDragOverride | null,
   ): void;
   /**
@@ -275,7 +275,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
     doc: HexMap,
     hover: Axial | null,
     labelDrag: LabelDragOverride | null = null,
-    selection: Selection | null = null,
+    selections: readonly Selection[] = [],
     hexDrag: HexDragOverride | null = null,
   ): void {
     const ctx = this.ctx;
@@ -418,12 +418,27 @@ export class Canvas2dMapRenderer implements MapRenderer {
       ctx.restore();
     }
 
-    // The selection highlight rides on top of everything (issue #28): a Hex or
-    // Feature gets a strong outline on its hex; a Label gets a bounds rectangle
-    // around the box `drawLabel` just recorded. Drawn last so it sits above the
-    // grid, markers, and label text it points at. While a Hex drag is live the
-    // highlight follows the previewed content to the destination (issue #30).
-    if (selection) {
+    // The selection highlight rides on top of everything (issue #28): every member
+    // of the Selection set is highlighted (ADR-0017) — a Hex or Feature gets a
+    // strong outline on its hex, a Label a bounds rectangle around the box
+    // `drawLabel` just recorded, a Region a translucent member-fill. Drawn last so
+    // it sits above the grid, markers, and label text it points at. While a Hex
+    // drag is live, a selected hex/feature at the drag origin follows the previewed
+    // content to the destination (issue #30).
+    //
+    // The selection pass is O(selected) per frame, not O(selected × total): two
+    // id→entity indexes are built once here so each selected member resolves its
+    // Label box and Region by lookup rather than re-scanning `labelBoxes` /
+    // `doc.regions`. Both preserve first-wins (matching the old `.find`).
+    const labelBoxById = new Map<string, LabelBox>();
+    for (const box of this.labelBoxes) {
+      if (!labelBoxById.has(box.id)) labelBoxById.set(box.id, box);
+    }
+    const regionById_ = new Map<string, Region>();
+    for (const region of doc.regions) {
+      if (!regionById_.has(region.id)) regionById_.set(region.id, region);
+    }
+    for (const selection of selections) {
       // Only a hex/feature selection tracks a live Hex drag to its destination; a
       // Label or Region selection is never the dragged content (issues #30, #35).
       const tracking =
@@ -433,7 +448,8 @@ export class Canvas2dMapRenderer implements MapRenderer {
       this.drawSelection(
         ctx,
         camera,
-        doc,
+        regionById_,
+        labelBoxById,
         visibleKeys,
         tracking ? { ...selection, coord: drag.to } : selection,
       );
@@ -466,14 +482,15 @@ export class Canvas2dMapRenderer implements MapRenderer {
   private drawSelection(
     ctx: CanvasRenderingContext2D,
     camera: Camera,
-    doc: HexMap,
+    regionById: ReadonlyMap<string, Region>,
+    labelBoxById: ReadonlyMap<string, LabelBox>,
     visibleKeys: Set<string>,
     selection: Selection,
   ): void {
     // A Region is highlighted by tinting its member hexes, not by an accent
     // outline — its boundary stroke already comes from the regions pass (#35).
     if (selection.kind === 'region') {
-      this.fillRegionMembers(ctx, camera, doc, visibleKeys, selection.id);
+      this.fillRegionMembers(ctx, camera, regionById, visibleKeys, selection.id);
       return;
     }
     ctx.save();
@@ -481,7 +498,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
     ctx.lineWidth = SELECTION_STROKE;
     ctx.lineJoin = 'round';
     if (selection.kind === 'label') {
-      const box = this.labelBoxes.find((b) => b.id === selection.id);
+      const box = labelBoxById.get(selection.id);
       // Trace the padded box as a closed path and stroke it (rather than
       // `strokeRect`) so it draws like every other outline — one stroke pass.
       if (box) {
@@ -514,11 +531,11 @@ export class Canvas2dMapRenderer implements MapRenderer {
   private fillRegionMembers(
     ctx: CanvasRenderingContext2D,
     camera: Camera,
-    doc: HexMap,
+    regionById: ReadonlyMap<string, Region>,
     visibleKeys: Set<string>,
     id: string,
   ): void {
-    const region = regionById(doc, id);
+    const region = regionById.get(id);
     if (!region) return;
     ctx.save();
     ctx.globalAlpha = SELECTION_FILL_ALPHA;

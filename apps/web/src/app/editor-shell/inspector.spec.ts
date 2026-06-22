@@ -292,6 +292,76 @@ describe('Inspector hex and feature selection', () => {
   });
 });
 
+describe('Inspector multi-selection', () => {
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({ imports: [Inspector, provideTranslocoTesting()] }).compileComponents();
+  });
+
+  /** Select two Hexes and a Label, returning the store and the rendered fixture. */
+  function withThreeSelected() {
+    const store = TestBed.inject(EditorStore);
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.paintAt({ q: 1, r: 0 }, 'ocean');
+    const labelId = store.addLabel('Open Sea', { x: 5, y: 5 });
+    store.select({ q: 0, r: 0 }, null);
+    store.select({ q: 1, r: 0 }, null, 'toggle-top');
+    store.select({ q: 0, r: 0 }, labelId, 'toggle-top');
+    const fixture = TestBed.createComponent(Inspector);
+    fixture.detectChanges();
+    return { store, fixture, labelId };
+  }
+
+  it('shows the selection count instead of a single-entity editor when 2+ are selected', () => {
+    const { fixture } = withThreeSelected();
+    const el = fixture.nativeElement as HTMLElement;
+
+    // The count reflects the whole set, and no single-entity editor is shown.
+    expect(el.querySelector('[data-testid=selection-count]')?.textContent).toContain('3');
+    expect(el.querySelector('[data-testid=label-text]')).toBeNull();
+    expect(el.querySelector('[data-testid=entity-coord]')).toBeNull();
+  });
+
+  it('breaks the selection down by kind', () => {
+    const { fixture } = withThreeSelected();
+    // Collapse the inter-token whitespace the multi-line template leaves between
+    // the count and its word, so the kind-bound substrings match.
+    const breakdown = ((fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid=selection-breakdown]',
+    )?.textContent ?? '').replace(/\s+/g, ' ').trim();
+
+    // Two hexes and one label, each count bound to its kind — and the count-1 row
+    // reads the singular "label", not "1 labels" (the \b stops "1 label" matching
+    // a stray "1 labels").
+    expect(breakdown).toContain('2 hexes');
+    expect(breakdown).toMatch(/\b1 label\b/);
+  });
+
+  it('deletes the whole set in one step when Delete all is clicked', () => {
+    const { store, fixture } = withThreeSelected();
+    const del = (fixture.nativeElement as HTMLElement).querySelector(
+      '[data-testid=selection-delete-all]',
+    ) as HTMLButtonElement;
+    expect(del.disabled).toBe(false);
+
+    del.click();
+
+    expect(store.document().hexes).toEqual({});
+    expect(store.document().labels).toEqual([]);
+    expect(store.selections()).toEqual([]);
+  });
+
+  it('renders the multi-selection chrome in French', () => {
+    const { fixture } = withThreeSelected();
+    TestBed.inject(TranslocoService).setActiveLang('fr');
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(el.querySelector('[data-testid=selection-delete-all]')?.textContent).toContain(
+      'Tout supprimer',
+    );
+  });
+});
+
 describe('Inspector region editing', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({ imports: [Inspector, provideTranslocoTesting()] }).compileComponents();

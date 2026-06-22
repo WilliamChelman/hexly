@@ -1027,6 +1027,216 @@ describe('EditorStore Region selection cycle', () => {
   });
 });
 
+describe('EditorStore multi-selection set', () => {
+  it('builds a set when Cmd/Ctrl-click toggles a second topmost entity in', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.paintAt({ q: 1, r: 0 }, 'ocean');
+
+    store.select({ q: 0, r: 0 }, null); // plain click selects the first hex
+    store.select({ q: 1, r: 0 }, null, 'toggle-top'); // Cmd/Ctrl-click adds the second
+
+    // Both hexes are now selected — the Selection is a set, not a single ref.
+    expect(store.selections()).toEqual([
+      { kind: 'hex', coord: { q: 0, r: 0 } },
+      { kind: 'hex', coord: { q: 1, r: 0 } },
+    ]);
+    // With two selected, the singular selection() reads as null (exactly-one-or-null).
+    expect(store.selection()).toBeNull();
+  });
+
+  it('toggles the topmost entity back out on a second Cmd/Ctrl-click', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.paintAt({ q: 1, r: 0 }, 'ocean');
+    store.select({ q: 0, r: 0 }, null);
+    store.select({ q: 1, r: 0 }, null, 'toggle-top'); // adds the second
+
+    store.select({ q: 1, r: 0 }, null, 'toggle-top'); // toggles it back out
+
+    expect(store.selections()).toEqual([{ kind: 'hex', coord: { q: 0, r: 0 } }]);
+    expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 0, r: 0 } });
+  });
+
+  it('Shift-click toggles the whole stack at a coordinate into the set', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest'); // a bare Hex…
+    const region = store.createRegion('Avalon', '#b08a4e');
+    store.addHexToRegion(region, { q: 0, r: 0 }); // …inside a Region
+    const labelId = store.addLabel('Avalon', { x: 5, y: 5 }); // …under a Label
+
+    store.select({ q: 0, r: 0 }, labelId, 'toggle-stack');
+
+    // The whole pile is selected at once — a heterogeneous set (Label + Hex + Region).
+    expect(store.selections()).toEqual([
+      { kind: 'label', id: labelId },
+      { kind: 'hex', coord: { q: 0, r: 0 } },
+      { kind: 'region', id: region },
+    ]);
+  });
+
+  it('Shift-click on an already-fully-selected stack removes all of it', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    const region = store.createRegion('Avalon', '#b08a4e');
+    store.addHexToRegion(region, { q: 0, r: 0 });
+    store.select({ q: 0, r: 0 }, null, 'toggle-stack'); // Hex + Region in
+    expect(store.selections()).toHaveLength(2);
+
+    store.select({ q: 0, r: 0 }, null, 'toggle-stack'); // the pile is full → remove all
+
+    expect(store.selections()).toEqual([]);
+  });
+
+  it('Shift-click adds only the missing members of a partly-selected stack', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    const region = store.createRegion('Avalon', '#b08a4e');
+    store.addHexToRegion(region, { q: 0, r: 0 });
+    store.select({ q: 0, r: 0 }, null); // plain click selects just the Hex
+
+    store.select({ q: 0, r: 0 }, null, 'toggle-stack'); // not full → add the missing Region
+
+    expect(store.selections()).toEqual([
+      { kind: 'hex', coord: { q: 0, r: 0 } },
+      { kind: 'region', id: region },
+    ]);
+  });
+
+  it('a plain click replaces the whole set with the single topmost entity', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.paintAt({ q: 1, r: 0 }, 'ocean');
+    store.select({ q: 0, r: 0 }, null);
+    store.select({ q: 1, r: 0 }, null, 'toggle-top'); // build a two-entity set
+    expect(store.selections()).toHaveLength(2);
+
+    store.select({ q: 1, r: 0 }, null); // a plain click collapses the set to one
+
+    expect(store.selections()).toEqual([{ kind: 'hex', coord: { q: 1, r: 0 } }]);
+  });
+
+  it('drops a stale member when its entity is deleted, keeping the rest', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    const labelId = store.addLabel('Doomed', { x: 5, y: 5 });
+    store.select({ q: 0, r: 0 }, null);
+    store.select({ q: 0, r: 0 }, labelId, 'toggle-top'); // set = [Hex, Label]
+    expect(store.selections()).toHaveLength(2);
+
+    store.deleteLabel(labelId); // the Label is gone from the document…
+
+    // …so it self-heals out of the set, leaving the surviving Hex selected.
+    expect(store.selections()).toEqual([{ kind: 'hex', coord: { q: 0, r: 0 } }]);
+  });
+
+  it('clears the whole set on a plain click in empty space', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.paintAt({ q: 1, r: 0 }, 'ocean');
+    store.select({ q: 0, r: 0 }, null);
+    store.select({ q: 1, r: 0 }, null, 'toggle-top');
+    expect(store.selections()).toHaveLength(2);
+
+    store.select({ q: 9, r: 9 }, null); // plain click on Void clears everything
+
+    expect(store.selections()).toEqual([]);
+  });
+
+  it('add-top adds the topmost entity without removing existing members, idempotently', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.paintAt({ q: 1, r: 0 }, 'ocean');
+    store.select({ q: 0, r: 0 }, null); // [hex 0,0]
+
+    // A modifier-held drag sweeps in each hovered hex via the add-only path — it
+    // accumulates rather than toggling, so re-entering a hex never removes it.
+    store.select({ q: 1, r: 0 }, null, 'add-top');
+    expect(store.selections()).toEqual([
+      { kind: 'hex', coord: { q: 0, r: 0 } },
+      { kind: 'hex', coord: { q: 1, r: 0 } },
+    ]);
+
+    store.select({ q: 1, r: 0 }, null, 'add-top'); // re-hovering the same hex is a no-op
+    expect(store.selections()).toEqual([
+      { kind: 'hex', coord: { q: 0, r: 0 } },
+      { kind: 'hex', coord: { q: 1, r: 0 } },
+    ]);
+  });
+
+  it('add-stack adds the whole stack at a coordinate, never removing it on re-entry', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    const region = store.createRegion('Avalon', '#b08a4e');
+    store.addHexToRegion(region, { q: 0, r: 0 });
+    store.select({ q: 0, r: 0 }, null); // [hex]
+
+    store.select({ q: 0, r: 0 }, null, 'add-stack'); // adds the Region (hex already in)
+    expect(store.selections()).toEqual([
+      { kind: 'hex', coord: { q: 0, r: 0 } },
+      { kind: 'region', id: region },
+    ]);
+
+    store.select({ q: 0, r: 0 }, null, 'add-stack'); // fully present → unchanged, not removed
+    expect(store.selections()).toEqual([
+      { kind: 'hex', coord: { q: 0, r: 0 } },
+      { kind: 'region', id: region },
+    ]);
+  });
+
+  it('add-* over empty space leaves the set unchanged', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.select({ q: 0, r: 0 }, null);
+
+    store.select({ q: 9, r: 9 }, null, 'add-top'); // sweeping over Void adds nothing
+
+    expect(store.selections()).toEqual([{ kind: 'hex', coord: { q: 0, r: 0 } }]);
+  });
+
+  it('deletes a heterogeneous set per kind in a single undo step, restoring all on undo', () => {
+    const store = new EditorStore();
+    // `load` clears history so the multi-delete is the one and only edit on the
+    // stack — a single undo that fully restores everything then proves it is one step.
+    store.load({
+      hexes: {
+        '0,0': { terrain: 'forest' },
+        '1,0': { terrain: 'grass', feature: { ref: 'settlement' } },
+      },
+      regions: [{ id: 'reg', name: 'Avalon', color: '#b08a4e', hexes: { '2,2': true } }],
+      labels: [{ id: 'lab', text: 'Doomed', position: { x: 5, y: 5 }, size: 28 }],
+    });
+    // Build a four-entity heterogeneous set: a bare Hex, a Feature, a Region, a Label.
+    store.select({ q: 0, r: 0 }, null);
+    store.select({ q: 1, r: 0 }, null, 'toggle-top'); // the Feature on 1,0
+    store.select({ q: 2, r: 2 }, null, 'toggle-top'); // the Region (Void member)
+    store.select({ q: 0, r: 0 }, 'lab', 'toggle-top'); // the Label
+    expect(store.selections()).toHaveLength(4);
+
+    store.deleteSelected();
+
+    // Each entity is removed per its kind: the Hex erased back to Void, the Feature
+    // cleared (terrain stays), the Region destroyed, the Label removed.
+    expect('0,0' in store.document().hexes).toBe(false);
+    expect(store.document().hexes['1,0']).toEqual({ terrain: 'grass' });
+    expect(store.document().regions).toEqual([]);
+    expect(store.document().labels).toEqual([]);
+    expect(store.selections()).toEqual([]);
+
+    store.undo(); // a single step brings the whole set back
+
+    expect(store.document().hexes['0,0']).toEqual({ terrain: 'forest' });
+    expect(store.document().hexes['1,0']).toEqual({
+      terrain: 'grass',
+      feature: { ref: 'settlement' },
+    });
+    expect(store.document().regions[0].hexes).toEqual({ '2,2': true });
+    expect(store.document().labels).toHaveLength(1);
+    expect(store.selections()).toHaveLength(4);
+    expect(store.canUndo()).toBe(false); // it really was one step, not four
+  });
+});
+
 describe('EditorStore deleteSelected', () => {
   it('deletes the selected Label and clears the selection', () => {
     const store = new EditorStore();

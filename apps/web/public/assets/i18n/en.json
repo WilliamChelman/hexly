@@ -72,7 +72,18 @@
       "deleteRegion": "Delete region",
       "deleteHex": "Delete hex",
       "deleteFeature": "Delete feature",
-      "emptyHint": "Pick the Select tool and click a Hex, Feature, or Label to inspect it. Place a Label with the Label tool, then select it here to edit its text, size, rotation and position."
+      "emptyHint": "Pick the Select tool and click a Hex, Feature, or Label to inspect it. Place a Label with the Label tool, then select it here to edit its text, size, rotation and position.",
+      "multiTitle": "Selection",
+      "selectedCount": "selected",
+      "kindHex": "hex",
+      "kindHexes": "hexes",
+      "kindFeature": "feature",
+      "kindFeatures": "features",
+      "kindRegion": "region",
+      "kindRegions": "regions",
+      "kindLabel": "label",
+      "kindLabels": "labels",
+      "deleteAll": "Delete all"
     },
     "regionsPanel": {
       "title": "Regions",
