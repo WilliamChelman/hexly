@@ -1,5 +1,6 @@
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { Button } from '../ui/button';
 import { Cartouche } from '../ui/cartouche';
 import { Chip } from '../ui/chip';
@@ -18,7 +19,8 @@ import { Textarea } from '../ui/textarea';
 
 interface SwatchRow {
   readonly token: string;
-  readonly name: string;
+  /** A `styleguide.swatch.*` translation key for the role's display name. */
+  readonly nameKey: string;
 }
 interface TypeRow {
   readonly token: string;
@@ -36,6 +38,7 @@ interface TypeRow {
   selector: 'app-styleguide',
   imports: [
     RouterLink,
+    TranslocoPipe,
     Button,
     Cartouche,
     Chip,
@@ -55,34 +58,27 @@ interface TypeRow {
   template: `
     <div class="guide">
       <header class="guide-top">
-        <a appButton variant="ghost" size="sm" routerLink="/">← Back to map</a>
+        <a appButton variant="ghost" size="sm" routerLink="/"
+          >← {{ 'styleguide.backToMap' | transloco }}</a
+        >
       </header>
 
       <!-- Masthead -->
       <section class="hero">
-        <span appEyebrow>Hexly design system</span>
-        <h1 class="hero-title">The cartographer’s table,<br />by starlight.</h1>
-        <p class="hero-lede">
-          One identity told at two hours of the day. <strong>Parchment</strong> is
-          the aged sea-chart on the drafting table; <strong>Astral</strong> is the
-          same chart under the night sky. Gold is the through-line — compass ink by
-          day, constellation lines by night — and the text stays warm
-          parchment-cream in both. Everything below is driven by the same CSS
-          custom-property layer that <code>apps/web</code> ships.
-        </p>
+        <span appEyebrow>{{ 'styleguide.eyebrow' | transloco }}</span>
+        <h1 class="hero-title" [innerHTML]="'styleguide.heroTitle' | transloco"></h1>
+        <p class="hero-lede" [innerHTML]="'styleguide.heroLede' | transloco"></p>
         <div class="hero-meta">
-          <app-chip tone="gold">Cinzel · display</app-chip>
-          <app-chip tone="sea">Spectral · body</app-chip>
-          <app-chip tone="astra">JetBrains Mono · coordinates</app-chip>
+          <app-chip tone="gold">{{ 'styleguide.fontDisplay' | transloco }}</app-chip>
+          <app-chip tone="sea">{{ 'styleguide.fontBody' | transloco }}</app-chip>
+          <app-chip tone="astra">{{ 'styleguide.fontCoord' | transloco }}</app-chip>
         </div>
       </section>
 
       <!-- Colour -->
       <section class="section">
-        <h2 class="section-title">Palette · semantic roles</h2>
-        <p class="section-note">
-          Slices request a role, never a raw colour. Showing the active theme.
-        </p>
+        <h2 class="section-title">{{ 'styleguide.paletteSemantic' | transloco }}</h2>
+        <p class="section-note">{{ 'styleguide.paletteNote' | transloco }}</p>
         <div class="swatches">
           @for (s of semantic; track s.token) {
           <figure class="swatchcard">
@@ -91,14 +87,14 @@ interface TypeRow {
               [style.background]="'var(' + s.token + ')'"
             ></span>
             <figcaption>
-              <strong>{{ s.name }}</strong>
+              <strong>{{ s.nameKey | transloco }}</strong>
               <code>{{ s.token }}</code>
             </figcaption>
           </figure>
           }
         </div>
 
-        <h2 class="section-title">Palette · terrain fills</h2>
+        <h2 class="section-title">{{ 'styleguide.paletteTerrain' | transloco }}</h2>
         <div class="swatches">
           @for (s of terrain; track s.token) {
           <figure class="swatchcard">
@@ -107,7 +103,7 @@ interface TypeRow {
               [style.background]="'var(' + s.token + ')'"
             ></span>
             <figcaption>
-              <strong>{{ s.name }}</strong>
+              <strong>{{ s.nameKey | transloco }}</strong>
               <code>{{ s.token }}</code>
             </figcaption>
           </figure>
@@ -117,7 +113,7 @@ interface TypeRow {
 
       <!-- Type -->
       <section class="section">
-        <h2 class="section-title">Type scale</h2>
+        <h2 class="section-title">{{ 'styleguide.typeScale' | transloco }}</h2>
         <div class="typelist" appPanel>
           @for (t of typeScale; track t.token) {
           <div class="typerow">
@@ -135,7 +131,7 @@ interface TypeRow {
       <!-- Spacing & radii -->
       <section class="section is-split">
         <div>
-          <h2 class="section-title">Spacing</h2>
+          <h2 class="section-title">{{ 'styleguide.spacing' | transloco }}</h2>
           <div class="ramp">
             @for (s of spacing; track s) {
             <div class="ramp-row">
@@ -146,7 +142,7 @@ interface TypeRow {
           </div>
         </div>
         <div>
-          <h2 class="section-title">Radii</h2>
+          <h2 class="section-title">{{ 'styleguide.radii' | transloco }}</h2>
           <div class="radii">
             @for (r of radii; track r) {
             <figure class="radiicard">
@@ -163,72 +159,76 @@ interface TypeRow {
 
       <!-- Components -->
       <section class="section">
-        <h2 class="section-title">Components</h2>
+        <h2 class="section-title">{{ 'styleguide.components' | transloco }}</h2>
         <div class="specimens">
           <figure class="specimen" appPanel>
-            <figcaption appEyebrow>Buttons</figcaption>
+            <figcaption appEyebrow>{{ 'styleguide.buttons' | transloco }}</figcaption>
             <div class="specimen-row">
-              <button appButton variant="primary">Share map</button>
-              <button appButton>Add region</button>
-              <button appButton variant="ghost">Cancel</button>
-              <button appButton danger>Clear hex</button>
-              <button appButton size="sm">Small</button>
+              <button appButton variant="primary">{{ 'styleguide.shareMap' | transloco }}</button>
+              <button appButton>{{ 'styleguide.addRegion' | transloco }}</button>
+              <button appButton variant="ghost">{{ 'common.cancel' | transloco }}</button>
+              <button appButton danger>{{ 'styleguide.clearHex' | transloco }}</button>
+              <button appButton size="sm">{{ 'styleguide.small' | transloco }}</button>
             </div>
           </figure>
 
           <figure class="specimen" appPanel>
-            <figcaption appEyebrow>Icon buttons</figcaption>
+            <figcaption appEyebrow>{{ 'styleguide.iconButtons' | transloco }}</figcaption>
             <div class="specimen-row">
               <button
                 appIconButton
                 toggle
                 active
-                title="Select (S)"
-                aria-label="Select"
+                [title]="'styleguide.iconSelectTitle' | transloco"
+                [attr.aria-label]="'styleguide.iconSelectLabel' | transloco"
               >
                 <app-icon-select [size]="20" />
               </button>
               <button
                 appIconButton
                 toggle
-                title="Terrain (T)"
-                aria-label="Terrain"
+                [title]="'styleguide.iconTerrainTitle' | transloco"
+                [attr.aria-label]="'styleguide.iconTerrainLabel' | transloco"
               >
                 <app-icon-terrain [size]="20" />
               </button>
               <button
                 appIconButton
                 toggle
-                title="Forest (2)"
-                aria-label="Forest"
+                [title]="'styleguide.iconForestTitle' | transloco"
+                [attr.aria-label]="'styleguide.iconForestLabel' | transloco"
               >
                 <span appSwatch [style.background]="'var(--terrain-forest)'"></span>
               </button>
-              <button appIconButton title="Undo" aria-label="Undo">
+              <button
+                appIconButton
+                [title]="'styleguide.iconUndo' | transloco"
+                [attr.aria-label]="'styleguide.iconUndo' | transloco"
+              >
                 <app-icon-undo [size]="20" />
               </button>
             </div>
           </figure>
 
           <figure class="specimen" appPanel>
-            <figcaption appEyebrow>Chips & coordinates</figcaption>
+            <figcaption appEyebrow>{{ 'styleguide.chipsCoords' | transloco }}</figcaption>
             <div class="specimen-row">
-              <app-chip>Default</app-chip>
-              <app-chip tone="gold">Settlement</app-chip>
-              <app-chip tone="sea">Editing</app-chip>
-              <app-chip tone="astra">Region</app-chip>
+              <app-chip>{{ 'styleguide.chipDefault' | transloco }}</app-chip>
+              <app-chip tone="gold">{{ 'styleguide.chipSettlement' | transloco }}</app-chip>
+              <app-chip tone="sea">{{ 'styleguide.chipEditing' | transloco }}</app-chip>
+              <app-chip tone="astra">{{ 'styleguide.chipRegion' | transloco }}</app-chip>
               <app-coord>q 12 · r −4</app-coord>
               <kbd appKbd>⌘ Z</kbd>
             </div>
           </figure>
 
           <figure class="specimen" appPanel>
-            <figcaption appEyebrow>Fields</figcaption>
+            <figcaption appEyebrow>{{ 'styleguide.fields' | transloco }}</figcaption>
             <div class="specimen-col">
-              <label appField label="Map name">
+              <label appField [label]="'styleguide.fieldMapName' | transloco">
                 <input appInput value="The Reach of Aldermoor" />
               </label>
-              <label appField label="Note">
+              <label appField [label]="'styleguide.fieldNote' | transloco">
                 <textarea appTextarea>
 A walled town where the forest road meets the river ford.</textarea
                 >
@@ -240,7 +240,10 @@ A walled town where the forest road meets the river ford.</textarea
 
       <footer class="guide-foot">
         <span class="brand" appCartouche>Hexly</span>
-        <span>Design tokens · <code>apps/web/src/styles</code></span>
+        <span
+          >{{ 'styleguide.footerTokens' | transloco }} ·
+          <code>apps/web/src/styles</code></span
+        >
       </footer>
     </div>
   `,
@@ -479,27 +482,27 @@ A walled town where the forest road meets the river ford.</textarea
 })
 export class Styleguide {
   protected readonly semantic: SwatchRow[] = [
-    { token: '--bg', name: 'Table' },
-    { token: '--surface', name: 'Paper' },
-    { token: '--surface-raised', name: 'Pinned note' },
-    { token: '--surface-sunken', name: 'Well' },
-    { token: '--ink', name: 'Ink' },
-    { token: '--ink-muted', name: 'Ink muted' },
-    { token: '--gold', name: 'Compass gold' },
-    { token: '--sea', name: 'Sea / aurora' },
-    { token: '--astra', name: 'Nebula' },
-    { token: '--ember', name: 'Marginalia' },
-    { token: '--positive', name: 'Moss' },
-    { token: '--line-strong', name: 'Drawn rule' },
+    { token: '--bg', nameKey: 'styleguide.swatch.table' },
+    { token: '--surface', nameKey: 'styleguide.swatch.paper' },
+    { token: '--surface-raised', nameKey: 'styleguide.swatch.pinnedNote' },
+    { token: '--surface-sunken', nameKey: 'styleguide.swatch.well' },
+    { token: '--ink', nameKey: 'styleguide.swatch.ink' },
+    { token: '--ink-muted', nameKey: 'styleguide.swatch.inkMuted' },
+    { token: '--gold', nameKey: 'styleguide.swatch.compassGold' },
+    { token: '--sea', nameKey: 'styleguide.swatch.seaAurora' },
+    { token: '--astra', nameKey: 'styleguide.swatch.nebula' },
+    { token: '--ember', nameKey: 'styleguide.swatch.marginalia' },
+    { token: '--positive', nameKey: 'styleguide.swatch.moss' },
+    { token: '--line-strong', nameKey: 'styleguide.swatch.drawnRule' },
   ];
 
   protected readonly terrain: SwatchRow[] = [
-    { token: '--terrain-grass', name: 'Grassland' },
-    { token: '--terrain-forest', name: 'Forest' },
-    { token: '--terrain-ocean', name: 'Ocean' },
-    { token: '--terrain-mountain', name: 'Mountains' },
-    { token: '--terrain-desert', name: 'Desert' },
-    { token: '--terrain-marsh', name: 'Marsh' },
+    { token: '--terrain-grass', nameKey: 'styleguide.swatch.grassland' },
+    { token: '--terrain-forest', nameKey: 'styleguide.swatch.forest' },
+    { token: '--terrain-ocean', nameKey: 'styleguide.swatch.ocean' },
+    { token: '--terrain-mountain', nameKey: 'styleguide.swatch.mountains' },
+    { token: '--terrain-desert', nameKey: 'styleguide.swatch.desert' },
+    { token: '--terrain-marsh', nameKey: 'styleguide.swatch.marsh' },
   ];
 
   protected readonly typeScale: TypeRow[] = [

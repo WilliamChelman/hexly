@@ -32,7 +32,9 @@ export const appRoutes: Route[] = [
     // the editor's interactive header into AppHeader's named `header` outlet.
     path: 'maps/:id',
     canActivate: [authGuard],
-    title: 'Hexly',
+    // A translation key resolved by TranslationTitleStrategy; its value is the
+    // bare "Hexly" brand, untranslated in every language (ADR-0014).
+    title: 'editorShell.tabTitle',
     children: [
       {
         path: '',
@@ -53,7 +55,9 @@ export const appRoutes: Route[] = [
     path: 'styleguide',
     loadComponent: () =>
       import('./styleguide/styleguide').then((m) => m.Styleguide),
-    title: 'Hexly — Design system',
+    // A translation key resolved by TranslationTitleStrategy; the value carries
+    // the untranslated "Hexly" brand (ADR-0014).
+    title: 'styleguide.tabTitle',
   },
   { path: '**', redirectTo: 'maps' },
 ];
