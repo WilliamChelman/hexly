@@ -51,7 +51,7 @@ import { StatusBar } from './status-bar';
       <div class="body relative min-h-0">
         <!-- Full-bleed canvas; all side chrome floats over it (ADR-0013). -->
         <app-map-canvas class="absolute inset-0" />
-        <app-tool-palette />
+        <app-tool-palette class="absolute top-3 left-3 z-[1]" />
         <!--
           The right dock: the dismissible panel (Inspector / Regions) and the edge
           rail laid out as one flex row, so the panel always sits just left of the
@@ -84,19 +84,15 @@ import { StatusBar } from './status-bar';
   styles: `
     /*
       The body is the floating-chrome stacking context (via its own 'relative'
-      utility): it lays out its children, positioning the full-bleed canvas with an
-      inline 'absolute inset-0' and floating the side chrome over it. The one rule
-      left here places the tool palette top-left, kept scoped because its
-      max-height is a calc() over a token — ADR-0021 keeps token-composing math
-      scoped (no faithful utility). The shell grid, the right-dock layout, and the
-      floating card chrome are inline utilities on their elements.
+      utility): it lays out its children — the full-bleed canvas and the tool
+      palette are positioned with inline utilities, and the side chrome floats over
+      them. The palette's max-height is the one property with no faithful utility (a
+      calc() over a token, which ADR-0021 keeps scoped), so it's split off here on
+      its own; the rest of the palette's placement, the shell grid, the right-dock
+      layout, and the floating card chrome are all inline on their elements.
     */
     .body app-tool-palette {
-      position: absolute;
-      top: var(--spacing-3);
-      left: var(--spacing-3);
       max-height: calc(100% - 2 * var(--spacing-3));
-      z-index: 1;
     }
   `,
 })

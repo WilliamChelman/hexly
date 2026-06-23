@@ -36,9 +36,10 @@ fragment one logical rule across two surfaces (utilities + leftover CSS) and
 invite specificity surprises. This is exactly the scoped, owned styling
 ADR-0007 exists to protect.
 
-**The hybrid seam (chosen).** Convert a rule to utilities only when *every*
-property in it maps 1:1 and the rule carries no state; otherwise leave the whole
-rule scoped.
+**The hybrid seam (chosen).** Express the properties that map 1:1 as utilities;
+leave a *minimal* scoped rule only for the ones that genuinely can't — keeping
+the whole rule scoped when the non-translatable properties are entangled with
+state or share a property with the converted ones.
 
 ## Decision
 
@@ -123,8 +124,18 @@ rule scoped.
     colours** (`bg-linear-[140deg] from-gold to-gold-strong`, which resolves to
     the same `var(--color-*)` stops and re-themes). A `radial-gradient` with
     sized/positioned stops (the map canvas's washes) stays scoped.
-- **A rule is never split across the two surfaces.** When a rule mixes
-  convertible and non-convertible properties, the whole rule stays scoped.
+- **Split a mixed rule only when the two halves set different properties.** When
+  a rule mixes convertible and non-convertible properties, inline the convertible
+  ones and leave a *minimal* scoped rule for the remainder — provided the inline
+  utilities and the scoped rule touch **disjoint** properties, so the unlayered
+  scoped rule and the layered utilities never fight over the same declaration.
+  Keep the whole rule scoped when the two halves would set the *same* property
+  (e.g. a base rule and a pseudo-state that both set `background`), where the
+  split would be a specificity coin-flip. The map canvas's `.readout`/`.zoom`
+  overlays split cleanly: layout, border, radius, shadow, and blur are inline
+  utilities, and only the frosted `background: color-mix(… var(--color-surface)
+  …, transparent)` stays scoped — Tailwind's `bg-surface/86` opacity modifier
+  bakes the resolved hex in srgb, so it would stop re-theming.
 - **One rule, one home.** The deciding test is per-rule, not per-component: a
   component routinely ends up with a `host: { class }` *and* a residual
   `styles:` block, and that is the intended shape, not a smell.
