@@ -93,16 +93,6 @@ const MARQUEE_DASH: readonly number[] = [5, 4];
  * drawing surface and paints one frame on demand for a given camera transform.
  */
 /**
- * A live label-drag preview: render `id` at `position` instead of its stored
- * one. Passed straight to {@link MapRenderer.render} so the canvas can preview a
- * drag without cloning the document each frame (issue #6).
- */
-export interface LabelDragOverride {
-  readonly id: string;
-  readonly position: Point;
-}
-
-/**
  * The in-flight Hex/group drag's gesture state the canvas tracks: the `from`
  * origin pressed and the `to` coordinate under the cursor (issue #30). The canvas
  * turns it into the move's offset and, via the planner, the {@link
@@ -136,8 +126,12 @@ export interface MarqueeOverride {
  * ones a frame doesn't need.
  */
 export interface RenderOverrides {
-  /** Preview one dragged Label at a live position without cloning the doc (issue #6). */
-  readonly labelDrag?: LabelDragOverride | null;
+  /**
+   * Live label-drag preview: a `labelId → world position` map overriding where
+   * those labels draw, without cloning the document each frame (issues #6, #64).
+   * A whole group of dragged labels rides here; an absent id draws as stored.
+   */
+  readonly labelPositions?: ReadonlyMap<string, Point> | null;
   /** The Selection set to highlight — the committed set, or a marquee's live preview. */
   readonly selections?: readonly Selection[];
   /**
@@ -333,7 +327,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
     overrides: RenderOverrides = {},
   ): void {
     const {
-      labelDrag = null,
+      labelPositions = null,
       selections = [],
       movePreview = null,
       marquee = null,
@@ -471,11 +465,8 @@ export class Canvas2dMapRenderer implements MapRenderer {
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       for (const label of doc.labels) {
-        // Preview a dragged label at its live position without cloning the doc.
-        const position =
-          labelDrag && labelDrag.id === label.id
-            ? labelDrag.position
-            : label.position;
+        // Preview any dragged label at its live position without cloning the doc.
+        const position = labelPositions?.get(label.id) ?? label.position;
         this.drawLabel(ctx, camera, label, position);
       }
       ctx.restore();

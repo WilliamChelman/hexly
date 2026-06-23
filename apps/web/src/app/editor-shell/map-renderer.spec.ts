@@ -514,6 +514,37 @@ describe('Canvas2dMapRenderer labels', () => {
     restore();
   });
 
+  it('previews dragged labels at their overridden positions, others unchanged', () => {
+    const restore = stubTheme();
+    const ctx = new FakeContext();
+    const renderer = makeRenderer(ctx);
+    // (0,0) world → screen (60,60); the layout is 1:1 at zoom 1, so a world dx is a
+    // screen dx of the same size. Hit-testing the drawn boxes proves *where* each
+    // label landed (the fake context can't read the canvas transform).
+    const camera = Camera.initial().panBy(60, 60);
+    const doc: HexMap = {
+      hexes: {},
+      regions: [],
+      labels: [
+        { id: 'l1', text: 'one', position: { x: 0, y: 0 }, size: 28 },
+        { id: 'l2', text: 'two', position: { x: 40, y: 0 }, size: 28 },
+      ],
+    };
+
+    // A group label-drag overrides only the selected labels' positions; the rest
+    // draw where the document stores them.
+    renderer.render(camera, doc, null, {
+      labelPositions: new Map([['l1', { x: -40, y: 0 }]]),
+    });
+
+    // l1 moved to world (-40,0) → screen (20,60); its old spot is now empty.
+    expect(renderer.labelAt({ x: 20, y: 60 })).toBe('l1');
+    expect(renderer.labelAt({ x: 60, y: 60 })).toBeNull();
+    // l2 was not dragged, so it stays at world (40,0) → screen (100,60).
+    expect(renderer.labelAt({ x: 100, y: 60 })).toBe('l2');
+    restore();
+  });
+
   it('draws no label text when the map has none', () => {
     const restore = stubTheme();
     const ctx = new FakeContext();
