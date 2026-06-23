@@ -134,6 +134,7 @@ const FEATURE_INK = 'rgb(9, 9, 9)';
 const LABEL_INK = 'rgb(7, 7, 7)';
 const SELECT_INK = 'rgb(5, 5, 5)';
 const NAME_INK = 'rgb(3, 3, 3)';
+const BLOCKED_INK = 'rgb(2, 2, 2)';
 
 /** Drive the colour resolution so terrain fills are deterministic. */
 function stubTheme(): () => void {
@@ -145,6 +146,7 @@ function stubTheme(): () => void {
     '--label-ink': LABEL_INK,
     '--name-ink': NAME_INK,
     '--gold-strong': SELECT_INK,
+    '--ember': BLOCKED_INK,
   };
   window.getComputedStyle = (() => ({
     getPropertyValue: (name: string) => colours[name] ?? '',
@@ -399,10 +401,17 @@ describe('Canvas2dMapRenderer swap drag preview', () => {
       labels: [],
     };
 
-    // Drag the forest hex onto the occupied ocean hex: the preview must show the
-    // swapped outcome — forest's record at the destination AND ocean's record slid
-    // back to the origin — so both hexes stay visible before release (ADR-0017).
-    renderer.render(camera, doc, null, { hexDrag: { from: { q: 0, r: 0 }, to: { q: 1, r: 0 } } });
+    // Drag the forest hex onto the occupied ocean hex: the preview overlays the
+    // plan's writes (the swapped outcome) — forest's record at the destination AND
+    // ocean's record slid back to the origin — so both hexes stay visible before
+    // release (ADR-0017). The canvas hands the renderer the plan's hex writes; here
+    // they are spelled out so the renderer draws exactly what it is told.
+    renderer.render(camera, doc, null, {
+      movePreview: [
+        { coord: { q: 1, r: 0 }, hex: { terrain: 'forest', name: 'Riverbend' } },
+        { coord: { q: 0, r: 0 }, hex: { terrain: 'ocean', name: 'The Deep' } },
+      ],
+    });
 
     // Assert *where* each record draws, not merely that both colours/names appear:
     // an inverted preview (forest left at the origin, ocean at the destination) must
@@ -425,6 +434,64 @@ describe('Canvas2dMapRenderer swap drag preview', () => {
     expect(ctx.textDraws).toContainEqual(
       expect.objectContaining({ text: 'The Deep', fill: NAME_INK, x: origin.x }),
     );
+    restore();
+  });
+
+  it('washes a blocked cell in the danger ink during a refused drag', () => {
+    const restore = stubTheme();
+    const ctx = new FakeContext();
+    const renderer = makeRenderer(ctx);
+    const camera = Camera.initial().panBy(60, 60);
+    // A non-selected occupant sits at the contested destination; a blocked plan
+    // names that cell, and the renderer marks it red so the drag reads as refused.
+    const doc: HexMap = { hexes: { '2,0': { terrain: 'ocean' } }, regions: [], labels: [] };
+
+    renderer.render(camera, doc, null, { blockedCells: [{ q: 2, r: 0 }] });
+
+    const centre = camera.worldToScreen(hexToPixel(LAYOUT, { q: 2, r: 0 }));
+    const filledAt = (fill: string, c: { x: number; y: number }) =>
+      ctx.pathDraws.some(
+        (d) => d.fill === fill && Math.abs(d.cx - c.x) < 0.5 && Math.abs(d.cy - c.y) < 0.5,
+      );
+
+    // The blocked cell is washed in the danger ink — a preview overlay only, so the
+    // document is never mutated to draw it.
+    expect(filledAt(BLOCKED_INK, centre)).toBe(true);
+    restore();
+  });
+
+  it('previews a whole group translated to its destinations, clearing the vacated origins', () => {
+    const restore = stubTheme();
+    const ctx = new FakeContext();
+    const renderer = makeRenderer(ctx);
+    const camera = Camera.initial().panBy(60, 60);
+    // Sources painted at (-1,0) and (0,0); the group nudges right by one. The plan
+    // writes each record at its destination and clears the only vacated origin.
+    const doc: HexMap = {
+      hexes: { '-1,0': { terrain: 'forest' }, '0,0': { terrain: 'ocean' } },
+      regions: [],
+      labels: [],
+    };
+
+    renderer.render(camera, doc, null, {
+      movePreview: [
+        { coord: { q: 0, r: 0 }, hex: { terrain: 'forest' } },
+        { coord: { q: 1, r: 0 }, hex: { terrain: 'ocean' } },
+        { coord: { q: -1, r: 0 }, hex: null },
+      ],
+    });
+
+    const centre = (hex: Axial) => camera.worldToScreen(hexToPixel(LAYOUT, hex));
+    const filledAt = (fill: string, c: { x: number; y: number }) =>
+      ctx.pathDraws.some(
+        (d) => d.fill === fill && Math.abs(d.cx - c.x) < 0.5 && Math.abs(d.cy - c.y) < 0.5,
+      );
+
+    // Each member draws at its destination — the group reads as moved, not duplicated.
+    expect(filledAt(FOREST, centre({ q: 0, r: 0 }))).toBe(true);
+    expect(filledAt(OCEAN, centre({ q: 1, r: 0 }))).toBe(true);
+    // The vacated origin previews as Void even though the document still paints it.
+    expect(filledAt(FOREST, centre({ q: -1, r: 0 }))).toBe(false);
     restore();
   });
 });

@@ -4,7 +4,7 @@ import { expect, test } from './fixtures';
  * The whole-Hex move journey (issue #30, ADR-0010). It crosses the one seam the
  * store unit tests cannot reach: the canvas press→drag-threshold gesture, where a
  * press over a selected hex arms a move and crossing a small pixel threshold turns
- * it into a `moveHex`, committed once on release. Like the other canvas journeys
+ * it into a `moveSelection`, committed once on release. Like the other canvas journeys
  * it then proves persistence with a direct API read of the saved document and a
  * reload (ADR-0003/0009): map state lives as Canvas pixels, so we observe the move
  * through the hex count, the inspector, and the persisted hexes record.
@@ -231,4 +231,152 @@ test('Escape cancels an in-progress Hex drag, leaving the hex at its origin', as
   // And the hex never moved: the drag destination is still Void.
   await canvas.click({ position: { x: box.width / 2 + dx, y: box.height / 2 } });
   await expect(page.getByTestId('entity-coord')).toHaveCount(0);
+});
+
+/**
+ * The whole-group move (issue #64, ADR-0017): dragging a multi-hex Selection
+ * translates *every* member by one offset in a single step, keeping the cluster's
+ * shape. Like the single-hex journey it rides the real canvas press→drag gesture —
+ * here a press on an already-selected member drags the whole set — and proves the
+ * move through the count and a direct API read of the persisted document.
+ */
+test('drags a multi-hex selection so the whole group moves by one offset', async ({
+  page,
+  request,
+}) => {
+  await page.goto('/maps');
+  await page.getByTestId('new-map').click();
+  await expect(page).toHaveURL(/\/maps\/[\w-]+$/);
+  const mapId = page.url().split('/').pop();
+
+  const canvas = page.getByRole('img', { name: 'Hex map' });
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('canvas not laid out');
+  const cx = box.x + box.width / 2;
+  const cy = box.y + box.height / 2;
+  const dx = 100; // a +100px drag at zoom 1 spans one column (offset q+1)
+
+  // Paint two adjacent hexes with distinct terrains: Forest at the centre (0,0) ...
+  await page.getByTestId('tool-terrain').click();
+  await canvas.click();
+  // ... and Ocean at the q1·r0 neighbour.
+  await page
+    .getByRole('group', { name: 'Terrain' })
+    .getByRole('button', { name: 'Ocean' })
+    .click();
+  await canvas.click({ position: { x: box.width / 2 + dx, y: box.height / 2 } });
+  await expect(page.getByTestId('hex-count')).toHaveText('2 hexes');
+
+  // Arm Select and build a two-hex Selection: click the centre, then Shift-click the
+  // neighbour to add it. Both are now selected.
+  await page.getByTestId('tool-select').click();
+  await canvas.click({ position: { x: box.width / 2, y: box.height / 2 } });
+  await canvas.click({
+    position: { x: box.width / 2 + dx, y: box.height / 2 },
+    modifiers: ['Shift'],
+  });
+
+  // Press on a selected member and drag the whole set one column to the right.
+  await page.mouse.move(cx, cy);
+  await page.mouse.down();
+  await page.mouse.move(cx + 40, cy);
+  await page.mouse.move(cx + 80, cy);
+  await page.mouse.move(cx + dx, cy);
+  await page.mouse.up();
+
+  // The group moved rather than duplicated: still exactly two hexes.
+  await expect(page.getByTestId('hex-count')).toHaveText('2 hexes');
+
+  // Persist and read the saved document: each member rode by the same offset, so the
+  // cluster kept its shape — Forest at q1·r0 and Ocean at q2·r0, the centre now Void.
+  const saved = page.waitForResponse(
+    (res) =>
+      res.request().method() === 'PUT' &&
+      /\/api\/maps\/[\w-]+$/.test(res.url()) &&
+      res.ok(),
+  );
+  await page.getByTestId('save').click();
+  await saved;
+  await expect(page.getByTestId('save')).toHaveText('Save');
+
+  const res = await request.get(`/api/maps/${mapId}`);
+  expect(res.ok()).toBeTruthy();
+  const detail = await res.json();
+  const hexes = detail.document.hexes as Record<string, { terrain: string }>;
+  expect(hexes['0,0']).toBeUndefined();
+  expect(hexes['1,0']).toEqual({ terrain: 'forest' });
+  expect(hexes['2,0']).toEqual({ terrain: 'ocean' });
+});
+
+/**
+ * A blocked group move is a no-op that snaps back (issue #64, ADR-0017): when a
+ * member's destination is occupied by a non-selected hex that can only be displaced
+ * onto the moving group's own path, the whole move is refused. Releasing leaves the
+ * document untouched — nothing moves. Rides the real canvas press→drag gesture.
+ */
+test('refuses a blocked group move, leaving every hex where it was', async ({
+  page,
+  request,
+}) => {
+  await page.goto('/maps');
+  await page.getByTestId('new-map').click();
+  await expect(page).toHaveURL(/\/maps\/[\w-]+$/);
+  const mapId = page.url().split('/').pop();
+
+  const canvas = page.getByRole('img', { name: 'Hex map' });
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('canvas not laid out');
+  const cx = box.x + box.width / 2;
+  const cy = box.y + box.height / 2;
+  const dx = 100; // one column right
+  const dx2 = 138; // two columns right (q2·r0)
+
+  // Paint a contiguous row of three: Forest (0,0), Ocean (1,0), Grassland (2,0).
+  await page.getByTestId('tool-terrain').click();
+  await canvas.click();
+  const terrain = page.getByRole('group', { name: 'Terrain' });
+  await terrain.getByRole('button', { name: 'Ocean' }).click();
+  await canvas.click({ position: { x: box.width / 2 + dx, y: box.height / 2 } });
+  await terrain.getByRole('button', { name: 'Grassland' }).click();
+  await canvas.click({ position: { x: box.width / 2 + dx2, y: box.height / 2 } });
+  await expect(page.getByTestId('hex-count')).toHaveText('3 hexes');
+
+  // Select only the first two (Forest + Ocean); leave Grassland out.
+  await page.getByTestId('tool-select').click();
+  await canvas.click({ position: { x: box.width / 2, y: box.height / 2 } });
+  await canvas.click({
+    position: { x: box.width / 2 + dx, y: box.height / 2 },
+    modifiers: ['Shift'],
+  });
+
+  // Drag the pair one column right: Ocean would land on Grassland, which could only
+  // be pushed onto where Forest is landing — a self-overlapping nudge that blocks.
+  await page.mouse.move(cx, cy);
+  await page.mouse.down();
+  await page.mouse.move(cx + 40, cy);
+  await page.mouse.move(cx + 80, cy);
+  await page.mouse.move(cx + dx, cy);
+  await page.mouse.up();
+
+  // The move was refused: still three hexes, and nothing budged.
+  await expect(page.getByTestId('hex-count')).toHaveText('3 hexes');
+
+  const saved = page.waitForResponse(
+    (res) =>
+      res.request().method() === 'PUT' &&
+      /\/api\/maps\/[\w-]+$/.test(res.url()) &&
+      res.ok(),
+  );
+  await page.getByTestId('save').click();
+  await saved;
+  await expect(page.getByTestId('save')).toHaveText('Save');
+
+  const res = await request.get(`/api/maps/${mapId}`);
+  expect(res.ok()).toBeTruthy();
+  const detail = await res.json();
+  const hexes = detail.document.hexes as Record<string, { terrain: string }>;
+  // Every hex is exactly where it was painted — the blocked move changed nothing.
+  expect(hexes['0,0']).toEqual({ terrain: 'forest' });
+  expect(hexes['1,0']).toEqual({ terrain: 'ocean' });
+  expect(hexes['2,0']).toEqual({ terrain: 'grass' });
 });

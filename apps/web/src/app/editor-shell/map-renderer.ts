@@ -5,8 +5,10 @@ import {
   featureLibrary,
   hexCorners,
   hexesInRect,
+  Hex,
   hexToPixel,
   HexMap,
+  HexWrite,
   Label,
   Layout,
   neighbors,
@@ -75,6 +77,8 @@ const SELECTION_STROKE = 3;
  * still making membership readable cell-by-cell during editing (ADR-0011).
  */
 const SELECTION_FILL_ALPHA = 0.25;
+/** The opacity a blocked-move cell is washed at, so the danger tint reads over the terrain beneath it (issue #64). */
+const BLOCKED_FILL_ALPHA = 0.45;
 /** Screen-pixel padding around a selected Label's text box, so the bounds clear the glyphs. */
 const SELECTION_LABEL_PAD = 4;
 /** A live marquee rectangle's stroke weight in screen pixels, constant across zoom. */
@@ -99,11 +103,11 @@ export interface LabelDragOverride {
 }
 
 /**
- * A live whole-Hex drag preview: render the content of the hex at `from` as
- * though it sat at `to` instead — the origin reads as Void and the destination
- * shows the moved terrain + feature (issue #30). Passed straight to
- * {@link MapRenderer.render} so the move previews without mutating or cloning
- * the document each frame, the same discipline as {@link LabelDragOverride}.
+ * The in-flight Hex/group drag's gesture state the canvas tracks: the `from`
+ * origin pressed and the `to` coordinate under the cursor (issue #30). The canvas
+ * turns it into the move's offset and, via the planner, the {@link
+ * RenderOverrides.movePreview} the renderer actually draws — so this is no longer
+ * a render override itself, just the raw drag state.
  */
 export interface HexDragOverride {
   readonly from: Axial;
@@ -136,10 +140,23 @@ export interface RenderOverrides {
   readonly labelDrag?: LabelDragOverride | null;
   /** The Selection set to highlight — the committed set, or a marquee's live preview. */
   readonly selections?: readonly Selection[];
-  /** Preview a whole-Hex move at its destination (issue #30). */
-  readonly hexDrag?: HexDragOverride | null;
+  /**
+   * Preview a live move by overlaying the planner's resolved hex writes (issue #30,
+   * #64): each `{ coord, hex }` draws that record at `coord`, and a `{ coord, hex:
+   * null }` leaves the coordinate Void. The single seam for previewing both a
+   * single-hex drag and a whole-group translation — the canvas computes the plan
+   * each frame and hands the writes here, so the renderer draws exactly what
+   * releasing would commit, without cloning or mutating the document.
+   */
+  readonly movePreview?: readonly HexWrite[] | null;
   /** Preview the live marquee rectangle being dragged (ADR-0017). */
   readonly marquee?: MarqueeOverride | null;
+  /**
+   * The destination cells a live group move is refused at — washed in the danger
+   * ink so the drag reads as blocked (CONTEXT.md → "blocked cells highlighted red";
+   * ADR-0017, issue #64). A preview overlay only: the document is never mutated.
+   */
+  readonly blockedCells?: readonly Axial[];
 }
 
 export interface MapRenderer {
@@ -192,6 +209,8 @@ interface Palette {
   readonly nameInk: string;
   /** The accent a selection highlight is stroked in, from `--gold-strong`. */
   readonly selected: string;
+  /** The danger ink a blocked move cell is washed in, from `--ember` (issue #64). */
+  readonly blocked: string;
   /** One fill colour per terrain id, resolved from its `--terrain-*` token. */
   readonly terrain: Record<TerrainId, string>;
 }
@@ -293,6 +312,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
       labelInk: read('--label-ink', '#f4ecd8'),
       nameInk: read('--name-ink', '#f4ecd8'),
       selected: read('--gold-strong', '#7e560f'),
+      blocked: read('--ember', '#a4402e'),
       terrain,
     };
   }
@@ -315,8 +335,9 @@ export class Canvas2dMapRenderer implements MapRenderer {
     const {
       labelDrag = null,
       selections = [],
-      hexDrag = null,
+      movePreview = null,
       marquee = null,
+      blockedCells = [],
     } = overrides;
     const ctx = this.ctx;
     if (!ctx || this.width === 0 || this.height === 0) return;
@@ -333,19 +354,17 @@ export class Canvas2dMapRenderer implements MapRenderer {
     // and the Set is built once per frame.
     const visibleKeys = new Set(visible.map(coordKey));
 
-    // A whole-Hex drag previews the move without touching the document: the
-    // dragged content (terrain + feature + name) draws at the destination, and the
-    // origin previews whatever slides back to it — the destination's record on a
-    // swap (so both hexes stay visible, ADR-0017), or Void on a plain move onto an
-    // empty cell. Ignore a drag that hasn't left its origin (from === to) so the
-    // hex never blinks out while the cursor is still on it.
-    const drag =
-      hexDrag && coordKey(hexDrag.from) !== coordKey(hexDrag.to) ? hexDrag : null;
-    const fromKey = drag ? coordKey(drag.from) : null;
-    const toKey = drag ? coordKey(drag.to) : null;
-    const dragged = fromKey ? doc.hexes[fromKey] : undefined;
-    // The occupant of an occupied destination — undefined (Void) for a plain move.
-    const swapBack = toKey ? doc.hexes[toKey] : undefined;
+    // A live move previews without touching the document by overlaying the planner's
+    // resolved writes: a `{ coord, hex }` draws that record at `coord` and a `{ coord,
+    // hex: null }` leaves it Void. This carries both a single-hex swap (the dragged
+    // record at the destination, the occupant slid back to the origin) and a whole
+    // group translated to its destinations with the vacated origins cleared
+    // (ADR-0017, issues #30, #64). Built once into a key→record map; an undefined
+    // lookup means "not previewed here — draw as stored".
+    const preview = new Map<string, Hex | null>();
+    if (movePreview) {
+      for (const { coord, hex } of movePreview) preview.set(coordKey(coord), hex);
+    }
 
     // Painted terrain, under the grid lines. Only the visible painted hexes are
     // drawn — the document is sparse, so this never touches the infinite Void.
@@ -357,14 +376,9 @@ export class Canvas2dMapRenderer implements MapRenderer {
     const named: { hex: Axial; name: string; hasFeature: boolean }[] = [];
     for (const hex of visible) {
       const key = coordKey(hex);
-      // Mid-drag the origin previews the destination's record (swapped back) and the
-      // destination previews the dragged content; every other hex draws as stored.
-      const painted =
-        key === fromKey
-          ? swapBack
-          : key === toKey && dragged
-            ? dragged
-            : doc.hexes[key];
+      // A previewed cell draws its overlaid record (or Void when the write clears it);
+      // every other cell draws as stored.
+      const painted = preview.has(key) ? preview.get(key) : doc.hexes[key];
       if (!painted) continue;
       ctx.fillStyle = this.palette.terrain[painted.terrain];
       this.tracePath(ctx, camera, hex);
@@ -467,13 +481,29 @@ export class Canvas2dMapRenderer implements MapRenderer {
       ctx.restore();
     }
 
+    // Blocked-move cells ride above the content but below the selection accent: a
+    // live group move whose plan is refused washes each contested destination in the
+    // danger ink, so the drag reads as blocked before release (ADR-0017, issue #64).
+    // A preview overlay only — the document is never mutated to draw it.
+    if (blockedCells.length > 0) {
+      ctx.save();
+      ctx.globalAlpha = BLOCKED_FILL_ALPHA;
+      ctx.fillStyle = this.palette.blocked;
+      for (const cell of blockedCells) {
+        this.tracePath(ctx, camera, cell);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
     // The selection highlight rides on top of everything (issue #28): every member
     // of the Selection set is highlighted (ADR-0017) — a Hex or Feature gets a
     // strong outline on its hex, a Label a bounds rectangle around the box
     // `drawLabel` just recorded, a Region a translucent member-fill. Drawn last so
-    // it sits above the grid, markers, and label text it points at. While a Hex
-    // drag is live, a selected hex/feature at the drag origin follows the previewed
-    // content to the destination (issue #30).
+    // it sits above the grid, markers, and label text it points at. A live drag
+    // makes its highlight follow the previewed content because the canvas hands this
+    // pass the selection already translated to the destinations (issues #30, #64) —
+    // so the renderer draws each member where it is told, no drag-tracking here.
     //
     // The selection pass is O(selected) per frame, not O(selected × total): two
     // id→entity indexes are built once here so each selected member resolves its
@@ -488,19 +518,13 @@ export class Canvas2dMapRenderer implements MapRenderer {
       if (!regionById_.has(region.id)) regionById_.set(region.id, region);
     }
     for (const selection of selections) {
-      // Only a hex/feature selection tracks a live Hex drag to its destination; a
-      // Label or Region selection is never the dragged content (issues #30, #35).
-      const tracking =
-        drag &&
-        (selection.kind === 'hex' || selection.kind === 'feature') &&
-        coordKey(selection.coord) === fromKey;
       this.drawSelection(
         ctx,
         camera,
         regionById_,
         labelBoxById,
         visibleKeys,
-        tracking ? { ...selection, coord: drag.to } : selection,
+        selection,
       );
     }
 

@@ -1485,205 +1485,212 @@ describe('EditorStore deleteSelected', () => {
   });
 });
 
-describe('EditorStore moveHex', () => {
-  it('moves a hex\'s content to the destination, leaving the origin Void', () => {
+describe('EditorStore moveSelection', () => {
+  const ZERO = { x: 0, y: 0 };
+
+  it('translates a whole multi-hex selection by one offset, keeping its shape', () => {
     const store = new EditorStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.placeFeatureAt({ q: 0, r: 0 }, 'settlement');
+    store.paintAt({ q: 1, r: 0 }, 'ocean');
+    store.marqueeSelect([{ q: 0, r: 0 }, { q: 1, r: 0 }], [], false);
 
-    store.moveHex({ q: 0, r: 0 }, { q: 2, r: -1 });
+    store.moveSelection({ q: 0, r: 2 }, ZERO);
+
+    // Both members rode by the same offset; the cluster keeps its internal shape
+    // and the whole records (feature included) travel along.
+    expect(store.document().hexes['0,2']).toEqual({
+      terrain: 'forest',
+      feature: { ref: 'settlement' },
+    });
+    expect(store.document().hexes['1,2']).toEqual({ terrain: 'ocean' });
+    expect('0,0' in store.document().hexes).toBe(false);
+    expect('1,0' in store.document().hexes).toBe(false);
+    // The selection re-points to the moved entities, so the group stays selected.
+    expect(store.selections()).toEqual(
+      expect.arrayContaining([
+        { kind: 'feature', coord: { q: 0, r: 2 } },
+        { kind: 'hex', coord: { q: 1, r: 2 } },
+      ]),
+    );
+    expect(store.selections()).toHaveLength(2);
+  });
+
+  it('shifts a contiguous blob by one cell without fighting itself (intra-group overlap)', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.paintAt({ q: 1, r: 0 }, 'ocean');
+    store.marqueeSelect([{ q: 0, r: 0 }, { q: 1, r: 0 }], [], false);
+
+    store.moveSelection({ q: 1, r: 0 }, ZERO);
+
+    // A nudge that lands one member on another's vacated cell just shifts: the tail
+    // clears, the rest is rewritten — no member is destroyed.
+    expect('0,0' in store.document().hexes).toBe(false);
+    expect(store.document().hexes['1,0']).toEqual({ terrain: 'forest' });
+    expect(store.document().hexes['2,0']).toEqual({ terrain: 'ocean' });
+  });
+
+  it('swaps a non-selected occupant back to d − offset when that cell is free', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.paintAt({ q: 0, r: 1 }, 'grass');
+    store.paintAt({ q: 3, r: 0 }, 'ocean'); // a non-selected occupant at one destination
+    store.marqueeSelect([{ q: 0, r: 0 }, { q: 0, r: 1 }], [], false);
+
+    store.moveSelection({ q: 3, r: 0 }, ZERO);
+
+    expect(store.document().hexes['3,0']).toEqual({ terrain: 'forest' });
+    expect(store.document().hexes['3,1']).toEqual({ terrain: 'grass' });
+    // The occupant swapped back by the inverse offset to (0,0), a vacated source.
+    expect(store.document().hexes['0,0']).toEqual({ terrain: 'ocean' });
+    expect('0,1' in store.document().hexes).toBe(false);
+  });
+
+  it('refuses a blocked move entirely: no document change, no undo step, selection intact', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.paintAt({ q: 1, r: 0 }, 'ocean');
+    store.paintAt({ q: 2, r: 0 }, 'mountain'); // X: pushing it back lands where A is going
+    store.marqueeSelect([{ q: 0, r: 0 }, { q: 1, r: 0 }], [], false);
+    const before = structuredClone(store.document());
+
+    store.moveSelection({ q: 1, r: 0 }, ZERO);
+
+    // A self-overlapping nudge blocks: the document is untouched and the move
+    // recorded nothing, so undoing reaches only the setup paints, never a no-op step.
+    expect(store.document()).toEqual(before);
+    expect(store.selections()).toHaveLength(2);
+    store.undo(); // undoes the last paint (mountain), proving no move step exists
+    expect(store.document().hexes['2,0']).toBeUndefined();
+    expect(store.canRedo()).toBe(true);
+  });
+
+  it('translates a selected region\'s footprint by the offset, keeping it selected', () => {
+    const store = new EditorStore();
+    const id = store.createRegion('Avalon', '#b08a4e');
+    store.addHexToRegion(id, { q: 0, r: 0 });
+    store.addHexToRegion(id, { q: 1, r: 0 });
+    store.selectRegion(id);
+
+    store.moveSelection({ q: 0, r: 3 }, ZERO);
+
+    expect(store.document().regions[0].hexes).toEqual({ '0,3': true, '1,3': true });
+    expect(store.selection()).toEqual({ kind: 'region', id });
+  });
+
+  it('moves a labels-only selection by free pixels, keeping the label selected', () => {
+    const store = new EditorStore();
+    const id = store.addLabel('Whisperwood', { x: 10, y: 10 });
+    store.selectLabel(id);
+
+    // No hex/region in the set, so the axial offset is zero; the label rides by the
+    // free pixel delta the drag decided.
+    store.moveSelection({ q: 0, r: 0 }, { x: 7, y: -3 });
+
+    expect(store.document().labels[0].position).toEqual({ x: 17, y: 7 });
+    expect(store.selection()).toEqual({ kind: 'label', id });
+  });
+
+  it('applies a mixed hex + region + label move as one undo step', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    const regionId = store.createRegion('Avalon', '#b08a4e');
+    store.addHexToRegion(regionId, { q: 0, r: 0 });
+    const labelId = store.addLabel('X', { x: 0, y: 0 });
+    // Build the heterogeneous set: the cell + label via marquee, then the region via
+    // a shift-toggle of the stack at the painted, region-owning coordinate.
+    store.marqueeSelect([{ q: 0, r: 0 }], [labelId], false);
+    store.select({ q: 0, r: 0 }, null, 'toggle-stack');
+
+    store.moveSelection({ q: 0, r: 1 }, { x: 5, y: 0 });
+
+    expect(store.document().hexes['0,1']).toEqual({ terrain: 'forest' });
+    expect(store.document().regions[0].hexes).toEqual({ '0,1': true });
+    expect(store.document().labels[0].position).toEqual({ x: 5, y: 0 });
+
+    // One undo step reverts the hex, the region footprint, and the label together.
+    store.undo();
+    expect(store.document().hexes['0,0']).toEqual({ terrain: 'forest' });
+    expect('0,1' in store.document().hexes).toBe(false);
+    expect(store.document().regions[0].hexes).toEqual({ '0,0': true });
+    expect(store.document().labels[0].position).toEqual({ x: 0, y: 0 });
+  });
+
+  it('moves a single selected hex onto Void, re-pointing the selection', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.placeFeatureAt({ q: 0, r: 0 }, 'settlement');
+    store.select({ q: 0, r: 0 }, null);
+
+    store.moveSelection({ q: 2, r: -1 }, ZERO);
 
     expect(store.document().hexes['2,-1']).toEqual({
       terrain: 'forest',
       feature: { ref: 'settlement' },
     });
     expect('0,0' in store.document().hexes).toBe(false);
+    expect(store.selection()).toEqual({ kind: 'feature', coord: { q: 2, r: -1 } });
   });
 
-  it('swaps the two whole records when the destination is occupied', () => {
+  it('swaps a single selected hex onto an occupant, selecting only the moved record', () => {
     const store = new EditorStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
-    store.placeFeatureAt({ q: 0, r: 0 }, 'settlement');
     store.editHexName({ q: 0, r: 0 }, 'Riverbend');
-    store.paintAt({ q: 1, r: 0 }, 'ocean'); // the destination is already painted
+    store.paintAt({ q: 1, r: 0 }, 'ocean');
     store.editHexName({ q: 1, r: 0 }, 'The Deep');
+    store.select({ q: 0, r: 0 }, null); // only the origin is selected
 
-    store.moveHex({ q: 0, r: 0 }, { q: 1, r: 0 });
+    store.moveSelection({ q: 1, r: 0 }, ZERO);
 
-    // A drop onto an occupant swaps both whole records (terrain + feature + name)
-    // rather than overwriting — a move never silently destroys content (ADR-0017).
-    expect(store.document().hexes['1,0']).toEqual({
-      terrain: 'forest',
-      feature: { ref: 'settlement' },
-      name: 'Riverbend',
-    });
-    expect(store.document().hexes['0,0']).toEqual({
-      terrain: 'ocean',
-      name: 'The Deep',
-    });
+    expect(store.document().hexes['1,0']).toEqual({ terrain: 'forest', name: 'Riverbend' });
+    expect(store.document().hexes['0,0']).toEqual({ terrain: 'ocean', name: 'The Deep' });
+    // Only the moved hex follows; the swapped-back occupant is not in the selection.
+    expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 1, r: 0 } });
   });
 
-  it('leaves region memberships at both the origin and destination untouched', () => {
-    const store = new EditorStore();
-    const id = store.createRegion('Avalon', '#b08a4e');
-    store.paintAt({ q: 0, r: 0 }, 'forest');
-    store.addHexToRegion(id, { q: 0, r: 0 }); // origin is a region member
-    store.addHexToRegion(id, { q: 1, r: 0 }); // so is the destination coordinate
-
-    // A Region is a location overlay keyed by coordinate, not a property of the
-    // painted cell, so moving content must not drag membership with it.
-    store.moveHex({ q: 0, r: 0 }, { q: 1, r: 0 });
-
-    expect(store.document().regions[0].hexes).toEqual({ '0,0': true, '1,0': true });
-  });
-
-  it('restores both swapped ends with a single undo', () => {
-    const store = new EditorStore();
-    store.paintAt({ q: 0, r: 0 }, 'forest');
-    store.placeFeatureAt({ q: 0, r: 0 }, 'settlement');
-    store.paintAt({ q: 1, r: 0 }, 'ocean'); // destination content the swap moves to the origin
-
-    store.moveHex({ q: 0, r: 0 }, { q: 1, r: 0 });
-    store.undo();
-
-    // One undo step puts both ends back: each coordinate recovers exactly what it
-    // held before the swap — no silent loss (ADR-0017).
-    expect(store.document().hexes['0,0']).toEqual({
-      terrain: 'forest',
-      feature: { ref: 'settlement' },
-    });
-    expect(store.document().hexes['1,0']).toEqual({ terrain: 'ocean' });
-  });
-
-  it('treats moving onto the same coordinate as a no-op with no undo step', () => {
-    const store = new EditorStore();
-    store.paintAt({ q: 0, r: 0 }, 'forest');
-
-    store.moveHex({ q: 0, r: 0 }, { q: 0, r: 0 });
-
-    expect(store.document().hexes['0,0']).toEqual({ terrain: 'forest' });
-    // The paint is the only undo step: a single undo empties the map, proving the
-    // self-move recorded nothing.
-    store.undo();
-    expect(store.canUndo()).toBe(false);
-    expect(store.document().hexes).toEqual({});
-  });
-
-  it('treats moving a Void origin as a no-op with no undo step', () => {
-    const store = new EditorStore();
-    store.paintAt({ q: 1, r: 0 }, 'ocean'); // a painted destination
-
-    store.moveHex({ q: 5, r: 5 }, { q: 1, r: 0 }); // origin is Void → nothing moves
-
-    expect(store.document().hexes['1,0']).toEqual({ terrain: 'ocean' });
-    expect('5,5' in store.document().hexes).toBe(false);
-    // Only the paint recorded a step; undoing it leaves nothing further to undo.
-    store.undo();
-    expect(store.canUndo()).toBe(false);
-    expect(store.document().hexes).toEqual({});
-  });
-
-  it('moves a terrain-only hex without inventing a feature on the destination', () => {
-    const store = new EditorStore();
-    store.paintAt({ q: 0, r: 0 }, 'forest'); // bare terrain, no feature
-
-    store.moveHex({ q: 0, r: 0 }, { q: 2, r: -1 });
-
-    // The clone carries exactly what the origin held — no `feature` key appears.
-    expect(store.document().hexes['2,-1']).toEqual({ terrain: 'forest' });
-    expect('feature' in store.document().hexes['2,-1']).toBe(false);
-  });
-
-  it('keeps the moved hex selected, following the selection to the destination', () => {
-    const store = new EditorStore();
-    store.paintAt({ q: 0, r: 0 }, 'forest');
-    store.select({ q: 0, r: 0 }, null); // the bare Hex is selected
-
-    store.moveHex({ q: 0, r: 0 }, { q: 2, r: -1 });
-
-    // Completing a move keeps the moved content selected at its new coordinate,
-    // matching the Label-drag path rather than silently deselecting.
-    expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 2, r: -1 } });
-  });
-
-  it('leaves a selection elsewhere untouched when a different hex is moved', () => {
-    const store = new EditorStore();
-    store.paintAt({ q: 0, r: 0 }, 'forest');
-    store.paintAt({ q: 3, r: 3 }, 'ocean');
-    store.select({ q: 3, r: 3 }, null); // a different hex is selected
-
-    store.moveHex({ q: 0, r: 0 }, { q: 2, r: -1 });
-
-    // Only a selection that pointed at the moved origin follows; this one stays.
-    expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 3, r: 3 } });
-  });
-
-  it('moves the selection back to the origin when the move is undone', () => {
-    const store = new EditorStore();
-    store.paintAt({ q: 0, r: 0 }, 'forest');
-    store.select({ q: 0, r: 0 }, null);
-
-    store.moveHex({ q: 0, r: 0 }, { q: 2, r: -1 });
-    expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 2, r: -1 } });
-
-    store.undo();
-
-    // Undo restores the document AND the selection in lockstep: the hex is back at
-    // the origin and selected there, not a stale reference to the empty destination.
-    expect('2,-1' in store.document().hexes).toBe(false);
-    expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 0, r: 0 } });
-  });
-
-  it('does not leave the selection highlighting swapped content after an undo', () => {
-    const store = new EditorStore();
-    store.paintAt({ q: 0, r: 0 }, 'forest');
-    store.paintAt({ q: 1, r: 0 }, 'ocean'); // destination content the swap relocates
-    store.select({ q: 0, r: 0 }, null); // the origin hex is selected
-
-    store.moveHex({ q: 0, r: 0 }, { q: 1, r: 0 });
-    store.undo();
-
-    // The destination's ocean is restored, but the selection follows the moved hex
-    // back to its origin rather than silently highlighting the recovered ocean.
-    expect(store.document().hexes['1,0']).toEqual({ terrain: 'ocean' });
-    expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 0, r: 0 } });
-  });
-
-  it('keeps both ends selected when a swap is dragged with both already selected', () => {
+  it('restores the whole group with a single undo and re-applies it on redo', () => {
     const store = new EditorStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.paintAt({ q: 1, r: 0 }, 'ocean');
-    store.marqueeSelect([{ q: 0, r: 0 }, { q: 1, r: 0 }], [], false); // both selected
+    store.marqueeSelect([{ q: 0, r: 0 }, { q: 1, r: 0 }], [], false);
 
-    store.moveHex({ q: 0, r: 0 }, { q: 1, r: 0 });
+    store.moveSelection({ q: 0, r: 2 }, ZERO);
+    store.undo();
 
-    // The swap exchanged the records, so each selection rides with its content:
-    // forest's ref follows to the destination, ocean's follows back to the origin.
-    // Neither end is silently dropped — the set still holds both coordinates.
-    expect(store.document().hexes['1,0']).toEqual({ terrain: 'forest' });
-    expect(store.document().hexes['0,0']).toEqual({ terrain: 'ocean' });
+    // One step puts both origins back and the selection with them.
+    expect(store.document().hexes['0,0']).toEqual({ terrain: 'forest' });
+    expect(store.document().hexes['1,0']).toEqual({ terrain: 'ocean' });
+    expect('0,2' in store.document().hexes).toBe(false);
     expect(store.selections()).toEqual(
       expect.arrayContaining([
-        { kind: 'hex', coord: { q: 1, r: 0 } },
         { kind: 'hex', coord: { q: 0, r: 0 } },
+        { kind: 'hex', coord: { q: 1, r: 0 } },
       ]),
     );
-    expect(store.selections()).toHaveLength(2);
+
+    store.redo();
+    expect(store.document().hexes['0,2']).toEqual({ terrain: 'forest' });
+    expect(store.document().hexes['1,2']).toEqual({ terrain: 'ocean' });
+    expect(store.selections()).toEqual(
+      expect.arrayContaining([
+        { kind: 'hex', coord: { q: 0, r: 2 } },
+        { kind: 'hex', coord: { q: 1, r: 2 } },
+      ]),
+    );
   });
 
-  it('follows the selection back to the destination when the move is redone', () => {
+  it('treats a drag that never moved (zero offset and pixels) as a no-op', () => {
     const store = new EditorStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.select({ q: 0, r: 0 }, null);
 
-    store.moveHex({ q: 0, r: 0 }, { q: 2, r: -1 });
-    store.undo();
-    store.redo();
+    store.moveSelection({ q: 0, r: 0 }, ZERO);
 
-    // Redo re-applies the move and its resulting selection, so the moved hex is
-    // selected at the destination again — no stale origin reference resolving null.
-    expect(store.document().hexes['2,-1']).toEqual({ terrain: 'forest' });
-    expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 2, r: -1 } });
+    // No move step recorded: the only undo is the paint, after which nothing remains.
+    store.undo();
+    expect(store.canUndo()).toBe(false);
+    expect(store.document().hexes).toEqual({});
   });
 });
 
@@ -1757,8 +1764,9 @@ describe('EditorStore hex name', () => {
     const store = new EditorStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.editHexName({ q: 0, r: 0 }, 'Riverbend');
+    store.select({ q: 0, r: 0 }, null);
 
-    store.moveHex({ q: 0, r: 0 }, { q: 2, r: -1 });
+    store.moveSelection({ q: 2, r: -1 }, { x: 0, y: 0 });
 
     expect(store.document().hexes['2,-1']).toEqual({
       terrain: 'forest',

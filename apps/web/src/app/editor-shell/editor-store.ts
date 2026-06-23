@@ -7,6 +7,8 @@ import {
   featureLibrary,
   HexMap,
   Label,
+  MovePlan,
+  MoveSelection,
   planMove,
   Point,
   Region,
@@ -642,81 +644,112 @@ export class EditorStore {
   }
 
   /**
-   * Move a whole Hex's content — terrain, feature, *and* name — from `from` to
-   * `to` (issue #30, ADR-0017). The one-hex case of the pure move-planner: a drop
-   * onto Void moves there and leaves the origin Void; a drop onto an occupied hex
-   * **swaps** the two whole records, so a move never silently destroys content.
-   * Region memberships at both coordinates are left untouched — a Region is a
-   * location overlay keyed by coordinate, not a property of the painted cell, so
-   * it stays put while the content slides out from under it (the planner carries
-   * no region here). The whole move is one `commit`, so a single undo restores
-   * both ends. Moving Void, or onto the same coordinate, changes nothing and
-   * records no undo step.
+   * Move the whole live Selection by one `offset` (issue #64, ADR-0017): the
+   * unified move every drag — one hex or a whole group — routes through. The
+   * selection's cells, labels, and regions are handed to the pure {@link planMove}
+   * seam, which resolves the rigid translation, intra-group overlap, and group
+   * collisions (a non-selected occupant swaps back to `d − offset`, or the cell
+   * blocks). A **blocked** plan is a no-op: the document and selection are left
+   * untouched, so the drag snaps back on release.
+   *
+   * A resolved plan applies in a single {@link commit} — hex writes/clears, each
+   * selected region's translated footprint, and every selected label nudged by
+   * `labelDelta` — so however much is selected the whole move is one undo step.
+   * `offset` is the axial hex delta (hexes and region footprints, and the
+   * re-pointed cell selection); `labelDelta` is the equivalent pixels for labels,
+   * decided by the drag's granularity (hex-snapped for a hex/region selection,
+   * free pixels for a labels-only one). The selection re-points to the moved
+   * entities — cells ride by the offset; region and label ids are unchanged — so
+   * the moved group stays selected. A drag that never moved (`offset` and
+   * `labelDelta` both zero) carries nothing and records no step, the unified
+   * counterpart of the old same-coordinate guard.
    */
-  moveHex(from: Axial, to: Axial): void {
-    const fromKey = coordKey(from);
-    const toKey = coordKey(to);
-    if (fromKey === toKey) return;
-    // Read the live immutable document once and share it with the planner, so the
-    // existence check and the plan see one consistent snapshot.
-    const doc = this._document();
-    // Moving Void carries nothing, so bail before the planner/`commit` runs.
-    if (!doc.hexes[fromKey]) return;
-    // A drop onto an occupant swaps the two records; remember whether this move is
-    // a swap (the destination held content) so the selection can follow both ends.
-    const swapped = !!doc.hexes[toKey];
-    // Route through the pure planner (the seam for every move): it reads the live
-    // immutable document and returns the writes/clears that swap or relocate the
-    // hex. A single-hex move never blocks, but a blocked plan would be a no-op.
-    const plan = planMove({
-      document: doc,
-      selection: { hexes: [from], labels: [], regions: [] },
-      offset: { q: to.q - from.q, r: to.r - from.r },
-    });
+  /**
+   * The live Selection as the domain {@link MoveSelection} the planner reads —
+   * cells as hex coordinates, plus label and region ids. The single place the move
+   * paths derive a planner request from the set, so {@link moveSelection} (which
+   * commits) and {@link planSelectionMove} (which previews) can never disagree.
+   */
+  private selectionForMove(): MoveSelection {
+    const hexes: Axial[] = [];
+    const labels: string[] = [];
+    const regions: string[] = [];
+    for (const ref of this._selections()) {
+      if (ref.kind === 'cell') hexes.push(ref.coord);
+      else if (ref.kind === 'label') labels.push(ref.id);
+      else regions.push(ref.id);
+    }
+    return { hexes, labels, regions };
+  }
+
+  /**
+   * The {@link MovePlan} moving the live Selection by `offset` *would* produce,
+   * without committing — the pure query the canvas reads each frame of a drag to
+   * preview the resolved writes (the group at its destination) or the blocked cells
+   * (highlighted red), exactly what releasing would commit (issue #64). Touches no
+   * signal and records no edit.
+   */
+  planSelectionMove(offset: Axial): MovePlan {
+    return planMove({ document: this._document(), selection: this.selectionForMove(), offset });
+  }
+
+  moveSelection(offset: Axial, labelDelta: Point): void {
+    if (
+      offset.q === 0 &&
+      offset.r === 0 &&
+      labelDelta.x === 0 &&
+      labelDelta.y === 0
+    ) {
+      return;
+    }
+    const refs = this._selections();
+    const selection = this.selectionForMove();
+    const plan = planMove({ document: this._document(), selection, offset });
+    // A blocked plan refuses the whole move — leave everything untouched so the
+    // release snaps the preview back (CONTEXT.md → "a blocked plan is a no-op").
     if (plan.blocked) return;
-    this.commit((draft) => {
-      // Apply each write/clear. Deep-clone the planner's records — they reference
-      // the immutable pre-move document — so the draft never aliases a live node,
-      // and every Hex field (a future one included) is carried along verbatim.
+    const labelIds = selection.labels;
+    const moveLabels = labelDelta.x !== 0 || labelDelta.y !== 0;
+    const committed = this.commit((draft) => {
+      // Deep-clone every record the planner hands back — they reference the
+      // immutable pre-move document, so the draft never aliases a live node and
+      // every Hex/footprint field is carried verbatim (matching the single-hex path).
       for (const { coord, hex } of plan.hexes) {
         const key = coordKey(coord);
         if (hex) draft.hexes[key] = deepClone(hex);
         else delete draft.hexes[key];
       }
+      for (const { id, hexes: footprint } of plan.regions) {
+        const region = regionById(draft, id);
+        if (region) region.hexes = deepClone(footprint);
+      }
+      if (moveLabels) {
+        for (const id of labelIds) {
+          const label = draft.labels.find((l) => l.id === id);
+          if (label) {
+            label.position = {
+              x: label.position.x + labelDelta.x,
+              y: label.position.y + labelDelta.y,
+            };
+          }
+        }
+      }
     });
-    // The content moved, so a cell selection rides along with the content it
-    // points at: a ref at the origin follows to the destination, and — on a swap —
-    // a ref at the destination follows back to the origin, since that record slid
-    // there. Copy each coordinate rather than aliasing the caller's `from`/`to`, so
-    // a coord the caller later mutates (e.g. a reused hover object) can't retarget
-    // the selection. (A single-hex drag only ever selects the origin; the symmetric
-    // case keeps the seam correct once a group drag can select both ends.)
-    const refs = this._selections();
-    const touched = refs.some(
-      (ref) =>
-        ref.kind === 'cell' &&
-        (coordKey(ref.coord) === fromKey ||
-          (swapped && coordKey(ref.coord) === toKey)),
+    // The plan changed nothing (an empty selection, or every source Void): no step
+    // was recorded, so there is nothing to re-point.
+    if (!committed) return;
+    // Re-point the selection to the moved entities: each cell rides by the axial
+    // offset to its destination; region and label refs keep their ids (their
+    // footprint/position moved under the same id). The cell translation is a
+    // bijection, so it introduces no duplicates.
+    const remapped = refs.map((ref): SelectionRef =>
+      ref.kind === 'cell'
+        ? { kind: 'cell', coord: { q: ref.coord.q + offset.q, r: ref.coord.r + offset.r } }
+        : ref,
     );
-    if (touched) {
-      const remapped = refs.map((ref): SelectionRef => {
-        if (ref.kind !== 'cell') return ref;
-        const key = coordKey(ref.coord);
-        if (key === fromKey) return { kind: 'cell', coord: { q: to.q, r: to.r } };
-        if (swapped && key === toKey)
-          return { kind: 'cell', coord: { q: from.q, r: from.r } };
-        return ref;
-      });
-      // The remap is a bijection on {origin, destination}, so it introduces no new
-      // duplicates; collapse any that pre-existed in the set, keeping the first.
-      const deduped = remapped.filter(
-        (ref, i) => remapped.findIndex((r) => sameSelectionRef(r, ref)) === i,
-      );
-      this._selections.set(deduped);
-    }
+    this._selections.set(remapped);
     // Stamp the post-move selection onto the edit so undo restores it to the
-    // origin and redo follows it back to the destination, in lockstep with the
-    // document — the move's `commit` always records a step, so an edit exists.
+    // sources and redo follows it back to the destinations, in lockstep.
     this.trackSelectionOnLastEdit();
   }
 

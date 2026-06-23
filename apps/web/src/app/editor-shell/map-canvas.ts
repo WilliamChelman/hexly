@@ -16,6 +16,8 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import {
   Axial,
   coordKey,
+  hexToPixel,
+  HexWrite,
   Layout,
   marqueeHits,
   pixelToHex,
@@ -271,8 +273,8 @@ export class MapCanvas {
    * The in-progress whole-Hex drag: the `from` origin (the selected hex) and the
    * `to` coordinate currently under the cursor. `null` until a press over a
    * selected Hex/Feature crosses {@link HEX_DRAG_THRESHOLD}. The renderer previews
-   * the move at this destination; the store only sees the final `moveHex` on
-   * release, so the drag is a single undo step (issue #30).
+   * the move at this destination; the store only sees the final `moveSelection` on
+   * release, so the drag is a single undo step (issue #30, #64).
    */
   private readonly hexDrag = signal<HexDragOverride | null>(null);
 
@@ -292,13 +294,18 @@ export class MapCanvas {
   } | null>(null);
 
   /**
-   * A press that *may* become a Hex drag: the origin coordinate and the press
-   * point in client pixels, recorded on pointer-down over a selected Hex/Feature.
+   * A press that *may* become a Hex/group drag: the origin coordinate and the press
+   * point in client pixels, recorded on pointer-down over a Hex/Feature. `group` is
+   * true when the press landed on a hex already in the Selection — then the press
+   * preserves the whole set and a drag moves it all (the "drag my selection" gesture,
+   * issue #64); a plain release collapses the set to the clicked hex. `group` is
+   * false for a press on an unselected hex, which selected just that hex on press.
    * Stays a plain field (not a signal) — it gates the move gesture but never the
    * render. `null` when no such press is armed (issue #30).
    */
-  private hexDragPress: { from: Axial; clientX: number; clientY: number } | null =
-    null;
+  private hexDragPress:
+    | { from: Axial; clientX: number; clientY: number; group: boolean }
+    | null = null;
 
   /**
    * An in-progress modifier select-sweep (ADR-0017): holding Cmd/Ctrl (`add-top`)
@@ -406,6 +413,8 @@ export class MapCanvas {
     const marqueeState = this.marquee();
     let selections = this.store.selections();
     let marquee: MarqueeOverride | null = null;
+    let movePreview: readonly HexWrite[] | null = null;
+    let blockedCells: readonly Axial[] = [];
     if (marqueeState) {
       marquee = { a: marqueeState.a, b: marqueeState.b };
       const rect = rectFromCorners(marqueeState.a, marqueeState.b);
@@ -415,12 +424,34 @@ export class MapCanvas {
         hits.labels,
         marqueeState.additive,
       );
+    } else if (hexDrag) {
+      // A live Hex/group drag previews the move from the planner's plan at the
+      // current offset (issue #30, #64). A resolved plan overlays its writes (the
+      // group at its destinations) and the highlight follows by translating each
+      // selected cell; a blocked plan washes the contested cells red and leaves the
+      // group in place, since releasing it would be a no-op that snaps back.
+      const offset = {
+        q: hexDrag.to.q - hexDrag.from.q,
+        r: hexDrag.to.r - hexDrag.from.r,
+      };
+      const plan = this.store.planSelectionMove(offset);
+      if (plan.blocked) {
+        blockedCells = plan.cells;
+      } else {
+        movePreview = plan.hexes;
+        selections = selections.map((s) =>
+          s.kind === 'hex' || s.kind === 'feature'
+            ? { ...s, coord: { q: s.coord.q + offset.q, r: s.coord.r + offset.r } }
+            : s,
+        );
+      }
     }
     this.renderer?.render(camera, doc, hover, {
       labelDrag,
       selections,
-      hexDrag,
+      movePreview,
       marquee,
+      blockedCells,
     });
   }
 
@@ -482,6 +513,22 @@ export class MapCanvas {
         return;
       }
       const hitId = this.renderer?.labelAt(this.localPoint(event)) ?? null;
+      // A plain press on a hex that is *already* selected drags the whole Selection
+      // (issue #64): preserve the set and arm a group drag rather than collapsing it
+      // to the one hex. The collapse is deferred to a plain release (no drag) below,
+      // so click-to-pick still works. Only a plain press takes this path — a modifier
+      // press always folds into the set instead.
+      const plainPress =
+        !event.shiftKey && !event.metaKey && !event.ctrlKey && hitId === null;
+      if (plainPress && this.isSelectedCell(hex)) {
+        this.hexDragPress = {
+          from: hex,
+          clientX: event.clientX,
+          clientY: event.clientY,
+          group: true,
+        };
+        return;
+      }
       // Modifiers fold the click into the Selection set (ADR-0017): Shift toggles
       // the whole stack at the coordinate, Cmd/Ctrl the topmost entity; a plain
       // click replaces (and cycles). Cmd/Ctrl wins if both are somehow held.
@@ -512,7 +559,7 @@ export class MapCanvas {
       // A plain click arms a *potential* drag (issue #30). A Label drags via the
       // existing `moveLabel` path — the grab offset keeps it from jumping to the
       // cursor. A Hex/Feature arms a whole-Hex move: the press already selected it,
-      // and crossing the threshold in `onPointerMove` turns it into a `moveHex`. A
+      // and crossing the threshold in `onPointerMove` turns it into a `moveSelection`. A
       // release before the threshold is a plain click — selection only, no move.
       if (selection?.kind === 'label') {
         const label = this.store.selectedLabel();
@@ -528,6 +575,7 @@ export class MapCanvas {
           from: selection.coord,
           clientX: event.clientX,
           clientY: event.clientY,
+          group: false,
         };
       }
       return;
@@ -684,13 +732,27 @@ export class MapCanvas {
       this.store.moveLabel(drag.id, drag.position);
       this.labelDrag.set(null);
     }
-    // Commit a whole-Hex drag as a single edit: `moveHex` to the destination
-    // under the cursor. A press that never crossed the threshold leaves `hexDrag`
-    // null, so it is a plain click — selection only, no move recorded (issue #30).
+    // Commit a whole-Hex drag as a single edit through the unified `moveSelection`
+    // (ADR-0017, issue #64): the press selected the hex, so the live Selection is
+    // what moves, by the drag's offset. `offset` is the axial hex delta; the label
+    // delta is its pixel equivalent (the hex-snapped granularity — relevant once a
+    // mixed group rides along). A press that never crossed the threshold leaves
+    // `hexDrag` null, so it is a plain click — selection only, no move recorded.
     const hexDrag = this.hexDrag();
     if (hexDrag) {
-      this.store.moveHex(hexDrag.from, hexDrag.to);
+      const offset = {
+        q: hexDrag.to.q - hexDrag.from.q,
+        r: hexDrag.to.r - hexDrag.from.r,
+      };
+      const fromPx = hexToPixel(this.layout, hexDrag.from);
+      const toPx = hexToPixel(this.layout, hexDrag.to);
+      this.store.moveSelection(offset, { x: toPx.x - fromPx.x, y: toPx.y - fromPx.y });
       this.hexDrag.set(null);
+    } else if (this.hexDragPress?.group) {
+      // A plain click (no drag) on an already-selected member collapses the whole
+      // Selection to just that hex — the pick that the group-drag press deferred so
+      // dragging could move the set (issue #64).
+      this.store.select(this.hexDragPress.from, null, 'replace');
     }
     // Commit a marquee box: run its world rectangle through the pure hit-test and
     // fold the contained hexes + labels into the selection (replace, or add when
@@ -741,6 +803,18 @@ export class MapCanvas {
     return (
       this.activePointerId !== null && event.pointerId !== this.activePointerId
     );
+  }
+
+  /** Whether the painted hex at `coord` (as a Hex or Feature) is in the Selection set. */
+  private isSelectedCell(coord: Axial): boolean {
+    const key = coordKey(coord);
+    return this.store
+      .selections()
+      .some(
+        (s) =>
+          (s.kind === 'hex' || s.kind === 'feature') &&
+          coordKey(s.coord) === key,
+      );
   }
 
   /**
