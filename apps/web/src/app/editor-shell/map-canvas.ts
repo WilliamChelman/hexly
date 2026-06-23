@@ -98,10 +98,11 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
   template: `
     <canvas
       #canvas
-      class="surface"
+      class="absolute inset-0 w-full h-full block touch-none"
       role="img"
       [attr.aria-label]="'editorShell.hexMap' | transloco"
-      [class.is-grabbing]="dragging()"
+      [class.cursor-grab]="!dragging()"
+      [class.cursor-grabbing]="dragging()"
       (pointerdown)="onPointerDown($event)"
       (pointermove)="onPointerMove($event)"
       (pointerup)="onPointerUp($event)"
@@ -112,7 +113,7 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
 
     <div class="readout">
       <app-coord>q {{ hover()?.q ?? 0 }} · r {{ hover()?.r ?? 0 }}</app-coord>
-      <span class="readout-sep">·</span>
+      <span class="text-line-strong">·</span>
       <span appEyebrow>{{ readoutKey() | transloco }}</span>
     </div>
 
@@ -131,7 +132,7 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
       >
         <app-icon-plus [size]="16" />
       </button>
-      <app-coord class="zoom-level">{{ zoomPercent() }}%</app-coord>
+      <app-coord class="min-w-[3.4em] text-center">{{ zoomPercent() }}%</app-coord>
       <button
         type="button"
         appButton
@@ -165,18 +166,6 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
         var(--color-canvas-mat)
       );
     }
-    .surface {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      display: block;
-      cursor: grab;
-      touch-action: none;
-    }
-    .surface.is-grabbing {
-      cursor: grabbing;
-    }
     /*
       Bottom-left: the floating tool strip now owns the top-left of the canvas
       (ADR-0013), so the hover coordinate readout drops to the opposite-free
@@ -197,9 +186,6 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
       backdrop-filter: blur(4px);
       pointer-events: none;
     }
-    .readout-sep {
-      color: var(--color-line-strong);
-    }
     /*
       Bottom-right, and lifted above the floating right dock (z-index 1, ADR-0013):
       a tall open Inspector/Regions card reaches this corner, so the zoom/fit
@@ -219,10 +205,6 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
       border-radius: var(--radius-full);
       box-shadow: var(--shadow-2);
       backdrop-filter: blur(4px);
-    }
-    .zoom-level {
-      min-width: 3.4em;
-      text-align: center;
     }
   `,
 })

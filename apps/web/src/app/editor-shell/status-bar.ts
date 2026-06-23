@@ -21,9 +21,13 @@ import { EditorStore } from './editor-store';
 @Component({
   selector: 'app-status-bar',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    class:
+      'flex items-center gap-4 py-0 px-4 text-2xs text-ink-muted bg-surface border-t border-line-strong',
+  },
   imports: [Cartouche, Coord, Dot, TranslocoPipe],
   template: `
-    <span class="item" data-testid="health">
+    <span class="flex items-center gap-2 whitespace-nowrap" data-testid="health">
       @if (health(); as status) {
         <span appDot [positive]="healthy()"></span>
         API {{ status.status }} · {{ status.service }}
@@ -33,9 +37,9 @@ import { EditorStore } from './editor-store';
         <span appDot></span>{{ 'editorShell.statusBar.connecting' | transloco }}
       }
     </span>
-    <span class="spacer"></span>
-    <span class="item"><app-coord>q 0 · r 0</app-coord></span>
-    <span class="item" data-testid="hex-count"
+    <span class="flex-1"></span>
+    <span class="flex items-center gap-2 whitespace-nowrap"><app-coord>q 0 · r 0</app-coord></span>
+    <span class="flex items-center gap-2 whitespace-nowrap" data-testid="hex-count"
       >{{ hexCount() }}
       {{
         (hexCount() === 1
@@ -43,29 +47,8 @@ import { EditorStore } from './editor-store';
           : 'editorShell.statusBar.hexes') | transloco
       }}</span
     >
-    <span class="item">Zoom 100%</span>
-    <span class="item" appCartouche>Astral / Parchment</span>
-  `,
-  styles: `
-    :host {
-      display: flex;
-      align-items: center;
-      gap: var(--spacing-4);
-      padding: 0 var(--spacing-4);
-      font-size: var(--text-2xs);
-      color: var(--color-ink-muted);
-      background: var(--color-surface);
-      border-top: 1px solid var(--color-line-strong);
-    }
-    .item {
-      display: flex;
-      align-items: center;
-      gap: var(--spacing-2);
-      white-space: nowrap;
-    }
-    .spacer {
-      flex: 1;
-    }
+    <span class="flex items-center gap-2 whitespace-nowrap">Zoom 100%</span>
+    <span class="flex items-center gap-2 whitespace-nowrap" appCartouche>Astral / Parchment</span>
   `,
 })
 export class StatusBar implements OnInit {

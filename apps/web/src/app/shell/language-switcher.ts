@@ -17,7 +17,7 @@ import { Button } from '../ui/button';
   imports: [Button, TranslocoPipe],
   template: `
     <div
-      class="group"
+      class="inline-flex items-center gap-1"
       role="group"
       [attr.aria-label]="'common.language' | transloco"
     >
@@ -27,32 +27,18 @@ import { Button } from '../ui/button';
           appButton
           variant="ghost"
           size="sm"
-          class="option"
-          [class.active]="locale === current()"
+          [active]="locale === current()"
           [attr.data-testid]="'lang-' + locale"
           [attr.aria-pressed]="locale === current()"
           [title]="names[locale]"
           (click)="select(locale)"
         >
-          {{ locale.toUpperCase() }}
+          <span class="font-mono" [class.text-ink-muted]="locale !== current()">{{
+            locale.toUpperCase()
+          }}</span>
         </button>
       }
     </div>
-  `,
-  styles: `
-    .group {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--spacing-1);
-    }
-    .option {
-      color: var(--color-ink-muted);
-      font-family: var(--font-mono);
-    }
-    .option.active {
-      color: var(--color-ink-strong);
-      background: var(--color-gold-soft);
-    }
   `,
 })
 export class LanguageSwitcher {

@@ -10,18 +10,10 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
 @Component({
   selector: 'app-coord',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    class:
+      'font-mono text-2xs tracking-[0.02em] text-ink-muted bg-surface-sunken border border-line rounded-sm py-[1px] px-2',
+  },
   template: `<ng-content />`,
-  styles: `
-    :host {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      letter-spacing: 0.02em;
-      color: var(--color-ink-muted);
-      background: var(--color-surface-sunken);
-      border: 1px solid var(--color-line);
-      border-radius: var(--radius-sm);
-      padding: 1px var(--spacing-2);
-    }
-  `,
 })
 export class Coord {}

@@ -28,6 +28,7 @@ export type ButtonSize = 'md' | 'sm';
     '[class.is-sm]': "size() === 'sm'",
     '[class.is-icon]': 'icon()',
     '[class.is-danger]': 'danger()',
+    '[class.is-active]': 'active()',
   },
   template: `<ng-content />`,
   styles: `
@@ -103,6 +104,13 @@ export type ButtonSize = 'md' | 'sm';
       --_bg: var(--color-ember);
       border-color: var(--color-ember);
     }
+    /* Selected/pressed — a sticky highlight for a button acting as a toggle or a
+       segmented choice (the consumer drives it via [active] and owns aria-pressed).
+       Composes over any variant; placed last so it wins the same-specificity tie. */
+    :host(.is-active) {
+      --_fg: var(--color-ink-strong);
+      --_bg: var(--color-gold-soft);
+    }
     :host(.is-sm) {
       padding: var(--spacing-1) var(--spacing-3);
       font-size: var(--text-xs);
@@ -120,4 +128,10 @@ export class Button {
   readonly icon = input(false, { transform: booleanAttribute });
   /** Destructive tone; composes with any variant. */
   readonly danger = input(false, { transform: booleanAttribute });
+  /**
+   * Selected/pressed highlight for a toggle or segmented choice. The consumer
+   * sets this and owns the matching `aria-pressed`/`aria-current` — this only
+   * paints the sticky highlight (gold-soft fill, ink-strong text).
+   */
+  readonly active = input(false, { transform: booleanAttribute });
 }

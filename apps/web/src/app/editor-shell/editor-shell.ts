@@ -37,6 +37,7 @@ import { StatusBar } from './status-bar';
 @Component({
   selector: 'app-editor-shell',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'block h-full overflow-hidden' },
   imports: [
     ToolPalette,
     MapCanvas,
@@ -47,7 +48,7 @@ import { StatusBar } from './status-bar';
   ],
   template: `
     <div class="shell">
-      <div class="body">
+      <div class="body relative min-h-0">
         <!-- Full-bleed canvas; all side chrome floats over it (ADR-0013). -->
         <app-map-canvas />
         <app-tool-palette />
@@ -59,7 +60,9 @@ import { StatusBar } from './status-bar';
           opens the Inspector. When the panel is closed (rightPanel is null) only
           the bare rail shows, so the map is clear.
         -->
-        <div class="right-dock">
+        <div
+          class="right-dock absolute top-3 right-3 bottom-3 flex items-start gap-2 z-[1] pointer-events-none"
+        >
           @if (store.rightPanel() === 'regions') {
             <app-regions-panel />
           } @else if (store.rightPanel() === 'inspector') {
@@ -72,21 +75,12 @@ import { StatusBar } from './status-bar';
     </div>
   `,
   styles: `
-    :host {
-      display: block;
-      height: 100%;
-      overflow: hidden;
-    }
     .shell {
       display: grid;
       grid-template-rows: 1fr var(--rail-status);
       height: 100%;
     }
     /* The body is the floating-chrome stacking context; the canvas fills it. */
-    .body {
-      position: relative;
-      min-height: 0;
-    }
     .body app-map-canvas {
       position: absolute;
       inset: 0;
@@ -100,22 +94,12 @@ import { StatusBar } from './status-bar';
       z-index: 1;
     }
     /*
-      The right dock floats top-right and lays the panel + rail out as a row. It
-      spans the body's height (top..bottom) so the panel can cap its height and
-      scroll internally (story 22); pointer-events pass through its empty area so
-      the canvas stays interactive below a short panel.
+      The right dock floats top-right and lays the panel + rail out as a row (its
+      box/layout lives in inline utilities on the element). It spans the body's
+      height (top..bottom) so the panel can cap its height and scroll internally
+      (story 22); pointer-events pass through its empty area so the canvas stays
+      interactive below a short panel — re-enabled per child here.
     */
-    .right-dock {
-      position: absolute;
-      top: var(--spacing-3);
-      right: var(--spacing-3);
-      bottom: var(--spacing-3);
-      display: flex;
-      align-items: flex-start;
-      gap: var(--spacing-2);
-      z-index: 1;
-      pointer-events: none;
-    }
     .right-dock > * {
       pointer-events: auto;
     }

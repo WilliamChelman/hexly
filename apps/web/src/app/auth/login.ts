@@ -28,10 +28,10 @@ import { Panel } from '../ui/panel';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [Panel, Field, Input, Button, TranslocoPipe],
   template: `
-    <div class="page">
-      <section class="card" appPanel raised>
+    <div class="grid place-items-center min-h-full p-5 bg-surface-sunken">
+      <section class="w-full max-w-[22rem] p-6" appPanel raised>
         <h1 class="sr-only">{{ heading() }}</h1>
-        <form (submit)="submit($event)">
+        <form class="flex flex-col gap-4" (submit)="submit($event)">
           <label appField [label]="'auth.email' | transloco">
             <input
               appInput
@@ -54,7 +54,7 @@ import { Panel } from '../ui/panel';
           </label>
 
           @if (error(); as e) {
-            <p class="error" role="alert">{{ e | transloco }}</p>
+            <p class="m-0 text-sm text-ember" role="alert">{{ e | transloco }}</p>
           }
 
           <button
@@ -68,30 +68,6 @@ import { Panel } from '../ui/panel';
         </form>
       </section>
     </div>
-  `,
-  styles: `
-    .page {
-      display: grid;
-      place-items: center;
-      min-height: 100%;
-      padding: var(--spacing-5);
-      background: var(--color-surface-sunken);
-    }
-    .card {
-      width: 100%;
-      max-width: 22rem;
-      padding: var(--spacing-6);
-    }
-    form {
-      display: flex;
-      flex-direction: column;
-      gap: var(--spacing-4);
-    }
-    .error {
-      margin: 0;
-      font-size: var(--text-sm);
-      color: var(--color-ember);
-    }
   `,
 })
 export class Login {

@@ -11,16 +11,9 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
 @Component({
   selector: '[appEyebrow]',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    class: 'font-display text-2xs font-semibold tracking-wider uppercase text-ink-muted',
+  },
   template: '<ng-content />',
-  styles: `
-    :host {
-      font-family: var(--font-display);
-      font-size: var(--text-2xs);
-      font-weight: var(--font-weight-semibold);
-      letter-spacing: var(--tracking-wider);
-      text-transform: uppercase;
-      color: var(--color-ink-muted);
-    }
-  `,
 })
 export class Eyebrow {}

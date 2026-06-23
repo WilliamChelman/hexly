@@ -13,28 +13,19 @@ import { Toaster } from './shell/toaster';
  */
 @Component({
   selector: 'app-root',
+  host: { class: 'flex flex-col h-screen' },
   imports: [RouterOutlet, AppHeader, Toaster],
   template: `
+    <!--
+      The outlet is the scroll container, so the always-present header stays
+      fixed above it while long pages (the library, the styleguide) scroll.
+      The editor fills the outlet exactly and manages its own overflow.
+    -->
     <app-header />
-    <main class="outlet">
+    <main class="flex-1 min-h-0 overflow-auto">
       <router-outlet />
     </main>
     <app-toaster />
-  `,
-  styles: `
-    :host {
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-    }
-    .outlet {
-      flex: 1;
-      min-height: 0;
-      /* The outlet is the scroll container, so the always-present header stays
-         fixed above it while long pages (the library, the styleguide) scroll.
-         The editor fills the outlet exactly and manages its own overflow. */
-      overflow: auto;
-    }
   `,
 })
 export class App {

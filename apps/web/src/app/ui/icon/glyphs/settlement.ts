@@ -14,7 +14,7 @@ const SETTLEMENT_PATH =
 @Component({
   selector: 'app-icon-settlement',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  styles: ':host { display: inline-flex; line-height: 0; }',
+  host: { class: 'inline-flex leading-[0]' },
   template: `
     <svg
       [attr.width]="size()"

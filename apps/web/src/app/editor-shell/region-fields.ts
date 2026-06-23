@@ -17,6 +17,7 @@ import { EditorStore } from './editor-store';
 @Component({
   selector: 'app-region-fields',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'contents' },
   imports: [Field, Input, TranslocoPipe],
   template: `
     @let r = region();
@@ -42,11 +43,6 @@ import { EditorStore } from './editor-store';
         (change)="onColor(r.id, $event)"
       />
     </div>
-  `,
-  styles: `
-    :host {
-      display: contents;
-    }
   `,
 })
 export class RegionFields {

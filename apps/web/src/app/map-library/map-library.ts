@@ -50,10 +50,11 @@ function formatEdited(updatedAt: number, lang: string): string {
   selector: 'app-map-library',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [Button, Panel, PlusIcon, TranslocoPipe],
+  host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
-    <div class="page">
+    <div class="max-w-[60rem] mx-auto py-6 px-5">
       <h1 class="sr-only">{{ pageTitle() }}</h1>
-      <div class="head">
+      <div class="flex justify-end mb-5">
         <button
           type="button"
           appButton
@@ -68,18 +69,18 @@ function formatEdited(updatedAt: number, lang: string): string {
       </div>
 
       @if (cards().length > 0) {
-        <ul class="grid">
+        <ul class="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-4 m-0 p-0 list-none">
           @for (card of cards(); track card.id) {
             <li>
-              <section class="card" appPanel>
+              <section class="flex items-center gap-2 py-3 px-4" appPanel>
                 <button
                   type="button"
-                  class="open"
+                  class="flex flex-1 flex-col gap-1 p-0 text-left bg-transparent border-0 cursor-pointer"
                   [attr.data-testid]="'open-' + card.id"
                   (click)="open(card.id)"
                 >
-                  <span class="map-title" data-testid="map-title">{{ card.title }}</span>
-                  <span class="meta">{{
+                  <span class="font-display text-md text-ink-strong" data-testid="map-title">{{ card.title }}</span>
+                  <span class="meta text-2xs text-ink-muted">{{
                     'mapLibrary.edited' | transloco: { date: card.edited }
                   }}</span>
                 </button>
@@ -99,12 +100,12 @@ function formatEdited(updatedAt: number, lang: string): string {
           }
         </ul>
       } @else if (loadError()) {
-        <section class="empty" data-testid="load-error" appPanel>
+        <section class="empty p-6 text-center text-ink-muted" data-testid="load-error" appPanel>
           <p>{{ 'mapLibrary.loadErrorTitle' | transloco }}</p>
           <p class="hint">{{ 'mapLibrary.loadErrorHint' | transloco }}</p>
         </section>
       } @else if (loaded()) {
-        <section class="empty" data-testid="empty" appPanel>
+        <section class="empty p-6 text-center text-ink-muted" data-testid="empty" appPanel>
           <p>{{ 'mapLibrary.emptyTitle' | transloco }}</p>
           <p class="hint">{{ 'mapLibrary.emptyHint' | transloco }}</p>
         </section>
@@ -112,60 +113,8 @@ function formatEdited(updatedAt: number, lang: string): string {
     </div>
   `,
   styles: `
-    :host {
-      display: block;
-      min-height: 100%;
-      background: var(--color-surface-sunken);
-    }
-    .page {
-      max-width: 60rem;
-      margin: 0 auto;
-      padding: var(--spacing-6) var(--spacing-5);
-    }
-    .head {
-      display: flex;
-      justify-content: flex-end;
-      margin-bottom: var(--spacing-5);
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
-      gap: var(--spacing-4);
-      margin: 0;
-      padding: 0;
-      list-style: none;
-    }
-    .card {
-      display: flex;
-      align-items: center;
-      gap: var(--spacing-2);
-      padding: var(--spacing-3) var(--spacing-4);
-    }
-    .open {
-      display: flex;
-      flex: 1;
-      flex-direction: column;
-      gap: var(--spacing-1);
-      padding: 0;
-      text-align: left;
-      background: none;
-      border: none;
-      cursor: pointer;
-    }
-    .map-title {
-      font-family: var(--font-display);
-      font-size: var(--text-md);
-      color: var(--color-ink-strong);
-    }
-    .meta {
-      font-size: var(--text-2xs);
-      color: var(--color-ink-muted);
-    }
-    .empty {
-      padding: var(--spacing-6);
-      text-align: center;
-      color: var(--color-ink-muted);
-    }
+    /* The card grid and the open-button box live in inline utilities on their
+       elements; only the descendant hint keeps a scoped rule. */
     .empty .hint {
       font-size: var(--text-sm);
     }

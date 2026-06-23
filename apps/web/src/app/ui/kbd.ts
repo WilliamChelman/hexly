@@ -9,18 +9,10 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
 @Component({
   selector: 'kbd[appKbd]',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    class:
+      'font-mono text-2xs py-[1px] px-2 text-ink-muted bg-surface-raised border border-line-strong border-b-2 rounded-sm',
+  },
   template: '<ng-content />',
-  styles: `
-    :host {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      padding: 1px var(--spacing-2);
-      color: var(--color-ink-muted);
-      background: var(--color-surface-raised);
-      border: 1px solid var(--color-line-strong);
-      border-bottom-width: 2px;
-      border-radius: var(--radius-sm);
-    }
-  `,
 })
 export class Kbd {}

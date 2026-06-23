@@ -21,9 +21,12 @@ import { EditorStore } from './editor-store';
 @Component({
   selector: 'app-regions-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    class: 'flex flex-col gap-2 p-4 overflow-y-auto bg-surface',
+  },
   imports: [Button, Eyebrow, Swatch, TranslocoPipe],
   template: `
-    <header class="head">
+    <header class="flex items-center justify-between gap-3">
       <span appEyebrow>{{ 'editorShell.regionsPanel.title' | transloco }}</span>
       <button
         type="button"
@@ -40,67 +43,16 @@ import { EditorStore } from './editor-store';
     @for (region of store.regions(); track region.id) {
       <button
         type="button"
-        class="row"
+        class="flex items-center gap-3 w-full py-2 px-3 text-sm text-ink bg-transparent border border-transparent rounded-md cursor-pointer text-left hover:bg-gold-soft aria-[current=true]:bg-gold-soft aria-[current=true]:border-gold aria-[current=true]:text-ink-strong"
         data-testid="region-item"
-        [class.is-active]="isRegionSelected(region.id)"
         [attr.aria-current]="isRegionSelected(region.id) ? 'true' : null"
         (click)="store.selectRegion(region.id)"
       >
         <span appSwatch [style.background]="region.color"></span>
-        <span class="name">{{ region.name }}</span>
+        <span class="flex-1 min-w-0 truncate">{{ region.name }}</span>
       </button>
     } @empty {
-      <p class="muted">{{ 'editorShell.regionsPanel.emptyHint' | transloco }}</p>
-    }
-  `,
-  styles: `
-    :host {
-      display: flex;
-      flex-direction: column;
-      gap: var(--spacing-2);
-      padding: var(--spacing-4);
-      overflow-y: auto;
-      background: var(--color-surface);
-    }
-    .head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: var(--spacing-3);
-    }
-    .row {
-      display: flex;
-      align-items: center;
-      gap: var(--spacing-3);
-      width: 100%;
-      padding: var(--spacing-2) var(--spacing-3);
-      font-size: var(--text-sm);
-      color: var(--color-ink);
-      background: transparent;
-      border: 1px solid transparent;
-      border-radius: var(--radius-md);
-      cursor: pointer;
-      text-align: left;
-    }
-    .row:hover {
-      background: var(--color-gold-soft);
-    }
-    .row.is-active {
-      background: var(--color-gold-soft);
-      border-color: var(--color-gold);
-      color: var(--color-ink-strong);
-    }
-    .muted {
-      font-size: var(--text-sm);
-      line-height: var(--leading-normal);
-      color: var(--color-ink-muted);
-    }
-    .name {
-      flex: 1;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      <p class="muted text-sm leading-normal text-ink-muted">{{ 'editorShell.regionsPanel.emptyHint' | transloco }}</p>
     }
   `,
 })

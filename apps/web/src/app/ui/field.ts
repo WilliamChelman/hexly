@@ -11,21 +11,9 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 @Component({
   selector: '[appField]',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  template: '<span class="label">{{ label() }}</span><ng-content />',
-  styles: `
-    :host {
-      display: flex;
-      flex-direction: column;
-      gap: var(--spacing-1);
-    }
-    .label {
-      font-size: var(--text-xs);
-      font-weight: var(--font-weight-semibold);
-      color: var(--color-ink-muted);
-      letter-spacing: var(--tracking-wide);
-      text-transform: uppercase;
-    }
-  `,
+  host: { class: 'flex flex-col gap-1' },
+  template:
+    '<span class="text-xs font-semibold text-ink-muted tracking-wide uppercase">{{ label() }}</span><ng-content />',
 })
 export class Field {
   readonly label = input.required<string>();
