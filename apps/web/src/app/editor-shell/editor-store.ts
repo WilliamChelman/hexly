@@ -7,6 +7,7 @@ import {
   featureLibrary,
   HexMap,
   Label,
+  planMove,
   Point,
   Region,
   regionById,
@@ -641,31 +642,40 @@ export class EditorStore {
   }
 
   /**
-   * Move a whole Hex's content — terrain *and* feature — from `from` to `to`
-   * (issue #30, ADR-0010). The origin becomes Void and an occupied destination
-   * is overwritten, so the move never silently duplicates a hex. Region
-   * memberships at both coordinates are left untouched: a Region is a location
-   * overlay keyed by coordinate, not a property of the painted cell, so it stays
-   * put while the content slides out from under it. The whole move is one
-   * `commit`, so a single undo restores both ends — the origin and any clobbered
-   * destination. Moving Void, or onto the same coordinate, changes nothing and
+   * Move a whole Hex's content — terrain, feature, *and* name — from `from` to
+   * `to` (issue #30, ADR-0017). The one-hex case of the pure move-planner: a drop
+   * onto Void moves there and leaves the origin Void; a drop onto an occupied hex
+   * **swaps** the two whole records, so a move never silently destroys content.
+   * Region memberships at both coordinates are left untouched — a Region is a
+   * location overlay keyed by coordinate, not a property of the painted cell, so
+   * it stays put while the content slides out from under it (the planner carries
+   * no region here). The whole move is one `commit`, so a single undo restores
+   * both ends. Moving Void, or onto the same coordinate, changes nothing and
    * records no undo step.
    */
   moveHex(from: Axial, to: Axial): void {
     const fromKey = coordKey(from);
-    const toKey = coordKey(to);
-    if (fromKey === toKey) return;
-    // Snapshot the origin's content from the live (immutable) document. Moving
-    // Void carries nothing, so bail before `commit` records an empty step.
-    const content = this._document().hexes[fromKey];
-    if (!content) return;
+    if (fromKey === coordKey(to)) return;
+    // Moving Void carries nothing, so bail before the planner/`commit` runs.
+    if (!this._document().hexes[fromKey]) return;
+    // Route through the pure planner (the seam for every move): it reads the live
+    // immutable document and returns the writes/clears that swap or relocate the
+    // hex. A single-hex move never blocks, but a blocked plan would be a no-op.
+    const plan = planMove({
+      document: this._document(),
+      selection: { hexes: [from], labels: [], regions: [] },
+      offset: { q: to.q - from.q, r: to.r - from.r },
+    });
+    if (plan.blocked) return;
     this.commit((draft) => {
-      // Deep-clone the snapshot into the destination (overwriting it) and clear
-      // the origin. Cloning the immutable source — rather than rebuilding the Hex
-      // field-by-field — avoids aliasing a draft node at two keys *and* carries
-      // every field along, so a future Hex field is never silently dropped.
-      draft.hexes[toKey] = deepClone(content);
-      delete draft.hexes[fromKey];
+      // Apply each write/clear. Deep-clone the planner's records — they reference
+      // the immutable pre-move document — so the draft never aliases a live node,
+      // and every Hex field (a future one included) is carried along verbatim.
+      for (const { coord, hex } of plan.hexes) {
+        const key = coordKey(coord);
+        if (hex) draft.hexes[key] = deepClone(hex);
+        else delete draft.hexes[key];
+      }
     });
     // The content moved, so a selection that pointed at the origin rides along to
     // the destination — completing a move keeps the moved Hex selected, matching

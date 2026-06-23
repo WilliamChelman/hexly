@@ -1500,15 +1500,27 @@ describe('EditorStore moveHex', () => {
     expect('0,0' in store.document().hexes).toBe(false);
   });
 
-  it('overwrites an already-occupied destination', () => {
+  it('swaps the two whole records when the destination is occupied', () => {
     const store = new EditorStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.placeFeatureAt({ q: 0, r: 0 }, 'settlement');
+    store.editHexName({ q: 0, r: 0 }, 'Riverbend');
     store.paintAt({ q: 1, r: 0 }, 'ocean'); // the destination is already painted
+    store.editHexName({ q: 1, r: 0 }, 'The Deep');
 
     store.moveHex({ q: 0, r: 0 }, { q: 1, r: 0 });
 
-    expect(store.document().hexes['1,0']).toEqual({ terrain: 'forest' });
-    expect('0,0' in store.document().hexes).toBe(false);
+    // A drop onto an occupant swaps both whole records (terrain + feature + name)
+    // rather than overwriting — a move never silently destroys content (ADR-0017).
+    expect(store.document().hexes['1,0']).toEqual({
+      terrain: 'forest',
+      feature: { ref: 'settlement' },
+      name: 'Riverbend',
+    });
+    expect(store.document().hexes['0,0']).toEqual({
+      terrain: 'ocean',
+      name: 'The Deep',
+    });
   });
 
   it('leaves region memberships at both the origin and destination untouched', () => {
@@ -1525,17 +1537,17 @@ describe('EditorStore moveHex', () => {
     expect(store.document().regions[0].hexes).toEqual({ '0,0': true, '1,0': true });
   });
 
-  it('restores both the origin and the overwritten destination with a single undo', () => {
+  it('restores both swapped ends with a single undo', () => {
     const store = new EditorStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.placeFeatureAt({ q: 0, r: 0 }, 'settlement');
-    store.paintAt({ q: 1, r: 0 }, 'ocean'); // destination content that gets clobbered
+    store.paintAt({ q: 1, r: 0 }, 'ocean'); // destination content the swap moves to the origin
 
     store.moveHex({ q: 0, r: 0 }, { q: 1, r: 0 });
     store.undo();
 
-    // One undo step puts both ends back: the origin returns and the destination
-    // recovers what it was before the overwrite — no silent loss (ADR-0010).
+    // One undo step puts both ends back: each coordinate recovers exactly what it
+    // held before the swap — no silent loss (ADR-0017).
     expect(store.document().hexes['0,0']).toEqual({
       terrain: 'forest',
       feature: { ref: 'settlement' },
@@ -1622,10 +1634,10 @@ describe('EditorStore moveHex', () => {
     expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 0, r: 0 } });
   });
 
-  it('does not leave the selection highlighting clobbered content after an undo', () => {
+  it('does not leave the selection highlighting swapped content after an undo', () => {
     const store = new EditorStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
-    store.paintAt({ q: 1, r: 0 }, 'ocean'); // destination content that gets clobbered
+    store.paintAt({ q: 1, r: 0 }, 'ocean'); // destination content the swap relocates
     store.select({ q: 0, r: 0 }, null); // the origin hex is selected
 
     store.moveHex({ q: 0, r: 0 }, { q: 1, r: 0 });

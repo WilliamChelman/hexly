@@ -106,6 +106,7 @@ const LAYOUT: Layout = {
 };
 
 const FOREST = 'rgb(1, 2, 3)';
+const OCEAN = 'rgb(4, 5, 6)';
 const FEATURE_INK = 'rgb(9, 9, 9)';
 const LABEL_INK = 'rgb(7, 7, 7)';
 const SELECT_INK = 'rgb(5, 5, 5)';
@@ -116,6 +117,7 @@ function stubTheme(): () => void {
   const original = window.getComputedStyle;
   const colours: Record<string, string> = {
     '--terrain-forest': FOREST,
+    '--terrain-ocean': OCEAN,
     '--feature-ink': FEATURE_INK,
     '--label-ink': LABEL_INK,
     '--name-ink': NAME_INK,
@@ -355,6 +357,34 @@ describe('Canvas2dMapRenderer hex names', () => {
     renderer.render(camera, doc, null);
 
     expect(ctx.textFills).toEqual([]);
+    restore();
+  });
+});
+
+describe('Canvas2dMapRenderer swap drag preview', () => {
+  it('previews both hexes when a drag would swap onto an occupied destination', () => {
+    const restore = stubTheme();
+    const ctx = new FakeContext();
+    const renderer = makeRenderer(ctx);
+    const camera = Camera.initial().panBy(60, 60);
+    const doc: HexMap = {
+      hexes: {
+        '0,0': { terrain: 'forest', name: 'Riverbend' },
+        '1,0': { terrain: 'ocean', name: 'The Deep' },
+      },
+      regions: [],
+      labels: [],
+    };
+
+    // Drag the forest hex onto the occupied ocean hex: the preview must show the
+    // swapped outcome — forest's record at the destination AND ocean's record slid
+    // back to the origin — so both hexes stay visible before release (ADR-0017).
+    renderer.render(camera, doc, null, { hexDrag: { from: { q: 0, r: 0 }, to: { q: 1, r: 0 } } });
+
+    expect(ctx.pathFills).toContain(FOREST);
+    expect(ctx.pathFills).toContain(OCEAN);
+    expect(ctx.textFills).toContainEqual({ text: 'Riverbend', fill: NAME_INK });
+    expect(ctx.textFills).toContainEqual({ text: 'The Deep', fill: NAME_INK });
     restore();
   });
 });
