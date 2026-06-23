@@ -47,10 +47,10 @@ import { StatusBar } from './status-bar';
     StatusBar,
   ],
   template: `
-    <div class="shell">
+    <div class="grid grid-rows-[1fr_var(--rail-status)] h-full">
       <div class="body relative min-h-0">
         <!-- Full-bleed canvas; all side chrome floats over it (ADR-0013). -->
-        <app-map-canvas />
+        <app-map-canvas class="absolute inset-0" />
         <app-tool-palette />
         <!--
           The right dock: the dismissible panel (Inspector / Regions) and the edge
@@ -58,63 +58,45 @@ import { StatusBar } from './status-bar';
           rail with a consistent gap — no hand-computed offsets (ADR-0013). The
           rail toggles the Regions list on and off; selecting an entity or a Region
           opens the Inspector. When the panel is closed (rightPanel is null) only
-          the bare rail shows, so the map is clear.
+          the bare rail shows, so the map is clear. The dock ignores the pointer in
+          its empty area (so the canvas stays interactive below a short panel) and
+          each child re-enables it with pointer-events-auto. The floating card
+          chrome (width, edge, radius, shadow) is inline on the panel elements.
         -->
         <div
-          class="right-dock absolute top-3 right-3 bottom-3 flex items-start gap-2 z-[1] pointer-events-none"
+          class="absolute top-3 right-3 bottom-3 flex items-start gap-2 z-[1] pointer-events-none"
         >
           @if (store.rightPanel() === 'regions') {
-            <app-regions-panel />
+            <app-regions-panel
+              class="w-[var(--rail-inspector)] max-h-full border border-line rounded-lg shadow-2 pointer-events-auto"
+            />
           } @else if (store.rightPanel() === 'inspector') {
-            <app-inspector />
+            <app-inspector
+              class="w-[var(--rail-inspector)] max-h-full border border-line rounded-lg shadow-2 pointer-events-auto"
+            />
           }
-          <app-editor-rail />
+          <app-editor-rail class="pointer-events-auto" />
         </div>
       </div>
       <app-status-bar />
     </div>
   `,
   styles: `
-    .shell {
-      display: grid;
-      grid-template-rows: 1fr var(--rail-status);
-      height: 100%;
-    }
-    /* The body is the floating-chrome stacking context; the canvas fills it. */
-    .body app-map-canvas {
-      position: absolute;
-      inset: 0;
-    }
-    /* Tool palette anchored top-left; rail top-right; panel to the rail's left. */
+    /*
+      The body is the floating-chrome stacking context (via its own 'relative'
+      utility): it lays out its children, positioning the full-bleed canvas with an
+      inline 'absolute inset-0' and floating the side chrome over it. The one rule
+      left here places the tool palette top-left, kept scoped because its
+      max-height is a calc() over a token — ADR-0021 keeps token-composing math
+      scoped (no faithful utility). The shell grid, the right-dock layout, and the
+      floating card chrome are inline utilities on their elements.
+    */
     .body app-tool-palette {
       position: absolute;
       top: var(--spacing-3);
       left: var(--spacing-3);
       max-height: calc(100% - 2 * var(--spacing-3));
       z-index: 1;
-    }
-    /*
-      The right dock floats top-right and lays the panel + rail out as a row (its
-      box/layout lives in inline utilities on the element). It spans the body's
-      height (top..bottom) so the panel can cap its height and scroll internally
-      (story 22); pointer-events pass through its empty area so the canvas stays
-      interactive below a short panel — re-enabled per child here.
-    */
-    .right-dock > * {
-      pointer-events: auto;
-    }
-    /*
-      The floating Inspector / Regions card sits just left of the rail, capped to
-      the dock height and scrolling internally, with full card chrome (edge,
-      radius, shadow) over the map.
-    */
-    .right-dock app-inspector,
-    .right-dock app-regions-panel {
-      width: var(--rail-inspector);
-      max-height: 100%;
-      border: 1px solid var(--color-line);
-      border-radius: var(--radius-lg);
-      box-shadow: var(--shadow-2);
     }
   `,
 })

@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { IconHost } from '../icon-host';
 
 /**
  * The region glyph (a dashed boundary). One `<svg>` drawn in `currentColor`,
@@ -8,7 +9,7 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 @Component({
   selector: 'app-icon-region',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { class: 'inline-flex leading-[0]' },
+  hostDirectives: [IconHost],
   template: `
     <svg
       [attr.width]="size()"

@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { IconHost } from '../icon-host';
 import { featureLibrary } from '@hexly/domain';
 
 /** The single source of truth for the settlement marker art (ADR-0006/0007). */
@@ -14,7 +15,7 @@ const SETTLEMENT_PATH =
 @Component({
   selector: 'app-icon-settlement',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { class: 'inline-flex leading-[0]' },
+  hostDirectives: [IconHost],
   template: `
     <svg
       [attr.width]="size()"

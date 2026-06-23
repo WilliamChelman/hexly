@@ -59,6 +59,17 @@ rule scoped.
   element (`hover:bg-gold-soft`, `disabled:opacity-50`). State is *not* a reason
   to stay scoped on its own — the question is always whether the properties
   translate.
+- **Off-scale and math values → an arbitrary-value utility.** A static value
+  with no on-scale token — a one-off length (`border-l-[3px]`, `text-[0.9rem]`)
+  or a self-contained `min()`/`max()`/`clamp()`/`calc()` over fixed lengths and
+  viewport units (`max-w-[min(90vw,32rem)]`) — converts to a Tailwind
+  arbitrary-value utility (`…-[…]`) rather than forcing the rule to stay scoped.
+  The value is still a faithful 1:1 translation, and `no-off-scale-spacing`
+  already sanctions the bracket form as the explicit opt-out. This does **not**
+  extend to an expression that composes a design token or component-local var
+  (e.g. `color-mix(in oklab, var(--color-surface) 86%, transparent)`, or a
+  `calc()` over `var(--…)`): those stay scoped so they re-theme and stay read
+  against the token vocabulary (see the non-translatables below).
 - **These keep the whole element scoped** (the genuinely-can't cases):
   - **`--_…` composition** — a `:host(.is-*)` variant reassigns a component-local
     var that the base rule reads (e.g. `Button`'s `--_fg`/`--_bg`/`--_bd`). No
@@ -74,11 +85,19 @@ rule scoped.
        out-specifies the base utility, so there's no conflict and the a11y
        attribute and the visual stay in sync by construction.
     2. **Angular conditional class bindings** (`[class.bg-gold-soft]="active()"`)
-       — the codebase's idiom (it uses no `ngClass`). Toggle base and active
-       utilities as *mutually exclusive* pairs (`[class.bg-transparent]="!active()"`)
-       so two conflicting utilities are never simultaneously applied.
-    It stays scoped only when neither reads cleanly — e.g. a variant matrix
-    large enough that mutually-exclusive pairs are noisier than a named rule, or
+       — the default for a binary state. Toggle base and active utilities as
+       *mutually exclusive* pairs (`[class.bg-transparent]="!active()"`) so two
+       conflicting utilities are never simultaneously applied.
+    3. **An `[ngClass]` map for a one-of-N variant** — when an element selects a
+       single utility from several keyed off one discriminant (the toaster's
+       left-border colour per `toast.tone`: error → `border-l-ember`, success →
+       `border-l-terrain-forest`, info → `border-l-gold-strong`), an `[ngClass]`
+       object reads more cleanly than three `[class.…]` pairs each restating the
+       negation. Reach for it only past two or three mutually-exclusive
+       utilities; a binary state stays a `[class.…]` pair, so `[ngClass]` stays
+       the exception, not the norm.
+    It stays scoped only when none of these read cleanly — e.g. a variant matrix
+    large enough that even an `[ngClass]` map is noisier than a named rule, or
     a state entangled with one of the other blockers below.
   - **Transitions/animations** — motion is kept as raw `--dur-*`/`--ease-*` vars
     (ADR-0020), with no utility scale, so any rule with a `transition` stays
@@ -94,9 +113,16 @@ rule scoped.
     switcher's selected segment became `appButton`'s `[active]` input, owned by
     the primitive, not a `.option.active` override.
   - Plus the per-property non-translatables: pseudo-elements
-    (`::before`/`::after`/`::placeholder`), `color-mix()`, `calc()`, gradients,
-    `@media`, combinators, attribute-selector rules, and properties with no
-    utility (`touch-action`, `background-clip`, `font: inherit`).
+    (`::before`/`::after`/`::placeholder`), radial / multi-stop / positioned
+    gradients, `@media`, combinators, attribute-selector rules,
+    **token-composing expressions** (`color-mix()`, or a `calc()`/`min()`/…
+    over `var(--…)`), and properties with no utility (`touch-action`,
+    `background-clip`, `font: inherit`). Two cases are *not* here — both convert
+    to utilities (above): a self-contained `min()`/`calc()` over fixed values,
+    and a **simple two-stop linear/conic gradient whose stops are theme
+    colours** (`bg-linear-[140deg] from-gold to-gold-strong`, which resolves to
+    the same `var(--color-*)` stops and re-themes). A `radial-gradient` with
+    sized/positioned stops (the map canvas's washes) stays scoped.
 - **A rule is never split across the two surfaces.** When a rule mixes
   convertible and non-convertible properties, the whole rule stays scoped.
 - **One rule, one home.** The deciding test is per-rule, not per-component: a

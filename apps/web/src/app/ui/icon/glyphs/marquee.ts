@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { IconHost } from '../icon-host';
 
 /**
  * The marquee glyph (a dashed selection rectangle). One `<svg>` drawn in
@@ -8,7 +9,7 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 @Component({
   selector: 'app-icon-marquee',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { class: 'inline-flex leading-[0]' },
+  hostDirectives: [IconHost],
   template: `
     <svg
       [attr.width]="size()"

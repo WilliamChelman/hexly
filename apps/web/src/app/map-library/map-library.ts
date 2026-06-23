@@ -100,24 +100,17 @@ function formatEdited(updatedAt: number, lang: string): string {
           }
         </ul>
       } @else if (loadError()) {
-        <section class="empty p-6 text-center text-ink-muted" data-testid="load-error" appPanel>
+        <section class="p-6 text-center text-ink-muted" data-testid="load-error" appPanel>
           <p>{{ 'mapLibrary.loadErrorTitle' | transloco }}</p>
-          <p class="hint">{{ 'mapLibrary.loadErrorHint' | transloco }}</p>
+          <p class="text-sm">{{ 'mapLibrary.loadErrorHint' | transloco }}</p>
         </section>
       } @else if (loaded()) {
-        <section class="empty p-6 text-center text-ink-muted" data-testid="empty" appPanel>
+        <section class="p-6 text-center text-ink-muted" data-testid="empty" appPanel>
           <p>{{ 'mapLibrary.emptyTitle' | transloco }}</p>
-          <p class="hint">{{ 'mapLibrary.emptyHint' | transloco }}</p>
+          <p class="text-sm">{{ 'mapLibrary.emptyHint' | transloco }}</p>
         </section>
       }
     </div>
-  `,
-  styles: `
-    /* The card grid and the open-button box live in inline utilities on their
-       elements; only the descendant hint keeps a scoped rule. */
-    .empty .hint {
-      font-size: var(--text-sm);
-    }
   `,
 })
 export class MapLibrary implements OnInit {

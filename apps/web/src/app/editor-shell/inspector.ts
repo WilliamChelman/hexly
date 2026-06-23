@@ -114,8 +114,8 @@ interface SelectedEntity {
         />
       </div>
 
-      <div class="pos flex gap-3">
-        <div appField [label]="'editorShell.inspector.x' | transloco">
+      <div class="flex gap-3">
+        <div appField class="flex-1 min-w-0" [label]="'editorShell.inspector.x' | transloco">
           <input
             appInput
             type="number"
@@ -124,7 +124,7 @@ interface SelectedEntity {
             (change)="onX(label, $event)"
           />
         </div>
-        <div appField [label]="'editorShell.inspector.y' | transloco">
+        <div appField class="flex-1 min-w-0" [label]="'editorShell.inspector.y' | transloco">
           <input
             appInput
             type="number"
@@ -158,10 +158,10 @@ interface SelectedEntity {
       <!--
         Engaging either button auto-arms the Region tool on this Region with the
         chosen membership direction (issue #37) — the only control outside the
-        palette permitted to arm a Tool. The active button (the .active class +
-        aria-pressed) is driven from the same store.regionDirection() the brush
-        paints by, so the active one reads as set and can never disagree with the
-        stroke.
+        palette permitted to arm a Tool. The active button (styled off its own
+        aria-pressed via an aria-[pressed=true]: variant) is driven from the
+        same store.regionDirection() the brush paints by, so the active one reads
+        as set and can never disagree with the stroke.
       -->
       <div appField [label]="'editorShell.inspector.membership' | transloco">
         <div
@@ -172,8 +172,7 @@ interface SelectedEntity {
           @for (d of directions; track d.direction) {
             <button
               type="button"
-              class="mode"
-              [class.active]="store.regionDirection() === d.direction"
+              class="flex-1 bg-transparent text-ink-muted border border-line rounded-sm py-1 px-3 text-xs font-semibold cursor-pointer aria-[pressed=true]:text-ink aria-[pressed=true]:border-gold aria-[pressed=true]:bg-gold-soft"
               [attr.aria-pressed]="store.regionDirection() === d.direction"
               [attr.data-testid]="d.testid"
               (click)="store.armRegionDirection(d.direction)"
@@ -293,30 +292,6 @@ interface SelectedEntity {
         <span appEyebrow>{{ 'editorShell.inspector.title' | transloco }}</span>
       </header>
       <p class="muted text-sm leading-normal text-ink-muted">{{ 'editorShell.inspector.emptyHint' | transloco }}</p>
-    }
-  `,
-  styles: `
-    /* The armed-mode affordance: a quiet outline that fills gold-soft when active,
-       not the global primary call-to-action variant. Stretched to share the row. */
-    .mode {
-      flex: 1;
-      background: none;
-      color: var(--color-ink-muted);
-      border: 1px solid var(--color-line);
-      border-radius: var(--radius-sm);
-      padding: var(--spacing-1) var(--spacing-3);
-      font-size: var(--text-xs);
-      font-weight: var(--font-weight-semibold);
-      cursor: pointer;
-    }
-    .mode.active {
-      color: var(--color-ink);
-      border-color: var(--color-gold);
-      background: var(--color-gold-soft);
-    }
-    .pos > div {
-      flex: 1;
-      min-width: 0;
     }
   `,
 })

@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { IconHost } from '../icon-host';
 
 /**
  * The label glyph (a serifed T). One `<svg>` drawn in `currentColor`, sized by
@@ -7,7 +8,7 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 @Component({
   selector: 'app-icon-label',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { class: 'inline-flex leading-[0]' },
+  hostDirectives: [IconHost],
   template: `
     <svg
       [attr.width]="size()"

@@ -24,7 +24,11 @@ import { LanguageSwitcher } from './language-switcher';
 @Component({
   selector: 'app-header',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { role: 'banner' },
+  host: {
+    role: 'banner',
+    class:
+      'flex items-center gap-5 px-4 h-[var(--rail-header)] bg-surface border-b border-b-line-strong shadow-1',
+  },
   imports: [
     RouterLink,
     RouterOutlet,
@@ -83,7 +87,11 @@ import { LanguageSwitcher } from './language-switcher';
         }
       </button>
       @if (user(); as u) {
-        <span class="avatar" [title]="u.displayName">{{ initials() }}</span>
+        <span
+          class="grid place-items-center size-6 font-mono text-2xs text-on-gold bg-linear-[140deg] from-gold to-gold-strong rounded-full shadow-1"
+          [title]="u.displayName"
+          >{{ initials() }}</span
+        >
         <span class="text-sm text-ink">{{ u.displayName }}</span>
         <button
           type="button"
@@ -97,30 +105,6 @@ import { LanguageSwitcher } from './language-switcher';
         </button>
       }
     </div>
-  `,
-  styles: `
-    :host {
-      display: flex;
-      align-items: center;
-      gap: var(--spacing-5);
-      padding: 0 var(--spacing-4);
-      height: var(--rail-header);
-      background: var(--color-surface);
-      border-bottom: 1px solid var(--color-line-strong);
-      box-shadow: var(--shadow-1);
-    }
-    .avatar {
-      display: grid;
-      place-items: center;
-      width: 32px;
-      height: 32px;
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--color-on-gold);
-      background: linear-gradient(140deg, var(--color-gold), var(--color-gold-strong));
-      border-radius: var(--radius-full);
-      box-shadow: var(--shadow-1);
-    }
   `,
 })
 export class AppHeader {

@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { IconHost } from '../icon-host';
 
 /**
  * The moon glyph (dark-theme toggle). One `<svg>` drawn in `currentColor`, sized
@@ -7,7 +8,7 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 @Component({
   selector: 'app-icon-moon',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { class: 'inline-flex leading-[0]' },
+  hostDirectives: [IconHost],
   template: `
     <svg
       [attr.width]="size()"

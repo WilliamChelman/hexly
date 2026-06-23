@@ -156,9 +156,16 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
     </div>
   `,
   styles: `
+    /*
+      The host sets no position of its own — placement is the parent's prerogative
+      (the shell lays this out full-bleed, ADR-0013). It owns only its appearance:
+      it clips to its box and paints the map's parchment/astral wash. Once the
+      shell positions it, the host is the containing block for the readout/zoom
+      overlays below. (No 'position' here is also what lets the shell's inline
+      'absolute inset-0' win — an emulated :host rule would be unlayered and beat
+      it.)
+    */
     :host {
-      position: relative;
-      display: block;
       overflow: hidden;
       background: radial-gradient(
         120% 120% at 50% 0%,
