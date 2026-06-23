@@ -81,12 +81,9 @@
   --color-positive: #86c46a; /* aurora green                                */
   --color-positive-soft: rgba(134, 196, 106, 0.16);
 
-  --color-focus: #e6b652;
-
   --color-canvas-bg: #111634;
   --color-canvas-mat: #0c1026;
   --color-hex-line: rgba(170, 188, 255, 0.16);
-  --color-void: #0e1330;
   --color-feature-ink: #f4ecd8; /* a placed Feature's marker — cream        */
   --color-label-ink: #f4ecd8; /* free-positioned Label text — cream         */
   --color-name-ink: #cdbf9f; /* a Hex name — dimmed parchment               */

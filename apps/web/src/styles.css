@@ -169,13 +169,10 @@
   --color-positive: #4a6f2f; /* moss — confirmations / "online"             */
   --color-positive-soft: rgba(74, 111, 47, 0.16);
 
-  --color-focus: #9a6a16;
-
   /* Canvas — the infinite hex plane (read by the renderer, ADR-0003) */
   --color-canvas-bg: #e8dabb;
   --color-canvas-mat: #ddcaa3;
   --color-hex-line: rgba(120, 96, 56, 0.5); /* grid ink                     */
-  --color-void: #e2d3b2; /* untouched space — a Void coordinate             */
   --color-feature-ink: #4a3a1e; /* a placed Feature's marker — sepia ink    */
   --color-label-ink: #2f2416; /* free-positioned Label text — iron-gall ink */
   --color-name-ink: #5a4a2c; /* a Hex name — muted sepia, quieter           */
