@@ -15,11 +15,11 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
   styles: `
     :host {
       width: 100%;
-      padding: var(--space-2) var(--space-3);
+      padding: var(--spacing-2) var(--spacing-3);
       font-size: var(--text-sm);
-      color: var(--ink-strong);
-      background: var(--surface-sunken);
-      border: 1px solid var(--line-strong);
+      color: var(--color-ink-strong);
+      background: var(--color-surface-sunken);
+      border: 1px solid var(--color-line-strong);
       border-radius: var(--radius-md);
       box-shadow: var(--shadow-inset);
       transition: border-color var(--dur-fast) var(--ease-out);
@@ -28,7 +28,7 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
       line-height: var(--leading-snug);
     }
     :host(:focus-visible) {
-      border-color: var(--gold);
+      border-color: var(--color-gold);
     }
   `,
 })

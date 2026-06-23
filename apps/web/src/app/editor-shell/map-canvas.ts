@@ -161,8 +161,8 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
       overflow: hidden;
       background: radial-gradient(
         120% 120% at 50% 0%,
-        var(--canvas-bg),
-        var(--canvas-mat)
+        var(--color-canvas-bg),
+        var(--color-canvas-mat)
       );
     }
     .surface {
@@ -184,21 +184,21 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
     */
     .readout {
       position: absolute;
-      bottom: var(--space-4);
-      left: var(--space-4);
+      bottom: var(--spacing-4);
+      left: var(--spacing-4);
       display: flex;
       align-items: center;
-      gap: var(--space-2);
-      padding: var(--space-1) var(--space-3);
-      background: color-mix(in oklab, var(--surface) 86%, transparent);
-      border: 1px solid var(--line);
+      gap: var(--spacing-2);
+      padding: var(--spacing-1) var(--spacing-3);
+      background: color-mix(in oklab, var(--color-surface) 86%, transparent);
+      border: 1px solid var(--color-line);
       border-radius: var(--radius-full);
       box-shadow: var(--shadow-1);
       backdrop-filter: blur(4px);
       pointer-events: none;
     }
     .readout-sep {
-      color: var(--line-strong);
+      color: var(--color-line-strong);
     }
     /*
       Bottom-right, and lifted above the floating right dock (z-index 1, ADR-0013):
@@ -207,15 +207,15 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
     */
     .zoom {
       position: absolute;
-      right: var(--space-4);
-      bottom: var(--space-4);
+      right: var(--spacing-4);
+      bottom: var(--spacing-4);
       z-index: 2;
       display: flex;
       align-items: center;
-      gap: var(--space-1);
-      padding: var(--space-1);
-      background: color-mix(in oklab, var(--surface) 88%, transparent);
-      border: 1px solid var(--line);
+      gap: var(--spacing-1);
+      padding: var(--spacing-1);
+      background: color-mix(in oklab, var(--color-surface) 88%, transparent);
+      border: 1px solid var(--color-line);
       border-radius: var(--radius-full);
       box-shadow: var(--shadow-2);
       backdrop-filter: blur(4px);

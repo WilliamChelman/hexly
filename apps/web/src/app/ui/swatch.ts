@@ -5,7 +5,7 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
  * for a grouping. It owns its size/border/radius only; callers set the colour
  * via `[style.background]` or inline style. See ADR-0007.
  *
- *   <span appSwatch [style.background]="'var(--terrain-forest)'"></span>
+ *   <span appSwatch [style.background]="'var(--color-terrain-forest)'"></span>
  */
 @Component({
   selector: '[appSwatch]',
@@ -13,10 +13,10 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
   template: '',
   styles: `
     :host {
-      width: var(--space-4);
-      height: var(--space-4);
+      width: var(--spacing-4);
+      height: var(--spacing-4);
       border-radius: var(--radius-sm);
-      border: 1px solid var(--line-strong);
+      border: 1px solid var(--color-line-strong);
       flex: none;
       box-shadow: var(--shadow-inset);
     }

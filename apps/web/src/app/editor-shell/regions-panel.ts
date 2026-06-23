@@ -57,25 +57,25 @@ import { EditorStore } from './editor-store';
     :host {
       display: flex;
       flex-direction: column;
-      gap: var(--space-2);
-      padding: var(--space-4);
+      gap: var(--spacing-2);
+      padding: var(--spacing-4);
       overflow-y: auto;
-      background: var(--surface);
+      background: var(--color-surface);
     }
     .head {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: var(--space-3);
+      gap: var(--spacing-3);
     }
     .row {
       display: flex;
       align-items: center;
-      gap: var(--space-3);
+      gap: var(--spacing-3);
       width: 100%;
-      padding: var(--space-2) var(--space-3);
+      padding: var(--spacing-2) var(--spacing-3);
       font-size: var(--text-sm);
-      color: var(--ink);
+      color: var(--color-ink);
       background: transparent;
       border: 1px solid transparent;
       border-radius: var(--radius-md);
@@ -83,17 +83,17 @@ import { EditorStore } from './editor-store';
       text-align: left;
     }
     .row:hover {
-      background: var(--gold-soft);
+      background: var(--color-gold-soft);
     }
     .row.is-active {
-      background: var(--gold-soft);
-      border-color: var(--gold);
-      color: var(--ink-strong);
+      background: var(--color-gold-soft);
+      border-color: var(--color-gold);
+      color: var(--color-ink-strong);
     }
     .muted {
       font-size: var(--text-sm);
       line-height: var(--leading-normal);
-      color: var(--ink-muted);
+      color: var(--color-ink-muted);
     }
     .name {
       flex: 1;

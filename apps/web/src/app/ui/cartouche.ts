@@ -14,7 +14,7 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
   styles: `
     :host {
       font-family: var(--font-display);
-      font-weight: var(--weight-semibold);
+      font-weight: var(--font-weight-semibold);
       letter-spacing: var(--tracking-wider);
       text-transform: uppercase;
     }

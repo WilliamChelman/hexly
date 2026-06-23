@@ -43,15 +43,15 @@ import { Button } from '../ui/button';
     .group {
       display: inline-flex;
       align-items: center;
-      gap: var(--space-1);
+      gap: var(--spacing-1);
     }
     .option {
-      color: var(--ink-muted);
+      color: var(--color-ink-muted);
       font-family: var(--font-mono);
     }
     .option.active {
-      color: var(--ink-strong);
-      background: var(--gold-soft);
+      color: var(--color-ink-strong);
+      background: var(--color-gold-soft);
     }
   `,
 })

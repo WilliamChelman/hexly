@@ -25,13 +25,13 @@ import {
   template: `<ng-content />`,
   styles: `
     :host {
-      background: var(--surface);
-      border: 1px solid var(--line);
+      background: var(--color-surface);
+      border: 1px solid var(--color-line);
       border-radius: var(--radius-lg);
       box-shadow: var(--shadow-1);
     }
     :host(.is-raised) {
-      background: var(--surface-raised);
+      background: var(--color-surface-raised);
       box-shadow: var(--shadow-2);
     }
     :host(.is-flush) {

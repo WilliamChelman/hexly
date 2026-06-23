@@ -57,12 +57,12 @@ import { ToasterService } from '../core/toaster.service';
          blocks the canvas; each toast re-enables it for its own controls. */
       position: fixed;
       left: 50%;
-      bottom: var(--space-5, 1.5rem);
+      bottom: var(--spacing-5, 1.5rem);
       transform: translateX(-50%);
       z-index: 1000;
       display: flex;
       flex-direction: column;
-      gap: var(--space-2, 0.5rem);
+      gap: var(--spacing-2, 0.5rem);
       align-items: center;
       pointer-events: none;
     }
@@ -70,25 +70,25 @@ import { ToasterService } from '../core/toaster.service';
       pointer-events: auto;
       display: flex;
       align-items: center;
-      gap: var(--space-3, 0.75rem);
+      gap: var(--spacing-3, 0.75rem);
       max-width: min(90vw, 32rem);
-      padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem);
-      background: var(--surface-raised, var(--surface));
-      color: var(--ink);
-      border: 1px solid var(--line);
+      padding: var(--spacing-2, 0.5rem) var(--spacing-3, 0.75rem);
+      background: var(--color-surface-raised, var(--color-surface));
+      color: var(--color-ink);
+      border: 1px solid var(--color-line);
       border-left-width: 3px;
       border-radius: var(--radius-md, 8px);
       box-shadow: var(--shadow-2);
       font-size: 0.9rem;
     }
     .toast.is-error {
-      border-left-color: var(--ember);
+      border-left-color: var(--color-ember);
     }
     .toast.is-success {
-      border-left-color: var(--terrain-forest, var(--ink));
+      border-left-color: var(--color-terrain-forest, var(--color-ink));
     }
     .toast.is-info {
-      border-left-color: var(--gold-strong, var(--ink));
+      border-left-color: var(--color-gold-strong, var(--color-ink));
     }
     .toast__message {
       flex: 1;
@@ -104,14 +104,14 @@ import { ToasterService } from '../core/toaster.service';
       background: transparent;
       border: 0;
       border-radius: var(--radius-sm, 4px);
-      color: var(--ink-soft, var(--ink));
+      color: var(--color-ink-muted, var(--color-ink));
       font-size: 0.85rem;
       line-height: 1;
       cursor: pointer;
     }
     .toast__dismiss:hover {
-      background: var(--surface-sunken, transparent);
-      color: var(--ink);
+      background: var(--color-surface-sunken, transparent);
+      color: var(--color-ink);
     }
   `,
 })

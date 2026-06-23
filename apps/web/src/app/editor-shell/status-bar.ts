@@ -50,17 +50,17 @@ import { EditorStore } from './editor-store';
     :host {
       display: flex;
       align-items: center;
-      gap: var(--space-4);
-      padding: 0 var(--space-4);
+      gap: var(--spacing-4);
+      padding: 0 var(--spacing-4);
       font-size: var(--text-2xs);
-      color: var(--ink-muted);
-      background: var(--surface);
-      border-top: 1px solid var(--line-strong);
+      color: var(--color-ink-muted);
+      background: var(--color-surface);
+      border-top: 1px solid var(--color-line-strong);
     }
     .item {
       display: flex;
       align-items: center;
-      gap: var(--space-2);
+      gap: var(--spacing-2);
       white-space: nowrap;
     }
     .spacer {

@@ -55,54 +55,142 @@
 @source './**/*.{html,ts}';
 
 /*
- * Bridge Hexly's design tokens into Tailwind's theme so utilities are
- * on-brand and theme-aware: `bg-surface`, `text-ink`, `text-gold`,
- * `border-line-strong`, `font-display`, `rounded-lg`, … all resolve to the
- * same custom properties that re-theme under [data-theme='dark'].
+ * Hexly's design tokens *are* Tailwind's theme (ADR-0020). Every utility-shaped
+ * token — colours, fonts, the type scale, spacing, radii, shadows — is declared
+ * here so the same value both (a) generates an on-brand utility (`bg-surface`,
+ * `text-ink`, `gap-5`, `text-md`, `rounded-lg`, `font-display`, …) and (b) is
+ * emitted as a CSS variable on `:root`/`:host` that scoped component styles
+ * consume directly (`var(--color-surface)`, `var(--spacing-4)`). One vocabulary,
+ * no parallel `--space-*`/`--surface` layer.
  *
- * `inline` makes utilities reference the source variable directly
- * (`background-color: var(--surface)`), which is what keeps them switching
- * with the theme. Tailwind's default palette (red-500, etc.) stays available.
+ * Theming: colours and shadows are declared *non-`inline`* so the override
+ * point is the generated property — the light value lives here, and
+ * `:root[data-theme='dark']` (tokens.css) reassigns the generated `--color-*` /
+ * `--shadow-*`. tokens.css is imported after `tailwindcss`, so the dark block
+ * cascades over this `:root`. Spacing/type/radii/fonts are theme-invariant.
  *
- * The spacing scale already matches: Tailwind's 4px base means `p-4` == 1rem
- * == our `--space-4`, so no spacing bridge is needed.
+ * Spacing is bridged via explicit `--spacing-<N>` keys: Tailwind v4 resolves an
+ * explicit key before the `calc(var(--spacing) * N)` multiplier, so the bespoke
+ * non-linear scale (1.5rem at step 5, …) survives under the same 1–9 names with
+ * zero renumbering. The curated set is enforced by a lint rule (see eslint).
+ *
+ * Tailwind's default palette (red-500, etc.) stays available — `@theme` extends.
+ *
+ * `static` disables Tailwind's theme-variable tree-shaking so *every* token is
+ * emitted to `:root`, not just those a generated utility references. This is
+ * load-bearing: many tokens are consumed only by raw `var(--…)` in scoped
+ * component styles or read at runtime by the Canvas renderer via
+ * `getComputedStyle` (ADR-0003) — references Tailwind's scanner can't see.
+ * Utilities are still generated on demand; only the `:root` block is complete.
  */
-@theme inline {
-  --font-display: var(--font-display);
-  --font-body: var(--font-body);
-  --font-mono: var(--font-mono);
+@theme static {
+  --font-display: 'Cinzel', 'Spectral', Georgia, serif;
+  --font-body: 'Spectral', Georgia, 'Times New Roman', serif;
+  --font-mono: 'JetBrains Mono', 'SFMono-Regular', Menlo, monospace;
 
-  --color-bg: var(--bg);
-  --color-bg-deep: var(--bg-deep);
-  --color-surface: var(--surface);
-  --color-surface-raised: var(--surface-raised);
-  --color-surface-sunken: var(--surface-sunken);
+  /* ---- Type scale (modular, ratio ~1.25) → text-* utilities ------------- */
+  --text-2xs: 0.6875rem; /* 11px — coordinate chips, micro-labels            */
+  --text-xs: 0.75rem; /*    12px                                             */
+  --text-sm: 0.8125rem; /* 13px — panel body                                 */
+  --text-base: 0.9375rem; /* 15px — default                                  */
+  --text-md: 1.0625rem; /* 17px                                             */
+  --text-lg: 1.3125rem; /* 21px                                            */
+  --text-xl: 1.625rem; /*  26px                                           */
+  --text-2xl: 2.0625rem; /* 33px                                          */
+  --text-3xl: 2.5625rem; /* 41px — display                               */
 
-  --color-ink: var(--ink);
-  --color-ink-strong: var(--ink-strong);
-  --color-ink-muted: var(--ink-muted);
-  --color-ink-faint: var(--ink-faint);
+  --leading-tight: 1.15;
+  --leading-snug: 1.35;
+  --leading-normal: 1.6;
 
-  --color-line: var(--line);
-  --color-line-strong: var(--line-strong);
+  --tracking-tight: -0.01em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.04em;
+  --tracking-wider: 0.14em; /* Cinzel small-caps cartouche lettering        */
 
-  --color-gold: var(--gold);
-  --color-gold-strong: var(--gold-strong);
-  --color-on-gold: var(--on-gold);
-  --color-sea: var(--sea);
-  --color-astra: var(--astra);
-  --color-ember: var(--ember);
-  --color-positive: var(--positive);
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
 
-  --color-terrain-grass: var(--terrain-grass);
-  --color-terrain-forest: var(--terrain-forest);
-  --color-terrain-ocean: var(--terrain-ocean);
-  --color-terrain-mountain: var(--terrain-mountain);
-  --color-terrain-desert: var(--terrain-desert);
-  --color-terrain-marsh: var(--terrain-marsh);
+  /* ---- Spacing (bespoke, non-linear) → explicit keys win over multiplier  */
+  --spacing-px: 1px;
+  --spacing-1: 0.25rem; /*  4 */
+  --spacing-2: 0.5rem; /*   8 */
+  --spacing-3: 0.75rem; /* 12 */
+  --spacing-4: 1rem; /*    16 */
+  --spacing-5: 1.5rem; /*  24 */
+  --spacing-6: 2rem; /*    32 */
+  --spacing-7: 3rem; /*    48 */
+  --spacing-8: 4rem; /*    64 */
+  --spacing-9: 6rem; /*    96 */
 
-  --radius-sm: var(--radius-sm);
-  --radius-md: var(--radius-md);
-  --radius-lg: var(--radius-lg);
-  --radius-xl: var(--radius-xl);
+  /* ---- Radii ------------------------------------------------------------ */
+  --radius-sm: 3px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 16px;
+  --radius-full: 999px;
+
+  /* =======================================================================
+   * Colours — light theme "Parchment" values. The dark "Astral" theme
+   * reassigns these generated --color-* in tokens.css under [data-theme].
+   * ===================================================================== */
+  --color-bg: #ece0c6; /* the table / outer parchment                       */
+  --color-bg-deep: #e2d3b2; /* shadowed paper behind panels                 */
+  --color-surface: #f5ecd6; /* primary paper stock for panels & cards       */
+  --color-surface-raised: #fbf5e6; /* a note pinned slightly above the page  */
+  --color-surface-sunken: #e6d8ba; /* wells, inputs, the canvas mat         */
+  --color-overlay: rgba(58, 44, 28, 0.42); /* scrim behind modals           */
+
+  --color-ink: #2f2416; /* primary iron-gall text                           */
+  --color-ink-strong: #1d1509; /* headings                                  */
+  --color-ink-muted: #6f5d40; /* secondary text, labels                     */
+  --color-ink-faint: #9c8862; /* tertiary, placeholders, disabled          */
+
+  --color-line: #cbb88e; /* hairline drawn rules                            */
+  --color-line-strong: #a8946a; /* emphasised borders, panel edges          */
+  --color-line-faint: rgba(120, 96, 56, 0.16);
+
+  --color-gold: #9a6a16; /* compass-rose ink — primary accent               */
+  --color-gold-strong: #7e560f;
+  --color-gold-soft: rgba(154, 106, 22, 0.14);
+  --color-on-gold: #fbf5e6; /* text/icon on a gold fill                     */
+
+  --color-sea: #2f6f6a; /* verdigris ocean wash — secondary accent          */
+  --color-sea-soft: rgba(47, 111, 106, 0.14);
+
+  --color-astra: #5a4aa6; /* dusk violet — tertiary                         */
+  --color-astra-soft: rgba(90, 74, 166, 0.14);
+
+  --color-ember: #a4402e; /* burnt-sienna marginalia — danger              */
+  --color-ember-soft: rgba(164, 64, 46, 0.14);
+
+  --color-positive: #4a6f2f; /* moss — confirmations / "online"             */
+  --color-positive-soft: rgba(74, 111, 47, 0.16);
+
+  /* Canvas — the infinite hex plane (read by the renderer, ADR-0003) */
+  --color-canvas-bg: #e8dabb;
+  --color-canvas-mat: #ddcaa3;
+  --color-hex-line: rgba(120, 96, 56, 0.5); /* grid ink                     */
+  --color-feature-ink: #4a3a1e; /* a placed Feature's marker — sepia ink    */
+  --color-label-ink: #2f2416; /* free-positioned Label text — iron-gall ink */
+  --color-name-ink: #5a4a2c; /* a Hex name — muted sepia, quieter           */
+
+  /* Terrain fills — the base type of a hex. Tuned to read as hand-tinted
+     washes on aged paper; the dark theme deepens them for the night chart. */
+  --color-terrain-grass: #b7be7e;
+  --color-terrain-forest: #6f9560;
+  --color-terrain-ocean: #7eaab0;
+  --color-terrain-mountain: #b9a489;
+  --color-terrain-desert: #e0c98c;
+  --color-terrain-marsh: #93a87f;
+  --color-terrain-sky: #a9c4d4; /* open air — a daylit pale cerulean        */
+
+  /* ---- Elevation — warm, paper-soft drop shadows (themed) --------------- */
+  --shadow-1: 0 1px 2px rgba(60, 44, 22, 0.12);
+  --shadow-2: 0 4px 12px -2px rgba(60, 44, 22, 0.2);
+  --shadow-3: 0 16px 36px -8px rgba(50, 36, 18, 0.32);
+  --shadow-inset: inset 0 1px 2px rgba(60, 44, 22, 0.12);
+  --shadow-focus: 0 0 0 3px rgba(154, 106, 22, 0.32); /* focus-visible ring  */
 }

@@ -25,31 +25,31 @@ export type ChipTone = 'gold' | 'sea' | 'astra';
     :host {
       display: inline-flex;
       align-items: center;
-      gap: var(--space-2);
-      padding: var(--space-1) var(--space-3);
+      gap: var(--spacing-2);
+      padding: var(--spacing-1) var(--spacing-3);
       font-size: var(--text-2xs);
-      font-weight: var(--weight-semibold);
+      font-weight: var(--font-weight-semibold);
       letter-spacing: var(--tracking-wide);
       text-transform: uppercase;
-      color: var(--ink-muted);
-      background: var(--surface-sunken);
-      border: 1px solid var(--line);
+      color: var(--color-ink-muted);
+      background: var(--color-surface-sunken);
+      border: 1px solid var(--color-line);
       border-radius: var(--radius-full);
     }
     :host(.is-gold) {
-      color: var(--gold-strong);
-      background: var(--gold-soft);
-      border-color: color-mix(in oklab, var(--gold) 36%, transparent);
+      color: var(--color-gold-strong);
+      background: var(--color-gold-soft);
+      border-color: color-mix(in oklab, var(--color-gold) 36%, transparent);
     }
     :host(.is-sea) {
-      color: var(--sea);
-      background: var(--sea-soft);
-      border-color: color-mix(in oklab, var(--sea) 36%, transparent);
+      color: var(--color-sea);
+      background: var(--color-sea-soft);
+      border-color: color-mix(in oklab, var(--color-sea) 36%, transparent);
     }
     :host(.is-astra) {
-      color: var(--astra);
-      background: var(--astra-soft);
-      border-color: color-mix(in oklab, var(--astra) 36%, transparent);
+      color: var(--color-astra);
+      background: var(--color-astra-soft);
+      border-color: color-mix(in oklab, var(--color-astra) 36%, transparent);
     }
   `,
 })

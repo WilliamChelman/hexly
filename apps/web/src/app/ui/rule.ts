@@ -14,8 +14,8 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
     :host {
       height: 0;
       border: 0;
-      border-top: 1px solid var(--line);
-      box-shadow: 0 1px 0 var(--line-faint);
+      border-top: 1px solid var(--color-line);
+      box-shadow: 0 1px 0 var(--color-line-faint);
     }
   `,
 })

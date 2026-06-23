@@ -294,14 +294,14 @@ export class Canvas2dMapRenderer implements MapRenderer {
       terrainPalette.map((t) => [t.id, read(t.fill, '#888')]),
     ) as Record<TerrainId, string>;
     return {
-      void: read('--canvas-bg', '#1b1b1b'),
-      hover: read('--gold-soft', 'rgba(212,175,55,.3)'),
-      line: read('--hex-line', '#888'),
-      featureInk: read('--feature-ink', '#f4ecd8'),
-      labelInk: read('--label-ink', '#f4ecd8'),
-      nameInk: read('--name-ink', '#f4ecd8'),
-      selected: read('--gold-strong', '#7e560f'),
-      blocked: read('--ember', '#a4402e'),
+      void: read('--color-canvas-bg', '#1b1b1b'),
+      hover: read('--color-gold-soft', 'rgba(212,175,55,.3)'),
+      line: read('--color-hex-line', '#888'),
+      featureInk: read('--color-feature-ink', '#f4ecd8'),
+      labelInk: read('--color-label-ink', '#f4ecd8'),
+      nameInk: read('--color-name-ink', '#f4ecd8'),
+      selected: read('--color-gold-strong', '#7e560f'),
+      blocked: read('--color-ember', '#a4402e'),
       terrain,
     };
   }

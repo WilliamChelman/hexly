@@ -32,17 +32,17 @@ export type ButtonSize = 'md' | 'sm';
   template: `<ng-content />`,
   styles: `
     :host {
-      --_fg: var(--ink);
-      --_bg: var(--surface-raised);
-      --_bd: var(--line-strong);
+      --_fg: var(--color-ink);
+      --_bg: var(--color-surface-raised);
+      --_bd: var(--color-line-strong);
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: var(--space-2);
-      padding: var(--space-2) var(--space-4);
+      gap: var(--spacing-2);
+      padding: var(--spacing-2) var(--spacing-4);
       font-family: var(--font-body);
       font-size: var(--text-sm);
-      font-weight: var(--weight-semibold);
+      font-weight: var(--font-weight-semibold);
       letter-spacing: 0.01em;
       color: var(--_fg);
       background: var(--_bg);
@@ -61,7 +61,7 @@ export type ButtonSize = 'md' | 'sm';
     :host(:hover) {
       transform: translateY(-1px);
       box-shadow: var(--shadow-2);
-      border-color: var(--gold);
+      border-color: var(--color-gold);
     }
     :host(:active) {
       transform: translateY(0);
@@ -76,13 +76,13 @@ export type ButtonSize = 'md' | 'sm';
     }
 
     :host(.is-primary) {
-      --_fg: var(--on-gold);
-      --_bg: var(--gold);
-      --_bd: var(--gold-strong);
+      --_fg: var(--color-on-gold);
+      --_bg: var(--color-gold);
+      --_bd: var(--color-gold-strong);
     }
     :host(.is-primary:hover) {
-      --_bg: var(--gold-strong);
-      border-color: var(--gold-strong);
+      --_bg: var(--color-gold-strong);
+      border-color: var(--color-gold-strong);
     }
     :host(.is-ghost) {
       --_bg: transparent;
@@ -90,25 +90,25 @@ export type ButtonSize = 'md' | 'sm';
       box-shadow: none;
     }
     :host(.is-ghost:hover) {
-      --_bg: var(--gold-soft);
+      --_bg: var(--color-gold-soft);
       border-color: transparent;
       box-shadow: none;
     }
     :host(.is-danger) {
-      --_fg: var(--ember);
-      --_bd: color-mix(in oklab, var(--ember) 40%, var(--line));
+      --_fg: var(--color-ember);
+      --_bd: color-mix(in oklab, var(--color-ember) 40%, var(--color-line));
     }
     :host(.is-danger:hover) {
-      --_fg: var(--on-gold);
-      --_bg: var(--ember);
-      border-color: var(--ember);
+      --_fg: var(--color-on-gold);
+      --_bg: var(--color-ember);
+      border-color: var(--color-ember);
     }
     :host(.is-sm) {
-      padding: var(--space-1) var(--space-3);
+      padding: var(--spacing-1) var(--spacing-3);
       font-size: var(--text-xs);
     }
     :host(.is-icon) {
-      padding: var(--space-2);
+      padding: var(--spacing-2);
       aspect-ratio: 1;
     }
   `,

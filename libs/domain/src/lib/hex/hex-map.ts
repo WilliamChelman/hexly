@@ -38,12 +38,12 @@ export interface Terrain {
  * {@link Terrain}.
  */
 export const terrainPalette = [
-  { id: 'grass', label: 'Grassland', fill: '--terrain-grass' },
-  { id: 'forest', label: 'Forest', fill: '--terrain-forest' },
-  { id: 'ocean', label: 'Ocean', fill: '--terrain-ocean' },
-  { id: 'mountain', label: 'Mountains', fill: '--terrain-mountain' },
-  { id: 'desert', label: 'Desert', fill: '--terrain-desert' },
-  { id: 'sky', label: 'Sky', fill: '--terrain-sky' },
+  { id: 'grass', label: 'Grassland', fill: '--color-terrain-grass' },
+  { id: 'forest', label: 'Forest', fill: '--color-terrain-forest' },
+  { id: 'ocean', label: 'Ocean', fill: '--color-terrain-ocean' },
+  { id: 'mountain', label: 'Mountains', fill: '--color-terrain-mountain' },
+  { id: 'desert', label: 'Desert', fill: '--color-terrain-desert' },
+  { id: 'sky', label: 'Sky', fill: '--color-terrain-sky' },
 ] as const satisfies readonly Terrain[];
 
 /**

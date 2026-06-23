@@ -39,9 +39,9 @@ import {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: var(--space-7);
-      height: var(--space-7);
-      color: var(--ink-muted);
+      width: var(--spacing-7);
+      height: var(--spacing-7);
+      color: var(--color-ink-muted);
       background: transparent;
       border: 1px solid transparent;
       border-radius: var(--radius-md);
@@ -52,13 +52,13 @@ import {
         color var(--dur-fast) var(--ease-out);
     }
     :host(:hover:not(:disabled)) {
-      color: var(--ink);
-      background: var(--gold-soft);
+      color: var(--color-ink);
+      background: var(--color-gold-soft);
     }
     :host(.is-active) {
-      color: var(--gold);
-      background: var(--gold-soft);
-      border-color: var(--gold);
+      color: var(--color-gold);
+      background: var(--color-gold-soft);
+      border-color: var(--color-gold);
     }
     :host(:disabled) {
       opacity: 0.4;

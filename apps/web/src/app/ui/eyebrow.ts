@@ -16,10 +16,10 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
     :host {
       font-family: var(--font-display);
       font-size: var(--text-2xs);
-      font-weight: var(--weight-semibold);
+      font-weight: var(--font-weight-semibold);
       letter-spacing: var(--tracking-wider);
       text-transform: uppercase;
-      color: var(--ink-muted);
+      color: var(--color-ink-muted);
     }
   `,
 })

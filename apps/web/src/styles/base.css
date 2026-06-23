@@ -26,8 +26,8 @@ body {
   font-family: var(--font-body);
   font-size: var(--text-base);
   line-height: var(--leading-normal);
-  color: var(--ink);
-  background-color: var(--bg);
+  color: var(--color-ink);
+  background-color: var(--color-bg);
   transition:
     background-color var(--dur-slow) var(--ease-out),
     color var(--dur-slow) var(--ease-out);
@@ -38,19 +38,19 @@ h2,
 h3,
 h4 {
   font-family: var(--font-display);
-  font-weight: var(--weight-semibold);
+  font-weight: var(--font-weight-semibold);
   line-height: var(--leading-tight);
-  color: var(--ink-strong);
+  color: var(--color-ink-strong);
   letter-spacing: var(--tracking-tight);
 }
 
 a {
-  color: var(--gold-strong);
-  text-decoration-color: var(--line-strong);
+  color: var(--color-gold-strong);
+  text-decoration-color: var(--color-line-strong);
   text-underline-offset: 0.18em;
 }
 a:hover {
-  color: var(--gold);
+  color: var(--color-gold);
 }
 
 button,
@@ -62,37 +62,37 @@ textarea {
 }
 
 ::selection {
-  background: var(--gold-soft);
-  color: var(--ink-strong);
+  background: var(--color-gold-soft);
+  color: var(--color-ink-strong);
 }
 
 ::placeholder {
-  color: var(--ink-faint);
+  color: var(--color-ink-faint);
 }
 
 :focus-visible {
   outline: none;
-  box-shadow: var(--focus-ring);
+  box-shadow: var(--shadow-focus);
   border-radius: var(--radius-sm);
 }
 
 /* Themed, slender scrollbars that read as drawn rules. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--line-strong) transparent;
+  scrollbar-color: var(--color-line-strong) transparent;
 }
 *::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 *::-webkit-scrollbar-thumb {
-  background: var(--line-strong);
+  background: var(--color-line-strong);
   border: 3px solid transparent;
   background-clip: padding-box;
   border-radius: var(--radius-full);
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: var(--ink-faint);
+  background: var(--color-ink-faint);
   background-clip: padding-box;
 }
 

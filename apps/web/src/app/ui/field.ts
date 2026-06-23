@@ -16,12 +16,12 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
     :host {
       display: flex;
       flex-direction: column;
-      gap: var(--space-1);
+      gap: var(--spacing-1);
     }
     .label {
       font-size: var(--text-xs);
-      font-weight: var(--weight-semibold);
-      color: var(--ink-muted);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-ink-muted);
       letter-spacing: var(--tracking-wide);
       text-transform: uppercase;
     }
