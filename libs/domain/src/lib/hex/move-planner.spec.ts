@@ -109,6 +109,35 @@ describe('planMove — single hex onto an occupied hex', () => {
   });
 });
 
+describe('planMove — carries nothing', () => {
+  it('resolves to an empty no-op plan when the origin is Void', () => {
+    // The origin coordinate is unpainted: there is nothing to carry. The plan must
+    // be empty rather than emitting a clear at the destination, which would destroy
+    // the occupant the move never touched.
+    const doc = docWith({ '1,0': { terrain: 'ocean' } });
+
+    const plan = planMove({
+      document: doc,
+      selection: pickHex({ q: 0, r: 0 }),
+      offset: { q: 1, r: 0 },
+    });
+
+    expect(plan).toEqual({ blocked: false, hexes: [], labels: [], regions: [] });
+  });
+
+  it('resolves to an empty no-op plan when nothing is selected', () => {
+    const doc = docWith({ '0,0': { terrain: 'forest' } });
+
+    const plan = planMove({
+      document: doc,
+      selection: { hexes: [], labels: [], regions: [] },
+      offset: { q: 1, r: 0 },
+    });
+
+    expect(plan).toEqual({ blocked: false, hexes: [], labels: [], regions: [] });
+  });
+});
+
 describe('planMove — regions stay put', () => {
   it('shifts no region footprint when the moved hex is a member but no region is selected', () => {
     const from = { q: 0, r: 0 };

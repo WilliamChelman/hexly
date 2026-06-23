@@ -1649,6 +1649,28 @@ describe('EditorStore moveHex', () => {
     expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 0, r: 0 } });
   });
 
+  it('keeps both ends selected when a swap is dragged with both already selected', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.paintAt({ q: 1, r: 0 }, 'ocean');
+    store.marqueeSelect([{ q: 0, r: 0 }, { q: 1, r: 0 }], [], false); // both selected
+
+    store.moveHex({ q: 0, r: 0 }, { q: 1, r: 0 });
+
+    // The swap exchanged the records, so each selection rides with its content:
+    // forest's ref follows to the destination, ocean's follows back to the origin.
+    // Neither end is silently dropped — the set still holds both coordinates.
+    expect(store.document().hexes['1,0']).toEqual({ terrain: 'forest' });
+    expect(store.document().hexes['0,0']).toEqual({ terrain: 'ocean' });
+    expect(store.selections()).toEqual(
+      expect.arrayContaining([
+        { kind: 'hex', coord: { q: 1, r: 0 } },
+        { kind: 'hex', coord: { q: 0, r: 0 } },
+      ]),
+    );
+    expect(store.selections()).toHaveLength(2);
+  });
+
   it('follows the selection back to the destination when the move is redone', () => {
     const store = new EditorStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');

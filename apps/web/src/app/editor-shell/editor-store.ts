@@ -655,14 +655,21 @@ export class EditorStore {
    */
   moveHex(from: Axial, to: Axial): void {
     const fromKey = coordKey(from);
-    if (fromKey === coordKey(to)) return;
+    const toKey = coordKey(to);
+    if (fromKey === toKey) return;
+    // Read the live immutable document once and share it with the planner, so the
+    // existence check and the plan see one consistent snapshot.
+    const doc = this._document();
     // Moving Void carries nothing, so bail before the planner/`commit` runs.
-    if (!this._document().hexes[fromKey]) return;
+    if (!doc.hexes[fromKey]) return;
+    // A drop onto an occupant swaps the two records; remember whether this move is
+    // a swap (the destination held content) so the selection can follow both ends.
+    const swapped = !!doc.hexes[toKey];
     // Route through the pure planner (the seam for every move): it reads the live
     // immutable document and returns the writes/clears that swap or relocate the
     // hex. A single-hex move never blocks, but a blocked plan would be a no-op.
     const plan = planMove({
-      document: this._document(),
+      document: doc,
       selection: { hexes: [from], labels: [], regions: [] },
       offset: { q: to.q - from.q, r: to.r - from.r },
     });
@@ -677,24 +684,33 @@ export class EditorStore {
         else delete draft.hexes[key];
       }
     });
-    // The content moved, so a selection that pointed at the origin rides along to
-    // the destination — completing a move keeps the moved Hex selected, matching
-    // the Label-drag path (and the Escape-cancel path, which leaves it put). Copy
-    // the coordinate rather than aliasing the caller's `to`, so a coord the caller
-    // later mutates (e.g. a reused hover object) can't retarget the selection.
+    // The content moved, so a cell selection rides along with the content it
+    // points at: a ref at the origin follows to the destination, and — on a swap —
+    // a ref at the destination follows back to the origin, since that record slid
+    // there. Copy each coordinate rather than aliasing the caller's `from`/`to`, so
+    // a coord the caller later mutates (e.g. a reused hover object) can't retarget
+    // the selection. (A single-hex drag only ever selects the origin; the symmetric
+    // case keeps the seam correct once a group drag can select both ends.)
     const refs = this._selections();
-    const at = refs.findIndex(
-      (ref) => ref.kind === 'cell' && coordKey(ref.coord) === fromKey,
+    const touched = refs.some(
+      (ref) =>
+        ref.kind === 'cell' &&
+        (coordKey(ref.coord) === fromKey ||
+          (swapped && coordKey(ref.coord) === toKey)),
     );
-    if (at !== -1) {
-      const next = refs.slice();
-      const moved: SelectionRef = { kind: 'cell', coord: { q: to.q, r: to.r } };
-      next[at] = moved;
-      // The destination may already be in the set as its own cell ref; re-pointing
-      // the origin onto it would leave the same cell twice. Drop every OTHER copy of
-      // the moved ref, keeping the one we just re-pointed at index `at`.
-      const deduped = next.filter(
-        (ref, i) => i === at || !sameSelectionRef(ref, moved),
+    if (touched) {
+      const remapped = refs.map((ref): SelectionRef => {
+        if (ref.kind !== 'cell') return ref;
+        const key = coordKey(ref.coord);
+        if (key === fromKey) return { kind: 'cell', coord: { q: to.q, r: to.r } };
+        if (swapped && key === toKey)
+          return { kind: 'cell', coord: { q: from.q, r: from.r } };
+        return ref;
+      });
+      // The remap is a bijection on {origin, destination}, so it introduces no new
+      // duplicates; collapse any that pre-existed in the set, keeping the first.
+      const deduped = remapped.filter(
+        (ref, i) => remapped.findIndex((r) => sameSelectionRef(r, ref)) === i,
       );
       this._selections.set(deduped);
     }
