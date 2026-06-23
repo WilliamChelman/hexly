@@ -479,6 +479,11 @@ describe('Canvas2dMapRenderer swap drag preview', () => {
     // The blocked cell is washed in the danger ink — a preview overlay only, so the
     // document is never mutated to draw it.
     expect(filledAt(BLOCKED_INK, centre)).toBe(true);
+    // And the wash is translucent (BLOCKED_FILL_ALPHA), so the terrain beneath still
+    // reads through — a regression to an opaque fill would hide it. pathFills and
+    // pathFillAlphas are pushed in lockstep per fill(), so the indices align.
+    const blockedFillIndex = ctx.pathFills.indexOf(BLOCKED_INK);
+    expect(ctx.pathFillAlphas[blockedFillIndex]).toBeLessThan(1);
     restore();
   });
 

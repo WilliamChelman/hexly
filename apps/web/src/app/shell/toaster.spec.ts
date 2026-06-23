@@ -1,14 +1,20 @@
+import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { TestBed } from '@angular/core/testing';
+import { vi } from 'vitest';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { ToasterService } from '../core/toaster.service';
 import { Toaster } from './toaster';
 
 describe('Toaster', () => {
-  beforeEach(() =>
+  let announce: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    announce = vi.fn();
     TestBed.configureTestingModule({
       imports: [Toaster, provideTranslocoTesting()],
-    }),
-  );
+      providers: [{ provide: LiveAnnouncer, useValue: { announce } }],
+    });
+  });
 
   function render() {
     const fixture = TestBed.createComponent(Toaster);
@@ -33,13 +39,28 @@ describe('Toaster', () => {
     expect(fixture.nativeElement.textContent).toContain('Saved');
   });
 
-  it('marks an error toast with its tone class and an assertive role', () => {
+  it('marks an error toast with its tone class', () => {
     TestBed.inject(ToasterService).show('Move blocked', 'error', 0);
 
     const fixture = render();
     const toast = fixture.nativeElement.querySelector('.toast');
     expect(toast.classList.contains('is-error')).toBe(true);
-    expect(toast.getAttribute('role')).toBe('alert');
+  });
+
+  it('announces an error toast assertively through the CDK live region', () => {
+    TestBed.inject(ToasterService).show('Move blocked', 'error', 0);
+
+    render();
+
+    expect(announce).toHaveBeenCalledWith('Move blocked', 'assertive');
+  });
+
+  it('announces a non-error toast politely', () => {
+    TestBed.inject(ToasterService).show('Saved', 'success', 0);
+
+    render();
+
+    expect(announce).toHaveBeenCalledWith('Saved', 'polite');
   });
 
   it('dismisses a toast when its dismiss control is clicked', () => {

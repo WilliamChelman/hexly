@@ -1,5 +1,7 @@
 import { computed, Injectable, signal } from '@angular/core';
 import {
+  addAxial,
+  addPoint,
   Axial,
   coordKey,
   emptyHexMap,
@@ -8,7 +10,6 @@ import {
   HexMap,
   Label,
   MovePlan,
-  MoveSelection,
   planMove,
   Point,
   Region,
@@ -652,13 +653,80 @@ export class EditorStore {
   }
 
   /**
+   * The live Selection partitioned for a move: cells as hex coordinates, plus the
+   * selected label and region ids. The single place the move paths read the set, so
+   * {@link moveSelection} (which commits) and {@link previewSelectionMove} (which
+   * previews) can never disagree about what is moving.
+   */
+  private selectionForMove(): {
+    hexes: Axial[];
+    labels: string[];
+    regions: string[];
+  } {
+    const hexes: Axial[] = [];
+    const labels: string[] = [];
+    const regions: string[] = [];
+    for (const ref of this._selections()) {
+      if (ref.kind === 'cell') hexes.push(ref.coord);
+      else if (ref.kind === 'label') labels.push(ref.id);
+      else regions.push(ref.id);
+    }
+    return { hexes, labels, regions };
+  }
+
+  /**
+   * Each selected label's destination position after nudging by `delta`, keyed by
+   * id — the one place label movement is computed, shared by the preview and the
+   * {@link moveSelection commit} so they can never drift. Empty for a zero `delta`
+   * (a hex/region drag carries no label movement), so no spurious label write is
+   * recorded. Builds an id→label index once, so it is O(labels + selected), not a
+   * scan per id (issue #64).
+   */
+  private movedLabelPositions(
+    labelIds: readonly string[],
+    delta: Point,
+  ): ReadonlyMap<string, Point> {
+    const moved = new Map<string, Point>();
+    if (delta.x === 0 && delta.y === 0) return moved;
+    const byId = new Map(this._document().labels.map((l) => [l.id, l]));
+    for (const id of labelIds) {
+      const label = byId.get(id);
+      if (label) moved.set(id, addPoint(label.position, delta));
+    }
+    return moved;
+  }
+
+  /**
+   * What moving the live Selection by `offset`/`labelDelta` *would* produce, without
+   * committing: the planner {@link MovePlan} (hex writes/clears + region-footprint
+   * shifts) and each selected label's previewed position. The single query the canvas
+   * reads each frame of a drag to preview the resolved writes (the group at its
+   * destination), the dragged labels, or the blocked cells — and the same query
+   * {@link moveSelection} derives its commit from, so the preview the user sees and
+   * the move that lands can never disagree (issues #30, #64). Touches no signal and
+   * records no edit.
+   */
+  previewSelectionMove(
+    offset: Axial,
+    labelDelta: Point,
+  ): { plan: MovePlan; labelPositions: ReadonlyMap<string, Point> } {
+    const { hexes, labels, regions } = this.selectionForMove();
+    const plan = planMove({
+      document: this._document(),
+      selection: { hexes, regions },
+      offset,
+    });
+    return { plan, labelPositions: this.movedLabelPositions(labels, labelDelta) };
+  }
+
+  /**
    * Move the whole live Selection by one `offset` (issue #64, ADR-0017): the
    * unified move every drag — one hex or a whole group — routes through. The
-   * selection's cells, labels, and regions are handed to the pure {@link planMove}
-   * seam, which resolves the rigid translation, intra-group overlap, and group
-   * collisions (a non-selected occupant swaps back to `d − offset`, or the cell
-   * blocks). A **blocked** plan is a no-op: the document and selection are left
-   * untouched, so the drag snaps back on release.
+   * selection's cells, labels, and regions are run through {@link
+   * previewSelectionMove}, which resolves the rigid translation, intra-group
+   * overlap, and group collisions (a non-selected occupant swaps back to
+   * `d − offset`, or the cell blocks). A **blocked** plan is a no-op: the document
+   * and selection are left untouched, so the drag snaps back on release.
    *
    * A resolved plan applies in a single {@link commit} — hex writes/clears, each
    * selected region's translated footprint, and every selected label nudged by
@@ -672,35 +740,6 @@ export class EditorStore {
    * `labelDelta` both zero) carries nothing and records no step, the unified
    * counterpart of the old same-coordinate guard.
    */
-  /**
-   * The live Selection as the domain {@link MoveSelection} the planner reads —
-   * cells as hex coordinates, plus label and region ids. The single place the move
-   * paths derive a planner request from the set, so {@link moveSelection} (which
-   * commits) and {@link planSelectionMove} (which previews) can never disagree.
-   */
-  private selectionForMove(): MoveSelection {
-    const hexes: Axial[] = [];
-    const labels: string[] = [];
-    const regions: string[] = [];
-    for (const ref of this._selections()) {
-      if (ref.kind === 'cell') hexes.push(ref.coord);
-      else if (ref.kind === 'label') labels.push(ref.id);
-      else regions.push(ref.id);
-    }
-    return { hexes, labels, regions };
-  }
-
-  /**
-   * The {@link MovePlan} moving the live Selection by `offset` *would* produce,
-   * without committing — the pure query the canvas reads each frame of a drag to
-   * preview the resolved writes (the group at its destination) or the blocked cells
-   * (highlighted red), exactly what releasing would commit (issue #64). Touches no
-   * signal and records no edit.
-   */
-  planSelectionMove(offset: Axial): MovePlan {
-    return planMove({ document: this._document(), selection: this.selectionForMove(), offset });
-  }
-
   moveSelection(offset: Axial, labelDelta: Point): MoveOutcome {
     if (
       offset.q === 0 &&
@@ -711,13 +750,10 @@ export class EditorStore {
       return 'noop';
     }
     const refs = this._selections();
-    const selection = this.selectionForMove();
-    const plan = planMove({ document: this._document(), selection, offset });
+    const { plan, labelPositions } = this.previewSelectionMove(offset, labelDelta);
     // A blocked plan refuses the whole move — leave everything untouched so the
     // release snaps the preview back (CONTEXT.md → "a blocked plan is a no-op").
     if (plan.blocked) return 'blocked';
-    const labelIds = selection.labels;
-    const moveLabels = labelDelta.x !== 0 || labelDelta.y !== 0;
     const committed = this.commit((draft) => {
       // Deep-clone every record the planner hands back — they reference the
       // immutable pre-move document, so the draft never aliases a live node and
@@ -731,16 +767,11 @@ export class EditorStore {
         const region = regionById(draft, id);
         if (region) region.hexes = deepClone(footprint);
       }
-      if (moveLabels) {
-        for (const id of labelIds) {
-          const label = draft.labels.find((l) => l.id === id);
-          if (label) {
-            label.position = {
-              x: label.position.x + labelDelta.x,
-              y: label.position.y + labelDelta.y,
-            };
-          }
-        }
+      // Apply the same previewed label positions the canvas drew mid-drag; an empty
+      // map (a zero-pixel/hex-only move) writes nothing, so no label step is recorded.
+      for (const [id, position] of labelPositions) {
+        const label = draft.labels.find((l) => l.id === id);
+        if (label) label.position = position;
       }
     });
     // The plan changed nothing (an empty selection, or every source Void): no step
@@ -752,7 +783,7 @@ export class EditorStore {
     // bijection, so it introduces no duplicates.
     const remapped = refs.map((ref): SelectionRef =>
       ref.kind === 'cell'
-        ? { kind: 'cell', coord: { q: ref.coord.q + offset.q, r: ref.coord.r + offset.r } }
+        ? { kind: 'cell', coord: addAxial(ref.coord, offset) }
         : ref,
     );
     this._selections.set(remapped);

@@ -10,7 +10,7 @@ function docWith(hexes: Record<string, Hex>): HexMap {
 
 /** A selection of a single hex coordinate (no labels or regions). */
 function pickHex(coord: Axial) {
-  return { hexes: [coord], labels: [], regions: [] };
+  return { hexes: [coord], regions: [] };
 }
 
 describe('planMove — single hex onto Void', () => {
@@ -127,7 +127,7 @@ describe('planMove — carries nothing', () => {
 
     const plan = planMove({
       document: doc,
-      selection: { hexes: [], labels: [], regions: [] },
+      selection: { hexes: [], regions: [] },
       offset: { q: 1, r: 0 },
     });
 
@@ -180,7 +180,7 @@ describe('planMove — group rigid translation onto Void', () => {
 
     const plan = planMove({
       document: doc,
-      selection: { hexes: [a, b], labels: [], regions: [] },
+      selection: { hexes: [a, b], regions: [] },
       offset: { q: 0, r: 2 },
     });
 
@@ -214,7 +214,7 @@ describe('planMove — intra-group overlap (shift-by-one)', () => {
 
     const plan = planMove({
       document: doc,
-      selection: { hexes: [a, b], labels: [], regions: [] },
+      selection: { hexes: [a, b], regions: [] },
       offset: { q: 1, r: 0 },
     });
 
@@ -247,7 +247,7 @@ describe('planMove — group collision swaps a non-selected occupant', () => {
 
     const plan = planMove({
       document: doc,
-      selection: { hexes: [a, b], labels: [], regions: [] },
+      selection: { hexes: [a, b], regions: [] },
       offset: { q: 3, r: 0 },
     });
 
@@ -283,7 +283,7 @@ describe('planMove — self-overlap blocks the contested cell', () => {
 
     const plan = planMove({
       document: doc,
-      selection: { hexes: [a, b], labels: [], regions: [] },
+      selection: { hexes: [a, b], regions: [] },
       offset: { q: 1, r: 0 },
     });
 
@@ -309,7 +309,7 @@ describe('planMove — any blocked cell blocks the whole move', () => {
 
     const plan = planMove({
       document: doc,
-      selection: { hexes: [a, b, c], labels: [], regions: [] },
+      selection: { hexes: [a, b, c], regions: [] },
       offset: { q: 1, r: 0 },
     });
 
@@ -337,7 +337,7 @@ describe('planMove — region footprint translation', () => {
 
     const plan = planMove({
       document: doc,
-      selection: { hexes: [], labels: [], regions: ['r1'] },
+      selection: { hexes: [], regions: ['r1'] },
       offset: { q: 0, r: 3 },
     });
 
@@ -350,10 +350,11 @@ describe('planMove — region footprint translation', () => {
 });
 
 describe('planMove — mixed selection', () => {
-  it('translates hexes and a region footprint together, ignoring labels (carried by the caller)', () => {
-    // A hex and a region picked together translate by the same offset. Labels in the
-    // selection are not the planner's concern — they are free-positioned pixels that
-    // never collide — so a label id passed here contributes nothing to the plan.
+  it('translates hexes and a region footprint together by the same offset', () => {
+    // A hex and a region picked together translate by the same offset. Labels are
+    // not the planner's concern at all — they are free-positioned pixels that never
+    // collide, so the MoveSelection it reads carries no labels (the caller nudges
+    // them by the equivalent pixels).
     const a = { q: 0, r: 0 };
     const doc: HexMap = {
       hexes: { [coordKey(a)]: { terrain: 'forest' } },
@@ -370,7 +371,7 @@ describe('planMove — mixed selection', () => {
 
     const plan = planMove({
       document: doc,
-      selection: { hexes: [a], labels: ['L1'], regions: ['r1'] },
+      selection: { hexes: [a], regions: ['r1'] },
       offset: { q: 0, r: 1 },
     });
 

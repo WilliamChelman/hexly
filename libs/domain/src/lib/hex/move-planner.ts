@@ -1,17 +1,16 @@
-import { Axial } from './coordinates';
+import { addAxial, Axial, subAxial } from './coordinates';
 import { coordKey, Hex, HexMap, parseCoordKey, regionById } from './hex-map';
 
 /**
  * The Map elements a move picks up and translates together (CONTEXT.md →
  * Selection). Domain-level, so the planner owns no store types: a move is
- * described by the coordinates, label ids, and region ids it carries. Labels are
- * carried by the *caller* (they are free-positioned pixels, never collide, and so
- * have no part in the coordinate-space collision logic this planner owns) — the
- * planner reads only `hexes` and `regions`.
+ * described by the coordinates and region ids it carries. Labels are deliberately
+ * absent — they are free-positioned pixels, never collide, and so have no part in
+ * the coordinate-space collision logic this planner owns; the *caller* translates
+ * them by the equivalent pixels.
  */
 export interface MoveSelection {
   readonly hexes: Axial[];
-  readonly labels: string[];
   readonly regions: string[];
 }
 
@@ -56,10 +55,11 @@ export interface ResolvedMovePlan {
 /**
  * A move the planner refuses: the destination `cells` that can't take their
  * content, so the caller leaves the document untouched. A cell blocks when the
- * non-selected hex sitting on it cannot be displaced by the inverse offset —
- * because the moving group is itself landing on `d − offset` (a self-overlapping
- * nudge) or another non-selected hex already holds it. Single-hex moves never
- * block (a drop onto an occupant swaps); blocking arrives with the group slice.
+ * non-selected hex sitting on it cannot be displaced by the inverse offset:
+ * `d − offset` is always a source the group is vacating, so it blocks precisely
+ * when another moving member is also landing there (a self-overlapping nudge).
+ * Single-hex moves never block (a drop onto an occupant swaps); blocking arrives
+ * with the group slice.
  */
 export interface BlockedMovePlan {
   readonly blocked: true;
@@ -68,16 +68,6 @@ export interface BlockedMovePlan {
 
 /** Either a resolved move or a refusal — the one result every move flows through. */
 export type MovePlan = ResolvedMovePlan | BlockedMovePlan;
-
-/** Translate a coordinate by an offset. */
-function shift(coord: Axial, offset: Axial): Axial {
-  return { q: coord.q + offset.q, r: coord.r + offset.r };
-}
-
-/** Translate a coordinate by the inverse offset — where a displaced occupant goes. */
-function unshift(coord: Axial, offset: Axial): Axial {
-  return { q: coord.q - offset.q, r: coord.r - offset.r };
-}
 
 /**
  * Plan a move of `selection` by `offset` over `document` (CONTEXT.md, ADR-0017):
@@ -92,12 +82,12 @@ function unshift(coord: Axial, offset: Axial): Axial {
  * cell never fights itself.
  *
  * **Group collision.** A destination occupied by a hex *outside* the selection
- * displaces that occupant by the inverse offset, to `d − offset`, when that cell
- * is free (Void or a vacated source). The clean single-hex swap is exactly this
- * with one member. Where `d − offset` is instead claimed by the moving group (a
- * self-overlapping nudge) or by another non-selected hex, that destination is
- * **blocked**; any blocked cell blocks the whole move, returning `{ blocked,
- * cells }` so the caller is a no-op.
+ * displaces that occupant by the inverse offset, to `d − offset`. That target is
+ * always the source the moving member is vacating, so it is free — except when
+ * another moving member is *also* landing there (a self-overlapping nudge), in
+ * which case the destination is **blocked**. The clean single-hex swap is exactly
+ * this displacement with one member. Any blocked cell blocks the whole move,
+ * returning `{ blocked, cells }` so the caller is a no-op.
  *
  * **Regions.** Each selected region's footprint translates by the offset (every
  * member key `(q,r) → (q+dq, r+dr)`); region membership is otherwise untouched, so
@@ -118,7 +108,7 @@ export function planMove({ document, selection, offset }: MoveRequest): MovePlan
   const moves = selection.hexes.flatMap((source) => {
     const hex = document.hexes[coordKey(source)];
     if (!hex) return [];
-    return [{ source, dest: shift(source, offset), hex }];
+    return [{ source, dest: addAxial(source, offset), hex }];
   });
   const destKeys = new Set(moves.map((m) => coordKey(m.dest)));
 
@@ -138,14 +128,12 @@ export function planMove({ document, selection, offset }: MoveRequest): MovePlan
     if (sourceKeys.has(destKey)) continue;
     const occupant = document.hexes[destKey];
     if (!occupant) continue;
-    const target = unshift(dest, offset);
+    const target = subAxial(dest, offset);
     const targetKey = coordKey(target);
-    const targetOccupied =
-      !!document.hexes[targetKey] && !sourceKeys.has(targetKey);
-    // The target is free when nothing else will hold it: the moving group is not
-    // landing there, and no non-selected hex already sits there (a vacated source
-    // is free — it is being cleared this same move).
-    if (destKeys.has(targetKey) || targetOccupied) {
+    // `d − offset` is always the source this member is vacating, so it is free —
+    // unless another moving member is *also* landing there, in which case the
+    // displaced occupant has nowhere to go and the destination blocks.
+    if (destKeys.has(targetKey)) {
       blocked.push(dest);
     } else {
       hexes.push({ coord: target, hex: occupant });
@@ -170,7 +158,7 @@ export function planMove({ document, selection, offset }: MoveRequest): MovePlan
     if (!region) return [];
     const moved: Record<string, true> = {};
     for (const key of Object.keys(region.hexes)) {
-      moved[coordKey(shift(parseCoordKey(key), offset))] = true;
+      moved[coordKey(addAxial(parseCoordKey(key), offset))] = true;
     }
     return [{ id, hexes: moved }];
   });

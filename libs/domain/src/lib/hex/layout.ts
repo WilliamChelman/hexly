@@ -6,6 +6,11 @@ export interface Point {
   readonly y: number;
 }
 
+/** Translate a point by `delta` — the shared `(x,y) + (dx,dy)` label moves use. */
+export function addPoint(point: Point, delta: Point): Point {
+  return { x: point.x + delta.x, y: point.y + delta.y };
+}
+
 /** Per-map hex orientation; pointy-top is the default (ADR-0003). */
 export type Orientation = 'pointy' | 'flat';
 

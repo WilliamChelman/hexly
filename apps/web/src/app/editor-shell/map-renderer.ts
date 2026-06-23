@@ -93,18 +93,6 @@ const MARQUEE_DASH: readonly number[] = [5, 4];
  * drawing surface and paints one frame on demand for a given camera transform.
  */
 /**
- * The in-flight Hex/group drag's gesture state the canvas tracks: the `from`
- * origin pressed and the `to` coordinate under the cursor (issue #30). The canvas
- * turns it into the move's offset and, via the planner, the {@link
- * RenderOverrides.movePreview} the renderer actually draws — so this is no longer
- * a render override itself, just the raw drag state.
- */
-export interface HexDragOverride {
-  readonly from: Axial;
-  readonly to: Axial;
-}
-
-/**
  * A live marquee box: the two world-space corners (`a` the drag origin, `b` the
  * cursor) of the rectangle the Marquee Subtool is dragging (ADR-0017). Passed to
  * {@link MapRenderer.render} so the box previews live without touching the
@@ -519,8 +507,11 @@ export class Canvas2dMapRenderer implements MapRenderer {
       if (regionById_.has(region.id)) continue;
       // The selection tint follows a dragged region's previewed footprint too, so
       // the highlight rides with the border above it.
-      const preview = regionPreview?.get(region.id);
-      regionById_.set(region.id, preview ? { ...region, hexes: preview } : region);
+      const previewFootprint = regionPreview?.get(region.id);
+      regionById_.set(
+        region.id,
+        previewFootprint ? { ...region, hexes: previewFootprint } : region,
+      );
     }
     for (const selection of selections) {
       this.drawSelection(

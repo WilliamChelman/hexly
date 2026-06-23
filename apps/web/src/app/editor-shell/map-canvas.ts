@@ -14,16 +14,17 @@ import {
 } from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import {
+  addAxial,
   Axial,
   coordKey,
   hexToPixel,
-  HexMap,
   HexWrite,
   Layout,
   marqueeHits,
   pixelToHex,
   Point,
   rectFromCorners,
+  regionById,
 } from '@hexly/domain';
 import { ThemeService } from '../core/theme.service';
 import { ToasterService } from '../core/toaster.service';
@@ -425,29 +426,32 @@ export class MapCanvas {
         marqueeState.additive,
       );
     } else if (drag) {
-      // A live Selection drag previews the move from the planner's plan at the
-      // current offset (issues #30, #64). A resolved plan overlays its hex writes
-      // (the group at its destinations), translates every selected label by the
-      // label delta, and the highlight follows by translating each selected cell;
-      // a blocked plan washes the contested cells red and leaves the group in
-      // place, since releasing it would be a no-op that snaps back.
-      const plan = this.store.planSelectionMove(drag.offset);
+      // A live Selection drag previews exactly what releasing it would commit, from
+      // the one shared query the store also commits from (issues #30, #64): a
+      // resolved plan overlays its hex writes (the group at its destinations),
+      // draws every selected label at its previewed position, and the highlight
+      // follows by translating each selected cell; a blocked plan washes the
+      // contested cells red and leaves the group in place, since releasing it would
+      // be a no-op that snaps back.
+      const { plan, labelPositions: previewLabels } = this.store.previewSelectionMove(
+        drag.offset,
+        drag.labelDelta,
+      );
       if (plan.blocked) {
         blockedCells = plan.cells;
       } else {
         movePreview = plan.hexes;
-        const { offset, labelDelta } = drag;
+        const { offset } = drag;
         selections = selections.map((s) =>
           s.kind === 'hex' || s.kind === 'feature'
-            ? { ...s, coord: { q: s.coord.q + offset.q, r: s.coord.r + offset.r } }
+            ? { ...s, coord: addAxial(s.coord, offset) }
             : s,
         );
-        labelPositions = this.draggedLabelPositions(doc, labelDelta);
+        labelPositions = previewLabels;
         // The selected regions' translated footprints (from the same plan) preview
-        // their border and tint at the destination.
-        if (plan.regions.length > 0) {
-          regionPreview = new Map(plan.regions.map((r) => [r.id, r.hexes]));
-        }
+        // their border and tint at the destination; an empty plan yields an empty
+        // map the renderer treats as "no override", so no guard is needed.
+        regionPreview = new Map(plan.regions.map((r) => [r.id, r.hexes]));
       }
     }
     this.renderer?.render(camera, doc, hover, {
@@ -458,29 +462,6 @@ export class MapCanvas {
       blockedCells,
       regionPreview,
     });
-  }
-
-  /**
-   * The live positions of the dragged labels: every selected Label translated by
-   * `labelDelta` from its stored position, keyed by id for the renderer's
-   * {@link RenderOverrides.labelPositions} preview. Empty when no label is selected.
-   */
-  private draggedLabelPositions(
-    doc: HexMap,
-    labelDelta: Point,
-  ): ReadonlyMap<string, Point> {
-    const positions = new Map<string, Point>();
-    for (const sel of this.store.selections()) {
-      if (sel.kind !== 'label') continue;
-      const label = doc.labels.find((l) => l.id === sel.id);
-      if (label) {
-        positions.set(sel.id, {
-          x: label.position.x + labelDelta.x,
-          y: label.position.y + labelDelta.y,
-        });
-      }
-    }
-    return positions;
   }
 
   protected onPointerDown(event: PointerEvent): void {
@@ -768,10 +749,16 @@ export class MapCanvas {
       const outcome = this.store.moveSelection(drag.offset, drag.labelDelta);
       if (outcome === 'blocked') {
         this.toaster.show(this.transloco.translate('editorShell.moveBlocked'), 'error');
+      } else if (outcome === 'noop') {
+        // A drag that crossed the pixel threshold but resolved to no movement
+        // (jiggled within the origin hex, or dragged back to the press point) is
+        // still a plain pick: collapse a deferred group press to what was pressed,
+        // exactly as a sub-threshold release does.
+        this.collapseGroupPress();
       }
       this.drag.set(null);
-    } else if (this.dragPress?.group) {
-      this.store.select(this.dragPress.hexStart, this.dragPress.labelHit, 'replace');
+    } else {
+      this.collapseGroupPress();
     }
     // Commit a marquee box: run its world rectangle through the pure hit-test and
     // fold the contained hexes + labels into the selection (replace, or add when
@@ -831,6 +818,17 @@ export class MapCanvas {
    * selected, or the pressed coordinate belongs to a selected Region (so a Region
    * is grabbable by any of its member cells, painted or not).
    */
+  /**
+   * Collapse a deferred group-drag press to the single entity that was pressed —
+   * the pick the press postponed so a drag could move the whole set instead. A
+   * no-op unless the press armed a group drag (issue #64).
+   */
+  private collapseGroupPress(): void {
+    if (this.dragPress?.group) {
+      this.store.select(this.dragPress.hexStart, this.dragPress.labelHit, 'replace');
+    }
+  }
+
   private pressOnSelection(hex: Axial, hitId: string | null): boolean {
     const key = coordKey(hex);
     return this.store.selections().some((s) => {
@@ -841,9 +839,7 @@ export class MapCanvas {
         case 'feature':
           return coordKey(s.coord) === key;
         case 'region':
-          return !!this.store
-            .document()
-            .regions.find((r) => r.id === s.id)?.hexes[key];
+          return !!regionById(this.store.document(), s.id)?.hexes[key];
       }
     });
   }

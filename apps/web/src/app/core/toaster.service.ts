@@ -39,6 +39,13 @@ export class ToasterService {
   private nextId = 0;
 
   /**
+   * The live auto-dismiss timers, keyed by toast id, so an early {@link dismiss} or
+   * {@link clear} can cancel the pending timer instead of leaving it to fire a late
+   * no-op (and pile up under bursty toasting).
+   */
+  private readonly timers = new Map<number, ReturnType<typeof setTimeout>>();
+
+  /**
    * Raise a toast with `message` and `tone` (default `info`), returning its id so
    * the caller can dismiss it early. It auto-dismisses after `durationMs`; pass
    * `0` to keep it until dismissed. The timer is best-effort — it is skipped where
@@ -52,18 +59,30 @@ export class ToasterService {
     const id = this.nextId++;
     this._toasts.update((list) => [...list, { id, message, tone }]);
     if (durationMs > 0 && typeof setTimeout === 'function') {
-      setTimeout(() => this.dismiss(id), durationMs);
+      this.timers.set(id, setTimeout(() => this.dismiss(id), durationMs));
     }
     return id;
   }
 
   /** Remove the toast with `id`, if it is still showing; a no-op otherwise. */
   dismiss(id: number): void {
+    this.cancelTimer(id);
     this._toasts.update((list) => list.filter((toast) => toast.id !== id));
   }
 
   /** Remove every toast at once. */
   clear(): void {
+    for (const timer of this.timers.values()) clearTimeout(timer);
+    this.timers.clear();
     this._toasts.set([]);
+  }
+
+  /** Cancel and forget the auto-dismiss timer for `id`, if one is pending. */
+  private cancelTimer(id: number): void {
+    const timer = this.timers.get(id);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      this.timers.delete(id);
+    }
   }
 }

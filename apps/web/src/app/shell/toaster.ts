@@ -1,4 +1,10 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  effect,
+  inject,
+} from '@angular/core';
+import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ToasterService } from '../core/toaster.service';
 
@@ -12,8 +18,12 @@ import { ToasterService } from '../core/toaster.service';
  *
  * Copy is owned at the call site (the message is already-resolved text, ADR-0014);
  * only the dismiss control's label is translated here, reusing `common.close`.
- * An `error` toast announces assertively (`role="alert"`); the rest are polite
- * status updates.
+ *
+ * Each new toast is announced through CDK's {@link LiveAnnouncer} — a single,
+ * always-present live region — rather than a `role="alert"` element inserted into
+ * the DOM together with its text, which assistive tech routinely fails to announce
+ * because the live region did not pre-exist. An `error` toast announces
+ * assertively; the rest are polite status updates.
  */
 @Component({
   selector: 'app-toaster',
@@ -26,7 +36,6 @@ import { ToasterService } from '../core/toaster.service';
         [class.is-info]="toast.tone === 'info'"
         [class.is-success]="toast.tone === 'success'"
         [class.is-error]="toast.tone === 'error'"
-        [attr.role]="toast.tone === 'error' ? 'alert' : 'status'"
       >
         <span class="toast__message">{{ toast.message }}</span>
         <button
@@ -108,4 +117,24 @@ import { ToasterService } from '../core/toaster.service';
 })
 export class Toaster {
   protected readonly toaster = inject(ToasterService);
+  private readonly liveAnnouncer = inject(LiveAnnouncer);
+  /** Toast ids already announced, reconciled to the live set so it stays bounded. */
+  private announced = new Set<number>();
+
+  constructor() {
+    // Announce every newly-shown toast through the always-present CDK live region;
+    // ids already announced are skipped, and the set is pruned to the current toasts
+    // so it cannot grow unbounded across a session.
+    effect(() => {
+      const toasts = this.toaster.toasts();
+      for (const toast of toasts) {
+        if (this.announced.has(toast.id)) continue;
+        this.liveAnnouncer.announce(
+          toast.message,
+          toast.tone === 'error' ? 'assertive' : 'polite',
+        );
+      }
+      this.announced = new Set(toasts.map((toast) => toast.id));
+    });
+  }
 }

@@ -1715,6 +1715,23 @@ describe('EditorStore moveSelection', () => {
     expect(store.moveSelection({ q: 1, r: 0 }, ZERO)).toBe('blocked');
     expect(store.document()).toEqual(before);
   });
+
+  it('leaves an unselected region\'s membership untouched at both the origin and destination', () => {
+    const store = new EditorStore();
+    const id = store.createRegion('Avalon', '#b08a4e');
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.addHexToRegion(id, { q: 0, r: 0 }); // the origin is a region member
+    store.addHexToRegion(id, { q: 1, r: 0 }); // so is the destination coordinate
+    store.select({ q: 0, r: 0 }, null); // select only the painted cell, not the region
+
+    // A Region is a coordinate overlay, not a property of the painted cell, so moving
+    // the content must not drag membership with it — at the origin or the destination.
+    store.moveSelection({ q: 1, r: 0 }, ZERO);
+
+    expect(store.document().hexes['1,0']).toEqual({ terrain: 'forest' });
+    expect('0,0' in store.document().hexes).toBe(false);
+    expect(store.document().regions[0].hexes).toEqual({ '0,0': true, '1,0': true });
+  });
 });
 
 describe('EditorStore hex name', () => {
