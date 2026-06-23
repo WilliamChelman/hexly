@@ -198,7 +198,7 @@ interface TypeRow {
                 [title]="'styleguide.iconForestTitle' | transloco"
                 [attr.aria-label]="'styleguide.iconForestLabel' | transloco"
               >
-                <span appSwatch [style.background]="'var(--terrain-forest)'"></span>
+                <span appSwatch [style.background]="'var(--color-terrain-forest)'"></span>
               </button>
               <button
                 appIconButton
@@ -256,10 +256,10 @@ A walled town where the forest road meets the river ford.</textarea
     .guide {
       max-width: 1080px;
       margin: 0 auto;
-      padding: var(--space-5) var(--space-5) var(--space-9);
+      padding: var(--spacing-5) var(--spacing-5) var(--spacing-9);
       display: flex;
       flex-direction: column;
-      gap: var(--space-8);
+      gap: var(--spacing-8);
     }
 
     .guide-top {
@@ -272,9 +272,9 @@ A walled town where the forest road meets the river ford.</textarea
     .hero {
       display: flex;
       flex-direction: column;
-      gap: var(--space-4);
-      padding: var(--space-7) 0 var(--space-5);
-      border-bottom: 1px solid var(--line);
+      gap: var(--spacing-4);
+      padding: var(--spacing-7) 0 var(--spacing-5);
+      border-bottom: 1px solid var(--color-line);
     }
     .hero-title {
       font-size: var(--text-3xl);
@@ -284,60 +284,60 @@ A walled town where the forest road meets the river ford.</textarea
       max-width: var(--container-reading);
       font-size: var(--text-md);
       line-height: var(--leading-normal);
-      color: var(--ink-muted);
+      color: var(--color-ink-muted);
     }
     .hero-lede code,
     .section-note code,
     figcaption code {
       font-family: var(--font-mono);
       font-size: 0.86em;
-      color: var(--gold-strong);
+      color: var(--color-gold-strong);
     }
     .hero-meta {
       display: flex;
       flex-wrap: wrap;
-      gap: var(--space-2);
-      margin-top: var(--space-2);
+      gap: var(--spacing-2);
+      margin-top: var(--spacing-2);
     }
 
     /* ----- Sections --------------------------------------------------------- */
     .section {
       display: flex;
       flex-direction: column;
-      gap: var(--space-4);
+      gap: var(--spacing-4);
     }
     .section.is-split {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: var(--space-7);
+      gap: var(--spacing-7);
     }
     .section-title {
       font-size: var(--text-lg);
-      padding-bottom: var(--space-2);
-      border-bottom: 1px solid var(--line-faint);
+      padding-bottom: var(--spacing-2);
+      border-bottom: 1px solid var(--color-line-faint);
     }
     .section-note {
-      margin-top: calc(var(--space-3) * -1);
+      margin-top: calc(var(--spacing-3) * -1);
       font-size: var(--text-sm);
-      color: var(--ink-muted);
+      color: var(--color-ink-muted);
     }
 
     /* ----- Colour swatches -------------------------------------------------- */
     .swatches {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-      gap: var(--space-3);
+      gap: var(--spacing-3);
     }
     .swatchcard {
       display: flex;
       flex-direction: column;
-      gap: var(--space-2);
+      gap: var(--spacing-2);
       margin: 0;
     }
     .swatchcard-chip {
       height: 64px;
       border-radius: var(--radius-md);
-      border: 1px solid var(--line-strong);
+      border: 1px solid var(--color-line-strong);
       box-shadow: var(--shadow-inset);
     }
     .swatchcard figcaption {
@@ -349,27 +349,27 @@ A walled town where the forest road meets the river ford.</textarea
     .swatchcard code {
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
-      color: var(--ink-faint);
+      color: var(--color-ink-faint);
     }
 
     /* ----- Type ------------------------------------------------------------- */
     .typelist {
-      padding: var(--space-2) var(--space-5);
+      padding: var(--spacing-2) var(--spacing-5);
     }
     .typerow {
       display: flex;
       align-items: baseline;
       justify-content: space-between;
-      gap: var(--space-5);
-      padding: var(--space-3) 0;
-      border-bottom: 1px solid var(--line-faint);
+      gap: var(--spacing-5);
+      padding: var(--spacing-3) 0;
+      border-bottom: 1px solid var(--color-line-faint);
     }
     .typerow:last-child {
       border-bottom: 0;
     }
     .typerow-sample {
       font-family: var(--font-display);
-      color: var(--ink-strong);
+      color: var(--color-ink-strong);
       line-height: 1.1;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -377,26 +377,26 @@ A walled town where the forest road meets the river ford.</textarea
     }
     .typerow-meta {
       display: flex;
-      gap: var(--space-3);
+      gap: var(--spacing-3);
       flex: none;
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
-      color: var(--ink-faint);
+      color: var(--color-ink-faint);
     }
 
     /* ----- Spacing & radii -------------------------------------------------- */
     .ramp {
       display: flex;
       flex-direction: column;
-      gap: var(--space-3);
+      gap: var(--spacing-3);
     }
     .ramp-row {
       display: flex;
       align-items: center;
-      gap: var(--space-4);
+      gap: var(--spacing-4);
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
-      color: var(--ink-muted);
+      color: var(--color-ink-muted);
     }
     .ramp-row code {
       width: 7ch;
@@ -404,54 +404,54 @@ A walled town where the forest road meets the river ford.</textarea
     }
     .ramp-bar {
       height: 14px;
-      background: linear-gradient(90deg, var(--gold), var(--gold-strong));
+      background: linear-gradient(90deg, var(--color-gold), var(--color-gold-strong));
       border-radius: var(--radius-sm);
     }
     .radii {
       display: flex;
       flex-wrap: wrap;
-      gap: var(--space-4);
+      gap: var(--spacing-4);
     }
     .radiicard {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: var(--space-2);
+      gap: var(--spacing-2);
       margin: 0;
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
-      color: var(--ink-muted);
+      color: var(--color-ink-muted);
     }
     .radiicard-box {
       width: 64px;
       height: 64px;
-      background: var(--surface-sunken);
-      border: 1px solid var(--gold);
+      background: var(--color-surface-sunken);
+      border: 1px solid var(--color-gold);
     }
 
     /* ----- Component specimens --------------------------------------------- */
     .specimens {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: var(--space-4);
+      gap: var(--spacing-4);
     }
     .specimen {
       display: flex;
       flex-direction: column;
-      gap: var(--space-4);
-      padding: var(--space-4);
+      gap: var(--spacing-4);
+      padding: var(--spacing-4);
       margin: 0;
     }
     .specimen-row {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: var(--space-3);
+      gap: var(--spacing-3);
     }
     .specimen-col {
       display: flex;
       flex-direction: column;
-      gap: var(--space-3);
+      gap: var(--spacing-3);
     }
 
     /* ----- Footer ----------------------------------------------------------- */
@@ -459,14 +459,14 @@ A walled town where the forest road meets the river ford.</textarea
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding-top: var(--space-5);
-      border-top: 1px solid var(--line);
+      padding-top: var(--spacing-5);
+      border-top: 1px solid var(--color-line);
       font-size: var(--text-sm);
-      color: var(--ink-muted);
+      color: var(--color-ink-muted);
     }
     .guide-foot .brand {
       font-size: var(--text-md);
-      color: var(--gold);
+      color: var(--color-gold);
     }
     .guide-foot code {
       font-family: var(--font-mono);
@@ -482,27 +482,27 @@ A walled town where the forest road meets the river ford.</textarea
 })
 export class Styleguide {
   protected readonly semantic: SwatchRow[] = [
-    { token: '--bg', nameKey: 'styleguide.swatch.table' },
-    { token: '--surface', nameKey: 'styleguide.swatch.paper' },
-    { token: '--surface-raised', nameKey: 'styleguide.swatch.pinnedNote' },
-    { token: '--surface-sunken', nameKey: 'styleguide.swatch.well' },
-    { token: '--ink', nameKey: 'styleguide.swatch.ink' },
-    { token: '--ink-muted', nameKey: 'styleguide.swatch.inkMuted' },
-    { token: '--gold', nameKey: 'styleguide.swatch.compassGold' },
-    { token: '--sea', nameKey: 'styleguide.swatch.seaAurora' },
-    { token: '--astra', nameKey: 'styleguide.swatch.nebula' },
-    { token: '--ember', nameKey: 'styleguide.swatch.marginalia' },
-    { token: '--positive', nameKey: 'styleguide.swatch.moss' },
-    { token: '--line-strong', nameKey: 'styleguide.swatch.drawnRule' },
+    { token: '--color-bg', nameKey: 'styleguide.swatch.table' },
+    { token: '--color-surface', nameKey: 'styleguide.swatch.paper' },
+    { token: '--color-surface-raised', nameKey: 'styleguide.swatch.pinnedNote' },
+    { token: '--color-surface-sunken', nameKey: 'styleguide.swatch.well' },
+    { token: '--color-ink', nameKey: 'styleguide.swatch.ink' },
+    { token: '--color-ink-muted', nameKey: 'styleguide.swatch.inkMuted' },
+    { token: '--color-gold', nameKey: 'styleguide.swatch.compassGold' },
+    { token: '--color-sea', nameKey: 'styleguide.swatch.seaAurora' },
+    { token: '--color-astra', nameKey: 'styleguide.swatch.nebula' },
+    { token: '--color-ember', nameKey: 'styleguide.swatch.marginalia' },
+    { token: '--color-positive', nameKey: 'styleguide.swatch.moss' },
+    { token: '--color-line-strong', nameKey: 'styleguide.swatch.drawnRule' },
   ];
 
   protected readonly terrain: SwatchRow[] = [
-    { token: '--terrain-grass', nameKey: 'styleguide.swatch.grassland' },
-    { token: '--terrain-forest', nameKey: 'styleguide.swatch.forest' },
-    { token: '--terrain-ocean', nameKey: 'styleguide.swatch.ocean' },
-    { token: '--terrain-mountain', nameKey: 'styleguide.swatch.mountains' },
-    { token: '--terrain-desert', nameKey: 'styleguide.swatch.desert' },
-    { token: '--terrain-marsh', nameKey: 'styleguide.swatch.marsh' },
+    { token: '--color-terrain-grass', nameKey: 'styleguide.swatch.grassland' },
+    { token: '--color-terrain-forest', nameKey: 'styleguide.swatch.forest' },
+    { token: '--color-terrain-ocean', nameKey: 'styleguide.swatch.ocean' },
+    { token: '--color-terrain-mountain', nameKey: 'styleguide.swatch.mountains' },
+    { token: '--color-terrain-desert', nameKey: 'styleguide.swatch.desert' },
+    { token: '--color-terrain-marsh', nameKey: 'styleguide.swatch.marsh' },
   ];
 
   protected readonly typeScale: TypeRow[] = [
@@ -533,13 +533,13 @@ export class Styleguide {
   ];
 
   protected readonly spacing = [
-    '--space-1',
-    '--space-2',
-    '--space-3',
-    '--space-4',
-    '--space-5',
-    '--space-6',
-    '--space-7',
+    '--spacing-1',
+    '--spacing-2',
+    '--spacing-3',
+    '--spacing-4',
+    '--spacing-5',
+    '--spacing-6',
+    '--spacing-7',
   ];
 
   protected readonly radii = [

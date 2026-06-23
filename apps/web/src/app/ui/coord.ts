@@ -16,11 +16,11 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
       letter-spacing: 0.02em;
-      color: var(--ink-muted);
-      background: var(--surface-sunken);
-      border: 1px solid var(--line);
+      color: var(--color-ink-muted);
+      background: var(--color-surface-sunken);
+      border: 1px solid var(--color-line);
       border-radius: var(--radius-sm);
-      padding: 1px var(--space-2);
+      padding: 1px var(--spacing-2);
     }
   `,
 })

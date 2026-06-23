@@ -296,10 +296,10 @@ interface SelectedEntity {
     :host {
       display: flex;
       flex-direction: column;
-      gap: var(--space-4);
-      padding: var(--space-4);
+      gap: var(--spacing-4);
+      padding: var(--spacing-4);
       overflow-y: auto;
-      background: var(--surface);
+      background: var(--color-surface);
     }
     .head {
       display: flex;
@@ -308,29 +308,29 @@ interface SelectedEntity {
     }
     .pos {
       display: flex;
-      gap: var(--space-3);
+      gap: var(--spacing-3);
     }
     .direction {
       display: flex;
-      gap: var(--space-2);
+      gap: var(--spacing-2);
     }
     /* The armed-mode affordance: a quiet outline that fills gold-soft when active,
        not the global primary call-to-action variant. Stretched to share the row. */
     .mode {
       flex: 1;
       background: none;
-      color: var(--ink-muted);
-      border: 1px solid var(--line);
+      color: var(--color-ink-muted);
+      border: 1px solid var(--color-line);
       border-radius: var(--radius-sm);
-      padding: var(--space-1) var(--space-3);
+      padding: var(--spacing-1) var(--spacing-3);
       font-size: var(--text-xs);
-      font-weight: var(--weight-semibold);
+      font-weight: var(--font-weight-semibold);
       cursor: pointer;
     }
     .mode.active {
-      color: var(--ink);
-      border-color: var(--gold);
-      background: var(--gold-soft);
+      color: var(--color-ink);
+      border-color: var(--color-gold);
+      background: var(--color-gold-soft);
     }
     .pos > div {
       flex: 1;
@@ -339,31 +339,31 @@ interface SelectedEntity {
     .muted {
       font-size: var(--text-sm);
       line-height: var(--leading-normal);
-      color: var(--ink-muted);
+      color: var(--color-ink-muted);
     }
     .count {
       font-size: var(--text-sm);
-      font-weight: var(--weight-semibold);
-      color: var(--ink);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-ink);
     }
     .breakdown {
       margin: 0;
-      padding-left: var(--space-4);
+      padding-left: var(--spacing-4);
       display: flex;
       flex-direction: column;
-      gap: var(--space-1);
+      gap: var(--spacing-1);
       font-size: var(--text-sm);
-      color: var(--ink-muted);
+      color: var(--color-ink-muted);
     }
     .detail {
       font-size: var(--text-sm);
-      color: var(--ink);
+      color: var(--color-ink);
     }
     .actions {
       display: flex;
-      gap: var(--space-2);
+      gap: var(--spacing-2);
       margin-top: auto;
-      padding-top: var(--space-2);
+      padding-top: var(--spacing-2);
     }
   `,
 })

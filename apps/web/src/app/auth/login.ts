@@ -74,23 +74,23 @@ import { Panel } from '../ui/panel';
       display: grid;
       place-items: center;
       min-height: 100%;
-      padding: var(--space-5);
-      background: var(--surface-sunken);
+      padding: var(--spacing-5);
+      background: var(--color-surface-sunken);
     }
     .card {
       width: 100%;
       max-width: 22rem;
-      padding: var(--space-6);
+      padding: var(--spacing-6);
     }
     form {
       display: flex;
       flex-direction: column;
-      gap: var(--space-4);
+      gap: var(--spacing-4);
     }
     .error {
       margin: 0;
       font-size: var(--text-sm);
-      color: var(--danger);
+      color: var(--color-ember);
     }
   `,
 })

@@ -99,45 +99,45 @@ import { LanguageSwitcher } from './language-switcher';
     :host {
       display: flex;
       align-items: center;
-      gap: var(--space-5);
-      padding: 0 var(--space-4);
+      gap: var(--spacing-5);
+      padding: 0 var(--spacing-4);
       height: var(--rail-header);
-      background: var(--surface);
-      border-bottom: 1px solid var(--line-strong);
+      background: var(--color-surface);
+      border-bottom: 1px solid var(--color-line-strong);
       box-shadow: var(--shadow-1);
     }
     .brand {
       display: flex;
       align-items: center;
-      gap: var(--space-2);
+      gap: var(--spacing-2);
       text-decoration: none;
       color: inherit;
     }
     .mark {
       display: grid;
       place-items: center;
-      color: var(--gold);
+      color: var(--color-gold);
     }
     .name {
       font-size: var(--text-lg);
-      color: var(--ink-strong);
+      color: var(--color-ink-strong);
     }
     .headline {
       display: flex;
       align-items: center;
-      gap: var(--space-3);
-      padding-left: var(--space-5);
-      border-left: 1px solid var(--line);
+      gap: var(--spacing-3);
+      padding-left: var(--spacing-5);
+      border-left: 1px solid var(--color-line);
     }
     .title {
       font-family: var(--font-display);
       font-size: var(--text-md);
-      color: var(--ink-strong);
+      color: var(--color-ink-strong);
     }
     .actions {
       display: flex;
       align-items: center;
-      gap: var(--space-2);
+      gap: var(--spacing-2);
       margin-left: auto;
     }
     .avatar {
@@ -147,14 +147,14 @@ import { LanguageSwitcher } from './language-switcher';
       height: 32px;
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
-      color: var(--on-gold);
-      background: linear-gradient(140deg, var(--gold), var(--gold-strong));
+      color: var(--color-on-gold);
+      background: linear-gradient(140deg, var(--color-gold), var(--color-gold-strong));
       border-radius: var(--radius-full);
       box-shadow: var(--shadow-1);
     }
     .who {
       font-size: var(--text-sm);
-      color: var(--ink);
+      color: var(--color-ink);
     }
   `,
 })

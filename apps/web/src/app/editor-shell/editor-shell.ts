@@ -94,9 +94,9 @@ import { StatusBar } from './status-bar';
     /* Tool palette anchored top-left; rail top-right; panel to the rail's left. */
     .body app-tool-palette {
       position: absolute;
-      top: var(--space-3);
-      left: var(--space-3);
-      max-height: calc(100% - 2 * var(--space-3));
+      top: var(--spacing-3);
+      left: var(--spacing-3);
+      max-height: calc(100% - 2 * var(--spacing-3));
       z-index: 1;
     }
     /*
@@ -107,12 +107,12 @@ import { StatusBar } from './status-bar';
     */
     .right-dock {
       position: absolute;
-      top: var(--space-3);
-      right: var(--space-3);
-      bottom: var(--space-3);
+      top: var(--spacing-3);
+      right: var(--spacing-3);
+      bottom: var(--spacing-3);
       display: flex;
       align-items: flex-start;
-      gap: var(--space-2);
+      gap: var(--spacing-2);
       z-index: 1;
       pointer-events: none;
     }
@@ -128,7 +128,7 @@ import { StatusBar } from './status-bar';
     .right-dock app-regions-panel {
       width: var(--rail-inspector);
       max-height: 100%;
-      border: 1px solid var(--line);
+      border: 1px solid var(--color-line);
       border-radius: var(--radius-lg);
       box-shadow: var(--shadow-2);
     }

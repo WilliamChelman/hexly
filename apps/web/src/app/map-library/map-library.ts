@@ -115,22 +115,22 @@ function formatEdited(updatedAt: number, lang: string): string {
     :host {
       display: block;
       min-height: 100%;
-      background: var(--surface-sunken);
+      background: var(--color-surface-sunken);
     }
     .page {
       max-width: 60rem;
       margin: 0 auto;
-      padding: var(--space-6) var(--space-5);
+      padding: var(--spacing-6) var(--spacing-5);
     }
     .head {
       display: flex;
       justify-content: flex-end;
-      margin-bottom: var(--space-5);
+      margin-bottom: var(--spacing-5);
     }
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
-      gap: var(--space-4);
+      gap: var(--spacing-4);
       margin: 0;
       padding: 0;
       list-style: none;
@@ -138,14 +138,14 @@ function formatEdited(updatedAt: number, lang: string): string {
     .card {
       display: flex;
       align-items: center;
-      gap: var(--space-2);
-      padding: var(--space-3) var(--space-4);
+      gap: var(--spacing-2);
+      padding: var(--spacing-3) var(--spacing-4);
     }
     .open {
       display: flex;
       flex: 1;
       flex-direction: column;
-      gap: var(--space-1);
+      gap: var(--spacing-1);
       padding: 0;
       text-align: left;
       background: none;
@@ -155,16 +155,16 @@ function formatEdited(updatedAt: number, lang: string): string {
     .map-title {
       font-family: var(--font-display);
       font-size: var(--text-md);
-      color: var(--ink-strong);
+      color: var(--color-ink-strong);
     }
     .meta {
       font-size: var(--text-2xs);
-      color: var(--ink-muted);
+      color: var(--color-ink-muted);
     }
     .empty {
-      padding: var(--space-6);
+      padding: var(--spacing-6);
       text-align: center;
-      color: var(--ink-muted);
+      color: var(--color-ink-muted);
     }
     .empty .hint {
       font-size: var(--text-sm);

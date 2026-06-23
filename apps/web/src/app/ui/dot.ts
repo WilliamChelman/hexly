@@ -23,12 +23,12 @@ import {
       width: 8px;
       height: 8px;
       border-radius: var(--radius-full);
-      background: var(--ink-faint);
+      background: var(--color-ink-faint);
       flex: none;
     }
     :host(.is-positive) {
-      background: var(--positive);
-      box-shadow: 0 0 0 3px var(--positive-soft);
+      background: var(--color-positive);
+      box-shadow: 0 0 0 3px var(--color-positive-soft);
     }
   `,
 })

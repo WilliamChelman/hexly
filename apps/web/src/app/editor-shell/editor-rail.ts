@@ -61,10 +61,10 @@ interface RailEntry {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: var(--space-2);
-      padding: var(--space-2);
-      background: var(--surface);
-      border: 1px solid var(--line);
+      gap: var(--spacing-2);
+      padding: var(--spacing-2);
+      background: var(--color-surface);
+      border: 1px solid var(--color-line);
       border-radius: var(--radius-lg);
       box-shadow: var(--shadow-1);
     }

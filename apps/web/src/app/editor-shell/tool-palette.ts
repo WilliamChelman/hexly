@@ -229,13 +229,13 @@ function glyphFor(subtool: SelectSubtool): Type<unknown> {
     :host {
       display: flex;
       align-items: flex-start;
-      gap: var(--space-2);
+      gap: var(--spacing-2);
     }
     .strip {
       display: flex;
       flex-direction: column;
       gap: 2px;
-      padding: var(--space-2);
+      padding: var(--spacing-2);
       /* Cap to the host (the shell bounds it to the body) and scroll if a short
          viewport can't fit the whole strip, matching the flyout. */
       min-height: 0;
@@ -246,7 +246,7 @@ function glyphFor(subtool: SelectSubtool): Type<unknown> {
       display: grid;
       grid-template-columns: repeat(2, auto);
       gap: 2px;
-      padding: var(--space-2);
+      padding: var(--spacing-2);
       max-height: 100%;
       overflow-y: auto;
     }

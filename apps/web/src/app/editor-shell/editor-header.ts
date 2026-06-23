@@ -27,9 +27,13 @@ import { EditorSession } from './editor-session';
 @Component({
   selector: 'app-editor-header',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  // Pure-layout shell containers use inline utilities (ADR-0020): no
+  // var-indirection, no state — nothing a scoped rule would protect. The
+  // stateful/indirection-driven bits (.title, .title-input) stay scoped below.
+  host: { class: 'flex flex-1 items-center gap-5' },
   imports: [RouterLink, Button, Chip, Eyebrow, ShareIcon, TranslocoPipe],
   template: `
-    <div class="titlebar">
+    <div class="flex items-center gap-3 pl-5 border-l border-line">
       <span appEyebrow>{{ 'editorShell.hexMap' | transloco }}</span>
       @if (editing()) {
         <input
@@ -72,7 +76,7 @@ import { EditorSession } from './editor-session';
       }
     </div>
 
-    <div class="actions">
+    <div class="flex items-center gap-2 ml-auto">
       <a appButton variant="ghost" size="sm" routerLink="/maps">{{
         'editorShell.allMaps' | transloco
       }}</a>
@@ -97,53 +101,34 @@ import { EditorSession } from './editor-session';
     </div>
   `,
   styles: `
-    :host {
-      display: flex;
-      flex: 1;
-      align-items: center;
-      gap: var(--space-5);
-    }
-    .titlebar {
-      display: flex;
-      align-items: center;
-      gap: var(--space-3);
-      padding-left: var(--space-5);
-      border-left: 1px solid var(--line);
-    }
     .title {
       font-family: var(--font-display);
       font-size: var(--text-md);
-      color: var(--ink);
-      padding: var(--space-1) var(--space-2);
-      margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-2));
+      color: var(--color-ink);
+      padding: var(--spacing-1) var(--spacing-2);
+      margin: calc(-1 * var(--spacing-1)) calc(-1 * var(--spacing-2));
       background: none;
       border: 1px solid transparent;
       border-radius: var(--radius-sm);
       cursor: text;
     }
     .title:hover {
-      border-color: var(--line);
-      background: var(--surface-sunken);
+      border-color: var(--color-line);
+      background: var(--color-surface-sunken);
     }
     .title-input {
       font-family: var(--font-display);
       font-size: var(--text-md);
-      color: var(--ink-strong);
-      padding: var(--space-1) var(--space-2);
-      margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-2));
-      background: var(--surface-sunken);
-      border: 1px solid var(--gold);
+      color: var(--color-ink-strong);
+      padding: var(--spacing-1) var(--spacing-2);
+      margin: calc(-1 * var(--spacing-1)) calc(-1 * var(--spacing-2));
+      background: var(--color-surface-sunken);
+      border: 1px solid var(--color-gold);
       border-radius: var(--radius-sm);
       outline: none;
     }
-    .actions {
-      display: flex;
-      align-items: center;
-      gap: var(--space-2);
-      margin-left: auto;
-    }
     .conflict-reload {
-      margin-left: var(--space-2);
+      margin-left: var(--spacing-2);
       padding: 0;
       font: inherit;
       color: inherit;

@@ -140,13 +140,13 @@ const BLOCKED_INK = 'rgb(2, 2, 2)';
 function stubTheme(): () => void {
   const original = window.getComputedStyle;
   const colours: Record<string, string> = {
-    '--terrain-forest': FOREST,
-    '--terrain-ocean': OCEAN,
-    '--feature-ink': FEATURE_INK,
-    '--label-ink': LABEL_INK,
-    '--name-ink': NAME_INK,
-    '--gold-strong': SELECT_INK,
-    '--ember': BLOCKED_INK,
+    '--color-terrain-forest': FOREST,
+    '--color-terrain-ocean': OCEAN,
+    '--color-feature-ink': FEATURE_INK,
+    '--color-label-ink': LABEL_INK,
+    '--color-name-ink': NAME_INK,
+    '--color-gold-strong': SELECT_INK,
+    '--color-ember': BLOCKED_INK,
   };
   window.getComputedStyle = (() => ({
     getPropertyValue: (name: string) => colours[name] ?? '',

@@ -1,5 +1,6 @@
 import nx from '@nx/eslint-plugin';
 import baseConfig from '../../eslint.config.mjs';
+import hexlyDesignTokens from '../../eslint-rules/design-tokens.mjs';
 
 export default [
   ...nx.configs['flat/angular'],
@@ -7,7 +8,13 @@ export default [
   ...baseConfig,
   {
     files: ['**/*.ts'],
+    plugins: { 'hexly-design': hexlyDesignTokens },
     rules: {
+      // ADR-0020 — the design tokens *are* the Tailwind theme; these guard the
+      // curation: every var(--…) must resolve to a defined token, and spacing
+      // utilities may only use the curated scale (not Tailwind's multiplier).
+      'hexly-design/no-unknown-design-token': 'error',
+      'hexly-design/no-off-scale-spacing': 'error',
       '@angular-eslint/directive-selector': [
         'error',
         {
