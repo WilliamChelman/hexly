@@ -334,14 +334,18 @@ export class Canvas2dMapRenderer implements MapRenderer {
     const visibleKeys = new Set(visible.map(coordKey));
 
     // A whole-Hex drag previews the move without touching the document: the
-    // origin draws as Void and its content (terrain + feature) draws at the
-    // destination instead. Ignore a drag that hasn't left its origin (from === to)
-    // so the hex never blinks out while the cursor is still on it.
+    // dragged content (terrain + feature + name) draws at the destination, and the
+    // origin previews whatever slides back to it — the destination's record on a
+    // swap (so both hexes stay visible, ADR-0017), or Void on a plain move onto an
+    // empty cell. Ignore a drag that hasn't left its origin (from === to) so the
+    // hex never blinks out while the cursor is still on it.
     const drag =
       hexDrag && coordKey(hexDrag.from) !== coordKey(hexDrag.to) ? hexDrag : null;
     const fromKey = drag ? coordKey(drag.from) : null;
     const toKey = drag ? coordKey(drag.to) : null;
     const dragged = fromKey ? doc.hexes[fromKey] : undefined;
+    // The occupant of an occupied destination — undefined (Void) for a plain move.
+    const swapBack = toKey ? doc.hexes[toKey] : undefined;
 
     // Painted terrain, under the grid lines. Only the visible painted hexes are
     // drawn — the document is sparse, so this never touches the infinite Void.
@@ -353,9 +357,14 @@ export class Canvas2dMapRenderer implements MapRenderer {
     const named: { hex: Axial; name: string; hasFeature: boolean }[] = [];
     for (const hex of visible) {
       const key = coordKey(hex);
-      if (key === fromKey) continue; // origin reads as Void mid-drag
-      // The destination previews the dragged content, overwriting whatever it held.
-      const painted = key === toKey && dragged ? dragged : doc.hexes[key];
+      // Mid-drag the origin previews the destination's record (swapped back) and the
+      // destination previews the dragged content; every other hex draws as stored.
+      const painted =
+        key === fromKey
+          ? swapBack
+          : key === toKey && dragged
+            ? dragged
+            : doc.hexes[key];
       if (!painted) continue;
       ctx.fillStyle = this.palette.terrain[painted.terrain];
       this.tracePath(ctx, camera, hex);

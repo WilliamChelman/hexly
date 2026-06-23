@@ -1,4 +1,4 @@
-import { HexMap, Layout } from '@hexly/domain';
+import { Axial, hexToPixel, HexMap, Layout } from '@hexly/domain';
 import { Camera } from './camera';
 import { Canvas2dMapRenderer } from './map-renderer';
 
@@ -15,6 +15,15 @@ class FakeContext {
   readonly pathFills: string[] = [];
   /** The globalAlpha in effect at each `fill()`, parallel to {@link pathFills}. */
   readonly pathFillAlphas: number[] = [];
+  /** The points of the path currently being traced, reset on each `beginPath`. */
+  private currentPath: { x: number; y: number }[] = [];
+  /**
+   * Each path `fill()` with its colour and the path's centroid. A traced hex is a
+   * regular polygon, so the centroid of its corners is the hex's screen centre —
+   * which lets a test assert *which* hex a fill landed on, not just that a colour
+   * was used somewhere.
+   */
+  readonly pathDraws: { fill: string; cx: number; cy: number }[] = [];
 
   setTransform(): void {
     this.ops.push('setTransform');
@@ -24,12 +33,15 @@ class FakeContext {
   }
   beginPath(): void {
     this.ops.push('beginPath');
+    this.currentPath = [];
   }
-  moveTo(): void {
+  moveTo(x: number, y: number): void {
     this.ops.push('moveTo');
+    this.currentPath.push({ x, y });
   }
-  lineTo(): void {
+  lineTo(x: number, y: number): void {
     this.ops.push('lineTo');
+    this.currentPath.push({ x, y });
   }
   closePath(): void {
     this.ops.push('closePath');
@@ -55,8 +67,11 @@ class FakeContext {
   textBaseline = '';
   /** Each (text, fillStyle) drawn — only the asserted ones need inspecting. */
   readonly textFills: { text: string; fill: string }[] = [];
-  fillText(text: string): void {
+  /** Each text draw with its anchor point, so a test can assert *where* it landed. */
+  readonly textDraws: { text: string; fill: string; x: number; y: number }[] = [];
+  fillText(text: string, x: number, y: number): void {
     this.textFills.push({ text, fill: this.fillStyle });
+    this.textDraws.push({ text, fill: this.fillStyle, x, y });
   }
   /** A deterministic width: half the font's pixel size per character. */
   measureText(text: string): { width: number } {
@@ -76,6 +91,14 @@ class FakeContext {
   fill(): void {
     this.pathFills.push(this.fillStyle);
     this.pathFillAlphas.push(this.globalAlpha);
+    const n = this.currentPath.length;
+    if (n > 0) {
+      const sum = this.currentPath.reduce(
+        (acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }),
+        { x: 0, y: 0 },
+      );
+      this.pathDraws.push({ fill: this.fillStyle, cx: sum.x / n, cy: sum.y / n });
+    }
   }
   /** Each dash pattern set, in order — the marquee is the only dashed stroke. */
   readonly dashes: number[][] = [];
@@ -106,6 +129,7 @@ const LAYOUT: Layout = {
 };
 
 const FOREST = 'rgb(1, 2, 3)';
+const OCEAN = 'rgb(4, 5, 6)';
 const FEATURE_INK = 'rgb(9, 9, 9)';
 const LABEL_INK = 'rgb(7, 7, 7)';
 const SELECT_INK = 'rgb(5, 5, 5)';
@@ -116,6 +140,7 @@ function stubTheme(): () => void {
   const original = window.getComputedStyle;
   const colours: Record<string, string> = {
     '--terrain-forest': FOREST,
+    '--terrain-ocean': OCEAN,
     '--feature-ink': FEATURE_INK,
     '--label-ink': LABEL_INK,
     '--name-ink': NAME_INK,
@@ -355,6 +380,51 @@ describe('Canvas2dMapRenderer hex names', () => {
     renderer.render(camera, doc, null);
 
     expect(ctx.textFills).toEqual([]);
+    restore();
+  });
+});
+
+describe('Canvas2dMapRenderer swap drag preview', () => {
+  it('previews both hexes when a drag would swap onto an occupied destination', () => {
+    const restore = stubTheme();
+    const ctx = new FakeContext();
+    const renderer = makeRenderer(ctx);
+    const camera = Camera.initial().panBy(60, 60);
+    const doc: HexMap = {
+      hexes: {
+        '0,0': { terrain: 'forest', name: 'Riverbend' },
+        '1,0': { terrain: 'ocean', name: 'The Deep' },
+      },
+      regions: [],
+      labels: [],
+    };
+
+    // Drag the forest hex onto the occupied ocean hex: the preview must show the
+    // swapped outcome — forest's record at the destination AND ocean's record slid
+    // back to the origin — so both hexes stay visible before release (ADR-0017).
+    renderer.render(camera, doc, null, { hexDrag: { from: { q: 0, r: 0 }, to: { q: 1, r: 0 } } });
+
+    // Assert *where* each record draws, not merely that both colours/names appear:
+    // an inverted preview (forest left at the origin, ocean at the destination) must
+    // fail. The centroid of a traced hex is its screen centre; names anchor on x.
+    const centre = (hex: Axial) => camera.worldToScreen(hexToPixel(LAYOUT, hex));
+    const origin = centre({ q: 0, r: 0 });
+    const dest = centre({ q: 1, r: 0 });
+    const filledAt = (fill: string, c: { x: number; y: number }) =>
+      ctx.pathDraws.some(
+        (d) => d.fill === fill && Math.abs(d.cx - c.x) < 0.5 && Math.abs(d.cy - c.y) < 0.5,
+      );
+
+    // Forest (dragged) at the destination; ocean (occupant) slid back to the origin.
+    expect(filledAt(FOREST, dest)).toBe(true);
+    expect(filledAt(OCEAN, origin)).toBe(true);
+    // And the carried names land with their records — not the other way round.
+    expect(ctx.textDraws).toContainEqual(
+      expect.objectContaining({ text: 'Riverbend', fill: NAME_INK, x: dest.x }),
+    );
+    expect(ctx.textDraws).toContainEqual(
+      expect.objectContaining({ text: 'The Deep', fill: NAME_INK, x: origin.x }),
+    );
     restore();
   });
 });

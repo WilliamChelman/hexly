@@ -99,6 +99,91 @@ test('drags a hex under Select to a new coordinate, and the move survives a relo
 });
 
 /**
+ * The non-destructive swap (issue #62, ADR-0017): dropping a Hex onto an occupied
+ * hex exchanges the two whole records rather than overwriting, so a move never
+ * silently destroys content. Like the move journey it rides the real canvas
+ * press→drag gesture and proves the swap through the inspector, a direct API read,
+ * and a reload — the two terrains end up exchanged at the two coordinates.
+ */
+test('drags a hex onto an occupied hex and swaps the two, surviving a reload', async ({
+  page,
+  request,
+}) => {
+  await page.goto('/maps');
+  await page.getByTestId('new-map').click();
+  await expect(page).toHaveURL(/\/maps\/[\w-]+$/);
+  const mapId = page.url().split('/').pop();
+
+  const canvas = page.getByRole('img', { name: 'Hex map' });
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('canvas not laid out');
+  const dx = 100; // a +100px drag at zoom 1 lands on the q1·r0 neighbour
+
+  // Paint the centre hex Forest (the default terrain) ...
+  await page.getByTestId('tool-terrain').click();
+  await canvas.click();
+  await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
+
+  // ... then arm Ocean and paint the q1·r0 neighbour, so the drop target is occupied.
+  await page
+    .getByRole('group', { name: 'Terrain' })
+    .getByRole('button', { name: 'Ocean' })
+    .click();
+  await canvas.click({ position: { x: box.width / 2 + dx, y: box.height / 2 } });
+  await expect(page.getByTestId('hex-count')).toHaveText('2 hexes');
+
+  // Arm Select and drag the Forest centre hex onto the occupied Ocean hex.
+  await page.getByTestId('tool-select').click();
+  const cx = box.x + box.width / 2;
+  const cy = box.y + box.height / 2;
+  await page.mouse.move(cx, cy);
+  await page.mouse.down();
+  await page.mouse.move(cx + 40, cy);
+  await page.mouse.move(cx + 80, cy);
+  await page.mouse.move(cx + dx, cy);
+  await page.mouse.up();
+
+  // Nothing is destroyed or duplicated: still exactly two hexes. The dragged hex
+  // landed at q1·r0 and stays selected, showing Forest there.
+  await expect(page.getByTestId('hex-count')).toHaveText('2 hexes');
+  await expect(page.getByTestId('entity-detail')).toHaveText('Forest');
+  await expect(page.getByTestId('entity-coord')).toContainText('q 1 · r 0');
+
+  // The occupant slid back to the origin: the centre now carries Ocean.
+  await canvas.click({ position: { x: box.width / 2, y: box.height / 2 } });
+  await expect(page.getByTestId('entity-detail')).toHaveText('Ocean');
+  await expect(page.getByTestId('entity-coord')).toContainText('q 0 · r 0');
+
+  // Persist, then read the saved document directly: the two records are exchanged.
+  const saved = page.waitForResponse(
+    (res) =>
+      res.request().method() === 'PUT' &&
+      /\/api\/maps\/[\w-]+$/.test(res.url()) &&
+      res.ok(),
+  );
+  await page.getByTestId('save').click();
+  await saved;
+  await expect(page.getByTestId('save')).toHaveText('Save');
+
+  const res = await request.get(`/api/maps/${mapId}`);
+  expect(res.ok()).toBeTruthy();
+  const detail = await res.json();
+  const hexes = detail.document.hexes as Record<string, { terrain: string }>;
+  expect(hexes['0,0']).toEqual({ terrain: 'ocean' });
+  expect(hexes['1,0']).toEqual({ terrain: 'forest' });
+
+  // The swap re-renders intact after a fresh load.
+  await page.reload();
+  await expect(page.getByTestId('hex-count')).toHaveText('2 hexes');
+  const box2 = await canvas.boundingBox();
+  if (!box2) throw new Error('canvas not laid out after reload');
+  await canvas.click({ position: { x: box2.width / 2, y: box2.height / 2 } });
+  await expect(page.getByTestId('entity-detail')).toHaveText('Ocean');
+  await canvas.click({ position: { x: box2.width / 2 + dx, y: box2.height / 2 } });
+  await expect(page.getByTestId('entity-detail')).toHaveText('Forest');
+});
+
+/**
  * Escape aborts an in-progress Hex drag (issue #30 follow-up): the move is never
  * committed, so the hex stays at its origin and the destination stays Void. Like
  * the move journey this lives in e2e because it rides the real canvas press→drag

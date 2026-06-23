@@ -7,6 +7,7 @@ import {
   featureLibrary,
   HexMap,
   Label,
+  planMove,
   Point,
   Region,
   regionById,
@@ -641,50 +642,75 @@ export class EditorStore {
   }
 
   /**
-   * Move a whole Hex's content — terrain *and* feature — from `from` to `to`
-   * (issue #30, ADR-0010). The origin becomes Void and an occupied destination
-   * is overwritten, so the move never silently duplicates a hex. Region
-   * memberships at both coordinates are left untouched: a Region is a location
-   * overlay keyed by coordinate, not a property of the painted cell, so it stays
-   * put while the content slides out from under it. The whole move is one
-   * `commit`, so a single undo restores both ends — the origin and any clobbered
-   * destination. Moving Void, or onto the same coordinate, changes nothing and
+   * Move a whole Hex's content — terrain, feature, *and* name — from `from` to
+   * `to` (issue #30, ADR-0017). The one-hex case of the pure move-planner: a drop
+   * onto Void moves there and leaves the origin Void; a drop onto an occupied hex
+   * **swaps** the two whole records, so a move never silently destroys content.
+   * Region memberships at both coordinates are left untouched — a Region is a
+   * location overlay keyed by coordinate, not a property of the painted cell, so
+   * it stays put while the content slides out from under it (the planner carries
+   * no region here). The whole move is one `commit`, so a single undo restores
+   * both ends. Moving Void, or onto the same coordinate, changes nothing and
    * records no undo step.
    */
   moveHex(from: Axial, to: Axial): void {
     const fromKey = coordKey(from);
     const toKey = coordKey(to);
     if (fromKey === toKey) return;
-    // Snapshot the origin's content from the live (immutable) document. Moving
-    // Void carries nothing, so bail before `commit` records an empty step.
-    const content = this._document().hexes[fromKey];
-    if (!content) return;
-    this.commit((draft) => {
-      // Deep-clone the snapshot into the destination (overwriting it) and clear
-      // the origin. Cloning the immutable source — rather than rebuilding the Hex
-      // field-by-field — avoids aliasing a draft node at two keys *and* carries
-      // every field along, so a future Hex field is never silently dropped.
-      draft.hexes[toKey] = deepClone(content);
-      delete draft.hexes[fromKey];
+    // Read the live immutable document once and share it with the planner, so the
+    // existence check and the plan see one consistent snapshot.
+    const doc = this._document();
+    // Moving Void carries nothing, so bail before the planner/`commit` runs.
+    if (!doc.hexes[fromKey]) return;
+    // A drop onto an occupant swaps the two records; remember whether this move is
+    // a swap (the destination held content) so the selection can follow both ends.
+    const swapped = !!doc.hexes[toKey];
+    // Route through the pure planner (the seam for every move): it reads the live
+    // immutable document and returns the writes/clears that swap or relocate the
+    // hex. A single-hex move never blocks, but a blocked plan would be a no-op.
+    const plan = planMove({
+      document: doc,
+      selection: { hexes: [from], labels: [], regions: [] },
+      offset: { q: to.q - from.q, r: to.r - from.r },
     });
-    // The content moved, so a selection that pointed at the origin rides along to
-    // the destination — completing a move keeps the moved Hex selected, matching
-    // the Label-drag path (and the Escape-cancel path, which leaves it put). Copy
-    // the coordinate rather than aliasing the caller's `to`, so a coord the caller
-    // later mutates (e.g. a reused hover object) can't retarget the selection.
+    if (plan.blocked) return;
+    this.commit((draft) => {
+      // Apply each write/clear. Deep-clone the planner's records — they reference
+      // the immutable pre-move document — so the draft never aliases a live node,
+      // and every Hex field (a future one included) is carried along verbatim.
+      for (const { coord, hex } of plan.hexes) {
+        const key = coordKey(coord);
+        if (hex) draft.hexes[key] = deepClone(hex);
+        else delete draft.hexes[key];
+      }
+    });
+    // The content moved, so a cell selection rides along with the content it
+    // points at: a ref at the origin follows to the destination, and — on a swap —
+    // a ref at the destination follows back to the origin, since that record slid
+    // there. Copy each coordinate rather than aliasing the caller's `from`/`to`, so
+    // a coord the caller later mutates (e.g. a reused hover object) can't retarget
+    // the selection. (A single-hex drag only ever selects the origin; the symmetric
+    // case keeps the seam correct once a group drag can select both ends.)
     const refs = this._selections();
-    const at = refs.findIndex(
-      (ref) => ref.kind === 'cell' && coordKey(ref.coord) === fromKey,
+    const touched = refs.some(
+      (ref) =>
+        ref.kind === 'cell' &&
+        (coordKey(ref.coord) === fromKey ||
+          (swapped && coordKey(ref.coord) === toKey)),
     );
-    if (at !== -1) {
-      const next = refs.slice();
-      const moved: SelectionRef = { kind: 'cell', coord: { q: to.q, r: to.r } };
-      next[at] = moved;
-      // The destination may already be in the set as its own cell ref; re-pointing
-      // the origin onto it would leave the same cell twice. Drop every OTHER copy of
-      // the moved ref, keeping the one we just re-pointed at index `at`.
-      const deduped = next.filter(
-        (ref, i) => i === at || !sameSelectionRef(ref, moved),
+    if (touched) {
+      const remapped = refs.map((ref): SelectionRef => {
+        if (ref.kind !== 'cell') return ref;
+        const key = coordKey(ref.coord);
+        if (key === fromKey) return { kind: 'cell', coord: { q: to.q, r: to.r } };
+        if (swapped && key === toKey)
+          return { kind: 'cell', coord: { q: from.q, r: from.r } };
+        return ref;
+      });
+      // The remap is a bijection on {origin, destination}, so it introduces no new
+      // duplicates; collapse any that pre-existed in the set, keeping the first.
+      const deduped = remapped.filter(
+        (ref, i) => remapped.findIndex((r) => sameSelectionRef(r, ref)) === i,
       );
       this._selections.set(deduped);
     }
