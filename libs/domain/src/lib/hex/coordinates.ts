@@ -77,6 +77,16 @@ export function neighbors({ q, r }: Axial): Axial[] {
   return DIRECTIONS.map((d) => ({ q: q + d.q, r: r + d.r }));
 }
 
+/** Translate `coord` by `offset` — the shared `(q,r) + (dq,dr)` every move uses. */
+export function addAxial(coord: Axial, offset: Axial): Axial {
+  return { q: coord.q + offset.q, r: coord.r + offset.r };
+}
+
+/** Translate `coord` by the inverse `offset` — `(q,r) − (dq,dr)`. */
+export function subAxial(coord: Axial, offset: Axial): Axial {
+  return { q: coord.q - offset.q, r: coord.r - offset.r };
+}
+
 /** The number of single-hex steps between two hexes (cube/Manhattan metric). */
 export function distance(a: Axial, b: Axial): number {
   const ac = axialToCube(a);

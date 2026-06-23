@@ -35,6 +35,7 @@
     "save": {
       "conflict": "Newer version on server"
     },
+    "moveBlocked": "Move blocked — something's in the way.",
     "toolPalette": {
       "tools": "Tools",
       "select": "Select",

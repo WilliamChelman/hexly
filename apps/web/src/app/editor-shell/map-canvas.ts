@@ -12,17 +12,22 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import {
+  addAxial,
   Axial,
   coordKey,
+  hexToPixel,
+  HexWrite,
   Layout,
   marqueeHits,
   pixelToHex,
   Point,
   rectFromCorners,
+  regionById,
 } from '@hexly/domain';
 import { ThemeService } from '../core/theme.service';
+import { ToasterService } from '../core/toaster.service';
 import { terrainKey } from './catalog-keys';
 import { EditorStore, SelectMode, ToolId } from './editor-store';
 import { Button } from '../ui/button';
@@ -34,7 +39,6 @@ import { PlusIcon } from '../ui/icon/glyphs/plus';
 import { Camera } from './camera';
 import {
   Canvas2dMapRenderer,
-  HexDragOverride,
   MapRenderer,
   MarqueeOverride,
 } from './map-renderer';
@@ -244,37 +248,18 @@ export class MapCanvas {
   );
 
   /**
-   * The in-progress label drag: the label `id`, the grab `offset` (label anchor
-   * minus the grab point, so the label doesn't jump to the cursor), and the live
-   * `position` shown while dragging. `null` when no drag is active. The move is
-   * committed once on release, so a drag is a single undo step (issue #10).
+   * The live Selection drag, once a press has crossed {@link HEX_DRAG_THRESHOLD}:
+   * the `offset` (axial hex steps) and `labelDelta` (world pixels) the whole set
+   * would move by. `null` when no drag is active. A hex/region selection snaps the
+   * offset to hex steps (labels ride by the pixel-equivalent); a labels-only
+   * selection moves by free pixels (`offset` stays zero). The renderer previews the
+   * move from this; the store only sees the final {@link EditorStore.moveSelection}
+   * on release, so the whole drag is a single undo step (issues #30, #64).
    */
-  private readonly labelDrag = signal<{
-    readonly id: string;
-    readonly offset: Point;
-    readonly position: Point;
+  private readonly drag = signal<{
+    readonly offset: Axial;
+    readonly labelDelta: Point;
   } | null>(null);
-
-  /**
-   * The live label-drag mapped to the renderer's override shape, or null. The
-   * renderer previews the dragged label at this position without the document
-   * being rebuilt each frame, which keeps the drag preview out of the undo
-   * history (the store only sees the final position on release) and avoids
-   * cloning the labels array per pointer-move frame (issue #6).
-   */
-  protected readonly labelDragOverride = computed(() => {
-    const drag = this.labelDrag();
-    return drag ? { id: drag.id, position: drag.position } : null;
-  });
-
-  /**
-   * The in-progress whole-Hex drag: the `from` origin (the selected hex) and the
-   * `to` coordinate currently under the cursor. `null` until a press over a
-   * selected Hex/Feature crosses {@link HEX_DRAG_THRESHOLD}. The renderer previews
-   * the move at this destination; the store only sees the final `moveHex` on
-   * release, so the drag is a single undo step (issue #30).
-   */
-  private readonly hexDrag = signal<HexDragOverride | null>(null);
 
   /**
    * The in-progress marquee box-selection (Select's Marquee Subtool, ADR-0017):
@@ -292,13 +277,33 @@ export class MapCanvas {
   } | null>(null);
 
   /**
-   * A press that *may* become a Hex drag: the origin coordinate and the press
-   * point in client pixels, recorded on pointer-down over a selected Hex/Feature.
+   * A press that *may* become a Selection drag, recorded on a plain pointer-down
+   * over a selectable thing (issues #30, #64):
+   * - `worldStart` / `hexStart` — the press point in world pixels and its hex, the
+   *   anchors the live offset is measured from (pixels for a labels-only drag, hex
+   *   steps for a hex/region drag).
+   * - `labelHit` — the label id under the press, if any, so a plain release can
+   *   re-pick it.
+   * - `snapped` — whether the Selection holds a hex or region, so the drag snaps to
+   *   hex steps; a labels-only selection drags by free pixels instead.
+   * - `group` — the press landed on something already selected, so the whole set is
+   *   preserved and a drag moves it all; a plain release collapses to what was
+   *   clicked. `false` for a press that just selected one fresh entity.
+   *
    * Stays a plain field (not a signal) — it gates the move gesture but never the
-   * render. `null` when no such press is armed (issue #30).
+   * render. `null` when no such press is armed.
    */
-  private hexDragPress: { from: Axial; clientX: number; clientY: number } | null =
-    null;
+  private dragPress:
+    | {
+        worldStart: Point;
+        hexStart: Axial;
+        labelHit: string | null;
+        clientX: number;
+        clientY: number;
+        snapped: boolean;
+        group: boolean;
+      }
+    | null = null;
 
   /**
    * An in-progress modifier select-sweep (ADR-0017): holding Cmd/Ctrl (`add-top`)
@@ -331,6 +336,8 @@ export class MapCanvas {
   private readonly theme = inject(ThemeService);
   private readonly store = inject(EditorStore);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly toaster = inject(ToasterService);
+  private readonly transloco = inject(TranslocoService);
 
   /**
    * The translation key for the hover readout: the painted hex's built-in terrain
@@ -396,8 +403,7 @@ export class MapCanvas {
     const camera = this.camera();
     const doc = this.store.document();
     const hover = this.hover();
-    const labelDrag = this.labelDragOverride();
-    const hexDrag = this.hexDrag();
+    const drag = this.drag();
     // While a marquee is dragging, highlight the elements it currently encloses —
     // a *live* preview of what releasing it would select, resolved by the store
     // against the document (so a featured cell reads as a Feature, exactly as the
@@ -406,6 +412,10 @@ export class MapCanvas {
     const marqueeState = this.marquee();
     let selections = this.store.selections();
     let marquee: MarqueeOverride | null = null;
+    let movePreview: readonly HexWrite[] | null = null;
+    let blockedCells: readonly Axial[] = [];
+    let labelPositions: ReadonlyMap<string, Point> | null = null;
+    let regionPreview: ReadonlyMap<string, Record<string, true>> | null = null;
     if (marqueeState) {
       marquee = { a: marqueeState.a, b: marqueeState.b };
       const rect = rectFromCorners(marqueeState.a, marqueeState.b);
@@ -415,12 +425,42 @@ export class MapCanvas {
         hits.labels,
         marqueeState.additive,
       );
+    } else if (drag) {
+      // A live Selection drag previews exactly what releasing it would commit, from
+      // the one shared query the store also commits from (issues #30, #64): a
+      // resolved plan overlays its hex writes (the group at its destinations),
+      // draws every selected label at its previewed position, and the highlight
+      // follows by translating each selected cell; a blocked plan washes the
+      // contested cells red and leaves the group in place, since releasing it would
+      // be a no-op that snaps back.
+      const { plan, labelPositions: previewLabels } = this.store.previewSelectionMove(
+        drag.offset,
+        drag.labelDelta,
+      );
+      if (plan.blocked) {
+        blockedCells = plan.cells;
+      } else {
+        movePreview = plan.hexes;
+        const { offset } = drag;
+        selections = selections.map((s) =>
+          s.kind === 'hex' || s.kind === 'feature'
+            ? { ...s, coord: addAxial(s.coord, offset) }
+            : s,
+        );
+        labelPositions = previewLabels;
+        // The selected regions' translated footprints (from the same plan) preview
+        // their border and tint at the destination; an empty plan yields an empty
+        // map the renderer treats as "no override", so no guard is needed.
+        regionPreview = new Map(plan.regions.map((r) => [r.id, r.hexes]));
+      }
     }
     this.renderer?.render(camera, doc, hover, {
-      labelDrag,
+      labelPositions,
       selections,
-      hexDrag,
+      movePreview,
       marquee,
+      blockedCells,
+      regionPreview,
     });
   }
 
@@ -437,9 +477,9 @@ export class MapCanvas {
     if (event.button === 1) {
       // A pan supersedes any armed/live Select drag (e.g. a held left button over
       // a selected hex), so the gesture pans instead of getting stuck re-targeting
-      // a hex move under the pointer-move drag branch.
-      this.hexDragPress = null;
-      this.hexDrag.set(null);
+      // a move under the pointer-move drag branch.
+      this.dragPress = null;
+      this.drag.set(null);
       // A live select-sweep also yields to the pan: onPointerMove checks the sweep
       // branch before the pan branch, so a sweep left armed here would swallow the
       // pan moves. A live marquee likewise yields, committing nothing.
@@ -482,6 +522,24 @@ export class MapCanvas {
         return;
       }
       const hitId = this.renderer?.labelAt(this.localPoint(event)) ?? null;
+      const modifier = event.shiftKey || event.metaKey || event.ctrlKey;
+      // A plain press on something *already* selected — a hex, a label, or a coord
+      // that belongs to a selected region — drags the whole Selection (issue #64):
+      // preserve the set and arm a group drag rather than re-selecting. The collapse
+      // to the pressed entity is deferred to a plain release (no drag) below, so
+      // click-to-pick still works. A modifier press always folds into the set instead.
+      if (!modifier && this.pressOnSelection(hex, hitId)) {
+        this.dragPress = {
+          worldStart: world,
+          hexStart: hex,
+          labelHit: hitId,
+          clientX: event.clientX,
+          clientY: event.clientY,
+          snapped: this.selectionHasHexOrRegion(),
+          group: true,
+        };
+        return;
+      }
       // Modifiers fold the click into the Selection set (ADR-0017): Shift toggles
       // the whole stack at the coordinate, Cmd/Ctrl the topmost entity; a plain
       // click replaces (and cycles). Cmd/Ctrl wins if both are somehow held.
@@ -509,25 +567,21 @@ export class MapCanvas {
         }
         return;
       }
-      // A plain click arms a *potential* drag (issue #30). A Label drags via the
-      // existing `moveLabel` path — the grab offset keeps it from jumping to the
-      // cursor. A Hex/Feature arms a whole-Hex move: the press already selected it,
-      // and crossing the threshold in `onPointerMove` turns it into a `moveHex`. A
-      // release before the threshold is a plain click — selection only, no move.
-      if (selection?.kind === 'label') {
-        const label = this.store.selectedLabel();
-        if (label) {
-          this.labelDrag.set({
-            id: label.id,
-            offset: { x: label.position.x - world.x, y: label.position.y - world.y },
-            position: label.position,
-          });
-        }
-      } else if (selection?.kind === 'hex' || selection?.kind === 'feature') {
-        this.hexDragPress = {
-          from: selection.coord,
+      // A plain click selected one entity (or cleared on empty Void). When something
+      // was selected, arm a *potential* drag of it: crossing the threshold in
+      // {@link onPointerMove} turns it into a {@link EditorStore.moveSelection}; a
+      // release before the threshold stays a plain click. A Label drags by free
+      // pixels (`snapped` false, so it follows the cursor exactly); a Hex, Feature,
+      // or Region snaps to hex steps.
+      if (selection) {
+        this.dragPress = {
+          worldStart: world,
+          hexStart: hex,
+          labelHit: hitId,
           clientX: event.clientX,
           clientY: event.clientY,
+          snapped: selection.kind !== 'label',
+          group: false,
         };
       }
       return;
@@ -586,28 +640,35 @@ export class MapCanvas {
       return;
     }
 
-    // A live label drag wins over painting/panning: track the cursor, applying
-    // the grab offset; the render effect previews it there until release.
-    const drag = this.labelDrag();
-    if (drag) {
-      const world = this.toWorld(event);
-      this.labelDrag.set({
-        ...drag,
-        position: { x: world.x + drag.offset.x, y: world.y + drag.offset.y },
-      });
-      return;
-    }
-
-    // An armed Hex press becomes a move once the pointer travels past the
-    // threshold; thereafter every move re-targets the destination hex under the
-    // cursor and the renderer previews the content there (issue #30).
-    const press = this.hexDragPress;
+    // An armed press becomes a Selection drag once the pointer travels past the
+    // threshold; thereafter every move recomputes the offset the whole set would
+    // move by, and the render effect previews it there until release (issues #30,
+    // #64). A hex/region selection snaps to the destination hex under the cursor
+    // (labels riding by the pixel-equivalent); a labels-only selection tracks the
+    // raw pixel delta from the press, so the grabbed label follows the cursor exactly.
+    const press = this.dragPress;
     if (press) {
       const moved =
         Math.hypot(event.clientX - press.clientX, event.clientY - press.clientY) >=
         HEX_DRAG_THRESHOLD;
-      if (this.hexDrag() || moved) {
-        this.hexDrag.set({ from: press.from, to: hex });
+      if (this.drag() || moved) {
+        if (press.snapped) {
+          const a = hexToPixel(this.layout, press.hexStart);
+          const b = hexToPixel(this.layout, hex);
+          this.drag.set({
+            offset: { q: hex.q - press.hexStart.q, r: hex.r - press.hexStart.r },
+            labelDelta: { x: b.x - a.x, y: b.y - a.y },
+          });
+        } else {
+          const world = this.toWorld(event);
+          this.drag.set({
+            offset: { q: 0, r: 0 },
+            labelDelta: {
+              x: world.x - press.worldStart.x,
+              y: world.y - press.worldStart.y,
+            },
+          });
+        }
       }
       return;
     }
@@ -676,21 +737,28 @@ export class MapCanvas {
   }
 
   private endGesture(event: PointerEvent): void {
-    // Commit a label drag as a single edit: `moveLabel` to the final position.
-    // A plain click (no movement) lands the label back on its anchor, so the
-    // commit changes nothing and records no undo step.
-    const drag = this.labelDrag();
+    // Commit a Selection drag as a single edit through the unified `moveSelection`
+    // (ADR-0017, issue #64): the whole live Selection moves by the drag's offset
+    // (hex steps) and label delta (pixels). A refused move snaps back silently
+    // otherwise, so a blocked outcome tells the user why it wouldn't land (the
+    // message lives client-side, ADR-0014). A press that never crossed the threshold
+    // leaves `drag` null: a plain click on an already-selected member collapses the
+    // set to what was pressed — the pick the group-drag press deferred.
+    const drag = this.drag();
     if (drag) {
-      this.store.moveLabel(drag.id, drag.position);
-      this.labelDrag.set(null);
-    }
-    // Commit a whole-Hex drag as a single edit: `moveHex` to the destination
-    // under the cursor. A press that never crossed the threshold leaves `hexDrag`
-    // null, so it is a plain click — selection only, no move recorded (issue #30).
-    const hexDrag = this.hexDrag();
-    if (hexDrag) {
-      this.store.moveHex(hexDrag.from, hexDrag.to);
-      this.hexDrag.set(null);
+      const outcome = this.store.moveSelection(drag.offset, drag.labelDelta);
+      if (outcome === 'blocked') {
+        this.toaster.show(this.transloco.translate('editorShell.moveBlocked'), 'error');
+      } else if (outcome === 'noop') {
+        // A drag that crossed the pixel threshold but resolved to no movement
+        // (jiggled within the origin hex, or dragged back to the press point) is
+        // still a plain pick: collapse a deferred group press to what was pressed,
+        // exactly as a sub-threshold release does.
+        this.collapseGroupPress();
+      }
+      this.drag.set(null);
+    } else {
+      this.collapseGroupPress();
     }
     // Commit a marquee box: run its world rectangle through the pure hit-test and
     // fold the contained hexes + labels into the selection (replace, or add when
@@ -714,7 +782,7 @@ export class MapCanvas {
 
   /** Drop all per-gesture interaction state and release the owning pointer. */
   private resetGesture(): void {
-    this.hexDragPress = null;
+    this.dragPress = null;
     this.selectSweep = null;
     this.painting = false;
     this.panning = false;
@@ -744,6 +812,47 @@ export class MapCanvas {
   }
 
   /**
+   * Whether a plain press at `hex` (with label hit `hitId`) landed on something
+   * already in the Selection — so it should drag the whole set rather than
+   * re-select (issue #64): the pressed label is selected, the pressed cell is
+   * selected, or the pressed coordinate belongs to a selected Region (so a Region
+   * is grabbable by any of its member cells, painted or not).
+   */
+  /**
+   * Collapse a deferred group-drag press to the single entity that was pressed —
+   * the pick the press postponed so a drag could move the whole set instead. A
+   * no-op unless the press armed a group drag (issue #64).
+   */
+  private collapseGroupPress(): void {
+    if (this.dragPress?.group) {
+      this.store.select(this.dragPress.hexStart, this.dragPress.labelHit, 'replace');
+    }
+  }
+
+  private pressOnSelection(hex: Axial, hitId: string | null): boolean {
+    const key = coordKey(hex);
+    return this.store.selections().some((s) => {
+      switch (s.kind) {
+        case 'label':
+          return s.id === hitId;
+        case 'hex':
+        case 'feature':
+          return coordKey(s.coord) === key;
+        case 'region':
+          return !!regionById(this.store.document(), s.id)?.hexes[key];
+      }
+    });
+  }
+
+  /**
+   * Whether the Selection holds any Hex, Feature, or Region — so a drag snaps to
+   * hex steps. A labels-only selection returns false and drags by free pixels.
+   */
+  private selectionHasHexOrRegion(): boolean {
+    return this.store.selections().some((s) => s.kind !== 'label');
+  }
+
+  /**
    * Discard any pending Select gesture without committing it: a live drag or an
    * armed (sub-threshold) press. The label/hex preview overrides are cleared (the
    * render effect snaps the entity back to its stored position) and the pending
@@ -754,14 +863,12 @@ export class MapCanvas {
    */
   private cancelDrag(): boolean {
     const pending =
-      this.labelDrag() !== null ||
-      this.hexDrag() !== null ||
-      this.hexDragPress !== null ||
+      this.drag() !== null ||
+      this.dragPress !== null ||
       this.selectSweep !== null ||
       this.marquee() !== null;
-    this.labelDrag.set(null);
-    this.hexDrag.set(null);
-    this.hexDragPress = null;
+    this.drag.set(null);
+    this.dragPress = null;
     // A marquee abandoned mid-drag (Escape, pointer leaves/cancels) commits
     // nothing — the selection is only ever changed by an explicit release.
     this.marquee.set(null);

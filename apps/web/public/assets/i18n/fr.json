@@ -35,6 +35,7 @@
     "save": {
       "conflict": "Version plus récente sur le serveur"
     },
+    "moveBlocked": "Déplacement bloqué — un obstacle gêne le passage.",
     "toolPalette": {
       "tools": "Outils",
       "select": "Sélection",
