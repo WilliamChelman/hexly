@@ -12,7 +12,7 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import {
   Axial,
   coordKey,
@@ -25,6 +25,7 @@ import {
   rectFromCorners,
 } from '@hexly/domain';
 import { ThemeService } from '../core/theme.service';
+import { ToasterService } from '../core/toaster.service';
 import { terrainKey } from './catalog-keys';
 import { EditorStore, SelectMode, ToolId } from './editor-store';
 import { Button } from '../ui/button';
@@ -338,6 +339,8 @@ export class MapCanvas {
   private readonly theme = inject(ThemeService);
   private readonly store = inject(EditorStore);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly toaster = inject(ToasterService);
+  private readonly transloco = inject(TranslocoService);
 
   /**
    * The translation key for the hover readout: the painted hex's built-in terrain
@@ -746,7 +749,15 @@ export class MapCanvas {
       };
       const fromPx = hexToPixel(this.layout, hexDrag.from);
       const toPx = hexToPixel(this.layout, hexDrag.to);
-      this.store.moveSelection(offset, { x: toPx.x - fromPx.x, y: toPx.y - fromPx.y });
+      const outcome = this.store.moveSelection(offset, {
+        x: toPx.x - fromPx.x,
+        y: toPx.y - fromPx.y,
+      });
+      // A refused move snaps back silently otherwise, so tell the user why it
+      // wouldn't land (issue #64); the message lives client-side (ADR-0014).
+      if (outcome === 'blocked') {
+        this.toaster.show(this.transloco.translate('editorShell.moveBlocked'), 'error');
+      }
       this.hexDrag.set(null);
     } else if (this.hexDragPress?.group) {
       // A plain click (no drag) on an already-selected member collapses the whole

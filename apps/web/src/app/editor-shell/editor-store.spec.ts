@@ -1692,6 +1692,29 @@ describe('EditorStore moveSelection', () => {
     expect(store.canUndo()).toBe(false);
     expect(store.document().hexes).toEqual({});
   });
+
+  it('reports a resolved move as moved and a drag that never moved as noop', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.select({ q: 0, r: 0 }, null);
+
+    expect(store.moveSelection({ q: 0, r: -1 }, ZERO)).toBe('moved');
+    // A zero offset and zero pixels carries nothing — the plain-click no-op.
+    expect(store.moveSelection({ q: 0, r: 0 }, ZERO)).toBe('noop');
+  });
+
+  it('reports a blocked group move as blocked, so the caller can warn the user', () => {
+    const store = new EditorStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.paintAt({ q: 1, r: 0 }, 'ocean');
+    store.paintAt({ q: 2, r: 0 }, 'grass'); // a non-selected occupant on B's destination
+    store.marqueeSelect([{ q: 0, r: 0 }, { q: 1, r: 0 }], [], false);
+    const before = structuredClone(store.document());
+
+    // Nudging the pair right by one is a self-overlapping move that blocks.
+    expect(store.moveSelection({ q: 1, r: 0 }, ZERO)).toBe('blocked');
+    expect(store.document()).toEqual(before);
+  });
 });
 
 describe('EditorStore hex name', () => {

@@ -361,6 +361,9 @@ test('refuses a blocked group move, leaving every hex where it was', async ({
   // The move was refused: still three hexes, and nothing budged.
   await expect(page.getByTestId('hex-count')).toHaveText('3 hexes');
 
+  // The refusal is surfaced to the user as a toast explaining why it wouldn't land.
+  await expect(page.getByRole('alert').filter({ hasText: 'Move blocked' })).toBeVisible();
+
   const saved = page.waitForResponse(
     (res) =>
       res.request().method() === 'PUT' &&

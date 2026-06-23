@@ -3,6 +3,7 @@ import { RouterOutlet } from '@angular/router';
 import { ThemeService } from './core/theme.service';
 import { LocaleService } from './core/i18n/locale.service';
 import { AppHeader } from './shell/app-header';
+import { Toaster } from './shell/toaster';
 
 /**
  * Application root and shell. It owns the single, always-present
@@ -12,12 +13,13 @@ import { AppHeader } from './shell/app-header';
  */
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, AppHeader],
+  imports: [RouterOutlet, AppHeader, Toaster],
   template: `
     <app-header />
     <main class="outlet">
       <router-outlet />
     </main>
+    <app-toaster />
   `,
   styles: `
     :host {

@@ -199,6 +199,14 @@ const DEFAULT_FEATURE: FeatureSubtool = featureLibrary[0].id;
 export const DEFAULT_LABEL_SIZE = 28;
 
 /**
+ * The outcome of {@link EditorStore.moveSelection}, so the gesture owner can react
+ * (issue #64): `moved` committed a step, `blocked` refused it (the caller may warn
+ * the user), and `noop` carried nothing (a drag that never moved, or an empty/void
+ * selection) — neither committed.
+ */
+export type MoveOutcome = 'moved' | 'blocked' | 'noop';
+
+/**
  * The editor's command/undo stack — the only "store" the editor needs (ADR-0005).
  * It holds the current {@link HexMap} as immutable state in a signal; every
  * mutation runs through Immer's `produceWithPatches`, and the inverse patches go
@@ -693,21 +701,21 @@ export class EditorStore {
     return planMove({ document: this._document(), selection: this.selectionForMove(), offset });
   }
 
-  moveSelection(offset: Axial, labelDelta: Point): void {
+  moveSelection(offset: Axial, labelDelta: Point): MoveOutcome {
     if (
       offset.q === 0 &&
       offset.r === 0 &&
       labelDelta.x === 0 &&
       labelDelta.y === 0
     ) {
-      return;
+      return 'noop';
     }
     const refs = this._selections();
     const selection = this.selectionForMove();
     const plan = planMove({ document: this._document(), selection, offset });
     // A blocked plan refuses the whole move — leave everything untouched so the
     // release snaps the preview back (CONTEXT.md → "a blocked plan is a no-op").
-    if (plan.blocked) return;
+    if (plan.blocked) return 'blocked';
     const labelIds = selection.labels;
     const moveLabels = labelDelta.x !== 0 || labelDelta.y !== 0;
     const committed = this.commit((draft) => {
@@ -737,7 +745,7 @@ export class EditorStore {
     });
     // The plan changed nothing (an empty selection, or every source Void): no step
     // was recorded, so there is nothing to re-point.
-    if (!committed) return;
+    if (!committed) return 'noop';
     // Re-point the selection to the moved entities: each cell rides by the axial
     // offset to its destination; region and label refs keep their ids (their
     // footprint/position moved under the same id). The cell translation is a
@@ -751,6 +759,7 @@ export class EditorStore {
     // Stamp the post-move selection onto the edit so undo restores it to the
     // sources and redo follows it back to the destinations, in lockstep.
     this.trackSelectionOnLastEdit();
+    return 'moved';
   }
 
   /**
