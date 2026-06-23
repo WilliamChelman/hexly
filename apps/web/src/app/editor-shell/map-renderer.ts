@@ -151,6 +151,13 @@ export interface RenderOverrides {
    * ADR-0017, issue #64). A preview overlay only: the document is never mutated.
    */
   readonly blockedCells?: readonly Axial[];
+  /**
+   * Live region-drag preview: a `regionId → translated membership` map overriding
+   * where those regions' footprints draw — both the coloured border and the
+   * selection tint — without mutating the document (issue #64). An absent id draws
+   * from the stored membership.
+   */
+  readonly regionPreview?: ReadonlyMap<string, Record<string, true>> | null;
 }
 
 export interface MapRenderer {
@@ -332,6 +339,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
       movePreview = null,
       marquee = null,
       blockedCells = [],
+      regionPreview = null,
     } = overrides;
     const ctx = this.ctx;
     if (!ctx || this.width === 0 || this.height === 0) return;
@@ -412,9 +420,11 @@ export class Canvas2dMapRenderer implements MapRenderer {
       ctx.lineCap = 'round';
       for (const region of doc.regions) {
         ctx.strokeStyle = region.color;
-        for (const key of Object.keys(region.hexes)) {
+        // A dragged region previews its translated footprint; others draw as stored.
+        const members = regionPreview?.get(region.id) ?? region.hexes;
+        for (const key of Object.keys(members)) {
           if (!visibleKeys.has(key)) continue;
-          this.strokeRegionBorder(ctx, camera, parseCoordKey(key), region.hexes);
+          this.strokeRegionBorder(ctx, camera, parseCoordKey(key), members);
         }
       }
       ctx.restore();
@@ -506,7 +516,11 @@ export class Canvas2dMapRenderer implements MapRenderer {
     }
     const regionById_ = new Map<string, Region>();
     for (const region of doc.regions) {
-      if (!regionById_.has(region.id)) regionById_.set(region.id, region);
+      if (regionById_.has(region.id)) continue;
+      // The selection tint follows a dragged region's previewed footprint too, so
+      // the highlight rides with the border above it.
+      const preview = regionPreview?.get(region.id);
+      regionById_.set(region.id, preview ? { ...region, hexes: preview } : region);
     }
     for (const selection of selections) {
       this.drawSelection(

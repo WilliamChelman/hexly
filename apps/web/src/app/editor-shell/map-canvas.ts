@@ -414,6 +414,7 @@ export class MapCanvas {
     let movePreview: readonly HexWrite[] | null = null;
     let blockedCells: readonly Axial[] = [];
     let labelPositions: ReadonlyMap<string, Point> | null = null;
+    let regionPreview: ReadonlyMap<string, Record<string, true>> | null = null;
     if (marqueeState) {
       marquee = { a: marqueeState.a, b: marqueeState.b };
       const rect = rectFromCorners(marqueeState.a, marqueeState.b);
@@ -442,6 +443,11 @@ export class MapCanvas {
             : s,
         );
         labelPositions = this.draggedLabelPositions(doc, labelDelta);
+        // The selected regions' translated footprints (from the same plan) preview
+        // their border and tint at the destination.
+        if (plan.regions.length > 0) {
+          regionPreview = new Map(plan.regions.map((r) => [r.id, r.hexes]));
+        }
       }
     }
     this.renderer?.render(camera, doc, hover, {
@@ -450,6 +456,7 @@ export class MapCanvas {
       movePreview,
       marquee,
       blockedCells,
+      regionPreview,
     });
   }
 

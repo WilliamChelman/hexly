@@ -279,6 +279,28 @@ describe('Canvas2dMapRenderer region borders', () => {
     expect(borders).toHaveLength(10);
     restore();
   });
+
+  it('previews a dragged region\'s border at its translated footprint', () => {
+    const restore = stubTheme();
+    const ctx = new FakeContext();
+    const renderer = makeRenderer(ctx);
+    const camera = Camera.initial().panBy(60, 60);
+    // The stored member is off-screen, so its border would not normally draw.
+    const doc: HexMap = {
+      hexes: {},
+      regions: [{ id: 'a', name: 'Avalon', color: '#b08a4e', hexes: { '5,5': true } }],
+      labels: [],
+    };
+
+    // A live region drag previews the footprint translated onto the visible centre,
+    // so the border now strokes at the previewed coordinate, not the stored one.
+    renderer.render(camera, doc, null, {
+      regionPreview: new Map([['a', { '0,0': true }]]),
+    });
+
+    expect(ctx.lineStrokes).toContain('#b08a4e');
+    restore();
+  });
 });
 
 describe('Canvas2dMapRenderer feature markers', () => {
