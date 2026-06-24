@@ -26,14 +26,13 @@ enablePatches();
  * A top-level Tool armed in the palette (CONTEXT.md → Tool). Exactly one is
  * armed at a time, and a canvas gesture applies it. Tools that have variants
  * carry a current Subtool tracked separately ({@link FeatureSubtool},
- * {@link RegionSubtool}, and the terrain id). Issue #27 split the old flat
- * tagged union into this two-level model:
+ * {@link RegionSubtool}, and the terrain id):
  *
  * - `select` — the non-destructive Tool; a click does nothing yet (issue #27)
  * - `terrain` — paint the remembered terrain (creates or replaces a hex)
  * - `feature` — place the remembered feature, or Clear it (see FeatureSubtool)
  * - `region` — paint the *selected* region's membership; a no-op with none
- *   selected (creation moved to the Regions panel, ADR-0012)
+ *   selected (regions are created in the Regions panel, ADR-0012)
  * - `label` — drop a free-positioned Label at the clicked world point (issue #10)
  * - `erase` — delete the whole hex record so the coordinate becomes Void
  */
@@ -69,8 +68,7 @@ export const selectSubtools: readonly SelectSubtool[] = ['pick', 'marquee'];
  * The Region membership brush's target: which region the brush paints, and whether
  * it adds (`add`) or removes (`remove`) membership. `null` until a Region is selected
  * and a direction engaged via the Inspector's Add/Remove (issue #37); with none, a
- * Region stroke is a no-op (creation moved to the Regions panel, ADR-0012). It keeps
- * the historical `RegionSubtool`/`region()` name though Region is no longer a Tool.
+ * Region stroke is a no-op (regions are created in the Regions panel, ADR-0012).
  */
 export interface RegionSubtool {
   readonly id: string;
@@ -577,10 +575,9 @@ export class EditorStore {
         break;
       }
       case 'region': {
-        // The Region tool is a membership brush only now (ADR-0012): it paints the
-        // *selected* Region's membership per the Add/Remove direction. Creation moved
-        // to the Regions panel's New Region, so a stroke with no Region selected mints
-        // nothing — it is a no-op rather than the old create-and-paint.
+        // The Region tool is a membership brush (ADR-0012): it paints the *selected*
+        // Region's membership per the Add/Remove direction. A stroke with no Region
+        // selected is a no-op — regions are created in the Regions panel, not here.
         const selected = this.selectedRegion();
         if (!selected) break;
         if (this.regionDirection() === 'add') this.addHexToRegion(selected.id, coord);
@@ -1416,12 +1413,6 @@ function sameSelectionRef(a: SelectionRef, b: SelectionRef): boolean {
 }
 
 /**
- * A stable string key for a {@link SelectionRef}, consistent with
- * {@link sameSelectionRef} (two refs share a key iff they are the same entity).
- * Lets the sweep-time membership tests build an O(1) `Set` index once rather than
- * re-scanning the growing set per swept hex (a quadratic over a long drag).
- */
-/**
  * Build the {@link SelectionRef}s a marquee box denotes from its resolved
  * `hexes` and `labelIds` (CONTEXT.md → Marquee): a cell ref per hex coordinate,
  * a label ref per id. The shared ref-builder behind both {@link
@@ -1465,6 +1456,12 @@ function mergeRefs(
   return merged;
 }
 
+/**
+ * A stable string key for a {@link SelectionRef}, consistent with
+ * {@link sameSelectionRef} (two refs share a key iff they are the same entity).
+ * Lets the sweep-time membership tests build an O(1) `Set` index once rather than
+ * re-scanning the growing set per swept hex (a quadratic over a long drag).
+ */
 function refKey(ref: SelectionRef): string {
   switch (ref.kind) {
     case 'label':

@@ -69,7 +69,6 @@ export class MapsStore {
     return this.http.post<MapDetail>('/maps', { title }).pipe(
       tap((created) => {
         this._current.set(created);
-        // A freshly created map has no outstanding conflict.
         this._conflict.set(null);
       }),
     );

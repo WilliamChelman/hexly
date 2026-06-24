@@ -11,11 +11,9 @@ import { ToasterService } from '../core/toaster.service';
 
 /**
  * Renders the {@link ToasterService}'s transient messages as a stack of toasts
- * floating above everything (issue #64 follow-up). Mounted once in the app root,
- * it reads the service's `toasts` signal — so it re-renders as toasts come and go
- * — and offers a dismiss control per toast. A fixed overlay above the editor's
- * floating chrome (ADR-0013), it sits out of the layout flow and never steals
- * pointer events except on the toasts themselves.
+ * floating above the editor's chrome (issue #64, ADR-0013). Mounted once in the
+ * app root, it reads the service's `toasts` signal and offers a per-toast dismiss
+ * control.
  *
  * Copy is owned at the call site (the message is already-resolved text, ADR-0014);
  * only the dismiss control's label is translated here, reusing `common.close`.
@@ -39,9 +37,7 @@ import { ToasterService } from '../core/toaster.service';
   imports: [NgClass, TranslocoPipe],
   template: `
     @for (toast of toaster.toasts(); track toast.id) {
-      <!-- .toast is kept as a test/e2e hook (toaster.spec, move-hex.spec); its
-           styling is inline. The left rule's tone colour is the one per-tone
-           difference, so it lives in [ngClass] (the t/r/b colours are static). -->
+      <!-- .toast is kept as a test/e2e hook (toaster.spec, move-hex.spec); its styling is inline. -->
       <div
         class="toast pointer-events-auto flex items-center gap-3 max-w-[min(90vw,32rem)] py-2 px-3 bg-surface-raised text-ink border border-l-[3px] border-t-line border-r-line border-b-line rounded-md shadow-2 text-[0.9rem]"
         [ngClass]="{
@@ -71,9 +67,6 @@ export class Toaster {
   private announced = new Set<number>();
 
   constructor() {
-    // Announce every newly-shown toast through the always-present CDK live region;
-    // ids already announced are skipped, and the set is pruned to the current toasts
-    // so it cannot grow unbounded across a session.
     effect(() => {
       const toasts = this.toaster.toasts();
       for (const toast of toasts) {

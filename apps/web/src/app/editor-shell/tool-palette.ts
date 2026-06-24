@@ -227,9 +227,8 @@ function glyphFor(subtool: SelectSubtool): Type<unknown> {
     }
   `,
   styles: `
-    /* The flyout's two-column grid keeps a scoped rule: the class is a test hook
-       and the grid template reads better named here than as triplicated inline
-       arbitrary utilities. Strip layout + the divider width are inline utilities. */
+    /* The flyout's two-column grid is scoped here (the class is also a test hook);
+       strip layout and divider width are inline utilities. */
     .flyout {
       display: grid;
       grid-template-columns: repeat(2, auto);

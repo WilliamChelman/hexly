@@ -77,9 +77,8 @@ export class Login {
   private readonly header = inject(HeaderService);
   private readonly destroyRef = inject(DestroyRef);
 
-  /** The translated page heading, shown both as the document's <h1> (sr-only)
-   * and the header chrome title — sourced from one key so the two can't drift
-   * and both re-render live when the language changes. */
+  /** Translated heading shared by the sr-only `<h1>` and the header chrome
+   * title — one key so the two can't drift and both re-render on language change. */
   protected readonly heading = translateSignal('auth.heading');
 
   protected readonly email = signal('');
@@ -89,17 +88,13 @@ export class Login {
   protected readonly error = signal<string | null>(null);
 
   constructor() {
-    // Contribute the sign-in heading to the single app header (ADR-0015) as a
-    // computed, so the chrome title tracks a live language switch — HeaderService
-    // owns the subscription. It is withdrawn automatically when this page is
-    // destroyed.
+    // Pass as a computed so the chrome title tracks live language switches (ADR-0015).
     this.header.set(
       computed(() => ({ title: this.heading() })),
       this.destroyRef,
     );
   }
 
-  /** Read the current value out of an input event. */
   protected value(event: Event): string {
     return (event.target as HTMLInputElement).value;
   }

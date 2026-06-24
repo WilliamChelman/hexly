@@ -87,12 +87,6 @@ const MARQUEE_STROKE = 1.5;
 const MARQUEE_DASH: readonly number[] = [5, 4];
 
 /**
- * The seam between the editor and whatever draws the map. There is one Canvas 2D
- * implementation today; the interface exists so a WebGL backend can drop in
- * later without touching the rest of the app (ADR-0003). A renderer owns its
- * drawing surface and paints one frame on demand for a given camera transform.
- */
-/**
  * A live marquee box: the two world-space corners (`a` the drag origin, `b` the
  * cursor) of the rectangle the Marquee Subtool is dragging (ADR-0017). Passed to
  * {@link MapRenderer.render} so the box previews live without touching the
@@ -148,6 +142,12 @@ export interface RenderOverrides {
   readonly regionPreview?: ReadonlyMap<string, Record<string, true>> | null;
 }
 
+/**
+ * The seam between the editor and whatever draws the map. There is one Canvas 2D
+ * implementation today; the interface exists so a WebGL backend can drop in
+ * later without touching the rest of the app (ADR-0003). A renderer owns its
+ * drawing surface and paints one frame on demand for a given camera transform.
+ */
 export interface MapRenderer {
   /** Match the drawing surface to the given CSS-pixel size. */
   resize(width: number, height: number): void;

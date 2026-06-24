@@ -26,13 +26,11 @@ import { StatusBar } from './status-bar';
  * {@link EditorSession} so a reload restores it.
  *
  * The body is a **full-bleed canvas** with the side chrome floating over it as
- * absolutely-positioned cards (ADR-0013, reversing ADR-0007's column grid and
- * ADR-0011's always-present right column): the tool palette anchors top-left, the
+ * absolutely-positioned cards (ADR-0013): the tool palette anchors top-left, the
  * edge rail top-right, and the dismissible right panel (Inspector / Regions) to
  * the rail's left — rendered only when {@link EditorStore.rightPanel} is open, so
  * nothing covers the map by default. The header and status bar stay docked as
- * full-width rows. The editor renders identically at every width — the old
- * narrow-viewport rail-hiding is gone.
+ * full-width rows. The editor renders identically at every width.
  */
 @Component({
   selector: 'app-editor-shell',

@@ -11,8 +11,7 @@ import { EditorStore } from './editor-store';
  * field controls and their commit handlers live, used by the Inspector's region
  * editor (issue #36). It lays the fields out as a labelled stack; the host is
  * `display: contents`, so they appear as direct children of whichever container
- * hosts the component. (The Region tool's legend that once also rendered these
- * fields was removed when Region became create-and-paint, issue #38.)
+ * hosts the component.
  */
 @Component({
   selector: 'app-region-fields',

@@ -3,8 +3,7 @@ import { IconHost } from '../icon-host';
 
 /**
  * The undo glyph (a curved arrow looping back to the left). One `<svg>` drawn in
- * `currentColor`, sized by `size`. Imported directly by the consumer that shows
- * it (there is no `app-icon` dispatcher). See ADR-0007.
+ * `currentColor`, sized by `size`. See ADR-0007.
  */
 @Component({
   selector: 'app-icon-undo',

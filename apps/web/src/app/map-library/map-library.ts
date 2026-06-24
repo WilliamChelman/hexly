@@ -189,7 +189,6 @@ export class MapLibrary implements OnInit {
       .subscribe((map) => this.open(map.id));
   }
 
-  /** Open a map in the editor. */
   protected open(id: string): void {
     this.router.navigate(['/maps', id]);
   }

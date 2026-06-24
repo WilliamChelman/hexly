@@ -72,9 +72,9 @@ const NEW_LABEL_TEXT = 'Label';
 const HEX_DRAG_THRESHOLD = 4;
 
 /**
- * The letter that arms each top-level Tool from the keyboard (issue #27). Region is
- * not here: it left the palette (ADR-0012), so there is no key to arm it — Regions
- * are created in the Regions panel and painted via the Inspector's Add/Remove brush.
+ * The letter that arms each top-level Tool from the keyboard (issue #27). Region has
+ * no key (ADR-0012): regions are created in the Regions panel and painted via the
+ * Inspector's Add/Remove brush.
  */
 const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
   s: 'select',
@@ -111,12 +111,7 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
       (wheel)="onWheel($event)"
     ></canvas>
 
-    <!--
-      Hover-coordinate readout, bottom-left (the tool strip owns top-left,
-      ADR-0013). '.readout' is a test hook (map-canvas.spec) and the anchor for the
-      frosted background (scoped below, as a color-mix over a token); the rest of
-      its styling is inline.
-    -->
+    <!-- Hover-coordinate readout, bottom-left. '.readout' is a test hook (map-canvas.spec). -->
     <div
       class="readout absolute bottom-4 left-4 flex items-center gap-2 py-1 px-3 border border-line rounded-full shadow-1 backdrop-blur-[4px] pointer-events-none"
     >
@@ -126,9 +121,8 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
     </div>
 
     <!--
-      Zoom/fit controls, bottom-right and lifted above the floating right dock
+      Zoom/fit controls, bottom-right, lifted above the floating right dock
       (z-2 over the dock's z-1, ADR-0013) so a tall open panel can't cover them.
-      '.zoom' anchors the frosted background (scoped below); the rest is inline.
     -->
     <div
       class="zoom absolute right-4 bottom-4 z-[2] flex items-center gap-1 p-1 border border-line rounded-full shadow-2 backdrop-blur-[4px]"

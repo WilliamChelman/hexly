@@ -15,9 +15,7 @@ import { TitleService } from './title.service';
  * page fills via {@link TitleService.setDocumentName} (the editor reads
  * `"Aldermoor — Hexly"`).
  *
- * A route with no `title` leaves the current tab title untouched, and a literal
- * (unmigrated) title resolves to itself (a missing key falls back to the key
- * text), so routes keep working until they adopt keys.
+ * A route with no `title` leaves the current tab title untouched.
  */
 @Injectable()
 export class TranslationTitleStrategy extends TitleStrategy {

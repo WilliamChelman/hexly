@@ -47,9 +47,8 @@ export const terrainPalette = [
 ] as const satisfies readonly Terrain[];
 
 /**
- * Build a Zod enum from a palette's ids. Centralizes the one fragile
- * non-empty-tuple cast Zod requires so it lives in exactly one place; the
- * inferred literal types and runtime enum are identical to inlining it.
+ * Build a Zod enum from a palette's ids, isolating the non-empty-tuple cast Zod
+ * requires while preserving the inferred literal types.
  */
 function idEnum<Id extends string>(ids: readonly Id[]) {
   return z.enum(ids as [Id, ...Id[]]);
@@ -164,9 +163,8 @@ export type TerrainId = (typeof terrainPalette)[number]['id'];
 export type FeatureId = (typeof featureLibrary)[number]['id'];
 
 /**
- * The human label for a terrain id, or `undefined` if it is not a built-in. The
- * single resolver for the palette lookup callers used to inline; each caller
- * applies its own fallback (e.g. the raw id, or `null` for "no hex").
+ * The human label for a terrain id, or `undefined` if it is not a built-in. Each
+ * caller applies its own fallback (e.g. the raw id, or `null` for "no hex").
  */
 export function terrainLabel(id: TerrainId): string | undefined {
   return terrainPalette.find((t) => t.id === id)?.label;
