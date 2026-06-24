@@ -55,20 +55,21 @@ interface TypeRow {
     Panel,
     Textarea,
   ],
+  host: { class: 'block' },
   template: `
-    <div class="guide">
-      <header class="guide-top">
+    <div class="max-w-[1080px] mx-auto pt-5 px-5 pb-9 flex flex-col gap-8">
+      <header class="guide-top flex justify-between items-center">
         <a appButton variant="ghost" size="sm" routerLink="/"
           >← {{ 'styleguide.backToMap' | transloco }}</a
         >
       </header>
 
       <!-- Masthead -->
-      <section class="hero">
+      <section class="hero flex flex-col gap-4 pt-7 pb-5 border-b border-line">
         <span appEyebrow>{{ 'styleguide.eyebrow' | transloco }}</span>
-        <h1 class="hero-title" [innerHTML]="'styleguide.heroTitle' | transloco"></h1>
+        <h1 class="text-3xl leading-[1.06]" [innerHTML]="'styleguide.heroTitle' | transloco"></h1>
         <p class="hero-lede" [innerHTML]="'styleguide.heroLede' | transloco"></p>
-        <div class="hero-meta">
+        <div class="flex flex-wrap gap-2 mt-2">
           <app-chip tone="gold">{{ 'styleguide.fontDisplay' | transloco }}</app-chip>
           <app-chip tone="sea">{{ 'styleguide.fontBody' | transloco }}</app-chip>
           <app-chip tone="astra">{{ 'styleguide.fontCoord' | transloco }}</app-chip>
@@ -249,37 +250,8 @@ A walled town where the forest road meets the river ford.</textarea
   `,
   styles: `
     /* Styleguide — layout only; specimens use the primitives and global classes. */
-    :host {
-      display: block;
-    }
-
-    .guide {
-      max-width: 1080px;
-      margin: 0 auto;
-      padding: var(--spacing-5) var(--spacing-5) var(--spacing-9);
-      display: flex;
-      flex-direction: column;
-      gap: var(--spacing-8);
-    }
-
-    .guide-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
 
     /* ----- Hero ------------------------------------------------------------- */
-    .hero {
-      display: flex;
-      flex-direction: column;
-      gap: var(--spacing-4);
-      padding: var(--spacing-7) 0 var(--spacing-5);
-      border-bottom: 1px solid var(--color-line);
-    }
-    .hero-title {
-      font-size: var(--text-3xl);
-      line-height: 1.06;
-    }
     .hero-lede {
       max-width: var(--container-reading);
       font-size: var(--text-md);
@@ -292,12 +264,6 @@ A walled town where the forest road meets the river ford.</textarea
       font-family: var(--font-mono);
       font-size: 0.86em;
       color: var(--color-gold-strong);
-    }
-    .hero-meta {
-      display: flex;
-      flex-wrap: wrap;
-      gap: var(--spacing-2);
-      margin-top: var(--spacing-2);
     }
 
     /* ----- Sections --------------------------------------------------------- */

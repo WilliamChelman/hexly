@@ -56,18 +56,24 @@
 
 /*
  * Hexly's design tokens *are* Tailwind's theme (ADR-0020). Every utility-shaped
- * token — colours, fonts, the type scale, spacing, radii, shadows — is declared
+ * token — colours, fonts, the type scale, spacing, radii — is declared
  * here so the same value both (a) generates an on-brand utility (`bg-surface`,
  * `text-ink`, `gap-5`, `text-md`, `rounded-lg`, `font-display`, …) and (b) is
  * emitted as a CSS variable on `:root`/`:host` that scoped component styles
  * consume directly (`var(--color-surface)`, `var(--spacing-4)`). One vocabulary,
  * no parallel `--space-*`/`--surface` layer.
  *
- * Theming: colours and shadows are declared *non-`inline`* so the override
- * point is the generated property — the light value lives here, and
- * `:root[data-theme='dark']` (tokens.css) reassigns the generated `--color-*` /
- * `--shadow-*`. tokens.css is imported after `tailwindcss`, so the dark block
- * cascades over this `:root`. Spacing/type/radii/fonts are theme-invariant.
+ * Theming: colours are declared *non-`inline`* so the override point is the
+ * generated property — the light value lives here, and
+ * `:root[data-theme='dark']` (tokens.css) reassigns the generated `--color-*`.
+ * tokens.css is imported after `tailwindcss`, so the dark block cascades over
+ * this `:root`. Spacing/type/radii/fonts are theme-invariant.
+ *
+ * Elevation is the one utility-shaped token that *can't* live here: the
+ * `--shadow-*` namespace inlines a `shadow-*` utility's value rather than
+ * referencing `var(--shadow-*)`, so a generated `shadow-1` would bake the light
+ * value and never re-theme. Shadows are raw vars in tokens.css, wrapped as a
+ * custom `@utility` below (ADR-0021).
  *
  * Spacing is bridged via explicit `--spacing-<N>` keys: Tailwind v4 resolves an
  * explicit key before the `calc(var(--spacing) * N)` multiplier, so the bespoke
@@ -187,10 +193,28 @@
   --color-terrain-marsh: #93a87f;
   --color-terrain-sky: #a9c4d4; /* open air — a daylit pale cerulean        */
 
-  /* ---- Elevation — warm, paper-soft drop shadows (themed) --------------- */
-  --shadow-1: 0 1px 2px rgba(60, 44, 22, 0.12);
-  --shadow-2: 0 4px 12px -2px rgba(60, 44, 22, 0.2);
-  --shadow-3: 0 16px 36px -8px rgba(50, 36, 18, 0.32);
-  --shadow-inset: inset 0 1px 2px rgba(60, 44, 22, 0.12);
-  --shadow-focus: 0 0 0 3px rgba(154, 106, 22, 0.32); /* focus-visible ring  */
+  /* Elevation (`--shadow-*`) lives in tokens.css as raw re-themable vars and is
+     wrapped as a custom `@utility` below — not here; see the header note. */
+}
+
+/*
+ * Elevation utilities. The `--shadow-*` theme namespace inlines a utility's
+ * value (to leave room for `--tw-shadow-color`), so a theme-generated `shadow-1`
+ * bakes the light shadow and ignores `[data-theme='dark']`. Hexly never recolours
+ * a shadow via utility, so we hand-wrap the raw token instead: `shadow-1` emits
+ * `box-shadow: var(--shadow-1)`, re-theming exactly like the scoped
+ * `box-shadow: var(--shadow-1)` it replaces. (`--shadow-focus` is composed only
+ * in scoped focus rings, so it stays a raw var with no utility.)
+ */
+@utility shadow-1 {
+  box-shadow: var(--shadow-1);
+}
+@utility shadow-2 {
+  box-shadow: var(--shadow-2);
+}
+@utility shadow-3 {
+  box-shadow: var(--shadow-3);
+}
+@utility shadow-inset {
+  box-shadow: var(--shadow-inset);
 }

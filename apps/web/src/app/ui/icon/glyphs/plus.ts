@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { IconHost } from '../icon-host';
 
 /**
  * The plus glyph (zoom in). One `<svg>` drawn in `currentColor`, sized by
@@ -7,7 +8,7 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 @Component({
   selector: 'app-icon-plus',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  styles: ':host { display: inline-flex; line-height: 0; }',
+  hostDirectives: [IconHost],
   template: `
     <svg
       [attr.width]="size()"

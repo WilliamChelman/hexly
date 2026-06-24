@@ -98,10 +98,11 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
   template: `
     <canvas
       #canvas
-      class="surface"
+      class="absolute inset-0 w-full h-full block touch-none"
       role="img"
       [attr.aria-label]="'editorShell.hexMap' | transloco"
-      [class.is-grabbing]="dragging()"
+      [class.cursor-grab]="!dragging()"
+      [class.cursor-grabbing]="dragging()"
       (pointerdown)="onPointerDown($event)"
       (pointermove)="onPointerMove($event)"
       (pointerup)="onPointerUp($event)"
@@ -110,14 +111,27 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
       (wheel)="onWheel($event)"
     ></canvas>
 
-    <div class="readout">
+    <!--
+      Hover-coordinate readout, bottom-left (the tool strip owns top-left,
+      ADR-0013). '.readout' is a test hook (map-canvas.spec) and the anchor for the
+      frosted background (scoped below, as a color-mix over a token); the rest of
+      its styling is inline.
+    -->
+    <div
+      class="readout absolute bottom-4 left-4 flex items-center gap-2 py-1 px-3 border border-line rounded-full shadow-1 backdrop-blur-[4px] pointer-events-none"
+    >
       <app-coord>q {{ hover()?.q ?? 0 }} · r {{ hover()?.r ?? 0 }}</app-coord>
-      <span class="readout-sep">·</span>
+      <span class="text-line-strong">·</span>
       <span appEyebrow>{{ readoutKey() | transloco }}</span>
     </div>
 
+    <!--
+      Zoom/fit controls, bottom-right and lifted above the floating right dock
+      (z-2 over the dock's z-1, ADR-0013) so a tall open panel can't cover them.
+      '.zoom' anchors the frosted background (scoped below); the rest is inline.
+    -->
     <div
-      class="zoom"
+      class="zoom absolute right-4 bottom-4 z-[2] flex items-center gap-1 p-1 border border-line rounded-full shadow-2 backdrop-blur-[4px]"
       role="group"
       [attr.aria-label]="'editorShell.canvas.zoom' | transloco"
     >
@@ -131,7 +145,7 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
       >
         <app-icon-plus [size]="16" />
       </button>
-      <app-coord class="zoom-level">{{ zoomPercent() }}%</app-coord>
+      <app-coord class="min-w-[3.4em] text-center">{{ zoomPercent() }}%</app-coord>
       <button
         type="button"
         appButton
@@ -155,9 +169,16 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
     </div>
   `,
   styles: `
+    /*
+      The host sets no position of its own — placement is the parent's prerogative
+      (the shell lays this out full-bleed, ADR-0013). It owns only its appearance:
+      it clips to its box and paints the map's parchment/astral wash. Once the
+      shell positions it, the host is the containing block for the readout/zoom
+      overlays below. (No 'position' here is also what lets the shell's inline
+      'absolute inset-0' win — an emulated :host rule would be unlayered and beat
+      it.)
+    */
     :host {
-      position: relative;
-      display: block;
       overflow: hidden;
       background: radial-gradient(
         120% 120% at 50% 0%,
@@ -165,64 +186,20 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
         var(--color-canvas-mat)
       );
     }
-    .surface {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      display: block;
-      cursor: grab;
-      touch-action: none;
-    }
-    .surface.is-grabbing {
-      cursor: grabbing;
-    }
     /*
-      Bottom-left: the floating tool strip now owns the top-left of the canvas
-      (ADR-0013), so the hover coordinate readout drops to the opposite-free
-      corner rather than sitting under the palette.
+      Only the frosted background stays scoped: it's a color-mix() over a theme
+      token. 'bg-surface/NN' would re-theme on modern browsers (its @supports
+      branch is the same oklab color-mix over var(--color-surface)), but the
+      modifier also emits a baked-srgb fallback at the light hex that wouldn't
+      re-theme on a browser lacking lab color-mix — so the single authored oklab
+      declaration is kept (ADR-0021). Each overlay's layout/border/shadow/blur is
+      inline; this one property is all that's left here, anchored on the kept class.
     */
     .readout {
-      position: absolute;
-      bottom: var(--spacing-4);
-      left: var(--spacing-4);
-      display: flex;
-      align-items: center;
-      gap: var(--spacing-2);
-      padding: var(--spacing-1) var(--spacing-3);
       background: color-mix(in oklab, var(--color-surface) 86%, transparent);
-      border: 1px solid var(--color-line);
-      border-radius: var(--radius-full);
-      box-shadow: var(--shadow-1);
-      backdrop-filter: blur(4px);
-      pointer-events: none;
     }
-    .readout-sep {
-      color: var(--color-line-strong);
-    }
-    /*
-      Bottom-right, and lifted above the floating right dock (z-index 1, ADR-0013):
-      a tall open Inspector/Regions card reaches this corner, so the zoom/fit
-      controls must stay on top and clickable rather than be covered by the panel.
-    */
     .zoom {
-      position: absolute;
-      right: var(--spacing-4);
-      bottom: var(--spacing-4);
-      z-index: 2;
-      display: flex;
-      align-items: center;
-      gap: var(--spacing-1);
-      padding: var(--spacing-1);
       background: color-mix(in oklab, var(--color-surface) 88%, transparent);
-      border: 1px solid var(--color-line);
-      border-radius: var(--radius-full);
-      box-shadow: var(--shadow-2);
-      backdrop-filter: blur(4px);
-    }
-    .zoom-level {
-      min-width: 3.4em;
-      text-align: center;
     }
   `,
 })

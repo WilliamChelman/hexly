@@ -70,6 +70,9 @@ interface SelectedEntity {
 @Component({
   selector: 'app-inspector',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    class: 'flex flex-col gap-4 p-4 overflow-y-auto bg-surface',
+  },
   imports: [Button, Coord, Eyebrow, Field, Input, RegionFields, TranslocoPipe],
   template: `
     @let label = store.selectedLabel();
@@ -77,7 +80,7 @@ interface SelectedEntity {
     @let entity = selectedEntity();
     @let multi = selectionSummary();
     @if (label) {
-      <header class="head">
+      <header class="flex items-center justify-between">
         <span appEyebrow>{{ 'editorShell.inspector.selectedLabel' | transloco }}</span>
       </header>
 
@@ -111,8 +114,8 @@ interface SelectedEntity {
         />
       </div>
 
-      <div class="pos">
-        <div appField [label]="'editorShell.inspector.x' | transloco">
+      <div class="flex gap-3">
+        <div appField class="flex-1 min-w-0" [label]="'editorShell.inspector.x' | transloco">
           <input
             appInput
             type="number"
@@ -121,7 +124,7 @@ interface SelectedEntity {
             (change)="onX(label, $event)"
           />
         </div>
-        <div appField [label]="'editorShell.inspector.y' | transloco">
+        <div appField class="flex-1 min-w-0" [label]="'editorShell.inspector.y' | transloco">
           <input
             appInput
             type="number"
@@ -132,7 +135,7 @@ interface SelectedEntity {
         </div>
       </div>
 
-      <div class="actions">
+      <div class="flex gap-2 mt-auto pt-2">
         <button
           type="button"
           appButton
@@ -146,7 +149,7 @@ interface SelectedEntity {
         </button>
       </div>
     } @else if (region) {
-      <header class="head">
+      <header class="flex items-center justify-between">
         <span appEyebrow>{{ 'editorShell.inspector.selectedRegion' | transloco }}</span>
       </header>
 
@@ -155,22 +158,21 @@ interface SelectedEntity {
       <!--
         Engaging either button auto-arms the Region tool on this Region with the
         chosen membership direction (issue #37) — the only control outside the
-        palette permitted to arm a Tool. The active button (the .active class +
-        aria-pressed) is driven from the same store.regionDirection() the brush
-        paints by, so the active one reads as set and can never disagree with the
-        stroke.
+        palette permitted to arm a Tool. The active button (styled off its own
+        aria-pressed via an aria-[pressed=true]: variant) is driven from the
+        same store.regionDirection() the brush paints by, so the active one reads
+        as set and can never disagree with the stroke.
       -->
       <div appField [label]="'editorShell.inspector.membership' | transloco">
         <div
-          class="direction"
+          class="flex gap-2"
           role="group"
           [attr.aria-label]="'editorShell.inspector.membershipDirection' | transloco"
         >
           @for (d of directions; track d.direction) {
             <button
               type="button"
-              class="mode"
-              [class.active]="store.regionDirection() === d.direction"
+              class="flex-1 bg-transparent text-ink-muted border border-line rounded-sm py-1 px-3 text-xs font-semibold cursor-pointer aria-[pressed=true]:text-ink aria-[pressed=true]:border-gold aria-[pressed=true]:bg-gold-soft"
               [attr.aria-pressed]="store.regionDirection() === d.direction"
               [attr.data-testid]="d.testid"
               (click)="store.armRegionDirection(d.direction)"
@@ -181,7 +183,7 @@ interface SelectedEntity {
         </div>
       </div>
 
-      <div class="actions">
+      <div class="flex gap-2 mt-auto pt-2">
         <button
           type="button"
           appButton
@@ -195,7 +197,7 @@ interface SelectedEntity {
         </button>
       </div>
     } @else if (entity) {
-      <header class="head">
+      <header class="flex items-center justify-between">
         <span appEyebrow>{{
           (entity.kind === 'feature'
             ? 'editorShell.inspector.selectedFeature'
@@ -217,7 +219,7 @@ interface SelectedEntity {
             : 'editorShell.inspector.terrain') | transloco
         "
       >
-        <span class="detail" data-testid="entity-detail">{{
+        <span class="text-sm text-ink" data-testid="entity-detail">{{
           entity.detailKey | transloco
         }}</span>
       </div>
@@ -231,7 +233,7 @@ interface SelectedEntity {
         />
       </div>
 
-      <div class="actions">
+      <div class="flex gap-2 mt-auto pt-2">
         <button
           type="button"
           appButton
@@ -255,15 +257,15 @@ interface SelectedEntity {
         removes the whole set in one undo step (ADR-0017). Bulk field editing
         across the set is deliberately out of scope.
       -->
-      <header class="head">
+      <header class="flex items-center justify-between">
         <span appEyebrow>{{ 'editorShell.inspector.multiTitle' | transloco }}</span>
       </header>
 
-      <p class="count" data-testid="selection-count">
+      <p class="text-sm font-semibold text-ink" data-testid="selection-count">
         {{ multi.count }} {{ 'editorShell.inspector.selectedCount' | transloco }}
       </p>
 
-      <ul class="breakdown" data-testid="selection-breakdown">
+      <ul class="m-0 pl-4 flex flex-col gap-1 text-sm text-ink-muted" data-testid="selection-breakdown">
         @for (group of multi.groups; track group.manyKey) {
           <li>
             {{ group.count }}
@@ -272,7 +274,7 @@ interface SelectedEntity {
         }
       </ul>
 
-      <div class="actions">
+      <div class="flex gap-2 mt-auto pt-2">
         <button
           type="button"
           appButton
@@ -286,84 +288,10 @@ interface SelectedEntity {
         </button>
       </div>
     } @else {
-      <header class="head">
+      <header class="flex items-center justify-between">
         <span appEyebrow>{{ 'editorShell.inspector.title' | transloco }}</span>
       </header>
-      <p class="muted">{{ 'editorShell.inspector.emptyHint' | transloco }}</p>
-    }
-  `,
-  styles: `
-    :host {
-      display: flex;
-      flex-direction: column;
-      gap: var(--spacing-4);
-      padding: var(--spacing-4);
-      overflow-y: auto;
-      background: var(--color-surface);
-    }
-    .head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    .pos {
-      display: flex;
-      gap: var(--spacing-3);
-    }
-    .direction {
-      display: flex;
-      gap: var(--spacing-2);
-    }
-    /* The armed-mode affordance: a quiet outline that fills gold-soft when active,
-       not the global primary call-to-action variant. Stretched to share the row. */
-    .mode {
-      flex: 1;
-      background: none;
-      color: var(--color-ink-muted);
-      border: 1px solid var(--color-line);
-      border-radius: var(--radius-sm);
-      padding: var(--spacing-1) var(--spacing-3);
-      font-size: var(--text-xs);
-      font-weight: var(--font-weight-semibold);
-      cursor: pointer;
-    }
-    .mode.active {
-      color: var(--color-ink);
-      border-color: var(--color-gold);
-      background: var(--color-gold-soft);
-    }
-    .pos > div {
-      flex: 1;
-      min-width: 0;
-    }
-    .muted {
-      font-size: var(--text-sm);
-      line-height: var(--leading-normal);
-      color: var(--color-ink-muted);
-    }
-    .count {
-      font-size: var(--text-sm);
-      font-weight: var(--font-weight-semibold);
-      color: var(--color-ink);
-    }
-    .breakdown {
-      margin: 0;
-      padding-left: var(--spacing-4);
-      display: flex;
-      flex-direction: column;
-      gap: var(--spacing-1);
-      font-size: var(--text-sm);
-      color: var(--color-ink-muted);
-    }
-    .detail {
-      font-size: var(--text-sm);
-      color: var(--color-ink);
-    }
-    .actions {
-      display: flex;
-      gap: var(--spacing-2);
-      margin-top: auto;
-      padding-top: var(--spacing-2);
+      <p class="muted text-sm leading-normal text-ink-muted">{{ 'editorShell.inspector.emptyHint' | transloco }}</p>
     }
   `,
 })

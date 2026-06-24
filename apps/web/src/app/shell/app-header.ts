@@ -24,7 +24,11 @@ import { LanguageSwitcher } from './language-switcher';
 @Component({
   selector: 'app-header',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { role: 'banner' },
+  host: {
+    role: 'banner',
+    class:
+      'flex items-center gap-5 px-4 h-[var(--rail-header)] bg-surface border-b border-b-line-strong shadow-1',
+  },
   imports: [
     RouterLink,
     RouterOutlet,
@@ -37,9 +41,9 @@ import { LanguageSwitcher } from './language-switcher';
     LanguageSwitcher,
   ],
   template: `
-    <a class="brand" routerLink="/">
-      <span class="mark"><app-icon-logo [size]="26" /></span>
-      <span class="name" appCartouche>Hexly</span>
+    <a class="brand flex items-center gap-2 no-underline text-inherit" routerLink="/">
+      <span class="grid place-items-center text-gold"><app-icon-logo [size]="26" /></span>
+      <span class="text-lg text-ink-strong" appCartouche>Hexly</span>
     </a>
 
     <!--
@@ -48,18 +52,21 @@ import { LanguageSwitcher } from './language-switcher';
       through the named header outlet. Both render here, between brand and actions.
     -->
     @if (content(); as c) {
-      <div class="headline" data-testid="header-headline">
+      <div
+        class="flex items-center gap-3 pl-5 border-l border-line"
+        data-testid="header-headline"
+      >
         @if (c.eyebrow; as e) {
           <span appEyebrow>{{ e }}</span>
         }
         @if (c.title; as t) {
-          <span class="title">{{ t }}</span>
+          <span class="font-display text-md text-ink-strong">{{ t }}</span>
         }
       </div>
     }
     <router-outlet name="header" />
 
-    <div class="actions">
+    <div class="flex items-center gap-2 ml-auto">
       <app-language-switcher />
       <button
         type="button"
@@ -80,8 +87,12 @@ import { LanguageSwitcher } from './language-switcher';
         }
       </button>
       @if (user(); as u) {
-        <span class="avatar" [title]="u.displayName">{{ initials() }}</span>
-        <span class="who">{{ u.displayName }}</span>
+        <span
+          class="grid place-items-center size-6 font-mono text-2xs text-on-gold bg-linear-[140deg] from-gold to-gold-strong rounded-full shadow-1"
+          [title]="u.displayName"
+          >{{ initials() }}</span
+        >
+        <span class="text-sm text-ink">{{ u.displayName }}</span>
         <button
           type="button"
           appButton
@@ -94,68 +105,6 @@ import { LanguageSwitcher } from './language-switcher';
         </button>
       }
     </div>
-  `,
-  styles: `
-    :host {
-      display: flex;
-      align-items: center;
-      gap: var(--spacing-5);
-      padding: 0 var(--spacing-4);
-      height: var(--rail-header);
-      background: var(--color-surface);
-      border-bottom: 1px solid var(--color-line-strong);
-      box-shadow: var(--shadow-1);
-    }
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: var(--spacing-2);
-      text-decoration: none;
-      color: inherit;
-    }
-    .mark {
-      display: grid;
-      place-items: center;
-      color: var(--color-gold);
-    }
-    .name {
-      font-size: var(--text-lg);
-      color: var(--color-ink-strong);
-    }
-    .headline {
-      display: flex;
-      align-items: center;
-      gap: var(--spacing-3);
-      padding-left: var(--spacing-5);
-      border-left: 1px solid var(--color-line);
-    }
-    .title {
-      font-family: var(--font-display);
-      font-size: var(--text-md);
-      color: var(--color-ink-strong);
-    }
-    .actions {
-      display: flex;
-      align-items: center;
-      gap: var(--spacing-2);
-      margin-left: auto;
-    }
-    .avatar {
-      display: grid;
-      place-items: center;
-      width: 32px;
-      height: 32px;
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--color-on-gold);
-      background: linear-gradient(140deg, var(--color-gold), var(--color-gold-strong));
-      border-radius: var(--radius-full);
-      box-shadow: var(--shadow-1);
-    }
-    .who {
-      font-size: var(--text-sm);
-      color: var(--color-ink);
-    }
   `,
 })
 export class AppHeader {

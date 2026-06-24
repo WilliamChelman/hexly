@@ -44,7 +44,8 @@ describe('Toaster', () => {
 
     const fixture = render();
     const toast = fixture.nativeElement.querySelector('.toast');
-    expect(toast.classList.contains('is-error')).toBe(true);
+    // The tone shows as the left-border colour utility (error → ember).
+    expect(toast.classList.contains('border-l-ember')).toBe(true);
   });
 
   it('announces an error toast assertively through the CDK live region', () => {

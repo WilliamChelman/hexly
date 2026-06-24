@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { IconHost } from './icon-host';
 
 /**
  * Renders an arbitrary SVG path (`d`) as one `<svg>` glyph in `currentColor`,
@@ -13,7 +14,7 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 @Component({
   selector: 'app-icon-path',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  styles: ':host { display: inline-flex; line-height: 0; }',
+  hostDirectives: [IconHost],
   template: `
     <svg
       [attr.width]="size()"

@@ -27,9 +27,6 @@ import { EditorSession } from './editor-session';
 @Component({
   selector: 'app-editor-header',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  // Pure-layout shell containers use inline utilities (ADR-0020): no
-  // var-indirection, no state — nothing a scoped rule would protect. The
-  // stateful/indirection-driven bits (.title, .title-input) stay scoped below.
   host: { class: 'flex flex-1 items-center gap-5' },
   imports: [RouterLink, Button, Chip, Eyebrow, ShareIcon, TranslocoPipe],
   template: `
@@ -37,7 +34,7 @@ import { EditorSession } from './editor-session';
       <span appEyebrow>{{ 'editorShell.hexMap' | transloco }}</span>
       @if (editing()) {
         <input
-          class="title-input"
+          class="font-display text-md text-ink-strong py-1 px-2 -my-1 -mx-2 bg-surface-sunken border border-gold rounded-sm outline-none"
           data-testid="title-input"
           [attr.aria-label]="'editorShell.mapTitleLabel' | transloco"
           [value]="draft()"
@@ -50,7 +47,7 @@ import { EditorSession } from './editor-session';
       } @else {
         <button
           type="button"
-          class="title"
+          class="font-display text-md text-ink py-1 px-2 -my-1 -mx-2 bg-transparent border border-transparent rounded-sm cursor-text hover:border-line hover:bg-surface-sunken"
           data-testid="title"
           [title]="'editorShell.renameMap' | transloco"
           [disabled]="!hasMap()"
@@ -64,7 +61,7 @@ import { EditorSession } from './editor-session';
           {{ 'editorShell.save.conflict' | transloco }}
           <button
             type="button"
-            class="conflict-reload"
+            class="ml-2 p-0 underline bg-transparent border-0 cursor-pointer"
             data-testid="conflict-reload"
             (click)="reload()"
           >
@@ -99,44 +96,6 @@ import { EditorSession } from './editor-session';
         {{ 'editorShell.share' | transloco }}
       </button>
     </div>
-  `,
-  styles: `
-    .title {
-      font-family: var(--font-display);
-      font-size: var(--text-md);
-      color: var(--color-ink);
-      padding: var(--spacing-1) var(--spacing-2);
-      margin: calc(-1 * var(--spacing-1)) calc(-1 * var(--spacing-2));
-      background: none;
-      border: 1px solid transparent;
-      border-radius: var(--radius-sm);
-      cursor: text;
-    }
-    .title:hover {
-      border-color: var(--color-line);
-      background: var(--color-surface-sunken);
-    }
-    .title-input {
-      font-family: var(--font-display);
-      font-size: var(--text-md);
-      color: var(--color-ink-strong);
-      padding: var(--spacing-1) var(--spacing-2);
-      margin: calc(-1 * var(--spacing-1)) calc(-1 * var(--spacing-2));
-      background: var(--color-surface-sunken);
-      border: 1px solid var(--color-gold);
-      border-radius: var(--radius-sm);
-      outline: none;
-    }
-    .conflict-reload {
-      margin-left: var(--spacing-2);
-      padding: 0;
-      font: inherit;
-      color: inherit;
-      text-decoration: underline;
-      background: none;
-      border: none;
-      cursor: pointer;
-    }
   `,
 })
 export class EditorHeader {

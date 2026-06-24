@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { IconHost } from '../icon-host';
 
 /**
  * The redo glyph (a curved arrow looping forward to the right) — the mirror of
@@ -9,7 +10,7 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 @Component({
   selector: 'app-icon-redo',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  styles: ':host { display: inline-flex; line-height: 0; }',
+  hostDirectives: [IconHost],
   template: `
     <svg
       [attr.width]="size()"

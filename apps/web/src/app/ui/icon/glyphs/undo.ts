@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { IconHost } from '../icon-host';
 
 /**
  * The undo glyph (a curved arrow looping back to the left). One `<svg>` drawn in
@@ -8,7 +9,7 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 @Component({
   selector: 'app-icon-undo',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  styles: ':host { display: inline-flex; line-height: 0; }',
+  hostDirectives: [IconHost],
   template: `
     <svg
       [attr.width]="size()"

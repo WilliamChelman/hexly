@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { IconHost } from '../icon-host';
 
 /**
  * The erase glyph (an eraser sweeping a baseline). One `<svg>` drawn in
@@ -8,7 +9,7 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 @Component({
   selector: 'app-icon-erase',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  styles: ':host { display: inline-flex; line-height: 0; }',
+  hostDirectives: [IconHost],
   template: `
     <svg
       [attr.width]="size()"

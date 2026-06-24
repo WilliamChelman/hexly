@@ -10,16 +10,9 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
 @Component({
   selector: '[appSwatch]',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    class: 'w-4 h-4 rounded-sm border border-line-strong flex-none shadow-inset',
+  },
   template: '',
-  styles: `
-    :host {
-      width: var(--spacing-4);
-      height: var(--spacing-4);
-      border-radius: var(--radius-sm);
-      border: 1px solid var(--color-line-strong);
-      flex: none;
-      box-shadow: var(--shadow-inset);
-    }
-  `,
 })
 export class Swatch {}

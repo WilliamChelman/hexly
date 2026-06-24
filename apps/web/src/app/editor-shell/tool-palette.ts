@@ -82,6 +82,7 @@ function glyphFor(subtool: SelectSubtool): Type<unknown> {
 @Component({
   selector: 'app-tool-palette',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'flex items-start gap-2' },
   imports: [
     IconButton,
     IconPath,
@@ -96,7 +97,7 @@ function glyphFor(subtool: SelectSubtool): Type<unknown> {
   ],
   template: `
     <div
-      class="strip"
+      class="flex flex-col gap-[2px] p-2 min-h-0 max-h-full overflow-y-auto"
       appPanel
       role="group"
       [attr.aria-label]="'editorShell.toolPalette.tools' | transloco"
@@ -116,7 +117,7 @@ function glyphFor(subtool: SelectSubtool): Type<unknown> {
         </button>
       }
 
-      <hr appRule />
+      <hr appRule class="w-full" />
 
       <button
         appIconButton
@@ -226,22 +227,9 @@ function glyphFor(subtool: SelectSubtool): Type<unknown> {
     }
   `,
   styles: `
-    :host {
-      display: flex;
-      align-items: flex-start;
-      gap: var(--spacing-2);
-    }
-    .strip {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      padding: var(--spacing-2);
-      /* Cap to the host (the shell bounds it to the body) and scroll if a short
-         viewport can't fit the whole strip, matching the flyout. */
-      min-height: 0;
-      max-height: 100%;
-      overflow-y: auto;
-    }
+    /* The flyout's two-column grid keeps a scoped rule: the class is a test hook
+       and the grid template reads better named here than as triplicated inline
+       arbitrary utilities. Strip layout + the divider width are inline utilities. */
     .flyout {
       display: grid;
       grid-template-columns: repeat(2, auto);
@@ -249,9 +237,6 @@ function glyphFor(subtool: SelectSubtool): Type<unknown> {
       padding: var(--spacing-2);
       max-height: 100%;
       overflow-y: auto;
-    }
-    hr[appRule] {
-      width: 100%;
     }
   `,
 })

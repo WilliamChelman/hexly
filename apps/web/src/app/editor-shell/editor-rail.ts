@@ -40,6 +40,10 @@ interface RailEntry {
 @Component({
   selector: 'app-editor-rail',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    class:
+      'flex flex-col items-center gap-2 p-2 bg-surface border border-line rounded-lg shadow-1',
+  },
   imports: [IconButton, NgComponentOutlet, TranslocoPipe],
   template: `
     @for (entry of entries; track entry.id) {
@@ -54,19 +58,6 @@ interface RailEntry {
       >
         <ng-container *ngComponentOutlet="entry.glyph; inputs: glyphInputs" />
       </button>
-    }
-  `,
-  styles: `
-    :host {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: var(--spacing-2);
-      padding: var(--spacing-2);
-      background: var(--color-surface);
-      border: 1px solid var(--color-line);
-      border-radius: var(--radius-lg);
-      box-shadow: var(--shadow-1);
     }
   `,
 })

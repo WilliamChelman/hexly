@@ -4,6 +4,7 @@ import {
   effect,
   inject,
 } from '@angular/core';
+import { NgClass } from '@angular/common';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ToasterService } from '../core/toaster.service';
@@ -28,19 +29,31 @@ import { ToasterService } from '../core/toaster.service';
 @Component({
   selector: 'app-toaster',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe],
+  // A fixed column of toasts, bottom-centre, above the editor's floating chrome
+  // (ADR-0013). The host ignores the pointer so it never blocks the canvas; each
+  // toast re-enables it for its own controls (.toast below).
+  host: {
+    class:
+      'fixed left-1/2 bottom-5 -translate-x-1/2 z-[1000] flex flex-col gap-2 items-center pointer-events-none',
+  },
+  imports: [NgClass, TranslocoPipe],
   template: `
     @for (toast of toaster.toasts(); track toast.id) {
+      <!-- .toast is kept as a test/e2e hook (toaster.spec, move-hex.spec); its
+           styling is inline. The left rule's tone colour is the one per-tone
+           difference, so it lives in [ngClass] (the t/r/b colours are static). -->
       <div
-        class="toast"
-        [class.is-info]="toast.tone === 'info'"
-        [class.is-success]="toast.tone === 'success'"
-        [class.is-error]="toast.tone === 'error'"
+        class="toast pointer-events-auto flex items-center gap-3 max-w-[min(90vw,32rem)] py-2 px-3 bg-surface-raised text-ink border border-l-[3px] border-t-line border-r-line border-b-line rounded-md shadow-2 text-[0.9rem]"
+        [ngClass]="{
+          'border-l-ember': toast.tone === 'error',
+          'border-l-terrain-forest': toast.tone === 'success',
+          'border-l-gold-strong': toast.tone === 'info',
+        }"
       >
-        <span class="toast__message">{{ toast.message }}</span>
+        <span class="flex-1">{{ toast.message }}</span>
         <button
           type="button"
-          class="toast__dismiss"
+          class="flex-none inline-flex items-center justify-center size-5 p-0 bg-transparent border-0 rounded-sm text-ink-muted text-[0.85rem] leading-none cursor-pointer hover:bg-surface-sunken hover:text-ink"
           data-testid="toast-dismiss"
           [attr.aria-label]="'common.close' | transloco"
           (click)="toaster.dismiss(toast.id)"
@@ -48,70 +61,6 @@ import { ToasterService } from '../core/toaster.service';
           ✕
         </button>
       </div>
-    }
-  `,
-  styles: `
-    :host {
-      /* A fixed column of toasts, bottom-centre, above the editor's floating
-         chrome (ADR-0013). The host itself ignores the pointer so it never
-         blocks the canvas; each toast re-enables it for its own controls. */
-      position: fixed;
-      left: 50%;
-      bottom: var(--spacing-5, 1.5rem);
-      transform: translateX(-50%);
-      z-index: 1000;
-      display: flex;
-      flex-direction: column;
-      gap: var(--spacing-2, 0.5rem);
-      align-items: center;
-      pointer-events: none;
-    }
-    .toast {
-      pointer-events: auto;
-      display: flex;
-      align-items: center;
-      gap: var(--spacing-3, 0.75rem);
-      max-width: min(90vw, 32rem);
-      padding: var(--spacing-2, 0.5rem) var(--spacing-3, 0.75rem);
-      background: var(--color-surface-raised, var(--color-surface));
-      color: var(--color-ink);
-      border: 1px solid var(--color-line);
-      border-left-width: 3px;
-      border-radius: var(--radius-md, 8px);
-      box-shadow: var(--shadow-2);
-      font-size: 0.9rem;
-    }
-    .toast.is-error {
-      border-left-color: var(--color-ember);
-    }
-    .toast.is-success {
-      border-left-color: var(--color-terrain-forest, var(--color-ink));
-    }
-    .toast.is-info {
-      border-left-color: var(--color-gold-strong, var(--color-ink));
-    }
-    .toast__message {
-      flex: 1;
-    }
-    .toast__dismiss {
-      flex: none;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 1.5rem;
-      height: 1.5rem;
-      padding: 0;
-      background: transparent;
-      border: 0;
-      border-radius: var(--radius-sm, 4px);
-      color: var(--color-ink-muted, var(--color-ink));
-      font-size: 0.85rem;
-      line-height: 1;
-      cursor: pointer;
-    }
-    .toast__dismiss:hover {
-      background: var(--color-surface-sunken, transparent);
-      color: var(--color-ink);
     }
   `,
 })
