@@ -62,7 +62,7 @@ test('drags a hex under Select to a new coordinate, and the move survives a relo
   const saved = page.waitForResponse(
     (res) =>
       res.request().method() === 'PUT' &&
-      /\/api\/maps\/[\w-]+$/.test(res.url()) &&
+      /\/api\/entities\/[\w-]+$/.test(res.url()) &&
       res.ok(),
   );
   await page.getByTestId('save').click();
@@ -71,7 +71,7 @@ test('drags a hex under Select to a new coordinate, and the move survives a relo
 
   // The persisted document holds one hex, no longer at the origin, still Forest:
   // the origin became Void and the destination took the moved content.
-  const res = await request.get(`/api/maps/${mapId}`);
+  const res = await request.get(`/api/entities/${mapId}`);
   expect(res.ok()).toBeTruthy();
   const detail = await res.json();
   const hexes = detail.document.hexes as Record<string, { terrain: string }>;
@@ -158,14 +158,14 @@ test('drags a hex onto an occupied hex and swaps the two, surviving a reload', a
   const saved = page.waitForResponse(
     (res) =>
       res.request().method() === 'PUT' &&
-      /\/api\/maps\/[\w-]+$/.test(res.url()) &&
+      /\/api\/entities\/[\w-]+$/.test(res.url()) &&
       res.ok(),
   );
   await page.getByTestId('save').click();
   await saved;
   await expect(page.getByTestId('save')).toHaveText('Save');
 
-  const res = await request.get(`/api/maps/${mapId}`);
+  const res = await request.get(`/api/entities/${mapId}`);
   expect(res.ok()).toBeTruthy();
   const detail = await res.json();
   const hexes = detail.document.hexes as Record<string, { terrain: string }>;
@@ -292,14 +292,14 @@ test('drags a multi-hex selection so the whole group moves by one offset', async
   const saved = page.waitForResponse(
     (res) =>
       res.request().method() === 'PUT' &&
-      /\/api\/maps\/[\w-]+$/.test(res.url()) &&
+      /\/api\/entities\/[\w-]+$/.test(res.url()) &&
       res.ok(),
   );
   await page.getByTestId('save').click();
   await saved;
   await expect(page.getByTestId('save')).toHaveText('Save');
 
-  const res = await request.get(`/api/maps/${mapId}`);
+  const res = await request.get(`/api/entities/${mapId}`);
   expect(res.ok()).toBeTruthy();
   const detail = await res.json();
   const hexes = detail.document.hexes as Record<string, { terrain: string }>;
@@ -368,14 +368,14 @@ test('refuses a blocked group move, leaving every hex where it was', async ({
   const saved = page.waitForResponse(
     (res) =>
       res.request().method() === 'PUT' &&
-      /\/api\/maps\/[\w-]+$/.test(res.url()) &&
+      /\/api\/entities\/[\w-]+$/.test(res.url()) &&
       res.ok(),
   );
   await page.getByTestId('save').click();
   await saved;
   await expect(page.getByTestId('save')).toHaveText('Save');
 
-  const res = await request.get(`/api/maps/${mapId}`);
+  const res = await request.get(`/api/entities/${mapId}`);
   expect(res.ok()).toBeTruthy();
   const detail = await res.json();
   const hexes = detail.document.hexes as Record<string, { terrain: string }>;

@@ -42,7 +42,7 @@ test('paints a hex, saves, and the hex survives a reload', async ({
   const saved = page.waitForResponse(
     (res) =>
       res.request().method() === 'PUT' &&
-      /\/api\/maps\/[\w-]+$/.test(res.url()) &&
+      /\/api\/entities\/[\w-]+$/.test(res.url()) &&
       res.ok(),
   );
   await page.getByTestId('save').click();
@@ -55,7 +55,7 @@ test('paints a hex, saves, and the hex survives a reload', async ({
   await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
 
   // And the persisted document really holds that one hex, with our terrain.
-  const res = await request.get(`/api/maps/${mapId}`);
+  const res = await request.get(`/api/entities/${mapId}`);
   expect(res.ok()).toBeTruthy();
   const detail = await res.json();
   const hexes = Object.values(detail.document.hexes) as Array<{

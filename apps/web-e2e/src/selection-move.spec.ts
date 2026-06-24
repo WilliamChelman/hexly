@@ -16,13 +16,13 @@ async function savedDocument(page: import('@playwright/test').Page, request: imp
   const saved = page.waitForResponse(
     (res) =>
       res.request().method() === 'PUT' &&
-      /\/api\/maps\/[\w-]+$/.test(res.url()) &&
+      /\/api\/entities\/[\w-]+$/.test(res.url()) &&
       res.ok(),
   );
   await page.getByTestId('save').click();
   await saved;
   await expect(page.getByTestId('save')).toHaveText('Save');
-  const res = await request.get(`/api/maps/${mapId}`);
+  const res = await request.get(`/api/entities/${mapId}`);
   expect(res.ok()).toBeTruthy();
   return (await res.json()).document;
 }
