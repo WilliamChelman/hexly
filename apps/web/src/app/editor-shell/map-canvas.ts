@@ -188,10 +188,12 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
     }
     /*
       Only the frosted background stays scoped: it's a color-mix() over a theme
-      token, and Tailwind's 'bg-surface/NN' opacity modifier bakes the resolved
-      hex in srgb (it would stop re-theming, ADR-0021) — so there's no faithful
-      utility. Each overlay's layout/border/shadow/blur is inline; this one
-      property is all that's left here, anchored on the element's kept class.
+      token. 'bg-surface/NN' would re-theme on modern browsers (its @supports
+      branch is the same oklab color-mix over var(--color-surface)), but the
+      modifier also emits a baked-srgb fallback at the light hex that wouldn't
+      re-theme on a browser lacking lab color-mix — so the single authored oklab
+      declaration is kept (ADR-0021). Each overlay's layout/border/shadow/blur is
+      inline; this one property is all that's left here, anchored on the kept class.
     */
     .readout {
       background: color-mix(in oklab, var(--color-surface) 86%, transparent);

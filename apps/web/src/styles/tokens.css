@@ -8,13 +8,20 @@
  * consume. There is no longer a parallel `--space-*` / `--surface` layer.
  *
  * This file carries the two things `@theme` can't:
- *   1. The DARK theme — reassigning the generated `--color-*` / `--shadow-*`
- *      under [data-theme='dark']. `@theme` holds only the light value, so the
- *      override point is the generated property. This file is imported after
- *      `tailwindcss`, so the dark block cascades over the `:root` Tailwind
- *      emits (the [data-theme] selector also out-specifies it).
- *   2. Non-utility tokens — motion (`--dur-*`/`--ease-*`, kept raw per ADR-0020)
- *      and fixed layout rails (`--rail-*`, `--container-reading`).
+ *   1. The DARK theme — reassigning the generated `--color-*` (and the raw
+ *      `--shadow-*`, below) under [data-theme='dark']. For colours `@theme`
+ *      holds only the light value, so the override point is the generated
+ *      property. This file is imported after `tailwindcss`, so the dark block
+ *      cascades over the `:root` Tailwind emits (the [data-theme] selector also
+ *      out-specifies it).
+ *   2. Non-utility raw tokens — motion (`--dur-*`/`--ease-*`), elevation
+ *      (`--shadow-*`), and fixed layout rails (`--rail-*`,
+ *      `--container-reading`). Elevation can't live in `@theme` as a generating
+ *      utility: Tailwind inlines a `shadow-*` utility's *value* instead of
+ *      referencing `var(--shadow-*)`, so a generated `shadow-1` would bake the
+ *      light value and never re-theme. The light values therefore live here as
+ *      plain re-themable vars, wrapped as a custom `@utility` in styles.css
+ *      (ADR-0021).
  *
  * Concept: "the cartographer's table, by starlight."
  *   - Light  "Parchment" — an aged sea-chart: cream paper, sepia ink, gold.
@@ -36,6 +43,15 @@
   --rail-status: 30px;
   --rail-inspector: 320px;
   --container-reading: 68ch;
+
+  /* ---- Elevation — warm, paper-soft drop shadows (light "Parchment").
+     Raw vars, not a `@theme` utility (see header); the dark block below
+     reassigns them, and styles.css wraps 1/2/3/inset as `@utility shadow-*`. */
+  --shadow-1: 0 1px 2px rgba(60, 44, 22, 0.12);
+  --shadow-2: 0 4px 12px -2px rgba(60, 44, 22, 0.2);
+  --shadow-3: 0 16px 36px -8px rgba(50, 36, 18, 0.32);
+  --shadow-inset: inset 0 1px 2px rgba(60, 44, 22, 0.12);
+  --shadow-focus: 0 0 0 3px rgba(154, 106, 22, 0.32); /* focus-visible ring  */
 
   color-scheme: light;
 }

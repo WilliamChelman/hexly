@@ -14,11 +14,15 @@ ADR-0007 was written before ADR-0020. At that time a utility like `bg-surface`
 either didn't exist or wasn't wired to the tokens, so "the component owns its
 styles" necessarily meant "all of it lives in `styles:`". ADR-0020 made the
 tokens *be* the Tailwind theme: `bg-surface`, `text-ink-muted`, `gap-5`,
-`rounded-lg`, `font-display`, `text-md`, `shadow-1` now resolve to the exact
+`rounded-lg`, `font-display`, `text-md` now resolve to the exact
 same `var(--…)` the scoped CSS used, re-theme under `[data-theme]` for free, and
 are lint-guarded (`hexly-design/no-off-scale-spacing`,
-`no-unknown-design-token`). That removes the original reason to route static
-layout/spacing/colour/type through `styles:`.
+`no-unknown-design-token`). (Shadows are the one exception: the `--shadow-*`
+theme namespace inlines a `shadow-*` utility's *value* rather than referencing
+`var(--shadow-*)`, so they can't be a `@theme` utility and re-theme — they move
+to raw vars wrapped in a custom `@utility`, see the Decision below.) That removes
+the original reason to route static layout/spacing/colour/type through
+`styles:`.
 
 ## Considered Options
 
@@ -71,6 +75,28 @@ state or share a property with the converted ones.
   (e.g. `color-mix(in oklab, var(--color-surface) 86%, transparent)`, or a
   `calc()` over `var(--…)`): those stay scoped so they re-theme and stay read
   against the token vocabulary (see the non-translatables below).
+- **Elevation → raw tokens wrapped in a custom `@utility`.** Shadows are the one
+  place "a `@theme` token both re-themes *and* generates a utility" (ADR-0020)
+  breaks down: to leave room for `--tw-shadow-color`, Tailwind inlines a
+  `shadow-*` utility's *value* rather than referencing `var(--shadow-*)`, so a
+  theme-generated `shadow-1` bakes the **light** value at build time and ignores
+  a `[data-theme='dark']` reassignment of `--shadow-1` entirely. Since hexly
+  never recolours a shadow through a utility, the `--tw-shadow-color` machinery
+  buys nothing — so the `--shadow-*` light values move *out* of `@theme` into
+  raw, re-themable custom properties in `tokens.css` (beside motion's `--dur-*`),
+  and `styles.css` hand-wraps them: `@utility shadow-1 { box-shadow:
+  var(--shadow-1); }`. Call sites keep the clean `shadow-1` name, a single rule
+  is emitted, and elevation re-themes by construction — a future `shadow-1`
+  can't silently regress the way a per-call-site `shadow-(--shadow-1)` form
+  could. (`--shadow-focus` is only composed in scoped focus rings, so it stays a
+  raw var with no utility.) This is the elevation analogue of motion's raw
+  `--dur-*`/`--ease-*`: a utility-shaped token whose Tailwind namespace can't
+  carry the variable, so it lives outside the theme and is wrapped by hand. The
+  trap is the whole **shadow family** — `inset-shadow-*`, `drop-shadow-*`, and
+  `text-shadow-*` inline their geometry identically — so a *themed* drop- or
+  text-shadow (hexly defines none today) takes the same raw-var-plus-`@utility`
+  treatment. Every other `@theme` token references `var(--…)` and re-themes
+  unaided; shadows are the lone exception.
 - **These keep the whole element scoped** (the genuinely-can't cases):
   - **`--_…` composition** — a `:host(.is-*)` variant reassigns a component-local
     var that the base rule reads (e.g. `Button`'s `--_fg`/`--_bg`/`--_bd`). No
@@ -132,10 +158,18 @@ state or share a property with the converted ones.
   Keep the whole rule scoped when the two halves would set the *same* property
   (e.g. a base rule and a pseudo-state that both set `background`), where the
   split would be a specificity coin-flip. The map canvas's `.readout`/`.zoom`
-  overlays split cleanly: layout, border, radius, shadow, and blur are inline
-  utilities, and only the frosted `background: color-mix(… var(--color-surface)
-  …, transparent)` stays scoped — Tailwind's `bg-surface/86` opacity modifier
-  bakes the resolved hex in srgb, so it would stop re-theming.
+  overlays split cleanly: layout, border, radius, shadow (the `shadow-1`/`-2`
+  `@utility` above), and blur are inline utilities, and
+  only the frosted `background: color-mix(in oklab, var(--color-surface) 86%,
+  transparent)` stays scoped. `bg-surface/86` would express the same fill, but
+  the opacity modifier emits *two* declarations — a baked-srgb fallback
+  (`color-mix(in srgb, #f5ecd6 86%, transparent)`) plus a `@supports (color-mix:
+  lab)` override of `color-mix(in oklab, var(--color-surface) 86%, transparent)`.
+  Modern browsers take the override and re-theme identically, but the srgb
+  fallback bakes the **light** hex, so a browser without lab `color-mix()` would
+  freeze the frosted panel at its light value. Keeping the single authored oklab
+  declaration avoids that mis-theming fallback and reads against the token
+  directly.
 - **One rule, one home.** The deciding test is per-rule, not per-component: a
   component routinely ends up with a `host: { class }` *and* a residual
   `styles:` block, and that is the intended shape, not a smell.
@@ -154,6 +188,9 @@ state or share a property with the converted ones.
 - The split is mechanical and lint-guarded, so it's safe to apply
   incrementally and to enforce on new components: reach for a utility first;
   drop to `styles:` when the styling is stateful or has no 1:1 utility.
-- Theming is unaffected — utilities resolve to the same `var(--color-*)` that
-  `[data-theme='dark']` reassigns (ADR-0020), so converted styling re-themes
-  identically with no `dark:` variants.
+- Theming is unaffected — colour utilities resolve to the same `var(--color-*)`
+  that `[data-theme='dark']` reassigns (ADR-0020), so converted styling re-themes
+  identically with no `dark:` variants. Elevation is the one utility-shaped token
+  the `@theme` namespace can't carry (a generated `shadow-*` inlines its value);
+  it lives as raw vars wrapped in a custom `@utility shadow-*`, so `shadow-1`
+  stays clean *and* re-themes.
