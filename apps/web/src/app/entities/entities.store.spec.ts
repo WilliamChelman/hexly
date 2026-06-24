@@ -119,6 +119,24 @@ describe('EntitiesStore', () => {
     expect(store.current()).toEqual(aldermoor);
   });
 
+  it('does not poison the conflict signal when a 409 carries a non-object body', () => {
+    openAldermoor();
+
+    // A 409 from a proxy/gateway can arrive as an HTML/text body, not an
+    // EntityDetail. It must not be stored as the conflict (which would break the
+    // conflict UI reading .name/.version off a string) — surface it as an error.
+    let errored = false;
+    store.save(emptyHexmapBody).subscribe({ error: () => (errored = true) });
+    http
+      .expectOne('/entities/e1')
+      .flush('<html>Conflict</html>', { status: 409, statusText: 'Conflict' });
+
+    expect(errored).toBe(true);
+    expect(store.conflict()).toBeNull();
+    // The open entity (and its in-progress edit) is left intact.
+    expect(store.current()).toEqual(aldermoor);
+  });
+
   it('clears an outstanding conflict when a fresh load succeeds (re-pull)', () => {
     openAldermoor();
     const serverCurrent: EntityDetail = { ...aldermoor, version: 5 };

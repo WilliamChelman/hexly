@@ -1,7 +1,12 @@
 import { isAbsolute, resolve } from 'node:path';
 import Database from 'better-sqlite3';
 import { drizzle, BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import { emptyContent, EntityBody, hexMapSchema } from '@hexly/domain';
+import {
+  emptyContent,
+  EntityBody,
+  hexMapSchema,
+  visibilitySchema,
+} from '@hexly/domain';
 import * as schema from './schema';
 
 /**
@@ -88,9 +93,13 @@ interface LegacyMapRow {
  * DB is opened: if the legacy `maps` table is present, each row becomes an
  * Entity of `type: 'hexmap'` (name ← title, empty tags, the grid re-wrapped
  * under the typed payload alongside an empty Content envelope), and the old
- * table is dropped. Idempotent: once `maps` is gone the guard returns early, and
- * the whole conversion is one transaction so a failure rolls back cleanly rather
- * than leaving a half-migrated database.
+ * table is dropped. Each row is converted independently and any row that cannot
+ * be (corrupt/invalid document, orphaned owner) is skipped and logged rather than
+ * aborting the whole migration — one bad legacy row must never wedge app boot for
+ * everyone. The legacy table is dropped only once *every* row has migrated
+ * cleanly, so a skipped row is preserved for recovery; until then this stays
+ * idempotent (`INSERT OR IGNORE` re-runs harmlessly) and retries the stragglers
+ * on the next boot. Once `maps` is gone the guard returns early.
  */
 export function migrateLegacyMaps(sqlite: Database.Database): void {
   const legacy = sqlite
@@ -99,14 +108,17 @@ export function migrateLegacyMaps(sqlite: Database.Database): void {
   if (!legacy) return;
 
   const rows = sqlite.prepare('SELECT * FROM maps').all() as LegacyMapRow[];
+  // OR IGNORE makes a re-run idempotent: rows already migrated on an earlier
+  // boot (when other rows failed and kept the table) are skipped, not duplicated.
   const insert = sqlite.prepare(
-    `INSERT INTO entities
+    `INSERT OR IGNORE INTO entities
        (id, owner_id, name, type, tags, visibility, version, document, created_at, updated_at)
      VALUES
        (@id, @owner_id, @name, 'hexmap', '[]', @visibility, @version, @document, @created_at, @updated_at)`,
   );
-  const run = sqlite.transaction((legacyRows: LegacyMapRow[]) => {
-    for (const row of legacyRows) {
+  let skipped = 0;
+  for (const row of rows) {
+    try {
       // Parse through the hex-map schema so documents saved before regions/labels
       // existed gain their defaults, then wrap the grid under the hexmap body.
       const grid = hexMapSchema.parse(JSON.parse(row.document));
@@ -115,16 +127,24 @@ export function migrateLegacyMaps(sqlite: Database.Database): void {
         id: row.id,
         owner_id: row.owner_id,
         name: row.title,
-        visibility: row.visibility,
+        // A stored visibility outside the schema falls back to the safe default
+        // (private) rather than failing the row or leaking it as public.
+        visibility: visibilitySchema.catch('private').parse(row.visibility),
         version: row.version,
         document: JSON.stringify(body),
         created_at: row.created_at,
         updated_at: row.updated_at,
       });
+    } catch (cause) {
+      // A single un-migratable row (bad document, missing owner FK) is logged and
+      // skipped — the table is kept below so the row survives for manual recovery.
+      skipped++;
+      console.error(`Skipping un-migratable legacy map ${row.id}`, cause);
     }
-    sqlite.exec('DROP TABLE maps');
-  });
-  run(rows);
+  }
+  // Drop the legacy table only if nothing was left behind, so skipped rows aren't
+  // silently destroyed and the migration retries them on the next boot.
+  if (skipped === 0) sqlite.exec('DROP TABLE maps');
 }
 
 /**

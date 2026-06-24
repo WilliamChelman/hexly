@@ -280,6 +280,24 @@ describe('Entities endpoints', () => {
     await request(server).delete('/entities/any').expect(401);
   });
 
+  it('surfaces an out-of-band corrupted tags column as a 500, like a bad type or document', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const created = await ada
+      .post('/entities')
+      .send({ name: 'Aldermoor', type: 'hexmap' });
+    const id = created.body.id;
+
+    // Corrupt the stored tags to a non-array value behind the API's back — the
+    // read path must catch this (ADR-0001), not hand a malformed value to the
+    // client as if it were valid tags.
+    app.get<{ $client: import('better-sqlite3').Database }>(DB).$client
+      .prepare('UPDATE entities SET tags = ? WHERE id = ?')
+      .run('"not-an-array"', id);
+
+    await ada.get(`/entities/${id}`).expect(500);
+    await ada.get('/entities').expect(500);
+  });
+
   it('rejects malformed bodies with 400, not a server error', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const created = await ada

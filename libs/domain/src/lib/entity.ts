@@ -82,7 +82,7 @@ const nameSchema = z.string().trim().min(1);
  * created or stored without tags still lists with an array rather than
  * `undefined`. Tags carry no behaviour — distinct from the structured type.
  */
-const tagsSchema = z.array(z.string()).default([]);
+export const tagsSchema = z.array(z.string()).default([]);
 
 /**
  * The body of `POST /entities`: a new Entity needs a name and a type; tags

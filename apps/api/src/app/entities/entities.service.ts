@@ -10,6 +10,7 @@ import {
   EntitySummary,
   entityTypeSchema,
   SaveEntityRequest,
+  tagsSchema,
   visibilitySchema,
 } from '@hexly/domain';
 import { and, eq } from 'drizzle-orm';
@@ -77,6 +78,7 @@ export class EntitiesService {
   /** Create an empty Entity of the requested type, owned by `ownerId`, at version 1. */
   create(ownerId: string, req: CreateEntityRequest): EntityDetail {
     const now = Date.now();
+    const body = emptyEntityBody(req.type);
     const row = {
       id: randomUUID(),
       ownerId,
@@ -85,12 +87,14 @@ export class EntitiesService {
       tags: req.tags,
       visibility: 'private',
       version: INITIAL_VERSION,
-      document: serialize(emptyEntityBody(req.type)),
+      document: serialize(body),
       createdAt: now,
       updatedAt: now,
     };
     this.db.insert(entities).values(row).run();
-    return toDetail(row);
+    // We just minted `body` in memory and validated it — return it directly
+    // rather than re-parsing the string we serialized from it.
+    return detailOf(row, body);
   }
 
   /**
@@ -135,9 +139,11 @@ export class EntitiesService {
         ? { status: 'conflict', current: toDetail(current) }
         : { status: 'not-found' };
     }
+    // `req.document` is the validated body we just wrote — return it directly
+    // rather than re-parsing and re-validating the string we serialized from it.
     return {
       status: 'saved',
-      entity: toDetail({ ...row, document, version, updatedAt }),
+      entity: detailOf({ ...row, version, updatedAt }, req.document),
     };
   }
 
@@ -215,7 +221,7 @@ function toSummary(row: SummaryRow): EntitySummary {
     // Zod schema is the single source of truth and both runtimes check against
     // it (ADR-0001).
     type: entityTypeSchema.parse(row.type),
-    tags: row.tags,
+    tags: tagsSchema.parse(row.tags),
     visibility: visibilitySchema.parse(row.visibility),
     version: row.version,
     createdAt: row.createdAt,
@@ -225,7 +231,17 @@ function toSummary(row: SummaryRow): EntitySummary {
 
 /** Rehydrate a stored row into the full {@link EntityDetail} contract. */
 function toDetail(row: typeof entities.$inferSelect): EntityDetail {
-  return { ...toSummary(row), document: parseDocument(row.id, row.document) };
+  return detailOf(row, parseDocument(row.id, row.document));
+}
+
+/**
+ * Assemble an {@link EntityDetail} from a row's metadata and an already-in-hand
+ * body. The write paths (create/save) pass the body they just minted/validated,
+ * so they pair {@link toSummary} with it directly and skip re-parsing the
+ * serialized `document` — only the read path ({@link toDetail}) pays that cost.
+ */
+function detailOf(row: SummaryRow, document: EntityBody): EntityDetail {
+  return { ...toSummary(row), document };
 }
 
 /**

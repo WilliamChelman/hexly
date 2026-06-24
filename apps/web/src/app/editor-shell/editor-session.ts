@@ -6,6 +6,7 @@ import {
   EntityDetail,
   EntitySaveOutcome,
   HexMap,
+  hexMapSchema,
 } from '@hexly/domain';
 import { EntitiesStore } from '../entities/entities.store';
 import { EditorStore } from './editor-store';
@@ -98,18 +99,23 @@ export class EditorSession {
   }
 }
 
-/** Extract the hex grid the canvas edits from an Entity body (empty for a note). */
+/**
+ * Extract the hex grid the canvas edits from an Entity body (empty for a note).
+ * Parsing the hexmap body through {@link hexMapSchema} pulls out exactly the grid
+ * fields and drops `type`/`content`, so this tracks the schema automatically
+ * rather than hand-listing fields that could drift as the grid grows.
+ */
 function gridOf(body: EntityBody): HexMap {
-  return body.type === 'hexmap'
-    ? { hexes: body.hexes, regions: body.regions, labels: body.labels }
-    : emptyHexMap();
+  return body.type === 'hexmap' ? hexMapSchema.parse(body) : emptyHexMap();
 }
 
 /**
- * Re-wrap an edited hex `grid` into a hexmap body, carrying the existing Content
- * through untouched (ADR-0019 — the editor never inspects or rewrites it). The
- * hex editor only ever opens hexmaps, so the result is always a hexmap body.
+ * Re-wrap an edited hex `grid` back into the open body, carrying the existing
+ * Content (and type) through untouched (ADR-0019 — the editor never inspects or
+ * rewrites it). Only a hexmap body takes the grid; a non-hexmap body (e.g. a
+ * note) is returned as-is, so opening one through the hex seam can never coerce
+ * it into a blank hexmap on save.
  */
 function withGrid(body: EntityBody, grid: HexMap): EntityBody {
-  return { type: 'hexmap', content: body.content, ...grid };
+  return body.type === 'hexmap' ? { ...body, ...grid } : body;
 }

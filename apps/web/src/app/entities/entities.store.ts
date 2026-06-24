@@ -122,7 +122,15 @@ export class EntitiesStore {
           // A 409 means the base version moved: surface the server's current
           // Entity as a conflict and leave the open Entity untouched, so the
           // in-progress edit is preserved for a re-pull rather than silently lost.
-          if (err instanceof HttpErrorResponse && err.status === 409) {
+          // Only when the body is actually an Entity, though — a non-JSON 409
+          // (e.g. a proxy's HTML error page) must not poison the conflict signal
+          // with a string; fall through to the error path instead.
+          if (
+            err instanceof HttpErrorResponse &&
+            err.status === 409 &&
+            err.error !== null &&
+            typeof err.error === 'object'
+          ) {
             const current = err.error as EntityDetail;
             this._conflict.set(current);
             return of<EntitySaveOutcome>({ status: 'conflict', current });

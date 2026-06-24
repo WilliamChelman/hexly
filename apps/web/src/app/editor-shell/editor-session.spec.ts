@@ -175,6 +175,28 @@ describe('EditorSession', () => {
     expect(editor.document()).toEqual(forestAt00);
   });
 
+  it('saves a non-hexmap entity without coercing it into a hexmap (no data loss)', () => {
+    // A note opened through this seam must save back as a note — the editor's
+    // empty grid must not overwrite it with a blank hexmap body.
+    const noteBody = { type: 'note' as const, content };
+    const note: EntityDetail = {
+      ...aldermoor,
+      id: 'n1',
+      type: 'note',
+      document: noteBody,
+    };
+    session.open('n1').subscribe();
+    http.expectOne('/entities/n1').flush(note);
+
+    session.save().subscribe();
+
+    const req = http.expectOne('/entities/n1');
+    expect(req.request.method).toBe('PUT');
+    // The body is the untouched note — same type, no hex grid grafted on.
+    expect(req.request.body).toEqual({ document: noteBody, version: 3 });
+    req.flush({ ...note, version: 4 });
+  });
+
   it('is a safe no-op with no entity open (no request, no throw)', () => {
     // Save/rename/reload before any entity is opened must not hit the server or
     // throw out of a handler-less subscribe.
