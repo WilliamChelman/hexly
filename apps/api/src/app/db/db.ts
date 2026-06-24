@@ -1,6 +1,7 @@
 import { isAbsolute, resolve } from 'node:path';
 import Database from 'better-sqlite3';
 import { drizzle, BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import { emptyContent, EntityBody, hexMapSchema } from '@hexly/domain';
 import * as schema from './schema';
 
 /**
@@ -49,10 +50,12 @@ export function createDb(path: string): Db {
     );
     -- Speeds up the expired-session sweep that runs on every login.
     CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
-    CREATE TABLE IF NOT EXISTS maps (
+    CREATE TABLE IF NOT EXISTS entities (
       id TEXT PRIMARY KEY,
       owner_id TEXT NOT NULL REFERENCES users(id),
-      title TEXT NOT NULL,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL,
+      tags TEXT NOT NULL,
       visibility TEXT NOT NULL,
       version INTEGER NOT NULL,
       document TEXT NOT NULL,
@@ -60,9 +63,68 @@ export function createDb(path: string): Db {
       updated_at INTEGER NOT NULL
     );
     -- The list endpoint and every access check filter by owner.
-    CREATE INDEX IF NOT EXISTS idx_maps_owner_id ON maps(owner_id);
+    CREATE INDEX IF NOT EXISTS idx_entities_owner_id ON entities(owner_id);
   `);
+  // Convert any pre-#69 `maps` rows into Entities, then drop the old table.
+  migrateLegacyMaps(sqlite);
   return drizzle(sqlite, { schema });
+}
+
+/** A row of the pre-#69 `maps` table, as the migration reads it. */
+interface LegacyMapRow {
+  id: string;
+  owner_id: string;
+  title: string;
+  visibility: string;
+  version: number;
+  document: string;
+  created_at: number;
+  updated_at: number;
+}
+
+/**
+ * The deliberate `maps` → `entities` migration (issue #69, ADR-0018). The schema
+ * is hand-synced raw DDL with no migration framework, so this runs every time a
+ * DB is opened: if the legacy `maps` table is present, each row becomes an
+ * Entity of `type: 'hexmap'` (name ← title, empty tags, the grid re-wrapped
+ * under the typed payload alongside an empty Content envelope), and the old
+ * table is dropped. Idempotent: once `maps` is gone the guard returns early, and
+ * the whole conversion is one transaction so a failure rolls back cleanly rather
+ * than leaving a half-migrated database.
+ */
+export function migrateLegacyMaps(sqlite: Database.Database): void {
+  const legacy = sqlite
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='maps'")
+    .get();
+  if (!legacy) return;
+
+  const rows = sqlite.prepare('SELECT * FROM maps').all() as LegacyMapRow[];
+  const insert = sqlite.prepare(
+    `INSERT INTO entities
+       (id, owner_id, name, type, tags, visibility, version, document, created_at, updated_at)
+     VALUES
+       (@id, @owner_id, @name, 'hexmap', '[]', @visibility, @version, @document, @created_at, @updated_at)`,
+  );
+  const run = sqlite.transaction((legacyRows: LegacyMapRow[]) => {
+    for (const row of legacyRows) {
+      // Parse through the hex-map schema so documents saved before regions/labels
+      // existed gain their defaults, then wrap the grid under the hexmap body.
+      const grid = hexMapSchema.parse(JSON.parse(row.document));
+      const body: EntityBody = { type: 'hexmap', content: emptyContent(), ...grid };
+      insert.run({
+        id: row.id,
+        owner_id: row.owner_id,
+        name: row.title,
+        visibility: row.visibility,
+        version: row.version,
+        document: JSON.stringify(body),
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+      });
+    }
+    sqlite.exec('DROP TABLE maps');
+  });
+  run(rows);
 }
 
 /**

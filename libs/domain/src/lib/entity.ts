@@ -1,0 +1,166 @@
+/**
+ * The Entity domain (ADR-0018/0019): the top-level thing a user owns. This is
+ * the single Zod source of truth (ADR-0001) for the Entity model and the REST
+ * payloads that list, create, load, and save Entities — generalizing the old
+ * Hex Map contracts so a Hex Map is now an Entity of `type: 'hexmap'`.
+ */
+
+import { z } from 'zod';
+import { emptyHexMap, hexMapSchema } from './hex/hex-map';
+
+/**
+ * The opaque, format-tagged Content body every Entity carries (ADR-0019). The
+ * `format` tag is the contract; the `snapshot` is editor-defined JSON the domain
+ * NEVER parses, so it round-trips untouched and the editor can change without
+ * touching the Entity model. `z.unknown()` keeps the snapshot opaque while still
+ * passing it through verbatim.
+ */
+export const contentSchema = z.object({
+  format: z.literal('tiptap-v1'),
+  snapshot: z.unknown(),
+});
+
+/** An Entity's opaque, format-tagged rich-text body (CONTEXT.md → Content). */
+export type Content = z.infer<typeof contentSchema>;
+
+/**
+ * The closed, code-known set of Entity shapes (ADR-0018): `note` is Content
+ * only; `hexmap` adds the hex grid. Only a *typed payload* (like the grid)
+ * justifies a new type — mere flavour is a `tag`. User/plugin types are a
+ * long-term goal, deliberately not built now.
+ */
+export const entityTypeSchema = z.enum(['note', 'hexmap']);
+
+/** An Entity's structural type (CONTEXT.md → Entity Type). */
+export type EntityType = z.infer<typeof entityTypeSchema>;
+
+/**
+ * The type-discriminated Entity body — what the storage `document` column holds
+ * (ADR-0018): `{ type, content, ...typedPayload }`. A `note` adds no payload; a
+ * `hexmap` spreads today's hex grid (hexes/regions/labels, unchanged) alongside
+ * the Content. Discriminating on `type` keeps the document type-safe: each arm
+ * is exhaustively known at compile time.
+ */
+export const entityBodySchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('note'), content: contentSchema }),
+  z.object({ type: z.literal('hexmap'), content: contentSchema, ...hexMapSchema.shape }),
+]);
+
+/** An Entity's stored body: its Content plus any type-specific payload. */
+export type EntityBody = z.infer<typeof entityBodySchema>;
+
+/**
+ * A fresh, empty Content envelope: an empty TipTap/ProseMirror document under
+ * the current `format` tag. The snapshot stays opaque to the domain (ADR-0019)
+ * — this is just the smallest valid document the editor hydrates from.
+ */
+export function emptyContent(): Content {
+  return { format: 'tiptap-v1', snapshot: { type: 'doc', content: [] } };
+}
+
+/**
+ * A brand-new body for an Entity of `type`: an empty Content envelope plus, for
+ * a `hexmap`, an empty hex grid. The one place that knows the per-type empty
+ * payload, so create and migration mint bodies the same way.
+ */
+export function emptyEntityBody(type: EntityType): EntityBody {
+  return type === 'hexmap'
+    ? { type, content: emptyContent(), ...emptyHexMap() }
+    : { type, content: emptyContent() };
+}
+
+/**
+ * An Entity name as the server stores it. The `.trim()` runs before `.min(1)`,
+ * so a whitespace-only name collapses to "" and is rejected, and no leading or
+ * trailing whitespace is persisted — the exact rule the Hex Map title used
+ * (issues #12, #15), reused so it lives in one place.
+ */
+const nameSchema = z.string().trim().min(1);
+
+/**
+ * Free-text Tags on an Entity (CONTEXT.md → Tag). Defaults to empty so an Entity
+ * created or stored without tags still lists with an array rather than
+ * `undefined`. Tags carry no behaviour — distinct from the structured type.
+ */
+const tagsSchema = z.array(z.string()).default([]);
+
+/**
+ * The body of `POST /entities`: a new Entity needs a name and a type; tags
+ * default to empty and the body (Content + payload) is minted server-side.
+ */
+export const createEntityRequestSchema = z.object({
+  name: nameSchema,
+  type: entityTypeSchema,
+  tags: tagsSchema,
+});
+
+/** A validated create submission for an Entity. */
+export type CreateEntityRequest = z.infer<typeof createEntityRequestSchema>;
+
+/**
+ * The body of `PATCH /entities/:id`: rename an Entity. Metadata-only, so it
+ * carries no body and no base `version` — a rename touches a different column
+ * than the document and must neither be rejected by the document's
+ * optimistic-concurrency check nor advance it.
+ */
+export const renameEntityRequestSchema = z.object({ name: nameSchema });
+
+/** A validated rename submission for an Entity. */
+export type RenameEntityRequest = z.infer<typeof renameEntityRequestSchema>;
+
+/**
+ * The body of `PUT /entities/:id`: the whole Entity body (ADR-0018 saves the
+ * document in full) plus the `version` it was built on. The server compares
+ * that base version against the stored one and rejects a stale save with 409,
+ * so two editors can't silently overwrite each other (ADR-0004).
+ */
+export const saveEntityRequestSchema = z.object({
+  document: entityBodySchema,
+  version: z.number().int().nonnegative(),
+});
+
+/** A validated save submission for an Entity. */
+export type SaveEntityRequest = z.infer<typeof saveEntityRequestSchema>;
+
+/**
+ * Who can reach an Entity. `private` is owner-only; `public` exposes the
+ * read-only link (ADR-0004, generalized from Map to Entity). Stored as metadata;
+ * the public-link endpoint itself is a later issue, so nothing yet acts on it.
+ */
+export const visibilitySchema = z.enum(['private', 'public']);
+
+/** An Entity's visibility (CONTEXT.md → Public Link). */
+export type Visibility = z.infer<typeof visibilitySchema>;
+
+/**
+ * An Entity without its body: the row metadata `GET /entities` lists. Cheap to
+ * return many of — the body (Content + any payload, potentially large) is
+ * fetched only on open. Carries `type` and `tags` so a list view can group and
+ * filter without loading each body.
+ */
+export interface EntitySummary {
+  readonly id: string;
+  readonly ownerId: string;
+  readonly name: string;
+  readonly type: EntityType;
+  readonly tags: readonly string[];
+  readonly visibility: Visibility;
+  /** The optimistic-concurrency counter; a save must carry this base value. */
+  readonly version: number;
+  readonly createdAt: number;
+  readonly updatedAt: number;
+}
+
+/** An Entity with its full body: what `GET /entities/:id` and saves return. */
+export interface EntityDetail extends EntitySummary {
+  readonly document: EntityBody;
+}
+
+/**
+ * The outcome of a save the client observes: the stored Entity at its new
+ * version, or a 409 conflict carrying the server's current Entity so the client
+ * can surface the clash and re-pull without a second round trip (ADR-0018).
+ */
+export type EntitySaveOutcome =
+  | { status: 'saved'; entity: EntityDetail }
+  | { status: 'conflict'; current: EntityDetail };

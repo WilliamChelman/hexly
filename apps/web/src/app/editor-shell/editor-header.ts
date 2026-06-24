@@ -103,9 +103,9 @@ export class EditorHeader {
 
   /** Whether a map is open — gates Save and rename so neither can run with none. */
   protected readonly hasMap = computed(() => this.session.current() !== null);
-  /** The open map's title, or a placeholder before one is opened. */
+  /** The open Entity's name, or a placeholder before one is opened. */
   protected readonly title = computed(
-    () => this.session.current()?.title ?? 'Untitled map',
+    () => this.session.current()?.name ?? 'Untitled map',
   );
   /** Whether a save is in flight — disables the Save button. */
   protected readonly saving = this.session.saving;

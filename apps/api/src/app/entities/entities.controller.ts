@@ -15,47 +15,44 @@ import {
 } from '@nestjs/common';
 import {
   AuthUser,
-  createMapRequestSchema,
-  MapDetail,
-  MapSummary,
-  renameMapRequestSchema,
-  saveMapRequestSchema,
+  createEntityRequestSchema,
+  EntityDetail,
+  EntitySummary,
+  renameEntityRequestSchema,
+  saveEntityRequestSchema,
 } from '@hexly/domain';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { SessionAuthGuard } from '../auth/session-auth.guard';
-import { MapsService } from './maps.service';
+import { EntitiesService } from './entities.service';
 
 /**
- * The Hex Map REST surface (issue #6). Every route is owner-scoped: the guard
+ * The Entity REST surface (ADR-0018). Every route is owner-scoped: the guard
  * resolves the session to a user and the service only ever touches that user's
  * rows. Bodies are validated against the shared Zod schema (ADR-0001) so an
  * invalid payload is a 400 here, never a 500 deeper down.
  */
-@Controller('maps')
+@Controller('entities')
 @UseGuards(SessionAuthGuard)
-export class MapsController {
-  constructor(private readonly maps: MapsService) {}
+export class EntitiesController {
+  constructor(private readonly entities: EntitiesService) {}
 
   @Get()
-  list(@CurrentUser() user: AuthUser): MapSummary[] {
-    return this.maps.list(user.id);
+  list(@CurrentUser() user: AuthUser): EntitySummary[] {
+    return this.entities.list(user.id);
   }
 
   @Post()
-  create(@CurrentUser() user: AuthUser, @Body() body: unknown): MapDetail {
-    const parsed = createMapRequestSchema.safeParse(body);
+  create(@CurrentUser() user: AuthUser, @Body() body: unknown): EntityDetail {
+    const parsed = createEntityRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
-    return this.maps.create(user.id, parsed.data);
+    return this.entities.create(user.id, parsed.data);
   }
 
   @Get(':id')
-  load(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-  ): MapDetail {
-    const map = this.maps.load(user.id, id);
-    if (!map) throw new NotFoundException();
-    return map;
+  load(@CurrentUser() user: AuthUser, @Param('id') id: string): EntityDetail {
+    const entity = this.entities.load(user.id, id);
+    if (!entity) throw new NotFoundException();
+    return entity;
   }
 
   @Put(':id')
@@ -64,19 +61,19 @@ export class MapsController {
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Body() body: unknown,
-  ): MapDetail {
-    const parsed = saveMapRequestSchema.safeParse(body);
+  ): EntityDetail {
+    const parsed = saveEntityRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
 
-    const result = this.maps.save(user.id, id, parsed.data);
+    const result = this.entities.save(user.id, id, parsed.data);
     switch (result.status) {
       case 'saved':
-        return result.map;
+        return result.entity;
       case 'not-found':
         throw new NotFoundException();
       case 'conflict':
         // The base version had moved: reject with 409 and hand back the current
-        // map so the client can surface the conflict and re-pull (issue #6).
+        // Entity so the client can surface the conflict and re-pull (ADR-0018).
         throw new ConflictException(result.current);
     }
   }
@@ -86,18 +83,18 @@ export class MapsController {
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Body() body: unknown,
-  ): MapDetail {
-    const parsed = renameMapRequestSchema.safeParse(body);
+  ): EntityDetail {
+    const parsed = renameEntityRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
 
-    const map = this.maps.rename(user.id, id, parsed.data.title);
-    if (!map) throw new NotFoundException();
-    return map;
+    const entity = this.entities.rename(user.id, id, parsed.data.name);
+    if (!entity) throw new NotFoundException();
+    return entity;
   }
 
   @Delete(':id')
   @HttpCode(204)
   remove(@CurrentUser() user: AuthUser, @Param('id') id: string): void {
-    if (!this.maps.delete(user.id, id)) throw new NotFoundException();
+    if (!this.entities.delete(user.id, id)) throw new NotFoundException();
   }
 }

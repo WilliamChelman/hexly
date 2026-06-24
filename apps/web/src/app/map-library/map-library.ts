@@ -14,8 +14,8 @@ import {
   TranslocoPipe,
   TranslocoService,
 } from '@jsverse/transloco';
-import { MapSummary } from '@hexly/domain';
-import { MapsStore } from '../maps/maps.store';
+import { EntitySummary } from '@hexly/domain';
+import { EntitiesStore } from '../entities/entities.store';
 import { HeaderService } from '../shell/header.service';
 import { Button } from '../ui/button';
 import { Panel } from '../ui/panel';
@@ -114,7 +114,7 @@ function formatEdited(updatedAt: number, lang: string): string {
   `,
 })
 export class MapLibrary implements OnInit {
-  private readonly maps$ = inject(MapsStore);
+  private readonly maps$ = inject(EntitiesStore);
   private readonly router = inject(Router);
   private readonly header = inject(HeaderService);
   private readonly destroyRef = inject(DestroyRef);
@@ -126,7 +126,7 @@ export class MapLibrary implements OnInit {
   protected readonly pageTitle = translateSignal('mapLibrary.heading');
   private readonly pageEyebrow = translateSignal('mapLibrary.eyebrow');
 
-  private readonly _maps = signal<MapSummary[]>([]);
+  private readonly _maps = signal<EntitySummary[]>([]);
   /** The user's maps, newest first. */
   protected readonly maps = computed(() =>
     [...this._maps()].sort((a, b) => b.updatedAt - a.updatedAt),
@@ -139,7 +139,7 @@ export class MapLibrary implements OnInit {
     const lang = this.transloco.activeLang();
     return this.maps().map((map) => ({
       id: map.id,
-      title: map.title,
+      title: map.name,
       edited: formatEdited(map.updatedAt, lang),
     }));
   });
@@ -184,7 +184,7 @@ export class MapLibrary implements OnInit {
     if (this.creating()) return;
     this.creating.set(true);
     this.maps$
-      .create(NEW_MAP_TITLE)
+      .create(NEW_MAP_TITLE, 'hexmap')
       .pipe(finalize(() => this.creating.set(false)))
       .subscribe((map) => this.open(map.id));
   }

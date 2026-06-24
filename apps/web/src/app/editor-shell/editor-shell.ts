@@ -106,7 +106,7 @@ export class EditorShell {
     // The editor owns its tab title: push the open map's name so it reads
     // "{map} — Hexly" and tracks loads and renames, and clear it on the way out
     // so a stale name never shadows the next page's title.
-    effect(() => this.title.setDocumentName(this.session.current()?.title ?? null));
+    effect(() => this.title.setDocumentName(this.session.current()?.name ?? null));
     inject(DestroyRef).onDestroy(() => this.title.setDocumentName(null));
 
     // Open whatever map the URL points at, and reopen it if the id changes

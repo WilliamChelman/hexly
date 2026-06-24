@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from './auth/auth.module';
 import { DbModule } from './db/db.module';
+import { EntitiesModule } from './entities/entities.module';
 import { HealthController } from './health.controller';
-import { MapsModule } from './maps/maps.module';
 import { TestModule } from './test/test.module';
 
 /**
@@ -26,7 +26,7 @@ const e2eTestingEnabled =
   imports: [
     DbModule,
     AuthModule,
-    MapsModule,
+    EntitiesModule,
     ...(e2eTestingEnabled ? [TestModule] : []),
   ],
   controllers: [HealthController],

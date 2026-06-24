@@ -1,6 +1,6 @@
 import { Controller, HttpCode, Inject, Post } from '@nestjs/common';
 import { DB, Db } from '../db/db';
-import { maps } from '../db/schema';
+import { entities } from '../db/schema';
 
 /**
  * E2E-only test support. This controller is mounted only when {@link AppModule}
@@ -19,13 +19,13 @@ export class TestController {
   constructor(@Inject(DB) private readonly db: Db) {}
 
   /**
-   * Reset to a clean slate: delete every Hex Map. Users and sessions are left
+   * Reset to a clean slate: delete every Entity. Users and sessions are left
    * intact on purpose, so an already-established e2e session survives the reset
-   * (ADR-0009 — maps-only reset).
+   * (ADR-0009 — entities-only reset).
    */
   @Post('reset')
   @HttpCode(204)
   reset(): void {
-    this.db.delete(maps).run();
+    this.db.delete(entities).run();
   }
 }

@@ -40,29 +40,36 @@ export const sessions = sqliteTable(
 );
 
 /**
- * A Hex Map stored as a single JSON document (ADR-0002). The relational columns
- * are the metadata the list view and access checks need; `document` holds the
- * whole map as JSON text. `version` is the optimistic-concurrency counter — a
- * save carries the base version it was built on and is rejected (409) if it has
- * since moved.
+ * An Entity stored as a single JSON document (ADR-0018, extending ADR-0002).
+ * The relational columns are the metadata the list view and access checks need;
+ * `document` holds the whole type-discriminated body (`{ type, content,
+ * ...payload }`) as JSON text. `type` and `tags` are denormalized out of the
+ * body so a list can group/filter without loading each body. `version` is the
+ * optimistic-concurrency counter — a save carries the base version it was built
+ * on and is rejected (409) if it has since moved. A Hex Map is an Entity of
+ * `type: 'hexmap'` (the `maps` table this replaces — see the migration in `db.ts`).
  */
-export const maps = sqliteTable(
-  'maps',
+export const entities = sqliteTable(
+  'entities',
   {
     id: text('id').primaryKey(),
     ownerId: text('owner_id')
       .notNull()
       .references(() => users.id),
-    title: text('title').notNull(),
+    name: text('name').notNull(),
+    // The closed Entity type enum (note | hexmap), validated at the edge.
+    type: text('type').notNull(),
+    // Free-text tags as a JSON array; `mode: 'json'` serializes on the way in.
+    tags: text('tags', { mode: 'json' }).$type<string[]>().notNull(),
     visibility: text('visibility').notNull(),
     version: integer('version').notNull(),
-    // The serialized Hex Map document (hexMapSchema), parsed/validated at the edge.
+    // The serialized Entity body (entityBodySchema), parsed/validated at the edge.
     document: text('document').notNull(),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
   (table) => [
     // The list endpoint and every access check filter by owner.
-    index('idx_maps_owner_id').on(table.ownerId),
+    index('idx_entities_owner_id').on(table.ownerId),
   ]
 );
