@@ -1,13 +1,7 @@
-import { NgComponentOutlet } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  inject,
-  Type,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { IconButton } from '../ui/icon-button';
-import { RegionIcon } from '../ui/icon/glyphs/region';
+import { Icon, IconName } from '../ui/icon/icon';
 import { EditorStore } from './editor-store';
 
 /** The right panel's identity a rail entry can open (mirrors {@link EditorStore.rightPanel}). */
@@ -19,8 +13,8 @@ interface RailEntry {
   readonly testid: string;
   /** Translation key for the entry's name, shown on its tooltip/aria-label (ADR-0014). */
   readonly titleKey: string;
-  /** The glyph component projected into the button (ADR-0007); rendered via outlet. */
-  readonly glyph: Type<unknown>;
+  /** The glyph drawn in the button (ADR-0007). */
+  readonly glyph: IconName;
 }
 
 /**
@@ -44,7 +38,7 @@ interface RailEntry {
     class:
       'flex flex-col items-center gap-2 p-2 bg-surface border border-line rounded-lg shadow-1',
   },
-  imports: [IconButton, NgComponentOutlet, TranslocoPipe],
+  imports: [IconButton, Icon, TranslocoPipe],
   template: `
     @for (entry of entries; track entry.id) {
       <button
@@ -56,7 +50,7 @@ interface RailEntry {
         [attr.data-testid]="entry.testid"
         (click)="store.toggleRegionsPanel()"
       >
-        <ng-container *ngComponentOutlet="entry.glyph; inputs: glyphInputs" />
+        <app-icon [name]="entry.glyph" [size]="20" />
       </button>
     }
   `,
@@ -64,16 +58,13 @@ interface RailEntry {
 export class EditorRail {
   protected readonly store = inject(EditorStore);
 
-  /** Inputs for each outlet-rendered glyph; matches the 20px icon-only chrome. */
-  protected readonly glyphInputs = { size: 20 };
-
   /** Rail entries rendered top-to-bottom; only Regions ships now (issue #39). */
   protected readonly entries: readonly RailEntry[] = [
     {
       id: 'regions',
       testid: 'rail-regions',
       titleKey: 'editorShell.regionsPanel.title',
-      glyph: RegionIcon,
+      glyph: 'region',
     },
   ];
 }

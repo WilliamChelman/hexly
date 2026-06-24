@@ -33,9 +33,7 @@ import { EditorStore, SelectMode, ToolId } from './editor-store';
 import { Button } from '../ui/button';
 import { Coord } from '../ui/coord';
 import { Eyebrow } from '../ui/eyebrow';
-import { FitIcon } from '../ui/icon/glyphs/fit';
-import { MinusIcon } from '../ui/icon/glyphs/minus';
-import { PlusIcon } from '../ui/icon/glyphs/plus';
+import { Icon } from '../ui/icon/icon';
 import { Camera } from './camera';
 import {
   Canvas2dMapRenderer,
@@ -94,7 +92,7 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
 @Component({
   selector: 'app-map-canvas',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Coord, Eyebrow, FitIcon, MinusIcon, PlusIcon, TranslocoPipe],
+  imports: [Button, Coord, Eyebrow, Icon, TranslocoPipe],
   template: `
     <canvas
       #canvas
@@ -137,7 +135,7 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
         [attr.aria-label]="'editorShell.canvas.zoomIn' | transloco"
         (click)="zoomByStep(1)"
       >
-        <app-icon-plus [size]="16" />
+        <app-icon name="plus" [size]="16" />
       </button>
       <app-coord class="min-w-[3.4em] text-center">{{ zoomPercent() }}%</app-coord>
       <button
@@ -148,7 +146,7 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
         [attr.aria-label]="'editorShell.canvas.zoomOut' | transloco"
         (click)="zoomByStep(-1)"
       >
-        <app-icon-minus [size]="16" />
+        <app-icon name="minus" [size]="16" />
       </button>
       <button
         type="button"
@@ -158,7 +156,7 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
         [attr.aria-label]="'editorShell.canvas.fit' | transloco"
         (click)="recenter()"
       >
-        <app-icon-fit [size]="16" />
+        <app-icon name="fit" [size]="16" />
       </button>
     </div>
   `,

@@ -1,23 +1,9 @@
-import { NgComponentOutlet } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  inject,
-  Type,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { featureLibrary, terrainPalette } from '@hexly/domain';
 import { IconButton } from '../ui/icon-button';
+import { Icon, IconName } from '../ui/icon/icon';
 import { IconPath } from '../ui/icon/icon-path';
-import { EraseIcon } from '../ui/icon/glyphs/erase';
-import { LabelIcon } from '../ui/icon/glyphs/label';
-import { MarqueeIcon } from '../ui/icon/glyphs/marquee';
-import { MinusIcon } from '../ui/icon/glyphs/minus';
-import { RedoIcon } from '../ui/icon/glyphs/redo';
-import { SelectIcon } from '../ui/icon/glyphs/select';
-import { SettlementIcon } from '../ui/icon/glyphs/settlement';
-import { TerrainIcon } from '../ui/icon/glyphs/terrain';
-import { UndoIcon } from '../ui/icon/glyphs/undo';
 import { Panel } from '../ui/panel';
 import { Rule } from '../ui/rule';
 import { Swatch } from '../ui/swatch';
@@ -35,8 +21,8 @@ interface ToolDef {
   readonly id: ToolId;
   /** The keycap that arms this Tool — surfaced in the tooltip (`Terrain (T)`). */
   readonly key: string;
-  /** The glyph component projected into the button (ADR-0007); rendered via outlet. */
-  readonly glyph: Type<unknown>;
+  /** The glyph drawn in the button (ADR-0007). */
+  readonly glyph: IconName;
 }
 
 /**
@@ -47,16 +33,16 @@ interface ToolDef {
  * (`editorShell.toolPalette.<id>`, ADR-0014), so it can localize.
  */
 const TOOLS: readonly ToolDef[] = [
-  { id: 'select', key: 'S', glyph: SelectIcon },
-  { id: 'terrain', key: 'T', glyph: TerrainIcon },
-  { id: 'feature', key: 'F', glyph: SettlementIcon },
-  { id: 'label', key: 'L', glyph: LabelIcon },
-  { id: 'erase', key: 'E', glyph: EraseIcon },
+  { id: 'select', key: 'S', glyph: 'select' },
+  { id: 'terrain', key: 'T', glyph: 'terrain' },
+  { id: 'feature', key: 'F', glyph: 'settlement' },
+  { id: 'label', key: 'L', glyph: 'label' },
+  { id: 'erase', key: 'E', glyph: 'erase' },
 ];
 
 /** The glyph for a Select Subtool: the arrow cursor for Pick, a dashed box for Marquee. */
-function glyphFor(subtool: SelectSubtool): Type<unknown> {
-  return subtool === 'marquee' ? MarqueeIcon : SelectIcon;
+function glyphFor(subtool: SelectSubtool): IconName {
+  return subtool === 'marquee' ? 'marquee' : 'select';
 }
 
 /**
@@ -83,18 +69,7 @@ function glyphFor(subtool: SelectSubtool): Type<unknown> {
   selector: 'app-tool-palette',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'flex items-start gap-2' },
-  imports: [
-    IconButton,
-    IconPath,
-    MinusIcon,
-    NgComponentOutlet,
-    RedoIcon,
-    Swatch,
-    UndoIcon,
-    Panel,
-    Rule,
-    TranslocoPipe,
-  ],
+  imports: [IconButton, Icon, IconPath, Swatch, Panel, Rule, TranslocoPipe],
   template: `
     <div
       class="flex flex-col gap-[2px] p-2 min-h-0 max-h-full overflow-y-auto"
@@ -113,7 +88,7 @@ function glyphFor(subtool: SelectSubtool): Type<unknown> {
           [attr.data-testid]="'tool-' + t.id"
           (click)="store.armTool(t.id)"
         >
-          <ng-container *ngComponentOutlet="t.glyph; inputs: glyphInputs" />
+          <app-icon [name]="t.glyph" [size]="20" />
         </button>
       }
 
@@ -127,7 +102,7 @@ function glyphFor(subtool: SelectSubtool): Type<unknown> {
         [disabled]="!store.canUndo()"
         (click)="store.undo()"
       >
-        <app-icon-undo [size]="20" />
+        <app-icon name="undo" [size]="20" />
       </button>
       <button
         appIconButton
@@ -137,7 +112,7 @@ function glyphFor(subtool: SelectSubtool): Type<unknown> {
         [disabled]="!store.canRedo()"
         (click)="store.redo()"
       >
-        <app-icon-redo [size]="20" />
+        <app-icon name="redo" [size]="20" />
       </button>
     </div>
 
@@ -160,7 +135,7 @@ function glyphFor(subtool: SelectSubtool): Type<unknown> {
               [attr.data-testid]="'select-' + s.id"
               (click)="store.armSelectSubtool(s.id)"
             >
-              <ng-container *ngComponentOutlet="s.glyph; inputs: glyphInputs" />
+              <app-icon [name]="s.glyph" [size]="20" />
             </button>
           }
         </div>
@@ -220,7 +195,7 @@ function glyphFor(subtool: SelectSubtool): Type<unknown> {
             data-testid="clear-feature"
             (click)="store.armFeature('clear')"
           >
-            <app-icon-minus [size]="20" />
+            <app-icon name="minus" [size]="20" />
           </button>
         </div>
       }
@@ -244,9 +219,6 @@ export class ToolPalette {
 
   /** The floating strip's Tool buttons, in palette order (issue #27). */
   protected readonly tools = TOOLS;
-
-  /** Inputs for each outlet-rendered Tool glyph; matches the 20px icon-only chrome. */
-  protected readonly glyphInputs = { size: 20 };
 
   /**
    * The Select tool's Subtools — Pick then Marquee — each placeable from the

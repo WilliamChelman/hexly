@@ -757,12 +757,12 @@ export class EditorStore {
       // every Hex/footprint field is carried verbatim (matching the single-hex path).
       for (const { coord, hex } of plan.hexes) {
         const key = coordKey(coord);
-        if (hex) draft.hexes[key] = deepClone(hex);
+        if (hex) draft.hexes[key] = structuredClone(hex);
         else delete draft.hexes[key];
       }
       for (const { id, hexes: footprint } of plan.regions) {
         const region = regionById(draft, id);
-        if (region) region.hexes = deepClone(footprint);
+        if (region) region.hexes = structuredClone(footprint);
       }
       // Apply the same previewed label positions the canvas drew mid-drag; an empty
       // map (a zero-pixel/hex-only move) writes nothing, so no label step is recorded.
@@ -1473,22 +1473,17 @@ function refKey(ref: SelectionRef): string {
   }
 }
 
-/** A unique id, preferring crypto.randomUUID but falling back where it is unavailable (insecure contexts). */
-function mintId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
-  return 'r-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
-}
-
 /**
- * Deep-clone a JSON-shaped value, preferring `structuredClone` but falling back
- * to a JSON round-trip where it is unavailable (older runtimes, some SSR/test
- * shims) — the same defensive pattern as {@link mintId}'s `crypto.randomUUID`
- * guard. The document is JSON-serializable (it is persisted as JSON), so the
- * fallback is faithful for every value a Hex can hold.
+ * A unique id for a region/label. Prefers `crypto.randomUUID`, but it is
+ * secure-context-only — undefined (and a throw) when Hexly is self-hosted over
+ * plain HTTP on a LAN, the intended deployment. The fallback covers that: these
+ * are internal ids, so collision resistance is all that matters, not unpredictability.
+ * ponytail: keep the fallback — it's a real calibration knob, not dead code.
  */
-function deepClone<T>(value: T): T {
-  if (typeof structuredClone === 'function') return structuredClone(value);
-  return JSON.parse(JSON.stringify(value)) as T;
+function mintId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+    return crypto.randomUUID();
+  return 'r-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 }
 
 /** A committed edit, as the forward and inverse Immer patches that effect it. */

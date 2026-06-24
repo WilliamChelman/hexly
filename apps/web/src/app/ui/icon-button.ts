@@ -22,7 +22,7 @@ import {
  *
  *   <button appIconButton toggle [active]="armed()"
  *           title="Terrain (T)" aria-label="Terrain" (click)="arm()">
- *     <app-icon-terrain [size]="20" />
+ *     <app-icon name="terrain" [size]="20" />
  *   </button>
  */
 @Component({

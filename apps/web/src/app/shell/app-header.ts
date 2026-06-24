@@ -10,9 +10,7 @@ import { ThemeService } from '../core/theme.service';
 import { Button } from '../ui/button';
 import { Cartouche } from '../ui/cartouche';
 import { Eyebrow } from '../ui/eyebrow';
-import { LogoIcon } from '../ui/icon/glyphs/logo';
-import { MoonIcon } from '../ui/icon/glyphs/moon';
-import { SunIcon } from '../ui/icon/glyphs/sun';
+import { Icon } from '../ui/icon/icon';
 import { HeaderService } from './header.service';
 import { LanguageSwitcher } from './language-switcher';
 
@@ -35,14 +33,12 @@ import { LanguageSwitcher } from './language-switcher';
     Button,
     Cartouche,
     Eyebrow,
-    LogoIcon,
-    MoonIcon,
-    SunIcon,
+    Icon,
     LanguageSwitcher,
   ],
   template: `
     <a class="brand flex items-center gap-2 no-underline text-inherit" routerLink="/">
-      <span class="grid place-items-center text-gold"><app-icon-logo [size]="26" /></span>
+      <span class="grid place-items-center text-gold"><app-icon name="logo" [size]="26" /></span>
       <span class="text-lg text-ink-strong" appCartouche>Hexly</span>
     </a>
 
@@ -81,9 +77,9 @@ import { LanguageSwitcher } from './language-switcher';
         [title]="theme() === 'dark' ? 'Parchment (light)' : 'Astral (dark)'"
       >
         @if (theme() === 'dark') {
-          <app-icon-sun [size]="20" />
+          <app-icon name="sun" [size]="20" />
         } @else {
-          <app-icon-moon [size]="20" />
+          <app-icon name="moon" [size]="20" />
         }
       </button>
       @if (user(); as u) {

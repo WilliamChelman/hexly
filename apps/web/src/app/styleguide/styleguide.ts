@@ -8,9 +8,7 @@ import { Coord } from '../ui/coord';
 import { Eyebrow } from '../ui/eyebrow';
 import { Field } from '../ui/field';
 import { IconButton } from '../ui/icon-button';
-import { SelectIcon } from '../ui/icon/glyphs/select';
-import { TerrainIcon } from '../ui/icon/glyphs/terrain';
-import { UndoIcon } from '../ui/icon/glyphs/undo';
+import { Icon } from '../ui/icon/icon';
 import { Input } from '../ui/input';
 import { Kbd } from '../ui/kbd';
 import { Panel } from '../ui/panel';
@@ -47,9 +45,7 @@ interface TypeRow {
     Field,
     Input,
     IconButton,
-    SelectIcon,
-    TerrainIcon,
-    UndoIcon,
+    Icon,
     Swatch,
     Kbd,
     Panel,
@@ -183,7 +179,7 @@ interface TypeRow {
                 [title]="'styleguide.iconSelectTitle' | transloco"
                 [attr.aria-label]="'styleguide.iconSelectLabel' | transloco"
               >
-                <app-icon-select [size]="20" />
+                <app-icon name="select" [size]="20" />
               </button>
               <button
                 appIconButton
@@ -191,7 +187,7 @@ interface TypeRow {
                 [title]="'styleguide.iconTerrainTitle' | transloco"
                 [attr.aria-label]="'styleguide.iconTerrainLabel' | transloco"
               >
-                <app-icon-terrain [size]="20" />
+                <app-icon name="terrain" [size]="20" />
               </button>
               <button
                 appIconButton
@@ -206,7 +202,7 @@ interface TypeRow {
                 [title]="'styleguide.iconUndo' | transloco"
                 [attr.aria-label]="'styleguide.iconUndo' | transloco"
               >
-                <app-icon-undo [size]="20" />
+                <app-icon name="undo" [size]="20" />
               </button>
             </div>
           </figure>

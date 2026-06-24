@@ -13,7 +13,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { Button } from '../ui/button';
 import { Chip } from '../ui/chip';
 import { Eyebrow } from '../ui/eyebrow';
-import { ShareIcon } from '../ui/icon/glyphs/share';
+import { Icon } from '../ui/icon/icon';
 import { inputValue } from './dom';
 import { EditorSession } from './editor-session';
 
@@ -28,7 +28,7 @@ import { EditorSession } from './editor-session';
   selector: 'app-editor-header',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'flex flex-1 items-center gap-5' },
-  imports: [RouterLink, Button, Chip, Eyebrow, ShareIcon, TranslocoPipe],
+  imports: [RouterLink, Button, Chip, Eyebrow, Icon, TranslocoPipe],
   template: `
     <div class="flex items-center gap-3 pl-5 border-l border-line">
       <span appEyebrow>{{ 'editorShell.hexMap' | transloco }}</span>
@@ -92,7 +92,7 @@ import { EditorSession } from './editor-session';
         {{ (saving() ? 'editorShell.saving' : 'common.save') | transloco }}
       </button>
       <button type="button" appButton variant="primary" size="sm">
-        <app-icon-share [size]="16" />
+        <app-icon name="share" [size]="16" />
         {{ 'editorShell.share' | transloco }}
       </button>
     </div>

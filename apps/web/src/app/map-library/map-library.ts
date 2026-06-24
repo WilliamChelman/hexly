@@ -19,7 +19,7 @@ import { MapsStore } from '../maps/maps.store';
 import { HeaderService } from '../shell/header.service';
 import { Button } from '../ui/button';
 import { Panel } from '../ui/panel';
-import { PlusIcon } from '../ui/icon/glyphs/plus';
+import { Icon } from '../ui/icon/icon';
 
 /** The title every freshly created map is given (the user renames later). */
 const NEW_MAP_TITLE = 'Untitled map';
@@ -49,7 +49,7 @@ function formatEdited(updatedAt: number, lang: string): string {
 @Component({
   selector: 'app-map-library',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Panel, PlusIcon, TranslocoPipe],
+  imports: [Button, Panel, Icon, TranslocoPipe],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
     <div class="max-w-[60rem] mx-auto py-6 px-5">
@@ -63,7 +63,7 @@ function formatEdited(updatedAt: number, lang: string): string {
           [disabled]="creating()"
           (click)="newMap()"
         >
-          <app-icon-plus [size]="16" />
+          <app-icon name="plus" [size]="16" />
           {{ (creating() ? 'mapLibrary.creating' : 'mapLibrary.newMap') | transloco }}
         </button>
       </div>
