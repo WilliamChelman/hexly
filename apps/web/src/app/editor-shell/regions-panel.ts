@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
+import { Region } from '@hexly/domain';
 import { Button } from '../ui/button';
 import { Eyebrow } from '../ui/eyebrow';
 import { Swatch } from '../ui/swatch';
@@ -48,11 +49,36 @@ import { EditorStore } from './editor-store';
         [attr.aria-current]="isRegionSelected(region.id) ? 'true' : null"
         (click)="store.selectRegion(region.id)"
       >
-        <span appSwatch [style.background]="region.color"></span>
-        <span class="flex-1 min-w-0 truncate">{{ region.name }}</span>
+        <span appSwatch [style.background]="region.color" [style.color]="region.color"></span>
+        <span class="flex-1 min-w-0 truncate" data-testid="region-name">{{ region.name }}</span>
+        <span
+          class="font-mono text-2xs text-ink-faint tabular-nums"
+          [attr.aria-label]="memberCount(region) + ' hexes'"
+          >{{ memberCount(region) }}</span
+        >
       </button>
     } @empty {
       <p class="muted text-sm leading-normal text-ink-muted">{{ 'editorShell.regionsPanel.emptyHint' | transloco }}</p>
+    }
+  `,
+  // Celestial Codex touches (ADR-0007, scoped): a gilded section mark, and a
+  // gold-ringed swatch that brightens to a soft glow on the selected Region.
+  styles: `
+    [appEyebrow]::before {
+      content: '✦';
+      margin-right: 0.5em;
+      color: var(--color-gold);
+      font-size: 0.85em;
+      opacity: 0.7;
+    }
+    [appSwatch] {
+      box-shadow: var(--shadow-inset), 0 0 7px -2px currentColor;
+    }
+    [aria-current='true'] [appSwatch] {
+      box-shadow:
+        var(--shadow-inset),
+        0 0 0 1px var(--color-gold),
+        0 0 11px -1px currentColor;
     }
   `,
 })
@@ -69,5 +95,10 @@ export class RegionsPanel {
    */
   protected isRegionSelected(id: string): boolean {
     return this.store.selections().some((s) => s.kind === 'region' && s.id === id);
+  }
+
+  /** A Region's painted-hex count, shown right-aligned in its row (0 for an empty Region). */
+  protected memberCount(region: Region): number {
+    return Object.keys(region.hexes).length;
   }
 }

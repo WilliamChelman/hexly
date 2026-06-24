@@ -11,7 +11,7 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
   selector: '[appCartouche]',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
-    class: 'font-display font-semibold tracking-wider uppercase',
+    class: 'font-cartouche font-bold tracking-wide uppercase',
   },
   template: '<ng-content />',
 })

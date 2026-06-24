@@ -31,6 +31,9 @@ class FakeContext {
   fillRect(): void {
     this.ops.push('fillRect');
   }
+  clearRect(): void {
+    this.ops.push('clearRect');
+  }
   beginPath(): void {
     this.ops.push('beginPath');
     this.currentPath = [];
@@ -72,6 +75,11 @@ class FakeContext {
   fillText(text: string, x: number, y: number): void {
     this.textFills.push({ text, fill: this.fillStyle });
     this.textDraws.push({ text, fill: this.fillStyle, x, y });
+  }
+  /** The legibility halo stroked behind name/label text — not asserted, just recorded so the call is safe. */
+  lineJoin = '';
+  strokeText(): void {
+    this.ops.push('strokeText');
   }
   /** A deterministic width: half the font's pixel size per character. */
   measureText(text: string): { width: number } {

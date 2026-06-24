@@ -81,7 +81,11 @@ describe('RegionsPanel', () => {
     TestBed.inject(TranslocoService).setActiveLang('fr');
     fixture.detectChanges();
 
-    expect(items(fixture.nativeElement)[0].textContent?.trim()).toBe('Terrain');
+    expect(
+      items(fixture.nativeElement)[0]
+        .querySelector('[data-testid=region-name]')
+        ?.textContent?.trim(),
+    ).toBe('Terrain');
   });
 
   it('routes a list selection through the shared store selection, even for an empty Region', () => {

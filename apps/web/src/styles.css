@@ -2,7 +2,8 @@
  * Hexly global stylesheet — the entry point the build loads (project.json
  * `styles`). Cascade order:
  *
- *   1. fonts      — Cinzel (display), Spectral (body), JetBrains Mono (coords)
+ *   1. fonts      — Marcellus (display), Cormorant Garamond (body),
+ *                   Cinzel Decorative (wordmark/cartouche), JetBrains Mono (coords)
  *   2. tailwind   — preflight + utilities, processed by @tailwindcss/postcss
  *   3. tokens     — semantic custom properties for both themes (unlayered)
  *   4. base       — reset/typography/table surface  → @layer base
@@ -20,27 +21,27 @@
  * unicode-range); each file is one `font-display: swap` @font-face whose woff2
  * the bundler resolves and emits locally.
  *
- *   Cinzel        — display       — 500 / 600 / 700
- *   Spectral      — body          — 400 / 500 / 600 / 700 + 400 italic
- *   JetBrains Mono — coords/mono  — 400 / 500
+ *   Marcellus          — display     — 400 (single weight)
+ *   Cormorant Garamond — body        — 400 / 500 / 600 / 700 + 400 italic
+ *   Cinzel Decorative  — wordmark    — 700
+ *   JetBrains Mono     — coords/mono — 400 / 500
  */
-@import '@fontsource/cinzel/latin-500.css';
-@import '@fontsource/cinzel/latin-600.css';
-@import '@fontsource/cinzel/latin-700.css';
-@import '@fontsource/cinzel/latin-ext-500.css';
-@import '@fontsource/cinzel/latin-ext-600.css';
-@import '@fontsource/cinzel/latin-ext-700.css';
+@import '@fontsource/marcellus/latin-400.css';
+@import '@fontsource/marcellus/latin-ext-400.css';
 
-@import '@fontsource/spectral/latin-400.css';
-@import '@fontsource/spectral/latin-500.css';
-@import '@fontsource/spectral/latin-600.css';
-@import '@fontsource/spectral/latin-700.css';
-@import '@fontsource/spectral/latin-400-italic.css';
-@import '@fontsource/spectral/latin-ext-400.css';
-@import '@fontsource/spectral/latin-ext-500.css';
-@import '@fontsource/spectral/latin-ext-600.css';
-@import '@fontsource/spectral/latin-ext-700.css';
-@import '@fontsource/spectral/latin-ext-400-italic.css';
+@import '@fontsource/cormorant-garamond/latin-400.css';
+@import '@fontsource/cormorant-garamond/latin-500.css';
+@import '@fontsource/cormorant-garamond/latin-600.css';
+@import '@fontsource/cormorant-garamond/latin-700.css';
+@import '@fontsource/cormorant-garamond/latin-400-italic.css';
+@import '@fontsource/cormorant-garamond/latin-ext-400.css';
+@import '@fontsource/cormorant-garamond/latin-ext-500.css';
+@import '@fontsource/cormorant-garamond/latin-ext-600.css';
+@import '@fontsource/cormorant-garamond/latin-ext-700.css';
+@import '@fontsource/cormorant-garamond/latin-ext-400-italic.css';
+
+@import '@fontsource/cinzel-decorative/latin-700.css';
+@import '@fontsource/cinzel-decorative/latin-ext-700.css';
 
 @import '@fontsource/jetbrains-mono/latin-400.css';
 @import '@fontsource/jetbrains-mono/latin-500.css';
@@ -90,8 +91,9 @@
  * Utilities are still generated on demand; only the `:root` block is complete.
  */
 @theme static {
-  --font-display: 'Cinzel', 'Spectral', Georgia, serif;
-  --font-body: 'Spectral', Georgia, 'Times New Roman', serif;
+  --font-cartouche: 'Cinzel Decorative', 'Marcellus', Georgia, serif;
+  --font-display: 'Marcellus', Georgia, serif;
+  --font-body: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
   --font-mono: 'JetBrains Mono', 'SFMono-Regular', Menlo, monospace;
 
   /* ---- Type scale (modular, ratio ~1.25) → text-* utilities ------------- */
@@ -139,32 +141,37 @@
   --radius-full: 999px;
 
   /* =======================================================================
-   * Colours — light theme "Parchment" values. The dark "Astral" theme
-   * reassigns these generated --color-* in tokens.css under [data-theme].
+   * Colours — light theme "Solar" values (the day half of the Celestial
+   * Codex: an illuminated solar almanac — warm ivory paper, sun-gold ink).
+   * The dark "Astral" theme reassigns these generated --color-* in
+   * tokens.css under [data-theme].
    * ===================================================================== */
-  --color-bg: #ece0c6; /* the table / outer parchment                       */
-  --color-bg-deep: #e2d3b2; /* shadowed paper behind panels                 */
-  --color-surface: #f5ecd6; /* primary paper stock for panels & cards       */
-  --color-surface-raised: #fbf5e6; /* a note pinned slightly above the page  */
-  --color-surface-sunken: #e6d8ba; /* wells, inputs, the canvas mat         */
+  --color-bg: #f1e5c7; /* the table / outer ivory paper                     */
+  --color-bg-deep: #e7d8b2; /* shadowed paper behind panels                 */
+  --color-surface: #fbf6e7; /* primary paper stock for panels & cards       */
+  --color-surface-raised: #fffaf0; /* a leaf lifted above the page          */
+  --color-surface-sunken: #ece0c0; /* wells, inputs                         */
   --color-overlay: rgba(58, 44, 28, 0.42); /* scrim behind modals           */
 
-  --color-ink: #2f2416; /* primary iron-gall text                           */
-  --color-ink-strong: #1d1509; /* headings                                  */
-  --color-ink-muted: #6f5d40; /* secondary text, labels                     */
-  --color-ink-faint: #9c8862; /* tertiary, placeholders, disabled          */
+  --color-ink: #2e2412; /* primary sepia-ink text                           */
+  --color-ink-strong: #211a0b; /* headings                                  */
+  --color-ink-muted: #6f5a36; /* secondary text, labels                     */
+  --color-ink-faint: #9c8a5e; /* tertiary, placeholders, disabled          */
 
-  --color-line: #cbb88e; /* hairline drawn rules                            */
-  --color-line-strong: #a8946a; /* emphasised borders, panel edges          */
-  --color-line-faint: rgba(120, 96, 56, 0.16);
+  --color-line: #d6c39a; /* hairline drawn rules                            */
+  --color-line-strong: #b89a62; /* emphasised borders, panel edges          */
+  --color-line-faint: rgba(120, 86, 30, 0.16);
 
-  --color-gold: #9a6a16; /* compass-rose ink — primary accent               */
+  --color-gold: #9a6a16; /* heliograph gold — primary accent                */
   --color-gold-strong: #7e560f;
   --color-gold-soft: rgba(154, 106, 22, 0.14);
-  --color-on-gold: #fbf5e6; /* text/icon on a gold fill                     */
+  --color-gold-bright: #efd078; /* metallic highlight — top stop of the gilded gradient */
+  --color-gold-deep: #b98323; /*   deep stop of the gilded gradient                    */
+  --color-on-gold: #fbf5e6; /* cream text/icon on the DARK flat gold (e.g. danger fill) */
+  --color-on-gilded: #2a1f08; /* dark ink on the BRIGHT gilded gradient — both themes  */
 
-  --color-sea: #2f6f6a; /* verdigris ocean wash — secondary accent          */
-  --color-sea-soft: rgba(47, 111, 106, 0.14);
+  --color-sea: #2f6f7a; /* lapis water — secondary accent                   */
+  --color-sea-soft: rgba(47, 111, 122, 0.14);
 
   --color-astra: #5a4aa6; /* dusk violet — tertiary                         */
   --color-astra-soft: rgba(90, 74, 166, 0.14);
@@ -175,13 +182,19 @@
   --color-positive: #4a6f2f; /* moss — confirmations / "online"             */
   --color-positive-soft: rgba(74, 111, 47, 0.16);
 
-  /* Canvas — the infinite hex plane (read by the renderer, ADR-0003) */
-  --color-canvas-bg: #e8dabb;
-  --color-canvas-mat: #ddcaa3;
-  --color-hex-line: rgba(120, 96, 56, 0.5); /* grid ink                     */
-  --color-feature-ink: #4a3a1e; /* a placed Feature's marker — sepia ink    */
-  --color-label-ink: #2f2416; /* free-positioned Label text — iron-gall ink */
+  /* Canvas — the Vellum field: a calm warm paper plane. -bg/-mat are the
+     directional gradient's light/deep stops; -glow pools soft light at the top
+     edge and -edge is the soft vignette. The .field-grain overlay adds the paper
+     tooth (codex vellum field). */
+  --color-canvas-bg: #efe2bf;
+  --color-canvas-mat: #e5d4a9;
+  --color-canvas-glow: rgba(255, 240, 202, 0.55); /* warm light at the field's top */
+  --color-canvas-edge: rgba(120, 86, 30, 0.14); /* soft sepia vignette           */
+  --color-hex-line: rgba(120, 96, 56, 0.42); /* grid ink                    */
+  --color-feature-ink: #5a3e16; /* a placed Feature's marker — sepia ink    */
+  --color-label-ink: #4a3a1e; /* free-positioned Label text — sepia ink     */
   --color-name-ink: #5a4a2c; /* a Hex name — muted sepia, quieter           */
+  --color-ink-stroke: #fbf6e7; /* halo behind name/label text — ivory on the light field, for legibility over any terrain (codex) */
 
   /* Terrain fills — the base type of a hex. Tuned to read as hand-tinted
      washes on aged paper; the dark theme deepens them for the night chart. */

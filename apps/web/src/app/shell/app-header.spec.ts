@@ -1,15 +1,8 @@
 import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { DestroyRef } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter, Router } from '@angular/router';
-import { TranslocoService } from '@jsverse/transloco';
-import { AuthStore } from '../auth/auth.store';
-import { ThemeService } from '../core/theme.service';
-import { LocaleService } from '../core/i18n/locale.service';
+import { provideRouter } from '@angular/router';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { AppHeader } from './app-header';
 import { HeaderService } from './header.service';
@@ -21,8 +14,6 @@ const noopDestroyRef = {
 } as DestroyRef;
 
 describe('AppHeader', () => {
-  let http: HttpTestingController;
-
   beforeEach(async () => {
     localStorage.clear();
     await TestBed.configureTestingModule({
@@ -33,29 +24,9 @@ describe('AppHeader', () => {
         provideRouter([]),
       ],
     }).compileComponents();
-    http = TestBed.inject(HttpTestingController);
   });
 
   afterEach(() => localStorage.clear());
-
-  afterEach(() => http.verify());
-
-  /** Spy on navigation so a sign-out can assert where it sends the user. */
-  function spyNavigate(): ReturnType<typeof vi.spyOn> {
-    return vi
-      .spyOn(TestBed.inject(Router), 'navigateByUrl')
-      .mockResolvedValue(true);
-  }
-
-  /** Establish a signed-in user the header can display. */
-  function signIn(displayName = 'Ada Lovelace'): void {
-    TestBed.inject(AuthStore).login('ada@hexly.test', 'pw').subscribe();
-    http.expectOne('/auth/login').flush({
-      id: 'u1',
-      email: 'ada@hexly.test',
-      displayName,
-    });
-  }
 
   it('shows the Hexly brand on every page', () => {
     const fixture = TestBed.createComponent(AppHeader);
@@ -75,70 +46,13 @@ describe('AppHeader', () => {
     expect(brand.getAttribute('href')).toBe('/');
   });
 
-  it('toggles the theme from the consolidated header', () => {
-    const theme = TestBed.inject(ThemeService);
-    const fixture = TestBed.createComponent(AppHeader);
-    fixture.detectChanges();
-
-    const before = theme.theme();
-    const toggle = fixture.nativeElement.querySelector(
-      '[data-testid=theme-toggle]',
-    ) as HTMLButtonElement;
-    toggle.click();
-
-    expect(theme.theme()).not.toBe(before);
-  });
-
-  it('shows the signed-in user', () => {
-    signIn();
-    const fixture = TestBed.createComponent(AppHeader);
-    fixture.detectChanges();
-
-    expect(fixture.nativeElement.textContent).toContain('Ada Lovelace');
-  });
-
-  it('ends the session and returns to login on sign out', () => {
-    signIn();
-    const navigate = spyNavigate();
-    const fixture = TestBed.createComponent(AppHeader);
-    fixture.detectChanges();
-
-    const signOut = fixture.nativeElement.querySelector(
-      '[data-testid=sign-out]',
-    ) as HTMLButtonElement;
-    signOut.click();
-
-    http.expectOne('/auth/logout').flush(null);
-
-    expect(navigate).toHaveBeenCalledWith('/login');
-  });
-
-  it('returns to login even when the logout request fails', () => {
-    signIn();
-    const navigate = spyNavigate();
-    const fixture = TestBed.createComponent(AppHeader);
-    fixture.detectChanges();
-
-    const signOut = fixture.nativeElement.querySelector(
-      '[data-testid=sign-out]',
-    ) as HTMLButtonElement;
-    signOut.click();
-
-    http
-      .expectOne('/auth/logout')
-      .flush(null, { status: 500, statusText: 'Server Error' });
-
-    // The user is never stranded signed-in: navigation fires regardless.
-    expect(navigate).toHaveBeenCalledWith('/login');
-  });
-
-  it('shows no user identity or Sign out when signed out', () => {
+  it('hosts the user menu', () => {
     const fixture = TestBed.createComponent(AppHeader);
     fixture.detectChanges();
 
     expect(
-      fixture.nativeElement.querySelector('[data-testid=sign-out]'),
-    ).toBeNull();
+      fixture.nativeElement.querySelector('button[aria-label="Open user menu"]'),
+    ).not.toBeNull();
   });
 
   it('renders the declarative eyebrow and title a page sets', () => {
@@ -168,27 +82,6 @@ describe('AppHeader', () => {
 
     expect(fixture.nativeElement.textContent).toContain('Your maps');
     expect(fixture.nativeElement.querySelector('h1')).toBeNull();
-  });
-
-  it('flips the language live and remembers it from the header', () => {
-    const locale = TestBed.inject(LocaleService);
-    const transloco = TestBed.inject(TranslocoService);
-    const fixture = TestBed.createComponent(AppHeader);
-    fixture.detectChanges();
-
-    expect(locale.lang()).toBe('en');
-
-    const toFrench = fixture.nativeElement.querySelector(
-      '[data-testid=lang-fr]',
-    ) as HTMLButtonElement;
-    toFrench.click();
-    fixture.detectChanges();
-
-    // Live: both the service and the active Transloco language flip with no reload.
-    expect(locale.lang()).toBe('fr');
-    expect(transloco.getActiveLang()).toBe('fr');
-    // Remembered across visits.
-    expect(localStorage.getItem('hexly-locale')).toBe('fr');
   });
 
   it('marks itself as the banner landmark', () => {

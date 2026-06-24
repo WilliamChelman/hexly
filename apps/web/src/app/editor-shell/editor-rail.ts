@@ -36,7 +36,7 @@ interface RailEntry {
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     class:
-      'flex flex-col items-center gap-2 p-2 bg-surface border border-line rounded-lg shadow-1',
+      'flex flex-col items-center gap-2 p-2 bg-linear-[180deg] from-surface to-bg-deep border border-line rounded-lg shadow-2',
   },
   imports: [IconButton, Icon, TranslocoPipe],
   template: `

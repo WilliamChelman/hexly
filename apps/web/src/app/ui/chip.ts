@@ -22,24 +22,26 @@ export type ChipTone = 'gold' | 'sea' | 'astra';
   },
   template: `<ng-content />`,
   styles: `
+    /* The codex pill: a display-face small-caps badge, widely tracked. Mirrors
+       the mockup '.pill'. */
     :host {
       display: inline-flex;
       align-items: center;
       gap: var(--spacing-2);
-      padding: var(--spacing-1) var(--spacing-3);
+      padding: 3px 11px;
+      font-family: var(--font-display);
       font-size: var(--text-2xs);
-      font-weight: var(--font-weight-semibold);
-      letter-spacing: var(--tracking-wide);
+      letter-spacing: 0.22em;
       text-transform: uppercase;
       color: var(--color-ink-muted);
       background: var(--color-surface-sunken);
-      border: 1px solid var(--color-line);
+      border: 1px solid var(--color-line-strong);
       border-radius: var(--radius-full);
     }
     :host(.is-gold) {
-      color: var(--color-gold-strong);
-      background: var(--color-gold-soft);
-      border-color: color-mix(in oklab, var(--color-gold) 36%, transparent);
+      color: var(--color-gold);
+      background: color-mix(in oklab, var(--color-gold) 12%, transparent);
+      border-color: var(--color-line-strong);
     }
     :host(.is-sea) {
       color: var(--color-sea);

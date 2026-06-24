@@ -23,7 +23,7 @@ import { EditorStore } from './editor-store';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     class:
-      'flex items-center gap-4 py-0 px-4 text-2xs text-ink-muted bg-surface border-t border-line-strong',
+      'flex items-center gap-4 py-0 px-4 text-2xs text-ink-muted bg-linear-[180deg] from-bg-deep to-surface border-t border-line',
   },
   imports: [Cartouche, Coord, Dot, TranslocoPipe],
   template: `
@@ -48,7 +48,7 @@ import { EditorStore } from './editor-store';
       }}</span
     >
     <span class="flex items-center gap-2 whitespace-nowrap">Zoom 100%</span>
-    <span class="flex items-center gap-2 whitespace-nowrap" appCartouche>Astral / Parchment</span>
+    <span class="flex items-center gap-2 whitespace-nowrap text-gold tracking-wider" appCartouche>Astral / Solar</span>
   `,
 })
 export class StatusBar implements OnInit {

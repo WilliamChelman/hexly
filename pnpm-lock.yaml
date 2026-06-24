@@ -29,14 +29,17 @@ importers:
       '@angular/router':
         specifier: ~21.2.0
         version: 21.2.17(@angular/common@21.2.17(@angular/core@21.2.17(@angular/compiler@21.2.17)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@21.2.17(@angular/compiler@21.2.17)(rxjs@7.8.2))(@angular/platform-browser@21.2.17(@angular/common@21.2.17(@angular/core@21.2.17(@angular/compiler@21.2.17)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@21.2.17(@angular/compiler@21.2.17)(rxjs@7.8.2)))(rxjs@7.8.2)
-      '@fontsource/cinzel':
-        specifier: 5.2.8
+      '@fontsource/cinzel-decorative':
+        specifier: ^5.2.8
         version: 5.2.8
+      '@fontsource/cormorant-garamond':
+        specifier: ^5.2.11
+        version: 5.2.11
       '@fontsource/jetbrains-mono':
         specifier: 5.2.8
         version: 5.2.8
-      '@fontsource/spectral':
-        specifier: 5.2.8
+      '@fontsource/marcellus':
+        specifier: ^5.2.8
         version: 5.2.8
       '@jsverse/transloco':
         specifier: ^8.4.0
@@ -1426,14 +1429,17 @@ packages:
       '@noble/hashes':
         optional: true
 
-  '@fontsource/cinzel@5.2.8':
-    resolution: {integrity: sha512-B9WeF/jPlOJOrcXfX96cy4KfM+s1QcU2C9W2hE3azBOBzPvzFkNpBovT5JmhAeicE/s4HZWKF9LF5hmEcqlbsw==}
+  '@fontsource/cinzel-decorative@5.2.8':
+    resolution: {integrity: sha512-BtrvcprcCd0DyAcIXZRohfMyh+n/MwNvmhmAZ0kXDe9T1w2XSOodb3RNoD1uHm3TlGw7fjTU0YepgAQbPW0sFw==}
+
+  '@fontsource/cormorant-garamond@5.2.11':
+    resolution: {integrity: sha512-5JjpN023lhA5soijgVT0BdRGzmlijm402ppjccMd6h+vRE0mX2lJnE+41UPfnlidrkV9/rCo1mf58WZlHnB0CA==}
 
   '@fontsource/jetbrains-mono@5.2.8':
     resolution: {integrity: sha512-6w8/SG4kqvIMu7xd7wt6x3idn1Qux3p9N62s6G3rfldOUYHpWcc2FKrqf+Vo44jRvqWj2oAtTHrZXEP23oSKwQ==}
 
-  '@fontsource/spectral@5.2.8':
-    resolution: {integrity: sha512-0CqZ8/z8A38BdeSz5t2NSd5tCO1R9P1k7SF2VpRLMbZTMSSR6+2Dk0ZBMfEQK/IrBLQS1HgHLMqpdTwRpnKpGQ==}
+  '@fontsource/marcellus@5.2.8':
+    resolution: {integrity: sha512-JHn6y1lz5IBjwqmwy4JSOIg2OV8X5UnbB4hGRUDaSlfViXghS6/4pX4CoRzFtQDIkH7axGCS+6kbdTVuYxBKDw==}
 
   '@gar/promise-retry@1.0.3':
     resolution: {integrity: sha512-GmzA9ckNokPypTg10pgpeHNQe7ph+iIKKmhKu3Ob9ANkswreCx7R3cKmY781K8QK3AqVL3xVh9A42JvIAbkkSA==}
@@ -9661,11 +9667,13 @@ snapshots:
 
   '@exodus/bytes@1.15.1': {}
 
-  '@fontsource/cinzel@5.2.8': {}
+  '@fontsource/cinzel-decorative@5.2.8': {}
+
+  '@fontsource/cormorant-garamond@5.2.11': {}
 
   '@fontsource/jetbrains-mono@5.2.8': {}
 
-  '@fontsource/spectral@5.2.8': {}
+  '@fontsource/marcellus@5.2.8': {}
 
   '@gar/promise-retry@1.0.3': {}
 

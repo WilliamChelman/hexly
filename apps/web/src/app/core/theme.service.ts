@@ -29,7 +29,7 @@ export class ThemeService {
   /** The active theme, readable by the UI (e.g. to label the toggle). */
   readonly theme = this.pref.value;
 
-  /** Swap between parchment (light) and astral (dark). */
+  /** Swap between solar (light) and astral (dark). */
   toggle(): void {
     this.set(this.theme() === 'dark' ? 'light' : 'dark');
   }

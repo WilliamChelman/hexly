@@ -23,9 +23,9 @@
  *      plain re-themable vars, wrapped as a custom `@utility` in styles.css
  *      (ADR-0021).
  *
- * Concept: "the cartographer's table, by starlight."
- *   - Light  "Parchment" — an aged sea-chart: cream paper, sepia ink, gold.
- *   - Dark   "Astral"    — the same map under a night sky: indigo + starlight.
+ * Concept: the Celestial Codex — the cartographer's table across the sky.
+ *   - Light  "Solar"  — a sunlit almanac: warm ivory paper, heliograph gold.
+ *   - Dark   "Astral" — the same chart by night: indigo + constellation gold.
  */
 
 :root {
@@ -53,6 +53,22 @@
   --shadow-inset: inset 0 1px 2px rgba(60, 44, 22, 0.12);
   --shadow-focus: 0 0 0 3px rgba(154, 106, 22, 0.32); /* focus-visible ring  */
 
+  /* ---- Gilded chrome — the metallic sheen + glow of the Celestial Codex.
+     Raw vars (like --shadow-*): consumed by scoped component styles, not as
+     utilities. --gradient-gold re-themes for free via the stop vars, which the
+     dark block reassigns; only --color-glow needs a dark override. */
+  --gradient-gold: linear-gradient(
+    180deg,
+    var(--color-gold-bright),
+    var(--color-gold-deep)
+  );
+  --gradient-gold-radial: radial-gradient(
+    circle at 50% 35%,
+    var(--color-gold-bright),
+    var(--color-gold-deep)
+  );
+  --color-glow: rgba(210, 150, 40, 0.5); /* gilded glow for active chrome */
+
   color-scheme: light;
 }
 
@@ -64,26 +80,29 @@
  * --shadow-* declared (light) in the styles.css @theme block.
  * ======================================================================= */
 :root[data-theme='dark'] {
-  --color-bg: #0d1124; /* the night table                                   */
-  --color-bg-deep: #080b1a;
-  --color-surface: #161c38; /* lifted indigo panel                          */
-  --color-surface-raised: #1d264a; /* a chart pinned into the starlight     */
-  --color-surface-sunken: #10152e; /* wells, the canvas mat                 */
-  --color-overlay: rgba(4, 6, 16, 0.62);
+  --color-bg: #0b0c1a; /* the night table                                   */
+  --color-bg-deep: #070710;
+  --color-surface: #10132b; /* lifted indigo panel                          */
+  --color-surface-raised: #181c3c; /* a chart pinned into the starlight     */
+  --color-surface-sunken: #0c0e22; /* wells                                 */
+  --color-overlay: rgba(4, 4, 14, 0.62);
 
-  --color-ink: #e9e2cf; /* starlit parchment text                           */
+  --color-ink: #ece3cf; /* starlit parchment text                           */
   --color-ink-strong: #fbf6e7;
-  --color-ink-muted: #aeb2cc; /* cool lavender-grey                         */
-  --color-ink-faint: #6f7596;
+  --color-ink-muted: #9aa0c8; /* cool lavender-grey                         */
+  --color-ink-faint: #666c95;
 
-  --color-line: #2c355e; /* faint constellation lines                       */
-  --color-line-strong: #3d4878;
-  --color-line-faint: rgba(180, 196, 255, 0.08);
+  --color-line: rgba(217, 178, 90, 0.16); /* gilded hairline edges          */
+  --color-line-strong: rgba(217, 178, 90, 0.32);
+  --color-line-faint: rgba(217, 178, 90, 0.08);
 
-  --color-gold: #e6b652; /* constellation gold — brighter against night     */
-  --color-gold-strong: #f1c977;
-  --color-gold-soft: rgba(230, 182, 82, 0.14);
-  --color-on-gold: #14110a;
+  --color-gold: #d9b25a; /* constellation gold leaf — primary accent        */
+  --color-gold-strong: #f0d68a;
+  --color-gold-soft: rgba(217, 178, 90, 0.14);
+  --color-gold-bright: #f0d897; /* metallic highlight stop (constellation)  */
+  --color-gold-deep: #c59335; /*   deep gradient stop                       */
+  --color-on-gold: #15110a;
+  --color-on-gilded: #15110a; /* dark ink on the bright gilded gradient */
 
   --color-sea: #54c8bb; /* aurora-teal                                      */
   --color-sea-soft: rgba(84, 200, 187, 0.14);
@@ -97,19 +116,23 @@
   --color-positive: #86c46a; /* aurora green                                */
   --color-positive-soft: rgba(134, 196, 106, 0.16);
 
-  --color-canvas-bg: #111634;
-  --color-canvas-mat: #0c1026;
-  --color-hex-line: rgba(170, 188, 255, 0.16);
-  --color-feature-ink: #f4ecd8; /* a placed Feature's marker — cream        */
-  --color-label-ink: #f4ecd8; /* free-positioned Label text — cream         */
+  /* Canvas — the Vellum field at night: deep indigo paper (codex). */
+  --color-canvas-bg: #12152e;
+  --color-canvas-mat: #0a0c1d;
+  --color-canvas-glow: rgba(58, 70, 140, 0.26); /* indigo light at the field's top */
+  --color-canvas-edge: rgba(4, 4, 14, 0.5); /* deep-night vignette                 */
+  --color-hex-line: rgba(160, 170, 235, 0.15);
+  --color-feature-ink: #ecd49a; /* a placed Feature's marker — gilded       */
+  --color-label-ink: #ecd49a; /* free-positioned Label text — gilded cream   */
   --color-name-ink: #cdbf9f; /* a Hex name — dimmed parchment               */
+  --color-ink-stroke: #0a0b16; /* halo behind name/label text — night ink, for legibility over any terrain (codex) */
 
-  --color-terrain-grass: #7e8a55;
-  --color-terrain-forest: #4f7355;
-  --color-terrain-ocean: #3f7d8a;
-  --color-terrain-mountain: #6f6a82;
-  --color-terrain-desert: #b09a64;
-  --color-terrain-marsh: #5d7361;
+  --color-terrain-grass: #4c5d3b;
+  --color-terrain-forest: #264237;
+  --color-terrain-ocean: #1e3a55;
+  --color-terrain-mountain: #474264;
+  --color-terrain-desert: #6b5736;
+  --color-terrain-marsh: #3a4b44;
   --color-terrain-sky: #45527d; /* open air — deep twilight indigo          */
 
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5);
@@ -117,6 +140,8 @@
   --shadow-3: 0 22px 48px -10px rgba(0, 0, 0, 0.72);
   --shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-focus: 0 0 0 3px rgba(230, 182, 82, 0.34);
+
+  --color-glow: rgba(217, 178, 90, 0.5); /* constellation glow */
 
   color-scheme: dark;
 }

@@ -41,18 +41,29 @@ const MARKER_STROKE = 1.6;
  */
 const ICON_BOX = 24;
 /**
- * The serif stack a Label is drawn in — a cartographic look that sets Labels
- * apart from the sans-serif UI chrome. Falls back through common serifs so it
- * renders without a bundled webfont (issue #10).
+ * The display-serif stack both a Label and a Hex name are drawn in — Marcellus,
+ * the codex display face, falling back through common serifs so the map still
+ * reads without the bundled webfont (issue #10). Name and Label share the family
+ * but stay distinct by *treatment* (ADR-0016): a name is upright, dim, and
+ * haloed; a Label is italic, brighter, larger, and carries a gilded glow — so a
+ * name never reads as a second Label system even though both are cartographic.
  */
-const LABEL_FONT = 'Georgia, "Times New Roman", serif';
+const MAP_FONT = 'Marcellus, Georgia, "Times New Roman", serif';
 /**
- * A Hex name's font — a quiet sans-serif, deliberately set apart from the serif
- * a Label uses (ADR-0016). The name is structured metadata bound to the hex, not
- * cartographic typography, so it must never read as a second Label system.
+ * The dark/ivory halo stroked behind name and Label glyphs (canvas's stand-in
+ * for CSS `paint-order: stroke`), as a fraction of the font's pixel size, so the
+ * text stays legible over any terrain beneath it (mockup `--ink-stroke`).
  */
-const NAME_FONT =
-  'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+const TEXT_HALO_FRACTION = 0.16;
+/** A Label's gilded glow blur, as a fraction of its font px (mockup `.label` drop-shadow). */
+const LABEL_GLOW_BLUR = 0.32;
+/**
+ * How many times the glow fill is laid down before the outlined word. The glow
+ * token is semi-transparent (it's shared with the chrome), so a single canvas
+ * shadow reads faint; stacking a few passes builds the bloom up to the mockup's
+ * CSS `drop-shadow` without a stronger, one-off colour.
+ */
+const LABEL_GLOW_PASSES = 3;
 /** A Hex name's text height as a fraction of the on-screen hex radius — kept small. */
 const NAME_SCALE = 0.34;
 /**
@@ -187,7 +198,6 @@ interface LabelBox {
 
 /** The themed colours one frame needs, resolved from CSS custom properties. */
 interface Palette {
-  readonly void: string;
   readonly hover: string;
   readonly line: string;
   /** The ink a feature marker is stroked in, from `--feature-ink`. */
@@ -196,6 +206,10 @@ interface Palette {
   readonly labelInk: string;
   /** The ink a Hex name is filled in, from `--name-ink` (ADR-0016). */
   readonly nameInk: string;
+  /** The halo stroked behind name/label text for legibility, from `--ink-stroke`. */
+  readonly inkStroke: string;
+  /** The gilded glow a Label's fill casts, from `--glow`. */
+  readonly glow: string;
   /** The accent a selection highlight is stroked in, from `--gold-strong`. */
   readonly selected: string;
   /** The danger ink a blocked move cell is washed in, from `--ember` (issue #64). */
@@ -294,12 +308,13 @@ export class Canvas2dMapRenderer implements MapRenderer {
       terrainPalette.map((t) => [t.id, read(t.fill, '#888')]),
     ) as Record<TerrainId, string>;
     return {
-      void: read('--color-canvas-bg', '#1b1b1b'),
       hover: read('--color-gold-soft', 'rgba(212,175,55,.3)'),
       line: read('--color-hex-line', '#888'),
       featureInk: read('--color-feature-ink', '#f4ecd8'),
       labelInk: read('--color-label-ink', '#f4ecd8'),
       nameInk: read('--color-name-ink', '#f4ecd8'),
+      inkStroke: read('--color-ink-stroke', '#0a0b16'),
+      glow: read('--color-glow', 'rgba(217,178,90,.5)'),
       selected: read('--color-gold-strong', '#7e560f'),
       blocked: read('--color-ember', '#a4402e'),
       terrain,
@@ -334,9 +349,11 @@ export class Canvas2dMapRenderer implements MapRenderer {
 
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
 
-    // Void: a flat neutral fill across the whole surface (CONTEXT.md → Void).
-    ctx.fillStyle = this.palette.void;
-    ctx.fillRect(0, 0, this.width, this.height);
+    // Void: clear to transparent so the host's Vellum field (its themed gradient,
+    // paper grain, and edge vignette) shows through where nothing is painted
+    // (CONTEXT.md → Void). Painted hexes draw opaque on top; the field is CSS, so
+    // it tracks the theme without the renderer re-painting it each frame.
+    ctx.clearRect(0, 0, this.width, this.height);
 
     const visible = hexesInRect(this.layout, this.visibleWorldRect(camera));
     // The visible hexes keyed for membership lookups — shared by the region
@@ -441,11 +458,18 @@ export class Canvas2dMapRenderer implements MapRenderer {
     // typography stays on top. The font/baseline are set once for the whole pass.
     if (named.length > 0) {
       const radius = this.layout.size.y * camera.zoom;
+      const namePx = radius * NAME_SCALE;
       ctx.save();
-      ctx.fillStyle = this.palette.nameInk;
-      ctx.font = `${radius * NAME_SCALE}px ${NAME_FONT}`;
+      ctx.font = `600 ${namePx}px ${MAP_FONT}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
+      // A dark/ivory halo behind each name keeps it legible over any terrain
+      // (paint-order: stroke). Set once for the whole pass; drawHexName strokes
+      // then fills each name.
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = namePx * TEXT_HALO_FRACTION;
+      ctx.strokeStyle = this.palette.inkStroke;
+      ctx.fillStyle = this.palette.nameInk;
       for (const { hex, name, hasFeature } of named) {
         this.drawHexName(ctx, camera, hex, name, hasFeature ? radius * NAME_FEATURE_OFFSET : 0);
       }
@@ -675,8 +699,24 @@ export class Canvas2dMapRenderer implements MapRenderer {
     ctx.save();
     ctx.translate(centre.x, centre.y);
     if (label.rotation) ctx.rotate((label.rotation * Math.PI) / 180);
-    ctx.font = `${fontPx}px ${LABEL_FONT}`;
+    ctx.font = `italic 600 ${fontPx}px ${MAP_FONT}`;
     const width = ctx.measureText(label.text).width;
+    // The cartographic, illuminated treatment that sets a Label apart from a Hex
+    // name (mockup `.label`). The fillStyle (labelInk) is the caller's; the rest
+    // unwinds on the restore. Back to front:
+    //   1. the gilded glow — stroke the word a few times with a gold shadow. The
+    //      bloom is cast from the *outlined* glyph (a fat shape), matching the
+    //      mockup's CSS drop-shadow, which blurs the whole stroked word — not the
+    //      thin fill, which would read shy. These strokes also lay down the dark
+    //      legibility halo (paint-order: stroke).
+    //   2. the gilded fill on top, so the bloom rings a crisp outlined word.
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = fontPx * TEXT_HALO_FRACTION;
+    ctx.strokeStyle = this.palette.inkStroke;
+    ctx.shadowColor = this.palette.glow;
+    ctx.shadowBlur = fontPx * LABEL_GLOW_BLUR;
+    for (let i = 0; i < LABEL_GLOW_PASSES; i++) ctx.strokeText(label.text, 0, 0);
+    ctx.shadowBlur = 0;
     ctx.fillText(label.text, 0, 0);
     ctx.restore();
 
@@ -705,6 +745,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
     offsetY: number,
   ): void {
     const centre = camera.worldToScreen(hexToPixel(this.layout, hex));
+    ctx.strokeText(name, centre.x, centre.y + offsetY);
     ctx.fillText(name, centre.x, centre.y + offsetY);
   }
 

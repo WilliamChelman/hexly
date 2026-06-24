@@ -30,10 +30,9 @@ import { ThemeService } from '../core/theme.service';
 import { ToasterService } from '../core/toaster.service';
 import { terrainKey } from './catalog-keys';
 import { EditorStore, SelectMode, ToolId } from './editor-store';
-import { Button } from '../ui/button';
-import { Coord } from '../ui/coord';
-import { Eyebrow } from '../ui/eyebrow';
 import { Icon } from '../ui/icon/icon';
+import { CoordReadout } from './coord-readout';
+import { ZoomControl } from './zoom-control';
 import { Camera } from './camera';
 import {
   Canvas2dMapRenderer,
@@ -92,7 +91,7 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
 @Component({
   selector: 'app-map-canvas',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Coord, Eyebrow, Icon, TranslocoPipe],
+  imports: [CoordReadout, Icon, ZoomControl, TranslocoPipe],
   template: `
     <canvas
       #canvas
@@ -109,89 +108,96 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
       (wheel)="onWheel($event)"
     ></canvas>
 
-    <!-- Hover-coordinate readout, bottom-left. '.readout' is a test hook (map-canvas.spec). -->
-    <div
-      class="readout absolute bottom-4 left-4 flex items-center gap-2 py-1 px-3 border border-line rounded-full shadow-1 backdrop-blur-[4px] pointer-events-none"
-    >
-      <app-coord>q {{ hover()?.q ?? 0 }} · r {{ hover()?.r ?? 0 }}</app-coord>
-      <span class="text-line-strong">·</span>
-      <span appEyebrow>{{ readoutKey() | transloco }}</span>
-    </div>
+    <!--
+      The Vellum field's two top layers, over the (transparent-Void) canvas and
+      below the UI overlays by DOM order. '.field-grain' is the faint paper tooth;
+      '.field-vignette' is the soft edge darkening (codex vellum field). Both inert
+      to the pointer so neither intercepts a canvas gesture.
+    -->
+    <div class="field-grain" aria-hidden="true"></div>
+    <div class="field-vignette" aria-hidden="true"></div>
+
+    <!-- Hover-coordinate readout, bottom-left (the canvas owns the hover state). -->
+    <app-coord-readout
+      class="absolute bottom-4 left-4"
+      [coord]="hover()"
+      [terrainKey]="readoutKey()"
+    />
 
     <!--
       Zoom/fit controls, bottom-right, lifted above the floating right dock
       (z-2 over the dock's z-1, ADR-0013) so a tall open panel can't cover them.
     -->
-    <div
-      class="zoom absolute right-4 bottom-4 z-[2] flex items-center gap-1 p-1 border border-line rounded-full shadow-2 backdrop-blur-[4px]"
-      role="group"
-      [attr.aria-label]="'editorShell.canvas.zoom' | transloco"
-    >
-      <button
-        type="button"
-        appButton
-        icon
-        size="sm"
-        [attr.aria-label]="'editorShell.canvas.zoomIn' | transloco"
-        (click)="zoomByStep(1)"
-      >
-        <app-icon name="plus" [size]="16" />
-      </button>
-      <app-coord class="min-w-[3.4em] text-center">{{ zoomPercent() }}%</app-coord>
-      <button
-        type="button"
-        appButton
-        icon
-        size="sm"
-        [attr.aria-label]="'editorShell.canvas.zoomOut' | transloco"
-        (click)="zoomByStep(-1)"
-      >
-        <app-icon name="minus" [size]="16" />
-      </button>
-      <button
-        type="button"
-        appButton
-        icon
-        size="sm"
-        [attr.aria-label]="'editorShell.canvas.fit' | transloco"
-        (click)="recenter()"
-      >
-        <app-icon name="fit" [size]="16" />
-      </button>
-    </div>
+    <app-zoom-control
+      class="absolute right-4 bottom-4 z-[2]"
+      [percent]="zoomPercent()"
+      (zoomIn)="zoomByStep(1)"
+      (zoomOut)="zoomByStep(-1)"
+      (fit)="recenter()"
+    />
   `,
   styles: `
     /*
       The host sets no position of its own — placement is the parent's prerogative
       (the shell lays this out full-bleed, ADR-0013). It owns only its appearance:
-      it clips to its box and paints the map's parchment/astral wash. Once the
-      shell positions it, the host is the containing block for the readout/zoom
-      overlays below. (No 'position' here is also what lets the shell's inline
-      'absolute inset-0' win — an emulated :host rule would be unlayered and beat
-      it.)
+      it clips to its box and paints the map's Solar/Astral Vellum wash — a soft
+      top-edge glow over a directional paper gradient (codex vellum field), shown
+      through the canvas's transparent Void. Once the shell positions it, the host
+      is the containing block for the field/readout/zoom overlays below.
+      'isolation' confines the .field-grain blend to the map, so it never reaches
+      the page behind. (No 'position' here is also what lets the shell's inline
+      'absolute inset-0' win — an emulated :host rule would be unlayered and beat it.)
     */
     :host {
       overflow: hidden;
-      background: radial-gradient(
-        120% 120% at 50% 0%,
-        var(--color-canvas-bg),
-        var(--color-canvas-mat)
-      );
+      isolation: isolate;
+      background:
+        radial-gradient(
+          110% 85% at 50% -6%,
+          var(--color-canvas-glow),
+          transparent 60%
+        ),
+        linear-gradient(
+          165deg,
+          var(--color-canvas-bg),
+          var(--color-canvas-mat)
+        );
     }
     /*
-      Only the frosted background stays scoped: it's a color-mix() over a theme
-      token. 'bg-surface/NN' would re-theme on modern browsers (its @supports
-      branch is the same oklab color-mix over var(--color-surface)), but the
-      modifier also emits a baked-srgb fallback at the light hex that wouldn't
-      re-theme on a browser lacking lab color-mix — so the single authored oklab
-      declaration is kept (ADR-0021). Each overlay's layout/border/shadow/blur is
-      inline; this one property is all that's left here, anchored on the kept class.
+      Paper tooth for the Vellum field. A single tiling SVG fractal-noise tile,
+      desaturated, blended at low opacity so it adds grain without shifting the
+      field's colour. The blend is themed (multiply darkens the light paper,
+      screen lifts the night paper, like the mockup), and it sits between the
+      canvas and the UI overlays by DOM order (no z-index, so readout/zoom stay
+      on top).
     */
-    .readout {
-      background: color-mix(in oklab, var(--color-surface) 86%, transparent);
+    .field-grain {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.06;
+      mix-blend-mode: multiply;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-size: 180px 180px;
     }
-    .zoom {
-      background: color-mix(in oklab, var(--color-surface) 88%, transparent);
+    :host-context([data-theme='dark']) .field-grain {
+      opacity: 0.05;
+      mix-blend-mode: screen;
+    }
+    /*
+      The Vellum field's soft edge vignette: clear at the centre, sinking to the
+      themed edge ink at the corners. Rides above the grain, below the UI overlays
+      (DOM order). Inert to the pointer.
+    */
+    .field-vignette {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(
+        120% 90% at 50% 42%,
+        transparent 56%,
+        var(--color-canvas-edge) 100%
+      );
     }
   `,
 })

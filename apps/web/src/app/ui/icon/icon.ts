@@ -93,6 +93,11 @@ const GLYPHS = {
       'stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"',
     body: '<path d="M9 7H15a5 5 0 0 1 0 10H8" /><path d="M9 3 5 7l4 4" />',
   },
+  user: {
+    attrs:
+      'stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"',
+    body: '<circle cx="12" cy="8" r="3.5" /><path d="M5.5 19a6.5 6.5 0 0 1 13 0" />',
+  },
 } as const;
 
 export type IconName = keyof typeof GLYPHS;

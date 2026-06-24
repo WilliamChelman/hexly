@@ -35,6 +35,9 @@ export class LocaleService {
   /** The active locale, readable by the UI (e.g. to mark the switcher). */
   readonly lang = this.pref.value;
 
+  /** Every locale Hexly ships, for a UI offering the choice (ADR-0014). */
+  readonly locales = LOCALES;
+
   /** Switch the UI language live and remember it for the next visit. */
   set(lang: Locale): void {
     this.pref.set(lang);
