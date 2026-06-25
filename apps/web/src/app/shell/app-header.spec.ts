@@ -50,9 +50,10 @@ describe('AppHeader', () => {
     const fixture = TestBed.createComponent(AppHeader);
     fixture.detectChanges();
 
-    expect(
-      fixture.nativeElement.querySelector('button[aria-label="Open user menu"]'),
-    ).not.toBeNull();
+    // Assert the menu is hosted, not its rendered trigger: the trigger's label is
+    // translated, and a synchronous render can beat the catalog preload depending
+    // on test-bundle order. The trigger itself is covered by user-menu.spec.
+    expect(fixture.nativeElement.querySelector('app-user-menu')).not.toBeNull();
   });
 
   it('renders the declarative eyebrow and title a page sets', () => {
