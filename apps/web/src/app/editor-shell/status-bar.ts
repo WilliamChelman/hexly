@@ -52,8 +52,7 @@ export class StatusBar implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly store = inject(EditorStore);
 
-  /** How many hexes the user has painted — the document is sparse, so this is
-   * exactly the count of records, not a grid area (ADR-0003). */
+  /** How many hexes the user has painted (sparse document — record count, ADR-0003). */
   protected readonly hexCount = computed(
     () => Object.keys(this.store.document().hexes).length,
   );

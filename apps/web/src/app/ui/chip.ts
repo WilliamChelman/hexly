@@ -22,8 +22,7 @@ export type ChipTone = 'gold' | 'sea' | 'astra';
   },
   template: `<ng-content />`,
   styles: `
-    /* The codex pill: a display-face small-caps badge, widely tracked. Mirrors
-       the mockup '.pill'. */
+    /* Display-face small-caps badge, widely tracked. */
     :host {
       display: inline-flex;
       align-items: center;

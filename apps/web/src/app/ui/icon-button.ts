@@ -52,8 +52,7 @@ import {
         border-color var(--dur-fast) var(--ease-out),
         color var(--dur-fast) var(--ease-out);
     }
-    /* Hover (only when not armed — the active gem keeps its dark-on-gold glyph):
-       gold glyph + a gilded border, keeping the sunken fill (no swap). */
+    /* Hover (only when not armed): gold glyph + gilded border, fill unchanged. */
     :host(:hover:not(:disabled):not(.is-active)) {
       color: var(--color-gold);
       border-color: var(--color-line-strong);

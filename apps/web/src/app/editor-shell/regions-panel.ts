@@ -64,9 +64,8 @@ import { EditorStore } from './editor-store';
       <p class="muted text-sm leading-normal text-ink-muted">{{ 'editorShell.regionsPanel.emptyHint' | transloco }}</p>
     }
   `,
-  // Celestial Codex touches (ADR-0007, scoped): a gold-ringed swatch that
-  // brightens to a soft glow on the selected Region. (The eyebrow's ✦ mark is
-  // the Eyebrow primitive's own `mark` variant.)
+  // Scoped chrome (ADR-0007): a gold-ringed swatch that brightens to a soft
+  // glow on the selected Region.
   styles: `
     [appSwatch] {
       box-shadow: var(--shadow-inset), 0 0 7px -2px currentColor;

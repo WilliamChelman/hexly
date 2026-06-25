@@ -76,8 +76,7 @@ export type ButtonSize = 'md' | 'sm';
       box-shadow: none;
     }
 
-    /* Gilded — metallic gradient fill, gold glow, and an inset top-highlight
-       that reads as light catching leaf. The glow strengthens on hover. */
+    /* Gilded — gradient fill, gold glow, inset top-highlight; glow grows on hover. */
     :host(.is-primary) {
       --_fg: var(--color-on-gilded);
       background: var(--gradient-gold);

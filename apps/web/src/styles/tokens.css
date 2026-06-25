@@ -1,31 +1,17 @@
 /*
- * Hexly design tokens — the theme-variant + non-utility layer
- * ---------------------------------------------------------------------------
- * The utility-shaped tokens (colours, fonts, the type scale, spacing, radii,
- * shadows) live in the Tailwind `@theme` block in `styles.css` (ADR-0020):
- * they generate on-brand utilities *and* are emitted as `--color-*` /
- * `--spacing-*` / `--text-*` / … on `:root` for scoped component styles to
- * consume. There is no longer a parallel `--space-*` / `--surface` layer.
+ * Hexly design tokens — the theme-variant + non-utility layer.
  *
- * This file carries the two things `@theme` can't:
- *   1. The DARK theme — reassigning the generated `--color-*` (and the raw
- *      `--shadow-*`, below) under [data-theme='dark']. For colours `@theme`
- *      holds only the light value, so the override point is the generated
- *      property. This file is imported after `tailwindcss`, so the dark block
- *      cascades over the `:root` Tailwind emits (the [data-theme] selector also
- *      out-specifies it).
- *   2. Non-utility raw tokens — motion (`--dur-*`/`--ease-*`), elevation
- *      (`--shadow-*`), and fixed layout rails (`--rail-*`,
- *      `--container-reading`). Elevation can't live in `@theme` as a generating
- *      utility: Tailwind inlines a `shadow-*` utility's *value* instead of
- *      referencing `var(--shadow-*)`, so a generated `shadow-1` would bake the
- *      light value and never re-theme. The light values therefore live here as
- *      plain re-themable vars, wrapped as a custom `@utility` in styles.css
- *      (ADR-0021).
+ * Utility-shaped tokens (colours, fonts, type, spacing, radii) live in the
+ * `@theme` block in styles.css (ADR-0020). This file carries what `@theme` can't:
+ *   1. The DARK theme — reassigning the generated `--color-*` / `--shadow-*`
+ *      under [data-theme='dark']. Imported after `tailwindcss`, so it cascades
+ *      over the `:root` Tailwind emits.
+ *   2. Raw non-utility tokens — motion (`--dur-*`/`--ease-*`), elevation
+ *      (`--shadow-*`, see ADR-0021), layout rails (`--rail-*`, `--container-reading`).
  *
  * Concept: the Celestial Codex — the cartographer's table across the sky.
- *   - Light  "Solar"  — a sunlit almanac: warm ivory paper, heliograph gold.
- *   - Dark   "Astral" — the same chart by night: indigo + constellation gold.
+ *   - Light "Solar"  — a sunlit almanac: warm ivory paper, heliograph gold.
+ *   - Dark  "Astral" — the same chart by night: indigo + constellation gold.
  */
 
 :root {
@@ -44,19 +30,17 @@
   --rail-inspector: 320px;
   --container-reading: 68ch;
 
-  /* ---- Elevation — warm, paper-soft drop shadows (light "Parchment").
-     Raw vars, not a `@theme` utility (see header); the dark block below
-     reassigns them, and styles.css wraps 1/2/3/inset as `@utility shadow-*`. */
+  /* ---- Elevation — warm, paper-soft drop shadows. Raw re-themable vars
+     (ADR-0021); styles.css wraps 1/2/3/inset as `@utility shadow-*`. */
   --shadow-1: 0 1px 2px rgba(60, 44, 22, 0.12);
   --shadow-2: 0 4px 12px -2px rgba(60, 44, 22, 0.2);
   --shadow-3: 0 16px 36px -8px rgba(50, 36, 18, 0.32);
   --shadow-inset: inset 0 1px 2px rgba(60, 44, 22, 0.12);
   --shadow-focus: 0 0 0 3px rgba(154, 106, 22, 0.32); /* focus-visible ring  */
 
-  /* ---- Gilded chrome — the metallic sheen + glow of the Celestial Codex.
-     Raw vars (like --shadow-*): consumed by scoped component styles, not as
-     utilities. --gradient-gold re-themes for free via the stop vars, which the
-     dark block reassigns; only --color-glow needs a dark override. */
+  /* ---- Gilded chrome — metallic sheen + glow. Raw vars consumed by scoped
+     styles. --gradient-gold re-themes via its stop vars; only --color-glow
+     needs a dark override (below). */
   --gradient-gold: linear-gradient(
     180deg,
     var(--color-gold-bright),

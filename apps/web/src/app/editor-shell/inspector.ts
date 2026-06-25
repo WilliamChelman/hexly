@@ -316,9 +316,8 @@ interface SelectedEntity {
       <p class="muted text-sm leading-normal text-ink-muted">{{ 'editorShell.inspector.emptyHint' | transloco }}</p>
     }
   `,
-  // Celestial Codex right-rail touches (ADR-0007, scoped to this component): a
-  // framed "leaf" — gold corner brackets on lifted paper — around each
-  // single-selection editor. (The eyebrow ✦ mark is the Eyebrow `mark` variant.)
+  // Scoped chrome (ADR-0007): a framed "leaf" — gold corner brackets on lifted
+  // paper — around each single-selection editor.
   styles: `
     .leaf {
       position: relative;

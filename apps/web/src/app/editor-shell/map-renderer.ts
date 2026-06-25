@@ -34,19 +34,13 @@ const REGION_BORDER_WIDTH = 2.5;
 const MARKER_SCALE = 1.3;
 /** A marker's stroke weight in screen pixels, held constant across zoom. */
 const MARKER_STROKE = 1.6;
-/**
- * The authoring viewBox the feature `path`s are drawn in: a 24×24 box, matching
- * the `<svg viewBox="0 0 24 24">` the UI icon components use. The marker is
- * scaled from this box and translated by its half (12) to centre it on the hex.
- */
+/** The 24×24 viewBox feature `path`s are authored in (matches the UI icons);
+ *  markers scale from this box and translate by half (12) to centre on the hex. */
 const ICON_BOX = 24;
 /**
- * The display-serif stack both a Label and a Hex name are drawn in — Marcellus,
- * the codex display face, falling back through common serifs so the map still
- * reads without the bundled webfont (issue #10). Name and Label share the family
- * but stay distinct by *treatment* (ADR-0016): a name is upright, dim, and
- * haloed; a Label is italic, brighter, larger, and carries a gilded glow — so a
- * name never reads as a second Label system even though both are cartographic.
+ * Display-serif stack for both Labels and Hex names — falls back through common
+ * serifs so the map reads without the bundled webfont (issue #10). Name vs Label
+ * stay distinct by treatment, not family (ADR-0016).
  */
 const MAP_FONT = 'Marcellus, Georgia, "Times New Roman", serif';
 /**
