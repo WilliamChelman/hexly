@@ -45,15 +45,9 @@ import { StatusBar } from './status-bar';
         <app-map-canvas class="absolute inset-0" />
         <app-tool-palette class="absolute top-3 left-3 z-[1]" />
         <!--
-          The right dock: the dismissible panel (Inspector / Regions) and the edge
-          rail laid out as one flex row, so the panel always sits just left of the
-          rail with a consistent gap — no hand-computed offsets (ADR-0013). The
-          rail toggles the Regions list on and off; selecting an entity or a Region
-          opens the Inspector. When the panel is closed (rightPanel is null) only
-          the bare rail shows, so the map is clear. The dock ignores the pointer in
-          its empty area (so the canvas stays interactive below a short panel) and
-          each child re-enables it with pointer-events-auto. The floating card
-          chrome (width, edge, radius, shadow) is inline on the panel elements.
+          Right dock: panel (Inspector / Regions) + edge rail as a flex row — no
+          hand-computed offsets (ADR-0013). pointer-events-none so the canvas stays
+          interactive below a short panel; each child re-enables with pointer-events-auto.
         -->
         <div
           class="absolute top-3 right-3 bottom-3 flex items-start gap-2 z-[1] pointer-events-none"

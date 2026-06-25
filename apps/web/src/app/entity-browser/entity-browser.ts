@@ -23,7 +23,6 @@ import { Button } from '../ui/button';
 import { Panel } from '../ui/panel';
 import { Icon } from '../ui/icon/icon';
 
-/** The title every freshly created Entity is given (the user renames later). */
 const NEW_MAP_TITLE = 'Untitled map';
 const NEW_NOTE_TITLE = 'Untitled note';
 
@@ -200,22 +199,18 @@ export class EntityBrowser implements OnInit {
       edited: formatEdited(map.updatedAt, lang),
     }));
   });
-  /** Whether the initial list has resolved — gates the empty state. */
+  /** Whether the initial load has resolved — gates the empty state. */
   protected readonly loaded = signal(false);
-  /** Whether the initial list failed — shows an error state, not a blank page. */
+  /** Whether the initial load failed — shows an error panel instead. */
   protected readonly loadError = signal(false);
-  /** Whether a create is in flight — disables the New map button. */
+  /** Whether a create is in flight — disables the create buttons. */
   protected readonly creating = signal(false);
   /** The id of the Entity whose name is being edited inline, or `null`. */
   protected readonly renamingId = signal<string | null>(null);
 
   constructor() {
-    // Contribute this page's heading to the single app header (ADR-0015) as a
-    // computed, so the chrome tracks a live language switch — HeaderService owns
-    // the subscription. It is withdrawn automatically when this page is
-    // destroyed. Set in the constructor (not ngOnInit) so a same-route brand-link
-    // round-trip (/entities → / → /entities) that reuses the component keeps the heading
-    // intact.
+    // Set in constructor (not ngOnInit) so same-route round-trips that reuse the
+    // component keep the heading. HeaderService withdraws it on destroy (ADR-0015).
     this.header.set(
       computed(() => ({ eyebrow: this.pageEyebrow(), title: this.pageTitle() })),
       this.destroyRef,
@@ -223,9 +218,7 @@ export class EntityBrowser implements OnInit {
   }
 
   ngOnInit(): void {
-    // Mark the load resolved on either branch: a failed GET /entities must still
-    // surface something (an error panel) rather than leaving the page blank
-    // forever because `loaded` never flipped.
+    // Set `loaded` on error too: a failed fetch must show the error panel, not a blank page.
     this.maps$.list().subscribe({
       next: (maps) => {
         this._maps.set(maps);
@@ -246,8 +239,7 @@ export class EntityBrowser implements OnInit {
       .create(type === 'note' ? NEW_NOTE_TITLE : NEW_MAP_TITLE, type)
       .pipe(finalize(() => this.creating.set(false)))
       .subscribe({
-        // The route-scoped EditorSession loads the Entity on open; no pre-adopt
-        // from here (it would outlive the create's own page).
+        // EditorSession loads on open; no pre-adopt from here (it would outlive this page).
         next: (entity) => this.open(entity.id),
         error: () =>
           this.toaster.show(
@@ -257,8 +249,6 @@ export class EntityBrowser implements OnInit {
       });
   }
 
-  // Open any Entity through the one type-dispatching route (#70): the shell at
-  // `/entities/:id` loads it and renders the map editor or the note view.
   protected open(id: string): void {
     this.router.navigate(['/entities', id]);
   }
@@ -272,11 +262,8 @@ export class EntityBrowser implements OnInit {
   }
 
   /**
-   * Rename an Entity by name only (metadata, ADR-0018 — version untouched, no
-   * body). A blank or unchanged name — or one whose card is no longer listed
-   * (concurrently deleted) — just closes the editor without a round trip. On
-   * success the list row is refreshed from the server's Entity; on failure the
-   * input is closed and the error is surfaced rather than left stuck open.
+   * Rename by name only (ADR-0018). A blank, unchanged, or concurrently-deleted card
+   * closes the input without a round trip. On error, closes and toasts.
    */
   protected commitRename(id: string, name: string): void {
     const trimmed = name.trim();
@@ -286,8 +273,7 @@ export class EntityBrowser implements OnInit {
       return;
     }
     this.maps$.rename(id, trimmed).subscribe({
-      // EntityDetail is assignable to the summary list; the extra body it carries
-      // is harmless.
+      // EntityDetail is assignable to EntitySummary; the extra body is harmless.
       next: (updated) => {
         this._maps.update((maps) => maps.map((m) => (m.id === id ? updated : m)));
         this.renamingId.set(null);

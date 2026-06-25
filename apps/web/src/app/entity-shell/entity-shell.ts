@@ -12,20 +12,13 @@ import { EditorShell } from '../editor-shell/editor-shell';
 import { NoteView } from '../note-view/note-view';
 
 /**
- * The one open-Entity route (#70): `/entities/:id` loads the Entity the URL
- * points at, then dispatches by its `type` — a `hexmap` opens the full
- * {@link EditorShell}, a `note` the minimal {@link NoteView}. The type is known
- * only after the load, so this thin shell does the load (reusing an already
- * adopted Entity without a round trip, ADR-0018) and renders the right view
- * once it resolves. A failed load (404 — deleted, foreign, or typo'd id) returns
- * to the library rather than stranding the user on a blank page (#3).
+ * The open-Entity route (`/entities/:id`, #70): loads the Entity, then dispatches
+ * by `type` — `hexmap` → {@link EditorShell}, `note` → {@link NoteView}. A failed
+ * load (404) sends the user back to the library (#3).
  *
- * This is the one loader for the route: it opens the Entity into the shared
- * {@link EditorSession}; the views ({@link EditorShell}, {@link NoteView}) and the
- * header outlet only read `session.current()`. Dispatching on the open Entity's
- * `type` (not a routed-id gate) keeps the editor mounted across a map→map
- * navigation — only the canvas swaps — while the session's write guards make a
- * mid-navigation Save safe.
+ * Single loader for the route: views only read `session.current()`. Dispatching on
+ * the open Entity's `type` (not a routed-id gate) keeps the editor mounted across
+ * map→map navigation — only the canvas swaps.
  */
 @Component({
   selector: 'app-entity-shell',
@@ -54,9 +47,8 @@ export class EntityShell {
   );
 
   constructor() {
-    // Open whatever Entity the URL points at, reopening on an id change.
-    // `switchMap` cancels an in-flight open when the id changes, so opening
-    // /entities/A then /entities/B can't let a late A response land over B.
+    // switchMap cancels an in-flight load on id change, so /entities/A then
+    // /entities/B can't let a stale A response land over B's canvas.
     this.route.paramMap
       .pipe(
         map((params) => params.get('id')),

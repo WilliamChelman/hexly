@@ -11,11 +11,8 @@ import { EditorSession } from '../editor-shell/editor-session';
 import { HeaderService } from '../shell/header.service';
 
 /**
- * The minimal note view (#70): the named shell a `note` Entity opens into,
- * parallel to {@link EditorShell} for a `hexmap`. It reads the open Entity from
- * the shared {@link EditorSession} — {@link EntityShell} has already loaded it —
- * and shows its name; the rich-text Content editor (TipTap, ADR-0019) lands in a
- * later slice, so for now this is a named placeholder, not an editor.
+ * The view a `note` Entity opens into (#70), parallel to {@link EditorShell} for a
+ * `hexmap`. Placeholder — TipTap content editor (ADR-0019) lands in a later slice.
  */
 @Component({
   selector: 'app-note-view',
@@ -47,9 +44,7 @@ export class NoteView {
   protected readonly name = computed(() => this.session.current()?.name ?? '');
 
   constructor() {
-    // Contribute this note's name to the single app header (ADR-0015) as a
-    // computed, so the chrome tracks renames and a live language switch. The tab
-    // title is owned by EditorSession, shared with the map editor.
+    // Tab title is owned by EditorSession (shared with the map editor), not here.
     this.header.set(
       computed(() => ({ eyebrow: this.eyebrow(), title: this.name() })),
       this.destroyRef,
