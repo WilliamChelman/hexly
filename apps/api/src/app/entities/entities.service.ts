@@ -21,23 +21,15 @@ import { entities } from '../db/schema';
 const INITIAL_VERSION = 1;
 
 /**
- * The outcome of a save. The `saved`/`conflict` arms are the client-observable
- * {@link EntitySaveOutcome} shared with the web client: `saved` carries the
- * stored Entity at its new version; `conflict` means the base version had moved
- * — `current` is the Entity as it now stands, so the caller can surface a 409
- * and offer a re-pull without a second round trip (ADR-0018). `not-found` is
- * kept api-local: it maps to a 404, not a JSON body, so it stays out of the
- * shared union.
+ * The shared {@link EntitySaveOutcome} (`saved`/`conflict`) plus an api-local
+ * `not-found` arm that maps to a 404 rather than a JSON body (ADR-0018).
  */
 export type SaveResult = EntitySaveOutcome | { status: 'not-found' };
 
 /**
- * The Entity persistence domain behind a small interface (ADR-0018, extending
- * ADR-0002): every Entity is one JSON body on an `entities` row. All access is
- * owner-scoped — the caller passes the authenticated user's id and the service
- * never returns or mutates a row owned by anyone else. Serialization of the body
- * and the optimistic-concurrency `version` bookkeeping live here; callers only
- * handle {@link EntityDetail}/{@link EntitySummary} values.
+ * Entity persistence: one JSON body per `entities` row (ADR-0018, ADR-0002).
+ * All access is owner-scoped — the service never returns or mutates a row owned
+ * by anyone else. Body serialization and `version` bookkeeping live here.
  */
 @Injectable()
 export class EntitiesService {
@@ -45,8 +37,7 @@ export class EntitiesService {
 
   /** The owner's Entities as metadata only — the bodies are loaded on open. */
   list(ownerId: string): EntitySummary[] {
-    // Select only the summary columns: the `document` TEXT can be large and is
-    // discarded by {@link toSummary}, so loading it here is pure waste.
+    // Summary columns only — skip the potentially large `document` TEXT.
     return this.db
       .select({
         id: entities.id,
@@ -92,8 +83,7 @@ export class EntitiesService {
       updatedAt: now,
     };
     this.db.insert(entities).values(row).run();
-    // We just minted `body` in memory and validated it — return it directly
-    // rather than re-parsing the string we serialized from it.
+    // `body` is already in hand and valid — return it without re-parsing.
     return detailOf(row, body);
   }
 
@@ -102,21 +92,16 @@ export class EntitiesService {
    * still matches the stored version — otherwise the Entity moved under the
    * caller and the save is a {@link SaveResult conflict} rather than a silent
    * overwrite (ADR-0018, ADR-0004). A successful save bumps the version by one.
-   *
-   * The version guard is enforced atomically by the SQL: the base version is a
-   * predicate in the UPDATE's WHERE clause, so the check and the write are a
-   * single statement and a row that moved between read and write cannot slip
-   * through. A zero-rows-changed result *is* the conflict.
+   * The guard is atomic: the base version is a WHERE predicate on the UPDATE,
+   * so zero rows changed *is* the conflict.
    */
   save(ownerId: string, id: string, req: SaveEntityRequest): SaveResult {
-    // Read first for the not-found case and to carry the columns a save does not
-    // touch (name, type, tags, ownerId, createdAt) into the response.
+    // Read first for not-found and to carry the untouched columns (name, type,
+    // tags, ownerId, createdAt) into the response.
     const row = this.ownedRow(ownerId, id);
     if (!row) return { status: 'not-found' };
 
-    // Set only the columns a save owns (document, version, timestamp) — never
-    // the whole row — so a concurrent rename's name is not written back over.
-    // The base version in the WHERE clause makes the concurrency check atomic.
+    // Set only the columns a save owns, so a concurrent rename isn't clobbered.
     const document = serialize(req.document);
     const version = req.version + 1;
     const updatedAt = Date.now();
@@ -132,15 +117,14 @@ export class EntitiesService {
       )
       .run();
     if (res.changes === 0) {
-      // The base version had moved (or the row vanished) between the read and
-      // the write: re-read to report the true current state.
+      // Base version moved (or row vanished) between read and write — re-read
+      // to report the true current state.
       const current = this.ownedRow(ownerId, id);
       return current
         ? { status: 'conflict', current: toDetail(current) }
         : { status: 'not-found' };
     }
-    // `req.document` is the validated body we just wrote — return it directly
-    // rather than re-parsing and re-validating the string we serialized from it.
+    // `req.document` is the validated body we just wrote — return it directly.
     return {
       status: 'saved',
       entity: detailOf({ ...row, version, updatedAt }, req.document),
@@ -148,11 +132,9 @@ export class EntitiesService {
   }
 
   /**
-   * Rename one of the owner's Entities. Metadata only: it sets the name (and the
-   * updated timestamp) and deliberately leaves the body and its `version`
-   * untouched, so renaming never invalidates an in-progress edit's base version
-   * (and is not itself subject to the body's concurrency check). Returns the
-   * updated Entity, or `null` if there is no such Entity for this owner.
+   * Rename one of the owner's Entities. Metadata only: leaves the body and its
+   * `version` untouched, so a rename never invalidates an in-progress edit's
+   * base version. Returns the updated Entity, or `null` if none for this owner.
    */
   rename(ownerId: string, id: string, name: string): EntityDetail | null {
     const row = this.ownedRow(ownerId, id);
@@ -172,9 +154,7 @@ export class EntitiesService {
    * (unknown id or not theirs), which the caller surfaces as 404.
    */
   delete(ownerId: string, id: string): boolean {
-    // A metadata-only ownership check: delete only needs to know the row exists
-    // and is this owner's, so it reads just `ownerId` rather than pulling the
-    // (potentially large) body through {@link ownedRow}.
+    // Read just `ownerId` for the ownership check — no need to pull the body.
     const owner = this.db
       .select({ ownerId: entities.ownerId })
       .from(entities)
@@ -186,8 +166,8 @@ export class EntitiesService {
   }
 
   /**
-   * Fetch a row only if `ownerId` owns it. The single owner-scoping primitive
-   * the read/save/delete paths share, so access control lives in one place.
+   * Fetch a row only if `ownerId` owns it — the shared owner-scoping primitive,
+   * so access control lives in one place.
    */
   private ownedRow(
     ownerId: string,
@@ -207,8 +187,7 @@ function serialize(body: EntityBody): string {
   return JSON.stringify(body);
 }
 
-/** The metadata columns {@link toSummary} reads — the body-free projection
- * `list` selects, and a structural subset of a full `$inferSelect` row. */
+/** A stored row without its `document` body — what `list` selects. */
 type SummaryRow = Omit<typeof entities.$inferSelect, 'document'>;
 
 /** Project a stored row onto the body-free {@link EntitySummary} metadata. */
@@ -217,9 +196,7 @@ function toSummary(row: SummaryRow): EntitySummary {
     id: row.id,
     ownerId: row.ownerId,
     name: row.name,
-    // Validate type/visibility against the schema rather than a bare cast: the
-    // Zod schema is the single source of truth and both runtimes check against
-    // it (ADR-0001).
+    // Validate against the schema (single source of truth) not a bare cast (ADR-0001).
     type: entityTypeSchema.parse(row.type),
     tags: tagsSchema.parse(row.tags),
     visibility: visibilitySchema.parse(row.visibility),
@@ -235,21 +212,17 @@ function toDetail(row: typeof entities.$inferSelect): EntityDetail {
 }
 
 /**
- * Assemble an {@link EntityDetail} from a row's metadata and an already-in-hand
- * body. The write paths (create/save) pass the body they just minted/validated,
- * so they pair {@link toSummary} with it directly and skip re-parsing the
- * serialized `document` — only the read path ({@link toDetail}) pays that cost.
+ * Assemble an {@link EntityDetail} from a row's metadata and an in-hand body.
+ * Write paths pass the body they just minted; only {@link toDetail} re-parses.
  */
 function detailOf(row: SummaryRow, document: EntityBody): EntityDetail {
   return { ...toSummary(row), document };
 }
 
 /**
- * Parse and validate a stored body. ADR-0001 makes the Zod schema the single
- * source of truth, so we validate the read path too: a row that fails to parse
- * or schema-validate is exceptional — only reachable via out-of-band corruption
- * or a botched migration — so we throw a descriptive Error naming the row (a
- * clear 500) rather than letting a bare cast crash cryptically deep downstream.
+ * Parse and validate a stored body (ADR-0001). A row that fails is exceptional
+ * — corruption or a botched migration — so throw a descriptive Error naming the
+ * row (a clear 500) rather than letting a bare cast crash deeper downstream.
  */
 function parseDocument(id: string, document: string): EntityBody {
   let parsed: unknown;

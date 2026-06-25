@@ -15,7 +15,8 @@ import {
   TranslocoService,
 } from '@jsverse/transloco';
 import { EntitySummary } from '@hexly/domain';
-import { EntitiesStore } from '../entities/entities.store';
+import { EntitiesClient } from '../entities/entities.client';
+import { EditorSession } from '../editor-shell/editor-session';
 import { HeaderService } from '../shell/header.service';
 import { Button } from '../ui/button';
 import { Panel } from '../ui/panel';
@@ -114,7 +115,8 @@ function formatEdited(updatedAt: number, lang: string): string {
   `,
 })
 export class MapLibrary implements OnInit {
-  private readonly maps$ = inject(EntitiesStore);
+  private readonly maps$ = inject(EntitiesClient);
+  private readonly session = inject(EditorSession);
   private readonly router = inject(Router);
   private readonly header = inject(HeaderService);
   private readonly destroyRef = inject(DestroyRef);
@@ -186,7 +188,12 @@ export class MapLibrary implements OnInit {
     this.maps$
       .create(NEW_MAP_TITLE, 'hexmap')
       .pipe(finalize(() => this.creating.set(false)))
-      .subscribe((map) => this.open(map.id));
+      .subscribe((map) => {
+        // Hand the created Entity to the editor before navigating, so openRoute
+        // reuses it without a redundant GET (#10).
+        this.session.adopt(map);
+        this.open(map.id);
+      });
   }
 
   protected open(id: string): void {
