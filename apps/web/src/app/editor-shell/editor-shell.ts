@@ -111,8 +111,8 @@ export class EditorShell {
 
     // Open whatever map the URL points at, and reopen it if the id changes
     // (e.g. navigating between maps without leaving the editor). `switchMap`
-    // cancels an in-flight open when the id changes, so navigating /maps/A then
-    // /maps/B can't let a late A response overwrite B's canvas (#1).
+    // cancels an in-flight open when the id changes, so navigating /entities/A then
+    // /entities/B can't let a late A response overwrite B's canvas (#1).
     this.route.paramMap
       .pipe(
         map((params) => params.get('id')),
@@ -123,7 +123,7 @@ export class EditorShell {
             // user back to the library rather than stranding them on a silently
             // blank editor (#3).
             catchError(() => {
-              this.router.navigateByUrl('/maps');
+              this.router.navigateByUrl('/entities');
               return EMPTY;
             }),
           ),

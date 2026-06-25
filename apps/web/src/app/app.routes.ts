@@ -11,31 +11,34 @@ export const appRoutes: Route[] = [
     title: 'auth.tabTitle',
   },
   {
-    // The library: every map the user owns, plus open / create / delete.
-    path: 'maps',
+    // The Entity browser: every Entity the user owns — notes and maps — plus
+    // open / create / rename / delete (#70).
+    path: 'entities',
     pathMatch: 'full',
     canActivate: [authGuard],
     loadComponent: () =>
-      import('./map-library/map-library').then((m) => m.MapLibrary),
+      import('./entity-browser/entity-browser').then((m) => m.EntityBrowser),
     // A translation key resolved by TranslationTitleStrategy; the value carries
     // the untranslated "Hexly" brand (ADR-0014).
-    title: 'mapLibrary.tabTitle',
+    title: 'entityBrowser.tabTitle',
   },
   {
-    // The editor for a specific map. The id is in the URL so a reload reopens
-    // the same map (issue #6). This does not collide with the API: the backend
-    // lives under `/api/*` (only `/api` is proxied), so `/maps/:id` is a pure
+    // The one open-Entity route (#70). The id is in the URL so a reload reopens
+    // the same Entity (issue #6). This does not collide with the API: the backend
+    // lives under `/api/*` (only `/api` is proxied), so `/entities/:id` is a pure
     // client route served by the SPA shell.
     //
     // A component-less route with two empty-path children fills the root shell's
-    // two outlets at once (ADR-0015): EditorShell into the primary outlet, and
-    // the editor's interactive header into AppHeader's named `header` outlet.
-    path: 'maps/:id',
+    // two outlets at once (ADR-0015): EntityShell into the primary outlet and
+    // EntityHeader into AppHeader's named `header` outlet. Each dispatches by the
+    // loaded Entity's type — a hexmap renders the map editor (and its interactive
+    // header), a note the minimal note view.
+    path: 'entities/:id',
     canActivate: [authGuard],
-    // The tab title is the open map's name composed with the brand
+    // The tab title is the open Entity's name composed with the brand
     // ("Aldermoor — Hexly"): TranslationTitleStrategy fills `documentTitleKey`'s
     // `{{name}}` slot from the open document. `title` is the fallback shown until
-    // the map loads — the bare "Hexly" brand, untranslated in every language
+    // it loads — the bare "Hexly" brand, untranslated in every language
     // (ADR-0014).
     title: 'editorShell.tabTitle',
     data: { documentTitleKey: 'editorShell.tabTitleNamed' },
@@ -43,18 +46,18 @@ export const appRoutes: Route[] = [
       {
         path: '',
         loadComponent: () =>
-          import('./editor-shell/editor-shell').then((m) => m.EditorShell),
+          import('./entity-shell/entity-shell').then((m) => m.EntityShell),
       },
       {
         path: '',
         outlet: 'header',
         loadComponent: () =>
-          import('./editor-shell/editor-header').then((m) => m.EditorHeader),
+          import('./entity-shell/entity-header').then((m) => m.EntityHeader),
       },
     ],
   },
   // Landing goes to the library.
-  { path: '', pathMatch: 'full', redirectTo: 'maps' },
+  { path: '', pathMatch: 'full', redirectTo: 'entities' },
   {
     path: 'styleguide',
     loadComponent: () =>
@@ -63,5 +66,5 @@ export const appRoutes: Route[] = [
     // the untranslated "Hexly" brand (ADR-0014).
     title: 'styleguide.tabTitle',
   },
-  { path: '**', redirectTo: 'maps' },
+  { path: '**', redirectTo: 'entities' },
 ];

@@ -73,7 +73,7 @@ import { EditorSession } from './editor-session';
     </div>
 
     <div class="flex items-center gap-2 ml-auto">
-      <a appButton variant="ghost" size="sm" routerLink="/maps">{{
+      <a appButton variant="ghost" size="sm" routerLink="/entities">{{
         'editorShell.allMaps' | transloco
       }}</a>
       <a appButton variant="ghost" size="sm" routerLink="/styleguide">{{

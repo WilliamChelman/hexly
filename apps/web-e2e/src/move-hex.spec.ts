@@ -16,9 +16,9 @@ test('drags a hex under Select to a new coordinate, and the move survives a relo
   page,
   request,
 }) => {
-  await page.goto('/maps');
+  await page.goto('/entities');
   await page.getByTestId('new-map').click();
-  await expect(page).toHaveURL(/\/maps\/[\w-]+$/);
+  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const mapId = page.url().split('/').pop();
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
@@ -109,9 +109,9 @@ test('drags a hex onto an occupied hex and swaps the two, surviving a reload', a
   page,
   request,
 }) => {
-  await page.goto('/maps');
+  await page.goto('/entities');
   await page.getByTestId('new-map').click();
-  await expect(page).toHaveURL(/\/maps\/[\w-]+$/);
+  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const mapId = page.url().split('/').pop();
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
@@ -192,9 +192,9 @@ test('drags a hex onto an occupied hex and swaps the two, surviving a reload', a
 test('Escape cancels an in-progress Hex drag, leaving the hex at its origin', async ({
   page,
 }) => {
-  await page.goto('/maps');
+  await page.goto('/entities');
   await page.getByTestId('new-map').click();
-  await expect(page).toHaveURL(/\/maps\/[\w-]+$/);
+  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
 
@@ -244,9 +244,9 @@ test('drags a multi-hex selection so the whole group moves by one offset', async
   page,
   request,
 }) => {
-  await page.goto('/maps');
+  await page.goto('/entities');
   await page.getByTestId('new-map').click();
-  await expect(page).toHaveURL(/\/maps\/[\w-]+$/);
+  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const mapId = page.url().split('/').pop();
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
@@ -318,9 +318,9 @@ test('refuses a blocked group move, leaving every hex where it was', async ({
   page,
   request,
 }) => {
-  await page.goto('/maps');
+  await page.goto('/entities');
   await page.getByTestId('new-map').click();
-  await expect(page).toHaveURL(/\/maps\/[\w-]+$/);
+  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const mapId = page.url().split('/').pop();
 
   const canvas = page.getByRole('img', { name: 'Hex map' });

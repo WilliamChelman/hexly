@@ -19,7 +19,7 @@ describe('TranslationTitleStrategy', () => {
           { path: 'login', component: Blank, title: 'auth.tabTitle' },
           {
             // The editor route derives its tab title from the open map's name.
-            path: 'maps/:id',
+            path: 'entities/:id',
             component: Blank,
             title: 'editorShell.tabTitle',
             data: { documentTitleKey: 'editorShell.tabTitleNamed' },
@@ -58,7 +58,7 @@ describe('TranslationTitleStrategy', () => {
 
   it('composes the pushed document name with the brand on a document-titled route', async () => {
     const { router, title, titles } = setup();
-    await router.navigateByUrl('/maps/42');
+    await router.navigateByUrl('/entities/42');
 
     titles.setDocumentName('The Reach of Aldermoor');
 
@@ -68,14 +68,14 @@ describe('TranslationTitleStrategy', () => {
   it('falls back to the bare brand until the document name is pushed', async () => {
     const { router, title } = setup();
 
-    await router.navigateByUrl('/maps/42');
+    await router.navigateByUrl('/entities/42');
 
     expect(title.getTitle()).toBe('Hexly');
   });
 
   it('tracks a live document rename with no navigation', async () => {
     const { router, title, titles } = setup();
-    await router.navigateByUrl('/maps/42');
+    await router.navigateByUrl('/entities/42');
     titles.setDocumentName('The Reach of Aldermoor');
 
     titles.setDocumentName('The Whisperwood');
@@ -85,7 +85,7 @@ describe('TranslationTitleStrategy', () => {
 
   it('leaves the document name and brand untranslated across a language switch', async () => {
     const { router, title, transloco, titles } = setup();
-    await router.navigateByUrl('/maps/42');
+    await router.navigateByUrl('/entities/42');
     titles.setDocumentName('The Reach of Aldermoor');
 
     transloco.setActiveLang('fr');
@@ -96,7 +96,7 @@ describe('TranslationTitleStrategy', () => {
 
   it('falls back to the route key once the document name is cleared', async () => {
     const { router, title, titles } = setup();
-    await router.navigateByUrl('/maps/42');
+    await router.navigateByUrl('/entities/42');
     titles.setDocumentName('The Reach of Aldermoor');
 
     // The editor clears the name when it leaves, so the bare brand shows again.

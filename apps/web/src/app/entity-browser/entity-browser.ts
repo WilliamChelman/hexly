@@ -14,7 +14,7 @@ import {
   TranslocoPipe,
   TranslocoService,
 } from '@jsverse/transloco';
-import { EntitySummary } from '@hexly/domain';
+import { EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient } from '../entities/entities.client';
 import { EditorSession } from '../editor-shell/editor-session';
 import { HeaderService } from '../shell/header.service';
@@ -22,8 +22,9 @@ import { Button } from '../ui/button';
 import { Panel } from '../ui/panel';
 import { Icon } from '../ui/icon/icon';
 
-/** The title every freshly created map is given (the user renames later). */
+/** The title every freshly created Entity is given (the user renames later). */
 const NEW_MAP_TITLE = 'Untitled map';
+const NEW_NOTE_TITLE = 'Untitled note';
 
 /**
  * Format an epoch-millis timestamp for `lang` using native `Intl` (ADR-0014 — no
@@ -41,31 +42,44 @@ function formatEdited(updatedAt: number, lang: string): string {
 }
 
 /**
- * The map library: the landing surface where a user sees every Hex Map they own,
- * opens one into the editor, creates a new one, or deletes one (issue #6 — the
- * "map list / open / create flow"). It holds the list as local state and keeps
- * it in sync with create/delete rather than re-fetching, so the view stays
- * responsive. Opening or creating navigates to `/maps/:id`, the editor route.
+ * The Entity browser: the landing surface (`/entities`) where a user sees every
+ * Entity they own — notes and maps together — with each one's name, type, tags,
+ * and last-edited date, and runs the lifecycle: create (note or map), open,
+ * rename in place, delete (#70, generalizing issue #6's map list). It holds the
+ * list as local state and keeps it in sync with create/rename/delete rather than
+ * re-fetching, so the view stays responsive. Opening or creating navigates to
+ * `/entities/:id`, the one type-dispatching route.
  */
 @Component({
-  selector: 'app-map-library',
+  selector: 'app-entity-browser',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [Button, Panel, Icon, TranslocoPipe],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
     <div class="max-w-[60rem] mx-auto py-6 px-5">
       <h1 class="sr-only">{{ pageTitle() }}</h1>
-      <div class="flex justify-end mb-5">
+      <div class="flex justify-end gap-2 mb-5">
+        <button
+          type="button"
+          appButton
+          variant="default"
+          data-testid="new-note"
+          [disabled]="creating()"
+          (click)="create('note')"
+        >
+          <app-icon name="plus" [size]="16" />
+          {{ 'entityBrowser.newNote' | transloco }}
+        </button>
         <button
           type="button"
           appButton
           variant="primary"
           data-testid="new-map"
           [disabled]="creating()"
-          (click)="newMap()"
+          (click)="create('hexmap')"
         >
           <app-icon name="plus" [size]="16" />
-          {{ (creating() ? 'mapLibrary.creating' : 'mapLibrary.newMap') | transloco }}
+          {{ (creating() ? 'entityBrowser.creating' : 'entityBrowser.newMap') | transloco }}
         </button>
       </div>
 
@@ -74,6 +88,17 @@ function formatEdited(updatedAt: number, lang: string): string {
           @for (card of cards(); track card.id) {
             <li>
               <section class="flex items-center gap-2 py-3 px-4" appPanel>
+                @if (renamingId() === card.id) {
+                  <input
+                    type="text"
+                    class="flex-1 font-display text-md text-ink-strong bg-surface-sunken border border-gold rounded-sm py-1 px-2 outline-none"
+                    [value]="card.title"
+                    [attr.data-testid]="'rename-input-' + card.id"
+                    [attr.aria-label]="'entityBrowser.renameLabel' | transloco"
+                    (keydown.enter)="commitRename(card.id, $any($event.target).value)"
+                    (keydown.escape)="cancelRename()"
+                  />
+                } @else {
                 <button
                   type="button"
                   class="flex flex-1 flex-col gap-1 p-0 text-left bg-transparent border-0 cursor-pointer"
@@ -81,9 +106,34 @@ function formatEdited(updatedAt: number, lang: string): string {
                   (click)="open(card.id)"
                 >
                   <span class="font-display text-md text-ink-strong" data-testid="map-title">{{ card.title }}</span>
+                  <span
+                    class="text-2xs uppercase tracking-wider text-ink-muted"
+                    [attr.data-testid]="'type-' + card.id"
+                    >{{ 'entityBrowser.type.' + card.type | transloco }}</span
+                  >
                   <span class="meta text-2xs text-ink-muted">{{
-                    'mapLibrary.edited' | transloco: { date: card.edited }
+                    'entityBrowser.edited' | transloco: { date: card.edited }
                   }}</span>
+                  @if (card.tags.length > 0) {
+                    <span
+                      class="flex flex-wrap gap-1 mt-1"
+                      [attr.data-testid]="'tags-' + card.id"
+                    >
+                      @for (tag of card.tags; track tag) {
+                        <span class="text-2xs text-ink-muted bg-surface-sunken rounded-sm py-px px-1">{{ tag }}</span>
+                      }
+                    </span>
+                  }
+                </button>
+                <button
+                  type="button"
+                  appButton
+                  variant="ghost"
+                  size="sm"
+                  [attr.data-testid]="'rename-' + card.id"
+                  (click)="startRename(card.id)"
+                >
+                  {{ 'entityBrowser.rename' | transloco }}
                 </button>
                 <button
                   type="button"
@@ -96,25 +146,26 @@ function formatEdited(updatedAt: number, lang: string): string {
                 >
                   {{ 'common.delete' | transloco }}
                 </button>
+                }
               </section>
             </li>
           }
         </ul>
       } @else if (loadError()) {
         <section class="p-6 text-center text-ink-muted" data-testid="load-error" appPanel>
-          <p>{{ 'mapLibrary.loadErrorTitle' | transloco }}</p>
-          <p class="text-sm">{{ 'mapLibrary.loadErrorHint' | transloco }}</p>
+          <p>{{ 'entityBrowser.loadErrorTitle' | transloco }}</p>
+          <p class="text-sm">{{ 'entityBrowser.loadErrorHint' | transloco }}</p>
         </section>
       } @else if (loaded()) {
         <section class="p-6 text-center text-ink-muted" data-testid="empty" appPanel>
-          <p>{{ 'mapLibrary.emptyTitle' | transloco }}</p>
-          <p class="text-sm">{{ 'mapLibrary.emptyHint' | transloco }}</p>
+          <p>{{ 'entityBrowser.emptyTitle' | transloco }}</p>
+          <p class="text-sm">{{ 'entityBrowser.emptyHint' | transloco }}</p>
         </section>
       }
     </div>
   `,
 })
-export class MapLibrary implements OnInit {
+export class EntityBrowser implements OnInit {
   private readonly maps$ = inject(EntitiesClient);
   private readonly session = inject(EditorSession);
   private readonly router = inject(Router);
@@ -125,8 +176,8 @@ export class MapLibrary implements OnInit {
   /** The translated page heading, shown both as the document's <h1> (sr-only)
    * and the header chrome title — sourced from one key so the two can't drift
    * and both re-render live when the language changes. */
-  protected readonly pageTitle = translateSignal('mapLibrary.heading');
-  private readonly pageEyebrow = translateSignal('mapLibrary.eyebrow');
+  protected readonly pageTitle = translateSignal('entityBrowser.heading');
+  private readonly pageEyebrow = translateSignal('entityBrowser.eyebrow');
 
   private readonly _maps = signal<EntitySummary[]>([]);
   /** The user's maps, newest first. */
@@ -142,6 +193,8 @@ export class MapLibrary implements OnInit {
     return this.maps().map((map) => ({
       id: map.id,
       title: map.name,
+      type: map.type,
+      tags: map.tags,
       edited: formatEdited(map.updatedAt, lang),
     }));
   });
@@ -151,13 +204,15 @@ export class MapLibrary implements OnInit {
   protected readonly loadError = signal(false);
   /** Whether a create is in flight — disables the New map button. */
   protected readonly creating = signal(false);
+  /** The id of the Entity whose name is being edited inline, or `null`. */
+  protected readonly renamingId = signal<string | null>(null);
 
   constructor() {
     // Contribute this page's heading to the single app header (ADR-0015) as a
     // computed, so the chrome tracks a live language switch — HeaderService owns
     // the subscription. It is withdrawn automatically when this page is
     // destroyed. Set in the constructor (not ngOnInit) so a same-route brand-link
-    // round-trip (/maps → / → /maps) that reuses the component keeps the heading
+    // round-trip (/entities → / → /entities) that reuses the component keeps the heading
     // intact.
     this.header.set(
       computed(() => ({ eyebrow: this.pageEyebrow(), title: this.pageTitle() })),
@@ -166,7 +221,7 @@ export class MapLibrary implements OnInit {
   }
 
   ngOnInit(): void {
-    // Mark the load resolved on either branch: a failed GET /maps must still
+    // Mark the load resolved on either branch: a failed GET /entities must still
     // surface something (an error panel) rather than leaving the page blank
     // forever because `loaded` never flipped.
     this.maps$.list().subscribe({
@@ -181,23 +236,57 @@ export class MapLibrary implements OnInit {
     });
   }
 
-  /** Create an empty map and open it straight in the editor. */
-  protected newMap(): void {
+  /** Create an empty Entity of `type` and open it straight away. */
+  protected create(type: EntityType): void {
     if (this.creating()) return;
     this.creating.set(true);
     this.maps$
-      .create(NEW_MAP_TITLE, 'hexmap')
+      .create(type === 'note' ? NEW_NOTE_TITLE : NEW_MAP_TITLE, type)
       .pipe(finalize(() => this.creating.set(false)))
-      .subscribe((map) => {
-        // Hand the created Entity to the editor before navigating, so openRoute
-        // reuses it without a redundant GET (#10).
-        this.session.adopt(map);
-        this.open(map.id);
+      .subscribe((entity) => {
+        // Hand the created Entity to the open-Entity seam before navigating, so
+        // openRoute reuses it without a redundant GET (#10).
+        this.session.adopt(entity);
+        this.open(entity.id);
       });
   }
 
+  // Open any Entity through the one type-dispatching route (#70): the shell at
+  // `/entities/:id` loads it and renders the map editor or the note view.
   protected open(id: string): void {
-    this.router.navigate(['/maps', id]);
+    this.router.navigate(['/entities', id]);
+  }
+
+  protected startRename(id: string): void {
+    this.renamingId.set(id);
+  }
+
+  protected cancelRename(): void {
+    this.renamingId.set(null);
+  }
+
+  /**
+   * Rename an Entity by name only (metadata, ADR-0018 — version untouched, no
+   * body). A blank or unchanged name just closes the editor without a round
+   * trip. On success the list row is refreshed from the server's Entity.
+   */
+  protected commitRename(id: string, name: string): void {
+    const trimmed = name.trim();
+    const current = this._maps().find((m) => m.id === id);
+    if (!trimmed || trimmed === current?.name) {
+      this.cancelRename();
+      return;
+    }
+    this.maps$.rename(id, trimmed).subscribe((updated) => {
+      // EntityDetail is assignable to the summary list; the extra body it carries
+      // is harmless and lets us refresh the open-Entity seam below without a cast.
+      this._maps.update((maps) => maps.map((m) => (m.id === id ? updated : m)));
+      // Keep the shared open-Entity seam fresh: if it still holds this Entity
+      // (e.g. just created, then renamed before reopening), refresh it so
+      // openRoute's reuse-by-id (#10) doesn't reopen the stale name.
+      if (this.session.current()?.id === id) this.session.adopt(updated);
+      this.renamingId.set(null);
+    });
   }
 
   /** Delete a map and drop it from the list once the server confirms. */

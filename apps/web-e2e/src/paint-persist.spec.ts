@@ -11,11 +11,11 @@ test('paints a hex, saves, and the hex survives a reload', async ({
   page,
   request,
 }) => {
-  await page.goto('/maps');
+  await page.goto('/entities');
   await page.getByTestId('new-map').click();
 
-  // Creating a map opens the editor at /maps/:id.
-  await expect(page).toHaveURL(/\/maps\/[\w-]+$/);
+  // Creating a map opens the editor at /entities/:id.
+  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const mapId = page.url().split('/').pop();
 
   // A map opens armed with the non-destructive Select tool, so a stray first

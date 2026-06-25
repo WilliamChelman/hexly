@@ -8,17 +8,29 @@
     "signingIn": "Signing in…",
     "invalidCredentials": "Incorrect email or password."
   },
-  "mapLibrary": {
-    "tabTitle": "Hexly — Your maps",
+  "entityBrowser": {
+    "tabTitle": "Hexly — Your library",
     "eyebrow": "Library",
-    "heading": "Your maps",
+    "heading": "Your library",
     "newMap": "New map",
+    "newNote": "New note",
+    "rename": "Rename",
+    "renameLabel": "New name",
     "creating": "Creating…",
     "edited": "Edited {{date}}",
-    "loadErrorTitle": "Couldn't load your maps.",
+    "type": {
+      "note": "Note",
+      "hexmap": "Map"
+    },
+    "loadErrorTitle": "Couldn't load your library.",
     "loadErrorHint": "Something went wrong. Please try again in a moment.",
-    "emptyTitle": "No maps yet.",
-    "emptyHint": "Create your first map to start painting a world."
+    "emptyTitle": "Your library is empty.",
+    "emptyHint": "Create a note or a map to begin."
+  },
+  "noteView": {
+    "eyebrow": "Note",
+    "backToLibrary": "Back to library",
+    "placeholder": "The content editor is coming soon."
   },
   "editorShell": {
     "tabTitle": "Hexly",

@@ -16,9 +16,9 @@ import { expect, test } from './fixtures';
 
 /** A new map, opened in its editor; returns the canvas locator and the map id. */
 async function newMap(page: import('@playwright/test').Page) {
-  await page.goto('/maps');
+  await page.goto('/entities');
   await page.getByTestId('new-map').click();
-  await expect(page).toHaveURL(/\/maps\/[\w-]+$/);
+  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const mapId = page.url().split('/').pop() as string;
   const canvas = page.getByRole('img', { name: 'Hex map' });
   return { canvas, mapId };

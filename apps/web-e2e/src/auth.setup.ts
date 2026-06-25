@@ -14,7 +14,7 @@ setup('authenticate', async ({ page }) => {
   await page.getByRole('button', { name: 'Sign in' }).click();
 
   // Landing on the library proves the cookie was set and the auth guard passed.
-  await expect(page.getByRole('heading', { name: 'Your maps' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Your library' })).toBeVisible();
 
   await page.context().storageState({ path: authFile });
 });
