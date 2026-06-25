@@ -5,7 +5,19 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { EMPTY, finalize, Observable, of, tap } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router } from '@angular/router';
+import {
+  catchError,
+  EMPTY,
+  filter,
+  finalize,
+  map,
+  Observable,
+  of,
+  switchMap,
+  tap,
+} from 'rxjs';
 import {
   emptyHexMap,
   EntityBody,
@@ -32,6 +44,8 @@ export class EditorSession {
   private readonly entities = inject(EntitiesClient);
   private readonly editor = inject(EditorStore);
   private readonly title = inject(TitleService);
+  private readonly router = inject(Router);
+  private readonly destroyRef = inject(DestroyRef);
 
   private readonly _current = signal<EntityDetail | null>(null);
   /** The open Entity's metadata (name, version), or `null` before one is opened. */
@@ -55,7 +69,33 @@ export class EditorSession {
     // One owner for the tab title across all views this route dispatches to —
     // lives here so neither the map editor nor the note view each re-derive it.
     effect(() => this.title.setDocumentName(this._current()?.name ?? null));
-    inject(DestroyRef).onDestroy(() => this.title.setDocumentName(null));
+    this.destroyRef.onDestroy(() => this.title.setDocumentName(null));
+  }
+
+  /**
+   * Drive the open Entity from a route's `:id`. The routed component hands its
+   * ActivatedRoute in (only the routed component's injector carries the one
+   * bound to `:id` — a route-scoped service injecting it would get the root).
+   * switchMap cancels an in-flight load on id change, so /entities/A then
+   * /entities/B can't let a stale A response land over B's canvas; a failed
+   * load (404) returns to the library (#3).
+   */
+  watchRoute(route: ActivatedRoute): void {
+    route.paramMap
+      .pipe(
+        map((params) => params.get('id')),
+        filter((id): id is string => id !== null),
+        switchMap((id) =>
+          this.openRoute(id).pipe(
+            catchError(() => {
+              this.router.navigateByUrl('/entities');
+              return EMPTY;
+            }),
+          ),
+        ),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe();
   }
 
   /** Open a stored Entity by id and load its hex grid into the editor. */

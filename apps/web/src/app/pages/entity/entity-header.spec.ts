@@ -3,9 +3,9 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { EntityDetail, EntityType } from '@hexly/domain';
-import { EditorSession } from '../editor-shell/editor-session';
-import { EditorHeader } from '../editor-shell/editor-header';
-import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
+import { EditorSession } from '../../editor-shell/editor-session';
+import { EditorHeader } from '../../editor-shell/editor-header';
+import { provideTranslocoTesting } from '../../core/i18n/transloco-testing';
 import { EntityHeader } from './entity-header';
 
 /** Stand-in so the test never mounts the real editor header and its deps. */

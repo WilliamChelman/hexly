@@ -15,7 +15,7 @@ import { StatusBar } from './status-bar';
  * The editor's layout orchestrator. It owns no chrome of its own — each region
  * (header, tool palette, canvas, inspector, status bar) is its own component —
  * only the frame that arranges them. It is a pure view of the open map:
- * {@link EntityShell} loads the routed Entity into the {@link EditorSession} and
+ * {@link EntityPage} loads the routed Entity into the {@link EditorSession} and
  * dispatches to this, so a map→map navigation swaps the canvas without
  * re-mounting the editor.
  *

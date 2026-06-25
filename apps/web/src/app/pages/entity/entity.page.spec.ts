@@ -12,17 +12,17 @@ import {
 } from '@angular/router';
 import { of } from 'rxjs';
 import { EntityDetail, EntityType } from '@hexly/domain';
-import { EditorShell } from '../editor-shell/editor-shell';
-import { EditorSession } from '../editor-shell/editor-session';
-import { TitleService } from '../core/i18n/title.service';
-import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
-import { EntityShell } from './entity-shell';
+import { EditorShell } from '../../editor-shell/editor-shell';
+import { EditorSession } from '../../editor-shell/editor-session';
+import { TitleService } from '../../core/i18n/title.service';
+import { provideTranslocoTesting } from '../../core/i18n/transloco-testing';
+import { EntityPage } from './entity.page';
 
 /** A throwaway stand-in so the dispatch test never mounts the real (heavy) editor. */
 @Component({ selector: 'app-editor-shell', template: 'EDITOR' })
 class EditorShellStub {}
 
-describe('EntityShell', () => {
+describe('EntityPage', () => {
   let http: HttpTestingController;
   let navigate: ReturnType<typeof vi.spyOn>;
 
@@ -50,7 +50,7 @@ describe('EntityShell', () => {
 
   async function render(id: string) {
     await TestBed.configureTestingModule({
-      imports: [EntityShell, provideTranslocoTesting()],
+      imports: [EntityPage, provideTranslocoTesting()],
       providers: [
         EditorSession,
         provideHttpClient(),
@@ -61,7 +61,7 @@ describe('EntityShell', () => {
         },
       ],
     })
-      .overrideComponent(EntityShell, {
+      .overrideComponent(EntityPage, {
         remove: { imports: [EditorShell] },
         add: { imports: [EditorShellStub] },
       })
@@ -70,7 +70,7 @@ describe('EntityShell', () => {
     navigate = vi
       .spyOn(TestBed.inject(Router), 'navigateByUrl')
       .mockResolvedValue(true);
-    const fixture = TestBed.createComponent(EntityShell);
+    const fixture = TestBed.createComponent(EntityPage);
     fixture.detectChanges();
     return fixture;
   }

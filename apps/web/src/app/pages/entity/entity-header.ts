@@ -4,13 +4,13 @@ import {
   computed,
   inject,
 } from '@angular/core';
-import { EditorSession } from '../editor-shell/editor-session';
-import { EditorHeader } from '../editor-shell/editor-header';
+import { EditorSession } from '../../editor-shell/editor-session';
+import { EditorHeader } from '../../editor-shell/editor-header';
 
 /**
  * Header outlet for `/entities/:id` (ADR-0015): renders {@link EditorHeader} for a
  * `hexmap`, nothing for a `note` — a note contributes its name through
- * {@link HeaderService} from {@link NoteView} instead. {@link EntityShell} owns the load.
+ * {@link HeaderService} from {@link NoteView} instead. {@link EntityPage} owns the load.
  */
 @Component({
   selector: 'app-entity-header',
