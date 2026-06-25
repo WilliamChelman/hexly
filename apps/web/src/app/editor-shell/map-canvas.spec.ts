@@ -181,7 +181,9 @@ describe('MapCanvas localization', () => {
 
     // With no hovered coordinate the readout reads the "no hex" fallback, and the
     // canvas/zoom chrome carries translated aria-labels.
-    expect(el.querySelector('.readout')?.textContent).toContain('Aucun hex');
+    expect(el.querySelector('app-coord-readout')?.textContent).toContain(
+      'Aucun hex',
+    );
     expect(el.querySelector('canvas')?.getAttribute('aria-label')).toBe(
       'Carte hexagonale',
     );

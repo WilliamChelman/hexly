@@ -34,25 +34,30 @@ const REGION_BORDER_WIDTH = 2.5;
 const MARKER_SCALE = 1.3;
 /** A marker's stroke weight in screen pixels, held constant across zoom. */
 const MARKER_STROKE = 1.6;
-/**
- * The authoring viewBox the feature `path`s are drawn in: a 24×24 box, matching
- * the `<svg viewBox="0 0 24 24">` the UI icon components use. The marker is
- * scaled from this box and translated by its half (12) to centre it on the hex.
- */
+/** The 24×24 viewBox feature `path`s are authored in (matches the UI icons);
+ *  markers scale from this box and translate by half (12) to centre on the hex. */
 const ICON_BOX = 24;
 /**
- * The serif stack a Label is drawn in — a cartographic look that sets Labels
- * apart from the sans-serif UI chrome. Falls back through common serifs so it
- * renders without a bundled webfont (issue #10).
+ * Display-serif stack for both Labels and Hex names — falls back through common
+ * serifs so the map reads without the bundled webfont (issue #10). Name vs Label
+ * stay distinct by treatment, not family (ADR-0016).
  */
-const LABEL_FONT = 'Georgia, "Times New Roman", serif';
+const MAP_FONT = 'Marcellus, Georgia, "Times New Roman", serif';
 /**
- * A Hex name's font — a quiet sans-serif, deliberately set apart from the serif
- * a Label uses (ADR-0016). The name is structured metadata bound to the hex, not
- * cartographic typography, so it must never read as a second Label system.
+ * The dark/ivory halo stroked behind name and Label glyphs (canvas's stand-in
+ * for CSS `paint-order: stroke`), as a fraction of the font's pixel size, so the
+ * text stays legible over any terrain beneath it (mockup `--ink-stroke`).
  */
-const NAME_FONT =
-  'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+const TEXT_HALO_FRACTION = 0.16;
+/** A Label's gilded glow blur, as a fraction of its font px (mockup `.label` drop-shadow). */
+const LABEL_GLOW_BLUR = 0.32;
+/**
+ * How many times the glow fill is laid down before the outlined word. The glow
+ * token is semi-transparent (it's shared with the chrome), so a single canvas
+ * shadow reads faint; stacking a few passes builds the bloom up to the mockup's
+ * CSS `drop-shadow` without a stronger, one-off colour.
+ */
+const LABEL_GLOW_PASSES = 3;
 /** A Hex name's text height as a fraction of the on-screen hex radius — kept small. */
 const NAME_SCALE = 0.34;
 /**
@@ -185,9 +190,23 @@ interface LabelBox {
   readonly maxY: number;
 }
 
+/**
+ * A Label rasterized once into an offscreen canvas (glow + halo + fill, centred),
+ * with the CSS-pixel size to blit it at and the measured text width for the
+ * hit-box. See {@link Canvas2dMapRenderer.labelGlyphCache}.
+ */
+interface LabelGlyph {
+  readonly canvas: HTMLCanvasElement;
+  readonly cssW: number;
+  readonly cssH: number;
+  readonly textW: number;
+}
+
+/** Cap on cached Label bitmaps, so a continuous zoom sweep can't grow it forever. */
+const LABEL_GLYPH_CACHE_MAX = 256;
+
 /** The themed colours one frame needs, resolved from CSS custom properties. */
 interface Palette {
-  readonly void: string;
   readonly hover: string;
   readonly line: string;
   /** The ink a feature marker is stroked in, from `--feature-ink`. */
@@ -196,6 +215,10 @@ interface Palette {
   readonly labelInk: string;
   /** The ink a Hex name is filled in, from `--name-ink` (ADR-0016). */
   readonly nameInk: string;
+  /** The halo stroked behind name/label text for legibility, from `--ink-stroke`. */
+  readonly inkStroke: string;
+  /** The gilded glow a Label's fill casts, from `--glow`. */
+  readonly glow: string;
   /** The accent a selection highlight is stroked in, from `--gold-strong`. */
   readonly selected: string;
   /** The danger ink a blocked move cell is washed in, from `--ember` (issue #64). */
@@ -228,6 +251,17 @@ export class Canvas2dMapRenderer implements MapRenderer {
    * with the camera, so this is rebuilt every render rather than cached.
    */
   private labelBoxes: LabelBox[] = [];
+  /**
+   * Cached, fully-rendered Label bitmaps keyed by `text|roundedFontPx`. The glow
+   * is a stack of `shadowBlur` strokes — one of the most expensive 2D ops — and
+   * {@link render} repaints on every hover/pan, so re-rasterizing it each frame
+   * is the renderer's hot cost. A Label's pixels depend only on its text and font
+   * px (which tracks zoom, not pan) and the themed palette, so each is rasterized
+   * once into an offscreen canvas and blitted thereafter; pan/hover frames just
+   * `drawImage`. Cleared on a theme switch ({@link refreshTheme}) and capped so a
+   * zoom sweep can't grow it without bound.
+   */
+  private readonly labelGlyphCache = new Map<string, LabelGlyph>();
   /**
    * For each hex edge (corner `i` → corner `i+1`), the {@link neighbors}
    * direction index of the hex across it. Lets the region pass tell a boundary
@@ -266,7 +300,10 @@ export class Canvas2dMapRenderer implements MapRenderer {
     const ns = neighbors(origin);
     return corners.map((a, i) => {
       const b = corners[(i + 1) % 6];
-      const mid = { x: (a.x + b.x) / 2 - centre.x, y: (a.y + b.y) / 2 - centre.y };
+      const mid = {
+        x: (a.x + b.x) / 2 - centre.x,
+        y: (a.y + b.y) / 2 - centre.y,
+      };
       let best = 0;
       let bestDot = -Infinity;
       ns.forEach((n, d) => {
@@ -283,6 +320,9 @@ export class Canvas2dMapRenderer implements MapRenderer {
 
   refreshTheme(): void {
     this.palette = this.readPalette();
+    // The cached Label bitmaps bake the themed glow/halo/fill colours, so drop
+    // them when the theme switches; they re-rasterize lazily in the new palette.
+    this.labelGlyphCache.clear();
   }
 
   /** Resolve the themed colours from CSS in a single style read (ADR-0006). */
@@ -294,12 +334,13 @@ export class Canvas2dMapRenderer implements MapRenderer {
       terrainPalette.map((t) => [t.id, read(t.fill, '#888')]),
     ) as Record<TerrainId, string>;
     return {
-      void: read('--color-canvas-bg', '#1b1b1b'),
       hover: read('--color-gold-soft', 'rgba(212,175,55,.3)'),
       line: read('--color-hex-line', '#888'),
       featureInk: read('--color-feature-ink', '#f4ecd8'),
       labelInk: read('--color-label-ink', '#f4ecd8'),
       nameInk: read('--color-name-ink', '#f4ecd8'),
+      inkStroke: read('--color-ink-stroke', '#0a0b16'),
+      glow: read('--color-glow', 'rgba(217,178,90,.5)'),
       selected: read('--color-gold-strong', '#7e560f'),
       blocked: read('--color-ember', '#a4402e'),
       terrain,
@@ -334,9 +375,11 @@ export class Canvas2dMapRenderer implements MapRenderer {
 
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
 
-    // Void: a flat neutral fill across the whole surface (CONTEXT.md → Void).
-    ctx.fillStyle = this.palette.void;
-    ctx.fillRect(0, 0, this.width, this.height);
+    // Void: clear to transparent so the host's Vellum field (its themed gradient,
+    // paper grain, and edge vignette) shows through where nothing is painted
+    // (CONTEXT.md → Void). Painted hexes draw opaque on top; the field is CSS, so
+    // it tracks the theme without the renderer re-painting it each frame.
+    ctx.clearRect(0, 0, this.width, this.height);
 
     const visible = hexesInRect(this.layout, this.visibleWorldRect(camera));
     // The visible hexes keyed for membership lookups — shared by the region
@@ -353,7 +396,8 @@ export class Canvas2dMapRenderer implements MapRenderer {
     // lookup means "not previewed here — draw as stored".
     const preview = new Map<string, Hex | null>();
     if (movePreview) {
-      for (const { coord, hex } of movePreview) preview.set(coordKey(coord), hex);
+      for (const { coord, hex } of movePreview)
+        preview.set(coordKey(coord), hex);
     }
 
     // Painted terrain, under the grid lines. Only the visible painted hexes are
@@ -375,7 +419,8 @@ export class Canvas2dMapRenderer implements MapRenderer {
       ctx.fill();
       if (painted.feature) featured.push({ hex, ref: painted.feature.ref });
       // An absent or empty name draws nothing (ADR-0016).
-      if (painted.name) named.push({ hex, name: painted.name, hasFeature: !!painted.feature });
+      if (painted.name)
+        named.push({ hex, name: painted.name, hasFeature: !!painted.feature });
     }
 
     // Hover highlight next, so the grid lines draw crisply on top of it.
@@ -441,13 +486,26 @@ export class Canvas2dMapRenderer implements MapRenderer {
     // typography stays on top. The font/baseline are set once for the whole pass.
     if (named.length > 0) {
       const radius = this.layout.size.y * camera.zoom;
+      const namePx = radius * NAME_SCALE;
       ctx.save();
-      ctx.fillStyle = this.palette.nameInk;
-      ctx.font = `${radius * NAME_SCALE}px ${NAME_FONT}`;
+      ctx.font = `${namePx}px ${MAP_FONT}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
+      // A dark/ivory halo behind each name keeps it legible over any terrain
+      // (paint-order: stroke). Set once for the whole pass; drawHexName strokes
+      // then fills each name.
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = namePx * TEXT_HALO_FRACTION;
+      ctx.strokeStyle = this.palette.inkStroke;
+      ctx.fillStyle = this.palette.nameInk;
       for (const { hex, name, hasFeature } of named) {
-        this.drawHexName(ctx, camera, hex, name, hasFeature ? radius * NAME_FEATURE_OFFSET : 0);
+        this.drawHexName(
+          ctx,
+          camera,
+          hex,
+          name,
+          hasFeature ? radius * NAME_FEATURE_OFFSET : 0,
+        );
       }
       ctx.restore();
     }
@@ -458,16 +516,13 @@ export class Canvas2dMapRenderer implements MapRenderer {
     // box is rebuilt here (not cached) because labels move with the camera.
     this.labelBoxes = [];
     if (doc.labels.length > 0) {
-      ctx.save();
-      ctx.fillStyle = this.palette.labelInk;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
+      // Each label draws from a cached bitmap (or the inline fallback), both of
+      // which bracket their own canvas state — no shared setup needed here.
       for (const label of doc.labels) {
         // Preview any dragged label at its live position without cloning the doc.
         const position = labelPositions?.get(label.id) ?? label.position;
         this.drawLabel(ctx, camera, label, position);
       }
-      ctx.restore();
     }
 
     // Blocked-move cells ride above the content but below the selection accent: a
@@ -599,7 +654,13 @@ export class Canvas2dMapRenderer implements MapRenderer {
     // A Region is highlighted by tinting its member hexes, not by an accent
     // outline — its boundary stroke already comes from the regions pass (#35).
     if (selection.kind === 'region') {
-      this.fillRegionMembers(ctx, camera, regionById, visibleKeys, selection.id);
+      this.fillRegionMembers(
+        ctx,
+        camera,
+        regionById,
+        visibleKeys,
+        selection.id,
+      );
       return;
     }
     ctx.save();
@@ -672,16 +733,29 @@ export class Canvas2dMapRenderer implements MapRenderer {
   ): void {
     const centre = camera.worldToScreen(position);
     const fontPx = label.size * camera.zoom;
+    // Blit the cached bitmap (the common path); rasterize on a cache miss. Falls
+    // back to drawing inline only when no offscreen 2D context is available.
+    const glyph = this.labelGlyph(label.text, fontPx);
     ctx.save();
     ctx.translate(centre.x, centre.y);
     if (label.rotation) ctx.rotate((label.rotation * Math.PI) / 180);
-    ctx.font = `${fontPx}px ${LABEL_FONT}`;
-    const width = ctx.measureText(label.text).width;
-    ctx.fillText(label.text, 0, 0);
+    let textW: number;
+    if (glyph) {
+      ctx.drawImage(
+        glyph.canvas,
+        -glyph.cssW / 2,
+        -glyph.cssH / 2,
+        glyph.cssW,
+        glyph.cssH,
+      );
+      textW = glyph.textW;
+    } else {
+      textW = this.paintLabel(ctx, label.text, fontPx);
+    }
     ctx.restore();
 
     // Floor the hit-box width so an empty/short label stays clickable (issue #2).
-    const halfW = Math.max(width, fontPx * MIN_LABEL_HALF_WIDTH_FACTOR) / 2;
+    const halfW = Math.max(textW, fontPx * MIN_LABEL_HALF_WIDTH_FACTOR) / 2;
     const halfH = fontPx / 2;
     this.labelBoxes.push({
       id: label.id,
@@ -690,6 +764,76 @@ export class Canvas2dMapRenderer implements MapRenderer {
       minY: centre.y - halfH,
       maxY: centre.y + halfH,
     });
+  }
+
+  /**
+   * The cached bitmap for a Label of `text` at `fontPx`, rasterizing it on a
+   * miss. Keyed by text and *rounded* font px so a pan (constant zoom) always
+   * hits; a continuous zoom re-rasterizes per integer size, bounded by
+   * {@link LABEL_GLYPH_CACHE_MAX}. `null` when no offscreen context exists.
+   */
+  private labelGlyph(text: string, fontPx: number): LabelGlyph | null {
+    const px = Math.max(1, Math.round(fontPx));
+    const key = `${text}|${px}`;
+    const cached = this.labelGlyphCache.get(key);
+    if (cached) return cached;
+    const glyph = this.rasterizeLabel(text, px);
+    if (!glyph) return null;
+    if (this.labelGlyphCache.size >= LABEL_GLYPH_CACHE_MAX) {
+      this.labelGlyphCache.clear();
+    }
+    this.labelGlyphCache.set(key, glyph);
+    return glyph;
+  }
+
+  /** Render a Label once into a padded offscreen canvas, ready to blit. */
+  private rasterizeLabel(text: string, px: number): LabelGlyph | null {
+    const canvas = document.createElement('canvas');
+    const octx = canvas.getContext('2d');
+    if (!octx) return null;
+    // Pad for the glow bloom + halo stroke so neither clips at the bitmap edge.
+    const pad = Math.ceil(px * (LABEL_GLOW_BLUR + TEXT_HALO_FRACTION)) + 2;
+    octx.font = `italic ${px}px ${MAP_FONT}`;
+    const textW = octx.measureText(text).width;
+    const cssW = Math.ceil(textW) + pad * 2;
+    const cssH = px + pad * 2;
+    // Rasterize at device resolution so the blit stays crisp on hi-dpi displays.
+    canvas.width = Math.max(1, Math.round(cssW * this.dpr));
+    canvas.height = Math.max(1, Math.round(cssH * this.dpr));
+    octx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    octx.translate(cssW / 2, cssH / 2);
+    this.paintLabel(octx, text, px);
+    return { canvas, cssW, cssH, textW };
+  }
+
+  /**
+   * Draw a Label's illuminated treatment centred on the current origin (mockup
+   * `.label`), returning the measured text width. Back to front: the gilded glow
+   * — the word stroked a few times under a gold `shadowBlur`, bloomed from the
+   * *outlined* (fat) glyph like the mockup's CSS drop-shadow, which also lays the
+   * dark legibility halo (paint-order: stroke) — then the gilded fill on top, so
+   * the bloom rings a crisp outlined word. Used both to rasterize the cache tile
+   * and as the fallback when no offscreen context exists.
+   */
+  private paintLabel(
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    fontPx: number,
+  ): number {
+    ctx.font = `italic ${fontPx}px ${MAP_FONT}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const width = ctx.measureText(text).width;
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = fontPx * TEXT_HALO_FRACTION;
+    ctx.strokeStyle = this.palette.inkStroke;
+    ctx.shadowColor = this.palette.glow;
+    ctx.shadowBlur = fontPx * LABEL_GLOW_BLUR;
+    for (let i = 0; i < LABEL_GLOW_PASSES; i++) ctx.strokeText(text, 0, 0);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = this.palette.labelInk;
+    ctx.fillText(text, 0, 0);
+    return width;
   }
 
   /**
@@ -705,6 +849,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
     offsetY: number,
   ): void {
     const centre = camera.worldToScreen(hexToPixel(this.layout, hex));
+    ctx.strokeText(name, centre.x, centre.y + offsetY);
     ctx.fillText(name, centre.x, centre.y + offsetY);
   }
 

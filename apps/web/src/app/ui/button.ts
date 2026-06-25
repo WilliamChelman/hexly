@@ -76,14 +76,21 @@ export type ButtonSize = 'md' | 'sm';
       box-shadow: none;
     }
 
+    /* Gilded — gradient fill, gold glow, inset top-highlight; glow grows on hover. */
     :host(.is-primary) {
-      --_fg: var(--color-on-gold);
-      --_bg: var(--color-gold);
-      --_bd: var(--color-gold-strong);
+      --_fg: var(--color-on-gilded);
+      background: var(--gradient-gold);
+      border-color: color-mix(in srgb, var(--color-gold-bright) 70%, #fff);
+      box-shadow:
+        0 0 16px -2px var(--color-glow),
+        inset 0 1px 0 rgba(255, 255, 255, 0.5);
     }
     :host(.is-primary:hover) {
-      --_bg: var(--color-gold-strong);
-      border-color: var(--color-gold-strong);
+      background: var(--gradient-gold);
+      border-color: color-mix(in srgb, var(--color-gold-bright) 80%, #fff);
+      box-shadow:
+        0 0 24px -2px var(--color-glow),
+        inset 0 1px 0 rgba(255, 255, 255, 0.55);
     }
     :host(.is-ghost) {
       --_bg: transparent;

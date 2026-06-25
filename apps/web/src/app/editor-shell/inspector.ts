@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { coordKey, Label } from '@hexly/domain';
+import { coordKey, Label, TerrainId } from '@hexly/domain';
 import { Button } from '../ui/button';
 import { Coord } from '../ui/coord';
 import { Eyebrow } from '../ui/eyebrow';
@@ -19,13 +19,13 @@ import { RegionFields } from './region-fields';
  */
 const SELECTION_KINDS: readonly {
   kind: Selection['kind'];
-  oneKey: string;
-  manyKey: string;
+  /** ICU plural key — renders both the count and the (localized) noun. */
+  countKey: string;
 }[] = [
-  { kind: 'hex', oneKey: 'editorShell.inspector.kindHex', manyKey: 'editorShell.inspector.kindHexes' },
-  { kind: 'feature', oneKey: 'editorShell.inspector.kindFeature', manyKey: 'editorShell.inspector.kindFeatures' },
-  { kind: 'region', oneKey: 'editorShell.inspector.kindRegion', manyKey: 'editorShell.inspector.kindRegions' },
-  { kind: 'label', oneKey: 'editorShell.inspector.kindLabel', manyKey: 'editorShell.inspector.kindLabels' },
+  { kind: 'hex', countKey: 'editorShell.inspector.kindHexCount' },
+  { kind: 'feature', countKey: 'editorShell.inspector.kindFeatureCount' },
+  { kind: 'region', countKey: 'editorShell.inspector.kindRegionCount' },
+  { kind: 'label', countKey: 'editorShell.inspector.kindLabelCount' },
 ];
 
 /**
@@ -44,6 +44,8 @@ interface SelectedEntity {
   readonly kind: 'hex' | 'feature';
   readonly q: number;
   readonly r: number;
+  /** The hex's terrain id, for the identity swatch colour. */
+  readonly terrain: TerrainId;
   /**
    * The translation key for the entity's built-in catalog label, keyed by its
    * stable id (`domain.terrain.<id>` / `domain.feature.<id>`, ADR-0014): the
@@ -81,9 +83,10 @@ interface SelectedEntity {
     @let multi = selectionSummary();
     @if (label) {
       <header class="flex items-center justify-between">
-        <span appEyebrow>{{ 'editorShell.inspector.selectedLabel' | transloco }}</span>
+        <span appEyebrow mark>{{ 'editorShell.inspector.selectedLabel' | transloco }}</span>
       </header>
 
+      <div class="leaf">
       <div appField [label]="'editorShell.inspector.text' | transloco">
         <input
           appInput
@@ -135,6 +138,8 @@ interface SelectedEntity {
         </div>
       </div>
 
+      </div>
+
       <div class="flex gap-2 mt-auto pt-2">
         <button
           type="button"
@@ -150,9 +155,10 @@ interface SelectedEntity {
       </div>
     } @else if (region) {
       <header class="flex items-center justify-between">
-        <span appEyebrow>{{ 'editorShell.inspector.selectedRegion' | transloco }}</span>
+        <span appEyebrow mark>{{ 'editorShell.inspector.selectedRegion' | transloco }}</span>
       </header>
 
+      <div class="leaf">
       <app-region-fields [region]="region" />
 
       <!--
@@ -183,6 +189,8 @@ interface SelectedEntity {
         </div>
       </div>
 
+      </div>
+
       <div class="flex gap-2 mt-auto pt-2">
         <button
           type="button"
@@ -198,39 +206,54 @@ interface SelectedEntity {
       </div>
     } @else if (entity) {
       <header class="flex items-center justify-between">
-        <span appEyebrow>{{
+        <span appEyebrow mark>{{
           (entity.kind === 'feature'
             ? 'editorShell.inspector.selectedFeature'
             : 'editorShell.inspector.selectedHex') | transloco
         }}</span>
       </header>
 
-      <div appField [label]="'editorShell.inspector.coordinate' | transloco">
-        <app-coord data-testid="entity-coord"
-          >q {{ entity.q }} · r {{ entity.r }}</app-coord
-        >
-      </div>
+      <div class="leaf">
+        <div class="ident">
+          <span
+            class="ident-swatch"
+            [style.background]="'var(--color-terrain-' + entity.terrain + ')'"
+          ></span>
+          <div class="min-w-0">
+            <div class="ident-name">{{ entity.name || (entity.detailKey | transloco) }}</div>
+            <div class="ident-sub">
+              <span data-testid="entity-detail">{{ entity.detailKey | transloco }}</span>
+              <span class="opacity-50">·</span>
+              <app-coord data-testid="entity-coord">q {{ entity.q }} · r {{ entity.r }}</app-coord>
+            </div>
+          </div>
+        </div>
 
-      <div
-        appField
-        [label]="
-          (entity.kind === 'feature'
-            ? 'editorShell.inspector.feature'
-            : 'editorShell.inspector.terrain') | transloco
-        "
-      >
-        <span class="text-sm text-ink" data-testid="entity-detail">{{
-          entity.detailKey | transloco
-        }}</span>
-      </div>
+        <div appField [label]="'editorShell.inspector.name' | transloco">
+          <input
+            appInput
+            data-testid="entity-name"
+            [value]="entity.name"
+            (change)="onName(entity, $event)"
+          />
+        </div>
 
-      <div appField [label]="'editorShell.inspector.name' | transloco">
-        <input
-          appInput
-          data-testid="entity-name"
-          [value]="entity.name"
-          (change)="onName(entity, $event)"
-        />
+        <!--
+          ponytail: stub — a Hex carries only terrain/feature/name; Tags live on the
+          top-level Entity (CONTEXT.md). Placeholder until a Map element's Entity Link
+          surfaces the linked Entity's tags here.
+        -->
+        <div appField [label]="'editorShell.inspector.tags' | transloco">
+          <span class="stub">{{ 'editorShell.inspector.tagsEmpty' | transloco }}</span>
+        </div>
+
+        <!--
+          ponytail: stub — the Entity Link is not on the Hex model yet (CONTEXT.md: Map
+          elements *can* carry one). Placeholder until it is wired through the store.
+        -->
+        <div appField [label]="'editorShell.inspector.linkedEntity' | transloco">
+          <span class="stub">{{ 'editorShell.inspector.notLinked' | transloco }}</span>
+        </div>
       </div>
 
       <div class="flex gap-2 mt-auto pt-2">
@@ -258,7 +281,7 @@ interface SelectedEntity {
         across the set is deliberately out of scope.
       -->
       <header class="flex items-center justify-between">
-        <span appEyebrow>{{ 'editorShell.inspector.multiTitle' | transloco }}</span>
+        <span appEyebrow mark>{{ 'editorShell.inspector.multiTitle' | transloco }}</span>
       </header>
 
       <p class="text-sm font-semibold text-ink" data-testid="selection-count">
@@ -266,10 +289,9 @@ interface SelectedEntity {
       </p>
 
       <ul class="m-0 pl-4 flex flex-col gap-1 text-sm text-ink-muted" data-testid="selection-breakdown">
-        @for (group of multi.groups; track group.manyKey) {
+        @for (group of multi.groups; track group.countKey) {
           <li>
-            {{ group.count }}
-            {{ (group.count === 1 ? group.oneKey : group.manyKey) | transloco }}
+            {{ group.countKey | transloco: { count: group.count } }}
           </li>
         }
       </ul>
@@ -289,9 +311,91 @@ interface SelectedEntity {
       </div>
     } @else {
       <header class="flex items-center justify-between">
-        <span appEyebrow>{{ 'editorShell.inspector.title' | transloco }}</span>
+        <span appEyebrow mark>{{ 'editorShell.inspector.title' | transloco }}</span>
       </header>
       <p class="muted text-sm leading-normal text-ink-muted">{{ 'editorShell.inspector.emptyHint' | transloco }}</p>
+    }
+  `,
+  // Scoped chrome (ADR-0007): a framed "leaf" — gold corner brackets on lifted
+  // paper — around each single-selection editor.
+  styles: `
+    .leaf {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-4);
+      padding: var(--spacing-4);
+      background: var(--color-surface-raised);
+      border: 1px solid var(--color-line);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-1);
+    }
+    .leaf::before,
+    .leaf::after {
+      content: '';
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      border: 1px solid var(--color-gold);
+      opacity: 0.5;
+      pointer-events: none;
+    }
+    .leaf::before {
+      top: 6px;
+      left: 6px;
+      border-right: 0;
+      border-bottom: 0;
+    }
+    .leaf::after {
+      bottom: 6px;
+      right: 6px;
+      border-left: 0;
+      border-top: 0;
+    }
+    /* Rich identity heading: terrain swatch + illuminated name + mono subtitle. */
+    .ident {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-3);
+    }
+    .ident-swatch {
+      width: 38px;
+      height: 38px;
+      flex: none;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--color-line-strong);
+      box-shadow: var(--shadow-inset), 0 0 0 1px var(--color-gold-soft);
+    }
+    .ident-name {
+      font-family: var(--font-display);
+      font-size: var(--text-lg);
+      line-height: 1.15;
+      color: var(--color-ink-strong);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .ident-name::first-letter {
+      font-family: var(--font-cartouche);
+      font-weight: 700;
+      font-size: 1.5em;
+      color: var(--color-gold);
+      padding-right: 0.04em;
+    }
+    .ident-sub {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-2);
+      margin-top: 2px;
+      font-family: var(--font-mono);
+      font-size: var(--text-2xs);
+      letter-spacing: 0.02em;
+      color: var(--color-ink-muted);
+    }
+    .stub {
+      font-size: var(--text-sm);
+      font-style: italic;
+      color: var(--color-ink-faint);
     }
   `,
 })
@@ -324,7 +428,14 @@ export class Inspector {
     const detailKey = hex.feature
       ? featureKey(hex.feature.ref)
       : terrainKey(hex.terrain);
-    return { kind: sel.kind, q: sel.coord.q, r: sel.coord.r, detailKey, name: hex.name ?? '' };
+    return {
+      kind: sel.kind,
+      q: sel.coord.q,
+      r: sel.coord.r,
+      terrain: hex.terrain,
+      detailKey,
+      name: hex.name ?? '',
+    };
   });
 
   /**
@@ -338,9 +449,8 @@ export class Inspector {
   protected readonly selectionSummary = computed(() => {
     const sels = this.store.selections();
     if (sels.length < 2) return null;
-    const groups = SELECTION_KINDS.map(({ kind, oneKey, manyKey }) => ({
-      oneKey,
-      manyKey,
+    const groups = SELECTION_KINDS.map(({ kind, countKey }) => ({
+      countKey,
       count: sels.filter((s) => s.kind === kind).length,
     })).filter((g) => g.count > 0);
     return { count: sels.length, groups };

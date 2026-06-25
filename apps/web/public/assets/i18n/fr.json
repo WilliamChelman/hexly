@@ -63,10 +63,11 @@
       "rotation": "Rotation (°)",
       "x": "X",
       "y": "Y",
-      "coordinate": "Coordonnée",
-      "terrain": "Terrain",
-      "feature": "Caractéristique",
       "name": "Nom",
+      "tags": "Tags",
+      "tagsEmpty": "Aucun tag",
+      "linkedEntity": "Entité liée",
+      "notLinked": "Non liée",
       "color": "Couleur",
       "membership": "Appartenance",
       "membershipDirection": "Direction d’appartenance",
@@ -79,14 +80,10 @@
       "emptyHint": "Choisissez l’outil Sélection et cliquez sur un Hex, une Caractéristique ou une Étiquette pour l’inspecter. Placez une Étiquette avec l’outil Étiquette, puis sélectionnez-la ici pour modifier son texte, sa taille, sa rotation et sa position.",
       "multiTitle": "Sélection",
       "selectedCount": "sélectionnés",
-      "kindHex": "hexagone",
-      "kindHexes": "hexagones",
-      "kindFeature": "caractéristique",
-      "kindFeatures": "caractéristiques",
-      "kindRegion": "région",
-      "kindRegions": "régions",
-      "kindLabel": "étiquette",
-      "kindLabels": "étiquettes",
+      "kindHexCount": "{count, plural, one {# hexagone} other {# hexagones}}",
+      "kindFeatureCount": "{count, plural, one {# caractéristique} other {# caractéristiques}}",
+      "kindRegionCount": "{count, plural, one {# région} other {# régions}}",
+      "kindLabelCount": "{count, plural, one {# étiquette} other {# étiquettes}}",
       "deleteAll": "Tout supprimer"
     },
     "regionsPanel": {
@@ -97,8 +94,7 @@
     "statusBar": {
       "connecting": "Connexion…",
       "apiError": "Impossible de joindre l’API.",
-      "hex": "hex",
-      "hexes": "hex"
+      "hexCount": "{count, plural, one {# hex} other {# hex}}"
     },
     "canvas": {
       "void": "Vide",
@@ -114,7 +110,7 @@
     "backToMap": "Retour à la carte",
     "eyebrow": "Système de design Hexly",
     "heroTitle": "La table du cartographe,<br />à la lueur des étoiles.",
-    "heroLede": "Une seule identité racontée à deux heures du jour. <strong>Parchemin</strong> est la carte marine vieillie posée sur la table à dessin ; <strong>Astral</strong> est la même carte sous le ciel nocturne. L’or est le fil conducteur — encre de boussole le jour, lignes de constellations la nuit — et le texte reste d’un crème parchemin chaleureux dans les deux. Tout ce qui suit est piloté par la même couche de propriétés personnalisées CSS que <code>apps/web</code> embarque.",
+    "heroLede": "Une seule identité racontée à deux heures du jour. <strong>Solaire</strong> est l’almanach ensoleillé posé sur la table du cartographe ; <strong>Astral</strong> est la même carte sous le ciel nocturne. L’or est le fil conducteur — encre d’héliographe le jour, lignes de constellations la nuit — et le texte reste d’un crème ivoire chaleureux dans les deux. Tout ce qui suit est piloté par la même couche de propriétés personnalisées CSS que <code>apps/web</code> embarque.",
     "swatch": {
       "table": "Table",
       "paper": "Papier",
@@ -184,6 +180,15 @@
   },
   "common": {
     "language": "Langue",
+    "userMenu": "Ouvrir le menu utilisateur",
+    "signOut": "Se déconnecter",
+    "login": "Connexion",
+    "theme": {
+      "solar": "Solaire (clair)",
+      "astral": "Astral (sombre)",
+      "toSolar": "Passer au thème solaire",
+      "toAstral": "Passer au thème astral"
+    },
     "save": "Enregistrer",
     "cancel": "Annuler",
     "close": "Fermer",

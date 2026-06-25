@@ -4,6 +4,7 @@ import {
   TranslocoTestingModule,
   TranslocoTestingOptions,
 } from '@jsverse/transloco';
+import { provideTranslocoMessageformat } from '@jsverse/transloco-messageformat';
 import en from '../../../../public/assets/i18n/en.json';
 import fr from '../../../../public/assets/i18n/fr.json';
 import { translocoAppConfig } from './transloco.config';
@@ -24,11 +25,16 @@ export function provideTranslocoTesting(
     Translation
   >,
 ): ModuleWithProviders<TranslocoTestingModule> {
-  return TranslocoTestingModule.forRoot({
+  const mod = TranslocoTestingModule.forRoot({
     langs,
     // The very config the running app uses (ADR-0014), so specs exercise the
     // real fallback / live-switch behaviour rather than a test-only imitation.
     translocoConfig: translocoAppConfig,
     preloadLangs: true,
   });
+  // Mirror the app's ICU transpiler so plural keys resolve in specs too (ADR-0014).
+  return {
+    ...mod,
+    providers: [...(mod.providers ?? []), provideTranslocoMessageformat()],
+  };
 }

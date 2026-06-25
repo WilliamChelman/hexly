@@ -30,10 +30,8 @@ import { ThemeService } from '../core/theme.service';
 import { ToasterService } from '../core/toaster.service';
 import { terrainKey } from './catalog-keys';
 import { EditorStore, SelectMode, ToolId } from './editor-store';
-import { Button } from '../ui/button';
-import { Coord } from '../ui/coord';
-import { Eyebrow } from '../ui/eyebrow';
-import { Icon } from '../ui/icon/icon';
+import { CoordReadout } from './coord-readout';
+import { ZoomControl } from './zoom-control';
 import { Camera } from './camera';
 import {
   Canvas2dMapRenderer,
@@ -92,7 +90,7 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
 @Component({
   selector: 'app-map-canvas',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Coord, Eyebrow, Icon, TranslocoPipe],
+  imports: [CoordReadout, ZoomControl, TranslocoPipe],
   template: `
     <canvas
       #canvas
@@ -109,89 +107,78 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
       (wheel)="onWheel($event)"
     ></canvas>
 
-    <!-- Hover-coordinate readout, bottom-left. '.readout' is a test hook (map-canvas.spec). -->
-    <div
-      class="readout absolute bottom-4 left-4 flex items-center gap-2 py-1 px-3 border border-line rounded-full shadow-1 backdrop-blur-[4px] pointer-events-none"
-    >
-      <app-coord>q {{ hover()?.q ?? 0 }} · r {{ hover()?.r ?? 0 }}</app-coord>
-      <span class="text-line-strong">·</span>
-      <span appEyebrow>{{ readoutKey() | transloco }}</span>
-    </div>
+    <!-- Vellum field layers over the transparent canvas: paper grain + edge
+         vignette. Inert to the pointer (DOM order keeps them below the overlays). -->
+    <div class="field-grain" aria-hidden="true"></div>
+    <div class="field-vignette" aria-hidden="true"></div>
 
-    <!--
-      Zoom/fit controls, bottom-right, lifted above the floating right dock
-      (z-2 over the dock's z-1, ADR-0013) so a tall open panel can't cover them.
-    -->
-    <div
-      class="zoom absolute right-4 bottom-4 z-[2] flex items-center gap-1 p-1 border border-line rounded-full shadow-2 backdrop-blur-[4px]"
-      role="group"
-      [attr.aria-label]="'editorShell.canvas.zoom' | transloco"
-    >
-      <button
-        type="button"
-        appButton
-        icon
-        size="sm"
-        [attr.aria-label]="'editorShell.canvas.zoomIn' | transloco"
-        (click)="zoomByStep(1)"
-      >
-        <app-icon name="plus" [size]="16" />
-      </button>
-      <app-coord class="min-w-[3.4em] text-center">{{ zoomPercent() }}%</app-coord>
-      <button
-        type="button"
-        appButton
-        icon
-        size="sm"
-        [attr.aria-label]="'editorShell.canvas.zoomOut' | transloco"
-        (click)="zoomByStep(-1)"
-      >
-        <app-icon name="minus" [size]="16" />
-      </button>
-      <button
-        type="button"
-        appButton
-        icon
-        size="sm"
-        [attr.aria-label]="'editorShell.canvas.fit' | transloco"
-        (click)="recenter()"
-      >
-        <app-icon name="fit" [size]="16" />
-      </button>
-    </div>
+    <!-- Hover-coordinate readout, bottom-left. -->
+    <app-coord-readout
+      class="absolute bottom-4 left-4"
+      [coord]="hover()"
+      [terrainKey]="readoutKey()"
+    />
+
+    <!-- Zoom/fit controls, bottom-right. -->
+    <app-zoom-control
+      class="absolute right-4 bottom-4"
+      [percent]="zoomPercent()"
+      (zoomIn)="zoomByStep(1)"
+      (zoomOut)="zoomByStep(-1)"
+      (fit)="recenter()"
+    />
   `,
   styles: `
     /*
-      The host sets no position of its own — placement is the parent's prerogative
-      (the shell lays this out full-bleed, ADR-0013). It owns only its appearance:
-      it clips to its box and paints the map's parchment/astral wash. Once the
-      shell positions it, the host is the containing block for the readout/zoom
-      overlays below. (No 'position' here is also what lets the shell's inline
-      'absolute inset-0' win — an emulated :host rule would be unlayered and beat
-      it.)
+      No position of its own — the shell positions it full-bleed (ADR-0013), and
+      omitting it lets the shell's inline 'absolute inset-0' win over an (unlayered)
+      :host rule. Paints the Vellum wash (top glow over a paper gradient) behind the
+      transparent-Void canvas; 'isolation' confines the grain blend to the map and
+      makes the host the containing block for the overlays below.
     */
     :host {
       overflow: hidden;
-      background: radial-gradient(
-        120% 120% at 50% 0%,
-        var(--color-canvas-bg),
-        var(--color-canvas-mat)
-      );
+      isolation: isolate;
+      background:
+        radial-gradient(
+          110% 85% at 50% -6%,
+          var(--color-canvas-glow),
+          transparent 60%
+        ),
+        linear-gradient(
+          165deg,
+          var(--color-canvas-bg),
+          var(--color-canvas-mat)
+        );
     }
     /*
-      Only the frosted background stays scoped: it's a color-mix() over a theme
-      token. 'bg-surface/NN' would re-theme on modern browsers (its @supports
-      branch is the same oklab color-mix over var(--color-surface)), but the
-      modifier also emits a baked-srgb fallback at the light hex that wouldn't
-      re-theme on a browser lacking lab color-mix — so the single authored oklab
-      declaration is kept (ADR-0021). Each overlay's layout/border/shadow/blur is
-      inline; this one property is all that's left here, anchored on the kept class.
+      Paper tooth: a tiling desaturated SVG fractal-noise, blended low so it adds
+      grain without shifting colour. Themed blend (multiply on light, screen on
+      dark). No z-index — DOM order keeps it below readout/zoom.
     */
-    .readout {
-      background: color-mix(in oklab, var(--color-surface) 86%, transparent);
+    .field-grain {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.06;
+      mix-blend-mode: multiply;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-size: 180px 180px;
     }
-    .zoom {
-      background: color-mix(in oklab, var(--color-surface) 88%, transparent);
+    :host-context([data-theme='dark']) .field-grain {
+      opacity: 0.05;
+      mix-blend-mode: screen;
+    }
+    /* Soft edge vignette: clear centre, sinking to the themed edge ink at the corners. */
+    .field-vignette {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(
+        120% 90% at 50% 42%,
+        transparent 56%,
+        var(--color-canvas-edge) 100%
+      );
     }
   `,
 })
@@ -285,20 +272,16 @@ export class MapCanvas {
   private selectSweep: { mode: SelectMode; last: string } | null = null;
 
   /**
-   * The `pointerId` that owns the canvas for the duration of one gesture, or
-   * `null` between gestures. A gesture (paint, pan, or a Select press/drag)
-   * claims it on pointer-down and releases it on up/cancel; events from any
-   * other pointer are ignored while it is held, so a second touch cannot hijack
-   * the drag origin or destination behind the active one.
+   * The `pointerId` that owns the canvas for one gesture (claimed on down,
+   * released on up/cancel), or `null` between gestures. Other pointers are
+   * ignored while it's held — see {@link foreignPointer}.
    */
   private activePointerId: number | null = null;
 
   /**
-   * The mouse `button` that claimed the active gesture (0 primary, 1 middle), or
-   * `null` between gestures. A mouse reports the same `pointerId` for every
-   * button, so the pointerId test alone can't tell a left-button sweep from a
-   * stray right/middle release during it; this lets onPointerUp ignore a release
-   * from any button other than the one that owns the gesture.
+   * The mouse `button` that claimed the gesture (0 primary, 1 middle), or `null`.
+   * A mouse reuses one `pointerId` across buttons, so pointerId alone can't tell a
+   * stray right/middle release from the owning one — onPointerUp checks this too.
    */
   private gestureButton: number | null = null;
 
@@ -434,9 +417,6 @@ export class MapCanvas {
   }
 
   protected onPointerDown(event: PointerEvent): void {
-    // One gesture owns the canvas at a time: a second pointer (e.g. another
-    // finger) while one is already active is ignored, so it cannot overwrite the
-    // active drag's origin or destination behind it.
     if (this.foreignPointer(event)) return;
     const hex = pixelToHex(this.layout, this.toWorld(event));
     this.hover.set(hex);
@@ -568,8 +548,6 @@ export class MapCanvas {
   }
 
   protected onPointerMove(event: PointerEvent): void {
-    // While a gesture is active, only its owning pointer drives it — a stray
-    // second pointer never moves the hover or re-targets the drag.
     if (this.foreignPointer(event)) return;
     const hex = pixelToHex(this.layout, this.toWorld(event));
     this.hover.set(hex);
@@ -657,13 +635,9 @@ export class MapCanvas {
   }
 
   protected onPointerUp(event: PointerEvent): void {
-    // Only the owning pointer ends the gesture; a non-owning pointer's release
-    // must not commit the active drag out from under it.
     if (this.foreignPointer(event)) return;
-    // A mouse fires pointerup with the same pointerId for every button, so a
-    // right/middle release during a left-button sweep would otherwise end the
-    // gesture while the left button is still held. Only the button that claimed
-    // the gesture ends it.
+    // A mouse reuses one pointerId across buttons, so a right/middle release
+    // during a left-button gesture mustn't end it — only the owning button does.
     if (this.gestureButton !== null && event.button !== this.gestureButton) return;
     (event.target as Element).releasePointerCapture?.(event.pointerId);
     this.endGesture(event);
@@ -781,16 +755,9 @@ export class MapCanvas {
   }
 
   /**
-   * Whether a plain press at `hex` (with label hit `hitId`) landed on something
-   * already in the Selection — so it should drag the whole set rather than
-   * re-select (issue #64): the pressed label is selected, the pressed cell is
-   * selected, or the pressed coordinate belongs to a selected Region (so a Region
-   * is grabbable by any of its member cells, painted or not).
-   */
-  /**
-   * Collapse a deferred group-drag press to the single entity that was pressed —
-   * the pick the press postponed so a drag could move the whole set instead. A
-   * no-op unless the press armed a group drag (issue #64).
+   * Collapse a deferred group-drag press to the single pressed entity — the pick
+   * the press postponed so a drag could move the whole set (issue #64). A no-op
+   * unless the press armed a group drag.
    */
   private collapseGroupPress(): void {
     if (this.dragPress?.group) {
@@ -798,6 +765,12 @@ export class MapCanvas {
     }
   }
 
+  /**
+   * Whether a plain press at `hex`/`hitId` landed on something already selected —
+   * so it drags the whole set rather than re-selecting (issue #64): the pressed
+   * label, the pressed cell, or a coord belonging to a selected Region (grabbable
+   * by any member cell, painted or not).
+   */
   private pressOnSelection(hex: Axial, hitId: string | null): boolean {
     const key = coordKey(hex);
     return this.store.selections().some((s) => {

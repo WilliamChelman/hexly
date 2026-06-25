@@ -1,46 +1,30 @@
 /*
- * Hexly global stylesheet — the entry point the build loads (project.json
- * `styles`). Cascade order:
- *
- *   1. fonts      — Cinzel (display), Spectral (body), JetBrains Mono (coords)
- *   2. tailwind   — preflight + utilities, processed by @tailwindcss/postcss
- *   3. tokens     — semantic custom properties for both themes (unlayered)
- *   4. base       — reset/typography/table surface  → @layer base
- *
- * Reusable component chrome no longer lives here: each primitive (`Button`,
- * `Panel`, `Tool`, …) owns its own scoped, token-driven styles (ADR-0007), so
- * there is no global component layer to override. `base` is wrapped in
- * Tailwind's cascade layer so that utility classes (the `utilities` layer) win
- * over reset/typography as expected.
+ * Hexly global stylesheet — the build entry point (project.json `styles`).
+ * Cascade order: fonts → tailwind → tokens → base. Component chrome lives in
+ * each primitive's scoped styles (ADR-0007), not here. `base` is wrapped in
+ * Tailwind's `base` layer so utilities win over reset/typography.
  */
 /*
- * Fonts are self-hosted via @fontsource so the app renders identically with
- * no network (no Google Fonts request). We import only the weights the design
- * uses and only the latin + latin-ext subsets (matching what Google served via
- * unicode-range); each file is one `font-display: swap` @font-face whose woff2
- * the bundler resolves and emits locally.
- *
- *   Cinzel        — display       — 500 / 600 / 700
- *   Spectral      — body          — 400 / 500 / 600 / 700 + 400 italic
- *   JetBrains Mono — coords/mono  — 400 / 500
+ * Fonts self-hosted via @fontsource (no third-party request) — only the weights/subsets the
+ * design uses (latin + latin-ext): Marcellus (display), Cormorant Garamond
+ * (body), Cinzel Decorative (wordmark), JetBrains Mono (coords).
  */
-@import '@fontsource/cinzel/latin-500.css';
-@import '@fontsource/cinzel/latin-600.css';
-@import '@fontsource/cinzel/latin-700.css';
-@import '@fontsource/cinzel/latin-ext-500.css';
-@import '@fontsource/cinzel/latin-ext-600.css';
-@import '@fontsource/cinzel/latin-ext-700.css';
+@import '@fontsource/marcellus/latin-400.css';
+@import '@fontsource/marcellus/latin-ext-400.css';
 
-@import '@fontsource/spectral/latin-400.css';
-@import '@fontsource/spectral/latin-500.css';
-@import '@fontsource/spectral/latin-600.css';
-@import '@fontsource/spectral/latin-700.css';
-@import '@fontsource/spectral/latin-400-italic.css';
-@import '@fontsource/spectral/latin-ext-400.css';
-@import '@fontsource/spectral/latin-ext-500.css';
-@import '@fontsource/spectral/latin-ext-600.css';
-@import '@fontsource/spectral/latin-ext-700.css';
-@import '@fontsource/spectral/latin-ext-400-italic.css';
+@import '@fontsource/cormorant-garamond/latin-400.css';
+@import '@fontsource/cormorant-garamond/latin-500.css';
+@import '@fontsource/cormorant-garamond/latin-600.css';
+@import '@fontsource/cormorant-garamond/latin-700.css';
+@import '@fontsource/cormorant-garamond/latin-400-italic.css';
+@import '@fontsource/cormorant-garamond/latin-ext-400.css';
+@import '@fontsource/cormorant-garamond/latin-ext-500.css';
+@import '@fontsource/cormorant-garamond/latin-ext-600.css';
+@import '@fontsource/cormorant-garamond/latin-ext-700.css';
+@import '@fontsource/cormorant-garamond/latin-ext-400-italic.css';
+
+@import '@fontsource/cinzel-decorative/latin-700.css';
+@import '@fontsource/cinzel-decorative/latin-ext-700.css';
 
 @import '@fontsource/jetbrains-mono/latin-400.css';
 @import '@fontsource/jetbrains-mono/latin-500.css';
@@ -51,47 +35,37 @@
 @import './styles/tokens.css';
 @import './styles/base.css' layer(base);
 
+/* CDK overlay container chrome (positioning + z-index) for the user menu's
+   cdkMenu — the documented requirement; keeps the panel fixed under scroll. */
+@import '@angular/cdk/overlay-prebuilt.css';
+
 /* Tell Tailwind where to scan for class names (Nx monorepo: be explicit). */
 @source './**/*.{html,ts}';
 
 /*
- * Hexly's design tokens *are* Tailwind's theme (ADR-0020). Every utility-shaped
- * token — colours, fonts, the type scale, spacing, radii — is declared
- * here so the same value both (a) generates an on-brand utility (`bg-surface`,
- * `text-ink`, `gap-5`, `text-md`, `rounded-lg`, `font-display`, …) and (b) is
- * emitted as a CSS variable on `:root`/`:host` that scoped component styles
- * consume directly (`var(--color-surface)`, `var(--spacing-4)`). One vocabulary,
- * no parallel `--space-*`/`--surface` layer.
+ * Hexly's design tokens *are* Tailwind's theme (ADR-0020): each utility-shaped
+ * token both generates an on-brand utility (`bg-surface`, `text-md`, `gap-5`, …)
+ * and is emitted as a CSS var on `:root` for scoped component styles to consume
+ * (`var(--color-surface)`). One vocabulary, no parallel `--space-*` layer.
  *
- * Theming: colours are declared *non-`inline`* so the override point is the
- * generated property — the light value lives here, and
- * `:root[data-theme='dark']` (tokens.css) reassigns the generated `--color-*`.
- * tokens.css is imported after `tailwindcss`, so the dark block cascades over
- * this `:root`. Spacing/type/radii/fonts are theme-invariant.
+ * Colours are declared *non-`inline`* so the override point is the generated
+ * `--color-*`: the light value lives here, `[data-theme='dark']` (tokens.css,
+ * imported after `tailwindcss`) reassigns it. Spacing/type/radii/fonts are
+ * theme-invariant. Elevation can't live here — see the @utility block below.
  *
- * Elevation is the one utility-shaped token that *can't* live here: the
- * `--shadow-*` namespace inlines a `shadow-*` utility's value rather than
- * referencing `var(--shadow-*)`, so a generated `shadow-1` would bake the light
- * value and never re-theme. Shadows are raw vars in tokens.css, wrapped as a
- * custom `@utility` below (ADR-0021).
+ * Spacing uses explicit `--spacing-<N>` keys: Tailwind v4 resolves these before
+ * the `calc(var(--spacing) * N)` multiplier, so the bespoke non-linear scale
+ * keeps the same 1–9 names (lint-enforced). `@theme` extends, so Tailwind's
+ * default palette stays available.
  *
- * Spacing is bridged via explicit `--spacing-<N>` keys: Tailwind v4 resolves an
- * explicit key before the `calc(var(--spacing) * N)` multiplier, so the bespoke
- * non-linear scale (1.5rem at step 5, …) survives under the same 1–9 names with
- * zero renumbering. The curated set is enforced by a lint rule (see eslint).
- *
- * Tailwind's default palette (red-500, etc.) stays available — `@theme` extends.
- *
- * `static` disables Tailwind's theme-variable tree-shaking so *every* token is
- * emitted to `:root`, not just those a generated utility references. This is
- * load-bearing: many tokens are consumed only by raw `var(--…)` in scoped
- * component styles or read at runtime by the Canvas renderer via
- * `getComputedStyle` (ADR-0003) — references Tailwind's scanner can't see.
- * Utilities are still generated on demand; only the `:root` block is complete.
+ * `static` disables theme tree-shaking so *every* token reaches `:root`, not
+ * just those a utility references — load-bearing: the Canvas renderer reads many
+ * via `getComputedStyle` (ADR-0003), references the scanner can't see.
  */
 @theme static {
-  --font-display: 'Cinzel', 'Spectral', Georgia, serif;
-  --font-body: 'Spectral', Georgia, 'Times New Roman', serif;
+  --font-cartouche: 'Cinzel Decorative', 'Marcellus', Georgia, serif;
+  --font-display: 'Marcellus', Georgia, serif;
+  --font-body: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
   --font-mono: 'JetBrains Mono', 'SFMono-Regular', Menlo, monospace;
 
   /* ---- Type scale (modular, ratio ~1.25) → text-* utilities ------------- */
@@ -139,32 +113,37 @@
   --radius-full: 999px;
 
   /* =======================================================================
-   * Colours — light theme "Parchment" values. The dark "Astral" theme
-   * reassigns these generated --color-* in tokens.css under [data-theme].
+   * Colours — light theme "Solar" values (the day half of the Celestial
+   * Codex: an illuminated solar almanac — warm ivory paper, sun-gold ink).
+   * The dark "Astral" theme reassigns these generated --color-* in
+   * tokens.css under [data-theme].
    * ===================================================================== */
-  --color-bg: #ece0c6; /* the table / outer parchment                       */
-  --color-bg-deep: #e2d3b2; /* shadowed paper behind panels                 */
-  --color-surface: #f5ecd6; /* primary paper stock for panels & cards       */
-  --color-surface-raised: #fbf5e6; /* a note pinned slightly above the page  */
-  --color-surface-sunken: #e6d8ba; /* wells, inputs, the canvas mat         */
+  --color-bg: #f1e5c7; /* the table / outer ivory paper                     */
+  --color-bg-deep: #e7d8b2; /* shadowed paper behind panels                 */
+  --color-surface: #fbf6e7; /* primary paper stock for panels & cards       */
+  --color-surface-raised: #fffaf0; /* a leaf lifted above the page          */
+  --color-surface-sunken: #ece0c0; /* wells, inputs                         */
   --color-overlay: rgba(58, 44, 28, 0.42); /* scrim behind modals           */
 
-  --color-ink: #2f2416; /* primary iron-gall text                           */
-  --color-ink-strong: #1d1509; /* headings                                  */
-  --color-ink-muted: #6f5d40; /* secondary text, labels                     */
-  --color-ink-faint: #9c8862; /* tertiary, placeholders, disabled          */
+  --color-ink: #2e2412; /* primary sepia-ink text                           */
+  --color-ink-strong: #211a0b; /* headings                                  */
+  --color-ink-muted: #6f5a36; /* secondary text, labels                     */
+  --color-ink-faint: #9c8a5e; /* tertiary, placeholders, disabled          */
 
-  --color-line: #cbb88e; /* hairline drawn rules                            */
-  --color-line-strong: #a8946a; /* emphasised borders, panel edges          */
-  --color-line-faint: rgba(120, 96, 56, 0.16);
+  --color-line: #d6c39a; /* hairline drawn rules                            */
+  --color-line-strong: #b89a62; /* emphasised borders, panel edges          */
+  --color-line-faint: rgba(120, 86, 30, 0.16);
 
-  --color-gold: #9a6a16; /* compass-rose ink — primary accent               */
+  --color-gold: #9a6a16; /* heliograph gold — primary accent                */
   --color-gold-strong: #7e560f;
   --color-gold-soft: rgba(154, 106, 22, 0.14);
-  --color-on-gold: #fbf5e6; /* text/icon on a gold fill                     */
+  --color-gold-bright: #efd078; /* metallic highlight — top stop of the gilded gradient */
+  --color-gold-deep: #b98323; /*   deep stop of the gilded gradient                    */
+  --color-on-gold: #fbf5e6; /* cream text/icon on the DARK flat gold (e.g. danger fill) */
+  --color-on-gilded: #2a1f08; /* dark ink on the BRIGHT gilded gradient — both themes  */
 
-  --color-sea: #2f6f6a; /* verdigris ocean wash — secondary accent          */
-  --color-sea-soft: rgba(47, 111, 106, 0.14);
+  --color-sea: #2f6f7a; /* lapis water — secondary accent                   */
+  --color-sea-soft: rgba(47, 111, 122, 0.14);
 
   --color-astra: #5a4aa6; /* dusk violet — tertiary                         */
   --color-astra-soft: rgba(90, 74, 166, 0.14);
@@ -175,13 +154,19 @@
   --color-positive: #4a6f2f; /* moss — confirmations / "online"             */
   --color-positive-soft: rgba(74, 111, 47, 0.16);
 
-  /* Canvas — the infinite hex plane (read by the renderer, ADR-0003) */
-  --color-canvas-bg: #e8dabb;
-  --color-canvas-mat: #ddcaa3;
-  --color-hex-line: rgba(120, 96, 56, 0.5); /* grid ink                     */
-  --color-feature-ink: #4a3a1e; /* a placed Feature's marker — sepia ink    */
-  --color-label-ink: #2f2416; /* free-positioned Label text — iron-gall ink */
+  /* Canvas — the Vellum field: a calm warm paper plane. -bg/-mat are the
+     directional gradient's light/deep stops; -glow pools soft light at the top
+     edge and -edge is the soft vignette. The .field-grain overlay adds the paper
+     tooth (codex vellum field). */
+  --color-canvas-bg: #efe2bf;
+  --color-canvas-mat: #e5d4a9;
+  --color-canvas-glow: rgba(255, 240, 202, 0.55); /* warm light at the field's top */
+  --color-canvas-edge: rgba(120, 86, 30, 0.14); /* soft sepia vignette           */
+  --color-hex-line: rgba(120, 96, 56, 0.42); /* grid ink                    */
+  --color-feature-ink: #5a3e16; /* a placed Feature's marker — sepia ink    */
+  --color-label-ink: #4a3a1e; /* free-positioned Label text — sepia ink     */
   --color-name-ink: #5a4a2c; /* a Hex name — muted sepia, quieter           */
+  --color-ink-stroke: #fbf6e7; /* halo behind name/label text — ivory on the light field, for legibility over any terrain (codex) */
 
   /* Terrain fills — the base type of a hex. Tuned to read as hand-tinted
      washes on aged paper; the dark theme deepens them for the night chart. */
@@ -198,13 +183,11 @@
 }
 
 /*
- * Elevation utilities. The `--shadow-*` theme namespace inlines a utility's
- * value (to leave room for `--tw-shadow-color`), so a theme-generated `shadow-1`
- * bakes the light shadow and ignores `[data-theme='dark']`. Hexly never recolours
- * a shadow via utility, so we hand-wrap the raw token instead: `shadow-1` emits
- * `box-shadow: var(--shadow-1)`, re-theming exactly like the scoped
- * `box-shadow: var(--shadow-1)` it replaces. (`--shadow-focus` is composed only
- * in scoped focus rings, so it stays a raw var with no utility.)
+ * Elevation utilities. A `@theme` `shadow-*` inlines its value (to leave room
+ * for `--tw-shadow-color`), baking the light shadow and ignoring [data-theme].
+ * Hexly never recolours a shadow via utility, so we wrap the raw re-themable
+ * token instead: `shadow-1` → `box-shadow: var(--shadow-1)` (ADR-0021).
+ * `--shadow-focus` has no utility — it's composed only in scoped focus rings.
  */
 @utility shadow-1 {
   box-shadow: var(--shadow-1);

@@ -1,8 +1,7 @@
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
-// This Drizzle definition and the `CREATE TABLE` DDL in `./db.ts` describe the
-// same tables and are kept in sync by hand. A column change needs a migration
-// (drizzle-kit) to reach an existing database, not just an edit here.
+// Keep in sync by hand with the `CREATE TABLE` DDL in `./db.ts`; column changes
+// need a drizzle-kit migration to reach an existing database.
 
 /**
  * The closed user set (ADR-0004). Users are provisioned out-of-band — there is

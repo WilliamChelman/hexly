@@ -61,18 +61,12 @@ describe('EditorHeader', () => {
     const fixture = TestBed.createComponent(EditorHeader);
     fixture.detectChanges();
 
-    // Click the title to start editing, then type a new name and commit on blur.
-    (
-      fixture.nativeElement.querySelector('[data-testid=title]') as HTMLButtonElement
-    ).click();
-    fixture.detectChanges();
-
-    const input = fixture.nativeElement.querySelector(
-      '[data-testid=title-input]',
-    ) as HTMLInputElement;
-    input.value = 'The Whisperwood';
-    input.dispatchEvent(new Event('input'));
-    input.dispatchEvent(new Event('blur'));
+    // Edit the title in place (contenteditable), then commit on blur.
+    const title = fixture.nativeElement.querySelector(
+      '[data-testid=title]',
+    ) as HTMLElement;
+    title.textContent = 'The Whisperwood';
+    title.dispatchEvent(new Event('blur'));
 
     const req = http.expectOne('/entities/m1');
     expect(req.request.method).toBe('PATCH');
@@ -88,14 +82,9 @@ describe('EditorHeader', () => {
     const fixture = TestBed.createComponent(EditorHeader);
     fixture.detectChanges();
 
-    (
-      fixture.nativeElement.querySelector('[data-testid=title]') as HTMLButtonElement
-    ).click();
-    fixture.detectChanges();
-
     // Blur without changing anything — a no-op edit must not hit the server.
     (
-      fixture.nativeElement.querySelector('[data-testid=title-input]') as HTMLInputElement
+      fixture.nativeElement.querySelector('[data-testid=title]') as HTMLElement
     ).dispatchEvent(new Event('blur'));
 
     http.expectNone('/entities/m1');

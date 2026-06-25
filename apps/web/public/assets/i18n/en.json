@@ -63,10 +63,11 @@
       "rotation": "Rotation (°)",
       "x": "X",
       "y": "Y",
-      "coordinate": "Coordinate",
-      "terrain": "Terrain",
-      "feature": "Feature",
       "name": "Name",
+      "tags": "Tags",
+      "tagsEmpty": "No tags",
+      "linkedEntity": "Linked entity",
+      "notLinked": "Not linked",
       "color": "Color",
       "membership": "Membership",
       "membershipDirection": "Membership direction",
@@ -79,14 +80,10 @@
       "emptyHint": "Pick the Select tool and click a Hex, Feature, or Label to inspect it. Place a Label with the Label tool, then select it here to edit its text, size, rotation and position.",
       "multiTitle": "Selection",
       "selectedCount": "selected",
-      "kindHex": "hex",
-      "kindHexes": "hexes",
-      "kindFeature": "feature",
-      "kindFeatures": "features",
-      "kindRegion": "region",
-      "kindRegions": "regions",
-      "kindLabel": "label",
-      "kindLabels": "labels",
+      "kindHexCount": "{count, plural, one {# hex} other {# hexes}}",
+      "kindFeatureCount": "{count, plural, one {# feature} other {# features}}",
+      "kindRegionCount": "{count, plural, one {# region} other {# regions}}",
+      "kindLabelCount": "{count, plural, one {# label} other {# labels}}",
       "deleteAll": "Delete all"
     },
     "regionsPanel": {
@@ -97,8 +94,7 @@
     "statusBar": {
       "connecting": "Connecting…",
       "apiError": "Could not reach the API.",
-      "hex": "hex",
-      "hexes": "hexes"
+      "hexCount": "{count, plural, one {# hex} other {# hexes}}"
     },
     "canvas": {
       "void": "Void",
@@ -114,7 +110,7 @@
     "backToMap": "Back to map",
     "eyebrow": "Hexly design system",
     "heroTitle": "The cartographer’s table,<br />by starlight.",
-    "heroLede": "One identity told at two hours of the day. <strong>Parchment</strong> is the aged sea-chart on the drafting table; <strong>Astral</strong> is the same chart under the night sky. Gold is the through-line — compass ink by day, constellation lines by night — and the text stays warm parchment-cream in both. Everything below is driven by the same CSS custom-property layer that <code>apps/web</code> ships.",
+    "heroLede": "One identity told at two hours of the day. <strong>Solar</strong> is the sunlit almanac on the cartographer’s table; <strong>Astral</strong> is the same chart under the night sky. Gold is the through-line — heliograph ink by day, constellation lines by night — and the text stays a warm ivory-cream in both. Everything below is driven by the same CSS custom-property layer that <code>apps/web</code> ships.",
     "swatch": {
       "table": "Table",
       "paper": "Paper",
@@ -184,6 +180,15 @@
   },
   "common": {
     "language": "Language",
+    "userMenu": "Open user menu",
+    "signOut": "Sign out",
+    "login": "Login",
+    "theme": {
+      "solar": "Solar (light)",
+      "astral": "Astral (dark)",
+      "toSolar": "Switch to solar theme",
+      "toAstral": "Switch to astral theme"
+    },
     "save": "Save",
     "cancel": "Cancel",
     "close": "Close",

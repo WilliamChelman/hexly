@@ -5,7 +5,6 @@ import {
   computed,
   effect,
   inject,
-  signal,
   viewChild,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
@@ -14,7 +13,6 @@ import { Button } from '../ui/button';
 import { Chip } from '../ui/chip';
 import { Eyebrow } from '../ui/eyebrow';
 import { Icon } from '../ui/icon/icon';
-import { inputValue } from './dom';
 import { EditorSession } from './editor-session';
 
 /**
@@ -30,32 +28,33 @@ import { EditorSession } from './editor-session';
   host: { class: 'flex flex-1 items-center gap-5' },
   imports: [RouterLink, Button, Chip, Eyebrow, Icon, TranslocoPipe],
   template: `
-    <div class="flex items-center gap-3 pl-5 border-l border-line">
-      <span appEyebrow>{{ 'editorShell.hexMap' | transloco }}</span>
-      @if (editing()) {
-        <input
-          class="font-display text-md text-ink-strong py-1 px-2 -my-1 -mx-2 bg-surface-sunken border border-gold rounded-sm outline-none"
-          data-testid="title-input"
-          [attr.aria-label]="'editorShell.mapTitleLabel' | transloco"
-          [value]="draft()"
-          (input)="draft.set(inputValue($event))"
-          (keydown.enter)="commitRename()"
-          (keydown.escape)="cancelRename()"
-          (blur)="commitRename()"
-          #titleInput
-        />
-      } @else {
-        <button
-          type="button"
-          class="font-display text-md text-ink py-1 px-2 -my-1 -mx-2 bg-transparent border border-transparent rounded-sm cursor-text hover:border-line hover:bg-surface-sunken"
-          data-testid="title"
-          [title]="'editorShell.renameMap' | transloco"
-          [disabled]="!hasMap()"
-          (click)="startRename()"
-        >
-          {{ title() }}
-        </button>
-      }
+    <div class="flex items-center gap-3 shrink-0">
+      <span class="w-px h-[26px] bg-line-strong shrink-0"></span>
+      <span appEyebrow class="text-gold! tracking-[0.28em] whitespace-nowrap">{{
+        'editorShell.hexMap' | transloco
+      }}</span>
+      <!--
+        Edit-in-place title: a plaintext contenteditable styled as the mockup
+        '.title'. The text is driven imperatively (effect, never while focused)
+        rather than interpolated, so re-renders can't move the caret mid-edit.
+      -->
+      <div
+        #titleEl
+        class="font-display text-[22px] font-semibold tracking-[0.01em] text-ink whitespace-nowrap py-1 px-2 -my-1 -mx-2 rounded-sm border border-transparent outline-none hover:border-line hover:bg-surface-sunken focus:bg-surface-sunken focus:border-gold"
+        [class.cursor-text]="hasMap()"
+        data-testid="title"
+        role="textbox"
+        aria-multiline="false"
+        spellcheck="false"
+        [attr.tabindex]="hasMap() ? 0 : null"
+        [attr.contenteditable]="hasMap() ? 'plaintext-only' : null"
+        [attr.aria-label]="'editorShell.mapTitleLabel' | transloco"
+        [title]="'editorShell.renameMap' | transloco"
+        (focus)="onFocus()"
+        (keydown.enter)="onEnter($event)"
+        (keydown.escape)="onEscape($event)"
+        (blur)="commit()"
+      ></div>
       @if (conflict()) {
         <app-chip tone="gold" data-testid="conflict">
           {{ 'editorShell.save.conflict' | transloco }}
@@ -69,7 +68,7 @@ import { EditorSession } from './editor-session';
           </button>
         </app-chip>
       } @else {
-        <app-chip tone="sea">{{ 'editorShell.editing' | transloco }}</app-chip>
+        <app-chip tone="gold">{{ 'editorShell.editing' | transloco }}</app-chip>
       }
     </div>
 
@@ -112,47 +111,67 @@ export class EditorHeader {
   /** The server's current map when a save was rejected as stale, else `null`. */
   protected readonly conflict = this.session.conflict;
 
-  /** Whether the title is being edited inline. */
-  protected readonly editing = signal(false);
-  /** The working title while editing, committed on Enter/blur. */
-  protected readonly draft = signal('');
-  private readonly titleInput =
-    viewChild<ElementRef<HTMLInputElement>>('titleInput');
+  private readonly titleEl =
+    viewChild.required<ElementRef<HTMLElement>>('titleEl');
+
+  /**
+   * The name shown when the field was focused — the text the user started from.
+   * commit() renames only when the field actually changed against *this*, not the
+   * live {@link title}: so an unedited blur after the name changed server-side
+   * mid-edit (e.g. a conflict reload) restores the new name rather than re-sending
+   * the stale one over it. `null` when not editing.
+   */
+  private editBaseline: string | null = null;
 
   constructor() {
-    // Focus (and select) the rename field as soon as it appears, so the user can
-    // type straight away.
+    // Mirror the open map's name into the contenteditable — but never while the
+    // user is editing it, or the write would fight the caret.
     effect(() => {
-      const input = this.titleInput();
-      if (input) input.nativeElement.select();
+      const name = this.title();
+      const el = this.titleEl().nativeElement;
+      if (document.activeElement !== el) el.textContent = name;
     });
   }
 
-  /** Read the current value out of an input event (template-visible alias). */
-  protected readonly inputValue = inputValue;
+  /** Snapshot the name the user begins editing from, for {@link commit}. */
+  protected onFocus(): void {
+    this.editBaseline = this.titleEl().nativeElement.textContent ?? '';
+  }
 
-  /** Enter inline edit, seeded with the current title. */
-  protected startRename(): void {
-    this.draft.set(this.title());
-    this.editing.set(true);
+  /** Commit on Enter without inserting a newline (blur runs {@link commit}). */
+  protected onEnter(event: Event): void {
+    event.preventDefault();
+    this.titleEl().nativeElement.blur();
+  }
+
+  /** Abandon the edit: restore the current name, then drop focus. */
+  protected onEscape(event: Event): void {
+    event.preventDefault();
+    // Make the pending blur-commit a no-op against the restored name.
+    this.editBaseline = this.title();
+    this.titleEl().nativeElement.textContent = this.title();
+    this.titleEl().nativeElement.blur();
   }
 
   /**
-   * Commit the edited title. A no-op (unchanged or blank) just closes the editor
-   * without a request. Guarded against a double fire when Enter is followed by
-   * the input's blur.
+   * Commit the edited title from the element's text. A no-op (blank, or unchanged
+   * from what the edit started with) just normalises the text back to the current
+   * name without a request; a rejected rename reverts the optimistic text.
    */
-  protected commitRename(): void {
-    if (!this.editing()) return;
-    this.editing.set(false);
-    const name = this.draft().trim();
-    if (!name || name === this.title()) return;
-    this.session.rename(name).subscribe();
-  }
-
-  /** Abandon the edit, leaving the title unchanged. */
-  protected cancelRename(): void {
-    this.editing.set(false);
+  protected commit(): void {
+    const el = this.titleEl().nativeElement;
+    const baseline = this.editBaseline ?? this.title();
+    this.editBaseline = null;
+    // The title is single-line (aria-multiline=false); collapse any pasted
+    // newlines/whitespace so they never reach the stored name.
+    const name = (el.textContent ?? '').replace(/\s+/g, ' ').trim();
+    if (!name || name === baseline) {
+      el.textContent = this.title();
+      return;
+    }
+    this.session.rename(name).subscribe({
+      error: () => (el.textContent = this.title()),
+    });
   }
 
   /** Persist the current map. A stale-version rejection surfaces as a conflict

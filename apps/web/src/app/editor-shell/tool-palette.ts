@@ -72,7 +72,7 @@ function glyphFor(subtool: SelectSubtool): IconName {
   imports: [IconButton, Icon, IconPath, Swatch, Panel, Rule, TranslocoPipe],
   template: `
     <div
-      class="flex flex-col gap-[2px] p-2 min-h-0 max-h-full overflow-y-auto"
+      class="flex flex-col gap-2 p-2 min-h-0 max-h-full overflow-y-auto"
       appPanel
       role="group"
       [attr.aria-label]="'editorShell.toolPalette.tools' | transloco"
@@ -207,7 +207,7 @@ function glyphFor(subtool: SelectSubtool): IconName {
     .flyout {
       display: grid;
       grid-template-columns: repeat(2, auto);
-      gap: 2px;
+      gap: var(--spacing-2);
       padding: var(--spacing-2);
       max-height: 100%;
       overflow-y: auto;

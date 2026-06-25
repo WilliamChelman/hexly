@@ -23,7 +23,7 @@ import { EditorStore } from './editor-store';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     class:
-      'flex items-center gap-4 py-0 px-4 text-2xs text-ink-muted bg-surface border-t border-line-strong',
+      'flex items-center gap-4 py-0 px-4 text-2xs text-ink-muted bg-linear-[180deg] from-bg-deep to-surface border-t border-line',
   },
   imports: [Cartouche, Coord, Dot, TranslocoPipe],
   template: `
@@ -40,23 +40,19 @@ import { EditorStore } from './editor-store';
     <span class="flex-1"></span>
     <span class="flex items-center gap-2 whitespace-nowrap"><app-coord>q 0 · r 0</app-coord></span>
     <span class="flex items-center gap-2 whitespace-nowrap" data-testid="hex-count"
-      >{{ hexCount() }}
-      {{
-        (hexCount() === 1
-          ? 'editorShell.statusBar.hex'
-          : 'editorShell.statusBar.hexes') | transloco
+      >{{
+        'editorShell.statusBar.hexCount' | transloco: { count: hexCount() }
       }}</span
     >
     <span class="flex items-center gap-2 whitespace-nowrap">Zoom 100%</span>
-    <span class="flex items-center gap-2 whitespace-nowrap" appCartouche>Astral / Parchment</span>
+    <span class="flex items-center gap-2 whitespace-nowrap text-gold tracking-wider" appCartouche>Astral / Solar</span>
   `,
 })
 export class StatusBar implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly store = inject(EditorStore);
 
-  /** How many hexes the user has painted — the document is sparse, so this is
-   * exactly the count of records, not a grid area (ADR-0003). */
+  /** How many hexes the user has painted (sparse document — record count, ADR-0003). */
   protected readonly hexCount = computed(
     () => Object.keys(this.store.document().hexes).length,
   );

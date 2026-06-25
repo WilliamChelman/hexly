@@ -91,12 +91,12 @@ describe('Styleguide', () => {
     // The emphasis/code markup survives the move into a single key.
     expect(lede().querySelector('strong')).not.toBeNull();
     expect(lede().querySelector('code')?.textContent).toBe('apps/web');
-    expect(lede().textContent).toContain('Parchment');
+    expect(lede().textContent).toContain('Solar');
 
     switchTo(fixture, 'fr');
 
-    expect(lede().querySelector('strong')?.textContent).toBe('Parchemin');
-    expect(lede().textContent).not.toContain('Parchment');
+    expect(lede().querySelector('strong')?.textContent).toBe('Solaire');
+    expect(lede().textContent).not.toContain('Solar');
   });
 
   it('keeps the Hexly brand untranslated in both languages', () => {

@@ -39,26 +39,32 @@ import {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: var(--spacing-7);
-      height: var(--spacing-7);
+      width: 2.625rem; /* 42px — codex tool gem (20px glyph + padding) */
+      height: 2.625rem;
       color: var(--color-ink-muted);
-      background: transparent;
+      /* A faint sunken fill so an inactive button still reads as a button. */
+      background: color-mix(in srgb, var(--color-bg-deep) 50%, transparent);
       border: 1px solid transparent;
-      border-radius: var(--radius-md);
+      border-radius: var(--radius-lg);
       cursor: pointer;
       transition:
         background-color var(--dur-fast) var(--ease-out),
         border-color var(--dur-fast) var(--ease-out),
         color var(--dur-fast) var(--ease-out);
     }
-    :host(:hover:not(:disabled)) {
-      color: var(--color-ink);
-      background: var(--color-gold-soft);
-    }
-    :host(.is-active) {
+    /* Hover (only when not armed): gold glyph + gilded border, fill unchanged. */
+    :host(:hover:not(:disabled):not(.is-active)) {
       color: var(--color-gold);
-      background: var(--color-gold-soft);
-      border-color: var(--color-gold);
+      border-color: var(--color-line-strong);
+    }
+    /* Armed/selected — a gilded gem: radial gold gradient + glow halo. */
+    :host(.is-active) {
+      color: var(--color-on-gilded);
+      background: var(--gradient-gold-radial);
+      border-color: color-mix(in srgb, var(--color-gold-bright) 60%, #fff);
+      box-shadow:
+        0 0 0 1px var(--color-glow),
+        0 0 16px -1px var(--color-glow);
     }
     :host(:disabled) {
       opacity: 0.4;
