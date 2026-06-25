@@ -3,12 +3,10 @@ import {
   Component,
   DestroyRef,
   computed,
-  effect,
   inject,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { translateSignal, TranslocoPipe } from '@jsverse/transloco';
-import { TitleService } from '../core/i18n/title.service';
 import { EditorSession } from '../editor-shell/editor-session';
 import { HeaderService } from '../shell/header.service';
 
@@ -42,7 +40,6 @@ import { HeaderService } from '../shell/header.service';
 export class NoteView {
   private readonly session = inject(EditorSession);
   private readonly header = inject(HeaderService);
-  private readonly title = inject(TitleService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly eyebrow = translateSignal('noteView.eyebrow');
 
@@ -51,14 +48,11 @@ export class NoteView {
 
   constructor() {
     // Contribute this note's name to the single app header (ADR-0015) as a
-    // computed, so the chrome tracks renames and a live language switch.
+    // computed, so the chrome tracks renames and a live language switch. The tab
+    // title is owned by EditorSession, shared with the map editor.
     this.header.set(
       computed(() => ({ eyebrow: this.eyebrow(), title: this.name() })),
       this.destroyRef,
     );
-    // Own the tab title while open ("{note} — Hexly"), and clear it on leave so a
-    // stale name never shadows the next page (parallel to EditorShell).
-    effect(() => this.title.setDocumentName(this.session.current()?.name ?? null));
-    this.destroyRef.onDestroy(() => this.title.setDocumentName(null));
   }
 }

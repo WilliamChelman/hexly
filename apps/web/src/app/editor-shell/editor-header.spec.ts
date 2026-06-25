@@ -37,6 +37,7 @@ describe('EditorHeader', () => {
     await TestBed.configureTestingModule({
       imports: [EditorHeader, provideTranslocoTesting()],
       providers: [
+        EditorSession,
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),

@@ -13,6 +13,8 @@ import {
 import { of } from 'rxjs';
 import { EntityDetail, EntityType } from '@hexly/domain';
 import { EditorShell } from '../editor-shell/editor-shell';
+import { EditorSession } from '../editor-shell/editor-session';
+import { TitleService } from '../core/i18n/title.service';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { EntityShell } from './entity-shell';
 
@@ -50,6 +52,7 @@ describe('EntityShell', () => {
     await TestBed.configureTestingModule({
       imports: [EntityShell, provideTranslocoTesting()],
       providers: [
+        EditorSession,
         provideHttpClient(),
         provideHttpClientTesting(),
         {
@@ -90,6 +93,16 @@ describe('EntityShell', () => {
 
     expect(fixture.nativeElement.querySelector('app-editor-shell')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('app-note-view')).toBeNull();
+  });
+
+  it('titles the tab with the open Entity name (owned by the session, not each view)', async () => {
+    const fixture = await render('m1');
+    http.expectOne('/entities/m1').flush(detail('m1', 'hexmap'));
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(TestBed.inject(TitleService).documentName()).toBe('Aldermoor');
   });
 
   it('returns to the library when the Entity fails to load', async () => {

@@ -24,6 +24,9 @@
     },
     "loadErrorTitle": "Couldn't load your library.",
     "loadErrorHint": "Something went wrong. Please try again in a moment.",
+    "createError": "Couldn't create that. Please try again.",
+    "renameError": "Couldn't rename that. Please try again.",
+    "deleteError": "Couldn't delete that. Please try again.",
     "emptyTitle": "Your library is empty.",
     "emptyHint": "Create a note or a map to begin."
   },

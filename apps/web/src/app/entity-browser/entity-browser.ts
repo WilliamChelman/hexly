@@ -16,8 +16,9 @@ import {
 } from '@jsverse/transloco';
 import { EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient } from '../entities/entities.client';
-import { EditorSession } from '../editor-shell/editor-session';
+import { ToasterService } from '../core/toaster.service';
 import { HeaderService } from '../shell/header.service';
+import { Autofocus } from '../ui/autofocus';
 import { Button } from '../ui/button';
 import { Panel } from '../ui/panel';
 import { Icon } from '../ui/icon/icon';
@@ -53,7 +54,7 @@ function formatEdited(updatedAt: number, lang: string): string {
 @Component({
   selector: 'app-entity-browser',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Panel, Icon, TranslocoPipe],
+  imports: [Button, Panel, Icon, TranslocoPipe, Autofocus],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
     <div class="max-w-[60rem] mx-auto py-6 px-5">
@@ -68,7 +69,7 @@ function formatEdited(updatedAt: number, lang: string): string {
           (click)="create('note')"
         >
           <app-icon name="plus" [size]="16" />
-          {{ 'entityBrowser.newNote' | transloco }}
+          {{ (creating() ? 'entityBrowser.creating' : 'entityBrowser.newNote') | transloco }}
         </button>
         <button
           type="button"
@@ -91,6 +92,7 @@ function formatEdited(updatedAt: number, lang: string): string {
                 @if (renamingId() === card.id) {
                   <input
                     type="text"
+                    appAutofocus
                     class="flex-1 font-display text-md text-ink-strong bg-surface-sunken border border-gold rounded-sm py-1 px-2 outline-none"
                     [value]="card.title"
                     [attr.data-testid]="'rename-input-' + card.id"
@@ -167,9 +169,9 @@ function formatEdited(updatedAt: number, lang: string): string {
 })
 export class EntityBrowser implements OnInit {
   private readonly maps$ = inject(EntitiesClient);
-  private readonly session = inject(EditorSession);
   private readonly router = inject(Router);
   private readonly header = inject(HeaderService);
+  private readonly toaster = inject(ToasterService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly transloco = inject(TranslocoService);
 
@@ -243,11 +245,15 @@ export class EntityBrowser implements OnInit {
     this.maps$
       .create(type === 'note' ? NEW_NOTE_TITLE : NEW_MAP_TITLE, type)
       .pipe(finalize(() => this.creating.set(false)))
-      .subscribe((entity) => {
-        // Hand the created Entity to the open-Entity seam before navigating, so
-        // openRoute reuses it without a redundant GET (#10).
-        this.session.adopt(entity);
-        this.open(entity.id);
+      .subscribe({
+        // The route-scoped EditorSession loads the Entity on open; no pre-adopt
+        // from here (it would outlive the create's own page).
+        next: (entity) => this.open(entity.id),
+        error: () =>
+          this.toaster.show(
+            this.transloco.translate('entityBrowser.createError'),
+            'error',
+          ),
       });
   }
 
@@ -267,32 +273,45 @@ export class EntityBrowser implements OnInit {
 
   /**
    * Rename an Entity by name only (metadata, ADR-0018 — version untouched, no
-   * body). A blank or unchanged name just closes the editor without a round
-   * trip. On success the list row is refreshed from the server's Entity.
+   * body). A blank or unchanged name — or one whose card is no longer listed
+   * (concurrently deleted) — just closes the editor without a round trip. On
+   * success the list row is refreshed from the server's Entity; on failure the
+   * input is closed and the error is surfaced rather than left stuck open.
    */
   protected commitRename(id: string, name: string): void {
     const trimmed = name.trim();
     const current = this._maps().find((m) => m.id === id);
-    if (!trimmed || trimmed === current?.name) {
+    if (!trimmed || !current || trimmed === current.name) {
       this.cancelRename();
       return;
     }
-    this.maps$.rename(id, trimmed).subscribe((updated) => {
+    this.maps$.rename(id, trimmed).subscribe({
       // EntityDetail is assignable to the summary list; the extra body it carries
-      // is harmless and lets us refresh the open-Entity seam below without a cast.
-      this._maps.update((maps) => maps.map((m) => (m.id === id ? updated : m)));
-      // Keep the shared open-Entity seam fresh: if it still holds this Entity
-      // (e.g. just created, then renamed before reopening), refresh it so
-      // openRoute's reuse-by-id (#10) doesn't reopen the stale name.
-      if (this.session.current()?.id === id) this.session.adopt(updated);
-      this.renamingId.set(null);
+      // is harmless.
+      next: (updated) => {
+        this._maps.update((maps) => maps.map((m) => (m.id === id ? updated : m)));
+        this.renamingId.set(null);
+      },
+      error: () => {
+        this.cancelRename();
+        this.toaster.show(
+          this.transloco.translate('entityBrowser.renameError'),
+          'error',
+        );
+      },
     });
   }
 
   /** Delete a map and drop it from the list once the server confirms. */
   protected remove(id: string): void {
-    this.maps$
-      .delete(id)
-      .subscribe(() => this._maps.update((maps) => maps.filter((m) => m.id !== id)));
+    this.maps$.delete(id).subscribe({
+      next: () =>
+        this._maps.update((maps) => maps.filter((m) => m.id !== id)),
+      error: () =>
+        this.toaster.show(
+          this.transloco.translate('entityBrowser.deleteError'),
+          'error',
+        ),
+    });
   }
 }

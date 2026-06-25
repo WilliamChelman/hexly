@@ -70,8 +70,16 @@ const nameSchema = z.string().trim().min(1);
  * Free-text Tags on an Entity (CONTEXT.md → Tag). Defaults to empty so an Entity
  * created or stored without tags still lists with an array rather than
  * `undefined`. Tags carry no behaviour — distinct from the structured type.
+ *
+ * De-duplicated on parse: a tag set is conceptually unique, so two identical
+ * strings are collapsed at the validation boundary rather than persisted — that
+ * keeps every consumer (e.g. the browser's keyed tag list) free of duplicate
+ * keys at the source instead of guarding each render.
  */
-export const tagsSchema = z.array(z.string()).default([]);
+export const tagsSchema = z
+  .array(z.string())
+  .transform((tags) => [...new Set(tags)])
+  .default([]);
 
 /**
  * The body of `POST /entities`: a new Entity needs a name and a type; tags

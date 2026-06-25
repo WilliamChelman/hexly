@@ -38,7 +38,11 @@ describe('EntityHeader', () => {
   async function render(type: EntityType) {
     await TestBed.configureTestingModule({
       imports: [EntityHeader, provideTranslocoTesting()],
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [
+        EditorSession,
+        provideHttpClient(),
+        provideHttpClientTesting(),
+      ],
     })
       .overrideComponent(EntityHeader, {
         remove: { imports: [EditorHeader] },

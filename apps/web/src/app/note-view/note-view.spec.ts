@@ -26,6 +26,7 @@ describe('NoteView', () => {
     await TestBed.configureTestingModule({
       imports: [NoteView, provideTranslocoTesting()],
       providers: [
+        EditorSession,
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),

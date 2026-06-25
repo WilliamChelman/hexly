@@ -7,7 +7,7 @@ const API_PREFIX = '/api';
  * Routes every backend request under {@link API_PREFIX}. Stores call clean
  * resource paths (`/entities`, `/auth/login`); this is the one place that knows the
  * API is namespaced under `/api`, keeping that prefix off the SPA's own routes
- * (the client owns `/entities/:id`, the API owns `/api/maps/:id`). Absolute URLs and
+ * (the client owns `/entities/:id`, the API owns `/api/entities/:id`). Absolute URLs and
  * requests already under `/api` pass through untouched.
  */
 export const apiPrefixInterceptor: HttpInterceptorFn = (req, next) => {

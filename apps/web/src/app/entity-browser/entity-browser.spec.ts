@@ -8,7 +8,7 @@ import { provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { EntitySummary } from '@hexly/domain';
 import { AuthStore } from '../auth/auth.store';
-import { EditorSession } from '../editor-shell/editor-session';
+import { ToasterService } from '../core/toaster.service';
 import { HeaderService } from '../shell/header.service';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { EntityBrowser } from './entity-browser';
@@ -349,14 +349,8 @@ describe('EntityBrowser', () => {
     expect(el.querySelector('[data-testid=rename-input-m1]')).toBeNull();
   });
 
-  it('refreshes the open-Entity session on rename so a reopen is not stale', () => {
-    const fixture = renderWith([summary({ id: 'm1', name: 'Aldermoor' })]);
-    const session = TestBed.inject(EditorSession);
-    // The browser holds this Entity open (e.g. just created), then renames it.
-    session.adopt({
-      ...summary({ id: 'm1', name: 'Aldermoor' }),
-      document: { type: 'hexmap', content: { format: 'tiptap-v1', snapshot: {} }, hexes: {}, regions: [], labels: [] },
-    });
+  it('closes the input and surfaces an error toast when a rename fails', () => {
+    const fixture = renderWith([summary({ id: 'm1', name: 'Aldermoor', version: 4 })]);
     const el = fixture.nativeElement as HTMLElement;
 
     (el.querySelector('[data-testid=rename-m1]') as HTMLButtonElement).click();
@@ -365,12 +359,15 @@ describe('EntityBrowser', () => {
     input.value = 'Aldermoor Keep';
     input.dispatchEvent(new Event('input'));
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
-    http.expectOne('/entities/m1').flush({
-      ...summary({ id: 'm1', name: 'Aldermoor Keep' }),
-      document: { type: 'hexmap', content: { format: 'tiptap-v1', snapshot: {} }, hexes: {}, regions: [], labels: [] },
-    });
+    http
+      .expectOne('/entities/m1')
+      .flush(null, { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
 
-    expect(session.current()?.name).toBe('Aldermoor Keep');
+    // The input is closed (not left stuck open) and the failure is surfaced.
+    expect(el.querySelector('[data-testid=rename-input-m1]')).toBeNull();
+    const toasts = TestBed.inject(ToasterService).toasts();
+    expect(toasts.map((t) => t.tone)).toEqual(['error']);
   });
 
   it('cancels an inline rename on Escape without saving', () => {
@@ -410,5 +407,22 @@ describe('EntityBrowser', () => {
       fixture.nativeElement.querySelectorAll('[data-testid=map-title]'),
     ).map((el) => (el as HTMLElement).textContent?.trim());
     expect(titles).toEqual(['The Whisperwood']);
+  });
+
+  it('keeps the card and surfaces an error toast when a delete fails', () => {
+    const fixture = renderWith([summary({ id: 'm1', name: 'Aldermoor' })]);
+
+    (
+      fixture.nativeElement.querySelector('[data-testid=delete-m1]') as HTMLButtonElement
+    ).click();
+    http
+      .expectOne('/entities/m1')
+      .flush(null, { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+
+    // The card stays (the delete didn't take) and the failure is surfaced.
+    expect(fixture.nativeElement.querySelector('[data-testid=open-m1]')).not.toBeNull();
+    const toasts = TestBed.inject(ToasterService).toasts();
+    expect(toasts.map((t) => t.tone)).toEqual(['error']);
   });
 });

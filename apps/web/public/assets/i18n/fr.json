@@ -24,6 +24,9 @@
     },
     "loadErrorTitle": "Impossible de charger votre bibliothèque.",
     "loadErrorHint": "Une erreur est survenue. Veuillez réessayer dans un instant.",
+    "createError": "Création impossible. Veuillez réessayer.",
+    "renameError": "Renommage impossible. Veuillez réessayer.",
+    "deleteError": "Suppression impossible. Veuillez réessayer.",
     "emptyTitle": "Votre bibliothèque est vide.",
     "emptyHint": "Créez une note ou une carte pour commencer."
   },

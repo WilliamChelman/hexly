@@ -99,6 +99,16 @@ describe('createEntityRequestSchema', () => {
     ).toEqual([]);
   });
 
+  it('de-duplicates tags so a tag set is never persisted with repeats', () => {
+    expect(
+      createEntityRequestSchema.parse({
+        name: 'Aldermoor',
+        type: 'note',
+        tags: ['kingdom', 'kingdom', 'coast'],
+      }).tags,
+    ).toEqual(['kingdom', 'coast']);
+  });
+
   it('trims the name and rejects an empty or whitespace-only one', () => {
     // Reuses the same trimmed, non-empty rule the Hex Map title used (#12/#15).
     expect(

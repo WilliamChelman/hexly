@@ -3,11 +3,10 @@ import {
   Component,
   computed,
   inject,
-  signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
-import { catchError, EMPTY, filter, map, switchMap, tap } from 'rxjs';
+import { catchError, EMPTY, filter, map, switchMap } from 'rxjs';
 import { EditorSession } from '../editor-shell/editor-session';
 import { EditorShell } from '../editor-shell/editor-shell';
 import { NoteView } from '../note-view/note-view';
@@ -20,6 +19,13 @@ import { NoteView } from '../note-view/note-view';
  * adopted Entity without a round trip, ADR-0018) and renders the right view
  * once it resolves. A failed load (404 — deleted, foreign, or typo'd id) returns
  * to the library rather than stranding the user on a blank page (#3).
+ *
+ * This is the one loader for the route: it opens the Entity into the shared
+ * {@link EditorSession}; the views ({@link EditorShell}, {@link NoteView}) and the
+ * header outlet only read `session.current()`. Dispatching on the open Entity's
+ * `type` (not a routed-id gate) keeps the editor mounted across a map→map
+ * navigation — only the canvas swaps — while the session's write guards make a
+ * mid-navigation Save safe.
  */
 @Component({
   selector: 'app-entity-shell',
@@ -42,26 +48,19 @@ export class EntityShell {
   private readonly router = inject(Router);
   private readonly session = inject(EditorSession);
 
-  /** The id the route currently points at — gates the view so a stale Entity
-   * (held by the session mid-navigation) never renders the wrong shell. */
-  private readonly routedId = signal<string | null>(null);
-
-  /** Which view to render, or `null` until the routed Entity has loaded. */
-  protected readonly view = computed(() => {
-    const current = this.session.current();
-    return current && current.id === this.routedId()
-      ? current.document.type
-      : null;
-  });
+  /** Which view to render, or `null` until an Entity is open. */
+  protected readonly view = computed(
+    () => this.session.current()?.document.type ?? null,
+  );
 
   constructor() {
-    // Open whatever Entity the URL points at, reopening on an id change. The
-    // editor's own openRoute (when EditorShell mounts) then reuses this load.
+    // Open whatever Entity the URL points at, reopening on an id change.
+    // `switchMap` cancels an in-flight open when the id changes, so opening
+    // /entities/A then /entities/B can't let a late A response land over B.
     this.route.paramMap
       .pipe(
         map((params) => params.get('id')),
         filter((id): id is string => id !== null),
-        tap((id) => this.routedId.set(id)),
         switchMap((id) =>
           this.session.openRoute(id).pipe(
             catchError(() => {

@@ -1,5 +1,6 @@
 import { Route } from '@angular/router';
 import { authGuard, loginGuard } from './auth/auth.guard';
+import { EditorSession } from './editor-shell/editor-session';
 
 export const appRoutes: Route[] = [
   {
@@ -35,6 +36,10 @@ export const appRoutes: Route[] = [
     // header), a note the minimal note view.
     path: 'entities/:id',
     canActivate: [authGuard],
+    // One EditorSession for this route subtree, shared by both outlets and the
+    // view they dispatch to, and destroyed when the route is left so its
+    // open-Entity state resets implicitly (#70).
+    providers: [EditorSession],
     // The tab title is the open Entity's name composed with the brand
     // ("Aldermoor — Hexly"): TranslationTitleStrategy fills `documentTitleKey`'s
     // `{{name}}` slot from the open document. `title` is the fallback shown until

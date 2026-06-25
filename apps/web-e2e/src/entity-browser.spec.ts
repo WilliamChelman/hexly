@@ -54,4 +54,9 @@ test('creating a map opens the map editor, not the note view', async ({
   // The editor chrome (the editable map title) is present; the note view is not.
   await expect(page.getByTestId('title')).toBeVisible();
   await expect(page.getByTestId('note-title')).toHaveCount(0);
+
+  // The editor header's "All maps" link returns to the library (retargeted from
+  // /maps to /entities in #70).
+  await page.getByRole('link', { name: 'All maps' }).click();
+  await expect(page).toHaveURL(/\/entities$/);
 });
