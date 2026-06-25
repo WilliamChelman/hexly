@@ -107,27 +107,19 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
       (wheel)="onWheel($event)"
     ></canvas>
 
-    <!--
-      The Vellum field's two top layers, over the (transparent-Void) canvas and
-      below the UI overlays by DOM order. '.field-grain' is the faint paper tooth;
-      '.field-vignette' is the soft edge darkening (codex vellum field). Both inert
-      to the pointer so neither intercepts a canvas gesture.
-    -->
+    <!-- Vellum field layers over the transparent canvas: paper grain + edge
+         vignette. Inert to the pointer (DOM order keeps them below the overlays). -->
     <div class="field-grain" aria-hidden="true"></div>
     <div class="field-vignette" aria-hidden="true"></div>
 
-    <!-- Hover-coordinate readout, bottom-left (the canvas owns the hover state). -->
+    <!-- Hover-coordinate readout, bottom-left. -->
     <app-coord-readout
       class="absolute bottom-4 left-4"
       [coord]="hover()"
       [terrainKey]="readoutKey()"
     />
 
-    <!--
-      Zoom/fit controls, bottom-right. The host establishes its own stacking
-      context (isolation: isolate, below), so this cannot lift above the shell's
-      right dock anyway — and a tall dock panel sitting over it is fine.
-    -->
+    <!-- Zoom/fit controls, bottom-right. -->
     <app-zoom-control
       class="absolute right-4 bottom-4"
       [percent]="zoomPercent()"
@@ -138,15 +130,11 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
   `,
   styles: `
     /*
-      The host sets no position of its own — placement is the parent's prerogative
-      (the shell lays this out full-bleed, ADR-0013). It owns only its appearance:
-      it clips to its box and paints the map's Solar/Astral Vellum wash — a soft
-      top-edge glow over a directional paper gradient (codex vellum field), shown
-      through the canvas's transparent Void. Once the shell positions it, the host
-      is the containing block for the field/readout/zoom overlays below.
-      'isolation' confines the .field-grain blend to the map, so it never reaches
-      the page behind. (No 'position' here is also what lets the shell's inline
-      'absolute inset-0' win — an emulated :host rule would be unlayered and beat it.)
+      No position of its own — the shell positions it full-bleed (ADR-0013), and
+      omitting it lets the shell's inline 'absolute inset-0' win over an (unlayered)
+      :host rule. Paints the Vellum wash (top glow over a paper gradient) behind the
+      transparent-Void canvas; 'isolation' confines the grain blend to the map and
+      makes the host the containing block for the overlays below.
     */
     :host {
       overflow: hidden;
@@ -164,12 +152,9 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
         );
     }
     /*
-      Paper tooth for the Vellum field. A single tiling SVG fractal-noise tile,
-      desaturated, blended at low opacity so it adds grain without shifting the
-      field's colour. The blend is themed (multiply darkens the light paper,
-      screen lifts the night paper, like the mockup), and it sits between the
-      canvas and the UI overlays by DOM order (no z-index, so readout/zoom stay
-      on top).
+      Paper tooth: a tiling desaturated SVG fractal-noise, blended low so it adds
+      grain without shifting colour. Themed blend (multiply on light, screen on
+      dark). No z-index — DOM order keeps it below readout/zoom.
     */
     .field-grain {
       position: absolute;
@@ -184,11 +169,7 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
       opacity: 0.05;
       mix-blend-mode: screen;
     }
-    /*
-      The Vellum field's soft edge vignette: clear at the centre, sinking to the
-      themed edge ink at the corners. Rides above the grain, below the UI overlays
-      (DOM order). Inert to the pointer.
-    */
+    /* Soft edge vignette: clear centre, sinking to the themed edge ink at the corners. */
     .field-vignette {
       position: absolute;
       inset: 0;
@@ -291,20 +272,16 @@ export class MapCanvas {
   private selectSweep: { mode: SelectMode; last: string } | null = null;
 
   /**
-   * The `pointerId` that owns the canvas for the duration of one gesture, or
-   * `null` between gestures. A gesture (paint, pan, or a Select press/drag)
-   * claims it on pointer-down and releases it on up/cancel; events from any
-   * other pointer are ignored while it is held, so a second touch cannot hijack
-   * the drag origin or destination behind the active one.
+   * The `pointerId` that owns the canvas for one gesture (claimed on down,
+   * released on up/cancel), or `null` between gestures. Other pointers are
+   * ignored while it's held — see {@link foreignPointer}.
    */
   private activePointerId: number | null = null;
 
   /**
-   * The mouse `button` that claimed the active gesture (0 primary, 1 middle), or
-   * `null` between gestures. A mouse reports the same `pointerId` for every
-   * button, so the pointerId test alone can't tell a left-button sweep from a
-   * stray right/middle release during it; this lets onPointerUp ignore a release
-   * from any button other than the one that owns the gesture.
+   * The mouse `button` that claimed the gesture (0 primary, 1 middle), or `null`.
+   * A mouse reuses one `pointerId` across buttons, so pointerId alone can't tell a
+   * stray right/middle release from the owning one — onPointerUp checks this too.
    */
   private gestureButton: number | null = null;
 
@@ -440,9 +417,6 @@ export class MapCanvas {
   }
 
   protected onPointerDown(event: PointerEvent): void {
-    // One gesture owns the canvas at a time: a second pointer (e.g. another
-    // finger) while one is already active is ignored, so it cannot overwrite the
-    // active drag's origin or destination behind it.
     if (this.foreignPointer(event)) return;
     const hex = pixelToHex(this.layout, this.toWorld(event));
     this.hover.set(hex);
@@ -574,8 +548,6 @@ export class MapCanvas {
   }
 
   protected onPointerMove(event: PointerEvent): void {
-    // While a gesture is active, only its owning pointer drives it — a stray
-    // second pointer never moves the hover or re-targets the drag.
     if (this.foreignPointer(event)) return;
     const hex = pixelToHex(this.layout, this.toWorld(event));
     this.hover.set(hex);
@@ -663,13 +635,9 @@ export class MapCanvas {
   }
 
   protected onPointerUp(event: PointerEvent): void {
-    // Only the owning pointer ends the gesture; a non-owning pointer's release
-    // must not commit the active drag out from under it.
     if (this.foreignPointer(event)) return;
-    // A mouse fires pointerup with the same pointerId for every button, so a
-    // right/middle release during a left-button sweep would otherwise end the
-    // gesture while the left button is still held. Only the button that claimed
-    // the gesture ends it.
+    // A mouse reuses one pointerId across buttons, so a right/middle release
+    // during a left-button gesture mustn't end it — only the owning button does.
     if (this.gestureButton !== null && event.button !== this.gestureButton) return;
     (event.target as Element).releasePointerCapture?.(event.pointerId);
     this.endGesture(event);
@@ -787,16 +755,9 @@ export class MapCanvas {
   }
 
   /**
-   * Whether a plain press at `hex` (with label hit `hitId`) landed on something
-   * already in the Selection — so it should drag the whole set rather than
-   * re-select (issue #64): the pressed label is selected, the pressed cell is
-   * selected, or the pressed coordinate belongs to a selected Region (so a Region
-   * is grabbable by any of its member cells, painted or not).
-   */
-  /**
-   * Collapse a deferred group-drag press to the single entity that was pressed —
-   * the pick the press postponed so a drag could move the whole set instead. A
-   * no-op unless the press armed a group drag (issue #64).
+   * Collapse a deferred group-drag press to the single pressed entity — the pick
+   * the press postponed so a drag could move the whole set (issue #64). A no-op
+   * unless the press armed a group drag.
    */
   private collapseGroupPress(): void {
     if (this.dragPress?.group) {
@@ -804,6 +765,12 @@ export class MapCanvas {
     }
   }
 
+  /**
+   * Whether a plain press at `hex`/`hitId` landed on something already selected —
+   * so it drags the whole set rather than re-selecting (issue #64): the pressed
+   * label, the pressed cell, or a coord belonging to a selected Region (grabbable
+   * by any member cell, painted or not).
+   */
   private pressOnSelection(hex: Axial, hitId: string | null): boolean {
     const key = coordKey(hex);
     return this.store.selections().some((s) => {
