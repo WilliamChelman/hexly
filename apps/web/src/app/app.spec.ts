@@ -43,9 +43,11 @@ describe('App', () => {
 });
 
 describe('App named header outlet', () => {
-  @Component({ template: 'PROJECTED HEADER' })
+  // Distinct selectors: two selector-less components hash to the same generated
+  // component ID and collide (NG0912), which flakes by test-bundle order.
+  @Component({ selector: 'fake-header', template: 'PROJECTED HEADER' })
   class FakeHeader {}
-  @Component({ template: 'page body' })
+  @Component({ selector: 'fake-page', template: 'page body' })
   class FakePage {}
 
   beforeEach(async () => {

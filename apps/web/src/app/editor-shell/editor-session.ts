@@ -14,7 +14,6 @@ import {
   finalize,
   map,
   Observable,
-  of,
   switchMap,
   tap,
 } from 'rxjs';
@@ -111,16 +110,17 @@ export class EditorSession {
   }
 
   /**
-   * Open the Entity the route points at. Reuses the current one without a round
-   * trip if the id is unchanged; otherwise clears the canvas and fetches, flagging
+   * Open the Entity the route points at: clear the canvas, then fetch, flagging
    * {@link _loading} to block writes mid-swap.
+   *
+   * Always a fresh fetch — even when the id matches what's already open. This
+   * session is route-scoped but outlives a trip back to the library (its route
+   * injector isn't torn down between visits), so a retained `current` can be
+   * stale — e.g. a note renamed in the browser then reopened (#70). Re-fetching
+   * on entry also re-adopts, resetting the open-Entity state the way leaving the
+   * route is meant to.
    */
   openRoute(id: string): Observable<EntityDetail> {
-    const current = this._current();
-    if (current?.id === id) {
-      this.editor.load(gridOf(current.document));
-      return of(current);
-    }
     this.editor.load(emptyHexMap()); // clear the previous map's canvas during load (#7)
     this._loading.set(true);
     return this.open(id).pipe(finalize(() => this._loading.set(false)));

@@ -155,17 +155,19 @@ describe('EditorSession', () => {
     expect(session.current()?.name).toBe('The Whisperwood');
   });
 
-  it('reuses the already-open entity for openRoute without a redundant GET', () => {
+  it('re-fetches on openRoute even when the same entity is already open', () => {
     openAldermoor();
 
-    // Navigating to the entity that is already open (e.g. just created) adopts
-    // it straight away — no second round trip — and loads its grid.
+    // Re-entering the route (e.g. reopened from the library after an in-library
+    // rename) must fetch the server's current Entity, not trust a retained
+    // `current` — the route-scoped session can outlive a trip to the library (#70).
     let opened: EntityDetail | undefined;
     session.openRoute('m1').subscribe((m) => (opened = m));
 
-    http.expectNone('/entities/m1');
-    expect(opened).toEqual(aldermoor);
-    expect(editor.document()).toEqual(forestAt00);
+    const renamed: EntityDetail = { ...aldermoor, name: 'Lady Mara' };
+    http.expectOne('/entities/m1').flush(renamed);
+    expect(opened).toEqual(renamed);
+    expect(session.current()?.name).toBe('Lady Mara');
   });
 
   it('clears the canvas then fetches when openRoute targets a different entity', () => {
