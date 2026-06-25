@@ -12,11 +12,13 @@ import {
   inject,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { AuthStore } from '../auth/auth.store';
 import { Locale, LocaleService } from '../core/i18n/locale.service';
 import { ThemeService } from '../core/theme.service';
 import { Button } from '../ui/button';
 import { Icon } from '../ui/icon/icon';
+import { Rule } from '../ui/rule';
 
 /**
  * The header's account control (ADR-0015): a single trigger that opens a CDK
@@ -38,6 +40,8 @@ import { Icon } from '../ui/icon/icon';
     RouterLink,
     Button,
     Icon,
+    Rule,
+    TranslocoPipe,
   ],
   template: `
     <button
@@ -46,7 +50,7 @@ import { Icon } from '../ui/icon/icon';
       variant="ghost"
       icon
       [cdkMenuTriggerFor]="menu"
-      aria-label="Open user menu"
+      [attr.aria-label]="'common.userMenu' | transloco"
     >
       @if (user(); as u) {
         <span
@@ -68,27 +72,30 @@ import { Icon } from '../ui/icon/icon';
           <span class="px-3 py-2 text-sm text-ink-strong">{{
             u.displayName
           }}</span>
-          <span class="h-px mx-1 my-1 bg-line"></span>
+          <hr appRule class="mx-1 my-1" />
         }
         <button
           type="button"
           cdkMenuItem
           class="flex items-center gap-2 px-3 py-2 text-sm text-ink text-left bg-transparent border-0 rounded-sm cursor-pointer hover:bg-gold-soft"
           [attr.aria-label]="
-            theme() === 'dark' ? 'Switch to solar theme' : 'Switch to astral theme'
+            (theme() === 'dark'
+              ? 'common.theme.toSolar'
+              : 'common.theme.toAstral'
+            ) | transloco
           "
           (cdkMenuItemTriggered)="themeService.toggle()"
         >
           @if (theme() === 'dark') {
             <app-icon name="sun" [size]="18" />
-            <span>Solar (light)</span>
+            <span>{{ 'common.theme.solar' | transloco }}</span>
           } @else {
             <app-icon name="moon" [size]="18" />
-            <span>Astral (dark)</span>
+            <span>{{ 'common.theme.astral' | transloco }}</span>
           }
         </button>
-        <span class="h-px mx-1 my-1 bg-line"></span>
-        <div cdkMenuGroup>
+        <hr appRule class="mx-1 my-1" />
+        <div cdkMenuGroup [attr.aria-label]="'common.language' | transloco">
           @for (locale of locales; track locale) {
             <button
               type="button"
@@ -104,7 +111,7 @@ import { Icon } from '../ui/icon/icon';
             </button>
           }
         </div>
-        <span class="h-px mx-1 my-1 bg-line"></span>
+        <hr appRule class="mx-1 my-1" />
         @if (user()) {
           <button
             type="button"
@@ -112,7 +119,7 @@ import { Icon } from '../ui/icon/icon';
             class="flex items-center gap-2 px-3 py-2 text-sm text-ink text-left bg-transparent border-0 rounded-sm cursor-pointer hover:bg-gold-soft"
             (cdkMenuItemTriggered)="signOut()"
           >
-            Sign out
+            {{ 'common.signOut' | transloco }}
           </button>
         } @else {
           <a
@@ -120,7 +127,7 @@ import { Icon } from '../ui/icon/icon';
             routerLink="/login"
             class="flex items-center gap-2 px-3 py-2 text-sm text-ink no-underline rounded-sm cursor-pointer hover:bg-gold-soft"
           >
-            Login
+            {{ 'common.login' | transloco }}
           </a>
         }
       </div>

@@ -22,8 +22,9 @@ test('guards the app, signs in, and signs out', async ({ page }) => {
   await expect(page).toHaveURL(/\/maps$/);
   await expect(page.getByRole('heading', { name: 'Your maps' })).toBeVisible();
 
-  // Sign out returns to /login...
-  await page.getByTestId('sign-out').click();
+  // Sign out returns to /login (the action lives in the user menu, ADR-0015)...
+  await page.getByRole('button', { name: 'Open user menu' }).click();
+  await page.getByRole('menuitem', { name: 'Sign out' }).click();
   await expect(page).toHaveURL(/\/login/);
 
   // ...and the guard blocks the app again.

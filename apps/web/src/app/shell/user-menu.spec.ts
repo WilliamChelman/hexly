@@ -147,6 +147,21 @@ describe('UserMenu', () => {
     expect(navigate).toHaveBeenCalledWith('/login');
   });
 
+  it('returns to login even when the logout request fails', () => {
+    signIn();
+    const navigate = spyNavigate();
+    const fixture = TestBed.createComponent(UserMenu);
+    fixture.detectChanges();
+
+    item(openMenu(fixture), /sign out/i).click();
+    http
+      .expectOne('/auth/logout')
+      .flush(null, { status: 500, statusText: 'Server Error' });
+
+    // The user is never stranded signed-in: navigation fires regardless.
+    expect(navigate).toHaveBeenCalledWith('/login');
+  });
+
   it('offers Login instead of Sign out when signed out', () => {
     const fixture = TestBed.createComponent(UserMenu);
     fixture.detectChanges();

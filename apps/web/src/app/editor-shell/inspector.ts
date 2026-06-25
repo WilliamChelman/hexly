@@ -19,13 +19,13 @@ import { RegionFields } from './region-fields';
  */
 const SELECTION_KINDS: readonly {
   kind: Selection['kind'];
-  oneKey: string;
-  manyKey: string;
+  /** ICU plural key — renders both the count and the (localized) noun. */
+  countKey: string;
 }[] = [
-  { kind: 'hex', oneKey: 'editorShell.inspector.kindHex', manyKey: 'editorShell.inspector.kindHexes' },
-  { kind: 'feature', oneKey: 'editorShell.inspector.kindFeature', manyKey: 'editorShell.inspector.kindFeatures' },
-  { kind: 'region', oneKey: 'editorShell.inspector.kindRegion', manyKey: 'editorShell.inspector.kindRegions' },
-  { kind: 'label', oneKey: 'editorShell.inspector.kindLabel', manyKey: 'editorShell.inspector.kindLabels' },
+  { kind: 'hex', countKey: 'editorShell.inspector.kindHexCount' },
+  { kind: 'feature', countKey: 'editorShell.inspector.kindFeatureCount' },
+  { kind: 'region', countKey: 'editorShell.inspector.kindRegionCount' },
+  { kind: 'label', countKey: 'editorShell.inspector.kindLabelCount' },
 ];
 
 /**
@@ -83,7 +83,7 @@ interface SelectedEntity {
     @let multi = selectionSummary();
     @if (label) {
       <header class="flex items-center justify-between">
-        <span appEyebrow>{{ 'editorShell.inspector.selectedLabel' | transloco }}</span>
+        <span appEyebrow mark>{{ 'editorShell.inspector.selectedLabel' | transloco }}</span>
       </header>
 
       <div class="leaf">
@@ -155,7 +155,7 @@ interface SelectedEntity {
       </div>
     } @else if (region) {
       <header class="flex items-center justify-between">
-        <span appEyebrow>{{ 'editorShell.inspector.selectedRegion' | transloco }}</span>
+        <span appEyebrow mark>{{ 'editorShell.inspector.selectedRegion' | transloco }}</span>
       </header>
 
       <div class="leaf">
@@ -206,7 +206,7 @@ interface SelectedEntity {
       </div>
     } @else if (entity) {
       <header class="flex items-center justify-between">
-        <span appEyebrow>{{
+        <span appEyebrow mark>{{
           (entity.kind === 'feature'
             ? 'editorShell.inspector.selectedFeature'
             : 'editorShell.inspector.selectedHex') | transloco
@@ -281,7 +281,7 @@ interface SelectedEntity {
         across the set is deliberately out of scope.
       -->
       <header class="flex items-center justify-between">
-        <span appEyebrow>{{ 'editorShell.inspector.multiTitle' | transloco }}</span>
+        <span appEyebrow mark>{{ 'editorShell.inspector.multiTitle' | transloco }}</span>
       </header>
 
       <p class="text-sm font-semibold text-ink" data-testid="selection-count">
@@ -289,10 +289,9 @@ interface SelectedEntity {
       </p>
 
       <ul class="m-0 pl-4 flex flex-col gap-1 text-sm text-ink-muted" data-testid="selection-breakdown">
-        @for (group of multi.groups; track group.manyKey) {
+        @for (group of multi.groups; track group.countKey) {
           <li>
-            {{ group.count }}
-            {{ (group.count === 1 ? group.oneKey : group.manyKey) | transloco }}
+            {{ group.countKey | transloco: { count: group.count } }}
           </li>
         }
       </ul>
@@ -312,22 +311,15 @@ interface SelectedEntity {
       </div>
     } @else {
       <header class="flex items-center justify-between">
-        <span appEyebrow>{{ 'editorShell.inspector.title' | transloco }}</span>
+        <span appEyebrow mark>{{ 'editorShell.inspector.title' | transloco }}</span>
       </header>
       <p class="muted text-sm leading-normal text-ink-muted">{{ 'editorShell.inspector.emptyHint' | transloco }}</p>
     }
   `,
-  // Celestial Codex right-rail touches (ADR-0007, scoped to this component):
-  // a gilded section mark on each eyebrow, and a framed "leaf" — gold corner
-  // brackets on lifted paper — around each single-selection editor.
+  // Celestial Codex right-rail touches (ADR-0007, scoped to this component): a
+  // framed "leaf" — gold corner brackets on lifted paper — around each
+  // single-selection editor. (The eyebrow ✦ mark is the Eyebrow `mark` variant.)
   styles: `
-    [appEyebrow]::before {
-      content: '✦';
-      margin-right: 0.5em;
-      color: var(--color-gold);
-      font-size: 0.85em;
-      opacity: 0.7;
-    }
     .leaf {
       position: relative;
       display: flex;
@@ -458,9 +450,8 @@ export class Inspector {
   protected readonly selectionSummary = computed(() => {
     const sels = this.store.selections();
     if (sels.length < 2) return null;
-    const groups = SELECTION_KINDS.map(({ kind, oneKey, manyKey }) => ({
-      oneKey,
-      manyKey,
+    const groups = SELECTION_KINDS.map(({ kind, countKey }) => ({
+      countKey,
       count: sels.filter((s) => s.kind === kind).length,
     })).filter((g) => g.count > 0);
     return { count: sels.length, groups };

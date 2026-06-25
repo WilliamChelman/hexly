@@ -28,7 +28,7 @@ import { EditorStore } from './editor-store';
   imports: [Button, Eyebrow, Swatch, TranslocoPipe],
   template: `
     <header class="flex items-center justify-between gap-3">
-      <span appEyebrow>{{ 'editorShell.regionsPanel.title' | transloco }}</span>
+      <span appEyebrow mark>{{ 'editorShell.regionsPanel.title' | transloco }}</span>
       <button
         type="button"
         appButton
@@ -53,7 +53,10 @@ import { EditorStore } from './editor-store';
         <span class="flex-1 min-w-0 truncate" data-testid="region-name">{{ region.name }}</span>
         <span
           class="font-mono text-2xs text-ink-faint tabular-nums"
-          [attr.aria-label]="memberCount(region) + ' hexes'"
+          [attr.aria-label]="
+            'editorShell.statusBar.hexCount'
+              | transloco: { count: memberCount(region) }
+          "
           >{{ memberCount(region) }}</span
         >
       </button>
@@ -61,16 +64,10 @@ import { EditorStore } from './editor-store';
       <p class="muted text-sm leading-normal text-ink-muted">{{ 'editorShell.regionsPanel.emptyHint' | transloco }}</p>
     }
   `,
-  // Celestial Codex touches (ADR-0007, scoped): a gilded section mark, and a
-  // gold-ringed swatch that brightens to a soft glow on the selected Region.
+  // Celestial Codex touches (ADR-0007, scoped): a gold-ringed swatch that
+  // brightens to a soft glow on the selected Region. (The eyebrow's ✦ mark is
+  // the Eyebrow primitive's own `mark` variant.)
   styles: `
-    [appEyebrow]::before {
-      content: '✦';
-      margin-right: 0.5em;
-      color: var(--color-gold);
-      font-size: 0.85em;
-      opacity: 0.7;
-    }
     [appSwatch] {
       box-shadow: var(--shadow-inset), 0 0 7px -2px currentColor;
     }

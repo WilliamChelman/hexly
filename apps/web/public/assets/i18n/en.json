@@ -63,9 +63,6 @@
       "rotation": "Rotation (°)",
       "x": "X",
       "y": "Y",
-      "coordinate": "Coordinate",
-      "terrain": "Terrain",
-      "feature": "Feature",
       "name": "Name",
       "tags": "Tags",
       "tagsEmpty": "No tags",
@@ -83,14 +80,10 @@
       "emptyHint": "Pick the Select tool and click a Hex, Feature, or Label to inspect it. Place a Label with the Label tool, then select it here to edit its text, size, rotation and position.",
       "multiTitle": "Selection",
       "selectedCount": "selected",
-      "kindHex": "hex",
-      "kindHexes": "hexes",
-      "kindFeature": "feature",
-      "kindFeatures": "features",
-      "kindRegion": "region",
-      "kindRegions": "regions",
-      "kindLabel": "label",
-      "kindLabels": "labels",
+      "kindHexCount": "{count, plural, one {# hex} other {# hexes}}",
+      "kindFeatureCount": "{count, plural, one {# feature} other {# features}}",
+      "kindRegionCount": "{count, plural, one {# region} other {# regions}}",
+      "kindLabelCount": "{count, plural, one {# label} other {# labels}}",
       "deleteAll": "Delete all"
     },
     "regionsPanel": {
@@ -101,8 +94,7 @@
     "statusBar": {
       "connecting": "Connecting…",
       "apiError": "Could not reach the API.",
-      "hex": "hex",
-      "hexes": "hexes"
+      "hexCount": "{count, plural, one {# hex} other {# hexes}}"
     },
     "canvas": {
       "void": "Void",
@@ -188,6 +180,15 @@
   },
   "common": {
     "language": "Language",
+    "userMenu": "Open user menu",
+    "signOut": "Sign out",
+    "login": "Login",
+    "theme": {
+      "solar": "Solar (light)",
+      "astral": "Astral (dark)",
+      "toSolar": "Switch to solar theme",
+      "toAstral": "Switch to astral theme"
+    },
     "save": "Save",
     "cancel": "Cancel",
     "close": "Close",

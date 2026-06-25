@@ -52,6 +52,12 @@
 @import './styles/tokens.css';
 @import './styles/base.css' layer(base);
 
+/* CDK Overlay container chrome (fixed positioning + z-index) for the user
+   menu's cdkMenu. The overlay sets the panel's position inline, so the menu
+   works without this too, but the prebuilt sheet is the documented requirement
+   and keeps the container fixed under document scroll. */
+@import '@angular/cdk/overlay-prebuilt.css';
+
 /* Tell Tailwind where to scan for class names (Nx monorepo: be explicit). */
 @source './**/*.{html,ts}';
 

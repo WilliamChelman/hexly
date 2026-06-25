@@ -16,8 +16,9 @@ test('defaults to English, flips to French live, and remembers it on reload', as
   await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible();
   await expect(page.getByLabel('Email')).toBeVisible();
 
-  // Flip to French from the header switcher — live, with no reload.
-  await page.getByTestId('lang-fr').click();
+  // Flip to French from the user menu's language group — live, no reload (ADR-0015).
+  await page.getByRole('button', { name: 'Open user menu' }).click();
+  await page.getByRole('menuitemradio', { name: 'Français' }).click();
   await expect(page.getByRole('button', { name: 'Se connecter' })).toBeVisible();
   await expect(page.getByLabel('E-mail')).toBeVisible();
   await expect(page.getByLabel('Mot de passe')).toBeVisible();

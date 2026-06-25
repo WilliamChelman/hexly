@@ -30,7 +30,6 @@ import { ThemeService } from '../core/theme.service';
 import { ToasterService } from '../core/toaster.service';
 import { terrainKey } from './catalog-keys';
 import { EditorStore, SelectMode, ToolId } from './editor-store';
-import { Icon } from '../ui/icon/icon';
 import { CoordReadout } from './coord-readout';
 import { ZoomControl } from './zoom-control';
 import { Camera } from './camera';
@@ -91,7 +90,7 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
 @Component({
   selector: 'app-map-canvas',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CoordReadout, Icon, ZoomControl, TranslocoPipe],
+  imports: [CoordReadout, ZoomControl, TranslocoPipe],
   template: `
     <canvas
       #canvas
@@ -125,11 +124,12 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
     />
 
     <!--
-      Zoom/fit controls, bottom-right, lifted above the floating right dock
-      (z-2 over the dock's z-1, ADR-0013) so a tall open panel can't cover them.
+      Zoom/fit controls, bottom-right. The host establishes its own stacking
+      context (isolation: isolate, below), so this cannot lift above the shell's
+      right dock anyway — and a tall dock panel sitting over it is fine.
     -->
     <app-zoom-control
-      class="absolute right-4 bottom-4 z-[2]"
+      class="absolute right-4 bottom-4"
       [percent]="zoomPercent()"
       (zoomIn)="zoomByStep(1)"
       (zoomOut)="zoomByStep(-1)"

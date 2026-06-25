@@ -40,11 +40,8 @@ import { EditorStore } from './editor-store';
     <span class="flex-1"></span>
     <span class="flex items-center gap-2 whitespace-nowrap"><app-coord>q 0 · r 0</app-coord></span>
     <span class="flex items-center gap-2 whitespace-nowrap" data-testid="hex-count"
-      >{{ hexCount() }}
-      {{
-        (hexCount() === 1
-          ? 'editorShell.statusBar.hex'
-          : 'editorShell.statusBar.hexes') | transloco
+      >{{
+        'editorShell.statusBar.hexCount' | transloco: { count: hexCount() }
       }}</span
     >
     <span class="flex items-center gap-2 whitespace-nowrap">Zoom 100%</span>

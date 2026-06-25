@@ -50,6 +50,7 @@ import { EditorSession } from './editor-session';
         [attr.contenteditable]="hasMap() ? 'plaintext-only' : null"
         [attr.aria-label]="'editorShell.mapTitleLabel' | transloco"
         [title]="'editorShell.renameMap' | transloco"
+        (focus)="onFocus()"
         (keydown.enter)="onEnter($event)"
         (keydown.escape)="onEscape($event)"
         (blur)="commit()"
@@ -113,6 +114,15 @@ export class EditorHeader {
   private readonly titleEl =
     viewChild.required<ElementRef<HTMLElement>>('titleEl');
 
+  /**
+   * The name shown when the field was focused — the text the user started from.
+   * commit() renames only when the field actually changed against *this*, not the
+   * live {@link title}: so an unedited blur after the name changed server-side
+   * mid-edit (e.g. a conflict reload) restores the new name rather than re-sending
+   * the stale one over it. `null` when not editing.
+   */
+  private editBaseline: string | null = null;
+
   constructor() {
     // Mirror the open map's name into the contenteditable — but never while the
     // user is editing it, or the write would fight the caret.
@@ -121,6 +131,11 @@ export class EditorHeader {
       const el = this.titleEl().nativeElement;
       if (document.activeElement !== el) el.textContent = name;
     });
+  }
+
+  /** Snapshot the name the user begins editing from, for {@link commit}. */
+  protected onFocus(): void {
+    this.editBaseline = this.titleEl().nativeElement.textContent ?? '';
   }
 
   /** Commit on Enter without inserting a newline (blur runs {@link commit}). */
@@ -132,22 +147,31 @@ export class EditorHeader {
   /** Abandon the edit: restore the current name, then drop focus. */
   protected onEscape(event: Event): void {
     event.preventDefault();
+    // Make the pending blur-commit a no-op against the restored name.
+    this.editBaseline = this.title();
     this.titleEl().nativeElement.textContent = this.title();
     this.titleEl().nativeElement.blur();
   }
 
   /**
-   * Commit the edited title from the element's text. A no-op (blank or unchanged)
-   * just normalises the text back to the current name without a request.
+   * Commit the edited title from the element's text. A no-op (blank, or unchanged
+   * from what the edit started with) just normalises the text back to the current
+   * name without a request; a rejected rename reverts the optimistic text.
    */
   protected commit(): void {
     const el = this.titleEl().nativeElement;
-    const name = (el.textContent ?? '').trim();
-    if (!name || name === this.title()) {
+    const baseline = this.editBaseline ?? this.title();
+    this.editBaseline = null;
+    // The title is single-line (aria-multiline=false); collapse any pasted
+    // newlines/whitespace so they never reach the stored name.
+    const name = (el.textContent ?? '').replace(/\s+/g, ' ').trim();
+    if (!name || name === baseline) {
       el.textContent = this.title();
       return;
     }
-    this.session.rename(name).subscribe();
+    this.session.rename(name).subscribe({
+      error: () => (el.textContent = this.title()),
+    });
   }
 
   /** Persist the current map. A stale-version rejection surfaces as a conflict
