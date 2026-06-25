@@ -110,26 +110,37 @@ describe('EditorShell', () => {
     expect(el.querySelector('app-inspector')).toBeNull();
   });
 
-  it('opens the map named by the route id, loading its document into the editor', () => {
+  it('opens the entity named by the route id, loading its hex grid into the editor', () => {
     routeParams = of(convertToParamMap({ id: 'm1' }));
 
     const fixture = TestBed.createComponent(EditorShell);
     fixture.detectChanges();
     httpMock.expectOne('/health').flush({ status: 'ok', service: 'api' });
 
-    httpMock.expectOne('/maps/m1').flush({
+    httpMock.expectOne('/entities/m1').flush({
       id: 'm1',
       ownerId: 'u1',
-      title: 'Aldermoor',
+      name: 'Aldermoor',
+      type: 'hexmap',
+      tags: [],
       visibility: 'private',
       version: 2,
       createdAt: 1,
       updatedAt: 1,
-      document: { hexes: { '0,0': { terrain: 'forest' } } },
+      document: {
+        type: 'hexmap',
+        content: { format: 'tiptap-v1', snapshot: {} },
+        hexes: { '0,0': { terrain: 'forest' } },
+        regions: [],
+        labels: [],
+      },
     });
 
+    // The editor sees the bare grid the seam unwrapped from the body.
     expect(TestBed.inject(EditorStore).document()).toEqual({
       hexes: { '0,0': { terrain: 'forest' } },
+      regions: [],
+      labels: [],
     });
   });
 
@@ -140,15 +151,23 @@ describe('EditorShell', () => {
     fixture.detectChanges();
     httpMock.expectOne('/health').flush({ status: 'ok', service: 'api' });
 
-    httpMock.expectOne('/maps/m1').flush({
+    httpMock.expectOne('/entities/m1').flush({
       id: 'm1',
       ownerId: 'u1',
-      title: 'Aldermoor',
+      name: 'Aldermoor',
+      type: 'hexmap',
+      tags: [],
       visibility: 'private',
       version: 2,
       createdAt: 1,
       updatedAt: 1,
-      document: { hexes: {} },
+      document: {
+        type: 'hexmap',
+        content: { format: 'tiptap-v1', snapshot: {} },
+        hexes: {},
+        regions: [],
+        labels: [],
+      },
     });
     await fixture.whenStable();
     fixture.detectChanges();

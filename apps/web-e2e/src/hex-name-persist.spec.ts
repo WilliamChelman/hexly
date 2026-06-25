@@ -49,7 +49,7 @@ test('names a painted hex in the Inspector, and the name survives a reload', asy
   const saved = page.waitForResponse(
     (res) =>
       res.request().method() === 'PUT' &&
-      /\/api\/maps\/[\w-]+$/.test(res.url()) &&
+      /\/api\/entities\/[\w-]+$/.test(res.url()) &&
       res.ok(),
   );
   await page.getByTestId('save').click();
@@ -60,7 +60,7 @@ test('names a painted hex in the Inspector, and the name survives a reload', asy
   await page.reload();
 
   // The persisted document really holds the named hex.
-  const res = await request.get(`/api/maps/${mapId}`);
+  const res = await request.get(`/api/entities/${mapId}`);
   expect(res.ok()).toBeTruthy();
   const detail = await res.json();
   expect(detail.document.hexes['0,0']).toEqual({ terrain: 'ocean', name: 'Riverbend' });

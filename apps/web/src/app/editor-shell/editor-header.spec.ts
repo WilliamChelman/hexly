@@ -6,7 +6,7 @@ import {
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
-import { MapDetail } from '@hexly/domain';
+import { emptyContent, EntityDetail } from '@hexly/domain';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { EditorSession } from './editor-session';
 import { EditorHeader } from './editor-header';
@@ -14,21 +14,23 @@ import { EditorHeader } from './editor-header';
 describe('EditorHeader', () => {
   let http: HttpTestingController;
 
-  const aldermoor: MapDetail = {
+  const aldermoor: EntityDetail = {
     id: 'm1',
     ownerId: 'u1',
-    title: 'The Reach of Aldermoor',
+    name: 'The Reach of Aldermoor',
+    type: 'hexmap',
+    tags: [],
     visibility: 'private',
     version: 3,
     createdAt: 1,
     updatedAt: 1,
-    document: { hexes: {}, regions: [], labels: [] },
+    document: { type: 'hexmap', content: emptyContent(), hexes: {}, regions: [], labels: [] },
   };
 
-  /** Open a map through the real session so the header has one to show/save. */
-  function openMap(detail: MapDetail): void {
+  /** Open an entity through the real session so the header has one to show/save. */
+  function openMap(detail: EntityDetail): void {
     TestBed.inject(EditorSession).open(detail.id).subscribe();
-    http.expectOne(`/maps/${detail.id}`).flush(detail);
+    http.expectOne(`/entities/${detail.id}`).flush(detail);
   }
 
   beforeEach(async () => {
@@ -45,8 +47,8 @@ describe('EditorHeader', () => {
 
   afterEach(() => http.verify());
 
-  it('shows the open map title', () => {
-    openMap({ ...aldermoor, title: 'The Whisperwood' });
+  it('shows the open entity name', () => {
+    openMap({ ...aldermoor, name: 'The Whisperwood' });
 
     const fixture = TestBed.createComponent(EditorHeader);
     fixture.detectChanges();
@@ -54,7 +56,7 @@ describe('EditorHeader', () => {
     expect(fixture.nativeElement.textContent).toContain('The Whisperwood');
   });
 
-  it('renames the open map when the title is edited', () => {
+  it('renames the open entity when the title is edited', () => {
     openMap(aldermoor);
     const fixture = TestBed.createComponent(EditorHeader);
     fixture.detectChanges();
@@ -72,10 +74,10 @@ describe('EditorHeader', () => {
     input.dispatchEvent(new Event('input'));
     input.dispatchEvent(new Event('blur'));
 
-    const req = http.expectOne('/maps/m1');
+    const req = http.expectOne('/entities/m1');
     expect(req.request.method).toBe('PATCH');
-    expect(req.request.body).toEqual({ title: 'The Whisperwood' });
-    req.flush({ ...aldermoor, title: 'The Whisperwood' });
+    expect(req.request.body).toEqual({ name: 'The Whisperwood' });
+    req.flush({ ...aldermoor, name: 'The Whisperwood' });
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('The Whisperwood');
@@ -96,11 +98,11 @@ describe('EditorHeader', () => {
       fixture.nativeElement.querySelector('[data-testid=title-input]') as HTMLInputElement
     ).dispatchEvent(new Event('blur'));
 
-    http.expectNone('/maps/m1');
+    http.expectNone('/entities/m1');
   });
 
-  it('disables Save until a map is open', () => {
-    // No openMap() here: with no open map, Save must be disabled so a click can't
+  it('disables Save until an entity is open', () => {
+    // No openMap() here: with none open, Save must be disabled so a click can't
     // flip the session into a stuck "Saving…" state with nothing to save.
     const fixture = TestBed.createComponent(EditorHeader);
     fixture.detectChanges();
@@ -111,7 +113,7 @@ describe('EditorHeader', () => {
     expect(save.disabled).toBe(true);
   });
 
-  it('saves the open map under its base version when Save is clicked', () => {
+  it('saves the open entity under its base version when Save is clicked', () => {
     openMap(aldermoor);
     const fixture = TestBed.createComponent(EditorHeader);
     fixture.detectChanges();
@@ -121,7 +123,7 @@ describe('EditorHeader', () => {
     ) as HTMLButtonElement;
     save.click();
 
-    const req = http.expectOne('/maps/m1');
+    const req = http.expectOne('/entities/m1');
     expect(req.request.method).toBe('PUT');
     expect(req.request.body.version).toBe(3);
     req.flush({ ...aldermoor, version: 4 });
@@ -137,7 +139,7 @@ describe('EditorHeader', () => {
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
-    // The Editing chip and the map-scoped actions translate; the map title stays
+    // The Editing chip and the map-scoped actions translate; the name stays
     // the user's words (asserted separately below).
     expect(el.textContent).toContain('Édition');
     expect(el.textContent).toContain('Partager');
@@ -147,8 +149,8 @@ describe('EditorHeader', () => {
     expect(save.textContent).not.toContain('Save');
   });
 
-  it('keeps the user’s map title verbatim — never translated — under French', () => {
-    openMap({ ...aldermoor, title: 'Save' }); // collides with a UI action label
+  it('keeps the user’s entity name verbatim — never translated — under French', () => {
+    openMap({ ...aldermoor, name: 'Save' }); // collides with a UI action label
     const fixture = TestBed.createComponent(EditorHeader);
     fixture.detectChanges();
 
@@ -172,7 +174,7 @@ describe('EditorHeader', () => {
       fixture.nativeElement.querySelector('[data-testid=save]') as HTMLButtonElement
     ).click();
     http
-      .expectOne('/maps/m1')
+      .expectOne('/entities/m1')
       .flush({ ...aldermoor, version: 9 }, { status: 409, statusText: 'Conflict' });
     fixture.detectChanges();
 
@@ -197,7 +199,7 @@ describe('EditorHeader', () => {
       fixture.nativeElement.querySelector('[data-testid=save]') as HTMLButtonElement
     ).click();
     http
-      .expectOne('/maps/m1')
+      .expectOne('/entities/m1')
       .flush({ ...aldermoor, version: 9 }, { status: 409, statusText: 'Conflict' });
     fixture.detectChanges();
 
@@ -210,7 +212,7 @@ describe('EditorHeader', () => {
         '[data-testid=conflict-reload]',
       ) as HTMLButtonElement
     ).click();
-    http.expectOne('/maps/m1').flush({ ...aldermoor, version: 9 });
+    http.expectOne('/entities/m1').flush({ ...aldermoor, version: 9 });
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('[data-testid=conflict]')).toBeNull();

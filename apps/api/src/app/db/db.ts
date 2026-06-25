@@ -27,12 +27,9 @@ export function createDb(path: string): Db {
   // SQLite ignores `REFERENCES` clauses unless foreign keys are enabled, and the
   // pragma is per-connection — so it must be set on every connection we open.
   sqlite.pragma('foreign_keys = ON');
-  // NOTE: This DDL is the runtime source of truth for the schema, but it MUST be
-  // kept in sync by hand with `./schema.ts` (the Drizzle definition the queries
-  // are typed against). `IF NOT EXISTS` only creates missing tables — it will
-  // NOT alter an existing table, so adding/changing a column here on a database
-  // that already exists is a silent no-op. A real schema change to a live DB
-  // requires a migration (e.g. drizzle-kit), not just editing this block.
+  // Runtime source of truth for the schema, kept in sync by hand with
+  // `./schema.ts`. `IF NOT EXISTS` won't alter an existing table — a column
+  // change on a live DB needs a migration (drizzle-kit), not an edit here.
   sqlite.exec(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
@@ -49,10 +46,12 @@ export function createDb(path: string): Db {
     );
     -- Speeds up the expired-session sweep that runs on every login.
     CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
-    CREATE TABLE IF NOT EXISTS maps (
+    CREATE TABLE IF NOT EXISTS entities (
       id TEXT PRIMARY KEY,
       owner_id TEXT NOT NULL REFERENCES users(id),
-      title TEXT NOT NULL,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL,
+      tags TEXT NOT NULL,
       visibility TEXT NOT NULL,
       version INTEGER NOT NULL,
       document TEXT NOT NULL,
@@ -60,23 +59,19 @@ export function createDb(path: string): Db {
       updated_at INTEGER NOT NULL
     );
     -- The list endpoint and every access check filter by owner.
-    CREATE INDEX IF NOT EXISTS idx_maps_owner_id ON maps(owner_id);
+    CREATE INDEX IF NOT EXISTS idx_entities_owner_id ON entities(owner_id);
   `);
   return drizzle(sqlite, { schema });
 }
 
 /**
- * Resolve the SQLite file path the app should open, identically for every entry
- * point (server bootstrap, seed CLI) so they always agree on one file.
+ * Resolve the SQLite file path, identically for every entry point (server, seed
+ * CLI) so they agree on one file.
  *
- * - `':memory:'` is returned verbatim (tests rely on a fresh per-process DB).
- * - `HEXLY_DB_PATH`, when set, is honoured as-is — callers are expected to pass
- *   an absolute path. A relative value is still resolved against cwd as an
- *   explicit, opt-in override.
- * - With nothing set, we default to an absolute path anchored to this module's
- *   bundled location (`__dirname`) rather than cwd, which varies between the
- *   server and the seed CLI. Both entry points bundle next to each other, so
- *   they land on the same `hexly.db` regardless of where they were launched.
+ * - `':memory:'` verbatim (tests rely on a fresh per-process DB).
+ * - `HEXLY_DB_PATH` honoured as-is if absolute, else resolved against cwd.
+ * - Nothing set: default to `__dirname` (where both entry points bundle), not
+ *   cwd, which differs between the server and the seed CLI.
  */
 export function resolveDbPath(): string {
   const configured = process.env.HEXLY_DB_PATH;

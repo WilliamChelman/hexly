@@ -41,7 +41,7 @@ test('places a feature on a hex, saves, and the feature survives a reload', asyn
   const saved = page.waitForResponse(
     (res) =>
       res.request().method() === 'PUT' &&
-      /\/api\/maps\/[\w-]+$/.test(res.url()) &&
+      /\/api\/entities\/[\w-]+$/.test(res.url()) &&
       res.ok(),
   );
   await page.getByTestId('save').click();
@@ -54,7 +54,7 @@ test('places a feature on a hex, saves, and the feature survives a reload', asyn
 
   // And the persisted document really holds that hex with its feature, the
   // single feature referenced by its stable library id.
-  const res = await request.get(`/api/maps/${mapId}`);
+  const res = await request.get(`/api/entities/${mapId}`);
   expect(res.ok()).toBeTruthy();
   const detail = await res.json();
   const hexes = Object.values(detail.document.hexes) as Array<{

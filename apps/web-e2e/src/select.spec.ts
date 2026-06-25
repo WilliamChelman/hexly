@@ -149,13 +149,13 @@ test('a painting Tool over a floating Label paints the hex beneath instead of gr
   const saved = page.waitForResponse(
     (res) =>
       res.request().method() === 'PUT' &&
-      /\/api\/maps\/[\w-]+$/.test(res.url()) &&
+      /\/api\/entities\/[\w-]+$/.test(res.url()) &&
       res.ok(),
   );
   await page.getByTestId('save').click();
   await saved;
 
-  const res = await request.get(`/api/maps/${mapId}`);
+  const res = await request.get(`/api/entities/${mapId}`);
   expect(res.ok()).toBeTruthy();
   const detail = await res.json();
   const hexes = Object.values(detail.document.hexes) as Array<{ terrain: string }>;

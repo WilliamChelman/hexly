@@ -6,7 +6,7 @@ import {
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
-import { MapSummary } from '@hexly/domain';
+import { EntitySummary } from '@hexly/domain';
 import { AuthStore } from '../auth/auth.store';
 import { HeaderService } from '../shell/header.service';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
@@ -16,10 +16,12 @@ describe('MapLibrary', () => {
   let http: HttpTestingController;
   let navigate: ReturnType<typeof vi.spyOn>;
 
-  const summary = (over: Partial<MapSummary>): MapSummary => ({
+  const summary = (over: Partial<EntitySummary>): EntitySummary => ({
     id: 'x',
     ownerId: 'u1',
-    title: 'A map',
+    name: 'A map',
+    type: 'hexmap',
+    tags: [],
     visibility: 'private',
     version: 1,
     createdAt: 1,
@@ -50,11 +52,11 @@ describe('MapLibrary', () => {
 
   afterEach(() => http.verify());
 
-  /** Create the library and resolve its initial list with `maps`. */
-  function renderWith(maps: MapSummary[]) {
+  /** Create the library and resolve its initial list with `entities`. */
+  function renderWith(entities: EntitySummary[]) {
     const fixture = TestBed.createComponent(MapLibrary);
-    fixture.detectChanges(); // ngOnInit -> GET /maps
-    http.expectOne('/maps').flush(maps);
+    fixture.detectChanges(); // ngOnInit -> GET /entities
+    http.expectOne('/entities').flush(entities);
     fixture.detectChanges();
     return fixture;
   }
@@ -105,10 +107,10 @@ describe('MapLibrary', () => {
     expect(header.content()).toBeNull();
   });
 
-  it('lists the maps the user owns, newest first', () => {
+  it('lists the entities the user owns, newest first', () => {
     const fixture = renderWith([
-      summary({ id: 'older', title: 'The Whisperwood', updatedAt: 100 }),
-      summary({ id: 'newest', title: 'Aldermoor', updatedAt: 300 }),
+      summary({ id: 'older', name: 'The Whisperwood', updatedAt: 100 }),
+      summary({ id: 'newest', name: 'Aldermoor', updatedAt: 300 }),
     ]);
 
     const titles = Array.from(
@@ -118,7 +120,7 @@ describe('MapLibrary', () => {
   });
 
   it('renders a card’s Delete action in French when French is the active language', () => {
-    const fixture = renderWith([summary({ id: 'm1', title: 'Aldermoor' })]);
+    const fixture = renderWith([summary({ id: 'm1', name: 'Aldermoor' })]);
 
     TestBed.inject(TranslocoService).setActiveLang('fr');
     fixture.detectChanges();
@@ -139,7 +141,7 @@ describe('MapLibrary', () => {
     const frDate = new Date(updatedAt).toLocaleDateString('fr');
     expect(frDate).not.toBe(enDate); // sanity: the date distinguishes the locales
 
-    const fixture = renderWith([summary({ id: 'm1', title: 'Aldermoor', updatedAt })]);
+    const fixture = renderWith([summary({ id: 'm1', name: 'Aldermoor', updatedAt })]);
     const meta = () =>
       (fixture.nativeElement.querySelector('.meta') as HTMLElement).textContent ?? '';
 
@@ -155,10 +157,10 @@ describe('MapLibrary', () => {
     expect(meta()).not.toContain('Edited');
   });
 
-  it('renders a map title verbatim — never translated — even when it collides with a UI string', () => {
-    // "New map" is also a UI action label; a map a user happened to name that
-    // must stay their words, not get swapped for the French action copy.
-    const fixture = renderWith([summary({ id: 'm1', title: 'New map' })]);
+  it('renders an entity name verbatim — never translated — even when it collides with a UI string', () => {
+    // "New map" is also a UI action label; an entity a user happened to name
+    // that must stay their words, not get swapped for the French action copy.
+    const fixture = renderWith([summary({ id: 'm1', name: 'New map' })]);
 
     TestBed.inject(TranslocoService).setActiveLang('fr');
     fixture.detectChanges();
@@ -170,7 +172,7 @@ describe('MapLibrary', () => {
     expect(title.textContent).not.toContain('Nouvelle carte');
   });
 
-  it('shows an empty state when the user has no maps', () => {
+  it('shows an empty state when the user has no entities', () => {
     const fixture = renderWith([]);
 
     expect(fixture.nativeElement.querySelector('[data-testid=empty]')).not.toBeNull();
@@ -181,9 +183,9 @@ describe('MapLibrary', () => {
 
   it('renders the load-error state in French when French is the active language', () => {
     const fixture = TestBed.createComponent(MapLibrary);
-    fixture.detectChanges(); // ngOnInit -> GET /maps
+    fixture.detectChanges(); // ngOnInit -> GET /entities
     http
-      .expectOne('/maps')
+      .expectOne('/entities')
       .flush(null, { status: 500, statusText: 'Server Error' });
     TestBed.inject(TranslocoService).setActiveLang('fr');
     fixture.detectChanges();
@@ -197,11 +199,11 @@ describe('MapLibrary', () => {
     );
   });
 
-  it('shows an error state when the map list fails to load', () => {
+  it('shows an error state when the entity list fails to load', () => {
     const fixture = TestBed.createComponent(MapLibrary);
-    fixture.detectChanges(); // ngOnInit -> GET /maps
+    fixture.detectChanges(); // ngOnInit -> GET /entities
     http
-      .expectOne('/maps')
+      .expectOne('/entities')
       .flush(null, { status: 500, statusText: 'Server Error' });
     fixture.detectChanges();
 
@@ -212,23 +214,26 @@ describe('MapLibrary', () => {
     expect(fixture.nativeElement.querySelector('[data-testid=empty]')).toBeNull();
   });
 
-  it('creates a new map and opens it in the editor', () => {
+  it('creates a new hexmap and opens it in the editor', () => {
     const fixture = renderWith([]);
 
     (
       fixture.nativeElement.querySelector('[data-testid=new-map]') as HTMLButtonElement
     ).click();
 
-    const req = http.expectOne('/maps');
+    const req = http.expectOne('/entities');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ title: 'Untitled map' });
-    req.flush({ ...summary({ id: 'created', title: 'Untitled map' }), document: { hexes: {} } });
+    expect(req.request.body).toEqual({ name: 'Untitled map', type: 'hexmap' });
+    req.flush({
+      ...summary({ id: 'created', name: 'Untitled map' }),
+      document: { type: 'hexmap', content: { format: 'tiptap-v1', snapshot: {} }, hexes: {}, regions: [], labels: [] },
+    });
 
     expect(navigate).toHaveBeenCalledWith(['/maps', 'created']);
   });
 
   it('opens a map when its card is activated', () => {
-    const fixture = renderWith([summary({ id: 'm1', title: 'Aldermoor' })]);
+    const fixture = renderWith([summary({ id: 'm1', name: 'Aldermoor' })]);
 
     (
       fixture.nativeElement.querySelector('[data-testid=open-m1]') as HTMLElement
@@ -239,14 +244,14 @@ describe('MapLibrary', () => {
 
   it('deletes a map and removes it from the list', () => {
     const fixture = renderWith([
-      summary({ id: 'm1', title: 'Aldermoor' }),
-      summary({ id: 'm2', title: 'The Whisperwood' }),
+      summary({ id: 'm1', name: 'Aldermoor' }),
+      summary({ id: 'm2', name: 'The Whisperwood' }),
     ]);
 
     (
       fixture.nativeElement.querySelector('[data-testid=delete-m1]') as HTMLButtonElement
     ).click();
-    http.expectOne('/maps/m1').flush(null);
+    http.expectOne('/entities/m1').flush(null);
     fixture.detectChanges();
 
     const titles = Array.from(

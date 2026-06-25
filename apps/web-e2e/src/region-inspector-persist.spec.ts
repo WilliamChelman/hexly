@@ -48,7 +48,7 @@ test('selects a Region on the canvas, renames it in the Inspector, and the renam
   const saved = page.waitForResponse(
     (res) =>
       res.request().method() === 'PUT' &&
-      /\/api\/maps\/[\w-]+$/.test(res.url()) &&
+      /\/api\/entities\/[\w-]+$/.test(res.url()) &&
       res.ok(),
   );
   await page.getByTestId('save').click();
@@ -59,7 +59,7 @@ test('selects a Region on the canvas, renames it in the Inspector, and the renam
   await page.reload();
 
   // The persisted document really holds the renamed Region with its membership.
-  const res = await request.get(`/api/maps/${mapId}`);
+  const res = await request.get(`/api/entities/${mapId}`);
   expect(res.ok()).toBeTruthy();
   const detail = await res.json();
   expect(detail.document.regions).toHaveLength(1);

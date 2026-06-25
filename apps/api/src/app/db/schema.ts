@@ -1,9 +1,8 @@
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
-// SINGLE SOURCE OF SCHEMA INTENT: this Drizzle definition and the raw
-// `CREATE TABLE` DDL in `./db.ts` describe the same tables and MUST be kept in
-// sync by hand. Changing a column here does NOT migrate an existing database —
-// a live schema change requires a migration (e.g. drizzle-kit), not just edits.
+// This Drizzle definition and the `CREATE TABLE` DDL in `./db.ts` describe the
+// same tables and are kept in sync by hand. A column change needs a migration
+// (drizzle-kit) to reach an existing database, not just an edit here.
 
 /**
  * The closed user set (ADR-0004). Users are provisioned out-of-band — there is
@@ -40,29 +39,34 @@ export const sessions = sqliteTable(
 );
 
 /**
- * A Hex Map stored as a single JSON document (ADR-0002). The relational columns
+ * An Entity stored as a single JSON document (ADR-0018, ADR-0002). The columns
  * are the metadata the list view and access checks need; `document` holds the
- * whole map as JSON text. `version` is the optimistic-concurrency counter — a
- * save carries the base version it was built on and is rejected (409) if it has
- * since moved.
+ * whole type-discriminated body as JSON. `type`/`tags` are denormalized out so
+ * a list can group/filter without loading each body. `version` is the
+ * optimistic-concurrency counter (a stale save is a 409). A Hex Map is an
+ * Entity of `type: 'hexmap'` (replaces the `maps` table — migration in `db.ts`).
  */
-export const maps = sqliteTable(
-  'maps',
+export const entities = sqliteTable(
+  'entities',
   {
     id: text('id').primaryKey(),
     ownerId: text('owner_id')
       .notNull()
       .references(() => users.id),
-    title: text('title').notNull(),
+    name: text('name').notNull(),
+    // The closed Entity type enum (note | hexmap), validated at the edge.
+    type: text('type').notNull(),
+    // Free-text tags as a JSON array; `mode: 'json'` serializes on the way in.
+    tags: text('tags', { mode: 'json' }).$type<string[]>().notNull(),
     visibility: text('visibility').notNull(),
     version: integer('version').notNull(),
-    // The serialized Hex Map document (hexMapSchema), parsed/validated at the edge.
+    // The serialized Entity body (entityBodySchema), parsed/validated at the edge.
     document: text('document').notNull(),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
   (table) => [
     // The list endpoint and every access check filter by owner.
-    index('idx_maps_owner_id').on(table.ownerId),
+    index('idx_entities_owner_id').on(table.ownerId),
   ]
 );

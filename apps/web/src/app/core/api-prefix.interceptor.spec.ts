@@ -24,8 +24,8 @@ describe('apiPrefixInterceptor', () => {
   afterEach(() => mock.verify());
 
   it('prefixes a root-relative API request with /api', () => {
-    http.get('/maps').subscribe();
-    mock.expectOne('/api/maps');
+    http.get('/entities').subscribe();
+    mock.expectOne('/api/entities');
   });
 
   it('does not double-prefix a request already under /api', () => {

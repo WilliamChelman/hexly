@@ -40,7 +40,7 @@ test('creates a region in the panel, paints a hex, saves, and the region survive
   const saved = page.waitForResponse(
     (res) =>
       res.request().method() === 'PUT' &&
-      /\/api\/maps\/[\w-]+$/.test(res.url()) &&
+      /\/api\/entities\/[\w-]+$/.test(res.url()) &&
       res.ok(),
   );
   await page.getByTestId('save').click();
@@ -52,7 +52,7 @@ test('creates a region in the panel, paints a hex, saves, and the region survive
 
   // Read the persisted document: it proves the round trip held the region with that
   // coordinate in its membership set, and its auto-assigned 'Region 1' name.
-  const res = await request.get(`/api/maps/${mapId}`);
+  const res = await request.get(`/api/entities/${mapId}`);
   expect(res.ok()).toBeTruthy();
   const detail = await res.json();
   expect(detail.document.regions).toHaveLength(1);

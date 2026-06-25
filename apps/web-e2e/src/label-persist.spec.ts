@@ -38,7 +38,7 @@ test('places a label, edits its text, saves, and it survives a reload', async ({
   const saved = page.waitForResponse(
     (res) =>
       res.request().method() === 'PUT' &&
-      /\/api\/maps\/[\w-]+$/.test(res.url()) &&
+      /\/api\/entities\/[\w-]+$/.test(res.url()) &&
       res.ok(),
   );
   await page.getByTestId('save').click();
@@ -46,7 +46,7 @@ test('places a label, edits its text, saves, and it survives a reload', async ({
   await expect(page.getByTestId('save')).toHaveText('Save');
 
   // The persisted document really holds the label, free-positioned at a point.
-  const res = await request.get(`/api/maps/${mapId}`);
+  const res = await request.get(`/api/entities/${mapId}`);
   expect(res.ok()).toBeTruthy();
   const detail = await res.json();
   expect(detail.document.labels).toHaveLength(1);
