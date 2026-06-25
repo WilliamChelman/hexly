@@ -15,11 +15,11 @@ test('names a painted hex in the Inspector, and the name survives a reload', asy
   page,
   request,
 }) => {
-  await page.goto('/maps');
+  await page.goto('/entities');
   await page.getByTestId('new-map').click();
 
-  // Creating a map opens the editor at /maps/:id.
-  await expect(page).toHaveURL(/\/maps\/[\w-]+$/);
+  // Creating a map opens the editor at /entities/:id.
+  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const mapId = page.url().split('/').pop();
 
   const canvas = page.getByRole('img', { name: 'Hex map' });

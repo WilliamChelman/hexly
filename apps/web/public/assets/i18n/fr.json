@@ -8,17 +8,32 @@
     "signingIn": "Connexion…",
     "invalidCredentials": "E-mail ou mot de passe incorrect."
   },
-  "mapLibrary": {
-    "tabTitle": "Hexly — Vos cartes",
+  "entityBrowser": {
+    "tabTitle": "Hexly — Votre bibliothèque",
     "eyebrow": "Bibliothèque",
-    "heading": "Vos cartes",
+    "heading": "Votre bibliothèque",
     "newMap": "Nouvelle carte",
+    "newNote": "Nouvelle note",
+    "rename": "Renommer",
+    "renameLabel": "Nouveau nom",
     "creating": "Création…",
     "edited": "Modifié le {{date}}",
-    "loadErrorTitle": "Impossible de charger vos cartes.",
+    "type": {
+      "note": "Note",
+      "hexmap": "Carte"
+    },
+    "loadErrorTitle": "Impossible de charger votre bibliothèque.",
     "loadErrorHint": "Une erreur est survenue. Veuillez réessayer dans un instant.",
-    "emptyTitle": "Aucune carte pour le moment.",
-    "emptyHint": "Créez votre première carte pour commencer à peindre un monde."
+    "createError": "Création impossible. Veuillez réessayer.",
+    "renameError": "Renommage impossible. Veuillez réessayer.",
+    "deleteError": "Suppression impossible. Veuillez réessayer.",
+    "emptyTitle": "Votre bibliothèque est vide.",
+    "emptyHint": "Créez une note ou une carte pour commencer."
+  },
+  "noteView": {
+    "eyebrow": "Note",
+    "backToLibrary": "Retour à la bibliothèque",
+    "placeholder": "L'éditeur de contenu arrive bientôt."
   },
   "editorShell": {
     "tabTitle": "Hexly",

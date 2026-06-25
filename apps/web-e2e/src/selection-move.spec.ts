@@ -31,9 +31,9 @@ test('drags one label of a multi-label selection and the whole group moves', asy
   page,
   request,
 }) => {
-  await page.goto('/maps');
+  await page.goto('/entities');
   await page.getByTestId('new-map').click();
-  await expect(page).toHaveURL(/\/maps\/[\w-]+$/);
+  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const mapId = page.url().split('/').pop() as string;
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
@@ -94,9 +94,9 @@ test('drags a region on its own and its whole footprint moves', async ({
   page,
   request,
 }) => {
-  await page.goto('/maps');
+  await page.goto('/entities');
   await page.getByTestId('new-map').click();
-  await expect(page).toHaveURL(/\/maps\/[\w-]+$/);
+  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const mapId = page.url().split('/').pop() as string;
 
   const canvas = page.getByRole('img', { name: 'Hex map' });

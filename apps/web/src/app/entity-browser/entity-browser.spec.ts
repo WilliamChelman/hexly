@@ -8,11 +8,12 @@ import { provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { EntitySummary } from '@hexly/domain';
 import { AuthStore } from '../auth/auth.store';
+import { ToasterService } from '../core/toaster.service';
 import { HeaderService } from '../shell/header.service';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
-import { MapLibrary } from './map-library';
+import { EntityBrowser } from './entity-browser';
 
-describe('MapLibrary', () => {
+describe('EntityBrowser', () => {
   let http: HttpTestingController;
   let navigate: ReturnType<typeof vi.spyOn>;
 
@@ -31,7 +32,7 @@ describe('MapLibrary', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [MapLibrary, provideTranslocoTesting()],
+      imports: [EntityBrowser, provideTranslocoTesting()],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -54,7 +55,7 @@ describe('MapLibrary', () => {
 
   /** Create the library and resolve its initial list with `entities`. */
   function renderWith(entities: EntitySummary[]) {
-    const fixture = TestBed.createComponent(MapLibrary);
+    const fixture = TestBed.createComponent(EntityBrowser);
     fixture.detectChanges(); // ngOnInit -> GET /entities
     http.expectOne('/entities').flush(entities);
     fixture.detectChanges();
@@ -66,7 +67,7 @@ describe('MapLibrary', () => {
 
     const header = TestBed.inject(HeaderService);
     expect(header.content()?.eyebrow).toBe('Library');
-    expect(header.content()?.title).toBe('Your maps');
+    expect(header.content()?.title).toBe('Your library');
   });
 
   it('renders its chrome and empty state in French when French is the active language', () => {
@@ -77,15 +78,15 @@ describe('MapLibrary', () => {
     TestBed.inject(TranslocoService).setActiveLang('fr');
     fixture.detectChanges();
 
-    expect(el.querySelector('h1')?.textContent).toContain('Vos cartes');
+    expect(el.querySelector('h1')?.textContent).toContain('Votre bibliothèque');
     const newMap = el.querySelector('[data-testid=new-map]') as HTMLElement;
     expect(newMap.textContent).toContain('Nouvelle carte');
     expect(newMap.textContent).not.toContain('New map');
     expect(el.querySelector('[data-testid=empty]')?.textContent).toContain(
-      'Aucune carte pour le moment.',
+      'Votre bibliothèque est vide.',
     );
     expect(el.textContent).toContain(
-      'Créez votre première carte pour commencer à peindre un monde.',
+      'Créez une note ou une carte pour commencer.',
     );
   });
 
@@ -95,7 +96,7 @@ describe('MapLibrary', () => {
     // The visible title is drawn as chrome in the app header; the document's
     // real heading lives here in the page (sr-only) so the outline is correct.
     const heading = fixture.nativeElement.querySelector('h1');
-    expect(heading?.textContent).toContain('Your maps');
+    expect(heading?.textContent).toContain('Your library');
   });
 
   it('clears its heading from the app header when it leaves', () => {
@@ -117,6 +118,66 @@ describe('MapLibrary', () => {
       fixture.nativeElement.querySelectorAll('[data-testid=map-title]'),
     ).map((el) => (el as HTMLElement).textContent?.trim());
     expect(titles).toEqual(['Aldermoor', 'The Whisperwood']);
+  });
+
+  it('shows each entity’s type', () => {
+    const fixture = renderWith([
+      summary({ id: 'm1', name: 'Aldermoor', type: 'hexmap' }),
+      summary({ id: 'n1', name: 'Lady Mara', type: 'note' }),
+    ]);
+    const typeOf = (id: string) =>
+      (
+        fixture.nativeElement.querySelector(
+          `[data-testid=type-${id}]`,
+        ) as HTMLElement
+      )?.textContent?.trim();
+
+    expect(typeOf('m1')).toBe('Map');
+    expect(typeOf('n1')).toBe('Note');
+  });
+
+  it('shows each entity’s tags', () => {
+    const fixture = renderWith([
+      summary({ id: 'm1', name: 'Aldermoor', tags: ['kingdom', 'northern reach'] }),
+    ]);
+
+    const tags = fixture.nativeElement.querySelector(
+      '[data-testid=tags-m1]',
+    ) as HTMLElement;
+    expect(tags.textContent).toContain('kingdom');
+    expect(tags.textContent).toContain('northern reach');
+  });
+
+  it('omits the tag list entirely for an untagged entity', () => {
+    const fixture = renderWith([summary({ id: 'm1', tags: [] })]);
+
+    expect(
+      fixture.nativeElement.querySelector('[data-testid=tags-m1]'),
+    ).toBeNull();
+  });
+
+  it('renders the new-note action and type labels in French when French is active', () => {
+    const fixture = renderWith([
+      summary({ id: 'm1', name: 'Aldermoor', type: 'hexmap' }),
+      summary({ id: 'n1', name: 'Lady Mara', type: 'note' }),
+    ]);
+    const el = fixture.nativeElement as HTMLElement;
+
+    TestBed.inject(TranslocoService).setActiveLang('fr');
+    fixture.detectChanges();
+
+    expect(
+      (el.querySelector('[data-testid=new-note]') as HTMLElement).textContent,
+    ).toContain('Nouvelle note');
+    expect(
+      (el.querySelector('[data-testid=type-m1]') as HTMLElement).textContent?.trim(),
+    ).toBe('Carte');
+    expect(
+      (el.querySelector('[data-testid=type-n1]') as HTMLElement).textContent?.trim(),
+    ).toBe('Note');
+    expect(
+      (el.querySelector('[data-testid=rename-m1]') as HTMLElement).textContent,
+    ).toContain('Renommer');
   });
 
   it('renders a card’s Delete action in French when French is the active language', () => {
@@ -182,7 +243,7 @@ describe('MapLibrary', () => {
   });
 
   it('renders the load-error state in French when French is the active language', () => {
-    const fixture = TestBed.createComponent(MapLibrary);
+    const fixture = TestBed.createComponent(EntityBrowser);
     fixture.detectChanges(); // ngOnInit -> GET /entities
     http
       .expectOne('/entities')
@@ -193,14 +254,14 @@ describe('MapLibrary', () => {
     const error = fixture.nativeElement.querySelector(
       '[data-testid=load-error]',
     ) as HTMLElement;
-    expect(error.textContent).toContain('Impossible de charger vos cartes.');
+    expect(error.textContent).toContain('Impossible de charger votre bibliothèque.');
     expect(error.textContent).toContain(
       'Une erreur est survenue. Veuillez réessayer dans un instant.',
     );
   });
 
   it('shows an error state when the entity list fails to load', () => {
-    const fixture = TestBed.createComponent(MapLibrary);
+    const fixture = TestBed.createComponent(EntityBrowser);
     fixture.detectChanges(); // ngOnInit -> GET /entities
     http
       .expectOne('/entities')
@@ -229,7 +290,25 @@ describe('MapLibrary', () => {
       document: { type: 'hexmap', content: { format: 'tiptap-v1', snapshot: {} }, hexes: {}, regions: [], labels: [] },
     });
 
-    expect(navigate).toHaveBeenCalledWith(['/maps', 'created']);
+    expect(navigate).toHaveBeenCalledWith(['/entities', 'created']);
+  });
+
+  it('creates a new note and opens it', () => {
+    const fixture = renderWith([]);
+
+    (
+      fixture.nativeElement.querySelector('[data-testid=new-note]') as HTMLButtonElement
+    ).click();
+
+    const req = http.expectOne('/entities');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ name: 'Untitled note', type: 'note' });
+    req.flush({
+      ...summary({ id: 'created', name: 'Untitled note', type: 'note' }),
+      document: { type: 'note', content: { format: 'tiptap-v1', snapshot: {} } },
+    });
+
+    expect(navigate).toHaveBeenCalledWith(['/entities', 'created']);
   });
 
   it('opens a map when its card is activated', () => {
@@ -239,7 +318,77 @@ describe('MapLibrary', () => {
       fixture.nativeElement.querySelector('[data-testid=open-m1]') as HTMLElement
     ).click();
 
-    expect(navigate).toHaveBeenCalledWith(['/maps', 'm1']);
+    expect(navigate).toHaveBeenCalledWith(['/entities', 'm1']);
+  });
+
+  it('renames an entity in place, changing only its name', () => {
+    const fixture = renderWith([summary({ id: 'm1', name: 'Aldermoor', version: 4 })]);
+    const el = fixture.nativeElement as HTMLElement;
+
+    (el.querySelector('[data-testid=rename-m1]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    const input = el.querySelector('[data-testid=rename-input-m1]') as HTMLInputElement;
+    input.value = 'Aldermoor Keep';
+    input.dispatchEvent(new Event('input'));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    const req = http.expectOne('/entities/m1');
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ name: 'Aldermoor Keep' });
+    req.flush({
+      ...summary({ id: 'm1', name: 'Aldermoor Keep', version: 4 }),
+      document: { type: 'hexmap', content: { format: 'tiptap-v1', snapshot: {} }, hexes: {}, regions: [], labels: [] },
+    });
+    fixture.detectChanges();
+
+    // The card shows the new name and the input is gone (back to read mode).
+    expect(
+      (el.querySelector('[data-testid=map-title]') as HTMLElement).textContent?.trim(),
+    ).toBe('Aldermoor Keep');
+    expect(el.querySelector('[data-testid=rename-input-m1]')).toBeNull();
+  });
+
+  it('closes the input and surfaces an error toast when a rename fails', () => {
+    const fixture = renderWith([summary({ id: 'm1', name: 'Aldermoor', version: 4 })]);
+    const el = fixture.nativeElement as HTMLElement;
+
+    (el.querySelector('[data-testid=rename-m1]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    const input = el.querySelector('[data-testid=rename-input-m1]') as HTMLInputElement;
+    input.value = 'Aldermoor Keep';
+    input.dispatchEvent(new Event('input'));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    http
+      .expectOne('/entities/m1')
+      .flush(null, { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+
+    // The input is closed (not left stuck open) and the failure is surfaced.
+    expect(el.querySelector('[data-testid=rename-input-m1]')).toBeNull();
+    const toasts = TestBed.inject(ToasterService).toasts();
+    expect(toasts.map((t) => t.tone)).toEqual(['error']);
+  });
+
+  it('cancels an inline rename on Escape without saving', () => {
+    const fixture = renderWith([summary({ id: 'm1', name: 'Aldermoor' })]);
+    const el = fixture.nativeElement as HTMLElement;
+
+    (el.querySelector('[data-testid=rename-m1]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    const input = el.querySelector('[data-testid=rename-input-m1]') as HTMLInputElement;
+    input.value = 'Discarded';
+    input.dispatchEvent(new Event('input'));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    fixture.detectChanges();
+
+    // No PATCH (afterEach http.verify() would fail on a pending request), and the
+    // original name stays put with the editor closed.
+    expect(el.querySelector('[data-testid=rename-input-m1]')).toBeNull();
+    expect(
+      (el.querySelector('[data-testid=map-title]') as HTMLElement).textContent?.trim(),
+    ).toBe('Aldermoor');
   });
 
   it('deletes a map and removes it from the list', () => {
@@ -258,5 +407,22 @@ describe('MapLibrary', () => {
       fixture.nativeElement.querySelectorAll('[data-testid=map-title]'),
     ).map((el) => (el as HTMLElement).textContent?.trim());
     expect(titles).toEqual(['The Whisperwood']);
+  });
+
+  it('keeps the card and surfaces an error toast when a delete fails', () => {
+    const fixture = renderWith([summary({ id: 'm1', name: 'Aldermoor' })]);
+
+    (
+      fixture.nativeElement.querySelector('[data-testid=delete-m1]') as HTMLButtonElement
+    ).click();
+    http
+      .expectOne('/entities/m1')
+      .flush(null, { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+
+    // The card stays (the delete didn't take) and the failure is surfaced.
+    expect(fixture.nativeElement.querySelector('[data-testid=open-m1]')).not.toBeNull();
+    const toasts = TestBed.inject(ToasterService).toasts();
+    expect(toasts.map((t) => t.tone)).toEqual(['error']);
   });
 });

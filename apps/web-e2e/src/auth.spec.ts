@@ -11,7 +11,7 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 test('guards the app, signs in, and signs out', async ({ page }) => {
   // Unauthenticated: the library is gated, so the guard bounces to /login.
-  await page.goto('/maps');
+  await page.goto('/entities');
   await expect(page).toHaveURL(/\/login/);
 
   await page.getByLabel('Email').fill(TEST_USER.email);
@@ -19,8 +19,8 @@ test('guards the app, signs in, and signs out', async ({ page }) => {
   await page.getByRole('button', { name: 'Sign in' }).click();
 
   // The returnUrl carries us back to the gated page we were headed to.
-  await expect(page).toHaveURL(/\/maps$/);
-  await expect(page.getByRole('heading', { name: 'Your maps' })).toBeVisible();
+  await expect(page).toHaveURL(/\/entities$/);
+  await expect(page.getByRole('heading', { name: 'Your library' })).toBeVisible();
 
   // Sign out returns to /login (the action lives in the user menu, ADR-0015)...
   await page.getByRole('button', { name: 'Open user menu' }).click();
@@ -28,6 +28,6 @@ test('guards the app, signs in, and signs out', async ({ page }) => {
   await expect(page).toHaveURL(/\/login/);
 
   // ...and the guard blocks the app again.
-  await page.goto('/maps');
+  await page.goto('/entities');
   await expect(page).toHaveURL(/\/login/);
 });

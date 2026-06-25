@@ -5,6 +5,7 @@ import {
 } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { coordKey, emptyContent, EntityDetail, HexMap } from '@hexly/domain';
+import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { EditorSession } from './editor-session';
 import { EditorStore } from './editor-store';
 
@@ -42,7 +43,12 @@ describe('EditorSession', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      imports: [provideTranslocoTesting()],
+      providers: [
+        EditorSession,
+        provideHttpClient(),
+        provideHttpClientTesting(),
+      ],
     });
     session = TestBed.inject(EditorSession);
     editor = TestBed.inject(EditorStore);
@@ -149,17 +155,19 @@ describe('EditorSession', () => {
     expect(session.current()?.name).toBe('The Whisperwood');
   });
 
-  it('reuses the already-open entity for openRoute without a redundant GET', () => {
+  it('re-fetches on openRoute even when the same entity is already open', () => {
     openAldermoor();
 
-    // Navigating to the entity that is already open (e.g. just created) adopts
-    // it straight away — no second round trip — and loads its grid.
+    // Re-entering the route (e.g. reopened from the library after an in-library
+    // rename) must fetch the server's current Entity, not trust a retained
+    // `current` — the route-scoped session can outlive a trip to the library (#70).
     let opened: EntityDetail | undefined;
     session.openRoute('m1').subscribe((m) => (opened = m));
 
-    http.expectNone('/entities/m1');
-    expect(opened).toEqual(aldermoor);
-    expect(editor.document()).toEqual(forestAt00);
+    const renamed: EntityDetail = { ...aldermoor, name: 'Lady Mara' };
+    http.expectOne('/entities/m1').flush(renamed);
+    expect(opened).toEqual(renamed);
+    expect(session.current()?.name).toBe('Lady Mara');
   });
 
   it('clears the canvas then fetches when openRoute targets a different entity', () => {
@@ -195,6 +203,26 @@ describe('EditorSession', () => {
     // The body is the untouched note — same type, no hex grid grafted on.
     expect(req.request.body).toEqual({ document: noteBody, version: 3 });
     req.flush({ ...note, version: 4 });
+  });
+
+  it('does not save or rename while a route load is in flight (mid-navigation)', () => {
+    openAldermoor(); // current = m1, not loading
+    editor.paintAt({ q: 5, r: 5 }, 'ocean');
+
+    // Navigate to a different entity: its load is in flight, `current` still m1.
+    session.openRoute('m2').subscribe();
+
+    // A late Save/rename from the outgoing header is inert — neither writes to
+    // the m1 the user navigated away from (#4, #70).
+    session.save().subscribe();
+    session.rename('Nope').subscribe();
+    http.expectNone('/entities/m1');
+    expect(session.saving()).toBe(false);
+
+    // The pending load still resolves normally.
+    http
+      .expectOne('/entities/m2')
+      .flush({ ...aldermoor, id: 'm2', document: bodyOf(forestAt00) });
   });
 
   it('is a safe no-op with no entity open (no request, no throw)', () => {
