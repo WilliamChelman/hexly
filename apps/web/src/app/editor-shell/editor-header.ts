@@ -13,7 +13,7 @@ import { Button } from '../ui/button';
 import { Chip } from '../ui/chip';
 import { Eyebrow } from '../ui/eyebrow';
 import { Icon } from '../ui/icon/icon';
-import { EditorSession } from './editor-session';
+import { EntitySession } from './entity-session';
 
 /**
  * The editor's interactive header content, projected into the single
@@ -98,7 +98,7 @@ import { EditorSession } from './editor-session';
   `,
 })
 export class EditorHeader {
-  private readonly session = inject(EditorSession);
+  private readonly session = inject(EntitySession);
 
   /** Whether a map is open — gates Save and rename so neither can run with none. */
   protected readonly hasMap = computed(() => this.session.current() !== null);

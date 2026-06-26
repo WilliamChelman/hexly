@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { TranslocoService } from '@jsverse/transloco';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
-import { EditorStore } from './editor-store';
+import { HexMapStore } from './hexmap-store';
 import { MapCanvas } from './map-canvas';
 
 /**
@@ -12,7 +12,7 @@ import { MapCanvas } from './map-canvas';
  * bubble to the window once the canvas is mounted.
  */
 describe('MapCanvas keyboard', () => {
-  let store: EditorStore;
+  let store: HexMapStore;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -20,7 +20,7 @@ describe('MapCanvas keyboard', () => {
     }).compileComponents();
     const fixture = TestBed.createComponent(MapCanvas);
     fixture.detectChanges();
-    store = TestBed.inject(EditorStore);
+    store = TestBed.inject(HexMapStore);
   });
 
   /** Dispatch a keydown that bubbles to the window's host listener. */

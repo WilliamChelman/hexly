@@ -3,7 +3,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { CONTENT_FORMAT, EntityDetail } from '@hexly/domain';
-import { EditorSession } from '../editor-shell/editor-session';
+import { EntitySession } from '../editor-shell/entity-session';
 import { HeaderService } from '../shell/header.service';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { NoteView } from './note-view';
@@ -26,7 +26,7 @@ describe('NoteView', () => {
     await TestBed.configureTestingModule({
       imports: [NoteView, provideTranslocoTesting()],
       providers: [
-        EditorSession,
+        EntitySession,
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
@@ -35,7 +35,7 @@ describe('NoteView', () => {
   });
 
   it('shows the open note’s name', () => {
-    TestBed.inject(EditorSession).adopt(note('Lady Mara'));
+    TestBed.inject(EntitySession).adopt(note('Lady Mara'));
 
     const fixture = TestBed.createComponent(NoteView);
     fixture.detectChanges();
@@ -44,7 +44,7 @@ describe('NoteView', () => {
   });
 
   it('offers a way back to the library', () => {
-    TestBed.inject(EditorSession).adopt(note('Lady Mara'));
+    TestBed.inject(EntitySession).adopt(note('Lady Mara'));
 
     const fixture = TestBed.createComponent(NoteView);
     fixture.detectChanges();
@@ -58,7 +58,7 @@ describe('NoteView', () => {
 
   it('seeds the editor with the open note’s stored Content', () => {
     const detail = note('Lady Mara');
-    TestBed.inject(EditorSession).adopt({
+    TestBed.inject(EntitySession).adopt({
       ...detail,
       document: {
         type: 'note',
@@ -89,7 +89,7 @@ describe('NoteView', () => {
   });
 
   it('contributes the note’s name to the app header while open', () => {
-    TestBed.inject(EditorSession).adopt(note('Lady Mara'));
+    TestBed.inject(EntitySession).adopt(note('Lady Mara'));
 
     const fixture = TestBed.createComponent(NoteView);
     fixture.detectChanges();

@@ -6,12 +6,12 @@ import {
 import { TestBed } from '@angular/core/testing';
 import { CONTENT_FORMAT, coordKey, emptyContent, EntityDetail, HexMap } from '@hexly/domain';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
-import { EditorSession } from './editor-session';
-import { EditorStore } from './editor-store';
+import { EntitySession } from './entity-session';
+import { HexMapStore } from './hexmap-store';
 
-describe('EditorSession', () => {
-  let session: EditorSession;
-  let editor: EditorStore;
+describe('EntitySession', () => {
+  let session: EntitySession;
+  let editor: HexMapStore;
   let http: HttpTestingController;
 
   const content = emptyContent();
@@ -45,13 +45,13 @@ describe('EditorSession', () => {
     TestBed.configureTestingModule({
       imports: [provideTranslocoTesting()],
       providers: [
-        EditorSession,
+        EntitySession,
         provideHttpClient(),
         provideHttpClientTesting(),
       ],
     });
-    session = TestBed.inject(EditorSession);
-    editor = TestBed.inject(EditorStore);
+    session = TestBed.inject(EntitySession);
+    editor = TestBed.inject(HexMapStore);
     http = TestBed.inject(HttpTestingController);
   });
 
@@ -216,7 +216,6 @@ describe('EditorSession', () => {
     session.open('n1').subscribe();
     http.expectOne('/entities/n1').flush(note);
 
-    // The editor hands back a TipTap/ProseMirror snapshot the domain never parses.
     const snapshot = {
       type: 'doc',
       content: [
@@ -232,8 +231,7 @@ describe('EditorSession', () => {
 
     const req = http.expectOne('/entities/n1');
     expect(req.request.method).toBe('PUT');
-    // The edited snapshot is wrapped in the format envelope and saved untouched —
-    // the seam never parses or reshapes it (ADR-0019).
+    // Snapshot wrapped in format envelope, never parsed (ADR-0019).
     expect(req.request.body).toEqual({
       document: { type: 'note', content: { format: CONTENT_FORMAT, snapshot } },
       version: 3,

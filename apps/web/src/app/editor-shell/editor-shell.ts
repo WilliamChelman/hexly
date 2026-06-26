@@ -3,7 +3,7 @@ import {
   Component,
   inject,
 } from '@angular/core';
-import { EditorStore } from './editor-store';
+import { HexMapStore } from './hexmap-store';
 import { ToolPalette } from './tool-palette';
 import { MapCanvas } from './map-canvas';
 import { Inspector } from './inspector';
@@ -15,14 +15,14 @@ import { StatusBar } from './status-bar';
  * The editor's layout orchestrator. It owns no chrome of its own — each region
  * (header, tool palette, canvas, inspector, status bar) is its own component —
  * only the frame that arranges them. It is a pure view of the open map:
- * {@link EntityPage} loads the routed Entity into the {@link EditorSession} and
+ * {@link EntityPage} loads the routed Entity into the {@link EntitySession} and
  * dispatches to this, so a map→map navigation swaps the canvas without
  * re-mounting the editor.
  *
  * The body is a **full-bleed canvas** with the side chrome floating over it as
  * absolutely-positioned cards (ADR-0013): the tool palette anchors top-left, the
  * edge rail top-right, and the dismissible right panel (Inspector / Regions) to
- * the rail's left — rendered only when {@link EditorStore.rightPanel} is open, so
+ * the rail's left — rendered only when {@link HexMapStore.rightPanel} is open, so
  * nothing covers the map by default. The header and status bar stay docked as
  * full-width rows. The editor renders identically at every width.
  */
@@ -84,5 +84,5 @@ import { StatusBar } from './status-bar';
 })
 export class EditorShell {
   /** Drives which view occupies the shared right column (Inspector vs Regions list). */
-  protected readonly store = inject(EditorStore);
+  protected readonly store = inject(HexMapStore);
 }

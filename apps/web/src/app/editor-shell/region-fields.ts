@@ -4,7 +4,7 @@ import { Region } from '@hexly/domain';
 import { Field } from '../ui/field';
 import { Input } from '../ui/input';
 import { inputValue } from './dom';
-import { EditorStore } from './editor-store';
+import { HexMapStore } from './hexmap-store';
 
 /**
  * The name + colour editor for a single {@link Region} — the one place the two
@@ -45,7 +45,7 @@ import { EditorStore } from './editor-store';
   `,
 })
 export class RegionFields {
-  private readonly store = inject(EditorStore);
+  private readonly store = inject(HexMapStore);
 
   /** The region whose name and colour these fields edit. */
   readonly region = input.required<Region>();

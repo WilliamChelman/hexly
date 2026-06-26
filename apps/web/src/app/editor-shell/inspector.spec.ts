@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { TranslocoService } from '@jsverse/transloco';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
-import { EditorStore } from './editor-store';
+import { HexMapStore } from './hexmap-store';
 import { Inspector } from './inspector';
 
 describe('Inspector label editing', () => {
@@ -11,7 +11,7 @@ describe('Inspector label editing', () => {
 
   /** Create the inspector with a label already selected, and return both. */
   function withSelectedLabel(text = 'The Whisperwood') {
-    const store = TestBed.inject(EditorStore);
+    const store = TestBed.inject(HexMapStore);
     const id = store.addLabel(text, { x: 40, y: -20 });
     store.selectLabel(id);
     const fixture = TestBed.createComponent(Inspector);
@@ -126,7 +126,7 @@ describe('Inspector hex and feature selection', () => {
   }
 
   it('shows a selected Hex\'s coordinate and terrain, with no label editor', () => {
-    const store = TestBed.inject(EditorStore);
+    const store = TestBed.inject(HexMapStore);
     store.paintAt({ q: 2, r: -1 }, 'ocean');
     store.select({ q: 2, r: -1 }, null);
 
@@ -141,7 +141,7 @@ describe('Inspector hex and feature selection', () => {
   });
 
   it('deletes a selected Hex when its Delete action is clicked, clearing the selection', () => {
-    const store = TestBed.inject(EditorStore);
+    const store = TestBed.inject(HexMapStore);
     store.paintAt({ q: 0, r: 0 }, 'grass');
     store.select({ q: 0, r: 0 }, null);
 
@@ -158,7 +158,7 @@ describe('Inspector hex and feature selection', () => {
   });
 
   it('deletes a selected Feature by clearing only its feature when Delete is clicked', () => {
-    const store = TestBed.inject(EditorStore);
+    const store = TestBed.inject(HexMapStore);
     store.paintAt({ q: 1, r: 1 }, 'forest');
     store.placeFeatureAt({ q: 1, r: 1 }, 'settlement');
     store.select({ q: 1, r: 1 }, null); // the Feature
@@ -174,7 +174,7 @@ describe('Inspector hex and feature selection', () => {
   });
 
   it('shows a selected Feature\'s identity, labelled as a feature', () => {
-    const store = TestBed.inject(EditorStore);
+    const store = TestBed.inject(HexMapStore);
     store.paintAt({ q: 1, r: 1 }, 'grass');
     store.placeFeatureAt({ q: 1, r: 1 }, 'settlement');
     store.select({ q: 1, r: 1 }, null);
@@ -191,7 +191,7 @@ describe('Inspector hex and feature selection', () => {
   });
 
   it('renders a selected Feature in French — built-in label keyed by id, chrome translated', () => {
-    const store = TestBed.inject(EditorStore);
+    const store = TestBed.inject(HexMapStore);
     store.paintAt({ q: 1, r: 1 }, 'ocean');
     store.placeFeatureAt({ q: 1, r: 1 }, 'settlement');
     store.select({ q: 1, r: 1 }, null);
@@ -219,7 +219,7 @@ describe('Inspector hex and feature selection', () => {
   });
 
   it('renders a selected Hex’s terrain in French, keyed by its id', () => {
-    const store = TestBed.inject(EditorStore);
+    const store = TestBed.inject(HexMapStore);
     store.paintAt({ q: 0, r: 0 }, 'ocean');
     store.select({ q: 0, r: 0 }, null);
 
@@ -233,7 +233,7 @@ describe('Inspector hex and feature selection', () => {
   });
 
   it('shows no membership direction toggle for a Hex selection', () => {
-    const store = TestBed.inject(EditorStore);
+    const store = TestBed.inject(HexMapStore);
     store.paintAt({ q: 0, r: 0 }, 'grass');
     store.select({ q: 0, r: 0 }, null);
 
@@ -246,7 +246,7 @@ describe('Inspector hex and feature selection', () => {
   });
 
   it('prefills the name field with a selected Hex\'s current name', () => {
-    const store = TestBed.inject(EditorStore);
+    const store = TestBed.inject(HexMapStore);
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.editHexName({ q: 0, r: 0 }, 'Riverbend');
     store.select({ q: 0, r: 0 }, null);
@@ -259,7 +259,7 @@ describe('Inspector hex and feature selection', () => {
   });
 
   it('commits a rename when the name field changes', () => {
-    const store = TestBed.inject(EditorStore);
+    const store = TestBed.inject(HexMapStore);
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.select({ q: 0, r: 0 }, null);
 
@@ -273,7 +273,7 @@ describe('Inspector hex and feature selection', () => {
   });
 
   it('offers the name field for a selected Feature too', () => {
-    const store = TestBed.inject(EditorStore);
+    const store = TestBed.inject(HexMapStore);
     store.paintAt({ q: 1, r: 1 }, 'forest');
     store.placeFeatureAt({ q: 1, r: 1 }, 'settlement');
     store.select({ q: 1, r: 1 }, null);
@@ -299,7 +299,7 @@ describe('Inspector multi-selection', () => {
 
   /** Select two Hexes and a Label, returning the store and the rendered fixture. */
   function withThreeSelected() {
-    const store = TestBed.inject(EditorStore);
+    const store = TestBed.inject(HexMapStore);
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.paintAt({ q: 1, r: 0 }, 'ocean');
     const labelId = store.addLabel('Open Sea', { x: 5, y: 5 });
@@ -370,7 +370,7 @@ describe('Inspector region editing', () => {
   /** Create the inspector with a Region selected, and return both. The member is a
    * Void coordinate so the Region is the only selection candidate there. */
   function withSelectedRegion(name = 'Region 3', color = '#b08a4e') {
-    const store = TestBed.inject(EditorStore);
+    const store = TestBed.inject(HexMapStore);
     const id = store.createRegion(name, color);
     store.addHexToRegion(id, { q: 0, r: 0 });
     store.select({ q: 0, r: 0 }, null);

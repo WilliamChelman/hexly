@@ -11,22 +11,16 @@ import { translateSignal, TranslocoPipe } from '@jsverse/transloco';
 import { Editor, JSONContent } from '@tiptap/core';
 import { EditorState } from '@tiptap/pm/state';
 import { TiptapEditorDirective } from 'ngx-tiptap';
-import { EditorSession } from '../editor-shell/editor-session';
+import { EntitySession } from '../editor-shell/entity-session';
 import { HeaderService } from '../shell/header.service';
 import { Button } from '../ui/button';
 import { Chip } from '../ui/chip';
 import { CONTENT_EXTENSIONS } from './content-extensions';
 
 /**
- * The view a `note` Entity opens into (#70, #71), parallel to {@link EditorShell} for
- * a `hexmap`. Mounts the TipTap rich-text editor (ADR-0019) on the open note: it
- * seeds from the note's stored Content snapshot, streams every edit into the session's
- * live Content, and saves the whole document under the note's base version.
- *
- * The editor sits behind the **opaque-snapshot boundary**: this view hands the session
- * the editor's `getJSON()` snapshot verbatim ({@link EditorSession.setContent}); neither
- * this view nor the session parses it. The registered extension set ({@link
- * CONTENT_EXTENSIONS}) is the schema half of the `tiptap-v1` format contract.
+ * The view a `note` Entity opens into, parallel to {@link EditorShell} for a `hexmap`.
+ * Mounts TipTap (ADR-0019): seeds from the stored snapshot, streams edits into the session's
+ * live Content via `getJSON()` — never parses the snapshot, just carries it from load to save.
  */
 @Component({
   selector: 'app-note-view',
@@ -86,14 +80,8 @@ import { CONTENT_EXTENSIONS } from './content-extensions';
       </h1>
 
       <!--
-        The editable surface. ngx-tiptap's directive mounts the (headless) editor
-        here; we read its JSON out through editor.on('update'), not the DOM, so the
-        snapshot stays opaque. Slash menu / formatting toolbar are later slices.
-
-        The wrapper is a flex column and the mounted ProseMirror editable fills
-        it (scoped CSS below), so a click anywhere in the box — not just on a text
-        line — lands in the editor and drops the caret near it. Without that, the
-        empty area below the prose is dead space that swallows clicks.
+        flex column + ProseMirror fills it (scoped CSS below) so a click anywhere in
+        the box focuses the editor — without that, the empty area below prose swallows clicks.
       -->
       <div
         tiptap
@@ -104,15 +92,8 @@ import { CONTENT_EXTENSIONS } from './content-extensions';
     </div>
   `,
   styles: `
-    /* The ProseMirror editable is created by TipTap outside this template, so it
-       carries no encapsulation attribute — pierce to it with :host ::ng-deep,
-       scoped to this component's subtree. It fills the wrapper so the whole box is
-       clickable, and we restore the prose semantics Tailwind's preflight strips
-       (list markers, heading sizes) so structure is legible before the formatting
-       toolbar slice ships. */
-    /* The wrapper already signals focus with focus-within:border-gold, so suppress
-       the editable's own ring — the global :focus-visible box-shadow (base.css) —
-       so focus reads as one box, not two nested ones. */
+    /* TipTap creates .ProseMirror outside Angular's template — pierce with ::ng-deep.
+       Suppress its focus ring: the wrapper's focus-within:border-gold already signals focus. */
     :host ::ng-deep .ProseMirror {
       flex: 1;
     }
@@ -158,53 +139,44 @@ import { CONTENT_EXTENSIONS } from './content-extensions';
   `,
 })
 export class NoteView {
-  private readonly session = inject(EditorSession);
+  private readonly session = inject(EntitySession);
   private readonly header = inject(HeaderService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly eyebrow = translateSignal('noteView.eyebrow');
   private readonly editorLabel = translateSignal('noteView.editorLabel');
 
-  /** The open note's name, or empty before one is loaded. */
   protected readonly name = computed(() => this.session.current()?.name ?? '');
-  /** Whether a save is in flight — disables the Save button. */
   protected readonly saving = this.session.saving;
-  /** The server's current note when a save was rejected as stale, else `null`. */
   protected readonly conflict = this.session.conflict;
-  /** Non-null when the last save or reload HTTP request failed. */
   protected readonly error = this.session.error;
 
-  /** The headless TipTap editor; the template's `tiptap` directive mounts it. */
+  /** Headless TipTap editor; the `tiptap` directive mounts it into the DOM. */
   protected readonly editor = new Editor({ extensions: CONTENT_EXTENSIONS });
 
   constructor() {
-    // Tab title is owned by EditorSession (shared with the map editor), not here.
+    // Tab title is owned by EntitySession (shared with the map editor), not here.
     this.header.set(
       computed(() => ({ eyebrow: this.eyebrow(), title: this.name() })),
       this.destroyRef,
     );
 
-    // Label the actual contenteditable (the .ProseMirror TipTap creates) rather than
-    // the wrapper — TipTap already sets role="textbox" on it, so we only add the label.
+    // Label .ProseMirror (not the wrapper) — TipTap already sets role="textbox" on it.
     effect(() => {
       this.editor.view.dom.setAttribute('aria-label', this.editorLabel());
     });
 
-    // Stream every edit into the session's live, opaque Content (the save source).
     this.editor.on('update', ({ editor }) => {
       this.session.setContent(editor.getJSON());
     });
 
-    // Seed from the server's authoritative snapshot on initial load, conflict reload,
-    // and note swap. `session.seed()` does NOT change on clean saves or renames, so
-    // in-flight keystrokes are never discarded. Clears undo history so the user can't
-    // Ctrl-Z past a conflict reload back to the rejected draft.
+    // Seed on load/swap/conflict-reload (not on clean saves — in-flight keystrokes must survive).
+    // Recreate editor state so Ctrl-Z can't undo past the seed point.
     effect(() => {
       const detail = this.session.seed();
       if (!detail || detail.document.type !== 'note') return;
       const snapshot = detail.document.content.snapshot;
       if (!isDocSnapshot(snapshot)) return;
       this.editor.commands.setContent(snapshot, { emitUpdate: false });
-      // Recreate state with the seeded doc so Ctrl-Z can't reach back past this point.
       const { state } = this.editor;
       this.editor.view.updateState(
         EditorState.create({ doc: state.doc, plugins: state.plugins }),
@@ -214,22 +186,16 @@ export class NoteView {
     this.destroyRef.onDestroy(() => this.editor.destroy());
   }
 
-  /** Persist the note. A stale-version rejection surfaces as the conflict chip. */
   protected save(): void {
     this.session.save().subscribe();
   }
 
-  /** Resolve a surfaced conflict by re-pulling the server's current note. */
   protected reload(): void {
     this.session.reload().subscribe();
   }
 }
 
-/**
- * Whether an opaque snapshot is a mountable ProseMirror document. Guards the seed so a
- * malformed or placeholder snapshot (e.g. `{}`) leaves the editor on its empty doc
- * rather than throwing in `setContent`.
- */
+/** A malformed/placeholder snapshot (e.g. `{}`) leaves the editor on its empty doc rather than throwing. */
 function isDocSnapshot(snapshot: unknown): snapshot is JSONContent {
   return (
     typeof snapshot === 'object' &&

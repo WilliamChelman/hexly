@@ -4,7 +4,7 @@ import {
   computed,
   inject,
 } from '@angular/core';
-import { EditorSession } from '../../editor-shell/editor-session';
+import { EntitySession } from '../../editor-shell/entity-session';
 import { EditorHeader } from '../../editor-shell/editor-header';
 
 /**
@@ -24,7 +24,7 @@ import { EditorHeader } from '../../editor-shell/editor-header';
   `,
 })
 export class EntityHeader {
-  private readonly session = inject(EditorSession);
+  private readonly session = inject(EntitySession);
 
   protected readonly isHexmap = computed(
     () => this.session.current()?.document.type === 'hexmap',

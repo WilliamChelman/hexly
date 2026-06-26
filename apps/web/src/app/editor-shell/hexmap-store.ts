@@ -78,11 +78,11 @@ export interface RegionSubtool {
 /**
  * One selected entity (CONTEXT.md → Selection, ADR-0010/0011/0017): a Label or a
  * Region by id, or a Feature / Hex by the coordinate it sits on. The Selection is
- * a *set* of these — zero, one, or many — exposed as {@link EditorStore.selections}
- * (with {@link EditorStore.selection} the "exactly one" view). The store resolves a
+ * a *set* of these — zero, one, or many — exposed as {@link HexMapStore.selections}
+ * (with {@link HexMapStore.selection} the "exactly one" view). The store resolves a
  * click's geometric inputs into candidates by walking a per-coordinate stack —
  * `Label → Feature → Hex → each containing Region (document order)` — which a plain
- * click cycles through and the modifiers fold into the set; see {@link EditorStore.select}.
+ * click cycles through and the modifiers fold into the set; see {@link HexMapStore.select}.
  */
 export type Selection =
   | { readonly kind: 'label'; readonly id: string }
@@ -93,7 +93,7 @@ export type Selection =
 /**
  * The internal selection reference the store actually stores: a Label or a Region
  * by id, or a map cell by coordinate. Whether a cell reads as a Feature or a bare
- * Hex is *derived* from the live document (see {@link EditorStore.selection}), as
+ * Hex is *derived* from the live document (see {@link HexMapStore.selection}), as
  * is whether a referenced Region still exists — so the selection self-heals when
  * the document changes under it (a feature placed/cleared, the hex erased, the
  * region deleted, an undo) rather than going stale (issues #28, #35).
@@ -147,9 +147,9 @@ function resolveRef(doc: HexMap, ref: SelectionRef): Selection | null {
 
 /**
  * The draft-mutation recipes the delete paths share, factored out so the single
- * deletes ({@link EditorStore.deleteLabel}, {@link EditorStore.deleteRegion},
- * {@link EditorStore.clearFeatureAt}, {@link EditorStore.eraseAt}) and the
- * batched {@link EditorStore.deleteSelected} cannot drift apart. Each takes the
+ * deletes ({@link HexMapStore.deleteLabel}, {@link HexMapStore.deleteRegion},
+ * {@link HexMapStore.clearFeatureAt}, {@link HexMapStore.eraseAt}) and the
+ * batched {@link HexMapStore.deleteSelected} cannot drift apart. Each takes the
  * Immer draft and mutates it in place; deciding when to wrap them in a `commit`
  * (one step each vs. one step for the whole set) stays with the callers.
  */
@@ -174,7 +174,7 @@ function eraseHexFrom(draft: HexMap, coord: Axial): void {
 /**
  * The Feature Tool's Subtools in palette/keyboard order: each library feature,
  * then the Clear Subtool last. The single source of truth for the index→Subtool
- * mapping the keyboard ({@link EditorStore.armSubtoolByIndex}) and the palette
+ * mapping the keyboard ({@link HexMapStore.armSubtoolByIndex}) and the palette
  * keycaps share, so the two cannot drift (issue #27, ADR-0010).
  */
 export const featureSubtools: readonly FeatureSubtool[] = [
@@ -198,7 +198,7 @@ const DEFAULT_FEATURE: FeatureSubtool = featureLibrary[0].id;
 export const DEFAULT_LABEL_SIZE = 28;
 
 /**
- * The outcome of {@link EditorStore.moveSelection}, so the gesture owner can react
+ * The outcome of {@link HexMapStore.moveSelection}, so the gesture owner can react
  * (issue #64): `moved` committed a step, `blocked` refused it (the caller may warn
  * the user), and `noop` carried nothing (a drag that never moved, or an empty/void
  * selection) — neither committed.
@@ -213,7 +213,7 @@ export type MoveOutcome = 'moved' | 'blocked' | 'noop';
  * directly — that discipline is what makes undo correct.
  */
 @Injectable({ providedIn: 'root' })
-export class EditorStore {
+export class HexMapStore {
   private readonly _document = signal<HexMap>(emptyHexMap());
   /** The live document. Read-only to everyone but this store. */
   readonly document = this._document.asReadonly();
@@ -1399,7 +1399,7 @@ export class EditorStore {
 
 /**
  * Whether two selection references point at the same entity: a cell by its
- * coordinate, a label or a region by its id. Lets {@link EditorStore.select}
+ * coordinate, a label or a region by its id. Lets {@link HexMapStore.select}
  * locate the live selection within a freshly-resolved candidate stack to derive
  * the cycle's descent position, rather than tracking a separate index (issue #35).
  */
@@ -1416,8 +1416,8 @@ function sameSelectionRef(a: SelectionRef, b: SelectionRef): boolean {
  * Build the {@link SelectionRef}s a marquee box denotes from its resolved
  * `hexes` and `labelIds` (CONTEXT.md → Marquee): a cell ref per hex coordinate,
  * a label ref per id. The shared ref-builder behind both {@link
- * EditorStore.marqueeSelect} (which commits them) and {@link
- * EditorStore.marqueePreview} (which resolves them for the live highlight), so
+ * HexMapStore.marqueeSelect} (which commits them) and {@link
+ * HexMapStore.marqueePreview} (which resolves them for the live highlight), so
  * the previewed box can never disagree with what releasing it selects. Each
  * coordinate is copied, never aliased, so a caller's reused hover object can't
  * retarget a ref later.
@@ -1435,8 +1435,8 @@ function marqueeRefs(hexes: Axial[], labelIds: string[]): SelectionRef[] {
 /**
  * Append `refs` to `base`, skipping any whose entity is already present (by
  * {@link refKey} identity) — the dedup-preserving union shared by the additive
- * select path ({@link EditorStore.addRefs}, which commits it) and the marquee
- * preview ({@link EditorStore.marqueePreview}, which resolves it for the live
+ * select path ({@link HexMapStore.addRefs}, which commits it) and the marquee
+ * preview ({@link HexMapStore.marqueePreview}, which resolves it for the live
  * highlight), so an additive box's live preview can never disagree with what
  * releasing it accumulates. Returns a fresh array; `base` is never mutated, and
  * its order is preserved with the new members appended after it.

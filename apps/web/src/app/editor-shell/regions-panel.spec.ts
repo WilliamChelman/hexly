@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { TranslocoService } from '@jsverse/transloco';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
-import { EditorStore } from './editor-store';
+import { HexMapStore } from './hexmap-store';
 import { RegionsPanel } from './regions-panel';
 
 describe('RegionsPanel', () => {
@@ -22,7 +22,7 @@ describe('RegionsPanel', () => {
   }
 
   it('lists every Region with its name and colour swatch, including emptied ones', () => {
-    const store = TestBed.inject(EditorStore);
+    const store = TestBed.inject(HexMapStore);
     // A populated Region and an emptied one (zero member hexes, so invisible on the
     // canvas) must both appear — the panel must not assume non-empty membership.
     const populated = store.createRegion('The Kingdom of Avalon', '#b08a4e');
@@ -43,7 +43,7 @@ describe('RegionsPanel', () => {
   });
 
   it('creates a Region through New Region, listing it without any painting', () => {
-    const store = TestBed.inject(EditorStore);
+    const store = TestBed.inject(HexMapStore);
     const fixture = render();
 
     (
@@ -75,7 +75,7 @@ describe('RegionsPanel', () => {
   });
 
   it('never translates a user-typed Region name, even one that collides with UI copy', () => {
-    const store = TestBed.inject(EditorStore);
+    const store = TestBed.inject(HexMapStore);
     store.createRegion('Terrain', '#6f7fae'); // collides with a UI label
     const fixture = render();
     TestBed.inject(TranslocoService).setActiveLang('fr');
@@ -89,7 +89,7 @@ describe('RegionsPanel', () => {
   });
 
   it('routes a list selection through the shared store selection, even for an empty Region', () => {
-    const store = TestBed.inject(EditorStore);
+    const store = TestBed.inject(HexMapStore);
     // An emptied Region — reachable only by id — proves the row goes through the
     // same store selection the canvas uses, not a coordinate click.
     const id = store.createRegion('The Whisperwood', '#6f7fae');

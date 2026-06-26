@@ -29,7 +29,7 @@ import {
 import { ThemeService } from '../core/theme.service';
 import { ToasterService } from '../core/toaster.service';
 import { terrainKey } from './catalog-keys';
-import { EditorStore, SelectMode, ToolId } from './editor-store';
+import { HexMapStore, SelectMode, ToolId } from './hexmap-store';
 import { CoordReadout } from './coord-readout';
 import { ZoomControl } from './zoom-control';
 import { Camera } from './camera';
@@ -209,7 +209,7 @@ export class MapCanvas {
    * would move by. `null` when no drag is active. A hex/region selection snaps the
    * offset to hex steps (labels ride by the pixel-equivalent); a labels-only
    * selection moves by free pixels (`offset` stays zero). The renderer previews the
-   * move from this; the store only sees the final {@link EditorStore.moveSelection}
+   * move from this; the store only sees the final {@link HexMapStore.moveSelection}
    * on release, so the whole drag is a single undo step (issues #30, #64).
    */
   private readonly drag = signal<{
@@ -286,7 +286,7 @@ export class MapCanvas {
   private gestureButton: number | null = null;
 
   private readonly theme = inject(ThemeService);
-  private readonly store = inject(EditorStore);
+  private readonly store = inject(HexMapStore);
   private readonly destroyRef = inject(DestroyRef);
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
@@ -518,7 +518,7 @@ export class MapCanvas {
       }
       // A plain click selected one entity (or cleared on empty Void). When something
       // was selected, arm a *potential* drag of it: crossing the threshold in
-      // {@link onPointerMove} turns it into a {@link EditorStore.moveSelection}; a
+      // {@link onPointerMove} turns it into a {@link HexMapStore.moveSelection}; a
       // release before the threshold stays a plain click. A Label drags by free
       // pixels (`snapped` false, so it follows the cursor exactly); a Hex, Feature,
       // or Region snaps to hex steps.

@@ -1,6 +1,6 @@
 import { Route } from '@angular/router';
 import { authGuard, loginGuard } from './auth/auth.guard';
-import { EditorSession } from './editor-shell/editor-session';
+import { EntitySession } from './editor-shell/entity-session';
 
 export const appRoutes: Route[] = [
   {
@@ -28,9 +28,9 @@ export const appRoutes: Route[] = [
     // primary outlet, EntityHeader into AppHeader's named `header` outlet.
     path: 'entities/:id',
     canActivate: [authGuard],
-    // One EditorSession for the subtree, shared by both outlets; destroyed on
+    // One EntitySession for the subtree, shared by both outlets; destroyed on
     // leave, so open-Entity state resets implicitly (#70).
-    providers: [EditorSession],
+    providers: [EntitySession],
     // Tab title is the open Entity's name composed with the brand ("Aldermoor —
     // Hexly") via documentTitleKey; `title` is the pre-load fallback (ADR-0014).
     title: 'editorShell.tabTitle',

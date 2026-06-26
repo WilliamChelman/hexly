@@ -9,8 +9,8 @@ import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { EditorShell } from './editor-shell';
 
 // EditorShell is a pure view: EntityPage loads the routed Entity into the
-// EditorSession and the session owns the tab title (see entity.page.spec /
-// editor-session.spec). This covers only the layout shell it still owns.
+// EntitySession and the session owns the tab title (see entity.page.spec /
+// entity-session.spec). This covers only the layout shell it still owns.
 describe('EditorShell', () => {
   let httpMock: HttpTestingController;
 

@@ -12,7 +12,7 @@ import {
 /**
  * The web client's HTTP conversation with the entities API (ADR-0018, ADR-0005).
  * Stateless: every verb is a round trip that returns what the server said. The
- * open-Entity/conflict state the editor reads lives in EditorSession, the seam
+ * open-Entity/conflict state the editor reads lives in EntitySession, the seam
  * that actually consumes it — this stays one load/save/conflict surface for
  * every Entity type. The session cookie rides along via `withCredentials`.
  */
