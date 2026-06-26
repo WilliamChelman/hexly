@@ -149,7 +149,7 @@ describe('EntitiesClient', () => {
     const serverCurrent: EntityDetail = { ...aldermoor, version: 5 };
 
     let outcome: unknown;
-    client.save('e1', emptyHexmapBody, 1).subscribe((o) => (outcome = o));
+    client.save('e1', emptyHexmapBody, 1, []).subscribe((o) => (outcome = o));
 
     http
       .expectOne('/entities/e1')
@@ -163,7 +163,7 @@ describe('EntitiesClient', () => {
     // EntityDetail. It must not be reported as a conflict (which would break the
     // conflict UI reading .name/.version off a string) — surface it as an error.
     let errored = false;
-    client.save('e1', emptyHexmapBody, 1).subscribe({
+    client.save('e1', emptyHexmapBody, 1, []).subscribe({
       error: () => (errored = true),
     });
     http

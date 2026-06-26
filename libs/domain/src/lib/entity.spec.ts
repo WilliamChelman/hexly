@@ -139,12 +139,35 @@ describe('renameEntityRequestSchema', () => {
 });
 
 describe('saveEntityRequestSchema', () => {
-  it('carries the whole body and the base version the save is built on', () => {
+  it('carries the whole body, the base version, and the tags the save replaces', () => {
     const body = { type: 'hexmap' as const, content, ...emptyHexMap() };
 
-    expect(saveEntityRequestSchema.parse({ document: body, version: 3 })).toEqual(
-      { document: body, version: 3 },
-    );
+    expect(
+      saveEntityRequestSchema.parse({ document: body, version: 3, tags: [] }),
+    ).toEqual({ document: body, version: 3, tags: [] });
+  });
+
+  it('requires tags on save — the save always carries the full current set', () => {
+    const body = { type: 'note' as const, content };
+
+    expect(() =>
+      saveEntityRequestSchema.parse({ document: body, version: 3 }),
+    ).toThrow();
+  });
+
+  it('normalizes tags on save: trims, lower-cases, dedupes, rejects blanks (#88)', () => {
+    const body = { type: 'note' as const, content };
+
+    expect(
+      saveEntityRequestSchema.parse({
+        document: body,
+        version: 1,
+        tags: [' Deity ', 'deity', 'RUINED'],
+      }).tags,
+    ).toEqual(['deity', 'ruined']);
+    expect(() =>
+      saveEntityRequestSchema.parse({ document: body, version: 1, tags: ['  '] }),
+    ).toThrow();
   });
 
   it('rejects a save that omits the base version', () => {

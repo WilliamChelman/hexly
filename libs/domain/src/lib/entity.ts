@@ -75,10 +75,15 @@ const nameSchema = z.string().trim().min(1);
  * created or stored without tags still lists with an array rather than
  * `undefined`. Tags carry no behaviour — distinct from the structured type.
  *
- * De-duplicated on parse: two identical strings collapse at the validation boundary
- * so consumers never see duplicate keys.
+ * Normalized on parse so the schema (the single source of truth, ADR-0001) — not
+ * just the UI — owns what a tag is: each is trimmed and lower-cased, blanks are
+ * rejected (no empty/whitespace tags, #88), then identical strings collapse so
+ * consumers never see duplicates. Lower-casing also folds case variants ("Deity"
+ * / "deity") into one, which chips render uppercase regardless.
  */
-const dedupedTags = z.array(z.string()).transform((tags) => [...new Set(tags)]);
+const dedupedTags = z
+  .array(z.string().trim().toLowerCase().min(1))
+  .transform((tags) => [...new Set(tags)]);
 
 export const tagsSchema = dedupedTags.default([]);
 
@@ -111,10 +116,10 @@ export type RenameEntityRequest = z.infer<typeof renameEntityRequestSchema>;
 export const saveEntityRequestSchema = z.object({
   document: entityBodySchema,
   version: z.number().int().nonnegative(),
-  // Tags ride along with the version-checked save (CONTEXT.md → Tag, #72). Optional
-  // so a body-only save (no `tags` key) leaves the stored tags untouched — omission
-  // means "preserve", not "clear" — while a present array (even empty) replaces them.
-  tags: dedupedTags.optional(),
+  // Tags ride along with the version-checked save (CONTEXT.md → Tag, #72): the save
+  // always carries the full current set (the editor holds them live), so a save
+  // replaces the stored tags — an empty array clears them.
+  tags: dedupedTags,
 });
 
 /** A validated save submission for an Entity. */

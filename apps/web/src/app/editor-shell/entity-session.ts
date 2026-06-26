@@ -152,6 +152,8 @@ export class EntitySession {
    */
   openRoute(id: string): Observable<EntityDetail> {
     this.editor.load(emptyHexMap()); // clear the previous map's canvas during load (#7)
+    this._tags.set([]); // and the previous Entity's tags/content, which ride the same load (#88)
+    this._content.set(null);
     this._loading.set(true);
     return this.open(id).pipe(finalize(() => this._loading.set(false)));
   }

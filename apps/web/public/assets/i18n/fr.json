@@ -33,7 +33,7 @@
   "entityTags": {
     "addLabel": "Ajouter un tag",
     "addPlaceholder": "Ajouter des tags…",
-    "removeLabel": "Supprimer le tag"
+    "removeLabel": "Supprimer le tag : {{tag}}"
   },
   "noteView": {
     "eyebrow": "Note",

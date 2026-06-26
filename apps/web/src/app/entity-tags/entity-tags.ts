@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { translateSignal } from '@jsverse/transloco';
+import { translateSignal, TranslocoPipe } from '@jsverse/transloco';
 import { Chip } from '../ui/chip';
 import { EntitySession } from '../editor-shell/entity-session';
 
@@ -12,7 +12,7 @@ import { EntitySession } from '../editor-shell/entity-session';
 @Component({
   selector: 'app-entity-tags',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Chip],
+  imports: [Chip, TranslocoPipe],
   template: `
     <div class="flex flex-wrap items-center gap-2" data-testid="entity-tags">
       @for (tag of tags(); track tag) {
@@ -21,7 +21,7 @@ import { EntitySession } from '../editor-shell/entity-session';
           <button
             type="button"
             class="-mr-1 leading-none opacity-70 hover:opacity-100 cursor-pointer bg-transparent border-0 text-current"
-            [attr.aria-label]="removeLabel() + ': ' + tag"
+            [attr.aria-label]="'entityTags.removeLabel' | transloco: { tag }"
             [attr.data-testid]="'tag-remove-' + tag"
             (click)="remove(tag)"
           >
@@ -36,6 +36,7 @@ import { EntitySession } from '../editor-shell/entity-session';
         [attr.aria-label]="addLabel()"
         [attr.placeholder]="addPlaceholder()"
         (keydown.enter)="add($event)"
+        (blur)="add($event)"
       />
     </div>
   `,
@@ -45,18 +46,19 @@ export class EntityTags {
   protected readonly tags = this.session.tags;
   protected readonly addLabel = translateSignal('entityTags.addLabel');
   protected readonly addPlaceholder = translateSignal('entityTags.addPlaceholder');
-  protected readonly removeLabel = translateSignal('entityTags.removeLabel');
 
   /**
-   * Add the typed entry to the live set. Splits on commas so a comma-separated
-   * paste adds several at once; trims blanks and skips duplicates (the server
-   * de-dups too, but the UI must match immediately). Clears the field on success.
+   * Add the typed entry to the live set — on Enter, and on blur so a tag typed
+   * but not Enter-confirmed isn't lost when the user clicks Save (#88). Splits on
+   * commas so a comma-separated paste adds several at once; trims, lower-cases and
+   * skips duplicates to match the server's normalization (entity.ts dedupedTags)
+   * immediately. Clears the field on success.
    */
   protected add(event: Event): void {
     const input = event.target as HTMLInputElement;
     const incoming = input.value
       .split(',')
-      .map((t) => t.trim())
+      .map((t) => t.trim().toLowerCase())
       .filter(Boolean);
     const next = [...this.tags()];
     for (const tag of incoming) if (!next.includes(tag)) next.push(tag);

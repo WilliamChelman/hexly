@@ -54,7 +54,7 @@ export class EntitiesClient {
     id: string,
     body: EntityBody,
     version: number,
-    tags?: readonly string[],
+    tags: readonly string[],
   ): Observable<EntitySaveOutcome> {
     return this.http
       .put<EntityDetail>(`/entities/${id}`, { document: body, version, tags })
