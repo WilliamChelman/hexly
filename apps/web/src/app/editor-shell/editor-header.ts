@@ -13,6 +13,7 @@ import { Button } from '../ui/button';
 import { Chip } from '../ui/chip';
 import { Eyebrow } from '../ui/eyebrow';
 import { Icon } from '../ui/icon/icon';
+import { EntityTags } from '../entity-tags/entity-tags';
 import { EntitySession } from './entity-session';
 
 /**
@@ -26,7 +27,7 @@ import { EntitySession } from './entity-session';
   selector: 'app-editor-header',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'flex flex-1 items-center gap-5' },
-  imports: [RouterLink, Button, Chip, Eyebrow, Icon, TranslocoPipe],
+  imports: [RouterLink, Button, Chip, Eyebrow, Icon, TranslocoPipe, EntityTags],
   template: `
     <div class="flex items-center gap-3 shrink-0">
       <span class="w-px h-[26px] bg-line-strong shrink-0"></span>
@@ -71,6 +72,8 @@ import { EntitySession } from './entity-session';
         <app-chip tone="gold">{{ 'editorShell.editing' | transloco }}</app-chip>
       }
     </div>
+
+    <app-entity-tags class="min-w-0 flex-1" />
 
     <div class="flex items-center gap-2 ml-auto">
       <a appButton variant="ghost" size="sm" routerLink="/entities">{{

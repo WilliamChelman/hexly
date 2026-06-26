@@ -57,6 +57,17 @@ describe('EditorHeader', () => {
     expect(fixture.nativeElement.textContent).toContain('The Whisperwood');
   });
 
+  it('mounts the tag editor for the open map', () => {
+    openMap(aldermoor);
+
+    const fixture = TestBed.createComponent(EditorHeader);
+    fixture.detectChanges();
+
+    expect(
+      fixture.nativeElement.querySelector('[data-testid=entity-tags]'),
+    ).not.toBeNull();
+  });
+
   it('renames the open entity when the title is edited', () => {
     openMap(aldermoor);
     const fixture = TestBed.createComponent(EditorHeader);

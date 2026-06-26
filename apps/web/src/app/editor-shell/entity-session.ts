@@ -70,6 +70,16 @@ export class EntitySession {
    */
   private readonly _content = signal<Content | null>(null);
 
+  /**
+   * Live Tags (CONTEXT.md → Tag, #72), seeded on load and edited by the tags UI.
+   * Like Content, they span every Entity type and ride with the version-checked
+   * save — so the session always carries the current set and a body-only save
+   * never silently drops them. Survives a clean save so in-flight edits aren't lost.
+   */
+  private readonly _tags = signal<readonly string[]>([]);
+  /** The open Entity's live tags — the editing buffer the Save button persists. */
+  readonly tags = this._tags.asReadonly();
+
   private readonly _saving = signal(false);
   readonly saving = this._saving.asReadonly();
 
@@ -121,12 +131,18 @@ export class EntitySession {
     this._current.set(detail);
     this._seed.set(detail);
     this._content.set(detail.document.content);
+    this._tags.set(detail.tags);
     this.editor.load(gridOf(detail.document));
   }
 
   /** Wrap the editor's latest snapshot in the format envelope (ADR-0019). */
   setContent(snapshot: unknown): void {
     this._content.set(tiptapContent(snapshot));
+  }
+
+  /** Replace the live tags (#72); the next save persists them version-checked. */
+  setTags(tags: readonly string[]): void {
+    this._tags.set(tags);
   }
 
   /**
@@ -167,7 +183,7 @@ export class EntitySession {
       this._content()!,
     );
     return this.entities
-      .save(open.id, body, open.version)
+      .save(open.id, body, open.version, this._tags())
       .pipe(
         tap((outcome) => {
           // On conflict, leave the open Entity untouched so the edit isn't lost

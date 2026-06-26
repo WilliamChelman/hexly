@@ -15,6 +15,7 @@ import { EntitySession } from '../editor-shell/entity-session';
 import { HeaderService } from '../shell/header.service';
 import { Button } from '../ui/button';
 import { Chip } from '../ui/chip';
+import { EntityTags } from '../entity-tags/entity-tags';
 import { CONTENT_EXTENSIONS } from './content-extensions';
 
 /**
@@ -25,7 +26,14 @@ import { CONTENT_EXTENSIONS } from './content-extensions';
 @Component({
   selector: 'app-note-view',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, TranslocoPipe, TiptapEditorDirective, Button, Chip],
+  imports: [
+    RouterLink,
+    TranslocoPipe,
+    TiptapEditorDirective,
+    Button,
+    Chip,
+    EntityTags,
+  ],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
     <div class="max-w-[60rem] mx-auto py-9 px-5">
@@ -78,6 +86,8 @@ import { CONTENT_EXTENSIONS } from './content-extensions';
       >
         {{ name() }}
       </h1>
+
+      <app-entity-tags class="mt-3 block" />
 
       <!--
         flex column + ProseMirror fills it (scoped CSS below) so a click anywhere in

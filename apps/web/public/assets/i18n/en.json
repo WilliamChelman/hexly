@@ -30,6 +30,11 @@
     "emptyTitle": "Your library is empty.",
     "emptyHint": "Create a note or a map to begin."
   },
+  "entityTags": {
+    "addLabel": "Add a tag",
+    "addPlaceholder": "Add tags…",
+    "removeLabel": "Remove tag"
+  },
   "noteView": {
     "eyebrow": "Note",
     "backToLibrary": "Back to library",

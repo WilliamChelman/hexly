@@ -102,12 +102,13 @@ export class EntitiesService {
     if (!row) return { status: 'not-found' };
 
     // Set only the columns a save owns, so a concurrent rename isn't clobbered.
+    // Tags ride along when present; an absent `tags` leaves the column untouched (#72).
     const document = serialize(req.document);
     const version = req.version + 1;
     const updatedAt = Date.now();
     const res = this.db
       .update(entities)
-      .set({ document, version, updatedAt })
+      .set({ document, version, updatedAt, ...(req.tags && { tags: req.tags }) })
       .where(
         and(
           eq(entities.id, id),
@@ -127,7 +128,10 @@ export class EntitiesService {
     // `req.document` is the validated body we just wrote — return it directly.
     return {
       status: 'saved',
-      entity: detailOf({ ...row, version, updatedAt }, req.document),
+      entity: detailOf(
+        { ...row, version, updatedAt, tags: req.tags ?? row.tags },
+        req.document,
+      ),
     };
   }
 

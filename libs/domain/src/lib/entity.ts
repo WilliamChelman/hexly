@@ -78,10 +78,9 @@ const nameSchema = z.string().trim().min(1);
  * De-duplicated on parse: two identical strings collapse at the validation boundary
  * so consumers never see duplicate keys.
  */
-export const tagsSchema = z
-  .array(z.string())
-  .transform((tags) => [...new Set(tags)])
-  .default([]);
+const dedupedTags = z.array(z.string()).transform((tags) => [...new Set(tags)]);
+
+export const tagsSchema = dedupedTags.default([]);
 
 /**
  * The body of `POST /entities`: a new Entity needs a name and a type; tags
@@ -112,6 +111,10 @@ export type RenameEntityRequest = z.infer<typeof renameEntityRequestSchema>;
 export const saveEntityRequestSchema = z.object({
   document: entityBodySchema,
   version: z.number().int().nonnegative(),
+  // Tags ride along with the version-checked save (CONTEXT.md → Tag, #72). Optional
+  // so a body-only save (no `tags` key) leaves the stored tags untouched — omission
+  // means "preserve", not "clear" — while a present array (even empty) replaces them.
+  tags: dedupedTags.optional(),
 });
 
 /** A validated save submission for an Entity. */

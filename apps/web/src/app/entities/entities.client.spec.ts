@@ -129,11 +129,15 @@ describe('EntitiesClient', () => {
     };
 
     let outcome: unknown;
-    client.save('e1', painted, 1).subscribe((o) => (outcome = o));
+    client.save('e1', painted, 1, ['deity', 'ruined']).subscribe((o) => (outcome = o));
 
     const req = http.expectOne('/entities/e1');
     expect(req.request.method).toBe('PUT');
-    expect(req.request.body).toEqual({ document: painted, version: 1 });
+    expect(req.request.body).toEqual({
+      document: painted,
+      version: 1,
+      tags: ['deity', 'ruined'],
+    });
 
     const saved: EntityDetail = { ...aldermoor, version: 2, document: painted };
     req.flush(saved);

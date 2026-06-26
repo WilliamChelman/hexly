@@ -85,6 +85,7 @@ describe('EntitySession', () => {
     expect(req.request.body).toEqual({
       document: bodyOf(editor.document()),
       version: 3,
+      tags: [],
     });
 
     const saved: EntityDetail = {
@@ -94,6 +95,33 @@ describe('EntitySession', () => {
     };
     req.flush(saved);
     expect(outcome).toEqual({ status: 'saved', entity: saved });
+  });
+
+  it('seeds the open entity’s tags and sends edited tags with the save (#72)', () => {
+    openAldermoor(); // tags: []
+    expect(session.tags()).toEqual([]);
+
+    session.setTags(['deity', 'ruined']);
+    expect(session.tags()).toEqual(['deity', 'ruined']);
+
+    session.save().subscribe();
+
+    const req = http.expectOne('/entities/m1');
+    expect(req.request.method).toBe('PUT');
+    expect(req.request.body).toEqual({
+      document: bodyOf(editor.document()),
+      version: 3,
+      tags: ['deity', 'ruined'],
+    });
+
+    const saved: EntityDetail = {
+      ...aldermoor,
+      version: 4,
+      tags: ['deity', 'ruined'],
+      document: bodyOf(editor.document()),
+    };
+    req.flush(saved);
+    expect(session.current()?.tags).toEqual(['deity', 'ruined']);
   });
 
   it('surfaces a stale save as a conflict and keeps the editor edit', () => {
@@ -201,7 +229,7 @@ describe('EntitySession', () => {
     const req = http.expectOne('/entities/n1');
     expect(req.request.method).toBe('PUT');
     // The body is the untouched note — same type, no hex grid grafted on.
-    expect(req.request.body).toEqual({ document: noteBody, version: 3 });
+    expect(req.request.body).toEqual({ document: noteBody, version: 3, tags: [] });
     req.flush({ ...note, version: 4 });
   });
 
@@ -235,6 +263,7 @@ describe('EntitySession', () => {
     expect(req.request.body).toEqual({
       document: { type: 'note', content: { format: CONTENT_FORMAT, snapshot } },
       version: 3,
+      tags: [],
     });
     req.flush({ ...note, version: 4 });
   });

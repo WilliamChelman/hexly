@@ -151,6 +151,43 @@ describe('Entities endpoints', () => {
     expect(reloaded.body.version).toBe(2);
   });
 
+  it('persists an entity’s tags through a version-checked save', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const created = await ada
+      .post('/entities')
+      .send({ name: 'Lady A', type: 'note' });
+    const id = created.body.id;
+    const body = { type: 'note', content: emptyContent() };
+
+    const res = await ada
+      .put(`/entities/${id}`)
+      .send({ document: body, version: 1, tags: ['deity', 'ruined'] })
+      .expect(200);
+
+    expect(res.body.tags).toEqual(['deity', 'ruined']);
+    expect(res.body.version).toBe(2);
+
+    const reloaded = await ada.get(`/entities/${id}`).expect(200);
+    expect(reloaded.body.tags).toEqual(['deity', 'ruined']);
+  });
+
+  it('leaves existing tags untouched when a save omits the tags key', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const created = await ada
+      .post('/entities')
+      .send({ name: 'Lady A', type: 'note', tags: ['deity'] });
+    const id = created.body.id;
+    const body = { type: 'note', content: emptyContent() };
+
+    // A body-only save (e.g. a content edit) must not clear the tags column.
+    const res = await ada
+      .put(`/entities/${id}`)
+      .send({ document: body, version: 1 })
+      .expect(200);
+
+    expect(res.body.tags).toEqual(['deity']);
+  });
+
   it('round-trips an opaque Content snapshot through a save untouched', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const created = await ada
