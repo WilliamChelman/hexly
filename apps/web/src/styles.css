@@ -6,22 +6,22 @@
  */
 /*
  * Fonts self-hosted via @fontsource (no third-party request) — only the weights/subsets the
- * design uses (latin + latin-ext): Marcellus (display), Cormorant Garamond
+ * design uses (latin + latin-ext): Marcellus (display), Source Serif 4
  * (body), Cinzel Decorative (wordmark), JetBrains Mono (coords).
  */
 @import '@fontsource/marcellus/latin-400.css';
 @import '@fontsource/marcellus/latin-ext-400.css';
 
-@import '@fontsource/cormorant-garamond/latin-400.css';
-@import '@fontsource/cormorant-garamond/latin-500.css';
-@import '@fontsource/cormorant-garamond/latin-600.css';
-@import '@fontsource/cormorant-garamond/latin-700.css';
-@import '@fontsource/cormorant-garamond/latin-400-italic.css';
-@import '@fontsource/cormorant-garamond/latin-ext-400.css';
-@import '@fontsource/cormorant-garamond/latin-ext-500.css';
-@import '@fontsource/cormorant-garamond/latin-ext-600.css';
-@import '@fontsource/cormorant-garamond/latin-ext-700.css';
-@import '@fontsource/cormorant-garamond/latin-ext-400-italic.css';
+@import '@fontsource/source-serif-4/latin-400.css';
+@import '@fontsource/source-serif-4/latin-500.css';
+@import '@fontsource/source-serif-4/latin-600.css';
+@import '@fontsource/source-serif-4/latin-700.css';
+@import '@fontsource/source-serif-4/latin-400-italic.css';
+@import '@fontsource/source-serif-4/latin-ext-400.css';
+@import '@fontsource/source-serif-4/latin-ext-500.css';
+@import '@fontsource/source-serif-4/latin-ext-600.css';
+@import '@fontsource/source-serif-4/latin-ext-700.css';
+@import '@fontsource/source-serif-4/latin-ext-400-italic.css';
 
 @import '@fontsource/cinzel-decorative/latin-700.css';
 @import '@fontsource/cinzel-decorative/latin-ext-700.css';
@@ -65,7 +65,7 @@
 @theme static {
   --font-cartouche: 'Cinzel Decorative', 'Marcellus', Georgia, serif;
   --font-display: 'Marcellus', Georgia, serif;
-  --font-body: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  --font-body: 'Source Serif 4', Georgia, 'Times New Roman', serif;
   --font-mono: 'JetBrains Mono', 'SFMono-Regular', Menlo, monospace;
 
   /* ---- Type scale (modular, ratio ~1.25) → text-* utilities ------------- */

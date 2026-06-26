@@ -87,6 +87,28 @@ describe('NoteView', () => {
     expect(surface.textContent).toContain('Lady Mara rules the north.');
   });
 
+  it('opens the slash menu of insertable blocks when “/” is typed', async () => {
+    TestBed.inject(EntitySession).adopt(note('Lady Mara'));
+
+    const fixture = TestBed.createComponent(NoteView);
+    fixture.detectChanges();
+
+    // Type "/" into the live editor; the suggestion plugin should surface the menu.
+    const editor = (
+      fixture.componentInstance as unknown as {
+        editor: { commands: { insertContent: (s: string) => void } };
+      }
+    ).editor;
+    editor.commands.insertContent('/');
+    // @tiptap/suggestion resolves items() asynchronously, then fires onStart/onUpdate.
+    await new Promise((resolve) => setTimeout(resolve));
+    fixture.detectChanges();
+
+    const menu = fixture.nativeElement.querySelector('[data-testid=slash-menu]');
+    expect(menu).not.toBeNull();
+    expect(menu.textContent).toContain('Heading 1');
+  });
+
   it('mounts the tag editor for the open note', () => {
     TestBed.inject(EntitySession).adopt(note('Lady Mara'));
 
