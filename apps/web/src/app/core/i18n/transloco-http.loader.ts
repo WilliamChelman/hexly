@@ -4,10 +4,9 @@ import { Translation, TranslocoLoader } from '@jsverse/transloco';
 
 /**
  * Fetches a language catalog from the web app's public assets (ADR-0014). The
- * URL is intentionally slash-less (`assets/…`, not `/assets/…`) so the
- * {@link apiPrefixInterceptor} leaves it alone — catalogs are static SPA assets
- * served off the document base (`<base href="/">`), not backend routes under
- * `/api`.
+ * URL is intentionally slash-less (`assets/…`, not `/assets/…`) so it resolves
+ * against the document base (`<base href="/">`) — catalogs are static SPA
+ * assets, not backend routes under `/api`.
  */
 @Injectable({ providedIn: 'root' })
 export class TranslocoHttpLoader implements TranslocoLoader {

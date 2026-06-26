@@ -8,7 +8,7 @@ import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { BehaviorSubject, Observable, map } from 'rxjs';
-import { AuthStore } from '../auth/auth.store';
+import { AuthClient } from '../core/services/auth.client';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { NavRail } from './nav-rail';
 
@@ -57,9 +57,9 @@ describe('NavRail', () => {
   });
 
   function signIn(displayName = 'Ada Lovelace'): void {
-    TestBed.inject(AuthStore).login('ada@hexly.test', 'pw').subscribe();
+    TestBed.inject(AuthClient).login('ada@hexly.test', 'pw').subscribe();
     http
-      .expectOne('/auth/login')
+      .expectOne('/api/auth/login')
       .flush({ id: 'u1', email: 'ada@hexly.test', displayName });
   }
 
@@ -69,7 +69,10 @@ describe('NavRail', () => {
     return fixture;
   }
 
-  function q(fixture: ReturnType<typeof render>, testid: string): HTMLElement | null {
+  function q(
+    fixture: ReturnType<typeof render>,
+    testid: string,
+  ): HTMLElement | null {
     return fixture.nativeElement.querySelector(`[data-testid="${testid}"]`);
   }
 
@@ -112,8 +115,12 @@ describe('NavRail', () => {
     await TestBed.inject(Router).navigateByUrl('/entities');
     fixture.detectChanges();
 
-    expect(q(fixture, 'nav-entities')?.getAttribute('aria-current')).toBe('page');
-    expect(q(fixture, 'nav-styleguide')?.getAttribute('aria-current')).toBeNull();
+    expect(q(fixture, 'nav-entities')?.getAttribute('aria-current')).toBe(
+      'page',
+    );
+    expect(
+      q(fixture, 'nav-styleguide')?.getAttribute('aria-current'),
+    ).toBeNull();
   });
 
   it('houses account and appearance behind the avatar', () => {
@@ -131,13 +138,16 @@ describe('NavRail', () => {
     fixture.detectChanges();
 
     const all = (testid: string) =>
-      fixture.nativeElement.querySelectorAll(`[data-testid="${testid}"]`).length;
+      fixture.nativeElement.querySelectorAll(`[data-testid="${testid}"]`)
+        .length;
     // The overlay is open; the docked strip behind it must not re-render the body.
     expect(q(fixture, 'nav-rail-overlay')).not.toBeNull();
     expect(all('brand')).toBe(1);
     expect(all('rail-toggle')).toBe(1);
     // The lone toggle's ARIA tracks its visibly-open state, not a stale source.
-    expect(q(fixture, 'rail-toggle')?.getAttribute('aria-expanded')).toBe('true');
+    expect(q(fixture, 'rail-toggle')?.getAttribute('aria-expanded')).toBe(
+      'true',
+    );
   });
 
   it('does not resurrect the overlay after a narrow → wide → narrow round trip', () => {

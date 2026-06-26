@@ -5,9 +5,9 @@ import {
   inject,
 } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
-import { EntitySession } from '../../editor-shell/entity-session';
-import { EditorShell } from '../../editor-shell/editor-shell';
-import { NoteView } from '../../note-view/note-view';
+import { EntitySession } from './services/entity-session';
+import { EditorShell } from './components/editor-shell';
+import { NoteView } from './components/note-view';
 
 /**
  * The open-Entity route (`/entities/:id`, #70): dispatches by the open Entity's

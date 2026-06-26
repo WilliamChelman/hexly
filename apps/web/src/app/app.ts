@@ -2,7 +2,7 @@ import { Component, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter, map } from 'rxjs';
-import { ThemeService } from './core/theme.service';
+import { ThemeService } from './core/services/theme.service';
 import { LocaleService } from './core/i18n/locale.service';
 import { AppShellStore } from './shell/app-shell.store';
 import { NavRail } from './shell/nav-rail';

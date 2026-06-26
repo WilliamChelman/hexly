@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { TranslocoService } from '@jsverse/transloco';
-import { persistedPreference } from '../persisted-preference';
+import { persistedPreference } from '../utils/persisted-preference';
 import { LOCALES } from './transloco.config';
 
 /** The languages Hexly ships (ADR-0014). English is the source and fallback. */

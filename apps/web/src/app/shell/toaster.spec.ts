@@ -2,7 +2,7 @@ import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
-import { ToasterService } from '../core/toaster.service';
+import { ToasterService } from '../core/services/toaster.service';
 import { Toaster } from './toaster';
 
 describe('Toaster', () => {

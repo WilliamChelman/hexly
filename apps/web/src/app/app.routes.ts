@@ -1,12 +1,12 @@
 import { Route } from '@angular/router';
-import { authGuard, loginGuard } from './auth/auth.guard';
-import { EntitySession } from './editor-shell/entity-session';
+import { authGuard, loginGuard } from './core/guards/auth.guard';
+import { EntitySession } from './pages/entity/services/entity-session';
 
 export const appRoutes: Route[] = [
   {
     path: 'login',
     canActivate: [loginGuard],
-    loadComponent: () => import('./auth/login').then((m) => m.Login),
+    loadComponent: () => import('./pages/login/login').then((m) => m.Login),
     // Title key resolved by TranslationTitleStrategy to the "Hexly" brand (ADR-0014).
     title: 'auth.tabTitle',
   },
@@ -17,7 +17,9 @@ export const appRoutes: Route[] = [
     pathMatch: 'full',
     canActivate: [authGuard],
     loadComponent: () =>
-      import('./entity-browser/entity-browser').then((m) => m.EntityBrowser),
+      import('./pages/entity-browser/entity-browser').then(
+        (m) => m.EntityBrowser,
+      ),
     // Title key resolved by TranslationTitleStrategy to the "Hexly" brand (ADR-0014).
     title: 'entityBrowser.tabTitle',
   },
@@ -37,12 +39,11 @@ export const appRoutes: Route[] = [
     loadComponent: () =>
       import('./pages/entity/entity.page').then((m) => m.EntityPage),
   },
-  // Landing goes to the library.
   { path: '', pathMatch: 'full', redirectTo: 'entities' },
   {
     path: 'styleguide',
     loadComponent: () =>
-      import('./styleguide/styleguide').then((m) => m.Styleguide),
+      import('./pages/styleguide/styleguide').then((m) => m.Styleguide),
     // Title key resolved by TranslationTitleStrategy to the "Hexly" brand (ADR-0014).
     title: 'styleguide.tabTitle',
   },

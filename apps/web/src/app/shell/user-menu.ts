@@ -13,9 +13,9 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { AuthStore } from '../auth/auth.store';
+import { AuthClient } from '../core/services/auth.client';
 import { Locale, LocaleService } from '../core/i18n/locale.service';
-import { ThemeService } from '../core/theme.service';
+import { ThemeService } from '../core/services/theme.service';
 import { Button } from '../ui/button';
 import { Icon } from '../ui/icon/icon';
 import { Rule } from '../ui/rule';
@@ -135,7 +135,7 @@ import { Rule } from '../ui/rule';
   `,
 })
 export class UserMenu {
-  private readonly auth = inject(AuthStore);
+  private readonly auth = inject(AuthClient);
   private readonly locale = inject(LocaleService);
   protected readonly themeService = inject(ThemeService);
   protected readonly theme = this.themeService.theme;

@@ -9,8 +9,7 @@ import { provideRouter, TitleStrategy } from '@angular/router';
 import { provideTransloco } from '@jsverse/transloco';
 import { provideTranslocoMessageformat } from '@jsverse/transloco-messageformat';
 import { appRoutes } from './app.routes';
-import { apiPrefixInterceptor } from './core/api-prefix.interceptor';
-import { withCredentialsInterceptor } from './core/with-credentials.interceptor';
+import { withCredentialsInterceptor } from './core/interceptors/with-credentials.interceptor';
 import { translocoAppConfig } from './core/i18n/transloco.config';
 import { TranslocoHttpLoader } from './core/i18n/transloco-http.loader';
 import { TranslationTitleStrategy } from './core/i18n/title-strategy';
@@ -21,7 +20,7 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideRouter(appRoutes),
     provideHttpClient(
-      withInterceptors([apiPrefixInterceptor, withCredentialsInterceptor]),
+      withInterceptors([withCredentialsInterceptor]),
     ),
     // Runtime i18n (ADR-0014): one bundle ships every language; LocaleService
     // picks the active one on boot and the switcher flips it live.

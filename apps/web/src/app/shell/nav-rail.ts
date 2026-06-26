@@ -11,8 +11,8 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { AuthStore } from '../auth/auth.store';
-import { persistedPreference } from '../core/persisted-preference';
+import { AuthClient } from '../core/services/auth.client';
+import { persistedPreference } from '../core/utils/persisted-preference';
 import { Button } from '../ui/button';
 import { Cartouche } from '../ui/cartouche';
 import { Icon, IconName } from '../ui/icon/icon';
@@ -26,8 +26,18 @@ interface NavEntry {
 }
 
 const ENTRIES: readonly NavEntry[] = [
-  { link: '/entities', testid: 'nav-entities', icon: 'library', labelKey: 'nav.library' },
-  { link: '/styleguide', testid: 'nav-styleguide', icon: 'palette', labelKey: 'nav.styleguide' },
+  {
+    link: '/entities',
+    testid: 'nav-entities',
+    icon: 'library',
+    labelKey: 'nav.library',
+  },
+  {
+    link: '/styleguide',
+    testid: 'nav-styleguide',
+    icon: 'palette',
+    labelKey: 'nav.styleguide',
+  },
 ];
 
 /**
@@ -65,7 +75,9 @@ const ENTRIES: readonly NavEntry[] = [
         [class.w-56]="docked()"
         [class.w-12]="!docked()"
       >
-        <ng-container *ngTemplateOutlet="body; context: { expanded: docked() }" />
+        <ng-container
+          *ngTemplateOutlet="body; context: { expanded: docked() }"
+        />
       </aside>
     }
 
@@ -110,7 +122,10 @@ const ENTRIES: readonly NavEntry[] = [
       </a>
 
       @if (isAuthenticated()) {
-        <nav class="flex flex-col gap-1 mt-1" [attr.aria-label]="'nav.primary' | transloco">
+        <nav
+          class="flex flex-col gap-1 mt-1"
+          [attr.aria-label]="'nav.primary' | transloco"
+        >
           @for (entry of entries; track entry.link) {
             <a
               [routerLink]="entry.link"
@@ -122,7 +137,9 @@ const ENTRIES: readonly NavEntry[] = [
               (click)="choose()"
             >
               <app-icon [name]="entry.icon" [size]="20" />
-              <span [class.sr-only]="!expanded">{{ entry.labelKey | transloco }}</span>
+              <span [class.sr-only]="!expanded">{{
+                entry.labelKey | transloco
+              }}</span>
             </a>
           }
         </nav>
@@ -134,10 +151,7 @@ const ENTRIES: readonly NavEntry[] = [
         Avatar and collapse toggle sit together at the foot: stacked when
         collapsed, side-by-side when expanded. Chevron points the way it moves.
       -->
-      <div
-        class="flex items-center gap-1"
-        [class.flex-col]="!expanded"
-      >
+      <div class="flex items-center gap-1" [class.flex-col]="!expanded">
         <app-user-menu />
         <button
           type="button"
@@ -147,7 +161,9 @@ const ENTRIES: readonly NavEntry[] = [
           data-testid="rail-toggle"
           [class.ml-auto]="expanded"
           [attr.aria-expanded]="expanded"
-          [attr.aria-label]="(expanded ? 'nav.collapse' : 'nav.expand') | transloco"
+          [attr.aria-label]="
+            (expanded ? 'nav.collapse' : 'nav.expand') | transloco
+          "
           (click)="toggle()"
         >
           <app-icon
@@ -162,7 +178,7 @@ const ENTRIES: readonly NavEntry[] = [
   `,
 })
 export class NavRail {
-  private readonly auth = inject(AuthStore);
+  private readonly auth = inject(AuthClient);
 
   protected readonly isAuthenticated = this.auth.isAuthenticated;
   protected readonly entries = ENTRIES;
@@ -183,7 +199,9 @@ export class NavRail {
     this.wide() ? this.pin.value() === 'expanded' : this.overlayOpen(),
   );
   protected readonly docked = computed(() => this.wide() && this.expanded());
-  protected readonly overlay = computed(() => !this.wide() && this.overlayOpen());
+  protected readonly overlay = computed(
+    () => !this.wide() && this.overlayOpen(),
+  );
 
   constructor() {
     // BreakpointObserver cleans up via takeUntilDestroyed so no listener fires

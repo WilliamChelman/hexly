@@ -1,10 +1,9 @@
-import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { provideHttpClient } from '@angular/common/http';
 import {
   HttpTestingController,
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { apiPrefixInterceptor } from '../api-prefix.interceptor';
 import { TranslocoHttpLoader } from './transloco-http.loader';
 
 describe('TranslocoHttpLoader', () => {
@@ -13,12 +12,7 @@ describe('TranslocoHttpLoader', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [
-        // The real API-prefix interceptor is in play: the loader must not be
-        // rewritten under /api, since the catalogs are static SPA assets.
-        provideHttpClient(withInterceptors([apiPrefixInterceptor])),
-        provideHttpClientTesting(),
-      ],
+      providers: [provideHttpClient(), provideHttpClientTesting()],
     });
     http = TestBed.inject(HttpTestingController);
     loader = TestBed.inject(TranslocoHttpLoader);

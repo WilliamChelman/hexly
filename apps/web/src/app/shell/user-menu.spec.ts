@@ -6,10 +6,10 @@ import {
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
-import { AuthStore } from '../auth/auth.store';
+import { AuthClient } from '../core/services/auth.client';
 import { LocaleService } from '../core/i18n/locale.service';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
-import { ThemeService } from '../core/theme.service';
+import { ThemeService } from '../core/services/theme.service';
 import { UserMenu } from './user-menu';
 
 describe('UserMenu', () => {
@@ -45,8 +45,8 @@ describe('UserMenu', () => {
 
   /** Establish a signed-in user the menu can reflect. */
   function signIn(displayName = 'Ada Lovelace'): void {
-    TestBed.inject(AuthStore).login('ada@hexly.test', 'pw').subscribe();
-    http.expectOne('/auth/login').flush({
+    TestBed.inject(AuthClient).login('ada@hexly.test', 'pw').subscribe();
+    http.expectOne('/api/auth/login').flush({
       id: 'u1',
       email: 'ada@hexly.test',
       displayName,
@@ -142,7 +142,7 @@ describe('UserMenu', () => {
     fixture.detectChanges();
 
     item(openMenu(fixture), /sign out/i).click();
-    http.expectOne('/auth/logout').flush(null);
+    http.expectOne('/api/auth/logout').flush(null);
 
     expect(navigate).toHaveBeenCalledWith('/login');
   });
@@ -155,7 +155,7 @@ describe('UserMenu', () => {
 
     item(openMenu(fixture), /sign out/i).click();
     http
-      .expectOne('/auth/logout')
+      .expectOne('/api/auth/logout')
       .flush(null, { status: 500, statusText: 'Server Error' });
 
     // The user is never stranded signed-in: navigation fires regardless.

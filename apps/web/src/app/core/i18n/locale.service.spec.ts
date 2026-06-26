@@ -1,11 +1,10 @@
-import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { provideHttpClient } from '@angular/common/http';
 import {
   HttpTestingController,
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideTransloco, TranslocoService } from '@jsverse/transloco';
-import { apiPrefixInterceptor } from '../api-prefix.interceptor';
 import { provideTranslocoTesting } from './transloco-testing';
 import { TranslocoHttpLoader } from './transloco-http.loader';
 import { translocoAppConfig } from './transloco.config';
@@ -87,7 +86,7 @@ describe('LocaleService', () => {
       localStorage.setItem('hexly-locale', 'fr');
       TestBed.configureTestingModule({
         providers: [
-          provideHttpClient(withInterceptors([apiPrefixInterceptor])),
+          provideHttpClient(),
           provideHttpClientTesting(),
           provideTransloco({
             config: translocoAppConfig,
