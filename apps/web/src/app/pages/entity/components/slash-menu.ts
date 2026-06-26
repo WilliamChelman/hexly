@@ -25,15 +25,17 @@ export interface SlashMenuProps {
         role="listbox"
         data-testid="slash-menu"
         [attr.aria-label]="'noteView.slashMenu.label' | transloco"
+        [attr.aria-activedescendant]="activeItemId()"
         class="fixed z-50 max-h-72 w-56 overflow-auto rounded-md border border-line bg-surface py-1 shadow-lg"
-        [style.left.px]="position()?.x ?? 0"
-        [style.top.px]="position()?.y ?? 0"
+        [style.left.px]="position()!.x"
+        [style.top.px]="position()!.y"
       >
         @for (item of items(); track item.id; let i = $index) {
-          <li>
+          <li role="presentation">
             <button
               type="button"
               role="option"
+              [id]="'slash-opt-' + item.id"
               [attr.data-testid]="'slash-item-' + item.id"
               [attr.aria-selected]="i === activeIndex()"
               class="block w-full cursor-pointer px-3 py-1 text-left text-sm text-ink"
@@ -61,21 +63,21 @@ export class SlashMenu {
   private command: ((item: SlashItem) => void) | null = null;
 
   open(props: SlashMenuProps): void {
+    const pos = toPosition(props.clientRect);
+    if (!pos) return;
     this.command = props.command;
     this.items.set(props.items);
     this.activeIndex.set(0);
-    this.position.set(toPosition(props.clientRect));
+    this.position.set(pos);
     this.visible.set(true);
   }
 
   update(props: SlashMenuProps): void {
     this.command = props.command;
     this.items.set(props.items);
-    this.position.set(toPosition(props.clientRect));
-    // Keep the highlight in range as the list shrinks under a longer query.
-    this.activeIndex.update((i) =>
-      Math.min(i, Math.max(0, props.items.length - 1)),
-    );
+    this.activeIndex.set(0);
+    const pos = toPosition(props.clientRect);
+    if (pos) this.position.set(pos);
   }
 
   close(): void {
@@ -89,15 +91,15 @@ export class SlashMenu {
     switch (event.key) {
       case 'ArrowDown':
         if (count) this.activeIndex.update((i) => (i + 1) % count);
-        return true;
+        return count > 0;
       case 'ArrowUp':
         if (count) this.activeIndex.update((i) => (i - 1 + count) % count);
-        return true;
+        return count > 0;
       case 'Enter':
       case 'Tab': {
         const item = this.items()[this.activeIndex()];
         if (item) this.select(item);
-        return true;
+        return !!item;
       }
       case 'Escape':
         this.close();
@@ -107,8 +109,14 @@ export class SlashMenu {
     }
   }
 
+  protected activeItemId(): string | null {
+    const item = this.items()[this.activeIndex()];
+    return item ? 'slash-opt-' + item.id : null;
+  }
+
   protected select(item: SlashItem): void {
     this.command?.(item);
+    this.close();
   }
 }
 

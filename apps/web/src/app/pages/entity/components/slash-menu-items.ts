@@ -50,19 +50,29 @@ export const SLASH_ITEMS: SlashItem[] = [
     id: 'bulletList',
     labelKey: 'noteView.slashMenu.bulletList',
     keywords: ['bullet', 'list', 'unordered', 'ul'],
-    apply: (editor, range) => chainFrom(editor, range).toggleBulletList().run(),
+    // ponytail: two-step avoids toggle un-wrapping an existing list
+    apply: (editor, range) => {
+      chainFrom(editor, range).run();
+      if (!editor.isActive('bulletList')) editor.chain().focus().toggleBulletList().run();
+    },
   },
   {
     id: 'orderedList',
     labelKey: 'noteView.slashMenu.orderedList',
     keywords: ['ordered', 'numbered', 'list', 'ol'],
-    apply: (editor, range) => chainFrom(editor, range).toggleOrderedList().run(),
+    apply: (editor, range) => {
+      chainFrom(editor, range).run();
+      if (!editor.isActive('orderedList')) editor.chain().focus().toggleOrderedList().run();
+    },
   },
   {
     id: 'blockquote',
     labelKey: 'noteView.slashMenu.blockquote',
     keywords: ['quote', 'blockquote', 'citation'],
-    apply: (editor, range) => chainFrom(editor, range).toggleBlockquote().run(),
+    apply: (editor, range) => {
+      chainFrom(editor, range).run();
+      if (!editor.isActive('blockquote')) editor.chain().focus().toggleBlockquote().run();
+    },
   },
   {
     id: 'codeBlock',
@@ -85,6 +95,6 @@ export function filterSlashItems(items: SlashItem[], query: string): SlashItem[]
   return items.filter(
     (item) =>
       item.id.toLowerCase().includes(q) ||
-      item.keywords.some((keyword) => keyword.includes(q)),
+      item.keywords.some((keyword) => keyword.toLowerCase().includes(q)),
   );
 }

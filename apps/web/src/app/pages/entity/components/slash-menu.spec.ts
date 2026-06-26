@@ -14,7 +14,7 @@ describe('SlashMenu', () => {
     const fixture = TestBed.createComponent(SlashMenu);
     const menu = fixture.componentInstance;
     const command = vi.fn();
-    menu.open({ items, command, clientRect: null });
+    menu.open({ items, command, clientRect: () => ({ left: 100, bottom: 200 } as DOMRect) });
     fixture.detectChanges();
     return { fixture, menu, command };
   }

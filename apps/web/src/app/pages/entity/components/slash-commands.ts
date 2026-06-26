@@ -21,6 +21,7 @@ export function slashCommands(getMenu: () => SlashMenu | undefined): Extension {
         Suggestion<SlashItem, SlashItem>({
           editor: this.editor,
           char: '/',
+          allow: ({ state }) => !state.selection.$from.parent.type.spec.code,
           items: ({ query }) => filterSlashItems(SLASH_ITEMS, query),
           // The selected item knows how to insert itself; range covers the typed "/query".
           command: ({ editor, range, props }) => props.apply(editor, range),

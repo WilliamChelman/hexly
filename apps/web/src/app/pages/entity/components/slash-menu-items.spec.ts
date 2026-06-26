@@ -1,6 +1,6 @@
 import { Editor } from '@tiptap/core';
 import { CONTENT_EXTENSIONS } from './content-extensions';
-import { SLASH_ITEMS, filterSlashItems } from './slash-menu-items';
+import { SLASH_ITEMS, SlashItem, filterSlashItems } from './slash-menu-items';
 
 describe('filterSlashItems', () => {
   it('returns every item for an empty query', () => {
@@ -13,6 +13,11 @@ describe('filterSlashItems', () => {
     // "title" is a keyword on the heading items.
     expect(result.length).toBeGreaterThan(0);
     expect(result.every((item) => item.id.startsWith('heading'))).toBe(true);
+  });
+
+  it('normalizes keyword case when matching (keyword side)', () => {
+    const item: SlashItem = { id: 'x', labelKey: 'x', keywords: ['MyKeyword'], apply: () => {} };
+    expect(filterSlashItems([item], 'mykeyword')).toHaveLength(1);
   });
 
   it('returns nothing when the query matches no block', () => {
