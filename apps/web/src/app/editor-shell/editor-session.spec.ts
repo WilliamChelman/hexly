@@ -205,6 +205,42 @@ describe('EditorSession', () => {
     req.flush({ ...note, version: 4 });
   });
 
+  it('saves a note’s edited Content opaquely, round-tripping the snapshot untouched', () => {
+    const noteBody = { type: 'note' as const, content };
+    const note: EntityDetail = {
+      ...aldermoor,
+      id: 'n1',
+      type: 'note',
+      document: noteBody,
+    };
+    session.open('n1').subscribe();
+    http.expectOne('/entities/n1').flush(note);
+
+    // The editor hands back a TipTap/ProseMirror snapshot the domain never parses.
+    const snapshot = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Lady Mara rules the north.' }],
+        },
+      ],
+    };
+    session.setContent(snapshot);
+
+    session.save().subscribe();
+
+    const req = http.expectOne('/entities/n1');
+    expect(req.request.method).toBe('PUT');
+    // The edited snapshot is wrapped in the format envelope and saved untouched —
+    // the seam never parses or reshapes it (ADR-0019).
+    expect(req.request.body).toEqual({
+      document: { type: 'note', content: { format: 'tiptap-v1', snapshot } },
+      version: 3,
+    });
+    req.flush({ ...note, version: 4 });
+  });
+
   it('does not save or rename while a route load is in flight (mid-navigation)', () => {
     openAldermoor(); // current = m1, not loading
     editor.paintAt({ q: 5, r: 5 }, 'ocean');

@@ -56,6 +56,38 @@ describe('NoteView', () => {
     expect(back.getAttribute('href')).toBe('/entities');
   });
 
+  it('seeds the editor with the open note’s stored Content', () => {
+    const detail = note('Lady Mara');
+    TestBed.inject(EditorSession).adopt({
+      ...detail,
+      document: {
+        type: 'note',
+        content: {
+          format: 'tiptap-v1',
+          snapshot: {
+            type: 'doc',
+            content: [
+              {
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'Lady Mara rules the north.' }],
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    const fixture = TestBed.createComponent(NoteView);
+    fixture.detectChanges();
+
+    // The stored prose renders into the editable surface — proving the snapshot
+    // was loaded into the editor, not just held opaquely in the session.
+    const surface = fixture.nativeElement.querySelector(
+      '[data-testid=note-content]',
+    ) as HTMLElement;
+    expect(surface.textContent).toContain('Lady Mara rules the north.');
+  });
+
   it('contributes the note’s name to the app header while open', () => {
     TestBed.inject(EditorSession).adopt(note('Lady Mara'));
 

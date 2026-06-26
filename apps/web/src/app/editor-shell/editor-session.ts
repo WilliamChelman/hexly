@@ -18,12 +18,14 @@ import {
   tap,
 } from 'rxjs';
 import {
+  Content,
   emptyHexMap,
   EntityBody,
   EntityDetail,
   EntitySaveOutcome,
   HexMap,
   hexMapSchema,
+  tiptapContent,
 } from '@hexly/domain';
 import { EntitiesClient } from '../entities/entities.client';
 import { TitleService } from '../core/i18n/title.service';
@@ -53,6 +55,18 @@ export class EditorSession {
   private readonly _conflict = signal<EntityDetail | null>(null);
   /** The server's current Entity when a save was rejected as stale, else `null`. */
   readonly conflict = this._conflict.asReadonly();
+
+  /**
+   * The open Entity's live, opaque Content envelope (ADR-0019) — seeded from the
+   * loaded body and replaced as the content editor produces snapshots. Held here,
+   * not in {@link EditorStore} (which is the hex grid's command/undo stack), because
+   * Content is the editing surface for every Entity type, `note` foremost. `null`
+   * before one is opened. The seam never parses the snapshot inside; it just carries
+   * it from load to save.
+   */
+  private readonly _content = signal<Content | null>(null);
+  /** The open Entity's live Content, or `null` before one is opened. */
+  readonly content = this._content.asReadonly();
 
   private readonly _saving = signal(false);
   readonly saving = this._saving.asReadonly();
@@ -102,11 +116,21 @@ export class EditorSession {
     return this.entities.load(id).pipe(tap((detail) => this.adopt(detail)));
   }
 
-  /** Adopt an already-fetched Entity as the open one (clearing any conflict) and load its grid. */
+  /** Adopt an already-fetched Entity as the open one (clearing any conflict) and load its grid + Content. */
   adopt(detail: EntityDetail): void {
     this._conflict.set(null);
     this._current.set(detail);
+    this._content.set(detail.document.content);
     this.editor.load(gridOf(detail.document));
+  }
+
+  /**
+   * Replace the live Content with the editor's latest `snapshot` (TipTap/ProseMirror
+   * JSON). Wrapped in the current format envelope here; the snapshot itself is never
+   * parsed (ADR-0019), so it round-trips to {@link save} exactly as the editor left it.
+   */
+  setContent(snapshot: unknown): void {
+    this._content.set(tiptapContent(snapshot));
   }
 
   /**
@@ -147,8 +171,12 @@ export class EditorSession {
     const open = this._current();
     if (!open || this._loading()) return EMPTY;
     this._saving.set(true);
+    const body = withContent(
+      withGrid(open.document, this.editor.document()),
+      this._content(),
+    );
     return this.entities
-      .save(open.id, withGrid(open.document, this.editor.document()), open.version)
+      .save(open.id, body, open.version)
       .pipe(
         tap((outcome) => {
           // On conflict, leave the open Entity untouched so the edit isn't lost
@@ -190,4 +218,14 @@ function gridOf(body: EntityBody): HexMap {
  */
 function withGrid(body: EntityBody, grid: HexMap): EntityBody {
   return body.type === 'hexmap' ? { ...body, ...grid } : body;
+}
+
+/**
+ * Fold the live edited Content back into the body on save (ADR-0019). `null`
+ * (nothing opened, so nothing edited) leaves the body's own Content untouched.
+ * Spreading preserves the `type` discriminant, so a note stays a note and a
+ * hexmap keeps its grid — only the opaque Content envelope is replaced.
+ */
+function withContent(body: EntityBody, content: Content | null): EntityBody {
+  return content ? { ...body, content } : body;
 }

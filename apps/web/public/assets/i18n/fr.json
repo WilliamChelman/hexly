@@ -33,7 +33,10 @@
   "noteView": {
     "eyebrow": "Note",
     "backToLibrary": "Retour à la bibliothèque",
-    "placeholder": "L'éditeur de contenu arrive bientôt."
+    "editorLabel": "Contenu de la note",
+    "saving": "Enregistrement…",
+    "conflict": "Version plus récente sur le serveur",
+    "reload": "Recharger"
   },
   "editorShell": {
     "tabTitle": "Hexly",

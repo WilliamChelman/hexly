@@ -8,17 +8,34 @@ import { z } from 'zod';
 import { emptyHexMap, hexMapSchema } from './hex/hex-map';
 
 /**
+ * The current Content format tag (ADR-0019). The registered TipTap extension set
+ * is part of this contract: a schema-affecting extension change is a `format` bump
+ * + migration, not a transparent edit. Lives here so every Content envelope is
+ * stamped from one source of truth.
+ */
+export const CONTENT_FORMAT = 'tiptap-v1';
+
+/**
  * The opaque, format-tagged Content body every Entity carries (ADR-0019). The
  * `format` tag is the contract; the `snapshot` is editor-defined JSON the domain
  * never parses (`z.unknown()`), so it round-trips untouched.
  */
 export const contentSchema = z.object({
-  format: z.literal('tiptap-v1'),
+  format: z.literal(CONTENT_FORMAT),
   snapshot: z.unknown(),
 });
 
 /** An Entity's opaque, format-tagged rich-text body (CONTEXT.md → Content). */
 export type Content = z.infer<typeof contentSchema>;
+
+/**
+ * Wrap an editor `snapshot` (TipTap/ProseMirror JSON) in the current Content
+ * envelope. The one place a snapshot becomes Content, so the editor seam never
+ * hand-stamps the `format` tag — keeping the boundary (ADR-0019) honest.
+ */
+export function tiptapContent(snapshot: unknown): Content {
+  return { format: CONTENT_FORMAT, snapshot };
+}
 
 /**
  * The closed, code-known set of Entity shapes (ADR-0018): `note` is Content
@@ -47,7 +64,7 @@ export type EntityBody = z.infer<typeof entityBodySchema>;
 
 /** A fresh, empty Content envelope: the smallest valid TipTap document. */
 export function emptyContent(): Content {
-  return { format: 'tiptap-v1', snapshot: { type: 'doc', content: [] } };
+  return tiptapContent({ type: 'doc', content: [] });
 }
 
 /**
