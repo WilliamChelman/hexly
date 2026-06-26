@@ -14,6 +14,9 @@ test('guards the app, signs in, and signs out', async ({ page }) => {
   await page.goto('/entities');
   await expect(page).toHaveURL(/\/login/);
 
+  // Login renders standalone — no nav rail (ADR-0022).
+  await expect(page.getByTestId('nav-rail')).toHaveCount(0);
+
   await page.getByLabel('Email').fill(TEST_USER.email);
   await page.getByLabel('Password').fill(TEST_USER.password);
   await page.getByRole('button', { name: 'Sign in' }).click();
@@ -22,7 +25,7 @@ test('guards the app, signs in, and signs out', async ({ page }) => {
   await expect(page).toHaveURL(/\/entities$/);
   await expect(page.getByRole('heading', { name: 'Your library' })).toBeVisible();
 
-  // Sign out returns to /login (the action lives in the user menu, ADR-0015)...
+  // Sign out returns to /login (the action lives behind the rail avatar, ADR-0022)...
   await page.getByRole('button', { name: 'Open user menu' }).click();
   await page.getByRole('menuitem', { name: 'Sign out' }).click();
   await expect(page).toHaveURL(/\/login/);

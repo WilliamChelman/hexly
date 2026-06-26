@@ -4,8 +4,11 @@ import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { App } from './app';
-import { appRoutes } from './app.routes';
 import { provideTranslocoTesting } from './core/i18n/transloco-testing';
+import { AppShellStore } from './shell/app-shell.store';
+
+@Component({ template: 'page' })
+class Blank {}
 
 describe('App', () => {
   beforeEach(async () => {
@@ -14,7 +17,11 @@ describe('App', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
-        provideRouter(appRoutes),
+        provideRouter([
+          { path: 'login', component: Blank },
+          { path: 'entities', component: Blank },
+          { path: '', pathMatch: 'full', redirectTo: 'entities' },
+        ]),
       ],
     }).compileComponents();
   });
@@ -26,57 +33,34 @@ describe('App', () => {
     expect(fixture.nativeElement.querySelector('router-outlet')).not.toBeNull();
   });
 
-  it('renders a single app header above the routed outlet', () => {
+  it('renders the persistent nav rail beside the outlet, not a shell header', async () => {
     const fixture = TestBed.createComponent(App);
+    await TestBed.inject(Router).navigateByUrl('/entities');
     fixture.detectChanges();
 
-    // The root shell owns one always-present header (ADR-0015); the bare-outlet
-    // root is gone.
-    expect(fixture.nativeElement.querySelector('app-header')).not.toBeNull();
-    expect(fixture.nativeElement.textContent).toContain('Hexly');
+    // The shell is the rail alone now (ADR-0022); the single app header is gone.
+    expect(fixture.nativeElement.querySelector('app-nav-rail')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('app-header')).toBeNull();
+  });
+
+  it('stays chrome-free before the first navigation resolves (no rail flash on a cold login load)', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges(); // no navigation has resolved yet
+
+    expect(fixture.nativeElement.querySelector('app-nav-rail')).toBeNull();
+  });
+
+  it('hides the rail when a page marks the shell standalone (e.g. login)', async () => {
+    const fixture = TestBed.createComponent(App);
+    TestBed.inject(AppShellStore).standalone.set(true);
+    await TestBed.inject(Router).navigateByUrl('/login');
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('app-nav-rail')).toBeNull();
   });
 
   it('applies a theme to the document on boot', () => {
     TestBed.createComponent(App);
     expect(document.documentElement.dataset['theme']).toMatch(/^(light|dark)$/);
-  });
-});
-
-describe('App named header outlet', () => {
-  @Component({ template: 'PROJECTED HEADER' })
-  class FakeHeader {}
-  @Component({ template: 'page body' })
-  class FakePage {}
-
-  beforeEach(async () => {
-    await TestBed.configureTestingModule({
-      imports: [App, provideTranslocoTesting()],
-      providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        provideRouter([
-          {
-            path: 'x',
-            children: [
-              { path: '', component: FakePage },
-              { path: '', outlet: 'header', component: FakeHeader },
-            ],
-          },
-        ]),
-      ],
-    }).compileComponents();
-  });
-
-  it("projects a route's header child into the app header", async () => {
-    const fixture = TestBed.createComponent(App);
-    fixture.detectChanges();
-
-    // A route may declare a header-outlet child; it must render inside the single
-    // app header, the way the editor route projects its interactive header.
-    await TestBed.inject(Router).navigateByUrl('/x');
-    fixture.detectChanges();
-
-    const header = fixture.nativeElement.querySelector('app-header');
-    expect(header.textContent).toContain('PROJECTED HEADER');
   });
 });

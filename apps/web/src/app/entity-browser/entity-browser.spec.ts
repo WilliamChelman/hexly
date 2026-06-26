@@ -9,7 +9,6 @@ import { TranslocoService } from '@jsverse/transloco';
 import { EntitySummary } from '@hexly/domain';
 import { AuthStore } from '../auth/auth.store';
 import { ToasterService } from '../core/toaster.service';
-import { HeaderService } from '../shell/header.service';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { EntityBrowser } from './entity-browser';
 
@@ -62,12 +61,15 @@ describe('EntityBrowser', () => {
     return fixture;
   }
 
-  it('contributes its heading to the app header while open', () => {
-    renderWith([]);
+  it('exposes the banner and main as sibling landmarks, not banner nested in main', () => {
+    const el = renderWith([]).nativeElement as HTMLElement;
 
-    const header = TestBed.inject(HeaderService);
-    expect(header.content()?.eyebrow).toBe('Library');
-    expect(header.content()?.title).toBe('Your library');
+    const banner = el.querySelector('[role="banner"]');
+    const main = el.querySelector('main');
+    expect(banner).not.toBeNull();
+    expect(main).not.toBeNull();
+    // The header is its own top-level landmark, not swallowed by the content region.
+    expect(main!.contains(banner)).toBe(false);
   });
 
   it('renders its chrome and empty state in French when French is the active language', () => {
@@ -90,22 +92,13 @@ describe('EntityBrowser', () => {
     );
   });
 
-  it('owns its page heading in the main content', () => {
+  it('owns its page heading in its page-owned header', () => {
     const fixture = renderWith([]);
 
-    // The visible title is drawn as chrome in the app header; the document's
-    // real heading lives here in the page (sr-only) so the outline is correct.
+    // The heading now lives in the page's own header (ADR-0022), visible — no
+    // longer chrome contributed to a shell header.
     const heading = fixture.nativeElement.querySelector('h1');
     expect(heading?.textContent).toContain('Your library');
-  });
-
-  it('clears its heading from the app header when it leaves', () => {
-    const fixture = renderWith([]);
-
-    fixture.destroy();
-
-    const header = TestBed.inject(HeaderService);
-    expect(header.content()).toBeNull();
   });
 
   it('lists the entities the user owns, newest first', () => {

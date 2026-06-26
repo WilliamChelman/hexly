@@ -20,6 +20,11 @@ const SETTLEMENT_PATH =
  * For a runtime/arbitrary path (e.g. a Feature's `path`), use {@link IconPath}.
  */
 const GLYPHS = {
+  chevrons: {
+    attrs:
+      'stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"',
+    body: '<path d="M7 6l6 6-6 6M13 6l6 6-6 6" />',
+  },
   erase: {
     attrs:
       'stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"',
@@ -34,9 +39,19 @@ const GLYPHS = {
     attrs: 'stroke="currentColor" stroke-width="1.5" stroke-linecap="round"',
     body: '<path d="M6 6h12M12 6v12M9.5 18h5" />',
   },
+  library: {
+    attrs:
+      'stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"',
+    body: '<path d="M4 5h6a2 2 0 0 1 2 2v12a2.5 2.5 0 0 0-2.5-2H4z" /><path d="M20 5h-6a2 2 0 0 0-2 2v12a2.5 2.5 0 0 1 2.5-2H20z" />',
+  },
   logo: {
     attrs: '',
     body: '<path d="M12 2.2 20.5 7v10L12 21.8 3.5 17V7z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" /><path d="M12 7.4 16.2 9.9v4.2L12 16.6 7.8 14.1V9.9z" fill="currentColor" opacity=".5" />',
+  },
+  palette: {
+    attrs:
+      'stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"',
+    body: '<path d="M12 3a9 9 0 1 0 0 18 1.6 1.6 0 0 0 1.5-2.3 1.6 1.6 0 0 1 1.4-2.2H17a4 4 0 0 0 4-4c0-4.1-4-7.5-9-7.5z" /><circle cx="7.5" cy="11.5" r="1" fill="currentColor" /><circle cx="11" cy="7.5" r="1" fill="currentColor" /><circle cx="15.5" cy="8.5" r="1" fill="currentColor" />',
   },
   marquee: {
     attrs:

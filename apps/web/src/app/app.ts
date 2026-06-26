@@ -1,37 +1,45 @@
 import { Component, inject } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
+import { filter, map } from 'rxjs';
 import { ThemeService } from './core/theme.service';
 import { LocaleService } from './core/i18n/locale.service';
-import { AppHeader } from './shell/app-header';
+import { AppShellStore } from './shell/app-shell.store';
+import { NavRail } from './shell/nav-rail';
 import { Toaster } from './shell/toaster';
 
-/**
- * Application root and shell. It owns the single, always-present
- * {@link AppHeader} (ADR-0015) above the routed outlet, and eagerly constructs
- * {@link ThemeService} and {@link LocaleService} so the active theme and
- * language are applied on boot.
- */
+/** Application root. The only persistent chrome is the {@link NavRail} (ADR-0022). */
 @Component({
   selector: 'app-root',
-  host: { class: 'flex flex-col h-screen' },
-  imports: [RouterOutlet, AppHeader, Toaster],
+  host: { class: 'flex h-screen' },
+  imports: [RouterOutlet, NavRail, Toaster],
   template: `
+    @if (navigated() && !shell.standalone()) {
+      <app-nav-rail />
+    }
     <!--
-      The outlet is the scroll container, so the always-present header stays
-      fixed above it while long pages (the library, the styleguide) scroll.
-      The editor fills the outlet exactly and manages its own overflow.
+      Outlet is the scroll container so the docked rail stays put while pages
+      scroll. Not a landmark: each page owns its own <main>.
     -->
-    <app-header />
-    <main class="flex-1 min-h-0 overflow-auto">
+    <div class="flex-1 min-w-0 overflow-auto">
       <router-outlet />
-    </main>
+    </div>
     <app-toaster />
   `,
 })
 export class App {
-  // Eagerly resolve the theme service so `data-theme` is wired up at startup.
+  protected readonly shell = inject(AppShellStore);
   protected readonly theme = inject(ThemeService);
-  // Eagerly resolve the locale service so the detected/remembered language is
-  // active before the first page renders.
   protected readonly locale = inject(LocaleService);
+
+  // Hold the rail back until the first navigation resolves; by then the landing
+  // page's constructor has set `standalone`, so a cold load on /login never
+  // flashes the rail.
+  protected readonly navigated = toSignal(
+    inject(Router).events.pipe(
+      filter((e) => e instanceof NavigationEnd),
+      map(() => true),
+    ),
+    { initialValue: false },
+  );
 }

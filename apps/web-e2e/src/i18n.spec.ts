@@ -1,29 +1,40 @@
 import { expect, test } from './fixtures';
 
 /**
- * The language switcher works for any actor, so this exercises it logged out on
- * the login screen (ADR-0014). A clean slate — no session, no stored locale —
- * means the first visit reflects genuine default detection.
+ * The language switcher works for any actor (ADR-0014), now behind the rail's
+ * avatar (ADR-0022). Login itself is standalone with no rail, so an anonymous
+ * actor flips the language from the reduced rail on a public page (the
+ * styleguide) and the choice carries over to login. A clean slate — no session,
+ * no stored locale — means the first visit reflects genuine default detection.
  */
 test.use({ storageState: { cookies: [], origins: [] } });
 
-test('defaults to English, flips to French live, and remembers it on reload', async ({
+test('defaults to English, flips to French via the rail, and remembers it on reload', async ({
   page,
 }) => {
+  // The login screen renders in English on a first visit with an English browser.
   await page.goto('/login');
-
-  // First visit with an English browser: the login screen renders in English.
   await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible();
   await expect(page.getByLabel('Email')).toBeVisible();
 
-  // Flip to French from the user menu's language group — live, no reload (ADR-0015).
+  // Flip to French from the rail avatar on a public page (login has no rail).
+  await page.goto('/styleguide');
   await page.getByRole('button', { name: 'Open user menu' }).click();
   await page.getByRole('menuitemradio', { name: 'Français' }).click();
+
+  // The switch takes effect live, in place — no reload, no navigation: the rail's
+  // own avatar control is already relabelled in French on this same page.
+  await expect(
+    page.getByRole('button', { name: 'Ouvrir le menu utilisateur' }),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Open user menu' })).toHaveCount(0);
+
+  // The choice carries to the standalone login screen and persists on reload.
+  await page.goto('/login');
   await expect(page.getByRole('button', { name: 'Se connecter' })).toBeVisible();
   await expect(page.getByLabel('E-mail')).toBeVisible();
   await expect(page.getByLabel('Mot de passe')).toBeVisible();
 
-  // The choice persists across a reload.
   await page.reload();
   await expect(page.getByRole('button', { name: 'Se connecter' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Sign in' })).toHaveCount(0);

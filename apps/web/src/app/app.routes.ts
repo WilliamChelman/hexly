@@ -23,31 +23,19 @@ export const appRoutes: Route[] = [
   },
   {
     // The open-Entity route (#70). The id is in the URL so a reload reopens the
-    // same Entity (#6). A component-less route fans its two empty-path children
-    // into the root shell's two outlets at once (ADR-0015): EntityPage into the
-    // primary outlet, EntityHeader into AppHeader's named `header` outlet.
+    // same Entity (#6). The routed page renders its own header now (ADR-0022):
+    // EditorShell for a hexmap, NoteView for a note.
     path: 'entities/:id',
     canActivate: [authGuard],
-    // One EntitySession for the subtree, shared by both outlets; destroyed on
-    // leave, so open-Entity state resets implicitly (#70).
+    // One EntitySession for the subtree, destroyed on leave, so open-Entity state
+    // resets implicitly (#70).
     providers: [EntitySession],
     // Tab title is the open Entity's name composed with the brand ("Aldermoor —
     // Hexly") via documentTitleKey; `title` is the pre-load fallback (ADR-0014).
     title: 'editorShell.tabTitle',
     data: { documentTitleKey: 'editorShell.tabTitleNamed' },
-    children: [
-      {
-        path: '',
-        loadComponent: () =>
-          import('./pages/entity/entity.page').then((m) => m.EntityPage),
-      },
-      {
-        path: '',
-        outlet: 'header',
-        loadComponent: () =>
-          import('./pages/entity/entity-header').then((m) => m.EntityHeader),
-      },
-    ],
+    loadComponent: () =>
+      import('./pages/entity/entity.page').then((m) => m.EntityPage),
   },
   // Landing goes to the library.
   { path: '', pathMatch: 'full', redirectTo: 'entities' },

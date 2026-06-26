@@ -6,7 +6,6 @@ import {
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
-import { HeaderService } from '../shell/header.service';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { Login } from './login';
 
@@ -47,28 +46,14 @@ describe('Login', () => {
     input.dispatchEvent(new Event('input'));
   }
 
-  it('contributes its heading to the app header while open', () => {
+  it('owns its page heading in the standalone screen', () => {
     const fixture = TestBed.createComponent(Login);
     fixture.detectChanges();
 
-    expect(TestBed.inject(HeaderService).content()?.title).toBe('Sign in');
-  });
-
-  it('owns its page heading in the main content', () => {
-    const fixture = TestBed.createComponent(Login);
-    fixture.detectChanges();
-
+    // Login renders with no rail/header chrome (ADR-0022); the sr-only <h1> is
+    // the document's only heading.
     const heading = fixture.nativeElement.querySelector('h1');
     expect(heading?.textContent).toContain('Sign in');
-  });
-
-  it('clears its heading from the app header when it leaves', () => {
-    const fixture = TestBed.createComponent(Login);
-    fixture.detectChanges();
-
-    fixture.destroy();
-
-    expect(TestBed.inject(HeaderService).content()).toBeNull();
   });
 
   it('submits the typed credentials and enters the app on success', () => {

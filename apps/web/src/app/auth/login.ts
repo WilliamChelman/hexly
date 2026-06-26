@@ -2,7 +2,6 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
-  computed,
   inject,
   signal,
 } from '@angular/core';
@@ -10,25 +9,18 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { translateSignal, TranslocoPipe } from '@jsverse/transloco';
 import { AuthStore } from './auth.store';
-import { HeaderService } from '../shell/header.service';
 import { Button } from '../ui/button';
 import { Field } from '../ui/field';
 import { Input } from '../ui/input';
 import { Panel } from '../ui/panel';
+import { AppShellStore } from '../shell/app-shell.store';
 
-/**
- * The sign-in screen for the closed user set (ADR-0004). It collects email +
- * password, hands them to {@link AuthStore}, and on success the session cookie
- * is set and we enter the editor. A rejected login surfaces a single,
- * deliberately vague message — the API never says whether it was the email or
- * the password that was wrong.
- */
 @Component({
   selector: 'app-login',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [Panel, Field, Input, Button, TranslocoPipe],
   template: `
-    <div class="grid place-items-center min-h-full p-5 bg-surface-sunken">
+    <main class="grid place-items-center min-h-full p-5 bg-surface-sunken">
       <section class="w-full max-w-[22rem] p-6" appPanel raised>
         <h1 class="sr-only">{{ heading() }}</h1>
         <form class="flex flex-col gap-4" (submit)="submit($event)">
@@ -67,33 +59,26 @@ import { Panel } from '../ui/panel';
           </button>
         </form>
       </section>
-    </div>
+    </main>
   `,
 })
 export class Login {
   private readonly auth = inject(AuthStore);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-  private readonly header = inject(HeaderService);
-  private readonly destroyRef = inject(DestroyRef);
 
-  /** Translated heading shared by the sr-only `<h1>` and the header chrome
-   * title — one key so the two can't drift and both re-render on language change. */
+  constructor() {
+    const shell = inject(AppShellStore);
+    shell.standalone.set(true);
+    inject(DestroyRef).onDestroy(() => shell.standalone.set(false));
+  }
+
   protected readonly heading = translateSignal('auth.heading');
 
   protected readonly email = signal('');
   protected readonly password = signal('');
   protected readonly pending = signal(false);
-  /** A translation key for the active error, or `null` when there is none. */
   protected readonly error = signal<string | null>(null);
-
-  constructor() {
-    // Pass as a computed so the chrome title tracks live language switches (ADR-0015).
-    this.header.set(
-      computed(() => ({ title: this.heading() })),
-      this.destroyRef,
-    );
-  }
 
   protected value(event: Event): string {
     return (event.target as HTMLInputElement).value;

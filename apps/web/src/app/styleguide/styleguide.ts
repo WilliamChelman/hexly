@@ -53,7 +53,7 @@ interface TypeRow {
   ],
   host: { class: 'block' },
   template: `
-    <div class="max-w-[1080px] mx-auto pt-5 px-5 pb-9 flex flex-col gap-8">
+    <main class="max-w-[1080px] mx-auto pt-5 px-5 pb-9 flex flex-col gap-8">
       <header class="guide-top flex justify-between items-center">
         <a appButton variant="ghost" size="sm" routerLink="/"
           >← {{ 'styleguide.backToMap' | transloco }}</a
@@ -242,7 +242,7 @@ A walled town where the forest road meets the river ford.</textarea
           <code>apps/web/src/styles</code></span
         >
       </footer>
-    </div>
+    </main>
   `,
   styles: `
     /* Styleguide — layout only; specimens use the primitives and global classes. */

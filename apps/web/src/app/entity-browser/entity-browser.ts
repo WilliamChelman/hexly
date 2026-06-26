@@ -1,7 +1,6 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   OnInit,
   computed,
   inject,
@@ -9,17 +8,14 @@ import {
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs';
-import {
-  translateSignal,
-  TranslocoPipe,
-  TranslocoService,
-} from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient } from '../entities/entities.client';
 import { ToasterService } from '../core/toaster.service';
-import { HeaderService } from '../shell/header.service';
 import { Autofocus } from '../ui/autofocus';
 import { Button } from '../ui/button';
+import { Eyebrow } from '../ui/eyebrow';
+import { PageHeader } from '../ui/page-header';
 import { Panel } from '../ui/panel';
 import { Icon } from '../ui/icon/icon';
 
@@ -53,36 +49,45 @@ function formatEdited(updatedAt: number, lang: string): string {
 @Component({
   selector: 'app-entity-browser',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Panel, Icon, TranslocoPipe, Autofocus],
+  imports: [Button, Eyebrow, PageHeader, Panel, Icon, TranslocoPipe, Autofocus],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
-    <div class="max-w-[60rem] mx-auto py-6 px-5">
-      <h1 class="sr-only">{{ pageTitle() }}</h1>
-      <div class="flex justify-end gap-2 mb-5">
-        <button
-          type="button"
-          appButton
-          variant="default"
-          data-testid="new-note"
-          [disabled]="creating()"
-          (click)="create('note')"
-        >
-          <app-icon name="plus" [size]="16" />
-          {{ (creating() ? 'entityBrowser.creating' : 'entityBrowser.newNote') | transloco }}
-        </button>
-        <button
-          type="button"
-          appButton
-          variant="primary"
-          data-testid="new-map"
-          [disabled]="creating()"
-          (click)="create('hexmap')"
-        >
-          <app-icon name="plus" [size]="16" />
-          {{ (creating() ? 'entityBrowser.creating' : 'entityBrowser.newMap') | transloco }}
-        </button>
+    <app-page-header sticky>
+      <div pageHeaderTitle class="flex flex-col">
+        <span appEyebrow class="text-gold! tracking-[0.28em]">{{
+          'entityBrowser.eyebrow' | transloco
+        }}</span>
+        <h1 class="font-display text-[22px] text-ink-strong m-0 leading-tight">
+          {{ 'entityBrowser.heading' | transloco }}
+        </h1>
       </div>
+      <button
+        type="button"
+        pageHeaderActions
+        appButton
+        variant="default"
+        data-testid="new-note"
+        [disabled]="creating()"
+        (click)="create('note')"
+      >
+        <app-icon name="plus" [size]="16" />
+        {{ (creating() ? 'entityBrowser.creating' : 'entityBrowser.newNote') | transloco }}
+      </button>
+      <button
+        type="button"
+        pageHeaderActions
+        appButton
+        variant="primary"
+        data-testid="new-map"
+        [disabled]="creating()"
+        (click)="create('hexmap')"
+      >
+        <app-icon name="plus" [size]="16" />
+        {{ (creating() ? 'entityBrowser.creating' : 'entityBrowser.newMap') | transloco }}
+      </button>
+    </app-page-header>
 
+    <main class="max-w-[60rem] mx-auto py-6 px-5">
       @if (cards().length > 0) {
         <ul class="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-4 m-0 p-0 list-none">
           @for (card of cards(); track card.id) {
@@ -163,22 +168,14 @@ function formatEdited(updatedAt: number, lang: string): string {
           <p class="text-sm">{{ 'entityBrowser.emptyHint' | transloco }}</p>
         </section>
       }
-    </div>
+    </main>
   `,
 })
 export class EntityBrowser implements OnInit {
   private readonly maps$ = inject(EntitiesClient);
   private readonly router = inject(Router);
-  private readonly header = inject(HeaderService);
   private readonly toaster = inject(ToasterService);
-  private readonly destroyRef = inject(DestroyRef);
   private readonly transloco = inject(TranslocoService);
-
-  /** The translated page heading, shown both as the document's <h1> (sr-only)
-   * and the header chrome title — sourced from one key so the two can't drift
-   * and both re-render live when the language changes. */
-  protected readonly pageTitle = translateSignal('entityBrowser.heading');
-  private readonly pageEyebrow = translateSignal('entityBrowser.eyebrow');
 
   private readonly _maps = signal<EntitySummary[]>([]);
   /** The user's maps, newest first. */
@@ -207,15 +204,6 @@ export class EntityBrowser implements OnInit {
   protected readonly creating = signal(false);
   /** The id of the Entity whose name is being edited inline, or `null`. */
   protected readonly renamingId = signal<string | null>(null);
-
-  constructor() {
-    // Set in constructor (not ngOnInit) so same-route round-trips that reuse the
-    // component keep the heading. HeaderService withdraws it on destroy (ADR-0015).
-    this.header.set(
-      computed(() => ({ eyebrow: this.pageEyebrow(), title: this.pageTitle() })),
-      this.destroyRef,
-    );
-  }
 
   ngOnInit(): void {
     // Set `loaded` on error too: a failed fetch must show the error panel, not a blank page.

@@ -101,6 +101,21 @@ describe('EditorHeader', () => {
     http.expectNone('/entities/m1');
   });
 
+  it('no longer carries app-level navigation — that lives in the rail (ADR-0022)', () => {
+    openMap(aldermoor);
+    const fixture = TestBed.createComponent(EditorHeader);
+    fixture.detectChanges();
+
+    // All Maps / Design System are rail destinations now, not header buttons.
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).not.toContain('All maps');
+    expect(text).not.toContain('Design system');
+    expect(fixture.nativeElement.querySelector('a[href="/entities"]')).toBeNull();
+    expect(
+      fixture.nativeElement.querySelector('a[href="/styleguide"]'),
+    ).toBeNull();
+  });
+
   it('disables Save until an entity is open', () => {
     // No openMap() here: with none open, Save must be disabled so a click can't
     // flip the session into a stuck "Saving…" state with nothing to save.

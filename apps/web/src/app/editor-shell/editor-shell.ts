@@ -4,6 +4,7 @@ import {
   inject,
 } from '@angular/core';
 import { HexMapStore } from './hexmap-store';
+import { EditorHeader } from './editor-header';
 import { ToolPalette } from './tool-palette';
 import { MapCanvas } from './map-canvas';
 import { Inspector } from './inspector';
@@ -31,6 +32,7 @@ import { StatusBar } from './status-bar';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block h-full overflow-hidden' },
   imports: [
+    EditorHeader,
     ToolPalette,
     MapCanvas,
     Inspector,
@@ -39,8 +41,10 @@ import { StatusBar } from './status-bar';
     StatusBar,
   ],
   template: `
-    <div class="grid grid-rows-[1fr_var(--rail-status)] h-full">
-      <div class="body relative min-h-0">
+    <div class="grid grid-rows-[auto_1fr_var(--rail-status)] h-full">
+      <!-- Page-owned header: the map's own controls, docked above the canvas (ADR-0022). -->
+      <app-editor-header />
+      <main class="body relative min-h-0">
         <!-- Full-bleed canvas; all side chrome floats over it (ADR-0013). -->
         <app-map-canvas class="absolute inset-0" />
         <app-tool-palette class="absolute top-3 left-3 z-[1]" />
@@ -63,7 +67,7 @@ import { StatusBar } from './status-bar';
           }
           <app-editor-rail class="pointer-events-auto" />
         </div>
-      </div>
+      </main>
       <app-status-bar />
     </div>
   `,
