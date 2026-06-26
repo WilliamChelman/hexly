@@ -94,7 +94,6 @@ describe('EditorHeader', () => {
     const fixture = TestBed.createComponent(EditorHeader);
     fixture.detectChanges();
 
-    // Blur without changing anything — a no-op edit must not hit the server.
     (
       fixture.nativeElement.querySelector('[data-testid=title]') as HTMLElement
     ).dispatchEvent(new Event('blur'));
@@ -140,8 +139,7 @@ describe('EditorHeader', () => {
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
-    // The Editing chip and the map-scoped actions translate; the name stays
-    // the user's words (asserted separately below).
+    // Name stays verbatim — asserted in the next test.
     expect(el.textContent).toContain('Édition');
     expect(el.textContent).toContain('Partager');
     expect(el.textContent).not.toContain('Editing');
@@ -169,8 +167,7 @@ describe('EditorHeader', () => {
     const fixture = TestBed.createComponent(EditorHeader);
     fixture.detectChanges();
 
-    // English (the default lang): the conflict chip resolves its key to the
-    // English copy, proving the 409 maps to editorShell.save.conflict.
+    // English first: confirms the 409 maps to editorShell.save.conflict.
     (
       fixture.nativeElement.querySelector('[data-testid=save]') as HTMLButtonElement
     ).click();
@@ -183,7 +180,6 @@ describe('EditorHeader', () => {
       fixture.nativeElement.querySelector('[data-testid=conflict]') as HTMLElement;
     expect(conflict().textContent).toContain('Newer version on server');
 
-    // ...and it reflows to French live on a language switch.
     TestBed.inject(TranslocoService).setActiveLang('fr');
     fixture.detectChanges();
     expect(conflict().textContent).toContain('Version plus récente sur le serveur');
@@ -195,7 +191,6 @@ describe('EditorHeader', () => {
     const fixture = TestBed.createComponent(EditorHeader);
     fixture.detectChanges();
 
-    // A save is rejected as stale...
     (
       fixture.nativeElement.querySelector('[data-testid=save]') as HTMLButtonElement
     ).click();
@@ -204,10 +199,8 @@ describe('EditorHeader', () => {
       .flush({ ...aldermoor, version: 9 }, { status: 409, statusText: 'Conflict' });
     fixture.detectChanges();
 
-    // ...so the header surfaces the conflict to the user...
     expect(fixture.nativeElement.querySelector('[data-testid=conflict]')).not.toBeNull();
 
-    // ...and offers a re-pull that resolves it.
     (
       fixture.nativeElement.querySelector(
         '[data-testid=conflict-reload]',

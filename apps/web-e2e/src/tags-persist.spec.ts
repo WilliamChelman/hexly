@@ -1,10 +1,6 @@
 import { expect, test, waitForSave } from './fixtures';
 
-/**
- * Full-stack tag round-trip (#72): add free-text tags on a note → versioned save →
- * reload re-renders them → the library reflects them. Tags ride the same version-
- * checked save as Content and are stored as Entity metadata (ADR-0018).
- */
+/** #72 — tags share the version-checked save path and are stored as Entity metadata (ADR-0018). */
 test('adds tags on a note, saves, and they survive reload and show in the library', async ({
   page,
   request,
@@ -36,7 +32,6 @@ test('adds tags on a note, saves, and they survive reload and show in the librar
   await expect(page.getByTestId('entity-tags')).toContainText('deity');
   await expect(page.getByTestId('entity-tags')).not.toContainText('ruined');
 
-  // The library reflects the entity's current tags.
   await page.getByTestId('back-to-library').click();
   await expect(page.getByTestId(`tags-${noteId}`)).toContainText('deity');
   await expect(page.getByTestId(`tags-${noteId}`)).not.toContainText('ruined');

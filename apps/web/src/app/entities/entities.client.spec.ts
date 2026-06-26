@@ -13,7 +13,7 @@ import {
 } from '@hexly/domain';
 import { EntitiesClient } from './entities.client';
 
-/** An empty hexmap body — the shape the editor round-trips through the client. */
+/** The shape the editor round-trips through the client. */
 const emptyHexmapBody: EntityBody = {
   type: 'hexmap',
   content: emptyContent(),

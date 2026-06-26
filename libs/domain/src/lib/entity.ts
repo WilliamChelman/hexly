@@ -16,7 +16,6 @@ export const contentSchema = z.object({
   snapshot: z.unknown(),
 });
 
-/** An Entity's opaque, format-tagged rich-text body (CONTEXT.md → Content). */
 export type Content = z.infer<typeof contentSchema>;
 
 /** The one place a snapshot becomes Content — keeps the editor seam from hand-stamping the format tag (ADR-0019). */
@@ -32,7 +31,7 @@ export function tiptapContent(snapshot: unknown): Content {
  */
 export const entityTypeSchema = z.enum(['note', 'hexmap']);
 
-/** An Entity's structural type (CONTEXT.md → Entity Type). */
+/** CONTEXT.md → Entity Type. */
 export type EntityType = z.infer<typeof entityTypeSchema>;
 
 /**
@@ -46,40 +45,28 @@ export const entityBodySchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('hexmap'), content: contentSchema, ...hexMapSchema.shape }),
 ]);
 
-/** An Entity's stored body: its Content plus any type-specific payload. */
 export type EntityBody = z.infer<typeof entityBodySchema>;
 
-/** A fresh, empty Content envelope: the smallest valid TipTap document. */
 export function emptyContent(): Content {
   return tiptapContent({ type: 'doc', content: [] });
 }
 
-/**
- * A brand-new body for an Entity of `type`: empty Content plus, for a `hexmap`,
- * an empty grid. The one place that knows the per-type empty payload.
- */
+/** The one place that knows the per-type empty payload. */
 export function emptyEntityBody(type: EntityType): EntityBody {
   return type === 'hexmap'
     ? { type, content: emptyContent(), ...emptyHexMap() }
     : { type, content: emptyContent() };
 }
 
-/**
- * An Entity name. `.trim()` before `.min(1)` rejects whitespace-only names and
- * strips surrounding whitespace before it's persisted (issues #12, #15).
- */
+/** `.trim()` before `.min(1)` rejects whitespace-only names and strips surrounding whitespace (issues #12, #15). */
 const nameSchema = z.string().trim().min(1);
 
 /**
- * Free-text Tags on an Entity (CONTEXT.md → Tag). Defaults to empty so an Entity
- * created or stored without tags still lists with an array rather than
- * `undefined`. Tags carry no behaviour — distinct from the structured type.
- *
- * Normalized on parse so the schema (the single source of truth, ADR-0001) — not
- * just the UI — owns what a tag is: each is trimmed and lower-cased, blanks are
- * rejected (no empty/whitespace tags, #88), then identical strings collapse so
- * consumers never see duplicates. Lower-casing also folds case variants ("Deity"
- * / "deity") into one, which chips render uppercase regardless.
+ * Free-text Tags on an Entity (CONTEXT.md → Tag), normalized on parse so the
+ * schema — not just the UI — owns what a tag is (ADR-0001): trimmed, lower-cased
+ * (folds "Deity"/"deity"; chips render uppercase regardless), blanks rejected
+ * (#88), duplicates collapsed. Defaults to empty so a tagless Entity still lists
+ * with an array.
  */
 const dedupedTags = z
   .array(z.string().trim().toLowerCase().min(1))
@@ -87,58 +74,38 @@ const dedupedTags = z
 
 export const tagsSchema = dedupedTags.default([]);
 
-/**
- * The body of `POST /entities`: a new Entity needs a name and a type; tags
- * default to empty and the body (Content + payload) is minted server-side.
- */
+/** POST /entities: body (Content + payload) is minted server-side. */
 export const createEntityRequestSchema = z.object({
   name: nameSchema,
   type: entityTypeSchema,
   tags: tagsSchema,
 });
 
-/** A validated create submission for an Entity. */
 export type CreateEntityRequest = z.infer<typeof createEntityRequestSchema>;
 
-/**
- * The body of `PATCH /entities/:id`: rename an Entity. Metadata-only — no body
- * and no base `version`, so a rename is outside the document's concurrency check.
- */
+/** PATCH /entities/:id: metadata-only — no `version`, so a rename is outside the document's concurrency check. */
 export const renameEntityRequestSchema = z.object({ name: nameSchema });
 
-/** A validated rename submission for an Entity. */
 export type RenameEntityRequest = z.infer<typeof renameEntityRequestSchema>;
 
-/**
- * The body of `PUT /entities/:id`: the whole Entity body (ADR-0018) plus the
- * base `version` it was built on; a stale base is rejected with 409 (ADR-0004).
- */
+/** PUT /entities/:id (ADR-0018): stale `version` is rejected with 409 (ADR-0004). */
 export const saveEntityRequestSchema = z.object({
   document: entityBodySchema,
   version: z.number().int().nonnegative(),
-  // Tags ride along with the version-checked save (CONTEXT.md → Tag, #72): the save
-  // always carries the full current set (the editor holds them live), so a save
-  // replaces the stored tags — an empty array clears them.
+  // Tags ride the version-checked save (#72): always the full current set, so a
+  // save replaces the stored tags — an empty array clears them.
   tags: dedupedTags,
 });
 
-/** A validated save submission for an Entity. */
 export type SaveEntityRequest = z.infer<typeof saveEntityRequestSchema>;
 
-/**
- * Who can reach an Entity. `private` is owner-only; `public` exposes the
- * read-only link (ADR-0004). Stored as metadata; the public-link endpoint is a
- * later issue, so nothing acts on it yet.
- */
+/** `private` is owner-only; `public` exposes the read-only link (ADR-0004). Stored as metadata; the public-link endpoint is a later issue, so nothing acts on it yet. */
 export const visibilitySchema = z.enum(['private', 'public']);
 
-/** An Entity's visibility (CONTEXT.md → Public Link). */
+/** CONTEXT.md → Public Link. */
 export type Visibility = z.infer<typeof visibilitySchema>;
 
-/**
- * An Entity without its body: the metadata `GET /entities` lists. The body is
- * fetched only on open; `type`/`tags` ride along so a list can group and filter.
- */
+/** What `GET /entities` lists; body fetched only on open. `type`/`tags` ride along for grouping and filtering. */
 export interface EntitySummary {
   readonly id: string;
   readonly ownerId: string;
@@ -152,15 +119,12 @@ export interface EntitySummary {
   readonly updatedAt: number;
 }
 
-/** An Entity with its full body: what `GET /entities/:id` and saves return. */
+/** What `GET /entities/:id` and saves return. */
 export interface EntityDetail extends EntitySummary {
   readonly document: EntityBody;
 }
 
-/**
- * The save outcome the client observes: the stored Entity at its new version,
- * or a 409 conflict carrying the server's current Entity to re-pull (ADR-0018).
- */
+/** Saved at the new version, or a 409 conflict carrying the server's current Entity to re-pull (ADR-0018). */
 export type EntitySaveOutcome =
   | { status: 'saved'; entity: EntityDetail }
   | { status: 'conflict'; current: EntityDetail };

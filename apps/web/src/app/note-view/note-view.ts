@@ -160,7 +160,6 @@ export class NoteView {
   protected readonly conflict = this.session.conflict;
   protected readonly error = this.session.error;
 
-  /** Headless TipTap editor; the `tiptap` directive mounts it into the DOM. */
   protected readonly editor = new Editor({ extensions: CONTENT_EXTENSIONS });
 
   constructor() {

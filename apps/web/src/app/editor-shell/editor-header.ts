@@ -17,11 +17,8 @@ import { EntityTags } from '../entity-tags/entity-tags';
 import { EntitySession } from './entity-session';
 
 /**
- * The editor's interactive header content, projected into the single
- * {@link AppHeader}'s named `header` outlet (ADR-0015): the editable map title,
- * the Editing/conflict chip, and the map-scoped actions (Save, Share, and the
- * navigation back to the library / styleguide). The global chrome — brand, theme
- * toggle, user identity + Sign out — lives in {@link AppHeader}, not here.
+ * Editor header content projected into {@link AppHeader}'s named `header` outlet (ADR-0015).
+ * The global chrome — brand, theme toggle, user identity — lives in {@link AppHeader}, not here.
  */
 @Component({
   selector: 'app-editor-header',
@@ -35,9 +32,8 @@ import { EntitySession } from './entity-session';
         'editorShell.hexMap' | transloco
       }}</span>
       <!--
-        Edit-in-place title: a plaintext contenteditable styled as the mockup
-        '.title'. The text is driven imperatively (effect, never while focused)
-        rather than interpolated, so re-renders can't move the caret mid-edit.
+        Text is driven imperatively (effect, never while focused) rather than
+        interpolated, so re-renders can't move the caret mid-edit.
       -->
       <div
         #titleEl
@@ -105,11 +101,9 @@ export class EditorHeader {
 
   /** Whether a map is open — gates Save and rename so neither can run with none. */
   protected readonly hasMap = computed(() => this.session.current() !== null);
-  /** The open Entity's name, or a placeholder before one is opened. */
   protected readonly title = computed(
     () => this.session.current()?.name ?? 'Untitled map',
   );
-  /** Whether a save is in flight — disables the Save button. */
   protected readonly saving = this.session.saving;
   /** The server's current map when a save was rejected as stale, else `null`. */
   protected readonly conflict = this.session.conflict;
@@ -136,7 +130,6 @@ export class EditorHeader {
     });
   }
 
-  /** Snapshot the name the user begins editing from, for {@link commit}. */
   protected onFocus(): void {
     this.editBaseline = this.titleEl().nativeElement.textContent ?? '';
   }
@@ -147,7 +140,6 @@ export class EditorHeader {
     this.titleEl().nativeElement.blur();
   }
 
-  /** Abandon the edit: restore the current name, then drop focus. */
   protected onEscape(event: Event): void {
     event.preventDefault();
     // Make the pending blur-commit a no-op against the restored name.
@@ -156,11 +148,7 @@ export class EditorHeader {
     this.titleEl().nativeElement.blur();
   }
 
-  /**
-   * Commit the edited title from the element's text. A no-op (blank, or unchanged
-   * from what the edit started with) just normalises the text back to the current
-   * name without a request; a rejected rename reverts the optimistic text.
-   */
+  /** No-op if blank or unchanged (normalises text back); a rejected rename reverts the optimistic text. */
   protected commit(): void {
     const el = this.titleEl().nativeElement;
     const baseline = this.editBaseline ?? this.title();
@@ -177,13 +165,11 @@ export class EditorHeader {
     });
   }
 
-  /** Persist the current map. A stale-version rejection surfaces as a conflict
-   * chip (driven by the session) rather than an error. */
+  /** Stale-version rejection surfaces as a conflict chip (driven by the session) rather than an error. */
   protected save(): void {
     this.session.save().subscribe();
   }
 
-  /** Resolve a surfaced conflict by re-pulling the server's current map. */
   protected reload(): void {
     this.session.reload().subscribe();
   }

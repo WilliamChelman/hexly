@@ -32,10 +32,8 @@ import { TitleService } from '../core/i18n/title.service';
 import { HexMapStore } from './hexmap-store';
 
 /**
- * Bridges persistence ({@link EntitiesClient}) and live editing ({@link HexMapStore})
- * for the open-Entity route: opening pulls a stored Entity and hands its grid to the
- * editor; saving pushes it back under the open Entity's base version. Extracts the
- * grid on open and re-wraps it (ADR-0019) on save, keeping HexMapStore on a plain HexMap.
+ * Bridges {@link EntitiesClient} and {@link HexMapStore} for `/entities/:id`:
+ * unwraps the stored grid on open, re-wraps it (ADR-0019) on save.
  *
  * Scoped to the `/entities/:id` route (`providers`), not root: leaving the route
  * destroys it, so open-Entity state resets implicitly — no teardown needed in views.
@@ -49,7 +47,6 @@ export class EntitySession {
   private readonly destroyRef = inject(DestroyRef);
 
   private readonly _current = signal<EntityDetail | null>(null);
-  /** The open Entity's metadata (name, version), or `null` before one is opened. */
   readonly current = this._current.asReadonly();
 
   private readonly _conflict = signal<EntityDetail | null>(null);
@@ -60,7 +57,6 @@ export class EntitySession {
   private readonly _seed = signal<EntityDetail | null>(null);
   readonly seed = this._seed.asReadonly();
 
-  /** Non-null when the last save or reload HTTP request failed. */
   private readonly _error = signal<'save' | 'reload' | null>(null);
   readonly error = this._error.asReadonly();
 
@@ -71,13 +67,11 @@ export class EntitySession {
   private readonly _content = signal<Content | null>(null);
 
   /**
-   * Live Tags (CONTEXT.md → Tag, #72), seeded on load and edited by the tags UI.
-   * Like Content, they span every Entity type and ride with the version-checked
-   * save — so the session always carries the current set and a body-only save
+   * Live Tags (#72), seeded on load and edited by the tags UI. Like Content, they
+   * span every Entity type and ride the version-checked save, so a body-only save
    * never silently drops them. Survives a clean save so in-flight edits aren't lost.
    */
   private readonly _tags = signal<readonly string[]>([]);
-  /** The open Entity's live tags — the editing buffer the Save button persists. */
   readonly tags = this._tags.asReadonly();
 
   private readonly _saving = signal(false);
@@ -98,9 +92,9 @@ export class EntitySession {
   }
 
   /**
-   * Drive the open Entity from a route's `:id`. The routed component passes its
-   * ActivatedRoute in — a route-scoped service would get the root injector's route.
-   * switchMap prevents a stale A response from landing over B's canvas; 404 returns to the library.
+   * The routed component passes its ActivatedRoute in — a route-scoped service would
+   * get the root injector's route. switchMap prevents a stale A response from landing
+   * over B's canvas; 404 returns to the library.
    */
   watchRoute(route: ActivatedRoute): void {
     route.paramMap
@@ -120,7 +114,6 @@ export class EntitySession {
       .subscribe();
   }
 
-  /** Open a stored Entity by id and load its hex grid into the editor. */
   open(id: string): Observable<EntityDetail> {
     return this.entities.load(id).pipe(tap((detail) => this.adopt(detail)));
   }
@@ -146,9 +139,8 @@ export class EntitySession {
   }
 
   /**
-   * Open the Entity the route points at: clear canvas, fetch, flag loading to block mid-swap writes.
-   * Always a fresh fetch: this session outlives trips to the library (route injector isn't torn down),
-   * so a cached `current` can be stale (#70).
+   * Always a fresh fetch: this session outlives trips to the library (route injector
+   * isn't torn down), so a cached `current` can be stale (#70).
    */
   openRoute(id: string): Observable<EntityDetail> {
     this.editor.load(emptyHexMap()); // clear the previous map's canvas during load (#7)
@@ -205,10 +197,7 @@ export class EntitySession {
       );
   }
 
-  /**
-   * Re-pull the open Entity, replacing the editor's grid. The conflict resolution
-   * path (#6): user accepts the server's version, discarding the rejected local edit.
-   */
+  /** Conflict resolution path (#6): user accepts the server's version, discarding the rejected local edit. */
   reload(): Observable<EntityDetail> {
     // Always a real GET via `open()` — the conflict re-pull must not be cached (#4).
     const open = this._current();
@@ -223,10 +212,7 @@ export class EntitySession {
   }
 }
 
-/**
- * Extract the hex grid from an Entity body (empty for a note). Parsing through
- * {@link hexMapSchema} drops `type`/`content`, tracking the schema not a hand-listed field set.
- */
+/** Parse through {@link hexMapSchema} so `type`/`content` are dropped by the schema, not a hand-listed field set; returns empty for notes. */
 function gridOf(body: EntityBody): HexMap {
   return body.type === 'hexmap' ? hexMapSchema.parse(body) : emptyHexMap();
 }

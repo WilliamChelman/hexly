@@ -4,10 +4,8 @@ import { Chip } from '../ui/chip';
 import { EntitySession } from '../editor-shell/entity-session';
 
 /**
- * Add and remove an Entity's free-text Tags (CONTEXT.md → Tag, #72). Reads and
- * writes the open Entity's live tags through {@link EntitySession}; the version-
- * checked Save (shared with Content) is what actually persists them. Type-agnostic:
- * the same surface serves a `note` and a `hexmap`.
+ * Free-text tag editor for the open Entity (CONTEXT.md → Tag, #72).
+ * Version-checked Save (shared with Content) actually persists changes; type-agnostic across entity types.
  */
 @Component({
   selector: 'app-entity-tags',
@@ -48,11 +46,9 @@ export class EntityTags {
   protected readonly addPlaceholder = translateSignal('entityTags.addPlaceholder');
 
   /**
-   * Add the typed entry to the live set — on Enter, and on blur so a tag typed
-   * but not Enter-confirmed isn't lost when the user clicks Save (#88). Splits on
-   * commas so a comma-separated paste adds several at once; trims, lower-cases and
-   * skips duplicates to match the server's normalization (entity.ts dedupedTags)
-   * immediately. Clears the field on success.
+   * Fires on Enter and blur (#88 — blur prevents losing a typed-but-not-confirmed tag when
+   * the user clicks Save). Comma-splits for paste; trims, lower-cases, and deduplicates to
+   * match server normalization immediately (entity.ts dedupedTags).
    */
   protected add(event: Event): void {
     const input = event.target as HTMLInputElement;
@@ -66,7 +62,7 @@ export class EntityTags {
     input.value = '';
   }
 
-  /** Drop a tag from the live set; the next save persists the removal. */
+  /** The next save persists the removal. */
   protected remove(tag: string): void {
     this.session.setTags(this.tags().filter((t) => t !== tag));
   }

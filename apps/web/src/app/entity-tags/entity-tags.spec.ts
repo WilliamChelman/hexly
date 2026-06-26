@@ -34,7 +34,6 @@ describe('EntityTags', () => {
     session = TestBed.inject(EntitySession);
   });
 
-  /** Mount EntityTags over an open entity carrying `tags`. */
   function render(tags: string[]) {
     session.adopt(noteWith(tags));
     const fixture = TestBed.createComponent(EntityTags);
@@ -66,7 +65,6 @@ describe('EntityTags', () => {
     expect(session.tags()).toEqual(['ruined']);
   });
 
-  /** Type into the tag input and press Enter, the way a user adds a tag. */
   function typeTag(fixture: ReturnType<typeof render>, value: string) {
     const input = fixture.nativeElement.querySelector(
       '[data-testid=tag-input]',
