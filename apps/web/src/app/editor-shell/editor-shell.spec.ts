@@ -7,6 +7,7 @@ import {
 import { provideRouter } from '@angular/router';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { EditorShell } from './editor-shell';
+import { EntitySession } from './entity-session';
 
 // EditorShell is a pure view: EntityPage loads the routed Entity into the
 // EntitySession and the session owns the tab title (see entity.page.spec /
@@ -18,6 +19,7 @@ describe('EditorShell', () => {
     await TestBed.configureTestingModule({
       imports: [EditorShell, provideTranslocoTesting()],
       providers: [
+        EntitySession,
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),

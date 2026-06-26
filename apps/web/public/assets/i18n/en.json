@@ -49,8 +49,6 @@
     "renameMap": "Rename map",
     "editing": "Editing",
     "reload": "Reload",
-    "allMaps": "All maps",
-    "designSystem": "Design system",
     "saving": "Saving…",
     "share": "Share",
     "save": {
@@ -214,5 +212,13 @@
     "cancel": "Cancel",
     "close": "Close",
     "delete": "Delete"
+  },
+  "nav": {
+    "primary": "Primary navigation",
+    "library": "Library",
+    "styleguide": "Styleguide",
+    "expand": "Expand navigation",
+    "collapse": "Collapse navigation",
+    "home": "Hexly home"
   }
 }

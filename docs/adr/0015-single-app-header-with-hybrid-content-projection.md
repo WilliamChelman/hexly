@@ -1,5 +1,7 @@
 # Single app header with hybrid content projection
 
+> **Status: superseded by ADR-0022.** The single shell header, `HeaderService`, and the `header`-named outlet are replaced by a persistent global nav rail (which absorbs the brand, theme toggle, and language switcher) plus page-owned headers. The history below records why the single header existed.
+
 Today there is no app-level header: `App` is a bare `<router-outlet />`, and each feature grows its own divergent top chrome — the theme toggle lives only inside `app-editor-header`, while map-library and login each roll their own. The new language switcher (ADR-0014) needs one home, not three. We are consolidating to a **single `AppHeader` in the root shell**, into which pages inject their own content through a **hybrid** mechanism: a stateful signal-based service for simple declarative content, and a **named router-outlet** for rich interactive content.
 
 ## What we decided

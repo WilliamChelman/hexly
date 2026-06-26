@@ -49,8 +49,6 @@
     "renameMap": "Renommer la carte",
     "editing": "Édition",
     "reload": "Recharger",
-    "allMaps": "Toutes les cartes",
-    "designSystem": "Système de design",
     "saving": "Enregistrement…",
     "share": "Partager",
     "save": {
@@ -214,5 +212,13 @@
     "cancel": "Annuler",
     "close": "Fermer",
     "delete": "Supprimer"
+  },
+  "nav": {
+    "primary": "Navigation principale",
+    "library": "Bibliothèque",
+    "styleguide": "Guide de style",
+    "expand": "Déployer la navigation",
+    "collapse": "Réduire la navigation",
+    "home": "Accueil Hexly"
   }
 }

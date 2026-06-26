@@ -1,8 +1,6 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
-  computed,
   inject,
   signal,
 } from '@angular/core';
@@ -10,7 +8,6 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { translateSignal, TranslocoPipe } from '@jsverse/transloco';
 import { AuthStore } from './auth.store';
-import { HeaderService } from '../shell/header.service';
 import { Button } from '../ui/button';
 import { Field } from '../ui/field';
 import { Input } from '../ui/input';
@@ -74,11 +71,9 @@ export class Login {
   private readonly auth = inject(AuthStore);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-  private readonly header = inject(HeaderService);
-  private readonly destroyRef = inject(DestroyRef);
 
-  /** Translated heading shared by the sr-only `<h1>` and the header chrome
-   * title — one key so the two can't drift and both re-render on language change. */
+  /** Translated heading for the sr-only `<h1>`; the login screen renders
+   * standalone with no header chrome (ADR-0022), so this is its only home. */
   protected readonly heading = translateSignal('auth.heading');
 
   protected readonly email = signal('');
@@ -86,14 +81,6 @@ export class Login {
   protected readonly pending = signal(false);
   /** A translation key for the active error, or `null` when there is none. */
   protected readonly error = signal<string | null>(null);
-
-  constructor() {
-    // Pass as a computed so the chrome title tracks live language switches (ADR-0015).
-    this.header.set(
-      computed(() => ({ title: this.heading() })),
-      this.destroyRef,
-    );
-  }
 
   protected value(event: Event): string {
     return (event.target as HTMLInputElement).value;

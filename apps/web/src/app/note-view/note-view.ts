@@ -12,9 +12,10 @@ import { Editor, JSONContent } from '@tiptap/core';
 import { EditorState } from '@tiptap/pm/state';
 import { TiptapEditorDirective } from 'ngx-tiptap';
 import { EntitySession } from '../editor-shell/entity-session';
-import { HeaderService } from '../shell/header.service';
 import { Button } from '../ui/button';
 import { Chip } from '../ui/chip';
+import { Eyebrow } from '../ui/eyebrow';
+import { PageHeader } from '../ui/page-header';
 import { EntityTags } from '../entity-tags/entity-tags';
 import { CONTENT_EXTENSIONS } from './content-extensions';
 
@@ -32,62 +33,68 @@ import { CONTENT_EXTENSIONS } from './content-extensions';
     TiptapEditorDirective,
     Button,
     Chip,
+    Eyebrow,
+    PageHeader,
     EntityTags,
   ],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
-    <div class="max-w-[60rem] mx-auto py-9 px-5">
-      <div class="flex items-center gap-3">
-        <a
-          class="text-sm text-ink-muted no-underline hover:underline"
-          routerLink="/entities"
-          data-testid="back-to-library"
-          >{{ 'noteView.backToLibrary' | transloco }}</a
+    <app-page-header>
+      <a
+        pageHeaderLeading
+        class="text-sm text-ink-muted no-underline hover:underline"
+        routerLink="/entities"
+        data-testid="back-to-library"
+        >{{ 'noteView.backToLibrary' | transloco }}</a
+      >
+      <div pageHeaderTitle class="flex flex-col min-w-0">
+        <span appEyebrow class="text-gold! tracking-[0.28em]">{{
+          'noteView.eyebrow' | transloco
+        }}</span>
+        <h1
+          class="font-display text-[22px] text-ink-strong m-0 leading-tight truncate"
+          data-testid="note-title"
         >
-        <div class="flex items-center gap-2 ml-auto">
-          @if (error()) {
-            <app-chip tone="gold" data-testid="http-error">
-              {{ 'noteView.httpError' | transloco }}
-            </app-chip>
-          }
-          @if (conflict()) {
-            <app-chip tone="gold" data-testid="conflict">
-              {{ 'editorShell.save.conflict' | transloco }}
-              <button
-                type="button"
-                appButton
-                variant="ghost"
-                size="sm"
-                class="ml-2 underline"
-                data-testid="conflict-reload"
-                (click)="reload()"
-              >
-                {{ 'editorShell.reload' | transloco }}
-              </button>
-            </app-chip>
-          }
+          {{ name() }}
+        </h1>
+      </div>
+      @if (error()) {
+        <app-chip pageHeaderActions tone="gold" data-testid="http-error">
+          {{ 'noteView.httpError' | transloco }}
+        </app-chip>
+      }
+      @if (conflict()) {
+        <app-chip pageHeaderActions tone="gold" data-testid="conflict">
+          {{ 'editorShell.save.conflict' | transloco }}
           <button
             type="button"
             appButton
-            variant="primary"
+            variant="ghost"
             size="sm"
-            data-testid="save"
-            [disabled]="saving()"
-            (click)="save()"
+            class="ml-2 underline"
+            data-testid="conflict-reload"
+            (click)="reload()"
           >
-            {{ (saving() ? 'editorShell.saving' : 'common.save') | transloco }}
+            {{ 'editorShell.reload' | transloco }}
           </button>
-        </div>
-      </div>
-
-      <h1
-        class="font-display text-3xl text-ink-strong mt-6"
-        data-testid="note-title"
+        </app-chip>
+      }
+      <button
+        type="button"
+        pageHeaderActions
+        appButton
+        variant="primary"
+        size="sm"
+        data-testid="save"
+        [disabled]="saving()"
+        (click)="save()"
       >
-        {{ name() }}
-      </h1>
+        {{ (saving() ? 'editorShell.saving' : 'common.save') | transloco }}
+      </button>
+    </app-page-header>
 
-      <app-entity-tags class="mt-3 block" />
+    <div class="max-w-[60rem] mx-auto py-9 px-5">
+      <app-entity-tags class="block" />
 
       <!--
         flex column + ProseMirror fills it (scoped CSS below) so a click anywhere in
@@ -150,9 +157,7 @@ import { CONTENT_EXTENSIONS } from './content-extensions';
 })
 export class NoteView {
   private readonly session = inject(EntitySession);
-  private readonly header = inject(HeaderService);
   private readonly destroyRef = inject(DestroyRef);
-  private readonly eyebrow = translateSignal('noteView.eyebrow');
   private readonly editorLabel = translateSignal('noteView.editorLabel');
 
   protected readonly name = computed(() => this.session.current()?.name ?? '');
@@ -164,10 +169,6 @@ export class NoteView {
 
   constructor() {
     // Tab title is owned by EntitySession (shared with the map editor), not here.
-    this.header.set(
-      computed(() => ({ eyebrow: this.eyebrow(), title: this.name() })),
-      this.destroyRef,
-    );
 
     // Label .ProseMirror (not the wrapper) — TipTap already sets role="textbox" on it.
     effect(() => {

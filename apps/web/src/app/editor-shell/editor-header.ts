@@ -7,79 +7,78 @@ import {
   inject,
   viewChild,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Button } from '../ui/button';
 import { Chip } from '../ui/chip';
 import { Eyebrow } from '../ui/eyebrow';
 import { Icon } from '../ui/icon/icon';
+import { PageHeader } from '../ui/page-header';
 import { EntityTags } from '../entity-tags/entity-tags';
 import { EntitySession } from './entity-session';
 
 /**
- * Editor header content projected into {@link AppHeader}'s named `header` outlet (ADR-0015).
- * The global chrome — brand, theme toggle, user identity — lives in {@link AppHeader}, not here.
+ * The hex map editor's page-owned header (ADR-0022): it fills the shared
+ * {@link PageHeader} frame with the map's own controls — the editable title, the
+ * Editing/Conflict status chip, Tags, and Save/Share — and nothing else. App-level
+ * navigation (the former All Maps / Design System buttons) now lives in the
+ * {@link NavRail}, not here.
  */
 @Component({
   selector: 'app-editor-header',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { class: 'flex flex-1 items-center gap-5' },
-  imports: [RouterLink, Button, Chip, Eyebrow, Icon, TranslocoPipe, EntityTags],
+  host: { class: 'contents' },
+  imports: [Button, Chip, Eyebrow, Icon, PageHeader, TranslocoPipe, EntityTags],
   template: `
-    <div class="flex items-center gap-3 shrink-0">
-      <span class="w-px h-[26px] bg-line-strong shrink-0"></span>
-      <span appEyebrow class="text-gold! tracking-[0.28em] whitespace-nowrap">{{
-        'editorShell.hexMap' | transloco
-      }}</span>
-      <!--
-        Text is driven imperatively (effect, never while focused) rather than
-        interpolated, so re-renders can't move the caret mid-edit.
-      -->
-      <div
-        #titleEl
-        class="font-display text-[22px] font-semibold tracking-[0.01em] text-ink whitespace-nowrap py-1 px-2 -my-1 -mx-2 rounded-sm border border-transparent outline-none hover:border-line hover:bg-surface-sunken focus:bg-surface-sunken focus:border-gold"
-        [class.cursor-text]="hasMap()"
-        data-testid="title"
-        role="textbox"
-        aria-multiline="false"
-        spellcheck="false"
-        [attr.tabindex]="hasMap() ? 0 : null"
-        [attr.contenteditable]="hasMap() ? 'plaintext-only' : null"
-        [attr.aria-label]="'editorShell.mapTitleLabel' | transloco"
-        [title]="'editorShell.renameMap' | transloco"
-        (focus)="onFocus()"
-        (keydown.enter)="onEnter($event)"
-        (keydown.escape)="onEscape($event)"
-        (blur)="commit()"
-      ></div>
-      @if (conflict()) {
-        <app-chip tone="gold" data-testid="conflict">
-          {{ 'editorShell.save.conflict' | transloco }}
-          <button
-            type="button"
-            class="ml-2 p-0 underline bg-transparent border-0 cursor-pointer"
-            data-testid="conflict-reload"
-            (click)="reload()"
-          >
-            {{ 'editorShell.reload' | transloco }}
-          </button>
-        </app-chip>
-      } @else {
-        <app-chip tone="gold">{{ 'editorShell.editing' | transloco }}</app-chip>
-      }
-    </div>
+    <app-page-header>
+      <div pageHeaderTitle class="flex items-center gap-3 min-w-0 flex-1">
+        <div class="flex items-center gap-3 shrink-0">
+          <span appEyebrow class="text-gold! tracking-[0.28em] whitespace-nowrap">{{
+            'editorShell.hexMap' | transloco
+          }}</span>
+          <!--
+            Text is driven imperatively (effect, never while focused) rather than
+            interpolated, so re-renders can't move the caret mid-edit.
+          -->
+          <div
+            #titleEl
+            class="font-display text-[22px] font-semibold tracking-[0.01em] text-ink whitespace-nowrap py-1 px-2 -my-1 -mx-2 rounded-sm border border-transparent outline-none hover:border-line hover:bg-surface-sunken focus:bg-surface-sunken focus:border-gold"
+            [class.cursor-text]="hasMap()"
+            data-testid="title"
+            role="textbox"
+            aria-multiline="false"
+            spellcheck="false"
+            [attr.tabindex]="hasMap() ? 0 : null"
+            [attr.contenteditable]="hasMap() ? 'plaintext-only' : null"
+            [attr.aria-label]="'editorShell.mapTitleLabel' | transloco"
+            [title]="'editorShell.renameMap' | transloco"
+            (focus)="onFocus()"
+            (keydown.enter)="onEnter($event)"
+            (keydown.escape)="onEscape($event)"
+            (blur)="commit()"
+          ></div>
+          @if (conflict()) {
+            <app-chip tone="gold" data-testid="conflict">
+              {{ 'editorShell.save.conflict' | transloco }}
+              <button
+                type="button"
+                class="ml-2 p-0 underline bg-transparent border-0 cursor-pointer"
+                data-testid="conflict-reload"
+                (click)="reload()"
+              >
+                {{ 'editorShell.reload' | transloco }}
+              </button>
+            </app-chip>
+          } @else {
+            <app-chip tone="gold">{{ 'editorShell.editing' | transloco }}</app-chip>
+          }
+        </div>
 
-    <app-entity-tags class="min-w-0 flex-1" />
+        <app-entity-tags class="min-w-0 flex-1" />
+      </div>
 
-    <div class="flex items-center gap-2 ml-auto">
-      <a appButton variant="ghost" size="sm" routerLink="/entities">{{
-        'editorShell.allMaps' | transloco
-      }}</a>
-      <a appButton variant="ghost" size="sm" routerLink="/styleguide">{{
-        'editorShell.designSystem' | transloco
-      }}</a>
       <button
         type="button"
+        pageHeaderActions
         appButton
         variant="ghost"
         size="sm"
@@ -89,11 +88,11 @@ import { EntitySession } from './entity-session';
       >
         {{ (saving() ? 'editorShell.saving' : 'common.save') | transloco }}
       </button>
-      <button type="button" appButton variant="primary" size="sm">
+      <button type="button" pageHeaderActions appButton variant="primary" size="sm">
         <app-icon name="share" [size]="16" />
         {{ 'editorShell.share' | transloco }}
       </button>
-    </div>
+    </app-page-header>
   `,
 })
 export class EditorHeader {

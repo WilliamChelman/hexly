@@ -50,7 +50,7 @@ test('creating a map opens the map editor, not the note view', async ({
   await expect(page.getByTestId('title')).toBeVisible();
   await expect(page.getByTestId('note-title')).toHaveCount(0);
 
-  // "All maps" was retargeted from /maps to /entities in #70.
-  await page.getByRole('link', { name: 'All maps' }).click();
+  // App navigation lives in the rail now (ADR-0022): Library returns to the browser.
+  await page.getByRole('link', { name: 'Library' }).click();
   await expect(page).toHaveURL(/\/entities$/);
 });

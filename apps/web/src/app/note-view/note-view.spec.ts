@@ -4,7 +4,6 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { CONTENT_FORMAT, EntityDetail } from '@hexly/domain';
 import { EntitySession } from '../editor-shell/entity-session';
-import { HeaderService } from '../shell/header.service';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { NoteView } from './note-view';
 
@@ -97,14 +96,5 @@ describe('NoteView', () => {
     expect(
       fixture.nativeElement.querySelector('[data-testid=entity-tags]'),
     ).not.toBeNull();
-  });
-
-  it('contributes the note’s name to the app header while open', () => {
-    TestBed.inject(EntitySession).adopt(note('Lady Mara'));
-
-    const fixture = TestBed.createComponent(NoteView);
-    fixture.detectChanges();
-
-    expect(TestBed.inject(HeaderService).content()?.title).toBe('Lady Mara');
   });
 });
