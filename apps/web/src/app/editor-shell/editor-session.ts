@@ -57,6 +57,18 @@ export class EditorSession {
   readonly conflict = this._conflict.asReadonly();
 
   /**
+   * Fires only when the editor should re-seed from the server's authoritative
+   * snapshot: initial load, conflict reload, and note swap. Does NOT fire on clean
+   * saves or renames, so neither advances the editor past in-flight keystrokes.
+   */
+  private readonly _seed = signal<EntityDetail | null>(null);
+  readonly seed = this._seed.asReadonly();
+
+  /** Non-null when the last save or reload HTTP request failed. */
+  private readonly _error = signal<'save' | 'reload' | null>(null);
+  readonly error = this._error.asReadonly();
+
+  /**
    * The open Entity's live, opaque Content envelope (ADR-0019) — seeded from the
    * loaded body and replaced as the content editor produces snapshots. Held here,
    * not in {@link EditorStore} (which is the hex grid's command/undo stack), because
@@ -65,8 +77,6 @@ export class EditorSession {
    * it from load to save.
    */
   private readonly _content = signal<Content | null>(null);
-  /** The open Entity's live Content, or `null` before one is opened. */
-  readonly content = this._content.asReadonly();
 
   private readonly _saving = signal(false);
   readonly saving = this._saving.asReadonly();
@@ -119,7 +129,9 @@ export class EditorSession {
   /** Adopt an already-fetched Entity as the open one (clearing any conflict) and load its grid + Content. */
   adopt(detail: EntityDetail): void {
     this._conflict.set(null);
+    this._error.set(null);
     this._current.set(detail);
+    this._seed.set(detail);
     this._content.set(detail.document.content);
     this.editor.load(gridOf(detail.document));
   }
@@ -171,9 +183,10 @@ export class EditorSession {
     const open = this._current();
     if (!open || this._loading()) return EMPTY;
     this._saving.set(true);
+    this._error.set(null);
     const body = withContent(
       withGrid(open.document, this.editor.document()),
-      this._content(),
+      this._content()!,
     );
     return this.entities
       .save(open.id, body, open.version)
@@ -188,6 +201,10 @@ export class EditorSession {
             this._current.set(outcome.entity);
           }
         }),
+        catchError(() => {
+          this._error.set('save');
+          return EMPTY;
+        }),
         finalize(() => this._saving.set(false)),
       );
   }
@@ -200,7 +217,13 @@ export class EditorSession {
     // Always a real GET via `open()` — the conflict re-pull must not be cached (#4).
     const open = this._current();
     if (!open) return EMPTY;
-    return this.open(open.id);
+    this._error.set(null);
+    return this.open(open.id).pipe(
+      catchError(() => {
+        this._error.set('reload');
+        return EMPTY;
+      }),
+    );
   }
 }
 
@@ -221,11 +244,10 @@ function withGrid(body: EntityBody, grid: HexMap): EntityBody {
 }
 
 /**
- * Fold the live edited Content back into the body on save (ADR-0019). `null`
- * (nothing opened, so nothing edited) leaves the body's own Content untouched.
- * Spreading preserves the `type` discriminant, so a note stays a note and a
- * hexmap keeps its grid — only the opaque Content envelope is replaced.
+ * Fold the live edited Content back into the body on save (ADR-0019). Spreading
+ * preserves the `type` discriminant, so a note stays a note and a hexmap keeps its
+ * grid — only the opaque Content envelope is replaced.
  */
-function withContent(body: EntityBody, content: Content | null): EntityBody {
-  return content ? { ...body, content } : body;
+function withContent(body: EntityBody, content: Content): EntityBody {
+  return { ...body, content };
 }

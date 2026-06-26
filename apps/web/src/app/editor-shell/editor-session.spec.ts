@@ -4,7 +4,7 @@ import {
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { coordKey, emptyContent, EntityDetail, HexMap } from '@hexly/domain';
+import { CONTENT_FORMAT, coordKey, emptyContent, EntityDetail, HexMap } from '@hexly/domain';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { EditorSession } from './editor-session';
 import { EditorStore } from './editor-store';
@@ -235,7 +235,7 @@ describe('EditorSession', () => {
     // The edited snapshot is wrapped in the format envelope and saved untouched —
     // the seam never parses or reshapes it (ADR-0019).
     expect(req.request.body).toEqual({
-      document: { type: 'note', content: { format: 'tiptap-v1', snapshot } },
+      document: { type: 'note', content: { format: CONTENT_FORMAT, snapshot } },
       version: 3,
     });
     req.flush({ ...note, version: 4 });

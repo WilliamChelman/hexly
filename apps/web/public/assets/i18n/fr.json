@@ -34,9 +34,7 @@
     "eyebrow": "Note",
     "backToLibrary": "Retour à la bibliothèque",
     "editorLabel": "Contenu de la note",
-    "saving": "Enregistrement…",
-    "conflict": "Version plus récente sur le serveur",
-    "reload": "Recharger"
+    "httpError": "Impossible de joindre le serveur. Veuillez réessayer."
   },
   "editorShell": {
     "tabTitle": "Hexly",

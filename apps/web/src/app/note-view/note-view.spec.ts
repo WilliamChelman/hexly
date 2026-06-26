@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { EntityDetail } from '@hexly/domain';
+import { CONTENT_FORMAT, EntityDetail } from '@hexly/domain';
 import { EditorSession } from '../editor-shell/editor-session';
 import { HeaderService } from '../shell/header.service';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
@@ -19,7 +19,7 @@ describe('NoteView', () => {
     version: 1,
     createdAt: 1,
     updatedAt: 1,
-    document: { type: 'note', content: { format: 'tiptap-v1', snapshot: {} } },
+    document: { type: 'note', content: { format: CONTENT_FORMAT, snapshot: {} } },
   });
 
   beforeEach(async () => {

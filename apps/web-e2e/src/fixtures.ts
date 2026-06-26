@@ -1,4 +1,4 @@
-import { test as base, expect } from '@playwright/test';
+import { test as base, expect, type Page, type Response } from '@playwright/test';
 
 /**
  * The base test for the authenticated suite. An auto fixture resets the database
@@ -25,3 +25,13 @@ export const test = base.extend<{ resetDb: void }>({
 });
 
 export { expect };
+
+/** Wait for a successful entity PUT — shared across all persist specs. */
+export function waitForSave(page: Page): Promise<Response> {
+  return page.waitForResponse(
+    (res) =>
+      res.request().method() === 'PUT' &&
+      /\/api\/entities\/[\w-]+$/.test(res.url()) &&
+      res.ok(),
+  );
+}

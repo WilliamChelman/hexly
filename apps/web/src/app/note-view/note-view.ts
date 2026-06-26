@@ -9,6 +9,7 @@ import {
 import { RouterLink } from '@angular/router';
 import { translateSignal, TranslocoPipe } from '@jsverse/transloco';
 import { Editor, JSONContent } from '@tiptap/core';
+import { EditorState } from '@tiptap/pm/state';
 import { TiptapEditorDirective } from 'ngx-tiptap';
 import { EditorSession } from '../editor-shell/editor-session';
 import { HeaderService } from '../shell/header.service';
@@ -42,16 +43,24 @@ import { CONTENT_EXTENSIONS } from './content-extensions';
           >{{ 'noteView.backToLibrary' | transloco }}</a
         >
         <div class="flex items-center gap-2 ml-auto">
+          @if (error()) {
+            <app-chip tone="gold" data-testid="http-error">
+              {{ 'noteView.httpError' | transloco }}
+            </app-chip>
+          }
           @if (conflict()) {
             <app-chip tone="gold" data-testid="conflict">
-              {{ 'noteView.conflict' | transloco }}
+              {{ 'editorShell.save.conflict' | transloco }}
               <button
                 type="button"
-                class="ml-2 p-0 underline bg-transparent border-0 cursor-pointer"
+                appButton
+                variant="ghost"
+                size="sm"
+                class="ml-2 underline"
                 data-testid="conflict-reload"
                 (click)="reload()"
               >
-                {{ 'noteView.reload' | transloco }}
+                {{ 'editorShell.reload' | transloco }}
               </button>
             </app-chip>
           }
@@ -64,7 +73,7 @@ import { CONTENT_EXTENSIONS } from './content-extensions';
             [disabled]="saving()"
             (click)="save()"
           >
-            {{ (saving() ? 'noteView.saving' : 'common.save') | transloco }}
+            {{ (saving() ? 'editorShell.saving' : 'common.save') | transloco }}
           </button>
         </div>
       </div>
@@ -90,9 +99,6 @@ import { CONTENT_EXTENSIONS } from './content-extensions';
         tiptap
         [editor]="editor"
         data-testid="note-content"
-        role="textbox"
-        aria-multiline="true"
-        [attr.aria-label]="'noteView.editorLabel' | transloco"
         class="mt-5 flex min-h-[24rem] flex-col rounded-md border border-line bg-surface px-5 py-1 text-ink cursor-text focus-within:border-gold"
       ></div>
     </div>
@@ -156,6 +162,7 @@ export class NoteView {
   private readonly header = inject(HeaderService);
   private readonly destroyRef = inject(DestroyRef);
   private readonly eyebrow = translateSignal('noteView.eyebrow');
+  private readonly editorLabel = translateSignal('noteView.editorLabel');
 
   /** The open note's name, or empty before one is loaded. */
   protected readonly name = computed(() => this.session.current()?.name ?? '');
@@ -163,17 +170,11 @@ export class NoteView {
   protected readonly saving = this.session.saving;
   /** The server's current note when a save was rejected as stale, else `null`. */
   protected readonly conflict = this.session.conflict;
+  /** Non-null when the last save or reload HTTP request failed. */
+  protected readonly error = this.session.error;
 
   /** The headless TipTap editor; the template's `tiptap` directive mounts it. */
   protected readonly editor = new Editor({ extensions: CONTENT_EXTENSIONS });
-
-  /**
-   * The JSON signature the editor currently shows, so the seeding effect can tell an
-   * incoming server snapshot apart from the echo of our own edit and never reset the
-   * caret mid-typing. ponytail: stringify compare — note docs are small; revisit if a
-   * note grows large enough that re-serialising per change shows up.
-   */
-  private shown: string | null = null;
 
   constructor() {
     // Tab title is owned by EditorSession (shared with the map editor), not here.
@@ -182,27 +183,32 @@ export class NoteView {
       this.destroyRef,
     );
 
-    // Stream every edit into the session's live, opaque Content (the save source).
-    this.editor.on('update', ({ editor }) => {
-      const json = editor.getJSON();
-      this.shown = JSON.stringify(json);
-      this.session.setContent(json);
+    // Label the actual contenteditable (the .ProseMirror TipTap creates) rather than
+    // the wrapper — TipTap already sets role="textbox" on it, so we only add the label.
+    effect(() => {
+      this.editor.view.dom.setAttribute('aria-label', this.editorLabel());
     });
 
-    // Seed (and re-seed on a conflict reload or a note swap) from the open note's
-    // stored snapshot. Keyed on the open-Entity object, which changes on load / save /
-    // rename but NOT on our own setContent — so typing never re-enters here. Skipped
-    // when the snapshot already matches what's shown, so a clean save doesn't jump
-    // the caret to the document start.
+    // Stream every edit into the session's live, opaque Content (the save source).
+    this.editor.on('update', ({ editor }) => {
+      this.session.setContent(editor.getJSON());
+    });
+
+    // Seed from the server's authoritative snapshot on initial load, conflict reload,
+    // and note swap. `session.seed()` does NOT change on clean saves or renames, so
+    // in-flight keystrokes are never discarded. Clears undo history so the user can't
+    // Ctrl-Z past a conflict reload back to the rejected draft.
     effect(() => {
-      const detail = this.session.current();
+      const detail = this.session.seed();
       if (!detail || detail.document.type !== 'note') return;
       const snapshot = detail.document.content.snapshot;
       if (!isDocSnapshot(snapshot)) return;
-      const sig = JSON.stringify(snapshot);
-      if (sig === this.shown) return;
-      this.shown = sig;
       this.editor.commands.setContent(snapshot, { emitUpdate: false });
+      // Recreate state with the seeded doc so Ctrl-Z can't reach back past this point.
+      const { state } = this.editor;
+      this.editor.view.updateState(
+        EditorState.create({ doc: state.doc, plugins: state.plugins }),
+      );
     });
 
     this.destroyRef.onDestroy(() => this.editor.destroy());

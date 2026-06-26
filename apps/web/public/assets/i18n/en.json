@@ -34,9 +34,7 @@
     "eyebrow": "Note",
     "backToLibrary": "Back to library",
     "editorLabel": "Note content",
-    "saving": "Saving…",
-    "conflict": "Newer version on server",
-    "reload": "Reload"
+    "httpError": "Couldn't reach the server. Please try again."
   },
   "editorShell": {
     "tabTitle": "Hexly",
