@@ -9,12 +9,12 @@ import { Rule } from '../ui/rule';
 import { Swatch } from '../ui/swatch';
 import { featureKey, terrainKey } from './catalog-keys';
 import {
-  EditorStore,
+  HexMapStore,
   featureSubtools,
   SelectSubtool,
   selectSubtools,
   ToolId,
-} from './editor-store';
+} from './hexmap-store';
 
 /** A top-level Tool button in the floating icon strip (issue #27, ADR-0013). */
 interface ToolDef {
@@ -61,7 +61,7 @@ function glyphFor(subtool: SelectSubtool): IconName {
  * (internal `region` state), the strip highlights no Tool and opens no flyout —
  * the active affordance is the Inspector's Add/Remove (issue #38, story 25).
  *
- * The armed Tool and its Subtools live in the shared {@link EditorStore} so the
+ * The armed Tool and its Subtools live in the shared {@link HexMapStore} so the
  * canvas applies them (ADR-0005). Discoverability moves from inline labels to
  * `title` tooltips of the form `Terrain (T)` (name + keycap), per ADR-0013.
  */
@@ -215,7 +215,7 @@ function glyphFor(subtool: SelectSubtool): IconName {
   `,
 })
 export class ToolPalette {
-  protected readonly store = inject(EditorStore);
+  protected readonly store = inject(HexMapStore);
 
   /** The floating strip's Tool buttons, in palette order (issue #27). */
   protected readonly tools = TOOLS;

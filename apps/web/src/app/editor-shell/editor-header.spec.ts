@@ -8,7 +8,7 @@ import { provideRouter } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { emptyContent, EntityDetail } from '@hexly/domain';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
-import { EditorSession } from './editor-session';
+import { EntitySession } from './entity-session';
 import { EditorHeader } from './editor-header';
 
 describe('EditorHeader', () => {
@@ -29,7 +29,7 @@ describe('EditorHeader', () => {
 
   /** Open an entity through the real session so the header has one to show/save. */
   function openMap(detail: EntityDetail): void {
-    TestBed.inject(EditorSession).open(detail.id).subscribe();
+    TestBed.inject(EntitySession).open(detail.id).subscribe();
     http.expectOne(`/entities/${detail.id}`).flush(detail);
   }
 
@@ -37,7 +37,7 @@ describe('EditorHeader', () => {
     await TestBed.configureTestingModule({
       imports: [EditorHeader, provideTranslocoTesting()],
       providers: [
-        EditorSession,
+        EntitySession,
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),

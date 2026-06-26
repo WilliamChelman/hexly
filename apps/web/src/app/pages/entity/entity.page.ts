@@ -5,7 +5,7 @@ import {
   inject,
 } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
-import { EditorSession } from '../../editor-shell/editor-session';
+import { EntitySession } from '../../editor-shell/entity-session';
 import { EditorShell } from '../../editor-shell/editor-shell';
 import { NoteView } from '../../note-view/note-view';
 
@@ -35,7 +35,7 @@ import { NoteView } from '../../note-view/note-view';
   `,
 })
 export class EntityPage {
-  private readonly session = inject(EditorSession);
+  private readonly session = inject(EntitySession);
 
   /** Which view to render, or `null` until an Entity is open. */
   protected readonly view = computed(

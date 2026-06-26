@@ -6,7 +6,7 @@ import {
 import { TestBed } from '@angular/core/testing';
 import { TranslocoService } from '@jsverse/transloco';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
-import { EditorStore } from './editor-store';
+import { HexMapStore } from './hexmap-store';
 import { StatusBar } from './status-bar';
 
 describe('StatusBar', () => {
@@ -69,7 +69,7 @@ describe('StatusBar', () => {
   });
 
   it('pluralizes the hex count in English and translates it in French', () => {
-    const store = TestBed.inject(EditorStore);
+    const store = TestBed.inject(HexMapStore);
     store.paintAt({ q: 0, r: 0 }, 'grass'); // exactly one painted hex
     const { fixture, req } = render();
     req.flush({ status: 'ok', service: 'api' });

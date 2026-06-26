@@ -2,9 +2,9 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { IconButton } from '../ui/icon-button';
 import { Icon, IconName } from '../ui/icon/icon';
-import { EditorStore } from './editor-store';
+import { HexMapStore } from './hexmap-store';
 
-/** The right panel's identity a rail entry can open (mirrors {@link EditorStore.rightPanel}). */
+/** The right panel's identity a rail entry can open (mirrors {@link HexMapStore.rightPanel}). */
 type RightPanel = 'inspector' | 'regions';
 
 /** A declarative rail entry: which panel it owns plus its icon-only button chrome. */
@@ -22,7 +22,7 @@ interface RailEntry {
  * entries open management panels into the dismissible right panel (ADR-0011,
  * ADR-0013, issue #39). It is built to take further entries later; only the
  * Regions entry ships now. The Regions entry toggles the panel between the
- * Regions list and closed ({@link EditorStore.toggleRegionsPanel}); it reads as
+ * Regions list and closed ({@link HexMapStore.toggleRegionsPanel}); it reads as
  * active while that list is showing, and clicking it again reclaims the map.
  *
  * Each entry's chrome — its glyph, tooltip, and active state — is data ({@link
@@ -56,7 +56,7 @@ interface RailEntry {
   `,
 })
 export class EditorRail {
-  protected readonly store = inject(EditorStore);
+  protected readonly store = inject(HexMapStore);
 
   /** Rail entries rendered top-to-bottom; only Regions ships now (issue #39). */
   protected readonly entries: readonly RailEntry[] = [

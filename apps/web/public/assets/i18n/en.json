@@ -33,7 +33,8 @@
   "noteView": {
     "eyebrow": "Note",
     "backToLibrary": "Back to library",
-    "placeholder": "The content editor is coming soon."
+    "editorLabel": "Note content",
+    "httpError": "Couldn't reach the server. Please try again."
   },
   "editorShell": {
     "tabTitle": "Hexly",

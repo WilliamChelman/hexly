@@ -3,7 +3,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { EntityDetail, EntityType } from '@hexly/domain';
-import { EditorSession } from '../../editor-shell/editor-session';
+import { EntitySession } from '../../editor-shell/entity-session';
 import { EditorHeader } from '../../editor-shell/editor-header';
 import { provideTranslocoTesting } from '../../core/i18n/transloco-testing';
 import { EntityHeader } from './entity-header';
@@ -39,7 +39,7 @@ describe('EntityHeader', () => {
     await TestBed.configureTestingModule({
       imports: [EntityHeader, provideTranslocoTesting()],
       providers: [
-        EditorSession,
+        EntitySession,
         provideHttpClient(),
         provideHttpClientTesting(),
       ],
@@ -49,7 +49,7 @@ describe('EntityHeader', () => {
         add: { imports: [EditorHeaderStub] },
       })
       .compileComponents();
-    TestBed.inject(EditorSession).adopt(detail(type));
+    TestBed.inject(EntitySession).adopt(detail(type));
     const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
     return fixture;

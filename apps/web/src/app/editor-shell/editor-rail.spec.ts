@@ -1,12 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import { TranslocoService } from '@jsverse/transloco';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
-import { EditorStore } from './editor-store';
+import { HexMapStore } from './hexmap-store';
 import { EditorRail } from './editor-rail';
 
 function setup() {
   const fixture = TestBed.createComponent(EditorRail);
-  const store = TestBed.inject(EditorStore);
+  const store = TestBed.inject(HexMapStore);
   fixture.detectChanges();
   const regions = () =>
     fixture.nativeElement.querySelector(

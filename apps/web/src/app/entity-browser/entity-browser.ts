@@ -239,7 +239,7 @@ export class EntityBrowser implements OnInit {
       .create(type === 'note' ? NEW_NOTE_TITLE : NEW_MAP_TITLE, type)
       .pipe(finalize(() => this.creating.set(false)))
       .subscribe({
-        // EditorSession loads on open; no pre-adopt from here (it would outlive this page).
+        // EntitySession loads on open; no pre-adopt from here (it would outlive this page).
         next: (entity) => this.open(entity.id),
         error: () =>
           this.toaster.show(

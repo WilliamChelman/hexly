@@ -18,30 +18,32 @@ import {
   tap,
 } from 'rxjs';
 import {
+  Content,
   emptyHexMap,
   EntityBody,
   EntityDetail,
   EntitySaveOutcome,
   HexMap,
   hexMapSchema,
+  tiptapContent,
 } from '@hexly/domain';
 import { EntitiesClient } from '../entities/entities.client';
 import { TitleService } from '../core/i18n/title.service';
-import { EditorStore } from './editor-store';
+import { HexMapStore } from './hexmap-store';
 
 /**
- * Bridges persistence ({@link EntitiesClient}) and live editing ({@link EditorStore})
+ * Bridges persistence ({@link EntitiesClient}) and live editing ({@link HexMapStore})
  * for the open-Entity route: opening pulls a stored Entity and hands its grid to the
  * editor; saving pushes it back under the open Entity's base version. Extracts the
- * grid on open and re-wraps it (ADR-0019) on save, keeping EditorStore on a plain HexMap.
+ * grid on open and re-wraps it (ADR-0019) on save, keeping HexMapStore on a plain HexMap.
  *
  * Scoped to the `/entities/:id` route (`providers`), not root: leaving the route
  * destroys it, so open-Entity state resets implicitly — no teardown needed in views.
  */
 @Injectable()
-export class EditorSession {
+export class EntitySession {
   private readonly entities = inject(EntitiesClient);
-  private readonly editor = inject(EditorStore);
+  private readonly editor = inject(HexMapStore);
   private readonly title = inject(TitleService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
@@ -53,6 +55,20 @@ export class EditorSession {
   private readonly _conflict = signal<EntityDetail | null>(null);
   /** The server's current Entity when a save was rejected as stale, else `null`. */
   readonly conflict = this._conflict.asReadonly();
+
+  /** Fires on load, conflict reload, and note swap — NOT on clean saves or renames, so in-flight keystrokes aren't discarded. */
+  private readonly _seed = signal<EntityDetail | null>(null);
+  readonly seed = this._seed.asReadonly();
+
+  /** Non-null when the last save or reload HTTP request failed. */
+  private readonly _error = signal<'save' | 'reload' | null>(null);
+  readonly error = this._error.asReadonly();
+
+  /**
+   * Live Content envelope (ADR-0019), seeded on load and updated by the editor.
+   * Held here (not in {@link HexMapStore}) because Content spans every Entity type.
+   */
+  private readonly _content = signal<Content | null>(null);
 
   private readonly _saving = signal(false);
   readonly saving = this._saving.asReadonly();
@@ -72,12 +88,9 @@ export class EditorSession {
   }
 
   /**
-   * Drive the open Entity from a route's `:id`. The routed component hands its
-   * ActivatedRoute in (only the routed component's injector carries the one
-   * bound to `:id` — a route-scoped service injecting it would get the root).
-   * switchMap cancels an in-flight load on id change, so /entities/A then
-   * /entities/B can't let a stale A response land over B's canvas; a failed
-   * load (404) returns to the library (#3).
+   * Drive the open Entity from a route's `:id`. The routed component passes its
+   * ActivatedRoute in — a route-scoped service would get the root injector's route.
+   * switchMap prevents a stale A response from landing over B's canvas; 404 returns to the library.
    */
   watchRoute(route: ActivatedRoute): void {
     route.paramMap
@@ -102,23 +115,24 @@ export class EditorSession {
     return this.entities.load(id).pipe(tap((detail) => this.adopt(detail)));
   }
 
-  /** Adopt an already-fetched Entity as the open one (clearing any conflict) and load its grid. */
   adopt(detail: EntityDetail): void {
     this._conflict.set(null);
+    this._error.set(null);
     this._current.set(detail);
+    this._seed.set(detail);
+    this._content.set(detail.document.content);
     this.editor.load(gridOf(detail.document));
   }
 
+  /** Wrap the editor's latest snapshot in the format envelope (ADR-0019). */
+  setContent(snapshot: unknown): void {
+    this._content.set(tiptapContent(snapshot));
+  }
+
   /**
-   * Open the Entity the route points at: clear the canvas, then fetch, flagging
-   * {@link _loading} to block writes mid-swap.
-   *
-   * Always a fresh fetch — even when the id matches what's already open. This
-   * session is route-scoped but outlives a trip back to the library (its route
-   * injector isn't torn down between visits), so a retained `current` can be
-   * stale — e.g. a note renamed in the browser then reopened (#70). Re-fetching
-   * on entry also re-adopts, resetting the open-Entity state the way leaving the
-   * route is meant to.
+   * Open the Entity the route points at: clear canvas, fetch, flag loading to block mid-swap writes.
+   * Always a fresh fetch: this session outlives trips to the library (route injector isn't torn down),
+   * so a cached `current` can be stale (#70).
    */
   openRoute(id: string): Observable<EntityDetail> {
     this.editor.load(emptyHexMap()); // clear the previous map's canvas during load (#7)
@@ -147,8 +161,13 @@ export class EditorSession {
     const open = this._current();
     if (!open || this._loading()) return EMPTY;
     this._saving.set(true);
+    this._error.set(null);
+    const body = withContent(
+      withGrid(open.document, this.editor.document()),
+      this._content()!,
+    );
     return this.entities
-      .save(open.id, withGrid(open.document, this.editor.document()), open.version)
+      .save(open.id, body, open.version)
       .pipe(
         tap((outcome) => {
           // On conflict, leave the open Entity untouched so the edit isn't lost
@@ -159,6 +178,10 @@ export class EditorSession {
             this._conflict.set(null);
             this._current.set(outcome.entity);
           }
+        }),
+        catchError(() => {
+          this._error.set('save');
+          return EMPTY;
         }),
         finalize(() => this._saving.set(false)),
       );
@@ -172,7 +195,13 @@ export class EditorSession {
     // Always a real GET via `open()` — the conflict re-pull must not be cached (#4).
     const open = this._current();
     if (!open) return EMPTY;
-    return this.open(open.id);
+    this._error.set(null);
+    return this.open(open.id).pipe(
+      catchError(() => {
+        this._error.set('reload');
+        return EMPTY;
+      }),
+    );
   }
 }
 
@@ -190,4 +219,9 @@ function gridOf(body: EntityBody): HexMap {
  */
 function withGrid(body: EntityBody, grid: HexMap): EntityBody {
   return body.type === 'hexmap' ? { ...body, ...grid } : body;
+}
+
+/** Fold the live Content into the body on save (ADR-0019); spread preserves the type discriminant. */
+function withContent(body: EntityBody, content: Content): EntityBody {
+  return { ...body, content };
 }

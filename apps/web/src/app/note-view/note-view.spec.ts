@@ -2,8 +2,8 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { EntityDetail } from '@hexly/domain';
-import { EditorSession } from '../editor-shell/editor-session';
+import { CONTENT_FORMAT, EntityDetail } from '@hexly/domain';
+import { EntitySession } from '../editor-shell/entity-session';
 import { HeaderService } from '../shell/header.service';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { NoteView } from './note-view';
@@ -19,14 +19,14 @@ describe('NoteView', () => {
     version: 1,
     createdAt: 1,
     updatedAt: 1,
-    document: { type: 'note', content: { format: 'tiptap-v1', snapshot: {} } },
+    document: { type: 'note', content: { format: CONTENT_FORMAT, snapshot: {} } },
   });
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [NoteView, provideTranslocoTesting()],
       providers: [
-        EditorSession,
+        EntitySession,
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
@@ -35,7 +35,7 @@ describe('NoteView', () => {
   });
 
   it('shows the open note’s name', () => {
-    TestBed.inject(EditorSession).adopt(note('Lady Mara'));
+    TestBed.inject(EntitySession).adopt(note('Lady Mara'));
 
     const fixture = TestBed.createComponent(NoteView);
     fixture.detectChanges();
@@ -44,7 +44,7 @@ describe('NoteView', () => {
   });
 
   it('offers a way back to the library', () => {
-    TestBed.inject(EditorSession).adopt(note('Lady Mara'));
+    TestBed.inject(EntitySession).adopt(note('Lady Mara'));
 
     const fixture = TestBed.createComponent(NoteView);
     fixture.detectChanges();
@@ -56,8 +56,40 @@ describe('NoteView', () => {
     expect(back.getAttribute('href')).toBe('/entities');
   });
 
+  it('seeds the editor with the open note’s stored Content', () => {
+    const detail = note('Lady Mara');
+    TestBed.inject(EntitySession).adopt({
+      ...detail,
+      document: {
+        type: 'note',
+        content: {
+          format: 'tiptap-v1',
+          snapshot: {
+            type: 'doc',
+            content: [
+              {
+                type: 'paragraph',
+                content: [{ type: 'text', text: 'Lady Mara rules the north.' }],
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    const fixture = TestBed.createComponent(NoteView);
+    fixture.detectChanges();
+
+    // The stored prose renders into the editable surface — proving the snapshot
+    // was loaded into the editor, not just held opaquely in the session.
+    const surface = fixture.nativeElement.querySelector(
+      '[data-testid=note-content]',
+    ) as HTMLElement;
+    expect(surface.textContent).toContain('Lady Mara rules the north.');
+  });
+
   it('contributes the note’s name to the app header while open', () => {
-    TestBed.inject(EditorSession).adopt(note('Lady Mara'));
+    TestBed.inject(EntitySession).adopt(note('Lady Mara'));
 
     const fixture = TestBed.createComponent(NoteView);
     fixture.detectChanges();

@@ -8,7 +8,7 @@ import { Field } from '../ui/field';
 import { Input } from '../ui/input';
 import { featureKey, terrainKey } from './catalog-keys';
 import { inputValue } from './dom';
-import { EditorStore, Selection } from './editor-store';
+import { HexMapStore, Selection } from './hexmap-store';
 import { RegionFields } from './region-fields';
 
 /**
@@ -64,9 +64,9 @@ interface SelectedEntity {
  * #36) — the only place a Region's details are edited (CONTEXT.md → Inspector);
  * while a selected Hex or Feature gets a minimal panel showing its identity and a
  * Delete action. The entity panel's Delete dispatches through the store's single
- * {@link EditorStore.deleteSelected} gesture (issue #29): a Hex erases the whole
+ * {@link HexMapStore.deleteSelected} gesture (issue #29): a Hex erases the whole
  * record, a Feature clears only its feature, a Label is removed, a Region is
- * destroyed. Every field commits through the {@link EditorStore}, so each edit is
+ * destroyed. Every field commits through the {@link HexMapStore}, so each edit is
  * undoable and persists. With nothing selected it shows a hint instead.
  */
 @Component({
@@ -400,7 +400,7 @@ interface SelectedEntity {
   `,
 })
 export class Inspector {
-  protected readonly store = inject(EditorStore);
+  protected readonly store = inject(HexMapStore);
 
   /** The Add/Remove membership-direction toggle pair, for the template `@for`. */
   protected readonly directions = DIRECTIONS;
@@ -442,7 +442,7 @@ export class Inspector {
    * The multi-selection summary — the set's size and a per-kind breakdown — or
    * `null` when fewer than two entities are selected (a single selection has its
    * own editor; an empty selection the hint). Resolved from the live
-   * {@link EditorStore.selections} set, so it self-heals as members drop out
+   * {@link HexMapStore.selections} set, so it self-heals as members drop out
    * (ADR-0017). Kinds the set doesn't hold are filtered away, so the breakdown
    * lists only what is actually selected.
    */

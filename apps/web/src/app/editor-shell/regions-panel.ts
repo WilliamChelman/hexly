@@ -4,7 +4,7 @@ import { Region } from '@hexly/domain';
 import { Button } from '../ui/button';
 import { Eyebrow } from '../ui/eyebrow';
 import { Swatch } from '../ui/swatch';
-import { EditorStore } from './editor-store';
+import { HexMapStore } from './hexmap-store';
 
 /**
  * The Regions panel — the right-edge rail's first entry, sharing the Inspector's
@@ -13,7 +13,7 @@ import { EditorStore } from './editor-store';
  * (zero member hexes, so invisible on the canvas) — so it must never assume
  * non-empty membership — and offers a New Region action.
  *
- * Selecting a Region here routes through the *same* {@link EditorStore.selectRegion}
+ * Selecting a Region here routes through the *same* {@link HexMapStore.selectRegion}
  * the canvas uses, so a list pick highlights on the canvas and opens in the
  * Inspector — which flips the shared column back to the Inspector. New Region mints
  * an empty "Region N" (next palette colour) without painting, then selects it so
@@ -79,11 +79,11 @@ import { EditorStore } from './editor-store';
   `,
 })
 export class RegionsPanel {
-  protected readonly store = inject(EditorStore);
+  protected readonly store = inject(HexMapStore);
 
   /**
    * Whether a Region is part of the *live selection set* — the source of truth the
-   * canvas highlights from. Reading the set (not the single {@link EditorStore.selection}
+   * canvas highlights from. Reading the set (not the single {@link HexMapStore.selection}
    * view, which is null whenever 2+ entities are selected) keeps the row's active
    * state in sync during a multi-selection, e.g. when Shift-clicking a hex inside a
    * Region adds both the hex and the Region. A sole selected Region is still in the

@@ -20,7 +20,7 @@ import {
   TerrainId,
 } from '@hexly/domain';
 import { Camera } from './camera';
-import type { Selection } from './editor-store';
+import type { Selection } from './hexmap-store';
 
 /** The built-in features keyed by id, for a marker's path lookup. */
 const FEATURE_BY_ID = new Map(featureLibrary.map((f) => [f.id, f]));

@@ -12,7 +12,7 @@ import { HealthStatus, isHealthy } from '@hexly/domain';
 import { Cartouche } from '../ui/cartouche';
 import { Coord } from '../ui/coord';
 import { Dot } from '../ui/dot';
-import { EditorStore } from './editor-store';
+import { HexMapStore } from './hexmap-store';
 
 /**
  * The bottom rail. It owns the API health probe it displays — the only piece of
@@ -50,7 +50,7 @@ import { EditorStore } from './editor-store';
 })
 export class StatusBar implements OnInit {
   private readonly http = inject(HttpClient);
-  private readonly store = inject(EditorStore);
+  private readonly store = inject(HexMapStore);
 
   /** How many hexes the user has painted (sparse document — record count, ADR-0003). */
   protected readonly hexCount = computed(

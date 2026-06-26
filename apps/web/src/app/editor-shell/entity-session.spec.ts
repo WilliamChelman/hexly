@@ -4,14 +4,14 @@ import {
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { coordKey, emptyContent, EntityDetail, HexMap } from '@hexly/domain';
+import { CONTENT_FORMAT, coordKey, emptyContent, EntityDetail, HexMap } from '@hexly/domain';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
-import { EditorSession } from './editor-session';
-import { EditorStore } from './editor-store';
+import { EntitySession } from './entity-session';
+import { HexMapStore } from './hexmap-store';
 
-describe('EditorSession', () => {
-  let session: EditorSession;
-  let editor: EditorStore;
+describe('EntitySession', () => {
+  let session: EntitySession;
+  let editor: HexMapStore;
   let http: HttpTestingController;
 
   const content = emptyContent();
@@ -45,13 +45,13 @@ describe('EditorSession', () => {
     TestBed.configureTestingModule({
       imports: [provideTranslocoTesting()],
       providers: [
-        EditorSession,
+        EntitySession,
         provideHttpClient(),
         provideHttpClientTesting(),
       ],
     });
-    session = TestBed.inject(EditorSession);
-    editor = TestBed.inject(EditorStore);
+    session = TestBed.inject(EntitySession);
+    editor = TestBed.inject(HexMapStore);
     http = TestBed.inject(HttpTestingController);
   });
 
@@ -202,6 +202,40 @@ describe('EditorSession', () => {
     expect(req.request.method).toBe('PUT');
     // The body is the untouched note — same type, no hex grid grafted on.
     expect(req.request.body).toEqual({ document: noteBody, version: 3 });
+    req.flush({ ...note, version: 4 });
+  });
+
+  it('saves a note’s edited Content opaquely, round-tripping the snapshot untouched', () => {
+    const noteBody = { type: 'note' as const, content };
+    const note: EntityDetail = {
+      ...aldermoor,
+      id: 'n1',
+      type: 'note',
+      document: noteBody,
+    };
+    session.open('n1').subscribe();
+    http.expectOne('/entities/n1').flush(note);
+
+    const snapshot = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Lady Mara rules the north.' }],
+        },
+      ],
+    };
+    session.setContent(snapshot);
+
+    session.save().subscribe();
+
+    const req = http.expectOne('/entities/n1');
+    expect(req.request.method).toBe('PUT');
+    // Snapshot wrapped in format envelope, never parsed (ADR-0019).
+    expect(req.request.body).toEqual({
+      document: { type: 'note', content: { format: CONTENT_FORMAT, snapshot } },
+      version: 3,
+    });
     req.flush({ ...note, version: 4 });
   });
 

@@ -7,18 +7,22 @@
 import { z } from 'zod';
 import { emptyHexMap, hexMapSchema } from './hex/hex-map';
 
-/**
- * The opaque, format-tagged Content body every Entity carries (ADR-0019). The
- * `format` tag is the contract; the `snapshot` is editor-defined JSON the domain
- * never parses (`z.unknown()`), so it round-trips untouched.
- */
+/** Single source for the format tag (ADR-0019); a schema-affecting extension change is a bump + migration. */
+export const CONTENT_FORMAT = 'tiptap-v1';
+
+/** Opaque, format-tagged Content (ADR-0019). `snapshot` is `z.unknown()` — the domain never parses it. */
 export const contentSchema = z.object({
-  format: z.literal('tiptap-v1'),
+  format: z.literal(CONTENT_FORMAT),
   snapshot: z.unknown(),
 });
 
 /** An Entity's opaque, format-tagged rich-text body (CONTEXT.md → Content). */
 export type Content = z.infer<typeof contentSchema>;
+
+/** The one place a snapshot becomes Content — keeps the editor seam from hand-stamping the format tag (ADR-0019). */
+export function tiptapContent(snapshot: unknown): Content {
+  return { format: CONTENT_FORMAT, snapshot };
+}
 
 /**
  * The closed, code-known set of Entity shapes (ADR-0018): `note` is Content
@@ -47,7 +51,7 @@ export type EntityBody = z.infer<typeof entityBodySchema>;
 
 /** A fresh, empty Content envelope: the smallest valid TipTap document. */
 export function emptyContent(): Content {
-  return { format: 'tiptap-v1', snapshot: { type: 'doc', content: [] } };
+  return tiptapContent({ type: 'doc', content: [] });
 }
 
 /**
