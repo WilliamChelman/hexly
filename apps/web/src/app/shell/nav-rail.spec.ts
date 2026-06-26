@@ -1,3 +1,4 @@
+import { BreakpointObserver, BreakpointState } from '@angular/cdk/layout';
 import { provideHttpClient } from '@angular/common/http';
 import {
   HttpTestingController,
@@ -6,6 +7,7 @@ import {
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
+import { BehaviorSubject, Observable, map } from 'rxjs';
 import { AuthStore } from '../auth/auth.store';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { NavRail } from './nav-rail';
@@ -13,11 +15,24 @@ import { NavRail } from './nav-rail';
 @Component({ template: '' })
 class Blank {}
 
+/** A viewport the test drives directly: `setWide(false)` simulates a narrow screen. */
+class FakeBreakpointObserver {
+  private readonly wide$ = new BehaviorSubject(true);
+  setWide(wide: boolean): void {
+    this.wide$.next(wide);
+  }
+  observe(): Observable<BreakpointState> {
+    return this.wide$.pipe(map((matches) => ({ matches, breakpoints: {} })));
+  }
+}
+
 describe('NavRail', () => {
   let http: HttpTestingController;
+  let viewport: FakeBreakpointObserver;
 
   beforeEach(async () => {
     localStorage.clear();
+    viewport = new FakeBreakpointObserver();
     await TestBed.configureTestingModule({
       imports: [NavRail, provideTranslocoTesting()],
       providers: [
@@ -27,6 +42,7 @@ describe('NavRail', () => {
           { path: 'entities', component: Blank },
           { path: 'styleguide', component: Blank },
         ]),
+        { provide: BreakpointObserver, useValue: viewport },
       ],
     }).compileComponents();
     http = TestBed.inject(HttpTestingController);
@@ -104,6 +120,43 @@ describe('NavRail', () => {
     signIn();
     const fixture = render();
     expect(fixture.nativeElement.querySelector('app-user-menu')).not.toBeNull();
+  });
+
+  it('instantiates the rail body once when the narrow overlay is open', () => {
+    viewport.setWide(false);
+    signIn();
+    const fixture = render();
+
+    (q(fixture, 'rail-toggle') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    const all = (testid: string) =>
+      fixture.nativeElement.querySelectorAll(`[data-testid="${testid}"]`).length;
+    // The overlay is open; the docked strip behind it must not re-render the body.
+    expect(q(fixture, 'nav-rail-overlay')).not.toBeNull();
+    expect(all('brand')).toBe(1);
+    expect(all('rail-toggle')).toBe(1);
+    // The lone toggle's ARIA tracks its visibly-open state, not a stale source.
+    expect(q(fixture, 'rail-toggle')?.getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('does not resurrect the overlay after a narrow → wide → narrow round trip', () => {
+    viewport.setWide(false);
+    signIn();
+    const fixture = render();
+
+    (q(fixture, 'rail-toggle') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(q(fixture, 'nav-rail-overlay')).not.toBeNull();
+
+    viewport.setWide(true);
+    fixture.detectChanges();
+    expect(q(fixture, 'nav-rail-overlay')).toBeNull();
+
+    viewport.setWide(false);
+    fixture.detectChanges();
+    // The overlay stays closed — the transient open flag didn't survive the resize.
+    expect(q(fixture, 'nav-rail-overlay')).toBeNull();
   });
 
   it('reduces to brand + avatar with no destinations for an anonymous viewer', () => {

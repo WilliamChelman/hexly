@@ -61,6 +61,17 @@ describe('EntityBrowser', () => {
     return fixture;
   }
 
+  it('exposes the banner and main as sibling landmarks, not banner nested in main', () => {
+    const el = renderWith([]).nativeElement as HTMLElement;
+
+    const banner = el.querySelector('[role="banner"]');
+    const main = el.querySelector('main');
+    expect(banner).not.toBeNull();
+    expect(main).not.toBeNull();
+    // The header is its own top-level landmark, not swallowed by the content region.
+    expect(main!.contains(banner)).toBe(false);
+  });
+
   it('renders its chrome and empty state in French when French is the active language', () => {
     const fixture = renderWith([]);
     const el = fixture.nativeElement as HTMLElement;

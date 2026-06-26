@@ -39,7 +39,7 @@ import { CONTENT_EXTENSIONS } from './content-extensions';
   ],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
-    <app-page-header>
+    <app-page-header sticky>
       <a
         pageHeaderLeading
         class="text-sm text-ink-muted no-underline hover:underline"
@@ -93,7 +93,7 @@ import { CONTENT_EXTENSIONS } from './content-extensions';
       </button>
     </app-page-header>
 
-    <div class="max-w-[60rem] mx-auto py-9 px-5">
+    <main class="max-w-[60rem] mx-auto py-9 px-5">
       <app-entity-tags class="block" />
 
       <!--
@@ -106,7 +106,7 @@ import { CONTENT_EXTENSIONS } from './content-extensions';
         data-testid="note-content"
         class="mt-5 flex min-h-[24rem] flex-col rounded-md border border-line bg-surface px-5 py-1 text-ink cursor-text focus-within:border-gold"
       ></div>
-    </div>
+    </main>
   `,
   styles: `
     /* TipTap creates .ProseMirror outside Angular's template — pierce with ::ng-deep.

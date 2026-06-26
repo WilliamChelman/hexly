@@ -10,7 +10,7 @@ import { Toaster } from './shell/toaster';
 /**
  * Application root and shell. The only persistent chrome is the {@link NavRail}
  * (ADR-0022, supersedes ADR-0015): it docks beside a bare routed outlet, and
- * each page renders its own header. The rail is hidden on `/login` so the
+ * each page renders its own banner header and `<main>`. The rail is hidden on `/login` so the
  * authentication screen stands alone. {@link ThemeService} and
  * {@link LocaleService} are eagerly constructed so the active theme and language
  * are applied on boot.
@@ -26,11 +26,12 @@ import { Toaster } from './shell/toaster';
     <!--
       The outlet region is the scroll container, so the docked rail stays put
       while long pages scroll; the editor fills it exactly and manages its own
-      overflow.
+      overflow. Not a landmark: each page owns its own <main> beside its banner
+      header, so the banner isn't nested inside main (ADR-0022).
     -->
-    <main class="flex-1 min-w-0 overflow-auto">
+    <div class="flex-1 min-w-0 overflow-auto">
       <router-outlet />
-    </main>
+    </div>
     <app-toaster />
   `,
 })
@@ -48,9 +49,15 @@ export class App {
       filter((e): e is NavigationEnd => e instanceof NavigationEnd),
       map((e) => e.urlAfterRedirects),
     ),
-    { initialValue: this.router.url },
   );
 
-  /** Login renders without the rail — no app chrome the user can't use yet. */
-  protected readonly standalone = computed(() => this.url().startsWith('/login'));
+  /**
+   * Login renders without the rail — no app chrome the user can't use yet.
+   * Standalone until the first navigation resolves (url is `undefined` then, not
+   * yet `/login`): the rail must never flash onto a cold/deep-loaded login screen.
+   */
+  protected readonly standalone = computed(() => {
+    const url = this.url();
+    return url === undefined || url.startsWith('/login');
+  });
 }

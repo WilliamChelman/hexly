@@ -52,7 +52,7 @@ function formatEdited(updatedAt: number, lang: string): string {
   imports: [Button, Eyebrow, PageHeader, Panel, Icon, TranslocoPipe, Autofocus],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
-    <app-page-header>
+    <app-page-header sticky>
       <div pageHeaderTitle class="flex flex-col">
         <span appEyebrow class="text-gold! tracking-[0.28em]">{{
           'entityBrowser.eyebrow' | transloco
@@ -87,7 +87,7 @@ function formatEdited(updatedAt: number, lang: string): string {
       </button>
     </app-page-header>
 
-    <div class="max-w-[60rem] mx-auto py-6 px-5">
+    <main class="max-w-[60rem] mx-auto py-6 px-5">
       @if (cards().length > 0) {
         <ul class="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-4 m-0 p-0 list-none">
           @for (card of cards(); track card.id) {
@@ -168,7 +168,7 @@ function formatEdited(updatedAt: number, lang: string): string {
           <p class="text-sm">{{ 'entityBrowser.emptyHint' | transloco }}</p>
         </section>
       }
-    </div>
+    </main>
   `,
 })
 export class EntityBrowser implements OnInit {

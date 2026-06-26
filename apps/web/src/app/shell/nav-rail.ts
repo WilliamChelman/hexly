@@ -1,5 +1,6 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { A11yModule } from '@angular/cdk/a11y';
+import { BreakpointObserver } from '@angular/cdk/layout';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -7,6 +8,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { AuthStore } from '../auth/auth.store';
@@ -66,15 +68,21 @@ const ENTRIES: readonly NavEntry[] = [
     TranslocoPipe,
   ],
   template: `
-    <!-- Docked column: in flow, so growing its width pushes the page (wide only). -->
-    <aside
-      class="flex flex-col shrink-0 h-full p-2 gap-1 bg-bg-deep text-ink border-r border-line shadow-2 transition-[width] duration-200"
-      data-testid="nav-rail"
-      [class.w-56]="docked()"
-      [class.w-12]="!docked()"
-    >
-      <ng-container *ngTemplateOutlet="body; context: { expanded: docked() }" />
-    </aside>
+    <!--
+      Docked column: in flow, so growing its width pushes the page. Hidden while
+      the narrow overlay is open, so the rail body isn't instantiated twice
+      (duplicate brand/nav/toggle in the a11y tree, ambiguous locators).
+    -->
+    @if (!overlay()) {
+      <aside
+        class="flex flex-col shrink-0 h-full p-2 gap-1 bg-bg-deep text-ink border-r border-line shadow-2 transition-[width] duration-200"
+        data-testid="nav-rail"
+        [class.w-56]="docked()"
+        [class.w-12]="!docked()"
+      >
+        <ng-container *ngTemplateOutlet="body; context: { expanded: docked() }" />
+      </aside>
+    }
 
     <!-- Narrow: the expanded rail overlays the page and is dismissed on click-away. -->
     @if (overlay()) {
@@ -154,10 +162,8 @@ const ENTRIES: readonly NavEntry[] = [
           icon
           data-testid="rail-toggle"
           [class.ml-auto]="expanded"
-          [attr.aria-expanded]="this.expanded()"
-          [attr.aria-label]="
-            (this.expanded() ? 'nav.collapse' : 'nav.expand') | transloco
-          "
+          [attr.aria-expanded]="expanded"
+          [attr.aria-label]="(expanded ? 'nav.collapse' : 'nav.expand') | transloco"
           (click)="toggle()"
         >
           <app-icon
@@ -202,14 +208,18 @@ export class NavRail {
   protected readonly overlay = computed(() => !this.wide() && this.overlayOpen());
 
   constructor() {
-    const mq =
-      typeof window !== 'undefined' && window.matchMedia
-        ? window.matchMedia('(min-width: 768px)')
-        : null;
-    if (mq) {
-      this.wide.set(mq.matches);
-      mq.addEventListener('change', (e) => this.wide.set(e.matches));
-    }
+    // BreakpointObserver over a hand-rolled matchMedia listener: it cleans up via
+    // takeUntilDestroyed (the rail is destroyed/recreated across login), so no
+    // leaked listener fires on a dead instance.
+    inject(BreakpointObserver)
+      .observe('(min-width: 768px)')
+      .pipe(takeUntilDestroyed())
+      .subscribe(({ matches }) => {
+        this.wide.set(matches);
+        // Crossing to wide closes any narrow overlay, so it can't resurrect itself
+        // (overlay = !wide && overlayOpen) the next time the viewport goes narrow.
+        if (matches) this.overlayOpen.set(false);
+      });
   }
 
   protected toggle(): void {

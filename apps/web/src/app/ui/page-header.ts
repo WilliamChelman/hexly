@@ -1,4 +1,9 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import {
+  booleanAttribute,
+  ChangeDetectionStrategy,
+  Component,
+  input,
+} from '@angular/core';
 
 /**
  * The reusable page-owned header frame (ADR-0022). It owns the shared chrome —
@@ -21,9 +26,14 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
   host: {
     class:
       'flex items-center gap-4 px-4 h-[var(--rail-header)] bg-linear-[180deg] from-surface to-bg-deep border-b border-b-line shadow-2',
+    role: 'banner',
+    '[class.sticky]': 'sticky()',
+    '[class.top-0]': 'sticky()',
+    '[class.z-30]': 'sticky()',
   },
   template: `
-    <div class="flex items-center shrink-0" data-testid="slot-leading">
+    <!-- empty:hidden so an unused leading slot reserves no phantom gap before the title. -->
+    <div class="flex items-center shrink-0 empty:hidden" data-testid="slot-leading">
       <ng-content select="[pageHeaderLeading]" />
     </div>
     <div class="flex items-center gap-3 min-w-0 flex-1" data-testid="slot-title">
@@ -34,4 +44,11 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
     </div>
   `,
 })
-export class PageHeader {}
+export class PageHeader {
+  /**
+   * Stick the header to the top of the page's scroll region so actions (Save,
+   * conflict Reload) stay reachable on a long page. Off by default; the editor
+   * leaves it off and pins the header via its own grid instead.
+   */
+  readonly sticky = input(false, { transform: booleanAttribute });
+}

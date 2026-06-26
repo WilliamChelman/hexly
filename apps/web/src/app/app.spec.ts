@@ -42,6 +42,13 @@ describe('App', () => {
     expect(fixture.nativeElement.querySelector('app-header')).toBeNull();
   });
 
+  it('stays chrome-free before the first navigation resolves (no rail flash on a cold login load)', () => {
+    const fixture = TestBed.createComponent(App);
+    fixture.detectChanges(); // no navigation has resolved yet
+
+    expect(fixture.nativeElement.querySelector('app-nav-rail')).toBeNull();
+  });
+
   it('renders the login screen standalone, with no rail', async () => {
     const fixture = TestBed.createComponent(App);
     await TestBed.inject(Router).navigateByUrl('/login');

@@ -25,7 +25,7 @@ import { Panel } from '../ui/panel';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [Panel, Field, Input, Button, TranslocoPipe],
   template: `
-    <div class="grid place-items-center min-h-full p-5 bg-surface-sunken">
+    <main class="grid place-items-center min-h-full p-5 bg-surface-sunken">
       <section class="w-full max-w-[22rem] p-6" appPanel raised>
         <h1 class="sr-only">{{ heading() }}</h1>
         <form class="flex flex-col gap-4" (submit)="submit($event)">
@@ -64,7 +64,7 @@ import { Panel } from '../ui/panel';
           </button>
         </form>
       </section>
-    </div>
+    </main>
   `,
 })
 export class Login {

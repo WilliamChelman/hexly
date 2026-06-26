@@ -22,6 +22,13 @@ test('defaults to English, flips to French via the rail, and remembers it on rel
   await page.getByRole('button', { name: 'Open user menu' }).click();
   await page.getByRole('menuitemradio', { name: 'Français' }).click();
 
+  // The switch takes effect live, in place — no reload, no navigation: the rail's
+  // own avatar control is already relabelled in French on this same page.
+  await expect(
+    page.getByRole('button', { name: 'Ouvrir le menu utilisateur' }),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Open user menu' })).toHaveCount(0);
+
   // The choice carries to the standalone login screen and persists on reload.
   await page.goto('/login');
   await expect(page.getByRole('button', { name: 'Se connecter' })).toBeVisible();
