@@ -1,33 +1,25 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter, map } from 'rxjs';
 import { ThemeService } from './core/theme.service';
 import { LocaleService } from './core/i18n/locale.service';
+import { AppShellStore } from './shell/app-shell.store';
 import { NavRail } from './shell/nav-rail';
 import { Toaster } from './shell/toaster';
 
-/**
- * Application root and shell. The only persistent chrome is the {@link NavRail}
- * (ADR-0022, supersedes ADR-0015): it docks beside a bare routed outlet, and
- * each page renders its own banner header and `<main>`. The rail is hidden on `/login` so the
- * authentication screen stands alone. {@link ThemeService} and
- * {@link LocaleService} are eagerly constructed so the active theme and language
- * are applied on boot.
- */
+/** Application root. The only persistent chrome is the {@link NavRail} (ADR-0022). */
 @Component({
   selector: 'app-root',
   host: { class: 'flex h-screen' },
   imports: [RouterOutlet, NavRail, Toaster],
   template: `
-    @if (!standalone()) {
+    @if (navigated() && !shell.standalone()) {
       <app-nav-rail />
     }
     <!--
-      The outlet region is the scroll container, so the docked rail stays put
-      while long pages scroll; the editor fills it exactly and manages its own
-      overflow. Not a landmark: each page owns its own <main> beside its banner
-      header, so the banner isn't nested inside main (ADR-0022).
+      Outlet is the scroll container so the docked rail stays put while pages
+      scroll. Not a landmark: each page owns its own <main>.
     -->
     <div class="flex-1 min-w-0 overflow-auto">
       <router-outlet />
@@ -36,28 +28,18 @@ import { Toaster } from './shell/toaster';
   `,
 })
 export class App {
-  private readonly router = inject(Router);
-
-  // Eagerly resolve the theme service so `data-theme` is wired up at startup.
+  protected readonly shell = inject(AppShellStore);
   protected readonly theme = inject(ThemeService);
-  // Eagerly resolve the locale service so the detected/remembered language is
-  // active before the first page renders.
   protected readonly locale = inject(LocaleService);
 
-  private readonly url = toSignal(
-    this.router.events.pipe(
-      filter((e): e is NavigationEnd => e instanceof NavigationEnd),
-      map((e) => e.urlAfterRedirects),
+  // Hold the rail back until the first navigation resolves; by then the landing
+  // page's constructor has set `standalone`, so a cold load on /login never
+  // flashes the rail.
+  protected readonly navigated = toSignal(
+    inject(Router).events.pipe(
+      filter((e) => e instanceof NavigationEnd),
+      map(() => true),
     ),
+    { initialValue: false },
   );
-
-  /**
-   * Login renders without the rail — no app chrome the user can't use yet.
-   * Standalone until the first navigation resolves (url is `undefined` then, not
-   * yet `/login`): the rail must never flash onto a cold/deep-loaded login screen.
-   */
-  protected readonly standalone = computed(() => {
-    const url = this.url();
-    return url === undefined || url.startsWith('/login');
-  });
 }

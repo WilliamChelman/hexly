@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   inject,
   signal,
 } from '@angular/core';
@@ -12,14 +13,8 @@ import { Button } from '../ui/button';
 import { Field } from '../ui/field';
 import { Input } from '../ui/input';
 import { Panel } from '../ui/panel';
+import { AppShellStore } from '../shell/app-shell.store';
 
-/**
- * The sign-in screen for the closed user set (ADR-0004). It collects email +
- * password, hands them to {@link AuthStore}, and on success the session cookie
- * is set and we enter the editor. A rejected login surfaces a single,
- * deliberately vague message — the API never says whether it was the email or
- * the password that was wrong.
- */
 @Component({
   selector: 'app-login',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -72,14 +67,17 @@ export class Login {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
-  /** Translated heading for the sr-only `<h1>`; the login screen renders
-   * standalone with no header chrome (ADR-0022), so this is its only home. */
+  constructor() {
+    const shell = inject(AppShellStore);
+    shell.standalone.set(true);
+    inject(DestroyRef).onDestroy(() => shell.standalone.set(false));
+  }
+
   protected readonly heading = translateSignal('auth.heading');
 
   protected readonly email = signal('');
   protected readonly password = signal('');
   protected readonly pending = signal(false);
-  /** A translation key for the active error, or `null` when there is none. */
   protected readonly error = signal<string | null>(null);
 
   protected value(event: Event): string {

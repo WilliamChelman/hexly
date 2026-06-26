@@ -18,12 +18,10 @@ import { Cartouche } from '../ui/cartouche';
 import { Icon, IconName } from '../ui/icon/icon';
 import { UserMenu } from './user-menu';
 
-/** A primary navigation destination: its route, glyph, and translated label. */
 interface NavEntry {
   readonly link: string;
   readonly testid: string;
   readonly icon: IconName;
-  /** Translation key for the visible label / accessible name (ADR-0014). */
   readonly labelKey: string;
 }
 
@@ -33,24 +31,12 @@ const ENTRIES: readonly NavEntry[] = [
 ];
 
 /**
- * The persistent global nav rail — the app shell's only chrome (ADR-0022,
- * supersedes ADR-0015). A slim icon strip at every viewport that owns everything
- * app-level: brand, primary navigation, and — behind the avatar ({@link UserMenu})
- * — appearance and account.
+ * The persistent global nav rail (ADR-0022). Expands to reveal labels on wide
+ * viewports (docked, persisted); overlays transiently on narrow viewports
+ * (focus-trapped, dismissed on click-away / Escape / destination chosen).
  *
- * It expands to reveal labels, viewport-driven: on wide screens it pushes the
- * page aside (a docked column that grows) and the choice is persisted; on narrow
- * screens it overlays the page transiently (focus-trapped, dismissed on
- * click-away / Escape / after a destination is chosen) so the rail never
- * permanently eats limited width.
- *
- * An anonymous viewer (no session) gets a reduced rail — brand + avatar, no
- * navigation rows — since the destinations are doors they can't open.
- *
- * ponytail: appearance/account stay in {@link UserMenu}'s popover at both widths
- * rather than morphing into an inline expanded section — the single-home
- * guarantee (ADR-0014) holds either way. Build the inline section if expanded-rail
- * affordances grow.
+ * ponytail: appearance/account stay in {@link UserMenu}'s popover at both widths.
+ * Build the inline section if expanded-rail affordances grow.
  */
 @Component({
   selector: 'app-nav-rail',
@@ -70,8 +56,7 @@ const ENTRIES: readonly NavEntry[] = [
   template: `
     <!--
       Docked column: in flow, so growing its width pushes the page. Hidden while
-      the narrow overlay is open, so the rail body isn't instantiated twice
-      (duplicate brand/nav/toggle in the a11y tree, ambiguous locators).
+      the narrow overlay is open to avoid duplicate content in the a11y tree.
     -->
     @if (!overlay()) {
       <aside
@@ -84,7 +69,7 @@ const ENTRIES: readonly NavEntry[] = [
       </aside>
     }
 
-    <!-- Narrow: the expanded rail overlays the page and is dismissed on click-away. -->
+    <!-- Narrow: expanded rail overlays the page, dismissed on click-away. -->
     @if (overlay()) {
       <button
         type="button"
@@ -146,9 +131,8 @@ const ENTRIES: readonly NavEntry[] = [
       <div class="flex-1"></div>
 
       <!--
-        Account + collapse control sit together at the foot of the rail: stacked
-        when collapsed, side-by-side (avatar left, chevron right) when expanded.
-        The chevron points the way it moves — » to open, « to close.
+        Avatar and collapse toggle sit together at the foot: stacked when
+        collapsed, side-by-side when expanded. Chevron points the way it moves.
       -->
       <div
         class="flex items-center gap-1"
@@ -183,7 +167,6 @@ export class NavRail {
   protected readonly isAuthenticated = this.auth.isAuthenticated;
   protected readonly entries = ENTRIES;
 
-  /** Wide-viewport expand state, remembered across sessions (ADR-0022). */
   private readonly pin = persistedPreference<'collapsed' | 'expanded'>({
     storageKey: 'hexly-rail',
     values: ['collapsed', 'expanded'],
@@ -193,31 +176,23 @@ export class NavRail {
     },
   });
 
-  /** True above the width threshold: the rail pushes; below it, it overlays. */
   protected readonly wide = signal(true);
-  /** Transient open state for the narrow overlay (never persisted). */
   protected readonly overlayOpen = signal(false);
 
-  /** The rail's logical expanded state — persisted when wide, transient when narrow. */
   protected readonly expanded = computed(() =>
     this.wide() ? this.pin.value() === 'expanded' : this.overlayOpen(),
   );
-  /** The docked column shows labels only when expanded on a wide viewport. */
   protected readonly docked = computed(() => this.wide() && this.expanded());
-  /** The overlay layer renders only when expanded on a narrow viewport. */
   protected readonly overlay = computed(() => !this.wide() && this.overlayOpen());
 
   constructor() {
-    // BreakpointObserver over a hand-rolled matchMedia listener: it cleans up via
-    // takeUntilDestroyed (the rail is destroyed/recreated across login), so no
-    // leaked listener fires on a dead instance.
+    // BreakpointObserver cleans up via takeUntilDestroyed so no listener fires
+    // on a dead instance (rail is destroyed/recreated across login).
     inject(BreakpointObserver)
       .observe('(min-width: 768px)')
       .pipe(takeUntilDestroyed())
       .subscribe(({ matches }) => {
         this.wide.set(matches);
-        // Crossing to wide closes any narrow overlay, so it can't resurrect itself
-        // (overlay = !wide && overlayOpen) the next time the viewport goes narrow.
         if (matches) this.overlayOpen.set(false);
       });
   }
@@ -230,7 +205,6 @@ export class NavRail {
     }
   }
 
-  /** Choosing a destination on the narrow overlay collapses it (ADR-0022). */
   protected choose(): void {
     if (!this.wide()) this.overlayOpen.set(false);
   }
