@@ -13,7 +13,7 @@ import {
 } from '@hexly/domain';
 import { EntitiesClient } from './entities.client';
 
-/** An empty hexmap body — the shape the editor round-trips through the client. */
+/** The shape the editor round-trips through the client. */
 const emptyHexmapBody: EntityBody = {
   type: 'hexmap',
   content: emptyContent(),
@@ -129,11 +129,15 @@ describe('EntitiesClient', () => {
     };
 
     let outcome: unknown;
-    client.save('e1', painted, 1).subscribe((o) => (outcome = o));
+    client.save('e1', painted, 1, ['deity', 'ruined']).subscribe((o) => (outcome = o));
 
     const req = http.expectOne('/entities/e1');
     expect(req.request.method).toBe('PUT');
-    expect(req.request.body).toEqual({ document: painted, version: 1 });
+    expect(req.request.body).toEqual({
+      document: painted,
+      version: 1,
+      tags: ['deity', 'ruined'],
+    });
 
     const saved: EntityDetail = { ...aldermoor, version: 2, document: painted };
     req.flush(saved);
@@ -145,7 +149,7 @@ describe('EntitiesClient', () => {
     const serverCurrent: EntityDetail = { ...aldermoor, version: 5 };
 
     let outcome: unknown;
-    client.save('e1', emptyHexmapBody, 1).subscribe((o) => (outcome = o));
+    client.save('e1', emptyHexmapBody, 1, []).subscribe((o) => (outcome = o));
 
     http
       .expectOne('/entities/e1')
@@ -159,7 +163,7 @@ describe('EntitiesClient', () => {
     // EntityDetail. It must not be reported as a conflict (which would break the
     // conflict UI reading .name/.version off a string) — surface it as an error.
     let errored = false;
-    client.save('e1', emptyHexmapBody, 1).subscribe({
+    client.save('e1', emptyHexmapBody, 1, []).subscribe({
       error: () => (errored = true),
     });
     http

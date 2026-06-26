@@ -88,6 +88,17 @@ describe('NoteView', () => {
     expect(surface.textContent).toContain('Lady Mara rules the north.');
   });
 
+  it('mounts the tag editor for the open note', () => {
+    TestBed.inject(EntitySession).adopt(note('Lady Mara'));
+
+    const fixture = TestBed.createComponent(NoteView);
+    fixture.detectChanges();
+
+    expect(
+      fixture.nativeElement.querySelector('[data-testid=entity-tags]'),
+    ).not.toBeNull();
+  });
+
   it('contributes the note’s name to the app header while open', () => {
     TestBed.inject(EntitySession).adopt(note('Lady Mara'));
 

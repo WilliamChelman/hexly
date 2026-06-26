@@ -10,11 +10,8 @@ import {
 } from '@hexly/domain';
 
 /**
- * The web client's HTTP conversation with the entities API (ADR-0018, ADR-0005).
- * Stateless: every verb is a round trip that returns what the server said. The
- * open-Entity/conflict state the editor reads lives in EntitySession, the seam
- * that actually consumes it — this stays one load/save/conflict surface for
- * every Entity type. The session cookie rides along via `withCredentials`.
+ * HTTP client for the entities API (ADR-0018, ADR-0005).
+ * Stateless: every call is a round trip; open-entity/conflict state lives in EntitySession.
  */
 @Injectable({ providedIn: 'root' })
 export class EntitiesClient {
@@ -24,10 +21,7 @@ export class EntitiesClient {
     return this.http.get<EntitySummary[]>('/entities');
   }
 
-  /**
-   * Rename an Entity. Metadata only — it does not touch the body or its version,
-   * so it never conflicts with an in-progress save.
-   */
+  /** Metadata only — never conflicts with an in-progress save. */
   rename(id: string, name: string): Observable<EntityDetail> {
     return this.http.patch<EntityDetail>(`/entities/${id}`, { name });
   }
@@ -44,19 +38,15 @@ export class EntitiesClient {
     return this.http.get<EntityDetail>(`/entities/${id}`);
   }
 
-  /**
-   * Save `body` for an Entity, carrying the base `version` it was built on. A
-   * stale base is reported as a `conflict` outcome carrying the server's current
-   * Entity (ADR-0018), not as an error — that is an expected result of optimistic
-   * concurrency, so the caller branches on it rather than catching it.
-   */
+  /** Stale base → `conflict` outcome (ADR-0018), not a thrown error; caller branches, not catches. */
   save(
     id: string,
     body: EntityBody,
     version: number,
+    tags: readonly string[],
   ): Observable<EntitySaveOutcome> {
     return this.http
-      .put<EntityDetail>(`/entities/${id}`, { document: body, version })
+      .put<EntityDetail>(`/entities/${id}`, { document: body, version, tags })
       .pipe(
         map((saved): EntitySaveOutcome => ({ status: 'saved', entity: saved })),
         catchError((err: unknown) => {

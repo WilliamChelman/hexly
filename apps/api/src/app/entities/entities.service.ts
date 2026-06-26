@@ -17,7 +17,6 @@ import { and, eq } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
 import { entities } from '../db/schema';
 
-/** The version a freshly created Entity starts at; the first save bumps it to 2. */
 const INITIAL_VERSION = 1;
 
 /**
@@ -57,16 +56,14 @@ export class EntitiesService {
   }
 
   /**
-   * Load one of the owner's Entities in full, or `null` if no such Entity exists
-   * *for this owner* — an Entity owned by someone else is indistinguishable from
-   * one that does not exist, so ownership never leaks (ADR-0004).
+   * An Entity owned by someone else is indistinguishable from one that does not
+   * exist, so ownership never leaks (ADR-0004).
    */
   load(ownerId: string, id: string): EntityDetail | null {
     const row = this.ownedRow(ownerId, id);
     return row ? toDetail(row) : null;
   }
 
-  /** Create an empty Entity of the requested type, owned by `ownerId`, at version 1. */
   create(ownerId: string, req: CreateEntityRequest): EntityDetail {
     const now = Date.now();
     const body = emptyEntityBody(req.type);
@@ -88,12 +85,10 @@ export class EntitiesService {
   }
 
   /**
-   * Overwrite the owner's Entity with `req.document`, but only if `req.version`
-   * still matches the stored version — otherwise the Entity moved under the
-   * caller and the save is a {@link SaveResult conflict} rather than a silent
-   * overwrite (ADR-0018, ADR-0004). A successful save bumps the version by one.
-   * The guard is atomic: the base version is a WHERE predicate on the UPDATE,
-   * so zero rows changed *is* the conflict.
+   * Version-checked save: only if `req.version` matches the stored version,
+   * so a concurrent edit is a {@link SaveResult conflict} rather than a silent
+   * overwrite (ADR-0018, ADR-0004). Guard is atomic: base version is a WHERE
+   * predicate on the UPDATE, so zero rows changed *is* the conflict.
    */
   save(ownerId: string, id: string, req: SaveEntityRequest): SaveResult {
     // Read first for not-found and to carry the untouched columns (name, type,
@@ -102,12 +97,13 @@ export class EntitiesService {
     if (!row) return { status: 'not-found' };
 
     // Set only the columns a save owns, so a concurrent rename isn't clobbered.
+    // The save always carries the full tag set, so it always replaces the column (#72).
     const document = serialize(req.document);
     const version = req.version + 1;
     const updatedAt = Date.now();
     const res = this.db
       .update(entities)
-      .set({ document, version, updatedAt })
+      .set({ document, version, updatedAt, tags: req.tags })
       .where(
         and(
           eq(entities.id, id),
@@ -127,14 +123,16 @@ export class EntitiesService {
     // `req.document` is the validated body we just wrote — return it directly.
     return {
       status: 'saved',
-      entity: detailOf({ ...row, version, updatedAt }, req.document),
+      entity: detailOf(
+        { ...row, version, updatedAt, tags: req.tags },
+        req.document,
+      ),
     };
   }
 
   /**
-   * Rename one of the owner's Entities. Metadata only: leaves the body and its
-   * `version` untouched, so a rename never invalidates an in-progress edit's
-   * base version. Returns the updated Entity, or `null` if none for this owner.
+   * Metadata only: leaves the body and its `version` untouched, so a rename
+   * never invalidates an in-progress edit's base version.
    */
   rename(ownerId: string, id: string, name: string): EntityDetail | null {
     const row = this.ownedRow(ownerId, id);
@@ -148,11 +146,7 @@ export class EntitiesService {
     return toDetail({ ...row, name, updatedAt });
   }
 
-  /**
-   * Delete one of the owner's Entities. Returns whether a row was actually
-   * removed — `false` means there was nothing to delete *for this owner*
-   * (unknown id or not theirs), which the caller surfaces as 404.
-   */
+  /** `false` means nothing to delete for this owner (unknown id or not theirs); caller surfaces as 404. */
   delete(ownerId: string, id: string): boolean {
     // Read just `ownerId` for the ownership check — no need to pull the body.
     const owner = this.db
@@ -182,15 +176,12 @@ export class EntitiesService {
   }
 }
 
-/** Serialize a body for the `document` text column. */
 function serialize(body: EntityBody): string {
   return JSON.stringify(body);
 }
 
-/** A stored row without its `document` body — what `list` selects. */
 type SummaryRow = Omit<typeof entities.$inferSelect, 'document'>;
 
-/** Project a stored row onto the body-free {@link EntitySummary} metadata. */
 function toSummary(row: SummaryRow): EntitySummary {
   return {
     id: row.id,
@@ -206,15 +197,11 @@ function toSummary(row: SummaryRow): EntitySummary {
   };
 }
 
-/** Rehydrate a stored row into the full {@link EntityDetail} contract. */
 function toDetail(row: typeof entities.$inferSelect): EntityDetail {
   return detailOf(row, parseDocument(row.id, row.document));
 }
 
-/**
- * Assemble an {@link EntityDetail} from a row's metadata and an in-hand body.
- * Write paths pass the body they just minted; only {@link toDetail} re-parses.
- */
+/** Write paths pass the body they just minted; only {@link toDetail} re-parses. */
 function detailOf(row: SummaryRow, document: EntityBody): EntityDetail {
   return { ...toSummary(row), document };
 }

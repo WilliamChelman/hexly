@@ -74,17 +74,18 @@ describe('EntitySession', () => {
 
   it('saves the editor grid, re-wrapped under the open entity base version', () => {
     openAldermoor();
-    editor.paintAt({ q: 5, r: 5 }, 'ocean'); // edit after opening
+    editor.paintAt({ q: 5, r: 5 }, 'ocean');
 
     let outcome: unknown;
     session.save().subscribe((o) => (outcome = o));
 
     const req = http.expectOne('/entities/m1');
     expect(req.request.method).toBe('PUT');
-    // The grid is re-wrapped into a hexmap body, Content preserved untouched.
+    // Content preserved untouched.
     expect(req.request.body).toEqual({
       document: bodyOf(editor.document()),
       version: 3,
+      tags: [],
     });
 
     const saved: EntityDetail = {
@@ -94,6 +95,33 @@ describe('EntitySession', () => {
     };
     req.flush(saved);
     expect(outcome).toEqual({ status: 'saved', entity: saved });
+  });
+
+  it('seeds the open entity’s tags and sends edited tags with the save (#72)', () => {
+    openAldermoor();
+    expect(session.tags()).toEqual([]);
+
+    session.setTags(['deity', 'ruined']);
+    expect(session.tags()).toEqual(['deity', 'ruined']);
+
+    session.save().subscribe();
+
+    const req = http.expectOne('/entities/m1');
+    expect(req.request.method).toBe('PUT');
+    expect(req.request.body).toEqual({
+      document: bodyOf(editor.document()),
+      version: 3,
+      tags: ['deity', 'ruined'],
+    });
+
+    const saved: EntityDetail = {
+      ...aldermoor,
+      version: 4,
+      tags: ['deity', 'ruined'],
+      document: bodyOf(editor.document()),
+    };
+    req.flush(saved);
+    expect(session.current()?.tags).toEqual(['deity', 'ruined']);
   });
 
   it('surfaces a stale save as a conflict and keeps the editor edit', () => {
@@ -133,8 +161,6 @@ describe('EntitySession', () => {
       .expectOne('/entities/m1')
       .flush(serverCurrent, { status: 409, statusText: 'Conflict' });
 
-    // The user chooses to re-pull: the editor adopts the server's current grid
-    // and the conflict is resolved.
     session.reload().subscribe();
     http.expectOne('/entities/m1').flush(serverCurrent);
 
@@ -172,7 +198,7 @@ describe('EntitySession', () => {
 
   it('clears the canvas then fetches when openRoute targets a different entity', () => {
     openAldermoor();
-    editor.paintAt({ q: 5, r: 5 }, 'ocean'); // dirty the canvas
+    editor.paintAt({ q: 5, r: 5 }, 'ocean');
 
     session.openRoute('m2').subscribe();
     // The previous map's canvas is cleared to empty while the load is in flight.
@@ -200,8 +226,7 @@ describe('EntitySession', () => {
 
     const req = http.expectOne('/entities/n1');
     expect(req.request.method).toBe('PUT');
-    // The body is the untouched note — same type, no hex grid grafted on.
-    expect(req.request.body).toEqual({ document: noteBody, version: 3 });
+    expect(req.request.body).toEqual({ document: noteBody, version: 3, tags: [] });
     req.flush({ ...note, version: 4 });
   });
 
@@ -235,6 +260,7 @@ describe('EntitySession', () => {
     expect(req.request.body).toEqual({
       document: { type: 'note', content: { format: CONTENT_FORMAT, snapshot } },
       version: 3,
+      tags: [],
     });
     req.flush({ ...note, version: 4 });
   });
@@ -243,7 +269,7 @@ describe('EntitySession', () => {
     openAldermoor(); // current = m1, not loading
     editor.paintAt({ q: 5, r: 5 }, 'ocean');
 
-    // Navigate to a different entity: its load is in flight, `current` still m1.
+    // load in flight for m2, current still m1
     session.openRoute('m2').subscribe();
 
     // A late Save/rename from the outgoing header is inert — neither writes to

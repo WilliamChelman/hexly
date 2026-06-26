@@ -24,8 +24,7 @@ describe('Entities endpoints', () => {
     const moduleRef = await Test.createTestingModule({
       imports: [AuthModule, EntitiesModule],
     })
-      // A throwaway in-memory database per test — real Drizzle, real schema,
-      // no shared state between tests (ADR-0002).
+      // Real Drizzle, real schema, isolated per-test (ADR-0002).
       .overrideProvider(DB)
       .useValue(createDb(':memory:'))
       .compile();
@@ -104,7 +103,6 @@ describe('Entities endpoints', () => {
       'Aldermoor',
       'Lady A',
     ]);
-    // The list is metadata only — neither the Content nor the grid is loaded.
     expect(res.body[0]).not.toHaveProperty('document');
     expect(res.body[0]).toHaveProperty('type');
     expect(res.body[0]).toHaveProperty('tags');
@@ -140,7 +138,7 @@ describe('Entities endpoints', () => {
 
     const res = await ada
       .put(`/entities/${created.body.id}`)
-      .send({ document: painted, version: created.body.version })
+      .send({ document: painted, version: created.body.version, tags: [] })
       .expect(200);
 
     expect(res.body.version).toBe(2);
@@ -149,6 +147,48 @@ describe('Entities endpoints', () => {
     const reloaded = await ada.get(`/entities/${created.body.id}`).expect(200);
     expect(reloaded.body.document).toEqual(painted);
     expect(reloaded.body.version).toBe(2);
+  });
+
+  it('persists an entity’s tags through a version-checked save', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const created = await ada
+      .post('/entities')
+      .send({ name: 'Lady A', type: 'note' });
+    const id = created.body.id;
+    const body = { type: 'note', content: emptyContent() };
+
+    const res = await ada
+      .put(`/entities/${id}`)
+      .send({ document: body, version: 1, tags: ['deity', 'ruined'] })
+      .expect(200);
+
+    expect(res.body.tags).toEqual(['deity', 'ruined']);
+    expect(res.body.version).toBe(2);
+
+    const reloaded = await ada.get(`/entities/${id}`).expect(200);
+    expect(reloaded.body.tags).toEqual(['deity', 'ruined']);
+  });
+
+  it('normalizes tags on save: trims, lower-cases, drops duplicates, rejects blanks', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const created = await ada
+      .post('/entities')
+      .send({ name: 'Lady A', type: 'note' });
+    const id = created.body.id;
+    const body = { type: 'note', content: emptyContent() };
+
+    // Case and surrounding whitespace fold together; duplicates collapse (#88).
+    const res = await ada
+      .put(`/entities/${id}`)
+      .send({ document: body, version: 1, tags: [' Deity ', 'deity', 'RUINED'] })
+      .expect(200);
+    expect(res.body.tags).toEqual(['deity', 'ruined']);
+
+    // A whitespace-only tag is rejected, not stored as a blank chip (#88).
+    await ada
+      .put(`/entities/${id}`)
+      .send({ document: body, version: 2, tags: ['   '] })
+      .expect(400);
   });
 
   it('round-trips an opaque Content snapshot through a save untouched', async () => {
@@ -162,7 +202,7 @@ describe('Entities endpoints', () => {
 
     await ada
       .put(`/entities/${created.body.id}`)
-      .send({ document: body, version: 1 })
+      .send({ document: body, version: 1, tags: [] })
       .expect(200);
 
     const reloaded = await ada.get(`/entities/${created.body.id}`).expect(200);
@@ -180,7 +220,7 @@ describe('Entities endpoints', () => {
       hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' } },
     };
 
-    await ada.put(`/entities/${id}`).send({ document: first, version: 1 }).expect(200);
+    await ada.put(`/entities/${id}`).send({ document: first, version: 1, tags: [] }).expect(200);
 
     const stale = {
       ...emptyHexmapBody,
@@ -188,7 +228,7 @@ describe('Entities endpoints', () => {
     };
     const conflict = await ada
       .put(`/entities/${id}`)
-      .send({ document: stale, version: 1 })
+      .send({ document: stale, version: 1, tags: [] })
       .expect(409);
     // The 409 carries the server's current Entity so the client can re-pull.
     expect(conflict.body.version).toBe(2);
@@ -209,7 +249,7 @@ describe('Entities endpoints', () => {
       ...emptyHexmapBody,
       hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' } },
     };
-    await ada.put(`/entities/${id}`).send({ document: painted, version: 1 }).expect(200);
+    await ada.put(`/entities/${id}`).send({ document: painted, version: 1, tags: [] }).expect(200);
 
     const res = await ada
       .patch(`/entities/${id}`)
@@ -217,7 +257,6 @@ describe('Entities endpoints', () => {
       .expect(200);
 
     expect(res.body.name).toBe('The Reach of Aldermoor');
-    // Rename is metadata only: the body and its version are untouched.
     expect(res.body.version).toBe(2);
     expect(res.body.document).toEqual(painted);
   });
@@ -252,12 +291,11 @@ describe('Entities endpoints', () => {
     const bobsList = await bob.get('/entities').expect(200);
     expect(bobsList.body).toEqual([]);
 
-    // Every by-id route is a 404 for Bob, indistinguishable from a missing
-    // Entity — ownership never leaks (ADR-0004).
+    // 404, not 403 — ownership never leaks (ADR-0004).
     await bob.get(`/entities/${id}`).expect(404);
     await bob
       .put(`/entities/${id}`)
-      .send({ document: emptyHexmapBody, version: 1 })
+      .send({ document: emptyHexmapBody, version: 1, tags: [] })
       .expect(404);
     await bob.patch(`/entities/${id}`).send({ name: 'Hijacked' }).expect(404);
     await bob.delete(`/entities/${id}`).expect(404);
@@ -287,9 +325,7 @@ describe('Entities endpoints', () => {
       .send({ name: 'Aldermoor', type: 'hexmap' });
     const id = created.body.id;
 
-    // Corrupt the stored tags to a non-array value behind the API's back — the
-    // read path must catch this (ADR-0001), not hand a malformed value to the
-    // client as if it were valid tags.
+    // Out-of-band corruption: read path must surface 500, not serve malformed data (ADR-0001).
     app.get<{ $client: import('better-sqlite3').Database }>(DB).$client
       .prepare('UPDATE entities SET tags = ? WHERE id = ?')
       .run('"not-an-array"', id);
@@ -305,13 +341,11 @@ describe('Entities endpoints', () => {
       .send({ name: 'Aldermoor', type: 'hexmap' });
     const id = created.body.id;
 
-    // An empty name fails the shared create schema.
     await ada.post('/entities').send({ name: '', type: 'note' }).expect(400);
     // A whitespace-only name trims to "" and is likewise rejected.
     await ada.post('/entities').send({ name: '   ', type: 'note' }).expect(400);
     // An unknown type is rejected before anything is stored.
     await ada.post('/entities').send({ name: 'X', type: 'spreadsheet' }).expect(400);
-    // A save with no base version fails the shared save schema.
     await ada.put(`/entities/${id}`).send({ document: emptyHexmapBody }).expect(400);
     // A hexmap body with an unknown terrain is rejected before it is ever stored.
     await ada
@@ -321,7 +355,6 @@ describe('Entities endpoints', () => {
         version: 1,
       })
       .expect(400);
-    // An empty rename name fails the shared rename schema.
     await ada.patch(`/entities/${id}`).send({ name: '' }).expect(400);
   });
 });

@@ -30,6 +30,11 @@
     "emptyTitle": "Votre bibliothèque est vide.",
     "emptyHint": "Créez une note ou une carte pour commencer."
   },
+  "entityTags": {
+    "addLabel": "Ajouter un tag",
+    "addPlaceholder": "Ajouter des tags…",
+    "removeLabel": "Supprimer le tag : {{tag}}"
+  },
   "noteView": {
     "eyebrow": "Note",
     "backToLibrary": "Retour à la bibliothèque",

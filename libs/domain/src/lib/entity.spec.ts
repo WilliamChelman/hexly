@@ -12,9 +12,7 @@ const content = { format: 'tiptap-v1' as const, snapshot: { type: 'doc', content
 
 describe('contentSchema', () => {
   it('round-trips an arbitrary snapshot untouched — the domain never inspects it', () => {
-    // A snapshot the domain has no knowledge of: arbitrary, deeply nested,
-    // editor-defined JSON. ADR-0019 makes Content opaque behind the `format`
-    // tag, so parse/serialize must hand back exactly what went in.
+    // ADR-0019: Content is opaque behind the format tag; parse/serialize must round-trip it exactly.
     const snapshot = {
       type: 'doc',
       content: [{ type: 'weirdFutureBlock', attrs: { x: [1, 2, { y: true }] } }],
@@ -129,8 +127,7 @@ describe('createEntityRequestSchema', () => {
 
 describe('renameEntityRequestSchema', () => {
   it('accepts a new, non-empty name and rejects an empty one', () => {
-    // Metadata-only: it carries no body and no base version, so a rename never
-    // collides with an in-progress save's optimistic-concurrency check.
+    // Metadata-only (no body, no base version) — never races with the save's optimistic-concurrency check.
     expect(renameEntityRequestSchema.parse({ name: 'Aldermoor' }).name).toBe(
       'Aldermoor',
     );
@@ -139,12 +136,35 @@ describe('renameEntityRequestSchema', () => {
 });
 
 describe('saveEntityRequestSchema', () => {
-  it('carries the whole body and the base version the save is built on', () => {
+  it('carries the whole body, the base version, and the tags the save replaces', () => {
     const body = { type: 'hexmap' as const, content, ...emptyHexMap() };
 
-    expect(saveEntityRequestSchema.parse({ document: body, version: 3 })).toEqual(
-      { document: body, version: 3 },
-    );
+    expect(
+      saveEntityRequestSchema.parse({ document: body, version: 3, tags: [] }),
+    ).toEqual({ document: body, version: 3, tags: [] });
+  });
+
+  it('requires tags on save — the save always carries the full current set', () => {
+    const body = { type: 'note' as const, content };
+
+    expect(() =>
+      saveEntityRequestSchema.parse({ document: body, version: 3 }),
+    ).toThrow();
+  });
+
+  it('normalizes tags on save: trims, lower-cases, dedupes, rejects blanks (#88)', () => {
+    const body = { type: 'note' as const, content };
+
+    expect(
+      saveEntityRequestSchema.parse({
+        document: body,
+        version: 1,
+        tags: [' Deity ', 'deity', 'RUINED'],
+      }).tags,
+    ).toEqual(['deity', 'ruined']);
+    expect(() =>
+      saveEntityRequestSchema.parse({ document: body, version: 1, tags: ['  '] }),
+    ).toThrow();
   });
 
   it('rejects a save that omits the base version', () => {
