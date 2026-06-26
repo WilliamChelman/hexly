@@ -5,6 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { App } from './app';
 import { provideTranslocoTesting } from './core/i18n/transloco-testing';
+import { AppShellStore } from './shell/app-shell.store';
 
 @Component({ template: 'page' })
 class Blank {}
@@ -49,8 +50,9 @@ describe('App', () => {
     expect(fixture.nativeElement.querySelector('app-nav-rail')).toBeNull();
   });
 
-  it('renders the login screen standalone, with no rail', async () => {
+  it('hides the rail when a page marks the shell standalone (e.g. login)', async () => {
     const fixture = TestBed.createComponent(App);
+    TestBed.inject(AppShellStore).standalone.set(true);
     await TestBed.inject(Router).navigateByUrl('/login');
     fixture.detectChanges();
 
