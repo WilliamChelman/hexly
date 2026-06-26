@@ -23,6 +23,7 @@ import {
 } from '@hexly/domain';
 import { EntitiesClient } from '../../../core/services/entities.client';
 import { TitleService } from '../../../core/i18n/title.service';
+import { AppShellStore } from '../../../shell/app-shell.store';
 import { HexMapStore } from './hexmap-store';
 
 /**
@@ -38,6 +39,7 @@ export class EntitySession {
   private readonly editor = inject(HexMapStore);
   private readonly title = inject(TitleService);
   private readonly router = inject(Router);
+  private readonly shell = inject(AppShellStore);
   private readonly destroyRef = inject(DestroyRef);
 
   private readonly _current = signal<EntityDetail | null>(null);
@@ -141,7 +143,10 @@ export class EntitySession {
     this._tags.set([]); // and the previous Entity's tags/content, which ride the same load (#88)
     this._content.set(null);
     this._loading.set(true);
-    return this.open(id).pipe(finalize(() => this._loading.set(false)));
+    return this.open(id).pipe(
+      this.shell.withLoading('subtle'),
+      finalize(() => this._loading.set(false)),
+    );
   }
 
   /** Rename the open Entity (metadata only — does not affect the body save). */
@@ -185,6 +190,7 @@ export class EntitySession {
         this._error.set('save');
         return EMPTY;
       }),
+      this.shell.withLoading('subtle'),
       finalize(() => this._saving.set(false)),
     );
   }

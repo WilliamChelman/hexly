@@ -12,6 +12,7 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient } from '../../core/services/entities.client';
 import { ToasterService } from '../../core/services/toaster.service';
+import { AppShellStore } from '../../shell/app-shell.store';
 import { Autofocus } from '../../ui/autofocus';
 import { Button } from '../../ui/button';
 import { Eyebrow } from '../../ui/eyebrow';
@@ -201,6 +202,7 @@ export class EntityBrowser implements OnInit {
   private readonly router = inject(Router);
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
+  private readonly shell = inject(AppShellStore);
 
   private readonly _maps = signal<EntitySummary[]>([]);
   /** The user's maps, newest first. */
@@ -232,7 +234,7 @@ export class EntityBrowser implements OnInit {
 
   ngOnInit(): void {
     // Set `loaded` on error too: a failed fetch must show the error panel, not a blank page.
-    this.maps$.list().subscribe({
+    this.maps$.list().pipe(this.shell.withLoading('subtle')).subscribe({
       next: (maps) => {
         this._maps.set(maps);
         this.loaded.set(true);

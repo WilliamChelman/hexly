@@ -12,6 +12,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { AuthClient } from '../core/services/auth.client';
+import { AppShellStore } from './app-shell.store';
 import { persistedPreference } from '../core/utils/persisted-preference';
 import { Button } from '../ui/button';
 import { Cartouche } from '../ui/cartouche';
@@ -109,8 +110,12 @@ const ENTRIES: readonly NavEntry[] = [
         [attr.aria-label]="'nav.home' | transloco"
         (click)="choose()"
       >
+        <!-- The brand mark doubles as the subtle loading metaphor: it pulses
+             while in-page work is in flight (a fetch, an entity load, a save). -->
         <span
           class="grid place-items-center text-gold [filter:drop-shadow(0_0_6px_var(--color-glow))]"
+          [class.animate-pulse]="loading() === 'subtle'"
+          [attr.aria-busy]="loading() === 'subtle'"
           ><app-icon name="logo" [size]="26"
         /></span>
         <span
@@ -181,6 +186,7 @@ export class NavRail {
   private readonly auth = inject(AuthClient);
 
   protected readonly isAuthenticated = this.auth.isAuthenticated;
+  protected readonly loading = inject(AppShellStore).loading;
   protected readonly entries = ENTRIES;
 
   private readonly pin = persistedPreference<'collapsed' | 'expanded'>({

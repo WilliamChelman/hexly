@@ -1,4 +1,9 @@
-import { Injectable } from '@angular/core';
+import {
+  EnvironmentProviders,
+  inject,
+  Injectable,
+  provideAppInitializer,
+} from '@angular/core';
 import { persistedPreference } from '../utils/persisted-preference';
 
 /** The two themes of Hexly's "cartographer's table": day paper, night sky. */
@@ -37,4 +42,12 @@ export class ThemeService {
   set(theme: Theme): void {
     this.pref.set(theme);
   }
+}
+
+/**
+ * Instantiate {@link ThemeService} during bootstrap so its constructor reflects
+ * the persisted/OS theme onto `<html data-theme>` before the first paint.
+ */
+export function provideTheme(): EnvironmentProviders {
+  return provideAppInitializer(() => void inject(ThemeService));
 }
