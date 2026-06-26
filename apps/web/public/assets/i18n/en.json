@@ -39,7 +39,20 @@
     "eyebrow": "Note",
     "backToLibrary": "Back to library",
     "editorLabel": "Note content",
-    "httpError": "Couldn't reach the server. Please try again."
+    "httpError": "Couldn't reach the server. Please try again.",
+    "slashMenu": {
+      "label": "Insert block",
+      "empty": "No matching blocks",
+      "text": "Text",
+      "heading1": "Heading 1",
+      "heading2": "Heading 2",
+      "heading3": "Heading 3",
+      "bulletList": "Bullet list",
+      "orderedList": "Numbered list",
+      "blockquote": "Quote",
+      "codeBlock": "Code block",
+      "horizontalRule": "Divider"
+    }
   },
   "editorShell": {
     "tabTitle": "Hexly",

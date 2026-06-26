@@ -5,6 +5,7 @@ import {
   computed,
   effect,
   inject,
+  viewChild,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { translateSignal, TranslocoPipe } from '@jsverse/transloco';
@@ -18,6 +19,8 @@ import { Eyebrow } from '../../../ui/eyebrow';
 import { PageHeader } from '../../../ui/page-header';
 import { EntityTags } from './entity-tags';
 import { CONTENT_EXTENSIONS } from './content-extensions';
+import { SlashMenu } from './slash-menu';
+import { slashCommands } from './slash-commands';
 
 /**
  * The view a `note` Entity opens into, parallel to {@link EditorShell} for a `hexmap`.
@@ -36,6 +39,7 @@ import { CONTENT_EXTENSIONS } from './content-extensions';
     Eyebrow,
     PageHeader,
     EntityTags,
+    SlashMenu,
   ],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
@@ -93,7 +97,7 @@ import { CONTENT_EXTENSIONS } from './content-extensions';
       </button>
     </app-page-header>
 
-    <main class="max-w-[60rem] mx-auto py-9 px-5">
+    <main class="max-w-[60rem] mx-auto py-5 px-5">
       <app-entity-tags class="block" />
 
       <!--
@@ -104,9 +108,11 @@ import { CONTENT_EXTENSIONS } from './content-extensions';
         tiptap
         [editor]="editor"
         data-testid="note-content"
-        class="mt-5 flex min-h-[24rem] flex-col rounded-md border border-line bg-surface px-5 py-1 text-ink cursor-text focus-within:border-gold"
+        class="mt-5 flex min-h-[24rem] flex-col rounded-md border border-line bg-surface px-5 py-3 text-ink cursor-text focus-within:border-gold"
       ></div>
     </main>
+
+    <app-slash-menu />
   `,
   styles: `
     /* TipTap creates .ProseMirror outside Angular's template — pierce with ::ng-deep.
@@ -118,36 +124,88 @@ import { CONTENT_EXTENSIONS } from './content-extensions';
       outline: none;
       box-shadow: none;
     }
+    /* Collapse leading/trailing block margins so prose doesn't hug the border. */
+    :host ::ng-deep .ProseMirror > :first-child {
+      margin-top: 0;
+    }
+    :host ::ng-deep .ProseMirror > :last-child {
+      margin-bottom: 0;
+    }
     :host ::ng-deep .ProseMirror p {
-      margin: 0.4em 0;
+      margin: 0.6em 0;
     }
     :host ::ng-deep .ProseMirror h1 {
-      font-size: 1.6em;
+      font-size: 1.8em;
       font-weight: 600;
-      margin: 0.7em 0 0.3em;
+      margin: 0.9em 0 0.3em;
     }
     :host ::ng-deep .ProseMirror h2 {
-      font-size: 1.35em;
+      font-size: 1.4em;
       font-weight: 600;
-      margin: 0.7em 0 0.3em;
+      margin: 0.9em 0 0.3em;
     }
     :host ::ng-deep .ProseMirror h3 {
       font-size: 1.15em;
       font-weight: 600;
-      margin: 0.7em 0 0.3em;
+      margin: 0.8em 0 0.3em;
+    }
+    :host ::ng-deep .ProseMirror ul,
+    :host ::ng-deep .ProseMirror ol {
+      margin: 0.6em 0;
+      padding-left: 1.5em;
     }
     :host ::ng-deep .ProseMirror ul {
       list-style: disc;
-      padding-left: 1.5em;
     }
     :host ::ng-deep .ProseMirror ol {
       list-style: decimal;
-      padding-left: 1.5em;
+    }
+    /* List rows read as a tight list, not stacked paragraphs. */
+    :host ::ng-deep .ProseMirror li {
+      margin: 0.15em 0;
+    }
+    :host ::ng-deep .ProseMirror li p {
+      margin: 0;
+    }
+    :host ::ng-deep .ProseMirror li::marker {
+      color: var(--color-ink-muted);
     }
     :host ::ng-deep .ProseMirror blockquote {
-      border-left: 3px solid var(--color-line);
+      border-left: 3px solid var(--color-line-strong);
       padding-left: 1em;
+      margin: 0.8em 0;
+      font-style: italic;
       color: var(--color-ink-muted);
+    }
+    :host ::ng-deep .ProseMirror hr {
+      border: none;
+      border-top: 1px solid var(--color-line);
+      margin: 1.4em 0;
+    }
+    /* Code block: a sunken well; inline code: a subtle inline chip. */
+    :host ::ng-deep .ProseMirror pre {
+      margin: 0.8em 0;
+      padding: 0.85em 1em;
+      border: 1px solid var(--color-line);
+      border-radius: var(--radius-md);
+      background: var(--color-surface-sunken);
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 0.85em;
+      line-height: var(--leading-normal);
+    }
+    :host ::ng-deep .ProseMirror pre code {
+      padding: 0;
+      background: none;
+      font-size: inherit;
+    }
+    :host ::ng-deep .ProseMirror :not(pre) > code {
+      padding: 0.1em 0.35em;
+      border: 1px solid var(--color-line);
+      border-radius: var(--radius-sm);
+      background: var(--color-surface-sunken);
+      font-family: var(--font-mono);
+      font-size: 0.85em;
     }
     :host ::ng-deep .ProseMirror a {
       color: var(--color-gold);
@@ -165,7 +223,14 @@ export class NoteView {
   protected readonly conflict = this.session.conflict;
   protected readonly error = this.session.error;
 
-  protected readonly editor = new Editor({ extensions: CONTENT_EXTENSIONS });
+  private readonly slashMenu = viewChild(SlashMenu);
+
+  // slashCommands is UI chrome, not part of the persisted schema, so it lives here
+  // rather than in CONTENT_EXTENSIONS (ADR-0019). The menu getter is deferred: render
+  // only fires on a real "/" keystroke, long after the viewChild has resolved.
+  protected readonly editor = new Editor({
+    extensions: [...CONTENT_EXTENSIONS, slashCommands(() => this.slashMenu())],
+  });
 
   constructor() {
     // Tab title is owned by EntitySession (shared with the map editor), not here.

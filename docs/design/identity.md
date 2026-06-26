@@ -59,7 +59,7 @@ slice/shell layout; primitives keep their scoped styles.
 | Role               | Family             | Notes                                                                   |
 | ------------------ | ------------------ | ----------------------------------------------------------------------- |
 | Display            | **Cinzel**         | Engraved Roman caps — cartouche titles, the wordmark, section eyebrows. |
-| Body / UI          | **Spectral**       | Literary serif designed for screens — panels, controls, prose.          |
+| Body / UI          | **Source Serif 4** | Literary serif drawn for screen text — panels, controls, prose. (Replaced Cormorant Garamond, whose thin display strokes read poorly at body sizes.) |
 | Coordinates / code | **JetBrains Mono** | Hex coordinates (`q · r`), tokens, keys — the signature numeric detail. |
 
 Type scale is modular (~1.25): `--text-2xs` (11px) → `--text-3xl` (41px). Cartouche
