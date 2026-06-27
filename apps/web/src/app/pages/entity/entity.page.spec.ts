@@ -14,6 +14,7 @@ import { of } from 'rxjs';
 import { EntityDetail, EntityType } from '@hexly/domain';
 import { EditorShell } from './components/editor-shell';
 import { EntitySession } from './services/entity-session';
+import { EntityNameResolver } from './services/entity-name-resolver';
 import { TitleService } from '../../core/i18n/title.service';
 import { provideTranslocoTesting } from '../../core/i18n/transloco-testing';
 import { EntityPage } from './entity.page';
@@ -53,6 +54,7 @@ describe('EntityPage', () => {
       imports: [EntityPage, provideTranslocoTesting()],
       providers: [
         EntitySession,
+        EntityNameResolver,
         provideHttpClient(),
         provideHttpClientTesting(),
         {

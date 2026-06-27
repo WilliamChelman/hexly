@@ -107,6 +107,14 @@ export const SLASH_ITEMS: SlashItem[] = [
     keywords: ['divider', 'rule', 'separator', 'hr', 'line'],
     apply: (editor, range) => chainFrom(editor, range).setHorizontalRule().run(),
   },
+  {
+    // Routes into the same `@` Entity picker (issue #95, ADR-0023): replace the
+    // typed "/link" with "@", letting the mention suggestion drive the one picker.
+    id: 'link',
+    labelKey: 'noteView.slashMenu.entityLink',
+    keywords: ['link', 'entity', 'mention', 'reference', 'note', 'map'],
+    apply: (editor, range) => chainFrom(editor, range).insertContent('@').run(),
+  },
 ];
 
 /** Filter by `query` against each item's id and keywords, case-insensitively. Empty query → all. */

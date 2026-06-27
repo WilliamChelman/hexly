@@ -58,6 +58,19 @@ describe('SlashItem.apply', () => {
     });
   }
 
+  it('routes "/link" into the @ picker by inserting an "@" trigger (issue #95)', () => {
+    const item = SLASH_ITEMS.find((i) => i.id === 'link')!;
+    const editor = new Editor({ extensions: CONTENT_EXTENSIONS });
+    editor.commands.insertContent('/link');
+    item.apply(editor, { from: 1, to: editor.state.doc.content.size });
+    const text = editor.state.doc.textContent;
+    editor.destroy();
+
+    // The slash query is replaced by "@", so the mention suggestion takes over —
+    // one picker for both entry points, not a second dialog.
+    expect(text).toBe('@');
+  });
+
   it('produces a snapshot that round-trips losslessly through the editor', () => {
     const json = applyToFreshDoc('heading2');
 

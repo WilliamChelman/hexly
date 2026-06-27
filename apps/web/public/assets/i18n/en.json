@@ -56,7 +56,15 @@
       "orderedList": "Numbered list",
       "blockquote": "Quote",
       "codeBlock": "Code block",
-      "horizontalRule": "Divider"
+      "horizontalRule": "Divider",
+      "entityLink": "Link to entity"
+    },
+    "entityPicker": {
+      "label": "Link an entity",
+      "empty": "No matching entities"
+    },
+    "entityLink": {
+      "dangling": "This entity is unavailable"
     },
     "formatMenu": {
       "label": "Formatting",

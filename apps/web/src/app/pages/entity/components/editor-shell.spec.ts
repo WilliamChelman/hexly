@@ -9,6 +9,7 @@ import { CONTENT_FORMAT, EntityDetail } from '@hexly/domain';
 import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
 import { EditorShell } from './editor-shell';
 import { EntitySession } from '../services/entity-session';
+import { EntityNameResolver } from '../services/entity-name-resolver';
 import { HexMapStore } from '../services/hexmap-store';
 
 // Pure view: routing/load/tab-title live in EntityPage + EntitySession (see
@@ -21,6 +22,7 @@ describe('EditorShell', () => {
       imports: [EditorShell, provideTranslocoTesting()],
       providers: [
         EntitySession,
+        EntityNameResolver,
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
