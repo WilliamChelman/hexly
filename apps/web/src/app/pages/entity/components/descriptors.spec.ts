@@ -85,17 +85,19 @@ describe('entityLinkPosBefore — the `::` arm predicate (#96)', () => {
 });
 
 describe('setLinkDescriptor — set/change/clear (#96)', () => {
+  let editor: Editor;
+  afterEach(() => editor.destroy());
+
   it('sets the descriptor on the link at the given position', () => {
-    const editor = freshEditor();
+    editor = freshEditor();
     editor.commands.insertEntityLink({ entityId: 'e1', label: 'Jane' });
     setLinkDescriptor(editor, 1, 'spouse');
 
     expect(linkAttrs(editor)?.['descriptor']).toBe('spouse');
-    editor.destroy();
   });
 
   it('changes an already-set descriptor when applied again', () => {
-    const editor = freshEditor();
+    editor = freshEditor();
     editor.commands.insertEntityLink({
       entityId: 'e1',
       label: 'Jane',
@@ -104,11 +106,10 @@ describe('setLinkDescriptor — set/change/clear (#96)', () => {
     setLinkDescriptor(editor, 1, 'rival');
 
     expect(linkAttrs(editor)?.['descriptor']).toBe('rival');
-    editor.destroy();
   });
 
   it('clears the descriptor when applied with empty/blank text', () => {
-    const editor = freshEditor();
+    editor = freshEditor();
     editor.commands.insertEntityLink({
       entityId: 'e1',
       label: 'Jane',
@@ -117,7 +118,6 @@ describe('setLinkDescriptor — set/change/clear (#96)', () => {
     setLinkDescriptor(editor, 1, '   ');
 
     expect(linkAttrs(editor)?.['descriptor'] ?? null).toBeNull();
-    editor.destroy();
   });
 });
 

@@ -87,9 +87,6 @@ export const entities = sqliteTable(
 export const entityDescriptors = sqliteTable(
   'entity_descriptors',
   {
-    ownerId: text('owner_id')
-      .notNull()
-      .references(() => users.id),
     entityId: text('entity_id')
       .notNull()
       .references(() => entities.id, { onDelete: 'cascade' }),
@@ -98,7 +95,5 @@ export const entityDescriptors = sqliteTable(
   (table) => [
     // One row per (entity, descriptor); the harvested set is already distinct per entity.
     primaryKey({ columns: [table.entityId, table.descriptor] }),
-    // The `::` suggestion read filters by owner.
-    index('idx_entity_descriptors_owner_id').on(table.ownerId),
   ]
 );

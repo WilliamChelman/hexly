@@ -147,7 +147,7 @@ export class EntitiesService {
         )
         .run();
       if (res.changes === 0) return false;
-      this.replaceDescriptors(ownerId, id, req.descriptors);
+      this.replaceDescriptors(id, req.descriptors);
       return true;
     });
     if (!saved) {
@@ -194,7 +194,8 @@ export class EntitiesService {
     return this.db
       .selectDistinct({ descriptor: entityDescriptors.descriptor })
       .from(entityDescriptors)
-      .where(eq(entityDescriptors.ownerId, ownerId))
+      .innerJoin(entities, eq(entities.id, entityDescriptors.entityId))
+      .where(eq(entities.ownerId, ownerId))
       .orderBy(asc(entityDescriptors.descriptor))
       .all()
       .map((row) => row.descriptor);
@@ -205,16 +206,12 @@ export class EntitiesService {
    * self-pruning step: a descriptor the save no longer carries loses its row and stops
    * being suggested. Runs inside {@link save}'s transaction, only on a successful write.
    */
-  private replaceDescriptors(
-    ownerId: string,
-    id: string,
-    descriptors: readonly string[],
-  ): void {
+  private replaceDescriptors(id: string, descriptors: readonly string[]): void {
     this.db.delete(entityDescriptors).where(eq(entityDescriptors.entityId, id)).run();
     if (descriptors.length === 0) return;
     this.db
       .insert(entityDescriptors)
-      .values(descriptors.map((descriptor) => ({ ownerId, entityId: id, descriptor })))
+      .values(descriptors.map((descriptor) => ({ entityId: id, descriptor })))
       .run();
   }
 

@@ -9,6 +9,8 @@ import { DescriptorItem } from './descriptors';
  * {@link EntityPicker} — both share {@link SuggestionMenu} — over the owner's last-saved
  * descriptor vocabulary. A row flagged `isNew` is the typed free text offered as a
  * brand-new descriptor (never boxed into the suggestions); picking it sets that text.
+ *
+ * ponytail: template shell duplicates EntityPicker's; share when a third picker is added.
  */
 @Component({
   selector: 'app-descriptor-picker',
