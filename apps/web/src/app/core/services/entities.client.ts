@@ -1,6 +1,6 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { catchError, map, Observable, of, shareReplay, throwError } from 'rxjs';
+import { catchError, map, Observable, of, throwError } from 'rxjs';
 import {
   EntityBody,
   EntityDetail,
@@ -12,17 +12,13 @@ import {
 /**
  * HTTP client for the entities API (ADR-0018, ADR-0005).
  * Stateless: every call is a round trip; open-entity/conflict state lives in EntitySession.
- * Exception: `list()` is shared across subscribers for the session so the EntityLink picker
- * doesn't re-fetch on every mount/unmount cycle.
  */
 @Injectable({ providedIn: 'root' })
 export class EntitiesClient {
   private readonly http = inject(HttpClient);
 
-  private readonly list$ = this.http.get<EntitySummary[]>('/api/entities').pipe(shareReplay(1));
-
   list(): Observable<EntitySummary[]> {
-    return this.list$;
+    return this.http.get<EntitySummary[]>('/api/entities');
   }
 
   /** Metadata only — never conflicts with an in-progress save. */

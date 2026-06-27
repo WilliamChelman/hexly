@@ -113,7 +113,7 @@ export class EntityLink {
   protected readonly store = inject(HexMapStore);
   private readonly entitiesClient = inject(EntitiesClient);
 
-  /** The owner's entities, fetched once per session (owner-scoped, cached in EntitiesClient — ADR-0023). */
+  /** The owner's entities, fetched once on mount (owner-scoped, no search endpoint — ADR-0023). */
   private readonly entities = toSignal(this.entitiesClient.list(), {
     initialValue: [] as EntitySummary[],
   });
