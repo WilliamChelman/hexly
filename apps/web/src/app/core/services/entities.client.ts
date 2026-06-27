@@ -1,13 +1,20 @@
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import {
+  HttpClient,
+  HttpErrorResponse,
+  HttpParams,
+} from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { catchError, map, Observable, of, throwError } from 'rxjs';
 import {
   EntityBody,
   EntityDetail,
+  EntityListQuery,
+  EntityPage,
   EntitySaveOutcome,
-  EntitySummary,
   EntityType,
 } from '@hexly/domain';
+
+export type EntityListParams = Partial<EntityListQuery>;
 
 /**
  * HTTP client for the entities API (ADR-0018, ADR-0005).
@@ -17,8 +24,16 @@ import {
 export class EntitiesClient {
   private readonly http = inject(HttpClient);
 
-  list(): Observable<EntitySummary[]> {
-    return this.http.get<EntitySummary[]>('/api/entities');
+  /** One page of the entities read surface (ADR-0025); `opts` filter and page it. */
+  list(opts: EntityListParams = {}): Observable<EntityPage> {
+    let params = new HttpParams();
+    // `ids` repeats the param once per id; the others are single-valued.
+    for (const id of opts.ids ?? []) params = params.append('ids', id);
+    if (opts.q) params = params.set('q', opts.q);
+    if (opts.type) params = params.set('type', opts.type);
+    if (opts.cursor) params = params.set('cursor', opts.cursor);
+    if (opts.limit !== undefined) params = params.set('limit', opts.limit);
+    return this.http.get<EntityPage>('/api/entities', { params });
   }
 
   /** Metadata only — never conflicts with an in-progress save. */
@@ -46,7 +61,11 @@ export class EntitiesClient {
     tags: readonly string[],
   ): Observable<EntitySaveOutcome> {
     return this.http
-      .put<EntityDetail>(`/api/entities/${id}`, { document: body, version, tags })
+      .put<EntityDetail>(`/api/entities/${id}`, {
+        document: body,
+        version,
+        tags,
+      })
       .pipe(
         map((saved): EntitySaveOutcome => ({ status: 'saved', entity: saved })),
         catchError((err: unknown) => {

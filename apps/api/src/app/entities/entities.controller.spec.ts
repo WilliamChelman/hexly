@@ -92,20 +92,99 @@ describe('Entities endpoints', () => {
     expect(res.body.name).toBe('The Whisperwood');
   });
 
-  it('lists the entities the owner created, without their bodies', async () => {
+  it('lists the owner’s entities as an envelope of summaries, last page → nextCursor null', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     await ada.post('/entities').send({ name: 'Aldermoor', type: 'hexmap' });
     await ada.post('/entities').send({ name: 'Lady A', type: 'note' });
 
     const res = await ada.get('/entities').expect(200);
 
-    expect(res.body.map((e: { name: string }) => e.name).sort()).toEqual([
+    // The response is always the envelope — never a bare array (ADR-0025).
+    expect(res.body.nextCursor).toBeNull();
+    expect(res.body.items.map((e: { name: string }) => e.name).sort()).toEqual([
       'Aldermoor',
       'Lady A',
     ]);
-    expect(res.body[0]).not.toHaveProperty('document');
-    expect(res.body[0]).toHaveProperty('type');
-    expect(res.body[0]).toHaveProperty('tags');
+    expect(res.body.items[0]).not.toHaveProperty('document');
+    expect(res.body.items[0]).toHaveProperty('type');
+    expect(res.body.items[0]).toHaveProperty('tags');
+  });
+
+  it('walks every owner entity exactly once via cursor, with limit bounding each page', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const names = ['A', 'B', 'C', 'D', 'E'];
+    for (const name of names) {
+      await ada.post('/entities').send({ name, type: 'note' });
+    }
+
+    // Walk the whole list two-at-a-time, following nextCursor to the end.
+    const seen: string[] = [];
+    let cursor: string | null = null;
+    let pages = 0;
+    do {
+      const res = await ada
+        .get('/entities')
+        .query({ limit: 2, ...(cursor ? { cursor } : {}) })
+        .expect(200);
+      expect(res.body.items.length).toBeLessThanOrEqual(2);
+      seen.push(...res.body.items.map((e: { name: string }) => e.name));
+      cursor = res.body.nextCursor;
+      pages++;
+    } while (cursor);
+
+    // Every entity surfaced exactly once — no duplicates, no gaps.
+    expect(seen.slice().sort()).toEqual(names.slice().sort());
+    expect(seen.length).toBe(names.length);
+    // 5 entities at 2 per page = 3 pages (2 + 2 + 1), last page's cursor is null.
+    expect(pages).toBe(3);
+  });
+
+  it('filters by case-insensitive name (q) and by type, composing the two', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    await ada.post('/entities').send({ name: 'Aldermoor Keep', type: 'hexmap' });
+    await ada.post('/entities').send({ name: 'Aldermoor Town', type: 'note' });
+    await ada.post('/entities').send({ name: 'The Whisperwood', type: 'note' });
+
+    // q matches a substring of the name, case-insensitively.
+    const byName = await ada.get('/entities').query({ q: 'aldermoor' }).expect(200);
+    expect(byName.body.items.map((e: { name: string }) => e.name).sort()).toEqual([
+      'Aldermoor Keep',
+      'Aldermoor Town',
+    ]);
+
+    // type filters by Entity Type.
+    const byType = await ada.get('/entities').query({ type: 'note' }).expect(200);
+    expect(byType.body.items.map((e: { name: string }) => e.name).sort()).toEqual([
+      'Aldermoor Town',
+      'The Whisperwood',
+    ]);
+
+    // The two compose — only the note named like "aldermoor".
+    const both = await ada
+      .get('/entities')
+      .query({ q: 'aldermoor', type: 'note' })
+      .expect(200);
+    expect(both.body.items.map((e: { name: string }) => e.name)).toEqual([
+      'Aldermoor Town',
+    ]);
+  });
+
+  it('returns exactly the requested owner-owned summaries when ids is given', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const a = await ada.post('/entities').send({ name: 'Aldermoor', type: 'hexmap' });
+    await ada.post('/entities').send({ name: 'The Whisperwood', type: 'note' });
+    const c = await ada.post('/entities').send({ name: 'Lady A', type: 'note' });
+
+    // ids selects the given set through the same envelope — and silently drops
+    // an unknown id rather than erroring (the picker's display-resolve path).
+    const res = await ada
+      .get('/entities')
+      .query({ ids: [a.body.id, c.body.id, 'no-such-id'] })
+      .expect(200);
+
+    expect(res.body.items.map((e: { id: string }) => e.id).sort()).toEqual(
+      [a.body.id, c.body.id].sort(),
+    );
   });
 
   it('loads an entity by id with its full body', async () => {
@@ -289,7 +368,7 @@ describe('Entities endpoints', () => {
     const bob = await signIn('bob@hexly.test', 'battery staple');
 
     const bobsList = await bob.get('/entities').expect(200);
-    expect(bobsList.body).toEqual([]);
+    expect(bobsList.body).toEqual({ items: [], nextCursor: null });
 
     // 404, not 403 — ownership never leaks (ADR-0004).
     await bob.get(`/entities/${id}`).expect(404);
@@ -302,6 +381,40 @@ describe('Entities endpoints', () => {
 
     const reloaded = await ada.get(`/entities/${id}`).expect(200);
     expect(reloaded.body.version).toBe(1);
+  });
+
+  it('stays owner-scoped under ids/q/type — another owner’s entity never surfaces', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const adas = await ada
+      .post('/entities')
+      .send({ name: 'Aldermoor', type: 'hexmap' });
+
+    await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob');
+    const bob = await signIn('bob@hexly.test', 'battery staple');
+    await bob.post('/entities').send({ name: 'Aldermoor', type: 'hexmap' });
+
+    // ids can't reach across owners — asking for Ada's id as Bob resolves to nothing.
+    const byId = await bob.get('/entities').query({ ids: [adas.body.id] }).expect(200);
+    expect(byId.body.items).toEqual([]);
+
+    // q/type only ever match Bob's own rows, never Ada's same-named hexmap.
+    const byQ = await bob.get('/entities').query({ q: 'aldermoor', type: 'hexmap' }).expect(200);
+    expect(byQ.body.items).toHaveLength(1);
+    expect(byQ.body.items.map((e: { id: string }) => e.id)).not.toContain(adas.body.id);
+  });
+
+  it('rejects a malformed cursor or limit with 400, not a 500', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+
+    // A cursor that doesn't decode to a valid offset is a client error (ADR-0001).
+    await ada.get('/entities').query({ cursor: 'not-a-real-cursor!!' }).expect(400);
+    // Non-numeric, zero, and negative limits are all malformed.
+    await ada.get('/entities').query({ limit: 'lots' }).expect(400);
+    await ada.get('/entities').query({ limit: '0' }).expect(400);
+    await ada.get('/entities').query({ limit: '-5' }).expect(400);
+
+    // A sane cursor/limit still works — the guard rejects only the malformed.
+    await ada.get('/entities').query({ limit: '10' }).expect(200);
   });
 
   it('refuses every entity route without a session cookie', async () => {

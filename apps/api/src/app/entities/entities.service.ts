@@ -8,16 +8,35 @@ import {
   EntityDetail,
   EntitySaveOutcome,
   EntitySummary,
+  EntityType,
   entityTypeSchema,
   SaveEntityRequest,
   tagsSchema,
   visibilitySchema,
 } from '@hexly/domain';
-import { and, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
 import { entities } from '../db/schema';
 
 const INITIAL_VERSION = 1;
+
+/** Owner-scoped paging + filtering options for {@link EntitiesService.list} (ADR-0025). */
+export interface ListOptions {
+  readonly offset: number;
+  readonly limit: number;
+  /** Restrict to an explicit id set (owner-scoped); unknown ids drop out silently. */
+  readonly ids?: readonly string[];
+  /** Case-insensitive substring match on the name. */
+  readonly q?: string;
+  /** Restrict to one Entity Type. */
+  readonly type?: EntityType;
+}
+
+/** One page of summaries plus whether a further page exists (drives the cursor). */
+export interface ListPage {
+  readonly items: EntitySummary[];
+  readonly hasMore: boolean;
+}
 
 /**
  * The shared {@link EntitySaveOutcome} (`saved`/`conflict`) plus an api-local
@@ -34,10 +53,15 @@ export type SaveResult = EntitySaveOutcome | { status: 'not-found' };
 export class EntitiesService {
   constructor(@Inject(DB) private readonly db: Db) {}
 
-  /** The owner's Entities as metadata only — the bodies are loaded on open. */
-  list(ownerId: string): EntitySummary[] {
+  /**
+   * One owner-scoped page of summaries (ADR-0025) — metadata only, bodies are
+   * loaded on open. The sort is stable and deterministic (newest first,
+   * tiebroken by id) so cursor paging never overlaps or skips. Reads `limit + 1`
+   * rows to know whether a further page exists without a phantom empty page.
+   */
+  list(ownerId: string, opts: ListOptions): ListPage {
     // Summary columns only — skip the potentially large `document` TEXT.
-    return this.db
+    const rows = this.db
       .select({
         id: entities.id,
         ownerId: entities.ownerId,
@@ -50,9 +74,15 @@ export class EntitiesService {
         updatedAt: entities.updatedAt,
       })
       .from(entities)
-      .where(eq(entities.ownerId, ownerId))
-      .all()
-      .map(toSummary);
+      .where(and(eq(entities.ownerId, ownerId), ...filters(opts)))
+      .orderBy(desc(entities.updatedAt), asc(entities.id))
+      .limit(opts.limit + 1)
+      .offset(opts.offset)
+      .all();
+
+    const hasMore = rows.length > opts.limit;
+    const items = rows.slice(0, opts.limit).map(toSummary);
+    return { items, hasMore };
   }
 
   /**
@@ -174,6 +204,23 @@ export class EntitiesService {
       .get();
     return row && row.ownerId === ownerId ? row : undefined;
   }
+}
+
+/**
+ * The composable list predicates (ADR-0025) — owner-scoping is applied by the
+ * caller, never here. `q` is a case-insensitive substring match (SQLite `LIKE`
+ * folds ASCII case by default); `type` is an exact Entity Type match.
+ */
+function filters(opts: ListOptions) {
+  const predicates = [];
+  // An empty id set selects nothing (inArray([]) is always-false), not everything.
+  if (opts.ids) predicates.push(inArray(entities.id, [...opts.ids]));
+  if (opts.q) {
+    const escaped = opts.q.replace(/[%_\\]/g, '\\$&');
+    predicates.push(sql`${entities.name} LIKE ${'%' + escaped + '%'} ESCAPE '\\'`);
+  }
+  if (opts.type) predicates.push(eq(entities.type, opts.type));
+  return predicates;
 }
 
 function serialize(body: EntityBody): string {

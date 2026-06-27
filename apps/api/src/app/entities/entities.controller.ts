@@ -11,18 +11,22 @@ import {
   Patch,
   Post,
   Put,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
   AuthUser,
   createEntityRequestSchema,
   EntityDetail,
-  EntitySummary,
+  entityListQuerySchema,
+  EntityPage,
   renameEntityRequestSchema,
   saveEntityRequestSchema,
 } from '@hexly/domain';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { SessionAuthGuard } from '../auth/session-auth.guard';
+import { decodeCursor } from './utils/decode-cursor';
+import { encodeCursor } from './utils/encode-cursor';
 import { EntitiesService } from './entities.service';
 
 /**
@@ -37,8 +41,24 @@ export class EntitiesController {
   constructor(private readonly entities: EntitiesService) {}
 
   @Get()
-  list(@CurrentUser() user: AuthUser): EntitySummary[] {
-    return this.entities.list(user.id);
+  list(@CurrentUser() user: AuthUser, @Query() query: unknown): EntityPage {
+    const parsed = entityListQuerySchema.safeParse(query);
+    if (!parsed.success) throw new BadRequestException();
+    const { cursor, limit, ids, q, type } = parsed.data;
+
+    // An absent cursor is page one; a present-but-undecodable one is a 400, not
+    // a 500 (ADR-0001). The opaque cursor decodes to a server-internal offset.
+    const offset = cursor === undefined ? 0 : decodeCursor(cursor);
+    if (offset === null) throw new BadRequestException();
+
+    const { items, hasMore } = this.entities.list(user.id, {
+      offset,
+      limit,
+      ids,
+      q,
+      type,
+    });
+    return { items, nextCursor: hasMore ? encodeCursor(offset + limit) : null };
   }
 
   @Post()
