@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures';
+import { expect, flushSave, test } from './fixtures';
 
 /**
  * Group moves for non-hex selections (issue #64 follow-up, ADR-0017). Two bugs the
@@ -13,15 +13,7 @@ import { expect, test } from './fixtures';
 
 /** Read the saved document for `mapId` after a committed PUT. */
 async function savedDocument(page: import('@playwright/test').Page, request: import('@playwright/test').APIRequestContext, mapId: string) {
-  const saved = page.waitForResponse(
-    (res) =>
-      res.request().method() === 'PUT' &&
-      /\/api\/entities\/[\w-]+$/.test(res.url()) &&
-      res.ok(),
-  );
-  await page.keyboard.press('ControlOrMeta+s');
-  await saved;
-  await expect(page.getByTestId('save-status')).toHaveText('Saved');
+  await flushSave(page);
   const res = await request.get(`/api/entities/${mapId}`);
   expect(res.ok()).toBeTruthy();
   return (await res.json()).document;

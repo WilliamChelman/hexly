@@ -1,5 +1,6 @@
 import { Route } from '@angular/router';
 import { authGuard, loginGuard } from './core/guards/auth.guard';
+import { flushOnLeave } from './pages/entity/flush-on-leave.guard';
 import { EntitySession } from './pages/entity/services/entity-session';
 
 export const appRoutes: Route[] = [
@@ -29,6 +30,9 @@ export const appRoutes: Route[] = [
     // EditorShell for a hexmap, NoteView for a note.
     path: 'entities/:id',
     canActivate: [authGuard],
+    // Await a pending autosave before leaving the route, so an in-app navigation never
+    // drops a debounced edit (ADR-0026).
+    canDeactivate: [flushOnLeave],
     // One EntitySession for the subtree, destroyed on leave, so open-Entity state
     // resets implicitly (#70).
     providers: [EntitySession],

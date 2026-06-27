@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures';
+import { expect, flushSave, test } from './fixtures';
 
 /**
  * The universal Select journey (issue #28, ADR-0010). These cross the one seam
@@ -146,14 +146,7 @@ test('a painting Tool over a floating Label paints the hex beneath instead of gr
 
   // Save and read back: the hex beneath the Label took the new terrain, and the
   // Label still exists (it was never moved or deleted).
-  const saved = page.waitForResponse(
-    (res) =>
-      res.request().method() === 'PUT' &&
-      /\/api\/entities\/[\w-]+$/.test(res.url()) &&
-      res.ok(),
-  );
-  await page.keyboard.press('ControlOrMeta+s');
-  await saved;
+  await flushSave(page);
 
   const res = await request.get(`/api/entities/${mapId}`);
   expect(res.ok()).toBeTruthy();

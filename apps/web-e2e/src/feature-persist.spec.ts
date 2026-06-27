@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures';
+import { expect, flushSave, test } from './fixtures';
 
 /**
  * The Feature journey (issue #7): a feature placed on a hex survives a save and
@@ -36,17 +36,7 @@ test('places a feature on a hex, saves, and the feature survives a reload', asyn
     .click();
   await canvas.click();
 
-  // Wait on the real save round-trip (not just the button text, which rests at
-  // 'Save' and would let the reload below race an in-flight PUT).
-  const saved = page.waitForResponse(
-    (res) =>
-      res.request().method() === 'PUT' &&
-      /\/api\/entities\/[\w-]+$/.test(res.url()) &&
-      res.ok(),
-  );
-  await page.keyboard.press('ControlOrMeta+s');
-  await saved;
-  await expect(page.getByTestId('save-status')).toHaveText('Saved');
+  await flushSave(page);
 
   // The seam under test: a fresh load re-fetches and re-renders the saved map.
   await page.reload();

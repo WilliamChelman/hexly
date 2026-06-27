@@ -5,6 +5,7 @@ import {
   inject,
 } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
+import { Observable, concat, ignoreElements, of } from 'rxjs';
 import { EntitySession } from './services/entity-session';
 import { EditorShell } from './components/editor-shell';
 import { NoteView } from './components/note-view';
@@ -44,5 +45,14 @@ export class EntityPage {
 
   constructor() {
     this.session.watchRoute(inject(ActivatedRoute));
+  }
+
+  /**
+   * Awaited by the route's CanDeactivate guard (ADR-0026): persist any pending edit before
+   * the route is torn down, then allow the leave. Always resolves true — a failed/timed-out
+   * flush is best-effort and must never trap the user on the page.
+   */
+  canDeactivate(): Observable<boolean> {
+    return concat(this.session.flush().pipe(ignoreElements()), of(true));
   }
 }

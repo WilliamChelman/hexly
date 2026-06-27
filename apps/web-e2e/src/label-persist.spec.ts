@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures';
+import { expect, flushSave, test } from './fixtures';
 
 /**
  * The Label journey (issue #10): a free-positioned label placed on the map, its
@@ -33,17 +33,7 @@ test('places a label, edits its text, saves, and it survives a reload', async ({
   await text.fill('The Whisperwood');
   await text.press('Tab');
 
-  // Wait on the real save round-trip (not just the button text, which rests at
-  // 'Save' and would let the reload below race an in-flight PUT).
-  const saved = page.waitForResponse(
-    (res) =>
-      res.request().method() === 'PUT' &&
-      /\/api\/entities\/[\w-]+$/.test(res.url()) &&
-      res.ok(),
-  );
-  await page.keyboard.press('ControlOrMeta+s');
-  await saved;
-  await expect(page.getByTestId('save-status')).toHaveText('Saved');
+  await flushSave(page);
 
   // The persisted document really holds the label, free-positioned at a point.
   const res = await request.get(`/api/entities/${mapId}`);

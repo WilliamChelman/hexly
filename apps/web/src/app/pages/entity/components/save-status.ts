@@ -27,6 +27,13 @@ import { EntitySession } from '../services/entity-session';
           >
             {{ 'editorShell.reload' | transloco }}
           </button>
+          @if (error() === 'reload') {
+            <!-- The re-pull itself failed; keep the Reload button but say so, else the
+                 chip looks unchanged and Reload appears to do nothing (ADR-0026). -->
+            <span data-testid="reload-error" class="ml-2">{{
+              'editorShell.save.reloadFailed' | transloco
+            }}</span>
+          }
         </app-chip>
       } @else if (error() === 'save') {
         <app-chip tone="gold" data-testid="save-error">
@@ -69,6 +76,6 @@ export class SaveStatus {
 
   /** Manual recovery after a network failure paused the scheduler. */
   protected retry(): void {
-    this.session.save().subscribe();
+    this.session.save(true).subscribe();
   }
 }

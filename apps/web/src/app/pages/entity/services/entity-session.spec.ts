@@ -3,7 +3,6 @@ import {
   HttpTestingController,
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
-import { createEnvironmentInjector, EnvironmentInjector } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { of } from 'rxjs';
@@ -242,36 +241,30 @@ describe('EntitySession', () => {
       http.expectNone('/api/entities/m1');
     });
 
-    it('flushes a pending edit on destroy (route leave), best-effort', () => {
-      // A fresh session in a child injector we can destroy with the HTTP controller
-      // still alive — modelling navigation away mid-debounce.
-      const parent = TestBed.inject(EnvironmentInjector);
-      const child = createEnvironmentInjector([EntitySession, HexMapStore], parent);
-      const leaving = child.get(EntitySession);
-      const leavingEditor = child.get(HexMapStore);
+    it('flush() persists a pending edit on leave, completing when it lands', () => {
+      openAldermoor();
+      editor.paintAt({ q: 5, r: 5 }, 'ocean'); // dirty, debounce not yet elapsed
+      expect(session.dirty()).toBe(true);
 
-      leaving.open('m1').subscribe();
-      http.expectOne('/api/entities/m1').flush(aldermoor);
-      leavingEditor.paintAt({ q: 5, r: 5 }, 'ocean'); // dirty, debounce not yet elapsed
-      expect(leaving.dirty()).toBe(true);
-
-      child.destroy();
+      let done = false;
+      session.flush().subscribe({ complete: () => (done = true) });
 
       const req = http.expectOne('/api/entities/m1');
       expect(req.request.method).toBe('PUT');
       req.flush({ ...aldermoor, version: 4 });
+
+      expect(done).toBe(true);
+      expect(session.dirty()).toBe(false);
     });
 
-    it('does not flush on destroy when nothing is dirty', () => {
-      const parent = TestBed.inject(EnvironmentInjector);
-      const child = createEnvironmentInjector([EntitySession, HexMapStore], parent);
-      const leaving = child.get(EntitySession);
+    it('flush() is a no-op (completes, no request) when nothing is dirty', () => {
+      openAldermoor();
 
-      leaving.open('m1').subscribe();
-      http.expectOne('/api/entities/m1').flush(aldermoor);
+      let done = false;
+      session.flush().subscribe({ complete: () => (done = true) });
 
-      child.destroy();
       http.expectNone('/api/entities/m1');
+      expect(done).toBe(true);
     });
 
     it('coalesces edits during an in-flight save into one follow-up save', () => {
@@ -361,6 +354,71 @@ describe('EntitySession', () => {
       );
       req.flush({ ...aldermoor, version: 8, document: bodyOf(editor.document()) });
     });
+
+    it('pauses autosave after a failed save until the next edit (no retry loop)', () => {
+      openAldermoor();
+      editor.paintAt({ q: 5, r: 5 }, 'ocean');
+      settle();
+      // The save fails; the edit stays dirty (baseline isn't advanced).
+      http
+        .expectOne('/api/entities/m1')
+        .flush('boom', { status: 500, statusText: 'Server Error' });
+      expect(session.error()).toBe('save');
+      expect(session.dirty()).toBe(true);
+
+      // The scheduler must not re-fire the same failing PUT every 800ms.
+      settle();
+      settle();
+      http.expectNone('/api/entities/m1');
+
+      // A fresh edit lifts the pause and autosave resumes.
+      editor.paintAt({ q: 6, r: 6 }, 'forest');
+      settle();
+      http
+        .expectOne('/api/entities/m1')
+        .flush({ ...aldermoor, version: 4, document: bodyOf(editor.document()) });
+    });
+
+    it('flush() is a no-op while a conflict is unresolved (no stale re-PUT)', () => {
+      openAldermoor();
+      editor.paintAt({ q: 5, r: 5 }, 'ocean');
+      session.save().subscribe();
+      http.expectOne('/api/entities/m1').flush(
+        { ...aldermoor, version: 7, document: bodyOf(desertAt99) },
+        { status: 409, statusText: 'Conflict' },
+      );
+      expect(session.conflict()).not.toBeNull();
+
+      // Leaving with the conflict unresolved must not re-send the stale base version.
+      let done = false;
+      session.flush().subscribe({ complete: () => (done = true) });
+      http.expectNone('/api/entities/m1');
+      expect(done).toBe(true);
+    });
+
+    it('flush() waits out an in-flight save, then sends the latest edit (ADR-0026)', () => {
+      openAldermoor();
+      editor.paintAt({ q: 5, r: 5 }, 'ocean');
+      session.save().subscribe();
+      const first = http.expectOne('/api/entities/m1'); // in flight, snapshot = ocean
+
+      // The user types more after the PUT started, then leaves before it returns.
+      editor.paintAt({ q: 6, r: 6 }, 'forest');
+      let done = false;
+      session.flush().subscribe({ complete: () => (done = true) });
+      TestBed.tick(); // let the in-flight wait observe saving === true
+      http.expectNone('/api/entities/m1'); // single-flight: no second save yet
+
+      // The first save settles and advances the version...
+      first.flush({ ...aldermoor, version: 4, document: bodyOf(desertAt99) });
+      TestBed.tick(); // ...the wait sees saving flip false and sends the follow-up
+      const followUp = http.expectOne('/api/entities/m1');
+      expect(followUp.request.body).toEqual(
+        expect.objectContaining({ version: 4 }),
+      );
+      followUp.flush({ ...aldermoor, version: 5 });
+      expect(done).toBe(true);
+    });
   });
 
   it('renames the open entity', () => {
@@ -390,13 +448,23 @@ describe('EntitySession', () => {
     expect(session.current()?.name).toBe('Lady Mara');
   });
 
-  it('clears the canvas then fetches when openRoute targets a different entity', () => {
+  it('flushes the dirty previous entity, then clears and fetches the new one (ADR-0026)', () => {
     openAldermoor();
-    editor.paintAt({ q: 5, r: 5 }, 'ocean');
+    editor.paintAt({ q: 5, r: 5 }, 'ocean'); // m1 now dirty
 
     session.openRoute('m2').subscribe();
-    // Previous canvas cleared while the load is in flight.
+
+    // openRoute awaits the flush of m1's pending edit before clearing its canvas — an
+    // in-app swap reuses this session, so the edit must land while the live signals still
+    // hold it; the m2 load only starts once the flush PUT resolves.
+    const flush = http.expectOne('/api/entities/m1');
+    expect(flush.request.method).toBe('PUT');
+    flush.flush({ ...aldermoor, version: 4 });
+
+    // Previous canvas cleared while the load is in flight — and re-baselined, so this
+    // empty placeholder doesn't read as dirty (else a 404 leave would PUT it over m1).
     expect(editor.document()).toEqual({ hexes: {}, regions: [], labels: [] });
+    expect(session.dirty()).toBe(false);
 
     const other: EntityDetail = { ...aldermoor, id: 'm2', document: bodyOf(forestAt00) };
     http.expectOne('/api/entities/m2').flush(other);
@@ -495,15 +563,16 @@ describe('EntitySession', () => {
     openAldermoor(); // current = m1, not loading
     editor.paintAt({ q: 5, r: 5 }, 'ocean');
 
-    // load in flight for m2, current still m1
+    // Navigating away first flushes m1's pending edit (ADR-0026), then loads m2.
     session.openRoute('m2').subscribe();
+    http.expectOne('/api/entities/m1').flush({ ...aldermoor, version: 4 });
+    expect(session.saving()).toBe(false);
 
-    // A late Save/rename from the outgoing header must not write to the m1 the
-    // user navigated away from (#4, #70).
+    // A *late* Save/rename from the outgoing header — now that the load is in flight —
+    // must not write to the m1 the user navigated away from (#4, #70).
     session.save().subscribe();
     session.rename('Nope').subscribe();
     http.expectNone('/api/entities/m1');
-    expect(session.saving()).toBe(false);
 
     // The pending load still resolves normally.
     http

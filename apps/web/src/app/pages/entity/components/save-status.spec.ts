@@ -111,6 +111,36 @@ describe('SaveStatus', () => {
     expect(session.conflict()).toBeNull();
   });
 
+  it('surfaces a failed Reload while keeping the conflict and its Reload button', () => {
+    open();
+    editor.paintAt({ q: 5, r: 5 }, 'ocean');
+    session.save().subscribe();
+    http
+      .expectOne('/api/entities/m1')
+      .flush(aldermoor, { status: 409, statusText: 'Conflict' });
+    fixture.detectChanges();
+
+    // The re-pull fails: the conflict stands, but the user must be told Reload failed —
+    // else the chip looks unchanged and Reload appears to do nothing (ADR-0026).
+    (
+      fixture.nativeElement.querySelector(
+        '[data-testid=conflict-reload]',
+      ) as HTMLButtonElement
+    ).click();
+    http.expectOne('/api/entities/m1').error(new ProgressEvent('network'));
+    fixture.detectChanges();
+
+    expect(session.conflict()).not.toBeNull();
+    expect(session.error()).toBe('reload');
+    expect(
+      fixture.nativeElement.querySelector('[data-testid=reload-error]'),
+    ).not.toBeNull();
+    // The Reload button is still there to try again.
+    expect(
+      fixture.nativeElement.querySelector('[data-testid=conflict-reload]'),
+    ).not.toBeNull();
+  });
+
   it('shows a save error with a Retry that re-saves', () => {
     open();
     editor.paintAt({ q: 5, r: 5 }, 'ocean');

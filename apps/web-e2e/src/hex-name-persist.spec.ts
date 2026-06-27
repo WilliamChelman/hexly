@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures';
+import { expect, flushSave, test } from './fixtures';
 
 /**
  * The hex-name journey (issue #60, ADR-0016): a painted Hex is named in the
@@ -44,17 +44,7 @@ test('names a painted hex in the Inspector, and the name survives a reload', asy
   await name.fill('Riverbend');
   await name.press('Tab');
 
-  // Wait on the real save round-trip (not just the button text, which rests at
-  // 'Save' and would let the reload below race an in-flight PUT).
-  const saved = page.waitForResponse(
-    (res) =>
-      res.request().method() === 'PUT' &&
-      /\/api\/entities\/[\w-]+$/.test(res.url()) &&
-      res.ok(),
-  );
-  await page.keyboard.press('ControlOrMeta+s');
-  await saved;
-  await expect(page.getByTestId('save-status')).toHaveText('Saved');
+  await flushSave(page);
 
   // The seam under test: a fresh load re-fetches the saved map.
   await page.reload();

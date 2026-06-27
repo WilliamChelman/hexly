@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures';
+import { expect, flushSave, test } from './fixtures';
 
 /**
  * The Entity Link journey (issue #76, CONTEXT.md → Entity Link): a Map element —
@@ -45,16 +45,7 @@ test('links a Hex to an Entity in the Inspector; the link survives a reload and 
   await page.getByTestId(`entity-link-option-${noteId}`).click();
   await expect(page.getByTestId('entity-link-name')).toBeVisible();
 
-  // Wait on the real save round-trip before reloading.
-  const saved = page.waitForResponse(
-    (res) =>
-      res.request().method() === 'PUT' &&
-      /\/api\/entities\/[\w-]+$/.test(res.url()) &&
-      res.ok(),
-  );
-  await page.keyboard.press('ControlOrMeta+s');
-  await saved;
-  await expect(page.getByTestId('save-status')).toHaveText('Saved');
+  await flushSave(page);
 
   // The seam under test: a fresh load re-fetches the saved map.
   await page.reload();

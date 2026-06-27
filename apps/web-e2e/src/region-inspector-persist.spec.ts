@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures';
+import { expect, flushSave, test } from './fixtures';
 
 /**
  * The Region select-and-edit journey (issue #39): a Region selected on the canvas
@@ -43,17 +43,7 @@ test('selects a Region on the canvas, renames it in the Inspector, and the renam
   await name.fill('The Whisperwood');
   await name.press('Tab');
 
-  // Wait on the real save round-trip (not just the button text, which rests at
-  // 'Save' and would let the reload below race an in-flight PUT).
-  const saved = page.waitForResponse(
-    (res) =>
-      res.request().method() === 'PUT' &&
-      /\/api\/entities\/[\w-]+$/.test(res.url()) &&
-      res.ok(),
-  );
-  await page.keyboard.press('ControlOrMeta+s');
-  await saved;
-  await expect(page.getByTestId('save-status')).toHaveText('Saved');
+  await flushSave(page);
 
   // The seam under test: a fresh load re-fetches the saved map.
   await page.reload();

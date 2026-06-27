@@ -120,7 +120,7 @@ export class EditorHeader {
   protected readonly store = inject(HexMapStore);
   protected readonly views = VIEWS;
 
-  /** Whether a map is open — gates Save and rename so neither can run with none. */
+  /** Whether a map is open — gates rename and the view toggle so neither shows with none. */
   protected readonly hasMap = computed(() => this.session.current() !== null);
   protected readonly title = computed(
     () => this.session.current()?.name ?? 'Untitled map',
