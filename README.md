@@ -13,6 +13,31 @@ It's an Nx monorepo:
 | `apps/api`     | NestJS API (SQLite via Drizzle, served by Express)                      |
 | `libs/domain`  | Framework-free contracts shared by both runtimes (Zod schemas, types)   |
 
+## Self-hosting
+
+Requires Docker and Docker Compose.
+
+```sh
+curl -O https://raw.githubusercontent.com/WilliamChelman/hexly/main/docker-compose.yml
+docker compose up -d
+```
+
+The container starts on port 3000. Data is persisted to a named Docker volume (`hexly-data`).
+
+**Seed the first user** (required before anyone can log in — there is no public signup):
+
+```sh
+docker exec hexly-hexly-1 node dist/apps/api/seed.js <email> <password> "<display name>"
+```
+
+**Upgrade** to the latest release:
+
+```sh
+docker compose pull && docker compose up -d
+```
+
+---
+
 ## Prerequisites
 
 - **Node.js** 20.x–24.x (developed on 24)
