@@ -56,7 +56,15 @@
       "orderedList": "Liste numérotée",
       "blockquote": "Citation",
       "codeBlock": "Bloc de code",
-      "horizontalRule": "Séparateur"
+      "horizontalRule": "Séparateur",
+      "entityLink": "Lier une entité"
+    },
+    "entityPicker": {
+      "label": "Lier une entité",
+      "empty": "Aucune entité correspondante"
+    },
+    "entityLink": {
+      "dangling": "Cette entité est indisponible"
     },
     "formatMenu": {
       "label": "Mise en forme",

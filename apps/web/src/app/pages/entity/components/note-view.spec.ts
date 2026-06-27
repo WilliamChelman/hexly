@@ -3,6 +3,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { EntitySession } from '../services/entity-session';
+import { EntityNameResolver } from '../services/entity-name-resolver';
 import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
 import { NoteView } from './note-view';
 import { noteDetail } from './entity-detail.fixtures';
@@ -17,6 +18,7 @@ describe('NoteView', () => {
       imports: [NoteView, provideTranslocoTesting()],
       providers: [
         EntitySession,
+        EntityNameResolver,
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),

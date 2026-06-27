@@ -1,7 +1,10 @@
 import {
+  ApplicationRef,
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  EnvironmentInjector,
+  Injector,
   effect,
   inject,
   input,
@@ -12,9 +15,15 @@ import {
 import { Editor, JSONContent } from '@tiptap/core';
 import { TiptapDirective } from './tiptap.directive';
 import { EntitySession } from '../services/entity-session';
+import { EntityNameResolver } from '../services/entity-name-resolver';
 import { CONTENT_EXTENSIONS } from './content-extensions';
+import { entityLinkNode } from './entity-link-node';
 import { SlashMenu } from './slash-menu';
 import { slashCommands } from './slash-commands';
+import { SLASH_ITEMS } from './slash-menu-items';
+import { EntityPicker } from './entity-picker';
+import { entityMention } from './entity-mention';
+import { createEntityLinkNodeView } from './entity-link-view';
 import { FormattingMenu } from './formatting-menu';
 import { BubbleMenuDirective } from './bubble-menu.directive';
 
@@ -29,7 +38,13 @@ import { BubbleMenuDirective } from './bubble-menu.directive';
 @Component({
   selector: 'app-content-editor',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [SlashMenu, FormattingMenu, BubbleMenuDirective, TiptapDirective],
+  imports: [
+    SlashMenu,
+    EntityPicker,
+    FormattingMenu,
+    BubbleMenuDirective,
+    TiptapDirective,
+  ],
   host: {
     class:
       'flex min-h-[24rem] flex-col rounded-md border border-line bg-surface px-5 py-3 text-ink cursor-text focus-within:border-gold',
@@ -45,6 +60,7 @@ import { BubbleMenuDirective } from './bubble-menu.directive';
     }
 
     <app-slash-menu />
+    <app-entity-picker />
   `,
   styles: `
     /* .ProseMirror lives outside Angular's template — pierce with ::ng-deep.
@@ -164,11 +180,22 @@ import { BubbleMenuDirective } from './bubble-menu.directive';
 export class ContentEditor {
   private readonly session = inject(EntitySession);
   private readonly destroyRef = inject(DestroyRef);
+  // The shared id→name resolver backs both the `@` picker (its entity list) and
+  // every entityLink node view; provided at the entities/:id route so navigating
+  // gets a fresh owner list. The route-level EnvironmentInjector is what each node
+  // view is created in, so they resolve the very same instance (ADR-0023).
+  private readonly resolver = inject(EntityNameResolver);
+  private readonly environmentInjector = inject(EnvironmentInjector);
+  // ContentEditor's own node injector — lives inside the router outlet, so the
+  // entityLink node views created from it can resolve ActivatedRoute for routerLink.
+  private readonly injector = inject(Injector);
+  private readonly appRef = inject(ApplicationRef);
 
   /** The editor's accessible name, localized by the caller (ADR-0014). */
   readonly ariaLabel = input.required<string>();
 
   private readonly slashMenu = viewChild(SlashMenu);
+  private readonly entityPicker = viewChild(EntityPicker);
 
   // Recreated on every seed rather than reset: a fresh Editor gets empty undo
   // history for free (Ctrl-Z can't reach past the seed), and the directives re-bind
@@ -217,12 +244,52 @@ export class ContentEditor {
     this.destroyRef.onDestroy(() => this.editor()?.destroy());
   }
 
-  // slashCommands is UI chrome, not persisted schema, so it lives here rather than
-  // CONTENT_EXTENSIONS (ADR-0019). The menu getter is deferred: render only fires on
-  // a "/" keystroke, long after the viewChild resolves.
+  // slashCommands and entityMention are UI chrome, not persisted schema, so they
+  // live here rather than CONTENT_EXTENSIONS (ADR-0019). The menu/picker getters are
+  // deferred: render only fires on a "/" or "@" keystroke, long after the viewChild
+  // resolves. The entityLink node *schema* is in CONTENT_EXTENSIONS (framework-free);
+  // its Angular node view attaches here by extending that node with addNodeView —
+  // TipTap derives node views from the extension set, not editorProps, so we swap the
+  // bare node for the view-carrying one rather than registering a raw PM nodeView.
   private createEditor(content?: JSONContent): Editor {
+    const environmentInjector = this.environmentInjector;
+    const elementInjector = this.injector;
+    const appRef = this.appRef;
+    const entityLinkWithView = entityLinkNode.extend({
+      addNodeView() {
+        return ({ node }) =>
+          createEntityLinkNodeView(node, environmentInjector, elementInjector, appRef);
+      },
+    });
+
+    const mention = entityMention(
+      () => this.entityPicker(),
+      (query) => this.resolver.search(query),
+    );
+
+    // Patch /link to flag the mention extension before inserting @, so onExit knows
+    // to clean up the stray @ if the user escapes instead of picking (finding #5/#9).
+    const slashItems = SLASH_ITEMS.map((item) =>
+      item.id !== 'link'
+        ? item
+        : {
+            ...item,
+            apply: (editor: Editor, range: { from: number; to: number }) => {
+              mention.setProgrammatic();
+              editor.chain().focus().deleteRange(range).insertContent('@').run();
+            },
+          },
+    );
+
     return new Editor({
-      extensions: [...CONTENT_EXTENSIONS, slashCommands(() => this.slashMenu())],
+      extensions: [
+        ...CONTENT_EXTENSIONS.filter(
+          (e) => (e as { name?: string }).name !== entityLinkNode.name,
+        ),
+        entityLinkWithView,
+        slashCommands(() => this.slashMenu(), slashItems),
+        mention.extension,
+      ],
       content,
     });
   }
