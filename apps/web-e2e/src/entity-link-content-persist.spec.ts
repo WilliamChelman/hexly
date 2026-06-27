@@ -39,6 +39,8 @@ test('inserts a Content Entity Link via @, persists it, navigates it, and dangle
   await expect(link).toBeVisible();
   await expect(link).toHaveText('Untitled note');
   await expect(link).toHaveAttribute('data-entity-id', targetId!);
+  // A real href so Ctrl/Cmd/middle-click open the target in a new tab natively.
+  await expect(link).toHaveAttribute('href', `/entities/${targetId}`);
 
   await flushSave(page);
 

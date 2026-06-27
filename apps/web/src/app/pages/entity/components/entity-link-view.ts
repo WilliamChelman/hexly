@@ -40,18 +40,17 @@ import { EntityNameResolver } from '../services/entity-name-resolver';
         >{{ display() }}@if (descriptor()) {<span> ({{ descriptor() }})</span>}</span
       >
     } @else {
-      <!-- A plain click (or Enter) SPA-navigates via Router.navigate — the node view
-           is created outside the outlet's injector, so routerLink's ActivatedRoute
-           isn't reachable; Router (root) is. Routes through flush-on-leave like the
-           back-to-library link. role/tabindex keep it keyboard-accessible. -->
+      <!-- A real href so the browser handles Ctrl/Cmd/middle-click natively (open in
+           a new tab); a plain left click is intercepted for SPA navigation via Router
+           (the node view is created outside the outlet's injector, so routerLink's
+           ActivatedRoute isn't reachable — Router, root-provided, is). SPA nav routes
+           through flush-on-leave like the back-to-library link. -->
       <a
         data-testid="entity-link"
-        role="link"
-        tabindex="0"
         [attr.data-entity-id]="entityId()"
+        [href]="href()"
         class="cursor-pointer text-gold no-underline hover:underline"
-        (click)="navigate()"
-        (keydown.enter)="navigate()"
+        (click)="onClick($event)"
         >{{ display()
         }}@if (descriptor()) {<span class="text-ink-muted"> ({{ descriptor() }})</span>}</a
       >
@@ -77,7 +76,21 @@ export class EntityLinkView {
     return r.status === 'found' ? r.entity.name : this.label();
   });
 
-  protected navigate(): void {
+  /** The target's route as a real href so modified clicks open a new tab natively. */
+  protected readonly href = computed(() => `/entities/${this.entityId()}`);
+
+  protected onClick(event: MouseEvent): void {
+    // Defer to the browser for new-tab/window gestures: modifier or non-primary clicks.
+    if (
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return;
+    }
+    event.preventDefault();
     this.router.navigate(['/entities', this.entityId()]);
   }
 }
