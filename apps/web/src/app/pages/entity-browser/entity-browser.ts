@@ -20,9 +20,6 @@ import { PageHeader } from '../../ui/page-header';
 import { Panel } from '../../ui/panel';
 import { Icon } from '../../ui/icon/icon';
 
-const NEW_MAP_TITLE = 'Untitled map';
-const NEW_NOTE_TITLE = 'Untitled note';
-
 /**
  * Format an epoch-millis timestamp for `lang` using native `Intl` (ADR-0014 — no
  * DatePipe/registerLocaleData). Falls back to the runtime default if `lang` is
@@ -251,7 +248,10 @@ export class EntityBrowser implements OnInit {
     if (this.creating()) return;
     this.creating.set(true);
     this.maps$
-      .create(type === 'note' ? NEW_NOTE_TITLE : NEW_MAP_TITLE, type)
+      .create(
+        this.transloco.translate(type === 'note' ? 'domain.untitledNote' : 'domain.untitledMap'),
+        type,
+      )
       .pipe(finalize(() => this.creating.set(false)))
       .subscribe({
         // EntitySession loads on open; no pre-adopt from here (it would outlive this page).

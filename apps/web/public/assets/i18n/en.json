@@ -122,6 +122,8 @@
       "removeLink": "Remove link",
       "searchLink": "Search entities…",
       "linkEmpty": "No entities",
+      "newNote": "New note",
+      "newMap": "New map",
       "color": "Color",
       "membership": "Membership",
       "membershipDirection": "Membership direction",
@@ -230,7 +232,9 @@
     "feature": {
       "settlement": "Settlement",
       "ruin": "Ruin"
-    }
+    },
+    "untitledNote": "Untitled note",
+    "untitledMap": "Untitled map"
   },
   "common": {
     "language": "Language",

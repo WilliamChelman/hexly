@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { of } from 'rxjs';
-import { EntitySummary } from '@hexly/domain';
+import { EntityDetail, EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient } from '../../../core/services/entities.client';
 import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
 import { HexMapStore } from '../services/hexmap-store';
@@ -26,11 +26,31 @@ function summary(id: string, name: string): EntitySummary {
 /** The owner's entities the stubbed client returns; set per test before render. */
 let stubEntities: EntitySummary[] = [];
 
+/** Records each `create(name, type)` the Entity Link control made (issue #77). */
+let createdCalls: Array<{ name: string; type: EntityType }> = [];
+
+/** The id the stubbed `create` mints for the next created Entity. */
+let nextCreatedId = 'created-1';
+
 /** Providers every Inspector spec needs now that it embeds the Entity Link control. */
 function inspectorProviders() {
   return [
     provideRouter([]),
-    { provide: EntitiesClient, useValue: { list: () => of(stubEntities) } },
+    {
+      provide: EntitiesClient,
+      useValue: {
+        list: () => of(stubEntities),
+        create: (name: string, type: EntityType) => {
+          createdCalls.push({ name, type });
+          const detail: EntityDetail = {
+            ...summary(nextCreatedId, name),
+            type,
+            document: { type } as EntityDetail['document'],
+          };
+          return of(detail);
+        },
+      },
+    },
   ];
 }
 
@@ -563,6 +583,8 @@ describe('Inspector region editing', () => {
 describe('Inspector Entity Link control', () => {
   beforeEach(async () => {
     stubEntities = [];
+    createdCalls = [];
+    nextCreatedId = 'created-1';
     await TestBed.configureTestingModule({
       imports: [Inspector, provideTranslocoTesting()],
       providers: inspectorProviders(),
@@ -671,6 +693,72 @@ describe('Inspector Entity Link control', () => {
     expect(name.textContent).toContain('note'); // type suffix
   });
 
+  it('creates a new note and links the selected Hex to it in one flow', () => {
+    nextCreatedId = 'n-new';
+    const store = TestBed.inject(HexMapStore);
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.select({ q: 0, r: 0 }, null);
+    const fixture = render();
+    const el = fixture.nativeElement as HTMLElement;
+
+    (byId(el, 'entity-link-pick') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    (byId(el, 'entity-link-create-note') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    // A note was created and the Hex now links to it; its name resolves locally.
+    expect(createdCalls).toEqual([{ name: 'Untitled note', type: 'note' }]);
+    expect(store.document().hexes['0,0'].entityId).toBe('n-new');
+    expect(byId(el, 'entity-link-name')?.textContent).toContain('Untitled note');
+  });
+
+  it('names the created Entity after the typed search query', () => {
+    nextCreatedId = 'iron';
+    const store = TestBed.inject(HexMapStore);
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.select({ q: 0, r: 0 }, null);
+    const fixture = render();
+    const el = fixture.nativeElement as HTMLElement;
+
+    (byId(el, 'entity-link-pick') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    const search = byId(el, 'entity-link-search') as HTMLInputElement;
+    search.value = 'Ironhold';
+    search.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    (byId(el, 'entity-link-create-note') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(createdCalls).toEqual([{ name: 'Ironhold', type: 'note' }]);
+    expect(byId(el, 'entity-link-name')?.textContent).toContain('Ironhold');
+  });
+
+  it('creates a new Hex Map and links a selected Feature to it (city pin → city map)', () => {
+    nextCreatedId = 'city-map';
+    const store = TestBed.inject(HexMapStore);
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.placeFeatureAt({ q: 0, r: 0 }, 'settlement');
+    store.select({ q: 0, r: 0 }, null); // resolves to the topmost Feature
+    const fixture = render();
+    const el = fixture.nativeElement as HTMLElement;
+
+    (byId(el, 'entity-link-pick') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    (byId(el, 'entity-link-create-map') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    // The Feature's own link points at the new hexmap — independent of the Hex.
+    expect(createdCalls).toEqual([{ name: 'Untitled map', type: 'hexmap' }]);
+    expect(store.document().hexes['0,0'].feature).toEqual({
+      ref: 'settlement',
+      entityId: 'city-map',
+    });
+  });
+
   it('renders the control chrome in French', () => {
     const store = TestBed.inject(HexMapStore);
     store.paintAt({ q: 0, r: 0 }, 'forest');
@@ -682,5 +770,20 @@ describe('Inspector Entity Link control', () => {
     expect(byId(fixture.nativeElement, 'entity-link-pick')?.textContent).toContain(
       'Lier une entité',
     );
+  });
+
+  it('renders the create-and-link row in French', () => {
+    const store = TestBed.inject(HexMapStore);
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.select({ q: 0, r: 0 }, null);
+    const fixture = render();
+    const el = fixture.nativeElement as HTMLElement;
+
+    (byId(el, 'entity-link-pick') as HTMLButtonElement).click();
+    TestBed.inject(TranslocoService).setActiveLang('fr');
+    fixture.detectChanges();
+
+    expect(byId(el, 'entity-link-create-note')?.textContent).toContain('Nouvelle note');
+    expect(byId(el, 'entity-link-create-map')?.textContent).toContain('Nouvelle carte');
   });
 });

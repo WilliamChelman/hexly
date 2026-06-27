@@ -122,6 +122,8 @@
       "removeLink": "Retirer le lien",
       "searchLink": "Rechercher des entités…",
       "linkEmpty": "Aucune entité",
+      "newNote": "Nouvelle note",
+      "newMap": "Nouvelle carte",
       "color": "Couleur",
       "membership": "Appartenance",
       "membershipDirection": "Direction d’appartenance",
@@ -230,7 +232,9 @@
     "feature": {
       "settlement": "Colonie",
       "ruin": "Ruine"
-    }
+    },
+    "untitledNote": "Note sans titre",
+    "untitledMap": "Carte sans titre"
   },
   "common": {
     "language": "Langue",

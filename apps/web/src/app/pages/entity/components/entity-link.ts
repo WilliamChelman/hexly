@@ -6,10 +6,9 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
-import { TranslocoPipe } from '@jsverse/transloco';
-import { EntitySummary } from '@hexly/domain';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+import { EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient } from '../../../core/services/entities.client';
 import { Button } from '../../../ui/button';
 import { Field } from '../../../ui/field';
@@ -79,7 +78,7 @@ import { HexMapStore } from '../services/hexmap-store';
 
       @if (open()) {
         <div
-          class="mt-2 max-h-56 overflow-auto rounded-md border border-line bg-surface p-1 shadow-2"
+          class="mt-2 rounded-md border border-line bg-surface p-1 shadow-2"
           data-testid="entity-link-menu"
         >
           <input
@@ -90,20 +89,51 @@ import { HexMapStore } from '../services/hexmap-store';
             [value]="query()"
             (input)="onQuery($event)"
           />
-          @for (e of filtered(); track e.id) {
+          <!-- Only the option list scrolls; the search box and create row stay pinned
+               so create-and-link is always reachable without scrolling past the list. -->
+          <div class="max-h-56 overflow-auto">
+            @for (e of filtered(); track e.id) {
+              <button
+                type="button"
+                class="block w-full cursor-pointer rounded-sm px-2 py-1 text-left text-sm text-ink hover:bg-surface-sunken"
+                [attr.data-testid]="'entity-link-option-' + e.id"
+                (click)="pick(e.id)"
+              >
+                {{ e.name }}
+              </button>
+            } @empty {
+              <p class="px-2 py-1 text-sm text-ink-muted">
+                {{ 'editorShell.inspector.linkEmpty' | transloco }}
+              </p>
+            }
+          </div>
+
+          <!-- Create-and-link a brand-new Entity in the same flow (issue #77). The
+               typed query names it; an empty query falls back to a default title. -->
+          <div class="mt-1 flex gap-1 border-t border-line pt-1">
             <button
               type="button"
-              class="block w-full cursor-pointer rounded-sm px-2 py-1 text-left text-sm text-ink hover:bg-surface-sunken"
-              [attr.data-testid]="'entity-link-option-' + e.id"
-              (click)="pick(e.id)"
+              appButton
+              variant="ghost"
+              size="sm"
+              class="flex-1"
+              data-testid="entity-link-create-note"
+              (click)="create('note')"
             >
-              {{ e.name }}
+              + {{ 'editorShell.inspector.newNote' | transloco }}
             </button>
-          } @empty {
-            <p class="px-2 py-1 text-sm text-ink-muted">
-              {{ 'editorShell.inspector.linkEmpty' | transloco }}
-            </p>
-          }
+            <button
+              type="button"
+              appButton
+              variant="ghost"
+              size="sm"
+              class="flex-1"
+              data-testid="entity-link-create-map"
+              (click)="create('hexmap')"
+            >
+              + {{ 'editorShell.inspector.newMap' | transloco }}
+            </button>
+          </div>
         </div>
       }
     </div>
@@ -112,16 +142,21 @@ import { HexMapStore } from '../services/hexmap-store';
 export class EntityLink {
   protected readonly store = inject(HexMapStore);
   private readonly entitiesClient = inject(EntitiesClient);
+  private readonly transloco = inject(TranslocoService);
 
-  /** The owner's entities, fetched once on mount (owner-scoped, no search endpoint — ADR-0023). */
-  private readonly entities = toSignal(this.entitiesClient.list(), {
-    initialValue: [] as EntitySummary[],
-  });
+  /**
+   * The owner's entities, fetched once on mount (owner-scoped, no search endpoint —
+   * ADR-0023). Writable so a create-and-link (issue #77) can append the new Entity
+   * and have its name resolve immediately, without re-fetching the whole list.
+   */
+  private readonly entities = signal<EntitySummary[]>([]);
 
   protected readonly open = signal(false);
   protected readonly query = signal('');
 
   constructor() {
+    this.entitiesClient.list().subscribe((list) => this.entities.set(list));
+
     // Close the picker and reset the query whenever the selected element changes so
     // a pick() always targets the element the picker was opened for.
     effect(() => {
@@ -168,6 +203,23 @@ export class EntityLink {
   protected pick(id: string): void {
     this.store.linkEntity(id);
     this.open.set(false);
+  }
+
+  /**
+   * Create a new owner-scoped Entity of `type` and link the selected element to it
+   * in one flow (issue #77). The typed query names it; an empty query falls back to
+   * a default title. The created Entity is appended locally so its name resolves at
+   * once, and the link rides the existing document save like any other.
+   */
+  protected create(type: EntityType): void {
+    const name =
+      this.query().trim() ||
+      this.transloco.translate(type === 'hexmap' ? 'domain.untitledMap' : 'domain.untitledNote');
+    this.entitiesClient.create(name, type).subscribe((entity) => {
+      this.entities.update((list) => [...list, entity]);
+      this.store.linkEntity(entity.id);
+      this.open.set(false);
+    });
   }
 
   protected remove(): void {
