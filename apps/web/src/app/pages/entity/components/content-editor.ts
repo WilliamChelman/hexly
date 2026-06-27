@@ -269,7 +269,7 @@ export class ContentEditor {
         slashCommands(() => this.slashMenu()),
         entityMention(
           () => this.entityPicker(),
-          () => this.resolver.loaded(),
+          (query) => this.resolver.search(query),
         ),
       ],
       content,

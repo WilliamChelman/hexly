@@ -5,22 +5,21 @@ import Suggestion, {
   SuggestionProps,
 } from '@tiptap/suggestion';
 import { EntitySummary } from '@hexly/domain';
-import { filterEntities } from './entity-mention-items';
 import { EntityPicker } from './entity-picker';
 
 /**
  * The `@` trigger for inserting a Content Entity Link (issue #95, ADR-0023).
  * Like {@link slashCommands}, a non-schema extension (it adds a ProseMirror plugin,
  * no node/mark) so it stays out of {@link CONTENT_EXTENSIONS} and changes no format
- * contract (ADR-0019). It filters the owner's Entity summaries client-side as the
- * user types — unfiltered by type or self — and a pick inserts the `entityLink`
- * atom, snapshotting the name as `label`. `getEntities`/`getPicker` are deferred so
- * the editor builds before the resolver list and the picker's `viewChild` resolve.
- * The `/link` slash item routes here by inserting `@`.
+ * contract (ADR-0019). It searches the owner's Entity summaries server-side as the
+ * user types — unfiltered by type or self (ADR-0025 `q`) — and a pick inserts the
+ * `entityLink` atom, snapshotting the name as `label`. `search`/`getPicker` are
+ * deferred so the editor builds before the resolver and the picker's `viewChild`
+ * resolve. The `/link` slash item routes here by inserting `@`.
  */
 export function entityMention(
   getPicker: () => EntityPicker | undefined,
-  getEntities: () => Promise<EntitySummary[]>,
+  search: (query: string) => Promise<EntitySummary[]>,
 ): Extension {
   return Extension.create({
     name: 'entityMention',
@@ -33,7 +32,7 @@ export function entityMention(
           pluginKey: new PluginKey('entityMention'),
           char: '@',
           allow: ({ state }) => !state.selection.$from.parent.type.spec.code,
-          items: ({ query }) => getEntities().then((list) => filterEntities(list, query)),
+          items: ({ query }) => search(query),
           command: ({ editor, range, props }) =>
             editor
               .chain()
