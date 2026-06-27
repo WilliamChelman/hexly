@@ -52,14 +52,17 @@ describe('EntityBrowser', () => {
 
   afterEach(() => http.verify());
 
-  /** Create the library and resolve its initial list with `entities` as a page envelope. */
-  function renderWith(entities: EntitySummary[]) {
+  /** Create the library and resolve its first page; `nextCursor` defaults to null (single page). */
+  function renderWith(entities: EntitySummary[], nextCursor: string | null = null) {
     const fixture = TestBed.createComponent(EntityBrowser);
     fixture.detectChanges(); // ngOnInit -> GET /entities
-    http.expectOne((r) => r.url === '/api/entities').flush({ items: entities, nextCursor: null });
+    http.expectOne((r) => r.url === '/api/entities').flush({ items: entities, nextCursor });
     fixture.detectChanges();
     return fixture;
   }
+
+  const loadMore = (el: HTMLElement) =>
+    el.querySelector('[data-testid=load-more]') as HTMLButtonElement | null;
 
   it('exposes the banner and main as sibling landmarks, not banner nested in main', () => {
     const el = renderWith([]).nativeElement as HTMLElement;
@@ -108,7 +111,7 @@ describe('EntityBrowser', () => {
     ]);
 
     const titles = Array.from(
-      fixture.nativeElement.querySelectorAll('[data-testid=map-title]'),
+      fixture.nativeElement.querySelectorAll('[data-testid=entity-title]'),
     ).map((el) => (el as HTMLElement).textContent?.trim());
     expect(titles).toEqual(['Aldermoor', 'The Whisperwood']);
   });
@@ -220,10 +223,61 @@ describe('EntityBrowser', () => {
     fixture.detectChanges();
 
     const title = fixture.nativeElement.querySelector(
-      '[data-testid=map-title]',
+      '[data-testid=entity-title]',
     ) as HTMLElement;
     expect(title.textContent?.trim()).toBe('New map');
     expect(title.textContent).not.toContain('Nouvelle carte');
+  });
+
+  it('shows a load-more affordance while there is a next page', () => {
+    const fixture = renderWith([summary({ id: 'm1' })], 'cursor-2');
+    expect(loadMore(fixture.nativeElement)).not.toBeNull();
+  });
+
+  it('shows no load-more affordance when the first page is the last (single page)', () => {
+    const fixture = renderWith([summary({ id: 'm1' })], null);
+    expect(loadMore(fixture.nativeElement)).toBeNull();
+  });
+
+  it('fetches the next page with the cursor and appends it, then hides load-more on the last page', () => {
+    const fixture = renderWith(
+      [summary({ id: 'm1', name: 'Aldermoor', updatedAt: 300 })],
+      'cursor-2',
+    );
+    const el = fixture.nativeElement as HTMLElement;
+
+    loadMore(el)?.click();
+    const req = http.expectOne((r) => r.url === '/api/entities');
+    expect(req.request.method).toBe('GET');
+    expect(req.request.params.get('cursor')).toBe('cursor-2');
+    req.flush({
+      items: [summary({ id: 'm2', name: 'The Whisperwood', updatedAt: 200 })],
+      nextCursor: null,
+    });
+    fixture.detectChanges();
+
+    // The next page is appended after the first — no duplicates, no gaps.
+    const titles = Array.from(el.querySelectorAll('[data-testid=entity-title]')).map(
+      (t) => (t as HTMLElement).textContent?.trim(),
+    );
+    expect(titles).toEqual(['Aldermoor', 'The Whisperwood']);
+    // Last page reached: the affordance is gone.
+    expect(loadMore(el)).toBeNull();
+  });
+
+  it('ignores a second load-more click while the first is still in flight (no double-append)', () => {
+    const fixture = renderWith([summary({ id: 'm1', updatedAt: 300 })], 'cursor-2');
+    const el = fixture.nativeElement as HTMLElement;
+
+    loadMore(el)?.click();
+    fixture.detectChanges();
+    // A second click before the page resolves must not fire a second request.
+    loadMore(el)?.click();
+    fixture.detectChanges();
+
+    const inflight = http.match((r) => r.url === '/api/entities');
+    expect(inflight.length).toBe(1);
+    inflight[0].flush({ items: [summary({ id: 'm2', updatedAt: 200 })], nextCursor: null });
   });
 
   it('shows an empty state when the user has no entities', () => {
@@ -231,7 +285,7 @@ describe('EntityBrowser', () => {
 
     expect(fixture.nativeElement.querySelector('[data-testid=empty]')).not.toBeNull();
     expect(
-      fixture.nativeElement.querySelector('[data-testid=map-title]'),
+      fixture.nativeElement.querySelector('[data-testid=entity-title]'),
     ).toBeNull();
   });
 
@@ -314,7 +368,7 @@ describe('EntityBrowser', () => {
     expect(navigate).toHaveBeenCalledWith(['/entities', 'm1']);
   });
 
-  it('renames an entity in place, changing only its name', () => {
+  it('renames an entity, then refreshes from page one (ADR-0025)', () => {
     const fixture = renderWith([summary({ id: 'm1', name: 'Aldermoor', version: 4 })]);
     const el = fixture.nativeElement as HTMLElement;
 
@@ -335,9 +389,20 @@ describe('EntityBrowser', () => {
     });
     fixture.detectChanges();
 
+    // After the rename the browser refreshes from page one: it re-fetches and
+    // renders what the server returns, rather than reconciling in place.
+    const refresh = http.expectOne((r) => r.url === '/api/entities');
+    expect(refresh.request.method).toBe('GET');
+    expect(refresh.request.params.get('cursor')).toBeNull();
+    refresh.flush({
+      items: [summary({ id: 'm1', name: 'Aldermoor Keep', version: 4 })],
+      nextCursor: null,
+    });
+    fixture.detectChanges();
+
     // The card shows the new name and the input is gone (back to read mode).
     expect(
-      (el.querySelector('[data-testid=map-title]') as HTMLElement).textContent?.trim(),
+      (el.querySelector('[data-testid=entity-title]') as HTMLElement).textContent?.trim(),
     ).toBe('Aldermoor Keep');
     expect(el.querySelector('[data-testid=rename-input-m1]')).toBeNull();
   });
@@ -380,11 +445,11 @@ describe('EntityBrowser', () => {
     // original name stays put with the editor closed.
     expect(el.querySelector('[data-testid=rename-input-m1]')).toBeNull();
     expect(
-      (el.querySelector('[data-testid=map-title]') as HTMLElement).textContent?.trim(),
+      (el.querySelector('[data-testid=entity-title]') as HTMLElement).textContent?.trim(),
     ).toBe('Aldermoor');
   });
 
-  it('deletes a map and removes it from the list', () => {
+  it('deletes a map, then refreshes from page one (ADR-0025)', () => {
     const fixture = renderWith([
       summary({ id: 'm1', name: 'Aldermoor' }),
       summary({ id: 'm2', name: 'The Whisperwood' }),
@@ -396,8 +461,18 @@ describe('EntityBrowser', () => {
     http.expectOne('/api/entities/m1').flush(null);
     fixture.detectChanges();
 
+    // The delete is followed by a page-one refresh; the view reflects the server.
+    const refresh = http.expectOne((r) => r.url === '/api/entities');
+    expect(refresh.request.method).toBe('GET');
+    expect(refresh.request.params.get('cursor')).toBeNull();
+    refresh.flush({
+      items: [summary({ id: 'm2', name: 'The Whisperwood' })],
+      nextCursor: null,
+    });
+    fixture.detectChanges();
+
     const titles = Array.from(
-      fixture.nativeElement.querySelectorAll('[data-testid=map-title]'),
+      fixture.nativeElement.querySelectorAll('[data-testid=entity-title]'),
     ).map((el) => (el as HTMLElement).textContent?.trim());
     expect(titles).toEqual(['The Whisperwood']);
   });

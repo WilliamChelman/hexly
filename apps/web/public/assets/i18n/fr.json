@@ -27,6 +27,9 @@
     "createError": "Création impossible. Veuillez réessayer.",
     "renameError": "Renommage impossible. Veuillez réessayer.",
     "deleteError": "Suppression impossible. Veuillez réessayer.",
+    "loadMore": "Charger plus",
+    "loadingMore": "Chargement…",
+    "loadMoreError": "Chargement impossible. Veuillez réessayer.",
     "emptyTitle": "Votre bibliothèque est vide.",
     "emptyHint": "Créez une note ou une carte pour commencer."
   },

@@ -20,6 +20,10 @@ import { PageHeader } from '../../ui/page-header';
 import { Panel } from '../../ui/panel';
 import { Icon } from '../../ui/icon/icon';
 
+// ponytail: bounded first page so a large vault loads fast; bump or make
+// configurable only if a real page size proves wrong in use.
+const PAGE_SIZE = 50;
+
 /**
  * Format an epoch-millis timestamp for `lang` using native `Intl` (ADR-0014 — no
  * DatePipe/registerLocaleData). Falls back to the runtime default if `lang` is
@@ -39,10 +43,11 @@ function formatEdited(updatedAt: number, lang: string): string {
  * The Entity browser: the landing surface (`/entities`) where a user sees every
  * Entity they own — notes and maps together — with each one's name, type, tags,
  * and last-edited date, and runs the lifecycle: create (note or map), open,
- * rename in place, delete (#70, generalizing issue #6's map list). It holds the
- * list as local state and keeps it in sync with create/rename/delete rather than
- * re-fetching, so the view stays responsive. Opening or creating navigates to
- * `/entities/:id`, the one type-dispatching route.
+ * rename in place, delete (#70, generalizing issue #6's map list). It accumulates
+ * the entities as cursor-paginated pages (ADR-0025): a bounded first page on load,
+ * a load-more control that appends the next page, and a refresh from page one after
+ * every rename/delete so the view stays coherent without reconciling a stale tail.
+ * Opening or creating navigates to `/entities/:id`, the one type-dispatching route.
  */
 @Component({
   selector: 'app-entity-browser',
@@ -121,7 +126,7 @@ function formatEdited(updatedAt: number, lang: string): string {
                   >
                     <span
                       class="font-display text-md text-ink-strong"
-                      data-testid="map-title"
+                      data-testid="entity-title"
                       >{{ card.title }}</span
                     >
                     <span
@@ -172,6 +177,25 @@ function formatEdited(updatedAt: number, lang: string): string {
             </li>
           }
         </ul>
+        @if (nextCursor() !== null) {
+          <div class="mt-6 flex justify-center">
+            <button
+              type="button"
+              appButton
+              variant="default"
+              data-testid="load-more"
+              [disabled]="loadingMore()"
+              (click)="loadMore()"
+            >
+              {{
+                (loadingMore()
+                  ? 'entityBrowser.loadingMore'
+                  : 'entityBrowser.loadMore'
+                ) | transloco
+              }}
+            </button>
+          </div>
+        }
       } @else if (loadError()) {
         <section
           class="p-6 text-center text-ink-muted"
@@ -195,31 +219,35 @@ function formatEdited(updatedAt: number, lang: string): string {
   `,
 })
 export class EntityBrowser implements OnInit {
-  private readonly maps$ = inject(EntitiesClient);
+  private readonly entitiesClient = inject(EntitiesClient);
   private readonly router = inject(Router);
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
   private readonly shell = inject(AppShellStore);
 
-  private readonly _maps = signal<EntitySummary[]>([]);
-  /** The user's maps, newest first. */
-  protected readonly maps = computed(() =>
-    [...this._maps()].sort((a, b) => b.updatedAt - a.updatedAt),
+  private readonly _entities = signal<EntitySummary[]>([]);
+  /** The user's entities, newest first. */
+  protected readonly entities = computed(() =>
+    [...this._entities()].sort((a, b) => b.updatedAt - a.updatedAt),
   );
-  /** The maps as view rows, with the last-edited date pre-formatted for the
-   * active language (ADR-0014). Keyed on `maps` and the active lang, so each date
-   * formats once per list/language change and reflows live on a switch — not on
-   * every change-detection pass, as a template method call would. */
+  /** The entities as view rows, with the last-edited date pre-formatted for the
+   * active language (ADR-0014). Keyed on `entities` and the active lang, so each
+   * date formats once per list/language change and reflows live on a switch — not
+   * on every change-detection pass, as a template method call would. */
   protected readonly cards = computed(() => {
     const lang = this.transloco.activeLang();
-    return this.maps().map((map) => ({
-      id: map.id,
-      title: map.name,
-      type: map.type,
-      tags: map.tags,
-      edited: formatEdited(map.updatedAt, lang),
+    return this.entities().map((entity) => ({
+      id: entity.id,
+      title: entity.name,
+      type: entity.type,
+      tags: entity.tags,
+      edited: formatEdited(entity.updatedAt, lang),
     }));
   });
+  /** The cursor for the next page, or `null` on the last page — gates load-more (ADR-0025). */
+  protected readonly nextCursor = signal<string | null>(null);
+  /** Whether a load-more is in flight — disables the control so a double-click can't double-append. */
+  protected readonly loadingMore = signal(false);
   /** Whether the initial load has resolved — gates the empty state. */
   protected readonly loaded = signal(false);
   /** Whether the initial load failed — shows an error panel instead. */
@@ -230,26 +258,65 @@ export class EntityBrowser implements OnInit {
   protected readonly renamingId = signal<string | null>(null);
 
   ngOnInit(): void {
+    this.fetchFirstPage();
+  }
+
+  /**
+   * Fetch page one and replace the accumulated list with it (ADR-0025). Used on
+   * load and after every create/rename/delete: refreshing from page one keeps the
+   * view coherent without reconciling a stale accumulated tail, and page one is the
+   * only view a client can always re-request — it needs no cursor and is bounded by
+   * `limit`, so it survives any future opaque-cursor encoding change.
+   */
+  private fetchFirstPage(): void {
     // Set `loaded` on error too: a failed fetch must show the error panel, not a blank page.
-    this.maps$.list({ limit: 200 }).pipe(this.shell.withLoading('subtle')).subscribe({
-      // Read the page envelope's items (ADR-0025). At small scale the whole list
-      // fits one page; load-more is a later slice (until import lands it never pages).
-      next: (page) => {
-        this._maps.set(page.items);
-        this.loaded.set(true);
-      },
-      error: () => {
-        this.loaded.set(true);
-        this.loadError.set(true);
-      },
-    });
+    this.entitiesClient
+      .list({ limit: PAGE_SIZE })
+      .pipe(this.shell.withLoading('subtle'))
+      .subscribe({
+        next: (page) => {
+          this._entities.set(page.items);
+          this.nextCursor.set(page.nextCursor);
+          this.loaded.set(true);
+        },
+        error: () => {
+          this.loaded.set(true);
+          this.loadError.set(true);
+        },
+      });
+  }
+
+  /**
+   * Fetch the next page via the opaque `nextCursor` and append it (ADR-0025). The
+   * `loadingMore` guard makes a double-click a no-op so a page can't be appended
+   * twice. A failed fetch just re-enables the control to retry — the list it already
+   * shows stays intact.
+   */
+  protected loadMore(): void {
+    const cursor = this.nextCursor();
+    if (cursor === null || this.loadingMore()) return;
+    this.loadingMore.set(true);
+    this.entitiesClient
+      .list({ cursor })
+      .pipe(finalize(() => this.loadingMore.set(false)))
+      .subscribe({
+        next: (page) => {
+          this._entities.update((entities) => [...entities, ...page.items]);
+          this.nextCursor.set(page.nextCursor);
+        },
+        error: () =>
+          this.toaster.show(
+            this.transloco.translate('entityBrowser.loadMoreError'),
+            'error',
+          ),
+      });
   }
 
   /** Create an empty Entity of `type` and open it straight away. */
   protected create(type: EntityType): void {
     if (this.creating()) return;
     this.creating.set(true);
-    this.maps$
+    this.entitiesClient
       .create(
         this.transloco.translate(type === 'note' ? 'domain.untitledNote' : 'domain.untitledMap'),
         type,
@@ -284,18 +351,17 @@ export class EntityBrowser implements OnInit {
    */
   protected commitRename(id: string, name: string): void {
     const trimmed = name.trim();
-    const current = this._maps().find((m) => m.id === id);
+    const current = this._entities().find((entity) => entity.id === id);
     if (!trimmed || !current || trimmed === current.name) {
       this.cancelRename();
       return;
     }
-    this.maps$.rename(id, trimmed).subscribe({
-      // EntityDetail is assignable to EntitySummary; the extra body is harmless.
-      next: (updated) => {
-        this._maps.update((maps) =>
-          maps.map((m) => (m.id === id ? updated : m)),
-        );
+    this.entitiesClient.rename(id, trimmed).subscribe({
+      // Refresh from page one (ADR-0025) rather than reconcile in place: a rename
+      // can move the item under the server's sort, so re-fetching keeps the view honest.
+      next: () => {
         this.renamingId.set(null);
+        this.fetchFirstPage();
       },
       error: () => {
         this.cancelRename();
@@ -307,10 +373,10 @@ export class EntityBrowser implements OnInit {
     });
   }
 
-  /** Delete a map and drop it from the list once the server confirms. */
+  /** Delete an entity, then refresh from page one once the server confirms (ADR-0025). */
   protected remove(id: string): void {
-    this.maps$.delete(id).subscribe({
-      next: () => this._maps.update((maps) => maps.filter((m) => m.id !== id)),
+    this.entitiesClient.delete(id).subscribe({
+      next: () => this.fetchFirstPage(),
       error: () =>
         this.toaster.show(
           this.transloco.translate('entityBrowser.deleteError'),

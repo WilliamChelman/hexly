@@ -26,7 +26,7 @@ test('a note round-trips: create → appears → open → rename → delete', as
   const input = page.getByTestId(`rename-input-${id}`);
   await input.fill('Lady Mara');
   await input.press('Enter');
-  await expect(page.getByTestId('map-title')).toHaveText('Lady Mara');
+  await expect(page.getByTestId('entity-title')).toHaveText('Lady Mara');
 
   await page.getByTestId(`open-${id}`).click();
   await expect(page).toHaveURL(new RegExp(`/entities/${id}$`));

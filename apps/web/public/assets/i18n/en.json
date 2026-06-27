@@ -27,6 +27,9 @@
     "createError": "Couldn't create that. Please try again.",
     "renameError": "Couldn't rename that. Please try again.",
     "deleteError": "Couldn't delete that. Please try again.",
+    "loadMore": "Load more",
+    "loadingMore": "Loading…",
+    "loadMoreError": "Couldn't load more. Please try again.",
     "emptyTitle": "Your library is empty.",
     "emptyHint": "Create a note or a map to begin."
   },
