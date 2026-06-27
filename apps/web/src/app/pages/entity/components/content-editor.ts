@@ -4,6 +4,7 @@ import {
   Component,
   DestroyRef,
   EnvironmentInjector,
+  Injector,
   effect,
   inject,
   input,
@@ -184,6 +185,9 @@ export class ContentEditor {
   // view is created in, so they resolve the very same instance (ADR-0023).
   private readonly resolver = inject(EntityNameResolver);
   private readonly environmentInjector = inject(EnvironmentInjector);
+  // ContentEditor's own node injector — lives inside the router outlet, so the
+  // entityLink node views created from it can resolve ActivatedRoute for routerLink.
+  private readonly injector = inject(Injector);
   private readonly appRef = inject(ApplicationRef);
 
   /** The editor's accessible name, localized by the caller (ADR-0014). */
@@ -247,11 +251,13 @@ export class ContentEditor {
   // TipTap derives node views from the extension set, not editorProps, so we swap the
   // bare node for the view-carrying one rather than registering a raw PM nodeView.
   private createEditor(content?: JSONContent): Editor {
-    const injector = this.environmentInjector;
+    const environmentInjector = this.environmentInjector;
+    const elementInjector = this.injector;
     const appRef = this.appRef;
     const entityLinkWithView = entityLinkNode.extend({
       addNodeView() {
-        return ({ node }) => createEntityLinkNodeView(node, injector, appRef);
+        return ({ node }) =>
+          createEntityLinkNodeView(node, environmentInjector, elementInjector, appRef);
       },
     });
     return new Editor({

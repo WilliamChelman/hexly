@@ -3,12 +3,13 @@ import {
   ChangeDetectionStrategy,
   Component,
   EnvironmentInjector,
+  Injector,
   computed,
   createComponent,
   inject,
   input,
 } from '@angular/core';
-import { Router } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { NodeView } from '@tiptap/pm/view';
@@ -19,13 +20,14 @@ import { EntityNameResolver } from '../services/entity-name-resolver';
  * Link inline. It resolves `entityId` to the target's **live** name via the
  * shared {@link EntityNameResolver}, falling back to the stored `label` while the
  * owner list loads (no placeholder flash) or — in a muted *dangling* style — when
- * the target is missing/deleted. A plain click SPA-navigates to `/entities/:id`;
- * a dangling link is non-navigable (issue #78). Deletion is plain atom backspace.
+ * the target is missing/deleted. `routerLink` SPA-navigates to `/entities/:id` on
+ * a plain click while letting Ctrl/Cmd/middle-click open a new tab; a dangling link
+ * is non-navigable (issue #78). Deletion is plain atom backspace.
  */
 @Component({
   selector: 'app-entity-link-view',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe],
+  imports: [RouterLink, TranslocoPipe],
   // Inline so it flows within the paragraph rather than breaking the line.
   host: { class: 'inline' },
   template: `
@@ -40,17 +42,16 @@ import { EntityNameResolver } from '../services/entity-name-resolver';
         >{{ display() }}@if (descriptor()) {<span> ({{ descriptor() }})</span>}</span
       >
     } @else {
-      <!-- A real href so the browser handles Ctrl/Cmd/middle-click natively (open in
-           a new tab); a plain left click is intercepted for SPA navigation via Router
-           (the node view is created outside the outlet's injector, so routerLink's
-           ActivatedRoute isn't reachable — Router, root-provided, is). SPA nav routes
-           through flush-on-leave like the back-to-library link. -->
+      <!-- routerLink gives a real href, so the browser handles Ctrl/Cmd/middle-click
+           (open in a new tab) while a plain click SPA-navigates through the same
+           flush-on-leave guard as the back-to-library link. Reachable because the
+           node view is created with ContentEditor's element Injector, which resolves
+           the route's ActivatedRoute (createEntityLinkNodeView). -->
       <a
         data-testid="entity-link"
         [attr.data-entity-id]="entityId()"
-        [href]="href()"
+        [routerLink]="['/entities', entityId()]"
         class="cursor-pointer text-gold no-underline hover:underline"
-        (click)="onClick($event)"
         >{{ display()
         }}@if (descriptor()) {<span class="text-ink-muted"> ({{ descriptor() }})</span>}</a
       >
@@ -63,7 +64,6 @@ export class EntityLinkView {
   readonly descriptor = input<string | null>(null);
 
   private readonly resolver = inject(EntityNameResolver);
-  private readonly router = inject(Router);
 
   private readonly resolution = computed(() => this.resolver.resolve(this.entityId()));
 
@@ -75,39 +75,26 @@ export class EntityLinkView {
     const r = this.resolution();
     return r.status === 'found' ? r.entity.name : this.label();
   });
-
-  /** The target's route as a real href so modified clicks open a new tab natively. */
-  protected readonly href = computed(() => `/entities/${this.entityId()}`);
-
-  protected onClick(event: MouseEvent): void {
-    // Defer to the browser for new-tab/window gestures: modifier or non-primary clicks.
-    if (
-      event.button !== 0 ||
-      event.metaKey ||
-      event.ctrlKey ||
-      event.shiftKey ||
-      event.altKey
-    ) {
-      return;
-    }
-    event.preventDefault();
-    this.router.navigate(['/entities', this.entityId()]);
-  }
 }
 
 /**
  * Bridge a ProseMirror node to an {@link EntityLinkView}. No `ngx-tiptap` here —
  * we mount the component imperatively (matching the hand-rolled `TiptapDirective`)
- * and feed node attrs through its signal inputs, re-applying on `update`. `injector`
- * must be the route-level {@link EnvironmentInjector} where {@link EntityNameResolver}
- * is provided, so every node view shares the one resolver the picker also reads.
+ * and feed node attrs through its signal inputs, re-applying on `update`.
+ *
+ * `environmentInjector` is the route-level injector where {@link EntityNameResolver}
+ * is provided (so every node view shares the one resolver the picker reads).
+ * `elementInjector` is ContentEditor's node injector, which lives inside the router
+ * outlet — passing it lets the component's `routerLink` resolve `ActivatedRoute`
+ * (absent from the environment injector alone, which is why this arg exists).
  */
 export function createEntityLinkNodeView(
   node: ProseMirrorNode,
-  injector: EnvironmentInjector,
+  environmentInjector: EnvironmentInjector,
+  elementInjector: Injector,
   appRef: ApplicationRef,
 ): NodeView {
-  const ref = createComponent(EntityLinkView, { environmentInjector: injector });
+  const ref = createComponent(EntityLinkView, { environmentInjector, elementInjector });
   const apply = (n: ProseMirrorNode) => {
     ref.setInput('entityId', n.attrs['entityId'] ?? '');
     ref.setInput('label', n.attrs['label'] ?? '');
@@ -123,7 +110,7 @@ export function createEntityLinkNodeView(
       apply(updated);
       return true;
     },
-    // The atom owns its own interaction (click → navigate); keep ProseMirror out.
+    // The atom owns its own interaction (the link); keep ProseMirror out.
     stopEvent: () => true,
     ignoreMutation: () => true,
     destroy: () => {
