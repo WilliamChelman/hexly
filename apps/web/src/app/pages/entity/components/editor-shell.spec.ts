@@ -78,8 +78,8 @@ describe('EditorShell', () => {
     expect(el.querySelector('app-regions-panel')).toBeNull();
   });
 
-  // A hexmap whose stored Content carries prose, to prove the Note view seeds it (#75).
-  const hexmapWithProse = (text: string): EntityDetail => ({
+  // A hexmap whose stored Content body is populated, to prove the Note view seeds it (#75).
+  const hexmapWithContent = (text: string): EntityDetail => ({
     id: 'm1',
     ownerId: 'u1',
     name: 'The Reach of Aldermoor',
@@ -110,20 +110,20 @@ describe('EditorShell', () => {
   }
 
   it('shows the hex canvas in the Map view, not the Content editor', () => {
-    TestBed.inject(EntitySession).adopt(hexmapWithProse('The reach lies north.'));
+    TestBed.inject(EntitySession).adopt(hexmapWithContent('The reach lies north.'));
 
     const fixture = TestBed.createComponent(EditorShell);
     fixture.detectChanges();
     flushHealth();
 
     const el = fixture.nativeElement as HTMLElement;
-    // Default Map view: the grid is up and the prose surface is not.
+    // Default Map view: the grid is up and the Content editor is not.
     expect(el.querySelector('app-map-canvas')).not.toBeNull();
     expect(el.querySelector('app-content-editor')).toBeNull();
   });
 
-  it('swaps the canvas for the Content editor in the Note view, seeded with the map’s prose', () => {
-    TestBed.inject(EntitySession).adopt(hexmapWithProse('The reach lies north.'));
+  it('swaps the canvas for the Content editor in the Note view, seeded with the map’s Content', () => {
+    TestBed.inject(EntitySession).adopt(hexmapWithContent('The reach lies north.'));
     // adopt() opens on the grid; the user flips to the Note view.
     TestBed.inject(HexMapStore).setView('note');
 

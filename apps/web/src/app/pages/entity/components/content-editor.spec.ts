@@ -8,22 +8,12 @@ import { Editor } from '@tiptap/core';
 import { EntitySession } from '../services/entity-session';
 import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
 import { ContentEditor } from './content-editor';
+import { noteDetail } from './entity-detail.fixtures';
 
 describe('ContentEditor', () => {
-  const note = (name: string): EntityDetail => ({
-    id: 'n1',
-    ownerId: 'u1',
-    name,
-    type: 'note',
-    tags: [],
-    visibility: 'private',
-    version: 1,
-    createdAt: 1,
-    updatedAt: 1,
-    document: { type: 'note', content: { format: CONTENT_FORMAT, snapshot: {} } },
-  });
+  const note = noteDetail;
 
-  // A note whose stored snapshot carries a paragraph of prose, to prove re-seeding.
+  // A note whose stored snapshot carries a paragraph of Content, to prove re-seeding.
   const noteWithProse = (text: string): EntityDetail => ({
     ...note('Lady Mara'),
     document: {
@@ -39,8 +29,9 @@ describe('ContentEditor', () => {
   });
 
   // The editor is a recreated-on-seed signal; reach through to the live instance.
+  // Non-null assertion: tests call this after detectChanges(), so the seed has fired.
   const editorOf = (fixture: { componentInstance: unknown }) =>
-    (fixture.componentInstance as { editor: () => Editor }).editor();
+    (fixture.componentInstance as { editor: () => Editor | null }).editor()!;
 
   // The formatting bubble menu registers a ProseMirror plugin keyed by name; its
   // presence on an editor proves BubbleMenuDirective bound to that instance.
@@ -124,7 +115,7 @@ describe('ContentEditor', () => {
     expect(fixture.nativeElement.querySelector('[role=toolbar]')).not.toBeNull();
   });
 
-  it('rebuilds the editor on re-seed and destroys the previous instance', () => {
+  it('rebuilds the editor on re-seed and destroys the previous instance', async () => {
     const session = TestBed.inject(EntitySession);
     session.adopt(noteWithProse('Original prose.'));
 
@@ -135,6 +126,10 @@ describe('ContentEditor', () => {
     session.adopt(noteWithProse('Reseeded prose.'));
     fixture.detectChanges();
     const second = editorOf(fixture);
+
+    // The previous editor is destroyed via queueMicrotask (after TiptapDirective mounts
+    // the new surface), so flush the microtask queue before asserting.
+    await new Promise((r) => queueMicrotask(r as () => void));
 
     expect(second).not.toBe(first);
     expect(first.isDestroyed).toBe(true);

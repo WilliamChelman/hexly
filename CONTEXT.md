@@ -74,25 +74,59 @@ _Avoid_: Title, caption, label
 A free-positioned text element drawn on the map (a point + text + size + optional rotation), not snapped to the hex grid — used for cartographic typography like region or ocean names. Distinct from an entity's `name` field, which the renderer may draw but which is not a Label.
 _Avoid_: Text, caption, title, annotation
 
+## Worlds
+
+**World**:
+A lightweight container record that groups Entities for a single campaign or setting. Not an Entity type — it lives outside the entity model. Every Entity belongs to exactly one World (`world_id NOT NULL`). Carries a `name`, an `owner_id`, and a `home_entity_id`.
+_Avoid_: Space, container, campaign
+
+**Home Entity**:
+A `note` Entity auto-created when a World is created, designated by `worlds.home_entity_id`. Serves as the World's landing page. Cannot be deleted and cannot be moved to another World.
+_Avoid_: World page, index, overview
+
+**World Owner**:
+The user who created the World. Full control over membership, roles, and the public link. Exactly one per World.
+_Avoid_: Admin, GM (user vocabulary, not system vocabulary)
+
+**Contributor**:
+A named user granted the ability to create Entities inside a World (and own what they create) and to read all `shared` Entities. Cannot edit Entities they do not own unless granted entity-level Editor access separately.
+_Avoid_: Editor, member, player
+
+**World Viewer**:
+A named user (or public link holder) granted read-only access to all `shared` Entities in a World.
+_Avoid_: Reader, guest, spectator
+
+**World Public Link**:
+An unguessable, unlisted URL that grants World Viewer access to all `shared` Entities in a World without an account.
+_Avoid_: Share link, invite link
+
 ## Sharing
 
-Sharing is per **Entity** — each note or hexmap is owned and shared on its own. A "World" container that shares a whole graph of linked Entities at once is a deferred concept (ADR-0018).
+Sharing is per **World** (ADR-0024). A World's sharing cascades to all `shared` Entities within it. Entity-level Editor/Viewer grants (ADR-0004) remain available for finer-grained control on top.
+
+**Entity Visibility**:
+A two-value field on every Entity: `private` (default) or `shared`. A `private` Entity is accessible only to its Owner and any entity-level Editor/Viewer grants. A `shared` Entity is accessible to all World members (Contributor, World Viewer, World Public Link holders). Per-user visibility is deferred.
+_Avoid_: Published, public, visible
 
 **Owner**:
-The user who created an Entity. Full control, including granting roles to others and managing the public link. Exactly one per Entity.
+The user who created an Entity. Full control, including granting entity-level roles and managing entity-level access. Exactly one per Entity.
 _Avoid_: Admin, creator
 
 **Editor**:
-A named user granted permission to edit an Entity. Edits are asynchronous and last-write-wins, guarded by the Entity's version (a stale save is rejected). Real-time co-editing is deferred, not precluded (ADR-0019).
+A named user granted permission to edit a specific Entity. Edits are asynchronous and last-write-wins, guarded by the Entity's version (a stale save is rejected). Real-time co-editing is deferred, not precluded (ADR-0019).
 _Avoid_: Collaborator, contributor
 
 **Viewer**:
-A named user granted read-only access to an Entity.
+A named user granted read-only access to a specific Entity.
 _Avoid_: Reader, guest
 
 **Public Link**:
-An unguessable, unlisted URL that grants read-only access to an Entity without an account. The way a world is shown to people outside the closed user set.
+An unguessable, unlisted URL that grants read-only access to a specific Entity without an account. Distinct from the World Public Link, which covers all `shared` Entities in a World.
 _Avoid_: Share link, public URL, share token
+
+**EntityView**:
+Which editor surface is currently showing for an Entity that has multiple surfaces — the hex `'map'` (grid) or the `'note'` (Content body). Mirrored to the URL `view` param so a refresh or shared link lands on the correct surface. Session-only state, never part of the Entity document. Applies only to `hexmap` Entities; Notes have a single surface.
+_Avoid_: Mode, surface, panel, view mode
 
 ## Placement modes
 

@@ -16,7 +16,13 @@ import { Icon } from '../../../ui/icon/icon';
 import { PageHeader } from '../../../ui/page-header';
 import { EntityTags } from './entity-tags';
 import { EntitySession } from '../services/entity-session';
-import { HexMapStore, MapView } from '../services/hexmap-store';
+import { EntityView, HexMapStore } from '../services/hexmap-store';
+
+/** The view toggle's two segments, in display order; Map (the grid) is the default. */
+const VIEWS: readonly { id: EntityView; labelKey: string; testid: string }[] = [
+  { id: 'map', labelKey: 'editorShell.view.map', testid: 'view-map' },
+  { id: 'note', labelKey: 'editorShell.view.note', testid: 'view-note' },
+];
 
 /**
  * The hex map editor's page-owned header (ADR-0022): it fills the shared
@@ -130,16 +136,7 @@ export class EditorHeader {
   private readonly route = inject(ActivatedRoute);
   /** Owns the Map/Note surface choice, shared with the {@link EditorShell} (#75). */
   protected readonly store = inject(HexMapStore);
-
-  /** The view toggle's two segments, in display order; Map (the grid) is the default. */
-  protected readonly views: readonly {
-    id: MapView;
-    labelKey: string;
-    testid: string;
-  }[] = [
-    { id: 'map', labelKey: 'editorShell.view.map', testid: 'view-map' },
-    { id: 'note', labelKey: 'editorShell.view.note', testid: 'view-note' },
-  ];
+  protected readonly views = VIEWS;
 
   /** Whether a map is open — gates Save and rename so neither can run with none. */
   protected readonly hasMap = computed(() => this.session.current() !== null);
@@ -211,16 +208,22 @@ export class EditorHeader {
    * Switch the editor surface (#75). Updates the store for instant feedback and
    * mirrors the choice to the URL `view` param (`replaceUrl` — a view flip is not a
    * navigation), so the session restores it on refresh. The default Map view drops
-   * the param to keep the URL clean.
+   * the param to keep the URL clean. If navigation is cancelled the store is reverted
+   * so it never diverges from the URL.
    */
-  protected selectView(view: MapView): void {
+  protected selectView(view: EntityView): void {
+    const previous = this.store.view();
     this.store.setView(view);
-    this.router.navigate([], {
-      relativeTo: this.route,
-      queryParams: { view: view === 'map' ? null : view },
-      queryParamsHandling: 'merge',
-      replaceUrl: true,
-    });
+    this.router
+      .navigate([], {
+        relativeTo: this.route,
+        queryParams: { view: view === 'map' ? null : view },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      })
+      .then((navigated) => {
+        if (!navigated) this.store.setView(previous);
+      });
   }
 
   /** Stale-version rejection surfaces as a conflict chip (driven by the session) rather than an error. */

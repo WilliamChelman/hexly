@@ -37,15 +37,17 @@ import { BubbleMenuDirective } from './bubble-menu.directive';
   template: `
     <!--
       flex column + ProseMirror fills it (scoped CSS below) so a click anywhere in
-      the box focuses the editor — without that, the empty area below prose swallows clicks.
+      the box focuses the editor — without that, the empty area below Content swallows clicks.
     -->
-    <div [appTiptap]="editor()" data-testid="note-content" class="flex flex-1 flex-col"></div>
+    @if (editor()) {
+      <div [appTiptap]="editor()!" data-testid="note-content" class="flex flex-1 flex-col"></div>
+
+      <!-- Out of flow + hidden until the bubble-menu plugin positions it over a
+           text selection (it sets position/left/top and flips visibility on show). -->
+      <app-formatting-menu appBubbleMenu [editor]="editor()!" />
+    }
 
     <app-slash-menu />
-
-    <!-- Out of flow + hidden until the bubble-menu plugin positions it over a
-         text selection (it sets position/left/top and flips visibility on show). -->
-    <app-formatting-menu appBubbleMenu [editor]="editor()" />
   `,
   styles: `
     /* TipTap creates .ProseMirror outside Angular's template — pierce with ::ng-deep.
@@ -174,15 +176,16 @@ export class ContentEditor {
   // Recreated on every seed (load/swap/conflict-reload) rather than surgically reset:
   // a fresh Editor has empty undo history for free, so Ctrl-Z can't reach past the seed,
   // and TiptapDirective / BubbleMenuDirective re-bind to the new instance through their
-  // signal inputs — no manual plugin re-registration. Starts empty; the first seed swaps
-  // in the stored snapshot.
-  protected readonly editor = signal(this.createEditor());
+  // signal inputs — no manual plugin re-registration. Starts null; the first seed creates
+  // the initial editor, avoiding a double-construction on every mount.
+  protected readonly editor = signal<Editor | null>(null);
 
   constructor() {
     // Stream edits to the session; re-attach when the editor instance swaps (the old
     // one's listener dies with it on destroy()).
     effect((onCleanup) => {
       const editor = this.editor();
+      if (!editor) return;
       const push = ({ editor }: { editor: Editor }) =>
         this.session.setContent(editor.getJSON());
       editor.on('update', push);
@@ -192,7 +195,9 @@ export class ContentEditor {
     // Label .ProseMirror (not the wrapper) — TipTap already sets role="textbox" on it.
     // Re-runs on language change and on editor swap.
     effect(() => {
-      this.editor().view.dom.setAttribute('aria-label', this.ariaLabel());
+      const editor = this.editor();
+      if (!editor) return;
+      editor.view.dom.setAttribute('aria-label', this.ariaLabel());
     });
 
     // Seed on load/swap/conflict-reload (not on clean saves — in-flight keystrokes must
@@ -205,14 +210,21 @@ export class ContentEditor {
       if (!detail) return;
       // untracked: this effect reacts to seed() and its own editor swap, never to the
       // live Content (which every keystroke updates — tracking it would thrash the editor).
-      const snapshot = untracked(this.session.content)?.snapshot;
-      if (!isDocSnapshot(snapshot)) return;
+      const content = untracked(this.session.content);
+      if (content === null) return; // mid-load: content not yet available
+      // Empty placeholder snapshot ({}) produces an empty editor — correct after a conflict
+      // reload where the server has no stored prose. Previously isDocSnapshot({}) returned
+      // false and bailed, leaving the editor showing stale rejected edits.
+      const snapshot = isDocSnapshot(content.snapshot) ? content.snapshot : undefined;
       const previous = untracked(this.editor);
       this.editor.set(this.createEditor(snapshot));
-      previous.destroy();
+      // Defer destroy until after TiptapDirective mounts the new surface (one render
+      // later), so there is no blank frame between the old DOM being removed and the
+      // new one being inserted.
+      queueMicrotask(() => previous?.destroy());
     });
 
-    this.destroyRef.onDestroy(() => this.editor().destroy());
+    this.destroyRef.onDestroy(() => this.editor()?.destroy());
   }
 
   // slashCommands is UI chrome, not part of the persisted schema, so it lives here

@@ -61,8 +61,8 @@ export type FeatureSubtool = FeatureId | 'clear';
  */
 export type SelectSubtool = 'pick' | 'marquee';
 
-/** Which surface the hexmap editor shows: the hex grid or the Content body (#75). */
-export type MapView = 'map' | 'note';
+/** Which surface a multi-surface Entity's editor shows: the hex grid (`'map'`) or the Content body (`'note'`) (#75). */
+export type EntityView = 'map' | 'note';
 
 /** The Select tool's Subtools in palette/keyboard order — Pick first (the default). */
 export const selectSubtools: readonly SelectSubtool[] = ['pick', 'marquee'];
@@ -262,7 +262,7 @@ export class HexMapStore {
    * to the URL `view` param so a refresh or shared link keeps the open view; the
    * session drives it from the route, so {@link load} does not reset it.
    */
-  private readonly _view = signal<MapView>('map');
+  private readonly _view = signal<EntityView>('map');
   readonly view = this._view.asReadonly();
 
   /**
@@ -561,7 +561,7 @@ export class HexMapStore {
   }
 
   /** Switch the editor surface between the hex grid and the Content body (#75). */
-  setView(view: MapView): void {
+  setView(view: EntityView): void {
     this._view.set(view);
   }
 

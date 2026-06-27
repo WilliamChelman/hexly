@@ -3,6 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
   catchError,
+  distinctUntilChanged,
   EMPTY,
   filter,
   finalize,
@@ -24,7 +25,7 @@ import {
 import { EntitiesClient } from '../../../core/services/entities.client';
 import { TitleService } from '../../../core/i18n/title.service';
 import { AppShellStore } from '../../../shell/app-shell.store';
-import { HexMapStore, MapView } from './hexmap-store';
+import { EntityView, HexMapStore } from './hexmap-store';
 
 /**
  * Bridges {@link EntitiesClient} and {@link HexMapStore} for `/entities/:id`:
@@ -120,7 +121,8 @@ export class EntitySession {
     // on the same view, and opening another Entity (no `view` param) resets to the grid.
     route.queryParamMap
       .pipe(
-        map((q): MapView => (q.get('view') === 'note' ? 'note' : 'map')),
+        map((q): EntityView => (q.get('view') === 'note' ? 'note' : 'map')),
+        distinctUntilChanged(),
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe((view) => this.editor.setView(view));
@@ -134,8 +136,8 @@ export class EntitySession {
     this._conflict.set(null);
     this._error.set(null);
     this._current.set(detail);
+    this._content.set(detail.document.content); // content before seed: seed effect reads content()
     this._seed.set(detail);
-    this._content.set(detail.document.content);
     this._tags.set(detail.tags);
     this.editor.load(gridOf(detail.document));
   }

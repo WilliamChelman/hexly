@@ -2,26 +2,15 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { CONTENT_FORMAT, EntityDetail } from '@hexly/domain';
 import { EntitySession } from '../services/entity-session';
 import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
 import { NoteView } from './note-view';
+import { noteDetail } from './entity-detail.fixtures';
 
 // NoteView owns only the note's page chrome (title, tags, Save/conflict) around the
 // shared ContentEditor — the editor surface itself is covered by content-editor.spec.
 describe('NoteView', () => {
-  const note = (name: string): EntityDetail => ({
-    id: 'n1',
-    ownerId: 'u1',
-    name,
-    type: 'note',
-    tags: [],
-    visibility: 'private',
-    version: 1,
-    createdAt: 1,
-    updatedAt: 1,
-    document: { type: 'note', content: { format: CONTENT_FORMAT, snapshot: {} } },
-  });
+  const note = noteDetail;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
