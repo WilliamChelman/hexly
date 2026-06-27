@@ -18,6 +18,16 @@
           {
             "glob": "**/*",
             "input": "apps/web/public"
+          },
+          {
+            "glob": "marcellus-latin-400-normal.woff2",
+            "input": "node_modules/@fontsource/marcellus/files",
+            "output": "fonts"
+          },
+          {
+            "glob": "source-serif-4-latin-wght-normal.woff2",
+            "input": "node_modules/@fontsource-variable/source-serif-4/files",
+            "output": "fonts"
           }
         ],
         "styles": ["apps/web/src/styles.css"],

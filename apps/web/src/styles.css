@@ -9,27 +9,34 @@
  * design uses (latin + latin-ext): Marcellus (display), Source Serif 4
  * (body), Cinzel Decorative (wordmark), JetBrains Mono (coords).
  */
+/* ponytail: preloaded critical fonts with font-display:optional — no FOUT on first
+   paint. Declared before the @fontsource imports so these rules win (first match).
+   Source Serif 4 and JetBrains Mono use the variable font family names. */
+@font-face {
+  font-family: 'Marcellus';
+  font-style: normal;
+  font-weight: 400;
+  font-display: optional;
+  src: url('/fonts/marcellus-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Source Serif 4 Variable';
+  font-style: normal;
+  font-weight: 200 900;
+  font-display: optional;
+  src: url('/fonts/source-serif-4-latin-wght-normal.woff2') format('woff2-variations');
+}
+
 @import '@fontsource/marcellus/latin-400.css';
 @import '@fontsource/marcellus/latin-ext-400.css';
 
-@import '@fontsource/source-serif-4/latin-400.css';
-@import '@fontsource/source-serif-4/latin-500.css';
-@import '@fontsource/source-serif-4/latin-600.css';
-@import '@fontsource/source-serif-4/latin-700.css';
-@import '@fontsource/source-serif-4/latin-400-italic.css';
-@import '@fontsource/source-serif-4/latin-ext-400.css';
-@import '@fontsource/source-serif-4/latin-ext-500.css';
-@import '@fontsource/source-serif-4/latin-ext-600.css';
-@import '@fontsource/source-serif-4/latin-ext-700.css';
-@import '@fontsource/source-serif-4/latin-ext-400-italic.css';
+@import '@fontsource-variable/source-serif-4/wght.css';
+@import '@fontsource-variable/source-serif-4/wght-italic.css';
 
 @import '@fontsource/cinzel-decorative/latin-700.css';
 @import '@fontsource/cinzel-decorative/latin-ext-700.css';
 
-@import '@fontsource/jetbrains-mono/latin-400.css';
-@import '@fontsource/jetbrains-mono/latin-500.css';
-@import '@fontsource/jetbrains-mono/latin-ext-400.css';
-@import '@fontsource/jetbrains-mono/latin-ext-500.css';
+@import '@fontsource-variable/jetbrains-mono/wght.css';
 
 @import 'tailwindcss';
 @import './styles/tokens.css';
@@ -65,8 +72,8 @@
 @theme static {
   --font-cartouche: 'Cinzel Decorative', 'Marcellus', Georgia, serif;
   --font-display: 'Marcellus', Georgia, serif;
-  --font-body: 'Source Serif 4', Georgia, 'Times New Roman', serif;
-  --font-mono: 'JetBrains Mono', 'SFMono-Regular', Menlo, monospace;
+  --font-body: 'Source Serif 4 Variable', Georgia, 'Times New Roman', serif;
+  --font-mono: 'JetBrains Mono Variable', 'SFMono-Regular', Menlo, monospace;
 
   /* ---- Type scale (modular, ratio ~1.25) → text-* utilities ------------- */
   --text-2xs: 0.6875rem; /* 11px — coordinate chips, micro-labels            */
