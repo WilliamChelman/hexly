@@ -16,7 +16,7 @@ describe('filterSlashItems', () => {
   });
 
   it('normalizes keyword case when matching (keyword side)', () => {
-    const item: SlashItem = { id: 'x', labelKey: 'x', keywords: ['MyKeyword'], apply: () => {} };
+    const item: SlashItem = { id: 'x', labelKey: 'x', keywords: ['MyKeyword'], apply: () => void 0 };
     expect(filterSlashItems([item], 'mykeyword')).toHaveLength(1);
   });
 

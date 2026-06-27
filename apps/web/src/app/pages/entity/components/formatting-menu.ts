@@ -33,7 +33,7 @@ import {
       role="toolbar"
       data-testid="format-menu"
       [attr.aria-label]="'noteView.formatMenu.label' | transloco"
-      class="flex items-center gap-0.5 rounded-md border border-line bg-surface p-1 shadow-lg"
+      class="flex items-center gap-[2px] rounded-md border border-line bg-surface p-1 shadow-lg"
     >
       @for (item of items; track item.id) {
         <button
