@@ -109,6 +109,19 @@ describe('NoteView', () => {
     expect(menu.textContent).toContain('Heading 1');
   });
 
+  it('mounts the formatting bubble menu for the open note', () => {
+    TestBed.inject(EntitySession).adopt(note('Lady Mara'));
+
+    const fixture = TestBed.createComponent(NoteView);
+    fixture.detectChanges();
+
+    // The toolbar is rendered (hidden until a selection); the bubble-menu plugin
+    // owns its show/hide, so presence is what wiring guarantees here.
+    expect(
+      fixture.nativeElement.querySelector('[data-testid=format-menu]'),
+    ).not.toBeNull();
+  });
+
   it('mounts the tag editor for the open note', () => {
     TestBed.inject(EntitySession).adopt(note('Lady Mara'));
 

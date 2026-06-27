@@ -52,6 +52,21 @@
       "blockquote": "Quote",
       "codeBlock": "Code block",
       "horizontalRule": "Divider"
+    },
+    "formatMenu": {
+      "label": "Formatting",
+      "bold": "Bold",
+      "italic": "Italic",
+      "underline": "Underline",
+      "strike": "Strikethrough",
+      "code": "Inline code",
+      "heading1": "Heading 1",
+      "heading2": "Heading 2",
+      "heading3": "Heading 3",
+      "bulletList": "Bullet list",
+      "orderedList": "Numbered list",
+      "link": "Link",
+      "linkPlaceholder": "Paste or type a URL"
     }
   },
   "editorShell": {

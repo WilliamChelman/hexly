@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  ElementRef,
   computed,
   effect,
   inject,
@@ -11,6 +12,7 @@ import { RouterLink } from '@angular/router';
 import { translateSignal, TranslocoPipe } from '@jsverse/transloco';
 import { Editor, JSONContent } from '@tiptap/core';
 import { EditorState } from '@tiptap/pm/state';
+import { BubbleMenuPlugin } from '@tiptap/extension-bubble-menu';
 import { TiptapEditorDirective } from 'ngx-tiptap';
 import { EntitySession } from '../services/entity-session';
 import { Button } from '../../../ui/button';
@@ -21,6 +23,7 @@ import { EntityTags } from './entity-tags';
 import { CONTENT_EXTENSIONS } from './content-extensions';
 import { SlashMenu } from './slash-menu';
 import { slashCommands } from './slash-commands';
+import { FormattingMenu } from './formatting-menu';
 
 /**
  * The view a `note` Entity opens into, parallel to {@link EditorShell} for a `hexmap`.
@@ -40,6 +43,7 @@ import { slashCommands } from './slash-commands';
     PageHeader,
     EntityTags,
     SlashMenu,
+    FormattingMenu,
   ],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
@@ -113,6 +117,13 @@ import { slashCommands } from './slash-commands';
     </main>
 
     <app-slash-menu />
+
+    <!-- Out of flow + hidden until the bubble-menu plugin positions it over a
+         text selection (it sets position/left/top and flips visibility on show). -->
+    <app-formatting-menu
+      [editor]="editor"
+      style="position: fixed; visibility: hidden"
+    />
   `,
   styles: `
     /* TipTap creates .ProseMirror outside Angular's template — pierce with ::ng-deep.
@@ -224,6 +235,8 @@ export class NoteView {
   protected readonly error = this.session.error;
 
   private readonly slashMenu = viewChild(SlashMenu);
+  private readonly formatMenuEl = viewChild(FormattingMenu, { read: ElementRef });
+  private bubbleRegistered = false;
 
   // slashCommands is UI chrome, not part of the persisted schema, so it lives here
   // rather than in CONTENT_EXTENSIONS (ADR-0019). The menu getter is deferred: render
@@ -242,6 +255,25 @@ export class NoteView {
 
     this.editor.on('update', ({ editor }) => {
       this.session.setContent(editor.getJSON());
+    });
+
+    // Register the formatting bubble menu once its host element exists — the
+    // viewChild resolves after the editor field is constructed. Chrome only, not
+    // part of the persisted schema (ADR-0019), so it lives here, not in CONTENT_EXTENSIONS.
+    effect(() => {
+      const host = this.formatMenuEl()?.nativeElement;
+      if (!host || this.bubbleRegistered) return;
+      this.bubbleRegistered = true;
+      this.editor.registerPlugin(
+        BubbleMenuPlugin({
+          editor: this.editor,
+          element: host,
+          pluginKey: 'formattingBubbleMenu',
+          // Default is 250ms, which makes the menu lag behind the selection and
+          // linger after an action; show/hide it in step with the selection.
+          updateDelay: 0,
+        }),
+      );
     });
 
     // Seed on load/swap/conflict-reload (not on clean saves — in-flight keystrokes must survive).

@@ -98,6 +98,7 @@
     "@nestjs/platform-express": "^11.0.0",
     "@node-rs/argon2": "^2.0.2",
     "@tiptap/core": "^3.27.1",
+    "@tiptap/extension-bubble-menu": "^3.27.1",
     "@tiptap/pm": "^3.27.1",
     "@tiptap/starter-kit": "^3.27.1",
     "@tiptap/suggestion": "^3.27.1",
