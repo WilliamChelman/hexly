@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures';
+import { expect, flushSave, test } from './fixtures';
 
 /**
  * The whole-Hex move journey (issue #30, ADR-0010). It crosses the one seam the
@@ -58,16 +58,7 @@ test('drags a hex under Select to a new coordinate, and the move survives a relo
   await expect(page.getByTestId('entity-detail')).toHaveText('Forest');
   await expect(page.getByTestId('entity-coord')).toContainText('q 1 · r 0');
 
-  // Save and wait on the real round-trip so the reload below can't race the PUT.
-  const saved = page.waitForResponse(
-    (res) =>
-      res.request().method() === 'PUT' &&
-      /\/api\/entities\/[\w-]+$/.test(res.url()) &&
-      res.ok(),
-  );
-  await page.getByTestId('save').click();
-  await saved;
-  await expect(page.getByTestId('save')).toHaveText('Save');
+  await flushSave(page);
 
   // The persisted document holds one hex, no longer at the origin, still Forest:
   // the origin became Void and the destination took the moved content.
@@ -155,15 +146,7 @@ test('drags a hex onto an occupied hex and swaps the two, surviving a reload', a
   await expect(page.getByTestId('entity-coord')).toContainText('q 0 · r 0');
 
   // Persist, then read the saved document directly: the two records are exchanged.
-  const saved = page.waitForResponse(
-    (res) =>
-      res.request().method() === 'PUT' &&
-      /\/api\/entities\/[\w-]+$/.test(res.url()) &&
-      res.ok(),
-  );
-  await page.getByTestId('save').click();
-  await saved;
-  await expect(page.getByTestId('save')).toHaveText('Save');
+  await flushSave(page);
 
   const res = await request.get(`/api/entities/${mapId}`);
   expect(res.ok()).toBeTruthy();
@@ -289,15 +272,7 @@ test('drags a multi-hex selection so the whole group moves by one offset', async
 
   // Persist and read the saved document: each member rode by the same offset, so the
   // cluster kept its shape — Forest at q1·r0 and Ocean at q2·r0, the centre now Void.
-  const saved = page.waitForResponse(
-    (res) =>
-      res.request().method() === 'PUT' &&
-      /\/api\/entities\/[\w-]+$/.test(res.url()) &&
-      res.ok(),
-  );
-  await page.getByTestId('save').click();
-  await saved;
-  await expect(page.getByTestId('save')).toHaveText('Save');
+  await flushSave(page);
 
   const res = await request.get(`/api/entities/${mapId}`);
   expect(res.ok()).toBeTruthy();
@@ -365,15 +340,7 @@ test('refuses a blocked group move, leaving every hex where it was', async ({
   // wouldn't land (announced to assistive tech via the CDK live region).
   await expect(page.locator('.toast', { hasText: 'Move blocked' })).toBeVisible();
 
-  const saved = page.waitForResponse(
-    (res) =>
-      res.request().method() === 'PUT' &&
-      /\/api\/entities\/[\w-]+$/.test(res.url()) &&
-      res.ok(),
-  );
-  await page.getByTestId('save').click();
-  await saved;
-  await expect(page.getByTestId('save')).toHaveText('Save');
+  await flushSave(page);
 
   const res = await request.get(`/api/entities/${mapId}`);
   expect(res.ok()).toBeTruthy();

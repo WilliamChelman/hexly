@@ -42,7 +42,6 @@
     "eyebrow": "Note",
     "backToLibrary": "Retour à la bibliothèque",
     "editorLabel": "Contenu de la note",
-    "httpError": "Impossible de joindre le serveur. Veuillez réessayer.",
     "slashMenu": {
       "label": "Insérer un bloc",
       "empty": "Aucun bloc correspondant",
@@ -76,7 +75,6 @@
     "hexMap": "Carte hexagonale",
     "mapTitleLabel": "Titre de la carte",
     "renameMap": "Renommer la carte",
-    "editing": "Édition",
     "reload": "Recharger",
     "saving": "Enregistrement…",
     "share": "Partager",
@@ -87,7 +85,12 @@
       "editorLabel": "Notes de la carte"
     },
     "save": {
-      "conflict": "Version plus récente sur le serveur"
+      "conflict": "Version plus récente sur le serveur",
+      "saved": "Enregistré",
+      "unsaved": "Non enregistré…",
+      "failed": "Échec de l'enregistrement",
+      "retry": "Réessayer",
+      "reloadFailed": "Échec du rechargement — serveur injoignable."
     },
     "moveBlocked": "Déplacement bloqué — un obstacle gêne le passage.",
     "toolPalette": {
@@ -251,7 +254,6 @@
       "toSolar": "Passer au thème solaire",
       "toAstral": "Passer au thème astral"
     },
-    "save": "Enregistrer",
     "cancel": "Annuler",
     "close": "Fermer",
     "delete": "Supprimer"

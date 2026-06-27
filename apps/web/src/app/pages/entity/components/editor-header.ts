@@ -11,11 +11,11 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Button } from '../../../ui/button';
 import { ButtonGroup } from '../../../ui/button-group';
-import { Chip } from '../../../ui/chip';
 import { Eyebrow } from '../../../ui/eyebrow';
 import { Icon } from '../../../ui/icon/icon';
 import { PageHeader } from '../../../ui/page-header';
 import { EntityTags } from './entity-tags';
+import { SaveStatus } from './save-status';
 import { EntitySession } from '../services/entity-session';
 import { EntityView, HexMapStore } from '../services/hexmap-store';
 
@@ -27,8 +27,9 @@ const VIEWS: readonly { id: EntityView; labelKey: string; testid: string }[] = [
 
 /**
  * The hex map editor's page-owned header (ADR-0022): fills the shared
- * {@link PageHeader} with the map's own controls — editable title, Editing/Conflict
- * chip, Tags, view toggle, Save/Share. App navigation lives in the NavRail, not here.
+ * {@link PageHeader} with the map's own controls — editable title, autosave status
+ * chip ({@link SaveStatus}, ADR-0026), Tags, view toggle, Share. App navigation lives
+ * in the NavRail, not here.
  */
 @Component({
   selector: 'app-editor-header',
@@ -37,12 +38,12 @@ const VIEWS: readonly { id: EntityView; labelKey: string; testid: string }[] = [
   imports: [
     Button,
     ButtonGroup,
-    Chip,
     Eyebrow,
     Icon,
     PageHeader,
     TranslocoPipe,
     EntityTags,
+    SaveStatus,
   ],
   template: `
     <app-page-header>
@@ -72,21 +73,7 @@ const VIEWS: readonly { id: EntityView; labelKey: string; testid: string }[] = [
             (keydown.escape)="onEscape($event)"
             (blur)="commit()"
           ></div>
-          @if (conflict()) {
-            <app-chip tone="gold" data-testid="conflict">
-              {{ 'editorShell.save.conflict' | transloco }}
-              <button
-                type="button"
-                class="ml-2 p-0 underline bg-transparent border-0 cursor-pointer"
-                data-testid="conflict-reload"
-                (click)="reload()"
-              >
-                {{ 'editorShell.reload' | transloco }}
-              </button>
-            </app-chip>
-          } @else {
-            <app-chip tone="gold">{{ 'editorShell.editing' | transloco }}</app-chip>
-          }
+          <app-save-status />
         </div>
 
         <app-entity-tags class="min-w-0 flex-1" />
@@ -118,18 +105,6 @@ const VIEWS: readonly { id: EntityView; labelKey: string; testid: string }[] = [
         </div>
       }
 
-      <button
-        type="button"
-        pageHeaderActions
-        appButton
-        variant="ghost"
-        size="sm"
-        data-testid="save"
-        [disabled]="saving() || !hasMap()"
-        (click)="save()"
-      >
-        {{ (saving() ? 'editorShell.saving' : 'common.save') | transloco }}
-      </button>
       <button type="button" pageHeaderActions appButton variant="primary" size="sm">
         <app-icon name="share" [size]="16" />
         {{ 'editorShell.share' | transloco }}
@@ -145,14 +120,11 @@ export class EditorHeader {
   protected readonly store = inject(HexMapStore);
   protected readonly views = VIEWS;
 
-  /** Whether a map is open — gates Save and rename so neither can run with none. */
+  /** Whether a map is open — gates rename and the view toggle so neither shows with none. */
   protected readonly hasMap = computed(() => this.session.current() !== null);
   protected readonly title = computed(
     () => this.session.current()?.name ?? 'Untitled map',
   );
-  protected readonly saving = this.session.saving;
-  /** The server's current map when a save was rejected as stale, else `null`. */
-  protected readonly conflict = this.session.conflict;
 
   private readonly titleEl =
     viewChild.required<ElementRef<HTMLElement>>('titleEl');
@@ -227,14 +199,5 @@ export class EditorHeader {
       .then((navigated) => {
         if (!navigated) this.store.setView(previous);
       });
-  }
-
-  /** Stale-version rejection surfaces as a conflict chip (driven by the session) rather than an error. */
-  protected save(): void {
-    this.session.save().subscribe();
-  }
-
-  protected reload(): void {
-    this.session.reload().subscribe();
   }
 }

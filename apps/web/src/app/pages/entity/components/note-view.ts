@@ -7,16 +7,16 @@ import {
 import { RouterLink } from '@angular/router';
 import { translateSignal, TranslocoPipe } from '@jsverse/transloco';
 import { EntitySession } from '../services/entity-session';
-import { Button } from '../../../ui/button';
-import { Chip } from '../../../ui/chip';
 import { Eyebrow } from '../../../ui/eyebrow';
 import { PageHeader } from '../../../ui/page-header';
 import { EntityTags } from './entity-tags';
 import { ContentEditor } from './content-editor';
+import { SaveStatus } from './save-status';
 
 /**
  * The view a `note` Entity opens into, parallel to {@link EditorShell} for a `hexmap`:
- * page chrome (title, tags, Save/conflict) around the shared {@link ContentEditor} (ADR-0019).
+ * page chrome (title, tags, autosave status) around the shared {@link ContentEditor}
+ * (ADR-0019, ADR-0026).
  */
 @Component({
   selector: 'app-note-view',
@@ -24,12 +24,11 @@ import { ContentEditor } from './content-editor';
   imports: [
     RouterLink,
     TranslocoPipe,
-    Button,
-    Chip,
     Eyebrow,
     PageHeader,
     EntityTags,
     ContentEditor,
+    SaveStatus,
   ],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
@@ -52,39 +51,7 @@ import { ContentEditor } from './content-editor';
           {{ name() }}
         </h1>
       </div>
-      @if (error()) {
-        <app-chip pageHeaderActions tone="gold" data-testid="http-error">
-          {{ 'noteView.httpError' | transloco }}
-        </app-chip>
-      }
-      @if (conflict()) {
-        <app-chip pageHeaderActions tone="gold" data-testid="conflict">
-          {{ 'editorShell.save.conflict' | transloco }}
-          <button
-            type="button"
-            appButton
-            variant="ghost"
-            size="sm"
-            class="ml-2 underline"
-            data-testid="conflict-reload"
-            (click)="reload()"
-          >
-            {{ 'editorShell.reload' | transloco }}
-          </button>
-        </app-chip>
-      }
-      <button
-        type="button"
-        pageHeaderActions
-        appButton
-        variant="primary"
-        size="sm"
-        data-testid="save"
-        [disabled]="saving()"
-        (click)="save()"
-      >
-        {{ (saving() ? 'editorShell.saving' : 'common.save') | transloco }}
-      </button>
+      <app-save-status pageHeaderActions />
     </app-page-header>
 
     <main class="max-w-[60rem] mx-auto py-5 px-5">
@@ -98,15 +65,4 @@ export class NoteView {
   protected readonly editorLabel = translateSignal('noteView.editorLabel');
 
   protected readonly name = computed(() => this.session.current()?.name ?? '');
-  protected readonly saving = this.session.saving;
-  protected readonly conflict = this.session.conflict;
-  protected readonly error = this.session.error;
-
-  protected save(): void {
-    this.session.save().subscribe();
-  }
-
-  protected reload(): void {
-    this.session.reload().subscribe();
-  }
 }

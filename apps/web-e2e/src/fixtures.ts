@@ -26,7 +26,11 @@ export const test = base.extend<{ resetDb: void }>({
 
 export { expect };
 
-/** Wait for a successful entity PUT — shared across all persist specs. */
+/**
+ * Wait for a successful entity PUT — shared across all persist specs. Since the Save
+ * button is gone (ADR-0026), specs register this, then press `ControlOrMeta+s` to flush
+ * the autosave immediately rather than waiting out the debounce.
+ */
 export function waitForSave(page: Page): Promise<Response> {
   return page.waitForResponse(
     (res) =>
@@ -34,4 +38,17 @@ export function waitForSave(page: Page): Promise<Response> {
       /\/api\/entities\/[\w-]+$/.test(res.url()) &&
       res.ok(),
   );
+}
+
+/**
+ * Flush a pending autosave and wait for it to commit (ADR-0026 — no Save button): press
+ * Cmd/Ctrl+S, await the PUT, and confirm the status chip settles on 'Saved'. Returns the
+ * PUT Response for the specs that read the saved payload straight off it.
+ */
+export async function flushSave(page: Page): Promise<Response> {
+  const saved = waitForSave(page);
+  await page.keyboard.press('ControlOrMeta+s');
+  const res = await saved;
+  await expect(page.getByTestId('save-status')).toHaveText('Saved');
+  return res;
 }

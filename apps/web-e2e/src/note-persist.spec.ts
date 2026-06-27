@@ -1,4 +1,4 @@
-import { expect, test, waitForSave } from './fixtures';
+import { expect, flushSave, test } from './fixtures';
 
 /**
  * Full-stack note round-trip: real TipTap keyboard input → versioned save → reload
@@ -22,11 +22,7 @@ test('types into a note, saves, and the Content survives a reload', async ({
   await page.keyboard.type(content);
   await expect(surface).toContainText(content);
 
-  // Wait on the HTTP response, not just the button text — the reload can't race an in-flight PUT.
-  const saved = waitForSave(page);
-  await page.getByTestId('save').click();
-  await saved;
-  await expect(page.getByTestId('save')).toHaveText('Save');
+  await flushSave(page);
 
   await page.reload();
   await expect(page.getByTestId('note-content')).toContainText(content);

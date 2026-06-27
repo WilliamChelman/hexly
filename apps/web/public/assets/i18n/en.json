@@ -42,7 +42,6 @@
     "eyebrow": "Note",
     "backToLibrary": "Back to library",
     "editorLabel": "Note content",
-    "httpError": "Couldn't reach the server. Please try again.",
     "slashMenu": {
       "label": "Insert block",
       "empty": "No matching blocks",
@@ -76,7 +75,6 @@
     "hexMap": "Hex map",
     "mapTitleLabel": "Map title",
     "renameMap": "Rename map",
-    "editing": "Editing",
     "reload": "Reload",
     "saving": "Saving…",
     "share": "Share",
@@ -87,7 +85,12 @@
       "editorLabel": "Map notes"
     },
     "save": {
-      "conflict": "Newer version on server"
+      "conflict": "Newer version on server",
+      "saved": "Saved",
+      "unsaved": "Unsaved…",
+      "failed": "Save failed",
+      "retry": "Retry",
+      "reloadFailed": "Reload failed — couldn't reach the server."
     },
     "moveBlocked": "Move blocked — something's in the way.",
     "toolPalette": {
@@ -251,7 +254,6 @@
       "toSolar": "Switch to solar theme",
       "toAstral": "Switch to astral theme"
     },
-    "save": "Save",
     "cancel": "Cancel",
     "close": "Close",
     "delete": "Delete"

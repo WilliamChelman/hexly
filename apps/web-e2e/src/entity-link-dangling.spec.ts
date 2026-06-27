@@ -1,4 +1,4 @@
-import { expect, test, waitForSave } from './fixtures';
+import { expect, flushSave, test } from './fixtures';
 
 /**
  * Dangling Entity Link journey (issue #78, CONTEXT.md → Entity Link, ADR-0018): a
@@ -45,10 +45,7 @@ test('a link whose target is deleted renders non-navigable, and the map opens wi
   await page.getByTestId(`entity-link-option-${noteId}`).click();
   await expect(page.getByTestId('entity-link-name')).toBeVisible();
 
-  const saved = waitForSave(page);
-  await page.getByTestId('save').click();
-  await saved;
-  await expect(page.getByTestId('save')).toHaveText('Save');
+  await flushSave(page);
 
   // Delete the target out from under the link (the "inaccessible/missing" case).
   const del = await request.delete(`/api/entities/${noteId}`);
