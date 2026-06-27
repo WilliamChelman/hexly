@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - beta
   pull_request:
 
 permissions:
@@ -22,7 +23,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: 'pnpm'
 
       - run: pnpm install --frozen-lockfile
@@ -53,7 +54,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: 'pnpm'
 
       - run: pnpm install --frozen-lockfile
@@ -80,3 +81,97 @@ jobs:
           name: playwright-report
           path: apps/web-e2e/playwright-report/
           retention-days: 7
+
+  release-preview:
+    if: >-
+      github.event_name == 'pull_request' &&
+      (github.base_ref == 'main' || github.base_ref == 'beta')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Release dry-run
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Tell semantic-release we're on the target branch so it analyses
+          # the commits and reports the version that would be released.
+          GITHUB_REF: refs/heads/${{ github.base_ref }}
+        run: pnpm exec semantic-release --dry-run
+
+  release:
+    needs: [main, e2e]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Semantic release
+        id: release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PREV=$(git tag --sort=-version:refname | head -1)
+          pnpm exec semantic-release
+          NEXT=$(git tag --sort=-version:refname | head -1)
+          if [ "$PREV" != "$NEXT" ] && [ -n "$NEXT" ]; then
+            echo "tag=$NEXT" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Log in to ghcr.io
+        if: steps.release.outputs.tag
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        if: steps.release.outputs.tag
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/williamchelman/hexly
+          tags: |
+            type=raw,value=${{ steps.release.outputs.tag }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=beta,enable=${{ github.ref == 'refs/heads/beta' }}
+
+      - name: Set up Docker Buildx
+        if: steps.release.outputs.tag
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        if: steps.release.outputs.tag
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
