@@ -33,6 +33,7 @@ describe('EntitySession', () => {
   const aldermoor: EntityDetail = {
     id: 'm1',
     ownerId: 'u1',
+    worldId: 'w1',
     name: 'Aldermoor',
     type: 'hexmap',
     tags: [],

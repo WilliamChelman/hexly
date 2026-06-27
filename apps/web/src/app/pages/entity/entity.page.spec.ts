@@ -30,6 +30,7 @@ describe('EntityPage', () => {
   const detail = (id: string, type: EntityType): EntityDetail => ({
     id,
     ownerId: 'u1',
+    worldId: 'w1',
     name: type === 'note' ? 'Lady Mara' : 'Aldermoor',
     type,
     tags: [],

@@ -16,7 +16,7 @@ import {
 } from '@hexly/domain';
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
-import { entities, entityDescriptors } from '../db/schema';
+import { entities, entityDescriptors, worlds } from '../db/schema';
 
 const INITIAL_VERSION = 1;
 
@@ -65,6 +65,7 @@ export class EntitiesService {
       .select({
         id: entities.id,
         ownerId: entities.ownerId,
+        worldId: entities.worldId,
         name: entities.name,
         type: entities.type,
         tags: entities.tags,
@@ -100,6 +101,8 @@ export class EntitiesService {
     const row = {
       id: randomUUID(),
       ownerId,
+      // A client may target a World; absent that, default to the owner's (ADR-0024, #101).
+      worldId: req.worldId ?? this.ownerWorldId(ownerId),
       name: req.name,
       type: req.type,
       tags: req.tags,
@@ -229,6 +232,22 @@ export class EntitiesService {
   }
 
   /**
+   * The World a new Entity defaults into (ADR-0024): the owner's World. Every
+   * user has exactly one after migration/seeding, so the oldest is unambiguous;
+   * the tiebreak keeps it deterministic once multi-World lands.
+   */
+  private ownerWorldId(ownerId: string): string {
+    const world = this.db
+      .select({ id: worlds.id })
+      .from(worlds)
+      .where(eq(worlds.ownerId, ownerId))
+      .orderBy(asc(worlds.createdAt), asc(worlds.id))
+      .get();
+    if (!world) throw new Error(`User ${ownerId} has no World to create in`);
+    return world.id;
+  }
+
+  /**
    * Fetch a row only if `ownerId` owns it — the shared owner-scoping primitive,
    * so access control lives in one place.
    */
@@ -272,6 +291,7 @@ function toSummary(row: SummaryRow): EntitySummary {
   return {
     id: row.id,
     ownerId: row.ownerId,
+    worldId: row.worldId,
     name: row.name,
     // Validate against the schema (single source of truth) not a bare cast (ADR-0001).
     type: entityTypeSchema.parse(row.type),

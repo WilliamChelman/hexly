@@ -5,13 +5,15 @@ A **World** is a lightweight container record (its own `worlds` table, not an En
 ## Schema sketch
 
 ```
-worlds:        { id, name, owner_id, home_entity_id }
+worlds:        { id, name, owner_id }
 world_members: { world_id, user_id, role: contributor | viewer }
 world_links:   { world_id, token }   -- World Public Link
-entities:      { ..., world_id NOT NULL, visibility: private | shared }
+entities:      { ..., world_id NOT NULL, is_home, visibility: private | shared }
 ```
 
-A `note` Entity is auto-created alongside every new World and designated as its **Home Entity** (`home_entity_id`). The Home Entity cannot be deleted or moved to another World.
+A `note` Entity is auto-created alongside every new World and designated as its **Home Entity** by an `is_home` flag on the Entity (a partial unique index over `world_id` enforces at most one per World). The flag lives on the Entity — rather than a `worlds.home_entity_id` FK — so a World holds no reference back to entities: no circular FK, the home is intrinsically in-world, and World deletion cascades through `entities.world_id` without a hand-written teardown order. The Home Entity cannot be deleted or moved to another World.
+
+The trade is that "every World has a Home" is no longer a NOT NULL guarantee but an invariant upheld at the one creation point (the World-create path always mints a Home note). The migration onto Worlds is also simpler — a World is inserted first, then its Entities reference it, with no deferred-FK dance.
 
 ## World roles
 
@@ -41,6 +43,6 @@ The Entity link picker (ADR-0023) orders results in-world first. Off-world resul
 
 ## Consequences
 
-- Extends ADR-0018: `entities` table gains `world_id NOT NULL` and `visibility`.
+- Extends ADR-0018: `entities` table gains `world_id NOT NULL`, `is_home`, and `visibility`.
 - Extends ADR-0004: Owner/Editor/Viewer on individual Entities remain; world-level roles (Owner/Contributor/Viewer) sit above them, cascading to `shared` Entities.
 - Multi-world Entity membership is explicitly deferred — a "common world" is a user recipe (create a world, mark shared entities as `shared`, link it from other worlds), not a system feature.
