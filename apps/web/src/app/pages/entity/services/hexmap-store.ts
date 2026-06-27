@@ -161,7 +161,7 @@ function eraseHexFrom(draft: HexMap, coord: Axial): void {
 }
 
 /**
- * Set `target.entityId` to `entityId`, or delete it when `entityId` is falsy —
+ * Set `target.entityId` to `entityId`, or delete it when `entityId` is undefined —
  * keeping a cleared link absent rather than blank, like the Hex name (issue #76).
  * A missing target (stale coordinate) is left untouched.
  */
@@ -170,7 +170,7 @@ function setOrClearLink(
   entityId: string | undefined,
 ): void {
   if (!target) return;
-  if (entityId) target.entityId = entityId;
+  if (entityId !== undefined) target.entityId = entityId;
   else delete target.entityId;
 }
 

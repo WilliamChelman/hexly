@@ -63,7 +63,7 @@ test('links a Hex to an Entity in the Inspector; the link survives a reload and 
   const res = await request.get(`/api/entities/${mapId}`);
   expect(res.ok()).toBeTruthy();
   const detail = await res.json();
-  expect(detail.document.hexes['0,0'].entityId).toBe(noteId);
+  expect(detail.document.hexes['0,0']?.entityId).toBe(noteId);
 
   // Re-select the hex: the Inspector shows the persisted link, ready to follow.
   await canvas.click();

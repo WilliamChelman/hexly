@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -112,7 +113,7 @@ export class EntityLink {
   protected readonly store = inject(HexMapStore);
   private readonly entitiesClient = inject(EntitiesClient);
 
-  /** The owner's entities, fetched once (owner-scoped, no search endpoint — ADR-0023). */
+  /** The owner's entities, fetched once per session (owner-scoped, cached in EntitiesClient — ADR-0023). */
   private readonly entities = toSignal(this.entitiesClient.list(), {
     initialValue: [] as EntitySummary[],
   });
@@ -120,11 +121,20 @@ export class EntityLink {
   protected readonly open = signal(false);
   protected readonly query = signal('');
 
+  constructor() {
+    // Close the picker and reset the query whenever the selected element changes so
+    // a pick() always targets the element the picker was opened for.
+    effect(() => {
+      this.store.selection();
+      this.open.set(false);
+      this.query.set('');
+    });
+  }
+
   /** The picker list, filtered by a case-insensitive name match on the query. */
   protected readonly filtered = computed(() => {
     const q = this.query().trim().toLowerCase();
-    const all = this.entities();
-    return q ? all.filter((e) => e.name.toLowerCase().includes(q)) : all;
+    return this.entities().filter((e) => e.name.toLowerCase().includes(q));
   });
 
   /** The linked Entity's summary, resolved from the owner list, or null when unset/unresolved. */
@@ -147,7 +157,7 @@ export class EntityLink {
   protected readonly linkedType = computed(() => this.linked()?.type ?? '');
 
   protected toggle(): void {
-    this.query.set('');
+    if (!this.open()) this.query.set('');
     this.open.update((v) => !v);
   }
 
