@@ -20,6 +20,7 @@ import { CONTENT_EXTENSIONS } from './content-extensions';
 import { entityLinkNode } from './entity-link-node';
 import { SlashMenu } from './slash-menu';
 import { slashCommands } from './slash-commands';
+import { SLASH_ITEMS } from './slash-menu-items';
 import { EntityPicker } from './entity-picker';
 import { entityMention } from './entity-mention';
 import { createEntityLinkNodeView } from './entity-link-view';
@@ -260,17 +261,34 @@ export class ContentEditor {
           createEntityLinkNodeView(node, environmentInjector, elementInjector, appRef);
       },
     });
+
+    const mention = entityMention(
+      () => this.entityPicker(),
+      (query) => this.resolver.search(query),
+    );
+
+    // Patch /link to flag the mention extension before inserting @, so onExit knows
+    // to clean up the stray @ if the user escapes instead of picking (finding #5/#9).
+    const slashItems = SLASH_ITEMS.map((item) =>
+      item.id !== 'link'
+        ? item
+        : {
+            ...item,
+            apply: (editor: Editor, range: { from: number; to: number }) => {
+              mention.setProgrammatic();
+              editor.chain().focus().deleteRange(range).insertContent('@').run();
+            },
+          },
+    );
+
     return new Editor({
       extensions: [
         ...CONTENT_EXTENSIONS.filter(
           (e) => (e as { name?: string }).name !== entityLinkNode.name,
         ),
         entityLinkWithView,
-        slashCommands(() => this.slashMenu()),
-        entityMention(
-          () => this.entityPicker(),
-          (query) => this.resolver.search(query),
-        ),
+        slashCommands(() => this.slashMenu(), slashItems),
+        mention.extension,
       ],
       content,
     });

@@ -63,7 +63,10 @@ export const entityLinkNode = Node.create({
   renderHTML({ node, HTMLAttributes }) {
     return [
       'a',
-      mergeAttributes(HTMLAttributes, { 'data-entity-link': '' }),
+      mergeAttributes(HTMLAttributes, {
+        'data-entity-link': '',
+        href: `/entities/${node.attrs['entityId'] ?? ''}`,
+      }),
       node.attrs['label'] ?? '',
     ];
   },

@@ -12,8 +12,14 @@ import { SlashMenu } from './slash-menu';
  * and changes no format contract (ADR-0019). It owns the trigger/query/keyboard plumbing
  * via `@tiptap/suggestion` and drives the {@link SlashMenu} chrome through `getMenu`, which is
  * deferred so the editor can be built before its `viewChild` resolves.
+ *
+ * `items` defaults to `SLASH_ITEMS`; callers can override to patch individual items
+ * (e.g. ContentEditor patches `/link` to set the programmatic-trigger flag).
  */
-export function slashCommands(getMenu: () => SlashMenu | undefined): Extension {
+export function slashCommands(
+  getMenu: () => SlashMenu | undefined,
+  items: SlashItem[] = SLASH_ITEMS,
+): Extension {
   return Extension.create({
     name: 'slashCommands',
     addProseMirrorPlugins() {
@@ -22,7 +28,7 @@ export function slashCommands(getMenu: () => SlashMenu | undefined): Extension {
           editor: this.editor,
           char: '/',
           allow: ({ state }) => !state.selection.$from.parent.type.spec.code,
-          items: ({ query }) => filterSlashItems(SLASH_ITEMS, query),
+          items: ({ query }) => filterSlashItems(items, query),
           // The selected item knows how to insert itself; range covers the typed "/query".
           command: ({ editor, range, props }) => props.apply(editor, range),
           render: () => ({

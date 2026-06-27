@@ -26,12 +26,12 @@ export abstract class SuggestionMenu<T extends { id: string }> {
   protected abstract readonly optionIdPrefix: string;
 
   open(props: SuggestionMenuProps<T>): void {
-    const pos = toPosition(props.clientRect);
-    if (!pos) return;
     this.command = props.command;
     this.items.set(props.items);
     this.activeIndex.set(0);
-    this.position.set(pos);
+    // ponytail: fallback {x:0,y:0} when DOMRect is null (programmatic insertion before
+    // layout flush); the first update() call corrects it once TipTap has a real rect.
+    this.position.set(toPosition(props.clientRect) ?? { x: 0, y: 0 });
     this.visible.set(true);
   }
 
