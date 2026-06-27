@@ -5,13 +5,14 @@ import {
   computed,
   effect,
   inject,
+  signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { translateSignal, TranslocoPipe } from '@jsverse/transloco';
 import { Editor, JSONContent } from '@tiptap/core';
-import { EditorState } from '@tiptap/pm/state';
-import { TiptapEditorDirective } from 'ngx-tiptap';
+import { TiptapDirective } from './tiptap.directive';
 import { EntitySession } from '../services/entity-session';
 import { Button } from '../../../ui/button';
 import { Chip } from '../../../ui/chip';
@@ -21,6 +22,8 @@ import { EntityTags } from './entity-tags';
 import { CONTENT_EXTENSIONS } from './content-extensions';
 import { SlashMenu } from './slash-menu';
 import { slashCommands } from './slash-commands';
+import { FormattingMenu } from './formatting-menu';
+import { BubbleMenuDirective } from './bubble-menu.directive';
 
 /**
  * The view a `note` Entity opens into, parallel to {@link EditorShell} for a `hexmap`.
@@ -33,13 +36,15 @@ import { slashCommands } from './slash-commands';
   imports: [
     RouterLink,
     TranslocoPipe,
-    TiptapEditorDirective,
     Button,
     Chip,
     Eyebrow,
     PageHeader,
     EntityTags,
     SlashMenu,
+    FormattingMenu,
+    BubbleMenuDirective,
+    TiptapDirective,
   ],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
@@ -105,14 +110,20 @@ import { slashCommands } from './slash-commands';
         the box focuses the editor — without that, the empty area below prose swallows clicks.
       -->
       <div
-        tiptap
-        [editor]="editor"
+        [appTiptap]="editor()"
         data-testid="note-content"
         class="mt-5 flex min-h-[24rem] flex-col rounded-md border border-line bg-surface px-5 py-3 text-ink cursor-text focus-within:border-gold"
       ></div>
     </main>
 
     <app-slash-menu />
+
+    <!-- Out of flow + hidden until the bubble-menu plugin positions it over a
+         text selection (it sets position/left/top and flips visibility on show). -->
+    <app-formatting-menu
+      appBubbleMenu
+      [editor]="editor()"
+    />
   `,
   styles: `
     /* TipTap creates .ProseMirror outside Angular's template — pierce with ::ng-deep.
@@ -148,6 +159,22 @@ import { slashCommands } from './slash-commands';
       font-size: 1.15em;
       font-weight: 600;
       margin: 0.8em 0 0.3em;
+    }
+    :host ::ng-deep .ProseMirror h4 {
+      font-size: 1em;
+      font-weight: 600;
+      margin: 0.8em 0 0.3em;
+    }
+    :host ::ng-deep .ProseMirror h5 {
+      font-size: 0.9em;
+      font-weight: 600;
+      margin: 0.75em 0 0.25em;
+    }
+    :host ::ng-deep .ProseMirror h6 {
+      font-size: 0.85em;
+      font-weight: 600;
+      margin: 0.75em 0 0.25em;
+      color: var(--color-ink-muted);
     }
     :host ::ng-deep .ProseMirror ul,
     :host ::ng-deep .ProseMirror ol {
@@ -225,40 +252,55 @@ export class NoteView {
 
   private readonly slashMenu = viewChild(SlashMenu);
 
-  // slashCommands is UI chrome, not part of the persisted schema, so it lives here
-  // rather than in CONTENT_EXTENSIONS (ADR-0019). The menu getter is deferred: render
-  // only fires on a real "/" keystroke, long after the viewChild has resolved.
-  protected readonly editor = new Editor({
-    extensions: [...CONTENT_EXTENSIONS, slashCommands(() => this.slashMenu())],
-  });
+  // Recreated on every seed (load/swap/conflict-reload) rather than surgically reset:
+  // a fresh Editor has empty undo history for free, so Ctrl-Z can't reach past the seed,
+  // and TiptapDirective / BubbleMenuDirective re-bind to the new instance through their
+  // signal inputs — no manual plugin re-registration. Starts empty; the first seed swaps
+  // in the stored snapshot.
+  protected readonly editor = signal(this.createEditor());
 
   constructor() {
     // Tab title is owned by EntitySession (shared with the map editor), not here.
 
-    // Label .ProseMirror (not the wrapper) — TipTap already sets role="textbox" on it.
-    effect(() => {
-      this.editor.view.dom.setAttribute('aria-label', this.editorLabel());
+    // Stream edits to the session; re-attach when the editor instance swaps (the old
+    // one's listener dies with it on destroy()).
+    effect((onCleanup) => {
+      const editor = this.editor();
+      const push = ({ editor }: { editor: Editor }) =>
+        this.session.setContent(editor.getJSON());
+      editor.on('update', push);
+      onCleanup(() => editor.off('update', push));
     });
 
-    this.editor.on('update', ({ editor }) => {
-      this.session.setContent(editor.getJSON());
+    // Label .ProseMirror (not the wrapper) — TipTap already sets role="textbox" on it.
+    // Re-runs on language change and on editor swap.
+    effect(() => {
+      this.editor().view.dom.setAttribute('aria-label', this.editorLabel());
     });
 
     // Seed on load/swap/conflict-reload (not on clean saves — in-flight keystrokes must survive).
-    // Recreate editor state so Ctrl-Z can't undo past the seed point.
     effect(() => {
       const detail = this.session.seed();
       if (!detail || detail.document.type !== 'note') return;
       const snapshot = detail.document.content.snapshot;
       if (!isDocSnapshot(snapshot)) return;
-      this.editor.commands.setContent(snapshot, { emitUpdate: false });
-      const { state } = this.editor;
-      this.editor.view.updateState(
-        EditorState.create({ doc: state.doc, plugins: state.plugins }),
-      );
+      // untracked: this effect reacts to seed(), not to its own editor swap.
+      const previous = untracked(this.editor);
+      this.editor.set(this.createEditor(snapshot));
+      previous.destroy();
     });
 
-    this.destroyRef.onDestroy(() => this.editor.destroy());
+    this.destroyRef.onDestroy(() => this.editor().destroy());
+  }
+
+  // slashCommands is UI chrome, not part of the persisted schema, so it lives here
+  // rather than in CONTENT_EXTENSIONS (ADR-0019). The menu getter is deferred: render
+  // only fires on a real "/" keystroke, long after the viewChild has resolved.
+  private createEditor(content?: JSONContent): Editor {
+    return new Editor({
+      extensions: [...CONTENT_EXTENSIONS, slashCommands(() => this.slashMenu())],
+      content,
+    });
   }
 
   protected save(): void {

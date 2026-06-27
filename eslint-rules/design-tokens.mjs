@@ -52,9 +52,9 @@ const UNIVERSAL_STEPS = ['0', 'auto'];
 
 let cache = null;
 /**
- * Read the curated token set + spacing scale from the CSS source of truth.
+ * Read the curated token set + spacing scale + shadow utilities from the CSS source of truth.
  *
- * Returns `{ sig, tokens, spacingSteps }`. The cache is keyed by the resolved
+ * Returns `{ sig, tokens, spacingSteps, shadowUtilities }`. The cache is keyed by the resolved
  * file mtimes, so editing a token file invalidates it — a long-lived ESLint
  * server / Nx daemon picks up a new or renamed token without a restart. A load
  * that managed to read *no* file is deliberately NOT cached: otherwise a single
@@ -85,6 +85,7 @@ function loadCss(cwd) {
 
   const tokens = new Set(BUILTIN_TOKENS);
   const spacingSteps = new Set(UNIVERSAL_STEPS);
+  const shadowUtilities = new Set();
   let readAny = false;
   for (const rel of TOKEN_FILES) {
     try {
@@ -94,11 +95,15 @@ function loadCss(cwd) {
       // The curated spacing scale *is* whatever `--spacing-<step>` keys exist,
       // so the off-scale rule tracks the @theme instead of a hardcoded list.
       for (const m of txt.matchAll(/--spacing-([a-z0-9]+)\s*:/g)) spacingSteps.add(m[1]);
+      // Shadow utilities are the `@utility shadow-*` declarations; only these
+      // respect the [data-theme] reassignment — Tailwind's built-ins bake a
+      // light-mode value (ADR-0021).
+      for (const m of txt.matchAll(/@utility\s+(shadow-[a-z0-9-]+)/g)) shadowUtilities.add(m[1]);
     } catch {
       /* token file not found from this cwd */
     }
   }
-  const result = { sig, tokens, spacingSteps };
+  const result = { sig, tokens, spacingSteps, shadowUtilities };
   if (readAny) cache = result; // never cache a total-failure load (avoids poisoning)
   return result;
 }
@@ -191,9 +196,50 @@ const noOffScaleSpacing = {
   },
 };
 
+const noBuiltinShadow = {
+  meta: {
+    type: 'problem',
+    docs: { description: 'Disallow Tailwind built-in shadow-* utilities; use the project\'s shadow-1/2/3/inset tokens (ADR-0021).' },
+    schema: [],
+    messages: {
+      builtin:
+        'Built-in shadow utility `{{cls}}` bakes a light-mode value and ignores [data-theme]. Use shadow-1, shadow-2, shadow-3, or shadow-inset instead (ADR-0021).',
+    },
+  },
+  create(context) {
+    const { shadowUtilities } = loadCss(context.cwd ?? process.cwd());
+    function scan(node, text) {
+      for (const tok of text.split(/[\s"'`=<>(){},;:]+/)) {
+        if (!tok.startsWith('shadow-') && tok !== 'shadow') continue;
+        if (tok.includes('[')) continue; // explicit arbitrary value — intentional opt-out
+        if (!shadowUtilities.has(tok)) {
+          context.report({ node, messageId: 'builtin', data: { cls: tok } });
+        }
+      }
+    }
+    return {
+      TemplateLiteral(node) {
+        const text = textOf(node);
+        if (text) scan(node, text);
+      },
+      Literal(node) {
+        if (typeof node.value !== 'string') return;
+        const p = node.parent;
+        const isClassProp =
+          !!p &&
+          p.type === 'Property' &&
+          p.value === node &&
+          (p.key.name === 'class' || p.key.value === 'class');
+        if (isClassProp || node.value.includes('class=')) scan(node, node.value);
+      },
+    };
+  },
+};
+
 export default {
   rules: {
     'no-unknown-design-token': noUnknownDesignToken,
     'no-off-scale-spacing': noOffScaleSpacing,
+    'no-builtin-shadow': noBuiltinShadow,
   },
 };

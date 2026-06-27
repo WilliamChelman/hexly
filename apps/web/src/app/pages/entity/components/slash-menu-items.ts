@@ -47,6 +47,27 @@ export const SLASH_ITEMS: SlashItem[] = [
       chainFrom(editor, range).setNode('heading', { level: 3 }).run(),
   },
   {
+    id: 'heading4',
+    labelKey: 'noteView.slashMenu.heading4',
+    keywords: ['heading', 'h4'],
+    apply: (editor, range) =>
+      chainFrom(editor, range).setNode('heading', { level: 4 }).run(),
+  },
+  {
+    id: 'heading5',
+    labelKey: 'noteView.slashMenu.heading5',
+    keywords: ['heading', 'h5'],
+    apply: (editor, range) =>
+      chainFrom(editor, range).setNode('heading', { level: 5 }).run(),
+  },
+  {
+    id: 'heading6',
+    labelKey: 'noteView.slashMenu.heading6',
+    keywords: ['heading', 'h6'],
+    apply: (editor, range) =>
+      chainFrom(editor, range).setNode('heading', { level: 6 }).run(),
+  },
+  {
     id: 'bulletList',
     labelKey: 'noteView.slashMenu.bulletList',
     keywords: ['bullet', 'list', 'unordered', 'ul'],

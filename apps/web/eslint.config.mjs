@@ -15,6 +15,7 @@ export default [
       // utilities may only use the curated scale (not Tailwind's multiplier).
       'hexly-design/no-unknown-design-token': 'error',
       'hexly-design/no-off-scale-spacing': 'error',
+      'hexly-design/no-builtin-shadow': 'error',
       '@angular-eslint/directive-selector': [
         'error',
         {
