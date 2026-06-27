@@ -1,7 +1,6 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  computed,
   effect,
   inject,
   signal,
@@ -17,18 +16,12 @@ import { Input } from '../../../ui/input';
 import { HexMapStore } from '../services/hexmap-store';
 
 /**
- * The Inspector's Entity Link control (issue #76, CONTEXT.md → Entity Link). For
- * the single selected linkable Map element (a Hex, Feature, or Region — never a
- * Label, which is why the Inspector only mounts this in those branches) it lets a
- * worldbuilder pick another Entity to link to, follow the link to jump to it, and
- * remove it. The picker filters the owner's whole entity list — notes and maps
- * alike (ADR-0023's owner-scoped `list()`, no search endpoint) — so a Feature can
- * point at another `hexmap`. The link itself lives in the document and rides the
- * existing save; this control only reads/writes it through the {@link HexMapStore}.
- * A link whose target is deleted or inaccessible (absent from the owner's list, so
- * unresolvable — ADR-0018) renders **non-navigable**: a muted, unfollowable label
- * rather than a dead `/entities/:id` link, so deleting an Entity never breaks a map
- * that referenced it (issue #78). The id stays in the document untouched.
+ * The Inspector's Entity Link control (issue #76, CONTEXT.md → Entity Link) for the
+ * single selected linkable Map element (a Hex, Feature, or Region — never a Label):
+ * pick an Entity to link, follow it, or remove it. The picker searches server-side
+ * via `list({ q })` and resolves the linked name via `list({ ids: [id] })` (ADR-0025),
+ * never holding the whole owner list. A link to a deleted/inaccessible target renders
+ * non-navigable rather than a dead link (issue #78); the id stays in the document.
  */
 @Component({
   selector: 'app-entity-link',
@@ -48,7 +41,7 @@ import { HexMapStore } from '../services/hexmap-store';
               <span aria-hidden="true">→ </span>{{ e.name }}
               <span class="font-mono text-2xs text-ink-muted">({{ e.type }})</span>
             </a>
-          } @else if (loaded()) {
+          } @else if (resolved()) {
             <!-- Target deleted/inaccessible: visible but non-navigable (issue #78). -->
             <span
               class="block flex-1 min-w-0 truncate font-display text-base italic text-ink-muted"
@@ -108,7 +101,7 @@ import { HexMapStore } from '../services/hexmap-store';
           <!-- Only the option list scrolls; the search box and create row stay pinned
                so create-and-link is always reachable without scrolling past the list. -->
           <div class="max-h-56 overflow-auto">
-            @for (e of filtered(); track e.id) {
+            @for (e of options(); track e.id) {
               <button
                 type="button"
                 appButton
@@ -163,23 +156,60 @@ export class EntityLink {
   private readonly entitiesClient = inject(EntitiesClient);
   private readonly transloco = inject(TranslocoService);
 
-  /**
-   * The owner's entities, fetched once on mount (owner-scoped, no search endpoint —
-   * ADR-0023). Writable so a create-and-link (issue #77) can append the new Entity
-   * and have its name resolve immediately, without re-fetching the whole list.
-   */
-  private readonly entities = signal<EntitySummary[]>([]);
+  /** The picker's options for the current query — a server-side search (ADR-0025). */
+  protected readonly options = signal<EntitySummary[]>([]);
 
-  /** True once the list has arrived, so the template can tell "still loading" from "unresolved/dangling". */
-  protected readonly loaded = signal(false);
+  /**
+   * Entities created via create-and-link (issue #77), resolved locally so their
+   * name shows at once without a server round trip. The display-resolve still
+   * goes to the server for everything else.
+   */
+  private readonly created = signal<EntitySummary[]>([]);
+
+  /** The linked Entity's summary, or null when unset or unresolvable (dangling). */
+  protected readonly linked = signal<EntitySummary | null>(null);
+  /** True once resolving the current link has settled, so the template tells "loading" from "dangling". */
+  protected readonly resolved = signal(false);
 
   protected readonly open = signal(false);
   protected readonly query = signal('');
 
   constructor() {
-    this.entitiesClient.list().subscribe((list) => {
-      this.entities.set(list);
-      this.loaded.set(true);
+    // Resolve the linked name on demand (ADR-0025): a freshly-created Entity is
+    // known locally; anything else is fetched by id, never by pulling the whole
+    // list. onCleanup cancels an in-flight fetch when the link changes or the
+    // control is destroyed, so a stale response can't overwrite a newer link.
+    effect((onCleanup) => {
+      const id = this.store.selectedEntityLink();
+      this.linked.set(null);
+      this.resolved.set(false);
+      if (!id) {
+        this.resolved.set(true);
+        return;
+      }
+      const local = this.created().find((e) => e.id === id);
+      if (local) {
+        this.linked.set(local);
+        this.resolved.set(true);
+        return;
+      }
+      const sub = this.entitiesClient.list({ ids: [id] }).subscribe((page) => {
+        this.linked.set(page.items[0] ?? null);
+        this.resolved.set(true);
+      });
+      onCleanup(() => sub.unsubscribe());
+    });
+
+    // Search server-side as the query changes while the picker is open (ADR-0025).
+    // onCleanup cancels the prior search, so responses can't land out of order.
+    // ponytail: no debounce — small lists, fine until import.
+    effect((onCleanup) => {
+      if (!this.open()) return;
+      const q = this.query().trim();
+      const sub = this.entitiesClient
+        .list({ q })
+        .subscribe((page) => this.options.set(page.items));
+      onCleanup(() => sub.unsubscribe());
     });
 
     // Close the picker and reset the query whenever the selected element changes so
@@ -190,24 +220,6 @@ export class EntityLink {
       this.query.set('');
     });
   }
-
-  /** The picker list, filtered by a case-insensitive name match on the query. */
-  protected readonly filtered = computed(() => {
-    const q = this.query().trim().toLowerCase();
-    return this.entities().filter((e) => e.name.toLowerCase().includes(q));
-  });
-
-  /**
-   * The linked Entity's summary, resolved from the owner list, or null when unset or
-   * unresolvable (the target is deleted/inaccessible, so absent from the list). A
-   * null with a present id and {@link loaded} true is a dangling link — rendered
-   * non-navigable.
-   */
-  protected readonly linked = computed<EntitySummary | null>(() => {
-    const id = this.store.selectedEntityLink();
-    if (!id) return null;
-    return this.entities().find((e) => e.id === id) ?? null;
-  });
 
   protected toggle(): void {
     if (!this.open()) this.query.set('');
@@ -234,7 +246,9 @@ export class EntityLink {
       this.query().trim() ||
       this.transloco.translate(type === 'hexmap' ? 'domain.untitledMap' : 'domain.untitledNote');
     this.entitiesClient.create(name, type).subscribe((entity) => {
-      this.entities.update((list) => [...list, entity]);
+      // Remember it locally so its name resolves without a server round trip,
+      // then link — the resolve effect picks it up from `created`.
+      this.created.update((list) => [...list, entity]);
       this.store.linkEntity(entity.id);
       this.open.set(false);
     });

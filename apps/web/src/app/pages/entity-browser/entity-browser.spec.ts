@@ -52,11 +52,11 @@ describe('EntityBrowser', () => {
 
   afterEach(() => http.verify());
 
-  /** Create the library and resolve its initial list with `entities`. */
+  /** Create the library and resolve its initial list with `entities` as a page envelope. */
   function renderWith(entities: EntitySummary[]) {
     const fixture = TestBed.createComponent(EntityBrowser);
     fixture.detectChanges(); // ngOnInit -> GET /entities
-    http.expectOne('/api/entities').flush(entities);
+    http.expectOne('/api/entities').flush({ items: entities, nextCursor: null });
     fixture.detectChanges();
     return fixture;
   }

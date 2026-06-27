@@ -49,29 +49,45 @@ describe('EntitiesClient', () => {
 
   afterEach(() => http.verify());
 
-  it('lists the entities available to the user', () => {
-    const summaries: EntitySummary[] = [
-      {
-        id: 'e1',
-        ownerId: 'u1',
-        name: 'Aldermoor',
-        type: 'hexmap',
-        tags: [],
-        visibility: 'private',
-        version: 1,
-        createdAt: 1,
-        updatedAt: 1,
-      },
-    ];
+  const summary: EntitySummary = {
+    id: 'e1',
+    ownerId: 'u1',
+    name: 'Aldermoor',
+    type: 'hexmap',
+    tags: [],
+    visibility: 'private',
+    version: 1,
+    createdAt: 1,
+    updatedAt: 1,
+  };
 
-    let listed: EntitySummary[] | undefined;
-    client.list().subscribe((entities) => (listed = entities));
+  it('lists entities as the page envelope (items + nextCursor)', () => {
+    const page = { items: [summary], nextCursor: 'CURSOR-2' };
+
+    let listed: unknown;
+    client.list().subscribe((p) => (listed = p));
 
     const req = http.expectOne('/api/entities');
     expect(req.request.method).toBe('GET');
-    req.flush(summaries);
+    // No options → no query params.
+    expect(req.request.params.keys()).toEqual([]);
+    req.flush(page);
 
-    expect(listed).toEqual(summaries);
+    expect(listed).toEqual(page);
+  });
+
+  it('serializes ids/q/type/cursor/limit into the query string', () => {
+    client
+      .list({ ids: ['a', 'b'], q: 'river', type: 'note', cursor: 'CUR', limit: 25 })
+      .subscribe();
+
+    const req = http.expectOne((r) => r.url === '/api/entities');
+    expect(req.request.params.getAll('ids')).toEqual(['a', 'b']);
+    expect(req.request.params.get('q')).toBe('river');
+    expect(req.request.params.get('type')).toBe('note');
+    expect(req.request.params.get('cursor')).toBe('CUR');
+    expect(req.request.params.get('limit')).toBe('25');
+    req.flush({ items: [], nextCursor: null });
   });
 
   it('creates an entity by name and type', () => {

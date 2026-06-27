@@ -99,6 +99,37 @@ export const saveEntityRequestSchema = z.object({
 
 export type SaveEntityRequest = z.infer<typeof saveEntityRequestSchema>;
 
+/** The list page size default and server-enforced cap (ADR-0025). Over-cap requests are clamped, not rejected. */
+export const ENTITY_LIST_DEFAULT_LIMIT = 50;
+export const ENTITY_LIST_MAX_LIMIT = 200;
+
+/**
+ * `GET /entities` query params (ADR-0025), validated at the boundary (ADR-0001).
+ * All optional and composable: `ids` selects an explicit owner-scoped set, `q`
+ * filters by case-insensitive name match, `type` by Entity Type, `cursor` is the
+ * opaque page token, `limit` bounds the page. A malformed `limit` is a 400; an
+ * over-cap `limit` is clamped. `cursor` is only shape-checked here — its decode
+ * (and the 400 for a malformed one) is server-internal.
+ */
+export const entityListQuerySchema = z.object({
+  // A query param arrives as a string for one value, an array for repeats.
+  ids: z
+    .union([z.string(), z.array(z.string())])
+    .transform((v) => (Array.isArray(v) ? v : [v]))
+    .optional(),
+  q: z.string().optional(),
+  type: entityTypeSchema.optional(),
+  cursor: z.string().optional(),
+  limit: z.coerce
+    .number()
+    .int()
+    .positive()
+    .transform((n) => Math.min(n, ENTITY_LIST_MAX_LIMIT))
+    .default(ENTITY_LIST_DEFAULT_LIMIT),
+});
+
+export type EntityListQuery = z.infer<typeof entityListQuerySchema>;
+
 /** `private` is owner-only; `public` exposes the read-only link (ADR-0004). Stored as metadata; the public-link endpoint is a later issue, so nothing acts on it yet. */
 export const visibilitySchema = z.enum(['private', 'public']);
 
@@ -122,6 +153,17 @@ export interface EntitySummary {
 /** What `GET /entities/:id` and saves return. */
 export interface EntityDetail extends EntitySummary {
   readonly document: EntityBody;
+}
+
+/**
+ * One page of the entities read surface (ADR-0025): summaries only, plus an
+ * opaque {@link cursor} clients pass back as `cursor` to fetch the next page.
+ * `nextCursor` is `null` on the final page. The cursor's internal encoding is
+ * server-only — clients never construct or inspect it.
+ */
+export interface EntityPage {
+  readonly items: EntitySummary[];
+  readonly nextCursor: string | null;
 }
 
 /** Saved at the new version, or a 409 conflict carrying the server's current Entity to re-pull (ADR-0018). */

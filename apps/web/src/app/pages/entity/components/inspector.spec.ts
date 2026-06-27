@@ -39,7 +39,17 @@ function inspectorProviders() {
     {
       provide: EntitiesClient,
       useValue: {
-        list: () => of(stubEntities),
+        // Mirror the server's envelope + filters (ADR-0025): `ids` selects, `q`
+        // matches names case-insensitively, so the picker's calls resolve as in prod.
+        list: (opts: { ids?: string[]; q?: string } = {}) => {
+          let items = stubEntities;
+          if (opts.ids) items = items.filter((e) => opts.ids!.includes(e.id));
+          if (opts.q)
+            items = items.filter((e) =>
+              e.name.toLowerCase().includes(opts.q!.toLowerCase()),
+            );
+          return of({ items, nextCursor: null });
+        },
         create: (name: string, type: EntityType) => {
           createdCalls.push({ name, type });
           const detail: EntityDetail = {
@@ -674,6 +684,20 @@ describe('Inspector Entity Link control', () => {
     const el = render().nativeElement as HTMLElement;
     expect(byId(el, 'entity-link-pick')).toBeNull();
     expect(byId(el, 'entity-link-name')).toBeNull();
+  });
+
+  it('renders a non-navigable dangling label when the link cannot be resolved', () => {
+    // The target is deleted/inaccessible, so ids-resolve comes back empty (#78).
+    stubEntities = [];
+    const store = TestBed.inject(HexMapStore);
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.select({ q: 0, r: 0 }, null);
+    store.linkEntity('ghost');
+    const el = render().nativeElement as HTMLElement;
+
+    // Visible but non-navigable — the dangling label, never an anchor.
+    expect(byId(el, 'entity-link-name')).toBeNull();
+    expect(byId(el, 'entity-link-dangling')).not.toBeNull();
   });
 
   it('renders the entity name as a real anchor to the linked Entity', () => {
