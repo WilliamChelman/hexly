@@ -26,7 +26,14 @@ jobs:
           node-version: 24
           cache: 'pnpm'
 
+      - uses: actions/cache@v4
+        id: node-modules-cache
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('pnpm-lock.yaml') }}
+
       - run: pnpm install --frozen-lockfile
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
 
       # Persist the Nx cache across runs so the e2e job's web+api build can
       # reuse this job's cached build on a later run, avoiding a redundant rebuild.
@@ -57,7 +64,14 @@ jobs:
           node-version: 24
           cache: 'pnpm'
 
+      - uses: actions/cache@v4
+        id: node-modules-cache
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('pnpm-lock.yaml') }}
+
       - run: pnpm install --frozen-lockfile
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
 
       # Persist the Nx cache across runs so this job's web+api build (triggered by
       # the e2e dependsOn) can reuse the main job's cached build on a later run,
@@ -71,7 +85,14 @@ jobs:
             ${{ runner.os }}-nx-
 
       # Only chromium — the suite is a single-engine seam regression net (ADR-0009).
+      - uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+
       - run: pnpm exec playwright install --with-deps chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
 
       - run: pnpm exec nx e2e web-e2e
 
@@ -99,7 +120,14 @@ jobs:
           node-version: 24
           cache: 'pnpm'
 
+      - uses: actions/cache@v4
+        id: node-modules-cache
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('pnpm-lock.yaml') }}
+
       - run: pnpm install --frozen-lockfile
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
 
       - name: Release dry-run
         env:
@@ -130,7 +158,14 @@ jobs:
           node-version: 24
           cache: 'pnpm'
 
+      - uses: actions/cache@v4
+        id: node-modules-cache
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('pnpm-lock.yaml') }}
+
       - run: pnpm install --frozen-lockfile
+        if: steps.node-modules-cache.outputs.cache-hit != 'true'
 
       - name: Semantic release
         id: release

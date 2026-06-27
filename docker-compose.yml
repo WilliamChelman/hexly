@@ -4,10 +4,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - hexly-data:/data
+      - ./hexly-data:/data
     environment:
       HEXLY_DB_PATH: /data/hexly.db
     restart: unless-stopped
-
-volumes:
-  hexly-data:
