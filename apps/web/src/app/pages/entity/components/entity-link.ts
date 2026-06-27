@@ -216,6 +216,7 @@ export class EntityLink {
       this.options.set([]);
       const sub = this.entitiesClient.list({ q }).subscribe({
         next: (page) => this.options.set(page.items),
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
         error: () => {},
       });
       onCleanup(() => sub.unsubscribe());
