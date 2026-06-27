@@ -1,12 +1,46 @@
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
+import { of } from 'rxjs';
+import { EntitySummary } from '@hexly/domain';
+import { EntitiesClient } from '../../../core/services/entities.client';
 import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
 import { HexMapStore } from '../services/hexmap-store';
 import { Inspector } from './inspector';
 
+/** A minimal EntitySummary the Entity Link picker can list (issue #76). */
+function summary(id: string, name: string): EntitySummary {
+  return {
+    id,
+    ownerId: 'me',
+    name,
+    type: 'note',
+    tags: [],
+    visibility: 'private',
+    version: 1,
+    createdAt: 0,
+    updatedAt: 0,
+  };
+}
+
+/** The owner's entities the stubbed client returns; set per test before render. */
+let stubEntities: EntitySummary[] = [];
+
+/** Providers every Inspector spec needs now that it embeds the Entity Link control. */
+function inspectorProviders() {
+  return [
+    provideRouter([]),
+    { provide: EntitiesClient, useValue: { list: () => of(stubEntities) } },
+  ];
+}
+
 describe('Inspector label editing', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [Inspector, provideTranslocoTesting()] }).compileComponents();
+    stubEntities = [];
+    await TestBed.configureTestingModule({
+      imports: [Inspector, provideTranslocoTesting()],
+      providers: inspectorProviders(),
+    }).compileComponents();
   });
 
   /** Create the inspector with a label already selected, and return both. */
@@ -116,7 +150,11 @@ describe('Inspector label editing', () => {
 
 describe('Inspector hex and feature selection', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [Inspector, provideTranslocoTesting()] }).compileComponents();
+    stubEntities = [];
+    await TestBed.configureTestingModule({
+      imports: [Inspector, provideTranslocoTesting()],
+      providers: inspectorProviders(),
+    }).compileComponents();
   });
 
   function render() {
@@ -294,7 +332,11 @@ describe('Inspector hex and feature selection', () => {
 
 describe('Inspector multi-selection', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [Inspector, provideTranslocoTesting()] }).compileComponents();
+    stubEntities = [];
+    await TestBed.configureTestingModule({
+      imports: [Inspector, provideTranslocoTesting()],
+      providers: inspectorProviders(),
+    }).compileComponents();
   });
 
   /** Select two Hexes and a Label, returning the store and the rendered fixture. */
@@ -364,7 +406,11 @@ describe('Inspector multi-selection', () => {
 
 describe('Inspector region editing', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [Inspector, provideTranslocoTesting()] }).compileComponents();
+    stubEntities = [];
+    await TestBed.configureTestingModule({
+      imports: [Inspector, provideTranslocoTesting()],
+      providers: inspectorProviders(),
+    }).compileComponents();
   });
 
   /** Create the inspector with a Region selected, and return both. The member is a
@@ -511,5 +557,130 @@ describe('Inspector region editing', () => {
     expect(store.document().regions[0].hexes).toEqual({ '0,0': true });
     expect(store.selectedRegion()?.name).toBe('Avalon');
     expect(store.selection()).toEqual({ kind: 'region', id });
+  });
+});
+
+describe('Inspector Entity Link control', () => {
+  beforeEach(async () => {
+    stubEntities = [];
+    await TestBed.configureTestingModule({
+      imports: [Inspector, provideTranslocoTesting()],
+      providers: inspectorProviders(),
+    }).compileComponents();
+  });
+
+  function render() {
+    const fixture = TestBed.createComponent(Inspector);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  function byId(el: HTMLElement, testid: string) {
+    return el.querySelector(`[data-testid=${testid}]`) as HTMLElement | null;
+  }
+
+  it('opens the picker on a selected Hex and links the chosen Entity', () => {
+    stubEntities = [summary('n1', 'Riverbend'), summary('n2', 'North Reach')];
+    const store = TestBed.inject(HexMapStore);
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.select({ q: 0, r: 0 }, null);
+    const fixture = render();
+    const el = fixture.nativeElement as HTMLElement;
+
+    // Unlinked: a pick affordance, no picker open yet.
+    (byId(el, 'entity-link-pick') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    // The picker lists the owner's entities; choosing one links the Hex.
+    (byId(el, 'entity-link-option-n2') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(store.document().hexes['0,0'].entityId).toBe('n2');
+    expect(byId(el, 'entity-link-name')?.textContent).toContain('North Reach');
+  });
+
+  it('filters the picker by a case-insensitive name search', () => {
+    stubEntities = [summary('n1', 'Riverbend'), summary('n2', 'North Reach')];
+    const store = TestBed.inject(HexMapStore);
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.select({ q: 0, r: 0 }, null);
+    const fixture = render();
+    const el = fixture.nativeElement as HTMLElement;
+
+    (byId(el, 'entity-link-pick') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    const search = byId(el, 'entity-link-search') as HTMLInputElement;
+    search.value = 'river';
+    search.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    expect(byId(el, 'entity-link-option-n1')).not.toBeNull();
+    expect(byId(el, 'entity-link-option-n2')).toBeNull();
+  });
+
+  it('removes the link from a selected Hex without deleting the Hex', () => {
+    stubEntities = [summary('n1', 'Riverbend')];
+    const store = TestBed.inject(HexMapStore);
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.select({ q: 0, r: 0 }, null);
+    store.linkEntity('n1');
+    const fixture = render();
+    const el = fixture.nativeElement as HTMLElement;
+
+    (byId(el, 'entity-link-remove') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(store.document().hexes['0,0']).toEqual({ terrain: 'forest' });
+    expect(byId(el, 'entity-link-pick')).not.toBeNull();
+  });
+
+  it('shows the Entity Link control for a selected Region', () => {
+    const store = TestBed.inject(HexMapStore);
+    const id = store.createRegion('Avalon', '#b08a4e');
+    store.addHexToRegion(id, { q: 0, r: 0 });
+    store.select({ q: 0, r: 0 }, null);
+
+    expect(byId(render().nativeElement, 'entity-link-pick')).not.toBeNull();
+  });
+
+  it('shows no Entity Link control for a selected Label (Labels carry none)', () => {
+    const store = TestBed.inject(HexMapStore);
+    const id = store.addLabel('Open Sea', { x: 0, y: 0 });
+    store.selectLabel(id);
+
+    const el = render().nativeElement as HTMLElement;
+    expect(byId(el, 'entity-link-pick')).toBeNull();
+    expect(byId(el, 'entity-link-name')).toBeNull();
+  });
+
+  it('renders the entity name as a real anchor to the linked Entity', () => {
+    stubEntities = [summary('n1', 'Riverbend')];
+    const store = TestBed.inject(HexMapStore);
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.select({ q: 0, r: 0 }, null);
+    store.linkEntity('n1');
+    const el = render().nativeElement as HTMLElement;
+
+    // The name itself is the link — a real <a routerLink> so ctrl/cmd-click opens
+    // it in a new tab — with no separate Follow control.
+    const name = byId(el, 'entity-link-name') as HTMLAnchorElement;
+    expect(name.tagName).toBe('A');
+    expect(name.getAttribute('href')).toBe('/entities/n1');
+    expect(name.textContent).toContain('Riverbend');
+    expect(name.textContent).toContain('note'); // type suffix
+  });
+
+  it('renders the control chrome in French', () => {
+    const store = TestBed.inject(HexMapStore);
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.select({ q: 0, r: 0 }, null);
+    const fixture = render();
+    TestBed.inject(TranslocoService).setActiveLang('fr');
+    fixture.detectChanges();
+
+    expect(byId(fixture.nativeElement, 'entity-link-pick')?.textContent).toContain(
+      'Lier une entité',
+    );
   });
 });

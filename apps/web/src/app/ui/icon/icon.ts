@@ -25,6 +25,11 @@ const GLYPHS = {
       'stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"',
     body: '<path d="M7 6l6 6-6 6M13 6l6 6-6 6" />',
   },
+  close: {
+    attrs:
+      'stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"',
+    body: '<path d="M6 6l12 12M18 6 6 18" />',
+  },
   erase: {
     attrs:
       'stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"',
