@@ -1,10 +1,8 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   computed,
   effect,
-  inject,
   input,
   signal,
 } from '@angular/core';
@@ -88,7 +86,6 @@ import {
 })
 export class FormattingMenu {
   readonly editor = input.required<Editor>();
-  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly items = FORMAT_ITEMS;
   protected readonly linkEditing = signal(false);
@@ -115,13 +112,11 @@ export class FormattingMenu {
       editor.on('transaction', bump);
       onCleanup(() => editor.off('transaction', bump));
     });
-    this.destroyRef.onDestroy(() => this.linkEditing.set(false));
   }
 
   /** Run an action, then collapse the selection so the bubble menu dismisses. */
   protected apply(item: FormatItem): void {
-    item.run(this.editor());
-    this.dismiss();
+    if (item.run(this.editor())) this.dismiss();
   }
 
   /** Active link → drop it (and dismiss); otherwise reveal the URL input. */
@@ -138,19 +133,20 @@ export class FormattingMenu {
   protected submitLink(event: Event): void {
     const input = event.target as HTMLInputElement;
     const url = input.value.trim();
-    if (url) applyLink(this.editor(), url);
-    this.linkEditing.set(false);
+    if (!url || !applyLink(this.editor(), url)) return;
     this.dismiss();
   }
 
   // Collapsing the selection makes the plugin's shouldShow false (empty selection),
   // closing the menu while leaving the cursor where the user was working.
   private dismiss(): void {
+    this.linkEditing.set(false);
     const editor = this.editor();
     editor.commands.setTextSelection(editor.state.selection.to);
   }
 
   protected cancelLink(): void {
     this.linkEditing.set(false);
+    this.editor().commands.focus();
   }
 }

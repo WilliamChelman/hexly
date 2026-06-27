@@ -14,7 +14,7 @@ export interface FormatItem {
   labelKey: string;
   glyph: string;
   isActive: (editor: Editor) => boolean;
-  run: (editor: Editor) => void;
+  run: (editor: Editor) => boolean;
 }
 
 export const FORMAT_ITEMS: FormatItem[] = [
@@ -83,9 +83,8 @@ export const FORMAT_ITEMS: FormatItem[] = [
  */
 export const isLinkActive = (editor: Editor): boolean => editor.isActive('link');
 
-export const applyLink = (editor: Editor, href: string): void => {
+export const applyLink = (editor: Editor, href: string): boolean =>
   editor.chain().focus().setLink({ href }).run();
-};
 
 export const clearLink = (editor: Editor): void => {
   editor.chain().focus().unsetLink().run();

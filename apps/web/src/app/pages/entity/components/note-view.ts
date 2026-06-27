@@ -122,7 +122,7 @@ import { FormattingMenu } from './formatting-menu';
          text selection (it sets position/left/top and flips visibility on show). -->
     <app-formatting-menu
       [editor]="editor"
-      style="position: fixed; visibility: hidden"
+      class="fixed invisible"
     />
   `,
   styles: `
@@ -236,7 +236,6 @@ export class NoteView {
 
   private readonly slashMenu = viewChild(SlashMenu);
   private readonly formatMenuEl = viewChild(FormattingMenu, { read: ElementRef });
-  private bubbleRegistered = false;
 
   // slashCommands is UI chrome, not part of the persisted schema, so it lives here
   // rather than in CONTENT_EXTENSIONS (ADR-0019). The menu getter is deferred: render
@@ -262,8 +261,7 @@ export class NoteView {
     // part of the persisted schema (ADR-0019), so it lives here, not in CONTENT_EXTENSIONS.
     effect(() => {
       const host = this.formatMenuEl()?.nativeElement;
-      if (!host || this.bubbleRegistered) return;
-      this.bubbleRegistered = true;
+      if (!host) return;
       this.editor.registerPlugin(
         BubbleMenuPlugin({
           editor: this.editor,
@@ -284,10 +282,22 @@ export class NoteView {
       const snapshot = detail.document.content.snapshot;
       if (!isDocSnapshot(snapshot)) return;
       this.editor.commands.setContent(snapshot, { emitUpdate: false });
+      this.editor.unregisterPlugin('formattingBubbleMenu');
       const { state } = this.editor;
       this.editor.view.updateState(
         EditorState.create({ doc: state.doc, plugins: state.plugins }),
       );
+      const host = this.formatMenuEl()?.nativeElement;
+      if (host) {
+        this.editor.registerPlugin(
+          BubbleMenuPlugin({
+            editor: this.editor,
+            element: host,
+            pluginKey: 'formattingBubbleMenu',
+            updateDelay: 0,
+          }),
+        );
+      }
     });
 
     this.destroyRef.onDestroy(() => this.editor.destroy());
