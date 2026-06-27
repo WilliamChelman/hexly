@@ -95,7 +95,10 @@ import { HexMapStore } from '../services/hexmap-store';
             @for (e of filtered(); track e.id) {
               <button
                 type="button"
-                class="block w-full cursor-pointer rounded-sm px-2 py-1 text-left text-sm text-ink hover:bg-surface-sunken"
+                appButton
+                variant="ghost"
+                size="sm"
+                class="w-full justify-start!"
                 [attr.data-testid]="'entity-link-option-' + e.id"
                 (click)="pick(e.id)"
               >
