@@ -2267,4 +2267,33 @@ describe('HexMapStore shared right column', () => {
 
     expect(store.rightPanel()).toBe('regions');
   });
+
+  // The Map/Note view toggle (#75): a hexmap carries both a grid and a Content body,
+  // so the editor surface flips between them. Session-only view state like rightPanel —
+  // never part of the document, reset to the grid when a map opens.
+  it('opens to the Map view', () => {
+    const store = new HexMapStore();
+    expect(store.view()).toBe('map');
+  });
+
+  it('flips to the Note view and back via setView', () => {
+    const store = new HexMapStore();
+
+    store.setView('note');
+    expect(store.view()).toBe('note');
+
+    store.setView('map');
+    expect(store.view()).toBe('map');
+  });
+
+  it('does not reset the view when a map opens — the URL governs it (#75)', () => {
+    const store = new HexMapStore();
+    store.setView('note');
+
+    // load() is the document seam; the open view lives in the URL `view` param, which
+    // the session restores on (re)load, so opening a map must not clobber it here.
+    store.load(emptyHexMap());
+
+    expect(store.view()).toBe('note');
+  });
 });

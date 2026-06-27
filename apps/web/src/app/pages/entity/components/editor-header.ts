@@ -7,6 +7,7 @@ import {
   inject,
   viewChild,
 } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Button } from '../../../ui/button';
 import { Chip } from '../../../ui/chip';
@@ -15,6 +16,7 @@ import { Icon } from '../../../ui/icon/icon';
 import { PageHeader } from '../../../ui/page-header';
 import { EntityTags } from './entity-tags';
 import { EntitySession } from '../services/entity-session';
+import { HexMapStore, MapView } from '../services/hexmap-store';
 
 /**
  * The hex map editor's page-owned header (ADR-0022): it fills the shared
@@ -76,6 +78,33 @@ import { EntitySession } from '../services/entity-session';
         <app-entity-tags class="min-w-0 flex-1" />
       </div>
 
+      @if (hasMap()) {
+        <!--
+          Map/Note view toggle (#75): a hexmap carries both a grid and a Content body,
+          so this flips the editor surface between them. A segmented pair driven off
+          the store's view() — the shell renders whichever is pressed (ADR-0017's
+          aria-pressed pattern, as the Inspector membership toggle).
+        -->
+        <div
+          pageHeaderActions
+          role="group"
+          [attr.aria-label]="'editorShell.view.switchLabel' | transloco"
+          class="flex rounded-sm border border-line overflow-hidden"
+        >
+          @for (v of views; track v.id) {
+            <button
+              type="button"
+              class="bg-transparent text-ink-muted border-0 py-1 px-3 text-xs font-semibold cursor-pointer aria-[pressed=true]:text-ink aria-[pressed=true]:bg-gold-soft"
+              [attr.aria-pressed]="store.view() === v.id"
+              [attr.data-testid]="v.testid"
+              (click)="selectView(v.id)"
+            >
+              {{ v.labelKey | transloco }}
+            </button>
+          }
+        </div>
+      }
+
       <button
         type="button"
         pageHeaderActions
@@ -97,6 +126,20 @@ import { EntitySession } from '../services/entity-session';
 })
 export class EditorHeader {
   private readonly session = inject(EntitySession);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  /** Owns the Map/Note surface choice, shared with the {@link EditorShell} (#75). */
+  protected readonly store = inject(HexMapStore);
+
+  /** The view toggle's two segments, in display order; Map (the grid) is the default. */
+  protected readonly views: readonly {
+    id: MapView;
+    labelKey: string;
+    testid: string;
+  }[] = [
+    { id: 'map', labelKey: 'editorShell.view.map', testid: 'view-map' },
+    { id: 'note', labelKey: 'editorShell.view.note', testid: 'view-note' },
+  ];
 
   /** Whether a map is open — gates Save and rename so neither can run with none. */
   protected readonly hasMap = computed(() => this.session.current() !== null);
@@ -161,6 +204,22 @@ export class EditorHeader {
     }
     this.session.rename(name).subscribe({
       error: () => (el.textContent = this.title()),
+    });
+  }
+
+  /**
+   * Switch the editor surface (#75). Updates the store for instant feedback and
+   * mirrors the choice to the URL `view` param (`replaceUrl` — a view flip is not a
+   * navigation), so the session restores it on refresh. The default Map view drops
+   * the param to keep the URL clean.
+   */
+  protected selectView(view: MapView): void {
+    this.store.setView(view);
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { view: view === 'map' ? null : view },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
     });
   }
 

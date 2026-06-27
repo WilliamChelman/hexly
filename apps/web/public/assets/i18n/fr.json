@@ -77,6 +77,12 @@
     "reload": "Recharger",
     "saving": "Enregistrement…",
     "share": "Partager",
+    "view": {
+      "switchLabel": "Changer de vue",
+      "map": "Carte",
+      "note": "Note",
+      "editorLabel": "Notes de la carte"
+    },
     "save": {
       "conflict": "Version plus récente sur le serveur"
     },

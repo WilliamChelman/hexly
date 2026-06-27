@@ -4,6 +4,8 @@ import {
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { ActivatedRoute, convertToParamMap } from '@angular/router';
+import { of } from 'rxjs';
 import { CONTENT_FORMAT, coordKey, emptyContent, EntityDetail, HexMap } from '@hexly/domain';
 import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
 import { EntitySession } from './entity-session';
@@ -265,6 +267,39 @@ describe('EntitySession', () => {
     req.flush({ ...note, version: 4 });
   });
 
+  it('rides a hexmap’s edited Content alongside its grid on save (#75)', () => {
+    openAldermoor();
+    // Both surfaces edited: a hex painted on the grid and the Note view's prose.
+    editor.paintAt({ q: 5, r: 5 }, 'ocean');
+    const snapshot = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'The reach lies north.' }],
+        },
+      ],
+    };
+    session.setContent(snapshot);
+
+    session.save().subscribe();
+
+    const req = http.expectOne('/api/entities/m1');
+    expect(req.request.method).toBe('PUT');
+    // The body carries the edited grid AND the edited Content together — neither
+    // surface's edit is dropped by the other (ADR-0019).
+    expect(req.request.body).toEqual({
+      document: {
+        type: 'hexmap',
+        content: { format: CONTENT_FORMAT, snapshot },
+        ...editor.document(),
+      },
+      version: 3,
+      tags: [],
+    });
+    req.flush({ ...aldermoor, version: 4 });
+  });
+
   it('does not save or rename while a route load is in flight (mid-navigation)', () => {
     openAldermoor(); // current = m1, not loading
     editor.paintAt({ q: 5, r: 5 }, 'ocean');
@@ -283,6 +318,28 @@ describe('EntitySession', () => {
     http
       .expectOne('/api/entities/m2')
       .flush({ ...aldermoor, id: 'm2', document: bodyOf(forestAt00) });
+  });
+
+  it('restores the editor view from the ?view query param on load (#75)', () => {
+    // A refresh or shared link with ?view=note must land on the Note view. No id
+    // param → no fetch; only the view is restored from the URL.
+    session.watchRoute({
+      paramMap: of(convertToParamMap({})),
+      queryParamMap: of(convertToParamMap({ view: 'note' })),
+    } as unknown as ActivatedRoute);
+
+    expect(editor.view()).toBe('note');
+  });
+
+  it('opens on the Map view when the URL carries no view param (#75)', () => {
+    editor.setView('note'); // a stale view from a previously open Entity
+
+    session.watchRoute({
+      paramMap: of(convertToParamMap({})),
+      queryParamMap: of(convertToParamMap({})),
+    } as unknown as ActivatedRoute);
+
+    expect(editor.view()).toBe('map');
   });
 
   it('is a safe no-op with no entity open (no request, no throw)', () => {

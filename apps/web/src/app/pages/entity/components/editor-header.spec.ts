@@ -4,11 +4,12 @@ import {
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { emptyContent, EntityDetail } from '@hexly/domain';
 import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
 import { EntitySession } from '../services/entity-session';
+import { HexMapStore } from '../services/hexmap-store';
 import { EditorHeader } from './editor-header';
 
 describe('EditorHeader', () => {
@@ -225,5 +226,72 @@ describe('EditorHeader', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('[data-testid=conflict]')).toBeNull();
+  });
+
+  // The Map/Note view toggle (#75): a hexmap carries both a grid and a Content body,
+  // so the header offers a switch between the two editor surfaces.
+  it('offers a Map/Note view toggle, with Map active by default', () => {
+    openMap(aldermoor);
+    const fixture = TestBed.createComponent(EditorHeader);
+    fixture.detectChanges();
+
+    const map = fixture.nativeElement.querySelector(
+      '[data-testid=view-map]',
+    ) as HTMLButtonElement;
+    const note = fixture.nativeElement.querySelector(
+      '[data-testid=view-note]',
+    ) as HTMLButtonElement;
+    expect(map).not.toBeNull();
+    expect(note).not.toBeNull();
+    // Opens on the grid: Map reads as pressed, Note as not.
+    expect(map.getAttribute('aria-pressed')).toBe('true');
+    expect(note.getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('switches the editor surface to the Note view when Note is clicked', () => {
+    openMap(aldermoor);
+    const fixture = TestBed.createComponent(EditorHeader);
+    fixture.detectChanges();
+
+    (
+      fixture.nativeElement.querySelector('[data-testid=view-note]') as HTMLButtonElement
+    ).click();
+    fixture.detectChanges();
+
+    // The store is the single owner of the surface choice (shared with the shell).
+    expect(TestBed.inject(HexMapStore).view()).toBe('note');
+    expect(
+      (
+        fixture.nativeElement.querySelector('[data-testid=view-note]') as HTMLButtonElement
+      ).getAttribute('aria-pressed'),
+    ).toBe('true');
+  });
+
+  it('mirrors the chosen view to the URL so a refresh keeps it (#75)', () => {
+    openMap(aldermoor);
+    const fixture = TestBed.createComponent(EditorHeader);
+    fixture.detectChanges();
+
+    const nav = vi
+      .spyOn(TestBed.inject(Router), 'navigate')
+      .mockResolvedValue(true);
+
+    (
+      fixture.nativeElement.querySelector('[data-testid=view-note]') as HTMLButtonElement
+    ).click();
+    // Persisted as ?view=note (replaceUrl — a view flip is not a navigation).
+    expect(nav).toHaveBeenCalledWith(
+      [],
+      expect.objectContaining({ queryParams: { view: 'note' }, replaceUrl: true }),
+    );
+
+    (
+      fixture.nativeElement.querySelector('[data-testid=view-map]') as HTMLButtonElement
+    ).click();
+    // The default Map view drops the param to keep the URL clean.
+    expect(nav).toHaveBeenCalledWith(
+      [],
+      expect.objectContaining({ queryParams: { view: null }, replaceUrl: true }),
+    );
   });
 });

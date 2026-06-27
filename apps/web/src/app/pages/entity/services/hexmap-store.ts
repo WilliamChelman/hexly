@@ -61,6 +61,9 @@ export type FeatureSubtool = FeatureId | 'clear';
  */
 export type SelectSubtool = 'pick' | 'marquee';
 
+/** Which surface the hexmap editor shows: the hex grid or the Content body (#75). */
+export type MapView = 'map' | 'note';
+
 /** The Select tool's Subtools in palette/keyboard order — Pick first (the default). */
 export const selectSubtools: readonly SelectSubtool[] = ['pick', 'marquee'];
 
@@ -251,6 +254,16 @@ export class HexMapStore {
    */
   private readonly _rightPanel = signal<'inspector' | 'regions' | null>(null);
   readonly rightPanel = this._rightPanel.asReadonly();
+
+  /**
+   * Which surface the editor shows: the hex `'map'` (grid) or the `'note'` (the
+   * Content body), since a hexmap carries both (#75). Never part of the `HexMap`
+   * document, never undone or saved — but, unlike {@link rightPanel}, it is mirrored
+   * to the URL `view` param so a refresh or shared link keeps the open view; the
+   * session drives it from the route, so {@link load} does not reset it.
+   */
+  private readonly _view = signal<MapView>('map');
+  readonly view = this._view.asReadonly();
 
   /**
    * The remembered Select Subtool — `pick` (click/cycle/move) or `marquee`
@@ -543,6 +556,13 @@ export class HexMapStore {
     // A reopened map shows a clear right side: the panel resets closed, not the
     // previous session's list view nor an empty Inspector (ADR-0013, issue #39).
     this._rightPanel.set(null);
+    // The Map/Note surface is NOT reset here: it lives in the URL `view` param (#75),
+    // which the session restores on every (re)load, so a refresh keeps the open view.
+  }
+
+  /** Switch the editor surface between the hex grid and the Content body (#75). */
+  setView(view: MapView): void {
+    this._view.set(view);
   }
 
   /** Restore the cold-start Subtool memory shared by a fresh store and a reload. */

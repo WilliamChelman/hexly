@@ -5,9 +5,11 @@ import {
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
+import { CONTENT_FORMAT, EntityDetail } from '@hexly/domain';
 import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
 import { EditorShell } from './editor-shell';
 import { EntitySession } from '../services/entity-session';
+import { HexMapStore } from '../services/hexmap-store';
 
 // EditorShell is a pure view: EntityPage loads the routed Entity into the
 // EntitySession and the session owns the tab title (see entity.page.spec /
@@ -74,6 +76,68 @@ describe('EditorShell', () => {
     expect(el.querySelector('app-editor-rail')).not.toBeNull();
     expect(el.querySelector('app-inspector')).toBeNull();
     expect(el.querySelector('app-regions-panel')).toBeNull();
+  });
+
+  // A hexmap whose stored Content carries prose, to prove the Note view seeds it (#75).
+  const hexmapWithProse = (text: string): EntityDetail => ({
+    id: 'm1',
+    ownerId: 'u1',
+    name: 'The Reach of Aldermoor',
+    type: 'hexmap',
+    tags: [],
+    visibility: 'private',
+    version: 1,
+    createdAt: 1,
+    updatedAt: 1,
+    document: {
+      type: 'hexmap',
+      content: {
+        format: CONTENT_FORMAT,
+        snapshot: {
+          type: 'doc',
+          content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
+        },
+      },
+      hexes: {},
+      regions: [],
+      labels: [],
+    },
+  });
+
+  /** Flush the status bar's health probe so afterEach's verify() is satisfied. */
+  function flushHealth() {
+    httpMock.expectOne('/api/health').flush({ status: 'ok', service: 'api' });
+  }
+
+  it('shows the hex canvas in the Map view, not the Content editor', () => {
+    TestBed.inject(EntitySession).adopt(hexmapWithProse('The reach lies north.'));
+
+    const fixture = TestBed.createComponent(EditorShell);
+    fixture.detectChanges();
+    flushHealth();
+
+    const el = fixture.nativeElement as HTMLElement;
+    // Default Map view: the grid is up and the prose surface is not.
+    expect(el.querySelector('app-map-canvas')).not.toBeNull();
+    expect(el.querySelector('app-content-editor')).toBeNull();
+  });
+
+  it('swaps the canvas for the Content editor in the Note view, seeded with the map’s prose', () => {
+    TestBed.inject(EntitySession).adopt(hexmapWithProse('The reach lies north.'));
+    // adopt() opens on the grid; the user flips to the Note view.
+    TestBed.inject(HexMapStore).setView('note');
+
+    const fixture = TestBed.createComponent(EditorShell);
+    fixture.detectChanges();
+    flushHealth();
+
+    const el = fixture.nativeElement as HTMLElement;
+    // Note view: the Content editor takes the body and the canvas is gone.
+    expect(el.querySelector('app-content-editor')).not.toBeNull();
+    expect(el.querySelector('app-map-canvas')).toBeNull();
+    // …and it carries the hexmap's stored Content, not an empty doc.
+    const surface = el.querySelector('[data-testid=note-content]') as HTMLElement;
+    expect(surface.textContent).toContain('The reach lies north.');
   });
 
   it('opens the Regions panel from the closed default via the rail', () => {

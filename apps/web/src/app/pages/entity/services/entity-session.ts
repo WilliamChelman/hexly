@@ -24,7 +24,7 @@ import {
 import { EntitiesClient } from '../../../core/services/entities.client';
 import { TitleService } from '../../../core/i18n/title.service';
 import { AppShellStore } from '../../../shell/app-shell.store';
-import { HexMapStore } from './hexmap-store';
+import { HexMapStore, MapView } from './hexmap-store';
 
 /**
  * Bridges {@link EntitiesClient} and {@link HexMapStore} for `/entities/:id`:
@@ -61,6 +61,13 @@ export class EntitySession {
    * Held here (not in {@link HexMapStore}) because Content spans every Entity type.
    */
   private readonly _content = signal<Content | null>(null);
+  /**
+   * The live Content, for an editor to seed from on (re)mount. Unlike {@link seed},
+   * this carries edits made since load — a clean save advances it but not the seed —
+   * so an editor recreated mid-session (e.g. the hexmap Map↔Note toggle, #75) restores
+   * the latest prose rather than the originally-loaded snapshot.
+   */
+  readonly content = this._content.asReadonly();
 
   /**
    * Live Tags (#72), seeded on load and edited by the tags UI. Like Content, they
@@ -108,6 +115,15 @@ export class EntitySession {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe();
+
+    // The editor surface lives in the URL (#75), so a refresh or a shared link lands
+    // on the same view, and opening another Entity (no `view` param) resets to the grid.
+    route.queryParamMap
+      .pipe(
+        map((q): MapView => (q.get('view') === 'note' ? 'note' : 'map')),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((view) => this.editor.setView(view));
   }
 
   open(id: string): Observable<EntityDetail> {

@@ -57,7 +57,10 @@ describe('EntityPage', () => {
         provideHttpClientTesting(),
         {
           provide: ActivatedRoute,
-          useValue: { paramMap: of(convertToParamMap({ id })) },
+          useValue: {
+            paramMap: of(convertToParamMap({ id })),
+            queryParamMap: of(convertToParamMap({})),
+          },
         },
       ],
     })
