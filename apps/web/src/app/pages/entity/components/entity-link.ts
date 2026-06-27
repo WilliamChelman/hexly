@@ -1,10 +1,13 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   effect,
   inject,
   signal,
+  untracked,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntitySummary, EntityType } from '@hexly/domain';
@@ -155,6 +158,7 @@ export class EntityLink {
   protected readonly store = inject(HexMapStore);
   private readonly entitiesClient = inject(EntitiesClient);
   private readonly transloco = inject(TranslocoService);
+  private readonly destroyRef = inject(DestroyRef);
 
   /** The picker's options for the current query — a server-side search (ADR-0025). */
   protected readonly options = signal<EntitySummary[]>([]);
@@ -187,15 +191,18 @@ export class EntityLink {
         this.resolved.set(true);
         return;
       }
-      const local = this.created().find((e) => e.id === id);
+      const local = untracked(() => this.created().find((e) => e.id === id));
       if (local) {
         this.linked.set(local);
         this.resolved.set(true);
         return;
       }
-      const sub = this.entitiesClient.list({ ids: [id] }).subscribe((page) => {
-        this.linked.set(page.items[0] ?? null);
-        this.resolved.set(true);
+      const sub = this.entitiesClient.list({ ids: [id] }).subscribe({
+        next: (page) => {
+          this.linked.set(page.items[0] ?? null);
+          this.resolved.set(true);
+        },
+        error: () => this.resolved.set(true),
       });
       onCleanup(() => sub.unsubscribe());
     });
@@ -206,9 +213,11 @@ export class EntityLink {
     effect((onCleanup) => {
       if (!this.open()) return;
       const q = this.query().trim();
-      const sub = this.entitiesClient
-        .list({ q })
-        .subscribe((page) => this.options.set(page.items));
+      this.options.set([]);
+      const sub = this.entitiesClient.list({ q }).subscribe({
+        next: (page) => this.options.set(page.items),
+        error: () => {},
+      });
       onCleanup(() => sub.unsubscribe());
     });
 
@@ -245,13 +254,16 @@ export class EntityLink {
     const name =
       this.query().trim() ||
       this.transloco.translate(type === 'hexmap' ? 'domain.untitledMap' : 'domain.untitledNote');
-    this.entitiesClient.create(name, type).subscribe((entity) => {
-      // Remember it locally so its name resolves without a server round trip,
-      // then link — the resolve effect picks it up from `created`.
-      this.created.update((list) => [...list, entity]);
-      this.store.linkEntity(entity.id);
-      this.open.set(false);
-    });
+    this.entitiesClient
+      .create(name, type)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((entity) => {
+        // Remember it locally so its name resolves without a server round trip,
+        // then link — the resolve effect picks it up from `created`.
+        this.created.update((list) => [...list, entity]);
+        this.store.linkEntity(entity.id);
+        this.open.set(false);
+      });
   }
 
   protected remove(): void {

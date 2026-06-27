@@ -29,7 +29,7 @@ export class EntitiesClient {
     let params = new HttpParams();
     // `ids` repeats the param once per id; the others are single-valued.
     for (const id of opts.ids ?? []) params = params.append('ids', id);
-    if (opts.q !== undefined) params = params.set('q', opts.q);
+    if (opts.q) params = params.set('q', opts.q);
     if (opts.type) params = params.set('type', opts.type);
     if (opts.cursor) params = params.set('cursor', opts.cursor);
     if (opts.limit !== undefined) params = params.set('limit', opts.limit);

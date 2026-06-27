@@ -14,7 +14,7 @@ import {
   tagsSchema,
   visibilitySchema,
 } from '@hexly/domain';
-import { and, asc, desc, eq, inArray, like } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
 import { entities } from '../db/schema';
 
@@ -215,9 +215,10 @@ function filters(opts: ListOptions) {
   const predicates = [];
   // An empty id set selects nothing (inArray([]) is always-false), not everything.
   if (opts.ids) predicates.push(inArray(entities.id, [...opts.ids]));
-  // ponytail: LIKE wildcards in `q` aren't escaped — a stray % just widens the
-  // (parameterized, injection-safe) match. Escape with an ESCAPE clause if it bites.
-  if (opts.q) predicates.push(like(entities.name, `%${opts.q}%`));
+  if (opts.q) {
+    const escaped = opts.q.replace(/[%_\\]/g, '\\$&');
+    predicates.push(sql`${entities.name} LIKE ${'%' + escaped + '%'} ESCAPE '\\'`);
+  }
   if (opts.type) predicates.push(eq(entities.type, opts.type));
   return predicates;
 }

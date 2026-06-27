@@ -231,7 +231,7 @@ export class EntityBrowser implements OnInit {
 
   ngOnInit(): void {
     // Set `loaded` on error too: a failed fetch must show the error panel, not a blank page.
-    this.maps$.list().pipe(this.shell.withLoading('subtle')).subscribe({
+    this.maps$.list({ limit: 200 }).pipe(this.shell.withLoading('subtle')).subscribe({
       // Read the page envelope's items (ADR-0025). At small scale the whole list
       // fits one page; load-more is a later slice (until import lands it never pages).
       next: (page) => {

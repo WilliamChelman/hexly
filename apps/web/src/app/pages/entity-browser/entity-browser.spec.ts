@@ -56,7 +56,7 @@ describe('EntityBrowser', () => {
   function renderWith(entities: EntitySummary[]) {
     const fixture = TestBed.createComponent(EntityBrowser);
     fixture.detectChanges(); // ngOnInit -> GET /entities
-    http.expectOne('/api/entities').flush({ items: entities, nextCursor: null });
+    http.expectOne((r) => r.url === '/api/entities').flush({ items: entities, nextCursor: null });
     fixture.detectChanges();
     return fixture;
   }
@@ -239,7 +239,7 @@ describe('EntityBrowser', () => {
     const fixture = TestBed.createComponent(EntityBrowser);
     fixture.detectChanges(); // ngOnInit -> GET /entities
     http
-      .expectOne('/api/entities')
+      .expectOne((r) => r.url === '/api/entities')
       .flush(null, { status: 500, statusText: 'Server Error' });
     TestBed.inject(TranslocoService).setActiveLang('fr');
     fixture.detectChanges();
@@ -257,7 +257,7 @@ describe('EntityBrowser', () => {
     const fixture = TestBed.createComponent(EntityBrowser);
     fixture.detectChanges(); // ngOnInit -> GET /entities
     http
-      .expectOne('/api/entities')
+      .expectOne((r) => r.url === '/api/entities')
       .flush(null, { status: 500, statusText: 'Server Error' });
     fixture.detectChanges();
 
