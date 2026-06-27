@@ -21,8 +21,12 @@ A free-text label on an Entity, for flavour and informal grouping (e.g. "deity",
 _Avoid_: Keyword, category, label
 
 **Entity Link**:
-An optional reference from a Map element (Hex, Feature, or Region — not a Label) to an Entity by id: e.g. a settlement Feature pointing at the town's `note`, or at another `hexmap`. A link to a missing or inaccessible Entity renders non-navigable rather than erroring; ids are not referentially enforced.
+An optional reference to an Entity by id, from either a Map element (a Hex, Feature, or Region — not a Label, set via the Inspector) or inline within another Entity's Content (prose, inserted via `@` or the link picker): e.g. a settlement Feature pointing at the town's `note`, or a sentence in one note linking to another `hexmap`. A link to a missing or inaccessible Entity renders non-navigable — a Content link shows its last-known name as a dangling label — rather than erroring; ids are not referentially enforced. A Content link may carry an optional Link Descriptor.
 _Avoid_: Reference, relation, backlink
+
+**Link Descriptor**:
+An optional free-text label on a Content Entity Link, characterising the relationship it expresses (e.g. "spouse", "rival", "capital of"). Like a Tag, but on a link rather than an Entity: carries no behaviour, one per link. A one-way annotation — it does not imply a reciprocal link on the target.
+_Avoid_: Relationship, relation, role, type
 
 **Map element**:
 A placed thing *within* a Hex Map — a Hex, Feature, Region, or Label — that can be selected and moved, and (except a Label) can carry an Entity Link. The in-map counterpart to a top-level Entity. (Formerly called "entity" informally; renamed to free that word for the top-level type.)
