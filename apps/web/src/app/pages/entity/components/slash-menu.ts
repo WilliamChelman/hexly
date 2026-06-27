@@ -26,7 +26,7 @@ export interface SlashMenuProps {
         data-testid="slash-menu"
         [attr.aria-label]="'noteView.slashMenu.label' | transloco"
         [attr.aria-activedescendant]="activeItemId()"
-        class="fixed z-50 max-h-72 w-56 overflow-auto rounded-md border border-line bg-surface py-1 shadow-lg"
+        class="fixed z-50 max-h-72 w-56 overflow-auto rounded-md border border-line bg-surface py-1 shadow-2"
         [style.left.px]="position()!.x"
         [style.top.px]="position()!.y"
       >

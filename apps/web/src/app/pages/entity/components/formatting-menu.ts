@@ -1,10 +1,12 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
   computed,
   effect,
   input,
   signal,
+  viewChild,
 } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Editor } from '@tiptap/core';
@@ -28,11 +30,12 @@ import {
   selector: 'app-formatting-menu',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [TranslocoPipe, Button],
+  host: { class: 'fixed invisible' },
   template: `
     <div
       role="toolbar"
       [attr.aria-label]="'noteView.formatMenu.label' | transloco"
-      class="flex items-center gap-[2px] rounded-md border border-line bg-surface p-1 shadow-lg"
+      class="flex items-center gap-[2px] rounded-md border border-line bg-surface p-1 shadow-2"
     >
       @for (item of items; track item.id) {
         <button
@@ -69,6 +72,7 @@ import {
 
       @if (linkEditing()) {
         <input
+          #urlInput
           type="url"
           [attr.aria-label]="'noteView.formatMenu.linkPlaceholder' | transloco"
           [attr.placeholder]="'noteView.formatMenu.linkPlaceholder' | transloco"
@@ -85,28 +89,41 @@ export class FormattingMenu {
 
   protected readonly items = FORMAT_ITEMS;
   protected readonly linkEditing = signal(false);
+  private readonly urlInput = viewChild<ElementRef<HTMLInputElement>>('urlInput');
 
   // The editor mutates outside Angular; `tick` bumps on every transaction so the
-  // active-state computeds re-read the selection and the toolbar highlights track it.
+  // active-state computed re-reads the selection and the toolbar highlights track it.
   private readonly tick = signal(0);
 
-  protected readonly activeIds = computed(() => {
+  // Single reactive read for both derived values; one subscriber per signal.
+  private readonly _menuState = computed(() => {
     this.tick();
     const editor = this.editor();
-    return new Set(FORMAT_ITEMS.filter((i) => i.isActive(editor)).map((i) => i.id));
+    return {
+      ids: new Set(FORMAT_ITEMS.filter((i) => i.isActive(editor)).map((i) => i.id)),
+      link: isLinkActive(editor),
+    };
   });
 
-  protected readonly linkActive = computed(() => {
-    this.tick();
-    return isLinkActive(this.editor());
-  });
+  protected readonly activeIds = computed(() => this._menuState().ids);
+  protected readonly linkActive = computed(() => this._menuState().link);
 
   constructor() {
     effect((onCleanup) => {
       const editor = this.editor();
+      // Editor swap (conflict-reload) must reset the URL input — stale linkEditing
+      // state would make the input reappear on the next selection without user action.
+      this.linkEditing.set(false);
       const bump = () => this.tick.update((t) => t + 1);
       editor.on('transaction', bump);
       onCleanup(() => editor.off('transaction', bump));
+    });
+
+    // Focus the URL input when it is rendered; buttons use preventDefault on mousedown
+    // so focus stays in ProseMirror and won't reach the input naturally.
+    effect(() => {
+      if (!this.linkEditing()) return;
+      this.urlInput()?.nativeElement.focus();
     });
   }
 
@@ -135,10 +152,11 @@ export class FormattingMenu {
 
   // Collapsing the selection makes the plugin's shouldShow false (empty selection),
   // closing the menu while leaving the cursor where the user was working.
+  // Use head (the active end) so right-to-left selections land at the correct side.
   private dismiss(): void {
     this.linkEditing.set(false);
     const editor = this.editor();
-    editor.commands.setTextSelection(editor.state.selection.to);
+    editor.commands.setTextSelection(editor.state.selection.head);
   }
 
   protected cancelLink(): void {

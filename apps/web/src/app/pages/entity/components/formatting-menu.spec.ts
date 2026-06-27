@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { Editor } from '@tiptap/core';
+import { TextSelection } from '@tiptap/pm/state';
 import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
 import { CONTENT_EXTENSIONS } from './content-extensions';
 import { FormattingMenu } from './formatting-menu';
@@ -103,5 +104,47 @@ describe('FormattingMenu', () => {
 
     const marks = editor.getJSON().content?.[0]?.content?.[0]?.marks ?? [];
     expect(marks.map((m) => m.type)).not.toContain('link');
+  });
+
+  it('moves focus to the URL input after the link button is clicked', () => {
+    const { fixture, el } = mount();
+
+    button(el, 'Link').click();
+    fixture.detectChanges();
+
+    const input = el.querySelector('input[type=url]') as HTMLInputElement;
+    expect(document.activeElement).toBe(input);
+  });
+
+  it('collapses to the head position on dismiss, respecting right-to-left selection direction', () => {
+    const { fixture, editor, el } = mount();
+
+    // Create a backwards selection: anchor=10 (end), head=1 (start).
+    // selection.to === 10, selection.head === 1.
+    editor.view.dispatch(
+      editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 10, 1)),
+    );
+    fixture.detectChanges();
+
+    button(el, 'Bold').click();
+    fixture.detectChanges();
+
+    // Should collapse to head (1), not to (10).
+    expect(editor.state.selection.head).toBe(1);
+  });
+
+  it('resets the URL input when the editor instance is swapped', () => {
+    const { fixture, el } = mount();
+
+    button(el, 'Link').click();
+    fixture.detectChanges();
+    expect(el.querySelector('input[type=url]')).not.toBeNull();
+
+    const newEditor = new Editor({ extensions: CONTENT_EXTENSIONS });
+    fixture.componentRef.setInput('editor', newEditor);
+    fixture.detectChanges();
+
+    expect(el.querySelector('input[type=url]')).toBeNull();
+    newEditor.destroy();
   });
 });

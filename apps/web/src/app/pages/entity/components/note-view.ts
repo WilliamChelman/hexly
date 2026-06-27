@@ -123,7 +123,6 @@ import { BubbleMenuDirective } from './bubble-menu.directive';
     <app-formatting-menu
       appBubbleMenu
       [editor]="editor()"
-      class="fixed invisible"
     />
   `,
   styles: `
@@ -160,6 +159,22 @@ import { BubbleMenuDirective } from './bubble-menu.directive';
       font-size: 1.15em;
       font-weight: 600;
       margin: 0.8em 0 0.3em;
+    }
+    :host ::ng-deep .ProseMirror h4 {
+      font-size: 1em;
+      font-weight: 600;
+      margin: 0.8em 0 0.3em;
+    }
+    :host ::ng-deep .ProseMirror h5 {
+      font-size: 0.9em;
+      font-weight: 600;
+      margin: 0.75em 0 0.25em;
+    }
+    :host ::ng-deep .ProseMirror h6 {
+      font-size: 0.85em;
+      font-weight: 600;
+      margin: 0.75em 0 0.25em;
+      color: var(--color-ink-muted);
     }
     :host ::ng-deep .ProseMirror ul,
     :host ::ng-deep .ProseMirror ol {
