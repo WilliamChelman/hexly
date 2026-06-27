@@ -53,7 +53,7 @@ export const FORMAT_ITEMS: FormatItem[] = [
     isActive: (editor) => editor.isActive('code'),
     run: (editor) => editor.chain().focus().toggleCode().run(),
   },
-  ...([1, 2, 3] as const).map((level) => ({
+  ...([1, 2, 3, 4, 5, 6] as const).map((level) => ({
     id: `heading${level}`,
     labelKey: `noteView.formatMenu.heading${level}`,
     glyph: `H${level}`,
