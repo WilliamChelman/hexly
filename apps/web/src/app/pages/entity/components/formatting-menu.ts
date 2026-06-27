@@ -31,7 +31,6 @@ import {
   template: `
     <div
       role="toolbar"
-      data-testid="format-menu"
       [attr.aria-label]="'noteView.formatMenu.label' | transloco"
       class="flex items-center gap-[2px] rounded-md border border-line bg-surface p-1 shadow-lg"
     >
@@ -42,7 +41,6 @@ import {
           size="sm"
           icon
           type="button"
-          [attr.data-testid]="'format-item-' + item.id"
           [attr.aria-label]="item.labelKey | transloco"
           [attr.title]="item.labelKey | transloco"
           [active]="activeIds().has(item.id)"
@@ -59,7 +57,6 @@ import {
         variant="ghost"
         size="sm"
         type="button"
-        data-testid="format-item-link"
         [attr.aria-label]="'noteView.formatMenu.link' | transloco"
         [attr.title]="'noteView.formatMenu.link' | transloco"
         [active]="linkActive()"
@@ -73,7 +70,6 @@ import {
       @if (linkEditing()) {
         <input
           type="url"
-          data-testid="format-link-input"
           [attr.aria-label]="'noteView.formatMenu.linkPlaceholder' | transloco"
           [attr.placeholder]="'noteView.formatMenu.linkPlaceholder' | transloco"
           class="ml-1 w-44 rounded-sm border border-line bg-surface-sunken px-2 py-1 text-sm text-ink"

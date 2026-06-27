@@ -2,18 +2,17 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
-  ElementRef,
   computed,
   effect,
   inject,
+  signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { translateSignal, TranslocoPipe } from '@jsverse/transloco';
 import { Editor, JSONContent } from '@tiptap/core';
-import { EditorState } from '@tiptap/pm/state';
-import { BubbleMenuPlugin } from '@tiptap/extension-bubble-menu';
-import { TiptapEditorDirective } from 'ngx-tiptap';
+import { TiptapDirective } from './tiptap.directive';
 import { EntitySession } from '../services/entity-session';
 import { Button } from '../../../ui/button';
 import { Chip } from '../../../ui/chip';
@@ -24,6 +23,7 @@ import { CONTENT_EXTENSIONS } from './content-extensions';
 import { SlashMenu } from './slash-menu';
 import { slashCommands } from './slash-commands';
 import { FormattingMenu } from './formatting-menu';
+import { BubbleMenuDirective } from './bubble-menu.directive';
 
 /**
  * The view a `note` Entity opens into, parallel to {@link EditorShell} for a `hexmap`.
@@ -36,7 +36,6 @@ import { FormattingMenu } from './formatting-menu';
   imports: [
     RouterLink,
     TranslocoPipe,
-    TiptapEditorDirective,
     Button,
     Chip,
     Eyebrow,
@@ -44,6 +43,8 @@ import { FormattingMenu } from './formatting-menu';
     EntityTags,
     SlashMenu,
     FormattingMenu,
+    BubbleMenuDirective,
+    TiptapDirective,
   ],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
@@ -109,8 +110,7 @@ import { FormattingMenu } from './formatting-menu';
         the box focuses the editor — without that, the empty area below prose swallows clicks.
       -->
       <div
-        tiptap
-        [editor]="editor"
+        [appTiptap]="editor()"
         data-testid="note-content"
         class="mt-5 flex min-h-[24rem] flex-col rounded-md border border-line bg-surface px-5 py-3 text-ink cursor-text focus-within:border-gold"
       ></div>
@@ -121,7 +121,8 @@ import { FormattingMenu } from './formatting-menu';
     <!-- Out of flow + hidden until the bubble-menu plugin positions it over a
          text selection (it sets position/left/top and flips visibility on show). -->
     <app-formatting-menu
-      [editor]="editor"
+      appBubbleMenu
+      [editor]="editor()"
       class="fixed invisible"
     />
   `,
@@ -235,72 +236,56 @@ export class NoteView {
   protected readonly error = this.session.error;
 
   private readonly slashMenu = viewChild(SlashMenu);
-  private readonly formatMenuEl = viewChild(FormattingMenu, { read: ElementRef });
 
-  // slashCommands is UI chrome, not part of the persisted schema, so it lives here
-  // rather than in CONTENT_EXTENSIONS (ADR-0019). The menu getter is deferred: render
-  // only fires on a real "/" keystroke, long after the viewChild has resolved.
-  protected readonly editor = new Editor({
-    extensions: [...CONTENT_EXTENSIONS, slashCommands(() => this.slashMenu())],
-  });
+  // Recreated on every seed (load/swap/conflict-reload) rather than surgically reset:
+  // a fresh Editor has empty undo history for free, so Ctrl-Z can't reach past the seed,
+  // and TiptapDirective / BubbleMenuDirective re-bind to the new instance through their
+  // signal inputs — no manual plugin re-registration. Starts empty; the first seed swaps
+  // in the stored snapshot.
+  protected readonly editor = signal(this.createEditor());
 
   constructor() {
     // Tab title is owned by EntitySession (shared with the map editor), not here.
 
+    // Stream edits to the session; re-attach when the editor instance swaps (the old
+    // one's listener dies with it on destroy()).
+    effect((onCleanup) => {
+      const editor = this.editor();
+      const push = ({ editor }: { editor: Editor }) =>
+        this.session.setContent(editor.getJSON());
+      editor.on('update', push);
+      onCleanup(() => editor.off('update', push));
+    });
+
     // Label .ProseMirror (not the wrapper) — TipTap already sets role="textbox" on it.
+    // Re-runs on language change and on editor swap.
     effect(() => {
-      this.editor.view.dom.setAttribute('aria-label', this.editorLabel());
-    });
-
-    this.editor.on('update', ({ editor }) => {
-      this.session.setContent(editor.getJSON());
-    });
-
-    // Register the formatting bubble menu once its host element exists — the
-    // viewChild resolves after the editor field is constructed. Chrome only, not
-    // part of the persisted schema (ADR-0019), so it lives here, not in CONTENT_EXTENSIONS.
-    effect(() => {
-      const host = this.formatMenuEl()?.nativeElement;
-      if (!host) return;
-      this.editor.registerPlugin(
-        BubbleMenuPlugin({
-          editor: this.editor,
-          element: host,
-          pluginKey: 'formattingBubbleMenu',
-          // Default is 250ms, which makes the menu lag behind the selection and
-          // linger after an action; show/hide it in step with the selection.
-          updateDelay: 0,
-        }),
-      );
+      this.editor().view.dom.setAttribute('aria-label', this.editorLabel());
     });
 
     // Seed on load/swap/conflict-reload (not on clean saves — in-flight keystrokes must survive).
-    // Recreate editor state so Ctrl-Z can't undo past the seed point.
     effect(() => {
       const detail = this.session.seed();
       if (!detail || detail.document.type !== 'note') return;
       const snapshot = detail.document.content.snapshot;
       if (!isDocSnapshot(snapshot)) return;
-      this.editor.commands.setContent(snapshot, { emitUpdate: false });
-      this.editor.unregisterPlugin('formattingBubbleMenu');
-      const { state } = this.editor;
-      this.editor.view.updateState(
-        EditorState.create({ doc: state.doc, plugins: state.plugins }),
-      );
-      const host = this.formatMenuEl()?.nativeElement;
-      if (host) {
-        this.editor.registerPlugin(
-          BubbleMenuPlugin({
-            editor: this.editor,
-            element: host,
-            pluginKey: 'formattingBubbleMenu',
-            updateDelay: 0,
-          }),
-        );
-      }
+      // untracked: this effect reacts to seed(), not to its own editor swap.
+      const previous = untracked(this.editor);
+      this.editor.set(this.createEditor(snapshot));
+      previous.destroy();
     });
 
-    this.destroyRef.onDestroy(() => this.editor.destroy());
+    this.destroyRef.onDestroy(() => this.editor().destroy());
+  }
+
+  // slashCommands is UI chrome, not part of the persisted schema, so it lives here
+  // rather than in CONTENT_EXTENSIONS (ADR-0019). The menu getter is deferred: render
+  // only fires on a real "/" keystroke, long after the viewChild has resolved.
+  private createEditor(content?: JSONContent): Editor {
+    return new Editor({
+      extensions: [...CONTENT_EXTENSIONS, slashCommands(() => this.slashMenu())],
+      content,
+    });
   }
 
   protected save(): void {
