@@ -145,7 +145,7 @@ describe('EntitySession', () => {
 
     expect(outcome).toEqual({ status: 'conflict', current: serverCurrent });
     expect(session.conflict()).toEqual(serverCurrent);
-    // The in-progress edit is not lost — it stays in the editor for the re-pull.
+    // In-progress edit survives in the editor for the re-pull.
     expect(editor.document()).toEqual(edited);
   });
 
@@ -186,9 +186,8 @@ describe('EntitySession', () => {
   it('re-fetches on openRoute even when the same entity is already open', () => {
     openAldermoor();
 
-    // Re-entering the route (e.g. reopened from the library after an in-library
-    // rename) must fetch the server's current Entity, not trust a retained
-    // `current` — the route-scoped session can outlive a trip to the library (#70).
+    // Re-entering the route must re-fetch, not trust a retained `current`: the
+    // route-scoped session outlives a trip to the library (e.g. in-library rename) (#70).
     let opened: EntityDetail | undefined;
     session.openRoute('m1').subscribe((m) => (opened = m));
 
@@ -203,7 +202,7 @@ describe('EntitySession', () => {
     editor.paintAt({ q: 5, r: 5 }, 'ocean');
 
     session.openRoute('m2').subscribe();
-    // The previous map's canvas is cleared to empty while the load is in flight.
+    // Previous canvas cleared while the load is in flight.
     expect(editor.document()).toEqual({ hexes: {}, regions: [], labels: [] });
 
     const other: EntityDetail = { ...aldermoor, id: 'm2', document: bodyOf(forestAt00) };
@@ -212,8 +211,8 @@ describe('EntitySession', () => {
   });
 
   it('saves a non-hexmap entity without coercing it into a hexmap (no data loss)', () => {
-    // A note opened through this seam must save back as a note — the editor's
-    // empty grid must not overwrite it with a blank hexmap body.
+    // A note must save back as a note; the editor's empty grid must not
+    // overwrite it with a blank hexmap body.
     const noteBody = { type: 'note' as const, content };
     const note: EntityDetail = {
       ...aldermoor,
@@ -286,8 +285,7 @@ describe('EntitySession', () => {
 
     const req = http.expectOne('/api/entities/m1');
     expect(req.request.method).toBe('PUT');
-    // The body carries the edited grid AND the edited Content together — neither
-    // surface's edit is dropped by the other (ADR-0019).
+    // Body carries both edits; neither surface drops the other's (ADR-0019).
     expect(req.request.body).toEqual({
       document: {
         type: 'hexmap',
@@ -307,8 +305,8 @@ describe('EntitySession', () => {
     // load in flight for m2, current still m1
     session.openRoute('m2').subscribe();
 
-    // A late Save/rename from the outgoing header is inert — neither writes to
-    // the m1 the user navigated away from (#4, #70).
+    // A late Save/rename from the outgoing header must not write to the m1 the
+    // user navigated away from (#4, #70).
     session.save().subscribe();
     session.rename('Nope').subscribe();
     http.expectNone('/api/entities/m1');
@@ -321,8 +319,7 @@ describe('EntitySession', () => {
   });
 
   it('restores the editor view from the ?view query param on load (#75)', () => {
-    // A refresh or shared link with ?view=note must land on the Note view. No id
-    // param → no fetch; only the view is restored from the URL.
+    // A shared link with ?view=note lands on the Note view. No id param → no fetch.
     session.watchRoute({
       paramMap: of(convertToParamMap({})),
       queryParamMap: of(convertToParamMap({ view: 'note' })),
@@ -343,8 +340,8 @@ describe('EntitySession', () => {
   });
 
   it('is a safe no-op with no entity open (no request, no throw)', () => {
-    // Save/rename/reload before any entity is opened must not hit the server or
-    // throw out of a handler-less subscribe.
+    // Save/rename/reload before any open must not hit the server or throw out
+    // of a handler-less subscribe.
     expect(() => session.save().subscribe()).not.toThrow();
     expect(() => session.rename('whatever').subscribe()).not.toThrow();
     expect(() => session.reload().subscribe()).not.toThrow();

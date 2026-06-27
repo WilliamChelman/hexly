@@ -20,11 +20,11 @@ import { BubbleMenuDirective } from './bubble-menu.directive';
 
 /**
  * The Content editing surface every Entity shares (ADR-0019): mounts TipTap,
- * seeds from the open Entity's stored snapshot, and streams edits back into the
- * session's live Content via `getJSON()` — never parsing the snapshot, just
- * carrying it from load to save. {@link NoteView} wraps it in a note's page
- * chrome; the hex map editor mounts it as the Note view of a `hexmap`. The host
- * is the framed editor box; callers add only outer placement (margin/width).
+ * seeds from the Entity's stored snapshot, streams edits back to the session's
+ * live Content via `getJSON()` — carrying the snapshot load-to-save, never
+ * parsing it. {@link NoteView} wraps it in note chrome; the hex map editor
+ * mounts it as a `hexmap`'s Note view. Host is the framed box; callers add only
+ * outer placement.
  */
 @Component({
   selector: 'app-content-editor',
@@ -35,23 +35,20 @@ import { BubbleMenuDirective } from './bubble-menu.directive';
       'flex min-h-[24rem] flex-col rounded-md border border-line bg-surface px-5 py-3 text-ink cursor-text focus-within:border-gold',
   },
   template: `
-    <!--
-      flex column + ProseMirror fills it (scoped CSS below) so a click anywhere in
-      the box focuses the editor — without that, the empty area below Content swallows clicks.
-    -->
+    <!-- ProseMirror fills the flex column (scoped CSS below) so a click anywhere
+         in the box focuses the editor, not just on the prose. -->
     @if (editor()) {
       <div [appTiptap]="editor()!" data-testid="note-content" class="flex flex-1 flex-col"></div>
 
-      <!-- Out of flow + hidden until the bubble-menu plugin positions it over a
-           text selection (it sets position/left/top and flips visibility on show). -->
+      <!-- Hidden until the bubble-menu plugin positions it over a text selection. -->
       <app-formatting-menu appBubbleMenu [editor]="editor()!" />
     }
 
     <app-slash-menu />
   `,
   styles: `
-    /* TipTap creates .ProseMirror outside Angular's template — pierce with ::ng-deep.
-       Suppress its focus ring: the host's focus-within:border-gold already signals focus. */
+    /* .ProseMirror lives outside Angular's template — pierce with ::ng-deep.
+       Suppress its focus ring; host's focus-within:border-gold already signals focus. */
     :host ::ng-deep .ProseMirror {
       flex: 1;
     }
@@ -173,16 +170,13 @@ export class ContentEditor {
 
   private readonly slashMenu = viewChild(SlashMenu);
 
-  // Recreated on every seed (load/swap/conflict-reload) rather than surgically reset:
-  // a fresh Editor has empty undo history for free, so Ctrl-Z can't reach past the seed,
-  // and TiptapDirective / BubbleMenuDirective re-bind to the new instance through their
-  // signal inputs — no manual plugin re-registration. Starts null; the first seed creates
-  // the initial editor, avoiding a double-construction on every mount.
+  // Recreated on every seed rather than reset: a fresh Editor gets empty undo
+  // history for free (Ctrl-Z can't reach past the seed), and the directives re-bind
+  // via their signal inputs. Null until the first seed, so mount doesn't double-construct.
   protected readonly editor = signal<Editor | null>(null);
 
   constructor() {
-    // Stream edits to the session; re-attach when the editor instance swaps (the old
-    // one's listener dies with it on destroy()).
+    // Stream edits to the session; re-attach on editor swap.
     effect((onCleanup) => {
       const editor = this.editor();
       if (!editor) return;
@@ -192,44 +186,40 @@ export class ContentEditor {
       onCleanup(() => editor.off('update', push));
     });
 
-    // Label .ProseMirror (not the wrapper) — TipTap already sets role="textbox" on it.
-    // Re-runs on language change and on editor swap.
+    // Label .ProseMirror (not the wrapper) — TipTap sets role="textbox" on it.
     effect(() => {
       const editor = this.editor();
       if (!editor) return;
       editor.view.dom.setAttribute('aria-label', this.ariaLabel());
     });
 
-    // Seed on load/swap/conflict-reload (not on clean saves — in-flight keystrokes must
-    // survive), keyed off seed() so a keystroke never recreates the editor. The snapshot
-    // is read from the session's *live* Content, not the seed detail: a clean save advances
-    // the live Content but not the seed, so a mid-session remount (the hexmap Map↔Note
-    // toggle, #75) restores the latest prose rather than the originally-loaded one.
+    // Seed on load/swap/conflict-reload, keyed off seed() so a keystroke never
+    // recreates the editor. Snapshot comes from the *live* Content, not the seed
+    // detail: a clean save advances live Content but not seed, so a mid-session
+    // remount (hexmap Map↔Note toggle, #75) restores the latest prose, not the loaded one.
     effect(() => {
       const detail = this.session.seed();
       if (!detail) return;
-      // untracked: this effect reacts to seed() and its own editor swap, never to the
-      // live Content (which every keystroke updates — tracking it would thrash the editor).
+      // untracked: react to seed() and own editor swap, never to live Content —
+      // every keystroke updates it and tracking it would thrash the editor.
       const content = untracked(this.session.content);
-      if (content === null) return; // mid-load: content not yet available
-      // Empty placeholder snapshot ({}) produces an empty editor — correct after a conflict
-      // reload where the server has no stored prose. Previously isDocSnapshot({}) returned
-      // false and bailed, leaving the editor showing stale rejected edits.
+      if (content === null) return; // mid-load
+      // Empty placeholder snapshot ({}) yields an empty editor — correct after a
+      // conflict reload where the server has no stored prose.
       const snapshot = isDocSnapshot(content.snapshot) ? content.snapshot : undefined;
       const previous = untracked(this.editor);
       this.editor.set(this.createEditor(snapshot));
-      // Defer destroy until after TiptapDirective mounts the new surface (one render
-      // later), so there is no blank frame between the old DOM being removed and the
-      // new one being inserted.
+      // Destroy after TiptapDirective mounts the new surface (next render) so there's
+      // no blank frame between old DOM out and new DOM in.
       queueMicrotask(() => previous?.destroy());
     });
 
     this.destroyRef.onDestroy(() => this.editor()?.destroy());
   }
 
-  // slashCommands is UI chrome, not part of the persisted schema, so it lives here
-  // rather than in CONTENT_EXTENSIONS (ADR-0019). The menu getter is deferred: render
-  // only fires on a real "/" keystroke, long after the viewChild has resolved.
+  // slashCommands is UI chrome, not persisted schema, so it lives here rather than
+  // CONTENT_EXTENSIONS (ADR-0019). The menu getter is deferred: render only fires on
+  // a "/" keystroke, long after the viewChild resolves.
   private createEditor(content?: JSONContent): Editor {
     return new Editor({
       extensions: [...CONTENT_EXTENSIONS, slashCommands(() => this.slashMenu())],

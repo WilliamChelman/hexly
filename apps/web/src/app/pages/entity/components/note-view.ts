@@ -15,9 +15,8 @@ import { EntityTags } from './entity-tags';
 import { ContentEditor } from './content-editor';
 
 /**
- * The view a `note` Entity opens into, parallel to {@link EditorShell} for a `hexmap`.
- * The Content body itself is the shared {@link ContentEditor} (ADR-0019); this view owns
- * only the note's page chrome — title, tags, Save/conflict — around it.
+ * The view a `note` Entity opens into, parallel to {@link EditorShell} for a `hexmap`:
+ * page chrome (title, tags, Save/conflict) around the shared {@link ContentEditor} (ADR-0019).
  */
 @Component({
   selector: 'app-note-view',

@@ -383,8 +383,8 @@ describe('HexMapStore', () => {
   it('deleteSelected destroys a selected Region as one undoable step, restoring its membership and selection on undo', () => {
     const store = new HexMapStore();
     const id = 'reg-avalon';
-    // `load` clears history, so the deletion is the one and only edit on the stack
-    // — a single undo that fully restores the Region then proves it is one step.
+    // `load` clears history, so the deletion is the only edit on the stack —
+    // a single undo that restores the Region proves it is one step.
     store.load({
       hexes: {},
       regions: [{ id, name: 'Avalon', color: '#b08a4e', hexes: { '1,1': true } }],
@@ -422,8 +422,8 @@ describe('HexMapStore', () => {
     store.undo(); // restores the document and selection — but NOT the tool arming:
     expect(store.document().regions[0].id).toBe(id);
     expect(store.selection()).toEqual({ kind: 'region', id });
-    // Tool/subtool memory is session-only state (issue #27), never part of an
-    // undoable edit, so it stays on Select rather than re-arming the Region tool.
+    // Tool/subtool memory is session-only (issue #27), never an undoable edit —
+    // so it stays on Select rather than re-arming the Region tool.
     expect(store.tool()).toBe('select');
     expect(store.region()).toBeNull();
   });
@@ -490,9 +490,8 @@ describe('HexMapStore', () => {
     const id = store.addLabel('Big', { x: 0, y: 0 });
     store.resizeLabel(id, 64);
 
-    // 0 (a cleared field is Number('') === 0) and negatives would fail
-    // labelSchema.size (z.number().positive()) on save/load, so the store
-    // drops them as no-ops rather than letting the document hold them.
+    // 0 (Number('') === 0) and negatives fail labelSchema.size
+    // (z.number().positive()) on save/load, so the store drops them as no-ops.
     store.resizeLabel(id, 0);
     store.resizeLabel(id, -10);
 
@@ -705,8 +704,7 @@ describe('HexMapStore two-level armed state', () => {
     expect(store.terrain()).toBe('forest');
     expect(store.feature()).toBe('settlement');
     expect(store.region()).toBeNull();
-    // A reloaded map matches a fresh store, so the membership direction cold-starts
-    // back at Add rather than carrying the previous map's toggle choice.
+    // A reloaded map matches a fresh store: the direction cold-starts at Add.
     expect(store.regionDirection()).toBe('add');
   });
 
@@ -717,9 +715,8 @@ describe('HexMapStore two-level armed state', () => {
 
     store.armTool('region');
 
-    // Create-and-paint replaces the old auto-arm-first-region (issue #27 → #38): the
-    // tool arms with no Region, so the first canvas stroke mints a new one rather
-    // than silently painting an arbitrary existing region.
+    // Tool arms with no Region (issue #27 → #38), so the first canvas stroke mints
+    // a new one rather than silently painting an arbitrary existing region.
     expect(store.tool()).toBe('region');
     expect(store.region()).toBeNull();
   });
@@ -755,8 +752,8 @@ describe('HexMapStore two-level armed state', () => {
     store.selectLabel('L1');
     expect(store.selectedLabel()?.id).toBe('L1');
 
-    // Loading a different document that reuses the id must not keep the stale
-    // selection — load() forgets it rather than relying on the id not colliding.
+    // A reloaded doc reusing the id must not keep the stale selection —
+    // load() forgets it rather than relying on ids not colliding.
     const second: HexMap = {
       ...emptyHexMap(),
       labels: [{ id: 'L1', text: 'B', position: { x: 5, y: 5 }, size: 28 }],
@@ -959,9 +956,8 @@ describe('HexMapStore Region selection cycle', () => {
     store.select({ q: 0, r: 0 }, null); // descends to the Region (its only candidate)
     expect(store.selection()).toEqual({ kind: 'region', id });
 
-    // A click on a *different* coordinate starts a fresh cycle at the top — the
-    // painted Hex — rather than resuming the descent and skipping past it, even
-    // though the same Region is also a candidate at the new coordinate.
+    // A click on a *different* coordinate starts a fresh cycle at the top (the
+    // painted Hex), not a resumed descent — even though the Region is a candidate here too.
     store.select({ q: 1, r: 0 }, null);
     expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 1, r: 0 } });
   });
@@ -988,9 +984,8 @@ describe('HexMapStore Region selection cycle', () => {
     store.addHexToRegion(a, { q: 4, r: 4 }); // a is added first → first in document order
     store.addHexToRegion(b, { q: 4, r: 4 });
 
-    // The coordinate is Void (never painted), yet two Regions contain it: rather
-    // than deselecting, the first in document order is selected, then the cycle
-    // steps through the rest and wraps.
+    // Void coordinate, yet two Regions contain it: rather than deselecting, the
+    // first in document order is selected, then the cycle steps through and wraps.
     store.select({ q: 4, r: 4 }, null);
     expect(store.selection()).toEqual({ kind: 'region', id: a });
 
@@ -1053,9 +1048,9 @@ describe('HexMapStore Region selection cycle', () => {
     store.selectLabel(labelId);
     expect(store.selection()).toEqual({ kind: 'label', id: labelId });
 
-    // Clicking the same coordinate must restart at the top (the Hex), not resume
-    // the stale descent into the Region: the cycle position is derived from where
-    // the *live* selection sits in the stack, and the Label isn't a candidate here.
+    // Clicking the same coordinate restarts at the top (the Hex), not the stale
+    // descent: cycle position derives from the *live* selection's place in the
+    // stack, and the Label isn't a candidate here.
     store.select({ q: 0, r: 0 }, null);
     expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 0, r: 0 } });
   });
@@ -1068,10 +1063,9 @@ describe('HexMapStore Region selection cycle', () => {
     store.select({ q: 0, r: 0 }, null);
     expect(store.selection()).toEqual({ kind: 'region', id });
 
-    // Painting the cell grows the stack to [Hex, Region] without a deselect. The
-    // next click at the same anchor descends from the still-selected Region (the
-    // last candidate) and wraps to the new top (the Hex), rather than reusing a
-    // stale index that would re-pick the Region.
+    // Painting grows the stack to [Hex, Region] without a deselect. The next click
+    // descends from the still-selected Region (last candidate) and wraps to the new
+    // top (the Hex), rather than a stale index that would re-pick the Region.
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.select({ q: 0, r: 0 }, null);
     expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 0, r: 0 } });
@@ -1380,8 +1374,8 @@ describe('HexMapStore multi-selection set', () => {
 
   it('deletes a heterogeneous set per kind in a single undo step, restoring all on undo', () => {
     const store = new HexMapStore();
-    // `load` clears history so the multi-delete is the one and only edit on the
-    // stack — a single undo that fully restores everything then proves it is one step.
+    // `load` clears history, so the multi-delete is the only edit on the stack —
+    // a single undo that restores everything proves it is one step.
     store.load({
       hexes: {
         '0,0': { terrain: 'forest' },
@@ -1449,8 +1443,8 @@ describe('HexMapStore deleteSelected', () => {
     const store = new HexMapStore();
     store.paintAt({ q: -3, r: 4 }, 'ocean');
     store.placeFeatureAt({ q: -3, r: 4 }, 'ruin');
-    // Selecting a hex that carries a feature selects the Feature, so clear the
-    // feature first to get a bare-Hex selection (precedence: Feature wins).
+    // A featured hex selects the Feature (precedence), so clear it first to get
+    // a bare-Hex selection.
     store.clearFeatureAt({ q: -3, r: 4 });
     store.select({ q: -3, r: 4 }, null);
 
@@ -1497,8 +1491,8 @@ describe('HexMapStore moveSelection', () => {
 
     store.moveSelection({ q: 0, r: 2 }, ZERO);
 
-    // Both members rode by the same offset; the cluster keeps its internal shape
-    // and the whole records (feature included) travel along.
+    // Both members ride the same offset, keeping the cluster's shape; whole
+    // records (feature included) travel along.
     expect(store.document().hexes['0,2']).toEqual({
       terrain: 'forest',
       feature: { ref: 'settlement' },
@@ -1557,8 +1551,8 @@ describe('HexMapStore moveSelection', () => {
 
     store.moveSelection({ q: 1, r: 0 }, ZERO);
 
-    // A self-overlapping nudge blocks: the document is untouched and the move
-    // recorded nothing, so undoing reaches only the setup paints, never a no-op step.
+    // A self-overlapping nudge blocks: document untouched, no move step recorded,
+    // so undo reaches only the setup paints.
     expect(store.document()).toEqual(before);
     expect(store.selections()).toHaveLength(2);
     store.undo(); // undoes the last paint (mountain), proving no move step exists
@@ -1584,8 +1578,8 @@ describe('HexMapStore moveSelection', () => {
     const id = store.addLabel('Whisperwood', { x: 10, y: 10 });
     store.selectLabel(id);
 
-    // No hex/region in the set, so the axial offset is zero; the label rides by the
-    // free pixel delta the drag decided.
+    // No hex/region in the set, so the axial offset is zero; the label rides the
+    // free pixel delta instead.
     store.moveSelection({ q: 0, r: 0 }, { x: 7, y: -3 });
 
     expect(store.document().labels[0].position).toEqual({ x: 17, y: 7 });
@@ -1724,8 +1718,8 @@ describe('HexMapStore moveSelection', () => {
     store.addHexToRegion(id, { q: 1, r: 0 }); // so is the destination coordinate
     store.select({ q: 0, r: 0 }, null); // select only the painted cell, not the region
 
-    // A Region is a coordinate overlay, not a property of the painted cell, so moving
-    // the content must not drag membership with it — at the origin or the destination.
+    // A Region is a coordinate overlay, not a property of the cell, so moving the
+    // content must not drag membership — at the origin or the destination.
     store.moveSelection({ q: 1, r: 0 }, ZERO);
 
     expect(store.document().hexes['1,0']).toEqual({ terrain: 'forest' });
@@ -1817,10 +1811,7 @@ describe('HexMapStore hex name', () => {
 });
 
 describe('HexMapStore region direction', () => {
-  /**
-   * Select a fresh Region (its single member at a Void coordinate, so the Region
-   * is the only candidate there) and return the store and the region id.
-   */
+  /** Select a fresh Region (sole member at a Void coordinate, so it's the only candidate). */
   function withSelectedRegion() {
     const store = new HexMapStore();
     const id = store.createRegion('Avalon', '#b08a4e');
@@ -1863,9 +1854,8 @@ describe('HexMapStore region direction', () => {
     // Subtool's mode (and so regionDirection) would read 'remove' below.
     store.armRegionDirection('remove');
 
-    // Nothing is inspected, so there is no Region to arm on — the tool stays on the
-    // non-destructive Select, no Region Subtool is armed, and the toggle direction
-    // (derived from the armed Subtool's mode) cold-stays at Add rather than moving.
+    // Nothing inspected, so no Region to arm on: the tool stays on Select, no Region
+    // Subtool is armed, and the toggle direction cold-stays at Add.
     expect(store.tool()).toBe('select');
     expect(store.region()).toBeNull();
     expect(store.regionDirection()).toBe('add');
@@ -1875,8 +1865,8 @@ describe('HexMapStore region direction', () => {
     const { store, id } = withSelectedRegion();
 
     // Arm via the palette path (`armRegion`), not the toggle: the Inspector toggle
-    // must still reflect it, because the direction is derived from the armed Subtool
-    // rather than a separate, hand-synced signal — and it is what `applyAt` paints by.
+    // still reflects it because direction derives from the armed Subtool (what
+    // `applyAt` paints by), not a separate hand-synced signal.
     store.armRegion(id, 'remove');
     expect(store.regionDirection()).toBe('remove');
 
@@ -1891,9 +1881,9 @@ describe('HexMapStore region direction', () => {
     store.addHexToRegion(a, { q: 0, r: 0 });
     store.addHexToRegion(b, { q: 1, r: 1 });
 
-    // Arm A in Remove (the non-default direction), then select a *different* Region B
-    // through the Select tool — which moves the selection but leaves the armed Subtool
-    // pointing at A. The toggle and brush must reflect B, not A's stale 'remove'.
+    // Arm A in Remove, then select a *different* Region B via Select — which moves
+    // the selection but leaves the armed Subtool on A. Toggle/brush must reflect B,
+    // not A's stale 'remove'.
     store.select({ q: 0, r: 0 }, null); // selects A, the only candidate there
     store.armRegionDirection('remove'); // _region = { a, 'remove' }
     store.armTool('select');
@@ -1989,8 +1979,8 @@ describe('HexMapStore Region tool (membership brush only)', () => {
 
     store.applyAt({ q: 2, r: 3 });
 
-    // Creation is panel-only now (ADR-0012): a Region stroke with no selected Region
-    // paints nothing and mints nothing — there is no create-and-paint anymore.
+    // Creation is panel-only (ADR-0012): a Region stroke with no selected Region
+    // paints and mints nothing.
     expect(store.document().regions).toEqual([]);
     expect(store.selection()).toBeNull();
   });
@@ -2018,8 +2008,7 @@ describe('HexMapStore New Region (from the Regions panel)', () => {
     expect(regions[0].id).toBe(id);
     expect(regions[0].name).toBe('Region 1');
     expect(regions[0].color).toBe('#7c9b86');
-    // "without painting": the new Region starts with no member hexes (the panel
-    // lists it as an empty, canvas-invisible Region).
+    // "without painting": no member hexes — the panel lists it as a canvas-invisible Region.
     expect(regions[0].hexes).toEqual({});
   });
 
@@ -2029,8 +2018,8 @@ describe('HexMapStore New Region (from the Regions panel)', () => {
 
     const id = store.newRegion();
 
-    // The fresh Region is selected so the Inspector opens on it to be named, and the
-    // shared column flips from the list back to the Inspector to show that editor.
+    // The fresh Region is selected so the Inspector opens on it to be named, flipping
+    // the shared column from the list back to the Inspector.
     expect(store.selection()).toEqual({ kind: 'region', id });
     expect(store.rightPanel()).toBe('inspector');
   });
@@ -2040,8 +2029,8 @@ describe('HexMapStore New Region (from the Regions panel)', () => {
 
     const id = store.newRegion();
 
-    // A freshly-created Region is ready to receive hexes: the Region membership brush
-    // is armed on it in Add (issue #39, ADR-0012). No hex is painted yet.
+    // Ready to receive hexes: membership brush armed on it in Add (issue #39,
+    // ADR-0012). No hex painted yet.
     expect(store.tool()).toBe('region');
     expect(store.region()).toEqual({ id, mode: 'add' });
     expect(store.regionDirection()).toBe('add');
@@ -2081,8 +2070,8 @@ describe('HexMapStore New Region (from the Regions panel)', () => {
     store.deleteRegion(store.document().regions[0].id); // delete Region 1
     store.newRegion(); // mints again
 
-    // "Region 1" is free again, but the next number is max(existing)+1 = 3, so a
-    // name/colour freed by a deletion is not immediately reused.
+    // "Region 1" is free again, but the next number is max(existing)+1 = 3 — a
+    // name/colour freed by deletion is not immediately reused.
     expect(store.document().regions.map((r) => r.name)).toEqual([
       'Region 2',
       'Region 3',
@@ -2105,9 +2094,8 @@ describe('HexMapStore shared right column', () => {
 
   it('selects a Region by id — even an empty one — and flips back to the Inspector', () => {
     const store = new HexMapStore();
-    // An empty Region has no member hex, so it cannot be reached by select(coord);
-    // selecting it from the list must go by id. This is the "emptied Regions stay
-    // reachable" case the Regions panel must support (ADR-0011).
+    // An empty Region has no member hex, so select(coord) can't reach it — the list
+    // selects by id. "Emptied Regions stay reachable" (ADR-0011).
     const id = store.createRegion('The Whisperwood', '#6f7fae');
     store.showRegionsPanel();
 
@@ -2122,9 +2110,9 @@ describe('HexMapStore shared right column', () => {
     const store = new HexMapStore();
     store.showRegionsPanel();
 
-    // Opening a map is a fresh start (like the tool and selection reset in load), so
-    // the reopened map shows a clear right side — closed, not the previous session's
-    // list view, and not an empty Inspector (ADR-0013, story 20).
+    // Opening a map is a fresh start (like the tool/selection reset in load): the
+    // right side reopens closed, not the prior list view or an empty Inspector
+    // (ADR-0013, story 20).
     store.load(emptyHexMap());
 
     expect(store.rightPanel()).toBeNull();
@@ -2165,8 +2153,8 @@ describe('HexMapStore shared right column', () => {
     expect(store.tool()).toBe('region');
 
     // Selecting a *different* Region B from the list must disarm the stale brush, so
-    // the next canvas stroke does not silently paint into B (the brush is armed only
-    // via the Inspector's Add/Remove, ADR-0012).
+    // the next stroke does not silently paint into B (brush armed only via the
+    // Inspector's Add/Remove, ADR-0012).
     store.selectRegion(b);
 
     expect(store.tool()).toBe('select');
@@ -2208,8 +2196,8 @@ describe('HexMapStore shared right column', () => {
     store.paintAt({ q: 0, r: 0 }, 'forest');
     expect(store.rightPanel()).toBeNull(); // closed boot state
 
-    // Selecting an entity opens the Inspector so it can be edited (story 16) — the
-    // selection-opens-for-editing contract holds even when the panel was closed.
+    // Selecting an entity opens the Inspector to edit it (story 16) — the contract
+    // holds even when the panel was closed.
     store.select({ q: 0, r: 0 }, null);
 
     expect(store.rightPanel()).toBe('inspector');
@@ -2233,9 +2221,8 @@ describe('HexMapStore shared right column', () => {
     store.selectLabel(id); // a selection opens the Inspector
     expect(store.rightPanel()).toBe('inspector');
 
-    // Clearing the selection reclaims the map: the Inspector only floats while it
-    // has a selection to show, so a deselect closes it — the mirror of the
-    // selection that opened it (ADR-0013, story 20). Nothing left covering the map.
+    // The Inspector only floats while it has a selection, so a deselect closes it —
+    // the mirror of the selection that opened it (ADR-0013, story 20).
     store.deselect();
 
     expect(store.rightPanel()).toBeNull();
@@ -2247,9 +2234,8 @@ describe('HexMapStore shared right column', () => {
     store.selectLabel(id);
     expect(store.rightPanel()).toBe('inspector');
 
-    // Deleting the inspected entity clears the selection (the deletion paths route
-    // through deselect), so the panel returns to closed rather than stranding an
-    // empty-state Inspector over the map.
+    // Deleting the inspected entity clears the selection (deletion routes through
+    // deselect), so the panel closes rather than stranding an empty Inspector.
     store.deleteSelected();
 
     expect(store.rightPanel()).toBeNull();
@@ -2260,17 +2246,15 @@ describe('HexMapStore shared right column', () => {
     store.showRegionsPanel();
     expect(store.rightPanel()).toBe('regions');
 
-    // A Void-coordinate click deselects, but the Regions list is not selection-driven
-    // (the user opened it via the rail), so it stays open — only the Inspector closes
-    // on deselect.
+    // A Void click deselects, but the rail-opened Regions list isn't selection-driven,
+    // so it stays open — only the Inspector closes on deselect.
     store.select({ q: 9, r: 9 }, null);
 
     expect(store.rightPanel()).toBe('regions');
   });
 
-  // The Map/Note view toggle (#75): a hexmap carries both a grid and a Content body,
-  // so the editor surface flips between them. Session-only view state like rightPanel —
-  // never part of the document, reset to the grid when a map opens.
+  // The Map/Note view toggle (#75): a hexmap carries both a grid and a Content body.
+  // Session-only view state like rightPanel — never part of the document.
   it('opens to the Map view', () => {
     const store = new HexMapStore();
     expect(store.view()).toBe('map');

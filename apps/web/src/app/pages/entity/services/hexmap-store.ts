@@ -23,16 +23,14 @@ import { applyPatches, enablePatches, Patch, produceWithPatches } from 'immer';
 enablePatches();
 
 /**
- * A top-level Tool armed in the palette (CONTEXT.md → Tool). Exactly one is
- * armed at a time, and a canvas gesture applies it. Tools that have variants
- * carry a current Subtool tracked separately ({@link FeatureSubtool},
- * {@link RegionSubtool}, and the terrain id):
+ * A top-level Tool armed in the palette (CONTEXT.md → Tool); exactly one armed,
+ * a canvas gesture applies it. Variant Tools track a Subtool separately
+ * ({@link FeatureSubtool}, {@link RegionSubtool}, the terrain id):
  *
- * - `select` — the non-destructive Tool; a click does nothing yet (issue #27)
+ * - `select` — non-destructive; a click does nothing yet (issue #27)
  * - `terrain` — paint the remembered terrain (creates or replaces a hex)
  * - `feature` — place the remembered feature, or Clear it (see FeatureSubtool)
- * - `region` — paint the *selected* region's membership; a no-op with none
- *   selected (regions are created in the Regions panel, ADR-0012)
+ * - `region` — paint the *selected* region's membership; no-op with none selected (ADR-0012)
  * - `label` — drop a free-positioned Label at the clicked world point (issue #10)
  * - `erase` — delete the whole hex record so the coordinate becomes Void
  */
@@ -45,19 +43,17 @@ export type ToolId =
   | 'erase';
 
 /**
- * The Feature tool's Subtool: a built-in library feature to place, or `'clear'`
- * to remove a hex's feature (leaving its terrain). Clear lives among the feature
- * Subtools because it is scoped to the feature layer (issue #27, ADR-0010).
+ * The Feature tool's Subtool: a library feature to place, or `'clear'` to remove
+ * a hex's feature (leaving its terrain). Clear sits among the feature Subtools
+ * because it's scoped to the feature layer (issue #27, ADR-0010).
  */
 export type FeatureSubtool = FeatureId | 'clear';
 
 /**
- * The Select tool's Subtool (ADR-0017, amending ADR-0010): `pick` is the
- * click/cycle/move picker (the boot default, so a freshly-opened map behaves
- * exactly as before), `marquee` drags a rectangle to box-select the Hexes and
- * Labels within it. Like every Subtool it is session-only memory, never in the
- * document. The two are ordered `pick`, `marquee` so the keyboard `1`/`2` and
- * the palette keycaps index them from one source of truth.
+ * The Select tool's Subtool (ADR-0017): `pick` click/cycle/move picker (boot
+ * default), `marquee` drag-rectangle box-select. Session-only memory, never in
+ * the document. Ordered `pick`, `marquee` so keyboard `1`/`2` and the palette
+ * keycaps index from one source of truth.
  */
 export type SelectSubtool = 'pick' | 'marquee';
 
@@ -68,10 +64,10 @@ export type EntityView = 'map' | 'note';
 export const selectSubtools: readonly SelectSubtool[] = ['pick', 'marquee'];
 
 /**
- * The Region membership brush's target: which region the brush paints, and whether
- * it adds (`add`) or removes (`remove`) membership. `null` until a Region is selected
- * and a direction engaged via the Inspector's Add/Remove (issue #37); with none, a
- * Region stroke is a no-op (regions are created in the Regions panel, ADR-0012).
+ * The membership brush's target: which region it paints, and whether it adds or
+ * removes membership. `null` until a Region is selected and a direction engaged
+ * via the Inspector's Add/Remove (issue #37); none → a Region stroke is a no-op
+ * (ADR-0012).
  */
 export interface RegionSubtool {
   readonly id: string;
@@ -79,13 +75,12 @@ export interface RegionSubtool {
 }
 
 /**
- * One selected entity (CONTEXT.md → Selection, ADR-0010/0011/0017): a Label or a
- * Region by id, or a Feature / Hex by the coordinate it sits on. The Selection is
- * a *set* of these — zero, one, or many — exposed as {@link HexMapStore.selections}
- * (with {@link HexMapStore.selection} the "exactly one" view). The store resolves a
- * click's geometric inputs into candidates by walking a per-coordinate stack —
- * `Label → Feature → Hex → each containing Region (document order)` — which a plain
- * click cycles through and the modifiers fold into the set; see {@link HexMapStore.select}.
+ * One selected entity (CONTEXT.md → Selection, ADR-0010/0011/0017): a Label or
+ * Region by id, or a Feature / Hex by coordinate. The Selection is a *set* of
+ * these, exposed as {@link HexMapStore.selections} ({@link HexMapStore.selection}
+ * is the "exactly one" view). A click resolves a per-coordinate stack —
+ * `Label → Feature → Hex → each containing Region (document order)` — which a
+ * plain click cycles and modifiers fold into the set; see {@link HexMapStore.select}.
  */
 export type Selection =
   | { readonly kind: 'label'; readonly id: string }
@@ -94,12 +89,11 @@ export type Selection =
   | { readonly kind: 'region'; readonly id: string };
 
 /**
- * The internal selection reference the store actually stores: a Label or a Region
- * by id, or a map cell by coordinate. Whether a cell reads as a Feature or a bare
- * Hex is *derived* from the live document (see {@link HexMapStore.selection}), as
- * is whether a referenced Region still exists — so the selection self-heals when
- * the document changes under it (a feature placed/cleared, the hex erased, the
- * region deleted, an undo) rather than going stale (issues #28, #35).
+ * The internal selection reference the store holds: a Label or Region by id, or a
+ * cell by coordinate. Whether a cell reads as a Feature or bare Hex, and whether a
+ * Region still exists, are *derived* from the live document (see
+ * {@link HexMapStore.selection}), so the selection self-heals rather than going
+ * stale when the document changes under it (issues #28, #35).
  */
 type SelectionRef =
   | { readonly kind: 'label'; readonly id: string }
@@ -109,14 +103,13 @@ type SelectionRef =
 /**
  * How a Select gesture folds into the Selection set (CONTEXT.md → Pick, ADR-0017):
  *
- * - `replace` — a plain click: replace the set with the topmost entity, and on a
- *   repeat at the same coordinate cycle deeper through the stack.
+ * - `replace` — plain click: replace with the topmost entity; a repeat at the same
+ *   coordinate cycles deeper through the stack.
  * - `toggle-top` — Cmd/Ctrl-click: toggle just the topmost entity in or out.
- * - `toggle-stack` — Shift-click: toggle the whole stack at the coordinate (add
- *   the missing members, or remove them all when the pile is already fully in).
- * - `add-top` / `add-stack` — a modifier-held *drag*: the add-only counterparts of
- *   the toggles, used while sweeping the pointer across hexes so each one it enters
- *   accumulates into the set and re-entering a hex never removes it.
+ * - `toggle-stack` — Shift-click: toggle the whole stack (add the missing, or remove
+ *   all when the pile is already fully in).
+ * - `add-top` / `add-stack` — modifier-held *drag*: add-only counterparts of the
+ *   toggles, so sweeping accumulates and re-entering a hex never removes it.
  */
 export type SelectMode =
   | 'replace'
@@ -126,11 +119,10 @@ export type SelectMode =
   | 'add-stack';
 
 /**
- * Resolve one internal {@link SelectionRef} against the live document into the
- * public {@link Selection} it currently denotes, or `null` when it has gone stale
- * (its label/region id is gone, or its cell was erased). A cell reads as a
- * Feature when its hex carries one, else a bare Hex. This is the single place the
- * ref→Selection self-healing lives, shared by every selected member (issue #28).
+ * Resolve one {@link SelectionRef} against the live document into the
+ * {@link Selection} it denotes, or `null` when stale (label/region id gone, cell
+ * erased). A cell reads as a Feature when its hex carries one, else a bare Hex.
+ * The single place ref→Selection self-healing lives (issue #28).
  */
 function resolveRef(doc: HexMap, ref: SelectionRef): Selection | null {
   if (ref.kind === 'label') {
@@ -149,12 +141,9 @@ function resolveRef(doc: HexMap, ref: SelectionRef): Selection | null {
 }
 
 /**
- * The draft-mutation recipes the delete paths share, factored out so the single
- * deletes ({@link HexMapStore.deleteLabel}, {@link HexMapStore.deleteRegion},
- * {@link HexMapStore.clearFeatureAt}, {@link HexMapStore.eraseAt}) and the
- * batched {@link HexMapStore.deleteSelected} cannot drift apart. Each takes the
- * Immer draft and mutates it in place; deciding when to wrap them in a `commit`
- * (one step each vs. one step for the whole set) stays with the callers.
+ * Draft-mutation recipes the delete paths share, so the single deletes and the
+ * batched {@link HexMapStore.deleteSelected} can't drift apart. Each mutates the
+ * Immer draft in place; callers decide when to wrap them in a `commit`.
  */
 function removeLabelFrom(draft: HexMap, id: string): void {
   const at = draft.labels.findIndex((l) => l.id === id);
@@ -176,9 +165,9 @@ function eraseHexFrom(draft: HexMap, coord: Axial): void {
 
 /**
  * The Feature Tool's Subtools in palette/keyboard order: each library feature,
- * then the Clear Subtool last. The single source of truth for the index→Subtool
- * mapping the keyboard ({@link HexMapStore.armSubtoolByIndex}) and the palette
- * keycaps share, so the two cannot drift (issue #27, ADR-0010).
+ * then Clear last. One source of truth for the index→Subtool mapping shared by the
+ * keyboard ({@link HexMapStore.armSubtoolByIndex}) and the palette keycaps
+ * (issue #27, ADR-0010).
  */
 export const featureSubtools: readonly FeatureSubtool[] = [
   ...featureLibrary.map((f) => f.id),
@@ -186,10 +175,9 @@ export const featureSubtools: readonly FeatureSubtool[] = [
 ];
 
 /**
- * The colours a freshly-created Region cycles through, so two new Regions look
- * distinct without the user picking a colour first; they can recolour to anything
- * afterwards (the document stores an arbitrary `#rrggbb`). Keyed by the Region's
- * "Region N" number so the colour tracks the name (issue #8, #38, #39).
+ * Colours a fresh Region cycles through, so two new Regions look distinct without
+ * the user picking one first (they can recolour afterwards). Keyed by the "Region
+ * N" number so the colour tracks the name (issue #8, #38, #39).
  */
 const NEW_REGION_COLORS = ['#7c9b86', '#b08a4e', '#6f7fae', '#a8674f', '#5f8c8c'];
 
@@ -201,19 +189,17 @@ const DEFAULT_FEATURE: FeatureSubtool = featureLibrary[0].id;
 export const DEFAULT_LABEL_SIZE = 28;
 
 /**
- * The outcome of {@link HexMapStore.moveSelection}, so the gesture owner can react
- * (issue #64): `moved` committed a step, `blocked` refused it (the caller may warn
- * the user), and `noop` carried nothing (a drag that never moved, or an empty/void
- * selection) — neither committed.
+ * The outcome of {@link HexMapStore.moveSelection} (issue #64): `moved` committed
+ * a step, `blocked` refused it (the caller may warn), `noop` carried nothing (a
+ * drag that never moved, or an empty/void selection).
  */
 export type MoveOutcome = 'moved' | 'blocked' | 'noop';
 
 /**
  * The editor's command/undo stack — the only "store" the editor needs (ADR-0005).
- * It holds the current {@link HexMap} as immutable state in a signal; every
- * mutation runs through Immer's `produceWithPatches`, and the inverse patches go
- * onto an undo stack so undo/redo come for free. Nothing mutates the document
- * directly — that discipline is what makes undo correct.
+ * Holds the {@link HexMap} as immutable signal state; every mutation runs through
+ * Immer's `produceWithPatches`, inverse patches onto an undo stack. Nothing mutates
+ * the document directly — that discipline is what makes undo correct.
  */
 @Injectable({ providedIn: 'root' })
 export class HexMapStore {
@@ -222,19 +208,17 @@ export class HexMapStore {
   readonly document = this._document.asReadonly();
 
   /**
-   * The armed top-level {@link ToolId} a canvas gesture applies. A map opens
-   * armed with the non-destructive `select` so a stray first click never paints
-   * (issue #27).
+   * The armed {@link ToolId} a canvas gesture applies. Opens on the non-destructive
+   * `select` so a stray first click never paints (issue #27).
    */
   private readonly _tool = signal<ToolId>('select');
   readonly tool = this._tool.asReadonly();
 
   /**
-   * Per-Tool Subtool memory — in-memory, session-only editor state in the same
-   * category as the armed Tool itself: never part of the `HexMap` document,
-   * never undone, saved, or restored across reloads (issue #27, ADR-0010).
-   * Re-arming a Tool restores its remembered Subtool. Cold-start defaults:
-   * Terrain → `forest`, Feature → the first library feature, Region → none.
+   * Per-Tool Subtool memory — session-only editor state, never in the document,
+   * undone, saved, or restored across reloads (issue #27, ADR-0010). Re-arming a
+   * Tool restores its Subtool. Cold-start: Terrain → `forest`, Feature → first
+   * library feature, Region → none.
    */
   private readonly _terrain = signal<TerrainId>(DEFAULT_TERRAIN);
   private readonly _feature = signal<FeatureSubtool>(DEFAULT_FEATURE);
@@ -242,33 +226,28 @@ export class HexMapStore {
   private readonly _selectSubtool = signal<SelectSubtool>('pick');
 
   /**
-   * Which view floats in the editor's dismissible right panel: the live
-   * {@link Inspector}, the Regions panel's list, or `null` when the panel is
-   * **closed** (ADR-0013). It is closed by default so nothing covers the map until
-   * there is something to show: selecting an entity or a Region opens it to
-   * `inspector` (the selection-opens-for-editing contract, ADR-0011, issue #39);
-   * the right-edge rail toggles it between `regions` and closed. Transient,
-   * session-only view state in the same category as the armed Tool and the
-   * selection: never part of the `HexMap` document, never undone, saved, or
-   * restored across reloads (a reopened map resets it closed via {@link load}).
+   * What floats in the dismissible right panel: the {@link Inspector}, the Regions
+   * list, or `null` when **closed** (ADR-0013). Closed by default so nothing covers
+   * the map: selecting an entity or Region opens it to `inspector` (ADR-0011, issue
+   * #39); the right-edge rail toggles `regions` ⇄ closed. Session-only view state,
+   * never in the document; {@link load} resets it closed.
    */
   private readonly _rightPanel = signal<'inspector' | 'regions' | null>(null);
   readonly rightPanel = this._rightPanel.asReadonly();
 
   /**
-   * Which surface the editor shows: the hex `'map'` (grid) or the `'note'` (the
-   * Content body), since a hexmap carries both (#75). Never part of the `HexMap`
-   * document, never undone or saved — but, unlike {@link rightPanel}, it is mirrored
-   * to the URL `view` param so a refresh or shared link keeps the open view; the
-   * session drives it from the route, so {@link load} does not reset it.
+   * Which surface the editor shows: hex `'map'` grid or `'note'` Content body (#75).
+   * Session-only like {@link rightPanel}, but mirrored to the URL `view` param so a
+   * refresh or shared link keeps the open view — the session drives it from the
+   * route, so {@link load} does not reset it.
    */
   private readonly _view = signal<EntityView>('map');
   readonly view = this._view.asReadonly();
 
   /**
    * The remembered Select Subtool — `pick` (click/cycle/move) or `marquee`
-   * (box-select). Boots at `pick` so a freshly-opened map behaves exactly as
-   * before (ADR-0017). The canvas reads this to choose its Select gesture.
+   * (box-select); boots at `pick` (ADR-0017). The canvas reads this to choose its
+   * Select gesture.
    */
   readonly selectSubtool = this._selectSubtool.asReadonly();
   /** The remembered Terrain Subtool — the terrain a Terrain stroke paints. */
@@ -283,23 +262,12 @@ export class HexMapStore {
   readonly region = this._region.asReadonly();
 
   /**
-   * The membership-paint direction the Inspector's Add ⇄ Remove toggle reflects:
-   * `add` paints a hex into the inspected Region, `remove` erases it. Derived from
-   * the armed Region's `mode` — the *same* state {@link applyAt} paints by — so the
-   * toggle is a single source of truth and can never disagree with what a stroke
-   * actually does. The Inspector's Add/Remove ({@link armRegionDirection}) is now the
-   * only path that arms the Region brush (ADR-0012).
-   *
-   * Scoped to the *selected* Region: the toggle belongs to the Inspector, which
-   * edits the selection, and {@link applyAt} now paints the selected Region — so the
-   * mode only counts while the armed Region IS the selected one. When the armed
-   * Region is a stale, different one (a Region armed in Remove, then a *different*
-   * Region selected), this falls back to `add` so a freshly-selected Region never
-   * silently inherits the previous Region's direction (issue #38). Cold-starts at
-   * `add` whenever no Region is armed too: a fresh store, a reloaded map, or after
-   * the armed Region is deleted. In-memory, session-only editor state in the same
-   * category as the armed Tool — never part of the `HexMap` document, never undone,
-   * saved, or restored across reloads (issue #37).
+   * The membership-paint direction the Inspector's Add ⇄ Remove toggle reflects,
+   * derived from the armed Region's `mode` — the *same* state {@link applyAt} paints
+   * by, so the toggle can't disagree with a stroke (ADR-0012). Scoped to the
+   * *selected* Region: a stale armed-but-not-selected Region falls back to `add` so a
+   * freshly-selected Region never inherits the previous direction (issue #38). Also
+   * `add` when none is armed. Session-only, never persisted (issue #37).
    */
   readonly regionDirection = computed<'add' | 'remove'>(() => {
     const armed = this._region();
@@ -309,10 +277,9 @@ export class HexMapStore {
 
   /**
    * Whether the armed Tool keeps applying as the pointer drags across hexes.
-   * Terrain, Erase, Region, and the feature Clear Subtool are continuous brushes
-   * — sweeping them is the intent and idempotent. Placing a Feature is a discrete
-   * stamp (a drag must not mass-place duplicates, issue #7); Label is likewise a
-   * discrete stamp (issue #10); Select paints nothing. (issue #27)
+   * Terrain, Erase, Region, and feature Clear are idempotent brushes — sweeping is
+   * the intent. Placing a Feature (issue #7) and Label (issue #10) are discrete
+   * stamps a drag must not duplicate; Select paints nothing (issue #27).
    */
   readonly continuous = computed<boolean>(() => {
     switch (this._tool()) {
@@ -328,48 +295,33 @@ export class HexMapStore {
   });
 
   /**
-   * The Selection as a *set* of references, in selection order (ADR-0017): zero,
-   * one, or many entities picked out by Select's clicks and modifiers. Transient
-   * editor state — not part of the document, so it is neither undone nor persisted
-   * (issues #10, #28). It holds only the references (a label/region id, or a cell
-   * coordinate); the live {@link Selection.kind} and existence of each are resolved
-   * from the document by {@link selections}, so the set self-heals member-by-member
-   * when the document changes under it rather than going stale (issues #28, #35).
+   * The Selection as a *set* of references, in selection order (ADR-0017). Transient
+   * editor state, neither undone nor persisted (issues #10, #28). Holds only the
+   * references; {@link selections} resolves each against the document, so the set
+   * self-heals member-by-member rather than going stale (issues #28, #35).
    */
   private readonly _selections = signal<readonly SelectionRef[]>([]);
 
   /**
-   * The anchor of the per-coordinate selection cycle (CONTEXT.md → Select,
-   * ADR-0011): the `coordKey|labelHit` of the click the cycle is running at, or
-   * `null` when no cycle is in progress. A click resolves a stack of candidates
-   * at one coordinate — `Label → Feature → Hex → each containing Region in
-   * document order` — and *repeated* clicks at the same anchor descend through it,
-   * wrapping after the last; a click on a different coordinate or label fails to
-   * match and resets to the top.
-   *
-   * Only the anchor is stored — never an index. The descent position is *derived*
-   * each click from where the live single {@link _selections selection} sits in the
-   * freshly-resolved stack (see {@link select}), so it can't go stale: any path that changes the
-   * selection out from under the cycle (a label drop, a Hex move, an undo, a
-   * document edit that adds/removes a candidate) is absorbed rather than leaving a
-   * dangling integer that mis-targets the next click (issues #28, #35). Transient
-   * editor state — never in the document, undone, or persisted.
+   * The anchor of the per-coordinate selection cycle (CONTEXT.md → Select, ADR-0011):
+   * the `coordKey|labelHit` of the running click, or `null`. Repeated clicks at the
+   * same anchor descend the candidate stack (wrapping); a different anchor resets to
+   * the top. Only the anchor is stored, never an index: the descent position is
+   * *derived* each click from where the live selection sits in the freshly-resolved
+   * stack (see {@link select}), so a label drop, Hex move, undo, or added/removed
+   * candidate can't leave it stale (issues #28, #35).
    */
   private cycleAnchor: string | null = null;
 
   /**
-   * What is currently selected, or `null`, resolved against the live document so
-   * it never goes stale: a cell with a Feature reads as `feature`, a cell with a
-   * bare Hex as `hex`, and a cell whose hex was erased (or a label whose id is
-   * gone) resolves to `null`. The inspector and renderer read this to show and
-   * highlight the selection; the canvas hands a click's geometric inputs to
-   * {@link select}, which sets the reference under the precedence rule (issue #28).
+   * The selection set resolved against the live document so it never goes stale: a
+   * cell reads as `feature` or bare `hex`, an erased cell or gone label resolves
+   * away. The inspector and renderer read this; the canvas feeds clicks to
+   * {@link select} (issue #28).
    */
   readonly selections = computed<Selection[]>(() => {
     const doc = this._document();
-    // Resolve every member against the live document, dropping any that have gone
-    // stale (a label/region deleted, a cell erased, an undo) — the set self-heals
-    // member-by-member rather than dangling (issues #28, #35).
+    // Drop any member gone stale — the set self-heals member-by-member (issues #28, #35).
     return this._selections().flatMap((ref) => {
       const resolved = resolveRef(doc, ref);
       return resolved ? [resolved] : [];
@@ -377,11 +329,9 @@ export class HexMapStore {
   });
 
   /**
-   * The single selected entity, or `null` when zero or two-or-more are selected —
-   * the "exactly one" view the single-entity Inspector, {@link selectedLabel},
-   * {@link selectedRegion}, and the single-Hex drag read. The renderer and the
-   * multi-selection Inspector read the whole {@link selections} set instead. Like
-   * the set it resolves against the live document, so it never goes stale.
+   * The single selected entity, or `null` when zero or many are selected — the
+   * "exactly one" view {@link selectedLabel}, {@link selectedRegion}, and the
+   * single-Hex drag read. Resolved against the live document, so never stale.
    */
   readonly selection = computed<Selection | null>(() => {
     const all = this.selections();
@@ -389,9 +339,8 @@ export class HexMapStore {
   });
 
   /**
-   * The currently-selected {@link Label} resolved from the live document, or
-   * `null` when the selection is not a Label, or its id no longer exists (e.g.
-   * after an undo removed it). The inspector binds to this to edit the label.
+   * The selected {@link Label} from the live document, or `null` when the selection
+   * isn't a Label or its id is gone. The inspector binds to this.
    */
   readonly selectedLabel = computed<Label | null>(() => {
     const sel = this.selection();
@@ -400,10 +349,8 @@ export class HexMapStore {
   });
 
   /**
-   * The currently-selected {@link Region} resolved from the live document, or
-   * `null` when the selection is not a Region (or its id is gone after an undo).
-   * Peer to {@link selectedLabel}: the Inspector binds to this to edit the
-   * Region's name, color, and deletion (issue #36).
+   * The selected {@link Region} from the live document, or `null` when the selection
+   * isn't a Region or its id is gone. Peer to {@link selectedLabel} (issue #36).
    */
   readonly selectedRegion = computed<Region | null>(() => {
     const sel = this.selection();
@@ -425,42 +372,35 @@ export class HexMapStore {
   readonly canRedo = this._canRedo.asReadonly();
 
   /**
-   * Arm the top-level Tool `id` for the next gestures. Re-arming a Tool restores
-   * its remembered Subtool implicitly — the Subtool memory is held separately, so
+   * Arm the Tool `id` for the next gestures; Subtool memory is held separately, so
    * switching Tools never disturbs it (issue #27). The palette never passes `region`
-   * (Region left the palette, ADR-0012); the Region membership brush is armed via the
-   * Inspector's {@link armRegionDirection} on the selected Region.
+   * — the brush is armed via {@link armRegionDirection} (ADR-0012).
    */
   armTool(id: ToolId): void {
     this._tool.set(id);
   }
 
   /**
-   * Flip the shared right column to the Regions panel's list — the right-edge rail's
-   * Regions entry (issue #39, ADR-0011). The reverse flip (back to the Inspector) is
-   * not a separate command: it happens whenever a Region is selected, through
-   * {@link selectRegion} and {@link newRegion}, so the list always yields to the
-   * selection it produced.
+   * Flip the right column to the Regions list (issue #39, ADR-0011). The reverse flip
+   * isn't a separate command — selecting a Region ({@link selectRegion},
+   * {@link newRegion}) yields the list back to the Inspector.
    */
   showRegionsPanel(): void {
     this._rightPanel.set('regions');
   }
 
   /**
-   * Toggle the floating right panel between the Regions list and closed — the
-   * rail entry's click (issue #39, ADR-0013). Its off-state is **closed** (`null`),
-   * not the Inspector: clicking the active Regions entry reclaims the right of the
-   * map. From any other state (closed, or the Inspector showing a selection) it
-   * opens the Regions list.
+   * Toggle the right panel between the Regions list and closed (issue #39, ADR-0013).
+   * Off-state is **closed** (`null`), not the Inspector. From any other state it
+   * opens the list.
    */
   toggleRegionsPanel(): void {
     this._rightPanel.set(this._rightPanel() === 'regions' ? null : 'regions');
   }
 
   /**
-   * Arm the Select tool with `subtool` — `pick` or `marquee` — remembering it as
-   * the Select Subtool (ADR-0017). Peer to {@link armTerrain}/{@link armFeature};
-   * the palette keycaps and keyboard `1`/`2` route through here.
+   * Arm the Select tool with `subtool`, remembering it as the Select Subtool
+   * (ADR-0017). The palette keycaps and keyboard `1`/`2` route through here.
    */
   armSelectSubtool(subtool: SelectSubtool): void {
     this._selectSubtool.set(subtool);
@@ -482,24 +422,18 @@ export class HexMapStore {
     this._tool.set('feature');
   }
 
-  /**
-   * Arm the Region tool targeting region `id` in `mode`, remembering it as the
-   * Region Subtool.
-   */
+  /** Arm the Region tool targeting region `id` in `mode`, remembering it as the Region Subtool. */
   armRegion(id: string, mode: 'add' | 'remove'): void {
     this._region.set({ id, mode });
     this._tool.set('region');
   }
 
   /**
-   * Engage the Inspector's Add ⇄ Remove toggle in `direction`: arm the Region tool
-   * on the currently-selected Region with it, collapsing select-then-edit into one
-   * gesture (issue #37). This is the first control outside the palette permitted to
-   * arm a Tool — Select itself still never paints. A no-op when nothing, or a
-   * non-Region, is selected: the toggle only appears in the Region editor, but
-   * guarding here keeps the action honest for every caller. Arming is the single
-   * write that moves the toggle: {@link regionDirection} is derived from the armed
-   * Subtool's mode, so there is no separate direction to keep in sync.
+   * Engage the Inspector's Add ⇄ Remove toggle in `direction`: arm the Region brush
+   * on the selected Region (issue #37). The only control outside the palette that
+   * arms a Tool. No-op when nothing, or a non-Region, is selected. {@link
+   * regionDirection} derives from the armed mode, so there's no separate direction
+   * to sync.
    */
   armRegionDirection(direction: 'add' | 'remove'): void {
     const region = this.selectedRegion();
@@ -507,12 +441,11 @@ export class HexMapStore {
   }
 
   /**
-   * Pick the `n`-th (1-based) Subtool of the currently armed Tool — the keyboard
-   * `1`–`9` binding (issue #27). The Subtool set is relative to the armed Tool:
-   * Terrain → the terrain palette, Feature → the feature library then Clear.
-   * Out-of-range indices and Tools without Subtools (Select, Label, Erase) are
-   * no-ops; `region`, when armed as the membership brush, has no indexed Subtool
-   * either (its target is the selected Region, ADR-0012).
+   * Pick the `n`-th (1-based) Subtool of the armed Tool — the keyboard `1`–`9`
+   * binding (issue #27). The set is relative to the armed Tool: Terrain → terrain
+   * palette, Feature → feature library then Clear. Out-of-range indices and Tools
+   * without Subtools are no-ops; the membership brush `region` has no indexed Subtool
+   * (its target is the selected Region, ADR-0012).
    */
   armSubtoolByIndex(n: number): void {
     switch (this._tool()) {
@@ -537,27 +470,23 @@ export class HexMapStore {
   }
 
   /**
-   * Adopt `document` as the map being edited — used when a map is opened from
-   * the backend (issue #6). This is a fresh starting point, not an edit, so the
-   * undo/redo history is cleared: you cannot undo back into the previous map.
+   * Adopt `document` as the map being edited (issue #6). A fresh start, not an edit,
+   * so undo/redo history is cleared — you can't undo back into the previous map.
    */
   load(document: HexMap): void {
     this._document.set(document);
     this.undoStack.length = 0;
     this.redoStack.length = 0;
     this.syncHistory();
-    // A freshly opened map arms the non-destructive Select tool so a stray click
-    // never paints (issue #27). The Subtool memory (and the selected label) all
-    // referenced the previous document, so reset them to the cold-start defaults
-    // rather than leaving a dangling region or label id behind.
+    // Arm the non-destructive Select so a stray click never paints (issue #27), and
+    // reset Subtool/selection memory that referenced the previous document.
     this._tool.set('select');
     this.resetSubtoolMemory();
-    this.deselect(); // clears the selection and forgets the per-coordinate cycle
-    // A reopened map shows a clear right side: the panel resets closed, not the
-    // previous session's list view nor an empty Inspector (ADR-0013, issue #39).
+    this.deselect();
+    // Reopened map shows a clear right side, reset closed (ADR-0013, issue #39).
     this._rightPanel.set(null);
-    // The Map/Note surface is NOT reset here: it lives in the URL `view` param (#75),
-    // which the session restores on every (re)load, so a refresh keeps the open view.
+    // Map/Note surface is NOT reset: it lives in the URL `view` param, which the
+    // session restores on every (re)load, so a refresh keeps the open view (#75).
   }
 
   /** Switch the editor surface between the hex grid and the Content body (#75). */
@@ -571,16 +500,14 @@ export class HexMapStore {
     this._terrain.set(DEFAULT_TERRAIN);
     this._feature.set(DEFAULT_FEATURE);
     this._region.set(null);
-    // The membership direction is derived from the armed Region Subtool, so
-    // clearing `_region` above already cold-starts `regionDirection` back to `add`.
+    // regionDirection derives from `_region`, so clearing it above cold-starts it to `add`.
   }
 
   /** Apply the armed Tool (and its Subtool) at `coord`, dispatching on the Tool. */
   applyAt(coord: Axial): void {
     switch (this._tool()) {
       case 'select':
-        // Select is non-destructive; its click behaviour is out of scope for
-        // this slice — a click does nothing yet (issue #27, ADR-0010).
+        // Select is non-destructive; a click does nothing yet (issue #27, ADR-0010).
         break;
       case 'terrain':
         this.paintAt(coord, this._terrain());
@@ -595,9 +522,8 @@ export class HexMapStore {
         break;
       }
       case 'region': {
-        // The Region tool is a membership brush (ADR-0012): it paints the *selected*
-        // Region's membership per the Add/Remove direction. A stroke with no Region
-        // selected is a no-op — regions are created in the Regions panel, not here.
+        // Membership brush (ADR-0012): paints the *selected* Region per Add/Remove;
+        // no Region selected → no-op (regions are created in the Regions panel).
         const selected = this.selectedRegion();
         if (!selected) break;
         if (this.regionDirection() === 'add') this.addHexToRegion(selected.id, coord);
@@ -605,18 +531,16 @@ export class HexMapStore {
         break;
       }
       case 'label':
-        // Labels are free-positioned at a world point, not a hex coordinate
-        // (CONTEXT.md → Label), so the canvas places them via `addLabel` — there
-        // is nothing to do on the hex-coordinate stroke path (issue #10).
+        // Labels are free-positioned, placed via `addLabel`, not the hex-stroke path
+        // (CONTEXT.md → Label, issue #10).
         break;
     }
   }
 
   /**
-   * Paint `terrain` onto the hex at `coord`, creating its record or replacing
-   * only the terrain of an existing one. Terrain and Feature are independent
-   * layers (CONTEXT.md), so a terrain stroke must not wipe a placed feature —
-   * which matters because painting is a drag that sweeps across hexes.
+   * Paint `terrain` at `coord`, creating the hex or replacing only its terrain.
+   * Terrain and Feature are independent layers (CONTEXT.md), so a terrain stroke
+   * must not wipe a placed feature — and painting is a sweeping drag.
    */
   paintAt(coord: Axial, terrain: TerrainId): void {
     this.commit((draft) => {
@@ -628,8 +552,7 @@ export class HexMapStore {
 
   /**
    * Place (or replace) `feature` on the hex at `coord`. A Feature rides on an
-   * existing Hex (CONTEXT.md), so placing on Void is a no-op — paint terrain
-   * first. The recipe changing nothing means `commit` records no undo step.
+   * existing Hex (CONTEXT.md), so placing on Void is a no-op — paint terrain first.
    */
   placeFeatureAt(coord: Axial, feature: FeatureId): void {
     this.commit((draft) => {
@@ -639,9 +562,8 @@ export class HexMapStore {
   }
 
   /**
-   * Remove the feature from the hex at `coord`, leaving its terrain intact. A
-   * hex with no feature, or a Void coordinate, is left untouched — `commit`
-   * records no undo step when nothing changes.
+   * Remove the feature from the hex at `coord`, leaving its terrain. A featureless
+   * hex or Void coordinate is untouched (no undo step).
    */
   clearFeatureAt(coord: Axial): void {
     this.commit((draft) => clearFeatureFrom(draft, coord));
@@ -653,11 +575,9 @@ export class HexMapStore {
   }
 
   /**
-   * Set the name on the hex at `coord` (ADR-0016). A name is a field on a Hex,
-   * so naming a Void coordinate is a no-op — paint terrain first. A blank or
-   * whitespace-only name clears the field entirely rather than leaving an empty
-   * string, keeping the document minimal (the renderer draws nothing either way).
-   * Like every edit it goes through `commit`, so a rename is a single undoable step.
+   * Set the name on the hex at `coord` (ADR-0016). Naming a Void coordinate is a
+   * no-op — paint terrain first. A blank name clears the field rather than storing
+   * an empty string, keeping the document minimal.
    */
   editHexName(coord: Axial, name: string): void {
     const trimmed = name.trim();
@@ -670,10 +590,9 @@ export class HexMapStore {
   }
 
   /**
-   * The live Selection partitioned for a move: cells as hex coordinates, plus the
-   * selected label and region ids. The single place the move paths read the set, so
-   * {@link moveSelection} (which commits) and {@link previewSelectionMove} (which
-   * previews) can never disagree about what is moving.
+   * The live Selection partitioned for a move: cell coordinates, label ids, region
+   * ids. One place the move paths read the set, so {@link moveSelection} and
+   * {@link previewSelectionMove} can't disagree about what's moving.
    */
   private selectionForMove(): {
     hexes: Axial[];
@@ -692,12 +611,10 @@ export class HexMapStore {
   }
 
   /**
-   * Each selected label's destination position after nudging by `delta`, keyed by
-   * id — the one place label movement is computed, shared by the preview and the
-   * {@link moveSelection commit} so they can never drift. Empty for a zero `delta`
-   * (a hex/region drag carries no label movement), so no spurious label write is
-   * recorded. Builds an id→label index once, so it is O(labels + selected), not a
-   * scan per id (issue #64).
+   * Each selected label's destination after nudging by `delta`, keyed by id — shared
+   * by the preview and the {@link moveSelection commit} so they can't drift. Empty
+   * for a zero `delta`, so no spurious label write. Builds an id→label index once,
+   * O(labels + selected) not a scan per id (issue #64).
    */
   private movedLabelPositions(
     labelIds: readonly string[],
@@ -715,13 +632,10 @@ export class HexMapStore {
 
   /**
    * What moving the live Selection by `offset`/`labelDelta` *would* produce, without
-   * committing: the planner {@link MovePlan} (hex writes/clears + region-footprint
-   * shifts) and each selected label's previewed position. The single query the canvas
-   * reads each frame of a drag to preview the resolved writes (the group at its
-   * destination), the dragged labels, or the blocked cells — and the same query
-   * {@link moveSelection} derives its commit from, so the preview the user sees and
-   * the move that lands can never disagree (issues #30, #64). Touches no signal and
-   * records no edit.
+   * committing: the {@link MovePlan} (hex writes/clears + region-footprint shifts) and
+   * each label's previewed position. The canvas reads this each drag frame, and
+   * {@link moveSelection} derives its commit from it, so preview and landed move can't
+   * disagree (issues #30, #64). Touches no signal, records no edit.
    */
   previewSelectionMove(
     offset: Axial,
@@ -737,25 +651,14 @@ export class HexMapStore {
   }
 
   /**
-   * Move the whole live Selection by one `offset` (issue #64, ADR-0017): the
-   * unified move every drag — one hex or a whole group — routes through. The
-   * selection's cells, labels, and regions are run through {@link
-   * previewSelectionMove}, which resolves the rigid translation, intra-group
-   * overlap, and group collisions (a non-selected occupant swaps back to
-   * `d − offset`, or the cell blocks). A **blocked** plan is a no-op: the document
-   * and selection are left untouched, so the drag snaps back on release.
-   *
-   * A resolved plan applies in a single {@link commit} — hex writes/clears, each
-   * selected region's translated footprint, and every selected label nudged by
-   * `labelDelta` — so however much is selected the whole move is one undo step.
-   * `offset` is the axial hex delta (hexes and region footprints, and the
-   * re-pointed cell selection); `labelDelta` is the equivalent pixels for labels,
-   * decided by the drag's granularity (hex-snapped for a hex/region selection,
-   * free pixels for a labels-only one). The selection re-points to the moved
-   * entities — cells ride by the offset; region and label ids are unchanged — so
-   * the moved group stays selected. A drag that never moved (`offset` and
-   * `labelDelta` both zero) carries nothing and records no step, the unified
-   * counterpart of the old same-coordinate guard.
+   * Move the whole live Selection by `offset` (issue #64, ADR-0017): the unified move
+   * every drag routes through. {@link previewSelectionMove} resolves the translation,
+   * intra-group overlap, and collisions; a **blocked** plan is a no-op so the drag
+   * snaps back. A resolved plan applies in one {@link commit} (hexes, region
+   * footprints, labels nudged by `labelDelta`) — one undo step however much is
+   * selected. `offset` is the axial hex delta, `labelDelta` the equivalent pixels.
+   * The selection re-points to the moved entities so the group stays selected; a
+   * zero/zero drag carries nothing and records no step.
    */
   moveSelection(offset: Axial, labelDelta: Point): MoveOutcome {
     if (
@@ -768,13 +671,11 @@ export class HexMapStore {
     }
     const refs = this._selections();
     const { plan, labelPositions } = this.previewSelectionMove(offset, labelDelta);
-    // A blocked plan refuses the whole move — leave everything untouched so the
-    // release snaps the preview back (CONTEXT.md → "a blocked plan is a no-op").
+    // Blocked → refuse the whole move, leave everything untouched (CONTEXT.md).
     if (plan.blocked) return 'blocked';
     const committed = this.commit((draft) => {
-      // Deep-clone every record the planner hands back — they reference the
-      // immutable pre-move document, so the draft never aliases a live node and
-      // every Hex/footprint field is carried verbatim (matching the single-hex path).
+      // Deep-clone planner records: they reference the immutable pre-move document,
+      // so the draft never aliases a live node (every field carried verbatim).
       for (const { coord, hex } of plan.hexes) {
         const key = coordKey(coord);
         if (hex) draft.hexes[key] = structuredClone(hex);
@@ -784,37 +685,30 @@ export class HexMapStore {
         const region = regionById(draft, id);
         if (region) region.hexes = structuredClone(footprint);
       }
-      // Apply the same previewed label positions the canvas drew mid-drag; an empty
-      // map (a zero-pixel/hex-only move) writes nothing, so no label step is recorded.
+      // Apply the previewed label positions; an empty map writes nothing.
       for (const [id, position] of labelPositions) {
         const label = draft.labels.find((l) => l.id === id);
         if (label) label.position = position;
       }
     });
-    // The plan changed nothing (an empty selection, or every source Void): no step
-    // was recorded, so there is nothing to re-point.
+    // Plan changed nothing (empty selection, or every source Void): nothing to re-point.
     if (!committed) return 'noop';
-    // Re-point the selection to the moved entities: each cell rides by the axial
-    // offset to its destination; region and label refs keep their ids (their
-    // footprint/position moved under the same id). The cell translation is a
-    // bijection, so it introduces no duplicates.
+    // Re-point the selection: each cell rides by the offset; region/label refs keep
+    // their ids. The cell translation is a bijection, so no duplicates.
     const remapped = refs.map((ref): SelectionRef =>
       ref.kind === 'cell'
         ? { kind: 'cell', coord: addAxial(ref.coord, offset) }
         : ref,
     );
     this._selections.set(remapped);
-    // Stamp the post-move selection onto the edit so undo restores it to the
-    // sources and redo follows it back to the destinations, in lockstep.
+    // Stamp the post-move selection so undo/redo track the document in lockstep.
     this.trackSelectionOnLastEdit();
     return 'moved';
   }
 
   /**
-   * Create an empty Region with `name` and `color`, appended to the document,
-   * and return its freshly-minted id. Membership starts empty — hexes are
-   * painted in afterwards. Like every edit it goes through `commit`, so undo
-   * removes the region (issue #8).
+   * Create an empty Region with `name`/`color`, returning its minted id. Membership
+   * starts empty — hexes are painted afterwards (issue #8).
    */
   createRegion(name: string, color: string): string {
     const id = mintId();
@@ -825,37 +719,28 @@ export class HexMapStore {
   }
 
   /**
-   * Create a fresh empty "Region N" with the next palette colour from the Regions
-   * panel's New Region action — the *only* way to create a Region now (ADR-0012). It
-   * mints no member hexes, so the new Region is invisible on the canvas and lives only
-   * in the Regions panel until hexes are painted into it; the panel must not assume
-   * non-empty membership (ADR-0011). It then selects the new Region (opening the
-   * Inspector to name it) and arms the Region brush on it in Add, so the next stroke
-   * adds straight into it — the fast create-then-draw flow, in one creation path.
-   * Returns the new id. Like every edit it goes through `commit`, so undo removes it.
+   * Create a fresh empty "Region N" — the Regions panel's New Region action, the
+   * *only* way to create a Region (ADR-0012). It mints no hexes, so the Region is
+   * invisible until painted into; the panel must not assume non-empty membership
+   * (ADR-0011). Selects it (opening the Inspector to name it) and arms the brush in
+   * Add for the create-then-draw flow. Returns the new id.
    */
   newRegion(): string {
     const { name, color } = this.nextRegionIdentity();
     const id = this.createRegion(name, color);
-    // Select the new Region so the Inspector opens on it to be named, flipping the
-    // shared column from the list back to the Inspector — the same routing a list
-    // pick uses (selectRegion).
+    // Select it so the Inspector opens to name it (same routing as a list pick).
     this.selectRegion(id);
-    // Arm the Region brush on it in Add so the next stroke paints hexes straight into
-    // it (ADR-0012). The mint itself still adds no hex, so the Region is created
-    // without painting; the canvas stroke is what fills it.
+    // Arm the brush in Add so the next stroke paints into it (ADR-0012).
     this.armRegion(id, 'add');
-    // Stamp the post-mint selection onto the edit so undo clears it with the Region
-    // and redo restores it — the mint always records a step, so an edit exists.
+    // Stamp the post-mint selection so undo/redo track it with the Region.
     this.trackSelectionOnLastEdit();
     return id;
   }
 
   /**
-   * The name and palette colour the next minted Region takes, used by
-   * {@link newRegion}. The number is the next unused "Region N" (max existing + 1, or
-   * 1 when none), so a name/colour freed by a deletion is not immediately reused; the
-   * colour is keyed by that number so it tracks the name (issue #8, #38, #39).
+   * The name and palette colour the next minted Region takes. The number is max
+   * existing "Region N" + 1 (or 1), so a freed name/colour isn't immediately reused;
+   * the colour is keyed by that number so it tracks the name (issue #8, #38, #39).
    */
   private nextRegionIdentity(): { name: string; color: string } {
     const used = this._document().regions.flatMap((r) => {
@@ -881,34 +766,28 @@ export class HexMapStore {
   }
 
   /**
-   * Delete the region `id` entirely, along with its membership set, clearing the
-   * selection if it pointed at it. Peer to {@link deleteLabel}: it owns its own
-   * selection teardown, so every caller — the Inspector and palette Delete
-   * buttons, and {@link deleteSelected} — gets correct, single-step undo without
-   * re-deriving the cleanup at the call site (issue #36).
+   * Delete the region `id` and its membership, clearing the selection if it pointed
+   * at it. Peer to {@link deleteLabel}: owns its selection teardown so every caller
+   * gets single-step undo without re-deriving it (issue #36).
    */
   deleteRegion(id: string): void {
     const committed = this.commit((draft) => removeRegionFrom(draft, id));
     this.dropSelections((ref) => ref.kind === 'region' && ref.id === id);
-    // The Region Subtool now points at a region that no longer exists. Forget it,
-    // and if the Region tool is armed, fall back to the non-destructive Select so
-    // the canvas stays inert rather than silently no-opping every stroke. This
-    // disarm is session-only tool state (issue #27, ADR-0010), so — unlike the
-    // document and selection above — it is deliberately NOT part of the undoable
-    // edit: undoing the deletion restores the Region but leaves the tool on Select.
+    // The brush now points at a gone region: forget it, falling back to Select so
+    // the canvas isn't silently no-opping. Session-only tool state, deliberately NOT
+    // in the undoable edit — undo restores the Region but leaves the tool on Select
+    // (issue #27, ADR-0010).
     if (this._region()?.id === id) {
       this._region.set(null);
       if (this._tool() === 'region') this._tool.set('select');
     }
-    // Record the cleared selection on the edit (only if one was actually made) so
-    // undo restores it with the region and redo clears it again.
+    // Stamp the cleared selection (if a step was made) so undo restores it with the region.
     if (committed) this.trackSelectionOnLastEdit();
   }
 
   /**
-   * Run `mutate` against the region `id` through `commit`; a no-op (no undo step)
-   * if there is no such region. The shared find-and-guard for the per-field region
-   * edits (rename, recolor).
+   * Run `mutate` against region `id` through `commit`; no-op if there's no such
+   * region. Shared find-and-guard for the per-field region edits.
    */
   private updateRegion(id: string, mutate: (region: Region) => void): void {
     this.commit((draft) => {
@@ -918,10 +797,9 @@ export class HexMapStore {
   }
 
   /**
-   * Add the hex at `coord` to region `id`. Membership is an independent set of
-   * coordinates (a hex need not be painted, and a coordinate may belong to many
-   * regions at once), so this only sets the key. Adding a coordinate already in
-   * the region changes nothing, so `commit` records no undo step.
+   * Add the hex at `coord` to region `id`. Membership is an independent coordinate
+   * set (a hex need not be painted; a coordinate may belong to many regions), so this
+   * just sets the key.
    */
   addHexToRegion(id: string, coord: Axial): void {
     this.commit((draft) => {
@@ -938,14 +816,11 @@ export class HexMapStore {
   }
 
   /**
-   * Select the topmost entity given a click's geometric inputs (issue #28): the
-   * hex `coord` under the pointer and the `labelHit` from `renderer.labelAt`
-   * (the id of the Label drawn there, or `null`). Precedence lives here, at the
-   * store seam, so it stays unit-testable: a Label hit wins; otherwise a painted
-   * cell is selected (it reads as a Feature or a bare Hex per the live document);
-   * a Void coordinate with no label hit clears the selection (CONTEXT.md →
-   * Select, ADR-0010). Returns the resolved {@link Selection} so the caller can
-   * branch on it (e.g. start a label drag) without re-scanning the document.
+   * Select given a click's geometric inputs (issue #28): the hex `coord` and the
+   * `labelHit` from `renderer.labelAt` (Label id drawn there, or `null`). Precedence
+   * lives here so it stays unit-testable: a Label hit wins, else a painted cell, else
+   * a Void with no hit clears (CONTEXT.md → Select, ADR-0010). Returns the resolved
+   * {@link Selection} so the caller can branch (e.g. start a label drag).
    */
   select(
     coord: Axial,
@@ -955,13 +830,10 @@ export class HexMapStore {
     const stack = this.candidatesAt(coord, labelHit);
     if (mode === 'replace') return this.selectReplace(coord, labelHit, stack);
 
-    // Modifier gestures fold into the set rather than cycling, so the per-coordinate
-    // cycle is forgotten — a later plain click at the same coordinate starts fresh
-    // at the top of the stack rather than resuming a stale descent (issue #35).
+    // Modifiers fold into the set, not cycle, so forget the cycle anchor (issue #35).
     this.cycleAnchor = null;
-    // A modifier click/drag on empty space (Void in no Region, no label hit) adds
-    // nothing and leaves the set — and the panel — exactly as they were; only a
-    // *plain* click on empty space clears (CONTEXT.md → Pick).
+    // A modifier on empty space leaves the set and panel untouched; only a *plain*
+    // click clears (CONTEXT.md → Pick).
     if (stack.length === 0) return this.selection();
     switch (mode) {
       case 'toggle-top':
@@ -982,15 +854,11 @@ export class HexMapStore {
   }
 
   /**
-   * The plain-click path: replace the set with the topmost entity under the click,
-   * cycling deeper on a repeat at the same anchor. Empty space clears the whole
-   * set through the one canonical {@link deselect}. The cycle descends only while
-   * clicks land on the same coordinate (and label hit); a different anchor resets
-   * to the top. The descent position is *derived* from where the live single
-   * selection sits in the freshly-resolved stack — never a stored index — so a
-   * label drop, a Hex move, an undo, or a candidate added/removed cannot leave it
-   * stale (issue #35). A selection that is no longer a candidate (it moved, or
-   * vanished, or the set holds more than one) starts the cycle fresh at the top.
+   * The plain-click path: replace the set with the topmost entity, cycling deeper on
+   * a repeat at the same anchor; empty space clears via {@link deselect}. The descent
+   * position is *derived* from where the live selection sits in the freshly-resolved
+   * stack — never a stored index — so a label drop, Hex move, undo, or added/removed
+   * candidate can't leave it stale (issue #35).
    */
   private selectReplace(
     coord: Axial,
@@ -1004,8 +872,7 @@ export class HexMapStore {
     const anchor = `${coordKey(coord)}|${labelHit ?? ''}`;
     let index = 0;
     if (anchor === this.cycleAnchor) {
-      // The cycle only ever runs on a single-entity selection, so a set of two or
-      // more (built by modifiers) restarts the descent at the top.
+      // The cycle runs only on a single-entity selection; a larger set restarts at top.
       const current = this.singleRef();
       const at = current
         ? stack.findIndex((ref) => sameSelectionRef(ref, current))
@@ -1014,9 +881,8 @@ export class HexMapStore {
     }
     this.cycleAnchor = anchor;
     this._selections.set([stack[index]]);
-    // A canvas selection flips the shared column back to the Inspector so the
-    // picked entity opens for editing (the _rightPanel contract, issue #39) — but
-    // only on a real selection, never the empty-stack/deselect branch above.
+    // A real selection flips the column to the Inspector to open the picked entity
+    // (issue #39), never the empty-stack branch above.
     this._rightPanel.set('inspector');
     return this.selection();
   }
@@ -1028,16 +894,14 @@ export class HexMapStore {
   }
 
   /**
-   * Add each of `refs` to the set if absent, never removing — the accumulating
-   * counterpart to {@link toggleRefs} that a modifier-held select-sweep uses, so
-   * re-entering an already-selected hex mid-drag leaves it put rather than flicking
-   * it off (ADR-0017).
+   * Add each of `refs` if absent, never removing — the accumulating counterpart to
+   * {@link toggleRefs} for a modifier-held sweep, so re-entering a selected hex
+   * mid-drag leaves it put (ADR-0017).
    */
   private addRefs(refs: SelectionRef[]): void {
     const current = this._selections();
-    // Dedup-preserving union via the shared {@link mergeRefs}. Only write when it
-    // grew — mergeRefs only ever appends, so an unchanged length means every ref
-    // was already present — keeping the no-op add cheap and signal-quiet.
+    // Dedup-preserving union; only write when it grew (mergeRefs only appends), so
+    // a no-op add stays signal-quiet.
     const merged = mergeRefs(current, refs);
     if (merged.length !== current.length) this._selections.set(merged);
   }
@@ -1054,15 +918,13 @@ export class HexMapStore {
   }
 
   /**
-   * Toggle a whole stack at once (Shift-click): remove every member when the pile
-   * is already fully selected, otherwise add just the missing ones. So Shift-click
-   * grows a heterogeneous pile into the set, and a second Shift-click on the same
-   * fully-selected pile clears it back out (ADR-0017).
+   * Toggle a whole stack (Shift-click): remove all when the pile is already fully
+   * selected, else add the missing ones — so a second Shift-click clears it back out
+   * (ADR-0017).
    */
   private toggleStack(stack: SelectionRef[]): void {
     const current = this._selections();
-    // One O(1) membership index over the current set; the set stays an ordered
-    // array, so the filter/concat below preserve selection order.
+    // O(1) membership index; the array stays ordered so filter/concat keep selection order.
     const present = new Set(current.map(refKey));
     const has = (ref: SelectionRef) => present.has(refKey(ref));
     if (stack.every(has)) {
@@ -1074,11 +936,9 @@ export class HexMapStore {
   }
 
   /**
-   * After a modifier select (toggle or add), open the Inspector when the set still
-   * holds something, or tear down to the closed/cycle-forgotten state when a toggle
-   * emptied it — the same routing a plain selection and {@link deselect} use, so a
-   * toggle that removes the last member behaves exactly like clearing it. (Add-only
-   * sweeps never empty the set, so they always open it.)
+   * After a modifier select, open the Inspector when the set holds something, else
+   * tear down via {@link deselect} — so a toggle that removes the last member behaves
+   * like clearing it.
    */
   private openOrCloseAfterModifierSelect(): void {
     if (this._selections().length > 0) this._rightPanel.set('inspector');
@@ -1086,17 +946,14 @@ export class HexMapStore {
   }
 
   /**
-   * The selection candidates under a click, deepest-last, as the references the
-   * cycle steps through: the Label hit (if any), then the painted cell (if any),
-   * then every Region whose membership contains the coordinate in document order.
-   * Whether the cell reads as a Feature or a bare Hex is left to {@link selection}
-   * to derive; this only records that the cell is a candidate (issue #35).
+   * The selection candidates under a click, deepest-last: the Label hit, then the
+   * painted cell, then every Region containing the coordinate in document order.
+   * Feature-vs-Hex is left to {@link selection} to derive (issue #35).
    */
   private candidatesAt(coord: Axial, labelHit: string | null): SelectionRef[] {
     const refs: SelectionRef[] = [];
     if (labelHit !== null) refs.push({ kind: 'label', id: labelHit });
-    // Copy the coordinate rather than aliasing the caller's object, so a coord it
-    // later mutates (e.g. a reused hover object) can't retarget the selection.
+    // Copy the coordinate, never alias: a reused hover object could retarget the selection.
     const key = coordKey(coord);
     if (this._document().hexes[key]) {
       refs.push({ kind: 'cell', coord: { q: coord.q, r: coord.r } });
@@ -1108,24 +965,16 @@ export class HexMapStore {
   }
 
   /**
-   * Select the Region `id` directly — by id, not by a clicked coordinate — and flip
-   * the shared right column back to the Inspector so the selection opens for editing
-   * (issue #39). This is the Regions panel's selection path and the *only* way to
-   * reach an empty Region (one with no member hex, so no coordinate to click): it
-   * routes through the same `_selections` set the canvas uses, replacing it with
-   * just this Region, so a list pick highlights on the canvas and opens in the
-   * Inspector exactly like a plain canvas pick (ADR-0011).
-   * Peer to {@link selectLabel}. Selecting is transient view state, not an edit, so
-   * it records no undo step.
+   * Select the Region `id` by id (not a clicked coordinate) and open the Inspector
+   * (issue #39). The Regions panel's path and the *only* way to reach an empty Region
+   * (no hex to click); routes through the same `_selections` set as the canvas
+   * (ADR-0011). Peer to {@link selectLabel}; transient view state, no undo step.
    */
   selectRegion(id: string): void {
     this._selections.set([{ kind: 'region', id }]);
     this._rightPanel.set('inspector');
-    // A membership brush armed on a *different* Region would otherwise stay armed,
-    // so the next canvas stroke would silently paint into that stale Region rather
-    // than this freshly-selected one (the brush is armed only via the Inspector's
-    // Add/Remove, ADR-0012). Disarm it the same way deleteRegion does. When the
-    // armed Region IS the one being selected, leave the brush armed.
+    // A brush armed on a *different* Region would paint into that stale one, so disarm
+    // it (as deleteRegion does); leave it armed when it IS this Region (ADR-0012).
     if (this._region()?.id !== id) {
       this._region.set(null);
       if (this._tool() === 'region') this._tool.set('select');
@@ -1133,39 +982,28 @@ export class HexMapStore {
   }
 
   /**
-   * Fold a marquee box-selection into the Selection set (CONTEXT.md → Marquee,
-   * ADR-0017): the `hexes` and `labelIds` the canvas resolved from the dragged
-   * rectangle via the pure {@link marqueeHits} helper. A plain marquee
-   * (`additive` false) *replaces* the set with exactly these; a Shift/Cmd marquee
-   * (`additive` true) *adds* them, so several boxes accumulate, never removing an
-   * already-selected member. Regions are never passed — they have no single
-   * position, so the marquee can't reach them. Selecting opens the Inspector on
-   * the result; a plain marquee that hit nothing clears the set like an empty
-   * click. Transient view state — records no undo step.
+   * Fold a marquee box-selection into the set (CONTEXT.md → Marquee, ADR-0017): plain
+   * (`additive` false) replaces, Shift/Cmd (`additive` true) adds so boxes accumulate.
+   * Regions are never passed — they have no single position. Opens the Inspector on
+   * the result; an empty plain marquee clears. Transient, no undo step.
    */
   marqueeSelect(hexes: Axial[], labelIds: string[], additive: boolean): void {
     const refs = marqueeRefs(hexes, labelIds);
-    // A marquee isn't a per-coordinate click cycle, so forget any cycle anchor —
-    // a later plain click starts fresh at the top of its stack (issue #35).
+    // Not a click cycle, so forget the cycle anchor (issue #35).
     this.cycleAnchor = null;
     if (additive) this.addRefs(refs);
     else this._selections.set(refs);
-    // Open the Inspector on the result, mirroring a click select; an empty plain
-    // marquee leaves nothing selected, so tear down to the closed state instead.
+    // Open the Inspector on the result; an empty plain marquee tears down instead.
     if (this._selections().length > 0) this._rightPanel.set('inspector');
     else this.deselect();
   }
 
   /**
-   * The Selection set a marquee {@link marqueeSelect commit} *would* produce for
-   * the given `hexes`/`labelIds`, resolved against the live document — without
-   * mutating anything. The canvas reads this each frame of a marquee drag to
-   * highlight the contained elements live, so the box previews exactly what
-   * releasing it would select (a featured cell shows as a Feature, just as the
-   * commit would). A plain box previews only its own contents; an additive box
-   * (Shift/Cmd) previews the committed set unioned with the box, the same merge
-   * {@link addRefs} performs on release. A pure query — records no edit, opens no
-   * panel, touches no signal.
+   * The Selection set a marquee {@link marqueeSelect commit} *would* produce, resolved
+   * against the live document without mutating. The canvas reads this each drag frame
+   * to highlight live, so the box previews exactly what release selects. A plain box
+   * previews its own contents; an additive box previews the committed set unioned with
+   * it. Pure query — no edit, no panel, no signal.
    */
   marqueePreview(
     hexes: Axial[],
@@ -1173,14 +1011,11 @@ export class HexMapStore {
     additive: boolean,
   ): Selection[] {
     const refs = marqueeRefs(hexes, labelIds);
-    // Additive previews build on the committed set (box refs appended, deduped via
-    // the same {@link mergeRefs} the additive commit uses, so the preview can never
-    // disagree with what release accumulates); a plain preview shows only the box,
-    // since release replaces the set.
+    // Additive builds on the committed set (deduped via the same {@link mergeRefs} as
+    // the commit); plain shows only the box, since release replaces the set.
     const base = additive ? this._selections() : [];
     const merged = mergeRefs(base, refs);
-    // Resolve against the live document, dropping any stale member — the same
-    // self-heal {@link selections} applies, so the preview can't show a ghost.
+    // Resolve against the live document, dropping stale members (as {@link selections}).
     const doc = this._document();
     return merged.flatMap((ref) => {
       const resolved = resolveRef(doc, ref);
@@ -1193,38 +1028,29 @@ export class HexMapStore {
     if (id === null) this.deselect();
     else {
       this._selections.set([{ kind: 'label', id }]);
-      // Selecting flips the shared column back to the Inspector to open the label
-      // for editing (the _rightPanel contract, issue #39).
+      // Open the label in the Inspector (issue #39).
       this._rightPanel.set('inspector');
     }
   }
 
   /**
-   * Clear the selection, if any. The one canonical clear that every clearing path
-   * routes through: the deliberate Escape gesture (issue #30), the internal
-   * teardown paths ({@link selectLabel} with `null`, {@link deleteLabel},
-   * {@link deleteSelected}), and the incidental clear when {@link select} lands on
-   * a Void coordinate.
+   * Clear the selection. The one canonical clear every path routes through: Escape
+   * (issue #30), the teardown paths, and {@link select} landing on Void.
    */
   deselect(): void {
     this._selections.set([]);
-    // Forget the cycle so a click that re-selects the same coordinate later starts
-    // from the top of the stack rather than resuming a stale descent (issue #35).
+    // Forget the cycle so a later re-select starts at the top of the stack (issue #35).
     this.cycleAnchor = null;
-    // Reclaim the map: the Inspector only floats while it has a selection to show,
-    // so clearing the selection closes it — the mirror of the selection that opened
-    // it, keeping the closed-by-default contract (ADR-0013). A Regions list opened
-    // via the rail is not selection-driven, so it is left showing.
+    // Close the Inspector (it floats only with a selection, ADR-0013); a rail-opened
+    // Regions list isn't selection-driven, so leave it.
     if (this._rightPanel() === 'inspector') this._rightPanel.set(null);
   }
 
   /**
-   * Drop every selection member matching `match` from the set, leaving the rest.
-   * When that empties the set, the same panel/cycle teardown as {@link deselect}
-   * runs so the Inspector closes and the cycle is forgotten; with members still
-   * selected the panel stays open on the smaller set. The single-member delete
-   * paths ({@link deleteLabel}, {@link deleteRegion}) route their selection
-   * cleanup through here so removing one entity never strands the whole set.
+   * Drop every member matching `match`, leaving the rest. Emptying the set runs the
+   * {@link deselect} teardown; otherwise the panel stays open on the smaller set. The
+   * single-member delete paths ({@link deleteLabel}, {@link deleteRegion}) route their
+   * cleanup through here so removing one entity never strands the set.
    */
   private dropSelections(match: (ref: SelectionRef) => boolean): void {
     const remaining = this._selections().filter((ref) => !match(ref));
@@ -1234,10 +1060,8 @@ export class HexMapStore {
   }
 
   /**
-   * Add a free-positioned Label with `text` anchored at world `position`, at the
-   * default size, and return its freshly-minted id (issue #10). Like every edit
-   * it goes through `commit`, so undo removes the label. The caller (the canvas)
-   * typically selects the returned id so the inspector opens on it.
+   * Add a free-positioned Label with `text` at world `position` and default size,
+   * returning its minted id (issue #10). The caller typically selects it.
    */
   addLabel(text: string, position: Point): string {
     const id = mintId();
@@ -1262,12 +1086,10 @@ export class HexMapStore {
   }
 
   /**
-   * Resize Label `id` to `size` world pixels; a no-op if there is no such label.
-   * The document's `size` must be a positive, finite number (`labelSchema.size`
-   * is `z.number().positive()`), or the map fails save/load validation. The UI
-   * can send `0` (a cleared field is `Number('') === 0`) or a negative, so the
-   * store is the deep guard: a non-finite or non-positive `size` is a no-op and,
-   * like every recipe that changes nothing, records no undo step (issue #10).
+   * Resize Label `id` to `size` world pixels; no-op if no such label. `size` must be
+   * positive and finite (`labelSchema.size` is `z.number().positive()`) or save/load
+   * fails; the UI can send `0` (cleared field) or a negative, so the store is the deep
+   * guard against it (issue #10).
    */
   resizeLabel(id: string, size: number): void {
     if (!Number.isFinite(size) || size <= 0) return;
@@ -1287,20 +1109,16 @@ export class HexMapStore {
   deleteLabel(id: string): void {
     const committed = this.commit((draft) => removeLabelFrom(draft, id));
     this.dropSelections((ref) => ref.kind === 'label' && ref.id === id);
-    // Record the cleared selection on the edit (only if one was actually made) so
-    // undo restores it with the label and redo clears it again.
+    // Stamp the cleared selection (if a step was made) so undo restores it with the label.
     if (committed) this.trackSelectionOnLastEdit();
   }
 
   /**
    * Delete the whole Selection set, each member per its kind (issue #29, ADR-0017):
-   * a Label is removed, a Region destroyed (with its membership), a Feature has
-   * only its feature cleared (its terrain stays), a Hex has its whole record erased
-   * (back to Void). An empty set is a no-op. The entire set is removed in a single
-   * {@link commit}, so however many entities are selected the deletion is *one*
-   * undoable step — the single delete gesture behind `Delete`/`Backspace` and the
-   * Inspector's Delete (single) / Delete all (multi) action. The set is resolved
-   * against the live document first, so stale members delete nothing.
+   * Label removed, Region destroyed with its membership, Feature cleared (terrain
+   * stays), Hex erased to Void. One {@link commit}, so the whole deletion is *one*
+   * undo step — behind `Delete`/`Backspace` and the Inspector's Delete actions.
+   * Resolved against the live document first, so stale members delete nothing.
    */
   deleteSelected(): void {
     const sels = this.selections();
@@ -1325,26 +1143,23 @@ export class HexMapStore {
         }
       }
     });
-    // A membership brush armed on any now-destroyed Region would dangle, so disarm
-    // it and fall back to the inert Select — session-only tool state that, like in
-    // `deleteRegion`, is deliberately kept out of the undoable edit (issue #27).
+    // A brush armed on a destroyed Region would dangle: disarm, fall back to Select.
+    // Session-only state, kept out of the undoable edit as in `deleteRegion` (issue #27).
     for (const sel of sels) {
       if (sel.kind === 'region' && this._region()?.id === sel.id) {
         this._region.set(null);
         if (this._tool() === 'region') this._tool.set('select');
       }
     }
-    // Clear the set so the Inspector never shows a stale selection, and stamp the
-    // cleared set onto the edit so undo restores both the entities and the
-    // selection together (only if a step was actually recorded).
+    // Clear the set and stamp it onto the edit (if recorded) so undo restores entities
+    // and selection together.
     this.deselect();
     if (committed) this.trackSelectionOnLastEdit();
   }
 
   /**
-   * Run `mutate` against Label `id` through `commit`; a no-op (no undo step) if
-   * there is no such label. The shared find-and-guard for the per-field label
-   * edits (text, position, size, rotation).
+   * Run `mutate` against Label `id` through `commit`; no-op if no such label. Shared
+   * find-and-guard for the per-field label edits.
    */
   private updateLabel(id: string, mutate: (label: Label) => void): void {
     this.commit((draft) => {
@@ -1358,9 +1173,7 @@ export class HexMapStore {
     const edit = this.undoStack.pop();
     if (!edit) return;
     this._document.set(applyPatches(this._document(), edit.undo));
-    // Move the selection back in lockstep with the document, so undoing a move
-    // re-selects the hex at its origin rather than leaving a stale reference at
-    // the (now-reverted) destination.
+    // Move the selection back in lockstep, so undoing a move re-selects the origin.
     this._selections.set(edit.selectionBefore);
     this.redoStack.push(edit);
     this.syncHistory();
@@ -1377,33 +1190,30 @@ export class HexMapStore {
   }
 
   /**
-   * Run `recipe` through Immer and adopt the result, recording the forward and
-   * inverse patches so the edit can be undone and redone. Returns whether a step
-   * was actually recorded — callers that re-point the selection afterwards use it
-   * to know an edit exists to {@link trackSelectionOnLastEdit stamp} it onto.
+   * Run `recipe` through Immer, adopting the result and recording the patches for
+   * undo/redo. Returns whether a step was recorded — callers that re-point the
+   * selection use it to know an edit exists to {@link trackSelectionOnLastEdit stamp}.
    */
   private commit(recipe: (draft: HexMap) => void): boolean {
-    // Snapshot the selection set as it stood before the edit; undo restores it.
+    // Snapshot the selection before the edit; undo restores it.
     const selectionBefore = this._selections();
     const [next, redo, undo] = produceWithPatches(this._document(), recipe);
-    // No patches means the recipe changed nothing (e.g. erasing Void). Recording
-    // it would leave empty undo steps and needlessly discard the redo branch.
+    // No patches → the recipe changed nothing (e.g. erasing Void); recording it would
+    // leave empty undo steps and discard the redo branch.
     if (redo.length === 0) return false;
     this._document.set(next);
-    // `selectionAfter` defaults to the before-state; the few edits that re-point
-    // or clear the selection update it via trackSelectionOnLastEdit.
+    // selectionAfter defaults to before; re-pointing edits update it via trackSelectionOnLastEdit.
     this.undoStack.push({ redo, undo, selectionBefore, selectionAfter: selectionBefore });
-    // A fresh edit forks history: the old redo branch can no longer be reached.
+    // A fresh edit forks history: the old redo branch is unreachable.
     this.redoStack.length = 0;
     this.syncHistory();
     return true;
   }
 
   /**
-   * Stamp the current selection onto the most recent edit as its `selectionAfter`,
-   * so redo restores it. Called by the edits that re-point or clear the selection
-   * after committing (a Hex move, a delete); every other edit leaves it equal to
-   * `selectionBefore`, which is already correct.
+   * Stamp the current selection onto the most recent edit as its `selectionAfter` so
+   * redo restores it. Called by edits that re-point or clear the selection (move,
+   * delete); others leave it equal to `selectionBefore`.
    */
   private trackSelectionOnLastEdit(): void {
     const edit = this.undoStack[this.undoStack.length - 1];
@@ -1418,10 +1228,9 @@ export class HexMapStore {
 }
 
 /**
- * Whether two selection references point at the same entity: a cell by its
- * coordinate, a label or a region by its id. Lets {@link HexMapStore.select}
- * locate the live selection within a freshly-resolved candidate stack to derive
- * the cycle's descent position, rather than tracking a separate index (issue #35).
+ * Whether two refs point at the same entity (cell by coordinate, label/region by
+ * id). Lets {@link HexMapStore.select} locate the live selection in a resolved stack
+ * to derive the cycle position, rather than tracking an index (issue #35).
  */
 function sameSelectionRef(a: SelectionRef, b: SelectionRef): boolean {
   if (a.kind === 'cell' && b.kind === 'cell') {
@@ -1433,14 +1242,10 @@ function sameSelectionRef(a: SelectionRef, b: SelectionRef): boolean {
 }
 
 /**
- * Build the {@link SelectionRef}s a marquee box denotes from its resolved
- * `hexes` and `labelIds` (CONTEXT.md → Marquee): a cell ref per hex coordinate,
- * a label ref per id. The shared ref-builder behind both {@link
- * HexMapStore.marqueeSelect} (which commits them) and {@link
- * HexMapStore.marqueePreview} (which resolves them for the live highlight), so
- * the previewed box can never disagree with what releasing it selects. Each
- * coordinate is copied, never aliased, so a caller's reused hover object can't
- * retarget a ref later.
+ * Build the {@link SelectionRef}s a marquee box denotes from `hexes`/`labelIds`
+ * (CONTEXT.md → Marquee): a cell ref per coordinate, a label ref per id. Shared by
+ * {@link HexMapStore.marqueeSelect} and {@link HexMapStore.marqueePreview} so the
+ * preview can't disagree with the commit. Coordinates are copied, never aliased.
  */
 function marqueeRefs(hexes: Axial[], labelIds: string[]): SelectionRef[] {
   return [
@@ -1453,13 +1258,10 @@ function marqueeRefs(hexes: Axial[], labelIds: string[]): SelectionRef[] {
 }
 
 /**
- * Append `refs` to `base`, skipping any whose entity is already present (by
- * {@link refKey} identity) — the dedup-preserving union shared by the additive
- * select path ({@link HexMapStore.addRefs}, which commits it) and the marquee
- * preview ({@link HexMapStore.marqueePreview}, which resolves it for the live
- * highlight), so an additive box's live preview can never disagree with what
- * releasing it accumulates. Returns a fresh array; `base` is never mutated, and
- * its order is preserved with the new members appended after it.
+ * Append `refs` to `base`, skipping any already present (by {@link refKey}) — the
+ * dedup-preserving union shared by {@link HexMapStore.addRefs} and
+ * {@link HexMapStore.marqueePreview} so the preview can't disagree with the commit.
+ * Returns a fresh array; `base` is unmutated, order preserved, new members appended.
  */
 function mergeRefs(
   base: readonly SelectionRef[],
@@ -1478,9 +1280,8 @@ function mergeRefs(
 
 /**
  * A stable string key for a {@link SelectionRef}, consistent with
- * {@link sameSelectionRef} (two refs share a key iff they are the same entity).
- * Lets the sweep-time membership tests build an O(1) `Set` index once rather than
- * re-scanning the growing set per swept hex (a quadratic over a long drag).
+ * {@link sameSelectionRef} (same key iff same entity). Lets membership tests build
+ * an O(1) `Set` index rather than rescanning per swept hex (quadratic over a drag).
  */
 function refKey(ref: SelectionRef): string {
   switch (ref.kind) {
@@ -1495,9 +1296,9 @@ function refKey(ref: SelectionRef): string {
 
 /**
  * A unique id for a region/label. Prefers `crypto.randomUUID`, but it is
- * secure-context-only — undefined (and a throw) when Hexly is self-hosted over
- * plain HTTP on a LAN, the intended deployment. The fallback covers that: these
- * are internal ids, so collision resistance is all that matters, not unpredictability.
+ * secure-context-only — undefined over plain HTTP on a LAN, the intended self-hosted
+ * deployment, so the fallback covers that (internal ids: collision resistance is all
+ * that matters, not unpredictability).
  * ponytail: keep the fallback — it's a real calibration knob, not dead code.
  */
 function mintId(): string {

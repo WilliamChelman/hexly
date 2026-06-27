@@ -10,6 +10,7 @@ import {
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Button } from '../../../ui/button';
+import { ButtonGroup } from '../../../ui/button-group';
 import { Chip } from '../../../ui/chip';
 import { Eyebrow } from '../../../ui/eyebrow';
 import { Icon } from '../../../ui/icon/icon';
@@ -25,17 +26,24 @@ const VIEWS: readonly { id: EntityView; labelKey: string; testid: string }[] = [
 ];
 
 /**
- * The hex map editor's page-owned header (ADR-0022): it fills the shared
- * {@link PageHeader} frame with the map's own controls — the editable title, the
- * Editing/Conflict status chip, Tags, and Save/Share — and nothing else. App-level
- * navigation (the former All Maps / Design System buttons) now lives in the
- * {@link NavRail}, not here.
+ * The hex map editor's page-owned header (ADR-0022): fills the shared
+ * {@link PageHeader} with the map's own controls — editable title, Editing/Conflict
+ * chip, Tags, view toggle, Save/Share. App navigation lives in the NavRail, not here.
  */
 @Component({
   selector: 'app-editor-header',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'contents' },
-  imports: [Button, Chip, Eyebrow, Icon, PageHeader, TranslocoPipe, EntityTags],
+  imports: [
+    Button,
+    ButtonGroup,
+    Chip,
+    Eyebrow,
+    Icon,
+    PageHeader,
+    TranslocoPipe,
+    EntityTags,
+  ],
   template: `
     <app-page-header>
       <div pageHeaderTitle class="flex items-center gap-3 min-w-0 flex-1">
@@ -85,22 +93,21 @@ const VIEWS: readonly { id: EntityView; labelKey: string; testid: string }[] = [
       </div>
 
       @if (hasMap()) {
-        <!--
-          Map/Note view toggle (#75): a hexmap carries both a grid and a Content body,
-          so this flips the editor surface between them. A segmented pair driven off
-          the store's view() — the shell renders whichever is pressed (ADR-0017's
-          aria-pressed pattern, as the Inspector membership toggle).
-        -->
+        <!-- Map/Note view toggle (#75): a hexmap carries both a grid and a Content
+             body; this flips the editor surface between them, driven off the store's
+             view() so the shell renders whichever is pressed. -->
         <div
           pageHeaderActions
-          role="group"
+          appButtonGroup
           [attr.aria-label]="'editorShell.view.switchLabel' | transloco"
-          class="flex rounded-sm border border-line overflow-hidden"
         >
           @for (v of views; track v.id) {
             <button
               type="button"
-              class="bg-transparent text-ink-muted border-0 py-1 px-3 text-xs font-semibold cursor-pointer aria-[pressed=true]:text-ink aria-[pressed=true]:bg-gold-soft"
+              appButton
+              variant="ghost"
+              size="sm"
+              [active]="store.view() === v.id"
               [attr.aria-pressed]="store.view() === v.id"
               [attr.data-testid]="v.testid"
               (click)="selectView(v.id)"
@@ -151,11 +158,9 @@ export class EditorHeader {
     viewChild.required<ElementRef<HTMLElement>>('titleEl');
 
   /**
-   * The name shown when the field was focused — the text the user started from.
-   * commit() renames only when the field actually changed against *this*, not the
-   * live {@link title}: so an unedited blur after the name changed server-side
-   * mid-edit (e.g. a conflict reload) restores the new name rather than re-sending
-   * the stale one over it. `null` when not editing.
+   * The name at focus time. commit() compares against this, not the live
+   * {@link title}, so an unedited blur after a mid-edit server change (e.g. conflict
+   * reload) doesn't re-send the stale name. `null` when not editing.
    */
   private editBaseline: string | null = null;
 
@@ -205,11 +210,9 @@ export class EditorHeader {
   }
 
   /**
-   * Switch the editor surface (#75). Updates the store for instant feedback and
-   * mirrors the choice to the URL `view` param (`replaceUrl` — a view flip is not a
-   * navigation), so the session restores it on refresh. The default Map view drops
-   * the param to keep the URL clean. If navigation is cancelled the store is reverted
-   * so it never diverges from the URL.
+   * Switch the editor surface (#75). Updates the store for instant feedback, then
+   * mirrors the choice to the URL `view` param (`replaceUrl`, Map drops the param)
+   * so a refresh restores it. Reverts the store if the navigation is cancelled.
    */
   protected selectView(view: EntityView): void {
     const previous = this.store.view();

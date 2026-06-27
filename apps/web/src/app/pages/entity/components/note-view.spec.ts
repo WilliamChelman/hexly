@@ -7,8 +7,8 @@ import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
 import { NoteView } from './note-view';
 import { noteDetail } from './entity-detail.fixtures';
 
-// NoteView owns only the note's page chrome (title, tags, Save/conflict) around the
-// shared ContentEditor — the editor surface itself is covered by content-editor.spec.
+// NoteView owns the note's page chrome around the shared ContentEditor; the editor
+// surface itself is covered by content-editor.spec.
 describe('NoteView', () => {
   const note = noteDetail;
 
@@ -69,8 +69,7 @@ describe('NoteView', () => {
     const fixture = TestBed.createComponent(NoteView);
     fixture.detectChanges();
 
-    // The ContentEditor renders inside the note view and its stored prose appears,
-    // proving NoteView wires the editor to the open note (not just holds it opaquely).
+    // Stored prose appearing proves NoteView wires the editor to the open note.
     expect(fixture.nativeElement.querySelector('app-content-editor')).not.toBeNull();
     const surface = fixture.nativeElement.querySelector(
       '[data-testid=note-content]',

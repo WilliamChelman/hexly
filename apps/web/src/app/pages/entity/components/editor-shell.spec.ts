@@ -11,9 +11,8 @@ import { EditorShell } from './editor-shell';
 import { EntitySession } from '../services/entity-session';
 import { HexMapStore } from '../services/hexmap-store';
 
-// EditorShell is a pure view: EntityPage loads the routed Entity into the
-// EntitySession and the session owns the tab title (see entity.page.spec /
-// entity-session.spec). This covers only the layout shell it still owns.
+// Pure view: routing/load/tab-title live in EntityPage + EntitySession (see
+// entity.page.spec / entity-session.spec). Covers only the layout shell.
 describe('EditorShell', () => {
   let httpMock: HttpTestingController;
 
@@ -34,7 +33,7 @@ describe('EditorShell', () => {
 
   it('renders the API health reported in the status bar', async () => {
     const fixture = TestBed.createComponent(EditorShell);
-    fixture.detectChanges(); // triggers ngOnInit -> GET /health
+    fixture.detectChanges(); // ngOnInit -> GET /health
 
     httpMock.expectOne('/api/health').flush({ status: 'ok', service: 'api' });
 
@@ -53,9 +52,8 @@ describe('EditorShell', () => {
     fixture.detectChanges();
     httpMock.expectOne('/api/health').flush({ status: 'ok', service: 'api' });
 
-    // A map opens armed with Select so a stray first click never paints (issue #27).
-    // The floating strip is icon-only now, so arming reads from the button's pressed
-    // state rather than a text label (ADR-0013).
+    // Maps open armed with Select so a stray first click never paints (#27).
+    // Icon-only strip, so arming reads from the button's pressed state (ADR-0013).
     const select = (fixture.nativeElement as HTMLElement).querySelector(
       '[data-testid=tool-select]',
     );
@@ -68,9 +66,8 @@ describe('EditorShell', () => {
     httpMock.expectOne('/api/health').flush({ status: 'ok', service: 'api' });
 
     const el = fixture.nativeElement as HTMLElement;
-    // The canvas and the floating strip + rail are present, but nothing covers the
-    // map: the right panel is closed by default, so neither the Inspector nor the
-    // Regions list renders until there's something to show (ADR-0013, story 20).
+    // Canvas, strip, and rail present; right panel closed by default, so neither
+    // Inspector nor Regions renders until there's something to show (ADR-0013, story 20).
     expect(el.querySelector('app-map-canvas')).not.toBeNull();
     expect(el.querySelector('app-tool-palette')).not.toBeNull();
     expect(el.querySelector('app-editor-rail')).not.toBeNull();
@@ -78,7 +75,7 @@ describe('EditorShell', () => {
     expect(el.querySelector('app-regions-panel')).toBeNull();
   });
 
-  // A hexmap whose stored Content body is populated, to prove the Note view seeds it (#75).
+  // Hexmap with a populated Content body, to prove the Note view seeds it (#75).
   const hexmapWithContent = (text: string): EntityDetail => ({
     id: 'm1',
     ownerId: 'u1',
@@ -117,14 +114,14 @@ describe('EditorShell', () => {
     flushHealth();
 
     const el = fixture.nativeElement as HTMLElement;
-    // Default Map view: the grid is up and the Content editor is not.
+    // Default Map view: grid up, Content editor absent.
     expect(el.querySelector('app-map-canvas')).not.toBeNull();
     expect(el.querySelector('app-content-editor')).toBeNull();
   });
 
   it('swaps the canvas for the Content editor in the Note view, seeded with the map’s Content', () => {
     TestBed.inject(EntitySession).adopt(hexmapWithContent('The reach lies north.'));
-    // adopt() opens on the grid; the user flips to the Note view.
+    // adopt() opens on the grid; flip to the Note view.
     TestBed.inject(HexMapStore).setView('note');
 
     const fixture = TestBed.createComponent(EditorShell);
@@ -132,10 +129,10 @@ describe('EditorShell', () => {
     flushHealth();
 
     const el = fixture.nativeElement as HTMLElement;
-    // Note view: the Content editor takes the body and the canvas is gone.
+    // Note view: Content editor takes the body, canvas gone.
     expect(el.querySelector('app-content-editor')).not.toBeNull();
     expect(el.querySelector('app-map-canvas')).toBeNull();
-    // …and it carries the hexmap's stored Content, not an empty doc.
+    // …seeded with the hexmap's stored Content, not an empty doc.
     const surface = el.querySelector('[data-testid=note-content]') as HTMLElement;
     expect(surface.textContent).toContain('The reach lies north.');
   });
@@ -146,11 +143,11 @@ describe('EditorShell', () => {
     httpMock.expectOne('/api/health').flush({ status: 'ok', service: 'api' });
 
     const el = fixture.nativeElement as HTMLElement;
-    // Closed by default — no panel floats over the map.
+    // Closed by default.
     expect(el.querySelector('app-regions-panel')).toBeNull();
     expect(el.querySelector('app-inspector')).toBeNull();
 
-    // The right-edge rail's first entry opens the Regions panel as a floating card.
+    // Rail's first entry opens the Regions panel.
     (el.querySelector('[data-testid=rail-regions]') as HTMLButtonElement).click();
     fixture.detectChanges();
 

@@ -74,7 +74,7 @@ describe('EditorHeader', () => {
     const fixture = TestBed.createComponent(EditorHeader);
     fixture.detectChanges();
 
-    // Edit the title in place (contenteditable), then commit on blur.
+    // Edit in place (contenteditable), commit on blur.
     const title = fixture.nativeElement.querySelector(
       '[data-testid=title]',
     ) as HTMLElement;
@@ -107,7 +107,7 @@ describe('EditorHeader', () => {
     const fixture = TestBed.createComponent(EditorHeader);
     fixture.detectChanges();
 
-    // All Maps / Design System are rail destinations now, not header buttons.
+    // All Maps / Design System are rail destinations, not header buttons.
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).not.toContain('All maps');
     expect(text).not.toContain('Design system');
@@ -118,8 +118,7 @@ describe('EditorHeader', () => {
   });
 
   it('disables Save until an entity is open', () => {
-    // No openMap() here: with none open, Save must be disabled so a click can't
-    // flip the session into a stuck "Saving…" state with nothing to save.
+    // No open map: Save disabled so a click can't strand the session in "Saving…".
     const fixture = TestBed.createComponent(EditorHeader);
     fixture.detectChanges();
 
@@ -228,8 +227,8 @@ describe('EditorHeader', () => {
     expect(fixture.nativeElement.querySelector('[data-testid=conflict]')).toBeNull();
   });
 
-  // The Map/Note view toggle (#75): a hexmap carries both a grid and a Content body,
-  // so the header offers a switch between the two editor surfaces.
+  // Map/Note toggle (#75): a hexmap carries both a grid and a Content body, so the
+  // header switches between the two editor surfaces.
   it('offers a Map/Note view toggle, with Map active by default', () => {
     openMap(aldermoor);
     const fixture = TestBed.createComponent(EditorHeader);
@@ -243,7 +242,7 @@ describe('EditorHeader', () => {
     ) as HTMLButtonElement;
     expect(map).not.toBeNull();
     expect(note).not.toBeNull();
-    // Opens on the grid: Map reads as pressed, Note as not.
+    // Default is the grid: Map pressed, Note not.
     expect(map.getAttribute('aria-pressed')).toBe('true');
     expect(note.getAttribute('aria-pressed')).toBe('false');
   });

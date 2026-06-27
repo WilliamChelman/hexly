@@ -25,9 +25,11 @@ export class BubbleMenuDirective {
           editor,
           element: this.el.nativeElement,
           pluginKey: PLUGIN_KEY,
-          // Default is 250ms, which makes the menu lag behind the selection and linger
-          // after an action; show/hide it in step with the selection.
-          updateDelay: 0,
+          // Debounce appearance so the menu settles after a selection rather than
+          // flickering during the drag. Dismissal stays instant: an action collapses
+          // the selection (FormattingMenu.dismiss), and the plugin only debounces
+          // non-empty selections — an empty one hides on the spot.
+          updateDelay: 250,
         }),
       );
       onCleanup(() => {

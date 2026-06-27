@@ -31,8 +31,8 @@ import { EntityView, HexMapStore } from './hexmap-store';
  * Bridges {@link EntitiesClient} and {@link HexMapStore} for `/entities/:id`:
  * unwraps the stored grid on open, re-wraps it (ADR-0019) on save.
  *
- * Scoped to the `/entities/:id` route (`providers`), not root: leaving the route
- * destroys it, so open-Entity state resets implicitly — no teardown needed in views.
+ * Route-scoped (`providers`), not root: leaving the route destroys it, so
+ * open-Entity state resets implicitly.
  */
 @Injectable()
 export class EntitySession {
@@ -50,30 +50,25 @@ export class EntitySession {
   /** The server's current Entity when a save was rejected as stale, else `null`. */
   readonly conflict = this._conflict.asReadonly();
 
-  /** Fires on load, conflict reload, and note swap — NOT on clean saves or renames, so in-flight keystrokes aren't discarded. */
+  /** Fires on load, conflict reload, note swap — NOT clean saves/renames, so in-flight keystrokes aren't discarded. */
   private readonly _seed = signal<EntityDetail | null>(null);
   readonly seed = this._seed.asReadonly();
 
   private readonly _error = signal<'save' | 'reload' | null>(null);
   readonly error = this._error.asReadonly();
 
-  /**
-   * Live Content envelope (ADR-0019), seeded on load and updated by the editor.
-   * Held here (not in {@link HexMapStore}) because Content spans every Entity type.
-   */
+  /** Live Content envelope (ADR-0019); here not in {@link HexMapStore} since Content spans every Entity type. */
   private readonly _content = signal<Content | null>(null);
   /**
-   * The live Content, for an editor to seed from on (re)mount. Unlike {@link seed},
-   * this carries edits made since load — a clean save advances it but not the seed —
-   * so an editor recreated mid-session (e.g. the hexmap Map↔Note toggle, #75) restores
-   * the latest prose rather than the originally-loaded snapshot.
+   * Live Content for an editor to seed from on (re)mount. Unlike {@link seed} it
+   * carries edits since load, so an editor recreated mid-session (Map↔Note toggle,
+   * #75) restores the latest prose, not the loaded snapshot.
    */
   readonly content = this._content.asReadonly();
 
   /**
-   * Live Tags (#72), seeded on load and edited by the tags UI. Like Content, they
-   * span every Entity type and ride the version-checked save, so a body-only save
-   * never silently drops them. Survives a clean save so in-flight edits aren't lost.
+   * Live Tags (#72): span every Entity type and ride the version-checked save, so a
+   * body-only save never silently drops them. Survives a clean save.
    */
   private readonly _tags = signal<readonly string[]>([]);
   readonly tags = this._tags.asReadonly();
@@ -82,23 +77,21 @@ export class EntitySession {
   readonly saving = this._saving.asReadonly();
 
   /**
-   * Whether a route load is in flight. `current` still holds the previous Entity
-   * until the new one resolves, so writes are blocked — a mounted header can't
-   * rename/save onto the Entity the user just navigated away from.
+   * Route load in flight. `current` still holds the previous Entity until the new
+   * one resolves, so writes are blocked — a header can't rename/save onto the
+   * Entity the user just navigated away from.
    */
   private readonly _loading = signal(false);
 
   constructor() {
-    // One owner for the tab title across all views this route dispatches to —
-    // lives here so neither the map editor nor the note view each re-derive it.
+    // One owner for the tab title across every view this route dispatches to.
     effect(() => this.title.setDocumentName(this._current()?.name ?? null));
     this.destroyRef.onDestroy(() => this.title.setDocumentName(null));
   }
 
   /**
-   * The routed component passes its ActivatedRoute in — a route-scoped service would
-   * get the root injector's route. switchMap prevents a stale A response from landing
-   * over B's canvas; 404 returns to the library.
+   * Caller passes its ActivatedRoute in — a route-scoped service would get the root
+   * injector's route. switchMap keeps a stale A response off B's canvas; 404 → library.
    */
   watchRoute(route: ActivatedRoute): void {
     route.paramMap
@@ -117,8 +110,8 @@ export class EntitySession {
       )
       .subscribe();
 
-    // The editor surface lives in the URL (#75), so a refresh or a shared link lands
-    // on the same view, and opening another Entity (no `view` param) resets to the grid.
+    // Editor surface lives in the URL (#75): refresh/shared link restores the view,
+    // opening another Entity (no `view` param) resets to the grid.
     route.queryParamMap
       .pipe(
         map((q): EntityView => (q.get('view') === 'note' ? 'note' : 'map')),
@@ -136,7 +129,7 @@ export class EntitySession {
     this._conflict.set(null);
     this._error.set(null);
     this._current.set(detail);
-    this._content.set(detail.document.content); // content before seed: seed effect reads content()
+    this._content.set(detail.document.content); // before seed: seed effect reads content()
     this._seed.set(detail);
     this._tags.set(detail.tags);
     this.editor.load(gridOf(detail.document));
@@ -152,12 +145,9 @@ export class EntitySession {
     this._tags.set(tags);
   }
 
-  /**
-   * Always a fresh fetch: this session outlives trips to the library (route injector
-   * isn't torn down), so a cached `current` can be stale (#70).
-   */
+  /** Always a fresh fetch: the session outlives library trips, so a cached `current` can be stale (#70). */
   openRoute(id: string): Observable<EntityDetail> {
-    this.editor.load(emptyHexMap()); // clear the previous map's canvas during load (#7)
+    this.editor.load(emptyHexMap()); // clear the previous canvas during load (#7)
     this._tags.set([]); // and the previous Entity's tags/content, which ride the same load (#88)
     this._content.set(null);
     this._loading.set(true);
@@ -169,22 +159,22 @@ export class EntitySession {
 
   /** Rename the open Entity (metadata only — does not affect the body save). */
   rename(name: string): Observable<EntityDetail> {
-    // No Entity open, or one loading under navigation → safe no-op (not a throw),
-    // so a stale rename can't write to the Entity the user navigated away from (#4).
+    // None open, or one loading under navigation → no-op (not a throw), so a stale
+    // rename can't write to the Entity the user navigated away from (#4).
     const open = this._current();
     if (!open || this._loading()) return EMPTY;
     return this.entities.rename(open.id, name).pipe(
       tap((updated) => {
         this._current.set(updated);
-        this._conflict.set(null); // a fresh state clears any stale 409 chip
+        this._conflict.set(null); // fresh state clears any stale 409 chip
       }),
     );
   }
 
   /** Save the editor's live grid under the open Entity's base version. */
   save(): Observable<EntitySaveOutcome> {
-    // No Entity open, or one loading under navigation → no-op: avoids flipping
-    // `_saving` (would stick the button on "Saving…") or writing to the wrong Entity (#4).
+    // None open, or one loading under navigation → no-op: avoids sticking `_saving`
+    // on "Saving…" or writing to the wrong Entity (#4).
     const open = this._current();
     if (!open || this._loading()) return EMPTY;
     this._saving.set(true);
@@ -195,8 +185,8 @@ export class EntitySession {
     );
     return this.entities.save(open.id, body, open.version, this._tags()).pipe(
       tap((outcome) => {
-        // On conflict, leave the open Entity untouched so the edit isn't lost
-        // before a re-pull; only a clean save advances it.
+        // On conflict, leave the open Entity untouched so the edit survives until
+        // a re-pull; only a clean save advances it.
         if (outcome.status === 'conflict') {
           this._conflict.set(outcome.current);
         } else {
@@ -213,9 +203,9 @@ export class EntitySession {
     );
   }
 
-  /** Conflict resolution path (#6): user accepts the server's version, discarding the rejected local edit. */
+  /** Conflict resolution (#6): accept the server's version, discarding the rejected local edit. */
   reload(): Observable<EntityDetail> {
-    // Always a real GET via `open()` — the conflict re-pull must not be cached (#4).
+    // Real GET via `open()` — the conflict re-pull must not be cached (#4).
     const open = this._current();
     if (!open) return EMPTY;
     this._error.set(null);
@@ -228,14 +218,14 @@ export class EntitySession {
   }
 }
 
-/** Parse through {@link hexMapSchema} so `type`/`content` are dropped by the schema, not a hand-listed field set; returns empty for notes. */
+/** Parse through {@link hexMapSchema} so the schema drops `type`/`content`, not a hand-listed field set; empty for notes. */
 function gridOf(body: EntityBody): HexMap {
   return body.type === 'hexmap' ? hexMapSchema.parse(body) : emptyHexMap();
 }
 
 /**
  * Re-wrap an edited grid into the body, carrying Content and type through (ADR-0019).
- * Non-hexmap bodies are returned as-is, so the hex seam can't coerce a note on save.
+ * Non-hexmap bodies pass through as-is, so the hex seam can't coerce a note on save.
  */
 function withGrid(body: EntityBody, grid: HexMap): EntityBody {
   return body.type === 'hexmap' ? { ...body, ...grid } : body;

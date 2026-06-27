@@ -13,7 +13,7 @@ import { noteDetail } from './entity-detail.fixtures';
 describe('ContentEditor', () => {
   const note = noteDetail;
 
-  // A note whose stored snapshot carries a paragraph of Content, to prove re-seeding.
+  // Note whose stored snapshot carries prose, to prove re-seeding.
   const noteWithProse = (text: string): EntityDetail => ({
     ...note('Lady Mara'),
     document: {
@@ -29,12 +29,12 @@ describe('ContentEditor', () => {
   });
 
   // The editor is a recreated-on-seed signal; reach through to the live instance.
-  // Non-null assertion: tests call this after detectChanges(), so the seed has fired.
+  // Non-null: called after detectChanges(), so the seed has fired.
   const editorOf = (fixture: { componentInstance: unknown }) =>
     (fixture.componentInstance as { editor: () => Editor | null }).editor()!;
 
-  // The formatting bubble menu registers a ProseMirror plugin keyed by name; its
-  // presence on an editor proves BubbleMenuDirective bound to that instance.
+  // The bubble menu registers a ProseMirror plugin keyed by name; its presence
+  // proves BubbleMenuDirective bound to this editor instance.
   const hasBubbleMenu = (editor: Editor) =>
     editor.state.plugins.some((p) => {
       const key = (p.spec.key as { key?: string } | undefined)?.key;
@@ -71,8 +71,8 @@ describe('ContentEditor', () => {
 
     const fixture = create();
 
-    // The stored prose renders into the editable surface — proving the snapshot
-    // was loaded into the editor, not just held opaquely in the session.
+    // Stored prose renders into the surface — the snapshot was loaded into the
+    // editor, not just held in the session.
     const surface = fixture.nativeElement.querySelector(
       '[data-testid=note-content]',
     ) as HTMLElement;
@@ -94,9 +94,8 @@ describe('ContentEditor', () => {
 
     const fixture = create();
 
-    // Type "/" into the live editor; the suggestion plugin should surface the menu.
     editorOf(fixture).commands.insertContent('/');
-    // @tiptap/suggestion resolves items() asynchronously, then fires onStart/onUpdate.
+    // @tiptap/suggestion resolves items() async, then fires onStart/onUpdate.
     await new Promise((resolve) => setTimeout(resolve));
     fixture.detectChanges();
 
@@ -110,8 +109,8 @@ describe('ContentEditor', () => {
 
     const fixture = create();
 
-    // The toolbar is rendered (hidden until a selection); the bubble-menu plugin
-    // owns its show/hide, so presence is what wiring guarantees here.
+    // Toolbar is rendered (hidden until selection); the plugin owns show/hide,
+    // so presence is all the wiring guarantees.
     expect(fixture.nativeElement.querySelector('[role=toolbar]')).not.toBeNull();
   });
 
@@ -127,13 +126,13 @@ describe('ContentEditor', () => {
     fixture.detectChanges();
     const second = editorOf(fixture);
 
-    // The previous editor is destroyed via queueMicrotask (after TiptapDirective mounts
-    // the new surface), so flush the microtask queue before asserting.
+    // Previous editor is destroyed via queueMicrotask (after the new surface
+    // mounts); flush the queue before asserting.
     await new Promise((r) => queueMicrotask(r as () => void));
 
     expect(second).not.toBe(first);
     expect(first.isDestroyed).toBe(true);
-    // The bubble menu must follow onto the fresh editor (the reason epoch once existed).
+    // The bubble menu must follow onto the fresh editor.
     expect(hasBubbleMenu(second)).toBe(true);
 
     const surface = fixture.nativeElement.querySelector(
@@ -144,11 +143,9 @@ describe('ContentEditor', () => {
   });
 
   it('seeds a remounted editor from the live Content, not the stale load snapshot', () => {
-    // Repro of the hexmap Map↔Note toggle bug (#75): the editor is destroyed when
-    // the user leaves the Note view and recreated on return. A clean save updates
-    // the session's live Content but not its seed, so a remount must read the live
-    // edits — otherwise it re-seeds the originally-loaded prose and the edit vanishes
-    // until a full reload.
+    // Repro of the Map↔Note toggle bug (#75): the editor is destroyed/recreated
+    // across views. A clean save advances the session's live Content but not its
+    // seed, so a remount must re-seed from the live edits, not the load snapshot.
     const session = TestBed.inject(EntitySession);
     session.adopt(noteWithProse('Original prose.'));
 
