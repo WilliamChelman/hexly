@@ -33,6 +33,6 @@ test('types into a note, saves, and the Content survives a reload', async ({
   expect(res.ok()).toBeTruthy();
   const detail = await res.json();
   expect(detail.document.type).toBe('note');
-  expect(detail.document.content.format).toBe('tiptap-v1'); // mirrors CONTENT_FORMAT
+  expect(detail.document.content.format).toBe('tiptap-v2'); // mirrors CONTENT_FORMAT
   expect(JSON.stringify(detail.document.content.snapshot)).toContain(content);
 });

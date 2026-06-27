@@ -7,12 +7,19 @@
 import { z } from 'zod';
 import { emptyHexMap, hexMapSchema } from './hex/hex-map';
 
-/** Single source for the format tag (ADR-0019); a schema-affecting extension change is a bump + migration. */
-export const CONTENT_FORMAT = 'tiptap-v1';
+/** The format tag new saves write (ADR-0019); a schema-affecting extension change is a bump + migration. */
+export const CONTENT_FORMAT = 'tiptap-v2';
+
+/**
+ * Formats a reader loads losslessly (ADR-0023 dual-read). `tiptap-v2` is additive
+ * over `tiptap-v1` (it adds the `entityLink` node), so a v1 doc simply has none and
+ * round-trips untouched — no transform either way. Saves always write CONTENT_FORMAT.
+ */
+export const READABLE_CONTENT_FORMATS = ['tiptap-v1', 'tiptap-v2'] as const;
 
 /** Opaque, format-tagged Content (ADR-0019). `snapshot` is `z.unknown()` — the domain never parses it. */
 export const contentSchema = z.object({
-  format: z.literal(CONTENT_FORMAT),
+  format: z.enum(READABLE_CONTENT_FORMATS),
   snapshot: z.unknown(),
 });
 

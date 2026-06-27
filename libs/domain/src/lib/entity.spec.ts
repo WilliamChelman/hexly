@@ -25,6 +25,18 @@ describe('contentSchema', () => {
     expect(JSON.parse(JSON.stringify(parsed))).toEqual(envelope);
   });
 
+  it('round-trips a tiptap-v2 snapshot untouched — dual-read across the format bump (ADR-0023)', () => {
+    // v2 is additive over v1; a reader loads either losslessly with no transform.
+    const envelope = {
+      format: 'tiptap-v2' as const,
+      snapshot: { type: 'doc', content: [{ type: 'entityLink', attrs: { entityId: 'e1' } }] },
+    };
+
+    const parsed = contentSchema.parse(envelope);
+
+    expect(parsed).toEqual(envelope);
+  });
+
   it('rejects a Content envelope tagged with an unknown format', () => {
     expect(() =>
       contentSchema.parse({ format: 'markdown-v9', snapshot: {} }),
@@ -68,7 +80,7 @@ describe('emptyEntityBody', () => {
     expect(entityBodySchema.parse(body)).toEqual(body);
     expect(body).toEqual({
       type: 'note',
-      content: { format: 'tiptap-v1', snapshot: { type: 'doc', content: [] } },
+      content: { format: 'tiptap-v2', snapshot: { type: 'doc', content: [] } },
     });
   });
 
