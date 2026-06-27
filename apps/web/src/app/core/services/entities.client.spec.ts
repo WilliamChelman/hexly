@@ -145,7 +145,9 @@ describe('EntitiesClient', () => {
     };
 
     let outcome: unknown;
-    client.save('e1', painted, 1, ['deity', 'ruined']).subscribe((o) => (outcome = o));
+    client
+      .save('e1', painted, 1, ['deity', 'ruined'], ['spouse'])
+      .subscribe((o) => (outcome = o));
 
     const req = http.expectOne('/api/entities/e1');
     expect(req.request.method).toBe('PUT');
@@ -153,6 +155,7 @@ describe('EntitiesClient', () => {
       document: painted,
       version: 1,
       tags: ['deity', 'ruined'],
+      descriptors: ['spouse'],
     });
 
     const saved: EntityDetail = { ...aldermoor, version: 2, document: painted };
@@ -161,11 +164,22 @@ describe('EntitiesClient', () => {
     expect(outcome).toEqual({ status: 'saved', entity: saved });
   });
 
+  it('reads the owner’s descriptor vocabulary (#96)', () => {
+    let listed: unknown;
+    client.listDescriptors().subscribe((d) => (listed = d));
+
+    const req = http.expectOne('/api/entities/descriptors');
+    expect(req.request.method).toBe('GET');
+    req.flush(['capital of', 'spouse']);
+
+    expect(listed).toEqual(['capital of', 'spouse']);
+  });
+
   it('reports a 409 as a conflict outcome carrying the server entity', () => {
     const serverCurrent: EntityDetail = { ...aldermoor, version: 5 };
 
     let outcome: unknown;
-    client.save('e1', emptyHexmapBody, 1, []).subscribe((o) => (outcome = o));
+    client.save('e1', emptyHexmapBody, 1, [], []).subscribe((o) => (outcome = o));
 
     http
       .expectOne('/api/entities/e1')
@@ -179,7 +193,7 @@ describe('EntitiesClient', () => {
     // EntityDetail. It must not be reported as a conflict (which would break the
     // conflict UI reading .name/.version off a string) — surface it as an error.
     let errored = false;
-    client.save('e1', emptyHexmapBody, 1, []).subscribe({
+    client.save('e1', emptyHexmapBody, 1, [], []).subscribe({
       error: () => (errored = true),
     });
     http

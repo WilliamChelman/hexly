@@ -81,6 +81,16 @@ const dedupedTags = z
 
 export const tagsSchema = dedupedTags.default([]);
 
+/**
+ * Link Descriptors harvested from a note's live Content and sent on save (#96,
+ * ADR-0023): the distinct relationship labels ("spouse", "capital of") this Entity
+ * currently uses. Normalized exactly like {@link tagsSchema} — trimmed, lower-cased,
+ * deduped, blanks rejected — so the owner vocabulary folds case the same way. Defaults
+ * to empty so a save with no links still carries an (empty) set, which the server's
+ * replace-on-save then prunes.
+ */
+export const descriptorsSchema = dedupedTags.default([]);
+
 /** POST /entities: body (Content + payload) is minted server-side. */
 export const createEntityRequestSchema = z.object({
   name: nameSchema,
@@ -102,6 +112,10 @@ export const saveEntityRequestSchema = z.object({
   // Tags ride the version-checked save (#72): always the full current set, so a
   // save replaces the stored tags — an empty array clears them.
   tags: dedupedTags,
+  // Distinct Link Descriptors harvested from the live doc (#96): ride the same save,
+  // replacing the server's per-entity index. Optional/defaulted so an older client omitting
+  // them saves cleanly (and prunes nothing it didn't know about — it just sends []).
+  descriptors: descriptorsSchema,
 });
 
 export type SaveEntityRequest = z.infer<typeof saveEntityRequestSchema>;

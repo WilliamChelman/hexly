@@ -60,6 +60,14 @@ export function createDb(path: string): Db {
     );
     -- The list endpoint and every access check filter by owner.
     CREATE INDEX IF NOT EXISTS idx_entities_owner_id ON entities(owner_id);
+    -- The owner's Link Descriptor vocabulary (#96): one row per (entity, descriptor),
+    -- replaced on each successful save and cascade-deleted with its entity.
+    -- owner_id is omitted — derivable via entities(id) JOIN, and the PK covers entity lookups.
+    CREATE TABLE IF NOT EXISTS entity_descriptors (
+      entity_id TEXT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+      descriptor TEXT NOT NULL,
+      PRIMARY KEY (entity_id, descriptor)
+    );
   `);
   return drizzle(sqlite, { schema });
 }

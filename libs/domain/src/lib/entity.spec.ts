@@ -153,7 +153,27 @@ describe('saveEntityRequestSchema', () => {
 
     expect(
       saveEntityRequestSchema.parse({ document: body, version: 3, tags: [] }),
-    ).toEqual({ document: body, version: 3, tags: [] });
+    ).toEqual({ document: body, version: 3, tags: [], descriptors: [] });
+  });
+
+  it('accepts harvested descriptors, normalizing them like tags and defaulting to empty (#96)', () => {
+    const body = { type: 'note' as const, content };
+
+    // Trim, lower-case, dedupe — the same vocabulary normalization as tags.
+    expect(
+      saveEntityRequestSchema.parse({
+        document: body,
+        version: 1,
+        tags: [],
+        descriptors: [' Spouse ', 'spouse', 'Capital Of'],
+      }).descriptors,
+    ).toEqual(['spouse', 'capital of']);
+
+    // Absent descriptors default to empty — an older client (or a save with none) is valid.
+    expect(
+      saveEntityRequestSchema.parse({ document: body, version: 1, tags: [] })
+        .descriptors,
+    ).toEqual([]);
   });
 
   it('requires tags on save — the save always carries the full current set', () => {
