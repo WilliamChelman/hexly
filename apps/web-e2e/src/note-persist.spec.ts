@@ -24,9 +24,9 @@ test('types into a note, saves, and the Content survives a reload', async ({
 
   // Wait on the HTTP response, not just the button text — the reload can't race an in-flight PUT.
   const saved = waitForSave(page);
-  await page.getByTestId('save').click();
+  await page.keyboard.press('ControlOrMeta+s');
   await saved;
-  await expect(page.getByTestId('save')).toHaveText('Save');
+  await expect(page.getByTestId('save-status')).toHaveText('Saved');
 
   await page.reload();
   await expect(page.getByTestId('note-content')).toContainText(content);

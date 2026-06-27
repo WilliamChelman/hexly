@@ -45,10 +45,10 @@ test('paints a hex, saves, and the hex survives a reload', async ({
       /\/api\/entities\/[\w-]+$/.test(res.url()) &&
       res.ok(),
   );
-  await page.getByTestId('save').click();
+  await page.keyboard.press('ControlOrMeta+s');
   await saved;
   // The button has also left its busy state.
-  await expect(page.getByTestId('save')).toHaveText('Save');
+  await expect(page.getByTestId('save-status')).toHaveText('Saved');
 
   // The seam under test: a fresh load re-fetches and re-renders the saved map.
   await page.reload();

@@ -19,9 +19,9 @@ async function savedDocument(page: import('@playwright/test').Page, request: imp
       /\/api\/entities\/[\w-]+$/.test(res.url()) &&
       res.ok(),
   );
-  await page.getByTestId('save').click();
+  await page.keyboard.press('ControlOrMeta+s');
   await saved;
-  await expect(page.getByTestId('save')).toHaveText('Save');
+  await expect(page.getByTestId('save-status')).toHaveText('Saved');
   const res = await request.get(`/api/entities/${mapId}`);
   expect(res.ok()).toBeTruthy();
   return (await res.json()).document;

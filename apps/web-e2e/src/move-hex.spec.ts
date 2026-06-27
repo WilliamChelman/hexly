@@ -65,9 +65,9 @@ test('drags a hex under Select to a new coordinate, and the move survives a relo
       /\/api\/entities\/[\w-]+$/.test(res.url()) &&
       res.ok(),
   );
-  await page.getByTestId('save').click();
+  await page.keyboard.press('ControlOrMeta+s');
   await saved;
-  await expect(page.getByTestId('save')).toHaveText('Save');
+  await expect(page.getByTestId('save-status')).toHaveText('Saved');
 
   // The persisted document holds one hex, no longer at the origin, still Forest:
   // the origin became Void and the destination took the moved content.
@@ -161,9 +161,9 @@ test('drags a hex onto an occupied hex and swaps the two, surviving a reload', a
       /\/api\/entities\/[\w-]+$/.test(res.url()) &&
       res.ok(),
   );
-  await page.getByTestId('save').click();
+  await page.keyboard.press('ControlOrMeta+s');
   await saved;
-  await expect(page.getByTestId('save')).toHaveText('Save');
+  await expect(page.getByTestId('save-status')).toHaveText('Saved');
 
   const res = await request.get(`/api/entities/${mapId}`);
   expect(res.ok()).toBeTruthy();
@@ -295,9 +295,9 @@ test('drags a multi-hex selection so the whole group moves by one offset', async
       /\/api\/entities\/[\w-]+$/.test(res.url()) &&
       res.ok(),
   );
-  await page.getByTestId('save').click();
+  await page.keyboard.press('ControlOrMeta+s');
   await saved;
-  await expect(page.getByTestId('save')).toHaveText('Save');
+  await expect(page.getByTestId('save-status')).toHaveText('Saved');
 
   const res = await request.get(`/api/entities/${mapId}`);
   expect(res.ok()).toBeTruthy();
@@ -371,9 +371,9 @@ test('refuses a blocked group move, leaving every hex where it was', async ({
       /\/api\/entities\/[\w-]+$/.test(res.url()) &&
       res.ok(),
   );
-  await page.getByTestId('save').click();
+  await page.keyboard.press('ControlOrMeta+s');
   await saved;
-  await expect(page.getByTestId('save')).toHaveText('Save');
+  await expect(page.getByTestId('save-status')).toHaveText('Saved');
 
   const res = await request.get(`/api/entities/${mapId}`);
   expect(res.ok()).toBeTruthy();

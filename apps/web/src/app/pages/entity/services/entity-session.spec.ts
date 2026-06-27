@@ -3,6 +3,7 @@ import {
   HttpTestingController,
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
+import { createEnvironmentInjector, EnvironmentInjector } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { of } from 'rxjs';
@@ -168,6 +169,198 @@ describe('EntitySession', () => {
 
     expect(editor.document()).toEqual(desertAt99);
     expect(session.conflict()).toBeNull();
+  });
+
+  it('is not dirty on open, and dirty after a grid edit', () => {
+    openAldermoor();
+    expect(session.dirty()).toBe(false);
+
+    editor.paintAt({ q: 5, r: 5 }, 'ocean');
+    expect(session.dirty()).toBe(true);
+  });
+
+  it('clears dirty on a clean save', () => {
+    openAldermoor();
+    editor.paintAt({ q: 5, r: 5 }, 'ocean');
+    expect(session.dirty()).toBe(true);
+
+    session.save().subscribe();
+    http
+      .expectOne('/api/entities/m1')
+      .flush({ ...aldermoor, version: 4, document: bodyOf(editor.document()) });
+
+    expect(session.dirty()).toBe(false);
+  });
+
+  it('keeps a mid-flight Content edit dirty across a clean save (linchpin, ADR-0026)', () => {
+    openAldermoor();
+    const first = {
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'first' }] }],
+    };
+    session.setContent(first);
+
+    // Save captures `first`, then the user keeps typing before the response lands.
+    session.save().subscribe();
+    const second = {
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'second' }] }],
+    };
+    session.setContent(second);
+
+    http.expectOne('/api/entities/m1').flush({ ...aldermoor, version: 4 });
+
+    // Baseline advanced to the sent `first`, not the live `second`, so the
+    // mid-flight keystrokes are still pending — not silently dropped.
+    expect(session.dirty()).toBe(true);
+  });
+
+  describe('autosave scheduler', () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    /** Flush Angular effects, then fire any debounce timer due within `ms`. */
+    function settle(ms = 800) {
+      TestBed.tick();
+      vi.advanceTimersByTime(ms);
+    }
+
+    it('autosaves a debounced PUT after an edit', () => {
+      openAldermoor();
+      editor.paintAt({ q: 5, r: 5 }, 'ocean');
+
+      TestBed.tick();
+      vi.advanceTimersByTime(799);
+      http.expectNone('/api/entities/m1'); // not yet
+
+      vi.advanceTimersByTime(1);
+      const req = http.expectOne('/api/entities/m1');
+      expect(req.request.method).toBe('PUT');
+      req.flush({ ...aldermoor, version: 4, document: bodyOf(editor.document()) });
+
+      settle(); // let the post-save effect settle (no follow-up save)
+      http.expectNone('/api/entities/m1');
+    });
+
+    it('flushes a pending edit on destroy (route leave), best-effort', () => {
+      // A fresh session in a child injector we can destroy with the HTTP controller
+      // still alive — modelling navigation away mid-debounce.
+      const parent = TestBed.inject(EnvironmentInjector);
+      const child = createEnvironmentInjector([EntitySession, HexMapStore], parent);
+      const leaving = child.get(EntitySession);
+      const leavingEditor = child.get(HexMapStore);
+
+      leaving.open('m1').subscribe();
+      http.expectOne('/api/entities/m1').flush(aldermoor);
+      leavingEditor.paintAt({ q: 5, r: 5 }, 'ocean'); // dirty, debounce not yet elapsed
+      expect(leaving.dirty()).toBe(true);
+
+      child.destroy();
+
+      const req = http.expectOne('/api/entities/m1');
+      expect(req.request.method).toBe('PUT');
+      req.flush({ ...aldermoor, version: 4 });
+    });
+
+    it('does not flush on destroy when nothing is dirty', () => {
+      const parent = TestBed.inject(EnvironmentInjector);
+      const child = createEnvironmentInjector([EntitySession, HexMapStore], parent);
+      const leaving = child.get(EntitySession);
+
+      leaving.open('m1').subscribe();
+      http.expectOne('/api/entities/m1').flush(aldermoor);
+
+      child.destroy();
+      http.expectNone('/api/entities/m1');
+    });
+
+    it('coalesces edits during an in-flight save into one follow-up save', () => {
+      openAldermoor();
+      editor.paintAt({ q: 5, r: 5 }, 'ocean');
+      settle();
+      const first = http.expectOne('/api/entities/m1'); // in flight, version 3
+
+      // Edit while the save is in flight: no second save starts (single-flight).
+      editor.paintAt({ q: 6, r: 6 }, 'forest');
+      settle();
+      http.expectNone('/api/entities/m1');
+
+      first.flush({ ...aldermoor, version: 4, document: bodyOf(editor.document()) });
+
+      // Exactly one coalesced follow-up, under the advanced version, carrying both edits.
+      settle();
+      const second = http.expectOne('/api/entities/m1');
+      expect(second.request.body).toEqual(
+        expect.objectContaining({ version: 4 }),
+      );
+      second.flush({ ...aldermoor, version: 5, document: bodyOf(editor.document()) });
+
+      settle();
+      http.expectNone('/api/entities/m1');
+    });
+
+    it('resets the debounce on each edit, saving only after the last (trailing)', () => {
+      openAldermoor();
+      editor.paintAt({ q: 5, r: 5 }, 'ocean');
+      TestBed.tick();
+      vi.advanceTimersByTime(500);
+
+      editor.paintAt({ q: 6, r: 6 }, 'forest'); // re-arms the window
+      TestBed.tick();
+      vi.advanceTimersByTime(500); // 500ms since the last edit — still quiet
+      http.expectNone('/api/entities/m1');
+
+      vi.advanceTimersByTime(300); // 800ms since the last edit
+      http
+        .expectOne('/api/entities/m1')
+        .flush({ ...aldermoor, version: 4, document: bodyOf(editor.document()) });
+    });
+
+    it('pauses autosave while a conflict is unresolved', () => {
+      openAldermoor();
+      editor.paintAt({ q: 5, r: 5 }, 'ocean');
+      settle();
+      http
+        .expectOne('/api/entities/m1')
+        .flush({ ...aldermoor, version: 7, document: bodyOf(desertAt99) }, {
+          status: 409,
+          statusText: 'Conflict',
+        });
+      expect(session.conflict()).not.toBeNull();
+
+      // Further edits accumulate but must not loop the stale base version.
+      editor.paintAt({ q: 6, r: 6 }, 'forest');
+      settle();
+      http.expectNone('/api/entities/m1');
+      expect(session.dirty()).toBe(true);
+    });
+
+    it('resumes autosave after a conflict is resolved by reload', () => {
+      openAldermoor();
+      editor.paintAt({ q: 5, r: 5 }, 'ocean');
+      settle();
+      http
+        .expectOne('/api/entities/m1')
+        .flush({ ...aldermoor, version: 7, document: bodyOf(desertAt99) }, {
+          status: 409,
+          statusText: 'Conflict',
+        });
+
+      session.reload().subscribe();
+      http
+        .expectOne('/api/entities/m1')
+        .flush({ ...aldermoor, version: 7, document: bodyOf(desertAt99) });
+      expect(session.conflict()).toBeNull();
+
+      // A fresh edit autosaves again under the reloaded version.
+      editor.paintAt({ q: 1, r: 1 }, 'ocean');
+      settle();
+      const req = http.expectOne('/api/entities/m1');
+      expect(req.request.body).toEqual(
+        expect.objectContaining({ version: 7 }),
+      );
+      req.flush({ ...aldermoor, version: 8, document: bodyOf(editor.document()) });
+    });
   });
 
   it('renames the open entity', () => {
@@ -337,6 +530,36 @@ describe('EntitySession', () => {
     } as unknown as ActivatedRoute);
 
     expect(editor.view()).toBe('map');
+  });
+
+  it('warns on tab close (beforeunload) only when there are unsaved edits', () => {
+    openAldermoor();
+
+    const clean = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(clean);
+    expect(clean.defaultPrevented).toBe(false);
+
+    editor.paintAt({ q: 5, r: 5 }, 'ocean');
+    const dirty = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(dirty);
+    expect(dirty.defaultPrevented).toBe(true);
+  });
+
+  it('flushes a save immediately on Cmd/Ctrl+S, bypassing the debounce', () => {
+    openAldermoor();
+    editor.paintAt({ q: 5, r: 5 }, 'ocean');
+
+    const event = new KeyboardEvent('keydown', {
+      key: 's',
+      metaKey: true,
+      cancelable: true,
+    });
+    window.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true); // suppresses the browser "save page" dialog
+    const req = http.expectOne('/api/entities/m1');
+    expect(req.request.method).toBe('PUT');
+    req.flush({ ...aldermoor, version: 4, document: bodyOf(editor.document()) });
   });
 
   it('is a safe no-op with no entity open (no request, no throw)', () => {

@@ -44,9 +44,9 @@ test('places a feature on a hex, saves, and the feature survives a reload', asyn
       /\/api\/entities\/[\w-]+$/.test(res.url()) &&
       res.ok(),
   );
-  await page.getByTestId('save').click();
+  await page.keyboard.press('ControlOrMeta+s');
   await saved;
-  await expect(page.getByTestId('save')).toHaveText('Save');
+  await expect(page.getByTestId('save-status')).toHaveText('Saved');
 
   // The seam under test: a fresh load re-fetches and re-renders the saved map.
   await page.reload();

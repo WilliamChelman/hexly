@@ -24,9 +24,9 @@ test('adds tags on a note, saves, and they survive reload and show in the librar
   await expect(tags).not.toContainText('ruined');
 
   const saved = waitForSave(page);
-  await page.getByTestId('save').click();
+  await page.keyboard.press('ControlOrMeta+s');
   await saved;
-  await expect(page.getByTestId('save')).toHaveText('Save');
+  await expect(page.getByTestId('save-status')).toHaveText('Saved');
 
   await page.reload();
   await expect(page.getByTestId('entity-tags')).toContainText('deity');

@@ -87,7 +87,11 @@
       "editorLabel": "Notes de la carte"
     },
     "save": {
-      "conflict": "Version plus récente sur le serveur"
+      "conflict": "Version plus récente sur le serveur",
+      "saved": "Enregistré",
+      "unsaved": "Non enregistré…",
+      "failed": "Échec de l'enregistrement",
+      "retry": "Réessayer"
     },
     "moveBlocked": "Déplacement bloqué — un obstacle gêne le passage.",
     "toolPalette": {

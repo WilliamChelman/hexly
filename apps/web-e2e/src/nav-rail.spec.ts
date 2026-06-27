@@ -29,7 +29,7 @@ test('the rail navigates, exposes account controls, and pages own their headers'
   await page.getByRole('button', { name: 'New map' }).click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   await expect(page.getByTestId('title')).toBeVisible();
-  await expect(page.getByTestId('save')).toBeVisible();
+  await expect(page.getByTestId('save-status')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Share' })).toBeVisible();
   // The former All Maps / Design System buttons are gone — that's rail navigation.
   await expect(page.getByRole('link', { name: 'All maps' })).toHaveCount(0);

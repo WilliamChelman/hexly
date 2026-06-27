@@ -152,7 +152,7 @@ test('a painting Tool over a floating Label paints the hex beneath instead of gr
       /\/api\/entities\/[\w-]+$/.test(res.url()) &&
       res.ok(),
   );
-  await page.getByTestId('save').click();
+  await page.keyboard.press('ControlOrMeta+s');
   await saved;
 
   const res = await request.get(`/api/entities/${mapId}`);

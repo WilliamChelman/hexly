@@ -117,33 +117,6 @@ describe('EditorHeader', () => {
     ).toBeNull();
   });
 
-  it('disables Save until an entity is open', () => {
-    // No open map: Save disabled so a click can't strand the session in "Saving…".
-    const fixture = TestBed.createComponent(EditorHeader);
-    fixture.detectChanges();
-
-    const save = fixture.nativeElement.querySelector(
-      '[data-testid=save]',
-    ) as HTMLButtonElement;
-    expect(save.disabled).toBe(true);
-  });
-
-  it('saves the open entity under its base version when Save is clicked', () => {
-    openMap(aldermoor);
-    const fixture = TestBed.createComponent(EditorHeader);
-    fixture.detectChanges();
-
-    const save = fixture.nativeElement.querySelector(
-      '[data-testid=save]',
-    ) as HTMLButtonElement;
-    save.click();
-
-    const req = http.expectOne('/api/entities/m1');
-    expect(req.request.method).toBe('PUT');
-    expect(req.request.body.version).toBe(3);
-    req.flush({ ...aldermoor, version: 4 });
-  });
-
   it('renders its chrome and actions in French when French is the active language', () => {
     openMap(aldermoor);
     const fixture = TestBed.createComponent(EditorHeader);
@@ -154,13 +127,10 @@ describe('EditorHeader', () => {
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
-    // Name stays verbatim — asserted in the next test.
-    expect(el.textContent).toContain('Édition');
     expect(el.textContent).toContain('Partager');
-    expect(el.textContent).not.toContain('Editing');
-    const save = el.querySelector('[data-testid=save]') as HTMLButtonElement;
-    expect(save.textContent).toContain('Enregistrer');
-    expect(save.textContent).not.toContain('Save');
+    // The autosave status chip (no Save button anymore, ADR-0026): clean → "Enregistré".
+    expect(el.textContent).toContain('Enregistré');
+    expect(el.textContent).not.toContain('Saved');
   });
 
   it('keeps the user’s entity name verbatim — never translated — under French', () => {
@@ -175,56 +145,6 @@ describe('EditorHeader', () => {
       '[data-testid=title]',
     ) as HTMLButtonElement;
     expect(title.textContent?.trim()).toBe('Save');
-  });
-
-  it('surfaces a 409 save conflict as a translated message', () => {
-    openMap(aldermoor);
-    const fixture = TestBed.createComponent(EditorHeader);
-    fixture.detectChanges();
-
-    // English first: confirms the 409 maps to editorShell.save.conflict.
-    (
-      fixture.nativeElement.querySelector('[data-testid=save]') as HTMLButtonElement
-    ).click();
-    http
-      .expectOne('/api/entities/m1')
-      .flush({ ...aldermoor, version: 9 }, { status: 409, statusText: 'Conflict' });
-    fixture.detectChanges();
-
-    const conflict = () =>
-      fixture.nativeElement.querySelector('[data-testid=conflict]') as HTMLElement;
-    expect(conflict().textContent).toContain('Newer version on server');
-
-    TestBed.inject(TranslocoService).setActiveLang('fr');
-    fixture.detectChanges();
-    expect(conflict().textContent).toContain('Version plus récente sur le serveur');
-    expect(conflict().textContent).not.toContain('Newer version on server');
-  });
-
-  it('surfaces a save conflict and re-pulls when the user reloads', () => {
-    openMap(aldermoor);
-    const fixture = TestBed.createComponent(EditorHeader);
-    fixture.detectChanges();
-
-    (
-      fixture.nativeElement.querySelector('[data-testid=save]') as HTMLButtonElement
-    ).click();
-    http
-      .expectOne('/api/entities/m1')
-      .flush({ ...aldermoor, version: 9 }, { status: 409, statusText: 'Conflict' });
-    fixture.detectChanges();
-
-    expect(fixture.nativeElement.querySelector('[data-testid=conflict]')).not.toBeNull();
-
-    (
-      fixture.nativeElement.querySelector(
-        '[data-testid=conflict-reload]',
-      ) as HTMLButtonElement
-    ).click();
-    http.expectOne('/api/entities/m1').flush({ ...aldermoor, version: 9 });
-    fixture.detectChanges();
-
-    expect(fixture.nativeElement.querySelector('[data-testid=conflict]')).toBeNull();
   });
 
   // Map/Note toggle (#75): a hexmap carries both a grid and a Content body, so the

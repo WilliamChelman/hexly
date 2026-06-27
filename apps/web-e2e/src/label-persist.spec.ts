@@ -41,9 +41,9 @@ test('places a label, edits its text, saves, and it survives a reload', async ({
       /\/api\/entities\/[\w-]+$/.test(res.url()) &&
       res.ok(),
   );
-  await page.getByTestId('save').click();
+  await page.keyboard.press('ControlOrMeta+s');
   await saved;
-  await expect(page.getByTestId('save')).toHaveText('Save');
+  await expect(page.getByTestId('save-status')).toHaveText('Saved');
 
   // The persisted document really holds the label, free-positioned at a point.
   const res = await request.get(`/api/entities/${mapId}`);

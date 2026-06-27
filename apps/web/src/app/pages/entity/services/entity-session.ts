@@ -1,4 +1,11 @@
-import { DestroyRef, Injectable, effect, inject, signal } from '@angular/core';
+import {
+  computed,
+  DestroyRef,
+  Injectable,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
@@ -34,6 +41,9 @@ import { EntityView, HexMapStore } from './hexmap-store';
  * Route-scoped (`providers`), not root: leaving the route destroys it, so
  * open-Entity state resets implicitly.
  */
+/** Trailing-debounce window before an edit is autosaved (ADR-0026). */
+const AUTOSAVE_DELAY_MS = 800;
+
 @Injectable()
 export class EntitySession {
   private readonly entities = inject(EntitiesClient);
@@ -77,6 +87,27 @@ export class EntitySession {
   readonly saving = this._saving.asReadonly();
 
   /**
+   * The last-persisted reference of each savable input (grid, Content, Tags), captured
+   * on load and reset to the *sent* snapshot after a clean save. {@link dirty} is the
+   * single channel: derived by reference equality against these, so a new editing
+   * widget can't forget to flag a change — if it mutates a savable signal, dirty sees
+   * it (ADR-0026). Reference equality is sound because immer's commit/undo/redo and
+   * TipTap-minted Content only yield a new reference on a real edit (ADR-0005).
+   */
+  private readonly _baseGrid = signal<HexMap | null>(null);
+  private readonly _baseContent = signal<Content | null>(null);
+  private readonly _baseTags = signal<readonly string[]>([]);
+
+  /** True when any savable input has moved off its baseline; false with none open. */
+  readonly dirty = computed(
+    () =>
+      this._current() !== null &&
+      (this.editor.document() !== this._baseGrid() ||
+        this._content() !== this._baseContent() ||
+        this._tags() !== this._baseTags()),
+  );
+
+  /**
    * Route load in flight. `current` still holds the previous Entity until the new
    * one resolves, so writes are blocked — a header can't rename/save onto the
    * Entity the user just navigated away from.
@@ -87,6 +118,54 @@ export class EntitySession {
     // One owner for the tab title across every view this route dispatches to.
     effect(() => this.title.setDocumentName(this._current()?.name ?? null));
     this.destroyRef.onDestroy(() => this.title.setDocumentName(null));
+
+    // Best-effort flush on route leave (ADR-0026): the debounce almost always leaves a
+    // pending edit when the user navigates. The HttpClient request outlives this
+    // destroyed, route-scoped session, so it completes; a conflict/error it can't show
+    // is accepted (last-write-wins, and the in-app chip covers staying on the page).
+    this.destroyRef.onDestroy(() => {
+      if (this.dirty()) this.save().subscribe();
+    });
+
+    // Tab close / refresh / external nav tears the page down before any async save can
+    // land (ADR-0026): warn the browser so the user can stay and let autosave finish.
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (this.dirty()) event.preventDefault();
+    };
+    // Cmd/Ctrl+S flushes now instead of waiting out the debounce, and suppresses the
+    // browser's "save page" dialog — muscle memory still works without a button.
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === 's' && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        this.save().subscribe();
+      }
+    };
+    window.addEventListener('beforeunload', beforeUnload);
+    window.addEventListener('keydown', keydown);
+    this.destroyRef.onDestroy(() => {
+      window.removeEventListener('beforeunload', beforeUnload);
+      window.removeEventListener('keydown', keydown);
+    });
+
+    // Autosave scheduler (ADR-0026). Reading the live edit signals — not just dirty() —
+    // re-arms the trailing debounce on every keystroke (dirty() stays true, so it alone
+    // wouldn't re-fire the effect). dirty() then decides whether to actually save.
+    // Single-flight: saving() gates a save out while one is in flight; when it clears,
+    // a still-dirty Entity re-arms here, coalescing mid-flight edits into one follow-up.
+    // Paused on conflict (a stale base version would just loop) and during route load.
+    effect((onCleanup) => {
+      this.editor.document();
+      this._content();
+      this._tags();
+      const armed =
+        this.dirty() &&
+        !this._conflict() &&
+        !this._saving() &&
+        !this._loading();
+      if (!armed) return;
+      const timer = setTimeout(() => this.save().subscribe(), AUTOSAVE_DELAY_MS);
+      onCleanup(() => clearTimeout(timer));
+    });
   }
 
   /**
@@ -133,6 +212,10 @@ export class EntitySession {
     this._seed.set(detail);
     this._tags.set(detail.tags);
     this.editor.load(gridOf(detail.document));
+    // Baseline = exactly the references now live, so a load never reads as dirty.
+    this._baseGrid.set(this.editor.document());
+    this._baseContent.set(this._content());
+    this._baseTags.set(this._tags());
   }
 
   /** Wrap the editor's latest snapshot in the format envelope (ADR-0019). */
@@ -174,16 +257,21 @@ export class EntitySession {
   /** Save the editor's live grid under the open Entity's base version. */
   save(): Observable<EntitySaveOutcome> {
     // None open, or one loading under navigation → no-op: avoids sticking `_saving`
-    // on "Saving…" or writing to the wrong Entity (#4).
+    // on "Saving…" or writing to the wrong Entity (#4). Already saving → no-op too, so
+    // a Cmd+S or flush can't start a second concurrent write (the scheduler coalesces
+    // mid-flight edits into one follow-up once this resolves, ADR-0026).
     const open = this._current();
-    if (!open || this._loading()) return EMPTY;
+    if (!open || this._loading() || this._saving()) return EMPTY;
     this._saving.set(true);
     this._error.set(null);
-    const body = withContent(
-      withGrid(open.document, this.editor.document()),
-      this._content()!,
-    );
-    return this.entities.save(open.id, body, open.version, this._tags()).pipe(
+    // Snapshot the exact references being sent. A clean save advances the baseline to
+    // *these*, not the live signals, so keystrokes that land mid-flight stay dirty and
+    // ride the next save instead of being silently marked clean (ADR-0026).
+    const sentGrid = this.editor.document();
+    const sentContent = this._content()!;
+    const sentTags = this._tags();
+    const body = withContent(withGrid(open.document, sentGrid), sentContent);
+    return this.entities.save(open.id, body, open.version, sentTags).pipe(
       tap((outcome) => {
         // On conflict, leave the open Entity untouched so the edit survives until
         // a re-pull; only a clean save advances it.
@@ -192,6 +280,9 @@ export class EntitySession {
         } else {
           this._conflict.set(null);
           this._current.set(outcome.entity);
+          this._baseGrid.set(sentGrid);
+          this._baseContent.set(sentContent);
+          this._baseTags.set(sentTags);
         }
       }),
       catchError(() => {

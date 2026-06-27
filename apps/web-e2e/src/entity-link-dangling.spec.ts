@@ -46,9 +46,9 @@ test('a link whose target is deleted renders non-navigable, and the map opens wi
   await expect(page.getByTestId('entity-link-name')).toBeVisible();
 
   const saved = waitForSave(page);
-  await page.getByTestId('save').click();
+  await page.keyboard.press('ControlOrMeta+s');
   await saved;
-  await expect(page.getByTestId('save')).toHaveText('Save');
+  await expect(page.getByTestId('save-status')).toHaveText('Saved');
 
   // Delete the target out from under the link (the "inaccessible/missing" case).
   const del = await request.delete(`/api/entities/${noteId}`);

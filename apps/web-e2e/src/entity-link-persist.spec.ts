@@ -52,9 +52,9 @@ test('links a Hex to an Entity in the Inspector; the link survives a reload and 
       /\/api\/entities\/[\w-]+$/.test(res.url()) &&
       res.ok(),
   );
-  await page.getByTestId('save').click();
+  await page.keyboard.press('ControlOrMeta+s');
   await saved;
-  await expect(page.getByTestId('save')).toHaveText('Save');
+  await expect(page.getByTestId('save-status')).toHaveText('Saved');
 
   // The seam under test: a fresh load re-fetches the saved map.
   await page.reload();

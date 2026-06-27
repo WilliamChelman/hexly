@@ -87,7 +87,11 @@
       "editorLabel": "Map notes"
     },
     "save": {
-      "conflict": "Newer version on server"
+      "conflict": "Newer version on server",
+      "saved": "Saved",
+      "unsaved": "Unsaved…",
+      "failed": "Save failed",
+      "retry": "Retry"
     },
     "moveBlocked": "Move blocked — something's in the way.",
     "toolPalette": {
