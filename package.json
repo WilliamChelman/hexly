@@ -4,10 +4,10 @@
   "license": "MIT",
   "packageManager": "pnpm@10.33.0",
   "scripts": {
-    "dev": "HEXLY_DB_PATH=hexly.db nx run-many -t serve -p api,web",
-    "dev:api": "HEXLY_DB_PATH=hexly.db nx serve api",
+    "dev": "HEXLY_DB_PATH=hexly-data/hexly.db nx run-many -t serve -p api,web",
+    "dev:api": "HEXLY_DB_PATH=hexly-data/hexly.db nx serve api",
     "dev:web": "nx serve web",
-    "seed": "nx build api && HEXLY_DB_PATH=hexly.db node dist/apps/api/seed.js",
+    "seed": "nx build api && HEXLY_DB_PATH=hexly-data/hexly.db node dist/apps/api/seed.js",
     "build": "nx run-many -t build -p api,web",
     "test": "nx run-many -t test",
     "lint": "nx run-many -t lint"
