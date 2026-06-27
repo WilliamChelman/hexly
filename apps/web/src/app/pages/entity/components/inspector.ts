@@ -9,6 +9,7 @@ import { Input } from '../../../ui/input';
 import { featureKey, terrainKey } from '../utils/catalog-keys';
 import { inputValue } from '../utils/dom';
 import { HexMapStore, Selection } from '../services/hexmap-store';
+import { EntityLink } from './entity-link';
 import { RegionFields } from './region-fields';
 
 /**
@@ -75,7 +76,7 @@ interface SelectedEntity {
   host: {
     class: 'flex flex-col gap-4 p-4 overflow-y-auto bg-surface',
   },
-  imports: [Button, Coord, Eyebrow, Field, Input, RegionFields, TranslocoPipe],
+  imports: [Button, Coord, EntityLink, Eyebrow, Field, Input, RegionFields, TranslocoPipe],
   template: `
     @let label = store.selectedLabel();
     @let region = store.selectedRegion();
@@ -189,6 +190,8 @@ interface SelectedEntity {
         </div>
       </div>
 
+      <app-entity-link />
+
       </div>
 
       <div class="flex gap-2 mt-auto pt-2">
@@ -247,13 +250,7 @@ interface SelectedEntity {
           <span class="stub">{{ 'editorShell.inspector.tagsEmpty' | transloco }}</span>
         </div>
 
-        <!--
-          ponytail: stub — the Entity Link is not on the Hex model yet (CONTEXT.md: Map
-          elements *can* carry one). Placeholder until it is wired through the store.
-        -->
-        <div appField [label]="'editorShell.inspector.linkedEntity' | transloco">
-          <span class="stub">{{ 'editorShell.inspector.notLinked' | transloco }}</span>
-        </div>
+        <app-entity-link />
       </div>
 
       <div class="flex gap-2 mt-auto pt-2">

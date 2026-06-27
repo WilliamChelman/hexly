@@ -17,10 +17,7 @@ import {
   TerrainId,
   terrainPalette,
 } from '@hexly/domain';
-import { applyPatches, enablePatches, Patch, produceWithPatches } from 'immer';
-
-// Immer only records patches once this is enabled; it underpins undo/redo.
-enablePatches();
+import { applyPatches, Patch, produceWithPatches } from '@hexly/immer';
 
 /**
  * A top-level Tool armed in the palette (CONTEXT.md → Tool); exactly one armed,
@@ -161,6 +158,20 @@ function clearFeatureFrom(draft: HexMap, coord: Axial): void {
 
 function eraseHexFrom(draft: HexMap, coord: Axial): void {
   delete draft.hexes[coordKey(coord)];
+}
+
+/**
+ * Set `target.entityId` to `entityId`, or delete it when `entityId` is falsy —
+ * keeping a cleared link absent rather than blank, like the Hex name (issue #76).
+ * A missing target (stale coordinate) is left untouched.
+ */
+function setOrClearLink(
+  target: { entityId?: string } | undefined,
+  entityId: string | undefined,
+): void {
+  if (!target) return;
+  if (entityId) target.entityId = entityId;
+  else delete target.entityId;
 }
 
 /**
@@ -360,6 +371,24 @@ export class HexMapStore {
 
   /** The document's Regions — a narrow view so consumers (the Regions panel) needn't subscribe to the whole document. */
   readonly regions = computed<Region[]>(() => this._document().regions);
+
+  /**
+   * The Entity Link id on the single selected Map element (Hex/Feature/Region),
+   * or `null` when nothing single is selected, the selection is a Label (Labels
+   * carry no link, CONTEXT.md), or the element has no link. The Inspector's
+   * Entity Link control binds to this (issue #76).
+   */
+  readonly selectedEntityLink = computed<string | null>(() => {
+    const sel = this.selection();
+    if (!sel) return null;
+    const doc = this._document();
+    if (sel.kind === 'hex') return doc.hexes[coordKey(sel.coord)]?.entityId ?? null;
+    if (sel.kind === 'feature') {
+      return doc.hexes[coordKey(sel.coord)]?.feature?.entityId ?? null;
+    }
+    if (sel.kind === 'region') return regionById(doc, sel.id)?.entityId ?? null;
+    return null;
+  });
 
   /** Committed edits, newest last — popped to undo, then parked on `redoStack`. */
   private readonly undoStack: Edit[] = [];
@@ -586,6 +615,36 @@ export class HexMapStore {
       if (!hex) return;
       if (trimmed) hex.name = trimmed;
       else delete hex.name;
+    });
+  }
+
+  /**
+   * Point the single selected Map element at the Entity `entityId` (its Entity
+   * Link, issue #76). A Hex links the tile; the link rides in the document so it
+   * round-trips through save/reload. A no-op when the selection isn't a single
+   * linkable element.
+   */
+  linkEntity(entityId: string): void {
+    this.setEntityLink(entityId);
+  }
+
+  /** Remove the selected Map element's Entity Link, deleting the field (no delete of either Entity). */
+  unlinkEntity(): void {
+    this.setEntityLink(undefined);
+  }
+
+  /** Set or clear the selected element's `entityId`; one commit so it is undoable. */
+  private setEntityLink(entityId: string | undefined): void {
+    const sel = this.selection();
+    if (!sel) return;
+    this.commit((draft) => {
+      if (sel.kind === 'hex') {
+        setOrClearLink(draft.hexes[coordKey(sel.coord)], entityId);
+      } else if (sel.kind === 'feature') {
+        setOrClearLink(draft.hexes[coordKey(sel.coord)]?.feature, entityId);
+      } else if (sel.kind === 'region') {
+        setOrClearLink(regionById(draft, sel.id), entityId);
+      }
     });
   }
 

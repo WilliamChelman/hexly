@@ -2281,3 +2281,68 @@ describe('HexMapStore shared right column', () => {
     expect(store.view()).toBe('note');
   });
 });
+
+describe('HexMapStore Entity Link', () => {
+  it('links the selected Hex to an Entity, surfacing it through selectedEntityLink', () => {
+    const store = new HexMapStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.select({ q: 0, r: 0 }, null);
+
+    store.linkEntity('ent-1');
+
+    expect(store.document().hexes['0,0'].entityId).toBe('ent-1');
+    expect(store.selectedEntityLink()).toBe('ent-1');
+  });
+
+  it('unlinks the selected Hex, dropping the field rather than blanking it', () => {
+    const store = new HexMapStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.select({ q: 0, r: 0 }, null);
+    store.linkEntity('ent-1');
+
+    store.unlinkEntity();
+
+    expect('entityId' in store.document().hexes['0,0']).toBe(false);
+    expect(store.selectedEntityLink()).toBeNull();
+  });
+
+  it('links a selected Feature on its own ref, leaving the host Hex unlinked', () => {
+    const store = new HexMapStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.placeFeatureAt({ q: 0, r: 0 }, 'settlement');
+    store.select({ q: 0, r: 0 }, null); // resolves to the Feature
+
+    store.linkEntity('ent-2');
+
+    const hex = store.document().hexes['0,0'];
+    expect(hex.feature).toEqual({ ref: 'settlement', entityId: 'ent-2' });
+    expect(hex.entityId).toBeUndefined();
+    expect(store.selectedEntityLink()).toBe('ent-2');
+  });
+
+  it('links a selected Region to an Entity, surfacing it through selectedEntityLink', () => {
+    const store = new HexMapStore();
+    const id = store.createRegion('Avalon', '#b08a4e');
+    store.addHexToRegion(id, { q: 0, r: 0 });
+    store.select({ q: 0, r: 0 }, null); // a Void member resolves to the Region
+
+    store.linkEntity('ent-5');
+
+    expect(store.document().regions[0].entityId).toBe('ent-5');
+    expect(store.selectedEntityLink()).toBe('ent-5');
+
+    store.unlinkEntity();
+    expect('entityId' in store.document().regions[0]).toBe(false);
+  });
+
+  it('exposes no Entity Link for a selected Label (Labels carry none)', () => {
+    const store = new HexMapStore();
+    const id = store.addLabel('Open Sea', { x: 0, y: 0 });
+    store.selectLabel(id);
+
+    expect(store.selectedEntityLink()).toBeNull();
+    // Linking a Label is a no-op — nothing to carry the id.
+    store.linkEntity('ent-6');
+    expect(store.selectedEntityLink()).toBeNull();
+  });
+});

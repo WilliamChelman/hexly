@@ -37,6 +37,13 @@ export default [
       '**/*.mjs',
     ],
     // Override or add rules here
-    rules: {},
+    rules: {
+      'no-restricted-imports': ['error', {
+        paths: [{
+          name: 'immer',
+          message: "Import from '@hexly/immer' instead — it boots enablePatches() and is the single Immer entrypoint.",
+        }],
+      }],
+    },
   },
 ];

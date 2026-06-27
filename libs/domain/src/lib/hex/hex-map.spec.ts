@@ -41,6 +41,18 @@ describe('regionSchema', () => {
 
     expect(regionSchema.parse(region)).toEqual(region);
   });
+
+  it('round-trips a region that carries an Entity Link by id', () => {
+    const region = {
+      id: 'r1',
+      name: 'The Whisperwood',
+      color: '#7c9b86',
+      hexes: { '0,0': true },
+      entityId: 'ent-3',
+    };
+
+    expect(regionSchema.parse(region)).toEqual(region);
+  });
 });
 
 describe('labelSchema', () => {
@@ -139,6 +151,24 @@ describe('hexMapSchema', () => {
   it('round-trips a hex that carries a name', () => {
     const doc = {
       hexes: { '0,0': { terrain: 'forest', name: 'Riverbend' } },
+    };
+
+    expect(hexMapSchema.parse(doc)).toEqual({ ...doc, regions: [], labels: [] });
+  });
+
+  it('round-trips a hex that carries an Entity Link by id', () => {
+    const doc = {
+      hexes: { '0,0': { terrain: 'forest', entityId: 'ent-7' } },
+    };
+
+    expect(hexMapSchema.parse(doc)).toEqual({ ...doc, regions: [], labels: [] });
+  });
+
+  it('round-trips a feature that carries its own Entity Link, distinct from the hex', () => {
+    const doc = {
+      hexes: {
+        '0,0': { terrain: 'forest', feature: { ref: 'settlement', entityId: 'ent-9' } },
+      },
     };
 
     expect(hexMapSchema.parse(doc)).toEqual({ ...doc, regions: [], labels: [] });

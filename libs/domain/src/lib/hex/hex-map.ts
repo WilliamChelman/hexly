@@ -85,8 +85,15 @@ export const featureLibrary = [
 /** A feature id constrained to the built-in library — the source of truth. */
 export const featureIdSchema = idEnum(featureLibrary.map((f) => f.id));
 
-/** A feature placed on a Hex: a reference to a built-in library id (issue #7). */
-export const featureRefSchema = z.object({ ref: featureIdSchema });
+/**
+ * A feature placed on a Hex: a reference to a built-in library id (issue #7),
+ * plus an optional Entity Link of its own — distinct from the host Hex's link,
+ * so a settlement icon can point at a different Entity than its tile (issue #76).
+ */
+export const featureRefSchema = z.object({
+  ref: featureIdSchema,
+  entityId: z.string().optional(),
+});
 
 /**
  * A painted Hex. Carries exactly one Terrain, plus at most one Feature and an
@@ -99,6 +106,10 @@ export const hexSchema = z.object({
   terrain: terrainIdSchema,
   feature: featureRefSchema.optional(),
   name: z.string().optional(),
+  /** An optional Entity Link: the id of another Entity this Hex points at
+   * (CONTEXT.md → Entity Link). Not referentially enforced — a dangling id is
+   * a valid document (issue #76). */
+  entityId: z.string().optional(),
 });
 
 /** A six-digit `#rrggbb` colour, the form a Region's user-chosen border colour is stored in. */
@@ -120,6 +131,9 @@ export const regionSchema = z.object({
   color: hexColorSchema,
   /** The member coordinate keys, each mapped to `true` — a JSON-friendly set. */
   hexes: z.record(z.string(), z.literal(true)),
+  /** An optional Entity Link: the id of another Entity this Region points at
+   * (issue #76). Not referentially enforced, like the Hex/Feature link. */
+  entityId: z.string().optional(),
 });
 
 /** A point in world/pixel space — the anchor a free-positioned Label sits at. */

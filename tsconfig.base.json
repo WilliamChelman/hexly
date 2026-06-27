@@ -15,7 +15,8 @@
     "skipDefaultLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "@hexly/domain": ["./libs/domain/src/index.ts"]
+      "@hexly/domain": ["./libs/domain/src/index.ts"],
+      "@hexly/immer": ["./libs/immer/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]
