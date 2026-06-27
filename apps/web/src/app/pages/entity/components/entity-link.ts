@@ -25,9 +25,10 @@ import { HexMapStore } from '../services/hexmap-store';
  * alike (ADR-0023's owner-scoped `list()`, no search endpoint) — so a Feature can
  * point at another `hexmap`. The link itself lives in the document and rides the
  * existing save; this control only reads/writes it through the {@link HexMapStore}.
- * Resolving a deleted/inaccessible target to a non-navigable label is a separate
- * follow-up slice — here a linked id always resolves to a name or falls back to
- * the raw id.
+ * A link whose target is deleted or inaccessible (absent from the owner's list, so
+ * unresolvable — ADR-0018) renders **non-navigable**: a muted, unfollowable label
+ * rather than a dead `/entities/:id` link, so deleting an Entity never breaks a map
+ * that referenced it (issue #78). The id stays in the document untouched.
  */
 @Component({
   selector: 'app-entity-link',
@@ -38,16 +39,31 @@ import { HexMapStore } from '../services/hexmap-store';
       @let id = store.selectedEntityLink();
       @if (id) {
         <div class="flex items-center gap-2">
-          <a
-            class="block flex-1 min-w-0 truncate cursor-pointer font-display text-base text-gold no-underline hover:underline"
-            data-testid="entity-link-name"
-            [routerLink]="['/entities', id]"
-          >
-            <span aria-hidden="true">→ </span>{{ linkedName() }}
-            @if (linkedType(); as type) {
-              <span class="font-mono text-2xs text-ink-muted">({{ type }})</span>
-            }
-          </a>
+          @if (linked(); as e) {
+            <a
+              class="block flex-1 min-w-0 truncate cursor-pointer font-display text-base text-gold no-underline hover:underline"
+              data-testid="entity-link-name"
+              [routerLink]="['/entities', id]"
+            >
+              <span aria-hidden="true">→ </span>{{ e.name }}
+              <span class="font-mono text-2xs text-ink-muted">({{ e.type }})</span>
+            </a>
+          } @else if (loaded()) {
+            <!-- Target deleted/inaccessible: visible but non-navigable (issue #78). -->
+            <span
+              class="block flex-1 min-w-0 truncate font-display text-base italic text-ink-muted"
+              data-testid="entity-link-dangling"
+              [attr.title]="'editorShell.inspector.linkUnavailable' | transloco"
+            >
+              <span aria-hidden="true">→ </span
+              >{{ 'editorShell.inspector.linkUnavailable' | transloco }}
+            </span>
+          } @else {
+            <!-- List still loading: neutral placeholder, never a clickable dead link. -->
+            <span class="block flex-1 min-w-0 truncate font-display text-base text-ink-muted">
+              <span aria-hidden="true">→ </span>…
+            </span>
+          }
           <button
             type="button"
             appButton
@@ -154,11 +170,17 @@ export class EntityLink {
    */
   private readonly entities = signal<EntitySummary[]>([]);
 
+  /** True once the list has arrived, so the template can tell "still loading" from "unresolved/dangling". */
+  protected readonly loaded = signal(false);
+
   protected readonly open = signal(false);
   protected readonly query = signal('');
 
   constructor() {
-    this.entitiesClient.list().subscribe((list) => this.entities.set(list));
+    this.entitiesClient.list().subscribe((list) => {
+      this.entities.set(list);
+      this.loaded.set(true);
+    });
 
     // Close the picker and reset the query whenever the selected element changes so
     // a pick() always targets the element the picker was opened for.
@@ -175,24 +197,17 @@ export class EntityLink {
     return this.entities().filter((e) => e.name.toLowerCase().includes(q));
   });
 
-  /** The linked Entity's summary, resolved from the owner list, or null when unset/unresolved. */
-  private readonly linked = computed<EntitySummary | null>(() => {
+  /**
+   * The linked Entity's summary, resolved from the owner list, or null when unset or
+   * unresolvable (the target is deleted/inaccessible, so absent from the list). A
+   * null with a present id and {@link loaded} true is a dangling link — rendered
+   * non-navigable.
+   */
+  protected readonly linked = computed<EntitySummary | null>(() => {
     const id = this.store.selectedEntityLink();
     if (!id) return null;
     return this.entities().find((e) => e.id === id) ?? null;
   });
-
-  /**
-   * The linked Entity's current name, or the raw id when it can't be resolved
-   * (list still loading, or a dangling link). Non-navigable rendering of a truly
-   * missing target is a later slice; this keeps the control honest meanwhile.
-   */
-  protected readonly linkedName = computed(
-    () => this.linked()?.name ?? this.store.selectedEntityLink() ?? '',
-  );
-
-  /** The linked Entity's type (e.g. `note`/`hexmap`) for the muted suffix, or '' when unresolved. */
-  protected readonly linkedType = computed(() => this.linked()?.type ?? '');
 
   protected toggle(): void {
     if (!this.open()) this.query.set('');

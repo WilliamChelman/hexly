@@ -122,6 +122,7 @@
       "removeLink": "Remove link",
       "searchLink": "Search entities…",
       "linkEmpty": "No entities",
+      "linkUnavailable": "Unavailable",
       "newNote": "New note",
       "newMap": "New map",
       "color": "Color",

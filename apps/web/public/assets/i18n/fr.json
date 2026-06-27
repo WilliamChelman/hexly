@@ -122,6 +122,7 @@
       "removeLink": "Retirer le lien",
       "searchLink": "Rechercher des entités…",
       "linkEmpty": "Aucune entité",
+      "linkUnavailable": "Indisponible",
       "newNote": "Nouvelle note",
       "newMap": "Nouvelle carte",
       "color": "Couleur",
