@@ -68,6 +68,13 @@ export class EntitiesController {
     return this.entities.create(user.id, parsed.data);
   }
 
+  // Declared before `:id` so the literal path isn't captured as an entity id. The owner's
+  // `::` Link Descriptor vocabulary — DISTINCT descriptors across their entities (#96).
+  @Get('descriptors')
+  descriptors(@CurrentUser() user: AuthUser): string[] {
+    return this.entities.listDescriptors(user.id);
+  }
+
   @Get(':id')
   load(@CurrentUser() user: AuthUser, @Param('id') id: string): EntityDetail {
     const entity = this.entities.load(user.id, id);

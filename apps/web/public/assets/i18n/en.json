@@ -63,6 +63,11 @@
       "label": "Link an entity",
       "empty": "No matching entities"
     },
+    "descriptorPicker": {
+      "label": "Describe this link",
+      "empty": "Type a descriptor",
+      "create": "(new)"
+    },
     "entityLink": {
       "dangling": "This entity is unavailable"
     },

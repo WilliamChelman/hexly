@@ -53,18 +53,25 @@ export class EntitiesClient {
     return this.http.get<EntityDetail>(`/api/entities/${id}`);
   }
 
+  /** The owner's `::` Link Descriptor vocabulary — DISTINCT, last-saved state (#96, ADR-0023). */
+  listDescriptors(): Observable<string[]> {
+    return this.http.get<string[]>('/api/entities/descriptors');
+  }
+
   /** Stale base → `conflict` outcome (ADR-0018), not a thrown error; caller branches, not catches. */
   save(
     id: string,
     body: EntityBody,
     version: number,
     tags: readonly string[],
+    descriptors: readonly string[],
   ): Observable<EntitySaveOutcome> {
     return this.http
       .put<EntityDetail>(`/api/entities/${id}`, {
         document: body,
         version,
         tags,
+        descriptors,
       })
       .pipe(
         map((saved): EntitySaveOutcome => ({ status: 'saved', entity: saved })),

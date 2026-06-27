@@ -63,6 +63,11 @@
       "label": "Lier une entité",
       "empty": "Aucune entité correspondante"
     },
+    "descriptorPicker": {
+      "label": "Décrire ce lien",
+      "empty": "Saisir un descripteur",
+      "create": "(nouveau)"
+    },
     "entityLink": {
       "dangling": "Cette entité est indisponible"
     },

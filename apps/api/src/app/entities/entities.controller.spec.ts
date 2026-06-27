@@ -417,6 +417,136 @@ describe('Entities endpoints', () => {
     await ada.get('/entities').query({ limit: '10' }).expect(200);
   });
 
+  describe('descriptor vocabulary index (#96)', () => {
+    const noteBody = { type: 'note', content: emptyContent() };
+
+    async function newNote(
+      agent: Awaited<ReturnType<typeof signIn>>,
+      name = 'Lady A',
+    ) {
+      const res = await agent.post('/entities').send({ name, type: 'note' });
+      return res.body.id as string;
+    }
+
+    it('serves the owner’s DISTINCT descriptors a save harvested, folding case', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const id = await newNote(ada);
+
+      await ada
+        .put(`/entities/${id}`)
+        .send({
+          document: noteBody,
+          version: 1,
+          tags: [],
+          descriptors: [' Spouse ', 'spouse', 'Capital Of'],
+        })
+        .expect(200);
+
+      // DISTINCT, case-folded, sorted for a stable suggestion order.
+      const res = await ada.get('/entities/descriptors').expect(200);
+      expect(res.body).toEqual(['capital of', 'spouse']);
+    });
+
+    it('unions descriptors across the owner’s entities', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const a = await newNote(ada, 'A');
+      const b = await newNote(ada, 'B');
+
+      await ada
+        .put(`/entities/${a}`)
+        .send({ document: noteBody, version: 1, tags: [], descriptors: ['spouse'] })
+        .expect(200);
+      await ada
+        .put(`/entities/${b}`)
+        .send({ document: noteBody, version: 1, tags: [], descriptors: ['rival'] })
+        .expect(200);
+
+      const res = await ada.get('/entities/descriptors').expect(200);
+      expect(res.body).toEqual(['rival', 'spouse']);
+    });
+
+    it('self-prunes: a later save without a descriptor drops it from the vocabulary', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const id = await newNote(ada);
+
+      await ada
+        .put(`/entities/${id}`)
+        .send({
+          document: noteBody,
+          version: 1,
+          tags: [],
+          descriptors: ['spouse', 'rival'],
+        })
+        .expect(200);
+      // The note's last link to "rival" was removed: the next save no longer harvests it.
+      await ada
+        .put(`/entities/${id}`)
+        .send({ document: noteBody, version: 2, tags: [], descriptors: ['spouse'] })
+        .expect(200);
+
+      const res = await ada.get('/entities/descriptors').expect(200);
+      expect(res.body).toEqual(['spouse']);
+    });
+
+    it('prunes an entity’s descriptors when the entity is deleted (cascade)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const id = await newNote(ada);
+
+      await ada
+        .put(`/entities/${id}`)
+        .send({ document: noteBody, version: 1, tags: [], descriptors: ['spouse'] })
+        .expect(200);
+      await ada.delete(`/entities/${id}`).expect(204);
+
+      const res = await ada.get('/entities/descriptors').expect(200);
+      expect(res.body).toEqual([]);
+    });
+
+    it('reflects last-saved state only: a stale-version 409 leaves the index untouched', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const id = await newNote(ada);
+
+      await ada
+        .put(`/entities/${id}`)
+        .send({ document: noteBody, version: 1, tags: [], descriptors: ['spouse'] })
+        .expect(200);
+      // A save built on the stale base version is a 409 and must not touch the index.
+      await ada
+        .put(`/entities/${id}`)
+        .send({ document: noteBody, version: 1, tags: [], descriptors: ['rival'] })
+        .expect(409);
+
+      const res = await ada.get('/entities/descriptors').expect(200);
+      expect(res.body).toEqual(['spouse']);
+    });
+
+    it('scopes the vocabulary to the owner', async () => {
+      await app
+        .get(AuthService)
+        .seedUser('bob@hexly.test', 'correct horse', 'Bob');
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const bob = await signIn('bob@hexly.test', 'correct horse');
+
+      const adaNote = await newNote(ada);
+      await ada
+        .put(`/entities/${adaNote}`)
+        .send({ document: noteBody, version: 1, tags: [], descriptors: ['spouse'] })
+        .expect(200);
+      const bobNote = await newNote(bob);
+      await bob
+        .put(`/entities/${bobNote}`)
+        .send({ document: noteBody, version: 1, tags: [], descriptors: ['rival'] })
+        .expect(200);
+
+      expect((await ada.get('/entities/descriptors').expect(200)).body).toEqual([
+        'spouse',
+      ]);
+      expect((await bob.get('/entities/descriptors').expect(200)).body).toEqual([
+        'rival',
+      ]);
+    });
+  });
+
   it('refuses every entity route without a session cookie', async () => {
     const server = app.getHttpServer();
 

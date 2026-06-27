@@ -1,4 +1,10 @@
-import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import {
+  index,
+  integer,
+  primaryKey,
+  sqliteTable,
+  text,
+} from 'drizzle-orm/sqlite-core';
 
 // Keep in sync by hand with the `CREATE TABLE` DDL in `./db.ts`; column changes
 // need a drizzle-kit migration to reach an existing database.
@@ -67,5 +73,32 @@ export const entities = sqliteTable(
   (table) => [
     // The list endpoint and every access check filter by owner.
     index('idx_entities_owner_id').on(table.ownerId),
+  ]
+);
+
+/**
+ * The owner's Link Descriptor vocabulary (#96, ADR-0023): the distinct relationship
+ * labels each Entity's Content currently uses ("spouse", "capital of"). The client
+ * harvests these from its opaque snapshot and a successful save *replaces* the entity's
+ * rows, so the server never parses Content (ADR-0019). `::` suggestions are the owner's
+ * `SELECT DISTINCT descriptor`. Self-pruning: a save that no longer carries a descriptor
+ * drops its row; deleting the Entity cascades these away (FK `ON DELETE CASCADE`).
+ */
+export const entityDescriptors = sqliteTable(
+  'entity_descriptors',
+  {
+    ownerId: text('owner_id')
+      .notNull()
+      .references(() => users.id),
+    entityId: text('entity_id')
+      .notNull()
+      .references(() => entities.id, { onDelete: 'cascade' }),
+    descriptor: text('descriptor').notNull(),
+  },
+  (table) => [
+    // One row per (entity, descriptor); the harvested set is already distinct per entity.
+    primaryKey({ columns: [table.entityId, table.descriptor] }),
+    // The `::` suggestion read filters by owner.
+    index('idx_entity_descriptors_owner_id').on(table.ownerId),
   ]
 );

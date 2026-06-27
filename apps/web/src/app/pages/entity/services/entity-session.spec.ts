@@ -88,6 +88,7 @@ describe('EntitySession', () => {
       document: bodyOf(editor.document()),
       version: 3,
       tags: [],
+      descriptors: [],
     });
 
     const saved: EntityDetail = {
@@ -114,6 +115,7 @@ describe('EntitySession', () => {
       document: bodyOf(editor.document()),
       version: 3,
       tags: ['deity', 'ruined'],
+      descriptors: [],
     });
 
     const saved: EntityDetail = {
@@ -124,6 +126,33 @@ describe('EntitySession', () => {
     };
     req.flush(saved);
     expect(session.current()?.tags).toEqual(['deity', 'ruined']);
+  });
+
+  it('harvests link descriptors from the live Content and sends them with the save (#96)', () => {
+    openAldermoor();
+    // A Content snapshot carrying a characterised entityLink — the descriptor rides the
+    // save so the server can index the owner's vocabulary (it never parses the snapshot).
+    session.setContent({
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            {
+              type: 'entityLink',
+              attrs: { entityId: 'x', label: 'Jane', descriptor: 'Spouse' },
+            },
+          ],
+        },
+      ],
+    });
+
+    session.save().subscribe();
+
+    const req = http.expectOne('/api/entities/m1');
+    // Sent verbatim (the server normalizes); links with no descriptor contribute nothing.
+    expect(req.request.body.descriptors).toEqual(['Spouse']);
+    req.flush({ ...aldermoor, version: 4 });
   });
 
   it('surfaces a stale save as a conflict and keeps the editor edit', () => {
@@ -488,7 +517,12 @@ describe('EntitySession', () => {
 
     const req = http.expectOne('/api/entities/n1');
     expect(req.request.method).toBe('PUT');
-    expect(req.request.body).toEqual({ document: noteBody, version: 3, tags: [] });
+    expect(req.request.body).toEqual({
+      document: noteBody,
+      version: 3,
+      tags: [],
+      descriptors: [],
+    });
     req.flush({ ...note, version: 4 });
   });
 
@@ -523,6 +557,7 @@ describe('EntitySession', () => {
       document: { type: 'note', content: { format: CONTENT_FORMAT, snapshot } },
       version: 3,
       tags: [],
+      descriptors: [],
     });
     req.flush({ ...note, version: 4 });
   });
@@ -555,6 +590,7 @@ describe('EntitySession', () => {
       },
       version: 3,
       tags: [],
+      descriptors: [],
     });
     req.flush({ ...aldermoor, version: 4 });
   });

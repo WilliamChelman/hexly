@@ -13,6 +13,8 @@ import {
   viewChild,
 } from '@angular/core';
 import { Editor, JSONContent } from '@tiptap/core';
+import { catchError, firstValueFrom, of } from 'rxjs';
+import { EntitiesClient } from '../../../core/services/entities.client';
 import { TiptapDirective } from './tiptap.directive';
 import { EntitySession } from '../services/entity-session';
 import { EntityNameResolver } from '../services/entity-name-resolver';
@@ -23,6 +25,8 @@ import { slashCommands } from './slash-commands';
 import { SLASH_ITEMS } from './slash-menu-items';
 import { EntityPicker } from './entity-picker';
 import { entityMention } from './entity-mention';
+import { DescriptorPicker } from './descriptor-picker';
+import { descriptorSuggestion } from './descriptor-suggestion';
 import { createEntityLinkNodeView } from './entity-link-view';
 import { FormattingMenu } from './formatting-menu';
 import { BubbleMenuDirective } from './bubble-menu.directive';
@@ -41,6 +45,7 @@ import { BubbleMenuDirective } from './bubble-menu.directive';
   imports: [
     SlashMenu,
     EntityPicker,
+    DescriptorPicker,
     FormattingMenu,
     BubbleMenuDirective,
     TiptapDirective,
@@ -61,6 +66,7 @@ import { BubbleMenuDirective } from './bubble-menu.directive';
 
     <app-slash-menu />
     <app-entity-picker />
+    <app-descriptor-picker />
   `,
   styles: `
     /* .ProseMirror lives outside Angular's template — pierce with ::ng-deep.
@@ -185,6 +191,8 @@ export class ContentEditor {
   // gets a fresh owner list. The route-level EnvironmentInjector is what each node
   // view is created in, so they resolve the very same instance (ADR-0023).
   private readonly resolver = inject(EntityNameResolver);
+  // The `::` picker's vocabulary source (#96): the owner's last-saved DISTINCT descriptors.
+  private readonly entities = inject(EntitiesClient);
   private readonly environmentInjector = inject(EnvironmentInjector);
   // ContentEditor's own node injector — lives inside the router outlet, so the
   // entityLink node views created from it can resolve ActivatedRoute for routerLink.
@@ -196,6 +204,7 @@ export class ContentEditor {
 
   private readonly slashMenu = viewChild(SlashMenu);
   private readonly entityPicker = viewChild(EntityPicker);
+  private readonly descriptorPicker = viewChild(DescriptorPicker);
 
   // Recreated on every seed rather than reset: a fresh Editor gets empty undo
   // history for free (Ctrl-Z can't reach past the seed), and the directives re-bind
@@ -267,6 +276,18 @@ export class ContentEditor {
       (query) => this.resolver.search(query),
     );
 
+    // The owner's descriptor vocabulary, fetched lazily on the first `::` and cached for
+    // this editor's life. ponytail: a reload recreates the editor and refreshes it, so a
+    // newly-saved descriptor is suggested next session — last-saved state, by design (#96).
+    let vocab: Promise<string[]> | undefined;
+    const descriptor = descriptorSuggestion(
+      () => this.descriptorPicker(),
+      () =>
+        (vocab ??= firstValueFrom(
+          this.entities.listDescriptors().pipe(catchError(() => of<string[]>([]))),
+        )),
+    );
+
     // Patch /link to flag the mention extension before inserting @, so onExit knows
     // to clean up the stray @ if the user escapes instead of picking (finding #5/#9).
     const slashItems = SLASH_ITEMS.map((item) =>
@@ -289,6 +310,7 @@ export class ContentEditor {
         entityLinkWithView,
         slashCommands(() => this.slashMenu(), slashItems),
         mention.extension,
+        descriptor,
       ],
       content,
     });

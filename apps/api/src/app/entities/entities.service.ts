@@ -16,7 +16,7 @@ import {
 } from '@hexly/domain';
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
-import { entities } from '../db/schema';
+import { entities, entityDescriptors } from '../db/schema';
 
 const INITIAL_VERSION = 1;
 
@@ -131,18 +131,26 @@ export class EntitiesService {
     const document = serialize(req.document);
     const version = req.version + 1;
     const updatedAt = Date.now();
-    const res = this.db
-      .update(entities)
-      .set({ document, version, updatedAt, tags: req.tags })
-      .where(
-        and(
-          eq(entities.id, id),
-          eq(entities.ownerId, ownerId),
-          eq(entities.version, req.version),
-        ),
-      )
-      .run();
-    if (res.changes === 0) {
+    // The body write and the descriptor-index replace ride one transaction (ADR-0023):
+    // a stale-version save changes nothing — neither the body nor the vocabulary — so the
+    // index always reflects last-*successful*-save state, never an in-flight or rejected one.
+    const saved = this.db.transaction(() => {
+      const res = this.db
+        .update(entities)
+        .set({ document, version, updatedAt, tags: req.tags })
+        .where(
+          and(
+            eq(entities.id, id),
+            eq(entities.ownerId, ownerId),
+            eq(entities.version, req.version),
+          ),
+        )
+        .run();
+      if (res.changes === 0) return false;
+      this.replaceDescriptors(ownerId, id, req.descriptors);
+      return true;
+    });
+    if (!saved) {
       // Base version moved (or row vanished) between read and write — re-read
       // to report the true current state.
       const current = this.ownedRow(ownerId, id);
@@ -174,6 +182,40 @@ export class EntitiesService {
       .where(eq(entities.id, id))
       .run();
     return toDetail({ ...row, name, updatedAt });
+  }
+
+  /**
+   * The owner's `::` suggestion vocabulary (#96, ADR-0023): every DISTINCT Link
+   * Descriptor across their entities, sorted for a stable suggestion order. Reflects
+   * last-saved state by design — it reads the index the save path maintains, never a
+   * snapshot's live edits.
+   */
+  listDescriptors(ownerId: string): string[] {
+    return this.db
+      .selectDistinct({ descriptor: entityDescriptors.descriptor })
+      .from(entityDescriptors)
+      .where(eq(entityDescriptors.ownerId, ownerId))
+      .orderBy(asc(entityDescriptors.descriptor))
+      .all()
+      .map((row) => row.descriptor);
+  }
+
+  /**
+   * Replace one entity's descriptor rows with the harvested set (#96) — the
+   * self-pruning step: a descriptor the save no longer carries loses its row and stops
+   * being suggested. Runs inside {@link save}'s transaction, only on a successful write.
+   */
+  private replaceDescriptors(
+    ownerId: string,
+    id: string,
+    descriptors: readonly string[],
+  ): void {
+    this.db.delete(entityDescriptors).where(eq(entityDescriptors.entityId, id)).run();
+    if (descriptors.length === 0) return;
+    this.db
+      .insert(entityDescriptors)
+      .values(descriptors.map((descriptor) => ({ ownerId, entityId: id, descriptor })))
+      .run();
   }
 
   /** `false` means nothing to delete for this owner (unknown id or not theirs); caller surfaces as 404. */
