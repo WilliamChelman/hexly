@@ -7,27 +7,43 @@ import {
   inject,
   viewChild,
 } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Button } from '../../../ui/button';
+import { ButtonGroup } from '../../../ui/button-group';
 import { Chip } from '../../../ui/chip';
 import { Eyebrow } from '../../../ui/eyebrow';
 import { Icon } from '../../../ui/icon/icon';
 import { PageHeader } from '../../../ui/page-header';
 import { EntityTags } from './entity-tags';
 import { EntitySession } from '../services/entity-session';
+import { EntityView, HexMapStore } from '../services/hexmap-store';
+
+/** The view toggle's two segments, in display order; Map (the grid) is the default. */
+const VIEWS: readonly { id: EntityView; labelKey: string; testid: string }[] = [
+  { id: 'map', labelKey: 'editorShell.view.map', testid: 'view-map' },
+  { id: 'note', labelKey: 'editorShell.view.note', testid: 'view-note' },
+];
 
 /**
- * The hex map editor's page-owned header (ADR-0022): it fills the shared
- * {@link PageHeader} frame with the map's own controls — the editable title, the
- * Editing/Conflict status chip, Tags, and Save/Share — and nothing else. App-level
- * navigation (the former All Maps / Design System buttons) now lives in the
- * {@link NavRail}, not here.
+ * The hex map editor's page-owned header (ADR-0022): fills the shared
+ * {@link PageHeader} with the map's own controls — editable title, Editing/Conflict
+ * chip, Tags, view toggle, Save/Share. App navigation lives in the NavRail, not here.
  */
 @Component({
   selector: 'app-editor-header',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'contents' },
-  imports: [Button, Chip, Eyebrow, Icon, PageHeader, TranslocoPipe, EntityTags],
+  imports: [
+    Button,
+    ButtonGroup,
+    Chip,
+    Eyebrow,
+    Icon,
+    PageHeader,
+    TranslocoPipe,
+    EntityTags,
+  ],
   template: `
     <app-page-header>
       <div pageHeaderTitle class="flex items-center gap-3 min-w-0 flex-1">
@@ -76,6 +92,32 @@ import { EntitySession } from '../services/entity-session';
         <app-entity-tags class="min-w-0 flex-1" />
       </div>
 
+      @if (hasMap()) {
+        <!-- Map/Note view toggle (#75): a hexmap carries both a grid and a Content
+             body; this flips the editor surface between them, driven off the store's
+             view() so the shell renders whichever is pressed. -->
+        <div
+          pageHeaderActions
+          appButtonGroup
+          [attr.aria-label]="'editorShell.view.switchLabel' | transloco"
+        >
+          @for (v of views; track v.id) {
+            <button
+              type="button"
+              appButton
+              variant="ghost"
+              size="sm"
+              [active]="store.view() === v.id"
+              [attr.aria-pressed]="store.view() === v.id"
+              [attr.data-testid]="v.testid"
+              (click)="selectView(v.id)"
+            >
+              {{ v.labelKey | transloco }}
+            </button>
+          }
+        </div>
+      }
+
       <button
         type="button"
         pageHeaderActions
@@ -97,6 +139,11 @@ import { EntitySession } from '../services/entity-session';
 })
 export class EditorHeader {
   private readonly session = inject(EntitySession);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  /** Owns the Map/Note surface choice, shared with the {@link EditorShell} (#75). */
+  protected readonly store = inject(HexMapStore);
+  protected readonly views = VIEWS;
 
   /** Whether a map is open — gates Save and rename so neither can run with none. */
   protected readonly hasMap = computed(() => this.session.current() !== null);
@@ -111,11 +158,9 @@ export class EditorHeader {
     viewChild.required<ElementRef<HTMLElement>>('titleEl');
 
   /**
-   * The name shown when the field was focused — the text the user started from.
-   * commit() renames only when the field actually changed against *this*, not the
-   * live {@link title}: so an unedited blur after the name changed server-side
-   * mid-edit (e.g. a conflict reload) restores the new name rather than re-sending
-   * the stale one over it. `null` when not editing.
+   * The name at focus time. commit() compares against this, not the live
+   * {@link title}, so an unedited blur after a mid-edit server change (e.g. conflict
+   * reload) doesn't re-send the stale name. `null` when not editing.
    */
   private editBaseline: string | null = null;
 
@@ -162,6 +207,26 @@ export class EditorHeader {
     this.session.rename(name).subscribe({
       error: () => (el.textContent = this.title()),
     });
+  }
+
+  /**
+   * Switch the editor surface (#75). Updates the store for instant feedback, then
+   * mirrors the choice to the URL `view` param (`replaceUrl`, Map drops the param)
+   * so a refresh restores it. Reverts the store if the navigation is cancelled.
+   */
+  protected selectView(view: EntityView): void {
+    const previous = this.store.view();
+    this.store.setView(view);
+    this.router
+      .navigate([], {
+        relativeTo: this.route,
+        queryParams: { view: view === 'map' ? null : view },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      })
+      .then((navigated) => {
+        if (!navigated) this.store.setView(previous);
+      });
   }
 
   /** Stale-version rejection surfaces as a conflict chip (driven by the session) rather than an error. */

@@ -77,6 +77,12 @@
     "reload": "Reload",
     "saving": "Saving…",
     "share": "Share",
+    "view": {
+      "switchLabel": "Switch view",
+      "map": "Map",
+      "note": "Note",
+      "editorLabel": "Map notes"
+    },
     "save": {
       "conflict": "Newer version on server"
     },

@@ -4,11 +4,12 @@ import {
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { emptyContent, EntityDetail } from '@hexly/domain';
 import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
 import { EntitySession } from '../services/entity-session';
+import { HexMapStore } from '../services/hexmap-store';
 import { EditorHeader } from './editor-header';
 
 describe('EditorHeader', () => {
@@ -73,7 +74,7 @@ describe('EditorHeader', () => {
     const fixture = TestBed.createComponent(EditorHeader);
     fixture.detectChanges();
 
-    // Edit the title in place (contenteditable), then commit on blur.
+    // Edit in place (contenteditable), commit on blur.
     const title = fixture.nativeElement.querySelector(
       '[data-testid=title]',
     ) as HTMLElement;
@@ -106,7 +107,7 @@ describe('EditorHeader', () => {
     const fixture = TestBed.createComponent(EditorHeader);
     fixture.detectChanges();
 
-    // All Maps / Design System are rail destinations now, not header buttons.
+    // All Maps / Design System are rail destinations, not header buttons.
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).not.toContain('All maps');
     expect(text).not.toContain('Design system');
@@ -117,8 +118,7 @@ describe('EditorHeader', () => {
   });
 
   it('disables Save until an entity is open', () => {
-    // No openMap() here: with none open, Save must be disabled so a click can't
-    // flip the session into a stuck "Saving…" state with nothing to save.
+    // No open map: Save disabled so a click can't strand the session in "Saving…".
     const fixture = TestBed.createComponent(EditorHeader);
     fixture.detectChanges();
 
@@ -225,5 +225,72 @@ describe('EditorHeader', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('[data-testid=conflict]')).toBeNull();
+  });
+
+  // Map/Note toggle (#75): a hexmap carries both a grid and a Content body, so the
+  // header switches between the two editor surfaces.
+  it('offers a Map/Note view toggle, with Map active by default', () => {
+    openMap(aldermoor);
+    const fixture = TestBed.createComponent(EditorHeader);
+    fixture.detectChanges();
+
+    const map = fixture.nativeElement.querySelector(
+      '[data-testid=view-map]',
+    ) as HTMLButtonElement;
+    const note = fixture.nativeElement.querySelector(
+      '[data-testid=view-note]',
+    ) as HTMLButtonElement;
+    expect(map).not.toBeNull();
+    expect(note).not.toBeNull();
+    // Default is the grid: Map pressed, Note not.
+    expect(map.getAttribute('aria-pressed')).toBe('true');
+    expect(note.getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('switches the editor surface to the Note view when Note is clicked', () => {
+    openMap(aldermoor);
+    const fixture = TestBed.createComponent(EditorHeader);
+    fixture.detectChanges();
+
+    (
+      fixture.nativeElement.querySelector('[data-testid=view-note]') as HTMLButtonElement
+    ).click();
+    fixture.detectChanges();
+
+    // The store is the single owner of the surface choice (shared with the shell).
+    expect(TestBed.inject(HexMapStore).view()).toBe('note');
+    expect(
+      (
+        fixture.nativeElement.querySelector('[data-testid=view-note]') as HTMLButtonElement
+      ).getAttribute('aria-pressed'),
+    ).toBe('true');
+  });
+
+  it('mirrors the chosen view to the URL so a refresh keeps it (#75)', () => {
+    openMap(aldermoor);
+    const fixture = TestBed.createComponent(EditorHeader);
+    fixture.detectChanges();
+
+    const nav = vi
+      .spyOn(TestBed.inject(Router), 'navigate')
+      .mockResolvedValue(true);
+
+    (
+      fixture.nativeElement.querySelector('[data-testid=view-note]') as HTMLButtonElement
+    ).click();
+    // Persisted as ?view=note (replaceUrl — a view flip is not a navigation).
+    expect(nav).toHaveBeenCalledWith(
+      [],
+      expect.objectContaining({ queryParams: { view: 'note' }, replaceUrl: true }),
+    );
+
+    (
+      fixture.nativeElement.querySelector('[data-testid=view-map]') as HTMLButtonElement
+    ).click();
+    // The default Map view drops the param to keep the URL clean.
+    expect(nav).toHaveBeenCalledWith(
+      [],
+      expect.objectContaining({ queryParams: { view: null }, replaceUrl: true }),
+    );
   });
 });

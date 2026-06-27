@@ -18,7 +18,7 @@ import { TitleService } from '../../core/i18n/title.service';
 import { provideTranslocoTesting } from '../../core/i18n/transloco-testing';
 import { EntityPage } from './entity.page';
 
-/** A throwaway stand-in so the dispatch test never mounts the real (heavy) editor. */
+/** Stub so the dispatch test never mounts the real (heavy) editor. */
 @Component({ selector: 'app-editor-shell', template: 'EDITOR' })
 class EditorShellStub {}
 
@@ -57,7 +57,10 @@ describe('EntityPage', () => {
         provideHttpClientTesting(),
         {
           provide: ActivatedRoute,
-          useValue: { paramMap: of(convertToParamMap({ id })) },
+          useValue: {
+            paramMap: of(convertToParamMap({ id })),
+            queryParamMap: of(convertToParamMap({})),
+          },
         },
       ],
     })

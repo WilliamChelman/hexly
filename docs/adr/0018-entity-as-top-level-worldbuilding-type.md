@@ -10,7 +10,7 @@ This **extends ADR-0002**: the `maps` table becomes `entities` (add a `type` col
 
 - **A generic property-bag Entity (Notion-style, open types) now** — rejected as far more machinery than a ~5-user tool needs, and incompatible with a type-safe discriminated document. Deferred to the long-term plugin goal.
 - **Keeping Hex Map as its own top-level type and bolting notes on separately** — rejected: it forks ownership, sharing, storage, and listing into two parallel stacks instead of one generalized one.
-- **A "World" container as the unit of ownership/sharing** — deferred. At current scale per-Entity sharing suffices, and a `worldId` foreign key is an additive migration when worlds are wanted.
+- **A "World" container as the unit of ownership/sharing** — decided in ADR-0024. A `worldId` FK on Entity plus a separate `worlds` table; world-level sharing cascades to `shared` Entities.
 
 ## Consequences
 

@@ -30,7 +30,12 @@ import {
   selector: 'app-formatting-menu',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [TranslocoPipe, Button],
-  host: { class: 'fixed invisible' },
+  // `absolute` (not fixed) matches the bubble-menu plugin's default Floating UI
+  // strategy. The plugin computes the position in absolute space and only switches
+  // the element to position:absolute *after* its first async layout — so a fixed host
+  // (null offsetParent) makes that first computation resolve against the wrong origin,
+  // landing the menu over the selection instead of above it (correct on every reopen).
+  host: { class: 'absolute invisible' },
   template: `
     <div
       role="toolbar"
@@ -89,7 +94,8 @@ export class FormattingMenu {
 
   protected readonly items = FORMAT_ITEMS;
   protected readonly linkEditing = signal(false);
-  private readonly urlInput = viewChild<ElementRef<HTMLInputElement>>('urlInput');
+  private readonly urlInput =
+    viewChild<ElementRef<HTMLInputElement>>('urlInput');
 
   // The editor mutates outside Angular; `tick` bumps on every transaction so the
   // active-state computed re-reads the selection and the toolbar highlights track it.
@@ -100,7 +106,9 @@ export class FormattingMenu {
     this.tick();
     const editor = this.editor();
     return {
-      ids: new Set(FORMAT_ITEMS.filter((i) => i.isActive(editor)).map((i) => i.id)),
+      ids: new Set(
+        FORMAT_ITEMS.filter((i) => i.isActive(editor)).map((i) => i.id),
+      ),
       link: isLinkActive(editor),
     };
   });
