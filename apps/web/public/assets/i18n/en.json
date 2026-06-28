@@ -284,6 +284,8 @@
   },
   "worlds": {
     "switcherLabel": "Active world",
+    "switcher": "Worlds",
+    "allWorlds": "All worlds",
     "new": "New world",
     "untitled": "Untitled world",
     "createError": "Couldn't create that world. Please try again."

@@ -1,4 +1,11 @@
-import { Injectable, effect, inject, signal, untracked } from '@angular/core';
+import {
+  Injectable,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+} from '@angular/core';
 import { Observable, tap } from 'rxjs';
 import { WorldDetail, WorldSummary } from '@hexly/domain';
 import { AuthClient } from './auth.client';
@@ -31,11 +38,16 @@ export class WorldStore {
   /** True when the last load() call failed — gates the error state in the World Index. */
   readonly loadError = this._loadError.asReadonly();
 
+  // The authenticated user's *identity*, not the mirror object: refresh() re-mirrors
+  // the same user as a fresh object on every navigation, and that must not be read as
+  // a user change (it would wipe the loaded list out from under the switcher).
+  private readonly userId = computed(() => this.auth.currentUser()?.id ?? null);
+
   constructor() {
     // Reset the store whenever the authenticated user changes — prevents cross-session
     // data leaks (logout → re-login on the same tab shows the new user's Worlds).
     effect(() => {
-      this.auth.currentUser();
+      this.userId();
       untracked(() => {
         this.hasLoaded = false;
         this._loaded.set(false);

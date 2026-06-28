@@ -6,7 +6,7 @@ import {
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { WorldSummary } from '@hexly/domain';
-import { ToasterService } from '../core/services/toaster.service';
+import { ActiveWorld } from '../core/services/active-world';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { WorldSwitcher } from './world-switcher';
 
@@ -19,7 +19,6 @@ describe('WorldSwitcher', () => {
   let navigate: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
-    localStorage.clear();
     await TestBed.configureTestingModule({
       imports: [WorldSwitcher, provideTranslocoTesting()],
       providers: [
@@ -29,71 +28,89 @@ describe('WorldSwitcher', () => {
       ],
     }).compileComponents();
     http = TestBed.inject(HttpTestingController);
-    navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    navigate = vi
+      .spyOn(TestBed.inject(Router), 'navigate')
+      .mockResolvedValue(true);
   });
 
   afterEach(() => {
     http.verify();
-    localStorage.clear();
+    document
+      .querySelectorAll('.cdk-overlay-container')
+      .forEach((el) => el.remove());
   });
 
-  /** Create the switcher and resolve its world list. */
-  function render(worlds: WorldSummary[]) {
+  /** Mount the switcher with the active World pinned and its world list resolved. */
+  function render(
+    worlds: WorldSummary[],
+    activeId: string | null = null,
+    expanded = true,
+  ) {
+    TestBed.inject(ActiveWorld).set(activeId);
     const fixture = TestBed.createComponent(WorldSwitcher);
+    fixture.componentRef.setInput('expanded', expanded);
     fixture.detectChanges(); // load() -> GET /worlds
     http.expectOne('/api/worlds').flush(worlds);
     fixture.detectChanges();
     return fixture;
   }
 
-  const select = (el: HTMLElement) =>
-    el.querySelector('[data-testid=world-switcher]') as HTMLSelectElement;
+  const trigger = (el: HTMLElement) =>
+    el.querySelector('[data-testid=world-switcher]') as HTMLButtonElement;
 
-  it('renders the caller’s worlds as options', () => {
-    const el = render([world('w1', 'Aldermoor'), world('w2', 'Whisperwood')])
-      .nativeElement as HTMLElement;
+  /** The CDK menu opens into the overlay container appended to <body>. */
+  function open(fixture: ReturnType<typeof render>) {
+    trigger(fixture.nativeElement).click();
+    fixture.detectChanges();
+  }
+  const item = (testid: string) =>
+    document.querySelector(`[data-testid="${testid}"]`) as HTMLElement;
 
-    const labels = Array.from(select(el).options).map((o) => o.textContent?.trim());
-    expect(labels).toEqual(['Aldermoor', 'Whisperwood']);
+  it('shows the active World’s name on the trigger', () => {
+    const el = render(
+      [world('w1', 'Aldermoor'), world('w2', 'Whisperwood')],
+      'w2',
+    ).nativeElement as HTMLElement;
+
+    expect(trigger(el).textContent).toContain('Whisperwood');
   });
 
-  it('navigates to the chosen World by URL (ADR-0028)', () => {
-    const fixture = render([world('w1'), world('w2')]);
+  it('navigates to a chosen World by URL (ADR-0028)', () => {
+    const fixture = render(
+      [world('w1', 'Aldermoor'), world('w2', 'Whisperwood')],
+      'w1',
+    );
 
-    const sel = select(fixture.nativeElement);
-    sel.value = 'w2';
-    sel.dispatchEvent(new Event('change'));
+    open(fixture);
+    item('world-option-w2').click();
 
     expect(navigate).toHaveBeenCalledWith(['/w', 'w2', 'entities']);
   });
 
-  it('creates a new world and navigates to its Home Entity', () => {
-    const fixture = render([world('w1')]);
+  it('offers a path to the World Index', () => {
+    const fixture = render([world('w1', 'Aldermoor')], 'w1');
 
-    (
-      fixture.nativeElement.querySelector('[data-testid=new-world]') as HTMLButtonElement
-    ).click();
+    open(fixture);
 
-    const req = http.expectOne('/api/worlds');
-    expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ name: 'Untitled world' });
-    req.flush({ ...world('w2', 'Untitled world'), homeEntityId: 'home2' });
-
-    expect(navigate).toHaveBeenCalledWith(['/w', 'w2', 'entities', 'home2']);
+    expect(item('world-index-link').getAttribute('href')).toBe('/');
   });
 
-  it('surfaces an error toast when world creation fails', () => {
-    const fixture = render([world('w1')]);
+  it('shows an initial chip when collapsed, with the full name for assistive tech', () => {
+    const fixture = render([world('w1', 'Aldermoor')], 'w1', false);
 
-    (
-      fixture.nativeElement.querySelector('[data-testid=new-world]') as HTMLButtonElement
-    ).click();
-    http
-      .expectOne('/api/worlds')
-      .flush(null, { status: 500, statusText: 'Server Error' });
+    const chip = fixture.nativeElement.querySelector(
+      '[data-testid=world-initial]',
+    ) as HTMLElement;
+    expect(chip.textContent?.trim()).toBe('A');
+    expect(trigger(fixture.nativeElement).getAttribute('title')).toBe(
+      'Aldermoor',
+    );
+  });
 
-    expect(TestBed.inject(ToasterService).toasts().map((t) => t.tone)).toEqual([
-      'error',
-    ]);
+  it('falls back to a neutral label when no World is active (the Index)', () => {
+    const el = render([world('w1', 'Aldermoor')], null)
+      .nativeElement as HTMLElement;
+
+    expect(trigger(el).textContent).toContain('Worlds');
   });
 });

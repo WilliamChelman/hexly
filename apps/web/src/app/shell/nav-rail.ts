@@ -128,13 +128,6 @@ const STATIC_ENTRIES: readonly NavEntry[] = [
       </a>
 
       @if (isAuthenticated()) {
-        <!-- The World switcher needs width for its select + label, so it shows
-             only on the expanded rail (ADR-0024); the collapsed rail stays icon-only. -->
-        @if (expanded) {
-          <div class="flex flex-col gap-1 mt-1 px-1">
-            <app-world-switcher />
-          </div>
-        }
         <nav
           class="flex flex-col gap-1 mt-1"
           [attr.aria-label]="'nav.primary' | transloco"
@@ -160,6 +153,12 @@ const STATIC_ENTRIES: readonly NavEntry[] = [
       }
 
       <div class="flex-1"></div>
+
+      <!-- The World switcher docks by the user menu, at both widths (#121): the
+           current World stays legible (full name expanded, initial chip collapsed). -->
+      @if (isAuthenticated()) {
+        <app-world-switcher [expanded]="expanded" />
+      }
 
       <!--
         Avatar and collapse toggle sit together at the foot: stacked when
