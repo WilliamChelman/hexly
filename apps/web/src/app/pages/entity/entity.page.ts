@@ -10,13 +10,13 @@ import { Observable, concat, ignoreElements, of } from 'rxjs';
 import { EntitySession } from './services/entity-session';
 import { HexMapStore } from './services/hexmap-store';
 import { EntityHeader } from './components/entity-header';
-import { ToolPalette } from './components/tool-palette';
-import { MapCanvas } from './components/map-canvas';
-import { Inspector } from './components/inspector';
-import { RegionsPanel } from './components/regions-panel';
-import { EditorRail } from './components/editor-rail';
-import { StatusBar } from './components/status-bar';
-import { ContentEditor } from './components/content-editor';
+import { ToolPalette } from './components/map/tool-palette';
+import { MapCanvas } from './components/map/map-canvas';
+import { Inspector } from './components/map/inspector';
+import { RegionsPanel } from './components/map/regions-panel';
+import { EditorRail } from './components/map/editor-rail';
+import { StatusBar } from './components/map/status-bar';
+import { ContentEditor } from './components/content-editor/content-editor';
 
 /**
  * The open-Entity route (`/entities/:id`, #70): the routed page that loads the

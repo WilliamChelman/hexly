@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { TranslocoService } from '@jsverse/transloco';
-import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
-import { HexMapStore } from '../services/hexmap-store';
+import { provideTranslocoTesting } from '../../../../core/i18n/transloco-testing';
+import { HexMapStore } from '../../services/hexmap-store';
 import { EditorRail } from './editor-rail';
 
 function setup() {

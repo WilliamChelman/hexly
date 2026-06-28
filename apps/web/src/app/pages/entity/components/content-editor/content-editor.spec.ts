@@ -5,9 +5,9 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { CONTENT_FORMAT, EntityDetail } from '@hexly/domain';
 import { Editor } from '@tiptap/core';
-import { EntitySession } from '../services/entity-session';
-import { EntityNameResolver } from '../services/entity-name-resolver';
-import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
+import { EntitySession } from '../../services/entity-session';
+import { EntityNameResolver } from '../../services/entity-name-resolver';
+import { provideTranslocoTesting } from '../../../../core/i18n/transloco-testing';
 import { ContentEditor } from './content-editor';
 import { noteDetail } from './entity-detail.fixtures';
 

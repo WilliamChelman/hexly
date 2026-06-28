@@ -9,10 +9,10 @@ import {
 import { HttpClient } from '@angular/common/http';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { HealthStatus, isHealthy } from '@hexly/domain';
-import { Cartouche } from '../../../ui/cartouche';
-import { Coord } from '../../../ui/coord';
-import { Dot } from '../../../ui/dot';
-import { HexMapStore } from '../services/hexmap-store';
+import { Cartouche } from '../../../../ui/cartouche';
+import { Coord } from '../../../../ui/coord';
+import { Dot } from '../../../../ui/dot';
+import { HexMapStore } from '../../services/hexmap-store';
 
 /**
  * The bottom rail. It owns the API health probe it displays — the only piece of

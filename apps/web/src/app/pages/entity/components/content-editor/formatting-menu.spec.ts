@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { Editor } from '@tiptap/core';
 import { TextSelection } from '@tiptap/pm/state';
-import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
+import { provideTranslocoTesting } from '../../../../core/i18n/transloco-testing';
 import { CONTENT_EXTENSIONS } from './content-extensions';
 import { FormattingMenu } from './formatting-menu';
 

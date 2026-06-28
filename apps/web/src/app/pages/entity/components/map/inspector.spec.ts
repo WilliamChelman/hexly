@@ -3,9 +3,9 @@ import { provideRouter } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { of } from 'rxjs';
 import { EntityDetail, EntitySummary, EntityType } from '@hexly/domain';
-import { EntitiesClient } from '../../../core/services/entities.client';
-import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
-import { HexMapStore } from '../services/hexmap-store';
+import { EntitiesClient } from '../../../../core/services/entities.client';
+import { provideTranslocoTesting } from '../../../../core/i18n/transloco-testing';
+import { HexMapStore } from '../../services/hexmap-store';
 import { Inspector } from './inspector';
 
 /** A minimal EntitySummary the Entity Link picker can list (issue #76). */

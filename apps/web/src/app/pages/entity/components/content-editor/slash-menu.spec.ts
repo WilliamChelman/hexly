@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
+import { provideTranslocoTesting } from '../../../../core/i18n/transloco-testing';
 import { SLASH_ITEMS, SlashItem } from './slash-menu-items';
 import { SlashMenu } from './slash-menu';
 

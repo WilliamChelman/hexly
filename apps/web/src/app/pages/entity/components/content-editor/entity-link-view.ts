@@ -13,7 +13,7 @@ import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { NodeView } from '@tiptap/pm/view';
-import { EntityNameResolver } from '../services/entity-name-resolver';
+import { EntityNameResolver } from '../../services/entity-name-resolver';
 
 /**
  * The app's first Angular TipTap node view (ADR-0023): renders a Content Entity

@@ -1,10 +1,10 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Region } from '@hexly/domain';
-import { Button } from '../../../ui/button';
-import { Eyebrow } from '../../../ui/eyebrow';
-import { Swatch } from '../../../ui/swatch';
-import { HexMapStore } from '../services/hexmap-store';
+import { Button } from '../../../../ui/button';
+import { Eyebrow } from '../../../../ui/eyebrow';
+import { Swatch } from '../../../../ui/swatch';
+import { HexMapStore } from '../../services/hexmap-store';
 
 /**
  * The Regions panel — the right-edge rail's first entry, sharing the Inspector's

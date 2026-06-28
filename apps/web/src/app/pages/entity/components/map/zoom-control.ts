@@ -7,7 +7,7 @@ import {
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { Icon } from '../../../ui/icon/icon';
+import { Icon } from '../../../../ui/icon/icon';
 
 /**
  * The map's zoom cluster — a single frosted pill of borderless controls: zoom

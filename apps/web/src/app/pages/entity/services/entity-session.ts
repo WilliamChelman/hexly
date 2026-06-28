@@ -39,7 +39,7 @@ import {
 import { JSONContent } from '@tiptap/core';
 import { EntitiesClient } from '../../../core/services/entities.client';
 import { ActiveWorld } from '../../../core/services/active-world';
-import { harvestDescriptors } from '../components/descriptors';
+import { harvestDescriptors } from '../components/content-editor/descriptors';
 import { TitleService } from '../../../core/i18n/title.service';
 import { AppShellStore } from '../../../shell/app-shell.store';
 import { EntityView, HexMapStore } from './hexmap-store';

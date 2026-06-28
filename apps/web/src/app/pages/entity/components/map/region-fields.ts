@@ -1,10 +1,10 @@
 import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Region } from '@hexly/domain';
-import { Field } from '../../../ui/field';
-import { Input } from '../../../ui/input';
-import { inputValue } from '../utils/dom';
-import { HexMapStore } from '../services/hexmap-store';
+import { Field } from '../../../../ui/field';
+import { Input } from '../../../../ui/input';
+import { inputValue } from '../../utils/dom';
+import { HexMapStore } from '../../services/hexmap-store';
 
 /**
  * The name + colour editor for a single {@link Region} — the one place the two

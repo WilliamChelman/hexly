@@ -1,20 +1,20 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { featureLibrary, terrainPalette } from '@hexly/domain';
-import { IconButton } from '../../../ui/icon-button';
-import { Icon, IconName } from '../../../ui/icon/icon';
-import { IconPath } from '../../../ui/icon/icon-path';
-import { Panel } from '../../../ui/panel';
-import { Rule } from '../../../ui/rule';
-import { Swatch } from '../../../ui/swatch';
-import { featureKey, terrainKey } from '../utils/catalog-keys';
+import { IconButton } from '../../../../ui/icon-button';
+import { Icon, IconName } from '../../../../ui/icon/icon';
+import { IconPath } from '../../../../ui/icon/icon-path';
+import { Panel } from '../../../../ui/panel';
+import { Rule } from '../../../../ui/rule';
+import { Swatch } from '../../../../ui/swatch';
+import { featureKey, terrainKey } from '../../utils/catalog-keys';
 import {
   HexMapStore,
   featureSubtools,
   SelectSubtool,
   selectSubtools,
   ToolId,
-} from '../services/hexmap-store';
+} from '../../services/hexmap-store';
 
 /** A top-level Tool button in the floating icon strip (issue #27, ADR-0013). */
 interface ToolDef {

@@ -11,13 +11,13 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntitySummary, EntityType } from '@hexly/domain';
-import { EntitiesClient } from '../../../core/services/entities.client';
-import { ActiveWorld } from '../../../core/services/active-world';
-import { Button } from '../../../ui/button';
-import { Field } from '../../../ui/field';
-import { Icon } from '../../../ui/icon/icon';
-import { Input } from '../../../ui/input';
-import { HexMapStore } from '../services/hexmap-store';
+import { EntitiesClient } from '../../../../core/services/entities.client';
+import { ActiveWorld } from '../../../../core/services/active-world';
+import { Button } from '../../../../ui/button';
+import { Field } from '../../../../ui/field';
+import { Icon } from '../../../../ui/icon/icon';
+import { Input } from '../../../../ui/input';
+import { HexMapStore } from '../../services/hexmap-store';
 
 /**
  * The Inspector's Entity Link control (issue #76, CONTEXT.md → Entity Link) for the

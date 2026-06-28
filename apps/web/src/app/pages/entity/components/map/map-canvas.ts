@@ -26,15 +26,15 @@ import {
   rectFromCorners,
   regionById,
 } from '@hexly/domain';
-import { ThemeService } from '../../../core/services/theme.service';
-import { ToasterService } from '../../../core/services/toaster.service';
-import { terrainKey } from '../utils/catalog-keys';
-import { HexMapStore, SelectMode, ToolId } from '../services/hexmap-store';
+import { ThemeService } from '../../../../core/services/theme.service';
+import { ToasterService } from '../../../../core/services/toaster.service';
+import { terrainKey } from '../../utils/catalog-keys';
+import { HexMapStore, SelectMode, ToolId } from '../../services/hexmap-store';
 import { CoordReadout } from './coord-readout';
 import { ZoomControl } from './zoom-control';
-import { Camera } from '../utils/camera';
-import { Canvas2dMapRenderer } from '../services/map-renderer';
-import { MapRenderer, MarqueeOverride } from '../models/map-renderer';
+import { Camera } from '../../utils/camera';
+import { Canvas2dMapRenderer } from '../../services/map-renderer';
+import { MapRenderer, MarqueeOverride } from '../../models/map-renderer';
 
 /** Hex radius (centre→corner) in world pixels at zoom 1. */
 const HEX_SIZE = 40;

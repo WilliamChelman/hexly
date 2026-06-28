@@ -14,10 +14,10 @@ import {
 } from '@angular/core';
 import { Editor, JSONContent } from '@tiptap/core';
 import { catchError, firstValueFrom, of } from 'rxjs';
-import { EntitiesClient } from '../../../core/services/entities.client';
+import { EntitiesClient } from '../../../../core/services/entities.client';
 import { TiptapDirective } from './tiptap.directive';
-import { EntitySession } from '../services/entity-session';
-import { EntityNameResolver } from '../services/entity-name-resolver';
+import { EntitySession } from '../../services/entity-session';
+import { EntityNameResolver } from '../../services/entity-name-resolver';
 import { CONTENT_EXTENSIONS } from './content-extensions';
 import { entityLinkNode } from './entity-link-node';
 import { SlashMenu } from './slash-menu';
