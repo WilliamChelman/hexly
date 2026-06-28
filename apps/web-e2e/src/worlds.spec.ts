@@ -29,8 +29,8 @@ async function createWorldFromIndex(
 
 /** Open the foot-of-rail World switcher and hop to another World by id. */
 async function switchToWorld(page: Page, worldId: string): Promise<void> {
-  await page.getByTestId('world-switcher').click();
-  await page.getByTestId(`world-option-${worldId}`).click();
+  await page.getByTestId('switcher').click();
+  await page.getByTestId(`switcher-option-${worldId}`).click();
 }
 
 test('the World Index lists reachable Worlds; creating one opens its Home Entity', async ({
@@ -161,10 +161,10 @@ test('the foot-of-rail switcher shows the current World and hops to another (#12
 
   // Land in World B; the switcher (loaded fresh) names B as the current World.
   await page.goto(`/w/${worldB.id}/entities`);
-  await expect(page.getByTestId('world-switcher')).toContainText('Whisperwood');
+  await expect(page.getByTestId('switcher')).toContainText('Whisperwood');
 
   // Hopping to World A re-scopes the URL to A's entity browser.
   await switchToWorld(page, worldA.id);
   await expect(page).toHaveURL(new RegExp(`/w/${worldA.id}/entities$`));
-  await expect(page.getByTestId('world-switcher')).toContainText('Aldermoor');
+  await expect(page.getByTestId('switcher')).toContainText('Aldermoor');
 });

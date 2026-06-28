@@ -56,7 +56,7 @@ describe('WorldSwitcher', () => {
   }
 
   const trigger = (el: HTMLElement) =>
-    el.querySelector('[data-testid=world-switcher]') as HTMLButtonElement;
+    el.querySelector('[data-testid=switcher]') as HTMLButtonElement;
 
   /** The CDK menu opens into the overlay container appended to <body>. */
   function open(fixture: ReturnType<typeof render>) {
@@ -82,7 +82,7 @@ describe('WorldSwitcher', () => {
     );
 
     open(fixture);
-    item('world-option-w2').click();
+    item('switcher-option-w2').click();
 
     expect(navigate).toHaveBeenCalledWith(['/w', 'w2', 'entities']);
   });
@@ -92,14 +92,14 @@ describe('WorldSwitcher', () => {
 
     open(fixture);
 
-    expect(item('world-index-link').getAttribute('href')).toBe('/');
+    expect(item('switcher-index-link').getAttribute('href')).toBe('/');
   });
 
   it('shows an initial chip when collapsed, with the full name for assistive tech', () => {
     const fixture = render([world('w1', 'Aldermoor')], 'w1', false);
 
     const chip = fixture.nativeElement.querySelector(
-      '[data-testid=world-initial]',
+      '[data-testid=switcher-initial]',
     ) as HTMLElement;
     expect(chip.textContent?.trim()).toBe('A');
     expect(trigger(fixture.nativeElement).getAttribute('title')).toBe(

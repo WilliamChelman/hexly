@@ -36,7 +36,7 @@ import { Rule } from '../ui/rule';
   template: `
     <button
       type="button"
-      data-testid="world-switcher"
+      data-testid="switcher"
       class="flex items-center gap-2 w-full px-2 py-1 rounded-sm bg-surface-sunken border border-line text-ink-strong text-sm text-left cursor-pointer hover:bg-gold-soft focus:border-gold outline-none"
       [class.justify-center]="!expanded()"
       [class.px-0]="!expanded()"
@@ -45,7 +45,7 @@ import { Rule } from '../ui/rule';
       [cdkMenuTriggerFor]="menu"
     >
       <span
-        data-testid="world-initial"
+        data-testid="switcher-initial"
         class="grid place-items-center shrink-0 size-6 font-mono text-2xs text-on-gilded bg-linear-[140deg] from-gold-bright to-gold-deep rounded-full"
         aria-hidden="true"
         >{{ initial() }}</span
@@ -67,7 +67,7 @@ import { Rule } from '../ui/rule';
           <button
             type="button"
             cdkMenuItem
-            [attr.data-testid]="'world-option-' + world.id"
+            [attr.data-testid]="'switcher-option-' + world.id"
             class="flex items-center justify-between gap-2 px-3 py-2 text-sm text-ink text-left bg-transparent border-0 rounded-sm cursor-pointer hover:bg-gold-soft"
             (cdkMenuItemTriggered)="switch(world.id)"
           >
@@ -81,7 +81,7 @@ import { Rule } from '../ui/rule';
         <a
           cdkMenuItem
           routerLink="/"
-          data-testid="world-index-link"
+          data-testid="switcher-index-link"
           class="flex items-center gap-2 px-3 py-2 text-sm text-ink no-underline rounded-sm cursor-pointer hover:bg-gold-soft"
         >
           <app-icon name="library" [size]="18" />
