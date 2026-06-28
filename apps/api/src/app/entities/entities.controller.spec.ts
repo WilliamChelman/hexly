@@ -49,11 +49,8 @@ describe('Entities endpoints', () => {
    * World's Home note, so it surfaces in the owner's Entity list.
    */
   async function seedUserWithWorld(email: string, password: string, name: string) {
-    await app.get(AuthService).seedUser(email, password, name);
-    const user = db.$client
-      .prepare(`SELECT id FROM users WHERE email = ?`)
-      .get(email) as { id: string };
-    mintWorldWithHome(db.$client, user.id, name);
+    const userId = await app.get(AuthService).seedUser(email, password, name);
+    mintWorldWithHome(db.$client, userId, name);
   }
 
   /** Log a seeded user in and return an agent that carries their session. */

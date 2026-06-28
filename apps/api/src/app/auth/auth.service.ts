@@ -39,18 +39,20 @@ export class AuthService {
     email: string,
     password: string,
     displayName: string,
-  ): Promise<void> {
+  ): Promise<string> {
+    const id = randomUUID();
     const passwordHash = await hash(password);
     this.db
       .insert(users)
       .values({
-        id: randomUUID(),
+        id,
         email: normalizeEmail(email),
         displayName,
         passwordHash,
         createdAt: Date.now(),
       })
       .run();
+    return id;
   }
 
   /**

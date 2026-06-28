@@ -11,6 +11,7 @@ import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app/app.module';
 import { AuthService } from './app/auth/auth.service';
+import { DB, Db, mintWorldWithHome } from './app/db/db';
 
 async function seed() {
   const [email, password, displayName] = process.argv.slice(2);
@@ -24,7 +25,9 @@ async function seed() {
     logger: ['error', 'warn', 'log'],
   });
   try {
-    await app.get(AuthService).seedUser(email, password, displayName);
+    const userId = await app.get(AuthService).seedUser(email, password, displayName);
+    const db = app.get<Db>(DB);
+    mintWorldWithHome(db.$client, userId, displayName);
     Logger.log(`Seeded user ${email}`);
   } catch (err) {
     Logger.error(`Could not seed ${email}: ${(err as Error).message}`);
