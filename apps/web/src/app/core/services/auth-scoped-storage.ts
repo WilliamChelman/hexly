@@ -1,4 +1,4 @@
-import { effect, Injectable, inject, Signal, signal, untracked } from '@angular/core';
+import { computed, effect, Injectable, inject, Signal, signal, untracked } from '@angular/core';
 import { AuthClient } from './auth.client';
 
 function hashId(id: string): string {
@@ -25,21 +25,24 @@ export interface AuthPreference<T extends string> {
 export class AuthScopedStorage {
   private readonly auth = inject(AuthClient);
 
+  /** The current user's id, or null — stable across same-user re-fetches. */
+  readonly userId = computed(() => this.auth.currentUser()?.id ?? null);
+
   constructor() {
     effect(() => {
-      const user = this.auth.currentUser();
+      const uid = this.userId();
       untracked(() => {
-        const newHash = user ? hashId(user.id) : null;
+        const newHash = uid ? hashId(uid) : null;
         try {
           const oldHash = localStorage.getItem(SCOPE_KEY);
-          if (oldHash && oldHash !== newHash) {
+          if (oldHash && newHash && oldHash !== newHash) {
             const suffix = `-${oldHash}`;
             for (const key of Object.keys(localStorage)) {
               if (key.endsWith(suffix)) localStorage.removeItem(key);
             }
           }
+          // Keep SCOPE_KEY on logout so a later cross-user login can still compare and wipe.
           if (newHash) localStorage.setItem(SCOPE_KEY, newHash);
-          else localStorage.removeItem(SCOPE_KEY);
         } catch { /* private mode */ }
       });
     });

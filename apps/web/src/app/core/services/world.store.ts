@@ -1,7 +1,6 @@
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { Observable, tap } from 'rxjs';
 import { WorldDetail, WorldSummary } from '@hexly/domain';
-import { AuthClient } from './auth.client';
 import { AuthScopedStorage } from './auth-scoped-storage';
 import { WorldsClient } from './worlds.client';
 
@@ -18,7 +17,6 @@ const ACTIVE_KEY = 'hexly-active-world';
 @Injectable({ providedIn: 'root' })
 export class WorldStore {
   private readonly client = inject(WorldsClient);
-  private readonly auth = inject(AuthClient);
   private readonly storage = inject(AuthScopedStorage);
 
   private readonly _worlds = signal<readonly WorldSummary[]>([]);
@@ -42,12 +40,12 @@ export class WorldStore {
     // data leaks (logout → re-login on the same tab shows the new user's Worlds, not
     // the previous user's). Reads the user-scoped localStorage key on each transition.
     effect(() => {
-      const user = this.auth.currentUser();
+      const userId = this.storage.userId();
       untracked(() => {
         this.hasLoaded = false;
         this._loaded.set(false);
         this._worlds.set([]);
-        this._activeId.set(user ? this.storage.getItem(ACTIVE_KEY) : null);
+        this._activeId.set(userId ? this.storage.getItem(ACTIVE_KEY) : null);
       });
     });
   }

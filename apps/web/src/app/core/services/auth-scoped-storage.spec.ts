@@ -81,14 +81,15 @@ describe('AuthScopedStorage', () => {
   });
 
   describe('auto-wipe on user change', () => {
-    it('wipes all user-scoped keys on logout', () => {
+    it('does NOT wipe user-scoped keys on logout — they persist until a different user logs in', () => {
       login('u1');
       const scopedKey = storage.userKey('hexly-foo');
       storage.setItem('hexly-foo', 'bar');
 
       logout();
 
-      expect(localStorage.getItem(scopedKey)).toBeNull();
+      // Keys survive logout so a same-user re-login still sees preferences.
+      expect(localStorage.getItem(scopedKey)).toBe('bar');
     });
 
     it('wipes user A keys when user B logs in on the same tab', () => {
@@ -105,34 +106,29 @@ describe('AuthScopedStorage', () => {
     });
 
     it('cleans up stale keys from a prior session when a different user logs in', () => {
-      // Simulate a prior session: login as u1, capture the scoped key + scope hash
+      // Simulate a prior session: login as u1, write a key, then logout.
+      // Logout keeps SCOPE_KEY so the next login can compare and wipe.
       login('u1');
       const staleScopedKey = storage.userKey('hexly-pref');
-      const staleScopeHash = localStorage.getItem('hexly-scope');
-      logout(); // wipes everything
+      storage.setItem('hexly-pref', 'stale-value');
+      logout();
 
-      // Restore what the prior session had left in localStorage
-      localStorage.setItem('hexly-scope', staleScopeHash!);
-      localStorage.setItem(staleScopedKey, 'stale-value');
-
-      // A different user logs in — the prior-session keys must be wiped
+      // A different user logs in — the prior-session keys must be wiped.
       login('u2');
 
       expect(localStorage.getItem(staleScopedKey)).toBeNull();
     });
 
-    it('does not wipe keys when the same user re-authenticates', () => {
+    it('preserves scoped keys when the same user re-authenticates', () => {
       login('u1');
       storage.setItem('hexly-foo', 'kept');
       const scopedKey = storage.userKey('hexly-foo');
       logout();
 
-      // Same user logs back in
+      // Same user logs back in — preferences survive the logout/re-login cycle.
       login('u1');
 
-      // The key was wiped on logout (u1 → null), not re-created;
-      // the important thing is the new session starts clean.
-      expect(localStorage.getItem(scopedKey)).toBeNull();
+      expect(localStorage.getItem(scopedKey)).toBe('kept');
     });
   });
 
