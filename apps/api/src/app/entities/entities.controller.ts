@@ -44,7 +44,7 @@ export class EntitiesController {
   list(@CurrentUser() user: AuthUser, @Query() query: unknown): EntityPage {
     const parsed = entityListQuerySchema.safeParse(query);
     if (!parsed.success) throw new BadRequestException();
-    const { cursor, limit, ids, q, type } = parsed.data;
+    const { cursor, limit, ids, q, type, worldId } = parsed.data;
 
     // An absent cursor is page one; a present-but-undecodable one is a 400, not
     // a 500 (ADR-0001). The opaque cursor decodes to a server-internal offset.
@@ -57,6 +57,7 @@ export class EntitiesController {
       ids,
       q,
       type,
+      worldId,
     });
     return { items, nextCursor: hasMore ? encodeCursor(offset + limit) : null };
   }

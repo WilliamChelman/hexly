@@ -278,5 +278,11 @@
     "expand": "Déployer la navigation",
     "collapse": "Réduire la navigation",
     "home": "Accueil Hexly"
+  },
+  "worlds": {
+    "switcherLabel": "Monde actif",
+    "new": "Nouveau monde",
+    "untitled": "Monde sans titre",
+    "createError": "Impossible de créer ce monde. Veuillez réessayer."
   }
 }

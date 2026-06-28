@@ -38,3 +38,12 @@ export interface WorldSummary {
   readonly createdAt: number;
   readonly updatedAt: number;
 }
+
+/**
+ * A single World plus its Home Entity id (ADR-0024) — what POST/GET/PATCH
+ * `/worlds/:id` return. The id is enough for the client to navigate to the
+ * landing page (`/entities/:homeEntityId`); the body is fetched on open.
+ */
+export interface WorldDetail extends WorldSummary {
+  readonly homeEntityId: string;
+}

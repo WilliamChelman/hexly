@@ -7,6 +7,7 @@ import { DB, Db, createDb, mintWorldWithHome } from '../db/db';
 import { AuthService } from '../auth/auth.service';
 import { AuthModule } from '../auth/auth.module';
 import { EntitiesModule } from './entities.module';
+import { WorldsModule } from '../worlds/worlds.module';
 
 /** An empty hexmap body — the shape create mints and the editor round-trips. */
 const emptyHexmapBody = {
@@ -25,7 +26,7 @@ describe('Entities endpoints', () => {
     // Real Drizzle, real schema, isolated per-test (ADR-0002).
     db = createDb(':memory:');
     const moduleRef = await Test.createTestingModule({
-      imports: [AuthModule, EntitiesModule],
+      imports: [AuthModule, EntitiesModule, WorldsModule],
     })
       .overrideProvider(DB)
       .useValue(db)
@@ -205,6 +206,39 @@ describe('Entities endpoints', () => {
     );
   });
 
+  it('filters the entity list to one World via worldId', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    // Ada's seeded World holds Home note 'Ada' plus this new map.
+    const seeded = await ada
+      .post('/entities')
+      .send({ name: 'In Seeded World', type: 'note' })
+      .expect(201);
+    const worldA = seeded.body.worldId;
+
+    // A second World for Ada, with its own entity.
+    const worldB = await ada.post('/worlds').send({ name: 'Second' }).expect(201);
+    await ada
+      .post('/entities')
+      .send({ name: 'In Second World', type: 'note', worldId: worldB.body.id })
+      .expect(201);
+
+    // worldId scopes the list to that World's entities only.
+    const inA = await ada.get('/entities').query({ worldId: worldA }).expect(200);
+    expect(inA.body.items.map((e: { name: string }) => e.name).sort()).toEqual([
+      'Ada',
+      'In Seeded World',
+    ]);
+
+    const inB = await ada
+      .get('/entities')
+      .query({ worldId: worldB.body.id })
+      .expect(200);
+    expect(inB.body.items.map((e: { name: string }) => e.name).sort()).toEqual([
+      'In Second World',
+      'Second',
+    ]);
+  });
+
   it('loads an entity by id with its full body', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const created = await ada
@@ -373,6 +407,18 @@ describe('Entities endpoints', () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
 
     await ada.delete('/entities/does-not-exist').expect(404);
+  });
+
+  it('refuses to delete a World’s Home Entity with 409', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+
+    // The Home note 'Ada' was minted with Ada's World (ADR-0024); it can't be deleted.
+    const list = await ada.get('/entities').expect(200);
+    const home = list.body.items.find((e: { name: string }) => e.name === 'Ada');
+
+    await ada.delete(`/entities/${home.id}`).expect(409);
+    // Still loadable — the rejected delete left it intact.
+    await ada.get(`/entities/${home.id}`).expect(200);
   });
 
   it('never lets another user reach an entity they do not own', async () => {

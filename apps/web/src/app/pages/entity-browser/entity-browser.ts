@@ -1,8 +1,8 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  OnInit,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -11,6 +11,7 @@ import { finalize } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient } from '../../core/services/entities.client';
+import { WorldStore } from '../../core/services/world.store';
 import { ToasterService } from '../../core/services/toaster.service';
 import { AppShellStore } from '../../shell/app-shell.store';
 import { Autofocus } from '../../ui/autofocus';
@@ -218,8 +219,9 @@ function formatEdited(updatedAt: number, lang: string): string {
     </main>
   `,
 })
-export class EntityBrowser implements OnInit {
+export class EntityBrowser {
   private readonly entitiesClient = inject(EntitiesClient);
+  private readonly worlds = inject(WorldStore);
   private readonly router = inject(Router);
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
@@ -257,8 +259,14 @@ export class EntityBrowser implements OnInit {
   /** The id of the Entity whose name is being edited inline, or `null`. */
   protected readonly renamingId = signal<string | null>(null);
 
-  ngOnInit(): void {
-    this.fetchFirstPage();
+  constructor() {
+    // Re-fetch page one whenever the active World changes (ADR-0024) — the browser
+    // shows only the active World's Entities. The WorldStore is loaded by the
+    // World switcher in the shell; until an active World settles, there's nothing
+    // to list, so a null id is a no-op rather than an all-Worlds fetch.
+    effect(() => {
+      if (this.worlds.activeWorldId()) this.fetchFirstPage();
+    });
   }
 
   /**
@@ -271,7 +279,7 @@ export class EntityBrowser implements OnInit {
   private fetchFirstPage(): void {
     // Set `loaded` on error too: a failed fetch must show the error panel, not a blank page.
     this.entitiesClient
-      .list({ limit: PAGE_SIZE })
+      .list({ limit: PAGE_SIZE, worldId: this.worlds.activeWorldId() ?? undefined })
       .pipe(this.shell.withLoading('subtle'))
       .subscribe({
         next: (page) => {
@@ -297,7 +305,7 @@ export class EntityBrowser implements OnInit {
     if (cursor === null || this.loadingMore()) return;
     this.loadingMore.set(true);
     this.entitiesClient
-      .list({ cursor })
+      .list({ cursor, worldId: this.worlds.activeWorldId() ?? undefined })
       .pipe(finalize(() => this.loadingMore.set(false)))
       .subscribe({
         next: (page) => {
@@ -320,6 +328,7 @@ export class EntityBrowser implements OnInit {
       .create(
         this.transloco.translate(type === 'note' ? 'domain.untitledNote' : 'domain.untitledMap'),
         type,
+        this.worlds.activeWorldId() ?? undefined,
       )
       .pipe(finalize(() => this.creating.set(false)))
       .subscribe({

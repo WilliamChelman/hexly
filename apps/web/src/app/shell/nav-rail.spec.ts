@@ -49,7 +49,13 @@ describe('NavRail', () => {
   });
 
   afterEach(() => localStorage.clear());
-  afterEach(() => http.verify());
+  afterEach(() => {
+    // The expanded rail mounts the World switcher, which loads the world list
+    // (ADR-0024). Drain that request so these rail-focused tests stay decoupled
+    // from it; tests that never expand match nothing here.
+    http.match('/api/worlds').forEach((req) => req.flush([]));
+    http.verify();
+  });
   afterEach(() => {
     document
       .querySelectorAll('.cdk-overlay-container')
