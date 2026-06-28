@@ -4,8 +4,8 @@ import { expect, test, type Page } from './fixtures';
  * URL-scoped Worlds + World Index (#118, ADR-0028): the root `/` is the World
  * Index — it lists reachable Worlds and owns create; the active World is a URL
  * fact (`/w/:worldId/entities`), so the entity browser is scoped by the segment
- * and switching Worlds re-scopes the list. The World switcher lives on the
- * expanded nav rail (relocating it is a later slice).
+ * and switching Worlds re-scopes the list. The World switcher is a compact
+ * dropdown docked by the user menu in the nav-rail foot, at both widths (#121).
  */
 
 /** Create a World from the Index and land on its Home Entity. Returns its id + homeEntityId. */
@@ -27,13 +27,10 @@ async function createWorldFromIndex(
   return world;
 }
 
-/** Expand the nav rail so the World switcher is on screen. */
-async function expandRail(page: Page): Promise<void> {
-  const toggle = page.getByTestId('rail-toggle');
-  if ((await toggle.getAttribute('aria-expanded')) === 'false') {
-    await toggle.click();
-  }
-  await expect(page.getByTestId('world-switcher')).toBeVisible();
+/** Open the foot-of-rail World switcher and hop to another World by id. */
+async function switchToWorld(page: Page, worldId: string): Promise<void> {
+  await page.getByTestId('switcher').click();
+  await page.getByTestId(`switcher-option-${worldId}`).click();
 }
 
 test('the World Index lists reachable Worlds; creating one opens its Home Entity', async ({
@@ -144,8 +141,30 @@ test('the entity browser is scoped by the URL World; switching Worlds filters it
   expect(worldB.id).not.toBe(worldA.id);
 
   // Switch back to World A via the switcher (it navigates by URL) → its note returns.
-  await expandRail(page);
-  await page.getByTestId('world-switcher').selectOption(worldA.id);
+  await switchToWorld(page, worldA.id);
   await expect(page).toHaveURL(new RegExp(`/w/${worldA.id}/entities$`));
   await expect(page.getByText('Alpha in A')).toBeVisible();
+});
+
+test('the foot-of-rail switcher shows the current World and hops to another (#121)', async ({
+  page,
+}) => {
+  // Two distinctly-named Worlds so the switcher's current-World label is legible.
+  const worldA = await createWorldFromIndex(page);
+  await page.request.patch(`/api/worlds/${worldA.id}`, {
+    data: { name: 'Aldermoor' },
+  });
+  const worldB = await createWorldFromIndex(page);
+  await page.request.patch(`/api/worlds/${worldB.id}`, {
+    data: { name: 'Whisperwood' },
+  });
+
+  // Land in World B; the switcher (loaded fresh) names B as the current World.
+  await page.goto(`/w/${worldB.id}/entities`);
+  await expect(page.getByTestId('switcher')).toContainText('Whisperwood');
+
+  // Hopping to World A re-scopes the URL to A's entity browser.
+  await switchToWorld(page, worldA.id);
+  await expect(page).toHaveURL(new RegExp(`/w/${worldA.id}/entities$`));
+  await expect(page.getByTestId('switcher')).toContainText('Aldermoor');
 });

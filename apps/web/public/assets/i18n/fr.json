@@ -284,6 +284,8 @@
   },
   "worlds": {
     "switcherLabel": "Monde actif",
+    "switcher": "Mondes",
+    "allWorlds": "Tous les mondes",
     "new": "Nouveau monde",
     "untitled": "Monde sans titre",
     "createError": "Impossible de créer ce monde. Veuillez réessayer."
