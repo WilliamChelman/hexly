@@ -40,95 +40,103 @@ describe('AuthScopedStorage', () => {
     localStorage.clear();
   });
 
-  describe('userKey()', () => {
-    it('returns the bare key when no user is authenticated', () => {
-      expect(storage.userKey('hexly-foo')).toBe('hexly-foo');
-    });
-
-    it('returns a namespaced key once a user is authenticated', () => {
-      login('u1');
-      expect(storage.userKey('hexly-foo')).toMatch(/^hexly-foo-.+$/);
-    });
-
-    it('returns different namespaced keys for different users', () => {
-      login('u1');
-      const keyForU1 = storage.userKey('hexly-foo');
-      login('u2');
-      const keyForU2 = storage.userKey('hexly-foo');
-      expect(keyForU1).not.toBe(keyForU2);
-    });
-  });
-
   describe('getItem / setItem / removeItem', () => {
-    it('reads and writes under the user-scoped key, not the bare key', () => {
+    it('reads and writes under a prefixed key, not the bare key', () => {
       login('u1');
-      storage.setItem('hexly-foo', 'bar');
-      expect(storage.getItem('hexly-foo')).toBe('bar');
-      expect(localStorage.getItem('hexly-foo')).toBeNull(); // bare key untouched
+      storage.setItem('foo', 'bar');
+      expect(storage.getItem('foo')).toBe('bar');
+      expect(localStorage.getItem('hexly-u:foo')).toBe('bar'); // namespaced internally
+      expect(localStorage.getItem('foo')).toBeNull(); // bare key untouched
     });
 
     it('getItem returns null when nothing is stored', () => {
       login('u1');
-      expect(storage.getItem('hexly-foo')).toBeNull();
+      expect(storage.getItem('foo')).toBeNull();
     });
 
-    it('removeItem deletes the user-scoped key', () => {
+    it('removeItem deletes the key', () => {
       login('u1');
-      storage.setItem('hexly-foo', 'bar');
-      storage.removeItem('hexly-foo');
-      expect(storage.getItem('hexly-foo')).toBeNull();
+      storage.setItem('foo', 'bar');
+      storage.removeItem('foo');
+      expect(storage.getItem('foo')).toBeNull();
+    });
+
+    it('reads back regardless of auth timing — written logged-in, read while anonymous', () => {
+      // The reload bug: a value written by a logged-in user must read back the
+      // same when the session is anonymous (as on boot before /auth/me resolves),
+      // since the key carries no user suffix to miss.
+      login('u1');
+      storage.setItem('foo', 'bar');
+      logout();
+
+      expect(storage.getItem('foo')).toBe('bar');
     });
   });
 
   describe('auto-wipe on user change', () => {
-    it('does NOT wipe user-scoped keys on logout — they persist until a different user logs in', () => {
+    it('does NOT wipe keys on logout — they persist until a different user logs in', () => {
       login('u1');
-      const scopedKey = storage.userKey('hexly-foo');
-      storage.setItem('hexly-foo', 'bar');
+      storage.setItem('foo', 'bar');
 
       logout();
 
       // Keys survive logout so a same-user re-login still sees preferences.
-      expect(localStorage.getItem(scopedKey)).toBe('bar');
+      expect(storage.getItem('foo')).toBe('bar');
     });
 
     it('wipes user A keys when user B logs in on the same tab', () => {
       login('u1');
-      const u1ScopedKey = storage.userKey('hexly-foo');
-      storage.setItem('hexly-foo', 'from-u1');
+      storage.setItem('foo', 'from-u1');
 
       login('u2');
 
-      expect(localStorage.getItem(u1ScopedKey)).toBeNull();
-      // User B can still write their own separate scoped key
-      storage.setItem('hexly-foo', 'from-u2');
-      expect(storage.getItem('hexly-foo')).toBe('from-u2');
+      expect(storage.getItem('foo')).toBeNull();
+      // User B writes their own value under the same key
+      storage.setItem('foo', 'from-u2');
+      expect(storage.getItem('foo')).toBe('from-u2');
     });
 
     it('cleans up stale keys from a prior session when a different user logs in', () => {
       // Simulate a prior session: login as u1, write a key, then logout.
       // Logout keeps SCOPE_KEY so the next login can compare and wipe.
       login('u1');
-      const staleScopedKey = storage.userKey('hexly-pref');
-      storage.setItem('hexly-pref', 'stale-value');
+      storage.setItem('pref', 'stale-value');
       logout();
 
       // A different user logs in — the prior-session keys must be wiped.
       login('u2');
 
-      expect(localStorage.getItem(staleScopedKey)).toBeNull();
+      expect(storage.getItem('pref')).toBeNull();
     });
 
-    it('preserves scoped keys when the same user re-authenticates', () => {
+    it('preserves keys when the same user re-authenticates', () => {
       login('u1');
-      storage.setItem('hexly-foo', 'kept');
-      const scopedKey = storage.userKey('hexly-foo');
+      storage.setItem('foo', 'kept');
       logout();
 
       // Same user logs back in — preferences survive the logout/re-login cycle.
       login('u1');
 
-      expect(localStorage.getItem(scopedKey)).toBe('kept');
+      expect(storage.getItem('foo')).toBe('kept');
+    });
+
+    it('does not wipe while the session is anonymous', () => {
+      login('u1');
+      storage.setItem('foo', 'bar');
+      logout(); // currentUser → null; must not wipe
+
+      expect(storage.getItem('foo')).toBe('bar');
+    });
+
+    it('leaves non-prefixed keys (e.g. device-level theme) untouched on a cross-user login', () => {
+      login('u1');
+      localStorage.setItem('hexly-theme', 'dark'); // device-level, not via this store
+      storage.setItem('foo', 'from-u1');
+
+      login('u2');
+
+      expect(storage.getItem('foo')).toBeNull(); // scoped key wiped
+      expect(localStorage.getItem('hexly-theme')).toBe('dark'); // device key kept
     });
   });
 
@@ -147,8 +155,7 @@ describe('AuthScopedStorage', () => {
     });
 
     it('reads the stored value instead of detecting', () => {
-      // bare key (no authenticated user)
-      localStorage.setItem('hexly-theme', 'dark');
+      storage.setItem('hexly-theme', 'dark');
       const pref = storage.preference({
         storageKey: 'hexly-theme',
         values: ['light', 'dark'] as const,
@@ -160,7 +167,7 @@ describe('AuthScopedStorage', () => {
     });
 
     it('ignores stored values not in the values list', () => {
-      localStorage.setItem('hexly-theme', 'solarized'); // not a valid value
+      storage.setItem('hexly-theme', 'solarized'); // not a valid value
       const pref = storage.preference({
         storageKey: 'hexly-theme',
         values: ['light', 'dark'] as const,
@@ -187,9 +194,9 @@ describe('AuthScopedStorage', () => {
       expect(storage.getItem('hexly-theme')).toBe('dark');
     });
 
-    it('reads from the user-scoped key when authenticated', () => {
+    it('reads the stored value when authenticated', () => {
       login('u1');
-      storage.setItem('hexly-theme', 'dark'); // writes user-scoped key
+      storage.setItem('hexly-theme', 'dark');
       const pref = storage.preference({
         storageKey: 'hexly-theme',
         values: ['light', 'dark'] as const,
@@ -198,8 +205,7 @@ describe('AuthScopedStorage', () => {
       });
 
       expect(pref.value()).toBe('dark');
-      // Bare key is untouched
-      expect(localStorage.getItem('hexly-theme')).toBeNull();
+      expect(localStorage.getItem('hexly-u:hexly-theme')).toBe('dark'); // namespaced
     });
   });
 });

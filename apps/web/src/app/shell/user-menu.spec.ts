@@ -124,7 +124,7 @@ describe('UserMenu', () => {
 
     expect(locale.lang()).toBe('fr');
     expect(transloco.getActiveLang()).toBe('fr');
-    expect(localStorage.getItem('hexly-locale')).toBe('fr');
+    expect(localStorage.getItem('hexly-u:hexly-locale')).toBe('fr');
   });
 
   it('reflects the signed-in user in the menu', () => {

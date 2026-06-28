@@ -52,7 +52,7 @@ describe('LocaleService', () => {
 
   it('prefers a previously stored choice over the browser language', () => {
     setBrowserLang('fr-FR');
-    localStorage.setItem('hexly-locale', 'en');
+    localStorage.setItem('hexly-u:hexly-locale', 'en');
     expect(build().locale.lang()).toBe('en');
   });
 
@@ -71,7 +71,7 @@ describe('LocaleService', () => {
     // Live: the active Transloco language flips without a reload.
     expect(transloco.getActiveLang()).toBe('fr');
     // Remembered: persisted so the next visit reads it back.
-    expect(localStorage.getItem('hexly-locale')).toBe('fr');
+    expect(localStorage.getItem('hexly-u:hexly-locale')).toBe('fr');
   });
 
   /**
@@ -83,7 +83,7 @@ describe('LocaleService', () => {
    */
   describe('init (real HTTP loader, no preload)', () => {
     it('loads the active catalog so a later synchronous translate resolves', async () => {
-      localStorage.setItem('hexly-locale', 'fr');
+      localStorage.setItem('hexly-u:hexly-locale', 'fr');
       TestBed.configureTestingModule({
         providers: [
           provideHttpClient(),
