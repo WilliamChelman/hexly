@@ -22,7 +22,7 @@ import {
 /**
  * The formatting toolbar that floats over a text selection in the Content editor (#74).
  * Headless TipTap owns no chrome (ADR-0019), so this is ours: a `@tiptap/extension-bubble-menu`
- * plugin (wired in {@link NoteView}) positions this component's host element over the selection
+ * plugin (wired in {@link ContentEditor}) positions this component's host element over the selection
  * and toggles its visibility. The toolbar itself just reads/drives the editor through
  * {@link FORMAT_ITEMS} — every action round-trips through the opaque snapshot for free.
  */

@@ -43,8 +43,8 @@ const TYPE_LABELS: Record<
 };
 
 /**
- * The open Entity's page-owned header (ADR-0022), shared by {@link EditorShell} and
- * {@link NoteView}: an eyebrow tag, editable title, autosave status chip
+ * The open Entity's page-owned header (ADR-0022), rendered by {@link EntityPage}
+ * for every Entity type: an eyebrow tag, editable title, autosave status chip
  * ({@link SaveStatus}, ADR-0026), Tags and Share. App navigation lives in the NavRail.
  *
  * Fully driven by {@link EntitySession.current} — the eyebrow/title labels switch on
@@ -135,7 +135,7 @@ export class EntityHeader {
   private readonly session = inject(EntitySession);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-  /** Owns the Map/Note surface choice, shared with the {@link EditorShell} (#75). */
+  /** Owns the Map/Note surface choice, shared with the {@link EntityPage} body (#75). */
   protected readonly store = inject(HexMapStore);
   protected readonly views = VIEWS;
 

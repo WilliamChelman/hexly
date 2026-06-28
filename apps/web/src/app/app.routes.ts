@@ -27,8 +27,8 @@ export const appRoutes: Route[] = [
   },
   {
     // The open-Entity route (#70). The id is in the URL so a reload reopens the
-    // same Entity (#6). The routed page renders its own header now (ADR-0022):
-    // EditorShell for a hexmap, NoteView for a note.
+    // same Entity (#6). The routed EntityPage renders its own header now
+    // (ADR-0022) and lays out the editor per Entity type.
     path: 'entities/:id',
     canActivate: [authGuard],
     // Await a pending autosave before leaving the route, so an in-app navigation never

@@ -35,8 +35,8 @@ import { BubbleMenuDirective } from './bubble-menu.directive';
  * The Content editing surface every Entity shares (ADR-0019): mounts TipTap,
  * seeds from the Entity's stored snapshot, streams edits back to the session's
  * live Content via `getJSON()` — carrying the snapshot load-to-save, never
- * parsing it. {@link NoteView} wraps it in note chrome; the hex map editor
- * mounts it as a `hexmap`'s Note view. Host is the framed box; callers add only
+ * parsing it. {@link EntityPage} mounts it as the body of a `note`, or of a
+ * `hexmap` on its Note view (#75). Host is the framed box; callers add only
  * outer placement.
  */
 @Component({
