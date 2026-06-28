@@ -1,3 +1,5 @@
+import { resolve } from 'node:path';
+import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { createDb } from './db';
 
 /**
@@ -29,8 +31,12 @@ describe('createDb boot migration (ADR-0027)', () => {
   });
 
   it('is safe to run twice — the migration ledger skips applied files', () => {
-    // A second handle over a fresh DB still boots cleanly; on a real file the
-    // ledger makes re-application a no-op rather than a "table exists" error.
-    expect(() => createDb(':memory:').$client.close()).not.toThrow();
+    // Call migrate() a second time on the SAME handle. If drizzle re-ran 0000
+    // the bare CREATE TABLE statements would throw "table already exists".
+    const db = createDb(':memory:');
+    expect(() =>
+      migrate(db, { migrationsFolder: resolve(__dirname, 'migrations') }),
+    ).not.toThrow();
+    db.$client.close();
   });
 });

@@ -77,11 +77,11 @@ _Avoid_: Text, caption, title, annotation
 ## Worlds
 
 **World**:
-A lightweight container record that groups Entities for a single campaign or setting. Not an Entity type — it lives outside the entity model. Every Entity belongs to exactly one World (`world_id NOT NULL`). Carries a `name`, an `owner_id`, and a `home_entity_id`.
+A lightweight container record that groups Entities for a single campaign or setting. Not an Entity type — it lives outside the entity model. Every Entity belongs to exactly one World (`world_id NOT NULL`). Carries a `name` and an `owner_id`. The Home Entity is identified by the `is_home` flag on the Entity, not a column on the World.
 _Avoid_: Space, container, campaign
 
 **Home Entity**:
-A `note` Entity auto-created when a World is created, designated by `worlds.home_entity_id`. Serves as the World's landing page. Cannot be deleted and cannot be moved to another World.
+A `note` Entity auto-created when a World is created, flagged `is_home = true` in the `entities` table. The partial unique index `idx_world_home` enforces at most one per World. Serves as the World's landing page. Cannot be deleted and cannot be moved to another World.
 _Avoid_: World page, index, overview
 
 **World Owner**:
