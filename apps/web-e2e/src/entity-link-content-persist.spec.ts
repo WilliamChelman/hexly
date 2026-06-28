@@ -41,12 +41,10 @@ test('inserts a Content Entity Link via @, persists it, navigates it, and dangle
   await expect(link).toBeVisible();
   await expect(link).toHaveText('Untitled note');
   await expect(link).toHaveAttribute('data-entity-id', targetId!);
-  // A real href so Ctrl/Cmd/middle-click open the target in a new tab natively —
-  // scoped to the World in the URL (ADR-0028).
-  await expect(link).toHaveAttribute(
-    'href',
-    new RegExp(`/w/[\\w-]+/entities/${targetId}$`),
-  );
+  // A real href so Ctrl/Cmd/middle-click open the target in a new tab natively.
+  // The link is World-agnostic (#118): /entities/:id resolves the target's World
+  // and redirects to /w/:worldId/entities/:id (asserted on the click below).
+  await expect(link).toHaveAttribute('href', `/entities/${targetId}`);
 
   await flushSave(page);
 
