@@ -28,6 +28,7 @@ interface NavEntry {
   readonly testid: string;
   readonly icon: IconName;
   readonly labelKey: string;
+  readonly exact?: boolean;
 }
 
 // Static entries below the (world-scoped) Library link, which is computed per URL.
@@ -143,6 +144,7 @@ const STATIC_ENTRIES: readonly NavEntry[] = [
               [routerLink]="entry.link"
               [attr.data-testid]="entry.testid"
               routerLinkActive="text-gold bg-gold-soft"
+              [routerLinkActiveOptions]="{ exact: !!entry.exact }"
               ariaCurrentWhenActive="page"
               class="flex items-center gap-3 px-2 py-2 rounded-sm no-underline text-ink hover:bg-gold-soft"
               [class.justify-center]="!expanded"
@@ -206,6 +208,7 @@ export class NavRail {
         testid: 'nav-entities',
         icon: 'library',
         labelKey: 'nav.library',
+        exact: !worldId,
       },
       ...STATIC_ENTRIES,
     ];

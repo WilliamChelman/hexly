@@ -295,6 +295,8 @@
     "creating": "Création…",
     "owned": "Propriétaire",
     "member": "Membre",
+    "loadErrorTitle": "Impossible de charger vos mondes.",
+    "loadErrorHint": "Une erreur s'est produite. Veuillez réessayer dans un instant.",
     "emptyTitle": "Aucun monde pour l'instant.",
     "emptyHint": "Créez votre premier monde pour commencer."
   }

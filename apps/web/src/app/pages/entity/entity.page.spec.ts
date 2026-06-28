@@ -14,6 +14,7 @@ import { of } from 'rxjs';
 import { CONTENT_FORMAT, EntityDetail, EntityType } from '@hexly/domain';
 import { EntitySession } from './services/entity-session';
 import { EntityNameResolver } from './services/entity-name-resolver';
+import { ActiveWorld } from '../../core/services/active-world';
 import { TitleService } from '../../core/i18n/title.service';
 import { provideTranslocoTesting } from '../../core/i18n/transloco-testing';
 import { HexMapStore } from './services/hexmap-store';
@@ -73,12 +74,13 @@ describe('EntityPage routing', () => {
         {
           provide: ActivatedRoute,
           useValue: {
-            paramMap: of(convertToParamMap({ id, worldId: 'w1' })),
+            paramMap: of(convertToParamMap({ id })),
             queryParamMap: of(convertToParamMap({})),
           },
         },
       ],
     }).compileComponents();
+    TestBed.inject(ActiveWorld).set('w1');
     http = TestBed.inject(HttpTestingController);
     navigate = vi
       .spyOn(TestBed.inject(Router), 'navigate')

@@ -295,6 +295,8 @@
     "creating": "Creating…",
     "owned": "Owned",
     "member": "Member",
+    "loadErrorTitle": "Couldn't load your worlds.",
+    "loadErrorHint": "Something went wrong. Please try again in a moment.",
     "emptyTitle": "No worlds yet.",
     "emptyHint": "Create your first world to begin."
   }

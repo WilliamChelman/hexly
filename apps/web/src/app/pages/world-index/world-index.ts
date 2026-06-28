@@ -90,6 +90,15 @@ import { Icon } from '../../ui/icon/icon';
             </li>
           }
         </ul>
+      } @else if (loadError()) {
+        <section
+          class="p-6 text-center text-ink-muted"
+          data-testid="load-error"
+          appPanel
+        >
+          <p>{{ 'worldIndex.loadErrorTitle' | transloco }}</p>
+          <p class="text-sm">{{ 'worldIndex.loadErrorHint' | transloco }}</p>
+        </section>
       } @else if (loaded()) {
         <section
           class="p-6 text-center text-ink-muted"
@@ -111,6 +120,7 @@ export class WorldIndex {
   private readonly transloco = inject(TranslocoService);
 
   protected readonly loaded = this.store.loaded;
+  protected readonly loadError = this.store.loadError;
   /** The reachable Worlds, each tagged owned (caller is its Owner) or member. */
   protected readonly cards = computed(() => {
     const me = this.auth.currentUser()?.id;

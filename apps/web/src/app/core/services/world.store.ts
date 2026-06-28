@@ -19,6 +19,7 @@ export class WorldStore {
 
   private readonly _worlds = signal<readonly WorldSummary[]>([]);
   private readonly _loaded = signal(false);
+  private readonly _loadError = signal(false);
   // ponytail: no retry-on-error beyond the guard reset; add a refresh() if worlds
   // ever change out-of-band.
   private hasLoaded = false;
@@ -27,6 +28,8 @@ export class WorldStore {
   readonly worlds = this._worlds.asReadonly();
   /** True once load() has resolved (whether with Worlds or empty) — gates the empty state. */
   readonly loaded = this._loaded.asReadonly();
+  /** True when the last load() call failed — gates the error state in the World Index. */
+  readonly loadError = this._loadError.asReadonly();
 
   constructor() {
     // Reset the store whenever the authenticated user changes — prevents cross-session
@@ -36,6 +39,7 @@ export class WorldStore {
       untracked(() => {
         this.hasLoaded = false;
         this._loaded.set(false);
+        this._loadError.set(false);
         this._worlds.set([]);
       });
     });
@@ -56,6 +60,7 @@ export class WorldStore {
       },
       error: () => {
         this.hasLoaded = false;
+        this._loadError.set(true);
         this._loaded.set(true);
       },
     });

@@ -9,6 +9,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
+import { HttpErrorResponse } from '@angular/common/http';
 import {
   catchError,
   concat,
@@ -37,6 +38,7 @@ import {
 } from '@hexly/domain';
 import { JSONContent } from '@tiptap/core';
 import { EntitiesClient } from '../../../core/services/entities.client';
+import { ActiveWorld } from '../../../core/services/active-world';
 import { harvestDescriptors } from '../components/descriptors';
 import { TitleService } from '../../../core/i18n/title.service';
 import { AppShellStore } from '../../../shell/app-shell.store';
@@ -74,6 +76,7 @@ export class EntitySession {
   private readonly editor = inject(HexMapStore);
   private readonly title = inject(TitleService);
   private readonly router = inject(Router);
+  private readonly activeWorld = inject(ActiveWorld);
   private readonly shell = inject(AppShellStore);
   private readonly destroyRef = inject(DestroyRef);
   private readonly injector = inject(Injector);
@@ -204,23 +207,24 @@ export class EntitySession {
 
   /**
    * Caller passes its ActivatedRoute in — a route-scoped service would get the root
-   * injector's route. switchMap keeps a stale A response off B's canvas; 404 → the
-   * World's library (ADR-0028), read from the `:worldId` segment we're nested under.
+   * injector's route. switchMap keeps a stale A response off B's canvas; 404 →
+   * the World's library (ADR-0028) via ActiveWorld; other load errors set the
+   * reload-error state so the user sees feedback without a silent redirect.
    */
   watchRoute(route: ActivatedRoute): void {
     route.paramMap
       .pipe(
-        map((params) => ({
-          id: params.get('id'),
-          worldId: params.get('worldId'),
-        })),
-        filter((p): p is { id: string; worldId: string | null } => p.id !== null),
-        switchMap(({ id, worldId }) =>
+        map((params) => params.get('id')),
+        filter((id): id is string => id !== null),
+        switchMap((id) =>
           this.openRoute(id).pipe(
-            catchError(() => {
-              this.router.navigate(
-                worldId ? ['/w', worldId, 'entities'] : ['/'],
-              );
+            catchError((err) => {
+              if (err instanceof HttpErrorResponse && err.status === 404) {
+                const worldId = this.activeWorld.worldId();
+                this.router.navigate(worldId ? ['/w', worldId, 'entities'] : ['/']);
+              } else {
+                this._error.set('reload');
+              }
               return EMPTY;
             }),
           ),

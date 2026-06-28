@@ -123,6 +123,19 @@ describe('WorldIndex', () => {
     ).toContain("Aucun monde pour l'instant.");
   });
 
+  it('shows an error state (not the empty state) when the World list fails to load', () => {
+    const fixture = TestBed.createComponent(WorldIndex);
+    fixture.detectChanges(); // load() → GET /worlds
+    http
+      .expectOne('/api/worlds')
+      .flush(null, { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect($(el, '[data-testid=load-error]')).not.toBeNull();
+    expect($(el, '[data-testid=worlds-empty]')).toBeNull();
+  });
+
   it('surfaces an error toast when creating a World fails', () => {
     const el = render([]).nativeElement as HTMLElement;
 
