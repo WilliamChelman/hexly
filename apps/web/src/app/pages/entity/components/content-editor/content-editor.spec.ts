@@ -9,7 +9,7 @@ import { EntitySession } from '../../services/entity-session';
 import { EntityNameResolver } from '../../services/entity-name-resolver';
 import { provideTranslocoTesting } from '../../../../core/i18n/transloco-testing';
 import { ContentEditor } from './content-editor';
-import { noteDetail } from './entity-detail.fixtures';
+import { noteDetail } from '../entity-detail.fixtures';
 
 describe('ContentEditor', () => {
   const note = noteDetail;

@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { CreateWorldRequest, WorldDetail, WorldSummary } from '@hexly/domain';
-import { and, asc, eq, or } from 'drizzle-orm';
+import { and, asc, count, eq, or } from 'drizzle-orm';
 import { DB, Db, mintWorldWithHome } from '../db/db';
 import { entities, worldMembers, worlds } from '../db/schema';
 
@@ -59,6 +59,8 @@ export class WorldsService {
       name: req.name,
       ownerId,
       homeEntityId,
+      // A fresh World holds exactly its Home Entity (#120).
+      entityCount: 1,
       createdAt: now,
       updatedAt: now,
     };
@@ -125,11 +127,18 @@ export class WorldsService {
     // Every World is minted with a Home Entity in one transaction, so this is
     // present for any World that exists; a missing one is corruption (a clear 500).
     if (!home) throw new Error(`World ${world.id} has no Home Entity`);
+    // The cascade target (#120): every Entity in the World, the Home included.
+    const [{ value: entityCount }] = this.db
+      .select({ value: count() })
+      .from(entities)
+      .where(eq(entities.worldId, world.id))
+      .all();
     return {
       id: world.id,
       name: world.name,
       ownerId: world.ownerId,
       homeEntityId: home.id,
+      entityCount,
       createdAt: world.createdAt,
       updatedAt: world.updatedAt,
     };

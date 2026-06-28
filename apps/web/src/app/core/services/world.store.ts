@@ -72,4 +72,22 @@ export class WorldStore {
       tap((world) => this._worlds.update((ws) => [...ws, world])),
     );
   }
+
+  /** Rename a World (Owner-only server-side, ADR-0024) and update it in place. */
+  rename(id: string, name: string): Observable<WorldDetail> {
+    return this.client.rename(id, name).pipe(
+      tap((world) =>
+        this._worlds.update((ws) =>
+          ws.map((w) => (w.id === id ? { ...w, name: world.name } : w)),
+        ),
+      ),
+    );
+  }
+
+  /** Delete a World (Owner-only server-side, cascades its Entities) and drop it from the list. */
+  delete(id: string): Observable<void> {
+    return this.client.delete(id).pipe(
+      tap(() => this._worlds.update((ws) => ws.filter((w) => w.id !== id))),
+    );
+  }
 }

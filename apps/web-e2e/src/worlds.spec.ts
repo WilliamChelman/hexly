@@ -75,6 +75,48 @@ test('renaming the World renames its Home Entity, read-only on its page (ADR-002
   await expect(page.getByTestId('title')).toHaveText('The Reach of Aldermoor');
 });
 
+test('type-to-confirm delete shows the entity count, enables on match, and removes the World (#120)', async ({
+  page,
+}) => {
+  const world = await createWorldFromIndex(page);
+  await page.goto('/');
+  await expect(page.getByTestId(`world-${world.id}`)).toBeVisible();
+
+  // Opening the modal reads the World's entity count (a fresh World has its Home).
+  const counted = page.waitForResponse(
+    (r) => r.url().endsWith(`/api/worlds/${world.id}`) && r.ok(),
+  );
+  await page.getByTestId(`delete-world-${world.id}`).click();
+  await counted;
+  await expect(page.getByTestId('delete-count')).toContainText('1');
+
+  // Delete is locked until the World's name is typed exactly.
+  const confirm = page.getByTestId('confirm-delete');
+  await expect(confirm).toBeDisabled();
+  await page.getByTestId('delete-confirm-input').fill('Untitled world');
+  await expect(confirm).toBeEnabled();
+
+  // Confirming removes the World from the Index.
+  await confirm.click();
+  await expect(page.getByTestId(`world-${world.id}`)).toHaveCount(0);
+});
+
+test('a stale World segment reconciles to the Entity’s real World (ADR-0028, #119)', async ({
+  page,
+}) => {
+  // Two Worlds; open World A's Home Entity under World B's (wrong) segment.
+  const worldA = await createWorldFromIndex(page);
+  const worldB = await createWorldFromIndex(page);
+  expect(worldB.id).not.toBe(worldA.id);
+
+  await page.goto(`/w/${worldB.id}/entities/${worldA.homeEntityId}`);
+
+  // The reconcile guard lands on the Entity under its correct World segment.
+  await expect(page).toHaveURL(
+    new RegExp(`/w/${worldA.id}/entities/${worldA.homeEntityId}$`),
+  );
+});
+
 test('the entity browser is scoped by the URL World; switching Worlds filters it', async ({
   page,
 }) => {

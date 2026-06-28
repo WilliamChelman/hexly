@@ -113,6 +113,122 @@ describe('WorldIndex', () => {
     ]);
   });
 
+  it('offers rename + delete on owned Worlds only, not on member Worlds', () => {
+    const el = render([
+      world('w1', 'Aldermoor'), // owned by the caller (u1)
+      world('w2', 'Whisperwood', 'someone-else'), // member
+    ]).nativeElement as HTMLElement;
+
+    expect($(el, '[data-testid=rename-world-w1]')).not.toBeNull();
+    expect($(el, '[data-testid=delete-world-w1]')).not.toBeNull();
+    expect($(el, '[data-testid=rename-world-w2]')).toBeNull();
+    expect($(el, '[data-testid=delete-world-w2]')).toBeNull();
+  });
+
+  it('renames an owned World from the Index, updating the list', () => {
+    const fixture = render([world('w1', 'Aldermoor')]);
+    const el = fixture.nativeElement as HTMLElement;
+
+    ($(el, '[data-testid=rename-world-w1]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    const input = $(el, '[data-testid=rename-world-input-w1]') as HTMLInputElement;
+    input.value = 'The Reach of Aldermoor';
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    const req = http.expectOne('/api/worlds/w1');
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ name: 'The Reach of Aldermoor' });
+    req.flush({
+      ...world('w1', 'The Reach of Aldermoor'),
+      homeEntityId: 'home1',
+      entityCount: 1,
+    });
+    fixture.detectChanges();
+
+    expect($(el, '[data-testid=world-w1]')?.textContent).toContain(
+      'The Reach of Aldermoor',
+    );
+  });
+
+  it('opens a delete modal that shows the count of Entities to be destroyed', () => {
+    const fixture = render([world('w1', 'Aldermoor')]);
+    const el = fixture.nativeElement as HTMLElement;
+
+    ($(el, '[data-testid=delete-world-w1]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    // The modal fetches the World's Detail for its entity count (#120).
+    const req = http.expectOne('/api/worlds/w1');
+    expect(req.request.method).toBe('GET');
+    req.flush({
+      ...world('w1', 'Aldermoor'),
+      homeEntityId: 'home1',
+      entityCount: 3,
+    });
+    fixture.detectChanges();
+
+    expect($(el, '[data-testid=delete-modal]')).not.toBeNull();
+    expect($(el, '[data-testid=delete-count]')?.textContent).toContain('3');
+  });
+
+  /** Open the delete modal for w1 and resolve its entity count. */
+  function openDeleteModal(name: string, count = 2) {
+    const fixture = render([world('w1', name)]);
+    const el = fixture.nativeElement as HTMLElement;
+    ($(el, '[data-testid=delete-world-w1]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    http.expectOne('/api/worlds/w1').flush({
+      ...world('w1', name),
+      homeEntityId: 'home1',
+      entityCount: count,
+    });
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  it('enables Delete only once the typed name matches the World exactly', () => {
+    const fixture = openDeleteModal('Aldermoor');
+    const el = fixture.nativeElement as HTMLElement;
+    // aria-disabled, not the native attribute, so the gated button stays focusable.
+    const armed = () =>
+      ($(el, '[data-testid=confirm-delete]') as HTMLButtonElement).getAttribute(
+        'aria-disabled',
+      ) === null;
+    const input = $(el, '[data-testid=delete-confirm-input]') as HTMLInputElement;
+
+    expect(armed()).toBe(false);
+
+    input.value = 'Aldermor'; // typo → still locked
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(armed()).toBe(false);
+
+    input.value = 'Aldermoor'; // exact match → armed
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(armed()).toBe(true);
+  });
+
+  it('deletes the World on confirm, removing it from the Index', () => {
+    const fixture = openDeleteModal('Aldermoor');
+    const el = fixture.nativeElement as HTMLElement;
+
+    const input = $(el, '[data-testid=delete-confirm-input]') as HTMLInputElement;
+    input.value = 'Aldermoor';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    ($(el, '[data-testid=confirm-delete]') as HTMLButtonElement).click();
+    const req = http.expectOne('/api/worlds/w1');
+    expect(req.request.method).toBe('DELETE');
+    req.flush(null);
+    fixture.detectChanges();
+
+    expect($(el, '[data-testid=world-w1]')).toBeNull();
+    expect($(el, '[data-testid=delete-modal]')).toBeNull();
+  });
+
   it('renders its empty state in French when French is the active language', () => {
     const fixture = render([]);
     TestBed.inject(TranslocoService).setActiveLang('fr');

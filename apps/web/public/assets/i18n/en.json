@@ -298,7 +298,16 @@
     "loadErrorTitle": "Couldn't load your worlds.",
     "loadErrorHint": "Something went wrong. Please try again in a moment.",
     "emptyTitle": "No worlds yet.",
-    "emptyHint": "Create your first world to begin."
+    "emptyHint": "Create your first world to begin.",
+    "rename": "Rename",
+    "renameLabel": "World name",
+    "renameError": "Couldn't rename that world. Please try again.",
+    "deleteHeading": "Delete world?",
+    "deleteCounting": "Counting entities…",
+    "deleteCount": "This permanently destroys {count, plural, one {# entity} other {# entities}}. This cannot be undone.",
+    "deleteConfirmPrompt": "Type {{name}} to confirm.",
+    "deleteConfirmLabel": "Type the world name to confirm deletion",
+    "deleteError": "Couldn't delete that world. Please try again."
   },
   "error": {
     "tabTitle": "Hexly — Not found",

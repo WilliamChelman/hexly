@@ -96,7 +96,8 @@
     "test": {
       "executor": "@angular/build:unit-test",
       "options": {
-        "watch": false
+        "watch": false,
+        "setupFiles": ["apps/web/src/test-setup.ts"]
       }
     },
     "serve-static": {

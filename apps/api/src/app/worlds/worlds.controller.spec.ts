@@ -53,6 +53,8 @@ describe('Worlds endpoints', () => {
       name: 'Aldermoor',
       ownerId: expect.any(String),
       homeEntityId: expect.any(String),
+      // A fresh World holds exactly its Home Entity (#120).
+      entityCount: 1,
       createdAt: expect.any(Number),
       updatedAt: expect.any(Number),
     });
@@ -111,6 +113,21 @@ describe('Worlds endpoints', () => {
 
     const res = await ada.get(`/worlds/${created.body.id}`).expect(200);
     expect(res.body).toEqual(created.body);
+  });
+
+  it('reports the count of Entities a delete would destroy on the Detail', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const created = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+
+    // A fresh World has just its Home Entity.
+    expect((await ada.get(`/worlds/${created.body.id}`).expect(200)).body.entityCount).toBe(1);
+
+    // Each Entity added to the World bumps the count (the cascade target, #120).
+    await ada
+      .post('/entities')
+      .send({ name: 'Lady Mara', type: 'note', worldId: created.body.id })
+      .expect(201);
+    expect((await ada.get(`/worlds/${created.body.id}`).expect(200)).body.entityCount).toBe(2);
   });
 
   it('returns 404 for a World the caller cannot reach', async () => {

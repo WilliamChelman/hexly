@@ -1,6 +1,7 @@
 import { Route } from '@angular/router';
 import { authGuard, loginGuard } from './core/guards/auth.guard';
 import { entityWorldRedirect } from './core/guards/entity-world-redirect.guard';
+import { reconcileWorldSegment } from './core/guards/reconcile-world-segment.guard';
 import {
   activeWorldResolver,
   clearActiveWorld,
@@ -54,6 +55,10 @@ export const appRoutes: Route[] = [
         // The open-Entity route (#70). The id reopens the same Entity on reload (#6);
         // the routed page renders its own header (ADR-0022).
         path: 'entities/:id',
+        // Reconcile a stale/hand-edited World segment against the Entity's real
+        // world_id before the page renders (ADR-0028, #119): the highest-point
+        // guard, redirecting to the Entity under its correct World on mismatch.
+        canActivate: [reconcileWorldSegment],
         // Await a pending autosave before leaving the route, so an in-app navigation
         // never drops a debounced edit (ADR-0026).
         canDeactivate: [flushOnLeave],

@@ -76,6 +76,7 @@ describe('WorldStore', () => {
     const detail: WorldDetail = {
       ...world('w2', 'New Realm'),
       homeEntityId: 'e2',
+      entityCount: 1,
     };
     http.expectOne('/api/worlds').flush(detail);
 

@@ -298,7 +298,16 @@
     "loadErrorTitle": "Impossible de charger vos mondes.",
     "loadErrorHint": "Une erreur s'est produite. Veuillez réessayer dans un instant.",
     "emptyTitle": "Aucun monde pour l'instant.",
-    "emptyHint": "Créez votre premier monde pour commencer."
+    "emptyHint": "Créez votre premier monde pour commencer.",
+    "rename": "Renommer",
+    "renameLabel": "Nom du monde",
+    "renameError": "Impossible de renommer ce monde. Veuillez réessayer.",
+    "deleteHeading": "Supprimer le monde ?",
+    "deleteCounting": "Décompte des entités…",
+    "deleteCount": "Cette action détruit définitivement {count, plural, one {# entité} other {# entités}}. Elle est irréversible.",
+    "deleteConfirmPrompt": "Tapez {{name}} pour confirmer.",
+    "deleteConfirmLabel": "Tapez le nom du monde pour confirmer la suppression",
+    "deleteError": "Impossible de supprimer ce monde. Veuillez réessayer."
   },
   "error": {
     "tabTitle": "Hexly — Introuvable",

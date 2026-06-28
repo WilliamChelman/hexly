@@ -46,4 +46,10 @@ export interface WorldSummary {
  */
 export interface WorldDetail extends WorldSummary {
   readonly homeEntityId: string;
+  /**
+   * How many Entities live in this World (the Home Entity included) — the number a
+   * delete would destroy (ADR-0024, #120). Surfaced on the Detail so the World
+   * Index's type-to-confirm delete can state the cost without a heavy endpoint.
+   */
+  readonly entityCount: number;
 }
