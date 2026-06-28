@@ -119,6 +119,36 @@ describe('EntityHeader', () => {
     ).toBeNull();
   });
 
+  // The Home Entity's title is the World's name (ADR-0029): read-only here, renamed
+  // via the World. The note view shows it but never lets the user edit it in place.
+  it('renders the Home Entity title read-only, with a tooltip pointing to the World', () => {
+    open({ ...noteDetail('Aldermoor'), isHome: true });
+    const fixture = TestBed.createComponent(EntityHeader);
+    fixture.detectChanges();
+
+    const title = fixture.nativeElement.querySelector(
+      '[data-testid=title]',
+    ) as HTMLElement;
+    // Not editable: no contenteditable, no keyboard reach.
+    expect(title.getAttribute('contenteditable')).toBeNull();
+    expect(title.getAttribute('tabindex')).toBeNull();
+    // Renamed via the World, not here — the hint says so.
+    expect(title.getAttribute('title')).toBe('Renamed with the world');
+    expect(title.textContent).toContain('Aldermoor');
+  });
+
+  it('does not rename when an unchanged title blur fires on the Home Entity', () => {
+    open({ ...noteDetail('Aldermoor'), isHome: true });
+    const fixture = TestBed.createComponent(EntityHeader);
+    fixture.detectChanges();
+
+    (
+      fixture.nativeElement.querySelector('[data-testid=title]') as HTMLElement
+    ).dispatchEvent(new Event('blur'));
+
+    http.expectNone('/api/entities/n1');
+  });
+
   it('renders its chrome and actions in French when French is the active language', () => {
     open(aldermoor);
     const fixture = TestBed.createComponent(EntityHeader);

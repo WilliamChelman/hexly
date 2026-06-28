@@ -81,6 +81,7 @@ describe('Entities endpoints', () => {
       createdAt: expect.any(Number),
       updatedAt: expect.any(Number),
       document: emptyHexmapBody,
+      isHome: false,
     });
   });
 

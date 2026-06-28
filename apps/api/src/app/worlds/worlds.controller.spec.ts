@@ -140,6 +140,25 @@ describe('Worlds endpoints', () => {
     expect(reloaded.body.name).toBe('The Reach of Aldermoor');
   });
 
+  it('renames the Home Entity alongside the World (one name, ADR-0029)', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const created = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+    const homeId = created.body.homeEntityId;
+
+    // Seeded equal: the Home note opens named after its World.
+    expect((await ada.get(`/entities/${homeId}`).expect(200)).body.name).toBe('Aldermoor');
+
+    await ada
+      .patch(`/worlds/${created.body.id}`)
+      .send({ name: 'The Reach of Aldermoor' })
+      .expect(200);
+
+    // The World name is the source of truth — the Home title follows it.
+    const home = await ada.get(`/entities/${homeId}`).expect(200);
+    expect(home.body.name).toBe('The Reach of Aldermoor');
+    expect(home.body.isHome).toBe(true);
+  });
+
   it('rejects a rename by a non-Owner with 403, leaving the World untouched', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const created = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);

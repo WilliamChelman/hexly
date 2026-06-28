@@ -180,6 +180,12 @@ export interface EntitySummary {
 /** What `GET /entities/:id` and saves return. */
 export interface EntityDetail extends EntitySummary {
   readonly document: EntityBody;
+  /**
+   * The World's Home Entity (ADR-0024): can't be deleted or moved, and its title
+   * is the World's name (ADR-0029) — renamed via the World, read-only on its own
+   * page. Absent/false for every ordinary Entity.
+   */
+  readonly isHome?: boolean;
 }
 
 /**

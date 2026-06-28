@@ -318,7 +318,7 @@ function toDetail(row: typeof entities.$inferSelect): EntityDetail {
 
 /** Write paths pass the body they just minted; only {@link toDetail} re-parses. */
 function detailOf(row: SummaryRow, document: EntityBody): EntityDetail {
-  return { ...toSummary(row), document };
+  return { ...toSummary(row), document, isHome: row.isHome };
 }
 
 /**

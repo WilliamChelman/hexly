@@ -66,8 +66,11 @@ export class WorldsService {
 
   /**
    * Rename a World, Owner only (ADR-0024): `'forbidden'` when the caller can't
-   * own it, `null` when no such World exists. Only the Owner-controlled `name`
-   * (and `updatedAt`) move; the Home Entity is untouched.
+   * own it, `null` when no such World exists. The World name is the source of
+   * truth for its Home Entity's title (ADR-0029), so one transaction writes both
+   * `worlds.name` and the Home Entity's `name` — they can never diverge. The Home
+   * row's `version` is left untouched (metadata-only, like an entity rename) so a
+   * rename never invalidates an in-progress edit's base version.
    */
   rename(
     userId: string,
@@ -78,7 +81,14 @@ export class WorldsService {
     if (!world) return null;
     if (world.ownerId !== userId) return 'forbidden';
     const updatedAt = Date.now();
-    this.db.update(worlds).set({ name, updatedAt }).where(eq(worlds.id, id)).run();
+    this.db.transaction(() => {
+      this.db.update(worlds).set({ name, updatedAt }).where(eq(worlds.id, id)).run();
+      this.db
+        .update(entities)
+        .set({ name, updatedAt })
+        .where(and(eq(entities.worldId, id), eq(entities.isHome, true)))
+        .run();
+    });
     return this.toDetail({ ...world, name, updatedAt });
   }
 

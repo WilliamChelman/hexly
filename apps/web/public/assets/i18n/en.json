@@ -42,6 +42,7 @@
     "eyebrow": "Note",
     "titleLabel": "Note title",
     "renameNote": "Rename note",
+    "homeTitleHint": "Renamed with the world",
     "backToLibrary": "Back to library",
     "editorLabel": "Note content",
     "slashMenu": {

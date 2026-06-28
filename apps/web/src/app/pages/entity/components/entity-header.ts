@@ -78,15 +78,15 @@ const TYPE_LABELS: Record<
           <div
             #titleEl
             class="font-display text-[22px] font-semibold tracking-[0.01em] text-ink whitespace-nowrap py-1 px-2 -my-1 -mx-2 rounded-sm border border-transparent outline-none hover:border-line hover:bg-surface-sunken focus:bg-surface-sunken focus:border-gold"
-            [class.cursor-text]="hasEntity()"
+            [class.cursor-text]="editable()"
             data-testid="title"
             role="textbox"
             aria-multiline="false"
             spellcheck="false"
-            [attr.tabindex]="hasEntity() ? 0 : null"
-            [attr.contenteditable]="hasEntity() ? 'plaintext-only' : null"
+            [attr.tabindex]="editable() ? 0 : null"
+            [attr.contenteditable]="editable() ? 'plaintext-only' : null"
             [attr.aria-label]="labels().titleLabel | transloco"
-            [title]="labels().rename | transloco"
+            [title]="titleHint() | transloco"
             (focus)="onFocus()"
             (keydown.enter)="onEnter($event)"
             (keydown.escape)="onEscape($event)"
@@ -139,8 +139,21 @@ export class EntityHeader {
   protected readonly store = inject(HexMapStore);
   protected readonly views = VIEWS;
 
-  /** Whether an Entity is open — gates rename so it never shows with none. */
-  protected readonly hasEntity = computed(() => this.session.current() !== null);
+  /**
+   * The Home Entity's title is the World's name (ADR-0029): read-only here, renamed
+   * via the World. Every other open Entity is renamed in place.
+   */
+  protected readonly isHome = computed(
+    () => this.session.current()?.isHome === true,
+  );
+  /** The title is editable when an Entity is open and it isn't the Home Entity's (World-owned) name. */
+  protected readonly editable = computed(
+    () => this.session.current() !== null && !this.isHome(),
+  );
+  /** Tooltip key: the in-place rename affordance, or — for the Home Entity — where its name really comes from. */
+  protected readonly titleHint = computed(() =>
+    this.isHome() ? 'noteView.homeTitleHint' : this.labels().rename,
+  );
   /** Only a hexmap carries both surfaces, so only it gets the view toggle (#75). */
   protected readonly isHexmap = computed(
     () => this.session.current()?.document.type === 'hexmap',
@@ -192,6 +205,8 @@ export class EntityHeader {
 
   /** No-op if blank or unchanged (normalises text back); a rejected rename reverts the optimistic text. */
   protected commit(): void {
+    // The Home Entity's title is World-owned (ADR-0029) — never renamed from here.
+    if (this.isHome()) return;
     const el = this.titleEl().nativeElement;
     const baseline = this.editBaseline ?? this.title();
     this.editBaseline = null;

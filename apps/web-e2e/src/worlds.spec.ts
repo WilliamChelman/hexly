@@ -47,6 +47,29 @@ test('create a World → its Home Entity appears and is navigable', async ({
   await expect(page.getByTestId(`open-${world.homeEntityId}`)).toBeVisible();
 });
 
+test('renaming the World renames its Home Entity, read-only on its page (ADR-0029)', async ({
+  page,
+}) => {
+  await page.goto('/entities');
+  await expandRail(page);
+
+  const world = await createWorld(page);
+  await expect(page).toHaveURL(new RegExp(`/entities/${world.homeEntityId}$`));
+  await expect(page.getByTestId('title')).toHaveText('Untitled world');
+  // The Home title is the World's name — never edited in place here.
+  await expect(page.getByTestId('title')).not.toHaveAttribute('contenteditable');
+
+  // Rename via the World (its name is the source of truth; no World rename UI yet).
+  const renamed = await page.request.patch(`/api/worlds/${world.id}`, {
+    data: { name: 'The Reach of Aldermoor' },
+  });
+  expect(renamed.ok()).toBeTruthy();
+
+  // The Home Entity's title follows the World name on reload.
+  await page.reload();
+  await expect(page.getByTestId('title')).toHaveText('The Reach of Aldermoor');
+});
+
 test('switching Worlds filters the entity browser to the active World', async ({
   page,
 }) => {
