@@ -44,3 +44,32 @@ describe('appRoutes titles', () => {
     expect(transloco.translate('editorShell.tabTitle')).toBe('Hexly');
   });
 });
+
+describe('appRoutes structure (ADR-0028)', () => {
+  it('nests the entity routes under a :worldId parent that pins and clears the active World', () => {
+    const parent = appRoutes.find((r) => r.path === 'w/:worldId');
+    expect(parent).toBeDefined();
+    // The parent owns the World scope: resolver pins, canDeactivate clears, no component.
+    expect(parent?.resolve).toBeDefined();
+    expect(parent?.canDeactivate).toBeDefined();
+    expect(parent?.loadComponent).toBeUndefined();
+
+    const childPaths = parent?.children?.map((c) => c.path);
+    expect(childPaths).toContain('entities');
+    expect(childPaths).toContain('entities/:id');
+
+    // The flat routes are gone — there is no World-less entities route.
+    const topPaths = appRoutes.map((r) => r.path);
+    expect(topPaths).not.toContain('entities');
+    expect(topPaths).not.toContain('entities/:id');
+    expect(topPaths).not.toContain('w/:worldId/entities');
+  });
+
+  it('serves the World Index at the root and falls unmatched URLs back to it', () => {
+    const root = appRoutes.find((r) => r.path === '');
+    expect(root?.loadComponent).toBeDefined();
+    expect(root?.redirectTo).toBeUndefined();
+
+    expect(appRoutes.find((r) => r.path === '**')?.redirectTo).toBe('');
+  });
+});

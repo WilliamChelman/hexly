@@ -11,7 +11,7 @@ import { Subscription, finalize } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient } from '../../core/services/entities.client';
-import { WorldStore } from '../../core/services/world.store';
+import { ActiveWorld } from '../../core/services/active-world';
 import { ToasterService } from '../../core/services/toaster.service';
 import { AppShellStore } from '../../shell/app-shell.store';
 import { Autofocus } from '../../ui/autofocus';
@@ -41,14 +41,14 @@ function formatEdited(updatedAt: number, lang: string): string {
 }
 
 /**
- * The Entity browser: the landing surface (`/entities`) where a user sees every
- * Entity they own — notes and maps together — with each one's name, type, tags,
+ * The Entity browser: the in-World surface (`/w/:worldId/entities`) where a user
+ * sees every Entity in that World — notes and maps together — with name, type, tags,
  * and last-edited date, and runs the lifecycle: create (note or map), open,
  * rename in place, delete (#70, generalizing issue #6's map list). It accumulates
  * the entities as cursor-paginated pages (ADR-0025): a bounded first page on load,
  * a load-more control that appends the next page, and a refresh from page one after
  * every rename/delete so the view stays coherent without reconciling a stale tail.
- * Opening or creating navigates to `/entities/:id`, the one type-dispatching route.
+ * Opening or creating navigates to `/w/:worldId/entities/:id`, the one type-dispatching route.
  */
 @Component({
   selector: 'app-entity-browser',
@@ -221,7 +221,7 @@ function formatEdited(updatedAt: number, lang: string): string {
 })
 export class EntityBrowser {
   private readonly entitiesClient = inject(EntitiesClient);
-  private readonly worlds = inject(WorldStore);
+  private readonly activeWorld = inject(ActiveWorld);
   private readonly router = inject(Router);
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
@@ -262,16 +262,11 @@ export class EntityBrowser {
   private fetchSub?: Subscription;
 
   constructor() {
-    // Re-fetch page one whenever the active World changes (ADR-0024). When there
-    // is no active World but the store has finished loading (user has 0 Worlds),
-    // surface the empty state instead of leaving the page blank.
+    // Re-fetch page one whenever the World in the URL changes (ADR-0028). The
+    // browser only mounts under /w/:worldId, so a worldId is always present;
+    // reacting to it covers a param-only switch between Worlds (same component).
     effect(() => {
-      const worldId = this.worlds.activeWorldId();
-      if (worldId) {
-        this.fetchFirstPage();
-      } else if (this.worlds.loaded()) {
-        this.fetchFirstPage(); // short-circuits inside to set empty state
-      }
+      if (this.activeWorld.worldId()) this.fetchFirstPage();
     });
   }
 
@@ -283,17 +278,10 @@ export class EntityBrowser {
    * `limit`, so it survives any future opaque-cursor encoding change.
    */
   private fetchFirstPage(): void {
-    const worldId = this.worlds.activeWorldId();
-    // No active World (user has 0 Worlds): surface the empty state directly.
-    if (!worldId) {
-      this.fetchSub?.unsubscribe();
-      this._entities.set([]);
-      this.nextCursor.set(null);
-      this.loadingMore.set(false);
-      this.loadError.set(false);
-      this.loaded.set(true);
-      return;
-    }
+    const worldId = this.activeWorld.worldId();
+    // Defensive: the browser only mounts under /w/:worldId, but never fetch the
+    // whole owner list (every World) if the segment is somehow absent.
+    if (!worldId) return;
     // Cancel any in-flight request from a previous World (prevents stale data race).
     this.fetchSub?.unsubscribe();
     // Reset state so the template shows loading rather than stale data from the old World.
@@ -329,7 +317,7 @@ export class EntityBrowser {
     if (cursor === null || this.loadingMore()) return;
     this.loadingMore.set(true);
     this.entitiesClient
-      .list({ cursor, worldId: this.worlds.activeWorldId() ?? undefined })
+      .list({ cursor, worldId: this.activeWorld.worldId() ?? undefined })
       .pipe(finalize(() => this.loadingMore.set(false)))
       .subscribe({
         next: (page) => {
@@ -352,7 +340,7 @@ export class EntityBrowser {
       .create(
         this.transloco.translate(type === 'note' ? 'domain.untitledNote' : 'domain.untitledMap'),
         type,
-        this.worlds.activeWorldId() ?? undefined,
+        this.activeWorld.worldId() ?? undefined,
       )
       .pipe(finalize(() => this.creating.set(false)))
       .subscribe({
@@ -367,7 +355,7 @@ export class EntityBrowser {
   }
 
   protected open(id: string): void {
-    this.router.navigate(['/entities', id]);
+    this.router.navigate(['/w', this.activeWorld.worldId(), 'entities', id]);
   }
 
   protected startRename(id: string): void {

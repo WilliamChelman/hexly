@@ -287,5 +287,15 @@
     "new": "New world",
     "untitled": "Untitled world",
     "createError": "Couldn't create that world. Please try again."
+  },
+  "worldIndex": {
+    "tabTitle": "Hexly — Worlds",
+    "eyebrow": "Worlds",
+    "heading": "Your worlds",
+    "creating": "Creating…",
+    "owned": "Owned",
+    "member": "Member",
+    "emptyTitle": "No worlds yet.",
+    "emptyHint": "Create your first world to begin."
   }
 }

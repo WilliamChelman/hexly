@@ -204,17 +204,23 @@ export class EntitySession {
 
   /**
    * Caller passes its ActivatedRoute in — a route-scoped service would get the root
-   * injector's route. switchMap keeps a stale A response off B's canvas; 404 → library.
+   * injector's route. switchMap keeps a stale A response off B's canvas; 404 → the
+   * World's library (ADR-0028), read from the `:worldId` segment we're nested under.
    */
   watchRoute(route: ActivatedRoute): void {
     route.paramMap
       .pipe(
-        map((params) => params.get('id')),
-        filter((id): id is string => id !== null),
-        switchMap((id) =>
+        map((params) => ({
+          id: params.get('id'),
+          worldId: params.get('worldId'),
+        })),
+        filter((p): p is { id: string; worldId: string | null } => p.id !== null),
+        switchMap(({ id, worldId }) =>
           this.openRoute(id).pipe(
             catchError(() => {
-              this.router.navigateByUrl('/entities');
+              this.router.navigate(
+                worldId ? ['/w', worldId, 'entities'] : ['/'],
+              );
               return EMPTY;
             }),
           ),

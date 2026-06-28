@@ -1,4 +1,4 @@
-import { expect, flushSave, test } from './fixtures';
+import { enterLibrary, expect, flushSave, test } from './fixtures';
 
 /**
  * The Content Entity Link journey (issue #95, ADR-0023): an author drops a live
@@ -14,16 +14,18 @@ test('inserts a Content Entity Link via @, persists it, navigates it, and dangle
   request,
 }) => {
   // Seed the link target: a note the picker can list and a click can jump to.
-  await page.goto('/entities');
+  await enterLibrary(page);
   await page.getByTestId('new-note').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const targetId = page.url().split('/').pop();
 
   // The source note that will carry the link in its prose.
-  await page.goto('/entities');
+  await enterLibrary(page);
   await page.getByTestId('new-note').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const sourceId = page.url().split('/').pop();
+  // The source's full world-scoped path (ADR-0028) — reused to reopen it later.
+  const sourcePath = new URL(page.url()).pathname;
 
   // Insert the link: type into the editor, trigger the `@` picker, pick the target.
   const surface = page.getByTestId('note-content');
@@ -39,8 +41,12 @@ test('inserts a Content Entity Link via @, persists it, navigates it, and dangle
   await expect(link).toBeVisible();
   await expect(link).toHaveText('Untitled note');
   await expect(link).toHaveAttribute('data-entity-id', targetId!);
-  // A real href so Ctrl/Cmd/middle-click open the target in a new tab natively.
-  await expect(link).toHaveAttribute('href', `/entities/${targetId}`);
+  // A real href so Ctrl/Cmd/middle-click open the target in a new tab natively —
+  // scoped to the World in the URL (ADR-0028).
+  await expect(link).toHaveAttribute(
+    'href',
+    new RegExp(`/w/[\\w-]+/entities/${targetId}$`),
+  );
 
   await flushSave(page);
 
@@ -63,7 +69,7 @@ test('inserts a Content Entity Link via @, persists it, navigates it, and dangle
   const del = await request.delete(`/api/entities/${targetId}`);
   expect(del.ok()).toBeTruthy();
 
-  await page.goto(`/entities/${sourceId}`);
+  await page.goto(sourcePath);
   const dangling = page.getByTestId('entity-link');
   await expect(dangling).toHaveAttribute('data-dangling', '');
   await expect(dangling).toHaveText('Untitled note');

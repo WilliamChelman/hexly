@@ -1,4 +1,4 @@
-import { expect, flushSave, test } from './fixtures';
+import { enterLibrary, expect, flushSave, test } from './fixtures';
 
 /**
  * The whole-Hex move journey (issue #30, ADR-0010). It crosses the one seam the
@@ -16,7 +16,7 @@ test('drags a hex under Select to a new coordinate, and the move survives a relo
   page,
   request,
 }) => {
-  await page.goto('/entities');
+  await enterLibrary(page);
   await page.getByTestId('new-map').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const mapId = page.url().split('/').pop();
@@ -100,7 +100,7 @@ test('drags a hex onto an occupied hex and swaps the two, surviving a reload', a
   page,
   request,
 }) => {
-  await page.goto('/entities');
+  await enterLibrary(page);
   await page.getByTestId('new-map').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const mapId = page.url().split('/').pop();
@@ -175,7 +175,7 @@ test('drags a hex onto an occupied hex and swaps the two, surviving a reload', a
 test('Escape cancels an in-progress Hex drag, leaving the hex at its origin', async ({
   page,
 }) => {
-  await page.goto('/entities');
+  await enterLibrary(page);
   await page.getByTestId('new-map').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
 
@@ -227,7 +227,7 @@ test('drags a multi-hex selection so the whole group moves by one offset', async
   page,
   request,
 }) => {
-  await page.goto('/entities');
+  await enterLibrary(page);
   await page.getByTestId('new-map').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const mapId = page.url().split('/').pop();
@@ -293,7 +293,7 @@ test('refuses a blocked group move, leaving every hex where it was', async ({
   page,
   request,
 }) => {
-  await page.goto('/entities');
+  await enterLibrary(page);
   await page.getByTestId('new-map').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const mapId = page.url().split('/').pop();

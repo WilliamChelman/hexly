@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures';
+import { enterLibrary, expect, test } from './fixtures';
 
 /**
  * The persistent nav rail and page-owned headers (ADR-0022, #89), driven as a
@@ -8,7 +8,7 @@ import { expect, test } from './fixtures';
 test('the rail navigates, exposes account controls, and pages own their headers', async ({
   page,
 }) => {
-  await page.goto('/entities');
+  await enterLibrary(page);
 
   // Present and collapsed: the expand toggle is offered at the slim width.
   await expect(page.getByRole('button', { name: 'Expand navigation' })).toBeVisible();
@@ -44,7 +44,7 @@ test('on a wide viewport the expanded rail pushes the page and is remembered', a
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
-  await page.goto('/entities');
+  await enterLibrary(page);
 
   const rail = page.getByTestId('nav-rail');
   const collapsed = (await rail.boundingBox())!.width;
@@ -67,7 +67,7 @@ test('on a narrow viewport the expanded rail overlays and dismisses on click-awa
   page,
 }) => {
   await page.setViewportSize({ width: 600, height: 800 });
-  await page.goto('/entities');
+  await enterLibrary(page);
 
   await page.getByRole('button', { name: 'Expand navigation' }).click();
   // Overlays the page, with a backdrop to dismiss it.

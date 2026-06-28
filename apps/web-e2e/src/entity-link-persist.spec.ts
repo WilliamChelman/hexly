@@ -1,4 +1,4 @@
-import { expect, flushSave, test } from './fixtures';
+import { enterLibrary, expect, flushSave, test } from './fixtures';
 
 /**
  * The Entity Link journey (issue #76, CONTEXT.md → Entity Link): a Map element —
@@ -15,13 +15,13 @@ test('links a Hex to an Entity in the Inspector; the link survives a reload and 
   request,
 }) => {
   // Seed the link target: a note the picker can list and Follow can jump to.
-  await page.goto('/entities');
+  await enterLibrary(page);
   await page.getByTestId('new-note').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const noteId = page.url().split('/').pop();
 
   // The source: a fresh map.
-  await page.goto('/entities');
+  await enterLibrary(page);
   await page.getByTestId('new-map').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const mapId = page.url().split('/').pop();

@@ -1,4 +1,4 @@
-import { expect, flushSave, test } from './fixtures';
+import { enterLibrary, expect, flushSave, test } from './fixtures';
 
 /**
  * The Link Descriptor journey (issue #96, ADR-0023): an author characterises a Content
@@ -14,13 +14,13 @@ test('characterises a Content Entity Link via :: , persists the descriptor, and 
   request,
 }) => {
   // Seed the link target.
-  await page.goto('/entities');
+  await enterLibrary(page);
   await page.getByTestId('new-note').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const targetId = page.url().split('/').pop();
 
   // The source note that will carry the characterised link.
-  await page.goto('/entities');
+  await enterLibrary(page);
   await page.getByTestId('new-note').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const sourceId = page.url().split('/').pop();

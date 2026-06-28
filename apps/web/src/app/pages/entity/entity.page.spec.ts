@@ -73,7 +73,7 @@ describe('EntityPage routing', () => {
         {
           provide: ActivatedRoute,
           useValue: {
-            paramMap: of(convertToParamMap({ id })),
+            paramMap: of(convertToParamMap({ id, worldId: 'w1' })),
             queryParamMap: of(convertToParamMap({})),
           },
         },
@@ -81,7 +81,7 @@ describe('EntityPage routing', () => {
     }).compileComponents();
     http = TestBed.inject(HttpTestingController);
     navigate = vi
-      .spyOn(TestBed.inject(Router), 'navigateByUrl')
+      .spyOn(TestBed.inject(Router), 'navigate')
       .mockResolvedValue(true);
     const fixture = TestBed.createComponent(EntityPage);
     fixture.detectChanges();
@@ -121,14 +121,14 @@ describe('EntityPage routing', () => {
     expect(TestBed.inject(TitleService).documentName()).toBe('Aldermoor');
   });
 
-  it('returns to the library when the Entity fails to load', async () => {
+  it('returns to the World’s library when the Entity fails to load', async () => {
     const fixture = await render('gone');
     http
       .expectOne('/api/entities/gone')
       .flush(null, { status: 404, statusText: 'Not Found' });
     fixture.detectChanges();
 
-    expect(navigate).toHaveBeenCalledWith('/entities');
+    expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities']);
   });
 });
 

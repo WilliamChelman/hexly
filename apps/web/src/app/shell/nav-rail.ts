@@ -14,6 +14,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { AuthClient } from '../core/services/auth.client';
 import { WorldStore } from '../core/services/world.store';
+import { ActiveWorld } from '../core/services/active-world';
 import { AppShellStore } from './app-shell.store';
 import { AuthScopedStorage } from '../core/services/auth-scoped-storage';
 import { Button } from '../ui/button';
@@ -29,13 +30,8 @@ interface NavEntry {
   readonly labelKey: string;
 }
 
-const ENTRIES: readonly NavEntry[] = [
-  {
-    link: '/entities',
-    testid: 'nav-entities',
-    icon: 'library',
-    labelKey: 'nav.library',
-  },
+// Static entries below the (world-scoped) Library link, which is computed per URL.
+const STATIC_ENTRIES: readonly NavEntry[] = [
   {
     link: '/styleguide',
     testid: 'nav-styleguide',
@@ -142,7 +138,7 @@ const ENTRIES: readonly NavEntry[] = [
           class="flex flex-col gap-1 mt-1"
           [attr.aria-label]="'nav.primary' | transloco"
         >
-          @for (entry of entries; track entry.link) {
+          @for (entry of entries(); track entry.link) {
             <a
               [routerLink]="entry.link"
               [attr.data-testid]="entry.testid"
@@ -196,10 +192,24 @@ const ENTRIES: readonly NavEntry[] = [
 export class NavRail {
   private readonly auth = inject(AuthClient);
   private readonly worlds = inject(WorldStore);
+  private readonly activeWorld = inject(ActiveWorld);
 
   protected readonly isAuthenticated = this.auth.isAuthenticated;
   protected readonly loading = inject(AppShellStore).loading;
-  protected readonly entries = ENTRIES;
+  // The Library link follows the World in the URL (ADR-0028); on the Index (no
+  // World) it points back at the Index itself.
+  protected readonly entries = computed<readonly NavEntry[]>(() => {
+    const worldId = this.activeWorld.worldId();
+    return [
+      {
+        link: worldId ? `/w/${worldId}/entities` : '/',
+        testid: 'nav-entities',
+        icon: 'library',
+        labelKey: 'nav.library',
+      },
+      ...STATIC_ENTRIES,
+    ];
+  });
 
   private readonly pin = inject(AuthScopedStorage).preference<'collapsed' | 'expanded'>({
     storageKey: 'hexly-rail',

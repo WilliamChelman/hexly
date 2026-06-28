@@ -287,5 +287,15 @@
     "new": "Nouveau monde",
     "untitled": "Monde sans titre",
     "createError": "Impossible de créer ce monde. Veuillez réessayer."
+  },
+  "worldIndex": {
+    "tabTitle": "Hexly — Mondes",
+    "eyebrow": "Mondes",
+    "heading": "Vos mondes",
+    "creating": "Création…",
+    "owned": "Propriétaire",
+    "member": "Membre",
+    "emptyTitle": "Aucun monde pour l'instant.",
+    "emptyHint": "Créez votre premier monde pour commencer."
   }
 }

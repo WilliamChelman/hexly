@@ -1,4 +1,4 @@
-import { expect, flushSave, test } from './fixtures';
+import { enterLibrary, expect, flushSave, test } from './fixtures';
 
 /**
  * The keystone journey: it crosses every seam — the session cookie on API calls,
@@ -11,7 +11,7 @@ test('paints a hex, saves, and the hex survives a reload', async ({
   page,
   request,
 }) => {
-  await page.goto('/entities');
+  await enterLibrary(page);
   await page.getByTestId('new-map').click();
 
   // Creating a map opens the editor at /entities/:id.

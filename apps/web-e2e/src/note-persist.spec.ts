@@ -1,4 +1,4 @@
-import { expect, flushSave, test } from './fixtures';
+import { enterLibrary, expect, flushSave, test } from './fixtures';
 
 /**
  * Full-stack note round-trip: real TipTap keyboard input → versioned save → reload
@@ -8,7 +8,7 @@ test('types into a note, saves, and the Content survives a reload', async ({
   page,
   request,
 }) => {
-  await page.goto('/entities');
+  await enterLibrary(page);
   await page.getByTestId('new-note').click();
 
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);

@@ -1,4 +1,4 @@
-import { expect, flushSave, test } from './fixtures';
+import { enterLibrary, expect, flushSave, test } from './fixtures';
 
 /**
  * The universal Select journey (issue #28, ADR-0010). These cross the one seam
@@ -16,7 +16,7 @@ import { expect, flushSave, test } from './fixtures';
 
 /** A new map, opened in its editor; returns the canvas locator and the map id. */
 async function newMap(page: import('@playwright/test').Page) {
-  await page.goto('/entities');
+  await enterLibrary(page);
   await page.getByTestId('new-map').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const mapId = page.url().split('/').pop() as string;

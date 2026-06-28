@@ -6,7 +6,6 @@ import {
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { WorldSummary } from '@hexly/domain';
-import { WorldStore } from '../core/services/world.store';
 import { ToasterService } from '../core/services/toaster.service';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { WorldSwitcher } from './world-switcher';
@@ -58,14 +57,14 @@ describe('WorldSwitcher', () => {
     expect(labels).toEqual(['Aldermoor', 'Whisperwood']);
   });
 
-  it('switches the active world when another option is chosen', () => {
+  it('navigates to the chosen World by URL (ADR-0028)', () => {
     const fixture = render([world('w1'), world('w2')]);
 
     const sel = select(fixture.nativeElement);
     sel.value = 'w2';
     sel.dispatchEvent(new Event('change'));
 
-    expect(TestBed.inject(WorldStore).activeWorldId()).toBe('w2');
+    expect(navigate).toHaveBeenCalledWith(['/w', 'w2', 'entities']);
   });
 
   it('creates a new world and navigates to its Home Entity', () => {
@@ -80,8 +79,7 @@ describe('WorldSwitcher', () => {
     expect(req.request.body).toEqual({ name: 'Untitled world' });
     req.flush({ ...world('w2', 'Untitled world'), homeEntityId: 'home2' });
 
-    expect(navigate).toHaveBeenCalledWith(['/entities', 'home2']);
-    expect(TestBed.inject(WorldStore).activeWorldId()).toBe('w2');
+    expect(navigate).toHaveBeenCalledWith(['/w', 'w2', 'entities', 'home2']);
   });
 
   it('surfaces an error toast when world creation fails', () => {

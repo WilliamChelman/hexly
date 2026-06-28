@@ -1,4 +1,4 @@
-import { expect, flushSave, test } from './fixtures';
+import { enterLibrary, expect, flushSave, test } from './fixtures';
 
 /**
  * The Feature journey (issue #7): a feature placed on a hex survives a save and
@@ -11,7 +11,7 @@ test('places a feature on a hex, saves, and the feature survives a reload', asyn
   page,
   request,
 }) => {
-  await page.goto('/entities');
+  await enterLibrary(page);
   await page.getByTestId('new-map').click();
 
   // Creating a map opens the editor at /entities/:id.

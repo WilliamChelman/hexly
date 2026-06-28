@@ -4,6 +4,7 @@ import { TranslocoService } from '@jsverse/transloco';
 import { of } from 'rxjs';
 import { EntityDetail, EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient } from '../../../core/services/entities.client';
+import { ActiveWorld } from '../../../core/services/active-world';
 import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
 import { HexMapStore } from '../services/hexmap-store';
 import { Inspector } from './inspector';
@@ -702,6 +703,8 @@ describe('Inspector Entity Link control', () => {
   });
 
   it('renders the entity name as a real anchor to the linked Entity', () => {
+    // The link routes within the active World (ADR-0028) — pin w1.
+    TestBed.inject(ActiveWorld).set('w1');
     stubEntities = [summary('n1', 'Riverbend')];
     const store = TestBed.inject(HexMapStore);
     store.paintAt({ q: 0, r: 0 }, 'forest');
@@ -713,7 +716,7 @@ describe('Inspector Entity Link control', () => {
     // it in a new tab — with no separate Follow control.
     const name = byId(el, 'entity-link-name') as HTMLAnchorElement;
     expect(name.tagName).toBe('A');
-    expect(name.getAttribute('href')).toBe('/entities/n1');
+    expect(name.getAttribute('href')).toBe('/w/w1/entities/n1');
     expect(name.textContent).toContain('Riverbend');
     expect(name.textContent).toContain('note'); // type suffix
   });
