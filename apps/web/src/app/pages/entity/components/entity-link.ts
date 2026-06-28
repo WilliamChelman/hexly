@@ -40,7 +40,7 @@ import { HexMapStore } from '../services/hexmap-store';
             <a
               class="block flex-1 min-w-0 truncate cursor-pointer font-display text-base text-gold no-underline hover:underline"
               data-testid="entity-link-name"
-              [routerLink]="['/w', activeWorld.worldId(), 'entities', id]"
+              [routerLink]="['/entities', id]"
             >
               <span aria-hidden="true">→ </span>{{ e.name }}
               <span class="font-mono text-2xs text-ink-muted">({{ e.type }})</span>

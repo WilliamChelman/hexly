@@ -1,5 +1,6 @@
 import { Route } from '@angular/router';
 import { authGuard, loginGuard } from './core/guards/auth.guard';
+import { entityWorldRedirect } from './core/guards/entity-world-redirect.guard';
 import {
   activeWorldResolver,
   clearActiveWorld,
@@ -71,12 +72,32 @@ export const appRoutes: Route[] = [
     ],
   },
   {
+    // World-agnostic Entity link target (issue #118 follow-up). A Content Link
+    // doesn't know its target's World — links can cross Worlds — so this abstract
+    // route resolves the World by id and redirects to the canonical
+    // `/w/:worldId/entities/:id`. authGuard runs first so an unauthenticated hit
+    // goes to login; a missing/inaccessible target renders the error page.
+    path: 'entities/:id',
+    canActivate: [authGuard, entityWorldRedirect],
+    loadComponent: () =>
+      import('./pages/error/error-page').then((m) => m.ErrorPage),
+    title: 'error.tabTitle',
+  },
+  {
     path: 'styleguide',
     loadComponent: () =>
       import('./pages/styleguide/styleguide').then((m) => m.Styleguide),
     // Title key resolved by TranslationTitleStrategy to the "Hexly" brand (ADR-0014).
     title: 'styleguide.tabTitle',
   },
-  // Anything unmatched falls back to the World Index (ADR-0028).
-  { path: '**', redirectTo: '' },
+  // Anything unmatched renders the error page rather than silently bouncing to
+  // the World Index, so a wrong URL is visible, not papered over. authGuard keeps
+  // an unauthenticated visitor going to login first.
+  {
+    path: '**',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./pages/error/error-page').then((m) => m.ErrorPage),
+    title: 'error.tabTitle',
+  },
 ];

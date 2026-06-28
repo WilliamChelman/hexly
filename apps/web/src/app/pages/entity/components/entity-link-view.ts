@@ -14,7 +14,6 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { NodeView } from '@tiptap/pm/view';
 import { EntityNameResolver } from '../services/entity-name-resolver';
-import { ActiveWorld } from '../../../core/services/active-world';
 
 /**
  * The app's first Angular TipTap node view (ADR-0023): renders a Content Entity
@@ -51,7 +50,7 @@ import { ActiveWorld } from '../../../core/services/active-world';
       <a
         data-testid="entity-link"
         [attr.data-entity-id]="entityId()"
-        [routerLink]="['/w', activeWorld.worldId(), 'entities', entityId()]"
+        [routerLink]="['/entities', entityId()]"
         class="cursor-pointer text-gold no-underline hover:underline"
         >{{ display()
         }}@if (descriptor()) {<span class="text-ink-muted"> ({{ descriptor() }})</span>}</a
@@ -65,7 +64,6 @@ export class EntityLinkView {
   readonly descriptor = input<string | null>(null);
 
   private readonly resolver = inject(EntityNameResolver);
-  protected readonly activeWorld = inject(ActiveWorld);
 
   private readonly resolution = computed(() => this.resolver.resolve(this.entityId()));
 

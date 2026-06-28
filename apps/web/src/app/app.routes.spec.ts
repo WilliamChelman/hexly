@@ -58,18 +58,28 @@ describe('appRoutes structure (ADR-0028)', () => {
     expect(childPaths).toContain('entities');
     expect(childPaths).toContain('entities/:id');
 
-    // The flat routes are gone — there is no World-less entities route.
+    // The World-less Entity *browser* is gone; only the World-scoped one remains.
     const topPaths = appRoutes.map((r) => r.path);
     expect(topPaths).not.toContain('entities');
-    expect(topPaths).not.toContain('entities/:id');
     expect(topPaths).not.toContain('w/:worldId/entities');
   });
 
-  it('serves the World Index at the root and falls unmatched URLs back to it', () => {
+  it('keeps a World-agnostic entities/:id route that resolves and redirects to its World (#118)', () => {
+    // Content Links don't know their target's World, so a top-level entities/:id
+    // route looks it up (entityWorldRedirect) and redirects to the World-scoped page.
+    const redirect = appRoutes.find((r) => r.path === 'entities/:id');
+    expect(redirect).toBeDefined();
+    expect(redirect?.canActivate).toBeDefined();
+    expect(redirect?.loadComponent).toBeDefined();
+  });
+
+  it('serves the World Index at the root and renders the error page for unmatched URLs', () => {
     const root = appRoutes.find((r) => r.path === '');
     expect(root?.loadComponent).toBeDefined();
     expect(root?.redirectTo).toBeUndefined();
 
-    expect(appRoutes.find((r) => r.path === '**')?.redirectTo).toBe('');
+    const wildcard = appRoutes.find((r) => r.path === '**');
+    expect(wildcard?.redirectTo).toBeUndefined();
+    expect(wildcard?.loadComponent).toBeDefined();
   });
 });
