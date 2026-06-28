@@ -29,7 +29,7 @@ test('adds tags on a note, saves, and they survive reload and show in the librar
   await expect(page.getByTestId('entity-tags')).toContainText('deity');
   await expect(page.getByTestId('entity-tags')).not.toContainText('ruined');
 
-  await page.getByTestId('back-to-library').click();
+  await page.getByRole('link', { name: 'Library' }).click();
   await expect(page.getByTestId(`tags-${noteId}`)).toContainText('deity');
   await expect(page.getByTestId(`tags-${noteId}`)).not.toContainText('ruined');
 

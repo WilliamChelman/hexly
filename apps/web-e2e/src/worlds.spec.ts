@@ -39,10 +39,10 @@ test('create a World → its Home Entity appears and is navigable', async ({
 
   // Creating switches to the new World and opens its Home note (named after it).
   await expect(page).toHaveURL(new RegExp(`/entities/${world.homeEntityId}$`));
-  await expect(page.getByTestId('note-title')).toHaveText('Untitled world');
+  await expect(page.getByTestId('title')).toHaveText('Untitled world');
 
   // Back in the browser, the Home Entity is listed and openable.
-  await page.getByTestId('back-to-library').click();
+  await page.getByRole('link', { name: 'Library' }).click();
   await expect(page).toHaveURL(/\/entities$/);
   await expect(page.getByTestId(`open-${world.homeEntityId}`)).toBeVisible();
 });
@@ -55,11 +55,11 @@ test('switching Worlds filters the entity browser to the active World', async ({
 
   // World A, with a distinctly-named note created inside it.
   const worldA = await createWorld(page);
-  await page.getByTestId('back-to-library').click();
+  await page.getByRole('link', { name: 'Library' }).click();
   await page.getByTestId('new-note').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const noteId = page.url().split('/').pop();
-  await page.getByTestId('back-to-library').click();
+  await page.getByRole('link', { name: 'Library' }).click();
   await page.getByTestId(`rename-${noteId}`).click();
   const input = page.getByTestId(`rename-input-${noteId}`);
   await input.fill('Alpha in A');
@@ -68,7 +68,7 @@ test('switching Worlds filters the entity browser to the active World', async ({
 
   // World B becomes active; A's note is out of scope, so it's gone from the list.
   const worldB = await createWorld(page);
-  await page.getByTestId('back-to-library').click();
+  await page.getByRole('link', { name: 'Library' }).click();
   await expect(page).toHaveURL(/\/entities$/);
   await expect(page.getByText('Alpha in A')).toHaveCount(0);
   expect(worldB.id).not.toBe(worldA.id);
