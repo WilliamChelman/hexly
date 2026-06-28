@@ -1,6 +1,9 @@
+import { randomUUID } from 'node:crypto';
 import { isAbsolute, resolve } from 'node:path';
 import Database from 'better-sqlite3';
 import { drizzle, BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
+import { emptyEntityBody } from '@hexly/domain';
 import * as schema from './schema';
 
 /**
@@ -17,9 +20,9 @@ export const DB = Symbol('DB');
 
 /**
  * Open a SQLite database at `path` (use `':memory:'` for tests), put it in WAL
- * mode for concurrent reads (ADR-0002), ensure the schema exists, and return a
- * Drizzle handle over it. The whole app shares one connection — one NestJS
- * process for a handful of users.
+ * mode for concurrent reads (ADR-0002), bring the schema up to date by applying
+ * any unapplied migrations, and return a Drizzle handle over it. The whole app
+ * shares one connection — one NestJS process for a handful of users.
  */
 export function createDb(path: string): Db {
   const sqlite = new Database(path);
@@ -27,49 +30,46 @@ export function createDb(path: string): Db {
   // SQLite ignores `REFERENCES` clauses unless foreign keys are enabled, and the
   // pragma is per-connection — so it must be set on every connection we open.
   sqlite.pragma('foreign_keys = ON');
-  // Runtime source of truth for the schema, kept in sync by hand with
-  // `./schema.ts`. `IF NOT EXISTS` won't alter an existing table — a column
-  // change on a live DB needs a migration (drizzle-kit), not an edit here.
-  sqlite.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      email TEXT NOT NULL UNIQUE,
-      display_name TEXT NOT NULL,
-      password_hash TEXT NOT NULL,
-      created_at INTEGER NOT NULL
-    );
-    CREATE TABLE IF NOT EXISTS sessions (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL REFERENCES users(id),
-      created_at INTEGER NOT NULL,
-      expires_at INTEGER NOT NULL
-    );
-    -- Speeds up the expired-session sweep that runs on every login.
-    CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
-    CREATE TABLE IF NOT EXISTS entities (
-      id TEXT PRIMARY KEY,
-      owner_id TEXT NOT NULL REFERENCES users(id),
-      name TEXT NOT NULL,
-      type TEXT NOT NULL,
-      tags TEXT NOT NULL,
-      visibility TEXT NOT NULL,
-      version INTEGER NOT NULL,
-      document TEXT NOT NULL,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
-    -- The list endpoint and every access check filter by owner.
-    CREATE INDEX IF NOT EXISTS idx_entities_owner_id ON entities(owner_id);
-    -- The owner's Link Descriptor vocabulary (#96): one row per (entity, descriptor),
-    -- replaced on each successful save and cascade-deleted with its entity.
-    -- owner_id is omitted — derivable via entities(id) JOIN, and the PK covers entity lookups.
-    CREATE TABLE IF NOT EXISTS entity_descriptors (
-      entity_id TEXT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
-      descriptor TEXT NOT NULL,
-      PRIMARY KEY (entity_id, descriptor)
-    );
-  `);
-  return drizzle(sqlite, { schema });
+  const db = drizzle(sqlite, { schema });
+  // Apply unapplied migrations at boot (ADR-0027). `schema.ts` is the single
+  // source of truth; the SQL files in `./migrations` are generated from it by
+  // `pnpm db:generate` and shipped beside the bundle (webpack asset-map), so
+  // `__dirname` resolves them in prod and in source-run tests alike — the same
+  // `__dirname` convention `resolveDbPath` relies on.
+  migrate(db, { migrationsFolder: resolve(__dirname, 'migrations') });
+  return db;
+}
+
+/**
+ * Create a World for `ownerId` with a freshly minted blank Home note (ADR-0024).
+ * Used when there is no existing Entity to home in — by {@link migrateToWorlds}
+ * for an entity-less user, and to stand in for the future World-creation flow.
+ * The World is inserted first, then its Home note (`is_home = 1`) references it —
+ * no cycle, so a plain transaction (atomicity only) suffices.
+ */
+export function mintWorldWithHome(
+  sqlite: Database.Database,
+  ownerId: string,
+  name: string,
+  now: number = Date.now(),
+): { worldId: string; homeEntityId: string } {
+  const worldId = randomUUID();
+  const homeEntityId = randomUUID();
+  const document = JSON.stringify(emptyEntityBody('note'));
+  sqlite.transaction(() => {
+    sqlite
+      .prepare(
+        `INSERT INTO worlds (id, name, owner_id, created_at, updated_at) VALUES (?,?,?,?,?)`,
+      )
+      .run(worldId, name, ownerId, now, now);
+    sqlite
+      .prepare(
+        `INSERT INTO entities (id, owner_id, world_id, is_home, name, type, tags, visibility, version, document, created_at, updated_at)
+         VALUES (?, ?, ?, 1, ?, 'note', '[]', 'private', 1, ?, ?, ?)`,
+      )
+      .run(homeEntityId, ownerId, worldId, name, document, now, now);
+  })();
+  return { worldId, homeEntityId };
 }
 
 /**

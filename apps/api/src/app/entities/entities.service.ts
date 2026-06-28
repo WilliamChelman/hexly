@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
   CreateEntityRequest,
   emptyEntityBody,
@@ -16,7 +16,7 @@ import {
 } from '@hexly/domain';
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
-import { entities, entityDescriptors } from '../db/schema';
+import { entities, entityDescriptors, worlds } from '../db/schema';
 
 const INITIAL_VERSION = 1;
 
@@ -65,6 +65,7 @@ export class EntitiesService {
       .select({
         id: entities.id,
         ownerId: entities.ownerId,
+        worldId: entities.worldId,
         name: entities.name,
         type: entities.type,
         tags: entities.tags,
@@ -100,12 +101,14 @@ export class EntitiesService {
     const row = {
       id: randomUUID(),
       ownerId,
+      worldId: this.resolveWorldId(ownerId, req.worldId),
       name: req.name,
       type: req.type,
       tags: req.tags,
       visibility: 'private',
       version: INITIAL_VERSION,
       document: serialize(body),
+      isHome: false,
       createdAt: now,
       updatedAt: now,
     };
@@ -179,7 +182,7 @@ export class EntitiesService {
     this.db
       .update(entities)
       .set({ name, updatedAt })
-      .where(eq(entities.id, id))
+      .where(and(eq(entities.id, id), eq(entities.ownerId, ownerId)))
       .run();
     return toDetail({ ...row, name, updatedAt });
   }
@@ -217,15 +220,35 @@ export class EntitiesService {
 
   /** `false` means nothing to delete for this owner (unknown id or not theirs); caller surfaces as 404. */
   delete(ownerId: string, id: string): boolean {
-    // Read just `ownerId` for the ownership check — no need to pull the body.
-    const owner = this.db
-      .select({ ownerId: entities.ownerId })
+    const row = this.db
+      .select({ ownerId: entities.ownerId, isHome: entities.isHome })
       .from(entities)
       .where(eq(entities.id, id))
       .get();
-    if (!owner || owner.ownerId !== ownerId) return false;
+    if (!row || row.ownerId !== ownerId) return false;
+    if (row.isHome) throw new BadRequestException('The Home Entity cannot be deleted');
     this.db.delete(entities).where(eq(entities.id, id)).run();
     return true;
+  }
+
+  /**
+   * Resolve the target World for a new Entity (ADR-0024). When the client
+   * supplies a worldId, it must be owned by ownerId (contributor access is a
+   * future concern). When absent, defaults to the owner's oldest World.
+   */
+  private resolveWorldId(ownerId: string, requestedId?: string): string {
+    const world = this.db
+      .select({ id: worlds.id })
+      .from(worlds)
+      .where(
+        requestedId
+          ? and(eq(worlds.id, requestedId), eq(worlds.ownerId, ownerId))
+          : eq(worlds.ownerId, ownerId),
+      )
+      .orderBy(asc(worlds.createdAt), asc(worlds.id))
+      .get();
+    if (!world) throw new NotFoundException('World not found');
+    return world.id;
   }
 
   /**
@@ -272,6 +295,7 @@ function toSummary(row: SummaryRow): EntitySummary {
   return {
     id: row.id,
     ownerId: row.ownerId,
+    worldId: row.worldId,
     name: row.name,
     // Validate against the schema (single source of truth) not a bare cast (ADR-0001).
     type: entityTypeSchema.parse(row.type),

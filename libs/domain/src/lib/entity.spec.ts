@@ -6,6 +6,7 @@ import {
   entityBodySchema,
   renameEntityRequestSchema,
   saveEntityRequestSchema,
+  visibilitySchema,
 } from './entity';
 
 const content = { format: 'tiptap-v1' as const, snapshot: { type: 'doc', content: [] } };
@@ -134,6 +135,26 @@ describe('createEntityRequestSchema', () => {
     expect(() =>
       createEntityRequestSchema.parse({ name: 'x', type: 'spreadsheet' }),
     ).toThrow();
+  });
+
+  it('accepts an optional worldId, and omits it when absent (server defaults to the owner World)', () => {
+    // A client may target a specific World; when omitted the server resolves the owner's World (#101).
+    expect(
+      createEntityRequestSchema.parse({ name: 'x', type: 'note', worldId: 'w1' })
+        .worldId,
+    ).toBe('w1');
+    expect(
+      createEntityRequestSchema.parse({ name: 'x', type: 'note' }).worldId,
+    ).toBeUndefined();
+  });
+});
+
+describe('visibilitySchema', () => {
+  it('accepts the two Entity Visibility values and rejects the retired "public" (ADR-0024)', () => {
+    // Sharing is per-World now: an Entity is `private` (owner-only) or `shared` (all World members).
+    expect(visibilitySchema.parse('private')).toBe('private');
+    expect(visibilitySchema.parse('shared')).toBe('shared');
+    expect(() => visibilitySchema.parse('public')).toThrow();
   });
 });
 

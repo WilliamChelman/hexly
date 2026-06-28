@@ -13,6 +13,7 @@ function summary(id: string, name: string): EntitySummary {
   return {
     id,
     ownerId: 'me',
+    worldId: 'w1',
     name,
     type: 'note',
     tags: [],

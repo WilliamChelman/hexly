@@ -65,8 +65,8 @@ export function emptyEntityBody(type: EntityType): EntityBody {
     : { type, content: emptyContent() };
 }
 
-/** `.trim()` before `.min(1)` rejects whitespace-only names and strips surrounding whitespace (issues #12, #15). */
-const nameSchema = z.string().trim().min(1);
+/** `.trim()` before `.min(1)` rejects whitespace-only names and strips surrounding whitespace (issues #12, #15). Shared with the World name (ADR-0024). */
+export const nameSchema = z.string().trim().min(1);
 
 /**
  * Free-text Tags on an Entity (CONTEXT.md → Tag), normalized on parse so the
@@ -96,6 +96,8 @@ export const createEntityRequestSchema = z.object({
   name: nameSchema,
   type: entityTypeSchema,
   tags: tagsSchema,
+  // Optional target World (ADR-0024): when omitted the server defaults to the owner's World (#101).
+  worldId: z.string().optional(),
 });
 
 export type CreateEntityRequest = z.infer<typeof createEntityRequestSchema>;
@@ -151,16 +153,18 @@ export const entityListQuerySchema = z.object({
 
 export type EntityListQuery = z.infer<typeof entityListQuerySchema>;
 
-/** `private` is owner-only; `public` exposes the read-only link (ADR-0004). Stored as metadata; the public-link endpoint is a later issue, so nothing acts on it yet. */
-export const visibilitySchema = z.enum(['private', 'public']);
+/** Entity Visibility (ADR-0024): `private` is owner-only; `shared` exposes the Entity to all World members. Replaces the retired `public` value — sharing is per-World now. */
+export const visibilitySchema = z.enum(['private', 'shared']);
 
-/** CONTEXT.md → Public Link. */
+/** CONTEXT.md → Entity Visibility. */
 export type Visibility = z.infer<typeof visibilitySchema>;
 
 /** What `GET /entities` lists; body fetched only on open. `type`/`tags` ride along for grouping and filtering. */
 export interface EntitySummary {
   readonly id: string;
   readonly ownerId: string;
+  /** The World this Entity belongs to (ADR-0024). Every Entity belongs to exactly one. */
+  readonly worldId: string;
   readonly name: string;
   readonly type: EntityType;
   readonly tags: readonly string[];

@@ -29,6 +29,7 @@ describe('EntitiesClient', () => {
   const aldermoor: EntityDetail = {
     id: 'e1',
     ownerId: 'u1',
+    worldId: 'w1',
     name: 'Aldermoor',
     type: 'hexmap',
     tags: [],
@@ -52,6 +53,7 @@ describe('EntitiesClient', () => {
   const summary: EntitySummary = {
     id: 'e1',
     ownerId: 'u1',
+    worldId: 'w1',
     name: 'Aldermoor',
     type: 'hexmap',
     tags: [],

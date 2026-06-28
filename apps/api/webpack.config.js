@@ -18,7 +18,16 @@ module.exports = {
         { entryName: 'seed', entryPath: './src/seed.ts' },
       ],
       tsConfig: './tsconfig.app.json',
-      assets: ['./src/assets'],
+      // Migrations are read at boot via `resolve(__dirname, 'migrations')`; map
+      // them to the bundle root so dist mirrors the source layout (ADR-0027).
+      assets: [
+        './src/assets',
+        {
+          input: './src/app/db/migrations',
+          output: 'migrations',
+          glob: '**/*',
+        },
+      ],
       optimization: false,
       outputHashing: 'none',
       generatePackageJson: true,

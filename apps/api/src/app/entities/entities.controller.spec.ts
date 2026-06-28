@@ -3,7 +3,7 @@ import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import { coordKey, emptyContent } from '@hexly/domain';
-import { DB, createDb } from '../db/db';
+import { DB, Db, createDb, mintWorldWithHome } from '../db/db';
 import { AuthService } from '../auth/auth.service';
 import { AuthModule } from '../auth/auth.module';
 import { EntitiesModule } from './entities.module';
@@ -19,26 +19,39 @@ const emptyHexmapBody = {
 
 describe('Entities endpoints', () => {
   let app: INestApplication;
+  let db: Db;
 
   beforeEach(async () => {
+    // Real Drizzle, real schema, isolated per-test (ADR-0002).
+    db = createDb(':memory:');
     const moduleRef = await Test.createTestingModule({
       imports: [AuthModule, EntitiesModule],
     })
-      // Real Drizzle, real schema, isolated per-test (ADR-0002).
       .overrideProvider(DB)
-      .useValue(createDb(':memory:'))
+      .useValue(db)
       .compile();
 
     app = moduleRef.createNestApplication();
     app.use(cookieParser());
     await app.init();
 
-    await app.get(AuthService).seedUser('ada@hexly.test', 'correct horse', 'Ada');
+    await seedUserWithWorld('ada@hexly.test', 'correct horse', 'Ada');
   });
 
   afterEach(async () => {
     await app.close();
   });
+
+  /**
+   * Seed a user and give them a World — the precondition for creating Entities
+   * (ADR-0024). Seeding alone no longer mints a World; the future World-creation
+   * UI does, which this stands in for. `mintWorldWithHome` also creates the
+   * World's Home note, so it surfaces in the owner's Entity list.
+   */
+  async function seedUserWithWorld(email: string, password: string, name: string) {
+    const userId = await app.get(AuthService).seedUser(email, password, name);
+    mintWorldWithHome(db.$client, userId, name);
+  }
 
   /** Log a seeded user in and return an agent that carries their session. */
   async function signIn(email: string, password: string) {
@@ -58,6 +71,7 @@ describe('Entities endpoints', () => {
     expect(res.body).toEqual({
       id: expect.any(String),
       ownerId: expect.any(String),
+      worldId: expect.any(String),
       name: 'The Reach of Aldermoor',
       type: 'hexmap',
       tags: [],
@@ -100,8 +114,10 @@ describe('Entities endpoints', () => {
     const res = await ada.get('/entities').expect(200);
 
     // The response is always the envelope — never a bare array (ADR-0025).
+    // 'Ada' is the World's Home note, auto-created when Ada was seeded (ADR-0024).
     expect(res.body.nextCursor).toBeNull();
     expect(res.body.items.map((e: { name: string }) => e.name).sort()).toEqual([
+      'Ada',
       'Aldermoor',
       'Lady A',
     ]);
@@ -112,8 +128,9 @@ describe('Entities endpoints', () => {
 
   it('walks every owner entity exactly once via cursor, with limit bounding each page', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
-    const names = ['A', 'B', 'C', 'D', 'E'];
-    for (const name of names) {
+    // 'Ada' is the Home note auto-created with Ada's World (ADR-0024); it lists too.
+    const names = ['Ada', 'A', 'B', 'C', 'D', 'E'];
+    for (const name of names.slice(1)) {
       await ada.post('/entities').send({ name, type: 'note' });
     }
 
@@ -135,7 +152,7 @@ describe('Entities endpoints', () => {
     // Every entity surfaced exactly once — no duplicates, no gaps.
     expect(seen.slice().sort()).toEqual(names.slice().sort());
     expect(seen.length).toBe(names.length);
-    // 5 entities at 2 per page = 3 pages (2 + 2 + 1), last page's cursor is null.
+    // 6 entities (5 + Home note) at 2 per page = 3 pages (2 + 2 + 2), last cursor null.
     expect(pages).toBe(3);
   });
 
@@ -152,9 +169,10 @@ describe('Entities endpoints', () => {
       'Aldermoor Town',
     ]);
 
-    // type filters by Entity Type.
+    // type filters by Entity Type — including the World's Home note 'Ada'.
     const byType = await ada.get('/entities').query({ type: 'note' }).expect(200);
     expect(byType.body.items.map((e: { name: string }) => e.name).sort()).toEqual([
+      'Ada',
       'Aldermoor Town',
       'The Whisperwood',
     ]);
@@ -364,11 +382,13 @@ describe('Entities endpoints', () => {
       .send({ name: 'Aldermoor', type: 'hexmap' });
     const id = created.body.id;
 
-    await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob');
+    await seedUserWithWorld('bob@hexly.test', 'battery staple', 'Bob');
     const bob = await signIn('bob@hexly.test', 'battery staple');
 
+    // Bob sees only his own World's Home note 'Bob' (ADR-0024) — never Ada's Entity.
     const bobsList = await bob.get('/entities').expect(200);
-    expect(bobsList.body).toEqual({ items: [], nextCursor: null });
+    expect(bobsList.body.items.map((e: { name: string }) => e.name)).toEqual(['Bob']);
+    expect(bobsList.body.items.map((e: { id: string }) => e.id)).not.toContain(id);
 
     // 404, not 403 — ownership never leaks (ADR-0004).
     await bob.get(`/entities/${id}`).expect(404);
@@ -389,7 +409,7 @@ describe('Entities endpoints', () => {
       .post('/entities')
       .send({ name: 'Aldermoor', type: 'hexmap' });
 
-    await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob');
+    await seedUserWithWorld('bob@hexly.test', 'battery staple', 'Bob');
     const bob = await signIn('bob@hexly.test', 'battery staple');
     await bob.post('/entities').send({ name: 'Aldermoor', type: 'hexmap' });
 
@@ -521,9 +541,7 @@ describe('Entities endpoints', () => {
     });
 
     it('scopes the vocabulary to the owner', async () => {
-      await app
-        .get(AuthService)
-        .seedUser('bob@hexly.test', 'correct horse', 'Bob');
+      await seedUserWithWorld('bob@hexly.test', 'correct horse', 'Bob');
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const bob = await signIn('bob@hexly.test', 'correct horse');
 
