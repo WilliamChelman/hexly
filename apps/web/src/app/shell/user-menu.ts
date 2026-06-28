@@ -10,6 +10,7 @@ import {
   Component,
   computed,
   inject,
+  input,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
@@ -48,18 +49,28 @@ import { Rule } from '../ui/rule';
       type="button"
       appButton
       variant="ghost"
-      icon
+      [icon]="!expanded()"
+      [class.w-full]="expanded()"
+      [class.!justify-start]="expanded()"
       [cdkMenuTriggerFor]="menu"
       [attr.aria-label]="'common.userMenu' | transloco"
     >
       @if (user(); as u) {
         <span
-          class="grid place-items-center size-6 font-mono text-2xs text-on-gilded bg-linear-[140deg] from-gold-bright to-gold-deep rounded-full shadow-[0_0_14px_-2px_var(--color-glow)]"
+          class="grid place-items-center shrink-0 size-6 font-mono text-2xs text-on-gilded bg-linear-[140deg] from-gold-bright to-gold-deep rounded-full shadow-[0_0_14px_-2px_var(--color-glow)]"
           [title]="u.displayName"
           >{{ initials() }}</span
         >
+        @if (expanded()) {
+          <span class="text-sm text-ink truncate">{{ u.displayName }}</span>
+        }
       } @else {
         <app-icon name="user" [size]="20" />
+        @if (expanded()) {
+          <span class="text-sm text-ink truncate">{{
+            'common.userMenu' | transloco
+          }}</span>
+        }
       }
     </button>
 
@@ -135,6 +146,9 @@ import { Rule } from '../ui/rule';
   `,
 })
 export class UserMenu {
+  /** Whether the nav rail is expanded — drives the full-name vs avatar-only trigger. */
+  readonly expanded = input(false);
+
   private readonly auth = inject(AuthClient);
   private readonly locale = inject(LocaleService);
   protected readonly themeService = inject(ThemeService);

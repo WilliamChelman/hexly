@@ -127,7 +127,12 @@ const STATIC_ENTRIES: readonly NavEntry[] = [
         >
       </a>
 
+      <!-- The World crest sits at the masthead under the brand (#121, redesign):
+           the active World stays legible at both widths and no longer twins the
+           foot avatar — a square gilt tile against the round personal avatar. -->
       @if (isAuthenticated()) {
+        <app-world-switcher [expanded]="expanded" />
+
         <nav
           class="flex flex-col gap-1 mt-1"
           [attr.aria-label]="'nav.primary' | transloco"
@@ -154,18 +159,12 @@ const STATIC_ENTRIES: readonly NavEntry[] = [
 
       <div class="flex-1"></div>
 
-      <!-- The World switcher docks by the user menu, at both widths (#121): the
-           current World stays legible (full name expanded, initial chip collapsed). -->
-      @if (isAuthenticated()) {
-        <app-world-switcher [expanded]="expanded" />
-      }
-
       <!--
         Avatar and collapse toggle sit together at the foot: stacked when
         collapsed, side-by-side when expanded. Chevron points the way it moves.
       -->
       <div class="flex items-center gap-1" [class.flex-col]="!expanded">
-        <app-user-menu />
+        <app-user-menu [expanded]="expanded" [class.flex-1]="expanded" />
         <button
           type="button"
           appButton

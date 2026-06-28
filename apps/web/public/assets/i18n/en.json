@@ -284,6 +284,7 @@
   },
   "worlds": {
     "switcherLabel": "Active world",
+    "crestLabel": "World",
     "switcher": "Worlds",
     "allWorlds": "All worlds",
     "new": "New world",
