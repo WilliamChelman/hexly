@@ -9,6 +9,7 @@ import { TranslocoService } from '@jsverse/transloco';
 import { EntitySummary } from '@hexly/domain';
 import { AuthClient } from '../../core/services/auth.client';
 import { ToasterService } from '../../core/services/toaster.service';
+import { WorldStore } from '../../core/services/world.store';
 import { provideTranslocoTesting } from '../../core/i18n/transloco-testing';
 import { EntityBrowser } from './entity-browser';
 
@@ -42,21 +43,27 @@ describe('EntityBrowser', () => {
     http = TestBed.inject(HttpTestingController);
     navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
 
-    // A signed-in user the library header can display.
+    // Log in first — auth-scoped storage uses the user id to namespace keys.
     TestBed.inject(AuthClient).login('ada@hexly.test', 'pw').subscribe();
     http.expectOne('/api/auth/login').flush({
       id: 'u1',
       email: 'ada@hexly.test',
       displayName: 'Ada',
     });
+
+    // Seed the active World after login so the auth-scoped key is written correctly.
+    TestBed.inject(WorldStore).setActive('w1');
   });
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    http.verify();
+    localStorage.clear();
+  });
 
   /** Create the library and resolve its first page; `nextCursor` defaults to null (single page). */
   function renderWith(entities: EntitySummary[], nextCursor: string | null = null) {
     const fixture = TestBed.createComponent(EntityBrowser);
-    fixture.detectChanges(); // ngOnInit -> GET /entities
+    fixture.detectChanges(); // active-World effect -> GET /entities
     http.expectOne((r) => r.url === '/api/entities').flush({ items: entities, nextCursor });
     fixture.detectChanges();
     return fixture;
@@ -103,6 +110,26 @@ describe('EntityBrowser', () => {
     // longer chrome contributed to a shell header.
     const heading = fixture.nativeElement.querySelector('h1');
     expect(heading?.textContent).toContain('Your library');
+  });
+
+  it('scopes the entity list to the active World (ADR-0024)', () => {
+    const fixture = TestBed.createComponent(EntityBrowser);
+    fixture.detectChanges();
+
+    const req = http.expectOne((r) => r.url === '/api/entities');
+    expect(req.request.params.get('worldId')).toBe('w1');
+    req.flush({ items: [], nextCursor: null });
+  });
+
+  it('re-fetches scoped to the new World when the active World changes', () => {
+    const fixture = renderWith([summary({ id: 'm1' })]); // initial fetch, World w1
+
+    TestBed.inject(WorldStore).setActive('w2');
+    fixture.detectChanges();
+
+    const req = http.expectOne((r) => r.url === '/api/entities');
+    expect(req.request.params.get('worldId')).toBe('w2');
+    req.flush({ items: [], nextCursor: null });
   });
 
   it('lists the entities the user owns, newest first', () => {
@@ -292,7 +319,7 @@ describe('EntityBrowser', () => {
 
   it('renders the load-error state in French when French is the active language', () => {
     const fixture = TestBed.createComponent(EntityBrowser);
-    fixture.detectChanges(); // ngOnInit -> GET /entities
+    fixture.detectChanges(); // active-World effect -> GET /entities
     http
       .expectOne((r) => r.url === '/api/entities')
       .flush(null, { status: 500, statusText: 'Server Error' });
@@ -310,7 +337,7 @@ describe('EntityBrowser', () => {
 
   it('shows an error state when the entity list fails to load', () => {
     const fixture = TestBed.createComponent(EntityBrowser);
-    fixture.detectChanges(); // ngOnInit -> GET /entities
+    fixture.detectChanges(); // active-World effect -> GET /entities
     http
       .expectOne((r) => r.url === '/api/entities')
       .flush(null, { status: 500, statusText: 'Server Error' });
@@ -332,7 +359,12 @@ describe('EntityBrowser', () => {
 
     const req = http.expectOne('/api/entities');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ name: 'Untitled map', type: 'hexmap' });
+    // Scoped to the active World (ADR-0024).
+    expect(req.request.body).toEqual({
+      name: 'Untitled map',
+      type: 'hexmap',
+      worldId: 'w1',
+    });
     req.flush({
       ...summary({ id: 'created', name: 'Untitled map' }),
       document: { type: 'hexmap', content: { format: 'tiptap-v1', snapshot: {} }, hexes: {}, regions: [], labels: [] },
@@ -350,7 +382,11 @@ describe('EntityBrowser', () => {
 
     const req = http.expectOne('/api/entities');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ name: 'Untitled note', type: 'note' });
+    expect(req.request.body).toEqual({
+      name: 'Untitled note',
+      type: 'note',
+      worldId: 'w1',
+    });
     req.flush({
       ...summary({ id: 'created', name: 'Untitled note', type: 'note' }),
       document: { type: 'note', content: { format: 'tiptap-v1', snapshot: {} } },

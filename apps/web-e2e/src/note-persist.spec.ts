@@ -26,7 +26,7 @@ test('types into a note, saves, and the Content survives a reload', async ({
 
   await page.reload();
   await expect(page.getByTestId('note-content')).toContainText(content);
-  await expect(page.getByTestId('note-title')).toHaveText('Untitled note');
+  await expect(page.getByTestId('title')).toHaveText('Untitled note');
 
   // Confirm the snapshot was stored opaquely — format tag present, text inside.
   const res = await request.get(`/api/entities/${noteId}`);

@@ -31,6 +31,7 @@ export class EntitiesClient {
     for (const id of opts.ids ?? []) params = params.append('ids', id);
     if (opts.q) params = params.set('q', opts.q);
     if (opts.type) params = params.set('type', opts.type);
+    if (opts.worldId) params = params.set('worldId', opts.worldId);
     if (opts.cursor) params = params.set('cursor', opts.cursor);
     if (opts.limit !== undefined) params = params.set('limit', opts.limit);
     return this.http.get<EntityPage>('/api/entities', { params });
@@ -45,8 +46,17 @@ export class EntitiesClient {
     return this.http.delete<void>(`/api/entities/${id}`);
   }
 
-  create(name: string, type: EntityType): Observable<EntityDetail> {
-    return this.http.post<EntityDetail>('/api/entities', { name, type });
+  /** `worldId` scopes the new Entity to a World (ADR-0024); omitted, the server defaults to the caller's first World. */
+  create(
+    name: string,
+    type: EntityType,
+    worldId?: string,
+  ): Observable<EntityDetail> {
+    return this.http.post<EntityDetail>('/api/entities', {
+      name,
+      type,
+      ...(worldId ? { worldId } : {}),
+    });
   }
 
   load(id: string): Observable<EntityDetail> {

@@ -6,7 +6,7 @@ import {
 } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { TranslocoService } from '@jsverse/transloco';
-import { persistedPreference } from '../utils/persisted-preference';
+import { AuthScopedStorage } from '../services/auth-scoped-storage';
 import { LOCALES } from './transloco.config';
 import { AppShellStore } from '../../shell/app-shell.store';
 
@@ -20,14 +20,14 @@ export type Locale = (typeof LOCALES)[number];
  * starts with `fr`, else English); thereafter a remembered choice wins. {@link set}
  * flips the active Transloco language so the UI updates live, and persists the
  * choice. It shares the detect/remember/apply mechanism with {@link ThemeService}
- * through {@link persistedPreference}.
+ * through {@link AuthScopedStorage#preference}.
  */
 @Injectable({ providedIn: 'root' })
 export class LocaleService {
   private readonly transloco = inject(TranslocoService);
   private readonly shell = inject(AppShellStore);
 
-  private readonly pref = persistedPreference<Locale>({
+  private readonly pref = inject(AuthScopedStorage).preference<Locale>({
     storageKey: 'hexly-locale',
     values: LOCALES,
     detect: () => {

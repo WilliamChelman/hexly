@@ -1,16 +1,17 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  OnInit,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
 import { Router } from '@angular/router';
-import { finalize } from 'rxjs';
+import { Subscription, finalize } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient } from '../../core/services/entities.client';
+import { WorldStore } from '../../core/services/world.store';
 import { ToasterService } from '../../core/services/toaster.service';
 import { AppShellStore } from '../../shell/app-shell.store';
 import { Autofocus } from '../../ui/autofocus';
@@ -218,8 +219,9 @@ function formatEdited(updatedAt: number, lang: string): string {
     </main>
   `,
 })
-export class EntityBrowser implements OnInit {
+export class EntityBrowser {
   private readonly entitiesClient = inject(EntitiesClient);
+  private readonly worlds = inject(WorldStore);
   private readonly router = inject(Router);
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
@@ -257,8 +259,20 @@ export class EntityBrowser implements OnInit {
   /** The id of the Entity whose name is being edited inline, or `null`. */
   protected readonly renamingId = signal<string | null>(null);
 
-  ngOnInit(): void {
-    this.fetchFirstPage();
+  private fetchSub?: Subscription;
+
+  constructor() {
+    // Re-fetch page one whenever the active World changes (ADR-0024). When there
+    // is no active World but the store has finished loading (user has 0 Worlds),
+    // surface the empty state instead of leaving the page blank.
+    effect(() => {
+      const worldId = this.worlds.activeWorldId();
+      if (worldId) {
+        this.fetchFirstPage();
+      } else if (this.worlds.loaded()) {
+        this.fetchFirstPage(); // short-circuits inside to set empty state
+      }
+    });
   }
 
   /**
@@ -269,9 +283,27 @@ export class EntityBrowser implements OnInit {
    * `limit`, so it survives any future opaque-cursor encoding change.
    */
   private fetchFirstPage(): void {
-    // Set `loaded` on error too: a failed fetch must show the error panel, not a blank page.
-    this.entitiesClient
-      .list({ limit: PAGE_SIZE })
+    const worldId = this.worlds.activeWorldId();
+    // No active World (user has 0 Worlds): surface the empty state directly.
+    if (!worldId) {
+      this.fetchSub?.unsubscribe();
+      this._entities.set([]);
+      this.nextCursor.set(null);
+      this.loadingMore.set(false);
+      this.loadError.set(false);
+      this.loaded.set(true);
+      return;
+    }
+    // Cancel any in-flight request from a previous World (prevents stale data race).
+    this.fetchSub?.unsubscribe();
+    // Reset state so the template shows loading rather than stale data from the old World.
+    this._entities.set([]);
+    this.nextCursor.set(null);
+    this.loadingMore.set(false); // clear any stuck load-more from the previous World
+    this.loadError.set(false);
+    this.loaded.set(false);
+    this.fetchSub = this.entitiesClient
+      .list({ limit: PAGE_SIZE, worldId })
       .pipe(this.shell.withLoading('subtle'))
       .subscribe({
         next: (page) => {
@@ -297,7 +329,7 @@ export class EntityBrowser implements OnInit {
     if (cursor === null || this.loadingMore()) return;
     this.loadingMore.set(true);
     this.entitiesClient
-      .list({ cursor })
+      .list({ cursor, worldId: this.worlds.activeWorldId() ?? undefined })
       .pipe(finalize(() => this.loadingMore.set(false)))
       .subscribe({
         next: (page) => {
@@ -320,6 +352,7 @@ export class EntityBrowser implements OnInit {
       .create(
         this.transloco.translate(type === 'note' ? 'domain.untitledNote' : 'domain.untitledMap'),
         type,
+        this.worlds.activeWorldId() ?? undefined,
       )
       .pipe(finalize(() => this.creating.set(false)))
       .subscribe({

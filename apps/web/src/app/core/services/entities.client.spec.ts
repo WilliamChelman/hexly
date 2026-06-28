@@ -104,6 +104,18 @@ describe('EntitiesClient', () => {
     expect(created).toEqual(aldermoor);
   });
 
+  it('scopes a create to a World when worldId is given', () => {
+    client.create('Aldermoor', 'hexmap', 'w9').subscribe();
+
+    const req = http.expectOne('/api/entities');
+    expect(req.request.body).toEqual({
+      name: 'Aldermoor',
+      type: 'hexmap',
+      worldId: 'w9',
+    });
+    req.flush(aldermoor);
+  });
+
   it('loads an entity by id', () => {
     let loaded: EntityDetail | undefined;
     client.load('e1').subscribe((e) => (loaded = e));

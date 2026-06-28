@@ -40,6 +40,8 @@
   },
   "noteView": {
     "eyebrow": "Note",
+    "titleLabel": "Titre de la note",
+    "renameNote": "Renommer la note",
     "backToLibrary": "Retour à la bibliothèque",
     "editorLabel": "Contenu de la note",
     "slashMenu": {
@@ -278,5 +280,11 @@
     "expand": "Déployer la navigation",
     "collapse": "Réduire la navigation",
     "home": "Accueil Hexly"
+  },
+  "worlds": {
+    "switcherLabel": "Monde actif",
+    "new": "Nouveau monde",
+    "untitled": "Monde sans titre",
+    "createError": "Impossible de créer ce monde. Veuillez réessayer."
   }
 }

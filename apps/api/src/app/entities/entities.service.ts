@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
   CreateEntityRequest,
   emptyEntityBody,
@@ -30,6 +30,8 @@ export interface ListOptions {
   readonly q?: string;
   /** Restrict to one Entity Type. */
   readonly type?: EntityType;
+  /** Restrict to one World (ADR-0024). */
+  readonly worldId?: string;
 }
 
 /** One page of summaries plus whether a further page exists (drives the cursor). */
@@ -226,7 +228,9 @@ export class EntitiesService {
       .where(eq(entities.id, id))
       .get();
     if (!row || row.ownerId !== ownerId) return false;
-    if (row.isHome) throw new BadRequestException('The Home Entity cannot be deleted');
+    // 409, not 400: the request is well-formed; it conflicts with the World's
+    // invariant that its Home Entity always exists (ADR-0024).
+    if (row.isHome) throw new ConflictException('The Home Entity cannot be deleted');
     this.db.delete(entities).where(eq(entities.id, id)).run();
     return true;
   }
@@ -282,6 +286,7 @@ function filters(opts: ListOptions) {
     predicates.push(sql`${entities.name} LIKE ${'%' + escaped + '%'} ESCAPE '\\'`);
   }
   if (opts.type) predicates.push(eq(entities.type, opts.type));
+  if (opts.worldId) predicates.push(eq(entities.worldId, opts.worldId));
   return predicates;
 }
 

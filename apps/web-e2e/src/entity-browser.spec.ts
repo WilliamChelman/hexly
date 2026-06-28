@@ -14,9 +14,9 @@ test('a note round-trips: create → appears → open → rename → delete', as
   await page.getByTestId('new-note').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const id = page.url().split('/').pop();
-  await expect(page.getByTestId('note-title')).toHaveText('Untitled note');
+  await expect(page.getByTestId('title')).toHaveText('Untitled note');
 
-  await page.getByTestId('back-to-library').click();
+  await page.getByRole('link', { name: 'Library' }).click();
   await expect(page).toHaveURL(/\/entities$/);
   await expect(page.getByTestId(`open-${id}`)).toBeVisible();
   await expect(page.getByTestId(`type-${id}`)).toHaveText('Note');
@@ -30,9 +30,9 @@ test('a note round-trips: create → appears → open → rename → delete', as
 
   await page.getByTestId(`open-${id}`).click();
   await expect(page).toHaveURL(new RegExp(`/entities/${id}$`));
-  await expect(page.getByTestId('note-title')).toHaveText('Lady Mara');
+  await expect(page.getByTestId('title')).toHaveText('Lady Mara');
 
-  await page.getByTestId('back-to-library').click();
+  await page.getByRole('link', { name: 'Library' }).click();
   await page.getByTestId(`delete-${id}`).click();
   await expect(page.getByTestId(`open-${id}`)).toHaveCount(0);
   await expect(page.getByTestId('empty')).toBeVisible();
@@ -46,9 +46,8 @@ test('creating a map opens the map editor, not the note view', async ({
   await page.getByTestId('new-map').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
 
-  // Editor chrome present; note view absent.
+  // Editor chrome present (harmonized header — ADR-0022).
   await expect(page.getByTestId('title')).toBeVisible();
-  await expect(page.getByTestId('note-title')).toHaveCount(0);
 
   // App navigation lives in the rail now (ADR-0022): Library returns to the browser.
   await page.getByRole('link', { name: 'Library' }).click();

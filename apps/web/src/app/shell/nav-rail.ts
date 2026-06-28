@@ -5,6 +5,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -12,12 +13,14 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { AuthClient } from '../core/services/auth.client';
+import { WorldStore } from '../core/services/world.store';
 import { AppShellStore } from './app-shell.store';
-import { persistedPreference } from '../core/utils/persisted-preference';
+import { AuthScopedStorage } from '../core/services/auth-scoped-storage';
 import { Button } from '../ui/button';
 import { Cartouche } from '../ui/cartouche';
 import { Icon, IconName } from '../ui/icon/icon';
 import { UserMenu } from './user-menu';
+import { WorldSwitcher } from './world-switcher';
 
 interface NavEntry {
   readonly link: string;
@@ -62,6 +65,7 @@ const ENTRIES: readonly NavEntry[] = [
     Cartouche,
     Icon,
     UserMenu,
+    WorldSwitcher,
     TranslocoPipe,
   ],
   template: `
@@ -127,6 +131,13 @@ const ENTRIES: readonly NavEntry[] = [
       </a>
 
       @if (isAuthenticated()) {
+        <!-- The World switcher needs width for its select + label, so it shows
+             only on the expanded rail (ADR-0024); the collapsed rail stays icon-only. -->
+        @if (expanded) {
+          <div class="flex flex-col gap-1 mt-1 px-1">
+            <app-world-switcher />
+          </div>
+        }
         <nav
           class="flex flex-col gap-1 mt-1"
           [attr.aria-label]="'nav.primary' | transloco"
@@ -184,12 +195,13 @@ const ENTRIES: readonly NavEntry[] = [
 })
 export class NavRail {
   private readonly auth = inject(AuthClient);
+  private readonly worlds = inject(WorldStore);
 
   protected readonly isAuthenticated = this.auth.isAuthenticated;
   protected readonly loading = inject(AppShellStore).loading;
   protected readonly entries = ENTRIES;
 
-  private readonly pin = persistedPreference<'collapsed' | 'expanded'>({
+  private readonly pin = inject(AuthScopedStorage).preference<'collapsed' | 'expanded'>({
     storageKey: 'hexly-rail',
     values: ['collapsed', 'expanded'],
     detect: () => 'collapsed',
@@ -210,6 +222,13 @@ export class NavRail {
   );
 
   constructor() {
+    // The rail is the always-present authenticated chrome, so it owns loading the
+    // World list (ADR-0024) — the switcher only shows on the expanded rail, but the
+    // active World must be known even when collapsed so the browser can scope to it.
+    effect(() => {
+      if (this.isAuthenticated()) this.worlds.load();
+    });
+
     // BreakpointObserver cleans up via takeUntilDestroyed so no listener fires
     // on a dead instance (rail is destroyed/recreated across login).
     inject(BreakpointObserver)

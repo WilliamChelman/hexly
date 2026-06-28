@@ -1,0 +1,11 @@
+# World scope lives in the URL; the World Index resolves it
+
+The active World is a **path segment** (`/w/:worldId/entities`, `/w/:worldId/entities/:id`), not a remembered client selection. The URL is the single source of truth for "which World am I in," so multiple tabs can sit in different Worlds and any in-app location is a copy-pasteable address. The root `/` is the **World Index** — a page listing every World the caller can reach and owning World create / rename / delete — which replaces the old auto-redirect-into-a-World behaviour. There is no remembered active-World selection.
+
+This supersedes the launch implementation, where the active World lived in `localStorage` (`hexly-active-world`), loaded by the nav rail and scoping the entity browser. That made multi-tab incoherent (opening World B re-scoped World A's tab) and left the scope invisible and unshareable. The `localStorage` hint and the redirect resolver are removed: the World Index is the resolver now, so a user with zero Worlds is just an empty Index with a Create button rather than an edge case to redirect around.
+
+## Consequences
+
+- Entity-detail nests under the World segment too (`/w/:worldId/entities/:id`) for a complete URL, even though an Entity's `world_id` already determines its World. A reconcile guard redirects when the segment contradicts the Entity's real World (hand-edited URL); the Entity's `world_id` stays the data source of truth, the segment is only navigation context.
+- The **World Switcher** (ADR-0024) drops from a top-of-rail `<select>` to a compact dropdown docked by the user menu, visible even on the collapsed rail (the current-World name is orienting info). It is now pure quick-hop navigation — the World Index, not the Switcher, owns World management.
+- World rename and delete gain UI on the World Index (Owner-only, per ADR-0024). Delete cascades to every Entity in the World, so it is gated behind type-the-World-name confirmation showing the entity count.

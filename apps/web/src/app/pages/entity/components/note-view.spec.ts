@@ -35,19 +35,6 @@ describe('NoteView', () => {
     expect(fixture.nativeElement.textContent).toContain('Lady Mara');
   });
 
-  it('offers a way back to the library', () => {
-    TestBed.inject(EntitySession).adopt(note('Lady Mara'));
-
-    const fixture = TestBed.createComponent(NoteView);
-    fixture.detectChanges();
-
-    const back = fixture.nativeElement.querySelector(
-      '[data-testid=back-to-library]',
-    ) as HTMLAnchorElement;
-    expect(back).not.toBeNull();
-    expect(back.getAttribute('href')).toBe('/entities');
-  });
-
   it('mounts the shared Content editor, seeded with the note’s stored Content', () => {
     TestBed.inject(EntitySession).adopt({
       ...note('Lady Mara'),

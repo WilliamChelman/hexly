@@ -1,68 +1,33 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  computed,
-  inject,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
-import { translateSignal, TranslocoPipe } from '@jsverse/transloco';
-import { EntitySession } from '../services/entity-session';
-import { Eyebrow } from '../../../ui/eyebrow';
-import { PageHeader } from '../../../ui/page-header';
-import { EntityTags } from './entity-tags';
+import { translateSignal } from '@jsverse/transloco';
+import { EntityHeader } from './entity-header';
 import { ContentEditor } from './content-editor';
-import { SaveStatus } from './save-status';
 
 /**
  * The view a `note` Entity opens into, parallel to {@link EditorShell} for a `hexmap`:
- * page chrome (title, tags, autosave status) around the shared {@link ContentEditor}
- * (ADR-0019, ADR-0026).
+ * the shared {@link EntityHeader} above the shared {@link ContentEditor} in a centered
+ * reading column (ADR-0019, ADR-0026). A note has no grid, so the header omits the
+ * Map/Note view toggle.
  */
 @Component({
   selector: 'app-note-view',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    RouterLink,
-    TranslocoPipe,
-    Eyebrow,
-    PageHeader,
-    EntityTags,
-    ContentEditor,
-    SaveStatus,
-  ],
-  host: { class: 'block min-h-full bg-surface-sunken' },
+  imports: [EntityHeader, ContentEditor],
+  host: { class: 'block h-full' },
   template: `
-    <app-page-header sticky>
-      <a
-        pageHeaderLeading
-        class="text-sm text-ink-muted no-underline hover:underline"
-        routerLink="/entities"
-        data-testid="back-to-library"
-        >{{ 'noteView.backToLibrary' | transloco }}</a
-      >
-      <div pageHeaderTitle class="flex flex-col min-w-0">
-        <span appEyebrow class="text-gold! tracking-[0.28em]">{{
-          'noteView.eyebrow' | transloco
-        }}</span>
-        <h1
-          class="font-display text-[22px] text-ink-strong m-0 leading-tight truncate"
-          data-testid="note-title"
-        >
-          {{ name() }}
-        </h1>
-      </div>
-      <app-save-status pageHeaderActions />
-    </app-page-header>
-
-    <main class="max-w-[60rem] mx-auto py-5 px-5">
-      <app-entity-tags class="block" />
-      <app-content-editor class="mt-5" [ariaLabel]="editorLabel()" />
-    </main>
+    <div class="grid grid-rows-[auto_1fr] h-full">
+      <app-entity-header />
+      <main class="overflow-y-auto bg-surface-sunken">
+        <div class="max-w-[60rem] mx-auto py-5 px-5">
+          <app-content-editor [ariaLabel]="editorLabel()" />
+        </div>
+      </main>
+    </div>
   `,
 })
 export class NoteView {
-  private readonly session = inject(EntitySession);
   protected readonly editorLabel = translateSignal('noteView.editorLabel');
-
-  protected readonly name = computed(() => this.session.current()?.name ?? '');
 }
