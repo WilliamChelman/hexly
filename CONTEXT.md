@@ -81,8 +81,16 @@ A lightweight container record that groups Entities for a single campaign or set
 _Avoid_: Space, container, campaign
 
 **Home Entity**:
-A `note` Entity auto-created when a World is created, flagged `is_home = true` in the `entities` table. The partial unique index `idx_world_home` enforces at most one per World. Serves as the World's landing page. Cannot be deleted and cannot be moved to another World.
+A `note` Entity auto-created when a World is created, flagged `is_home = true` in the `entities` table. The partial unique index `idx_world_home` enforces at most one per World. Serves as the World's landing page. Cannot be deleted and cannot be moved to another World. Its title is not its own — it is the World's name (the World name is the source of truth; ADR-0029), so it reads as derived rather than freely edited.
 _Avoid_: World page, index, overview
+
+**World Index**:
+The page at `/` listing every World the caller can reach (owned and member), and the surface that owns World create, rename, and delete. The durable directory of Worlds — distinct from the World Switcher (a transient quick-hop control) and from a World's own Home Entity (its in-world landing note).
+_Avoid_: World home, world library, dashboard, world picker
+
+**World Switcher**:
+The compact in-app control (docked by the user menu) for hopping to another reachable World without returning to the World Index. Pure navigation — it shows the current World and switches the URL scope; it does not manage Worlds.
+_Avoid_: World selector, world dropdown
 
 **World Owner**:
 The user who created the World. Full control over membership, roles, and the public link. Exactly one per World.
