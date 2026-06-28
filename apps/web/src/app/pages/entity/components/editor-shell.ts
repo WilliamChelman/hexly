@@ -5,7 +5,7 @@ import {
 } from '@angular/core';
 import { translateSignal } from '@jsverse/transloco';
 import { HexMapStore } from '../services/hexmap-store';
-import { EditorHeader } from './editor-header';
+import { EntityHeader } from './entity-header';
 import { ToolPalette } from './tool-palette';
 import { MapCanvas } from './map-canvas';
 import { Inspector } from './inspector';
@@ -29,7 +29,7 @@ import { ContentEditor } from './content-editor';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block h-full overflow-hidden' },
   imports: [
-    EditorHeader,
+    EntityHeader,
     ToolPalette,
     MapCanvas,
     Inspector,
@@ -41,7 +41,7 @@ import { ContentEditor } from './content-editor';
   template: `
     <div class="grid grid-rows-[auto_1fr_var(--rail-status)] h-full">
       <!-- Page-owned header docked above the canvas (ADR-0022). -->
-      <app-editor-header />
+      <app-entity-header />
       <main class="body relative min-h-0">
         @if (store.view() === 'map') {
           <!-- Full-bleed canvas; all side chrome floats over it (ADR-0013). -->

@@ -10,9 +10,10 @@ import { emptyContent, EntityDetail } from '@hexly/domain';
 import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
 import { EntitySession } from '../services/entity-session';
 import { HexMapStore } from '../services/hexmap-store';
-import { EditorHeader } from './editor-header';
+import { EntityHeader } from './entity-header';
+import { noteDetail } from './entity-detail.fixtures';
 
-describe('EditorHeader', () => {
+describe('EntityHeader', () => {
   let http: HttpTestingController;
 
   const aldermoor: EntityDetail = {
@@ -30,14 +31,14 @@ describe('EditorHeader', () => {
   };
 
   /** Open an entity through the real session so the header has one to show/save. */
-  function openMap(detail: EntityDetail): void {
+  function open(detail: EntityDetail): void {
     TestBed.inject(EntitySession).open(detail.id).subscribe();
     http.expectOne(`/api/entities/${detail.id}`).flush(detail);
   }
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [EditorHeader, provideTranslocoTesting()],
+      imports: [EntityHeader, provideTranslocoTesting()],
       providers: [
         EntitySession,
         provideHttpClient(),
@@ -51,18 +52,18 @@ describe('EditorHeader', () => {
   afterEach(() => http.verify());
 
   it('shows the open entity name', () => {
-    openMap({ ...aldermoor, name: 'The Whisperwood' });
+    open({ ...aldermoor, name: 'The Whisperwood' });
 
-    const fixture = TestBed.createComponent(EditorHeader);
+    const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('The Whisperwood');
   });
 
-  it('mounts the tag editor for the open map', () => {
-    openMap(aldermoor);
+  it('mounts the tag editor for the open entity', () => {
+    open(aldermoor);
 
-    const fixture = TestBed.createComponent(EditorHeader);
+    const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 
     expect(
@@ -71,8 +72,8 @@ describe('EditorHeader', () => {
   });
 
   it('renames the open entity when the title is edited', () => {
-    openMap(aldermoor);
-    const fixture = TestBed.createComponent(EditorHeader);
+    open(aldermoor);
+    const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 
     // Edit in place (contenteditable), commit on blur.
@@ -92,8 +93,8 @@ describe('EditorHeader', () => {
   });
 
   it('does not call the API when the title is left unchanged', () => {
-    openMap(aldermoor);
-    const fixture = TestBed.createComponent(EditorHeader);
+    open(aldermoor);
+    const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 
     (
@@ -104,8 +105,8 @@ describe('EditorHeader', () => {
   });
 
   it('no longer carries app-level navigation — that lives in the rail (ADR-0022)', () => {
-    openMap(aldermoor);
-    const fixture = TestBed.createComponent(EditorHeader);
+    open(aldermoor);
+    const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 
     // All Maps / Design System are rail destinations, not header buttons.
@@ -119,8 +120,8 @@ describe('EditorHeader', () => {
   });
 
   it('renders its chrome and actions in French when French is the active language', () => {
-    openMap(aldermoor);
-    const fixture = TestBed.createComponent(EditorHeader);
+    open(aldermoor);
+    const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 
     // No reload: flipping the active language re-renders the live component.
@@ -135,8 +136,8 @@ describe('EditorHeader', () => {
   });
 
   it('keeps the user’s entity name verbatim — never translated — under French', () => {
-    openMap({ ...aldermoor, name: 'Save' }); // collides with a UI action label
-    const fixture = TestBed.createComponent(EditorHeader);
+    open({ ...aldermoor, name: 'Save' }); // collides with a UI action label
+    const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 
     TestBed.inject(TranslocoService).setActiveLang('fr');
@@ -150,27 +151,38 @@ describe('EditorHeader', () => {
 
   // Map/Note toggle (#75): a hexmap carries both a grid and a Content body, so the
   // header switches between the two editor surfaces.
-  it('offers a Map/Note view toggle, with Map active by default', () => {
-    openMap(aldermoor);
-    const fixture = TestBed.createComponent(EditorHeader);
+  it('offers a Map/Note view toggle for a hexmap, with Map active by default', () => {
+    open(aldermoor);
+    const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 
     const map = fixture.nativeElement.querySelector(
       '[data-testid=view-map]',
     ) as HTMLButtonElement;
-    const note = fixture.nativeElement.querySelector(
+    const noteBtn = fixture.nativeElement.querySelector(
       '[data-testid=view-note]',
     ) as HTMLButtonElement;
     expect(map).not.toBeNull();
-    expect(note).not.toBeNull();
+    expect(noteBtn).not.toBeNull();
     // Default is the grid: Map pressed, Note not.
     expect(map.getAttribute('aria-pressed')).toBe('true');
-    expect(note.getAttribute('aria-pressed')).toBe('false');
+    expect(noteBtn.getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('omits the view toggle for a note — it has no grid surface to switch to', () => {
+    open(noteDetail('Lady Mara'));
+    const fixture = TestBed.createComponent(EntityHeader);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('[data-testid=view-map]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid=view-note]')).toBeNull();
+    // The title is still editable — a note can be renamed too.
+    expect(fixture.nativeElement.textContent).toContain('Lady Mara');
   });
 
   it('switches the editor surface to the Note view when Note is clicked', () => {
-    openMap(aldermoor);
-    const fixture = TestBed.createComponent(EditorHeader);
+    open(aldermoor);
+    const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 
     (
@@ -188,8 +200,8 @@ describe('EditorHeader', () => {
   });
 
   it('mirrors the chosen view to the URL so a refresh keeps it (#75)', () => {
-    openMap(aldermoor);
-    const fixture = TestBed.createComponent(EditorHeader);
+    open(aldermoor);
+    const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 
     const nav = vi

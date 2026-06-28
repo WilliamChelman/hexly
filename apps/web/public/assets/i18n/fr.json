@@ -40,6 +40,8 @@
   },
   "noteView": {
     "eyebrow": "Note",
+    "titleLabel": "Titre de la note",
+    "renameNote": "Renommer la note",
     "backToLibrary": "Retour à la bibliothèque",
     "editorLabel": "Contenu de la note",
     "slashMenu": {

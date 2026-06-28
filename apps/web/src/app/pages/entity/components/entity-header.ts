@@ -25,14 +25,33 @@ const VIEWS: readonly { id: EntityView; labelKey: string; testid: string }[] = [
   { id: 'note', labelKey: 'editorShell.view.note', testid: 'view-note' },
 ];
 
+/** Per-entity-type chrome: the eyebrow tag and the title's a11y labels. */
+const TYPE_LABELS: Record<
+  string,
+  { eyebrow: string; titleLabel: string; rename: string }
+> = {
+  hexmap: {
+    eyebrow: 'editorShell.hexMap',
+    titleLabel: 'editorShell.mapTitleLabel',
+    rename: 'editorShell.renameMap',
+  },
+  note: {
+    eyebrow: 'noteView.eyebrow',
+    titleLabel: 'noteView.titleLabel',
+    rename: 'noteView.renameNote',
+  },
+};
+
 /**
- * The hex map editor's page-owned header (ADR-0022): fills the shared
- * {@link PageHeader} with the map's own controls — editable title, autosave status
- * chip ({@link SaveStatus}, ADR-0026), Tags, view toggle, Share. App navigation lives
- * in the NavRail, not here.
+ * The open Entity's page-owned header (ADR-0022), shared by {@link EditorShell} and
+ * {@link NoteView}: an eyebrow tag, editable title, autosave status chip
+ * ({@link SaveStatus}, ADR-0026), Tags and Share. App navigation lives in the NavRail.
+ *
+ * Fully driven by {@link EntitySession.current} — the eyebrow/title labels switch on
+ * the Entity's `type`, and the Map/Note view toggle (#75) shows only for a `hexmap`.
  */
 @Component({
-  selector: 'app-editor-header',
+  selector: 'app-entity-header',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'contents' },
   imports: [
@@ -50,7 +69,7 @@ const VIEWS: readonly { id: EntityView; labelKey: string; testid: string }[] = [
       <div pageHeaderTitle class="flex items-center gap-3 min-w-0 flex-1">
         <div class="flex items-center gap-3 shrink-0">
           <span appEyebrow class="text-gold! tracking-[0.28em] whitespace-nowrap">{{
-            'editorShell.hexMap' | transloco
+            labels().eyebrow | transloco
           }}</span>
           <!--
             Text is driven imperatively (effect, never while focused) rather than
@@ -59,15 +78,15 @@ const VIEWS: readonly { id: EntityView; labelKey: string; testid: string }[] = [
           <div
             #titleEl
             class="font-display text-[22px] font-semibold tracking-[0.01em] text-ink whitespace-nowrap py-1 px-2 -my-1 -mx-2 rounded-sm border border-transparent outline-none hover:border-line hover:bg-surface-sunken focus:bg-surface-sunken focus:border-gold"
-            [class.cursor-text]="hasMap()"
+            [class.cursor-text]="hasEntity()"
             data-testid="title"
             role="textbox"
             aria-multiline="false"
             spellcheck="false"
-            [attr.tabindex]="hasMap() ? 0 : null"
-            [attr.contenteditable]="hasMap() ? 'plaintext-only' : null"
-            [attr.aria-label]="'editorShell.mapTitleLabel' | transloco"
-            [title]="'editorShell.renameMap' | transloco"
+            [attr.tabindex]="hasEntity() ? 0 : null"
+            [attr.contenteditable]="hasEntity() ? 'plaintext-only' : null"
+            [attr.aria-label]="labels().titleLabel | transloco"
+            [title]="labels().rename | transloco"
             (focus)="onFocus()"
             (keydown.enter)="onEnter($event)"
             (keydown.escape)="onEscape($event)"
@@ -79,7 +98,7 @@ const VIEWS: readonly { id: EntityView; labelKey: string; testid: string }[] = [
         <app-entity-tags class="min-w-0 flex-1" />
       </div>
 
-      @if (hasMap()) {
+      @if (isHexmap()) {
         <!-- Map/Note view toggle (#75): a hexmap carries both a grid and a Content
              body; this flips the editor surface between them, driven off the store's
              view() so the shell renders whichever is pressed. -->
@@ -112,7 +131,7 @@ const VIEWS: readonly { id: EntityView; labelKey: string; testid: string }[] = [
     </app-page-header>
   `,
 })
-export class EditorHeader {
+export class EntityHeader {
   private readonly session = inject(EntitySession);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -120,10 +139,17 @@ export class EditorHeader {
   protected readonly store = inject(HexMapStore);
   protected readonly views = VIEWS;
 
-  /** Whether a map is open — gates rename and the view toggle so neither shows with none. */
-  protected readonly hasMap = computed(() => this.session.current() !== null);
+  /** Whether an Entity is open — gates rename so it never shows with none. */
+  protected readonly hasEntity = computed(() => this.session.current() !== null);
+  /** Only a hexmap carries both surfaces, so only it gets the view toggle (#75). */
+  protected readonly isHexmap = computed(
+    () => this.session.current()?.document.type === 'hexmap',
+  );
+  protected readonly labels = computed(
+    () => TYPE_LABELS[this.session.current()?.document.type ?? ''] ?? TYPE_LABELS['note'],
+  );
   protected readonly title = computed(
-    () => this.session.current()?.name ?? 'Untitled map',
+    () => this.session.current()?.name ?? '',
   );
 
   private readonly titleEl =
@@ -137,7 +163,7 @@ export class EditorHeader {
   private editBaseline: string | null = null;
 
   constructor() {
-    // Mirror the open map's name into the contenteditable — but never while the
+    // Mirror the open Entity's name into the contenteditable — but never while the
     // user is editing it, or the write would fight the caret.
     effect(() => {
       const name = this.title();
