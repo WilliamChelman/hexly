@@ -15,7 +15,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { AuthClient } from '../core/services/auth.client';
 import { WorldStore } from '../core/services/world.store';
 import { AppShellStore } from './app-shell.store';
-import { persistedPreference } from '../core/utils/persisted-preference';
+import { AuthScopedStorage } from '../core/services/auth-scoped-storage';
 import { Button } from '../ui/button';
 import { Cartouche } from '../ui/cartouche';
 import { Icon, IconName } from '../ui/icon/icon';
@@ -201,7 +201,7 @@ export class NavRail {
   protected readonly loading = inject(AppShellStore).loading;
   protected readonly entries = ENTRIES;
 
-  private readonly pin = persistedPreference<'collapsed' | 'expanded'>({
+  private readonly pin = inject(AuthScopedStorage).preference<'collapsed' | 'expanded'>({
     storageKey: 'hexly-rail',
     values: ['collapsed', 'expanded'],
     detect: () => 'collapsed',

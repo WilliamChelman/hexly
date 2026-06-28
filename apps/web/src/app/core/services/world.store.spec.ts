@@ -58,11 +58,29 @@ describe('WorldStore', () => {
     expect(store.activeWorldId()).toBe('w1');
   });
 
-  it('persists the active World across store instances', () => {
+  it('persists the active World via setActive', () => {
     store.setActive('w7');
-    // A fresh store (new page load) reads the remembered selection back.
+    // The same singleton carries the selection in memory.
     const reborn = TestBed.inject(WorldStore);
     expect(reborn.activeWorldId()).toBe('w7');
+  });
+
+  it('marks loaded after a successful fetch', () => {
+    expect(store.loaded()).toBe(false);
+    store.load();
+    flushList([world('w1')]);
+    expect(store.loaded()).toBe(true);
+  });
+
+  it('marks loaded and resets hasLoaded on network error so the next load() retries', () => {
+    store.load();
+    http.expectOne('/api/worlds').flush(null, { status: 503, statusText: 'Service Unavailable' });
+
+    expect(store.loaded()).toBe(true);
+    // Second load() must retry — the error reset the guard.
+    store.load();
+    flushList([world('w1')]);
+    expect(store.activeWorldId()).toBe('w1');
   });
 
   it('creating a World appends it and switches to it', () => {

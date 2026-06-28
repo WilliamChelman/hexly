@@ -32,9 +32,6 @@ describe('EntityBrowser', () => {
   });
 
   beforeEach(async () => {
-    // The browser scopes to the active World (ADR-0024); remember one so its
-    // effect fetches without first awaiting a WorldStore load.
-    localStorage.setItem('hexly-active-world', 'w1');
     await TestBed.configureTestingModule({
       imports: [EntityBrowser, provideTranslocoTesting()],
       providers: [
@@ -46,13 +43,16 @@ describe('EntityBrowser', () => {
     http = TestBed.inject(HttpTestingController);
     navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
 
-    // A signed-in user the library header can display.
+    // Log in first — auth-scoped storage uses the user id to namespace keys.
     TestBed.inject(AuthClient).login('ada@hexly.test', 'pw').subscribe();
     http.expectOne('/api/auth/login').flush({
       id: 'u1',
       email: 'ada@hexly.test',
       displayName: 'Ada',
     });
+
+    // Seed the active World after login so the auth-scoped key is written correctly.
+    TestBed.inject(WorldStore).setActive('w1');
   });
 
   afterEach(() => {

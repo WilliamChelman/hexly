@@ -143,7 +143,7 @@ export const entityListQuerySchema = z.object({
   q: z.string().optional(),
   type: entityTypeSchema.optional(),
   // Scope the list to one World (ADR-0024) — the entity browser's active-World filter.
-  worldId: z.string().optional(),
+  worldId: z.string().min(1).optional(),
   cursor: z.string().optional(),
   limit: z.coerce
     .number()

@@ -7,7 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { Router } from '@angular/router';
-import { finalize } from 'rxjs';
+import { Subscription, finalize } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient } from '../../core/services/entities.client';
@@ -259,13 +259,19 @@ export class EntityBrowser {
   /** The id of the Entity whose name is being edited inline, or `null`. */
   protected readonly renamingId = signal<string | null>(null);
 
+  private fetchSub?: Subscription;
+
   constructor() {
-    // Re-fetch page one whenever the active World changes (ADR-0024) — the browser
-    // shows only the active World's Entities. The WorldStore is loaded by the
-    // World switcher in the shell; until an active World settles, there's nothing
-    // to list, so a null id is a no-op rather than an all-Worlds fetch.
+    // Re-fetch page one whenever the active World changes (ADR-0024). When there
+    // is no active World but the store has finished loading (user has 0 Worlds),
+    // surface the empty state instead of leaving the page blank.
     effect(() => {
-      if (this.worlds.activeWorldId()) this.fetchFirstPage();
+      const worldId = this.worlds.activeWorldId();
+      if (worldId) {
+        this.fetchFirstPage();
+      } else if (this.worlds.loaded()) {
+        this.fetchFirstPage(); // short-circuits inside to set empty state
+      }
     });
   }
 
@@ -277,9 +283,27 @@ export class EntityBrowser {
    * `limit`, so it survives any future opaque-cursor encoding change.
    */
   private fetchFirstPage(): void {
-    // Set `loaded` on error too: a failed fetch must show the error panel, not a blank page.
-    this.entitiesClient
-      .list({ limit: PAGE_SIZE, worldId: this.worlds.activeWorldId() ?? undefined })
+    const worldId = this.worlds.activeWorldId();
+    // No active World (user has 0 Worlds): surface the empty state directly.
+    if (!worldId) {
+      this.fetchSub?.unsubscribe();
+      this._entities.set([]);
+      this.nextCursor.set(null);
+      this.loadingMore.set(false);
+      this.loadError.set(false);
+      this.loaded.set(true);
+      return;
+    }
+    // Cancel any in-flight request from a previous World (prevents stale data race).
+    this.fetchSub?.unsubscribe();
+    // Reset state so the template shows loading rather than stale data from the old World.
+    this._entities.set([]);
+    this.nextCursor.set(null);
+    this.loadingMore.set(false); // clear any stuck load-more from the previous World
+    this.loadError.set(false);
+    this.loaded.set(false);
+    this.fetchSub = this.entitiesClient
+      .list({ limit: PAGE_SIZE, worldId })
       .pipe(this.shell.withLoading('subtle'))
       .subscribe({
         next: (page) => {
