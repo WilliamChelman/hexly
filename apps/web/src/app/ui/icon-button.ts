@@ -70,6 +70,12 @@ import {
       opacity: 0.4;
       cursor: not-allowed;
     }
+    /* Keyboard focus ring — restated here because the host's own box-shadow
+       overrides the global :focus-visible rule (base.css). Last, so it wins. */
+    :host(:focus-visible) {
+      outline: none;
+      box-shadow: var(--shadow-focus);
+    }
   `,
 })
 export class IconButton {

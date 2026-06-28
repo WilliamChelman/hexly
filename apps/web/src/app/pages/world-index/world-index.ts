@@ -5,7 +5,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { AuthClient } from '../../core/services/auth.client';
@@ -14,13 +14,12 @@ import { WorldsClient } from '../../core/services/worlds.client';
 import { ToasterService } from '../../core/services/toaster.service';
 import { Button } from '../../ui/button';
 import { Eyebrow } from '../../ui/eyebrow';
-import { PageHeader } from '../../ui/page-header';
 import { Panel } from '../../ui/panel';
 import { Icon } from '../../ui/icon/icon';
 import { Autofocus } from '../../ui/autofocus';
 import { Input } from '../../ui/input';
 import { Dialog } from '../../ui/dialog';
-import { WorldCard } from './world-card';
+import { ACCENT_SIGIL, accentFor, monogram } from '../../ui/sigil';
 
 /**
  * The World Index (ADR-0028, CONTEXT.md → World Index): the page at `/` listing
@@ -37,62 +36,165 @@ import { WorldCard } from './world-card';
   imports: [
     Button,
     Eyebrow,
-    PageHeader,
     Panel,
     Icon,
     TranslocoPipe,
     Autofocus,
     Input,
     Dialog,
-    WorldCard,
+    RouterLink,
   ],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
-    <app-page-header sticky>
-      <div pageHeaderTitle class="flex flex-col">
-        <span appEyebrow class="text-gold! tracking-[0.28em]">{{
-          'worldIndex.eyebrow' | transloco
-        }}</span>
-        <h1 class="font-display text-[22px] text-ink-strong m-0 leading-tight">
-          {{ 'worldIndex.heading' | transloco }}
-        </h1>
-      </div>
-      <button
-        type="button"
-        pageHeaderActions
-        appButton
-        variant="primary"
-        data-testid="create-world"
-        [disabled]="creating()"
-        (click)="create()"
+    @if (cards().length > 0) {
+      <header
+        class="bg-linear-[180deg] from-surface to-bg-deep border-b border-line"
       >
-        <app-icon name="plus" [size]="16" />
-        {{ (creating() ? 'worldIndex.creating' : 'worlds.new') | transloco }}
-      </button>
-    </app-page-header>
-
-    <main class="max-w-[60rem] mx-auto py-6 px-5">
-      @if (cards().length > 0) {
-        <ul
-          class="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-4 m-0 p-0 list-none"
+        <div
+          class="max-w-[64rem] mx-auto px-6 py-8 flex items-end justify-between gap-6"
         >
-          @for (card of cards(); track card.id) {
-            <li>
-              <app-world-card
-                [id]="card.id"
-                [name]="card.name"
-                [owned]="card.owned"
-                [renaming]="renamingId() === card.id"
-                (enter)="enter(card.id)"
-                (renameStart)="startRename(card.id)"
-                (renameSubmit)="commitRename(card.id, $event)"
-                (renameCancel)="cancelRename()"
-                (delete)="askDelete(card.id, card.name)"
-              />
+          <div>
+            <span appEyebrow class="text-gold! tracking-[0.28em]">{{
+              'worldIndex.eyebrow' | transloco
+            }}</span>
+            <h1 class="font-display text-3xl text-ink-strong m-0 leading-tight">
+              {{ 'worldIndex.greeting' | transloco: { name: who() } }}
+            </h1>
+            <p class="text-ink-muted text-base mt-1 mb-0">
+              {{ 'worldIndex.subhead' | transloco }}
+            </p>
+          </div>
+          <button
+            type="button"
+            appButton
+            variant="primary"
+            data-testid="create-world"
+            [disabled]="creating()"
+            (click)="create()"
+          >
+            <app-icon name="plus" [size]="16" />
+            {{ (creating() ? 'worldIndex.creating' : 'worlds.new') | transloco }}
+          </button>
+        </div>
+      </header>
+
+      <main class="max-w-[64rem] mx-auto px-6 py-6">
+        <h2 appEyebrow mark class="mb-3">
+          {{ 'worldIndex.continue' | transloco }}
+        </h2>
+        <ul class="flex gap-4 overflow-x-auto pb-3 m-0 p-0 list-none snap-x">
+          @for (card of sorted(); track card.id) {
+            <li class="snap-start shrink-0 w-56">
+              <div
+                class="group relative h-44 rounded-lg border border-line bg-surface shadow-1 overflow-hidden flex flex-col transition-shadow hover:shadow-2 has-[a:focus-visible]:[outline:2px_solid_var(--color-gold)] has-[a:focus-visible]:[outline-offset:-2px]"
+              >
+                <div
+                  class="h-20 flex items-center justify-center {{
+                    sigil(card.id)
+                  }}"
+                >
+                  <span class="font-cartouche text-2xl">{{
+                    mono(card.name)
+                  }}</span>
+                </div>
+                @if (renamingId() === card.id) {
+                  <input
+                    type="text"
+                    appAutofocus
+                    class="m-3 font-display text-md text-ink-strong bg-surface-sunken border border-gold rounded-sm py-1 px-2 outline-none"
+                    [value]="card.name"
+                    [attr.data-testid]="'rename-world-input-' + card.id"
+                    [attr.aria-label]="'worldIndex.renameLabel' | transloco"
+                    (keydown.enter)="
+                      commitRename(card.id, $any($event.target).value)
+                    "
+                    (keydown.escape)="cancelRename()"
+                  />
+                } @else {
+                  <!-- Stretched link (inset ::after) makes the whole card open the
+                       World; the action buttons live OUTSIDE this anchor as later
+                       siblings, lifted above the overlay with z-10 so they stay
+                       independently clickable and the markup keeps no nested
+                       interactives (a11y). -->
+                  <a
+                    class="flex-1 px-3 pt-2 no-underline outline-none focus-visible:shadow-none after:content-[''] after:absolute after:inset-0"
+                    [routerLink]="['/w', card.id, 'entities']"
+                    [attr.data-testid]="'world-' + card.id"
+                    [attr.aria-label]="card.name"
+                  >
+                    <span
+                      class="font-display text-md text-ink-strong line-clamp-2"
+                      >{{ card.name }}</span
+                    >
+                  </a>
+                }
+                <div class="flex items-center gap-1 px-3 pb-2">
+                  <span
+                    class="text-2xs uppercase tracking-wider"
+                    [class.text-gold]="card.owned"
+                    [class.text-ink-faint]="!card.owned"
+                    [attr.data-testid]="
+                      (card.owned ? 'owned-' : 'member-') + card.id
+                    "
+                    >{{
+                      (card.owned ? 'worldIndex.owned' : 'worldIndex.member')
+                        | transloco
+                    }}</span
+                  >
+                  @if (card.owned) {
+                    <span
+                      class="relative z-10 ml-auto flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+                    >
+                      <button
+                        type="button"
+                        appButton
+                        icon
+                        variant="ghost"
+                        size="sm"
+                        [attr.data-testid]="'rename-world-' + card.id"
+                        [attr.aria-label]="'worldIndex.rename' | transloco"
+                        [attr.title]="'worldIndex.rename' | transloco"
+                        (click)="startRename(card.id)"
+                      >
+                        <app-icon name="label" [size]="16" />
+                      </button>
+                      <button
+                        type="button"
+                        appButton
+                        icon
+                        variant="ghost"
+                        size="sm"
+                        danger
+                        [attr.data-testid]="'delete-world-' + card.id"
+                        [attr.aria-label]="'common.delete' | transloco"
+                        [attr.title]="'common.delete' | transloco"
+                        (click)="askDelete(card.id, card.name)"
+                      >
+                        <app-icon name="erase" [size]="16" />
+                      </button>
+                    </span>
+                  }
+                </div>
+              </div>
             </li>
           }
+          <li class="snap-start shrink-0 w-56">
+            <button
+              type="button"
+              class="h-44 w-full rounded-lg border border-dashed border-line-strong text-ink-muted hover:text-gold hover:border-gold bg-surface-sunken/40 flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors outline-none focus-visible:shadow-none focus-visible:[outline:2px_solid_var(--color-gold)] focus-visible:[outline-offset:-2px]"
+              [disabled]="creating()"
+              (click)="create()"
+            >
+              <app-icon name="plus" [size]="24" />
+              <span class="font-display text-md">{{
+                'worlds.new' | transloco
+              }}</span>
+            </button>
+          </li>
         </ul>
-      } @else if (loadError()) {
+      </main>
+    } @else if (loadError()) {
+      <main class="max-w-[60rem] mx-auto py-6 px-5">
         <section
           class="p-6 text-center text-ink-muted"
           data-testid="load-error"
@@ -101,17 +203,30 @@ import { WorldCard } from './world-card';
           <p>{{ 'worldIndex.loadErrorTitle' | transloco }}</p>
           <p class="text-sm">{{ 'worldIndex.loadErrorHint' | transloco }}</p>
         </section>
-      } @else if (loaded()) {
+      </main>
+    } @else if (loaded()) {
+      <main class="max-w-[60rem] mx-auto py-6 px-5">
         <section
-          class="p-6 text-center text-ink-muted"
+          class="p-8 text-center text-ink-muted flex flex-col items-center gap-3"
           data-testid="worlds-empty"
           appPanel
         >
-          <p>{{ 'worldIndex.emptyTitle' | transloco }}</p>
-          <p class="text-sm">{{ 'worldIndex.emptyHint' | transloco }}</p>
+          <p class="m-0">{{ 'worldIndex.emptyTitle' | transloco }}</p>
+          <p class="text-sm m-0">{{ 'worldIndex.emptyHint' | transloco }}</p>
+          <button
+            type="button"
+            appButton
+            variant="primary"
+            data-testid="create-world"
+            [disabled]="creating()"
+            (click)="create()"
+          >
+            <app-icon name="plus" [size]="16" />
+            {{ (creating() ? 'worldIndex.creating' : 'worlds.new') | transloco }}
+          </button>
         </section>
-      }
-    </main>
+      </main>
+    }
 
     @if (pendingDelete(); as target) {
       <app-dialog
@@ -184,6 +299,23 @@ export class WorldIndex {
     const me = this.auth.currentUser()?.id;
     return this.store.worlds().map((w) => ({ ...w, owned: w.ownerId === me }));
   });
+  /** The rail order: most-recently-touched World first (continue where you left off). */
+  protected readonly sorted = computed(() =>
+    [...this.cards()].sort((a, b) => b.updatedAt - a.updatedAt),
+  );
+
+  /** A capitalised display name derived from the signed-in user's email local part. */
+  protected who(): string {
+    const local = (this.auth.currentUser()?.email ?? '').split('@')[0];
+    return local
+      ? local.charAt(0).toUpperCase() + local.slice(1)
+      : this.transloco.translate('worldIndex.greetingFallback');
+  }
+
+  protected sigil(id: string): string {
+    return ACCENT_SIGIL[accentFor(id)];
+  }
+  protected readonly mono = monogram;
   protected readonly creating = signal(false);
   /** The World whose name is being edited inline, or `null`. */
   protected readonly renamingId = signal<string | null>(null);
@@ -276,11 +408,6 @@ export class WorldIndex {
         );
       },
     });
-  }
-
-  /** Enter a World's Entity browser (ADR-0028). */
-  protected enter(id: string): void {
-    this.router.navigate(['/w', id, 'entities']);
   }
 
   /** Create a World and open its Home Entity (the server mints it atomically). */

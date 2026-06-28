@@ -126,6 +126,13 @@ export type ButtonSize = 'md' | 'sm';
       padding: var(--spacing-2);
       aspect-ratio: 1;
     }
+    /* Keyboard focus ring. The component's own :host box-shadow overrides the
+       global :focus-visible rule (base.css), so restate the focus token here —
+       last, so it wins over every variant's box-shadow while focused. */
+    :host(:focus-visible) {
+      outline: none;
+      box-shadow: var(--shadow-focus);
+    }
   `,
 })
 export class Button {

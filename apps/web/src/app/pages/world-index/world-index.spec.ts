@@ -81,12 +81,16 @@ describe('WorldIndex', () => {
     expect($(el, '[data-testid=owned-w2]')).toBeNull();
   });
 
-  it('enters a World’s browser when its card is activated', () => {
+  it('links a World’s card to its Entity browser', () => {
     const el = render([world('w1', 'Aldermoor')]).nativeElement as HTMLElement;
 
-    ($(el, '[data-testid=world-w1]') as HTMLButtonElement).click();
-
-    expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities']);
+    // The whole card is a routerLink anchor (stretched-link inset), so assert the
+    // resolved href rather than a navigate() call.
+    expect(
+      ($(el, '[data-testid=world-w1]') as HTMLAnchorElement).getAttribute(
+        'href',
+      ),
+    ).toBe('/w/w1/entities');
   });
 
   it('shows an empty state with a create affordance when there are no Worlds', () => {
