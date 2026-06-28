@@ -13,8 +13,9 @@ setup('authenticate', async ({ page }) => {
   await page.getByLabel('Password').fill(TEST_USER.password);
   await page.getByRole('button', { name: 'Sign in' }).click();
 
-  // Landing on the library proves the cookie was set and the auth guard passed.
-  await expect(page.getByRole('heading', { name: 'Your library' })).toBeVisible();
+  // Landing on the World Index proves the cookie was set and the auth guard passed
+  // (post-login default is the Index now — ADR-0028).
+  await expect(page.getByRole('heading', { name: 'Your worlds' })).toBeVisible();
 
   await page.context().storageState({ path: authFile });
 });

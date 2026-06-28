@@ -10,8 +10,8 @@ import { TEST_USER } from './test-user';
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test('guards the app, signs in, and signs out', async ({ page }) => {
-  // Unauthenticated: the library is gated, so the guard bounces to /login.
-  await page.goto('/entities');
+  // Unauthenticated: the World Index at / is gated, so the guard bounces to /login.
+  await page.goto('/');
   await expect(page).toHaveURL(/\/login/);
 
   // Login renders standalone — no nav rail (ADR-0022).
@@ -21,9 +21,9 @@ test('guards the app, signs in, and signs out', async ({ page }) => {
   await page.getByLabel('Password').fill(TEST_USER.password);
   await page.getByRole('button', { name: 'Sign in' }).click();
 
-  // The returnUrl carries us back to the gated page we were headed to.
-  await expect(page).toHaveURL(/\/entities$/);
-  await expect(page.getByRole('heading', { name: 'Your library' })).toBeVisible();
+  // The returnUrl carries us back to the gated page we were headed to — the Index.
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole('heading', { name: 'Your worlds' })).toBeVisible();
 
   // Sign out returns to /login (the action lives behind the rail avatar, ADR-0022)...
   await page.getByRole('button', { name: 'Open user menu' }).click();
@@ -31,6 +31,6 @@ test('guards the app, signs in, and signs out', async ({ page }) => {
   await expect(page).toHaveURL(/\/login/);
 
   // ...and the guard blocks the app again.
-  await page.goto('/entities');
+  await page.goto('/');
   await expect(page).toHaveURL(/\/login/);
 });

@@ -12,6 +12,7 @@ import { RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient } from '../../../core/services/entities.client';
+import { ActiveWorld } from '../../../core/services/active-world';
 import { Button } from '../../../ui/button';
 import { Field } from '../../../ui/field';
 import { Icon } from '../../../ui/icon/icon';
@@ -156,6 +157,7 @@ import { HexMapStore } from '../services/hexmap-store';
 })
 export class EntityLink {
   protected readonly store = inject(HexMapStore);
+  protected readonly activeWorld = inject(ActiveWorld);
   private readonly entitiesClient = inject(EntitiesClient);
   private readonly transloco = inject(TranslocoService);
   private readonly destroyRef = inject(DestroyRef);
@@ -256,7 +258,9 @@ export class EntityLink {
       this.query().trim() ||
       this.transloco.translate(type === 'hexmap' ? 'domain.untitledMap' : 'domain.untitledNote');
     this.entitiesClient
-      .create(name, type)
+      // Scope the create-and-link Entity to the World in the URL (ADR-0028) so it
+      // lands in the same World as the map being edited, not the owner's oldest.
+      .create(name, type, this.activeWorld.worldId() ?? undefined)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((entity) => {
         // Remember it locally so its name resolves without a server round trip,

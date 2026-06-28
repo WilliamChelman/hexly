@@ -1,4 +1,4 @@
-import { expect, flushSave, test } from './fixtures';
+import { enterLibrary, expect, flushSave, test } from './fixtures';
 
 /**
  * The hex-name journey (issue #60, ADR-0016): a painted Hex is named in the
@@ -15,7 +15,7 @@ test('names a painted hex in the Inspector, and the name survives a reload', asy
   page,
   request,
 }) => {
-  await page.goto('/entities');
+  await enterLibrary(page);
   await page.getByTestId('new-map').click();
 
   // Creating a map opens the editor at /entities/:id.

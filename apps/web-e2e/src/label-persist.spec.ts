@@ -1,4 +1,4 @@
-import { expect, flushSave, test } from './fixtures';
+import { enterLibrary, expect, flushSave, test } from './fixtures';
 
 /**
  * The Label journey (issue #10): a free-positioned label placed on the map, its
@@ -12,7 +12,7 @@ test('places a label, edits its text, saves, and it survives a reload', async ({
   page,
   request,
 }) => {
-  await page.goto('/entities');
+  await enterLibrary(page);
   await page.getByTestId('new-map').click();
 
   // Creating a map opens the editor at /entities/:id.

@@ -8,16 +8,18 @@ import { Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { WorldStore } from '../core/services/world.store';
+import { ActiveWorld } from '../core/services/active-world';
 import { ToasterService } from '../core/services/toaster.service';
 import { Button } from '../ui/button';
 import { Icon } from '../ui/icon/icon';
 
 /**
- * The World switcher (ADR-0024): lists the user's Worlds and sets the active one
- * in {@link WorldStore}, which the entity browser scopes to. Loads the World list
- * on first render (it's the persistent shell chrome). "New world" mints a World —
- * the server creates its Home Entity atomically — switches to it, and opens that
- * landing page.
+ * The World switcher (ADR-0028): a quick-hop control that lists the caller's
+ * Worlds and navigates by URL — the active World is a URL fact ({@link
+ * ActiveWorld}), so switching is just a navigation, not a stored selection. Loads
+ * the World list on first render (it's the persistent shell chrome). "New world"
+ * mints a World — the server creates its Home Entity atomically — and opens that
+ * landing page. (Relocating it to the user menu is a later slice.)
  */
 @Component({
   selector: 'app-world-switcher',
@@ -57,12 +59,13 @@ import { Icon } from '../ui/icon/icon';
 })
 export class WorldSwitcher {
   private readonly store = inject(WorldStore);
+  private readonly activeWorld = inject(ActiveWorld);
   private readonly router = inject(Router);
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
 
   protected readonly worlds = this.store.worlds;
-  protected readonly activeId = this.store.activeWorldId;
+  protected readonly activeId = this.activeWorld.worldId;
   protected readonly creating = signal(false);
 
   constructor() {
@@ -70,7 +73,7 @@ export class WorldSwitcher {
   }
 
   protected switch(id: string): void {
-    this.store.setActive(id);
+    this.router.navigate(['/w', id, 'entities']);
   }
 
   protected createWorld(): void {
@@ -80,7 +83,13 @@ export class WorldSwitcher {
       .create(this.transloco.translate('worlds.untitled'))
       .pipe(finalize(() => this.creating.set(false)))
       .subscribe({
-        next: (world) => this.router.navigate(['/entities', world.homeEntityId]),
+        next: (world) =>
+          this.router.navigate([
+            '/w',
+            world.id,
+            'entities',
+            world.homeEntityId,
+          ]),
         error: () =>
           this.toaster.show(
             this.transloco.translate('worlds.createError'),

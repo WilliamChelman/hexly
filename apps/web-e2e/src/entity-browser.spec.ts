@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures';
+import { enterLibrary, expect, test } from './fixtures';
 
 /**
  * Entity browser lifecycle (#70): create → list → open → rename → delete, over
@@ -7,7 +7,7 @@ import { expect, test } from './fixtures';
 test('a note round-trips: create → appears → open → rename → delete', async ({
   page,
 }) => {
-  await page.goto('/entities');
+  await enterLibrary(page);
   await expect(page.getByTestId('empty')).toBeVisible();
 
   // Create a note: opens the minimal note view at /entities/:id.
@@ -41,7 +41,7 @@ test('a note round-trips: create → appears → open → rename → delete', as
 test('creating a map opens the map editor, not the note view', async ({
   page,
 }) => {
-  await page.goto('/entities');
+  await enterLibrary(page);
 
   await page.getByTestId('new-map').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);

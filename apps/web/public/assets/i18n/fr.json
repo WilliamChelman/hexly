@@ -287,5 +287,24 @@
     "new": "Nouveau monde",
     "untitled": "Monde sans titre",
     "createError": "Impossible de créer ce monde. Veuillez réessayer."
+  },
+  "worldIndex": {
+    "tabTitle": "Hexly — Mondes",
+    "eyebrow": "Mondes",
+    "heading": "Vos mondes",
+    "creating": "Création…",
+    "owned": "Propriétaire",
+    "member": "Membre",
+    "loadErrorTitle": "Impossible de charger vos mondes.",
+    "loadErrorHint": "Une erreur s'est produite. Veuillez réessayer dans un instant.",
+    "emptyTitle": "Aucun monde pour l'instant.",
+    "emptyHint": "Créez votre premier monde pour commencer."
+  },
+  "error": {
+    "tabTitle": "Hexly — Introuvable",
+    "eyebrow": "Hexly",
+    "heading": "Introuvable.",
+    "hint": "La page ou l'entité que vous cherchez n'existe pas, ou vous n'y avez pas accès.",
+    "backToWorlds": "Retour à vos mondes"
   }
 }

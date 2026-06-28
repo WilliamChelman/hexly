@@ -52,3 +52,18 @@ export async function flushSave(page: Page): Promise<Response> {
   await expect(page.getByTestId('save-status')).toHaveText('Saved');
   return res;
 }
+
+/**
+ * Enter a reachable World's Entity browser via the World Index (ADR-0028). The
+ * active World is a URL fact now (`/w/:worldId/entities`), not a remembered
+ * selection, so a test reaches its library by choosing a World from the Index at
+ * `/`. The seeded World always survives the entities-only reset (only Entities are
+ * cleared, never Worlds), so the Index is never empty here. Returns the entered
+ * World's id for specs that want to assert the URL scope.
+ */
+export async function enterLibrary(page: Page): Promise<string> {
+  await page.goto('/');
+  await page.getByTestId(/^world-/).first().click();
+  await page.waitForURL(/\/w\/[\w-]+\/entities$/);
+  return page.url().match(/\/w\/([\w-]+)\/entities/)![1];
+}

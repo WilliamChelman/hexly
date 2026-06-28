@@ -287,5 +287,24 @@
     "new": "New world",
     "untitled": "Untitled world",
     "createError": "Couldn't create that world. Please try again."
+  },
+  "worldIndex": {
+    "tabTitle": "Hexly — Worlds",
+    "eyebrow": "Worlds",
+    "heading": "Your worlds",
+    "creating": "Creating…",
+    "owned": "Owned",
+    "member": "Member",
+    "loadErrorTitle": "Couldn't load your worlds.",
+    "loadErrorHint": "Something went wrong. Please try again in a moment.",
+    "emptyTitle": "No worlds yet.",
+    "emptyHint": "Create your first world to begin."
+  },
+  "error": {
+    "tabTitle": "Hexly — Not found",
+    "eyebrow": "Hexly",
+    "heading": "We couldn't find that.",
+    "hint": "The page or entity you're looking for doesn't exist, or you don't have access to it.",
+    "backToWorlds": "Back to your worlds"
   }
 }

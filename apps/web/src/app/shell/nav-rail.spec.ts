@@ -9,6 +9,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { BehaviorSubject, Observable, map } from 'rxjs';
 import { AuthClient } from '../core/services/auth.client';
+import { ActiveWorld } from '../core/services/active-world';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { NavRail } from './nav-rail';
 
@@ -39,7 +40,8 @@ describe('NavRail', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([
-          { path: 'entities', component: Blank },
+          { path: '', component: Blank },
+          { path: 'w/:worldId/entities', component: Blank },
           { path: 'styleguide', component: Blank },
         ]),
         { provide: BreakpointObserver, useValue: viewport },
@@ -84,13 +86,15 @@ describe('NavRail', () => {
 
   it('shows the brand and the primary destinations to a signed-in user', () => {
     signIn();
+    // The Library link follows the active World (ADR-0028), pinned by the resolver.
+    TestBed.inject(ActiveWorld).set('w1');
     const fixture = render();
 
     const brand = q(fixture, 'brand') as HTMLAnchorElement;
     expect(brand?.getAttribute('href')).toBe('/');
 
     const library = q(fixture, 'nav-entities') as HTMLAnchorElement;
-    expect(library?.getAttribute('href')).toBe('/entities');
+    expect(library?.getAttribute('href')).toBe('/w/w1/entities');
     expect(library?.textContent).toContain('Library');
 
     const styleguide = q(fixture, 'nav-styleguide') as HTMLAnchorElement;
@@ -116,9 +120,14 @@ describe('NavRail', () => {
 
   it('marks the current destination for assistive tech', async () => {
     signIn();
+    // Pin the active World (link href) and sit at its URL (routerLinkActive match).
+    TestBed.inject(ActiveWorld).set('w1');
     const fixture = render();
 
-    await TestBed.inject(Router).navigateByUrl('/entities');
+    await TestBed.inject(Router).navigateByUrl('/w/w1/entities');
+    fixture.detectChanges();
+    // Let routerLinkActive settle against the world-scoped link (ADR-0028).
+    await fixture.whenStable();
     fixture.detectChanges();
 
     expect(q(fixture, 'nav-entities')?.getAttribute('aria-current')).toBe(

@@ -1,4 +1,4 @@
-import { expect, flushSave, test } from './fixtures';
+import { enterLibrary, expect, flushSave, test } from './fixtures';
 
 /**
  * Dangling Entity Link journey (issue #78, CONTEXT.md → Entity Link, ADR-0018): a
@@ -17,13 +17,13 @@ test('a link whose target is deleted renders non-navigable, and the map opens wi
   request,
 }) => {
   // Seed the link target, then delete it after linking.
-  await page.goto('/entities');
+  await enterLibrary(page);
   await page.getByTestId('new-note').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const noteId = page.url().split('/').pop();
 
   // The source: a fresh map with one painted hex.
-  await page.goto('/entities');
+  await enterLibrary(page);
   await page.getByTestId('new-map').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const mapId = page.url().split('/').pop();

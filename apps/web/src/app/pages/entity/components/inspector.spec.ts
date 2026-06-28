@@ -710,7 +710,8 @@ describe('Inspector Entity Link control', () => {
     const el = render().nativeElement as HTMLElement;
 
     // The name itself is the link — a real <a routerLink> so ctrl/cmd-click opens
-    // it in a new tab — with no separate Follow control.
+    // it in a new tab — with no separate Follow control. The link is World-agnostic
+    // (#118): /entities/:id resolves the target's World and redirects there.
     const name = byId(el, 'entity-link-name') as HTMLAnchorElement;
     expect(name.tagName).toBe('A');
     expect(name.getAttribute('href')).toBe('/entities/n1');

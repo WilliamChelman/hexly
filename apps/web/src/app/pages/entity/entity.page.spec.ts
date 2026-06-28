@@ -14,6 +14,7 @@ import { of } from 'rxjs';
 import { CONTENT_FORMAT, EntityDetail, EntityType } from '@hexly/domain';
 import { EntitySession } from './services/entity-session';
 import { EntityNameResolver } from './services/entity-name-resolver';
+import { ActiveWorld } from '../../core/services/active-world';
 import { TitleService } from '../../core/i18n/title.service';
 import { provideTranslocoTesting } from '../../core/i18n/transloco-testing';
 import { HexMapStore } from './services/hexmap-store';
@@ -79,9 +80,10 @@ describe('EntityPage routing', () => {
         },
       ],
     }).compileComponents();
+    TestBed.inject(ActiveWorld).set('w1');
     http = TestBed.inject(HttpTestingController);
     navigate = vi
-      .spyOn(TestBed.inject(Router), 'navigateByUrl')
+      .spyOn(TestBed.inject(Router), 'navigate')
       .mockResolvedValue(true);
     const fixture = TestBed.createComponent(EntityPage);
     fixture.detectChanges();
@@ -121,14 +123,14 @@ describe('EntityPage routing', () => {
     expect(TestBed.inject(TitleService).documentName()).toBe('Aldermoor');
   });
 
-  it('returns to the library when the Entity fails to load', async () => {
+  it('returns to the World’s library when the Entity fails to load', async () => {
     const fixture = await render('gone');
     http
       .expectOne('/api/entities/gone')
       .flush(null, { status: 404, statusText: 'Not Found' });
     fixture.detectChanges();
 
-    expect(navigate).toHaveBeenCalledWith('/entities');
+    expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities']);
   });
 });
 

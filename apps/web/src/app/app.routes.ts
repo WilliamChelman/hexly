@@ -1,5 +1,10 @@
 import { Route } from '@angular/router';
 import { authGuard, loginGuard } from './core/guards/auth.guard';
+import { entityWorldRedirect } from './core/guards/entity-world-redirect.guard';
+import {
+  activeWorldResolver,
+  clearActiveWorld,
+} from './core/services/active-world';
 import { flushOnLeave } from './pages/entity/flush-on-leave.guard';
 import { EntitySession } from './pages/entity/services/entity-session';
 import { EntityNameResolver } from './pages/entity/services/entity-name-resolver';
@@ -13,40 +18,71 @@ export const appRoutes: Route[] = [
     title: 'auth.tabTitle',
   },
   {
-    // The Entity browser: every Entity the user owns — notes and maps — plus
-    // open / create / rename / delete (#70).
-    path: 'entities',
+    // The World Index (ADR-0028): the root lists every reachable World and owns
+    // World create. It is the chooser — no auto-redirect into a World.
+    path: '',
     pathMatch: 'full',
     canActivate: [authGuard],
     loadComponent: () =>
-      import('./pages/entity-browser/entity-browser').then(
-        (m) => m.EntityBrowser,
-      ),
-    // Title key resolved by TranslationTitleStrategy to the "Hexly" brand (ADR-0014).
-    title: 'entityBrowser.tabTitle',
+      import('./pages/world-index/world-index').then((m) => m.WorldIndex),
+    title: 'worldIndex.tabTitle',
   },
   {
-    // The open-Entity route (#70). The id is in the URL so a reload reopens the
-    // same Entity (#6). The routed EntityPage renders its own header now
-    // (ADR-0022) and lays out the editor per Entity type.
-    path: 'entities/:id',
+    // The World scope (ADR-0028): a componentless parent that owns the `:worldId`
+    // segment. Its resolver pins the active World before any child renders; its
+    // canDeactivate clears it when navigation leaves the scope, so the Index never
+    // shows a stale World. Children share the root outlet; the segment is navigation
+    // context while an Entity's own world_id stays the data source of truth.
+    path: 'w/:worldId',
     canActivate: [authGuard],
-    // Await a pending autosave before leaving the route, so an in-app navigation never
-    // drops a debounced edit (ADR-0026).
-    canDeactivate: [flushOnLeave],
-    // One EntitySession for the subtree, destroyed on leave, so open-Entity state
-    // resets implicitly (#70). EntityNameResolver batches id→name lookups for the
-    // entityLink node views (the `@` picker searches the server directly); route-scoped
-    // so navigating to another Entity re-resolves names against a fresh cache (ADR-0023).
-    providers: [EntitySession, EntityNameResolver],
-    // Tab title is the open Entity's name composed with the brand ("Aldermoor —
-    // Hexly") via documentTitleKey; `title` is the pre-load fallback (ADR-0014).
-    title: 'editorShell.tabTitle',
-    data: { documentTitleKey: 'editorShell.tabTitleNamed' },
-    loadComponent: () =>
-      import('./pages/entity/entity.page').then((m) => m.EntityPage),
+    canDeactivate: [clearActiveWorld],
+    resolve: { activeWorld: activeWorldResolver },
+    children: [
+      {
+        // The Entity browser: every Entity in this World — notes and maps — plus
+        // open / create / rename / delete (#70).
+        path: 'entities',
+        pathMatch: 'full',
+        loadComponent: () =>
+          import('./pages/entity-browser/entity-browser').then(
+            (m) => m.EntityBrowser,
+          ),
+        // Title key resolved by TranslationTitleStrategy to the "Hexly" brand (ADR-0014).
+        title: 'entityBrowser.tabTitle',
+      },
+      {
+        // The open-Entity route (#70). The id reopens the same Entity on reload (#6);
+        // the routed page renders its own header (ADR-0022).
+        path: 'entities/:id',
+        // Await a pending autosave before leaving the route, so an in-app navigation
+        // never drops a debounced edit (ADR-0026).
+        canDeactivate: [flushOnLeave],
+        // One EntitySession for the subtree, destroyed on leave, so open-Entity state
+        // resets implicitly (#70). EntityNameResolver batches id→name lookups for the
+        // entityLink node views (the `@` picker searches the server directly); route-scoped
+        // so navigating to another Entity re-resolves names against a fresh cache (ADR-0023).
+        providers: [EntitySession, EntityNameResolver],
+        // Tab title is the open Entity's name composed with the brand ("Aldermoor —
+        // Hexly") via documentTitleKey; `title` is the pre-load fallback (ADR-0014).
+        title: 'editorShell.tabTitle',
+        data: { documentTitleKey: 'editorShell.tabTitleNamed' },
+        loadComponent: () =>
+          import('./pages/entity/entity.page').then((m) => m.EntityPage),
+      },
+    ],
   },
-  { path: '', pathMatch: 'full', redirectTo: 'entities' },
+  {
+    // World-agnostic Entity link target (issue #118 follow-up). A Content Link
+    // doesn't know its target's World — links can cross Worlds — so this abstract
+    // route resolves the World by id and redirects to the canonical
+    // `/w/:worldId/entities/:id`. authGuard runs first so an unauthenticated hit
+    // goes to login; a missing/inaccessible target renders the error page.
+    path: 'entities/:id',
+    canActivate: [authGuard, entityWorldRedirect],
+    loadComponent: () =>
+      import('./pages/error/error-page').then((m) => m.ErrorPage),
+    title: 'error.tabTitle',
+  },
   {
     path: 'styleguide',
     loadComponent: () =>
@@ -54,5 +90,14 @@ export const appRoutes: Route[] = [
     // Title key resolved by TranslationTitleStrategy to the "Hexly" brand (ADR-0014).
     title: 'styleguide.tabTitle',
   },
-  { path: '**', redirectTo: 'entities' },
+  // Anything unmatched renders the error page rather than silently bouncing to
+  // the World Index, so a wrong URL is visible, not papered over. authGuard keeps
+  // an unauthenticated visitor going to login first.
+  {
+    path: '**',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./pages/error/error-page').then((m) => m.ErrorPage),
+    title: 'error.tabTitle',
+  },
 ];

@@ -7,9 +7,8 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { EntitySummary } from '@hexly/domain';
-import { AuthClient } from '../../core/services/auth.client';
+import { ActiveWorld } from '../../core/services/active-world';
 import { ToasterService } from '../../core/services/toaster.service';
-import { WorldStore } from '../../core/services/world.store';
 import { provideTranslocoTesting } from '../../core/i18n/transloco-testing';
 import { EntityBrowser } from './entity-browser';
 
@@ -41,23 +40,17 @@ describe('EntityBrowser', () => {
       ],
     }).compileComponents();
     http = TestBed.inject(HttpTestingController);
-    navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    navigate = vi
+      .spyOn(TestBed.inject(Router), 'navigate')
+      .mockResolvedValue(true);
 
-    // Log in first — auth-scoped storage uses the user id to namespace keys.
-    TestBed.inject(AuthClient).login('ada@hexly.test', 'pw').subscribe();
-    http.expectOne('/api/auth/login').flush({
-      id: 'u1',
-      email: 'ada@hexly.test',
-      displayName: 'Ada',
-    });
-
-    // Seed the active World after login so the auth-scoped key is written correctly.
-    TestBed.inject(WorldStore).setActive('w1');
+    // The browser scopes to the active World (ADR-0028), pinned by the `w/:worldId`
+    // route resolver in the app; pin it directly here.
+    TestBed.inject(ActiveWorld).set('w1');
   });
 
   afterEach(() => {
     http.verify();
-    localStorage.clear();
   });
 
   /** Create the library and resolve its first page; `nextCursor` defaults to null (single page). */
@@ -112,7 +105,7 @@ describe('EntityBrowser', () => {
     expect(heading?.textContent).toContain('Your library');
   });
 
-  it('scopes the entity list to the active World (ADR-0024)', () => {
+  it('scopes the entity list to the World in the URL (ADR-0028)', () => {
     const fixture = TestBed.createComponent(EntityBrowser);
     fixture.detectChanges();
 
@@ -124,7 +117,7 @@ describe('EntityBrowser', () => {
   it('re-fetches scoped to the new World when the active World changes', () => {
     const fixture = renderWith([summary({ id: 'm1' })]); // initial fetch, World w1
 
-    TestBed.inject(WorldStore).setActive('w2');
+    TestBed.inject(ActiveWorld).set('w2');
     fixture.detectChanges();
 
     const req = http.expectOne((r) => r.url === '/api/entities');
@@ -359,7 +352,7 @@ describe('EntityBrowser', () => {
 
     const req = http.expectOne('/api/entities');
     expect(req.request.method).toBe('POST');
-    // Scoped to the active World (ADR-0024).
+    // Scoped to the World in the URL (ADR-0028).
     expect(req.request.body).toEqual({
       name: 'Untitled map',
       type: 'hexmap',
@@ -370,7 +363,7 @@ describe('EntityBrowser', () => {
       document: { type: 'hexmap', content: { format: 'tiptap-v1', snapshot: {} }, hexes: {}, regions: [], labels: [] },
     });
 
-    expect(navigate).toHaveBeenCalledWith(['/entities', 'created']);
+    expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'created']);
   });
 
   it('creates a new note and opens it', () => {
@@ -392,7 +385,7 @@ describe('EntityBrowser', () => {
       document: { type: 'note', content: { format: 'tiptap-v1', snapshot: {} } },
     });
 
-    expect(navigate).toHaveBeenCalledWith(['/entities', 'created']);
+    expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'created']);
   });
 
   it('opens a map when its card is activated', () => {
@@ -402,7 +395,7 @@ describe('EntityBrowser', () => {
       fixture.nativeElement.querySelector('[data-testid=open-m1]') as HTMLElement
     ).click();
 
-    expect(navigate).toHaveBeenCalledWith(['/entities', 'm1']);
+    expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'm1']);
   });
 
   it('renames an entity, then refreshes from page one (ADR-0025)', () => {

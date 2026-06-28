@@ -1,4 +1,4 @@
-import { expect, flushSave, test } from './fixtures';
+import { enterLibrary, expect, flushSave, test } from './fixtures';
 
 /**
  * The Region select-and-edit journey (issue #39): a Region selected on the canvas
@@ -13,7 +13,7 @@ test('selects a Region on the canvas, renames it in the Inspector, and the renam
   page,
   request,
 }) => {
-  await page.goto('/entities');
+  await enterLibrary(page);
   await page.getByTestId('new-map').click();
 
   // Creating a map opens the editor at /entities/:id.
