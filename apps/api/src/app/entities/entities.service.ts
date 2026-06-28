@@ -109,6 +109,7 @@ export class EntitiesService {
       visibility: 'private',
       version: INITIAL_VERSION,
       document: serialize(body),
+      isHome: false,
       createdAt: now,
       updatedAt: now,
     };
