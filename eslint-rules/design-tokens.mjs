@@ -212,6 +212,7 @@ const noBuiltinShadow = {
       for (const tok of text.split(/[\s"'`=<>(){},;:]+/)) {
         if (!tok.startsWith('shadow-') && tok !== 'shadow') continue;
         if (tok.includes('[')) continue; // explicit arbitrary value — intentional opt-out
+        if (tok === 'shadow-none') continue; // no shadow at all — nothing themeable to bake
         if (!shadowUtilities.has(tok)) {
           context.report({ node, messageId: 'builtin', data: { cls: tok } });
         }

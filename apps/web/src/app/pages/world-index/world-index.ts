@@ -117,7 +117,7 @@ import { ACCENT_SIGIL, accentFor, monogram } from '../../ui/sigil';
                        independently clickable and the markup keeps no nested
                        interactives (a11y). -->
                   <a
-                    class="flex-1 px-3 pt-2 no-underline outline-none focus-visible:[box-shadow:none] after:content-[''] after:absolute after:inset-0"
+                    class="flex-1 px-3 pt-2 no-underline outline-none focus-visible:shadow-none after:content-[''] after:absolute after:inset-0"
                     [routerLink]="['/w', card.id, 'entities']"
                     [attr.data-testid]="'world-' + card.id"
                     [attr.aria-label]="card.name"
@@ -181,7 +181,7 @@ import { ACCENT_SIGIL, accentFor, monogram } from '../../ui/sigil';
           <li class="snap-start shrink-0 w-56">
             <button
               type="button"
-              class="h-44 w-full rounded-lg border border-dashed border-line-strong text-ink-muted hover:text-gold hover:border-gold bg-surface-sunken/40 flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors outline-none focus-visible:[box-shadow:none] focus-visible:[outline:2px_solid_var(--color-gold)] focus-visible:[outline-offset:-2px]"
+              class="h-44 w-full rounded-lg border border-dashed border-line-strong text-ink-muted hover:text-gold hover:border-gold bg-surface-sunken/40 flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors outline-none focus-visible:shadow-none focus-visible:[outline:2px_solid_var(--color-gold)] focus-visible:[outline-offset:-2px]"
               [disabled]="creating()"
               (click)="create()"
             >
