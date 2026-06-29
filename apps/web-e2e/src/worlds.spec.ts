@@ -27,7 +27,7 @@ async function createWorldFromIndex(
   return world;
 }
 
-/** Open the foot-of-rail World switcher and hop to another World by id. */
+/** Open the masthead World switcher and hop to another World by id. */
 async function switchToWorld(page: Page, worldId: string): Promise<void> {
   await page.getByTestId('switcher').click();
   await page.getByTestId(`switcher-option-${worldId}`).click();
@@ -37,7 +37,7 @@ test('the World Index lists reachable Worlds; creating one opens its Home Entity
   page,
 }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Your worlds' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Welcome back/ })).toBeVisible();
 
   const world = await createWorldFromIndex(page);
   // The Home note is named after the World (ADR-0029).
@@ -146,7 +146,7 @@ test('the entity browser is scoped by the URL World; switching Worlds filters it
   await expect(page.getByText('Alpha in A')).toBeVisible();
 });
 
-test('the foot-of-rail switcher shows the current World and hops to another (#121)', async ({
+test('the masthead switcher shows the current World and hops to another (#121)', async ({
   page,
 }) => {
   // Two distinctly-named Worlds so the switcher's current-World label is legible.

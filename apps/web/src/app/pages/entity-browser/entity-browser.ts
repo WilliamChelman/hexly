@@ -149,7 +149,7 @@ function formatEdited(updatedAt: number, lang: string): string {
                          lifted above the overlay with z-10 so they stay clickable
                          and the markup keeps no nested interactives (a11y). -->
                     <a
-                      class="block w-full no-underline outline-none focus-visible:shadow-none after:content-[''] after:absolute after:inset-0"
+                      class="block w-full no-underline outline-none focus-visible:[box-shadow:none] after:content-[''] after:absolute after:inset-0"
                       [routerLink]="['/w', worldId(), 'entities', card.id]"
                       [attr.data-testid]="'open-' + card.id"
                       [attr.aria-label]="card.title"

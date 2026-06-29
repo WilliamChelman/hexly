@@ -41,7 +41,7 @@ import { Rule } from '../ui/rule';
       class="group flex items-center gap-2 w-full rounded-md text-left cursor-pointer outline-none transition-colors"
       [class]="
         expanded()
-          ? 'px-2 py-1.5 bg-surface-sunken border border-line hover:border-gold focus:border-gold'
+          ? 'px-2 py-2 bg-surface-sunken border border-line hover:border-gold focus:border-gold'
           : 'justify-center p-0 bg-transparent border-0'
       "
       [title]="activeName() ?? ('worlds.switcher' | transloco)"
@@ -72,6 +72,12 @@ import { Rule } from '../ui/rule';
           }}</span>
         </span>
         <app-icon name="chevrons" [size]="13" class="shrink-0 opacity-60" />
+      } @else {
+        <!-- Keep the World name in the DOM for assistive tech (and so the trigger
+             is addressable by name) even when the rail hides it visually. -->
+        <span class="sr-only">{{
+          activeName() ?? ('worlds.switcher' | transloco)
+        }}</span>
       }
     </button>
 
