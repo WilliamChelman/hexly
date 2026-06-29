@@ -32,7 +32,10 @@ describe('AuthScopedStorage', () => {
     });
     storage = TestBed.inject(AuthScopedStorage);
     http = TestBed.inject(HttpTestingController);
-    TestBed.flushEffects(); // initial effect: user = null, nothing to wipe
+    // Flush effects to process the initial auth-scoped-storage effect; this also
+    // fires the rxResource auto-fetch, so drain that request immediately.
+    TestBed.flushEffects();
+    http.expectOne('/api/auth/me').flush(null, { status: 401, statusText: 'Unauthorized' });
   });
 
   afterEach(() => {

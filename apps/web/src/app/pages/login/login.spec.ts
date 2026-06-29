@@ -38,7 +38,10 @@ describe('Login', () => {
     http = TestBed.inject(HttpTestingController);
   });
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    http.match('/api/auth/me'); // drain rxResource auto-fetch fired by detectChanges()
+    http.verify();
+  });
 
   function typeInto(el: HTMLElement, selector: string, value: string) {
     const input = el.querySelector(selector) as HTMLInputElement;

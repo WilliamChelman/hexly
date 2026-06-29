@@ -7,6 +7,8 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { WorldSummary } from '@hexly/domain';
 import { ActiveWorld } from '../core/services/active-world';
+import { AuthClient } from '../core/services/auth.client';
+import { MockAuthClient } from '../core/testing/mock-auth-client';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { WorldSwitcher } from './world-switcher';
 
@@ -25,6 +27,7 @@ describe('WorldSwitcher', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
+        { provide: AuthClient, useValue: new MockAuthClient() },
       ],
     }).compileComponents();
     http = TestBed.inject(HttpTestingController);

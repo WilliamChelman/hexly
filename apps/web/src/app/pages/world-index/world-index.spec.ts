@@ -8,6 +8,7 @@ import { provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { WorldSummary } from '@hexly/domain';
 import { AuthClient } from '../../core/services/auth.client';
+import { MockAuthClient } from '../../core/testing/mock-auth-client';
 import { ToasterService } from '../../core/services/toaster.service';
 import { provideTranslocoTesting } from '../../core/i18n/transloco-testing';
 import { WorldIndex } from './world-index';
@@ -19,14 +20,17 @@ function world(id: string, name = id, ownerId = 'u1'): WorldSummary {
 describe('WorldIndex', () => {
   let http: HttpTestingController;
   let navigate: ReturnType<typeof vi.spyOn>;
+  let auth: MockAuthClient;
 
   beforeEach(async () => {
+    auth = new MockAuthClient();
     await TestBed.configureTestingModule({
       imports: [WorldIndex, provideTranslocoTesting()],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
+        { provide: AuthClient, useValue: auth },
       ],
     }).compileComponents();
     http = TestBed.inject(HttpTestingController);
@@ -35,12 +39,7 @@ describe('WorldIndex', () => {
       .mockResolvedValue(true);
 
     // The caller (u1) — used to tell owned Worlds from member Worlds.
-    TestBed.inject(AuthClient).login('ada@hexly.test', 'pw').subscribe();
-    http.expectOne('/api/auth/login').flush({
-      id: 'u1',
-      email: 'ada@hexly.test',
-      displayName: 'Ada',
-    });
+    auth.setUser({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada' });
   });
 
   afterEach(() => http.verify());

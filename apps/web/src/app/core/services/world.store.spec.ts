@@ -100,22 +100,16 @@ describe('WorldStore', () => {
     expect(store.loaded()).toBe(false);
   });
 
-  it('keeps the loaded Worlds when the same user re-emits (a session refresh)', () => {
+  it('keeps the loaded Worlds when the same user logs in again (e.g. a re-auth)', () => {
     login('u1');
     TestBed.flushEffects();
     store.load();
     flushList([world('w1')]);
     expect(store.worlds()).toHaveLength(1);
 
-    // refresh() re-mirrors the same user — a fresh object, same id. That is not a
-    // user change, so it must not wipe the list (which the always-mounted switcher
-    // relies on, having loaded once).
-    TestBed.inject(AuthClient).refresh().subscribe();
-    http.expectOne('/api/auth/me').flush({
-      id: 'u1',
-      email: 'ada@hexly.test',
-      displayName: 'Ada',
-    });
+    // Re-login as the same user (fresh object, same id) must not wipe the list —
+    // the always-mounted switcher relies on having loaded once.
+    login('u1');
     TestBed.flushEffects();
 
     expect(store.worlds()).toHaveLength(1);

@@ -9,6 +9,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { BehaviorSubject, Observable, map } from 'rxjs';
 import { AuthClient } from '../core/services/auth.client';
+import { MockAuthClient } from '../core/testing/mock-auth-client';
 import { ActiveWorld } from '../core/services/active-world';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { NavRail } from './nav-rail';
@@ -30,9 +31,11 @@ class FakeBreakpointObserver {
 describe('NavRail', () => {
   let http: HttpTestingController;
   let viewport: FakeBreakpointObserver;
+  let auth: MockAuthClient;
 
   beforeEach(async () => {
     localStorage.clear();
+    auth = new MockAuthClient();
     viewport = new FakeBreakpointObserver();
     await TestBed.configureTestingModule({
       imports: [NavRail, provideTranslocoTesting()],
@@ -45,6 +48,7 @@ describe('NavRail', () => {
           { path: 'styleguide', component: Blank },
         ]),
         { provide: BreakpointObserver, useValue: viewport },
+        { provide: AuthClient, useValue: auth },
       ],
     }).compileComponents();
     http = TestBed.inject(HttpTestingController);
@@ -65,10 +69,7 @@ describe('NavRail', () => {
   });
 
   function signIn(displayName = 'Ada Lovelace'): void {
-    TestBed.inject(AuthClient).login('ada@hexly.test', 'pw').subscribe();
-    http
-      .expectOne('/api/auth/login')
-      .flush({ id: 'u1', email: 'ada@hexly.test', displayName });
+    auth.setUser({ id: 'u1', email: 'ada@hexly.test', displayName });
   }
 
   function render() {

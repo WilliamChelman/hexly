@@ -82,4 +82,5 @@ describe('appRoutes structure (ADR-0028)', () => {
     expect(wildcard?.redirectTo).toBeUndefined();
     expect(wildcard?.loadComponent).toBeDefined();
   });
+
 });

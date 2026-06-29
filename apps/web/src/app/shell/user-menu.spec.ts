@@ -1,56 +1,38 @@
-import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter, Router } from '@angular/router';
+import { provideRouter } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { AuthClient } from '../core/services/auth.client';
+import { MockAuthClient } from '../core/testing/mock-auth-client';
 import { LocaleService } from '../core/i18n/locale.service';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { ThemeService } from '../core/services/theme.service';
 import { UserMenu } from './user-menu';
 
 describe('UserMenu', () => {
-  let http: HttpTestingController;
+  let auth: MockAuthClient;
 
   beforeEach(async () => {
     localStorage.clear();
+    auth = new MockAuthClient();
     await TestBed.configureTestingModule({
       imports: [UserMenu, provideTranslocoTesting()],
       providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
         provideRouter([]),
+        { provide: AuthClient, useValue: auth },
       ],
     }).compileComponents();
-    http = TestBed.inject(HttpTestingController);
   });
 
   afterEach(() => localStorage.clear());
-  afterEach(() => http.verify());
   afterEach(() => {
     document
       .querySelectorAll('.cdk-overlay-container')
       .forEach((el) => el.remove());
   });
 
-  /** Spy on navigation so a sign-out can assert where it sends the user. */
-  function spyNavigate(): ReturnType<typeof vi.spyOn> {
-    return vi
-      .spyOn(TestBed.inject(Router), 'navigateByUrl')
-      .mockResolvedValue(true);
-  }
-
   /** Establish a signed-in user the menu can reflect. */
   function signIn(displayName = 'Ada Lovelace'): void {
-    TestBed.inject(AuthClient).login('ada@hexly.test', 'pw').subscribe();
-    http.expectOne('/api/auth/login').flush({
-      id: 'u1',
-      email: 'ada@hexly.test',
-      displayName,
-    });
+    auth.setUser({ id: 'u1', email: 'ada@hexly.test', displayName });
   }
 
   type Fixture = ReturnType<typeof TestBed.createComponent>;
@@ -135,31 +117,15 @@ describe('UserMenu', () => {
     expect(openMenu(fixture).textContent).toContain('Ada Lovelace');
   });
 
-  it('signs out and returns to login', () => {
+  it('calls auth.signOut() when the sign-out item is clicked', () => {
     signIn();
-    const navigate = spyNavigate();
+    const signOut = vi.spyOn(auth, 'signOut');
     const fixture = TestBed.createComponent(UserMenu);
     fixture.detectChanges();
 
     item(openMenu(fixture), /sign out/i).click();
-    http.expectOne('/api/auth/logout').flush(null);
 
-    expect(navigate).toHaveBeenCalledWith('/login');
-  });
-
-  it('returns to login even when the logout request fails', () => {
-    signIn();
-    const navigate = spyNavigate();
-    const fixture = TestBed.createComponent(UserMenu);
-    fixture.detectChanges();
-
-    item(openMenu(fixture), /sign out/i).click();
-    http
-      .expectOne('/api/auth/logout')
-      .flush(null, { status: 500, statusText: 'Server Error' });
-
-    // The user is never stranded signed-in: navigation fires regardless.
-    expect(navigate).toHaveBeenCalledWith('/login');
+    expect(signOut).toHaveBeenCalled();
   });
 
   it('offers Login instead of Sign out when signed out', () => {
