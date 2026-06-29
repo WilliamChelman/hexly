@@ -15,7 +15,7 @@ setup('authenticate', async ({ page }) => {
 
   // Landing on the World Index proves the cookie was set and the auth guard passed
   // (post-login default is the Index now — ADR-0028).
-  await expect(page.getByRole('heading', { name: 'Your worlds' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Welcome back/ })).toBeVisible();
 
   await page.context().storageState({ path: authFile });
 });

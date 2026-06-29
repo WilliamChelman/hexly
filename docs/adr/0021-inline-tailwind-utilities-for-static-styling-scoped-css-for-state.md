@@ -96,7 +96,9 @@ state or share a property with the converted ones.
   `text-shadow-*` inline their geometry identically — so a *themed* drop- or
   text-shadow (hexly defines none today) takes the same raw-var-plus-`@utility`
   treatment. Every other `@theme` token references `var(--…)` and re-themes
-  unaided; shadows are the lone exception.
+  unaided; shadows are the lone exception. (`shadow-none` is exempt from the lint
+  guard: it draws no shadow, so there is no baked light value to re-theme — it is
+  the canonical way to clear an inherited or focus-ring box-shadow.)
 - **These keep the whole element scoped** (the genuinely-can't cases):
   - **`--_…` composition** — a `:host(.is-*)` variant reassigns a component-local
     var that the base rule reads (e.g. `Button`'s `--_fg`/`--_bg`/`--_bd`). No

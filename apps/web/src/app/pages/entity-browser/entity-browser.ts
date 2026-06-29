@@ -6,7 +6,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { Subscription, finalize } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntitySummary, EntityType } from '@hexly/domain';
@@ -19,7 +19,8 @@ import { Button } from '../../ui/button';
 import { Eyebrow } from '../../ui/eyebrow';
 import { PageHeader } from '../../ui/page-header';
 import { Panel } from '../../ui/panel';
-import { Icon } from '../../ui/icon/icon';
+import { Icon, IconName } from '../../ui/icon/icon';
+import { ACCENT_BAR, ACCENT_SIGIL, accentFor } from '../../ui/sigil';
 
 // ponytail: bounded first page so a large vault loads fast; bump or make
 // configurable only if a real page size proves wrong in use.
@@ -53,7 +54,16 @@ function formatEdited(updatedAt: number, lang: string): string {
 @Component({
   selector: 'app-entity-browser',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Eyebrow, PageHeader, Panel, Icon, TranslocoPipe, Autofocus],
+  imports: [
+    Button,
+    Eyebrow,
+    PageHeader,
+    Panel,
+    Icon,
+    TranslocoPipe,
+    Autofocus,
+    RouterLink,
+  ],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
     <app-page-header sticky>
@@ -100,47 +110,104 @@ function formatEdited(updatedAt: number, lang: string): string {
     <main class="max-w-[60rem] mx-auto py-6 px-5">
       @if (cards().length > 0) {
         <ul
-          class="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-4 m-0 p-0 list-none"
+          class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 m-0 p-0 list-none"
         >
           @for (card of cards(); track card.id) {
             <li>
-              <section class="flex items-center gap-2 py-3 px-4" appPanel>
-                @if (renamingId() === card.id) {
-                  <input
-                    type="text"
-                    appAutofocus
-                    class="flex-1 font-display text-md text-ink-strong bg-surface-sunken border border-gold rounded-sm py-1 px-2 outline-none"
-                    [value]="card.title"
-                    [attr.data-testid]="'rename-input-' + card.id"
-                    [attr.aria-label]="'entityBrowser.renameLabel' | transloco"
-                    (keydown.enter)="
-                      commitRename(card.id, $any($event.target).value)
-                    "
-                    (keydown.escape)="cancelRename()"
-                  />
-                } @else {
-                  <button
-                    type="button"
-                    class="flex flex-1 flex-col gap-1 p-0 text-left bg-transparent border-0 cursor-pointer"
-                    [attr.data-testid]="'open-' + card.id"
-                    (click)="open(card.id)"
-                  >
-                    <span
-                      class="font-display text-md text-ink-strong"
-                      data-testid="entity-title"
-                      >{{ card.title }}</span
+              <section
+                class="group relative flex gap-4 p-4 pl-5 overflow-hidden h-full transition-shadow hover:shadow-3 has-[a:focus-visible]:[outline:2px_solid_var(--color-gold)] has-[a:focus-visible]:outline-offset-2"
+                appPanel
+                raised
+              >
+                <span
+                  class="absolute left-0 top-0 bottom-0 w-1.5 {{ bar(card.id) }}"
+                ></span>
+                <span
+                  class="shrink-0 size-12 rounded-full flex items-center justify-center {{
+                    sigil(card.id)
+                  }}"
+                >
+                  <app-icon [name]="typeIcon(card.type)" [size]="20" />
+                </span>
+                <div class="min-w-0 flex-1">
+                  @if (renamingId() === card.id) {
+                    <input
+                      type="text"
+                      appAutofocus
+                      class="w-full font-display text-md text-ink-strong bg-surface-sunken border border-gold rounded-sm py-1 px-2 outline-none"
+                      [value]="card.title"
+                      [attr.data-testid]="'rename-input-' + card.id"
+                      [attr.aria-label]="'entityBrowser.renameLabel' | transloco"
+                      (keydown.enter)="
+                        commitRename(card.id, $any($event.target).value)
+                      "
+                      (keydown.escape)="cancelRename()"
+                    />
+                  } @else {
+                    <!-- Stretched link (inset ::after) makes the whole tile open
+                         the Entity; the action buttons sit OUTSIDE this anchor,
+                         lifted above the overlay with z-10 so they stay clickable
+                         and the markup keeps no nested interactives (a11y). -->
+                    <a
+                      class="block w-full no-underline outline-none focus-visible:shadow-none after:content-[''] after:absolute after:inset-0"
+                      [routerLink]="['/w', worldId(), 'entities', card.id]"
+                      [attr.data-testid]="'open-' + card.id"
+                      [attr.aria-label]="card.title"
                     >
-                    <span
-                      class="text-2xs uppercase tracking-wider text-ink-muted"
-                      [attr.data-testid]="'type-' + card.id"
-                      >{{ 'entityBrowser.type.' + card.type | transloco }}</span
-                    >
-                    <span class="meta text-2xs text-ink-muted">{{
-                      'entityBrowser.edited' | transloco: { date: card.edited }
-                    }}</span>
+                      <span
+                        class="font-display text-lg text-ink-strong leading-tight line-clamp-2 group-hover:text-gold transition-colors"
+                        data-testid="entity-title"
+                        >{{ card.title }}</span
+                      >
+                    </a>
+                    <hr class="border-0 border-t border-line my-2" />
+                    <div class="flex items-center gap-2">
+                      <span
+                        class="text-2xs uppercase tracking-wider text-ink-muted"
+                        [attr.data-testid]="'type-' + card.id"
+                        >{{
+                          'entityBrowser.type.' + card.type | transloco
+                        }}</span
+                      >
+                      <span class="text-2xs text-ink-faint">·</span>
+                      <span class="meta text-2xs text-ink-muted">{{
+                        'entityBrowser.edited' | transloco: { date: card.edited }
+                      }}</span>
+                      <span
+                        class="relative z-10 ml-auto flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+                      >
+                        <button
+                          type="button"
+                          appButton
+                          icon
+                          variant="ghost"
+                          size="sm"
+                          [attr.data-testid]="'rename-' + card.id"
+                          [attr.aria-label]="'entityBrowser.rename' | transloco"
+                          [attr.title]="'entityBrowser.rename' | transloco"
+                          (click)="startRename(card.id)"
+                        >
+                          <app-icon name="label" [size]="16" />
+                        </button>
+                        <button
+                          type="button"
+                          appButton
+                          icon
+                          variant="ghost"
+                          size="sm"
+                          danger
+                          [attr.data-testid]="'delete-' + card.id"
+                          [attr.aria-label]="'common.delete' | transloco"
+                          [attr.title]="'common.delete' | transloco"
+                          (click)="remove(card.id)"
+                        >
+                          <app-icon name="erase" [size]="16" />
+                        </button>
+                      </span>
+                    </div>
                     @if (card.tags.length > 0) {
                       <span
-                        class="flex flex-wrap gap-1 mt-1"
+                        class="flex flex-wrap gap-1 mt-2"
                         [attr.data-testid]="'tags-' + card.id"
                       >
                         @for (tag of card.tags; track tag) {
@@ -151,29 +218,8 @@ function formatEdited(updatedAt: number, lang: string): string {
                         }
                       </span>
                     }
-                  </button>
-                  <button
-                    type="button"
-                    appButton
-                    variant="ghost"
-                    size="sm"
-                    [attr.data-testid]="'rename-' + card.id"
-                    (click)="startRename(card.id)"
-                  >
-                    {{ 'entityBrowser.rename' | transloco }}
-                  </button>
-                  <button
-                    type="button"
-                    appButton
-                    variant="ghost"
-                    size="sm"
-                    danger
-                    [attr.data-testid]="'delete-' + card.id"
-                    (click)="remove(card.id)"
-                  >
-                    {{ 'common.delete' | transloco }}
-                  </button>
-                }
+                  }
+                </div>
               </section>
             </li>
           }
@@ -226,6 +272,9 @@ export class EntityBrowser {
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
   private readonly shell = inject(AppShellStore);
+
+  /** The active World id (always present under `/w/:worldId`) — the routerLink scope for each tile. */
+  protected readonly worldId = this.activeWorld.worldId;
 
   private readonly _entities = signal<EntitySummary[]>([]);
   /** The user's entities, newest first. */
@@ -356,6 +405,18 @@ export class EntityBrowser {
 
   protected open(id: string): void {
     this.router.navigate(['/w', this.activeWorld.worldId(), 'entities', id]);
+  }
+
+  /** The sigil glyph for an Entity's type — a hex map reads as terrain, a note as a label. */
+  protected typeIcon(type: EntityType): IconName {
+    return type === 'hexmap' ? 'terrain' : 'label';
+  }
+
+  protected sigil(id: string): string {
+    return ACCENT_SIGIL[accentFor(id)];
+  }
+  protected bar(id: string): string {
+    return ACCENT_BAR[accentFor(id)];
   }
 
   protected startRename(id: string): void {

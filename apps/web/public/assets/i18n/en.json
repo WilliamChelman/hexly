@@ -284,6 +284,7 @@
   },
   "worlds": {
     "switcherLabel": "Active world",
+    "crestLabel": "World",
     "switcher": "Worlds",
     "allWorlds": "All worlds",
     "new": "New world",
@@ -294,6 +295,10 @@
     "tabTitle": "Hexly — Worlds",
     "eyebrow": "Worlds",
     "heading": "Your worlds",
+    "greeting": "Welcome back, {{name}}.",
+    "greetingFallback": "cartographer",
+    "subhead": "Pick up where you left off, or chart somewhere new.",
+    "continue": "Continue",
     "creating": "Creating…",
     "owned": "Owned",
     "member": "Member",

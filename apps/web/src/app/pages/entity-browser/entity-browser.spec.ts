@@ -192,9 +192,12 @@ describe('EntityBrowser', () => {
     expect(
       (el.querySelector('[data-testid=type-n1]') as HTMLElement).textContent?.trim(),
     ).toBe('Note');
+    // The rename action is an icon button — its label lives in aria-label/title.
     expect(
-      (el.querySelector('[data-testid=rename-m1]') as HTMLElement).textContent,
-    ).toContain('Renommer');
+      (el.querySelector('[data-testid=rename-m1]') as HTMLElement).getAttribute(
+        'aria-label',
+      ),
+    ).toBe('Renommer');
   });
 
   it('renders a card’s Delete action in French when French is the active language', () => {
@@ -206,8 +209,8 @@ describe('EntityBrowser', () => {
     const del = fixture.nativeElement.querySelector(
       '[data-testid=delete-m1]',
     ) as HTMLElement;
-    expect(del.textContent).toContain('Supprimer');
-    expect(del.textContent).not.toContain('Delete');
+    // Icon button — assert the localized label on aria-label, not text content.
+    expect(del.getAttribute('aria-label')).toBe('Supprimer');
   });
 
   it('formats the “Edited” timestamp for the active language, not the browser default', () => {
@@ -388,14 +391,18 @@ describe('EntityBrowser', () => {
     expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'created']);
   });
 
-  it('opens a map when its card is activated', () => {
+  it('links a map’s card to its editor', () => {
     const fixture = renderWith([summary({ id: 'm1', name: 'Aldermoor' })]);
 
-    (
-      fixture.nativeElement.querySelector('[data-testid=open-m1]') as HTMLElement
-    ).click();
-
-    expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'm1']);
+    // The whole tile is a routerLink anchor (stretched-link inset), so assert the
+    // resolved href rather than a navigate() call.
+    expect(
+      (
+        fixture.nativeElement.querySelector(
+          '[data-testid=open-m1]',
+        ) as HTMLAnchorElement
+      ).getAttribute('href'),
+    ).toBe('/w/w1/entities/m1');
   });
 
   it('renames an entity, then refreshes from page one (ADR-0025)', () => {
