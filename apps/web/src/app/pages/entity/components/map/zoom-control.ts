@@ -62,7 +62,7 @@ import { Icon } from '../../../../ui/icon/icon';
     .zbtn {
       display: inline-grid;
       place-items: center;
-      width: var(--spacing-6);
+      width: calc(var(--spacing) * 8);
       height: 1.75rem;
       border: 0;
       background: transparent;
@@ -87,7 +87,7 @@ import { Icon } from '../../../../ui/icon/icon';
     }
     .div {
       width: 1px;
-      height: var(--spacing-4);
+      height: calc(var(--spacing) * 4);
       margin: 0 2px;
       background: var(--color-line);
     }

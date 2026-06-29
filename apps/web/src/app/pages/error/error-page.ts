@@ -16,7 +16,7 @@ import { Eyebrow } from '../../ui/eyebrow';
   imports: [Button, Eyebrow, RouterLink, TranslocoPipe],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
-    <main class="mx-auto flex max-w-[40rem] flex-col items-center gap-3 px-5 py-[6rem] text-center">
+    <main class="mx-auto flex max-w-[40rem] flex-col items-center gap-3 px-6 py-[6rem] text-center">
       <span appEyebrow class="text-gold! tracking-[0.28em]">{{
         'error.eyebrow' | transloco
       }}</span>

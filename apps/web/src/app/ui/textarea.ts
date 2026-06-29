@@ -13,22 +13,16 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: '<ng-content />',
   styles: `
+    @reference '../../styles.css';
+
     :host {
-      width: 100%;
-      padding: var(--spacing-2) var(--spacing-3);
-      font-size: var(--text-sm);
-      color: var(--color-ink-strong);
-      background: var(--color-surface-sunken);
-      border: 1px solid var(--color-line-strong);
-      border-radius: var(--radius-md);
-      box-shadow: var(--shadow-inset);
+      @apply w-full py-2 px-3 text-sm text-ink-strong bg-surface-sunken border
+        border-line-strong rounded-md shadow-inset resize-y min-h-20 leading-snug;
+      /* bespoke single-prop transition on the motion tokens — stays raw. */
       transition: border-color var(--dur-fast) var(--ease-out);
-      resize: vertical;
-      min-height: 5rem;
-      line-height: var(--leading-snug);
     }
     :host(:focus-visible) {
-      border-color: var(--color-gold);
+      @apply border-gold;
     }
   `,
 })

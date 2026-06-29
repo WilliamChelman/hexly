@@ -53,7 +53,7 @@ interface TypeRow {
   ],
   host: { class: 'block' },
   template: `
-    <main class="max-w-[1080px] mx-auto pt-5 px-5 pb-9 flex flex-col gap-8">
+    <main class="max-w-[1080px] mx-auto pt-6 px-6 pb-24 flex flex-col gap-16">
       <header class="guide-top flex justify-between items-center">
         <a appButton variant="ghost" size="sm" routerLink="/"
           >← {{ 'styleguide.backToMap' | transloco }}</a
@@ -61,7 +61,7 @@ interface TypeRow {
       </header>
 
       <!-- Masthead -->
-      <section class="hero flex flex-col gap-4 pt-7 pb-5 border-b border-line">
+      <section class="hero flex flex-col gap-4 pt-12 pb-6 border-b border-line">
         <span appEyebrow>{{ 'styleguide.eyebrow' | transloco }}</span>
         <h1
           class="text-3xl leading-[1.06]"
@@ -312,20 +312,20 @@ A walled town where the forest road meets the river ford.</textarea
     .section {
       display: flex;
       flex-direction: column;
-      gap: var(--spacing-4);
+      gap: calc(var(--spacing) * 4);
     }
     .section.is-split {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: var(--spacing-7);
+      gap: calc(var(--spacing) * 12);
     }
     .section-title {
       font-size: var(--text-lg);
-      padding-bottom: var(--spacing-2);
+      padding-bottom: calc(var(--spacing) * 2);
       border-bottom: 1px solid var(--color-line-faint);
     }
     .section-note {
-      margin-top: calc(var(--spacing-3) * -1);
+      margin-top: calc(var(--spacing) * -3);
       font-size: var(--text-sm);
       color: var(--color-ink-muted);
     }
@@ -334,12 +334,12 @@ A walled town where the forest road meets the river ford.</textarea
     .swatches {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-      gap: var(--spacing-3);
+      gap: calc(var(--spacing) * 3);
     }
     .swatchcard {
       display: flex;
       flex-direction: column;
-      gap: var(--spacing-2);
+      gap: calc(var(--spacing) * 2);
       margin: 0;
     }
     .swatchcard-chip {
@@ -362,14 +362,14 @@ A walled town where the forest road meets the river ford.</textarea
 
     /* ----- Type ------------------------------------------------------------- */
     .typelist {
-      padding: var(--spacing-2) var(--spacing-5);
+      padding: calc(var(--spacing) * 2) calc(var(--spacing) * 6);
     }
     .typerow {
       display: flex;
       align-items: baseline;
       justify-content: space-between;
-      gap: var(--spacing-5);
-      padding: var(--spacing-3) 0;
+      gap: calc(var(--spacing) * 6);
+      padding: calc(var(--spacing) * 3) 0;
       border-bottom: 1px solid var(--color-line-faint);
     }
     .typerow:last-child {
@@ -385,7 +385,7 @@ A walled town where the forest road meets the river ford.</textarea
     }
     .typerow-meta {
       display: flex;
-      gap: var(--spacing-3);
+      gap: calc(var(--spacing) * 3);
       flex: none;
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
@@ -396,12 +396,12 @@ A walled town where the forest road meets the river ford.</textarea
     .ramp {
       display: flex;
       flex-direction: column;
-      gap: var(--spacing-3);
+      gap: calc(var(--spacing) * 3);
     }
     .ramp-row {
       display: flex;
       align-items: center;
-      gap: var(--spacing-4);
+      gap: calc(var(--spacing) * 4);
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
       color: var(--color-ink-muted);
@@ -422,13 +422,13 @@ A walled town where the forest road meets the river ford.</textarea
     .radii {
       display: flex;
       flex-wrap: wrap;
-      gap: var(--spacing-4);
+      gap: calc(var(--spacing) * 4);
     }
     .radiicard {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: var(--spacing-2);
+      gap: calc(var(--spacing) * 2);
       margin: 0;
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
@@ -445,25 +445,25 @@ A walled town where the forest road meets the river ford.</textarea
     .specimens {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: var(--spacing-4);
+      gap: calc(var(--spacing) * 4);
     }
     .specimen {
       display: flex;
       flex-direction: column;
-      gap: var(--spacing-4);
-      padding: var(--spacing-4);
+      gap: calc(var(--spacing) * 4);
+      padding: calc(var(--spacing) * 4);
       margin: 0;
     }
     .specimen-row {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: var(--spacing-3);
+      gap: calc(var(--spacing) * 3);
     }
     .specimen-col {
       display: flex;
       flex-direction: column;
-      gap: var(--spacing-3);
+      gap: calc(var(--spacing) * 3);
     }
 
     /* ----- Footer ----------------------------------------------------------- */
@@ -471,7 +471,7 @@ A walled town where the forest road meets the river ford.</textarea
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding-top: var(--spacing-5);
+      padding-top: calc(var(--spacing) * 6);
       border-top: 1px solid var(--color-line);
       font-size: var(--text-sm);
       color: var(--color-ink-muted);

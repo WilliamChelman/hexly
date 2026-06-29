@@ -13,19 +13,16 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: '',
   styles: `
+    @reference '../../styles.css';
+
     :host {
-      width: 100%;
-      padding: var(--spacing-2) var(--spacing-3);
-      font-size: var(--text-sm);
-      color: var(--color-ink-strong);
-      background: var(--color-surface-sunken);
-      border: 1px solid var(--color-line-strong);
-      border-radius: var(--radius-md);
-      box-shadow: var(--shadow-inset);
+      @apply w-full py-2 px-3 text-sm text-ink-strong bg-surface-sunken border
+        border-line-strong rounded-md shadow-inset;
+      /* bespoke single-prop transition on the motion tokens — stays raw. */
       transition: border-color var(--dur-fast) var(--ease-out);
     }
     :host(:focus-visible) {
-      border-color: var(--color-gold);
+      @apply border-gold;
     }
   `,
 })

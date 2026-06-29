@@ -1,5 +1,7 @@
 # Inline Tailwind utilities for static styling; scoped CSS reserved for state
 
+> **Extended by [ADR-0031](./0031-apply-in-scoped-styles-for-translatable-props.md):** the hybrid seam also applies *inside* a primitive's scoped `styles:` block via `@apply`, not only as inline-template utilities — translatable props convert, the custom core stays raw.
+
 Component styling splits along a single seam: **static, single-value styling is
 expressed as inline Tailwind utilities** (in the template's `class`, or in
 `host: { class }` for the host element), while **stateful, variant, and

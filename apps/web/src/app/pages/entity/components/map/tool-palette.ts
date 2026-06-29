@@ -207,8 +207,8 @@ function glyphFor(subtool: SelectSubtool): IconName {
     .flyout {
       display: grid;
       grid-template-columns: repeat(2, auto);
-      gap: var(--spacing-2);
-      padding: var(--spacing-2);
+      gap: calc(var(--spacing) * 2);
+      padding: calc(var(--spacing) * 2);
       max-height: 100%;
       overflow-y: auto;
     }

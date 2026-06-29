@@ -52,7 +52,7 @@ import { BubbleMenuDirective } from './bubble-menu.directive';
   ],
   host: {
     class:
-      'flex min-h-[24rem] flex-col rounded-md border border-line bg-surface px-5 py-3 text-ink cursor-text focus-within:border-gold',
+      'flex min-h-[24rem] flex-col rounded-md border border-line bg-surface px-6 py-3 text-ink cursor-text focus-within:border-gold',
   },
   template: `
     <!-- ProseMirror fills the flex column (scoped CSS below) so a click anywhere

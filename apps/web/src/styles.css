@@ -60,10 +60,11 @@
  * imported after `tailwindcss`) reassigns it. Spacing/type/radii/fonts are
  * theme-invariant. Elevation can't live here — see the @utility block below.
  *
- * Spacing uses explicit `--spacing-<N>` keys: Tailwind v4 resolves these before
- * the `calc(var(--spacing) * N)` multiplier, so the bespoke non-linear scale
- * keeps the same 1–9 names (lint-enforced). `@theme` extends, so Tailwind's
- * default palette stays available.
+ * Spacing uses Tailwind's default linear scale (`calc(var(--spacing) * N)`, base
+ * 0.25rem) — no curated keys, every step open (ADR-0030, reverting ADR-0020's
+ * bespoke `--spacing-1..9`). Scoped styles take a spacing value as
+ * `calc(var(--spacing) * N)`; there are no named `--spacing-N` properties to
+ * reference. `@theme` extends, so Tailwind's default palette stays available.
  *
  * `static` disables theme tree-shaking so *every* token reaches `:root`, not
  * just those a utility references — load-bearing: the Canvas renderer reads many
@@ -100,17 +101,8 @@
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
 
-  /* ---- Spacing (bespoke, non-linear) → explicit keys win over multiplier  */
-  --spacing-px: 1px;
-  --spacing-1: 0.25rem; /*  4 */
-  --spacing-2: 0.5rem; /*   8 */
-  --spacing-3: 0.75rem; /* 12 */
-  --spacing-4: 1rem; /*    16 */
-  --spacing-5: 1.5rem; /*  24 */
-  --spacing-6: 2rem; /*    32 */
-  --spacing-7: 3rem; /*    48 */
-  --spacing-8: 4rem; /*    64 */
-  --spacing-9: 6rem; /*    96 */
+  /* ---- Spacing: Tailwind's default linear scale (ADR-0030). No curated keys;
+     utilities resolve `calc(var(--spacing) * N)`, scoped styles do the same. -- */
 
   /* ---- Radii ------------------------------------------------------------ */
   --radius-sm: 3px;

@@ -11,10 +11,10 @@ export default [
     plugins: { 'hexly-design': hexlyDesignTokens },
     rules: {
       // ADR-0020 — the design tokens *are* the Tailwind theme; these guard the
-      // curation: every var(--…) must resolve to a defined token, and spacing
-      // utilities may only use the curated scale (not Tailwind's multiplier).
+      // curation: every var(--…) must resolve to a defined token, and built-in
+      // shadow utilities (which bake a light value) are barred (ADR-0021).
+      // Spacing is no longer fenced — ADR-0030 opened it to Tailwind's defaults.
       'hexly-design/no-unknown-design-token': 'error',
-      'hexly-design/no-off-scale-spacing': 'error',
       'hexly-design/no-builtin-shadow': 'error',
       '@angular-eslint/directive-selector': [
         'error',

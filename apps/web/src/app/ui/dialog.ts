@@ -36,7 +36,7 @@ let nextDialogId = 0;
     <dialog
       #dialog
       appPanel
-      class="m-auto w-[min(28rem,calc(100vw-2rem))] flex-col gap-4 p-6 open:flex"
+      class="m-auto w-[min(28rem,calc(100vw-2rem))] flex-col gap-4 p-8 open:flex"
       [attr.aria-labelledby]="heading() ? titleId : null"
       (close)="closed.emit()"
     >

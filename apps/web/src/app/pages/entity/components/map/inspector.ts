@@ -320,8 +320,8 @@ interface SelectedEntity {
       position: relative;
       display: flex;
       flex-direction: column;
-      gap: var(--spacing-4);
-      padding: var(--spacing-4);
+      gap: calc(var(--spacing) * 4);
+      padding: calc(var(--spacing) * 4);
       background: var(--color-surface-raised);
       border: 1px solid var(--color-line);
       border-radius: var(--radius-lg);
@@ -353,7 +353,7 @@ interface SelectedEntity {
     .ident {
       display: flex;
       align-items: center;
-      gap: var(--spacing-3);
+      gap: calc(var(--spacing) * 3);
     }
     .ident-swatch {
       width: 38px;
@@ -382,7 +382,7 @@ interface SelectedEntity {
     .ident-sub {
       display: flex;
       align-items: center;
-      gap: var(--spacing-2);
+      gap: calc(var(--spacing) * 2);
       margin-top: 2px;
       font-family: var(--font-mono);
       font-size: var(--text-2xs);
