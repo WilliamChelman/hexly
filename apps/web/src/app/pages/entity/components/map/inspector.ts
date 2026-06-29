@@ -316,62 +316,35 @@ interface SelectedEntity {
   // Scoped chrome (ADR-0007): a framed "leaf" — gold corner brackets on lifted
   // paper — around each single-selection editor.
   styles: `
+    @reference '#app-styles.css';
+
     .leaf {
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      gap: var(--spacing-4);
-      padding: var(--spacing-4);
-      background: var(--color-surface-raised);
-      border: 1px solid var(--color-line);
-      border-radius: var(--radius-lg);
-      box-shadow: var(--shadow-1);
+      @apply relative flex flex-col gap-4 p-4 bg-surface-raised border border-line rounded-lg shadow-1;
     }
     .leaf::before,
     .leaf::after {
       content: '';
-      position: absolute;
-      width: 12px;
-      height: 12px;
-      border: 1px solid var(--color-gold);
-      opacity: 0.5;
-      pointer-events: none;
+      @apply absolute w-3 h-3 border border-gold opacity-50 pointer-events-none;
     }
     .leaf::before {
-      top: 6px;
-      left: 6px;
-      border-right: 0;
-      border-bottom: 0;
+      @apply top-1.5 left-1.5 border-r-0 border-b-0;
     }
     .leaf::after {
-      bottom: 6px;
-      right: 6px;
-      border-left: 0;
-      border-top: 0;
+      @apply bottom-1.5 right-1.5 border-l-0 border-t-0;
     }
     /* Rich identity heading: terrain swatch + illuminated name + mono subtitle. */
     .ident {
-      display: flex;
-      align-items: center;
-      gap: var(--spacing-3);
+      @apply flex items-center gap-3;
     }
     .ident-swatch {
-      width: 38px;
-      height: 38px;
-      flex: none;
-      border-radius: var(--radius-md);
-      border: 1px solid var(--color-line-strong);
+      @apply w-[38px] h-[38px] flex-none rounded-md border border-line-strong;
+      /* multi-shadow list: named token + literal geometry — stays raw (ADR-0031). */
       box-shadow: var(--shadow-inset), 0 0 0 1px var(--color-gold-soft);
     }
     .ident-name {
-      font-family: var(--font-display);
-      font-size: var(--text-lg);
-      line-height: 1.15;
-      color: var(--color-ink-strong);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      @apply font-display text-lg leading-[1.15] text-ink-strong overflow-hidden text-ellipsis whitespace-nowrap;
     }
+    /* ponytail: kept raw — font-cartouche not in the listed font utilities, em values throughout. */
     .ident-name::first-letter {
       font-family: var(--font-cartouche);
       font-weight: 700;
@@ -380,19 +353,10 @@ interface SelectedEntity {
       padding-right: 0.04em;
     }
     .ident-sub {
-      display: flex;
-      align-items: center;
-      gap: var(--spacing-2);
-      margin-top: 2px;
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      letter-spacing: 0.02em;
-      color: var(--color-ink-muted);
+      @apply flex items-center gap-2 mt-0.5 font-mono text-2xs tracking-[0.02em] text-ink-muted;
     }
     .stub {
-      font-size: var(--text-sm);
-      font-style: italic;
-      color: var(--color-ink-faint);
+      @apply text-sm italic text-ink-faint;
     }
   `,
 })

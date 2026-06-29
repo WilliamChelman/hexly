@@ -107,15 +107,15 @@ function formatEdited(updatedAt: number, lang: string): string {
       </button>
     </app-page-header>
 
-    <main class="max-w-[60rem] mx-auto py-6 px-5">
+    <main class="max-w-[60rem] mx-auto py-8 px-6">
       @if (cards().length > 0) {
         <ul
-          class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 m-0 p-0 list-none"
+          class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 m-0 p-0 list-none"
         >
           @for (card of cards(); track card.id) {
             <li>
               <section
-                class="group relative flex gap-4 p-4 pl-5 overflow-hidden h-full transition-shadow hover:shadow-3 has-[a:focus-visible]:[outline:2px_solid_var(--color-gold)] has-[a:focus-visible]:outline-offset-2"
+                class="group relative flex gap-4 p-4 pl-6 overflow-hidden h-full transition-shadow hover:shadow-3 has-[a:focus-visible]:[outline:2px_solid_var(--color-gold)] has-[a:focus-visible]:outline-offset-2"
                 appPanel
                 raised
               >
@@ -225,7 +225,7 @@ function formatEdited(updatedAt: number, lang: string): string {
           }
         </ul>
         @if (nextCursor() !== null) {
-          <div class="mt-6 flex justify-center">
+          <div class="mt-8 flex justify-center">
             <button
               type="button"
               appButton
@@ -245,7 +245,7 @@ function formatEdited(updatedAt: number, lang: string): string {
         }
       } @else if (loadError()) {
         <section
-          class="p-6 text-center text-ink-muted"
+          class="p-8 text-center text-ink-muted"
           data-testid="load-error"
           appPanel
         >
@@ -254,7 +254,7 @@ function formatEdited(updatedAt: number, lang: string): string {
         </section>
       } @else if (loaded()) {
         <section
-          class="p-6 text-center text-ink-muted"
+          class="p-8 text-center text-ink-muted"
           data-testid="empty"
           appPanel
         >

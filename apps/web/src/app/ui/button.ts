@@ -32,26 +32,21 @@ export type ButtonSize = 'md' | 'sm';
   },
   template: `<ng-content />`,
   styles: `
+    /* @apply needs the theme in scope; reference the global sheet via the
+       depth-invariant '#app-styles.css' subpath import (package.json). */
+    @reference '#app-styles.css';
+
     :host {
       --_fg: var(--color-ink);
       --_bg: var(--color-surface-raised);
       --_bd: var(--color-line-strong);
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: var(--spacing-2);
-      padding: var(--spacing-2) var(--spacing-4);
-      font-family: var(--font-body);
-      font-size: var(--text-sm);
-      font-weight: var(--font-weight-semibold);
-      letter-spacing: 0.01em;
-      color: var(--_fg);
-      background: var(--_bg);
-      border: 1px solid var(--_bd);
-      border-radius: var(--radius-md);
-      box-shadow: var(--shadow-1);
-      cursor: pointer;
-      white-space: nowrap;
+      /* private-var consumption converts via v4 functional shorthand:
+         text-(--_fg) / bg-(--_bg) / border-(--_bd). */
+      @apply inline-flex items-center justify-center gap-2 px-4 py-2 font-body
+        text-sm font-semibold tracking-[0.01em] rounded-md shadow-1 cursor-pointer
+        whitespace-nowrap text-(--_fg) bg-(--_bg) border border-(--_bd);
+      /* only the custom multi-prop transition on the motion tokens
+         (--dur-… / --ease-…) has no utility form and stays raw. */
       transition:
         transform var(--dur-fast) var(--ease-spring),
         background-color var(--dur-fast) var(--ease-out),
@@ -60,23 +55,18 @@ export type ButtonSize = 'md' | 'sm';
         color var(--dur-fast) var(--ease-out);
     }
     :host(:hover) {
-      transform: translateY(-1px);
-      box-shadow: var(--shadow-2);
-      border-color: var(--color-gold);
+      @apply -translate-y-px shadow-2 border-gold;
     }
     :host(:active) {
-      transform: translateY(0);
-      box-shadow: var(--shadow-inset);
+      @apply translate-y-0 shadow-inset;
     }
     :host(:disabled),
     :host([aria-disabled='true']) {
-      opacity: 0.5;
-      cursor: not-allowed;
-      transform: none;
-      box-shadow: none;
+      @apply opacity-50 cursor-not-allowed transform-none shadow-none;
     }
 
-    /* Gilded — gradient fill, gold glow, inset top-highlight; glow grows on hover. */
+    /* Gilded — gradient fill, gold glow, inset top-highlight; glow grows on hover.
+       Fully raw: gradient, color-mix border, layered glow box-shadow — no utilities. */
     :host(.is-primary) {
       --_fg: var(--color-on-gilded);
       background: var(--gradient-gold);
@@ -95,12 +85,12 @@ export type ButtonSize = 'md' | 'sm';
     :host(.is-ghost) {
       --_bg: transparent;
       --_bd: transparent;
-      box-shadow: none;
+      @apply shadow-none;
     }
     :host(.is-ghost:hover) {
       --_bg: var(--color-gold-soft);
       border-color: transparent;
-      box-shadow: none;
+      @apply shadow-none;
     }
     :host(.is-danger) {
       --_fg: var(--color-ember);
@@ -119,18 +109,17 @@ export type ButtonSize = 'md' | 'sm';
       --_bg: var(--color-gold-soft);
     }
     :host(.is-sm) {
-      padding: var(--spacing-1) var(--spacing-3);
-      font-size: var(--text-xs);
+      @apply px-3 py-1 text-xs;
     }
     :host(.is-icon) {
-      padding: var(--spacing-2);
-      aspect-ratio: 1;
+      @apply p-2 aspect-square;
     }
     /* Keyboard focus ring. The component's own :host box-shadow overrides the
        global :focus-visible rule (base.css), so restate the focus token here —
-       last, so it wins over every variant's box-shadow while focused. */
+       last, so it wins over every variant's box-shadow while focused.
+       --shadow-focus has no utility, so box-shadow stays raw. */
     :host(:focus-visible) {
-      outline: none;
+      @apply outline-none;
       box-shadow: var(--shadow-focus);
     }
   `,

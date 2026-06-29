@@ -51,7 +51,7 @@ import { ACCENT_SIGIL, accentFor, monogram } from '../../ui/sigil';
         class="bg-linear-[180deg] from-surface to-bg-deep border-b border-line"
       >
         <div
-          class="max-w-[64rem] mx-auto px-6 py-8 flex items-end justify-between gap-6"
+          class="max-w-[64rem] mx-auto px-8 py-16 flex items-end justify-between gap-8"
         >
           <div>
             <span appEyebrow class="text-gold! tracking-[0.28em]">{{
@@ -78,7 +78,7 @@ import { ACCENT_SIGIL, accentFor, monogram } from '../../ui/sigil';
         </div>
       </header>
 
-      <main class="max-w-[64rem] mx-auto px-6 py-6">
+      <main class="max-w-[64rem] mx-auto px-8 py-8">
         <h2 appEyebrow mark class="mb-3">
           {{ 'worldIndex.continue' | transloco }}
         </h2>
@@ -194,9 +194,9 @@ import { ACCENT_SIGIL, accentFor, monogram } from '../../ui/sigil';
         </ul>
       </main>
     } @else if (loadError()) {
-      <main class="max-w-[60rem] mx-auto py-6 px-5">
+      <main class="max-w-[60rem] mx-auto py-8 px-6">
         <section
-          class="p-6 text-center text-ink-muted"
+          class="p-8 text-center text-ink-muted"
           data-testid="load-error"
           appPanel
         >
@@ -205,9 +205,9 @@ import { ACCENT_SIGIL, accentFor, monogram } from '../../ui/sigil';
         </section>
       </main>
     } @else if (loaded()) {
-      <main class="max-w-[60rem] mx-auto py-6 px-5">
+      <main class="max-w-[60rem] mx-auto py-8 px-6">
         <section
-          class="p-8 text-center text-ink-muted flex flex-col items-center gap-3"
+          class="p-16 text-center text-ink-muted flex flex-col items-center gap-3"
           data-testid="worlds-empty"
           appPanel
         >

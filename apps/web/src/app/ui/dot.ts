@@ -19,15 +19,14 @@ import {
   },
   template: '',
   styles: `
+    @reference '#app-styles.css';
+
     :host {
-      width: 8px;
-      height: 8px;
-      border-radius: var(--radius-full);
-      background: var(--color-ink-faint);
-      flex: none;
+      @apply w-2 h-2 rounded-full bg-ink-faint flex-none;
     }
     :host(.is-positive) {
-      background: var(--color-positive);
+      @apply bg-positive;
+      /* literal-geometry halo (not a token shadow) — stays raw. */
       box-shadow: 0 0 0 3px var(--color-positive-soft);
     }
   `,

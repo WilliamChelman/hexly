@@ -24,18 +24,16 @@ import {
   },
   template: `<ng-content />`,
   styles: `
+    @reference '#app-styles.css';
+
     :host {
-      background: var(--color-surface);
-      border: 1px solid var(--color-line);
-      border-radius: var(--radius-lg);
-      box-shadow: var(--shadow-1);
+      @apply bg-surface border border-line rounded-lg shadow-1;
     }
     :host(.is-raised) {
-      background: var(--color-surface-raised);
-      box-shadow: var(--shadow-2);
+      @apply bg-surface-raised shadow-2;
     }
     :host(.is-flush) {
-      border-radius: 0;
+      @apply rounded-none;
     }
   `,
 })

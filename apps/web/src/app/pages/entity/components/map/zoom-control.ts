@@ -54,42 +54,30 @@ import { Icon } from '../../../../ui/icon/icon';
     </button>
   `,
   styles: `
+    @reference '#app-styles.css';
+
     /* Frosted surface kept scoped: a color-mix() over a theme token re-themes
        where the 'bg-surface/NN' modifier's baked fallback would not (ADR-0021). */
     :host {
       background: color-mix(in oklab, var(--color-surface) 88%, transparent);
     }
     .zbtn {
-      display: inline-grid;
-      place-items: center;
-      width: var(--spacing-6);
-      height: 1.75rem;
-      border: 0;
-      background: transparent;
-      color: var(--color-ink-muted);
-      border-radius: var(--radius-md);
-      cursor: pointer;
+      @apply inline-grid place-items-center w-8 h-7 border-0 bg-transparent
+        text-ink-muted rounded-md cursor-pointer;
+      /* transition on motion tokens (--dur-… / --ease-…) has no utility form — stays raw. */
       transition:
         background-color var(--dur-fast) var(--ease-out),
         color var(--dur-fast) var(--ease-out);
     }
     .zbtn:hover {
-      background: var(--color-gold-soft);
-      color: var(--color-gold);
+      @apply bg-gold-soft text-gold;
     }
     .lvl {
-      min-width: 3.4em;
-      text-align: center;
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      letter-spacing: 0.02em;
-      color: var(--color-ink);
+      @apply min-w-[3.4em] text-center font-mono text-2xs tracking-[0.02em] text-ink;
     }
     .div {
-      width: 1px;
-      height: var(--spacing-4);
+      @apply w-px h-4 bg-line;
       margin: 0 2px;
-      background: var(--color-line);
     }
   `,
 })

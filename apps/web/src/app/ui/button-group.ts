@@ -17,25 +17,21 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
   host: { role: 'group' },
   template: `<ng-content />`,
   styles: `
+    @reference '#app-styles.css';
+
     :host {
-      display: inline-flex;
-      border: 1px solid var(--color-line);
-      border-radius: var(--radius-sm);
-      overflow: hidden;
+      @apply inline-flex border border-line rounded-sm overflow-hidden;
     }
     /* Strip each button's own frame so they read as one control; a hairline
        divider marks the seams. The group owns the border and rounding. */
     :host ::ng-deep [appButton] {
-      border-radius: 0;
-      border-color: transparent;
-      box-shadow: none;
+      @apply rounded-none border-transparent shadow-none;
     }
     :host ::ng-deep [appButton]:hover {
-      transform: none;
-      box-shadow: none;
+      @apply transform-none shadow-none;
     }
     :host ::ng-deep [appButton] + [appButton] {
-      border-left: 1px solid var(--color-line);
+      @apply border-l border-l-line;
     }
   `,
 })

@@ -85,7 +85,7 @@ import { ContentEditor } from './components/content-editor/content-editor';
           } @else {
             <!-- Content body in a centred reading column: a note, or a hexmap on its Note view (#75). -->
             <div class="absolute inset-0 overflow-y-auto bg-surface-sunken">
-              <div class="max-w-[60rem] mx-auto py-5 px-5">
+              <div class="max-w-[60rem] mx-auto py-6 px-6">
                 <app-content-editor [ariaLabel]="editorLabel()" />
               </div>
             </div>
@@ -103,7 +103,7 @@ import { ContentEditor } from './components/content-editor/content-editor';
       calc() over a token, ADR-0021), so it lives here; everything else is inline.
     */
     .body app-tool-palette {
-      max-height: calc(100% - 2 * var(--spacing-3));
+      max-height: calc(100% - 2 * calc(var(--spacing) * 3));
     }
   `,
 })

@@ -35,18 +35,14 @@ import {
   },
   template: `<ng-content />`,
   styles: `
+    @reference '#app-styles.css';
+
     :host {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 2.625rem; /* 42px — codex tool gem (20px glyph + padding) */
-      height: 2.625rem;
-      color: var(--color-ink-muted);
-      /* A faint sunken fill so an inactive button still reads as a button. */
+      /* 42px codex tool gem (20px glyph + padding) → arbitrary w/h (off-scale). */
+      @apply inline-flex items-center justify-center w-[2.625rem] h-[2.625rem]
+        text-ink-muted border border-transparent rounded-lg cursor-pointer;
+      /* faint sunken fill (color-mix) + custom transition (motion tokens) stay raw. */
       background: color-mix(in srgb, var(--color-bg-deep) 50%, transparent);
-      border: 1px solid transparent;
-      border-radius: var(--radius-lg);
-      cursor: pointer;
       transition:
         background-color var(--dur-fast) var(--ease-out),
         border-color var(--dur-fast) var(--ease-out),
@@ -54,12 +50,11 @@ import {
     }
     /* Hover (only when not armed): gold glyph + gilded border, fill unchanged. */
     :host(:hover:not(:disabled):not(.is-active)) {
-      color: var(--color-gold);
-      border-color: var(--color-line-strong);
+      @apply text-gold border-line-strong;
     }
-    /* Armed/selected — a gilded gem: radial gold gradient + glow halo. */
+    /* Armed/selected — a gilded gem: radial gold gradient + glow halo (raw). */
     :host(.is-active) {
-      color: var(--color-on-gilded);
+      @apply text-on-gilded;
       background: var(--gradient-gold-radial);
       border-color: color-mix(in srgb, var(--color-gold-bright) 60%, #fff);
       box-shadow:
@@ -67,13 +62,12 @@ import {
         0 0 16px -1px var(--color-glow);
     }
     :host(:disabled) {
-      opacity: 0.4;
-      cursor: not-allowed;
+      @apply opacity-40 cursor-not-allowed;
     }
     /* Keyboard focus ring — restated here because the host's own box-shadow
        overrides the global :focus-visible rule (base.css). Last, so it wins. */
     :host(:focus-visible) {
-      outline: none;
+      @apply outline-none;
       box-shadow: var(--shadow-focus);
     }
   `,

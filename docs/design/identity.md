@@ -30,12 +30,16 @@ The design tokens **are** Tailwind's theme — one source of truth (ADR-0020).
 | `apps/web/src/app/styleguide/`   | The living `/styleguide` reference page.                                                  |
 
 Primitives (`Button`, `Panel`, `Tool`, …) own their **scoped** styles and consume
-the tokens directly (ADR-0007); there is no global component sheet.
+the tokens directly (ADR-0007); there is no global component sheet. Within those
+scoped `styles:` blocks, translatable props are expressed with `@apply` (each
+component `@reference`s the global sheet); only the custom core — private-var
+assignment, `color-mix`, gradients, bespoke transitions — stays raw CSS (ADR-0031).
 
 **Rule for slices:** style from semantic tokens — never hard-code a hex value.
 Ask for a role (`--color-ink`, `--color-gold`, `--color-terrain-forest`), not a
 colour. A lint rule (`hexly-design/*`) enforces that every `var(--…)` resolves to
-a defined token and that spacing utilities stay on the curated scale.
+a defined token and that built-in `shadow-*` utilities (which bake a light value)
+stay out (ADR-0021). Spacing is unfenced — it follows Tailwind's defaults (ADR-0030).
 
 ### Tailwind
 
@@ -49,10 +53,9 @@ both generates an on-brand, theme-aware utility (`bg-surface`, `text-ink`,
 shadows are declared non-`inline` so `[data-theme='dark']` (tokens.css) can
 reassign the generated `--color-*`/`--shadow-*`; `static` disables theme-variable
 tree-shaking so tokens read only by the Canvas renderer (`getComputedStyle`) or by
-raw `var(--…)` still resolve. Spacing is bridged with explicit `--spacing-1..9`
-keys, which Tailwind resolves before its `calc(var(--spacing) * N)` multiplier — so
-the bespoke non-linear scale survives under the same names. Use utilities for
-slice/shell layout; primitives keep their scoped styles.
+raw `var(--…)` still resolve. Spacing uses Tailwind's default linear scale
+(`calc(var(--spacing) * N)`, 0.25rem base); every step is open (ADR-0030). Use
+utilities for slice/shell layout; primitives keep their scoped styles.
 
 ## Typography
 
@@ -90,8 +93,9 @@ canvas. The Canvas renderer reads them by name (ADR-0003).
 
 ## Spacing, radius, motion
 
-- **Spacing** — bespoke, non-linear, bridged as explicit `@theme` keys:
-  `--spacing-1` (4px) → `--spacing-9` (96px). Drives `p-`/`m-`/`gap-` utilities.
+- **Spacing** — Tailwind's default linear scale, `calc(var(--spacing) * N)` off a
+  `0.25rem` base; every step open, no curated keys (ADR-0030). Drives `p-`/`m-`/`gap-`
+  utilities; scoped styles take a value as `calc(var(--spacing) * N)`.
 - **Radius** — `--radius-sm` (3px) → `--radius-xl` (16px), plus `--radius-full`.
 - **Motion** — durations `--dur-fast/base/slow`; eases `--ease-out`, `--ease-spring`.
   Reserved for interaction (hovers, presses) and theme transitions — no entrance

@@ -20,8 +20,8 @@ import { AppShellStore } from '../../shell/app-shell.store';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [Panel, Field, Input, Button, TranslocoPipe],
   template: `
-    <main class="grid place-items-center min-h-full p-5 bg-surface-sunken">
-      <section class="w-full max-w-[22rem] p-6" appPanel raised>
+    <main class="grid place-items-center min-h-full p-6 bg-surface-sunken">
+      <section class="w-full max-w-[22rem] p-8" appPanel raised>
         <h1 class="sr-only">{{ heading() }}</h1>
         <form class="flex flex-col gap-4" (submit)="submit($event)">
           <label appField [label]="'auth.email' | transloco">

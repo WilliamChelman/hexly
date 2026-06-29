@@ -22,6 +22,9 @@ describe('no-builtin-shadow', () => {
         { code: 'const c = `class="focus-visible:shadow-none"`' },
         // Non-shadow tokens aren't touched.
         { code: 'const c = `class="rounded-md border border-line"`' },
+        // The word "shadow" inside a CSS comment is prose, not a utility — the
+        // styles-block comment scan strips comments first (ADR-0031).
+        { code: 'const c = `:host { /* layered glow shadow */ color: red; }`' },
       ],
       invalid: [
         {

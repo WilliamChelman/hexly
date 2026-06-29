@@ -126,6 +126,8 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
     />
   `,
   styles: `
+    @reference '#app-styles.css';
+
     /*
       No position of its own — the shell positions it full-bleed (ADR-0013), and
       omitting it lets the shell's inline 'absolute inset-0' win over an (unlayered)
@@ -134,8 +136,7 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
       makes the host the containing block for the overlays below.
     */
     :host {
-      overflow: hidden;
-      isolation: isolate;
+      @apply overflow-hidden isolate;
       background:
         radial-gradient(
           110% 85% at 50% -6%,
@@ -154,23 +155,16 @@ const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
       dark). No z-index — DOM order keeps it below readout/zoom.
     */
     .field-grain {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      opacity: 0.06;
-      mix-blend-mode: multiply;
+      @apply absolute inset-0 pointer-events-none opacity-[0.06] mix-blend-multiply;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
       background-size: 180px 180px;
     }
     :host-context([data-theme='dark']) .field-grain {
-      opacity: 0.05;
-      mix-blend-mode: screen;
+      @apply opacity-[0.05] mix-blend-screen;
     }
     /* Soft edge vignette: clear centre, sinking to the themed edge ink at the corners. */
     .field-vignette {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
+      @apply absolute inset-0 pointer-events-none;
       background: radial-gradient(
         120% 90% at 50% 42%,
         transparent 56%,
