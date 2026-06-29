@@ -13,7 +13,7 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: '<ng-content />',
   styles: `
-    @reference '../../styles.css';
+    @reference '#app-styles.css';
 
     :host {
       @apply w-full py-2 px-3 text-sm text-ink-strong bg-surface-sunken border

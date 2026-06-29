@@ -19,7 +19,7 @@ import {
   },
   template: '',
   styles: `
-    @reference '../../styles.css';
+    @reference '#app-styles.css';
 
     :host {
       @apply w-2 h-2 rounded-full bg-ink-faint flex-none;

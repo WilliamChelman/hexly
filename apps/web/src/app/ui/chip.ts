@@ -22,7 +22,7 @@ export type ChipTone = 'gold' | 'sea' | 'astra';
   },
   template: `<ng-content />`,
   styles: `
-    @reference '../../styles.css';
+    @reference '#app-styles.css';
 
     /* Display-face small-caps badge, widely tracked. Base fully converts —
        off-scale padding (3/11px) rides arbitrary utilities. */

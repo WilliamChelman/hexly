@@ -22,7 +22,13 @@ The win scales inversely with how much a component leans on the raw core: flat p
 
 ## `@reference` convention
 
-Each component references the global sheet by **relative path**. Primitives live in `apps/web/src/app/ui/`, so the path is uniformly `../../styles.css`; deeper components compute their own. (No package alias — PostCSS doesn't resolve TS path aliases.)
+Each component references the global sheet via a **Node subpath import** — `@reference '#app-styles.css'` — mapped in the root `package.json`:
+
+```json
+"imports": { "#app-styles.css": "./apps/web/src/styles.css" }
+```
+
+Tailwind v4 resolves `@reference` through `enhanced-resolve`, which honors the `imports` field, so the specifier is **depth-invariant**: the same `#app-styles.css` works from any folder, no `../../` to count or break on a move. (TS path aliases don't help here — Tailwind's CSS resolver doesn't read `tsconfig`; the package `imports` field is the portable mechanism it does honor.)
 
 ## Tooling
 

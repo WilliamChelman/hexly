@@ -24,7 +24,7 @@ import {
   },
   template: `<ng-content />`,
   styles: `
-    @reference '../../styles.css';
+    @reference '#app-styles.css';
 
     :host {
       @apply bg-surface border border-line rounded-lg shadow-1;

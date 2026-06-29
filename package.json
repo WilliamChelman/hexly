@@ -112,5 +112,8 @@
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.0",
     "zod": "^4.4.3"
+  },
+  "imports": {
+    "#app-styles.css": "./apps/web/src/styles.css"
   }
 }

@@ -17,7 +17,7 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
   host: { role: 'group' },
   template: `<ng-content />`,
   styles: `
-    @reference '../../styles.css';
+    @reference '#app-styles.css';
 
     :host {
       @apply inline-flex border border-line rounded-sm overflow-hidden;

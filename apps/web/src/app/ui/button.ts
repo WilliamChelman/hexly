@@ -32,9 +32,9 @@ export type ButtonSize = 'md' | 'sm';
   },
   template: `<ng-content />`,
   styles: `
-    /* @apply needs the theme in scope; each component re-references the global
-       sheet (relative path varies by folder depth). */
-    @reference '../../styles.css';
+    /* @apply needs the theme in scope; reference the global sheet via the
+       depth-invariant '#app-styles.css' subpath import (package.json). */
+    @reference '#app-styles.css';
 
     :host {
       --_fg: var(--color-ink);

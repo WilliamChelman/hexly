@@ -35,7 +35,7 @@ import {
   },
   template: `<ng-content />`,
   styles: `
-    @reference '../../styles.css';
+    @reference '#app-styles.css';
 
     :host {
       /* 42px codex tool gem (20px glyph + padding) → arbitrary w/h (off-scale). */
