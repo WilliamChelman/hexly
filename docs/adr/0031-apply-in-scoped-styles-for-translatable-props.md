@@ -37,5 +37,5 @@ The `hexly-design` lint rules (`no-unknown-design-token`, `no-builtin-shadow`) n
 ## Consequences
 
 - Primitives in `app/ui/` carry an `@apply` seam; the raw remainder is the custom core ADR-0007 exists to protect. Inline-template utilities (ADR-0021) remain the rule for static template elements and composite view shells.
-- Out of scope: page/feature components keep their scoped `calc(var(--spacing) * N)` refs for now; they may adopt the same seam later, but they aren't primitives.
+- The seam also applies to feature/page components' scoped `styles:` (the map/entity components — content-editor, inspector, map-canvas, tool-palette, zoom-control — are converted). Inline-template utilities (ADR-0021) remain the rule for their *template* markup; this only governs the scoped block.
 - `dialog`, `eyebrow`, `rule` deliberately stay raw — recorded above so a future reader doesn't "finish the job" and regress them.

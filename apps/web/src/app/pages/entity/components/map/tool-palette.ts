@@ -202,15 +202,12 @@ function glyphFor(subtool: SelectSubtool): IconName {
     }
   `,
   styles: `
+    @reference '#app-styles.css';
+
     /* The flyout's two-column grid is scoped here (the class is also a test hook);
        strip layout and divider width are inline utilities. */
     .flyout {
-      display: grid;
-      grid-template-columns: repeat(2, auto);
-      gap: calc(var(--spacing) * 2);
-      padding: calc(var(--spacing) * 2);
-      max-height: 100%;
-      overflow-y: auto;
+      @apply grid grid-cols-[repeat(2,auto)] gap-2 p-2 max-h-full overflow-y-auto;
     }
   `,
 })

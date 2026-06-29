@@ -69,14 +69,15 @@ import { BubbleMenuDirective } from './bubble-menu.directive';
     <app-descriptor-picker />
   `,
   styles: `
+    @reference '#app-styles.css';
+
     /* .ProseMirror lives outside Angular's template — pierce with ::ng-deep.
        Suppress its focus ring; host's focus-within:border-gold already signals focus. */
     :host ::ng-deep .ProseMirror {
       flex: 1;
     }
     :host ::ng-deep .ProseMirror:focus-visible {
-      outline: none;
-      box-shadow: none;
+      @apply outline-none shadow-none;
     }
     /* Collapse leading/trailing block margins so prose doesn't hug the border. */
     :host ::ng-deep .ProseMirror > :first-child {
@@ -89,35 +90,34 @@ import { BubbleMenuDirective } from './bubble-menu.directive';
       margin: 0.6em 0;
     }
     :host ::ng-deep .ProseMirror h1 {
+      @apply font-semibold;
       font-size: 1.8em;
-      font-weight: 600;
       margin: 0.9em 0 0.3em;
     }
     :host ::ng-deep .ProseMirror h2 {
+      @apply font-semibold;
       font-size: 1.4em;
-      font-weight: 600;
       margin: 0.9em 0 0.3em;
     }
     :host ::ng-deep .ProseMirror h3 {
+      @apply font-semibold;
       font-size: 1.15em;
-      font-weight: 600;
       margin: 0.8em 0 0.3em;
     }
     :host ::ng-deep .ProseMirror h4 {
+      @apply font-semibold;
       font-size: 1em;
-      font-weight: 600;
       margin: 0.8em 0 0.3em;
     }
     :host ::ng-deep .ProseMirror h5 {
+      @apply font-semibold;
       font-size: 0.9em;
-      font-weight: 600;
       margin: 0.75em 0 0.25em;
     }
     :host ::ng-deep .ProseMirror h6 {
+      @apply font-semibold text-ink-muted;
       font-size: 0.85em;
-      font-weight: 600;
       margin: 0.75em 0 0.25em;
-      color: var(--color-ink-muted);
     }
     :host ::ng-deep .ProseMirror ul,
     :host ::ng-deep .ProseMirror ol {
@@ -141,11 +141,9 @@ import { BubbleMenuDirective } from './bubble-menu.directive';
       color: var(--color-ink-muted);
     }
     :host ::ng-deep .ProseMirror blockquote {
-      border-left: 3px solid var(--color-line-strong);
+      @apply border-l-[3px] border-line-strong italic text-ink-muted;
       padding-left: 1em;
       margin: 0.8em 0;
-      font-style: italic;
-      color: var(--color-ink-muted);
     }
     :host ::ng-deep .ProseMirror hr {
       border: none;
@@ -154,32 +152,23 @@ import { BubbleMenuDirective } from './bubble-menu.directive';
     }
     /* Code block: a sunken well; inline code: a subtle inline chip. */
     :host ::ng-deep .ProseMirror pre {
+      @apply border border-line rounded-md bg-surface-sunken overflow-x-auto font-mono leading-normal;
       margin: 0.8em 0;
       padding: 0.85em 1em;
-      border: 1px solid var(--color-line);
-      border-radius: var(--radius-md);
-      background: var(--color-surface-sunken);
-      overflow-x: auto;
-      font-family: var(--font-mono);
       font-size: 0.85em;
-      line-height: var(--leading-normal);
     }
     :host ::ng-deep .ProseMirror pre code {
-      padding: 0;
+      @apply p-0;
       background: none;
       font-size: inherit;
     }
     :host ::ng-deep .ProseMirror :not(pre) > code {
+      @apply border border-line rounded-sm bg-surface-sunken font-mono;
       padding: 0.1em 0.35em;
-      border: 1px solid var(--color-line);
-      border-radius: var(--radius-sm);
-      background: var(--color-surface-sunken);
-      font-family: var(--font-mono);
       font-size: 0.85em;
     }
     :host ::ng-deep .ProseMirror a {
-      color: var(--color-gold);
-      text-decoration: underline;
+      @apply text-gold underline;
     }
   `,
 })
