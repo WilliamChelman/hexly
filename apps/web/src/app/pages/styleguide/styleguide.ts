@@ -151,8 +151,8 @@ interface TypeRow {
           <div class="ramp">
             @for (s of spacing; track s) {
               <div class="ramp-row">
-                <code>{{ s }}</code>
-                <span class="ramp-bar" [style.width]="'var(' + s + ')'"></span>
+                <code>p-{{ s }}</code>
+                <span class="ramp-bar" [style.width]="'calc(var(--spacing) * ' + s + ')'"></span>
               </div>
             }
           </div>
@@ -291,203 +291,125 @@ A walled town where the forest road meets the river ford.</textarea
     </main>
   `,
   styles: `
+    @reference '#app-styles.css';
+
     /* Styleguide — layout only; specimens use the primitives and global classes. */
 
     /* ----- Hero ------------------------------------------------------------- */
     .hero-lede {
+      @apply text-md leading-normal text-ink-muted;
       max-width: var(--container-reading);
-      font-size: var(--text-md);
-      line-height: var(--leading-normal);
-      color: var(--color-ink-muted);
     }
     .hero-lede code,
     .section-note code,
     figcaption code {
-      font-family: var(--font-mono);
+      @apply font-mono text-gold-strong;
       font-size: 0.86em;
-      color: var(--color-gold-strong);
     }
 
     /* ----- Sections --------------------------------------------------------- */
     .section {
-      display: flex;
-      flex-direction: column;
-      gap: calc(var(--spacing) * 4);
+      @apply flex flex-col gap-4;
     }
     .section.is-split {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: calc(var(--spacing) * 12);
+      @apply grid grid-cols-2 gap-12;
     }
     .section-title {
-      font-size: var(--text-lg);
-      padding-bottom: calc(var(--spacing) * 2);
-      border-bottom: 1px solid var(--color-line-faint);
+      @apply text-lg pb-2 border-b border-line-faint;
     }
     .section-note {
-      margin-top: calc(var(--spacing) * -3);
-      font-size: var(--text-sm);
-      color: var(--color-ink-muted);
+      @apply -mt-3 text-sm text-ink-muted;
     }
 
     /* ----- Colour swatches -------------------------------------------------- */
     .swatches {
-      display: grid;
+      @apply grid gap-3;
       grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-      gap: calc(var(--spacing) * 3);
     }
     .swatchcard {
-      display: flex;
-      flex-direction: column;
-      gap: calc(var(--spacing) * 2);
-      margin: 0;
+      @apply flex flex-col gap-2 m-0;
     }
     .swatchcard-chip {
-      height: 64px;
-      border-radius: var(--radius-md);
-      border: 1px solid var(--color-line-strong);
-      box-shadow: var(--shadow-inset);
+      @apply h-16 rounded-md border border-line-strong shadow-inset;
     }
     .swatchcard figcaption {
-      display: flex;
-      flex-direction: column;
-      gap: 1px;
-      font-size: var(--text-sm);
+      @apply flex flex-col gap-px text-sm;
     }
     .swatchcard code {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--color-ink-faint);
+      @apply font-mono text-2xs text-ink-faint;
     }
 
     /* ----- Type ------------------------------------------------------------- */
     .typelist {
-      padding: calc(var(--spacing) * 2) calc(var(--spacing) * 6);
+      @apply py-2 px-6;
     }
     .typerow {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: calc(var(--spacing) * 6);
-      padding: calc(var(--spacing) * 3) 0;
-      border-bottom: 1px solid var(--color-line-faint);
+      @apply flex items-baseline justify-between gap-6 py-3 border-b border-line-faint;
     }
     .typerow:last-child {
-      border-bottom: 0;
+      @apply border-b-0;
     }
     .typerow-sample {
-      font-family: var(--font-display);
-      color: var(--color-ink-strong);
-      line-height: 1.1;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      @apply font-display text-ink-strong leading-[1.1] overflow-hidden text-ellipsis whitespace-nowrap;
     }
     .typerow-meta {
-      display: flex;
-      gap: calc(var(--spacing) * 3);
-      flex: none;
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--color-ink-faint);
+      @apply flex gap-3 flex-none font-mono text-2xs text-ink-faint;
     }
 
     /* ----- Spacing & radii -------------------------------------------------- */
     .ramp {
-      display: flex;
-      flex-direction: column;
-      gap: calc(var(--spacing) * 3);
+      @apply flex flex-col gap-3;
     }
     .ramp-row {
-      display: flex;
-      align-items: center;
-      gap: calc(var(--spacing) * 4);
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--color-ink-muted);
+      @apply flex items-center gap-4 font-mono text-2xs text-ink-muted;
     }
     .ramp-row code {
+      @apply flex-none;
       width: 7ch;
-      flex: none;
     }
     .ramp-bar {
-      height: 14px;
-      background: linear-gradient(
-        90deg,
-        var(--color-gold),
-        var(--color-gold-strong)
-      );
-      border-radius: var(--radius-sm);
+      @apply h-3.5 rounded-sm;
+      background: linear-gradient(90deg, var(--color-gold), var(--color-gold-strong));
     }
     .radii {
-      display: flex;
-      flex-wrap: wrap;
-      gap: calc(var(--spacing) * 4);
+      @apply flex flex-wrap gap-4;
     }
     .radiicard {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: calc(var(--spacing) * 2);
-      margin: 0;
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
-      color: var(--color-ink-muted);
+      @apply flex flex-col items-center gap-2 m-0 font-mono text-2xs text-ink-muted;
     }
     .radiicard-box {
-      width: 64px;
-      height: 64px;
-      background: var(--color-surface-sunken);
-      border: 1px solid var(--color-gold);
+      @apply w-16 h-16 bg-surface-sunken border border-gold;
     }
 
     /* ----- Component specimens --------------------------------------------- */
     .specimens {
-      display: grid;
+      @apply grid gap-4;
       grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: calc(var(--spacing) * 4);
     }
     .specimen {
-      display: flex;
-      flex-direction: column;
-      gap: calc(var(--spacing) * 4);
-      padding: calc(var(--spacing) * 4);
-      margin: 0;
+      @apply flex flex-col gap-4 p-4 m-0;
     }
     .specimen-row {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: calc(var(--spacing) * 3);
+      @apply flex flex-wrap items-center gap-3;
     }
     .specimen-col {
-      display: flex;
-      flex-direction: column;
-      gap: calc(var(--spacing) * 3);
+      @apply flex flex-col gap-3;
     }
 
     /* ----- Footer ----------------------------------------------------------- */
     .guide-foot {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding-top: calc(var(--spacing) * 6);
-      border-top: 1px solid var(--color-line);
-      font-size: var(--text-sm);
-      color: var(--color-ink-muted);
+      @apply flex justify-between items-center pt-6 border-t border-line text-sm text-ink-muted;
     }
     .guide-foot .brand {
-      font-size: var(--text-md);
-      color: var(--color-gold);
+      @apply text-md text-gold;
     }
     .guide-foot code {
-      font-family: var(--font-mono);
-      font-size: var(--text-2xs);
+      @apply font-mono text-2xs;
     }
 
     @media (max-width: 720px) {
       .section.is-split {
-        grid-template-columns: 1fr;
+        @apply grid-cols-1;
       }
     }
   `,
@@ -550,15 +472,7 @@ export class Styleguide {
     },
   ];
 
-  protected readonly spacing = [
-    '--spacing-1',
-    '--spacing-2',
-    '--spacing-3',
-    '--spacing-4',
-    '--spacing-5',
-    '--spacing-6',
-    '--spacing-7',
-  ];
+  protected readonly spacing = [1, 2, 3, 4, 6, 8, 12];
 
   protected readonly radii = [
     '--radius-sm',

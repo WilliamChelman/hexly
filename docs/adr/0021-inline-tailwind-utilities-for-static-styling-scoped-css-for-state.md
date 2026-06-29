@@ -18,8 +18,7 @@ styles" necessarily meant "all of it lives in `styles:`". ADR-0020 made the
 tokens *be* the Tailwind theme: `bg-surface`, `text-ink-muted`, `gap-5`,
 `rounded-lg`, `font-display`, `text-md` now resolve to the exact
 same `var(--…)` the scoped CSS used, re-theme under `[data-theme]` for free, and
-are lint-guarded (`hexly-design/no-off-scale-spacing`,
-`no-unknown-design-token`). (Shadows are the one exception: the `--shadow-*`
+are lint-guarded (`no-unknown-design-token`). (Shadows are the one exception: the `--shadow-*`
 theme namespace inlines a `shadow-*` utility's *value* rather than referencing
 `var(--shadow-*)`, so they can't be a `@theme` utility and re-theme — they move
 to raw vars wrapped in a custom `@utility`, see the Decision below.) That removes
@@ -71,8 +70,8 @@ state or share a property with the converted ones.
   or a self-contained `min()`/`max()`/`clamp()`/`calc()` over fixed lengths and
   viewport units (`max-w-[min(90vw,32rem)]`) — converts to a Tailwind
   arbitrary-value utility (`…-[…]`) rather than forcing the rule to stay scoped.
-  The value is still a faithful 1:1 translation, and `no-off-scale-spacing`
-  already sanctions the bracket form as the explicit opt-out. This does **not**
+  The value is still a faithful 1:1 translation, and the bracket form is always
+  an acceptable opt-out. This does **not**
   extend to an expression that composes a design token or component-local var
   (e.g. `color-mix(in oklab, var(--color-surface) 86%, transparent)`, or a
   `calc()` over `var(--…)`): those stay scoped so they re-theme and stay read

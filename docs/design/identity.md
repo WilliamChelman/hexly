@@ -53,10 +53,9 @@ both generates an on-brand, theme-aware utility (`bg-surface`, `text-ink`,
 shadows are declared non-`inline` so `[data-theme='dark']` (tokens.css) can
 reassign the generated `--color-*`/`--shadow-*`; `static` disables theme-variable
 tree-shaking so tokens read only by the Canvas renderer (`getComputedStyle`) or by
-raw `var(--…)` still resolve. Spacing is bridged with explicit `--spacing-1..9`
-keys, which Tailwind resolves before its `calc(var(--spacing) * N)` multiplier — so
-the bespoke non-linear scale survives under the same names. Use utilities for
-slice/shell layout; primitives keep their scoped styles.
+raw `var(--…)` still resolve. Spacing uses Tailwind's default linear scale
+(`calc(var(--spacing) * N)`, 0.25rem base); every step is open (ADR-0030). Use
+utilities for slice/shell layout; primitives keep their scoped styles.
 
 ## Typography
 

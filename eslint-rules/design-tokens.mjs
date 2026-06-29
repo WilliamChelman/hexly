@@ -168,7 +168,7 @@ const noBuiltinShadow = {
           p.type === 'Property' &&
           p.value === node &&
           (p.key.name === 'class' || p.key.value === 'class');
-        if (isClassProp || node.value.includes('class=')) scan(node, node.value);
+        if (isClassProp || node.value.includes('class=')) { const t = textOf(node); if (t) scan(node, t); }
       },
     };
   },
