@@ -123,6 +123,20 @@ describe('EntitiesClient', () => {
     expect(loaded.isHome).toBe(true);
   });
 
+  it('loads an entity whose document arrives already parsed (jsonschema JSON column, #130)', async () => {
+    // The `document` jsonschema CHECK makes TrailBase return the column as a parsed
+    // object, not a JSON string — the mapper must not JSON.parse an object.
+    const painted: EntityBody = {
+      ...emptyHexmapBody,
+      hexes: { [coordKey({ q: 1, r: 2 })]: { terrain: 'ocean' } },
+    };
+    store.seed('entities', [entityRow({ id: 'e1', document: painted as unknown as string })]);
+
+    const loaded = await firstValueFrom(client.load('e1'));
+
+    expect(loaded.document).toEqual(painted);
+  });
+
   it('renames an entity (metadata only) and re-reads it', async () => {
     store.seed('entities', [entityRow({ id: 'e1', name: 'Aldermoor' })]);
 
@@ -140,7 +154,7 @@ describe('EntitiesClient', () => {
     expect(store.rows('entities')).toEqual([]);
   });
 
-  it('saves the body last-write-wins, bumping the version, and reports saved', async () => {
+  it('saves the body under the base version; the version-bump trigger advances it, and reports saved', async () => {
     store.seed('entities', [entityRow({ id: 'e1', version: 1 })]);
     const painted: EntityBody = {
       ...emptyHexmapBody,
@@ -153,8 +167,28 @@ describe('EntitiesClient', () => {
 
     expect(outcome.status).toBe('saved');
     const row = store.rows('entities')[0];
+    // The client sends the base version (1); the UPDATE access-rule admits it and the
+    // bump trigger advances the stored counter — the client never sends version+1.
     expect(row['version']).toBe(2);
     expect(JSON.parse(row['document'] as string)).toEqual(painted);
     expect(JSON.parse(row['tags'] as string)).toEqual(['deity', 'ruined']);
+  });
+
+  it('routes a stale save (rejected by the version access-rule) through a conflict carrying the server state', async () => {
+    // The row has moved on to version 5; a save under base version 3 is stale.
+    store.seed('entities', [entityRow({ id: 'e1', version: 5, name: 'Newer' })]);
+
+    const outcome = await firstValueFrom(
+      client.save('e1', emptyHexmapBody, 3, [], []),
+    );
+
+    // No throw: the rejected write becomes a conflict the session re-pulls from.
+    expect(outcome.status).toBe('conflict');
+    if (outcome.status === 'conflict') {
+      expect(outcome.current.version).toBe(5);
+      expect(outcome.current.name).toBe('Newer');
+    }
+    // The stale write did not land.
+    expect(store.rows('entities')[0]['version']).toBe(5);
   });
 });

@@ -39,8 +39,19 @@ record_apis {
   acl_authenticated: [CREATE, READ, UPDATE, DELETE]
   create_access_rule: "_USER_.id IS NOT NULL"
   read_access_rule: "_ROW_.owner_id = _USER_.id"
-  update_access_rule: "_ROW_.owner_id = _USER_.id"
+  # Optimistic concurrency (#130, ADR-0032): a body save sends the base `version` it last
+  # read; a stale one (the row has since advanced) is rejected here (403). Metadata-only
+  # updates (rename) omit `version`, so the IS NULL arm lets them through unchecked. The
+  # `AFTER UPDATE` trigger advances the stored counter — the client never sends version+1.
+  update_access_rule: "_ROW_.owner_id = _USER_.id AND (_REQ_.version IS NULL OR _REQ_.version = _ROW_.version)"
   # The Home Entity is undeletable (ADR-0024): the DELETE rule excludes it.
   delete_access_rule: "_ROW_.owner_id = _USER_.id AND _ROW_.is_home = FALSE"
   autofill_missing_user_id_columns: true
 }
+
+# BEGIN GENERATED entity_body schema — regenerate with `pnpm gen:schema` (do not edit by hand)
+schemas {
+  name: "entity_body"
+  schema: '{"$schema":"https://json-schema.org/draft/2020-12/schema","oneOf":[{"type":"object","properties":{"type":{"type":"string","const":"note"},"content":{"type":"object","properties":{"format":{"type":"string","enum":["tiptap-v1","tiptap-v2"]},"snapshot":{}},"required":["format","snapshot"],"additionalProperties":false}},"required":["type","content"],"additionalProperties":false},{"type":"object","properties":{"type":{"type":"string","const":"hexmap"},"content":{"type":"object","properties":{"format":{"type":"string","enum":["tiptap-v1","tiptap-v2"]},"snapshot":{}},"required":["format","snapshot"],"additionalProperties":false},"hexes":{"type":"object","propertyNames":{"type":"string"},"additionalProperties":{"type":"object","properties":{"terrain":{"type":"string","enum":["grass","forest","ocean","mountain","desert","sky"]},"feature":{"type":"object","properties":{"ref":{"type":"string","enum":["settlement","ruin"]},"entityId":{"type":"string"}},"required":["ref"],"additionalProperties":false},"name":{"type":"string"},"entityId":{"type":"string"}},"required":["terrain"],"additionalProperties":false}},"regions":{"default":[],"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"name":{"type":"string"},"color":{"type":"string","pattern":"^#[0-9a-fA-F]{6}$"},"hexes":{"type":"object","propertyNames":{"type":"string"},"additionalProperties":{"type":"boolean","const":true}},"entityId":{"type":"string"}},"required":["id","name","color","hexes"],"additionalProperties":false}},"labels":{"default":[],"type":"array","items":{"type":"object","properties":{"id":{"type":"string"},"text":{"type":"string"},"position":{"type":"object","properties":{"x":{"type":"number"},"y":{"type":"number"}},"required":["x","y"],"additionalProperties":false},"size":{"type":"number","exclusiveMinimum":0},"rotation":{"type":"number"}},"required":["id","text","position","size"],"additionalProperties":false}}},"required":["type","content","hexes","regions","labels"],"additionalProperties":false}]}'
+}
+# END GENERATED entity_body schema

@@ -1,4 +1,4 @@
-import { enterLibrary, expect, flushSave, test } from './fixtures';
+import { enterLibrary, expect, flushSave, readEntity, test } from './fixtures';
 
 /**
  * The whole-Hex move journey (issue #30, ADR-0010). It crosses the one seam the
@@ -18,7 +18,7 @@ test('drags a hex under Select to a new coordinate, and the move survives a relo
 }) => {
   await enterLibrary(page);
   await page.getByTestId('new-map').click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  await expect(page).toHaveURL(/\/entities\/[^/]+$/);
   const mapId = page.url().split('/').pop();
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
@@ -62,10 +62,8 @@ test('drags a hex under Select to a new coordinate, and the move survives a relo
 
   // The persisted document holds one hex, no longer at the origin, still Forest:
   // the origin became Void and the destination took the moved content.
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  const hexes = detail.document.hexes as Record<string, { terrain: string }>;
+  const { document } = await readEntity(page, request, mapId);
+  const hexes = document.hexes as Record<string, { terrain: string }>;
   expect(Object.keys(hexes)).toHaveLength(1);
   expect(hexes['0,0']).toBeUndefined();
   expect(hexes['1,0']).toEqual({ terrain: 'forest' });
@@ -102,7 +100,7 @@ test('drags a hex onto an occupied hex and swaps the two, surviving a reload', a
 }) => {
   await enterLibrary(page);
   await page.getByTestId('new-map').click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  await expect(page).toHaveURL(/\/entities\/[^/]+$/);
   const mapId = page.url().split('/').pop();
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
@@ -148,10 +146,8 @@ test('drags a hex onto an occupied hex and swaps the two, surviving a reload', a
   // Persist, then read the saved document directly: the two records are exchanged.
   await flushSave(page);
 
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  const hexes = detail.document.hexes as Record<string, { terrain: string }>;
+  const { document } = await readEntity(page, request, mapId);
+  const hexes = document.hexes as Record<string, { terrain: string }>;
   expect(hexes['0,0']).toEqual({ terrain: 'ocean' });
   expect(hexes['1,0']).toEqual({ terrain: 'forest' });
 
@@ -177,7 +173,7 @@ test('Escape cancels an in-progress Hex drag, leaving the hex at its origin', as
 }) => {
   await enterLibrary(page);
   await page.getByTestId('new-map').click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  await expect(page).toHaveURL(/\/entities\/[^/]+$/);
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
 
@@ -229,7 +225,7 @@ test('drags a multi-hex selection so the whole group moves by one offset', async
 }) => {
   await enterLibrary(page);
   await page.getByTestId('new-map').click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  await expect(page).toHaveURL(/\/entities\/[^/]+$/);
   const mapId = page.url().split('/').pop();
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
@@ -274,10 +270,8 @@ test('drags a multi-hex selection so the whole group moves by one offset', async
   // cluster kept its shape — Forest at q1·r0 and Ocean at q2·r0, the centre now Void.
   await flushSave(page);
 
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  const hexes = detail.document.hexes as Record<string, { terrain: string }>;
+  const { document } = await readEntity(page, request, mapId);
+  const hexes = document.hexes as Record<string, { terrain: string }>;
   expect(hexes['0,0']).toBeUndefined();
   expect(hexes['1,0']).toEqual({ terrain: 'forest' });
   expect(hexes['2,0']).toEqual({ terrain: 'ocean' });
@@ -295,7 +289,7 @@ test('refuses a blocked group move, leaving every hex where it was', async ({
 }) => {
   await enterLibrary(page);
   await page.getByTestId('new-map').click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  await expect(page).toHaveURL(/\/entities\/[^/]+$/);
   const mapId = page.url().split('/').pop();
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
@@ -342,10 +336,8 @@ test('refuses a blocked group move, leaving every hex where it was', async ({
 
   await flushSave(page);
 
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  const hexes = detail.document.hexes as Record<string, { terrain: string }>;
+  const { document } = await readEntity(page, request, mapId);
+  const hexes = document.hexes as Record<string, { terrain: string }>;
   // Every hex is exactly where it was painted — the blocked move changed nothing.
   expect(hexes['0,0']).toEqual({ terrain: 'forest' });
   expect(hexes['1,0']).toEqual({ terrain: 'ocean' });

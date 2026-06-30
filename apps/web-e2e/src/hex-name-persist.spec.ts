@@ -1,4 +1,4 @@
-import { enterLibrary, expect, flushSave, test } from './fixtures';
+import { enterLibrary, expect, flushSave, readEntity, test } from './fixtures';
 
 /**
  * The hex-name journey (issue #60, ADR-0016): a painted Hex is named in the
@@ -19,7 +19,7 @@ test('names a painted hex in the Inspector, and the name survives a reload', asy
   await page.getByTestId('new-map').click();
 
   // Creating a map opens the editor at /entities/:id.
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  await expect(page).toHaveURL(/\/entities\/[^/]+$/);
   const mapId = page.url().split('/').pop();
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
@@ -50,10 +50,8 @@ test('names a painted hex in the Inspector, and the name survives a reload', asy
   await page.reload();
 
   // The persisted document really holds the named hex.
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  expect(detail.document.hexes['0,0']).toEqual({ terrain: 'ocean', name: 'Riverbend' });
+  const { document } = await readEntity(page, request, mapId);
+  expect(document.hexes['0,0']).toEqual({ terrain: 'ocean', name: 'Riverbend' });
 
   // The reloaded map boots in Select (issue #27). Clicking the centre re-selects the
   // re-rendered hex, and the Inspector shows its persisted name, ready to re-edit.

@@ -1,4 +1,4 @@
-import { enterLibrary, expect, flushSave, test } from './fixtures';
+import { enterLibrary, expect, flushSave, readEntity, test } from './fixtures';
 
 /**
  * The Region journey (issue #8, #38, #39, ADR-0012): a region created in the Regions
@@ -17,7 +17,7 @@ test('creates a region in the panel, paints a hex, saves, and the region survive
   await page.getByTestId('new-map').click();
 
   // Creating a map opens the editor at /entities/:id.
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  await expect(page).toHaveURL(/\/entities\/[^/]+$/);
   const mapId = page.url().split('/').pop();
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
@@ -42,12 +42,10 @@ test('creates a region in the panel, paints a hex, saves, and the region survive
 
   // Read the persisted document: it proves the round trip held the region with that
   // coordinate in its membership set, and its auto-assigned 'Region 1' name.
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  expect(detail.document.regions).toHaveLength(1);
-  expect(detail.document.regions[0].hexes).toEqual({ '0,0': true });
-  expect(detail.document.regions[0].name).toBe('Region 1');
+  const { document } = await readEntity(page, request, mapId);
+  expect(document.regions).toHaveLength(1);
+  expect(document.regions[0].hexes).toEqual({ '0,0': true });
+  expect(document.regions[0].name).toBe('Region 1');
 
   // The reloaded map boots in Select (issue #27). Clicking the centre hex selects
   // the Region that contains (0,0) — a Void coordinate inside a Region selects it

@@ -2,6 +2,7 @@ import {
   test as base,
   expect,
   type APIRequestContext,
+  type APIResponse,
   type Page,
   type Response,
 } from '@playwright/test';
@@ -75,13 +76,53 @@ export async function authToken(page: Page): Promise<string> {
 }
 
 /**
- * Wait for a successful entity save. Save (optimistic concurrency, the `version`
- * UPDATE access-rule) returns in slice #4 (#129 covers reads/writes only), so the
- * persist/link specs that flush a save are quarantined here at the one chokepoint
- * they share — rather than annotating ~16 files — until #4 brings them back.
+ * The persisted Entity body as the specs drill into it (ADR-0019 keeps it opaque to the
+ * domain, but a test asserts on concrete fields). Loosely typed like the raw JSON it is.
+ */
+interface PersistedDocument {
+  type: string;
+  content: { format: string; snapshot: unknown };
+  hexes: Record<
+    string,
+    { terrain: string; name?: string; entityId?: string; feature?: { ref: string; entityId?: string } }
+  >;
+  regions: Record<string, unknown>[];
+  labels: Record<string, unknown>[];
+}
+
+/** A persisted Entity read straight off the wire — `document` parsed, `tags` decoded. */
+interface PersistedEntity {
+  readonly res: APIResponse;
+  readonly document: PersistedDocument;
+  readonly tags: string[];
+}
+
+/**
+ * Read an Entity directly from the TrailBase `entities` Record API as the seeded user
+ * (ADR-0009 independent-channel proof that a save persisted; ADR-0032). Replaces the
+ * retired NestJS `GET /api/entities/:id`. `id` is the percent-encoded id taken from the
+ * page URL — it rides the path as-is. `document` is a jsonschema JSON column (#130) so it
+ * arrives already parsed; `tags` is a JSON string, decoded here.
+ */
+export async function readEntity(
+  page: Page,
+  request: APIRequestContext,
+  id: string,
+): Promise<PersistedEntity> {
+  const res = await request.get(`/api/records/v1/entities/${id}`, {
+    headers: { authorization: `Bearer ${await authToken(page)}` },
+  });
+  const row = (await res.json()) as { document: PersistedEntity['document']; tags?: string };
+  return { res, document: row.document, tags: JSON.parse(row.tags ?? '[]') as string[] };
+}
+
+/**
+ * Wait for a successful entity save. Save + optimistic concurrency (the `version`
+ * UPDATE access-rule) landed in slice #4 (#130), so this no longer quarantines — it
+ * waits for the PATCH the autosave/flush emits. The conflict path returns
+ * `{status:'conflict'}` client-side, not a failed PATCH, so `res.ok()` still holds.
  */
 export function waitForSave(page: Page): Promise<Response> {
-  test.skip(true, 'Save/concurrency returns in slice #4 (#129).');
   return page.waitForResponse(
     (res) => res.request().method() === 'PATCH' && res.ok(),
   );
@@ -112,14 +153,21 @@ export async function enterSeedLibrary(page: Page): Promise<string> {
 }
 
 /**
- * The quarantined library entry. #129 restored Worlds/Entities reads/writes
- * (entity-browser.spec enters via {@link enterSeedLibrary}), but the persist / link /
- * select / move specs exercise saving and editing features that return on TrailBase
- * in later slices (#4 save + optimistic concurrency, #5 sharing + Entity Links). They
- * all enter here, so they skip from this one chokepoint rather than ~30 per-file
- * annotations. Delete the skip per spec as each slice migrates it back.
+ * Library entry for the map persist / selection / move specs. Slice #4 (#130) brought
+ * save + optimistic concurrency back, lifting the blanket quarantine that lived here —
+ * this is now a thin alias for {@link enterSeedLibrary}. The Entity Link specs that still
+ * need slice #5 (sharing + Entity Links + the descriptor index) carry their own per-file
+ * {@link quarantineSlice5} skip instead.
  */
 export async function enterLibrary(page: Page): Promise<string> {
-  test.skip(true, 'Map persist / links / selection return on TrailBase in slices #4–#5.');
   return enterSeedLibrary(page);
+}
+
+/**
+ * Per-file skip for the Entity Link journeys (#76/#78/#95/#96): they exercise link
+ * resolution, the `@`/`::` pickers, and the server descriptor index — all slice #5,
+ * not yet on TrailBase. Call it first in each such spec; drop it as #5 migrates them.
+ */
+export function quarantineSlice5(): void {
+  test.skip(true, 'Entity Links + descriptor index return on TrailBase in slice #5.');
 }

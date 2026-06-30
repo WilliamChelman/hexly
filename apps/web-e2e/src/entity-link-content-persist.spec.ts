@@ -1,4 +1,4 @@
-import { enterLibrary, expect, flushSave, test } from './fixtures';
+import { enterLibrary, expect, flushSave, quarantineSlice5, test } from './fixtures';
 
 /**
  * The Content Entity Link journey (issue #95, ADR-0023): an author drops a live
@@ -13,6 +13,7 @@ test('inserts a Content Entity Link via @, persists it, navigates it, and dangle
   page,
   request,
 }) => {
+  quarantineSlice5();
   // Seed the link target: a note the picker can list and a click can jump to.
   await enterLibrary(page);
   await page.getByTestId('new-note').click();

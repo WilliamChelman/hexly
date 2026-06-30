@@ -1,4 +1,4 @@
-import { enterLibrary, expect, flushSave, test } from './fixtures';
+import { enterLibrary, expect, flushSave, quarantineSlice5, test } from './fixtures';
 
 /**
  * The Link Descriptor journey (issue #96, ADR-0023): an author characterises a Content
@@ -13,6 +13,7 @@ test('characterises a Content Entity Link via :: , persists the descriptor, and 
   page,
   request,
 }) => {
+  quarantineSlice5();
   // Seed the link target.
   await enterLibrary(page);
   await page.getByTestId('new-note').click();

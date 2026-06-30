@@ -111,7 +111,16 @@ class FakeRecordApi<T extends Row> {
   async update(id: RecordId, record: Partial<T>): Promise<void> {
     const row = this.store.rows(this.table).find((r) => r['id'] === id);
     if (!row) throw new Error(`record ${String(id)} not found`);
+    // Optimistic concurrency (ADR-0032): an update carrying `version` is admitted only
+    // when it matches the row's current value — the entities UPDATE access-rule
+    // `_REQ_.version = _ROW_.version`. A stale one is rejected exactly as TrailBase does,
+    // a FetchError with a numeric `status` (403). The admitted write advances the counter,
+    // mirroring the AFTER UPDATE bump trigger — so the client sends the base, never base+1.
+    if (record['version'] !== undefined && record['version'] !== row['version']) {
+      throw Object.assign(new Error(`stale version for ${String(id)}`), { status: 403 });
+    }
     Object.assign(row, record);
+    if (record['version'] !== undefined) row['version'] = (record['version'] as number) + 1;
   }
 
   async delete(id: RecordId): Promise<void> {

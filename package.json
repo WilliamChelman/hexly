@@ -9,6 +9,7 @@
     "dev:web": "nx serve web",
     "serve": "nx build web && node scripts/trailbase.mjs run -a localhost:3000 --public-dir dist/apps/web/browser --spa",
     "trail": "node scripts/trailbase.mjs",
+    "gen:schema": "tsx scripts/gen-entity-schema.ts",
     "seed": "node scripts/seed-user.mjs",
     "db:generate": "cd apps/api && drizzle-kit generate",
     "build": "nx run-many -t build -p api,web",

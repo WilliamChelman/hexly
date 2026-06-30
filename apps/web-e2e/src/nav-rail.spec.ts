@@ -27,7 +27,7 @@ test('the rail navigates, exposes account controls, and pages own their headers'
 
   // Into the editor: its header holds only the map's controls now.
   await page.getByRole('button', { name: 'New map' }).click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  await expect(page).toHaveURL(/\/entities\/[^/]+$/);
   await expect(page.getByTestId('title')).toBeVisible();
   await expect(page.getByTestId('save-status')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Share' })).toBeVisible();

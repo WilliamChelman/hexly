@@ -1,4 +1,4 @@
-import { enterLibrary, expect, flushSave, test } from './fixtures';
+import { enterLibrary, expect, flushSave, readEntity, test } from './fixtures';
 
 /** #72 — tags share the version-checked save path and are stored as Entity metadata (ADR-0018). */
 test('adds tags on a note, saves, and they survive reload and show in the library', async ({
@@ -8,8 +8,11 @@ test('adds tags on a note, saves, and they survive reload and show in the librar
   await enterLibrary(page);
   await page.getByTestId('new-note').click();
 
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  await expect(page).toHaveURL(/\/entities\/[^/]+$/);
+  // The URL carries the percent-encoded id (TrailBase base64 ids end in `==` → `%3D%3D`);
+  // the API path takes it as-is, but the library testids carry the raw id, so decode for those.
   const noteId = page.url().split('/').pop();
+  const rawNoteId = decodeURIComponent(noteId!);
 
   // Add two tags through the editor: comma-separated entry adds both at once.
   const tagInput = page.getByTestId('tag-input');
@@ -30,11 +33,10 @@ test('adds tags on a note, saves, and they survive reload and show in the librar
   await expect(page.getByTestId('entity-tags')).not.toContainText('ruined');
 
   await page.getByRole('link', { name: 'Library' }).click();
-  await expect(page.getByTestId(`tags-${noteId}`)).toContainText('deity');
-  await expect(page.getByTestId(`tags-${noteId}`)).not.toContainText('ruined');
+  await expect(page.getByTestId(`tags-${rawNoteId}`)).toContainText('deity');
+  await expect(page.getByTestId(`tags-${rawNoteId}`)).not.toContainText('ruined');
 
   // And the tags are stored as Entity metadata, not in the document body.
-  const res = await request.get(`/api/entities/${noteId}`);
-  expect(res.ok()).toBeTruthy();
-  expect((await res.json()).tags).toEqual(['deity']);
+  const persisted = await readEntity(page, request, noteId);
+  expect(persisted.tags).toEqual(['deity']);
 });
