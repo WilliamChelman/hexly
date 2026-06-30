@@ -4,8 +4,11 @@ import {
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 import { WorldDetail, WorldSummary } from '@hexly/domain';
 import { AuthClient } from './auth.client';
+import { makeUser, provideFakeTrailbase } from '../testing/fake-trailbase-client';
 import { WorldStore } from './world.store';
 
 function world(id: string, name = id): WorldSummary {
@@ -15,10 +18,12 @@ function world(id: string, name = id): WorldSummary {
 describe('WorldStore', () => {
   let store: WorldStore;
   let http: HttpTestingController;
+  let tb: ReturnType<typeof provideFakeTrailbase>;
 
   beforeEach(() => {
+    tb = provideFakeTrailbase();
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideHttpClient(), provideHttpClientTesting(), tb.provider, provideRouter([])],
     });
     store = TestBed.inject(WorldStore);
     http = TestBed.inject(HttpTestingController);
@@ -26,17 +31,18 @@ describe('WorldStore', () => {
 
   afterEach(() => {
     http.verify();
+    // A fake-backed login persists a token (via the real onAuthChange); clear it
+    // so it can't leak into another spec's session.
+    localStorage.clear();
   });
 
   function flushList(worlds: WorldSummary[]): void {
     http.expectOne('/api/worlds').flush(worlds);
   }
 
-  function login(id = 'u1'): void {
-    TestBed.inject(AuthClient).login('ada@hexly.test', 'pw').subscribe();
-    http
-      .expectOne('/api/auth/login')
-      .flush({ id, email: 'ada@hexly.test', displayName: 'Ada' });
+  async function login(id = 'u1'): Promise<void> {
+    tb.client.nextLogin = { user: makeUser(id, 'ada@hexly.test') };
+    await firstValueFrom(TestBed.inject(AuthClient).login('ada@hexly.test', 'pw'));
   }
 
   it('loads the caller’s Worlds and marks loaded', () => {
@@ -84,24 +90,23 @@ describe('WorldStore', () => {
     expect(store.worlds().map((w) => w.id)).toEqual(['w1', 'w2']);
   });
 
-  it('forgets the loaded Worlds when the authenticated user changes', () => {
-    login('u1');
+  it('forgets the loaded Worlds when the authenticated user changes', async () => {
+    await login('u1');
     TestBed.flushEffects();
     store.load();
     flushList([world('w1')]);
     expect(store.worlds()).toHaveLength(1);
 
     // Logout clears the user — the next user must not see u1's Worlds.
-    TestBed.inject(AuthClient).logout().subscribe();
-    http.expectOne('/api/auth/logout').flush(null);
+    await firstValueFrom(TestBed.inject(AuthClient).logout());
     TestBed.flushEffects();
 
     expect(store.worlds()).toEqual([]);
     expect(store.loaded()).toBe(false);
   });
 
-  it('keeps the loaded Worlds when the same user logs in again (e.g. a re-auth)', () => {
-    login('u1');
+  it('keeps the loaded Worlds when the same user logs in again (e.g. a re-auth)', async () => {
+    await login('u1');
     TestBed.flushEffects();
     store.load();
     flushList([world('w1')]);
@@ -109,7 +114,7 @@ describe('WorldStore', () => {
 
     // Re-login as the same user (fresh object, same id) must not wipe the list —
     // the always-mounted switcher relies on having loaded once.
-    login('u1');
+    await login('u1');
     TestBed.flushEffects();
 
     expect(store.worlds()).toHaveLength(1);

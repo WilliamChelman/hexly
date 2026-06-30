@@ -1,0 +1,20 @@
+# Hexly's TrailBase server config (ADR-0032). Committed; runtime state
+# (data/, secrets/, uploads/, …) is gitignored — see ./.gitignore.
+email {}
+server {
+  application_name: "Hexly"
+  logs_retention_sec: 604800
+}
+auth {
+  # Short-lived JWT + 30-day opaque refresh token. Revocation is TTL-bounded
+  # (revoke the refresh token; the live JWT expires within the hour) — this
+  # supersedes the instant-revocation half of ADR-0004.
+  auth_token_ttl_sec: 3600
+  refresh_token_ttl_sec: 2592000
+
+  # Closed user set (ADR-0004, preserved): no public sign-up. The /register
+  # endpoint is rejected (403) and existing users still log in with a password.
+  # Members are provisioned by an admin (see docs/agents/domain.md / README).
+  disable_password_auth: true
+}
+jobs {}

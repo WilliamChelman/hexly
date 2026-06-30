@@ -1,28 +1,20 @@
-import { inject, Injector } from '@angular/core';
+import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
-import { filter, first, map } from 'rxjs';
-import { toObservable } from '@angular/core/rxjs-interop';
 import { AuthClient } from '../services/auth.client';
 
 /**
- * Blocks a route until the session boot-check settles, then redirects to
- * `/login` if there is no authenticated user (ADR-0004). Guards wait for
- * `sessionLoading` rather than re-validating against the server on every
- * navigation — the rxResource auto-fetch runs once at boot and the result is
- * stable until an explicit login/logout.
+ * Redirects to `/login` (preserving the intended destination) when there is no
+ * authenticated user (ADR-0004). The check is synchronous: `AuthClient` settles
+ * the session from the stored JWT at construction (ADR-0032), so `currentUser`
+ * is already correct here — no server round-trip per navigation.
  */
 export const authGuard: CanActivateFn = (_route, state) => {
   const auth = inject(AuthClient);
   const router = inject(Router);
-  const injector = inject(Injector);
-  const toLogin = () =>
-    router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
 
-  return toObservable(auth.sessionLoading, { injector }).pipe(
-    filter((loading) => !loading),
-    first(),
-    map(() => (auth.isAuthenticated() ? true : toLogin())),
-  );
+  return auth.isAuthenticated()
+    ? true
+    : router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
 };
 
 /**
@@ -33,13 +25,8 @@ export const authGuard: CanActivateFn = (_route, state) => {
 export const loginGuard: CanActivateFn = (route) => {
   const auth = inject(AuthClient);
   const router = inject(Router);
-  const injector = inject(Injector);
-  const home = () =>
-    router.parseUrl(route.queryParamMap.get('returnUrl') ?? '/');
 
-  return toObservable(auth.sessionLoading, { injector }).pipe(
-    filter((loading) => !loading),
-    first(),
-    map(() => (auth.isAuthenticated() ? home() : true)),
-  );
+  return auth.isAuthenticated()
+    ? router.parseUrl(route.queryParamMap.get('returnUrl') ?? '/')
+    : true;
 };

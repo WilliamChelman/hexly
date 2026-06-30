@@ -12,9 +12,9 @@ const baseURL = process.env.E2E_BASE_URL ?? `http://localhost:${port}`;
 
 /**
  * E2E runs against the real production build on a single origin (ADR-0008,
- * ADR-0009): `e2e-server.mjs` seeds a throwaway DB and boots one Nest process
- * that serves both the API and the built SPA. Serial (`workers: 1`) because the
- * suite shares one DB and resets it between tests via a global endpoint.
+ * ADR-0009, ADR-0032): `e2e-server.mjs` seeds a throwaway TrailBase depot and
+ * boots one TrailBase process that serves both the API and the built SPA. Serial
+ * (`workers: 1`) because the suite shares one depot and resets it between tests.
  */
 export default defineConfig({
   testDir: join(__dirname, 'src'),

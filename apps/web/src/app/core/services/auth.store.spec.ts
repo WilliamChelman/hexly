@@ -1,140 +1,86 @@
-import { Component } from '@angular/core';
-import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter, Router } from '@angular/router';
+import { provideRouter } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 import { AuthClient } from './auth.client';
+import {
+  makeUser,
+  provideFakeTrailbase,
+  restoredSession,
+} from '../testing/fake-trailbase-client';
 
-@Component({ template: '', standalone: true })
-class TestHost {}
+/**
+ * The session contract the route guards depend on (ADR-0004, ADR-0032):
+ * `currentUser`/`isAuthenticated` reflect the live session, settled synchronously
+ * from the restored JWT (no `sessionLoading` — there's no boot round-trip to wait
+ * on). The TrailBase wire itself is exercised end-to-end by the e2e suite; here
+ * the client is faked so the orchestration is tested in isolation.
+ */
+describe('AuthClient session', () => {
+  afterEach(() => localStorage.clear());
 
-/** Drain the microtask queue — rxResource defers its status update via queueMicrotask. */
-const tick = () => new Promise((r) => queueMicrotask(r as () => void));
+  function setup(seed?: { tokens: ReturnType<typeof restoredSession> }) {
+    const tb = provideFakeTrailbase(seed);
+    TestBed.configureTestingModule({ providers: [tb.provider, provideRouter([])] });
+    const client = TestBed.inject(AuthClient);
+    return { client, tb };
+  }
 
-describe('AuthClient.sessionLoading', () => {
-  let client: AuthClient;
-  let http: HttpTestingController;
-
-  beforeEach(() => {
-    TestBed.configureTestingModule({
-      imports: [TestHost],
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+  describe('with no restored session', () => {
+    it('is signed out: currentUser null', () => {
+      const { client } = setup();
+      expect(client.currentUser()).toBeNull();
+      expect(client.isAuthenticated()).toBe(false);
     });
-    client = TestBed.inject(AuthClient);
-    http = TestBed.inject(HttpTestingController);
   });
 
-  afterEach(() => {
-    http.match('/api/auth/me');
-    http.verify();
-  });
-
-  it('is true from the moment the service is constructed (rxResource pre-loads)', () => {
-    // rxResource starts in "loading" state before any CD — guards must wait for
-    // sessionLoading to settle, not assume it starts false.
-    expect(client.sessionLoading()).toBe(true);
-  });
-
-  it('is true while the boot check is in flight', async () => {
-    TestBed.createComponent(TestHost).detectChanges();
-    expect(client.sessionLoading()).toBe(true);
-    http.expectOne('/api/auth/me').flush(null, { status: 401, statusText: 'Unauthorized' });
-    await tick(); // rxResource defers status → resolved via queueMicrotask
-    expect(client.sessionLoading()).toBe(false);
-  });
-
-  it('is false once the boot check resolves to a user', async () => {
-    TestBed.createComponent(TestHost).detectChanges();
-    http.expectOne('/api/auth/me').flush({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada' });
-    await tick();
-    expect(client.sessionLoading()).toBe(false);
-  });
-
-  it('resolves to null when the boot check returns 401', async () => {
-    TestBed.createComponent(TestHost).detectChanges();
-    http.expectOne('/api/auth/me').flush(null, { status: 401, statusText: 'Unauthorized' });
-    await tick();
-    expect(client.currentUser()).toBeNull();
-    expect(client.isAuthenticated()).toBe(false);
-  });
-});
-
-describe('AuthClient', () => {
-  let client: AuthClient;
-  let http: HttpTestingController;
-
-  const ada = { id: 'u1', email: 'ada@hexly.test', displayName: 'Ada' };
-
-  beforeEach(() => {
-    TestBed.configureTestingModule({
-      providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        provideRouter([]),
-      ],
+  describe('with a session restored from storage', () => {
+    it('trusts the restored JWT: signed in immediately', () => {
+      const { client } = setup({ tokens: restoredSession('u1') });
+      // The unexpired JWT is authority on boot (ADR-0032) — no server round-trip,
+      // so guards see a settled, authenticated session at once.
+      expect(client.currentUser()?.id).toBe('u1');
+      expect(client.isAuthenticated()).toBe(true);
     });
-    client = TestBed.inject(AuthClient);
-    http = TestBed.inject(HttpTestingController);
-  });
 
-  afterEach(() => http.verify());
+    it('signs out when the background revalidation finds the session revoked', () => {
+      const { client, tb } = setup({ tokens: restoredSession('u1') });
+      expect(client.isAuthenticated()).toBe(true);
 
-  it('records the current user after a successful login', () => {
-    client.login('ada@hexly.test', 'correct horse').subscribe();
+      // TTL-bounded revocation: the background check downgrades us to signed-out.
+      tb.client.emitBoot(undefined);
 
-    const req = http.expectOne('/api/auth/login');
-    expect(req.request.body).toEqual({
-      email: 'ada@hexly.test',
-      password: 'correct horse',
+      expect(client.currentUser()).toBeNull();
     });
-    req.flush(ada);
-
-    expect(client.currentUser()).toEqual(ada);
-    expect(client.isAuthenticated()).toBe(true);
   });
 
-  it('clears the current user on logout', () => {
-    client.login('ada@hexly.test', 'correct horse').subscribe();
-    http.expectOne('/api/auth/login').flush(ada);
+  describe('login / logout', () => {
+    it('establishes the user on a successful login', async () => {
+      const { client, tb } = setup();
+      tb.client.nextLogin = { user: makeUser('u1', 'ada@hexly.test') };
 
-    client.logout().subscribe();
-    http.expectOne('/api/auth/logout').flush(null);
+      const user = await firstValueFrom(client.login('ada@hexly.test', 'pw'));
 
-    expect(client.currentUser()).toBeNull();
-    expect(client.isAuthenticated()).toBe(false);
-  });
-
-  it('clears the current user even when logout fails', () => {
-    client.login('ada@hexly.test', 'correct horse').subscribe();
-    http.expectOne('/api/auth/login').flush(ada);
-
-    let completed = false;
-    client.logout().subscribe({
-      error: () => undefined,
-      complete: () => (completed = true),
+      expect(user.displayName).toBe('ada');
+      expect(client.isAuthenticated()).toBe(true);
+      expect(client.currentUser()?.id).toBe('u1');
     });
-    http
-      .expectOne('/api/auth/logout')
-      .flush(null, { status: 500, statusText: 'Server Error' });
 
-    expect(client.currentUser()).toBeNull();
-    expect(client.isAuthenticated()).toBe(false);
-    expect(completed).toBe(true);
-  });
+    it('rejects and stays signed-out on a bad login', async () => {
+      const { client, tb } = setup();
+      tb.client.nextLogin = { error: new Error('401') };
 
-  it('navigates to /login on sign-out regardless of whether logout succeeds', () => {
-    const navigate = vi
-      .spyOn(TestBed.inject(Router), 'navigateByUrl')
-      .mockResolvedValue(true);
+      await expect(firstValueFrom(client.login('ada@hexly.test', 'nope'))).rejects.toThrow();
+      expect(client.isAuthenticated()).toBe(false);
+    });
 
-    client.signOut();
-    http
-      .expectOne('/api/auth/logout')
-      .flush(null, { status: 500, statusText: 'Server Error' });
+    it('clears the user on logout', async () => {
+      const { client, tb } = setup();
+      tb.client.nextLogin = { user: makeUser('u1') };
+      await firstValueFrom(client.login('u1@test.com', 'pw'));
 
-    expect(navigate).toHaveBeenCalledWith('/login');
+      await firstValueFrom(client.logout());
+
+      expect(client.currentUser()).toBeNull();
+    });
   });
 });

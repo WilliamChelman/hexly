@@ -22,8 +22,17 @@ test('guards the app, signs in, and signs out', async ({ page }) => {
   await page.getByRole('button', { name: 'Sign in' }).click();
 
   // The returnUrl carries us back to the gated page we were headed to — the Index.
+  // We assert the authed shell (the nav rail) rather than World content: Worlds
+  // are still on `/api/...` this slice (#128) and return to TrailBase in #3, so
+  // the rail is the durable "we're signed in and inside the app" signal.
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole('heading', { name: /Welcome back/ })).toBeVisible();
+  await expect(page.getByTestId('nav-rail')).toBeVisible();
+
+  // Session survives a reload: the stored tokens re-authenticate on boot rather
+  // than bouncing back to /login (ADR-0032 — short-lived JWT + refresh token).
+  await page.reload();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByTestId('nav-rail')).toBeVisible();
 
   // Sign out returns to /login (the action lives behind the rail avatar, ADR-0022)...
   await page.getByRole('button', { name: 'Open user menu' }).click();

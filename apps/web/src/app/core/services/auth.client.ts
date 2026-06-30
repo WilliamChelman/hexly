@@ -1,56 +1,60 @@
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import {
-  computed, Injectable, Injector, inject, Signal,
-} from '@angular/core';
-import { rxResource } from '@angular/core/rxjs-interop';
+import { computed, Injectable, Signal, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { catchError, finalize, Observable, of, tap, throwError } from 'rxjs';
+import { catchError, finalize, from, map, Observable, of } from 'rxjs';
+import type { User } from 'trailbase';
 import { AuthUser } from '@hexly/domain';
+import { TrailbaseClient } from './trailbase-client';
 
 /**
- * The web client's view of the session (ADR-0004, ADR-0005). The actual session
- * lives in an HttpOnly cookie; this service mirrors who it authenticates as
- * signals. The cookie is sent automatically via the `withCredentials` interceptor.
+ * TrailBase's `User` carries no display name, so derive one from the email's
+ * local part (the closed set logs in with email). Falls back to the id only if
+ * an account somehow has neither — never blank, which the avatar relies on.
+ */
+function toAuthUser(user: User | undefined): AuthUser | null {
+  if (!user) return null;
+  const email = user.email ?? user.username ?? '';
+  return { id: user.id, email, displayName: email.split('@')[0] || email || user.id };
+}
+
+/**
+ * The web client's view of the session (ADR-0004, ADR-0032) — a thin domain
+ * facade over {@link TrailbaseClient}. It maps the transport's `User` to the
+ * `AuthUser` the app speaks via the `currentUser`/`isAuthenticated` signals the
+ * route guards key off. The underlying client (and its session state) is owned
+ * by `TrailbaseClient`, which any consumer can inject directly.
+ *
+ * There's no `sessionLoading`: the restored JWT settles the session synchronously
+ * at construction (ADR-0032 — revocation is TTL-bounded, so we trust the
+ * unexpired token rather than waiting on a server round-trip), so `currentUser`
+ * is correct the moment a guard reads it. The background revalidation only
+ * *downgrades* us to signed-out later if the refresh token was revoked.
  */
 @Injectable({ providedIn: 'root' })
 export class AuthClient {
-  private readonly http = inject(HttpClient);
+  private readonly tb = inject(TrailbaseClient);
   private readonly router = inject(Router);
-  private readonly injector = inject(Injector);
 
-  private readonly session = rxResource<AuthUser | null, undefined>({
-    injector: this.injector,
-    defaultValue: null,
-    stream: () =>
-      this.http.get<AuthUser>('/api/auth/me').pipe(
-        catchError((err: unknown) => {
-          if (
-            err instanceof HttpErrorResponse &&
-            (err.status === 401 || err.status === 403)
-          ) {
-            return of(null);
-          }
-          return throwError(() => err);
-        }),
-      ),
-  });
-
-  readonly currentUser: Signal<AuthUser | null> = this.session.value.asReadonly();
+  readonly currentUser: Signal<AuthUser | null> = computed(() => toAuthUser(this.tb.user()));
   readonly isAuthenticated = computed(() => this.currentUser() !== null);
-  // true from construction until the boot /auth/me resolves; guards wait on this.
-  readonly sessionLoading = this.session.isLoading;
 
   login(email: string, password: string): Observable<AuthUser> {
-    return this.http
-      .post<AuthUser>('/api/auth/login', { email, password })
-      .pipe(tap((user) => this.session.set(user)));
+    // The session signal updates via the client's onAuthChange; we just surface
+    // the established AuthUser (and reject a login that didn't establish one).
+    return from(this.tb.client.login(email, password)).pipe(
+      map(() => {
+        const user = toAuthUser(this.tb.client.user());
+        if (!user) throw new Error('Login did not establish a session.');
+        return user;
+      }),
+    );
   }
 
-  // Mirror is cleared in finalize so a failed logout never leaves the UI stuck signed-in.
+  // The client revokes locally even if the network logout fails (firing
+  // onAuthChange → signed out), so swallowing the transport error is safe.
   logout(): Observable<void> {
-    return this.http.post<void>('/api/auth/logout', {}).pipe(
-      catchError(() => of(void 0)),
-      finalize(() => this.session.set(null)),
+    return from(this.tb.client.logout()).pipe(
+      map(() => undefined),
+      catchError(() => of(undefined)),
     );
   }
 

@@ -33,6 +33,13 @@ async function switchToWorld(page: Page, worldId: string): Promise<void> {
   await page.getByTestId(`switcher-option-${worldId}`).click();
 }
 
+// ponytail: #128 quarantine — World CRUD lives on `/api/worlds` (NestJS, no longer
+// wired into e2e) and returns on TrailBase in slice #3. This file never enters via
+// `enterLibrary`, so it carries its own skip. Delete in #3.
+test.beforeEach(() => {
+  test.skip(true, 'World CRUD returns on TrailBase in slice #3 (#128).');
+});
+
 test('the World Index lists reachable Worlds; creating one opens its Home Entity', async ({
   page,
 }) => {

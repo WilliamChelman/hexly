@@ -16,7 +16,8 @@
     "baseUrl": ".",
     "paths": {
       "@hexly/domain": ["./libs/domain/src/index.ts"],
-      "@hexly/immer": ["./libs/immer/src/index.ts"]
+      "@hexly/immer": ["./libs/immer/src/index.ts"],
+      "trailbase": ["./node_modules/trailbase/dist/src/index.d.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]

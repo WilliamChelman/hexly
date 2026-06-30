@@ -4,7 +4,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
+      # The TrailBase depot (DB, config.textproto, uploads). DATA_DIR=/data is
+      # baked into the image.
       - ./hexly-data:/data
-    environment:
-      HEXLY_DB_PATH: /data/hexly.db
     restart: unless-stopped

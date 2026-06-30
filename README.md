@@ -22,12 +22,18 @@ curl -O https://raw.githubusercontent.com/WilliamChelman/hexly/main/docker-compo
 docker compose up -d
 ```
 
-The container starts on port 3000. Data is persisted to a named Docker volume (`hexly-data`).
+The container runs a single TrailBase process serving the built SPA and the API on
+one origin (ADR-0008, ADR-0032). It starts on port 3000; the TrailBase depot (DB,
+config, uploads) is persisted to `./hexly-data`. The admin UI is at
+`http://localhost:3000/_/admin/`.
 
-**Seed the first user** (required before anyone can log in — there is no public signup):
+**Seed the first user** (required before anyone can log in — there is no public
+signup). Under the closed-set config both steps are needed: `user add` registers
+the account, `change-password` stores the usable credential.
 
 ```sh
-docker exec hexly-hexly-1 node dist/apps/api/seed.js <email> <password> "<display name>"
+docker exec hexly-hexly-1 trail --data-dir /data user add <email> <password>
+docker exec hexly-hexly-1 trail --data-dir /data user change-password <email> <password>
 ```
 
 **Upgrade** to the latest release:
@@ -49,62 +55,58 @@ pnpm install
 
 ## Local development
 
+The backbone is [TrailBase](https://trailbase.io) (ADR-0032) — a single binary
+that owns auth and (soon) the data APIs. The first run downloads the pinned
+release into `.trailbase/` (git-ignored); no manual install.
+
 ```sh
 pnpm dev
 ```
 
-Runs both apps together:
+Runs both together:
 
-- **API** on `http://localhost:3000`
+- **TrailBase** (API + admin) on `http://localhost:4000`
 - **Web** on `http://localhost:4200`
 
-The web dev server proxies `/auth` and `/health` to the API (see
-`apps/web/proxy.conf.json`), so the browser talks to a single origin and the
-session cookie rides along automatically.
+The web dev server proxies `/api` to TrailBase (see `apps/web/proxy.conf.json`),
+so the browser talks to a single origin. The **admin UI** is at
+`http://localhost:4000/_/admin/` — its credentials are printed to the terminal
+the first time TrailBase boots.
 
 Run them separately if you prefer:
 
 ```sh
-pnpm dev:api    # NestJS API only
+pnpm dev:api    # TrailBase only
 pnpm dev:web    # Angular app only
 ```
 
 ## Seeding a user (required to log in)
 
-There is **no public signup** — Hexly serves a small, closed set of users who
-are provisioned out-of-band (see
-[ADR-0004](./docs/adr/0004-closed-user-set-role-based-sharing.md)). So before you
-can log in locally you must seed at least one user:
+There is **no public signup** — Hexly serves a small, closed set of users
+(ADR-0004) provisioned by an admin; TrailBase's config disables the `/register`
+endpoint. So before you can log in locally you must provision at least one user:
 
 ```sh
-pnpm seed <email> <password> "<display name>"
+pnpm seed <email> <password>
 
 # example — creates a local dev login:
-pnpm seed dev@hexly.test devpass "Dev User"
+pnpm seed dev@hexly.test devpass
 ```
 
-Then sign in at `http://localhost:4200/login` with those credentials. Passwords
-are stored as argon2 hashes; the plaintext is never persisted.
+Then sign in at `http://localhost:4200/login` with those credentials. (You can
+also manage users from the admin UI.) TrailBase stores password hashes; the
+plaintext is never persisted.
 
 ### Where the data lives
 
-The API stores everything in a single SQLite file (WAL mode). The dev scripts
-pin it to `hexly.db` at the repo root via `HEXLY_DB_PATH`, so:
-
-- `pnpm seed` and `pnpm dev`/`pnpm dev:api` always agree on the same file, and
-- the database **survives rebuilds** (the API build cleans `dist/`, so the
-  default in-bundle location would be wiped on every serve).
-
-`hexly.db*` is git-ignored. To start fresh, delete it and re-seed:
+TrailBase keeps everything under `./traildepot`: `config.textproto` is committed,
+while runtime state (`data/` SQLite DBs, `secrets/`, `uploads/`, …) is
+git-ignored. To start fresh, delete the runtime state and re-seed:
 
 ```sh
-rm -f hexly.db hexly.db-wal hexly.db-shm
-pnpm seed dev@hexly.test devpass "Dev User"
+rm -rf traildepot/data traildepot/secrets
+pnpm seed dev@hexly.test devpass
 ```
-
-Set `HEXLY_DB_PATH` to an absolute path to point at a different/shared database
-(it's honored as-is when absolute; a relative value resolves against the current
-working directory).
 
 ## Build, test, lint
 
