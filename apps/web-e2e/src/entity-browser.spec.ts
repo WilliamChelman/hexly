@@ -1,4 +1,4 @@
-import { enterLibrary, expect, test } from './fixtures';
+import { enterSeedLibrary, expect, test } from './fixtures';
 
 /**
  * Entity browser lifecycle (#70): create → list → open → rename → delete, over
@@ -7,13 +7,15 @@ import { enterLibrary, expect, test } from './fixtures';
 test('a note round-trips: create → appears → open → rename → delete', async ({
   page,
 }) => {
-  await enterLibrary(page);
+  await enterSeedLibrary(page);
   await expect(page.getByTestId('empty')).toBeVisible();
 
   // Create a note: opens the minimal note view at /entities/:id.
   await page.getByTestId('new-note').click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const id = page.url().split('/').pop();
+  await expect(page).toHaveURL(/\/entities\/[^/]+$/);
+  // Decode: a TrailBase UUID id base64-encodes to a `=` the browser percent-encodes
+  // in the path, but data-testids carry the raw id.
+  const id = decodeURIComponent(page.url().split('/').pop()!);
   await expect(page.getByTestId('title')).toHaveText('Untitled note');
 
   await page.getByRole('link', { name: 'Library' }).click();
@@ -29,7 +31,7 @@ test('a note round-trips: create → appears → open → rename → delete', as
   await expect(page.getByTestId('entity-title')).toHaveText('Lady Mara');
 
   await page.getByTestId(`open-${id}`).click();
-  await expect(page).toHaveURL(new RegExp(`/entities/${id}$`));
+  await expect(page).toHaveURL(new RegExp(`/entities/${encodeURIComponent(id)}$`));
   await expect(page.getByTestId('title')).toHaveText('Lady Mara');
 
   await page.getByRole('link', { name: 'Library' }).click();
@@ -41,10 +43,10 @@ test('a note round-trips: create → appears → open → rename → delete', as
 test('creating a map opens the map editor, not the note view', async ({
   page,
 }) => {
-  await enterLibrary(page);
+  await enterSeedLibrary(page);
 
   await page.getByTestId('new-map').click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  await expect(page).toHaveURL(/\/entities\/[^/]+$/);
 
   // Editor chrome present (harmonized header — ADR-0022).
   await expect(page.getByTestId('title')).toBeVisible();

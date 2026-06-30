@@ -1,9 +1,9 @@
-import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentRef } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { CONTENT_FORMAT, EntityDetail } from '@hexly/domain';
+import { EntitiesClient } from '../../../../core/services/entities.client';
+import { MockEntitiesClient } from '../../../../core/testing/mock-entities-client';
 import { Editor } from '@tiptap/core';
 import { EntitySession } from '../../services/entity-session';
 import { EntityNameResolver } from '../../services/entity-name-resolver';
@@ -59,8 +59,7 @@ describe('ContentEditor', () => {
       providers: [
         EntitySession,
         EntityNameResolver,
-        provideHttpClient(),
-        provideHttpClientTesting(),
+        { provide: EntitiesClient, useValue: new MockEntitiesClient() },
         provideRouter([]),
       ],
     }).compileComponents();

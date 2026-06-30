@@ -1,120 +1,112 @@
-import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { firstValueFrom } from 'rxjs';
-import { WorldDetail, WorldSummary } from '@hexly/domain';
+import { firstValueFrom, of, throwError } from 'rxjs';
+import { AuthUser, WorldDetail, WorldSummary } from '@hexly/domain';
 import { AuthClient } from './auth.client';
-import { makeUser, provideFakeTrailbase } from '../testing/fake-trailbase-client';
+import { WorldsClient } from './worlds.client';
+import { MockAuthClient } from '../testing/mock-auth-client';
+import { MockWorldsClient } from '../testing/mock-worlds-client';
 import { WorldStore } from './world.store';
 
-function world(id: string, name = id): WorldSummary {
+function summary(id: string, name = id): WorldSummary {
   return { id, name, ownerId: 'u1', createdAt: 1, updatedAt: 1 };
+}
+
+function detail(id: string, name = id): WorldDetail {
+  return { ...summary(id, name), homeEntityId: `home-${id}`, entityCount: 1 };
+}
+
+function user(id: string): AuthUser {
+  return { id, email: `${id}@hexly.test`, displayName: id };
 }
 
 describe('WorldStore', () => {
   let store: WorldStore;
-  let http: HttpTestingController;
-  let tb: ReturnType<typeof provideFakeTrailbase>;
+  let worlds: MockWorldsClient;
+  let auth: MockAuthClient;
 
   beforeEach(() => {
-    tb = provideFakeTrailbase();
+    worlds = new MockWorldsClient();
+    auth = new MockAuthClient();
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting(), tb.provider, provideRouter([])],
+      providers: [
+        { provide: WorldsClient, useValue: worlds },
+        { provide: AuthClient, useValue: auth },
+        provideRouter([]),
+      ],
     });
     store = TestBed.inject(WorldStore);
-    http = TestBed.inject(HttpTestingController);
+    // Settle the store's initial reset effect so a later load isn't wiped.
+    TestBed.flushEffects();
   });
-
-  afterEach(() => {
-    http.verify();
-    // A fake-backed login persists a token (via the real onAuthChange); clear it
-    // so it can't leak into another spec's session.
-    localStorage.clear();
-  });
-
-  function flushList(worlds: WorldSummary[]): void {
-    http.expectOne('/api/worlds').flush(worlds);
-  }
-
-  async function login(id = 'u1'): Promise<void> {
-    tb.client.nextLogin = { user: makeUser(id, 'ada@hexly.test') };
-    await firstValueFrom(TestBed.inject(AuthClient).login('ada@hexly.test', 'pw'));
-  }
 
   it('loads the caller’s Worlds and marks loaded', () => {
     expect(store.loaded()).toBe(false);
+    worlds.list.mockReturnValue(of([summary('w1', 'Aldermoor'), summary('w2', 'Whisperwood')]));
     store.load();
-    flushList([world('w1', 'Aldermoor'), world('w2', 'Whisperwood')]);
 
     expect(store.worlds().map((w) => w.id)).toEqual(['w1', 'w2']);
     expect(store.loaded()).toBe(true);
   });
 
   it('loads once — a second load() is a no-op while the first stands', () => {
+    worlds.list.mockReturnValue(of([summary('w1')]));
     store.load();
-    flushList([world('w1')]);
     store.load();
-    http.expectNone('/api/worlds');
-  });
 
-  it('marks loaded and resets the guard on error so the next load() retries', () => {
-    store.load();
-    http
-      .expectOne('/api/worlds')
-      .flush(null, { status: 503, statusText: 'Service Unavailable' });
-
-    expect(store.loaded()).toBe(true);
-    store.load();
-    flushList([world('w1')]);
+    // No re-fetch: the store guards a second load while the first stands.
+    expect(worlds.list).toHaveBeenCalledTimes(1);
     expect(store.worlds().map((w) => w.id)).toEqual(['w1']);
   });
 
-  it('creating a World appends it and returns its detail', () => {
+  it('marks loaded and resets the guard on error so the next load() retries', () => {
+    worlds.list.mockReturnValueOnce(throwError(() => new Error('down')));
     store.load();
-    flushList([world('w1')]);
+    expect(store.loaded()).toBe(true);
+    expect(store.loadError()).toBe(true);
 
-    let created: WorldDetail | undefined;
-    store.create('New Realm').subscribe((w) => (created = w));
-    const detail: WorldDetail = {
-      ...world('w2', 'New Realm'),
-      homeEntityId: 'e2',
-      entityCount: 1,
-    };
-    http.expectOne('/api/worlds').flush(detail);
-
-    expect(created).toEqual(detail);
-    expect(store.worlds().map((w) => w.id)).toEqual(['w1', 'w2']);
+    worlds.list.mockReturnValue(of([summary('w1')]));
+    store.load();
+    expect(store.worlds().map((w) => w.id)).toEqual(['w1']);
   });
 
-  it('forgets the loaded Worlds when the authenticated user changes', async () => {
-    await login('u1');
-    TestBed.flushEffects();
+  it('creating a World appends it and returns its detail', async () => {
+    worlds.list.mockReturnValue(of([summary('w1')]));
     store.load();
-    flushList([world('w1')]);
+
+    worlds.create.mockReturnValue(of(detail('w2', 'New Realm')));
+    const created = await firstValueFrom(store.create('New Realm'));
+
+    expect(created.name).toBe('New Realm');
+    expect(created.entityCount).toBe(1);
+    expect(store.worlds().map((w) => w.name).sort()).toEqual(['New Realm', 'w1']);
+  });
+
+  it('forgets the loaded Worlds when the authenticated user changes', () => {
+    auth.setUser(user('u1'));
+    TestBed.flushEffects();
+    worlds.list.mockReturnValue(of([summary('w1')]));
+    store.load();
     expect(store.worlds()).toHaveLength(1);
 
     // Logout clears the user — the next user must not see u1's Worlds.
-    await firstValueFrom(TestBed.inject(AuthClient).logout());
+    auth.setUser(null);
     TestBed.flushEffects();
 
     expect(store.worlds()).toEqual([]);
     expect(store.loaded()).toBe(false);
   });
 
-  it('keeps the loaded Worlds when the same user logs in again (e.g. a re-auth)', async () => {
-    await login('u1');
+  it('keeps the loaded Worlds when the same user logs in again (e.g. a re-auth)', () => {
+    auth.setUser(user('u1'));
     TestBed.flushEffects();
+    worlds.list.mockReturnValue(of([summary('w1')]));
     store.load();
-    flushList([world('w1')]);
     expect(store.worlds()).toHaveLength(1);
 
     // Re-login as the same user (fresh object, same id) must not wipe the list —
     // the always-mounted switcher relies on having loaded once.
-    await login('u1');
+    auth.setUser(user('u1'));
     TestBed.flushEffects();
 
     expect(store.worlds()).toHaveLength(1);

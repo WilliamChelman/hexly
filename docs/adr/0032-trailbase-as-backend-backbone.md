@@ -1,5 +1,5 @@
 ---
-status: accepted (in progress — slice #128 landed the foundation: TrailBase serves the SPA and owns auth; Entities/Worlds Record APIs land in slice #3, then NestJS is deleted)
+status: accepted (in progress — #128 landed the foundation (TrailBase serves the SPA + owns auth); #129 landed Worlds + Entities as owner-scoped Record APIs with the atomic-Home trigger, the undeletable-Home DELETE rule, and the World-name→Home-title trigger (ADR-0029) — owner happy path only, save optimistic-concurrency is slice #4 and the share cascade slice #5; NestJS deleted once those land)
 ---
 
 # TrailBase as the backend backbone

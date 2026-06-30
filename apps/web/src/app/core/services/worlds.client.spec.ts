@@ -1,89 +1,90 @@
-import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { WorldDetail, WorldSummary } from '@hexly/domain';
+import { firstValueFrom } from 'rxjs';
+import {
+  FakeStore,
+  installWorldHomeTrigger,
+  provideFakeTrailbaseRecords,
+} from '../testing/fake-records-client';
 import { WorldsClient } from './worlds.client';
+
+/** Wire-shaped `worlds` row as a TrailBase Record API returns it. */
+function worldRow(over: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: 'w1',
+    name: 'Aldermoor',
+    owner_id: 'u1',
+    created_at: 1,
+    updated_at: 1,
+    ...over,
+  };
+}
 
 describe('WorldsClient', () => {
   let client: WorldsClient;
-  let http: HttpTestingController;
-
-  const summary: WorldSummary = {
-    id: 'w1',
-    name: 'Aldermoor',
-    ownerId: 'u1',
-    createdAt: 1,
-    updatedAt: 1,
-  };
-  const detail: WorldDetail = { ...summary, homeEntityId: 'e1', entityCount: 1 };
+  let store: FakeStore;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting()],
-    });
+    const fake = provideFakeTrailbaseRecords();
+    store = fake.store;
+    TestBed.configureTestingModule({ providers: [fake.provider] });
     client = TestBed.inject(WorldsClient);
-    http = TestBed.inject(HttpTestingController);
   });
 
-  afterEach(() => http.verify());
+  it('lists the caller’s worlds as summaries, newest first', async () => {
+    store.seed('worlds', [
+      worldRow({ id: 'w1', name: 'Aldermoor', updated_at: 1 }),
+      worldRow({ id: 'w2', name: 'Whisperwood', updated_at: 2 }),
+    ]);
 
-  it('lists the caller’s worlds as summaries', () => {
-    let listed: unknown;
-    client.list().subscribe((w) => (listed = w));
+    const listed = await firstValueFrom(client.list());
 
-    const req = http.expectOne('/api/worlds');
-    expect(req.request.method).toBe('GET');
-    req.flush([summary]);
-
-    expect(listed).toEqual([summary]);
+    expect(listed).toEqual([
+      { id: 'w2', name: 'Whisperwood', ownerId: 'u1', createdAt: 1, updatedAt: 2 },
+      { id: 'w1', name: 'Aldermoor', ownerId: 'u1', createdAt: 1, updatedAt: 1 },
+    ]);
   });
 
-  it('creates a world by name', () => {
-    let created: WorldDetail | undefined;
-    client.create('Aldermoor').subscribe((w) => (created = w));
+  it('creates a world and composes its Home Entity id + count (the trigger mints the Home)', async () => {
+    installWorldHomeTrigger(store);
 
-    const req = http.expectOne('/api/worlds');
-    expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ name: 'Aldermoor' });
-    req.flush(detail);
+    const created = await firstValueFrom(client.create('Aldermoor'));
 
-    expect(created).toEqual(detail);
+    expect(created.name).toBe('Aldermoor');
+    expect(created.entityCount).toBe(1);
+    // The composed Home id points at the Entity the trigger minted for this World.
+    const home = store.rows('entities').find((e) => e['world_id'] === created.id);
+    expect(created.homeEntityId).toBe(home?.['id']);
   });
 
-  it('gets one world as a detail', () => {
-    let got: WorldDetail | undefined;
-    client.get('w1').subscribe((w) => (got = w));
+  it('gets one world as a detail carrying its Home id and entity count', async () => {
+    store.seed('worlds', [worldRow({ id: 'w1' })]);
+    store.seed('entities', [
+      { id: 'home', world_id: 'w1', is_home: 1, name: 'Aldermoor' },
+      { id: 'note', world_id: 'w1', is_home: 0, name: 'Lady Mara' },
+    ]);
 
-    const req = http.expectOne('/api/worlds/w1');
-    expect(req.request.method).toBe('GET');
-    req.flush(detail);
+    const got = await firstValueFrom(client.get('w1'));
 
-    expect(got).toEqual(detail);
+    expect(got.homeEntityId).toBe('home');
+    expect(got.entityCount).toBe(2);
+    expect(got.name).toBe('Aldermoor');
   });
 
-  it('renames a world', () => {
-    let renamed: WorldDetail | undefined;
-    client.rename('w1', 'The Reach').subscribe((w) => (renamed = w));
+  it('renames a world and re-reads the updated detail', async () => {
+    store.seed('worlds', [worldRow({ id: 'w1', name: 'Aldermoor' })]);
+    store.seed('entities', [{ id: 'home', world_id: 'w1', is_home: 1 }]);
 
-    const req = http.expectOne('/api/worlds/w1');
-    expect(req.request.method).toBe('PATCH');
-    expect(req.request.body).toEqual({ name: 'The Reach' });
-    req.flush({ ...detail, name: 'The Reach' });
+    const renamed = await firstValueFrom(client.rename('w1', 'The Reach'));
 
-    expect(renamed?.name).toBe('The Reach');
+    expect(renamed.name).toBe('The Reach');
+    expect(store.rows('worlds')[0]['name']).toBe('The Reach');
   });
 
-  it('deletes a world by id', () => {
-    let completed = false;
-    client.delete('w1').subscribe({ complete: () => (completed = true) });
+  it('deletes a world by id', async () => {
+    store.seed('worlds', [worldRow({ id: 'w1' })]);
 
-    const req = http.expectOne('/api/worlds/w1');
-    expect(req.request.method).toBe('DELETE');
-    req.flush(null);
+    await firstValueFrom(client.delete('w1'));
 
-    expect(completed).toBe(true);
+    expect(store.rows('worlds')).toEqual([]);
   });
 });

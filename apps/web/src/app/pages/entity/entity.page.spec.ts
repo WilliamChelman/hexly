@@ -10,8 +10,10 @@ import {
   provideRouter,
   Router,
 } from '@angular/router';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { CONTENT_FORMAT, EntityDetail, EntityType } from '@hexly/domain';
+import { EntitiesClient } from '../../core/services/entities.client';
+import { MockEntitiesClient } from '../../core/testing/mock-entities-client';
 import { EntitySession } from './services/entity-session';
 import { EntityNameResolver } from './services/entity-name-resolver';
 import { ActiveWorld } from '../../core/services/active-world';
@@ -53,17 +55,22 @@ const hexmapWithContent = (text: string): EntityDetail => ({
   },
 });
 
-// Routing/load/title/404: the page drives the session off the route's `:id`.
+// Routing/load/title: the page drives the session off the route's `:id`.
 describe('EntityPage routing', () => {
   let http: HttpTestingController;
-  let navigate: ReturnType<typeof vi.spyOn>;
 
   const detail = (id: string, type: EntityType): EntityDetail =>
     type === 'note'
       ? noteDetail('Lady Mara')
       : { ...hexmapWithContent('The reach lies north.'), id, name: 'Aldermoor' };
 
-  async function render(id: string) {
+  /** Configure the page on route `id`; the mocked client resolves (or 404s) the load. */
+  async function render(id: string, d?: EntityDetail) {
+    const entities = new MockEntitiesClient();
+    // A seeded detail loads; an unseeded id 404s like a missing TrailBase record.
+    entities.load.mockReturnValue(
+      d ? of(d) : throwError(() => Object.assign(new Error('not found'), { status: 404 })),
+    );
     await TestBed.configureTestingModule({
       imports: [EntityPage, provideTranslocoTesting()],
       providers: [
@@ -71,6 +78,7 @@ describe('EntityPage routing', () => {
         EntityNameResolver,
         provideHttpClient(),
         provideHttpClientTesting(),
+        { provide: EntitiesClient, useValue: entities },
         {
           provide: ActivatedRoute,
           useValue: {
@@ -82,10 +90,10 @@ describe('EntityPage routing', () => {
     }).compileComponents();
     TestBed.inject(ActiveWorld).set('w1');
     http = TestBed.inject(HttpTestingController);
-    navigate = vi
-      .spyOn(TestBed.inject(Router), 'navigate')
-      .mockResolvedValue(true);
+    vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     const fixture = TestBed.createComponent(EntityPage);
+    fixture.detectChanges(); // fires watchRoute → load
+    await new Promise((resolve) => setTimeout(resolve)); // let the load resolve
     fixture.detectChanges();
     return fixture;
   }
@@ -93,9 +101,7 @@ describe('EntityPage routing', () => {
   afterEach(() => http.verify());
 
   it('shows the Content body for a note', async () => {
-    const fixture = await render('n1');
-    http.expectOne('/api/entities/n1').flush(detail('n1', 'note'));
-    fixture.detectChanges();
+    const fixture = await render('n1', detail('n1', 'note'));
 
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelector('app-content-editor')).not.toBeNull();
@@ -103,9 +109,7 @@ describe('EntityPage routing', () => {
   });
 
   it('shows the map editor for a hexmap', async () => {
-    const fixture = await render('m1');
-    http.expectOne('/api/entities/m1').flush(detail('m1', 'hexmap'));
-    fixture.detectChanges();
+    const fixture = await render('m1', detail('m1', 'hexmap'));
     flushHealth(http);
 
     const el = fixture.nativeElement as HTMLElement;
@@ -113,9 +117,7 @@ describe('EntityPage routing', () => {
   });
 
   it('titles the tab with the open Entity name (owned by the session, not the view)', async () => {
-    const fixture = await render('m1');
-    http.expectOne('/api/entities/m1').flush(detail('m1', 'hexmap'));
-    fixture.detectChanges();
+    const fixture = await render('m1', detail('m1', 'hexmap'));
     flushHealth(http);
     await fixture.whenStable();
     fixture.detectChanges();
@@ -124,13 +126,10 @@ describe('EntityPage routing', () => {
   });
 
   it('returns to the World’s library when the Entity fails to load', async () => {
-    const fixture = await render('gone');
-    http
-      .expectOne('/api/entities/gone')
-      .flush(null, { status: 404, statusText: 'Not Found' });
-    fixture.detectChanges();
-
-    expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities']);
+    // 'missing' has no detail, so the load 404s — watchRoute bounces to the active
+    // World's library (ADR-0028), recognising TrailBase's FetchError shape.
+    await render('missing');
+    expect(TestBed.inject(Router).navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities']);
   });
 });
 

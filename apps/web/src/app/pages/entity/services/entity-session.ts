@@ -9,7 +9,6 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
-import { HttpErrorResponse } from '@angular/common/http';
 import {
   catchError,
   concat,
@@ -43,6 +42,20 @@ import { harvestDescriptors } from '../components/content-editor/descriptors';
 import { TitleService } from '../../../core/i18n/title.service';
 import { AppShellStore } from '../../../shell/app-shell.store';
 import { EntityView, HexMapStore } from './hexmap-store';
+
+/**
+ * A 404 from a load, recognised across transports: Angular's `HttpErrorResponse` and
+ * TrailBase's `FetchError` (ADR-0032) both carry a numeric `status`, so a missing
+ * Entity bounces to the library regardless of which client threw.
+ */
+function isNotFound(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'status' in err &&
+    (err as { status: unknown }).status === 404
+  );
+}
 
 /**
  * Bridges {@link EntitiesClient} and {@link HexMapStore} for `/entities/:id`:
@@ -219,7 +232,7 @@ export class EntitySession {
         switchMap((id) =>
           this.openRoute(id).pipe(
             catchError((err) => {
-              if (err instanceof HttpErrorResponse && err.status === 404) {
+              if (isNotFound(err)) {
                 const worldId = this.activeWorld.worldId();
                 this.router.navigate(worldId ? ['/w', worldId, 'entities'] : ['/']);
               } else {

@@ -21,6 +21,7 @@ const workspaceRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const webDir = join(workspaceRoot, 'dist', 'apps', 'web', 'browser');
 const webIndex = join(webDir, 'index.html');
 const committedConfig = join(workspaceRoot, 'traildepot', 'config.textproto');
+const committedMigrations = join(workspaceRoot, 'traildepot', 'migrations');
 const depot = join(workspaceRoot, 'tmp', 'web-e2e', 'traildepot');
 const port = process.env.PORT ?? '3100';
 
@@ -63,6 +64,9 @@ const trail = ensureTrailbase();
 rmSync(depot, { recursive: true, force: true });
 mkdirSync(depot, { recursive: true });
 
+// 0. Stage the committed migrations so the bootstrap applies the Worlds/Entities
+//    schema (#129). They must be in place before the depot bootstraps below.
+cpSync(committedMigrations, join(depot, 'migrations'), { recursive: true });
 // 1. Seed the verified e2e user. This also bootstraps the depot (default config,
 //    migrations, admin) — with password auth on, so the credential is usable.
 trailSync(trail, ['user', 'add', user.email, user.password]);

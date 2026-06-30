@@ -1,6 +1,14 @@
 import { Provider } from '@angular/core';
-import type { Client, ClientOptions, MultiFactorAuthToken, Tokens, User } from 'trailbase';
+import type {
+  Client,
+  ClientOptions,
+  MultiFactorAuthToken,
+  RecordApi,
+  Tokens,
+  User,
+} from 'trailbase';
 import { InitClient, TRAILBASE_INIT } from '../services/trailbase-client';
+import { FakeStore } from './fake-records-client';
 
 /** Minimal opaque tokens — only the presence of a `refresh_token` is read. */
 function tokensFor(user: User | undefined): Tokens | undefined {
@@ -27,7 +35,23 @@ export class FakeTrailbaseClient {
     error: new Error('FakeTrailbaseClient.nextLogin not configured'),
   };
 
-  constructor(opts?: ClientOptions) {
+  /**
+   * In-memory backing for the Record APIs (ADR-0032). The same fake serves both the
+   * session (login/logout) and the Worlds/Entities clients, so a consumer spec drives
+   * one fake: seed rows on `store`, then exercise the code that reads them. Injected
+   * by {@link provideFakeTrailbase} so a test can hold `store` before the client is
+   * constructed (it isn't built until `TrailbaseClient` is first injected).
+   */
+  readonly store: FakeStore;
+
+  records<T extends Record<string, unknown> = Record<string, unknown>>(
+    name: string,
+  ): RecordApi<T> {
+    return this.store.api<T>(name);
+  }
+
+  constructor(opts?: ClientOptions, store: FakeStore = new FakeStore()) {
+    this.store = store;
     this.onAuthChange = opts?.onAuthChange;
     if (opts?.tokens) {
       this._tokens = opts.tokens;
@@ -99,22 +123,30 @@ export function makeUser(id: string, email = `${id}@test.com`): User {
 export function provideFakeTrailbase(seed?: { tokens?: Tokens }): {
   readonly provider: Provider;
   readonly client: FakeTrailbaseClient;
+  readonly store: FakeStore;
 } {
   let client!: FakeTrailbaseClient;
+  // One store, created eagerly, so a spec can `seed()` it in `beforeEach` before the
+  // client is constructed (it isn't built until `TrailbaseClient` is first injected).
+  const store = new FakeStore();
   // Drive the fake only from `seed` — never `opts.tokens`, which is the real
   // `readStoredTokens()` off localStorage. Inheriting it would let a token a
   // sibling test persisted leak in and silently restore a session (the cross-test
   // contamination that turned this red on CI's file order). We keep `onAuthChange`
   // so the session signal still updates on login/logout.
   const init: InitClient = (_site, opts) =>
-    (client = new FakeTrailbaseClient({
-      onAuthChange: (opts as ClientOptions | undefined)?.onAuthChange,
-      tokens: seed?.tokens,
-    })) as unknown as Client;
+    (client = new FakeTrailbaseClient(
+      {
+        onAuthChange: (opts as ClientOptions | undefined)?.onAuthChange,
+        tokens: seed?.tokens,
+      },
+      store,
+    )) as unknown as Client;
   return {
     provider: { provide: TRAILBASE_INIT, useValue: init },
     get client() {
       return client;
     },
+    store,
   };
 }

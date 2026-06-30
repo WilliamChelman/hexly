@@ -26,6 +26,7 @@ WORKDIR /app
 COPY --from=builder /app/.trailbase/*/trail /usr/local/bin/trail
 COPY --from=builder /app/dist/apps/web/browser ./web
 COPY --from=builder /app/traildepot/config.textproto ./config.textproto
+COPY --from=builder /app/traildepot/migrations ./migrations
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/trail /usr/local/bin/docker-entrypoint.sh
 ENV PORT=3000 DATA_DIR=/data

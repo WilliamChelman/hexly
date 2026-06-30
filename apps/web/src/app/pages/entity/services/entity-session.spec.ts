@@ -1,20 +1,31 @@
-import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
-import { of } from 'rxjs';
-import { CONTENT_FORMAT, coordKey, emptyContent, EntityDetail, HexMap } from '@hexly/domain';
+import { firstValueFrom, of, Subject, throwError } from 'rxjs';
+import {
+  CONTENT_FORMAT,
+  coordKey,
+  emptyContent,
+  EntityDetail,
+  EntitySaveOutcome,
+  HexMap,
+} from '@hexly/domain';
 import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
+import { MockEntitiesClient } from '../../../core/testing/mock-entities-client';
+import { EntitiesClient } from '../../../core/services/entities.client';
 import { EntitySession } from './entity-session';
 import { HexMapStore } from './hexmap-store';
 
+/**
+ * EntitySession over a mocked {@link EntitiesClient} (#129): the session is the unit
+ * under test, the client its facade. A spec drives the outcome the client returns —
+ * `saved`, `conflict`, a transport error, or a `Subject` left in flight — and asserts
+ * the session's behaviour and the call it made. The client↔TrailBase mapping lives in
+ * `entities.client.spec`; the wire never appears here.
+ */
 describe('EntitySession', () => {
   let session: EntitySession;
   let editor: HexMapStore;
-  let http: HttpTestingController;
+  let entities: MockEntitiesClient;
 
   const content = emptyContent();
   /** Wrap a hex grid into the hexmap body the store carries end to end. */
@@ -43,93 +54,71 @@ describe('EntitySession', () => {
     updatedAt: 1,
     document: bodyOf(forestAt00),
   };
+  /** A clean-save outcome carrying the entity at `version`, document defaulting to the live grid. */
+  const saved = (version: number, document: unknown = bodyOf(editor.document())): EntitySaveOutcome => ({
+    status: 'saved',
+    entity: { ...aldermoor, version, document } as EntityDetail,
+  });
 
   beforeEach(() => {
+    entities = new MockEntitiesClient();
     TestBed.configureTestingModule({
       imports: [provideTranslocoTesting()],
-      providers: [
-        EntitySession,
-        provideHttpClient(),
-        provideHttpClientTesting(),
-      ],
+      providers: [EntitySession, { provide: EntitiesClient, useValue: entities }],
     });
     session = TestBed.inject(EntitySession);
     editor = TestBed.inject(HexMapStore);
-    http = TestBed.inject(HttpTestingController);
   });
 
-  afterEach(() => http.verify());
+  /** Open Aldermoor (version 3) so save/edit tests have an open entity. */
+  function openAldermoor(detail: EntityDetail = aldermoor): void {
+    entities.load.mockReturnValue(of(detail));
+    session.open('m1').subscribe();
+  }
 
   it('opens an entity by id and loads its hex grid into the editor', () => {
-    session.open('m1').subscribe();
-
-    http.expectOne('/api/entities/m1').flush(aldermoor);
+    openAldermoor();
 
     // The editor sees the bare grid, not the body — the seam unwraps it.
     expect(editor.document()).toEqual(forestAt00);
   });
 
-  /** Open Aldermoor (version 3) so save/conflict tests have an open entity. */
-  function openAldermoor() {
-    session.open('m1').subscribe();
-    http.expectOne('/api/entities/m1').flush(aldermoor);
-  }
-
-  it('saves the editor grid, re-wrapped under the open entity base version', () => {
+  it('saves the editor grid, re-wrapped under the open entity base version', async () => {
     openAldermoor();
     editor.paintAt({ q: 5, r: 5 }, 'ocean');
+    entities.save.mockReturnValue(of(saved(4)));
 
-    let outcome: unknown;
-    session.save().subscribe((o) => (outcome = o));
+    const outcome = await firstValueFrom(session.save());
 
-    const req = http.expectOne('/api/entities/m1');
-    expect(req.request.method).toBe('PUT');
-    // Content preserved untouched.
-    expect(req.request.body).toEqual({
-      document: bodyOf(editor.document()),
-      version: 3,
-      tags: [],
-      descriptors: [],
-    });
-
-    const saved: EntityDetail = {
-      ...aldermoor,
-      version: 4,
-      document: bodyOf(editor.document()),
-    };
-    req.flush(saved);
-    expect(outcome).toEqual({ status: 'saved', entity: saved });
+    // Sent under the base version, Content preserved, grid re-wrapped.
+    expect(entities.save).toHaveBeenCalledWith('m1', bodyOf(editor.document()), 3, [], []);
+    expect(outcome).toEqual(saved(4));
+    expect(session.current()?.version).toBe(4);
   });
 
-  it('seeds the open entity’s tags and sends edited tags with the save (#72)', () => {
+  it('seeds the open entity’s tags and sends edited tags with the save (#72)', async () => {
     openAldermoor();
     expect(session.tags()).toEqual([]);
 
     session.setTags(['deity', 'ruined']);
     expect(session.tags()).toEqual(['deity', 'ruined']);
+    entities.save.mockReturnValue(
+      of({ status: 'saved', entity: { ...aldermoor, version: 4, tags: ['deity', 'ruined'] } }),
+    );
 
-    session.save().subscribe();
+    await firstValueFrom(session.save());
 
-    const req = http.expectOne('/api/entities/m1');
-    expect(req.request.method).toBe('PUT');
-    expect(req.request.body).toEqual({
-      document: bodyOf(editor.document()),
-      version: 3,
-      tags: ['deity', 'ruined'],
-      descriptors: [],
-    });
-
-    const saved: EntityDetail = {
-      ...aldermoor,
-      version: 4,
-      tags: ['deity', 'ruined'],
-      document: bodyOf(editor.document()),
-    };
-    req.flush(saved);
+    expect(entities.save).toHaveBeenCalledWith(
+      'm1',
+      bodyOf(editor.document()),
+      3,
+      ['deity', 'ruined'],
+      [],
+    );
     expect(session.current()?.tags).toEqual(['deity', 'ruined']);
   });
 
-  it('harvests link descriptors from the live Content and sends them with the save (#96)', () => {
+  it('harvests link descriptors from the live Content and sends them with the save (#96)', async () => {
     openAldermoor();
     // A Content snapshot carrying a characterised entityLink — the descriptor rides the
     // save so the server can index the owner's vocabulary (it never parses the snapshot).
@@ -139,39 +128,27 @@ describe('EntitySession', () => {
         {
           type: 'paragraph',
           content: [
-            {
-              type: 'entityLink',
-              attrs: { entityId: 'x', label: 'Jane', descriptor: 'Spouse' },
-            },
+            { type: 'entityLink', attrs: { entityId: 'x', label: 'Jane', descriptor: 'Spouse' } },
           ],
         },
       ],
     });
+    entities.save.mockReturnValue(of(saved(4)));
 
-    session.save().subscribe();
+    await firstValueFrom(session.save());
 
-    const req = http.expectOne('/api/entities/m1');
-    // Sent verbatim (the server normalizes); links with no descriptor contribute nothing.
-    expect(req.request.body.descriptors).toEqual(['Spouse']);
-    req.flush({ ...aldermoor, version: 4 });
+    // Descriptors are the 5th arg; sent verbatim (the server normalizes).
+    expect(entities.save.mock.calls[0][4]).toEqual(['Spouse']);
   });
 
-  it('surfaces a stale save as a conflict and keeps the editor edit', () => {
+  it('surfaces a stale save as a conflict and keeps the editor edit', async () => {
     openAldermoor();
     editor.paintAt({ q: 5, r: 5 }, 'ocean');
     const edited = editor.document();
+    const serverCurrent: EntityDetail = { ...aldermoor, version: 7, document: bodyOf(desertAt99) };
+    entities.save.mockReturnValue(of({ status: 'conflict', current: serverCurrent }));
 
-    const serverCurrent: EntityDetail = {
-      ...aldermoor,
-      version: 7,
-      document: bodyOf(desertAt99),
-    };
-
-    let outcome: unknown;
-    session.save().subscribe((o) => (outcome = o));
-    http
-      .expectOne('/api/entities/m1')
-      .flush(serverCurrent, { status: 409, statusText: 'Conflict' });
+    const outcome = await firstValueFrom(session.save());
 
     expect(outcome).toEqual({ status: 'conflict', current: serverCurrent });
     expect(session.conflict()).toEqual(serverCurrent);
@@ -179,22 +156,16 @@ describe('EntitySession', () => {
     expect(editor.document()).toEqual(edited);
   });
 
-  it('re-pulls the server version on reload, replacing the edit and clearing the conflict', () => {
+  it('re-pulls the server version on reload, replacing the edit and clearing the conflict', async () => {
     openAldermoor();
     editor.paintAt({ q: 5, r: 5 }, 'ocean');
-
-    const serverCurrent: EntityDetail = {
-      ...aldermoor,
-      version: 7,
-      document: bodyOf(desertAt99),
-    };
+    const serverCurrent: EntityDetail = { ...aldermoor, version: 7, document: bodyOf(desertAt99) };
+    entities.save.mockReturnValue(of({ status: 'conflict', current: serverCurrent }));
     session.save().subscribe();
-    http
-      .expectOne('/api/entities/m1')
-      .flush(serverCurrent, { status: 409, statusText: 'Conflict' });
+    expect(session.conflict()).toEqual(serverCurrent);
 
-    session.reload().subscribe();
-    http.expectOne('/api/entities/m1').flush(serverCurrent);
+    entities.load.mockReturnValue(of(serverCurrent));
+    await firstValueFrom(session.reload());
 
     expect(editor.document()).toEqual(desertAt99);
     expect(session.conflict()).toBeNull();
@@ -208,15 +179,13 @@ describe('EntitySession', () => {
     expect(session.dirty()).toBe(true);
   });
 
-  it('clears dirty on a clean save', () => {
+  it('clears dirty on a clean save', async () => {
     openAldermoor();
     editor.paintAt({ q: 5, r: 5 }, 'ocean');
     expect(session.dirty()).toBe(true);
+    entities.save.mockReturnValue(of(saved(4)));
 
-    session.save().subscribe();
-    http
-      .expectOne('/api/entities/m1')
-      .flush({ ...aldermoor, version: 4, document: bodyOf(editor.document()) });
+    await firstValueFrom(session.save());
 
     expect(session.dirty()).toBe(false);
   });
@@ -229,15 +198,17 @@ describe('EntitySession', () => {
     };
     session.setContent(first);
 
-    // Save captures `first`, then the user keeps typing before the response lands.
+    // Save captures `first` (in flight via a Subject); the user keeps typing before it lands.
+    const save$ = new Subject<EntitySaveOutcome>();
+    entities.save.mockReturnValue(save$);
     session.save().subscribe();
     const second = {
       type: 'doc',
       content: [{ type: 'paragraph', content: [{ type: 'text', text: 'second' }] }],
     };
     session.setContent(second);
-
-    http.expectOne('/api/entities/m1').flush({ ...aldermoor, version: 4 });
+    save$.next(saved(4));
+    save$.complete();
 
     // Baseline advanced to the sent `first`, not the live `second`, so the
     // mid-flight keystrokes are still pending — not silently dropped.
@@ -248,373 +219,331 @@ describe('EntitySession', () => {
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => vi.useRealTimers());
 
-    /** Flush Angular effects, then fire any debounce timer due within `ms`. */
-    function settle(ms = 800) {
+    /** Flush Angular effects, then fire any debounce timer + microtasks due within `ms`. */
+    async function settle(ms = 800): Promise<void> {
       TestBed.tick();
-      vi.advanceTimersByTime(ms);
+      await vi.advanceTimersByTimeAsync(ms);
     }
 
-    it('autosaves a debounced PUT after an edit', () => {
-      openAldermoor();
+    function open(): void {
+      entities.load.mockReturnValue(of(aldermoor));
+      session.open('m1').subscribe();
+    }
+
+    it('autosaves a debounced save after an edit', async () => {
+      open();
       editor.paintAt({ q: 5, r: 5 }, 'ocean');
+      entities.save.mockReturnValue(of(saved(4)));
 
       TestBed.tick();
-      vi.advanceTimersByTime(799);
-      http.expectNone('/api/entities/m1'); // not yet
+      await vi.advanceTimersByTimeAsync(799);
+      expect(entities.save).not.toHaveBeenCalled(); // not yet
 
-      vi.advanceTimersByTime(1);
-      const req = http.expectOne('/api/entities/m1');
-      expect(req.request.method).toBe('PUT');
-      req.flush({ ...aldermoor, version: 4, document: bodyOf(editor.document()) });
+      await vi.advanceTimersByTimeAsync(1);
+      expect(entities.save).toHaveBeenCalledWith('m1', bodyOf(editor.document()), 3, [], []);
 
-      settle(); // let the post-save effect settle (no follow-up save)
-      http.expectNone('/api/entities/m1');
+      await settle(); // no follow-up save after a clean one
+      expect(entities.save).toHaveBeenCalledTimes(1);
     });
 
-    it('flush() persists a pending edit on leave, completing when it lands', () => {
-      openAldermoor();
+    it('flush() persists a pending edit on leave, completing when it lands', async () => {
+      open();
       editor.paintAt({ q: 5, r: 5 }, 'ocean'); // dirty, debounce not yet elapsed
       expect(session.dirty()).toBe(true);
+      entities.save.mockReturnValue(of(saved(4)));
 
       let done = false;
       session.flush().subscribe({ complete: () => (done = true) });
-
-      const req = http.expectOne('/api/entities/m1');
-      expect(req.request.method).toBe('PUT');
-      req.flush({ ...aldermoor, version: 4 });
+      await settle(0);
 
       expect(done).toBe(true);
       expect(session.dirty()).toBe(false);
+      expect(entities.save).toHaveBeenCalledTimes(1);
     });
 
-    it('flush() is a no-op (completes, no request) when nothing is dirty', () => {
-      openAldermoor();
+    it('flush() is a no-op (completes, no save) when nothing is dirty', async () => {
+      open();
 
       let done = false;
       session.flush().subscribe({ complete: () => (done = true) });
+      await settle(0);
 
-      http.expectNone('/api/entities/m1');
       expect(done).toBe(true);
+      expect(entities.save).not.toHaveBeenCalled();
     });
 
-    it('coalesces edits during an in-flight save into one follow-up save', () => {
-      openAldermoor();
+    it('coalesces edits during an in-flight save into one follow-up save', async () => {
+      open();
+      const saves: Subject<EntitySaveOutcome>[] = [];
+      entities.save.mockImplementation(() => {
+        const s = new Subject<EntitySaveOutcome>();
+        saves.push(s);
+        return s;
+      });
+
       editor.paintAt({ q: 5, r: 5 }, 'ocean');
-      settle();
-      const first = http.expectOne('/api/entities/m1'); // in flight, version 3
+      await settle(); // autosave fires → save #1 in flight, version 3
+      expect(entities.save).toHaveBeenCalledTimes(1);
 
       // Edit while the save is in flight: no second save starts (single-flight).
       editor.paintAt({ q: 6, r: 6 }, 'forest');
-      settle();
-      http.expectNone('/api/entities/m1');
+      await settle();
+      expect(entities.save).toHaveBeenCalledTimes(1);
 
-      first.flush({ ...aldermoor, version: 4, document: bodyOf(editor.document()) });
+      saves[0].next(saved(4));
+      saves[0].complete();
 
       // Exactly one coalesced follow-up, under the advanced version, carrying both edits.
-      settle();
-      const second = http.expectOne('/api/entities/m1');
-      expect(second.request.body).toEqual(
-        expect.objectContaining({ version: 4 }),
-      );
-      second.flush({ ...aldermoor, version: 5, document: bodyOf(editor.document()) });
+      await settle();
+      expect(entities.save).toHaveBeenCalledTimes(2);
+      expect(entities.save.mock.calls[1][2]).toBe(4);
 
-      settle();
-      http.expectNone('/api/entities/m1');
+      saves[1].next(saved(5));
+      saves[1].complete();
+      await settle();
+      expect(entities.save).toHaveBeenCalledTimes(2);
     });
 
-    it('resets the debounce on each edit, saving only after the last (trailing)', () => {
-      openAldermoor();
+    it('resets the debounce on each edit, saving only after the last (trailing)', async () => {
+      open();
+      entities.save.mockReturnValue(of(saved(4)));
       editor.paintAt({ q: 5, r: 5 }, 'ocean');
       TestBed.tick();
-      vi.advanceTimersByTime(500);
+      await vi.advanceTimersByTimeAsync(500);
 
       editor.paintAt({ q: 6, r: 6 }, 'forest'); // re-arms the window
       TestBed.tick();
-      vi.advanceTimersByTime(500); // 500ms since the last edit — still quiet
-      http.expectNone('/api/entities/m1');
+      await vi.advanceTimersByTimeAsync(500); // 500ms since the last edit — still quiet
+      expect(entities.save).not.toHaveBeenCalled();
 
-      vi.advanceTimersByTime(300); // 800ms since the last edit
-      http
-        .expectOne('/api/entities/m1')
-        .flush({ ...aldermoor, version: 4, document: bodyOf(editor.document()) });
+      await vi.advanceTimersByTimeAsync(300); // 800ms since the last edit
+      expect(entities.save).toHaveBeenCalledTimes(1);
     });
 
-    it('pauses autosave while a conflict is unresolved', () => {
-      openAldermoor();
+    it('pauses autosave while a conflict is unresolved', async () => {
+      open();
+      const serverCurrent: EntityDetail = { ...aldermoor, version: 7, document: bodyOf(desertAt99) };
+      entities.save.mockReturnValue(of({ status: 'conflict', current: serverCurrent }));
       editor.paintAt({ q: 5, r: 5 }, 'ocean');
-      settle();
-      http
-        .expectOne('/api/entities/m1')
-        .flush({ ...aldermoor, version: 7, document: bodyOf(desertAt99) }, {
-          status: 409,
-          statusText: 'Conflict',
-        });
+      await settle();
       expect(session.conflict()).not.toBeNull();
+      expect(entities.save).toHaveBeenCalledTimes(1);
 
       // Further edits accumulate but must not loop the stale base version.
       editor.paintAt({ q: 6, r: 6 }, 'forest');
-      settle();
-      http.expectNone('/api/entities/m1');
+      await settle();
+      expect(entities.save).toHaveBeenCalledTimes(1);
       expect(session.dirty()).toBe(true);
     });
 
-    it('resumes autosave after a conflict is resolved by reload', () => {
-      openAldermoor();
+    it('resumes autosave after a conflict is resolved by reload', async () => {
+      open();
+      const serverCurrent: EntityDetail = { ...aldermoor, version: 7, document: bodyOf(desertAt99) };
+      entities.save.mockReturnValue(of({ status: 'conflict', current: serverCurrent }));
       editor.paintAt({ q: 5, r: 5 }, 'ocean');
-      settle();
-      http
-        .expectOne('/api/entities/m1')
-        .flush({ ...aldermoor, version: 7, document: bodyOf(desertAt99) }, {
-          status: 409,
-          statusText: 'Conflict',
-        });
+      await settle();
+      expect(session.conflict()).not.toBeNull();
 
+      entities.load.mockReturnValue(of(serverCurrent));
       session.reload().subscribe();
-      http
-        .expectOne('/api/entities/m1')
-        .flush({ ...aldermoor, version: 7, document: bodyOf(desertAt99) });
+      await settle(0);
       expect(session.conflict()).toBeNull();
 
       // A fresh edit autosaves again under the reloaded version.
+      entities.save.mockReturnValue(of({ status: 'saved', entity: { ...serverCurrent, version: 8 } }));
       editor.paintAt({ q: 1, r: 1 }, 'ocean');
-      settle();
-      const req = http.expectOne('/api/entities/m1');
-      expect(req.request.body).toEqual(
-        expect.objectContaining({ version: 7 }),
-      );
-      req.flush({ ...aldermoor, version: 8, document: bodyOf(editor.document()) });
+      await settle();
+      expect(entities.save).toHaveBeenCalledTimes(2);
+      expect(entities.save.mock.calls[1][2]).toBe(7); // sent under the reloaded version
     });
 
-    it('pauses autosave after a failed save until the next edit (no retry loop)', () => {
-      openAldermoor();
+    it('pauses autosave after a failed save until the next edit (no retry loop)', async () => {
+      open();
+      entities.save.mockReturnValue(throwError(() => new Error('boom')));
       editor.paintAt({ q: 5, r: 5 }, 'ocean');
-      settle();
-      // The save fails; the edit stays dirty (baseline isn't advanced).
-      http
-        .expectOne('/api/entities/m1')
-        .flush('boom', { status: 500, statusText: 'Server Error' });
+      await settle();
       expect(session.error()).toBe('save');
       expect(session.dirty()).toBe(true);
+      expect(entities.save).toHaveBeenCalledTimes(1);
 
-      // The scheduler must not re-fire the same failing PUT every 800ms.
-      settle();
-      settle();
-      http.expectNone('/api/entities/m1');
+      // The scheduler must not re-fire the same failing save every 800ms.
+      await settle();
+      await settle();
+      expect(entities.save).toHaveBeenCalledTimes(1);
 
       // A fresh edit lifts the pause and autosave resumes.
+      entities.save.mockReturnValue(of(saved(4)));
       editor.paintAt({ q: 6, r: 6 }, 'forest');
-      settle();
-      http
-        .expectOne('/api/entities/m1')
-        .flush({ ...aldermoor, version: 4, document: bodyOf(editor.document()) });
+      await settle();
+      expect(entities.save).toHaveBeenCalledTimes(2);
     });
 
-    it('flush() is a no-op while a conflict is unresolved (no stale re-PUT)', () => {
-      openAldermoor();
+    it('flush() is a no-op while a conflict is unresolved (no stale re-PUT)', async () => {
+      open();
+      const serverCurrent: EntityDetail = { ...aldermoor, version: 7, document: bodyOf(desertAt99) };
+      entities.save.mockReturnValue(of({ status: 'conflict', current: serverCurrent }));
       editor.paintAt({ q: 5, r: 5 }, 'ocean');
       session.save().subscribe();
-      http.expectOne('/api/entities/m1').flush(
-        { ...aldermoor, version: 7, document: bodyOf(desertAt99) },
-        { status: 409, statusText: 'Conflict' },
-      );
       expect(session.conflict()).not.toBeNull();
+      entities.save.mockClear();
 
       // Leaving with the conflict unresolved must not re-send the stale base version.
       let done = false;
       session.flush().subscribe({ complete: () => (done = true) });
-      http.expectNone('/api/entities/m1');
+      await settle(0);
+      expect(entities.save).not.toHaveBeenCalled();
       expect(done).toBe(true);
     });
 
-    it('flush() waits out an in-flight save, then sends the latest edit (ADR-0026)', () => {
-      openAldermoor();
+    it('flush() waits out an in-flight save, then sends the latest edit (ADR-0026)', async () => {
+      open();
+      const saves: Subject<EntitySaveOutcome>[] = [];
+      entities.save.mockImplementation(() => {
+        const s = new Subject<EntitySaveOutcome>();
+        saves.push(s);
+        return s;
+      });
       editor.paintAt({ q: 5, r: 5 }, 'ocean');
-      session.save().subscribe();
-      const first = http.expectOne('/api/entities/m1'); // in flight, snapshot = ocean
+      session.save().subscribe(); // in flight, snapshot = ocean
+      expect(entities.save).toHaveBeenCalledTimes(1);
 
-      // The user types more after the PUT started, then leaves before it returns.
+      // The user types more after the save started, then leaves before it returns.
       editor.paintAt({ q: 6, r: 6 }, 'forest');
       let done = false;
       session.flush().subscribe({ complete: () => (done = true) });
-      TestBed.tick(); // let the in-flight wait observe saving === true
-      http.expectNone('/api/entities/m1'); // single-flight: no second save yet
+      await settle(0); // the wait observes saving === true
+      expect(entities.save).toHaveBeenCalledTimes(1); // single-flight: no second save yet
 
       // The first save settles and advances the version...
-      first.flush({ ...aldermoor, version: 4, document: bodyOf(desertAt99) });
-      TestBed.tick(); // ...the wait sees saving flip false and sends the follow-up
-      const followUp = http.expectOne('/api/entities/m1');
-      expect(followUp.request.body).toEqual(
-        expect.objectContaining({ version: 4 }),
-      );
-      followUp.flush({ ...aldermoor, version: 5 });
+      saves[0].next(saved(4, bodyOf(desertAt99)));
+      saves[0].complete();
+      await settle(0); // ...the wait sees saving flip false and sends the follow-up
+      expect(entities.save).toHaveBeenCalledTimes(2);
+      expect(entities.save.mock.calls[1][2]).toBe(4);
+
+      saves[1].next(saved(5));
+      saves[1].complete();
+      await settle(0);
       expect(done).toBe(true);
     });
   });
 
-  it('renames the open entity', () => {
+  it('renames the open entity', async () => {
     openAldermoor();
+    entities.rename.mockReturnValue(of({ ...aldermoor, name: 'The Whisperwood' }));
 
-    session.rename('The Whisperwood').subscribe();
+    await firstValueFrom(session.rename('The Whisperwood'));
 
-    const req = http.expectOne('/api/entities/m1');
-    expect(req.request.method).toBe('PATCH');
-    expect(req.request.body).toEqual({ name: 'The Whisperwood' });
-    req.flush({ ...aldermoor, name: 'The Whisperwood' });
-
+    expect(entities.rename).toHaveBeenCalledWith('m1', 'The Whisperwood');
     expect(session.current()?.name).toBe('The Whisperwood');
   });
 
-  it('re-fetches on openRoute even when the same entity is already open', () => {
+  it('re-fetches on openRoute even when the same entity is already open', async () => {
     openAldermoor();
-
     // Re-entering the route must re-fetch, not trust a retained `current`: the
     // route-scoped session outlives a trip to the library (e.g. in-library rename) (#70).
-    let opened: EntityDetail | undefined;
-    session.openRoute('m1').subscribe((m) => (opened = m));
-
     const renamed: EntityDetail = { ...aldermoor, name: 'Lady Mara' };
-    http.expectOne('/api/entities/m1').flush(renamed);
+    entities.load.mockReturnValue(of(renamed));
+
+    const opened = await firstValueFrom(session.openRoute('m1'));
+
     expect(opened).toEqual(renamed);
     expect(session.current()?.name).toBe('Lady Mara');
   });
 
-  it('flushes the dirty previous entity, then clears and fetches the new one (ADR-0026)', () => {
+  it('flushes the dirty previous entity, then clears and fetches the new one (ADR-0026)', async () => {
     openAldermoor();
     editor.paintAt({ q: 5, r: 5 }, 'ocean'); // m1 now dirty
-
-    session.openRoute('m2').subscribe();
-
-    // openRoute awaits the flush of m1's pending edit before clearing its canvas — an
-    // in-app swap reuses this session, so the edit must land while the live signals still
-    // hold it; the m2 load only starts once the flush PUT resolves.
-    const flush = http.expectOne('/api/entities/m1');
-    expect(flush.request.method).toBe('PUT');
-    flush.flush({ ...aldermoor, version: 4 });
-
-    // Previous canvas cleared while the load is in flight — and re-baselined, so this
-    // empty placeholder doesn't read as dirty (else a 404 leave would PUT it over m1).
-    expect(editor.document()).toEqual({ hexes: {}, regions: [], labels: [] });
-    expect(session.dirty()).toBe(false);
-
+    entities.save.mockReturnValue(of(saved(4)));
     const other: EntityDetail = { ...aldermoor, id: 'm2', document: bodyOf(forestAt00) };
-    http.expectOne('/api/entities/m2').flush(other);
+    entities.load.mockReturnValue(of(other));
+
+    await firstValueFrom(session.openRoute('m2'));
+
+    // m1's pending edit was flushed before the swap.
+    expect(entities.save).toHaveBeenCalledTimes(1);
+    // m2's grid is now loaded into the editor.
     expect(editor.document()).toEqual(forestAt00);
+    expect(session.current()?.id).toBe('m2');
   });
 
-  it('saves a non-hexmap entity without coercing it into a hexmap (no data loss)', () => {
-    // A note must save back as a note; the editor's empty grid must not
-    // overwrite it with a blank hexmap body.
+  it('saves a non-hexmap entity without coercing it into a hexmap (no data loss)', async () => {
     const noteBody = { type: 'note' as const, content };
-    const note: EntityDetail = {
-      ...aldermoor,
-      id: 'n1',
-      type: 'note',
-      document: noteBody,
-    };
-    session.open('n1').subscribe();
-    http.expectOne('/api/entities/n1').flush(note);
+    openAldermoor({ ...aldermoor, id: 'n1', type: 'note', document: noteBody });
+    entities.save.mockReturnValue(of({ status: 'saved', entity: { ...aldermoor, id: 'n1', type: 'note', document: noteBody, version: 4 } }));
 
-    session.save().subscribe();
+    await firstValueFrom(session.save());
 
-    const req = http.expectOne('/api/entities/n1');
-    expect(req.request.method).toBe('PUT');
-    expect(req.request.body).toEqual({
-      document: noteBody,
-      version: 3,
-      tags: [],
-      descriptors: [],
-    });
-    req.flush({ ...note, version: 4 });
+    // Saved back as a note; the editor's empty grid did not overwrite it with a hexmap.
+    expect(entities.save).toHaveBeenCalledWith('n1', noteBody, 3, [], []);
   });
 
-  it('saves a note’s edited Content opaquely, round-tripping the snapshot untouched', () => {
+  it('saves a note’s edited Content opaquely, round-tripping the snapshot untouched', async () => {
     const noteBody = { type: 'note' as const, content };
-    const note: EntityDetail = {
-      ...aldermoor,
-      id: 'n1',
-      type: 'note',
-      document: noteBody,
-    };
-    session.open('n1').subscribe();
-    http.expectOne('/api/entities/n1').flush(note);
-
+    openAldermoor({ ...aldermoor, id: 'n1', type: 'note', document: noteBody });
     const snapshot = {
       type: 'doc',
-      content: [
-        {
-          type: 'paragraph',
-          content: [{ type: 'text', text: 'Lady Mara rules the north.' }],
-        },
-      ],
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Lady Mara rules the north.' }] }],
     };
     session.setContent(snapshot);
+    entities.save.mockReturnValue(of(saved(4)));
 
-    session.save().subscribe();
+    await firstValueFrom(session.save());
 
-    const req = http.expectOne('/api/entities/n1');
-    expect(req.request.method).toBe('PUT');
-    // Snapshot wrapped in format envelope, never parsed (ADR-0019).
-    expect(req.request.body).toEqual({
-      document: { type: 'note', content: { format: CONTENT_FORMAT, snapshot } },
-      version: 3,
-      tags: [],
-      descriptors: [],
-    });
-    req.flush({ ...note, version: 4 });
+    // Snapshot wrapped in the format envelope, never parsed (ADR-0019).
+    expect(entities.save).toHaveBeenCalledWith(
+      'n1',
+      { type: 'note', content: { format: CONTENT_FORMAT, snapshot } },
+      3,
+      [],
+      [],
+    );
   });
 
-  it('rides a hexmap’s edited Content alongside its grid on save (#75)', () => {
+  it('rides a hexmap’s edited Content alongside its grid on save (#75)', async () => {
     openAldermoor();
-    // Both surfaces edited: a hex painted on the grid and the Note view's prose.
     editor.paintAt({ q: 5, r: 5 }, 'ocean');
     const snapshot = {
       type: 'doc',
-      content: [
-        {
-          type: 'paragraph',
-          content: [{ type: 'text', text: 'The reach lies north.' }],
-        },
-      ],
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'The reach lies north.' }] }],
     };
     session.setContent(snapshot);
+    entities.save.mockReturnValue(of(saved(4)));
 
-    session.save().subscribe();
+    await firstValueFrom(session.save());
 
-    const req = http.expectOne('/api/entities/m1');
-    expect(req.request.method).toBe('PUT');
     // Body carries both edits; neither surface drops the other's (ADR-0019).
-    expect(req.request.body).toEqual({
-      document: {
-        type: 'hexmap',
-        content: { format: CONTENT_FORMAT, snapshot },
-        ...editor.document(),
-      },
-      version: 3,
-      tags: [],
-      descriptors: [],
-    });
-    req.flush({ ...aldermoor, version: 4 });
+    expect(entities.save).toHaveBeenCalledWith(
+      'm1',
+      { type: 'hexmap', content: { format: CONTENT_FORMAT, snapshot }, ...editor.document() },
+      3,
+      [],
+      [],
+    );
   });
 
-  it('does not save or rename while a route load is in flight (mid-navigation)', () => {
+  it('does not save or rename while a route load is in flight (mid-navigation)', async () => {
     openAldermoor(); // current = m1, not loading
     editor.paintAt({ q: 5, r: 5 }, 'ocean');
-
-    // Navigating away first flushes m1's pending edit (ADR-0026), then loads m2.
+    entities.save.mockReturnValue(of(saved(4)));
+    // The m2 load stays in flight so the session sits in the loading state.
+    const load$ = new Subject<EntityDetail>();
+    entities.load.mockReturnValue(load$);
     session.openRoute('m2').subscribe();
-    http.expectOne('/api/entities/m1').flush({ ...aldermoor, version: 4 });
-    expect(session.saving()).toBe(false);
+    entities.save.mockClear();
 
     // A *late* Save/rename from the outgoing header — now that the load is in flight —
     // must not write to the m1 the user navigated away from (#4, #70).
     session.save().subscribe();
     session.rename('Nope').subscribe();
-    http.expectNone('/api/entities/m1');
+    expect(entities.save).not.toHaveBeenCalled();
+    expect(entities.rename).not.toHaveBeenCalled();
 
     // The pending load still resolves normally.
-    http
-      .expectOne('/api/entities/m2')
-      .flush({ ...aldermoor, id: 'm2', document: bodyOf(forestAt00) });
+    load$.next({ ...aldermoor, id: 'm2', document: bodyOf(forestAt00) });
+    load$.complete();
+    await Promise.resolve();
+    expect(session.current()?.id).toBe('m2');
   });
 
   it('restores the editor view from the ?view query param on load (#75)', () => {
@@ -654,28 +583,23 @@ describe('EntitySession', () => {
   it('flushes a save immediately on Cmd/Ctrl+S, bypassing the debounce', () => {
     openAldermoor();
     editor.paintAt({ q: 5, r: 5 }, 'ocean');
+    entities.save.mockReturnValue(of(saved(4)));
 
-    const event = new KeyboardEvent('keydown', {
-      key: 's',
-      metaKey: true,
-      cancelable: true,
-    });
+    const event = new KeyboardEvent('keydown', { key: 's', metaKey: true, cancelable: true });
     window.dispatchEvent(event);
 
     expect(event.defaultPrevented).toBe(true); // suppresses the browser "save page" dialog
-    const req = http.expectOne('/api/entities/m1');
-    expect(req.request.method).toBe('PUT');
-    req.flush({ ...aldermoor, version: 4, document: bodyOf(editor.document()) });
+    expect(entities.save).toHaveBeenCalledTimes(1);
   });
 
-  it('is a safe no-op with no entity open (no request, no throw)', () => {
-    // Save/rename/reload before any open must not hit the server or throw out
-    // of a handler-less subscribe.
+  it('is a safe no-op with no entity open (no save, no throw)', () => {
+    // Save/rename/reload before any open must not call the client or throw out of a
+    // handler-less subscribe.
     expect(() => session.save().subscribe()).not.toThrow();
     expect(() => session.rename('whatever').subscribe()).not.toThrow();
     expect(() => session.reload().subscribe()).not.toThrow();
 
-    http.expectNone('/api/entities/m1');
+    expect(entities.save).not.toHaveBeenCalled();
     // `_saving` was never flipped, so the Save button can't stick on "Saving…".
     expect(session.saving()).toBe(false);
   });

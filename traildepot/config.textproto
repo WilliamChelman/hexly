@@ -18,3 +18,29 @@ auth {
   disable_password_auth: true
 }
 jobs {}
+
+# Worlds + Entities as Record APIs (#129, ADR-0032, ADR-0024). Owner happy path:
+# every row is owner-scoped; owner_id is autofilled from the caller. The cascade
+# share (member reads of `shared` Entities) is slice #5 — not yet expressed here.
+record_apis {
+  name: "worlds"
+  table_name: "worlds"
+  acl_authenticated: [CREATE, READ, UPDATE, DELETE]
+  create_access_rule: "_USER_.id IS NOT NULL"
+  read_access_rule: "_ROW_.owner_id = _USER_.id"
+  update_access_rule: "_ROW_.owner_id = _USER_.id"
+  delete_access_rule: "_ROW_.owner_id = _USER_.id"
+  autofill_missing_user_id_columns: true
+}
+
+record_apis {
+  name: "entities"
+  table_name: "entities"
+  acl_authenticated: [CREATE, READ, UPDATE, DELETE]
+  create_access_rule: "_USER_.id IS NOT NULL"
+  read_access_rule: "_ROW_.owner_id = _USER_.id"
+  update_access_rule: "_ROW_.owner_id = _USER_.id"
+  # The Home Entity is undeletable (ADR-0024): the DELETE rule excludes it.
+  delete_access_rule: "_ROW_.owner_id = _USER_.id AND _ROW_.is_home = FALSE"
+  autofill_missing_user_id_columns: true
+}

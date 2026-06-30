@@ -340,7 +340,8 @@ export class EntityBrowser {
     this.loadError.set(false);
     this.loaded.set(false);
     this.fetchSub = this.entitiesClient
-      .list({ limit: PAGE_SIZE, worldId })
+      // The Home Entity is the World's landing page, not a library card (ADR-0024).
+      .list({ limit: PAGE_SIZE, worldId, excludeHome: true })
       .pipe(this.shell.withLoading('subtle'))
       .subscribe({
         next: (page) => {
@@ -366,7 +367,7 @@ export class EntityBrowser {
     if (cursor === null || this.loadingMore()) return;
     this.loadingMore.set(true);
     this.entitiesClient
-      .list({ cursor, worldId: this.activeWorld.worldId() ?? undefined })
+      .list({ cursor, worldId: this.activeWorld.worldId() ?? undefined, excludeHome: true })
       .pipe(finalize(() => this.loadingMore.set(false)))
       .subscribe({
         next: (page) => {

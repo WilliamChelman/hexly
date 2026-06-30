@@ -1,105 +1,122 @@
-import {
-  HttpClient,
-  HttpErrorResponse,
-  HttpParams,
-} from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { catchError, map, Observable, of, throwError } from 'rxjs';
+import { Observable, from, map, of, switchMap } from 'rxjs';
+import type { FilterOrComposite, ListOpts } from 'trailbase';
 import {
+  ENTITY_LIST_DEFAULT_LIMIT,
   EntityBody,
   EntityDetail,
   EntityListQuery,
   EntityPage,
   EntitySaveOutcome,
   EntityType,
+  emptyEntityBody,
 } from '@hexly/domain';
+import { TrailbaseClient } from './trailbase-client';
+import { EntityRow } from '../models/entity-row';
+import { toEntityDetail, toEntitySummary } from '../utils/tb-records';
 
-export type EntityListParams = Partial<EntityListQuery>;
+export type EntityListParams = Partial<EntityListQuery> & {
+  /** Drop the World's Home Entity from the page — the library shows authored Entities, not the landing page. */
+  excludeHome?: boolean;
+};
 
 /**
- * HTTP client for the entities API (ADR-0018, ADR-0005).
- * Stateless: every call is a round trip; open-entity/conflict state lives in EntitySession.
+ * Owner-scoped reads/writes for Entities over the TrailBase `entities` Record API
+ * (ADR-0032, ADR-0018). Stateless: every call is a round trip; open-entity state
+ * lives in EntitySession. Access is enforced by the API's owner access-rules, so
+ * this client carries no auth of its own — it talks through {@link TrailbaseClient}.
  */
 @Injectable({ providedIn: 'root' })
 export class EntitiesClient {
-  private readonly http = inject(HttpClient);
+  private readonly records = inject(TrailbaseClient).client.records<EntityRow>('entities');
 
   /** One page of the entities read surface (ADR-0025); `opts` filter and page it. */
   list(opts: EntityListParams = {}): Observable<EntityPage> {
-    let params = new HttpParams();
-    // `ids` repeats the param once per id; the others are single-valued.
-    for (const id of opts.ids ?? []) params = params.append('ids', id);
-    if (opts.q) params = params.set('q', opts.q);
-    if (opts.type) params = params.set('type', opts.type);
-    if (opts.worldId) params = params.set('worldId', opts.worldId);
-    if (opts.cursor) params = params.set('cursor', opts.cursor);
-    if (opts.limit !== undefined) params = params.set('limit', opts.limit);
-    return this.http.get<EntityPage>('/api/entities', { params });
+    // An explicit empty id set selects nothing — short-circuit, never fetch-all.
+    if (opts.ids && opts.ids.length === 0) return of({ items: [], nextCursor: null });
+
+    const limit = opts.limit ?? ENTITY_LIST_DEFAULT_LIMIT;
+    const filters: FilterOrComposite[] = [];
+    if (opts.worldId) filters.push({ column: 'world_id', value: opts.worldId });
+    if (opts.type) filters.push({ column: 'type', value: opts.type });
+    if (opts.q) filters.push({ column: 'name', op: 'like', value: `%${opts.q}%` });
+    if (opts.excludeHome) filters.push({ column: 'is_home', value: '0' });
+    // Batch-by-id (the link picker / world-redirect guards) — an OR over equals.
+    // An empty set selects nothing, never everything.
+    if (opts.ids) filters.push({ or: opts.ids.map((id) => ({ column: 'id', value: id })) });
+
+    const listOpts: ListOpts = {
+      filters,
+      order: ['-updated_at', '-id'],
+      pagination: { limit, ...(opts.cursor ? { cursor: opts.cursor } : {}) },
+    };
+    return from(this.records.list(listOpts)).pipe(
+      map((res) => ({
+        items: res.records.map(toEntitySummary),
+        // TrailBase always returns a cursor; a short page means there's no next page.
+        nextCursor: res.records.length === limit ? (res.cursor ?? null) : null,
+      })),
+    );
+  }
+
+  /** `worldId` scopes the new Entity to a World (ADR-0024); `owner_id` is autofilled from the caller. */
+  create(name: string, type: EntityType, worldId?: string): Observable<EntityDetail> {
+    return from(
+      this.records.create({
+        name,
+        type,
+        ...(worldId ? { world_id: worldId } : {}),
+        document: JSON.stringify(emptyEntityBody(type)),
+      } as unknown as EntityRow),
+    ).pipe(switchMap((id) => this.load(String(id))));
+  }
+
+  load(id: string): Observable<EntityDetail> {
+    return from(this.records.read(id)).pipe(map(toEntityDetail));
   }
 
   /** Metadata only — never conflicts with an in-progress save. */
   rename(id: string, name: string): Observable<EntityDetail> {
-    return this.http.patch<EntityDetail>(`/api/entities/${id}`, { name });
+    return from(this.records.update(id, { name } as Partial<EntityRow>)).pipe(
+      switchMap(() => this.load(id)),
+    );
   }
 
   delete(id: string): Observable<void> {
-    return this.http.delete<void>(`/api/entities/${id}`);
+    return from(this.records.delete(id)).pipe(map(() => undefined));
   }
 
-  /** `worldId` scopes the new Entity to a World (ADR-0024); omitted, the server defaults to the caller's first World. */
-  create(
-    name: string,
-    type: EntityType,
-    worldId?: string,
-  ): Observable<EntityDetail> {
-    return this.http.post<EntityDetail>('/api/entities', {
-      name,
-      type,
-      ...(worldId ? { worldId } : {}),
-    });
-  }
-
-  load(id: string): Observable<EntityDetail> {
-    return this.http.get<EntityDetail>(`/api/entities/${id}`);
-  }
-
-  /** The owner's `::` Link Descriptor vocabulary — DISTINCT, last-saved state (#96, ADR-0023). */
-  listDescriptors(): Observable<string[]> {
-    return this.http.get<string[]>('/api/entities/descriptors');
-  }
-
-  /** Stale base → `conflict` outcome (ADR-0018), not a thrown error; caller branches, not catches. */
+  /**
+   * Naive last-write-wins save (#129): writes the body/tags and re-reads the row.
+   * Optimistic concurrency (the `version` UPDATE access-rule and its `conflict`
+   * outcome) lands in slice #4 — until then a save always reports `saved`.
+   * ponytail: no 409/conflict branch yet; #4 adds `_REQ_.version = _ROW_.version`.
+   */
   save(
     id: string,
     body: EntityBody,
     version: number,
     tags: readonly string[],
-    descriptors: readonly string[],
+    _descriptors: readonly string[],
   ): Observable<EntitySaveOutcome> {
-    return this.http
-      .put<EntityDetail>(`/api/entities/${id}`, {
-        document: body,
-        version,
-        tags,
-        descriptors,
-      })
-      .pipe(
-        map((saved): EntitySaveOutcome => ({ status: 'saved', entity: saved })),
-        catchError((err: unknown) => {
-          // A 409 means the base version moved: report the server's Entity as a
-          // conflict. Guard that the body is actually an Entity — a non-JSON 409
-          // (e.g. a proxy's HTML error page) falls through to the error path.
-          if (
-            err instanceof HttpErrorResponse &&
-            err.status === 409 &&
-            err.error !== null &&
-            typeof err.error === 'object'
-          ) {
-            const current = err.error as EntityDetail;
-            return of<EntitySaveOutcome>({ status: 'conflict', current });
-          }
-          return throwError(() => err);
-        }),
-      );
+    return from(
+      this.records.update(id, {
+        document: JSON.stringify(body),
+        tags: JSON.stringify(tags),
+        version: version + 1,
+      } as Partial<EntityRow>),
+    ).pipe(
+      switchMap(() => this.load(id)),
+      map((entity): EntitySaveOutcome => ({ status: 'saved', entity })),
+    );
+  }
+
+  /**
+   * The owner's Link Descriptor vocabulary (#96, ADR-0023). The descriptor index
+   * is a separate surface not yet on TrailBase (slice #4/#5); until then there are
+   * no `::` suggestions. ponytail: returns empty; wire to its Record API with save.
+   */
+  listDescriptors(): Observable<string[]> {
+    return from(Promise.resolve<string[]>([]));
   }
 }

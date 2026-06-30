@@ -1,20 +1,17 @@
-import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { emptyContent, EntityDetail } from '@hexly/domain';
+import { of } from 'rxjs';
 import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
+import { MockEntitySession } from '../../../core/testing/mock-entity-session';
 import { EntitySession } from '../services/entity-session';
 import { HexMapStore } from '../services/hexmap-store';
 import { EntityHeader } from './entity-header';
 import { noteDetail } from './entity-detail.fixtures';
 
 describe('EntityHeader', () => {
-  let http: HttpTestingController;
+  let session: MockEntitySession;
 
   const aldermoor: EntityDetail = {
     id: 'm1',
@@ -30,26 +27,23 @@ describe('EntityHeader', () => {
     document: { type: 'hexmap', content: emptyContent(), hexes: {}, regions: [], labels: [] },
   };
 
-  /** Open an entity through the real session so the header has one to show/save. */
+  const tick = (): Promise<void> => new Promise((resolve) => setTimeout(resolve));
+
+  /** Open `detail` through the session facade (drives the header's `current()`). */
   function open(detail: EntityDetail): void {
-    TestBed.inject(EntitySession).open(detail.id).subscribe();
-    http.expectOne(`/api/entities/${detail.id}`).flush(detail);
+    session.setCurrent(detail);
   }
 
   beforeEach(async () => {
+    session = new MockEntitySession();
     await TestBed.configureTestingModule({
       imports: [EntityHeader, provideTranslocoTesting()],
       providers: [
-        EntitySession,
-        provideHttpClient(),
-        provideHttpClientTesting(),
+        { provide: EntitySession, useValue: session },
         provideRouter([]),
       ],
     }).compileComponents();
-    http = TestBed.inject(HttpTestingController);
   });
-
-  afterEach(() => http.verify());
 
   it('shows the open entity name', () => {
     open({ ...aldermoor, name: 'The Whisperwood' });
@@ -71,37 +65,40 @@ describe('EntityHeader', () => {
     ).not.toBeNull();
   });
 
-  it('renames the open entity when the title is edited', () => {
+  it('renames the open entity when the title is edited', async () => {
     open(aldermoor);
+    // A clean rename advances the open Entity — the header mirrors the new name.
+    session.rename.mockImplementation((name) => {
+      const renamed = { ...aldermoor, name };
+      session.setCurrent(renamed);
+      return of(renamed);
+    });
     const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 
     // Edit in place (contenteditable), commit on blur.
-    const title = fixture.nativeElement.querySelector(
-      '[data-testid=title]',
-    ) as HTMLElement;
+    const title = fixture.nativeElement.querySelector('[data-testid=title]') as HTMLElement;
     title.textContent = 'The Whisperwood';
     title.dispatchEvent(new Event('blur'));
-
-    const req = http.expectOne('/api/entities/m1');
-    expect(req.request.method).toBe('PATCH');
-    expect(req.request.body).toEqual({ name: 'The Whisperwood' });
-    req.flush({ ...aldermoor, name: 'The Whisperwood' });
+    await tick();
     fixture.detectChanges();
 
+    expect(session.rename).toHaveBeenCalledWith('The Whisperwood');
     expect(fixture.nativeElement.textContent).toContain('The Whisperwood');
   });
 
-  it('does not call the API when the title is left unchanged', () => {
+  it('does not call the API when the title is left unchanged', async () => {
     open(aldermoor);
     const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 
-    (
-      fixture.nativeElement.querySelector('[data-testid=title]') as HTMLElement
-    ).dispatchEvent(new Event('blur'));
+    (fixture.nativeElement.querySelector('[data-testid=title]') as HTMLElement).dispatchEvent(
+      new Event('blur'),
+    );
+    await tick();
 
-    http.expectNone('/api/entities/m1');
+    // No rename round-trip on an unchanged title.
+    expect(session.rename).not.toHaveBeenCalled();
   });
 
   it('no longer carries app-level navigation — that lives in the rail (ADR-0022)', () => {
@@ -114,9 +111,7 @@ describe('EntityHeader', () => {
     expect(text).not.toContain('All maps');
     expect(text).not.toContain('Design system');
     expect(fixture.nativeElement.querySelector('a[href="/entities"]')).toBeNull();
-    expect(
-      fixture.nativeElement.querySelector('a[href="/styleguide"]'),
-    ).toBeNull();
+    expect(fixture.nativeElement.querySelector('a[href="/styleguide"]')).toBeNull();
   });
 
   // The Home Entity's title is the World's name (ADR-0029): read-only here, renamed
@@ -126,9 +121,7 @@ describe('EntityHeader', () => {
     const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 
-    const title = fixture.nativeElement.querySelector(
-      '[data-testid=title]',
-    ) as HTMLElement;
+    const title = fixture.nativeElement.querySelector('[data-testid=title]') as HTMLElement;
     // Not editable: no contenteditable, no keyboard reach.
     expect(title.getAttribute('contenteditable')).toBeNull();
     expect(title.getAttribute('tabindex')).toBeNull();
@@ -137,16 +130,17 @@ describe('EntityHeader', () => {
     expect(title.textContent).toContain('Aldermoor');
   });
 
-  it('does not rename when an unchanged title blur fires on the Home Entity', () => {
+  it('does not rename when an unchanged title blur fires on the Home Entity', async () => {
     open({ ...noteDetail('Aldermoor'), isHome: true });
     const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 
-    (
-      fixture.nativeElement.querySelector('[data-testid=title]') as HTMLElement
-    ).dispatchEvent(new Event('blur'));
+    (fixture.nativeElement.querySelector('[data-testid=title]') as HTMLElement).dispatchEvent(
+      new Event('blur'),
+    );
+    await tick();
 
-    http.expectNone('/api/entities/n1');
+    expect(session.rename).not.toHaveBeenCalled();
   });
 
   it('renders its chrome and actions in French when French is the active language', () => {
@@ -173,9 +167,7 @@ describe('EntityHeader', () => {
     TestBed.inject(TranslocoService).setActiveLang('fr');
     fixture.detectChanges();
 
-    const title = fixture.nativeElement.querySelector(
-      '[data-testid=title]',
-    ) as HTMLButtonElement;
+    const title = fixture.nativeElement.querySelector('[data-testid=title]') as HTMLButtonElement;
     expect(title.textContent?.trim()).toBe('Save');
   });
 
@@ -186,12 +178,8 @@ describe('EntityHeader', () => {
     const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 
-    const map = fixture.nativeElement.querySelector(
-      '[data-testid=view-map]',
-    ) as HTMLButtonElement;
-    const noteBtn = fixture.nativeElement.querySelector(
-      '[data-testid=view-note]',
-    ) as HTMLButtonElement;
+    const map = fixture.nativeElement.querySelector('[data-testid=view-map]') as HTMLButtonElement;
+    const noteBtn = fixture.nativeElement.querySelector('[data-testid=view-note]') as HTMLButtonElement;
     expect(map).not.toBeNull();
     expect(noteBtn).not.toBeNull();
     // Default is the grid: Map pressed, Note not.
@@ -215,17 +203,15 @@ describe('EntityHeader', () => {
     const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 
-    (
-      fixture.nativeElement.querySelector('[data-testid=view-note]') as HTMLButtonElement
-    ).click();
+    (fixture.nativeElement.querySelector('[data-testid=view-note]') as HTMLButtonElement).click();
     fixture.detectChanges();
 
     // The store is the single owner of the surface choice (shared with the shell).
     expect(TestBed.inject(HexMapStore).view()).toBe('note');
     expect(
-      (
-        fixture.nativeElement.querySelector('[data-testid=view-note]') as HTMLButtonElement
-      ).getAttribute('aria-pressed'),
+      (fixture.nativeElement.querySelector('[data-testid=view-note]') as HTMLButtonElement).getAttribute(
+        'aria-pressed',
+      ),
     ).toBe('true');
   });
 
@@ -234,22 +220,16 @@ describe('EntityHeader', () => {
     const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 
-    const nav = vi
-      .spyOn(TestBed.inject(Router), 'navigate')
-      .mockResolvedValue(true);
+    const nav = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
 
-    (
-      fixture.nativeElement.querySelector('[data-testid=view-note]') as HTMLButtonElement
-    ).click();
+    (fixture.nativeElement.querySelector('[data-testid=view-note]') as HTMLButtonElement).click();
     // Persisted as ?view=note (replaceUrl — a view flip is not a navigation).
     expect(nav).toHaveBeenCalledWith(
       [],
       expect.objectContaining({ queryParams: { view: 'note' }, replaceUrl: true }),
     );
 
-    (
-      fixture.nativeElement.querySelector('[data-testid=view-map]') as HTMLButtonElement
-    ).click();
+    (fixture.nativeElement.querySelector('[data-testid=view-map]') as HTMLButtonElement).click();
     // The default Map view drops the param to keep the URL clean.
     expect(nav).toHaveBeenCalledWith(
       [],
