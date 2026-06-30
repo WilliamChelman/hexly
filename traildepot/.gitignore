@@ -1,0 +1,17 @@
+# Deployment-specific / runtime state, recreated by `trail`. Only config.textproto
+# and migrations/ are tracked.
+backups/
+data/
+secrets/
+uploads/
+wasm/
+scripts/
+
+metadata.textproto
+
+# Runtime files, will be overridden by `trail`.
+trailbase.d.ts
+trailbase.js
+
+# Any potential MaxMind GeoIP dbs.
+*.mmdb

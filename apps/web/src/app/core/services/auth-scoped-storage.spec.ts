@@ -1,97 +1,87 @@
-import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 import { AuthClient } from './auth.client';
 import { AuthScopedStorage } from './auth-scoped-storage';
+import { makeUser, provideFakeTrailbase } from '../testing/fake-trailbase-client';
 
 describe('AuthScopedStorage', () => {
   let storage: AuthScopedStorage;
-  let http: HttpTestingController;
+  let tb: ReturnType<typeof provideFakeTrailbase>;
 
-  function login(id: string): void {
-    TestBed.inject(AuthClient)
-      .login(`${id}@test.com`, 'pw')
-      .subscribe();
-    http.expectOne('/api/auth/login').flush({ id, email: `${id}@test.com`, displayName: id });
+  async function login(id: string): Promise<void> {
+    tb.client.nextLogin = { user: makeUser(id) };
+    await firstValueFrom(TestBed.inject(AuthClient).login(`${id}@test.com`, 'pw'));
     TestBed.flushEffects();
   }
 
-  function logout(): void {
-    TestBed.inject(AuthClient).logout().subscribe();
-    http.expectOne('/api/auth/logout').flush(null);
+  async function logout(): Promise<void> {
+    await firstValueFrom(TestBed.inject(AuthClient).logout());
     TestBed.flushEffects();
   }
 
   beforeEach(() => {
     localStorage.clear();
-    TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting()],
-    });
+    tb = provideFakeTrailbase();
+    TestBed.configureTestingModule({ providers: [tb.provider, provideRouter([])] });
     storage = TestBed.inject(AuthScopedStorage);
-    http = TestBed.inject(HttpTestingController);
-    // Flush effects to process the initial auth-scoped-storage effect; this also
-    // fires the rxResource auto-fetch, so drain that request immediately.
+    // Flush the initial effect (anonymous boot — nothing to wipe).
     TestBed.flushEffects();
-    http.expectOne('/api/auth/me').flush(null, { status: 401, statusText: 'Unauthorized' });
   });
 
   afterEach(() => {
-    http.verify();
     localStorage.clear();
   });
 
   describe('getItem / setItem / removeItem', () => {
-    it('reads and writes under a prefixed key, not the bare key', () => {
-      login('u1');
+    it('reads and writes under a prefixed key, not the bare key', async () => {
+      await login('u1');
       storage.setItem('foo', 'bar');
       expect(storage.getItem('foo')).toBe('bar');
       expect(localStorage.getItem('hexly-u:foo')).toBe('bar'); // namespaced internally
       expect(localStorage.getItem('foo')).toBeNull(); // bare key untouched
     });
 
-    it('getItem returns null when nothing is stored', () => {
-      login('u1');
+    it('getItem returns null when nothing is stored', async () => {
+      await login('u1');
       expect(storage.getItem('foo')).toBeNull();
     });
 
-    it('removeItem deletes the key', () => {
-      login('u1');
+    it('removeItem deletes the key', async () => {
+      await login('u1');
       storage.setItem('foo', 'bar');
       storage.removeItem('foo');
       expect(storage.getItem('foo')).toBeNull();
     });
 
-    it('reads back regardless of auth timing — written logged-in, read while anonymous', () => {
+    it('reads back regardless of auth timing — written logged-in, read while anonymous', async () => {
       // The reload bug: a value written by a logged-in user must read back the
-      // same when the session is anonymous (as on boot before /auth/me resolves),
+      // same when the session is anonymous (as on boot before revalidation),
       // since the key carries no user suffix to miss.
-      login('u1');
+      await login('u1');
       storage.setItem('foo', 'bar');
-      logout();
+      await logout();
 
       expect(storage.getItem('foo')).toBe('bar');
     });
   });
 
   describe('auto-wipe on user change', () => {
-    it('does NOT wipe keys on logout — they persist until a different user logs in', () => {
-      login('u1');
+    it('does NOT wipe keys on logout — they persist until a different user logs in', async () => {
+      await login('u1');
       storage.setItem('foo', 'bar');
 
-      logout();
+      await logout();
 
       // Keys survive logout so a same-user re-login still sees preferences.
       expect(storage.getItem('foo')).toBe('bar');
     });
 
-    it('wipes user A keys when user B logs in on the same tab', () => {
-      login('u1');
+    it('wipes user A keys when user B logs in on the same tab', async () => {
+      await login('u1');
       storage.setItem('foo', 'from-u1');
 
-      login('u2');
+      await login('u2');
 
       expect(storage.getItem('foo')).toBeNull();
       // User B writes their own value under the same key
@@ -99,44 +89,44 @@ describe('AuthScopedStorage', () => {
       expect(storage.getItem('foo')).toBe('from-u2');
     });
 
-    it('cleans up stale keys from a prior session when a different user logs in', () => {
+    it('cleans up stale keys from a prior session when a different user logs in', async () => {
       // Simulate a prior session: login as u1, write a key, then logout.
       // Logout keeps SCOPE_KEY so the next login can compare and wipe.
-      login('u1');
+      await login('u1');
       storage.setItem('pref', 'stale-value');
-      logout();
+      await logout();
 
       // A different user logs in — the prior-session keys must be wiped.
-      login('u2');
+      await login('u2');
 
       expect(storage.getItem('pref')).toBeNull();
     });
 
-    it('preserves keys when the same user re-authenticates', () => {
-      login('u1');
+    it('preserves keys when the same user re-authenticates', async () => {
+      await login('u1');
       storage.setItem('foo', 'kept');
-      logout();
+      await logout();
 
       // Same user logs back in — preferences survive the logout/re-login cycle.
-      login('u1');
+      await login('u1');
 
       expect(storage.getItem('foo')).toBe('kept');
     });
 
-    it('does not wipe while the session is anonymous', () => {
-      login('u1');
+    it('does not wipe while the session is anonymous', async () => {
+      await login('u1');
       storage.setItem('foo', 'bar');
-      logout(); // currentUser → null; must not wipe
+      await logout(); // currentUser → null; must not wipe
 
       expect(storage.getItem('foo')).toBe('bar');
     });
 
-    it('leaves non-prefixed keys (e.g. device-level theme) untouched on a cross-user login', () => {
-      login('u1');
+    it('leaves non-prefixed keys (e.g. device-level theme) untouched on a cross-user login', async () => {
+      await login('u1');
       localStorage.setItem('hexly-theme', 'dark'); // device-level, not via this store
       storage.setItem('foo', 'from-u1');
 
-      login('u2');
+      await login('u2');
 
       expect(storage.getItem('foo')).toBeNull(); // scoped key wiped
       expect(localStorage.getItem('hexly-theme')).toBe('dark'); // device key kept
@@ -197,8 +187,8 @@ describe('AuthScopedStorage', () => {
       expect(storage.getItem('hexly-theme')).toBe('dark');
     });
 
-    it('reads the stored value when authenticated', () => {
-      login('u1');
+    it('reads the stored value when authenticated', async () => {
+      await login('u1');
       storage.setItem('hexly-theme', 'dark');
       const pref = storage.preference({
         storageKey: 'hexly-theme',

@@ -15,5 +15,7 @@ export class MockAuthClient {
 
   login(): Observable<never> { return EMPTY; }
   logout(): Observable<void> { return of(undefined); }
-  signOut(): void {}
+  signOut(): void {
+    /* no-op: tests that care about sign-out drive currentUser via setUser() */
+  }
 }

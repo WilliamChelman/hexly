@@ -1,5 +1,8 @@
 # Schema migrations via drizzle-kit, applied at boot
 
+> **Superseded by [ADR-0032](./0032-trailbase-as-backend-backbone.md)** — TrailBase owns migrations once the backbone is replaced. Accurate for the current NestJS code until then.
+
+
 The schema had two hand-synced sources of truth — a raw `CREATE TABLE IF NOT EXISTS` block in `db.ts` (runtime truth) and `schema.ts` (Drizzle types) — plus bespoke, hand-written upgrades for live databases (`migrateToWorlds`). As the schema grows and real databases must travel across app versions without losing data, this drifts and doesn't scale. We adopt **drizzle-kit** with the **`generate` + `migrate`** workflow: `schema.ts` becomes the single source, `drizzle-kit generate` emits versioned SQL migration files committed to the repo, and drizzle's `migrate()` applies the unapplied ones **at boot, inside `createDb`** — the same path serves the production process, the seed CLI, and every `:memory:` test, so tests exercise the real migration files rather than a parallel schema.
 
 Boot-time application (rather than a separate deploy/CLI step) is deliberate: there is one NestJS process on one SQLite file (ADR-0002), so nothing races the migration, and some self-hosters are **non-technical** — no manual migration step is acceptable. Deploy = restart, schema follows automatically.

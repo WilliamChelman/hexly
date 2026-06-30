@@ -1,27 +1,28 @@
-import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
+import { Observable, of, throwError } from 'rxjs';
 import { TranslocoService } from '@jsverse/transloco';
+import { AuthUser } from '@hexly/domain';
 import { provideTranslocoTesting } from '../../core/i18n/transloco-testing';
+import { AuthClient } from '../../core/services/auth.client';
 import { Login } from './login';
 
+const ADA: AuthUser = { id: 'u1', email: 'ada@hexly.test', displayName: 'Ada' };
+
 describe('Login', () => {
-  let http: HttpTestingController;
   let navigate: ReturnType<typeof vi.fn>;
+  let login: ReturnType<typeof vi.fn>;
   let queryParams: Record<string, string>;
 
   beforeEach(async () => {
     navigate = vi.fn().mockResolvedValue(true);
+    // Default: a successful login. Individual tests override for the failure path.
+    login = vi.fn<(email: string, password: string) => Observable<AuthUser>>(() => of(ADA));
     queryParams = {};
     await TestBed.configureTestingModule({
       imports: [Login, provideTranslocoTesting()],
       providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
+        { provide: AuthClient, useValue: { login } },
         { provide: Router, useValue: { navigateByUrl: navigate } },
         {
           provide: ActivatedRoute,
@@ -35,12 +36,6 @@ describe('Login', () => {
         },
       ],
     }).compileComponents();
-    http = TestBed.inject(HttpTestingController);
-  });
-
-  afterEach(() => {
-    http.match('/api/auth/me'); // drain rxResource auto-fetch fired by detectChanges()
-    http.verify();
   });
 
   function typeInto(el: HTMLElement, selector: string, value: string) {
@@ -67,15 +62,9 @@ describe('Login', () => {
     typeInto(el, 'input[type=email]', 'ada@hexly.test');
     typeInto(el, 'input[type=password]', 'correct horse');
     el.querySelector('form')!.dispatchEvent(new Event('submit'));
-
-    const req = http.expectOne('/api/auth/login');
-    expect(req.request.body).toEqual({
-      email: 'ada@hexly.test',
-      password: 'correct horse',
-    });
-    req.flush({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada' });
     fixture.detectChanges();
 
+    expect(login).toHaveBeenCalledWith('ada@hexly.test', 'correct horse');
     expect(navigate).toHaveBeenCalledWith('/');
     // The button must not be stuck on "Signing in…" — pending is reset on
     // success too, so a cancelled navigation can't strand the UI.
@@ -94,12 +83,7 @@ describe('Login', () => {
     typeInto(el, 'input[type=password]', 'correct horse');
     el.querySelector('form')!.dispatchEvent(new Event('submit'));
 
-    const req = http.expectOne('/api/auth/login');
-    expect(req.request.body).toEqual({
-      email: 'ada@hexly.test',
-      password: 'correct horse',
-    });
-    req.flush({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada' });
+    expect(login).toHaveBeenCalledWith('ada@hexly.test', 'correct horse');
   });
 
   it('navigates to returnUrl when one is present', () => {
@@ -111,10 +95,6 @@ describe('Login', () => {
     typeInto(el, 'input[type=email]', 'ada@hexly.test');
     typeInto(el, 'input[type=password]', 'correct horse');
     el.querySelector('form')!.dispatchEvent(new Event('submit'));
-
-    http
-      .expectOne('/api/auth/login')
-      .flush({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada' });
 
     expect(navigate).toHaveBeenCalledWith('/atlas/42');
   });
@@ -137,6 +117,7 @@ describe('Login', () => {
   });
 
   it('shows the rejection error translated when French is active', () => {
+    login.mockReturnValue(throwError(() => new Error('401')));
     const fixture = TestBed.createComponent(Login);
     const el = fixture.nativeElement as HTMLElement;
     fixture.detectChanges();
@@ -146,15 +127,13 @@ describe('Login', () => {
     typeInto(el, 'input[type=email]', 'ada@hexly.test');
     typeInto(el, 'input[type=password]', 'wrong');
     el.querySelector('form')!.dispatchEvent(new Event('submit'));
-    http
-      .expectOne('/api/auth/login')
-      .flush(null, { status: 401, statusText: 'Unauthorized' });
     fixture.detectChanges();
 
     expect(el.textContent).toContain('E-mail ou mot de passe incorrect');
   });
 
   it('shows an error and stays put when the credentials are rejected', () => {
+    login.mockReturnValue(throwError(() => new Error('401')));
     const fixture = TestBed.createComponent(Login);
     const el = fixture.nativeElement as HTMLElement;
     fixture.detectChanges();
@@ -162,10 +141,6 @@ describe('Login', () => {
     typeInto(el, 'input[type=email]', 'ada@hexly.test');
     typeInto(el, 'input[type=password]', 'wrong');
     el.querySelector('form')!.dispatchEvent(new Event('submit'));
-
-    http
-      .expectOne('/api/auth/login')
-      .flush(null, { status: 401, statusText: 'Unauthorized' });
     fixture.detectChanges();
 
     expect(navigate).not.toHaveBeenCalled();

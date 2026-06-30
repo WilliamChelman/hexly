@@ -13,9 +13,10 @@ setup('authenticate', async ({ page }) => {
   await page.getByLabel('Password').fill(TEST_USER.password);
   await page.getByRole('button', { name: 'Sign in' }).click();
 
-  // Landing on the World Index proves the cookie was set and the auth guard passed
-  // (post-login default is the Index now — ADR-0028).
-  await expect(page.getByRole('heading', { name: /Welcome back/ })).toBeVisible();
+  // Landing in the authed shell (the nav rail) proves the session was stored and
+  // the auth guard passed. We don't assert World content: Worlds are still on
+  // `/api/...` this slice (#128) and return to TrailBase in #3.
+  await expect(page.getByTestId('nav-rail')).toBeVisible();
 
   await page.context().storageState({ path: authFile });
 });
