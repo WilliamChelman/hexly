@@ -22,12 +22,18 @@ curl -O https://raw.githubusercontent.com/WilliamChelman/hexly/main/docker-compo
 docker compose up -d
 ```
 
-The container starts on port 3000. Data is persisted to a named Docker volume (`hexly-data`).
+The container runs a single TrailBase process serving the built SPA and the API on
+one origin (ADR-0008, ADR-0032). It starts on port 3000; the TrailBase depot (DB,
+config, uploads) is persisted to `./hexly-data`. The admin UI is at
+`http://localhost:3000/_/admin/`.
 
-**Seed the first user** (required before anyone can log in — there is no public signup):
+**Seed the first user** (required before anyone can log in — there is no public
+signup). Under the closed-set config both steps are needed: `user add` registers
+the account, `change-password` stores the usable credential.
 
 ```sh
-docker exec hexly-hexly-1 node dist/apps/api/seed.js <email> <password> "<display name>"
+docker exec hexly-hexly-1 trail --data-dir /data user add <email> <password>
+docker exec hexly-hexly-1 trail --data-dir /data user change-password <email> <password>
 ```
 
 **Upgrade** to the latest release:
