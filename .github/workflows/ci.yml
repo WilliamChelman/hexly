@@ -94,13 +94,18 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
         if: steps.playwright-cache.outputs.cache-hit != 'true'
 
-      # Cache the pinned TrailBase binary (downloaded by scripts/trailbase.mjs on
-      # first boot) so the e2e server doesn't re-fetch ~22 MB every run. Keyed on
-      # the script so a version bump invalidates it.
+      # Cache the pinned TrailBase binary (downloaded by scripts/trailbase.mjs) so
+      # the run below doesn't re-fetch ~22 MB every time. Keyed on the script so a
+      # version bump invalidates it.
       - uses: actions/cache@v4
         with:
           path: .trailbase
           key: trailbase-${{ runner.os }}-${{ hashFiles('scripts/trailbase.mjs') }}
+
+      # Fetch the binary as an explicit, visible step. The e2e server boots it
+      # transitively, but doing it here surfaces a download/unzip failure plainly
+      # instead of as an opaque Playwright webServer timeout.
+      - run: node scripts/trailbase.mjs --version
 
       - run: pnpm exec nx e2e web-e2e
 

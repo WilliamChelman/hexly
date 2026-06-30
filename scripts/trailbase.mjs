@@ -46,18 +46,38 @@ export function ensureTrailbase() {
   const zipPath = join(cacheDir, asset);
 
   console.error(`[trailbase] Downloading ${VERSION} for this platform…`);
-  const dl = spawnSync('curl', ['-fSL', '--retry', '3', '-o', zipPath, url], { stdio: 'inherit' });
+  // Timeouts so a stalled connection fails fast instead of hanging the e2e boot.
+  const dl = spawnSync(
+    'curl',
+    ['-fSL', '--retry', '3', '--connect-timeout', '30', '--max-time', '300', '-o', zipPath, url],
+    { stdio: 'inherit' },
+  );
   if (dl.status !== 0) throw new Error(`[trailbase] Download failed: ${url}`);
 
-  // ponytail: `unzip` (mac/linux) and Windows `tar` (bsdtar) both handle zip;
-  // swap to a node unzip lib only if a host without either shows up.
-  const unzip = platform() === 'win32'
-    ? spawnSync('tar', ['-xf', zipPath, '-C', cacheDir], { stdio: 'inherit' })
-    : spawnSync('unzip', ['-oq', zipPath, bin, '-d', cacheDir], { stdio: 'inherit' });
-  if (unzip.status !== 0) throw new Error('[trailbase] Unzip failed (need `unzip` on PATH).');
-
+  extract(zipPath, cacheDir);
+  if (!existsSync(binPath)) throw new Error(`[trailbase] Binary missing after extract: ${binPath}`);
   spawnSync('chmod', ['+x', binPath]);
   return binPath;
+}
+
+/**
+ * Unzip the release. No hard dependency on a single tool: try `unzip` then
+ * `python3` (one of which is on every mac/linux CI image); on Windows `tar` is
+ * bsdtar and reads zip natively.
+ */
+function extract(zipPath, dest) {
+  const attempts =
+    platform() === 'win32'
+      ? [['tar', ['-xf', zipPath, '-C', dest]]]
+      : [
+          ['unzip', ['-oq', zipPath, '-d', dest]],
+          ['python3', ['-m', 'zipfile', '-e', zipPath, dest]],
+        ];
+  for (const [cmd, args] of attempts) {
+    const r = spawnSync(cmd, args, { stdio: 'inherit' });
+    if (!r.error && r.status === 0) return;
+  }
+  throw new Error('[trailbase] Could not unzip the release (need `unzip` or `python3`).');
 }
 
 // CLI: `node scripts/trailbase.mjs run -a ...` → ensure then exec `trail run -a ...`.
