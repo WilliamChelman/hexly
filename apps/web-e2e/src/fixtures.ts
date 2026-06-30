@@ -43,9 +43,22 @@ export { expect };
 
 /** Mint a fresh auth token for the seeded e2e user via TrailBase's JSON login. */
 async function login(request: APIRequestContext): Promise<string> {
+  return loginAs(request, TEST_USER);
+}
+
+/**
+ * Mint a fresh auth token for any seeded user via TrailBase's JSON login — the
+ * sharing specs (#131) drive the Record APIs as each role (Owner / Contributor /
+ * World Viewer / grantee / outsider) by logging in as the matching seeded user.
+ */
+export async function loginAs(
+  request: APIRequestContext,
+  user: { email: string; password: string },
+): Promise<string> {
   const res = await request.post('/api/auth/v1/login', {
-    data: { email: TEST_USER.email, password: TEST_USER.password },
+    data: { email: user.email, password: user.password },
   });
+  if (!res.ok()) throw new Error(`login ${user.email}: HTTP ${res.status()}`);
   const body = (await res.json()) as { auth_token: string };
   return body.auth_token;
 }
