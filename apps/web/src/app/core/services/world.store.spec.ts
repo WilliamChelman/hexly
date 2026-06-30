@@ -1,11 +1,10 @@
-import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { of, throwError } from 'rxjs';
 import { WorldDetail, WorldSummary } from '@hexly/domain';
 import { AuthClient } from './auth.client';
+import { MockAuthClient } from '../testing/auth-client.mock';
+import { WorldsClient } from './worlds.client';
+import { MockWorldsClient } from '../testing/worlds-client.mock';
 import { WorldStore } from './world.store';
 
 function world(id: string, name = id): WorldSummary {
@@ -14,71 +13,68 @@ function world(id: string, name = id): WorldSummary {
 
 describe('WorldStore', () => {
   let store: WorldStore;
-  let http: HttpTestingController;
+  let worldsClient: MockWorldsClient;
+  let auth: MockAuthClient;
 
   beforeEach(() => {
+    worldsClient = new MockWorldsClient();
+    auth = new MockAuthClient();
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [
+        { provide: WorldsClient, useValue: worldsClient },
+        { provide: AuthClient, useValue: auth },
+      ],
     });
     store = TestBed.inject(WorldStore);
-    http = TestBed.inject(HttpTestingController);
-  });
-
-  afterEach(() => {
-    http.verify();
   });
 
   function flushList(worlds: WorldSummary[]): void {
-    http.expectOne('/api/worlds').flush(worlds);
+    worldsClient.list.mockReturnValue(of(worlds));
   }
 
   function login(id = 'u1'): void {
-    TestBed.inject(AuthClient).login('ada@hexly.test', 'pw').subscribe();
-    http
-      .expectOne('/api/auth/login')
-      .flush({ id, email: 'ada@hexly.test', displayName: 'Ada' });
+    auth.setUser({ id, email: 'ada@hexly.test', displayName: 'Ada' });
   }
 
   it('loads the caller’s Worlds and marks loaded', () => {
     expect(store.loaded()).toBe(false);
-    store.load();
     flushList([world('w1', 'Aldermoor'), world('w2', 'Whisperwood')]);
+    store.load();
 
     expect(store.worlds().map((w) => w.id)).toEqual(['w1', 'w2']);
     expect(store.loaded()).toBe(true);
   });
 
   it('loads once — a second load() is a no-op while the first stands', () => {
-    store.load();
     flushList([world('w1')]);
     store.load();
-    http.expectNone('/api/worlds');
+    store.load();
+    expect(worldsClient.list).toHaveBeenCalledTimes(1);
   });
 
   it('marks loaded and resets the guard on error so the next load() retries', () => {
+    worldsClient.list.mockReturnValueOnce(throwError(() => new Error('unavailable')));
     store.load();
-    http
-      .expectOne('/api/worlds')
-      .flush(null, { status: 503, statusText: 'Service Unavailable' });
 
     expect(store.loaded()).toBe(true);
-    store.load();
     flushList([world('w1')]);
+    store.load();
     expect(store.worlds().map((w) => w.id)).toEqual(['w1']);
   });
 
   it('creating a World appends it and returns its detail', () => {
-    store.load();
     flushList([world('w1')]);
+    store.load();
 
-    let created: WorldDetail | undefined;
-    store.create('New Realm').subscribe((w) => (created = w));
     const detail: WorldDetail = {
       ...world('w2', 'New Realm'),
       homeEntityId: 'e2',
       entityCount: 1,
     };
-    http.expectOne('/api/worlds').flush(detail);
+    worldsClient.create.mockReturnValue(of(detail));
+
+    let created: WorldDetail | undefined;
+    store.create('New Realm').subscribe((w) => (created = w));
 
     expect(created).toEqual(detail);
     expect(store.worlds().map((w) => w.id)).toEqual(['w1', 'w2']);
@@ -87,13 +83,12 @@ describe('WorldStore', () => {
   it('forgets the loaded Worlds when the authenticated user changes', () => {
     login('u1');
     TestBed.flushEffects();
-    store.load();
     flushList([world('w1')]);
+    store.load();
     expect(store.worlds()).toHaveLength(1);
 
     // Logout clears the user — the next user must not see u1's Worlds.
-    TestBed.inject(AuthClient).logout().subscribe();
-    http.expectOne('/api/auth/logout').flush(null);
+    auth.setUser(null);
     TestBed.flushEffects();
 
     expect(store.worlds()).toEqual([]);
@@ -103,8 +98,8 @@ describe('WorldStore', () => {
   it('keeps the loaded Worlds when the same user logs in again (e.g. a re-auth)', () => {
     login('u1');
     TestBed.flushEffects();
-    store.load();
     flushList([world('w1')]);
+    store.load();
     expect(store.worlds()).toHaveLength(1);
 
     // Re-login as the same user (fresh object, same id) must not wipe the list —

@@ -1,8 +1,3 @@
-import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import {
   ActivatedRouteSnapshot,
@@ -10,8 +5,10 @@ import {
   RouterStateSnapshot,
   UrlTree,
 } from '@angular/router';
-import { firstValueFrom, isObservable, Observable } from 'rxjs';
+import { firstValueFrom, isObservable, Observable, of, throwError } from 'rxjs';
 import { EntitySummary } from '@hexly/domain';
+import { EntitiesClient } from '../services/entities.client';
+import { MockEntitiesClient } from '../testing/entities-client.mock';
 import { reconcileWorldSegment } from './reconcile-world-segment.guard';
 
 function summary(over: Partial<EntitySummary>): EntitySummary {
@@ -31,16 +28,14 @@ function summary(over: Partial<EntitySummary>): EntitySummary {
 }
 
 describe('reconcileWorldSegment', () => {
-  let http: HttpTestingController;
+  let entities: MockEntitiesClient;
 
   beforeEach(() => {
+    entities = new MockEntitiesClient();
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [{ provide: EntitiesClient, useValue: entities }],
     });
-    http = TestBed.inject(HttpTestingController);
   });
-
-  afterEach(() => http.verify());
 
   /** Invoke the guard the way the router would for `w/:worldId/entities/:id`. */
   function run(worldId: string, id = 'e1') {
@@ -62,44 +57,32 @@ describe('reconcileWorldSegment', () => {
   }
 
   it("redirects to the Entity's real World when the segment is stale", async () => {
-    const settled = settle(run('w1', 'e1'));
+    entities.list.mockReturnValue(
+      of({ items: [summary({ id: 'e1', worldId: 'w9' })], nextCursor: null }),
+    );
 
-    http
-      .expectOne('/api/entities?ids=e1')
-      .flush({ items: [summary({ id: 'e1', worldId: 'w9' })], nextCursor: null });
-
-    const value = await settled;
+    const value = await settle(run('w1', 'e1'));
     expect(value).toBeInstanceOf(UrlTree);
     expect((value as UrlTree).toString()).toBe('/w/w9/entities/e1');
   });
 
   it('passes through without redirecting when the segment matches', async () => {
-    const settled = settle(run('w1', 'e1'));
+    entities.list.mockReturnValue(
+      of({ items: [summary({ id: 'e1', worldId: 'w1' })], nextCursor: null }),
+    );
 
-    http
-      .expectOne('/api/entities?ids=e1')
-      .flush({ items: [summary({ id: 'e1', worldId: 'w1' })], nextCursor: null });
-
-    expect(await settled).toBe(true);
+    expect(await settle(run('w1', 'e1'))).toBe(true);
   });
 
   it('falls through (renders the page) when the target is missing', async () => {
-    const settled = settle(run('w1', 'ghost'));
+    entities.list.mockReturnValue(of({ items: [], nextCursor: null }));
 
-    http
-      .expectOne('/api/entities?ids=ghost')
-      .flush({ items: [], nextCursor: null });
-
-    expect(await settled).toBe(true);
+    expect(await settle(run('w1', 'ghost'))).toBe(true);
   });
 
   it('falls through when the lookup errors', async () => {
-    const settled = settle(run('w1', 'boom'));
+    entities.list.mockReturnValue(throwError(() => new Error('boom')));
 
-    http
-      .expectOne('/api/entities?ids=boom')
-      .flush(null, { status: 500, statusText: 'Server Error' });
-
-    expect(await settled).toBe(true);
+    expect(await settle(run('w1', 'boom'))).toBe(true);
   });
 });

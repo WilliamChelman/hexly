@@ -1,4 +1,4 @@
-import { provideHttpClient } from '@angular/common/http';
+import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
 import {
   HttpTestingController,
   provideHttpClientTesting,
@@ -10,8 +10,10 @@ import {
   provideRouter,
   Router,
 } from '@angular/router';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { CONTENT_FORMAT, EntityDetail, EntityType } from '@hexly/domain';
+import { EntitiesClient } from '../../core/services/entities.client';
+import { MockEntitiesClient } from '../../core/testing/entities-client.mock';
 import { EntitySession } from './services/entity-session';
 import { EntityNameResolver } from './services/entity-name-resolver';
 import { ActiveWorld } from '../../core/services/active-world';
@@ -56,6 +58,7 @@ const hexmapWithContent = (text: string): EntityDetail => ({
 // Routing/load/title/404: the page drives the session off the route's `:id`.
 describe('EntityPage routing', () => {
   let http: HttpTestingController;
+  let entities: MockEntitiesClient;
   let navigate: ReturnType<typeof vi.spyOn>;
 
   const detail = (id: string, type: EntityType): EntityDetail =>
@@ -63,12 +66,15 @@ describe('EntityPage routing', () => {
       ? noteDetail('Lady Mara')
       : { ...hexmapWithContent('The reach lies north.'), id, name: 'Aldermoor' };
 
-  async function render(id: string) {
+  /** Configure the TestBed for `:id` without mounting yet, so a test can arm `entities` first. */
+  async function configure(id: string) {
+    entities = new MockEntitiesClient();
     await TestBed.configureTestingModule({
       imports: [EntityPage, provideTranslocoTesting()],
       providers: [
         EntitySession,
         EntityNameResolver,
+        { provide: EntitiesClient, useValue: entities },
         provideHttpClient(),
         provideHttpClientTesting(),
         {
@@ -85,6 +91,9 @@ describe('EntityPage routing', () => {
     navigate = vi
       .spyOn(TestBed.inject(Router), 'navigate')
       .mockResolvedValue(true);
+  }
+
+  function mount() {
     const fixture = TestBed.createComponent(EntityPage);
     fixture.detectChanges();
     return fixture;
@@ -93,8 +102,9 @@ describe('EntityPage routing', () => {
   afterEach(() => http.verify());
 
   it('shows the Content body for a note', async () => {
-    const fixture = await render('n1');
-    http.expectOne('/api/entities/n1').flush(detail('n1', 'note'));
+    await configure('n1');
+    entities.load.mockReturnValue(of(detail('n1', 'note')));
+    const fixture = mount();
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
@@ -103,8 +113,9 @@ describe('EntityPage routing', () => {
   });
 
   it('shows the map editor for a hexmap', async () => {
-    const fixture = await render('m1');
-    http.expectOne('/api/entities/m1').flush(detail('m1', 'hexmap'));
+    await configure('m1');
+    entities.load.mockReturnValue(of(detail('m1', 'hexmap')));
+    const fixture = mount();
     fixture.detectChanges();
     flushHealth(http);
 
@@ -113,8 +124,9 @@ describe('EntityPage routing', () => {
   });
 
   it('titles the tab with the open Entity name (owned by the session, not the view)', async () => {
-    const fixture = await render('m1');
-    http.expectOne('/api/entities/m1').flush(detail('m1', 'hexmap'));
+    await configure('m1');
+    entities.load.mockReturnValue(of(detail('m1', 'hexmap')));
+    const fixture = mount();
     fixture.detectChanges();
     flushHealth(http);
     await fixture.whenStable();
@@ -124,10 +136,11 @@ describe('EntityPage routing', () => {
   });
 
   it('returns to the World’s library when the Entity fails to load', async () => {
-    const fixture = await render('gone');
-    http
-      .expectOne('/api/entities/gone')
-      .flush(null, { status: 404, statusText: 'Not Found' });
+    await configure('gone');
+    entities.load.mockReturnValue(
+      throwError(() => new HttpErrorResponse({ status: 404 })),
+    );
+    const fixture = mount();
     fixture.detectChanges();
 
     expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities']);

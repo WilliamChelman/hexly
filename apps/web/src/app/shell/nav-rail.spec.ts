@@ -1,15 +1,12 @@
 import { BreakpointObserver, BreakpointState } from '@angular/cdk/layout';
-import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
-import { BehaviorSubject, Observable, map } from 'rxjs';
+import { BehaviorSubject, Observable, map, of } from 'rxjs';
 import { AuthClient } from '../core/services/auth.client';
-import { MockAuthClient } from '../core/testing/mock-auth-client';
+import { MockAuthClient } from '../core/testing/auth-client.mock';
+import { WorldsClient } from '../core/services/worlds.client';
+import { MockWorldsClient } from '../core/testing/worlds-client.mock';
 import { ActiveWorld } from '../core/services/active-world';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { NavRail } from './nav-rail';
@@ -29,7 +26,6 @@ class FakeBreakpointObserver {
 }
 
 describe('NavRail', () => {
-  let http: HttpTestingController;
   let viewport: FakeBreakpointObserver;
   let auth: MockAuthClient;
 
@@ -37,11 +33,13 @@ describe('NavRail', () => {
     localStorage.clear();
     auth = new MockAuthClient();
     viewport = new FakeBreakpointObserver();
+    const worldsClient = new MockWorldsClient();
+    // The expanded rail mounts the World switcher, which loads the world list
+    // (ADR-0024); tests that never expand simply never call this.
+    worldsClient.list.mockReturnValue(of([]));
     await TestBed.configureTestingModule({
       imports: [NavRail, provideTranslocoTesting()],
       providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
         provideRouter([
           { path: '', component: Blank },
           { path: 'w/:worldId/entities', component: Blank },
@@ -49,19 +47,12 @@ describe('NavRail', () => {
         ]),
         { provide: BreakpointObserver, useValue: viewport },
         { provide: AuthClient, useValue: auth },
+        { provide: WorldsClient, useValue: worldsClient },
       ],
     }).compileComponents();
-    http = TestBed.inject(HttpTestingController);
   });
 
   afterEach(() => localStorage.clear());
-  afterEach(() => {
-    // The expanded rail mounts the World switcher, which loads the world list
-    // (ADR-0024). Drain that request so these rail-focused tests stay decoupled
-    // from it; tests that never expand match nothing here.
-    http.match('/api/worlds').forEach((req) => req.flush([]));
-    http.verify();
-  });
   afterEach(() => {
     document
       .querySelectorAll('.cdk-overlay-container')

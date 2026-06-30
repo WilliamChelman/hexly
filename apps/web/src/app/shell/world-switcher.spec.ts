@@ -1,14 +1,12 @@
-import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
+import { Subject } from 'rxjs';
 import { WorldSummary } from '@hexly/domain';
 import { ActiveWorld } from '../core/services/active-world';
 import { AuthClient } from '../core/services/auth.client';
-import { MockAuthClient } from '../core/testing/mock-auth-client';
+import { MockAuthClient } from '../core/testing/auth-client.mock';
+import { WorldsClient } from '../core/services/worlds.client';
+import { MockWorldsClient } from '../core/testing/worlds-client.mock';
 import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { WorldSwitcher } from './world-switcher';
 
@@ -17,43 +15,50 @@ function world(id: string, name = id): WorldSummary {
 }
 
 describe('WorldSwitcher', () => {
-  let http: HttpTestingController;
+  let worldsClient: MockWorldsClient;
   let navigate: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
+    worldsClient = new MockWorldsClient();
     await TestBed.configureTestingModule({
       imports: [WorldSwitcher, provideTranslocoTesting()],
       providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
         provideRouter([]),
         { provide: AuthClient, useValue: new MockAuthClient() },
+        { provide: WorldsClient, useValue: worldsClient },
       ],
     }).compileComponents();
-    http = TestBed.inject(HttpTestingController);
     navigate = vi
       .spyOn(TestBed.inject(Router), 'navigate')
       .mockResolvedValue(true);
   });
 
   afterEach(() => {
-    http.verify();
     document
       .querySelectorAll('.cdk-overlay-container')
       .forEach((el) => el.remove());
   });
 
-  /** Mount the switcher with the active World pinned and its world list resolved. */
+  /**
+   * Mount the switcher with the active World pinned and its world list resolved.
+   * The list resolves via a Subject (not `of`) so the emission lands AFTER the
+   * first detectChanges: WorldStore's user-change effect runs for the first time
+   * on that tick and unconditionally resets its state, which would otherwise wipe
+   * a synchronously-emitted load() result before it's ever rendered.
+   */
   function render(
     worlds: WorldSummary[],
     activeId: string | null = null,
     expanded = true,
   ) {
     TestBed.inject(ActiveWorld).set(activeId);
+    const list$ = new Subject<WorldSummary[]>();
+    worldsClient.list.mockReturnValue(list$);
     const fixture = TestBed.createComponent(WorldSwitcher);
     fixture.componentRef.setInput('expanded', expanded);
-    fixture.detectChanges(); // load() -> GET /worlds
-    http.expectOne('/api/worlds').flush(worlds);
+    fixture.detectChanges(); // load() -> WorldStore.load()
+    list$.next(worlds);
+    list$.complete();
     fixture.detectChanges();
     return fixture;
   }

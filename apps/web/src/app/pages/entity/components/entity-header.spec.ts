@@ -1,20 +1,18 @@
-import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
+import { of } from 'rxjs';
 import { emptyContent, EntityDetail } from '@hexly/domain';
 import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
+import { EntitiesClient } from '../../../core/services/entities.client';
+import { MockEntitiesClient } from '../../../core/testing/entities-client.mock';
 import { EntitySession } from '../services/entity-session';
 import { HexMapStore } from '../services/hexmap-store';
 import { EntityHeader } from './entity-header';
 import { noteDetail } from './entity-detail.fixtures';
 
 describe('EntityHeader', () => {
-  let http: HttpTestingController;
+  let entities: MockEntitiesClient;
 
   const aldermoor: EntityDetail = {
     id: 'm1',
@@ -32,24 +30,21 @@ describe('EntityHeader', () => {
 
   /** Open an entity through the real session so the header has one to show/save. */
   function open(detail: EntityDetail): void {
+    entities.load.mockReturnValue(of(detail));
     TestBed.inject(EntitySession).open(detail.id).subscribe();
-    http.expectOne(`/api/entities/${detail.id}`).flush(detail);
   }
 
   beforeEach(async () => {
+    entities = new MockEntitiesClient();
     await TestBed.configureTestingModule({
       imports: [EntityHeader, provideTranslocoTesting()],
       providers: [
         EntitySession,
-        provideHttpClient(),
-        provideHttpClientTesting(),
+        { provide: EntitiesClient, useValue: entities },
         provideRouter([]),
       ],
     }).compileComponents();
-    http = TestBed.inject(HttpTestingController);
   });
-
-  afterEach(() => http.verify());
 
   it('shows the open entity name', () => {
     open({ ...aldermoor, name: 'The Whisperwood' });
@@ -77,16 +72,14 @@ describe('EntityHeader', () => {
     fixture.detectChanges();
 
     // Edit in place (contenteditable), commit on blur.
+    entities.rename.mockReturnValue(of({ ...aldermoor, name: 'The Whisperwood' }));
     const title = fixture.nativeElement.querySelector(
       '[data-testid=title]',
     ) as HTMLElement;
     title.textContent = 'The Whisperwood';
     title.dispatchEvent(new Event('blur'));
 
-    const req = http.expectOne('/api/entities/m1');
-    expect(req.request.method).toBe('PATCH');
-    expect(req.request.body).toEqual({ name: 'The Whisperwood' });
-    req.flush({ ...aldermoor, name: 'The Whisperwood' });
+    expect(entities.rename).toHaveBeenCalledWith('m1', 'The Whisperwood');
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('The Whisperwood');
@@ -101,7 +94,7 @@ describe('EntityHeader', () => {
       fixture.nativeElement.querySelector('[data-testid=title]') as HTMLElement
     ).dispatchEvent(new Event('blur'));
 
-    http.expectNone('/api/entities/m1');
+    expect(entities.rename).not.toHaveBeenCalled();
   });
 
   it('no longer carries app-level navigation — that lives in the rail (ADR-0022)', () => {
@@ -146,7 +139,7 @@ describe('EntityHeader', () => {
       fixture.nativeElement.querySelector('[data-testid=title]') as HTMLElement
     ).dispatchEvent(new Event('blur'));
 
-    http.expectNone('/api/entities/n1');
+    expect(entities.rename).not.toHaveBeenCalled();
   });
 
   it('renders its chrome and actions in French when French is the active language', () => {

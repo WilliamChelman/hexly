@@ -1,14 +1,12 @@
-import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
+import { Subject, of, throwError } from 'rxjs';
 import { WorldSummary } from '@hexly/domain';
 import { AuthClient } from '../../core/services/auth.client';
-import { MockAuthClient } from '../../core/testing/mock-auth-client';
+import { MockAuthClient } from '../../core/testing/auth-client.mock';
+import { WorldsClient } from '../../core/services/worlds.client';
+import { MockWorldsClient } from '../../core/testing/worlds-client.mock';
 import { ToasterService } from '../../core/services/toaster.service';
 import { provideTranslocoTesting } from '../../core/i18n/transloco-testing';
 import { WorldIndex } from './world-index';
@@ -18,22 +16,21 @@ function world(id: string, name = id, ownerId = 'u1'): WorldSummary {
 }
 
 describe('WorldIndex', () => {
-  let http: HttpTestingController;
+  let worldsClient: MockWorldsClient;
   let navigate: ReturnType<typeof vi.spyOn>;
   let auth: MockAuthClient;
 
   beforeEach(async () => {
     auth = new MockAuthClient();
+    worldsClient = new MockWorldsClient();
     await TestBed.configureTestingModule({
       imports: [WorldIndex, provideTranslocoTesting()],
       providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
         provideRouter([]),
         { provide: AuthClient, useValue: auth },
+        { provide: WorldsClient, useValue: worldsClient },
       ],
     }).compileComponents();
-    http = TestBed.inject(HttpTestingController);
     navigate = vi
       .spyOn(TestBed.inject(Router), 'navigate')
       .mockResolvedValue(true);
@@ -42,13 +39,20 @@ describe('WorldIndex', () => {
     auth.setUser({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada' });
   });
 
-  afterEach(() => http.verify());
-
-  /** Render the Index and resolve its world list. */
+  /**
+   * Render the Index and resolve its world list. The list resolves via a Subject
+   * (not `of`) so the emission lands AFTER the first detectChanges: WorldStore's
+   * user-change effect runs for the first time on that tick and unconditionally
+   * resets its state, which would otherwise wipe a synchronously-emitted load()
+   * result before it's ever rendered.
+   */
   function render(worlds: WorldSummary[]) {
+    const list$ = new Subject<WorldSummary[]>();
+    worldsClient.list.mockReturnValue(list$);
     const fixture = TestBed.createComponent(WorldIndex);
-    fixture.detectChanges(); // load() -> GET /worlds
-    http.expectOne('/api/worlds').flush(worlds);
+    fixture.detectChanges(); // load() -> WorldStore.load()
+    list$.next(worlds);
+    list$.complete();
     fixture.detectChanges();
     return fixture;
   }
@@ -102,11 +106,14 @@ describe('WorldIndex', () => {
   it('creating a World opens its Home Entity', () => {
     const el = render([]).nativeElement as HTMLElement;
 
+    worldsClient.create.mockReturnValue(
+      of({
+        ...world('w9', 'Untitled world'),
+        homeEntityId: 'home9',
+        entityCount: 1,
+      }),
+    );
     ($(el, '[data-testid=create-world]') as HTMLButtonElement).click();
-
-    const req = http.expectOne('/api/worlds');
-    expect(req.request.method).toBe('POST');
-    req.flush({ ...world('w9', 'Untitled world'), homeEntityId: 'home9' });
 
     expect(navigate).toHaveBeenCalledWith([
       '/w',
@@ -135,20 +142,22 @@ describe('WorldIndex', () => {
     ($(el, '[data-testid=rename-world-w1]') as HTMLButtonElement).click();
     fixture.detectChanges();
 
+    worldsClient.rename.mockReturnValue(
+      of({
+        ...world('w1', 'The Reach of Aldermoor'),
+        homeEntityId: 'home1',
+        entityCount: 1,
+      }),
+    );
     const input = $(el, '[data-testid=rename-world-input-w1]') as HTMLInputElement;
     input.value = 'The Reach of Aldermoor';
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
-
-    const req = http.expectOne('/api/worlds/w1');
-    expect(req.request.method).toBe('PATCH');
-    expect(req.request.body).toEqual({ name: 'The Reach of Aldermoor' });
-    req.flush({
-      ...world('w1', 'The Reach of Aldermoor'),
-      homeEntityId: 'home1',
-      entityCount: 1,
-    });
     fixture.detectChanges();
 
+    expect(worldsClient.rename).toHaveBeenCalledWith(
+      'w1',
+      'The Reach of Aldermoor',
+    );
     expect($(el, '[data-testid=world-w1]')?.textContent).toContain(
       'The Reach of Aldermoor',
     );
@@ -158,19 +167,18 @@ describe('WorldIndex', () => {
     const fixture = render([world('w1', 'Aldermoor')]);
     const el = fixture.nativeElement as HTMLElement;
 
+    // The modal fetches the World's Detail for its entity count (#120).
+    worldsClient.get.mockReturnValue(
+      of({
+        ...world('w1', 'Aldermoor'),
+        homeEntityId: 'home1',
+        entityCount: 3,
+      }),
+    );
     ($(el, '[data-testid=delete-world-w1]') as HTMLButtonElement).click();
     fixture.detectChanges();
 
-    // The modal fetches the World's Detail for its entity count (#120).
-    const req = http.expectOne('/api/worlds/w1');
-    expect(req.request.method).toBe('GET');
-    req.flush({
-      ...world('w1', 'Aldermoor'),
-      homeEntityId: 'home1',
-      entityCount: 3,
-    });
-    fixture.detectChanges();
-
+    expect(worldsClient.get).toHaveBeenCalledWith('w1');
     expect($(el, '[data-testid=delete-modal]')).not.toBeNull();
     expect($(el, '[data-testid=delete-count]')?.textContent).toContain('3');
   });
@@ -179,13 +187,10 @@ describe('WorldIndex', () => {
   function openDeleteModal(name: string, count = 2) {
     const fixture = render([world('w1', name)]);
     const el = fixture.nativeElement as HTMLElement;
+    worldsClient.get.mockReturnValue(
+      of({ ...world('w1', name), homeEntityId: 'home1', entityCount: count }),
+    );
     ($(el, '[data-testid=delete-world-w1]') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    http.expectOne('/api/worlds/w1').flush({
-      ...world('w1', name),
-      homeEntityId: 'home1',
-      entityCount: count,
-    });
     fixture.detectChanges();
     return fixture;
   }
@@ -222,12 +227,11 @@ describe('WorldIndex', () => {
     input.dispatchEvent(new Event('input'));
     fixture.detectChanges();
 
+    worldsClient.delete.mockReturnValue(of(undefined));
     ($(el, '[data-testid=confirm-delete]') as HTMLButtonElement).click();
-    const req = http.expectOne('/api/worlds/w1');
-    expect(req.request.method).toBe('DELETE');
-    req.flush(null);
     fixture.detectChanges();
 
+    expect(worldsClient.delete).toHaveBeenCalledWith('w1');
     expect($(el, '[data-testid=world-w1]')).toBeNull();
     expect($(el, '[data-testid=delete-modal]')).toBeNull();
   });
@@ -243,11 +247,11 @@ describe('WorldIndex', () => {
   });
 
   it('shows an error state (not the empty state) when the World list fails to load', () => {
+    const list$ = new Subject<WorldSummary[]>();
+    worldsClient.list.mockReturnValue(list$);
     const fixture = TestBed.createComponent(WorldIndex);
-    fixture.detectChanges(); // load() → GET /worlds
-    http
-      .expectOne('/api/worlds')
-      .flush(null, { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges(); // load() → WorldStore.load()
+    list$.error(new Error('server error'));
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
@@ -258,10 +262,8 @@ describe('WorldIndex', () => {
   it('surfaces an error toast when creating a World fails', () => {
     const el = render([]).nativeElement as HTMLElement;
 
+    worldsClient.create.mockReturnValue(throwError(() => new Error('server error')));
     ($(el, '[data-testid=create-world]') as HTMLButtonElement).click();
-    http
-      .expectOne('/api/worlds')
-      .flush(null, { status: 500, statusText: 'Server Error' });
 
     expect(TestBed.inject(ToasterService).toasts().map((t) => t.tone)).toEqual([
       'error',

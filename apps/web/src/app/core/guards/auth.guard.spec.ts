@@ -8,7 +8,7 @@ import {
 import { firstValueFrom, isObservable, Observable } from 'rxjs';
 import { authGuard, loginGuard } from './auth.guard';
 import { AuthClient } from '../services/auth.client';
-import { MockAuthClient } from '../testing/mock-auth-client';
+import { MockAuthClient } from '../testing/auth-client.mock';
 
 const ada = { id: 'u1', email: 'ada@hexly.test', displayName: 'Ada' };
 

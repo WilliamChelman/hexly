@@ -1,47 +1,34 @@
-import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { AuthClient } from './auth.client';
+import { MockAuthClient } from '../testing/auth-client.mock';
 import { AuthScopedStorage } from './auth-scoped-storage';
 
 describe('AuthScopedStorage', () => {
   let storage: AuthScopedStorage;
-  let http: HttpTestingController;
+  let auth: MockAuthClient;
 
   function login(id: string): void {
-    TestBed.inject(AuthClient)
-      .login(`${id}@test.com`, 'pw')
-      .subscribe();
-    http.expectOne('/api/auth/login').flush({ id, email: `${id}@test.com`, displayName: id });
+    auth.setUser({ id, email: `${id}@test.com`, displayName: id });
     TestBed.flushEffects();
   }
 
   function logout(): void {
-    TestBed.inject(AuthClient).logout().subscribe();
-    http.expectOne('/api/auth/logout').flush(null);
+    auth.setUser(null);
     TestBed.flushEffects();
   }
 
   beforeEach(() => {
     localStorage.clear();
+    auth = new MockAuthClient();
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [{ provide: AuthClient, useValue: auth }],
     });
     storage = TestBed.inject(AuthScopedStorage);
-    http = TestBed.inject(HttpTestingController);
-    // Flush effects to process the initial auth-scoped-storage effect; this also
-    // fires the rxResource auto-fetch, so drain that request immediately.
+    // Flush effects to process the initial (anonymous) auth-scoped-storage effect.
     TestBed.flushEffects();
-    http.expectOne('/api/auth/me').flush(null, { status: 401, statusText: 'Unauthorized' });
   });
 
-  afterEach(() => {
-    http.verify();
-    localStorage.clear();
-  });
+  afterEach(() => localStorage.clear());
 
   describe('getItem / setItem / removeItem', () => {
     it('reads and writes under a prefixed key, not the bare key', () => {

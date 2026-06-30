@@ -1,12 +1,16 @@
-import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { EntityDetail, HexMap, coordKey, emptyContent } from '@hexly/domain';
+import { of, Subject, throwError } from 'rxjs';
+import {
+  EntityDetail,
+  EntitySaveOutcome,
+  HexMap,
+  coordKey,
+  emptyContent,
+} from '@hexly/domain';
 import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
+import { EntitiesClient } from '../../../core/services/entities.client';
+import { MockEntitiesClient } from '../../../core/testing/entities-client.mock';
 import { EntitySession } from '../services/entity-session';
 import { HexMapStore } from '../services/hexmap-store';
 import { SaveStatus } from './save-status';
@@ -16,7 +20,7 @@ import { SaveStatus } from './save-status';
 describe('SaveStatus', () => {
   let session: EntitySession;
   let editor: HexMapStore;
-  let http: HttpTestingController;
+  let entities: MockEntitiesClient;
   let fixture: ComponentFixture<SaveStatus>;
 
   const content = emptyContent();
@@ -41,26 +45,23 @@ describe('SaveStatus', () => {
   };
 
   beforeEach(() => {
+    entities = new MockEntitiesClient();
     TestBed.configureTestingModule({
       imports: [SaveStatus, provideTranslocoTesting()],
       providers: [
         EntitySession,
-        provideHttpClient(),
-        provideHttpClientTesting(),
+        { provide: EntitiesClient, useValue: entities },
         provideRouter([]),
       ],
     });
     session = TestBed.inject(EntitySession);
     editor = TestBed.inject(HexMapStore);
-    http = TestBed.inject(HttpTestingController);
     fixture = TestBed.createComponent(SaveStatus);
   });
 
-  afterEach(() => http.verify());
-
   function open() {
+    entities.load.mockReturnValue(of(aldermoor));
     session.open('m1').subscribe();
-    http.expectOne('/api/entities/m1').flush(aldermoor);
     fixture.detectChanges();
   }
 
@@ -81,13 +82,17 @@ describe('SaveStatus', () => {
   it('reads Saving while a save is in flight, then Saved', () => {
     open();
     editor.paintAt({ q: 5, r: 5 }, 'ocean');
+    const save$ = new Subject<EntitySaveOutcome>();
+    entities.save.mockReturnValue(save$);
     session.save().subscribe();
     fixture.detectChanges();
     expect(text()).toContain('Saving');
 
-    http
-      .expectOne('/api/entities/m1')
-      .flush({ ...aldermoor, version: 4, document: bodyOf(editor.document()) });
+    save$.next({
+      status: 'saved',
+      entity: { ...aldermoor, version: 4, document: bodyOf(editor.document()) },
+    });
+    save$.complete();
     fixture.detectChanges();
     expect(text()).toContain('Saved');
   });
@@ -95,19 +100,17 @@ describe('SaveStatus', () => {
   it('shows a conflict with a working Reload', () => {
     open();
     editor.paintAt({ q: 5, r: 5 }, 'ocean');
+    entities.save.mockReturnValue(of({ status: 'conflict', current: aldermoor }));
     session.save().subscribe();
-    http
-      .expectOne('/api/entities/m1')
-      .flush(aldermoor, { status: 409, statusText: 'Conflict' });
     fixture.detectChanges();
     expect(text()).toContain('Newer version on server');
 
+    entities.load.mockReturnValue(of(aldermoor));
     (
       fixture.nativeElement.querySelector(
         '[data-testid=conflict-reload]',
       ) as HTMLButtonElement
     ).click();
-    http.expectOne('/api/entities/m1').flush(aldermoor);
     fixture.detectChanges();
     expect(session.conflict()).toBeNull();
   });
@@ -115,20 +118,18 @@ describe('SaveStatus', () => {
   it('surfaces a failed Reload while keeping the conflict and its Reload button', () => {
     open();
     editor.paintAt({ q: 5, r: 5 }, 'ocean');
+    entities.save.mockReturnValue(of({ status: 'conflict', current: aldermoor }));
     session.save().subscribe();
-    http
-      .expectOne('/api/entities/m1')
-      .flush(aldermoor, { status: 409, statusText: 'Conflict' });
     fixture.detectChanges();
 
     // The re-pull fails: the conflict stands, but the user must be told Reload failed —
     // else the chip looks unchanged and Reload appears to do nothing (ADR-0026).
+    entities.load.mockReturnValue(throwError(() => new Error('network')));
     (
       fixture.nativeElement.querySelector(
         '[data-testid=conflict-reload]',
       ) as HTMLButtonElement
     ).click();
-    http.expectOne('/api/entities/m1').error(new ProgressEvent('network'));
     fixture.detectChanges();
 
     expect(session.conflict()).not.toBeNull();
@@ -145,21 +146,23 @@ describe('SaveStatus', () => {
   it('shows a save error with a Retry that re-saves', () => {
     open();
     editor.paintAt({ q: 5, r: 5 }, 'ocean');
+    entities.save.mockReturnValue(throwError(() => new Error('network')));
     session.save().subscribe();
-    http
-      .expectOne('/api/entities/m1')
-      .error(new ProgressEvent('network'));
     fixture.detectChanges();
     expect(text()).toContain('Save failed');
 
+    entities.save.mockReturnValue(
+      of({
+        status: 'saved',
+        entity: { ...aldermoor, version: 4, document: bodyOf(editor.document()) },
+      }),
+    );
     (
       fixture.nativeElement.querySelector(
         '[data-testid=save-retry]',
       ) as HTMLButtonElement
     ).click();
-    const retry = http.expectOne('/api/entities/m1');
-    expect(retry.request.method).toBe('PUT');
-    retry.flush({ ...aldermoor, version: 4, document: bodyOf(editor.document()) });
+    expect(entities.save).toHaveBeenCalledTimes(2);
   });
 
   it('announces status politely for assistive tech', () => {

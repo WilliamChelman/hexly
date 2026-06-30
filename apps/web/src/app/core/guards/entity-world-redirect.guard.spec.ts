@@ -1,8 +1,3 @@
-import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import {
   ActivatedRouteSnapshot,
@@ -10,8 +5,10 @@ import {
   RouterStateSnapshot,
   UrlTree,
 } from '@angular/router';
-import { firstValueFrom, isObservable, Observable } from 'rxjs';
+import { firstValueFrom, isObservable, Observable, of, throwError } from 'rxjs';
 import { EntitySummary } from '@hexly/domain';
+import { EntitiesClient } from '../services/entities.client';
+import { MockEntitiesClient } from '../testing/entities-client.mock';
 import { entityWorldRedirect } from './entity-world-redirect.guard';
 
 function summary(over: Partial<EntitySummary>): EntitySummary {
@@ -31,16 +28,14 @@ function summary(over: Partial<EntitySummary>): EntitySummary {
 }
 
 describe('entityWorldRedirect', () => {
-  let http: HttpTestingController;
+  let entities: MockEntitiesClient;
 
   beforeEach(() => {
+    entities = new MockEntitiesClient();
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [{ provide: EntitiesClient, useValue: entities }],
     });
-    http = TestBed.inject(HttpTestingController);
   });
-
-  afterEach(() => http.verify());
 
   /** Invoke the functional guard the way the router would for `entities/:id`. */
   function run(id = 'e1') {
@@ -59,34 +54,25 @@ describe('entityWorldRedirect', () => {
   }
 
   it("redirects to the Entity's World-scoped route once its World resolves", async () => {
-    const settled = settle(run('e1'));
+    entities.list.mockReturnValue(
+      of({ items: [summary({ id: 'e1', worldId: 'w9' })], nextCursor: null }),
+    );
 
-    http
-      .expectOne('/api/entities?ids=e1')
-      .flush({ items: [summary({ id: 'e1', worldId: 'w9' })], nextCursor: null });
-
-    const value = await settled;
+    const value = await settle(run('e1'));
+    expect(entities.list).toHaveBeenCalledWith({ ids: ['e1'] });
     expect(value).toBeInstanceOf(UrlTree);
     expect((value as UrlTree).toString()).toBe('/w/w9/entities/e1');
   });
 
   it('falls through to render the error page when the target is missing', async () => {
-    const settled = settle(run('ghost'));
+    entities.list.mockReturnValue(of({ items: [], nextCursor: null }));
 
-    http
-      .expectOne('/api/entities?ids=ghost')
-      .flush({ items: [], nextCursor: null });
-
-    expect(await settled).toBe(true);
+    expect(await settle(run('ghost'))).toBe(true);
   });
 
   it('falls through to render the error page when the lookup errors', async () => {
-    const settled = settle(run('boom'));
+    entities.list.mockReturnValue(throwError(() => new Error('boom')));
 
-    http
-      .expectOne('/api/entities?ids=boom')
-      .flush(null, { status: 500, statusText: 'Server Error' });
-
-    expect(await settled).toBe(true);
+    expect(await settle(run('boom'))).toBe(true);
   });
 });

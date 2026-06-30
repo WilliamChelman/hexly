@@ -13,7 +13,7 @@ export class MockAuthClient {
   setUser(user: AuthUser | null): void { this._user.set(user); }
   setLoading(loading: boolean): void { this._loading.set(loading); }
 
-  login(): Observable<never> { return EMPTY; }
-  logout(): Observable<void> { return of(undefined); }
-  signOut(): void {}
+  login = vi.fn<(email: string, password: string) => Observable<AuthUser>>(() => EMPTY);
+  logout = vi.fn<() => Observable<void>>(() => of(undefined));
+  signOut = vi.fn();
 }

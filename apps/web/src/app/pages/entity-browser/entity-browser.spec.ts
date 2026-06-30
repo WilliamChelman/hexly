@@ -1,19 +1,17 @@
-import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
-import { EntitySummary } from '@hexly/domain';
+import { of, Subject, throwError } from 'rxjs';
+import { EntityPage, EntitySummary } from '@hexly/domain';
+import { EntitiesClient } from '../../core/services/entities.client';
+import { MockEntitiesClient } from '../../core/testing/entities-client.mock';
 import { ActiveWorld } from '../../core/services/active-world';
 import { ToasterService } from '../../core/services/toaster.service';
 import { provideTranslocoTesting } from '../../core/i18n/transloco-testing';
 import { EntityBrowser } from './entity-browser';
 
 describe('EntityBrowser', () => {
-  let http: HttpTestingController;
+  let client: MockEntitiesClient;
   let navigate: ReturnType<typeof vi.spyOn>;
 
   const summary = (over: Partial<EntitySummary>): EntitySummary => ({
@@ -31,15 +29,14 @@ describe('EntityBrowser', () => {
   });
 
   beforeEach(async () => {
+    client = new MockEntitiesClient();
     await TestBed.configureTestingModule({
       imports: [EntityBrowser, provideTranslocoTesting()],
       providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
+        { provide: EntitiesClient, useValue: client },
         provideRouter([]),
       ],
     }).compileComponents();
-    http = TestBed.inject(HttpTestingController);
     navigate = vi
       .spyOn(TestBed.inject(Router), 'navigate')
       .mockResolvedValue(true);
@@ -49,15 +46,11 @@ describe('EntityBrowser', () => {
     TestBed.inject(ActiveWorld).set('w1');
   });
 
-  afterEach(() => {
-    http.verify();
-  });
-
   /** Create the library and resolve its first page; `nextCursor` defaults to null (single page). */
-  function renderWith(entities: EntitySummary[], nextCursor: string | null = null) {
+  function renderWith(items: EntitySummary[], nextCursor: string | null = null) {
+    client.list.mockReturnValueOnce(of({ items, nextCursor }));
     const fixture = TestBed.createComponent(EntityBrowser);
-    fixture.detectChanges(); // active-World effect -> GET /entities
-    http.expectOne((r) => r.url === '/api/entities').flush({ items: entities, nextCursor });
+    fixture.detectChanges(); // active-World effect -> list()
     fixture.detectChanges();
     return fixture;
   }
@@ -106,23 +99,21 @@ describe('EntityBrowser', () => {
   });
 
   it('scopes the entity list to the World in the URL (ADR-0028)', () => {
+    client.list.mockReturnValueOnce(of({ items: [], nextCursor: null }));
     const fixture = TestBed.createComponent(EntityBrowser);
     fixture.detectChanges();
 
-    const req = http.expectOne((r) => r.url === '/api/entities');
-    expect(req.request.params.get('worldId')).toBe('w1');
-    req.flush({ items: [], nextCursor: null });
+    expect(client.list).toHaveBeenCalledWith({ limit: 50, worldId: 'w1' });
   });
 
   it('re-fetches scoped to the new World when the active World changes', () => {
     const fixture = renderWith([summary({ id: 'm1' })]); // initial fetch, World w1
 
+    client.list.mockReturnValueOnce(of({ items: [], nextCursor: null }));
     TestBed.inject(ActiveWorld).set('w2');
     fixture.detectChanges();
 
-    const req = http.expectOne((r) => r.url === '/api/entities');
-    expect(req.request.params.get('worldId')).toBe('w2');
-    req.flush({ items: [], nextCursor: null });
+    expect(client.list).toHaveBeenCalledWith({ limit: 50, worldId: 'w2' });
   });
 
   it('lists the entities the user owns, newest first', () => {
@@ -270,14 +261,14 @@ describe('EntityBrowser', () => {
     );
     const el = fixture.nativeElement as HTMLElement;
 
+    client.list.mockReturnValueOnce(
+      of({
+        items: [summary({ id: 'm2', name: 'The Whisperwood', updatedAt: 200 })],
+        nextCursor: null,
+      }),
+    );
     loadMore(el)?.click();
-    const req = http.expectOne((r) => r.url === '/api/entities');
-    expect(req.request.method).toBe('GET');
-    expect(req.request.params.get('cursor')).toBe('cursor-2');
-    req.flush({
-      items: [summary({ id: 'm2', name: 'The Whisperwood', updatedAt: 200 })],
-      nextCursor: null,
-    });
+    expect(client.list).toHaveBeenCalledWith({ cursor: 'cursor-2', worldId: 'w1' });
     fixture.detectChanges();
 
     // The next page is appended after the first — no duplicates, no gaps.
@@ -293,15 +284,19 @@ describe('EntityBrowser', () => {
     const fixture = renderWith([summary({ id: 'm1', updatedAt: 300 })], 'cursor-2');
     const el = fixture.nativeElement as HTMLElement;
 
+    // Held open (not `of`) so `loadingMore` stays true across both clicks.
+    const pending = new Subject<EntityPage>();
+    client.list.mockReturnValueOnce(pending.asObservable());
+
     loadMore(el)?.click();
     fixture.detectChanges();
     // A second click before the page resolves must not fire a second request.
     loadMore(el)?.click();
     fixture.detectChanges();
 
-    const inflight = http.match((r) => r.url === '/api/entities');
-    expect(inflight.length).toBe(1);
-    inflight[0].flush({ items: [summary({ id: 'm2', updatedAt: 200 })], nextCursor: null });
+    expect(client.list).toHaveBeenCalledTimes(2); // initial render + one load-more
+    pending.next({ items: [summary({ id: 'm2', updatedAt: 200 })], nextCursor: null });
+    pending.complete();
   });
 
   it('shows an empty state when the user has no entities', () => {
@@ -314,11 +309,9 @@ describe('EntityBrowser', () => {
   });
 
   it('renders the load-error state in French when French is the active language', () => {
+    client.list.mockReturnValueOnce(throwError(() => new Error('boom')));
     const fixture = TestBed.createComponent(EntityBrowser);
-    fixture.detectChanges(); // active-World effect -> GET /entities
-    http
-      .expectOne((r) => r.url === '/api/entities')
-      .flush(null, { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges(); // active-World effect -> list()
     TestBed.inject(TranslocoService).setActiveLang('fr');
     fixture.detectChanges();
 
@@ -332,11 +325,9 @@ describe('EntityBrowser', () => {
   });
 
   it('shows an error state when the entity list fails to load', () => {
+    client.list.mockReturnValueOnce(throwError(() => new Error('boom')));
     const fixture = TestBed.createComponent(EntityBrowser);
-    fixture.detectChanges(); // active-World effect -> GET /entities
-    http
-      .expectOne((r) => r.url === '/api/entities')
-      .flush(null, { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges(); // active-World effect -> list()
     fixture.detectChanges();
 
     // A failed list surfaces an error panel rather than a permanently blank page.
@@ -349,45 +340,35 @@ describe('EntityBrowser', () => {
   it('creates a new hexmap and opens it in the editor', () => {
     const fixture = renderWith([]);
 
+    client.create.mockReturnValueOnce(
+      of({
+        ...summary({ id: 'created', name: 'Untitled map' }),
+        document: { type: 'hexmap', content: { format: 'tiptap-v1', snapshot: {} }, hexes: {}, regions: [], labels: [] },
+      }),
+    );
     (
       fixture.nativeElement.querySelector('[data-testid=new-map]') as HTMLButtonElement
     ).click();
 
-    const req = http.expectOne('/api/entities');
-    expect(req.request.method).toBe('POST');
     // Scoped to the World in the URL (ADR-0028).
-    expect(req.request.body).toEqual({
-      name: 'Untitled map',
-      type: 'hexmap',
-      worldId: 'w1',
-    });
-    req.flush({
-      ...summary({ id: 'created', name: 'Untitled map' }),
-      document: { type: 'hexmap', content: { format: 'tiptap-v1', snapshot: {} }, hexes: {}, regions: [], labels: [] },
-    });
-
+    expect(client.create).toHaveBeenCalledWith('Untitled map', 'hexmap', 'w1');
     expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'created']);
   });
 
   it('creates a new note and opens it', () => {
     const fixture = renderWith([]);
 
+    client.create.mockReturnValueOnce(
+      of({
+        ...summary({ id: 'created', name: 'Untitled note', type: 'note' }),
+        document: { type: 'note', content: { format: 'tiptap-v1', snapshot: {} } },
+      }),
+    );
     (
       fixture.nativeElement.querySelector('[data-testid=new-note]') as HTMLButtonElement
     ).click();
 
-    const req = http.expectOne('/api/entities');
-    expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({
-      name: 'Untitled note',
-      type: 'note',
-      worldId: 'w1',
-    });
-    req.flush({
-      ...summary({ id: 'created', name: 'Untitled note', type: 'note' }),
-      document: { type: 'note', content: { format: 'tiptap-v1', snapshot: {} } },
-    });
-
+    expect(client.create).toHaveBeenCalledWith('Untitled note', 'note', 'w1');
     expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'created']);
   });
 
@@ -415,26 +396,25 @@ describe('EntityBrowser', () => {
     const input = el.querySelector('[data-testid=rename-input-m1]') as HTMLInputElement;
     input.value = 'Aldermoor Keep';
     input.dispatchEvent(new Event('input'));
-    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
 
-    const req = http.expectOne('/api/entities/m1');
-    expect(req.request.method).toBe('PATCH');
-    expect(req.request.body).toEqual({ name: 'Aldermoor Keep' });
-    req.flush({
-      ...summary({ id: 'm1', name: 'Aldermoor Keep', version: 4 }),
-      document: { type: 'hexmap', content: { format: 'tiptap-v1', snapshot: {} }, hexes: {}, regions: [], labels: [] },
-    });
-    fixture.detectChanges();
-
+    client.rename.mockReturnValueOnce(
+      of({
+        ...summary({ id: 'm1', name: 'Aldermoor Keep', version: 4 }),
+        document: { type: 'hexmap', content: { format: 'tiptap-v1', snapshot: {} }, hexes: {}, regions: [], labels: [] },
+      }),
+    );
     // After the rename the browser refreshes from page one: it re-fetches and
     // renders what the server returns, rather than reconciling in place.
-    const refresh = http.expectOne((r) => r.url === '/api/entities');
-    expect(refresh.request.method).toBe('GET');
-    expect(refresh.request.params.get('cursor')).toBeNull();
-    refresh.flush({
-      items: [summary({ id: 'm1', name: 'Aldermoor Keep', version: 4 })],
-      nextCursor: null,
-    });
+    client.list.mockReturnValueOnce(
+      of({
+        items: [summary({ id: 'm1', name: 'Aldermoor Keep', version: 4 })],
+        nextCursor: null,
+      }),
+    );
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    expect(client.rename).toHaveBeenCalledWith('m1', 'Aldermoor Keep');
+    expect(client.list).toHaveBeenCalledWith({ limit: 50, worldId: 'w1' });
     fixture.detectChanges();
 
     // The card shows the new name and the input is gone (back to read mode).
@@ -453,10 +433,8 @@ describe('EntityBrowser', () => {
     const input = el.querySelector('[data-testid=rename-input-m1]') as HTMLInputElement;
     input.value = 'Aldermoor Keep';
     input.dispatchEvent(new Event('input'));
+    client.rename.mockReturnValueOnce(throwError(() => new Error('boom')));
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
-    http
-      .expectOne('/api/entities/m1')
-      .flush(null, { status: 500, statusText: 'Server Error' });
     fixture.detectChanges();
 
     // The input is closed (not left stuck open) and the failure is surfaced.
@@ -478,8 +456,8 @@ describe('EntityBrowser', () => {
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     fixture.detectChanges();
 
-    // No PATCH (afterEach http.verify() would fail on a pending request), and the
-    // original name stays put with the editor closed.
+    // No PATCH, and the original name stays put with the editor closed.
+    expect(client.rename).not.toHaveBeenCalled();
     expect(el.querySelector('[data-testid=rename-input-m1]')).toBeNull();
     expect(
       (el.querySelector('[data-testid=entity-title]') as HTMLElement).textContent?.trim(),
@@ -492,20 +470,17 @@ describe('EntityBrowser', () => {
       summary({ id: 'm2', name: 'The Whisperwood' }),
     ]);
 
+    client.delete.mockReturnValueOnce(of(undefined));
+    // The delete is followed by a page-one refresh; the view reflects the server.
+    client.list.mockReturnValueOnce(
+      of({ items: [summary({ id: 'm2', name: 'The Whisperwood' })], nextCursor: null }),
+    );
     (
       fixture.nativeElement.querySelector('[data-testid=delete-m1]') as HTMLButtonElement
     ).click();
-    http.expectOne('/api/entities/m1').flush(null);
-    fixture.detectChanges();
 
-    // The delete is followed by a page-one refresh; the view reflects the server.
-    const refresh = http.expectOne((r) => r.url === '/api/entities');
-    expect(refresh.request.method).toBe('GET');
-    expect(refresh.request.params.get('cursor')).toBeNull();
-    refresh.flush({
-      items: [summary({ id: 'm2', name: 'The Whisperwood' })],
-      nextCursor: null,
-    });
+    expect(client.delete).toHaveBeenCalledWith('m1');
+    expect(client.list).toHaveBeenCalledWith({ limit: 50, worldId: 'w1' });
     fixture.detectChanges();
 
     const titles = Array.from(
@@ -517,12 +492,10 @@ describe('EntityBrowser', () => {
   it('keeps the card and surfaces an error toast when a delete fails', () => {
     const fixture = renderWith([summary({ id: 'm1', name: 'Aldermoor' })]);
 
+    client.delete.mockReturnValueOnce(throwError(() => new Error('boom')));
     (
       fixture.nativeElement.querySelector('[data-testid=delete-m1]') as HTMLButtonElement
     ).click();
-    http
-      .expectOne('/api/entities/m1')
-      .flush(null, { status: 500, statusText: 'Server Error' });
     fixture.detectChanges();
 
     // The card stays (the delete didn't take) and the failure is surfaced.
