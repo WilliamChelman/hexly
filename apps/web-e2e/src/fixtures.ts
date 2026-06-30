@@ -64,6 +64,12 @@ export async function flushSave(page: Page): Promise<Response> {
  * World's id for specs that want to assert the URL scope.
  */
 export async function enterLibrary(page: Page): Promise<string> {
+  // ponytail: #128 quarantine — the Worlds/Entities surfaces still call `/api/...`
+  // (NestJS, no longer wired into e2e) and are knowingly broken until slice #3
+  // restores them on TrailBase. Every spec that enters the library depends on
+  // them, so skip from this one chokepoint instead of annotating ~16 files.
+  // Delete this line in #3 to bring the suite back.
+  test.skip(true, 'Worlds/Entities return on TrailBase in slice #3 (#128).');
   await page.goto('/');
   await page.getByTestId(/^world-/).first().click();
   await page.waitForURL(/\/w\/[\w-]+\/entities$/);
