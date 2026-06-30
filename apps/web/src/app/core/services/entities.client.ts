@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { Observable, from, map, of, switchMap } from 'rxjs';
+import { Observable, catchError, from, map, of, switchMap, throwError } from 'rxjs';
 import type { FilterOrComposite, ListOpts } from 'trailbase';
 import {
   ENTITY_LIST_DEFAULT_LIMIT,
@@ -14,6 +14,22 @@ import {
 import { TrailbaseClient } from './trailbase-client';
 import { EntityRow } from '../models/entity-row';
 import { toEntityDetail, toEntitySummary } from '../utils/tb-records';
+
+/**
+ * A save the version access-rule rejected: TrailBase answers a denied UPDATE with HTTP
+ * 403 (its `FetchError` carries the numeric `status`, ADR-0032). 403 means a stale base
+ * `version` here — the caller only saves Entities it owns and has open — so it maps to a
+ * conflict. A malformed body trips the jsonschema CHECK as a 400 instead, which is a
+ * client bug (zod is the write-path validator), so that propagates as an error.
+ */
+function isStaleWrite(err: unknown): boolean {
+  return (
+    typeof err === 'object' &&
+    err !== null &&
+    'status' in err &&
+    (err as { status: unknown }).status === 403
+  );
+}
 
 export type EntityListParams = Partial<EntityListQuery> & {
   /** Drop the World's Home Entity from the page — the library shows authored Entities, not the landing page. */
@@ -87,10 +103,13 @@ export class EntitiesClient {
   }
 
   /**
-   * Naive last-write-wins save (#129): writes the body/tags and re-reads the row.
-   * Optimistic concurrency (the `version` UPDATE access-rule and its `conflict`
-   * outcome) lands in slice #4 — until then a save always reports `saved`.
-   * ponytail: no 409/conflict branch yet; #4 adds `_REQ_.version = _ROW_.version`.
+   * Version-checked save (#130, ADR-0032): writes the body/tags under the base `version`
+   * the caller last read, then re-reads the row. Optimistic concurrency is the entities
+   * UPDATE access-rule `_REQ_.version = _ROW_.version` — so we send the *base*, not
+   * `version + 1`; an `AFTER UPDATE` trigger advances the stored counter. A stale write
+   * is rejected by TrailBase as a 403; rather than throw, we re-read and surface the
+   * server's current state as a `conflict` for the session to re-pull from (the 403 has
+   * no body — a subscribed client will already hold current state once realtime lands, #7).
    */
   save(
     id: string,
@@ -103,11 +122,17 @@ export class EntitiesClient {
       this.records.update(id, {
         document: JSON.stringify(body),
         tags: JSON.stringify(tags),
-        version: version + 1,
+        version,
       } as Partial<EntityRow>),
     ).pipe(
-      switchMap(() => this.load(id)),
-      map((entity): EntitySaveOutcome => ({ status: 'saved', entity })),
+      catchError((err) =>
+        isStaleWrite(err) ? of('conflict' as const) : throwError(() => err),
+      ),
+      switchMap((updateResult) =>
+        updateResult === 'conflict'
+          ? this.load(id).pipe(map((current): EntitySaveOutcome => ({ status: 'conflict', current })))
+          : this.load(id).pipe(map((entity): EntitySaveOutcome => ({ status: 'saved', entity }))),
+      ),
     );
   }
 

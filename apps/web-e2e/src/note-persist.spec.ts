@@ -1,4 +1,4 @@
-import { enterLibrary, expect, flushSave, test } from './fixtures';
+import { enterLibrary, expect, flushSave, readEntity, test } from './fixtures';
 
 /**
  * Full-stack note round-trip: real TipTap keyboard input → versioned save → reload
@@ -11,7 +11,7 @@ test('types into a note, saves, and the Content survives a reload', async ({
   await enterLibrary(page);
   await page.getByTestId('new-note').click();
 
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  await expect(page).toHaveURL(/\/entities\/[^/]+$/);
   const noteId = page.url().split('/').pop();
 
   // Click below the text (60% down) to prove the whole box focuses the editor, not just prose.
@@ -29,10 +29,8 @@ test('types into a note, saves, and the Content survives a reload', async ({
   await expect(page.getByTestId('title')).toHaveText('Untitled note');
 
   // Confirm the snapshot was stored opaquely — format tag present, text inside.
-  const res = await request.get(`/api/entities/${noteId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  expect(detail.document.type).toBe('note');
-  expect(detail.document.content.format).toBe('tiptap-v2'); // mirrors CONTENT_FORMAT
-  expect(JSON.stringify(detail.document.content.snapshot)).toContain(content);
+  const { document } = await readEntity(page, request, noteId);
+  expect(document.type).toBe('note');
+  expect(document.content.format).toBe('tiptap-v2'); // mirrors CONTENT_FORMAT
+  expect(JSON.stringify(document.content.snapshot)).toContain(content);
 });

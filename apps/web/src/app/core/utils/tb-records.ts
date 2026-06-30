@@ -43,9 +43,19 @@ export function toEntitySummary(row: EntityRow): EntitySummary {
 export function toEntityDetail(row: EntityRow): EntityDetail {
   return {
     ...toEntitySummary(row),
-    document: JSON.parse(row.document) as EntityBody,
+    document: parseDocument(row.document),
     isHome: row.is_home === 1,
   };
+}
+
+/**
+ * `entities.document` is a jsonschema-typed JSON column (#130, ADR-0032): TrailBase's
+ * Record API returns it already parsed as an object. Tolerate a JSON *string* too — the
+ * unit-test fake (and any plain `is_json` TEXT column) hands one back — so the mapping
+ * doesn't care which transport produced the row.
+ */
+function parseDocument(raw: string | EntityBody): EntityBody {
+  return typeof raw === 'string' ? (JSON.parse(raw) as EntityBody) : raw;
 }
 
 /** `tags` arrives as a JSON string; tolerate a malformed/empty value as no tags. */

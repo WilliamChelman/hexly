@@ -67,11 +67,15 @@ mkdirSync(depot, { recursive: true });
 // 0. Stage the committed migrations so the bootstrap applies the Worlds/Entities
 //    schema (#129). They must be in place before the depot bootstraps below.
 cpSync(committedMigrations, join(depot, 'migrations'), { recursive: true });
-// 1. Seed the verified e2e user. This also bootstraps the depot (default config,
-//    migrations, admin) — with password auth on, so the credential is usable.
-trailSync(trail, ['user', 'add', user.email, user.password]);
-// 2. Apply the closed-set config (disables /register; existing user still logs in).
+// 1. Apply the committed config *before* the bootstrap: the entities migration's
+//    `CHECK(jsonschema('entity_body', …))` (#130) is validated when migrations apply, so
+//    the named schema this config registers must already be present. Disabling password
+//    auth here does not block `trail user add` (admin provisioning bypasses it) — the
+//    seeded user still logs in afterwards; only /register is rejected.
 cpSync(committedConfig, join(depot, 'config.textproto'));
+// 2. Seed the verified e2e user. This also bootstraps the depot (applies migrations,
+//    creates the admin) against the config staged above.
+trailSync(trail, ['user', 'add', user.email, user.password]);
 
 // 3. Serve the SPA + API on a single origin. `--spa` falls index.html back for
 //    client routes; `/api` and `/_` stay owned by TrailBase.

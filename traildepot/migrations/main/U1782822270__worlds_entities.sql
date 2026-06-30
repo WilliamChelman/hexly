@@ -1,7 +1,8 @@
 -- Worlds + Entities backbone on TrailBase Record APIs (#129, ADR-0032, ADR-0024).
 -- Mirrors the retired Drizzle schema; UUIDv7 BLOB PKs are TrailBase's Record-API
--- requirement. Validation of `document` is client-side zod (ADR-0032); a
--- jsonschema CHECK backstop is deferred to the write-hardening slice (#4).
+-- requirement. `document` is validated client-side by zod and backstopped server-side
+-- by the `entity_body` jsonschema CHECK below (#130) — the named schema is generated
+-- from `@hexly/domain` into config.textproto by `pnpm gen:schema`.
 
 CREATE TABLE worlds (
   id         BLOB    PRIMARY KEY NOT NULL CHECK(is_uuid_v7(id)) DEFAULT (uuid_v7()),
@@ -23,7 +24,9 @@ CREATE TABLE entities (
   tags       TEXT    NOT NULL DEFAULT '[]' CHECK(is_json(tags)),
   visibility TEXT    NOT NULL DEFAULT 'private',
   version    INTEGER NOT NULL DEFAULT 1,
-  document   TEXT    NOT NULL CHECK(is_json(document)),
+  -- Server-side body backstop (#130, ADR-0032): a malformed Entity document is
+  -- unwritable. The named schema is registered in config.textproto (gen:schema).
+  document   TEXT    NOT NULL CHECK(jsonschema('entity_body', document)),
   created_at INTEGER NOT NULL DEFAULT (unixepoch()),
   updated_at INTEGER NOT NULL DEFAULT (unixepoch())
 ) STRICT;
@@ -49,4 +52,17 @@ END;
 CREATE TRIGGER worlds_after_rename_home AFTER UPDATE OF name ON worlds
 BEGIN
   UPDATE entities SET name = NEW.name WHERE world_id = NEW.id AND is_home = TRUE;
+END;
+
+-- Optimistic concurrency (#130, ADR-0032): a body save is admitted by the UPDATE
+-- access-rule only when its base `version` equals the row's; this trigger then advances
+-- the stored counter. The client sends the base it last read, never version+1.
+-- Scoped to UPDATE OF document so rename/tag-only PATCHes (which omit `version` from
+-- the SET clause) don't inadvertently bump the counter and cause spurious conflicts.
+-- Recursion-safe: the WHEN guard is false on the bump's own re-update
+-- (NEW.version <> OLD.version), so it fires exactly once per save.
+CREATE TRIGGER entities_after_update_version AFTER UPDATE OF document ON entities
+FOR EACH ROW WHEN NEW.version = OLD.version
+BEGIN
+  UPDATE entities SET version = OLD.version + 1 WHERE id = NEW.id;
 END;

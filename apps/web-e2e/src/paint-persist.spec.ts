@@ -1,4 +1,4 @@
-import { enterLibrary, expect, flushSave, test } from './fixtures';
+import { enterLibrary, expect, flushSave, readEntity, test } from './fixtures';
 
 /**
  * The keystone journey: it crosses every seam — the session cookie on API calls,
@@ -15,7 +15,7 @@ test('paints a hex, saves, and the hex survives a reload', async ({
   await page.getByTestId('new-map').click();
 
   // Creating a map opens the editor at /entities/:id.
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  await expect(page).toHaveURL(/\/entities\/[^/]+$/);
   const mapId = page.url().split('/').pop();
 
   // A map opens armed with the non-destructive Select tool, so a stray first
@@ -44,10 +44,8 @@ test('paints a hex, saves, and the hex survives a reload', async ({
   await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
 
   // And the persisted document really holds that one hex, with our terrain.
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  const hexes = Object.values(detail.document.hexes) as Array<{
+  const { document } = await readEntity(page, request, mapId);
+  const hexes = Object.values(document.hexes) as Array<{
     terrain: string;
   }>;
   expect(hexes).toHaveLength(1);

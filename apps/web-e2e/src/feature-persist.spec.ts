@@ -1,4 +1,4 @@
-import { enterLibrary, expect, flushSave, test } from './fixtures';
+import { enterLibrary, expect, flushSave, readEntity, test } from './fixtures';
 
 /**
  * The Feature journey (issue #7): a feature placed on a hex survives a save and
@@ -15,7 +15,7 @@ test('places a feature on a hex, saves, and the feature survives a reload', asyn
   await page.getByTestId('new-map').click();
 
   // Creating a map opens the editor at /entities/:id.
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  await expect(page).toHaveURL(/\/entities\/[^/]+$/);
   const mapId = page.url().split('/').pop();
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
@@ -44,10 +44,8 @@ test('places a feature on a hex, saves, and the feature survives a reload', asyn
 
   // And the persisted document really holds that hex with its feature, the
   // single feature referenced by its stable library id.
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  const hexes = Object.values(detail.document.hexes) as Array<{
+  const { document } = await readEntity(page, request, mapId);
+  const hexes = Object.values(document.hexes) as Array<{
     terrain: string;
     feature?: { ref: string };
   }>;

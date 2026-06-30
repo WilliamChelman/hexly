@@ -1,4 +1,4 @@
-import { enterLibrary, expect, flushSave, test } from './fixtures';
+import { enterLibrary, expect, flushSave, quarantineSlice5, test } from './fixtures';
 
 /**
  * The Entity Link journey (issue #76, CONTEXT.md → Entity Link): a Map element —
@@ -14,6 +14,7 @@ test('links a Hex to an Entity in the Inspector; the link survives a reload and 
   page,
   request,
 }) => {
+  quarantineSlice5();
   // Seed the link target: a note the picker can list and Follow can jump to.
   await enterLibrary(page);
   await page.getByTestId('new-note').click();

@@ -1,4 +1,4 @@
-import { enterLibrary, expect, flushSave, test } from './fixtures';
+import { enterLibrary, expect, flushSave, readEntity, test } from './fixtures';
 
 /**
  * Group moves for non-hex selections (issue #64 follow-up, ADR-0017). Two bugs the
@@ -14,9 +14,8 @@ import { enterLibrary, expect, flushSave, test } from './fixtures';
 /** Read the saved document for `mapId` after a committed PUT. */
 async function savedDocument(page: import('@playwright/test').Page, request: import('@playwright/test').APIRequestContext, mapId: string) {
   await flushSave(page);
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  return (await res.json()).document;
+  const { document } = await readEntity(page, request, mapId);
+  return document;
 }
 
 test('drags one label of a multi-label selection and the whole group moves', async ({
@@ -25,7 +24,7 @@ test('drags one label of a multi-label selection and the whole group moves', asy
 }) => {
   await enterLibrary(page);
   await page.getByTestId('new-map').click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  await expect(page).toHaveURL(/\/entities\/[^/]+$/);
   const mapId = page.url().split('/').pop() as string;
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
@@ -88,7 +87,7 @@ test('drags a region on its own and its whole footprint moves', async ({
 }) => {
   await enterLibrary(page);
   await page.getByTestId('new-map').click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  await expect(page).toHaveURL(/\/entities\/[^/]+$/);
   const mapId = page.url().split('/').pop() as string;
 
   const canvas = page.getByRole('img', { name: 'Hex map' });

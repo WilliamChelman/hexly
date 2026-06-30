@@ -1,4 +1,4 @@
-import { enterLibrary, expect, flushSave, test } from './fixtures';
+import { enterLibrary, expect, flushSave, readEntity, test } from './fixtures';
 
 /**
  * The Region select-and-edit journey (issue #39): a Region selected on the canvas
@@ -17,7 +17,7 @@ test('selects a Region on the canvas, renames it in the Inspector, and the renam
   await page.getByTestId('new-map').click();
 
   // Creating a map opens the editor at /entities/:id.
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  await expect(page).toHaveURL(/\/entities\/[^/]+$/);
   const mapId = page.url().split('/').pop();
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
@@ -49,12 +49,10 @@ test('selects a Region on the canvas, renames it in the Inspector, and the renam
   await page.reload();
 
   // The persisted document really holds the renamed Region with its membership.
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  expect(detail.document.regions).toHaveLength(1);
-  expect(detail.document.regions[0].name).toBe('The Whisperwood');
-  expect(detail.document.regions[0].hexes).toEqual({ '0,0': true });
+  const { document } = await readEntity(page, request, mapId);
+  expect(document.regions).toHaveLength(1);
+  expect(document.regions[0].name).toBe('The Whisperwood');
+  expect(document.regions[0].hexes).toEqual({ '0,0': true });
 
   // The reloaded map boots in Select (issue #27). Clicking the centre re-selects the
   // re-rendered Region, and the Inspector shows its persisted, renamed value.
