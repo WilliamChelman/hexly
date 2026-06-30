@@ -27,6 +27,9 @@ const port = process.env.PORT ?? '3100';
 
 // TrailBase has no display name; the seeded user logs in with email + password.
 const user = { email: process.env.E2E_USER_EMAIL, password: process.env.E2E_USER_PASSWORD };
+// The full role set the sharing slice (#131) needs (owner + contributor + viewer +
+// grantee + outsider). Falls back to just the default user so a bare env still boots.
+const users = process.env.E2E_USERS ? JSON.parse(process.env.E2E_USERS) : [user];
 
 /** Fail loudly with a fix-it hint rather than a cryptic error mid-run. */
 function requireBuilt(path, what) {
@@ -73,9 +76,13 @@ cpSync(committedMigrations, join(depot, 'migrations'), { recursive: true });
 //    auth here does not block `trail user add` (admin provisioning bypasses it) — the
 //    seeded user still logs in afterwards; only /register is rejected.
 cpSync(committedConfig, join(depot, 'config.textproto'));
-// 2. Seed the verified e2e user. This also bootstraps the depot (applies migrations,
-//    creates the admin) against the config staged above.
-trailSync(trail, ['user', 'add', user.email, user.password]);
+// 2. Seed the verified e2e users (every sharing role). The first `user add` also
+//    bootstraps the depot (applies migrations, creates the admin) against the config
+//    staged above; admin provisioning bypasses `disable_password_auth`, so each user
+//    still logs in afterwards while /register stays rejected.
+for (const u of users) {
+  trailSync(trail, ['user', 'add', u.email, u.password]);
+}
 
 // 3. Serve the SPA + API on a single origin. `--spa` falls index.html back for
 //    client routes; `/api` and `/_` stay owned by TrailBase.

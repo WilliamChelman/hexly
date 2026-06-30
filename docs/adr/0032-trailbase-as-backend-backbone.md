@@ -1,5 +1,5 @@
 ---
-status: accepted (in progress — #128 landed the foundation (TrailBase serves the SPA + owns auth); #129 landed Worlds + Entities as owner-scoped Record APIs with the atomic-Home trigger, the undeletable-Home DELETE rule, and the World-name→Home-title trigger (ADR-0029) — owner happy path only, save optimistic-concurrency is slice #4 and the share cascade slice #5; NestJS deleted once those land)
+status: accepted (in progress — #128 landed the foundation (TrailBase serves the SPA + owns auth); #129 landed Worlds + Entities as owner-scoped Record APIs with the atomic-Home trigger, the undeletable-Home DELETE rule, and the World-name→Home-title trigger (ADR-0029); #130 landed the version optimistic-concurrency rule + jsonschema backstop (slice #4); #131 landed the share cascade + entity grants as declarative SQL access-rules for the four authenticated roles (Owner/Contributor/World-Viewer-member/non-member + entity Editor/Viewer grants) — slice #5, the account-less World Public Link split out to #138 (a READ rule can't validate a per-request token); NestJS deleted once the remaining slices land)
 ---
 
 # TrailBase as the backend backbone

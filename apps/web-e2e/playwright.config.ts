@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
 import { authFile } from './src/auth-file';
-import { TEST_USER } from './src/test-user';
+import { TEST_USER, TEST_USERS } from './src/test-user';
 
 // `__dirname` (not `import.meta`) because Playwright loads this config as CommonJS.
 const workspaceRoot = join(__dirname, '..', '..');
@@ -51,6 +51,9 @@ export default defineConfig({
       E2E_USER_EMAIL: TEST_USER.email,
       E2E_USER_PASSWORD: TEST_USER.password,
       E2E_USER_NAME: TEST_USER.displayName,
+      // Every role the sharing slice (#131) drives the Record APIs as. The server
+      // `trail user add`s each; the specs log in via TrailBase's JSON auth.
+      E2E_USERS: JSON.stringify(TEST_USERS),
     },
   },
 });

@@ -27,7 +27,8 @@ record_apis {
   table_name: "worlds"
   acl_authenticated: [CREATE, READ, UPDATE, DELETE]
   create_access_rule: "_USER_.id IS NOT NULL"
-  read_access_rule: "_ROW_.owner_id = _USER_.id"
+  # The World Index lists Worlds the caller can reach — owned or a named member (ADR-0028).
+  read_access_rule: "_ROW_.owner_id = _USER_.id OR EXISTS(SELECT 1 FROM world_members m WHERE m.world_id = _ROW_.id AND m.user_id = _USER_.id)"
   update_access_rule: "_ROW_.owner_id = _USER_.id"
   delete_access_rule: "_ROW_.owner_id = _USER_.id"
   autofill_missing_user_id_columns: true
@@ -37,16 +38,67 @@ record_apis {
   name: "entities"
   table_name: "entities"
   acl_authenticated: [CREATE, READ, UPDATE, DELETE]
-  create_access_rule: "_USER_.id IS NOT NULL"
-  read_access_rule: "_ROW_.owner_id = _USER_.id"
+  # Create scope (#131, ADR-0024): only the World Owner or a Contributor may add an Entity
+  # to a World (and `owner_id` is autofilled to the caller, so they own what they create).
+  # A World Viewer and a non-member are rejected. The Home Entity is minted by the
+  # worlds AFTER INSERT trigger, which runs below the Record API and is unaffected.
+  # Adjacent string literals concatenate (no space is inserted, so each line keeps a
+  # trailing space) — splitting the long SQL across lines for readability.
+  create_access_rule:
+    "EXISTS(SELECT 1 FROM worlds w WHERE w.id = _REQ_.world_id AND w.owner_id = _USER_.id) "
+    "OR EXISTS(SELECT 1 FROM world_members m "
+    "  WHERE m.world_id = _REQ_.world_id AND m.user_id = _USER_.id AND m.role = 'contributor')"
+  # Read cascade (#131, ADR-0024): the Owner always; a named World member (Contributor or
+  # World Viewer) reads every `shared` Entity in their World — a `private` one stays hidden,
+  # so the visibility gate is what keeps unrevealed lore out of players' hands.
+  # An entity-level grant (Editor or Viewer, ADR-0004) reads regardless of visibility —
+  # this is how a single `private` Entity is shared with one person, on top of World sharing.
+  read_access_rule:
+    "_ROW_.owner_id = _USER_.id "
+    "OR (_ROW_.visibility = 'shared' AND EXISTS("
+    "  SELECT 1 FROM world_members m WHERE m.world_id = _ROW_.world_id AND m.user_id = _USER_.id)) "
+    "OR EXISTS(SELECT 1 FROM entity_grants g WHERE g.entity_id = _ROW_.id AND g.user_id = _USER_.id)"
   # Optimistic concurrency (#130, ADR-0032): a body save sends the base `version` it last
   # read; a stale one (the row has since advanced) is rejected here (403). Metadata-only
   # updates (rename) omit `version`, so the IS NULL arm lets them through unchecked. The
   # `AFTER UPDATE` trigger advances the stored counter — the client never sends version+1.
-  update_access_rule: "_ROW_.owner_id = _USER_.id AND (_REQ_.version IS NULL OR _REQ_.version = _ROW_.version)"
+  # Edit rights (#131, ADR-0024/ADR-0004): the Entity Owner, the World Owner (who may edit
+  # any Entity in their World), or an entity-level Editor grant. A Contributor and a Viewer
+  # grant get no edit. The version arm is unchanged — a body save still carries its base
+  # `version` and a stale one is rejected; a metadata-only PATCH omits it (IS NULL).
+  update_access_rule:
+    "(_ROW_.owner_id = _USER_.id "
+    "OR EXISTS(SELECT 1 FROM worlds w WHERE w.id = _ROW_.world_id AND w.owner_id = _USER_.id) "
+    "OR EXISTS(SELECT 1 FROM entity_grants g "
+    "  WHERE g.entity_id = _ROW_.id AND g.user_id = _USER_.id AND g.role = 'editor')) "
+    "AND (_REQ_.version IS NULL OR _REQ_.version = _ROW_.version)"
   # The Home Entity is undeletable (ADR-0024): the DELETE rule excludes it.
   delete_access_rule: "_ROW_.owner_id = _USER_.id AND _ROW_.is_home = FALSE"
   autofill_missing_user_id_columns: true
+}
+
+# World membership (#131, ADR-0024): owner-managed. The World Owner grants/revokes
+# named members (contributor | viewer); a member may read their own row. owner_id is
+# not on this table, so ownership is checked by joining back to `worlds`.
+record_apis {
+  name: "world_members"
+  table_name: "world_members"
+  acl_authenticated: [CREATE, READ, DELETE]
+  create_access_rule: "EXISTS(SELECT 1 FROM worlds w WHERE w.id = _REQ_.world_id AND w.owner_id = _USER_.id)"
+  read_access_rule: "_ROW_.user_id = _USER_.id OR EXISTS(SELECT 1 FROM worlds w WHERE w.id = _ROW_.world_id AND w.owner_id = _USER_.id)"
+  delete_access_rule: "EXISTS(SELECT 1 FROM worlds w WHERE w.id = _ROW_.world_id AND w.owner_id = _USER_.id)"
+}
+
+# Entity-level grants (#131, ADR-0004): owner-managed. The Entity Owner grants/revokes
+# editor | viewer on one Entity; a grantee may read their own row. Ownership is checked
+# by joining back to `entities`.
+record_apis {
+  name: "entity_grants"
+  table_name: "entity_grants"
+  acl_authenticated: [CREATE, READ, DELETE]
+  create_access_rule: "EXISTS(SELECT 1 FROM entities e WHERE e.id = _REQ_.entity_id AND e.owner_id = _USER_.id)"
+  read_access_rule: "_ROW_.user_id = _USER_.id OR EXISTS(SELECT 1 FROM entities e WHERE e.id = _ROW_.entity_id AND e.owner_id = _USER_.id)"
+  delete_access_rule: "EXISTS(SELECT 1 FROM entities e WHERE e.id = _ROW_.entity_id AND e.owner_id = _USER_.id)"
 }
 
 # BEGIN GENERATED entity_body schema — regenerate with `pnpm gen:schema` (do not edit by hand)
