@@ -112,6 +112,7 @@ export async function readEntity(
   const res = await request.get(`/api/records/v1/entities/${id}`, {
     headers: { authorization: `Bearer ${await authToken(page)}` },
   });
+  if (!res.ok()) throw new Error(`readEntity ${id}: HTTP ${res.status()}`);
   const row = (await res.json()) as { document: PersistedEntity['document']; tags?: string };
   return { res, document: row.document, tags: JSON.parse(row.tags ?? '[]') as string[] };
 }

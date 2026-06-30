@@ -1,4 +1,4 @@
-import { enterLibrary, expect, flushSave, quarantineSlice5, test } from './fixtures';
+import { authToken, enterLibrary, expect, flushSave, quarantineSlice5, readEntity, test } from './fixtures';
 
 /**
  * Dangling Entity Link journey (issue #78, CONTEXT.md → Entity Link, ADR-0018): a
@@ -20,13 +20,13 @@ test('a link whose target is deleted renders non-navigable, and the map opens wi
   // Seed the link target, then delete it after linking.
   await enterLibrary(page);
   await page.getByTestId('new-note').click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  await expect(page).toHaveURL(/\/entities\/[^/]+$/);
   const noteId = page.url().split('/').pop();
 
   // The source: a fresh map with one painted hex.
   await enterLibrary(page);
   await page.getByTestId('new-map').click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  await expect(page).toHaveURL(/\/entities\/[^/]+$/);
   const mapId = page.url().split('/').pop();
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
@@ -49,7 +49,9 @@ test('a link whose target is deleted renders non-navigable, and the map opens wi
   await flushSave(page);
 
   // Delete the target out from under the link (the "inaccessible/missing" case).
-  const del = await request.delete(`/api/entities/${noteId}`);
+  const del = await request.delete(`/api/records/v1/entities/${noteId}`, {
+    headers: { authorization: `Bearer ${await authToken(page)}` },
+  });
   expect(del.ok()).toBeTruthy();
 
   // The map opens cleanly on a fresh load despite the now-dangling link.
@@ -58,10 +60,8 @@ test('a link whose target is deleted renders non-navigable, and the map opens wi
   await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
 
   // No cascade, no corruption: the document still carries the link id (AC3).
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  expect(detail.document.hexes['0,0']?.entityId).toBe(noteId);
+  const { document } = await readEntity(page, request, mapId!);
+  expect(document.hexes['0,0']?.entityId).toBe(decodeURIComponent(noteId!));
 
   // Re-select the hex: the Inspector shows the link as non-navigable — visible but
   // not a followable link (no `entity-link-name` anchor).

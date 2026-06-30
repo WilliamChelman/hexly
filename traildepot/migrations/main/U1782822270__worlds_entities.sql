@@ -57,9 +57,11 @@ END;
 -- Optimistic concurrency (#130, ADR-0032): a body save is admitted by the UPDATE
 -- access-rule only when its base `version` equals the row's; this trigger then advances
 -- the stored counter. The client sends the base it last read, never version+1.
+-- Scoped to UPDATE OF document so rename/tag-only PATCHes (which omit `version` from
+-- the SET clause) don't inadvertently bump the counter and cause spurious conflicts.
 -- Recursion-safe: the WHEN guard is false on the bump's own re-update
 -- (NEW.version <> OLD.version), so it fires exactly once per save.
-CREATE TRIGGER entities_after_update_version AFTER UPDATE ON entities
+CREATE TRIGGER entities_after_update_version AFTER UPDATE OF document ON entities
 FOR EACH ROW WHEN NEW.version = OLD.version
 BEGIN
   UPDATE entities SET version = OLD.version + 1 WHERE id = NEW.id;

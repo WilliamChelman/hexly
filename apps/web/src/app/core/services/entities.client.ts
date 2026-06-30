@@ -125,14 +125,13 @@ export class EntitiesClient {
         version,
       } as Partial<EntityRow>),
     ).pipe(
-      switchMap(() => this.load(id)),
-      map((entity): EntitySaveOutcome => ({ status: 'saved', entity })),
       catchError((err) =>
-        isStaleWrite(err)
-          ? this.load(id).pipe(
-              map((current): EntitySaveOutcome => ({ status: 'conflict', current })),
-            )
-          : throwError(() => err),
+        isStaleWrite(err) ? of('conflict' as const) : throwError(() => err),
+      ),
+      switchMap((updateResult) =>
+        updateResult === 'conflict'
+          ? this.load(id).pipe(map((current): EntitySaveOutcome => ({ status: 'conflict', current })))
+          : this.load(id).pipe(map((entity): EntitySaveOutcome => ({ status: 'saved', entity }))),
       ),
     );
   }
