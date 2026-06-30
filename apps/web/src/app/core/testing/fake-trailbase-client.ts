@@ -101,8 +101,16 @@ export function provideFakeTrailbase(seed?: { tokens?: Tokens }): {
   readonly client: FakeTrailbaseClient;
 } {
   let client!: FakeTrailbaseClient;
+  // Drive the fake only from `seed` — never `opts.tokens`, which is the real
+  // `readStoredTokens()` off localStorage. Inheriting it would let a token a
+  // sibling test persisted leak in and silently restore a session (the cross-test
+  // contamination that turned this red on CI's file order). We keep `onAuthChange`
+  // so the session signal still updates on login/logout.
   const init: InitClient = (_site, opts) =>
-    (client = new FakeTrailbaseClient({ ...(opts as ClientOptions), ...seed })) as unknown as Client;
+    (client = new FakeTrailbaseClient({
+      onAuthChange: (opts as ClientOptions | undefined)?.onAuthChange,
+      tokens: seed?.tokens,
+    })) as unknown as Client;
   return {
     provider: { provide: TRAILBASE_INIT, useValue: init },
     get client() {

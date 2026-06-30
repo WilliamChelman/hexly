@@ -31,6 +31,9 @@ describe('WorldStore', () => {
 
   afterEach(() => {
     http.verify();
+    // A fake-backed login persists a token (via the real onAuthChange); clear it
+    // so it can't leak into another spec's session.
+    localStorage.clear();
   });
 
   function flushList(worlds: WorldSummary[]): void {

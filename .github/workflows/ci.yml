@@ -94,6 +94,14 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
         if: steps.playwright-cache.outputs.cache-hit != 'true'
 
+      # Cache the pinned TrailBase binary (downloaded by scripts/trailbase.mjs on
+      # first boot) so the e2e server doesn't re-fetch ~22 MB every run. Keyed on
+      # the script so a version bump invalidates it.
+      - uses: actions/cache@v4
+        with:
+          path: .trailbase
+          key: trailbase-${{ runner.os }}-${{ hashFiles('scripts/trailbase.mjs') }}
+
       - run: pnpm exec nx e2e web-e2e
 
       - uses: actions/upload-artifact@v4
