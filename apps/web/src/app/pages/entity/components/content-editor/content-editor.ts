@@ -15,6 +15,7 @@ import {
 import { Editor, JSONContent } from '@tiptap/core';
 import { catchError, firstValueFrom, of } from 'rxjs';
 import { EntitiesClient } from '../../../../core/services/entities.client';
+import { ActiveWorld } from '../../../../core/services/active-world';
 import { TiptapDirective } from './tiptap.directive';
 import { EntitySession } from '../../services/entity-session';
 import { EntityNameResolver } from '../../services/entity-name-resolver';
@@ -180,8 +181,9 @@ export class ContentEditor {
   // gets a fresh owner list. The route-level EnvironmentInjector is what each node
   // view is created in, so they resolve the very same instance (ADR-0023).
   private readonly resolver = inject(EntityNameResolver);
-  // The `::` picker's vocabulary source (#96): the owner's last-saved DISTINCT descriptors.
+  // The `::` picker's vocabulary source (#96): the active World's last-saved descriptors.
   private readonly entities = inject(EntitiesClient);
+  private readonly activeWorld = inject(ActiveWorld);
   private readonly environmentInjector = inject(EnvironmentInjector);
   // ContentEditor's own node injector — lives inside the router outlet, so the
   // entityLink node views created from it can resolve ActivatedRoute for routerLink.
@@ -265,16 +267,16 @@ export class ContentEditor {
       (query) => this.resolver.search(query),
     );
 
-    // The owner's descriptor vocabulary, fetched lazily on the first `::` and cached for
-    // this editor's life. ponytail: a reload recreates the editor and refreshes it, so a
-    // newly-saved descriptor is suggested next session — last-saved state, by design (#96).
-    let vocab: Promise<string[]> | undefined;
+    // The active World's descriptor vocabulary, queried server-side per `::` keystroke so the
+    // picker type-aheads against last-saved state (#96/#132). A failed fetch yields no
+    // suggestions (the typed free text is still selectable via descriptorItems' "new" row).
+    const worldId = this.activeWorld.worldId() ?? '';
     const descriptor = descriptorSuggestion(
       () => this.descriptorPicker(),
-      () =>
-        (vocab ??= firstValueFrom(
-          this.entities.listDescriptors().pipe(catchError(() => of<string[]>([]))),
-        )),
+      (query) =>
+        firstValueFrom(
+          this.entities.listDescriptors(worldId, query).pipe(catchError(() => of<string[]>([]))),
+        ),
     );
 
     // Patch /link to flag the mention extension before inserting @, so onExit knows

@@ -3,6 +3,7 @@ import { Observable, catchError, from, map, of, switchMap, throwError } from 'rx
 import type { FilterOrComposite, ListOpts } from 'trailbase';
 import {
   ENTITY_LIST_DEFAULT_LIMIT,
+  ENTITY_LIST_MAX_LIMIT,
   EntityBody,
   EntityDetail,
   EntityListQuery,
@@ -44,7 +45,9 @@ export type EntityListParams = Partial<EntityListQuery> & {
  */
 @Injectable({ providedIn: 'root' })
 export class EntitiesClient {
-  private readonly records = inject(TrailbaseClient).client.records<EntityRow>('entities');
+  private readonly tb = inject(TrailbaseClient).client;
+  private readonly records = this.tb.records<EntityRow>('entities');
+  private readonly descriptors = this.tb.records<{ descriptor: string }>('entity_descriptors');
 
   /** One page of the entities read surface (ADR-0025); `opts` filter and page it. */
   list(opts: EntityListParams = {}): Observable<EntityPage> {
@@ -116,12 +119,15 @@ export class EntitiesClient {
     body: EntityBody,
     version: number,
     tags: readonly string[],
-    _descriptors: readonly string[],
+    descriptors: readonly string[],
   ): Observable<EntitySaveOutcome> {
     return from(
       this.records.update(id, {
         document: JSON.stringify(body),
         tags: JSON.stringify(tags),
+        // The harvested Link Descriptors ride the save like tags (#132, ADR-0023): the
+        // full current set, replacing this Entity's saved vocabulary.
+        descriptors: JSON.stringify(descriptors),
         version,
       } as Partial<EntityRow>),
     ).pipe(
@@ -137,11 +143,23 @@ export class EntitiesClient {
   }
 
   /**
-   * The owner's Link Descriptor vocabulary (#96, ADR-0023). The descriptor index
-   * is a separate surface not yet on TrailBase (slice #4/#5); until then there are
-   * no `::` suggestions. ponytail: returns empty; wire to its Record API with save.
+   * The `::` type-ahead vocabulary for a World (#96/#132, ADR-0023): the distinct Link
+   * Descriptors the caller has saved on Entities in `worldId` that match `query`, sorted.
+   * `query` narrows server-side with a `LIKE` so the picker lists on the fly per keystroke
+   * rather than fetching the whole vocabulary; an empty `query` lists it all. Reflects
+   * last-saved state by design — a label coined in one World isn't suggested in another.
+   * The index holds one row per (entity, descriptor) — the Record-API read rule gates each by
+   * its source Entity's visibility, which a Record API can't DISTINCT (the gate needs the
+   * entity grain DISTINCT would destroy), so we dedupe client-side — cheap because the `LIKE`
+   * already trims the result. ponytail: interim. At scale this moves to a WASM endpoint that
+   * does gate-then-DISTINCT server-side (ADR-0034); the signature here stays the same.
    */
-  listDescriptors(): Observable<string[]> {
-    return from(Promise.resolve<string[]>([]));
+  listDescriptors(worldId: string, query = ''): Observable<string[]> {
+    const filters: FilterOrComposite[] = [{ column: 'world_id', value: worldId }];
+    const q = query.trim();
+    if (q) filters.push({ column: 'descriptor', op: 'like', value: `%${q}%` });
+    return from(
+      this.descriptors.list({ filters, pagination: { limit: ENTITY_LIST_MAX_LIMIT } }),
+    ).pipe(map((res) => [...new Set(res.records.map((r) => r.descriptor))].sort()));
   }
 }

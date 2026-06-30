@@ -97,6 +97,24 @@ const readWorld = (api: APIRequestContext, token: string, id: string) =>
     headers: { authorization: `Bearer ${token}` },
   });
 
+/** Set an Entity's harvested Link Descriptors (#132): the save column the index trigger reads. */
+const setDescriptors = (api: APIRequestContext, token: string, id: string, descriptors: string[]) =>
+  api.patch(`/api/records/v1/entities/${encodeURIComponent(id)}`, {
+    headers: { authorization: `Bearer ${token}` },
+    data: { descriptors: JSON.stringify(descriptors) },
+  });
+
+/** The `::` vocabulary a caller sees for a World, via the entity_descriptors Record API. */
+async function vocab(api: APIRequestContext, token: string, worldId: string): Promise<string[]> {
+  const res = await api.get('/api/records/v1/entity_descriptors', {
+    headers: { authorization: `Bearer ${token}` },
+    params: { 'filter[world_id]': worldId },
+  });
+  expect(res.ok(), `list descriptors: ${res.status()}`).toBeTruthy();
+  const { records } = (await res.json()) as { records: { descriptor: string }[] };
+  return records.map((r) => r.descriptor).sort();
+}
+
 test('a Contributor and a World Viewer read shared Entities in their World; a private one stays hidden', async ({
   request,
 }) => {
@@ -209,6 +227,30 @@ test('a non-member reaches neither the World nor its Entities; a member reaches 
   expect((await readWorld(request, outsider, worldId)).ok()).toBeFalsy();
   // And a non-member reaches none of its Entities, shared or otherwise.
   expect((await readEntity(request, outsider, shared)).ok()).toBeFalsy();
+});
+
+test('the `::` descriptor vocabulary follows Entity visibility: a Contributor sees shared labels, never a private Entity’s (#132)', async ({
+  request,
+}) => {
+  const owner = await loginAs(request, TEST_USER);
+  const contributor = await loginAs(request, CONTRIBUTOR);
+
+  const worldId = await createWorld(request, owner, 'Aldermoor');
+  await addMember(request, owner, worldId, contributor, 'contributor');
+
+  // The Owner characterises a link on a shared Entity and on a private one; each save's
+  // harvested descriptors are indexed by the AFTER UPDATE trigger.
+  const shared = (await createEntity(request, owner, worldId, { name: 'Town', visibility: 'shared' })).id!;
+  const secret = (await createEntity(request, owner, worldId, { name: 'Secret', visibility: 'private' })).id!;
+  expect((await setDescriptors(request, owner, shared, ['capital of'])).ok()).toBeTruthy();
+  expect((await setDescriptors(request, owner, secret, ['secret heir'])).ok()).toBeTruthy();
+
+  // The Owner reads the whole World vocabulary — both Entities are theirs.
+  expect(await vocab(request, owner, worldId)).toEqual(['capital of', 'secret heir']);
+
+  // The Contributor sees the shared Entity's label (the World vocabulary they collaborate on),
+  // but the private Entity's label never leaks — descriptor reads follow the visibility cascade.
+  expect(await vocab(request, contributor, worldId)).toEqual(['capital of']);
 });
 
 test('the World Owner can edit a Contributor-owned Entity', async ({ request }) => {

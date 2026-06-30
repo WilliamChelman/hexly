@@ -1,4 +1,4 @@
-import { enterLibrary, expect, flushSave, quarantineSlice5, test } from './fixtures';
+import { authToken, enterLibrary, expect, flushSave, readEntity, test } from './fixtures';
 
 /**
  * The Content Entity Link journey (issue #95, ADR-0023): an author drops a live
@@ -13,17 +13,19 @@ test('inserts a Content Entity Link via @, persists it, navigates it, and dangle
   page,
   request,
 }) => {
-  quarantineSlice5();
   // Seed the link target: a note the picker can list and a click can jump to.
   await enterLibrary(page);
   await page.getByTestId('new-note').click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  await expect(page).toHaveURL(/\/entities\/[^/]+$/);
   const targetId = page.url().split('/').pop();
+  // The URL segment percent-encodes the base64 id's `==` padding (`%3D%3D`); the raw wire
+  // id is what the DOM (data-entity-id) and the persisted snapshot carry, so decode for those.
+  const targetWireId = decodeURIComponent(targetId!);
 
   // The source note that will carry the link in its prose.
   await enterLibrary(page);
   await page.getByTestId('new-note').click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  await expect(page).toHaveURL(/\/entities\/[^/]+$/);
   const sourceId = page.url().split('/').pop();
   // The source's full world-scoped path (ADR-0028) — reused to reopen it later.
   const sourcePath = new URL(page.url()).pathname;
@@ -35,13 +37,13 @@ test('inserts a Content Entity Link via @, persists it, navigates it, and dangle
   await page.keyboard.type('@');
 
   await expect(page.getByTestId('entity-picker')).toBeVisible();
-  await page.getByTestId(`entity-picker-option-${targetId}`).click();
+  await page.getByTestId(`entity-picker-option-${targetWireId}`).click();
 
   // The atom renders with the target's live name, pointing at its id.
   const link = page.getByTestId('entity-link');
   await expect(link).toBeVisible();
   await expect(link).toHaveText('Untitled note');
-  await expect(link).toHaveAttribute('data-entity-id', targetId!);
+  await expect(link).toHaveAttribute('data-entity-id', targetWireId);
   // A real href so Ctrl/Cmd/middle-click open the target in a new tab natively.
   // The link is World-agnostic (#118): /entities/:id resolves the target's World
   // and redirects to /w/:worldId/entities/:id (asserted on the click below).
@@ -51,13 +53,11 @@ test('inserts a Content Entity Link via @, persists it, navigates it, and dangle
 
   // The persisted snapshot really carries the entityLink node, tagged tiptap-v2.
   await page.reload();
-  const res = await request.get(`/api/entities/${sourceId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  expect(detail.document.content.format).toBe('tiptap-v2');
-  const snapshot = JSON.stringify(detail.document.content.snapshot);
+  const { document } = await readEntity(page, request, sourceId!);
+  expect(document.content.format).toBe('tiptap-v2');
+  const snapshot = JSON.stringify(document.content.snapshot);
   expect(snapshot).toContain('entityLink');
-  expect(snapshot).toContain(targetId);
+  expect(snapshot).toContain(targetWireId);
 
   // After reload the link re-renders live and navigates to the target on click.
   await expect(page.getByTestId('entity-link')).toHaveText('Untitled note');
@@ -65,7 +65,9 @@ test('inserts a Content Entity Link via @, persists it, navigates it, and dangle
   await expect(page).toHaveURL(new RegExp(`/entities/${targetId}$`));
 
   // Delete the target: the link now dangles (last-known label, non-navigable).
-  const del = await request.delete(`/api/entities/${targetId}`);
+  const del = await request.delete(`/api/records/v1/entities/${targetId}`, {
+    headers: { authorization: `Bearer ${await authToken(page)}` },
+  });
   expect(del.ok()).toBeTruthy();
 
   await page.goto(sourcePath);

@@ -101,6 +101,26 @@ record_apis {
   delete_access_rule: "EXISTS(SELECT 1 FROM entities e WHERE e.id = _ROW_.entity_id AND e.owner_id = _USER_.id)"
 }
 
+# Link Descriptor index (#132, ADR-0023): the `::` suggestion vocabulary. Read-only — the
+# index is maintained by the `entities` AFTER UPDATE trigger from the harvested set the client
+# sends on save, never written through this API. listDescriptors() filters by `world_id` (the
+# World being worked) and dedupes client-side (one row per (entity, descriptor)).
+# A descriptor is readable exactly when its source Entity is — the same cascade as the
+# `entities` READ rule, joined through `entity_id`: the Entity Owner; a World member on a
+# `shared` Entity; an entity-level grantee. So a Contributor sees the World's shared
+# vocabulary (and their own), while a `private` Entity's labels never leak to its members.
+record_apis {
+  name: "entity_descriptors"
+  table_name: "entity_descriptors"
+  acl_authenticated: [READ]
+  read_access_rule:
+    "EXISTS(SELECT 1 FROM entities e WHERE e.id = _ROW_.entity_id AND ("
+    "  e.owner_id = _USER_.id "
+    "  OR (e.visibility = 'shared' AND EXISTS("
+    "    SELECT 1 FROM world_members m WHERE m.world_id = e.world_id AND m.user_id = _USER_.id)) "
+    "  OR EXISTS(SELECT 1 FROM entity_grants g WHERE g.entity_id = e.id AND g.user_id = _USER_.id)))"
+}
+
 # BEGIN GENERATED entity_body schema — regenerate with `pnpm gen:schema` (do not edit by hand)
 schemas {
   name: "entity_body"

@@ -33,5 +33,5 @@ export class MockEntitiesClient {
       descriptors: readonly string[],
     ) => Observable<EntitySaveOutcome>
   >();
-  listDescriptors = vi.fn<() => Observable<string[]>>(() => of([]));
+  listDescriptors = vi.fn<(worldId: string, query?: string) => Observable<string[]>>(() => of([]));
 }

@@ -1,4 +1,4 @@
-import { enterLibrary, expect, flushSave, quarantineSlice5, test } from './fixtures';
+import { enterLibrary, expect, flushSave, readEntity, test } from './fixtures';
 
 /**
  * The Entity Link journey (issue #76, CONTEXT.md → Entity Link): a Map element —
@@ -14,17 +14,16 @@ test('links a Hex to an Entity in the Inspector; the link survives a reload and 
   page,
   request,
 }) => {
-  quarantineSlice5();
   // Seed the link target: a note the picker can list and Follow can jump to.
   await enterLibrary(page);
   await page.getByTestId('new-note').click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  await expect(page).toHaveURL(/\/entities\/[^/]+$/);
   const noteId = page.url().split('/').pop();
 
   // The source: a fresh map.
   await enterLibrary(page);
   await page.getByTestId('new-map').click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  await expect(page).toHaveURL(/\/entities\/[^/]+$/);
   const mapId = page.url().split('/').pop();
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
@@ -43,7 +42,9 @@ test('links a Hex to an Entity in the Inspector; the link survives a reload and 
   await page.getByTestId('tool-select').click();
   await canvas.click();
   await page.getByTestId('entity-link-pick').click();
-  await page.getByTestId(`entity-link-option-${noteId}`).click();
+  // The option's data-testid carries the raw wire id; the URL segment percent-encodes the
+  // base64 `==` padding, so decode to match.
+  await page.getByTestId(`entity-link-option-${decodeURIComponent(noteId!)}`).click();
   await expect(page.getByTestId('entity-link-name')).toBeVisible();
 
   await flushSave(page);
@@ -52,10 +53,8 @@ test('links a Hex to an Entity in the Inspector; the link survives a reload and 
   await page.reload();
 
   // The persisted document really holds the Entity Link on the hex.
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  expect(detail.document.hexes['0,0']?.entityId).toBe(noteId);
+  const { document } = await readEntity(page, request, mapId!);
+  expect(document.hexes['0,0']?.entityId).toBe(decodeURIComponent(noteId!));
 
   // Re-select the hex: the Inspector shows the persisted link, ready to follow.
   await canvas.click();

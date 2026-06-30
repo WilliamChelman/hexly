@@ -1,4 +1,4 @@
-import { authToken, enterLibrary, expect, flushSave, quarantineSlice5, readEntity, test } from './fixtures';
+import { authToken, enterLibrary, expect, flushSave, readEntity, test } from './fixtures';
 
 /**
  * Dangling Entity Link journey (issue #78, CONTEXT.md → Entity Link, ADR-0018): a
@@ -16,7 +16,6 @@ test('a link whose target is deleted renders non-navigable, and the map opens wi
   page,
   request,
 }) => {
-  quarantineSlice5();
   // Seed the link target, then delete it after linking.
   await enterLibrary(page);
   await page.getByTestId('new-note').click();
@@ -43,7 +42,9 @@ test('a link whose target is deleted renders non-navigable, and the map opens wi
   await page.getByTestId('tool-select').click();
   await canvas.click();
   await page.getByTestId('entity-link-pick').click();
-  await page.getByTestId(`entity-link-option-${noteId}`).click();
+  // The option's data-testid carries the raw wire id; the URL segment percent-encodes the
+  // base64 `==` padding, so decode to match.
+  await page.getByTestId(`entity-link-option-${decodeURIComponent(noteId!)}`).click();
   await expect(page.getByTestId('entity-link-name')).toBeVisible();
 
   await flushSave(page);

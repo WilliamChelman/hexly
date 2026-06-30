@@ -19,12 +19,14 @@ import {
  * (ADR-0019). It **arms only when the node immediately before the cursor is an
  * `entityLink`** ({@link entityLinkPosBefore}); everywhere else `::` is literal text.
  * Selecting a suggestion — or the typed free text — sets that link's `descriptor` attr
- * (set/change/clear), sourced from the owner's last-saved vocabulary. `getPicker`/`loadVocab`
- * are deferred so the editor builds before the picker `viewChild` and the client resolve.
+ * (set/change/clear), sourced from the World's last-saved vocabulary. `fetchVocab` is a
+ * type-ahead: it takes the live `::` query and returns the matching descriptors, so the
+ * picker lists on the fly per keystroke. `getPicker`/`fetchVocab` are deferred so the
+ * editor builds before the picker `viewChild` and the client resolve.
  */
 export function descriptorSuggestion(
   getPicker: () => DescriptorPicker | undefined,
-  loadVocab: () => Promise<string[]>,
+  fetchVocab: (query: string) => Promise<string[]>,
 ): Extension {
   return Extension.create({
     name: 'descriptorSuggestion',
@@ -41,7 +43,7 @@ export function descriptorSuggestion(
           allow: ({ state, range }) =>
             !state.selection.$from.parent.type.spec.code &&
             entityLinkPosBefore(state, range.from) !== null,
-          items: async ({ query }) => descriptorItems(query, await loadVocab()),
+          items: async ({ query }) => descriptorItems(query, await fetchVocab(query)),
           command: ({ editor, range, props }) => {
             // Recompute against the live state: the link sits just before the `::query`.
             const linkPos = entityLinkPosBefore(editor.state, range.from);

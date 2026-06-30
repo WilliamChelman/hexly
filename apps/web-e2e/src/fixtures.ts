@@ -169,19 +169,9 @@ export async function enterSeedLibrary(page: Page): Promise<string> {
 /**
  * Library entry for the map persist / selection / move specs. Slice #4 (#130) brought
  * save + optimistic concurrency back, lifting the blanket quarantine that lived here —
- * this is now a thin alias for {@link enterSeedLibrary}. The Entity Link specs that still
- * need slice #5 (sharing + Entity Links + the descriptor index) carry their own per-file
- * {@link quarantineSlice5} skip instead.
+ * this is now a thin alias for {@link enterSeedLibrary}. The Entity Link + descriptor
+ * journeys returned on TrailBase with #132, so they no longer carry a per-file skip.
  */
 export async function enterLibrary(page: Page): Promise<string> {
   return enterSeedLibrary(page);
-}
-
-/**
- * Per-file skip for the Entity Link journeys (#76/#78/#95/#96): they exercise link
- * resolution, the `@`/`::` pickers, and the server descriptor index — all slice #5,
- * not yet on TrailBase. Call it first in each such spec; drop it as #5 migrates them.
- */
-export function quarantineSlice5(): void {
-  test.skip(true, 'Entity Links + descriptor index return on TrailBase in slice #5.');
 }

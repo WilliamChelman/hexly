@@ -146,6 +146,35 @@ describe('EntitiesClient', () => {
     expect(store.rows('entities')[0]['name']).toBe('The Whisperwood');
   });
 
+  it('lists the current World’s `::` vocabulary from the descriptor index, distinct and sorted (#132)', async () => {
+    // The index has one row per (entity, descriptor); the same descriptor used across
+    // entities appears more than once, and the picker wants a stable, deduped order.
+    // Descriptors from another World are out of scope — a label coined in w9 must not leak.
+    store.seed('entity_descriptors', [
+      { id: 'd1', entity_id: 'e1', world_id: 'w1', descriptor: 'spouse' },
+      { id: 'd2', entity_id: 'e1', world_id: 'w1', descriptor: 'capital of' },
+      { id: 'd3', entity_id: 'e2', world_id: 'w1', descriptor: 'spouse' },
+      { id: 'd4', entity_id: 'e9', world_id: 'w9', descriptor: 'rival' },
+    ]);
+
+    const vocab = await firstValueFrom(client.listDescriptors('w1'));
+
+    expect(vocab).toEqual(['capital of', 'spouse']);
+  });
+
+  it('narrows the vocabulary with a type-ahead query, server-side (#132)', async () => {
+    store.seed('entity_descriptors', [
+      { id: 'd1', entity_id: 'e1', world_id: 'w1', descriptor: 'spouse' },
+      { id: 'd2', entity_id: 'e1', world_id: 'w1', descriptor: 'capital of' },
+      { id: 'd3', entity_id: 'e2', world_id: 'w1', descriptor: 'cap-in-hand' },
+    ]);
+
+    // The `::cap` keystrokes filter to matches via a server-side LIKE, not a full fetch.
+    const vocab = await firstValueFrom(client.listDescriptors('w1', 'cap'));
+
+    expect(vocab).toEqual(['cap-in-hand', 'capital of']);
+  });
+
   it('deletes an entity by id', async () => {
     store.seed('entities', [entityRow({ id: 'e1' })]);
 
@@ -172,6 +201,19 @@ describe('EntitiesClient', () => {
     expect(row['version']).toBe(2);
     expect(JSON.parse(row['document'] as string)).toEqual(painted);
     expect(JSON.parse(row['tags'] as string)).toEqual(['deity', 'ruined']);
+  });
+
+  it('sends the harvested Link Descriptors on save, so the trigger can index them (#132, ADR-0023)', async () => {
+    store.seed('entities', [entityRow({ id: 'e1', version: 1 })]);
+
+    await firstValueFrom(
+      client.save('e1', emptyHexmapBody, 1, [], ['spouse', 'capital of']),
+    );
+
+    // Descriptors ride the version-checked save as a JSON column (like tags); the
+    // AFTER UPDATE trigger explodes them into the entity_descriptors index.
+    const row = store.rows('entities')[0];
+    expect(JSON.parse(row['descriptors'] as string)).toEqual(['spouse', 'capital of']);
   });
 
   it('routes a stale save (rejected by the version access-rule) through a conflict carrying the server state', async () => {

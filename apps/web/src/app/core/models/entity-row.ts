@@ -16,6 +16,8 @@ export interface EntityRow {
   name: string;
   type: string;
   tags: string;
+  /** Harvested Link Descriptors as a JSON string (#132); write-only on save, feeds the index trigger. */
+  descriptors: string;
   visibility: string;
   version: number;
   document: string | EntityBody;
