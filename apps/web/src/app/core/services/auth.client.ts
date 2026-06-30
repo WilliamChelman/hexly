@@ -1,4 +1,4 @@
-import { computed, Injectable, Signal, inject, signal } from '@angular/core';
+import { computed, Injectable, Signal, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, finalize, from, map, Observable, of } from 'rxjs';
 import type { User } from 'trailbase';
@@ -19,30 +19,23 @@ function toAuthUser(user: User | undefined): AuthUser | null {
 /**
  * The web client's view of the session (ADR-0004, ADR-0032) — a thin domain
  * facade over {@link TrailbaseClient}. It maps the transport's `User` to the
- * `AuthUser` the app speaks and keeps the signal surface
- * (`currentUser`/`isAuthenticated`/`sessionLoading`) the route guards key off,
- * unchanged from the cookie-session era. The underlying client (and its session
- * state) is owned by `TrailbaseClient`, which any consumer can inject directly.
+ * `AuthUser` the app speaks via the `currentUser`/`isAuthenticated` signals the
+ * route guards key off. The underlying client (and its session state) is owned
+ * by `TrailbaseClient`, which any consumer can inject directly.
+ *
+ * There's no `sessionLoading`: the restored JWT settles the session synchronously
+ * at construction (ADR-0032 — revocation is TTL-bounded, so we trust the
+ * unexpired token rather than waiting on a server round-trip), so `currentUser`
+ * is correct the moment a guard reads it. The background revalidation only
+ * *downgrades* us to signed-out later if the refresh token was revoked.
  */
 @Injectable({ providedIn: 'root' })
 export class AuthClient {
   private readonly tb = inject(TrailbaseClient);
   private readonly router = inject(Router);
 
-  // true until the constructor settles the restored session; guards wait on this.
-  private readonly _loading = signal(true);
-
   readonly currentUser: Signal<AuthUser | null> = computed(() => toAuthUser(this.tb.user()));
   readonly isAuthenticated = computed(() => this.currentUser() !== null);
-  readonly sessionLoading = this._loading.asReadonly();
-
-  constructor() {
-    // Trust the restored, unexpired JWT (ADR-0032 — revocation is TTL-bounded):
-    // the session is settled the moment we read it. The background revalidation
-    // only *downgrades* us to signed-out if the refresh token was revoked. So
-    // there's no server round-trip to wait on, which is what the guards key off.
-    this._loading.set(false);
-  }
 
   login(email: string, password: string): Observable<AuthUser> {
     // The session signal updates via the client's onAuthChange; we just surface

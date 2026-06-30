@@ -10,10 +10,10 @@ import {
 
 /**
  * The session contract the route guards depend on (ADR-0004, ADR-0032):
- * `sessionLoading` stays true until the boot revalidation settles, after which
- * `currentUser`/`isAuthenticated` reflect the live session. The TrailBase wire
- * itself is exercised end-to-end by the e2e suite; here the client is faked so
- * the orchestration is tested in isolation.
+ * `currentUser`/`isAuthenticated` reflect the live session, settled synchronously
+ * from the restored JWT (no `sessionLoading` — there's no boot round-trip to wait
+ * on). The TrailBase wire itself is exercised end-to-end by the e2e suite; here
+ * the client is faked so the orchestration is tested in isolation.
  */
 describe('AuthClient session', () => {
   afterEach(() => localStorage.clear());
@@ -26,22 +26,20 @@ describe('AuthClient session', () => {
   }
 
   describe('with no restored session', () => {
-    it('settles signed-out: sessionLoading false, currentUser null', () => {
+    it('is signed out: currentUser null', () => {
       const { client } = setup();
-      expect(client.sessionLoading()).toBe(false);
       expect(client.currentUser()).toBeNull();
       expect(client.isAuthenticated()).toBe(false);
     });
   });
 
   describe('with a session restored from storage', () => {
-    it('trusts the restored JWT: signed in immediately, not loading', () => {
+    it('trusts the restored JWT: signed in immediately', () => {
       const { client } = setup({ tokens: restoredSession('u1') });
-      // The unexpired JWT is authority on boot (ADR-0032) — no server round-trip
-      // to wait on, so guards see a settled, authenticated session at once.
+      // The unexpired JWT is authority on boot (ADR-0032) — no server round-trip,
+      // so guards see a settled, authenticated session at once.
       expect(client.currentUser()?.id).toBe('u1');
       expect(client.isAuthenticated()).toBe(true);
-      expect(client.sessionLoading()).toBe(false);
     });
 
     it('signs out when the background revalidation finds the session revoked', () => {
@@ -52,7 +50,6 @@ describe('AuthClient session', () => {
       tb.client.emitBoot(undefined);
 
       expect(client.currentUser()).toBeNull();
-      expect(client.sessionLoading()).toBe(false);
     });
   });
 

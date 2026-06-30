@@ -47,29 +47,6 @@ describe('authGuard', () => {
     auth.setUser(ada);
     expect(await settle(run())).toBe(true);
   });
-
-  it('waits for the boot check to finish before allowing an authenticated user through', async () => {
-    auth.setLoading(true);
-    auth.setUser(ada);
-    const resultPromise = settle(run());
-
-    auth.setLoading(false);
-    TestBed.flushEffects();
-
-    expect(await resultPromise).toBe(true);
-  });
-
-  it('redirects after the boot check resolves to no session', async () => {
-    auth.setLoading(true);
-    const resultPromise = settle(run('/atlas/42'));
-
-    auth.setLoading(false);
-    TestBed.flushEffects();
-
-    const value = await resultPromise;
-    expect(value).toBeInstanceOf(UrlTree);
-    expect((value as UrlTree).toString()).toBe('/login?returnUrl=%2Fatlas%2F42');
-  });
 });
 
 describe('loginGuard', () => {
@@ -105,19 +82,6 @@ describe('loginGuard', () => {
   it('bounces an already-authenticated user to returnUrl when present', async () => {
     auth.setUser(ada);
     const value = await settle(run('/atlas/42'));
-    expect(value).toBeInstanceOf(UrlTree);
-    expect((value as UrlTree).toString()).toBe('/atlas/42');
-  });
-
-  it('waits for the boot check before redirecting an authenticated user', async () => {
-    auth.setLoading(true);
-    auth.setUser(ada);
-    const resultPromise = settle(run('/atlas/42'));
-
-    auth.setLoading(false);
-    TestBed.flushEffects();
-
-    const value = await resultPromise;
     expect(value).toBeInstanceOf(UrlTree);
     expect((value as UrlTree).toString()).toBe('/atlas/42');
   });

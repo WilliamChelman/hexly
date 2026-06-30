@@ -7,11 +7,7 @@ export class MockAuthClient {
   readonly currentUser = this._user.asReadonly();
   readonly isAuthenticated = computed(() => this._user() !== null);
 
-  private readonly _loading = signal(false);
-  readonly sessionLoading = this._loading.asReadonly();
-
   setUser(user: AuthUser | null): void { this._user.set(user); }
-  setLoading(loading: boolean): void { this._loading.set(loading); }
 
   login(): Observable<never> { return EMPTY; }
   logout(): Observable<void> { return of(undefined); }
