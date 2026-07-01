@@ -322,5 +322,24 @@
     "heading": "We couldn't find that.",
     "hint": "The page or entity you're looking for doesn't exist, or you don't have access to it.",
     "backToWorlds": "Back to your worlds"
+  },
+  "commandPalette": {
+    "title": "Command palette",
+    "open": "Open command palette",
+    "placeholder": "Search worlds and entities, or type > for commands",
+    "empty": "No results",
+    "entity": "Entity",
+    "world": "World",
+    "action": "Action",
+    "createNote": "Create note",
+    "createMap": "Create map",
+    "create": {
+      "noteHeading": "Create note",
+      "mapHeading": "Create map",
+      "nameLabel": "Name",
+      "namePlaceholder": "Untitled",
+      "worldLabel": "World",
+      "submit": "Create"
+    }
   }
 }

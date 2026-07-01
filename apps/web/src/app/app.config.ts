@@ -13,6 +13,7 @@ import { TranslocoHttpLoader } from './core/i18n/transloco-http.loader';
 import { TranslationTitleStrategy } from './core/i18n/title-strategy';
 import { provideLocale } from './core/i18n/locale.service';
 import { provideTheme } from './core/services/theme.service';
+import { provideBuiltInCommands } from './shell/command-palette/command-palette';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -37,5 +38,8 @@ export const appConfig: ApplicationConfig = {
     provideLocale(),
     // Route titles are translation keys (ADR-0014), resolved live by language.
     { provide: TitleStrategy, useClass: TranslationTitleStrategy },
+    // The Command Palette's built-in Providers (ADR-0032), registered for the
+    // app's lifetime by the palette when it mounts.
+    provideBuiltInCommands(),
   ],
 };

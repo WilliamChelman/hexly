@@ -322,5 +322,24 @@
     "heading": "Introuvable.",
     "hint": "La page ou l'entité que vous cherchez n'existe pas, ou vous n'y avez pas accès.",
     "backToWorlds": "Retour à vos mondes"
+  },
+  "commandPalette": {
+    "title": "Palette de commandes",
+    "open": "Ouvrir la palette de commandes",
+    "placeholder": "Rechercher mondes et entités, ou tapez > pour les commandes",
+    "empty": "Aucun résultat",
+    "entity": "Entité",
+    "world": "Monde",
+    "action": "Action",
+    "createNote": "Créer une note",
+    "createMap": "Créer une carte",
+    "create": {
+      "noteHeading": "Créer une note",
+      "mapHeading": "Créer une carte",
+      "nameLabel": "Nom",
+      "namePlaceholder": "Sans titre",
+      "worldLabel": "Monde",
+      "submit": "Créer"
+    }
   }
 }
