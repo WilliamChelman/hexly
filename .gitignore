@@ -66,3 +66,4 @@ __screenshots__/
 /apps/web-e2e/playwright-report
 /apps/web-e2e/blob-report
 /playwright/.cache
+.playwright-mcp/
