@@ -181,3 +181,21 @@ _Avoid_: Side panel, details pane, properties
 **Regions panel**:
 A list of every Region (named, colored, including ones currently empty and so invisible on the map), plus a New Region action. Selecting a Region here is equivalent to selecting it on the canvas. Shares its on-screen home with the Inspector.
 _Avoid_: Region legend, layers, list
+
+## Command Palette
+
+**Command Palette**:
+A Cmd/Ctrl+K overlay, reachable from anywhere in the app regardless of route or active World, for finding Entities and Worlds and invoking Commands. Distinct from the World Switcher (Worlds only) and the Inspector's Entity Link picker (one Content Link's target only) — the Command Palette is the one cross-cutting search-and-act surface.
+_Avoid_: Quick open, search bar, spotlight
+
+**Command**:
+A single invocable entry in the Command Palette — e.g. creating a Note, or navigating to a matched Entity or World. Distinct from a Tool: invoking a Command may arm a Tool, but a Command is not itself one.
+_Avoid_: Action, shortcut
+
+**Command Provider**:
+A source of Commands for the Command Palette, bound to a prefix (the default empty prefix, or an arbitrary string such as `>`) that decides when it contributes results. Several Providers may share a prefix; each owns its own matching against the typed query, so an Entity-searching Provider and a fixed-Command-listing Provider can behave completely differently.
+_Avoid_: Source, matcher
+
+**Command Registry**:
+Where Command Providers make themselves known to the Command Palette. A Provider may be registered for the app's whole lifetime, or only while the part of the UI it belongs to (e.g. an editor) is present — so Commands become contextual without the Palette itself knowing what a context is.
+_Avoid_: Provider list, command bus
