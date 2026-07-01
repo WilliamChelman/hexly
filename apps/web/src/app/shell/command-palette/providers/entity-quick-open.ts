@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { Observable, map, of } from 'rxjs';
+import { Observable, catchError, map, of } from 'rxjs';
 import { EntitiesClient } from '../../../core/services/entities.client';
 import { Command, CommandProvider } from '../command';
 
@@ -24,20 +24,21 @@ export class EntityQuickOpen implements CommandProvider {
     return this.entitiesClient.list({ q }).pipe(
       map((page) =>
         page.items.map(
-          (entity): Command => ({
-            id: entity.id,
-            label: entity.name,
-            hint: entity.type,
-            run: () =>
-              void this.router.navigate([
-                '/w',
-                entity.worldId,
-                'entities',
-                entity.id,
-              ]),
-          }),
+          (entity): Command => {
+            const route = ['/w', entity.worldId, 'entities', entity.id];
+            return {
+              id: entity.id,
+              label: entity.name,
+              hint: entity.type,
+              route,
+              run: () => void this.router.navigate(route),
+            };
+          },
         ),
       ),
+      // A failed search yields no matches rather than erroring the merged stream,
+      // which would otherwise leave the palette unable to search until reopened.
+      catchError(() => of<readonly Command[]>([])),
     );
   }
 }

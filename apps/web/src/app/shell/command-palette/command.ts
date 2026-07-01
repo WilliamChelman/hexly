@@ -11,6 +11,13 @@ export interface Command {
   readonly label: string;
   /** Optional secondary text, e.g. an Entity's type. */
   readonly hint?: string;
+  /**
+   * If the Command navigates, its target as a routerLink commands array. The
+   * Palette then renders the row as an anchor so it can be opened in a new tab
+   * (middle-click, Ctrl/Cmd+click, Ctrl/Cmd+Enter). `run()` remains the plain
+   * activation — for a link Command it navigates in place.
+   */
+  readonly route?: readonly unknown[];
   run(): void;
 }
 

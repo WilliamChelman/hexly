@@ -95,4 +95,23 @@ describe('CommandRegistry', () => {
       { provider: fast, commands: [command('a')] },
     ]);
   });
+
+  it('seeds a new query with the provider\'s previous results (no blank between queries)', () => {
+    const results = new Subject<Command[]>();
+    // One provider whose emissions the test drives; it ignores the query text.
+    const p: CommandProvider = { prefix: '', label: 'p', search: () => results };
+    registry.register(p);
+
+    // First query resolves to [a].
+    const firstSub = registry.search('', 'ar').subscribe();
+    results.next([command('a')]);
+    // A new query tears down the previous subscription (as the palette's switchMap does).
+    firstSub.unsubscribe();
+
+    // The next query emits [a] immediately — the last-known rows stay put until
+    // the new results arrive, rather than blanking to [].
+    const seen: (readonly CommandSection[])[] = [];
+    registry.search('', 'arc').subscribe((sections) => seen.push(sections));
+    expect(seen[0]).toEqual([{ provider: p, commands: [command('a')] }]);
+  });
 });

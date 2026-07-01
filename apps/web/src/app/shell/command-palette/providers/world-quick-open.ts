@@ -24,11 +24,15 @@ export class WorldQuickOpen implements CommandProvider {
       .filter((w) => !q || w.name.toLowerCase().includes(q));
     return of(
       worlds.map(
-        (world): Command => ({
-          id: world.id,
-          label: world.name,
-          run: () => void this.router.navigate(['/w', world.id, 'entities']),
-        }),
+        (world): Command => {
+          const route = ['/w', world.id, 'entities'];
+          return {
+            id: world.id,
+            label: world.name,
+            route,
+            run: () => void this.router.navigate(route),
+          };
+        },
       ),
     );
   }

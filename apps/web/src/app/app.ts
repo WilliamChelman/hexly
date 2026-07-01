@@ -4,11 +4,7 @@ import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter, map, of, switchMap, timer } from 'rxjs';
 import { AppShellStore } from './shell/app-shell.store';
 import { CommandPalette } from './shell/command-palette/command-palette';
-import { CommandRegistry } from './shell/command-palette/command-registry';
 import { CreateEntityDialog } from './shell/command-palette/create-entity-dialog';
-import { CreateCommands } from './shell/command-palette/providers/create-commands';
-import { EntityQuickOpen } from './shell/command-palette/providers/entity-quick-open';
-import { WorldQuickOpen } from './shell/command-palette/providers/world-quick-open';
 import { NavRail } from './shell/nav-rail';
 import { Toaster } from './shell/toaster';
 import { Icon } from './ui/icon/icon';
@@ -74,15 +70,6 @@ const FULL_CURTAIN_DELAY_MS = 150;
 })
 export class App {
   protected readonly shell = inject(AppShellStore);
-
-  constructor() {
-    // Built-in Command Providers register once here, for the app's lifetime
-    // (ADR-0032) — the same root scope App itself lives in, no unregister.
-    const registry = inject(CommandRegistry);
-    registry.register(inject(EntityQuickOpen));
-    registry.register(inject(WorldQuickOpen));
-    registry.register(inject(CreateCommands));
-  }
 
   // Defer the full curtain's appearance by FULL_CURTAIN_DELAY_MS so a quick
   // (cached) language switch never flashes it; drop it the instant loading

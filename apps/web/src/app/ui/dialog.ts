@@ -37,6 +37,7 @@ let nextDialogId = 0;
       #dialog
       appPanel
       class="m-auto w-[min(28rem,calc(100vw-2rem))] flex-col gap-4 p-8 open:flex"
+      [style.margin-top]="align() === 'top' ? '10vh' : null"
       [attr.aria-labelledby]="heading() ? titleId : null"
       (close)="closed.emit()"
     >
@@ -62,6 +63,12 @@ export class Dialog {
   readonly open = input(false, { transform: booleanAttribute });
   /** Optional title; when set, it labels the dialog for assistive tech. */
   readonly heading = input<string>();
+  /**
+   * Vertical placement. `center` (default) sits mid-viewport; `top` pins it near
+   * the top so a body whose height changes (e.g. a live result list) grows
+   * downward instead of shifting the whole dialog.
+   */
+  readonly align = input<'center' | 'top'>('center');
   /** Fires whenever the dialog closes — Escape, or a programmatic close. */
   readonly closed = output<void>();
 
