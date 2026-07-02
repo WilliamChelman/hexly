@@ -38,7 +38,7 @@ describe('CalloutView node view', () => {
     const dom = view.dom as HTMLElement;
 
     expect(dom.querySelector('.callout')?.getAttribute('data-callout')).toBe('warning');
-    expect(dom.textContent).toContain('warning');
+    expect((dom.querySelector('input') as HTMLInputElement).value).toBe('warning');
     expect(dom.textContent).toContain('Beware');
 
     view.destroy?.();
@@ -58,15 +58,15 @@ describe('CalloutView node view', () => {
     editor.destroy();
   });
 
-  it('lets the reader change the callout type — updating the node attr', () => {
+  it('lets the reader edit the callout type as free text — updating the node attr', () => {
     const { editor, view } = nodeViewFor({ type: 'note', title: null });
-    const select = (view.dom as HTMLElement).querySelector('select') as HTMLSelectElement;
-    expect(select).toBeTruthy();
-    expect(select.value).toBe('note');
+    const input = (view.dom as HTMLElement).querySelector('input') as HTMLInputElement;
+    expect(input).toBeTruthy();
+    expect(input.value).toBe('note');
 
-    // Pick a different type as a user would; the change flows back into the doc.
-    select.value = 'warning';
-    select.dispatchEvent(new Event('change'));
+    // Type any value; on change (blur/enter) it flows back into the doc.
+    input.value = 'warning';
+    input.dispatchEvent(new Event('change'));
 
     expect(editor.state.doc.firstChild?.attrs['type']).toBe('warning');
 
@@ -74,14 +74,11 @@ describe('CalloutView node view', () => {
     editor.destroy();
   });
 
-  it('keeps an unknown (imported) type selectable rather than dropping it', () => {
+  it('shows an arbitrary (imported) type verbatim in the input', () => {
     const { editor, view } = nodeViewFor({ type: 'custom-obsidian', title: null });
-    const select = (view.dom as HTMLElement).querySelector('select') as HTMLSelectElement;
+    const input = (view.dom as HTMLElement).querySelector('input') as HTMLInputElement;
 
-    expect(select.value).toBe('custom-obsidian');
-    expect(
-      Array.from(select.options).some((o) => o.value === 'custom-obsidian'),
-    ).toBe(true);
+    expect(input.value).toBe('custom-obsidian');
 
     view.destroy?.();
     editor.destroy();

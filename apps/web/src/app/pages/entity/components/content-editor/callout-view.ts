@@ -3,7 +3,6 @@ import {
   ChangeDetectionStrategy,
   Component,
   EnvironmentInjector,
-  computed,
   createComponent,
   input,
   output,
@@ -11,12 +10,11 @@ import {
 import { Editor } from '@tiptap/core';
 import { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { NodeView } from '@tiptap/pm/view';
-import { CALLOUT_TYPES } from './callout-node';
 
 /**
  * The `callout` node view (ADR-0033): renders an Obsidian admonition as a coloured
  * box with a non-editable header above an **editable body**. The header carries a
- * `<select>` to change the callout `type` (a native control — no custom dropdown)
+ * freetext `<input>` for the callout `type` (any value, matching Obsidian's open set)
  * and the optional `title`. The body element is handed to ProseMirror as `contentDOM`,
  * so the block children render into it natively — inner `entityLink`s and other nodes
  * stay live and clickable, the point of modelling callout as block content.
@@ -29,15 +27,13 @@ import { CALLOUT_TYPES } from './callout-node';
     <div class="callout" [attr.data-callout]="type()">
       <!-- contenteditable=false: the chrome is ours; ProseMirror only owns the body. -->
       <div class="callout-header" contenteditable="false">
-        <select
+        <!-- change (not input): one transaction on blur/enter, not per keystroke. -->
+        <input
           class="callout-type"
           aria-label="Callout type"
+          [value]="type()"
           (change)="typeChange.emit($any($event.target).value)"
-        >
-          @for (option of options(); track option) {
-            <option [value]="option" [selected]="option === type()">{{ option }}</option>
-          }
-        </select>
+        />
         @if (title()) {
           <span class="callout-title">{{ title() }}</span>
         }
@@ -50,16 +46,8 @@ import { CALLOUT_TYPES } from './callout-node';
 export class CalloutView {
   readonly type = input.required<string>();
   readonly title = input<string | null>(null);
-  /** The reader picked a new type; the bridge writes it back to the node attr. */
+  /** The reader edited the type; the bridge writes it back to the node attr. */
   readonly typeChange = output<string>();
-
-  /** Known types, plus the current one when it's an unknown (imported) value so it stays selectable. */
-  protected readonly options = computed<readonly string[]>(() => {
-    const current = this.type();
-    return CALLOUT_TYPES.includes(current as (typeof CALLOUT_TYPES)[number])
-      ? CALLOUT_TYPES
-      : [current, ...CALLOUT_TYPES];
-  });
 }
 
 /**

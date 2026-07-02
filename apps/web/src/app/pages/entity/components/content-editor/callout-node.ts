@@ -1,27 +1,6 @@
 import { Node, mergeAttributes } from '@tiptap/core';
 
 /**
- * The callout types offered in the node-view picker — Obsidian's canonical set
- * (ADR-0033). Import may set a type outside this list (Obsidian allows arbitrary
- * ones); the picker surfaces such a value as an extra option rather than dropping it.
- */
-export const CALLOUT_TYPES = [
-  'note',
-  'abstract',
-  'info',
-  'todo',
-  'tip',
-  'success',
-  'question',
-  'warning',
-  'failure',
-  'danger',
-  'bug',
-  'example',
-  'quote',
-] as const;
-
-/**
  * A `callout` block (ADR-0033): an Obsidian `[!type]` admonition — a coloured box
  * with a `type` ("note", "warning", …) and an optional `title`. Its content is
  * **block** (`group: 'block'`, `content: 'block+'`), not an atom, so links and
