@@ -10,7 +10,6 @@ import {
   clearActiveWorld,
 } from './active-world';
 
-/** An ActivatedRouteSnapshot stub carrying just the params the resolver reads. */
 function snapshot(params: Record<string, string>): ActivatedRouteSnapshot {
   return { paramMap: convertToParamMap(params) } as ActivatedRouteSnapshot;
 }

@@ -124,8 +124,7 @@ import { HexMapStore } from '../../services/hexmap-store';
             }
           </div>
 
-          <!-- Create-and-link a brand-new Entity in the same flow (issue #77). The
-               typed query names it; an empty query falls back to a default title. -->
+          <!-- Create-and-link in the same flow (issue #77): query names it, empty → default. -->
           <div class="mt-1 flex gap-1 border-t border-line pt-1">
             <button
               type="button"
@@ -181,10 +180,8 @@ export class EntityLink {
   protected readonly query = signal('');
 
   constructor() {
-    // Resolve the linked name on demand (ADR-0025): a freshly-created Entity is
-    // known locally; anything else is fetched by id, never by pulling the whole
-    // list. onCleanup cancels an in-flight fetch when the link changes or the
-    // control is destroyed, so a stale response can't overwrite a newer link.
+    // Resolve the linked name on demand (ADR-0025): created entities are known locally,
+    // others fetched by id. onCleanup cancels stale responses on link change.
     effect((onCleanup) => {
       const id = this.store.selectedEntityLink();
       this.linked.set(null);
@@ -209,13 +206,7 @@ export class EntityLink {
       onCleanup(() => sub.unsubscribe());
     });
 
-    // Search server-side as the query changes while the picker is open (ADR-0025).
-    // onCleanup cancels the prior search, so responses can't land out of order.
-    // The previous query's options stay put until the new ones arrive rather than
-    // blanking first (stale-while-revalidate), so refining the query doesn't
-    // flicker the list; options clear when the picker closes (so a reopen never
-    // shows the last session's results) or when a search fails (so a failed
-    // refine never leaves the prior query's non-matching results clickable).
+    // Search server-side as query changes (ADR-0025, stale-while-revalidate).
     // ponytail: no debounce — small lists, fine until import.
     effect((onCleanup) => {
       if (!this.open()) {
@@ -253,12 +244,8 @@ export class EntityLink {
     this.open.set(false);
   }
 
-  /**
-   * Create a new owner-scoped Entity of `type` and link the selected element to it
-   * in one flow (issue #77). The typed query names it; an empty query falls back to
-   * a default title. The created Entity is appended locally so its name resolves at
-   * once, and the link rides the existing document save like any other.
-   */
+  // Create new owner-scoped Entity and link in one flow (issue #77).
+  // Created Entity appended locally so its name resolves immediately.
   protected create(type: EntityType): void {
     const name =
       this.query().trim() ||

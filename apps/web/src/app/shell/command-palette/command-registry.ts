@@ -2,7 +2,6 @@ import { Injectable, signal } from '@angular/core';
 import { Observable, combineLatest, map, of, startWith, tap } from 'rxjs';
 import { Command, CommandProvider } from './command';
 
-/** One Provider's results for the current query, grouped under its own heading. */
 export interface CommandSection {
   readonly provider: CommandProvider;
   readonly commands: readonly Command[];

@@ -23,8 +23,7 @@ test('drags a hex under Select to a new coordinate, and the move survives a relo
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
 
-  // Paint the centre hex with the default terrain (Forest), then re-arm the
-  // non-destructive Select tool so the next press selects rather than paints.
+  // Arm Select so the next press selects rather than paints.
   await page.getByTestId('tool-terrain').click();
   await canvas.click();
   await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
@@ -49,19 +48,12 @@ test('drags a hex under Select to a new coordinate, and the move survives a relo
   // The hex moved rather than duplicated: still exactly one hex on the map.
   await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
 
-  // In-page proof the move actually landed — a no-op gesture (selected but never
-  // moved) would also leave the count at 1, so assert the destination directly:
-  // completing the drag keeps the moved hex selected, at the specific destination
-  // it landed on — a +100px drag at zoom 1 lands on q1·r0, well inside the
-  // rounding margin — and the inspector still shows it as Forest. Pinning the
-  // exact coordinate catches a move to the wrong hex, not merely "not the origin".
+  // Pinning the exact coordinate catches a move to the wrong hex.
   await expect(page.getByTestId('entity-detail')).toHaveText('Forest');
   await expect(page.getByTestId('entity-coord')).toContainText('q 1 · r 0');
 
   await flushSave(page);
 
-  // The persisted document holds one hex, no longer at the origin, still Forest:
-  // the origin became Void and the destination took the moved content.
   const res = await request.get(`/api/entities/${mapId}`);
   expect(res.ok()).toBeTruthy();
   const detail = await res.json();
@@ -70,15 +62,10 @@ test('drags a hex under Select to a new coordinate, and the move survives a relo
   expect(hexes['0,0']).toBeUndefined();
   expect(hexes['1,0']).toEqual({ terrain: 'forest' });
 
-  // The seam under test: a fresh load re-fetches and re-renders the moved map.
-  // The origin is now Void (a click there selects nothing), and the destination
-  // carries the re-rendered hex (clicking it opens the Hex panel).
   await page.reload();
   await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
 
-  // Re-read the canvas box after the reload: its size and origin-centering are
-  // re-applied on the fresh layout, so the pre-reload `box` may not match — using
-  // it for the destination offset could round to a neighbouring hex.
+  // Re-read the canvas box after reload: origin-centering may differ.
   const box2 = await canvas.boundingBox();
   if (!box2) throw new Error('canvas not laid out after reload');
 
@@ -110,12 +97,11 @@ test('drags a hex onto an occupied hex and swaps the two, surviving a reload', a
   if (!box) throw new Error('canvas not laid out');
   const dx = 100; // a +100px drag at zoom 1 lands on the q1·r0 neighbour
 
-  // Paint the centre hex Forest (the default terrain) ...
   await page.getByTestId('tool-terrain').click();
   await canvas.click();
   await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
 
-  // ... then arm Ocean and paint the q1·r0 neighbour, so the drop target is occupied.
+  // Paint the neighbour hex (Ocean) so the drop target is occupied.
   await page
     .getByRole('group', { name: 'Terrain' })
     .getByRole('button', { name: 'Ocean' })
@@ -123,7 +109,6 @@ test('drags a hex onto an occupied hex and swaps the two, surviving a reload', a
   await canvas.click({ position: { x: box.width / 2 + dx, y: box.height / 2 } });
   await expect(page.getByTestId('hex-count')).toHaveText('2 hexes');
 
-  // Arm Select and drag the Forest centre hex onto the occupied Ocean hex.
   await page.getByTestId('tool-select').click();
   const cx = box.x + box.width / 2;
   const cy = box.y + box.height / 2;
@@ -134,18 +119,15 @@ test('drags a hex onto an occupied hex and swaps the two, surviving a reload', a
   await page.mouse.move(cx + dx, cy);
   await page.mouse.up();
 
-  // Nothing is destroyed or duplicated: still exactly two hexes. The dragged hex
-  // landed at q1·r0 and stays selected, showing Forest there.
   await expect(page.getByTestId('hex-count')).toHaveText('2 hexes');
   await expect(page.getByTestId('entity-detail')).toHaveText('Forest');
   await expect(page.getByTestId('entity-coord')).toContainText('q 1 · r 0');
 
-  // The occupant slid back to the origin: the centre now carries Ocean.
+  // The occupant slid back to the origin.
   await canvas.click({ position: { x: box.width / 2, y: box.height / 2 } });
   await expect(page.getByTestId('entity-detail')).toHaveText('Ocean');
   await expect(page.getByTestId('entity-coord')).toContainText('q 0 · r 0');
 
-  // Persist, then read the saved document directly: the two records are exchanged.
   await flushSave(page);
 
   const res = await request.get(`/api/entities/${mapId}`);
@@ -155,7 +137,6 @@ test('drags a hex onto an occupied hex and swaps the two, surviving a reload', a
   expect(hexes['0,0']).toEqual({ terrain: 'ocean' });
   expect(hexes['1,0']).toEqual({ terrain: 'forest' });
 
-  // The swap re-renders intact after a fresh load.
   await page.reload();
   await expect(page.getByTestId('hex-count')).toHaveText('2 hexes');
   const box2 = await canvas.boundingBox();
@@ -181,14 +162,11 @@ test('Escape cancels an in-progress Hex drag, leaving the hex at its origin', as
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
 
-  // Paint the centre hex (Forest) and arm Select.
   await page.getByTestId('tool-terrain').click();
   await canvas.click();
   await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
   await page.getByTestId('tool-select').click();
 
-  // Begin dragging the hex ~100px to the right, then press Escape mid-drag —
-  // before releasing — to abort the move.
   const box = await canvas.boundingBox();
   if (!box) throw new Error('canvas not laid out');
   const cx = box.x + box.width / 2;
@@ -199,19 +177,16 @@ test('Escape cancels an in-progress Hex drag, leaving the hex at its origin', as
   await page.mouse.move(cx + 40, cy);
   await page.mouse.move(cx + dx, cy);
   await page.keyboard.press('Escape');
-  // Keep dragging *after* Escape with the pointer still held: the cancelled
-  // gesture must not resume, so neither this continued travel nor the release
-  // after it may start a fresh move.
+  // Pressing Escape mid-drag should not resume when dragging resumes.
   await page.mouse.move(cx + dx + 40, cy);
   await page.mouse.up();
 
-  // The move never committed: still one hex. Cancelling a drag keeps the entity
-  // selected, so the inspector still shows the origin hex without re-clicking it.
+  // The move never committed: hex stays at origin.
   await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
   await expect(page.getByTestId('entity-coord')).toContainText('q 0');
   await expect(page.getByTestId('entity-detail')).toHaveText('Forest');
 
-  // And the hex never moved: the drag destination is still Void.
+  // The hex never moved: drag destination is still Void.
   await canvas.click({ position: { x: box.width / 2 + dx, y: box.height / 2 } });
   await expect(page.getByTestId('entity-coord')).toHaveCount(0);
 });
@@ -239,10 +214,9 @@ test('drags a multi-hex selection so the whole group moves by one offset', async
   const cy = box.y + box.height / 2;
   const dx = 100; // a +100px drag at zoom 1 spans one column (offset q+1)
 
-  // Paint two adjacent hexes with distinct terrains: Forest at the centre (0,0) ...
   await page.getByTestId('tool-terrain').click();
   await canvas.click();
-  // ... and Ocean at the q1·r0 neighbour.
+  // Paint Ocean at the q1·r0 neighbour.
   await page
     .getByRole('group', { name: 'Terrain' })
     .getByRole('button', { name: 'Ocean' })
@@ -250,8 +224,7 @@ test('drags a multi-hex selection so the whole group moves by one offset', async
   await canvas.click({ position: { x: box.width / 2 + dx, y: box.height / 2 } });
   await expect(page.getByTestId('hex-count')).toHaveText('2 hexes');
 
-  // Arm Select and build a two-hex Selection: click the centre, then Shift-click the
-  // neighbour to add it. Both are now selected.
+  // Build a two-hex Selection: click the centre, then Shift-click the neighbour.
   await page.getByTestId('tool-select').click();
   await canvas.click({ position: { x: box.width / 2, y: box.height / 2 } });
   await canvas.click({
@@ -259,7 +232,7 @@ test('drags a multi-hex selection so the whole group moves by one offset', async
     modifiers: ['Shift'],
   });
 
-  // Press on a selected member and drag the whole set one column to the right.
+  // Drag the whole set one column to the right.
   await page.mouse.move(cx, cy);
   await page.mouse.down();
   await page.mouse.move(cx + 40, cy);
@@ -267,11 +240,9 @@ test('drags a multi-hex selection so the whole group moves by one offset', async
   await page.mouse.move(cx + dx, cy);
   await page.mouse.up();
 
-  // The group moved rather than duplicated: still exactly two hexes.
   await expect(page.getByTestId('hex-count')).toHaveText('2 hexes');
 
-  // Persist and read the saved document: each member rode by the same offset, so the
-  // cluster kept its shape — Forest at q1·r0 and Ocean at q2·r0, the centre now Void.
+  // Each member rode by the same offset, so the cluster kept its shape.
   await flushSave(page);
 
   const res = await request.get(`/api/entities/${mapId}`);
@@ -324,7 +295,7 @@ test('refuses a blocked group move, leaving every hex where it was', async ({
     modifiers: ['Shift'],
   });
 
-  // Drag the pair one column right: Ocean would land on Grassland, which could only
+  // Attempt drag: Ocean would land on Grassland, which could only
   // be pushed onto where Forest is landing — a self-overlapping nudge that blocks.
   await page.mouse.move(cx, cy);
   await page.mouse.down();
@@ -333,11 +304,9 @@ test('refuses a blocked group move, leaving every hex where it was', async ({
   await page.mouse.move(cx + dx, cy);
   await page.mouse.up();
 
-  // The move was refused: still three hexes, and nothing budged.
   await expect(page.getByTestId('hex-count')).toHaveText('3 hexes');
 
-  // The refusal is surfaced to the user as a visible toast explaining why it
-  // wouldn't land (announced to assistive tech via the CDK live region).
+  // The refusal is surfaced as a toast.
   await expect(page.locator('.toast', { hasText: 'Move blocked' })).toBeVisible();
 
   await flushSave(page);
@@ -346,7 +315,7 @@ test('refuses a blocked group move, leaving every hex where it was', async ({
   expect(res.ok()).toBeTruthy();
   const detail = await res.json();
   const hexes = detail.document.hexes as Record<string, { terrain: string }>;
-  // Every hex is exactly where it was painted — the blocked move changed nothing.
+  // Every hex is exactly where it was painted.
   expect(hexes['0,0']).toEqual({ terrain: 'forest' });
   expect(hexes['1,0']).toEqual({ terrain: 'ocean' });
   expect(hexes['2,0']).toEqual({ terrain: 'grass' });

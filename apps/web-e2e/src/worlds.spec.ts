@@ -43,12 +43,11 @@ test('the World Index lists reachable Worlds; creating one opens its Home Entity
   // The Home note is named after the World (ADR-0029).
   await expect(page.getByTestId('title')).toHaveText('Untitled world');
 
-  // Back on the Index, the new World is listed and tagged owned.
   await page.goto('/');
   await expect(page.getByTestId(`world-${world.id}`)).toBeVisible();
   await expect(page.getByTestId(`owned-${world.id}`)).toBeVisible();
 
-  // Activating it enters its Entity browser (the URL carries the World).
+  // Activating it enters its Entity browser (URL carries the World).
   await page.getByTestId(`world-${world.id}`).click();
   await expect(page).toHaveURL(new RegExp(`/w/${world.id}/entities$`));
 });
@@ -58,16 +57,15 @@ test('renaming the World renames its Home Entity, read-only on its page (ADR-002
 }) => {
   const world = await createWorldFromIndex(page);
   await expect(page.getByTestId('title')).toHaveText('Untitled world');
-  // The Home title is the World's name — never edited in place here.
+  // The Home title is read-only (World's name is the source of truth; no rename UI yet).
   await expect(page.getByTestId('title')).not.toHaveAttribute('contenteditable');
 
-  // Rename via the World (its name is the source of truth; no World rename UI yet).
+  // Rename via the World API.
   const renamed = await page.request.patch(`/api/worlds/${world.id}`, {
     data: { name: 'The Reach of Aldermoor' },
   });
   expect(renamed.ok()).toBeTruthy();
 
-  // The Home Entity's title follows the World name on reload.
   await page.reload();
   await expect(page.getByTestId('title')).toHaveText('The Reach of Aldermoor');
 });
@@ -79,7 +77,6 @@ test('type-to-confirm delete shows the entity count, enables on match, and remov
   await page.goto('/');
   await expect(page.getByTestId(`world-${world.id}`)).toBeVisible();
 
-  // Opening the modal reads the World's entity count (a fresh World has its Home).
   const counted = page.waitForResponse(
     (r) => r.url().endsWith(`/api/worlds/${world.id}`) && r.ok(),
   );
@@ -93,7 +90,6 @@ test('type-to-confirm delete shows the entity count, enables on match, and remov
   await page.getByTestId('delete-confirm-input').fill('Untitled world');
   await expect(confirm).toBeEnabled();
 
-  // Confirming removes the World from the Index.
   await confirm.click();
   await expect(page.getByTestId(`world-${world.id}`)).toHaveCount(0);
 });
@@ -101,14 +97,14 @@ test('type-to-confirm delete shows the entity count, enables on match, and remov
 test('a stale World segment reconciles to the Entity’s real World (ADR-0028, #119)', async ({
   page,
 }) => {
-  // Two Worlds; open World A's Home Entity under World B's (wrong) segment.
   const worldA = await createWorldFromIndex(page);
   const worldB = await createWorldFromIndex(page);
   expect(worldB.id).not.toBe(worldA.id);
 
+  // Open A’s Home Entity under B’s (wrong) segment.
   await page.goto(`/w/${worldB.id}/entities/${worldA.homeEntityId}`);
 
-  // The reconcile guard lands on the Entity under its correct World segment.
+  // Reconcile guard lands on the Entity under its correct World segment.
   await expect(page).toHaveURL(
     new RegExp(`/w/${worldA.id}/entities/${worldA.homeEntityId}$`),
   );
@@ -117,7 +113,6 @@ test('a stale World segment reconciles to the Entity’s real World (ADR-0028, #
 test('the entity browser is scoped by the URL World; switching Worlds filters it', async ({
   page,
 }) => {
-  // World A, with a distinctly-named note created inside it.
   const worldA = await createWorldFromIndex(page);
   await page.getByRole('link', { name: 'Library' }).click();
   await expect(page).toHaveURL(new RegExp(`/w/${worldA.id}/entities$`));
@@ -133,14 +128,14 @@ test('the entity browser is scoped by the URL World; switching Worlds filters it
   await input.press('Enter');
   await expect(page.getByText('Alpha in A')).toBeVisible();
 
-  // World B is a different scope: A's note is out of scope, so it's gone from the list.
+  // World B is a different scope; A's note is out of scope.
   const worldB = await createWorldFromIndex(page);
   await page.getByRole('link', { name: 'Library' }).click();
   await expect(page).toHaveURL(new RegExp(`/w/${worldB.id}/entities$`));
   await expect(page.getByText('Alpha in A')).toHaveCount(0);
   expect(worldB.id).not.toBe(worldA.id);
 
-  // Switch back to World A via the switcher (it navigates by URL) → its note returns.
+  // Switch back to World A via the switcher; its note returns.
   await switchToWorld(page, worldA.id);
   await expect(page).toHaveURL(new RegExp(`/w/${worldA.id}/entities$`));
   await expect(page.getByText('Alpha in A')).toBeVisible();
@@ -149,7 +144,6 @@ test('the entity browser is scoped by the URL World; switching Worlds filters it
 test('the masthead switcher shows the current World and hops to another (#121)', async ({
   page,
 }) => {
-  // Two distinctly-named Worlds so the switcher's current-World label is legible.
   const worldA = await createWorldFromIndex(page);
   await page.request.patch(`/api/worlds/${worldA.id}`, {
     data: { name: 'Aldermoor' },
@@ -159,11 +153,11 @@ test('the masthead switcher shows the current World and hops to another (#121)',
     data: { name: 'Whisperwood' },
   });
 
-  // Land in World B; the switcher (loaded fresh) names B as the current World.
+  // Land in World B; switcher names B as the current World.
   await page.goto(`/w/${worldB.id}/entities`);
   await expect(page.getByTestId('switcher')).toContainText('Whisperwood');
 
-  // Hopping to World A re-scopes the URL to A's entity browser.
+  // Hopping to World A re-scopes the URL.
   await switchToWorld(page, worldA.id);
   await expect(page).toHaveURL(new RegExp(`/w/${worldA.id}/entities$`));
   await expect(page.getByTestId('switcher')).toContainText('Aldermoor');

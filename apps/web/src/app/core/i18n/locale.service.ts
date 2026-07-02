@@ -39,18 +39,11 @@ export class LocaleService {
     apply: (lang) => this.transloco.setActiveLang(lang),
   });
 
-  /** The active locale, readable by the UI (e.g. to mark the switcher). */
   readonly lang = this.pref.value;
-
-  /** Every locale Hexly ships, for a UI offering the choice (ADR-0014). */
   readonly locales = LOCALES;
 
-  /**
-   * Switch the UI language live and remember it for the next visit. A switch
-   * re-renders every translated string at once and may need to pull an uncached
-   * catalog, so it raises the shell's `full` curtain until the catalog is in —
-   * the shell debounces it, so a cached (instant) switch shows nothing.
-   */
+  // Switch the UI language live and remember it. Raises `full` curtain while
+  // loading an uncached catalog; shell debounces so cached switches show nothing.
   set(lang: Locale): void {
     this.pref.set(lang);
     const end = this.shell.beginLoading('full');

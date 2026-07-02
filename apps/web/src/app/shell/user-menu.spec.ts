@@ -30,7 +30,6 @@ describe('UserMenu', () => {
       .forEach((el) => el.remove());
   });
 
-  /** Establish a signed-in user the menu can reflect. */
   function signIn(displayName = 'Ada Lovelace'): void {
     auth.setUser({ id: 'u1', email: 'ada@hexly.test', displayName });
   }
@@ -44,7 +43,6 @@ describe('UserMenu', () => {
     ) as HTMLButtonElement;
   }
 
-  /** Open the menu and return the `role=menu` panel from the overlay. */
   function openMenu(fixture: Fixture): HTMLElement {
     trigger(fixture).click();
     fixture.detectChanges();

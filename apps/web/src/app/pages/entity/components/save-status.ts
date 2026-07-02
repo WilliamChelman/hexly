@@ -4,11 +4,9 @@ import { Chip } from '../../../ui/chip';
 import { EntitySession } from '../services/entity-session';
 
 /**
- * Autosave feedback chip (ADR-0026) — the surface that replaced the Save button on
- * every Entity. One `aria-live="polite"` region over the session's persistence state,
- * so a screen-reader user (who no longer has a button to confirm intent) hears
- * "Saving…/Saved/Save failed". States, highest priority first:
- *   conflict → save error (Retry) → saving → dirty → saved.
+ * Autosave feedback chip (ADR-0026) replacing the Save button. One aria-live region
+ * over the session's persistence state. States, highest priority first:
+ * conflict → save error (Retry) → saving → dirty → saved.
  */
 @Component({
   selector: 'app-save-status',
@@ -28,8 +26,6 @@ import { EntitySession } from '../services/entity-session';
             {{ 'editorShell.reload' | transloco }}
           </button>
           @if (error() === 'reload') {
-            <!-- The re-pull itself failed; keep the Reload button but say so, else the
-                 chip looks unchanged and Reload appears to do nothing (ADR-0026). -->
             <span data-testid="reload-error" class="ml-2">{{
               'editorShell.save.reloadFailed' | transloco
             }}</span>

@@ -135,12 +135,10 @@ export class FormattingMenu {
     });
   }
 
-  /** Run an action, then collapse the selection so the bubble menu dismisses. */
   protected apply(item: FormatItem): void {
     if (item.run(this.editor())) this.dismiss();
   }
 
-  /** Active link → drop it (and dismiss); otherwise reveal the URL input. */
   protected toggleLink(): void {
     const editor = this.editor();
     if (isLinkActive(editor)) {
@@ -158,9 +156,6 @@ export class FormattingMenu {
     this.dismiss();
   }
 
-  // Collapsing the selection makes the plugin's shouldShow false (empty selection),
-  // closing the menu while leaving the cursor where the user was working.
-  // Use head (the active end) so right-to-left selections land at the correct side.
   private dismiss(): void {
     this.linkEditing.set(false);
     const editor = this.editor();

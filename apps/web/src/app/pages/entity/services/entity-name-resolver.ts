@@ -18,28 +18,20 @@ export type EntityResolution =
   | { status: 'missing' };
 
 /**
- * The shared id→name resolver behind every Content Entity Link in a note
- * (ADR-0023). Resolution reads the target's **live** name, so a renamed target
- * reflects automatically while a deleted one resolves to `missing` (the node view
- * then renders its stored `label` as a dangling link).
- *
- * Rather than fetch the whole owner library up front (which capped links at one
- * page), it fetches only the ids notes actually reference: a `resolve(id)` queues
- * the id and a microtask coalesces a render's worth of links into one (chunked)
- * `list({ ids })` call. The `@` picker no longer shares an in-memory list — it
- * searches the server directly via {@link search}.
- *
- * Provided per note surface so navigating to another Entity gets a fresh cache.
+ * Shared id→name resolver for Entity Links in notes (ADR-0023). Resolves targets'
+ * live names: renamed targets reflect automatically, deleted ones resolve to `missing`.
+ * Fetches only referenced ids (one chunked `list({ ids })` per render). The `@`
+ * picker searches the server directly via {@link search}.
+ * Provided per note surface for a fresh cache on navigation.
  */
 @Injectable()
 export class EntityNameResolver {
   private readonly client = inject(EntitiesClient);
   private readonly destroyRef = inject(DestroyRef);
 
-  // One signal per requested id, created on first resolve and filled when its
-  // batch lands; persists for the surface's life so each id is fetched once.
+  // One signal per requested id, created on first resolve and filled when its batch lands.
   private readonly cache = new Map<string, WritableSignal<EntityResolution>>();
-  // Ids awaiting the next flush — coalesced so a page of links is one request.
+  // Ids awaiting the next flush, coalesced into one request.
   private readonly pending = new Set<string>();
   private flushQueued = false;
 
@@ -55,8 +47,7 @@ export class EntityNameResolver {
     return entry();
   }
 
-  // The `@` picker's live query stream. `share()` lets a fast-typing burst's
-  // overlapping awaits collapse onto one debounced, superseding server search.
+  // Picker's live query stream, shared so overlapping awaits collapse onto one debounced search.
   private readonly pickerQuery$ = new Subject<string>();
   private readonly pickerResults$ = searchEntities(
     this.client,
@@ -82,8 +73,7 @@ export class EntityNameResolver {
     queueMicrotask(() => this.flush());
   }
 
-  // Batch every id queued this tick into id-set list() calls (chunked to the page
-  // cap), then fill each id's signal: found, or missing → dangling link.
+  // Batch queued ids into chunked list() calls, then fill each id's signal.
   private flush(): void {
     this.flushQueued = false;
     const ids = [...this.pending];
@@ -95,8 +85,7 @@ export class EntityNameResolver {
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe({
           next: (page) => this.fill(chunk, page.items),
-          // A failed batch resolves its ids to missing (dangling) — the link still
-          // shows its stored label, matching the old list-fetch error path.
+          // Failed batch resolves ids to missing (dangling).
           error: () => this.fill(chunk, []),
         });
     }

@@ -3,13 +3,9 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { Axial } from '@hexly/domain';
 
 /**
- * The map's hover readout — a single frosted mono pill showing the hovered
- * coordinate and the terrain (or state) under the cursor, with the q/r values
- * and terrain illuminated in gold (codex `.coord`). Purely presentational, like
- * {@link ZoomControl}: it renders the {@link coord} and {@link terrainKey} it's
- * handed; the canvas owns the hover state (ADR-0003) and the parent places it.
- * Owns its own chrome (ADR-0007). Inert to the pointer so it never intercepts a
- * canvas gesture.
+ * Map's hover readout showing coordinate and terrain. Purely presentational: renders
+ * {@link coord} and {@link terrainKey}; canvas owns hover state (ADR-0003).
+ * Owns its own chrome (ADR-0007). Inert to pointer.
  */
 @Component({
   selector: 'app-coord-readout',
@@ -25,16 +21,12 @@ import { Axial } from '@hexly/domain';
     · <b class="font-semibold text-gold-strong">{{ terrainKey() | transloco }}</b>
   `,
   styles: `
-    /* Frosted surface kept scoped: a color-mix() over a theme token re-themes
-       where the 'bg-surface/NN' modifier's baked fallback would not (ADR-0021). */
     :host {
       background: color-mix(in oklab, var(--color-surface) 86%, transparent);
     }
   `,
 })
 export class CoordReadout {
-  /** The hex under the cursor, or null when the cursor is off the canvas. */
   readonly coord = input<Axial | null>(null);
-  /** The i18n key for the terrain (or Void/no-hex state) under the cursor. */
   readonly terrainKey = input.required<string>();
 }

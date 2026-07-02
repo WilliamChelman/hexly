@@ -71,9 +71,8 @@ const FULL_CURTAIN_DELAY_MS = 150;
 export class App {
   protected readonly shell = inject(AppShellStore);
 
-  // Defer the full curtain's appearance by FULL_CURTAIN_DELAY_MS so a quick
-  // (cached) language switch never flashes it; drop it the instant loading
-  // leaves 'full'. switchMap cancels the pending timer if that happens first.
+  // Debounce so a cached (instant) language switch never flashes the curtain;
+  // switchMap cancels the pending timer if loading resolves early.
   protected readonly showFull = toSignal(
     toObservable(this.shell.loading).pipe(
       switchMap((level) =>
@@ -85,15 +84,12 @@ export class App {
     { initialValue: false },
   );
 
-  // Standalone pages (e.g. login) hide the rail, so its brand-mark pulse can't
-  // carry the subtle signal — fall back to a corner pulse there.
   protected readonly showSubtleFallback = computed(
     () => this.shell.loading() === 'subtle' && this.shell.standalone(),
   );
 
-  // Hold the rail back until the first navigation resolves; by then the landing
-  // page's constructor has set `standalone`, so a cold load on /login never
-  // flashes the rail.
+  // Wait for first navigation so the landing page's `standalone` flag is set,
+  // preventing the rail flash on cold /login loads.
   protected readonly navigated = toSignal(
     inject(Router).events.pipe(
       filter((e) => e instanceof NavigationEnd),

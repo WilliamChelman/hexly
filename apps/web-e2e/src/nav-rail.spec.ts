@@ -10,13 +10,10 @@ test('the rail navigates, exposes account controls, and pages own their headers'
 }) => {
   await enterLibrary(page);
 
-  // Present and collapsed: the expand toggle is offered at the slim width.
   await expect(page.getByRole('button', { name: 'Expand navigation' })).toBeVisible();
-
-  // The library header is page-owned (its title is a real heading on the page).
   await expect(page.getByRole('heading', { name: 'Your library' })).toBeVisible();
 
-  // Account + appearance live behind the avatar — reachable from every page.
+  // Account + appearance live behind the avatar.
   await page.getByRole('button', { name: 'Open user menu' }).click();
   await expect(
     page.getByRole('menuitem', { name: /Switch to (solar|astral) theme/ }),
@@ -25,17 +22,15 @@ test('the rail navigates, exposes account controls, and pages own their headers'
   await expect(page.getByRole('menuitem', { name: 'Sign out' })).toBeVisible();
   await page.keyboard.press('Escape');
 
-  // Into the editor: its header holds only the map's controls now.
   await page.getByRole('button', { name: 'New map' }).click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   await expect(page.getByTestId('title')).toBeVisible();
   await expect(page.getByTestId('save-status')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Share' })).toBeVisible();
-  // The former All Maps / Design System buttons are gone — that's rail navigation.
+  // Old All Maps / Design System buttons now moved to rail navigation.
   await expect(page.getByRole('link', { name: 'All maps' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Design system' })).toHaveCount(0);
 
-  // A rail destination is always one click away.
   await page.getByRole('link', { name: 'Library' }).click();
   await expect(page).toHaveURL(/\/entities$/);
 });
@@ -51,14 +46,14 @@ test('on a wide viewport the expanded rail pushes the page and is remembered', a
 
   await page.getByRole('button', { name: 'Expand navigation' }).click();
   await expect(page.getByRole('button', { name: 'Collapse navigation' })).toBeVisible();
-  // Poll past the width transition: the docked rail grows in place (pushes).
+  // Poll past width transition: docked rail grows in place (pushes).
   await expect
     .poll(async () => (await rail.boundingBox())!.width)
     .toBeGreaterThan(collapsed);
-  // Pushes, doesn't overlay: no backdrop over the page.
+  // No backdrop: pushes rather than overlays.
   await expect(page.getByTestId('rail-backdrop')).toHaveCount(0);
 
-  // The expanded choice persists across a reload (wide only).
+  // Expanded choice persists across reload (wide only).
   await page.reload();
   await expect(page.getByRole('button', { name: 'Collapse navigation' })).toBeVisible();
 });
@@ -70,10 +65,10 @@ test('on a narrow viewport the expanded rail overlays and dismisses on click-awa
   await enterLibrary(page);
 
   await page.getByRole('button', { name: 'Expand navigation' }).click();
-  // Overlays the page, with a backdrop to dismiss it.
+  // Overlays with a backdrop to dismiss.
   await expect(page.getByTestId('rail-backdrop')).toBeVisible();
 
-  // Choosing a destination collapses the overlay (never permanently eats width).
+  // Choosing a destination collapses the overlay.
   await page
     .getByTestId('nav-rail-overlay')
     .getByRole('link', { name: 'Library' })

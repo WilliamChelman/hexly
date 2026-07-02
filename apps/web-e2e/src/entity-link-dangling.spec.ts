@@ -16,13 +16,11 @@ test('a link whose target is deleted renders non-navigable, and the map opens wi
   page,
   request,
 }) => {
-  // Seed the link target, then delete it after linking.
   await enterLibrary(page);
   await page.getByTestId('new-note').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const noteId = page.url().split('/').pop();
 
-  // The source: a fresh map with one painted hex.
   await enterLibrary(page);
   await page.getByTestId('new-map').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
@@ -38,7 +36,6 @@ test('a link whose target is deleted renders non-navigable, and the map opens wi
   await canvas.click();
   await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
 
-  // Link the hex to the note, then save.
   await page.getByTestId('tool-select').click();
   await canvas.click();
   await page.getByTestId('entity-link-pick').click();
@@ -51,7 +48,6 @@ test('a link whose target is deleted renders non-navigable, and the map opens wi
   const del = await request.delete(`/api/entities/${noteId}`);
   expect(del.ok()).toBeTruthy();
 
-  // The map opens cleanly on a fresh load despite the now-dangling link.
   await page.reload();
   await expect(canvas).toBeVisible();
   await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
@@ -62,13 +58,11 @@ test('a link whose target is deleted renders non-navigable, and the map opens wi
   const detail = await res.json();
   expect(detail.document.hexes['0,0']?.entityId).toBe(noteId);
 
-  // Re-select the hex: the Inspector shows the link as non-navigable — visible but
-  // not a followable link (no `entity-link-name` anchor).
+  // Re-select the hex: the Inspector shows the link as non-navigable.
   await canvas.click();
   await expect(page.getByTestId('entity-link-dangling')).toBeVisible();
   await expect(page.getByTestId('entity-link-name')).toHaveCount(0);
 
-  // The remove control still works on a dangling link, clearing it from the doc.
   await page.getByTestId('entity-link-remove').click();
   await expect(page.getByTestId('entity-link-dangling')).toHaveCount(0);
   await expect(page.getByTestId('entity-link-pick')).toBeVisible();

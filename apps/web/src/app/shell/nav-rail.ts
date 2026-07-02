@@ -31,7 +31,6 @@ interface NavEntry {
   readonly exact?: boolean;
 }
 
-// Static entries below the (world-scoped) Library link, which is computed per URL.
 const STATIC_ENTRIES: readonly NavEntry[] = [
   {
     link: '/styleguide',

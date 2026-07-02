@@ -23,8 +23,6 @@ describe('EditorRail', () => {
   it('renders the Regions entry inactive while the panel is closed', () => {
     const { regions } = setup();
 
-    // The rail floats with a bare Regions entry; with the panel closed by default
-    // the entry reads inactive (ADR-0013).
     expect(regions()).not.toBeNull();
     expect(regions().getAttribute('aria-pressed')).toBe('false');
   });
@@ -34,7 +32,6 @@ describe('EditorRail', () => {
     TestBed.inject(TranslocoService).setActiveLang('fr');
     fixture.detectChanges();
 
-    // The icon-only entry carries its name on aria-label/title for assistive tech.
     expect(regions().getAttribute('aria-label')).toBe('Régions');
     expect(regions().getAttribute('title')).toBe('Régions');
   });
@@ -52,9 +49,9 @@ describe('EditorRail', () => {
   it('closes the panel and clears the active entry when clicked again', () => {
     const { fixture, store, regions } = setup();
 
-    regions().click(); // open
+    regions().click();
     fixture.detectChanges();
-    regions().click(); // and the active entry toggles back closed (story 18)
+    regions().click();
     fixture.detectChanges();
 
     expect(store.rightPanel()).toBeNull();
@@ -64,8 +61,6 @@ describe('EditorRail', () => {
   it('reads active whenever the Regions list is showing, however it was opened', () => {
     const { fixture, store, regions } = setup();
 
-    // Opened through the store (e.g. New Region's showRegionsPanel) rather than the
-    // rail click — the entry still reflects the live panel state.
     store.showRegionsPanel();
     fixture.detectChanges();
 

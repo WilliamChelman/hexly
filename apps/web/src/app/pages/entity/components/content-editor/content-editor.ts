@@ -201,7 +201,6 @@ export class ContentEditor {
   protected readonly editor = signal<Editor | null>(null);
 
   constructor() {
-    // Stream edits to the session; re-attach on editor swap.
     effect((onCleanup) => {
       const editor = this.editor();
       if (!editor) return;

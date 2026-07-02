@@ -72,9 +72,8 @@ export class AuthService {
       .where(eq(users.email, normalizeEmail(email)))
       .get();
 
-    // Verify against the real hash when the email is known, or a constant dummy
-    // hash otherwise, so both paths take comparable time. A throw (e.g. a
-    // malformed stored hash) is treated as an auth failure, never a 500.
+    // Verify against the real hash or dummy to equalize timing and prevent enumeration.
+    // A throw is treated as auth failure, not a 500.
     let passwordOk = false;
     try {
       const targetHash = user ? user.passwordHash : await DUMMY_PASSWORD_HASH;
@@ -84,9 +83,7 @@ export class AuthService {
     }
     if (!user || !passwordOk) return null;
 
-    // Opportunistic sweep: login is the natural low-frequency moment to clear
-    // out sessions whose lifetime has passed, so the table can't grow unbounded
-    // without a separate job (ADR-0002 — this stays a tiny single-file DB).
+    // Opportunistic sweep on login to prevent unbounded table growth (ADR-0002).
     this.purgeExpiredSessions();
 
     const token = newToken();

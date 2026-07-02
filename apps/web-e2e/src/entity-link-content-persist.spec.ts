@@ -27,7 +27,6 @@ test('inserts a Content Entity Link via @, persists it, navigates it, and dangle
   // The source's full world-scoped path (ADR-0028) — reused to reopen it later.
   const sourcePath = new URL(page.url()).pathname;
 
-  // Insert the link: type into the editor, trigger the `@` picker, pick the target.
   const surface = page.getByTestId('note-content');
   await surface.click();
   await page.keyboard.type('Ruled by ');
@@ -36,7 +35,6 @@ test('inserts a Content Entity Link via @, persists it, navigates it, and dangle
   await expect(page.getByTestId('entity-picker')).toBeVisible();
   await page.getByTestId(`entity-picker-option-${targetId}`).click();
 
-  // The atom renders with the target's live name, pointing at its id.
   const link = page.getByTestId('entity-link');
   await expect(link).toBeVisible();
   await expect(link).toHaveText('Untitled note');
@@ -48,7 +46,6 @@ test('inserts a Content Entity Link via @, persists it, navigates it, and dangle
 
   await flushSave(page);
 
-  // The persisted snapshot really carries the entityLink node, tagged tiptap-v2.
   await page.reload();
   const res = await request.get(`/api/entities/${sourceId}`);
   expect(res.ok()).toBeTruthy();
@@ -58,7 +55,6 @@ test('inserts a Content Entity Link via @, persists it, navigates it, and dangle
   expect(snapshot).toContain('entityLink');
   expect(snapshot).toContain(targetId);
 
-  // After reload the link re-renders live and navigates to the target on click.
   await expect(page.getByTestId('entity-link')).toHaveText('Untitled note');
   await page.getByTestId('entity-link').click();
   await expect(page).toHaveURL(new RegExp(`/entities/${targetId}$`));

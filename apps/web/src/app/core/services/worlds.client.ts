@@ -11,12 +11,11 @@ import { WorldDetail, WorldSummary } from '@hexly/domain';
 export class WorldsClient {
   private readonly http = inject(HttpClient);
 
-  /** The caller's owned + member worlds (ADR-0024). */
   list(): Observable<WorldSummary[]> {
     return this.http.get<WorldSummary[]>('/api/worlds');
   }
 
-  /** Create a World; the server mints its Home Entity atomically. */
+  // Server mints the Home Entity atomically.
   create(name: string): Observable<WorldDetail> {
     return this.http.post<WorldDetail>('/api/worlds', { name });
   }

@@ -49,7 +49,6 @@ describe('SlashMenu', () => {
     expect(handled).toBe(true);
 
     expect(menu.onKeyDown(new KeyboardEvent('keydown', { key: 'Enter' }))).toBe(true);
-    // First item is index 0; ArrowDown moved to index 1 before Enter.
     expect(command).toHaveBeenCalledWith(SLASH_ITEMS[1]);
   });
 
@@ -95,8 +94,6 @@ describe('SlashMenu', () => {
       SLASH_ITEMS.find((i) => i.id === 'heading1')!,
     ]);
 
-    // tiptap's interim "loading" render carries empty items; the menu must ignore
-    // it and keep showing the previous results until the resolved render lands.
     menu.update({
       items: [],
       command: vi.fn(),

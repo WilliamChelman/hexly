@@ -22,7 +22,6 @@ function editorWith(text: string) {
 const item = (id: string): FormatItem => FORMAT_ITEMS.find((i) => i.id === id)!;
 
 describe('FORMAT_ITEMS', () => {
-  // Each inline-mark control and the mark it should leave on the selected text.
   const markFor: Record<string, string> = {
     bold: 'bold',
     italic: 'italic',
@@ -45,7 +44,6 @@ describe('FORMAT_ITEMS', () => {
     });
   }
 
-  // Each block control and the top-level node type it should leave at the selection.
   const nodeFor: Record<string, string> = {
     heading1: 'heading',
     heading2: 'heading',
@@ -75,8 +73,9 @@ describe('FORMAT_ITEMS', () => {
     applyLink(editor, 'https://example.com/mara');
     expect(isLinkActive(editor)).toBe(true);
     const marks = editor.getJSON().content?.[0]?.content?.[0]?.marks ?? [];
-    const link = marks.find((m) => m.type === 'link');
-    expect(link?.attrs?.['href']).toBe('https://example.com/mara');
+    expect(marks.find((m) => m.type === 'link')?.attrs?.['href']).toBe(
+      'https://example.com/mara',
+    );
 
     clearLink(editor);
     expect(isLinkActive(editor)).toBe(false);
@@ -90,11 +89,9 @@ describe('FORMAT_ITEMS', () => {
     const json = editor.getJSON();
     editor.destroy();
 
-    // The selected text now carries the bold mark.
     const marks = json.content?.[0]?.content?.[0]?.marks ?? [];
     expect(marks.map((m) => m.type)).toContain('bold');
 
-    // Reloading the snapshot into a fresh editor yields identical JSON (ADR-0019).
     const reloaded = new Editor({ extensions: CONTENT_EXTENSIONS });
     reloaded.commands.setContent(json);
     const after = reloaded.getJSON();

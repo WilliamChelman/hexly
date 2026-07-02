@@ -52,15 +52,12 @@ export class StatusBar implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly store = inject(HexMapStore);
 
-  /** How many hexes the user has painted (sparse document — record count, ADR-0003). */
   protected readonly hexCount = computed(
     () => Object.keys(this.store.document().hexes).length,
   );
 
-  /** The API's reported health, or `null` until the call resolves. */
   protected readonly health = signal<HealthStatus | null>(null);
-  /** A translation key set when the `/health` call fails, so the status bar shows
-   * a translated fallback (ADR-0014 — the client maps the outcome to a key). */
+  // Translation key set when `/health` call fails (ADR-0014).
   protected readonly errorKey = signal<string | null>(null);
   protected readonly healthy = computed(() => {
     const status = this.health();

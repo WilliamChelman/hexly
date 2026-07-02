@@ -7,17 +7,9 @@ import { Swatch } from '../../../../ui/swatch';
 import { HexMapStore } from '../../services/hexmap-store';
 
 /**
- * The Regions panel — the right-edge rail's first entry, sharing the Inspector's
- * column (ADR-0011, issue #39). It is a Region's persistent management home: it
- * lists *every* Region with a colour swatch and name, including emptied Regions
- * (zero member hexes, so invisible on the canvas) — so it must never assume
- * non-empty membership — and offers a New Region action.
- *
- * Selecting a Region here routes through the *same* {@link HexMapStore.selectRegion}
- * the canvas uses, so a list pick highlights on the canvas and opens in the
- * Inspector — which flips the shared column back to the Inspector. New Region mints
- * an empty "Region N" (next palette colour) without painting, then selects it so
- * the Inspector opens on it to be named.
+ * Regions panel sharing the Inspector's column (ADR-0011, issue #39).
+ * Lists every Region (including emptied ones), with New Region action.
+ * Selection routes through the same {@link HexMapStore.selectRegion} as canvas.
  */
 @Component({
   selector: 'app-regions-panel',
@@ -81,19 +73,11 @@ import { HexMapStore } from '../../services/hexmap-store';
 export class RegionsPanel {
   protected readonly store = inject(HexMapStore);
 
-  /**
-   * Whether a Region is part of the *live selection set* — the source of truth the
-   * canvas highlights from. Reading the set (not the single {@link HexMapStore.selection}
-   * view, which is null whenever 2+ entities are selected) keeps the row's active
-   * state in sync during a multi-selection, e.g. when Shift-clicking a hex inside a
-   * Region adds both the hex and the Region. A sole selected Region is still in the
-   * set, so single-selection behaviour is unchanged.
-   */
+  // Reads the selection set (not single selection view) to stay in sync during multi-selection.
   protected isRegionSelected(id: string): boolean {
     return this.store.selections().some((s) => s.kind === 'region' && s.id === id);
   }
 
-  /** A Region's painted-hex count, shown right-aligned in its row (0 for an empty Region). */
   protected memberCount(region: Region): number {
     return Object.keys(region.hexes).length;
   }

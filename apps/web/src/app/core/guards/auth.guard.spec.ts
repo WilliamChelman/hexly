@@ -13,6 +13,7 @@ import { MockAuthClient } from '../testing/auth-client.mock';
 const ada = { id: 'u1', email: 'ada@hexly.test', displayName: 'Ada' };
 
 function settle(result: unknown): Promise<boolean | UrlTree> {
+  // Helper to unify Observable and Promise guard results.
   return isObservable(result)
     ? firstValueFrom(result as Observable<boolean | UrlTree>)
     : Promise.resolve(result as boolean | UrlTree);

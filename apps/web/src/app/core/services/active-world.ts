@@ -17,10 +17,8 @@ import {
 export class ActiveWorld {
   private readonly _worldId = signal<string | null>(null);
 
-  /** The active World's id, or `null` outside a World (the Index). */
   readonly worldId = this._worldId.asReadonly();
 
-  /** Pin the active World. Called by the route resolver, not by components. */
   set(id: string | null): void {
     this._worldId.set(id);
   }

@@ -60,7 +60,6 @@ interface TypeRow {
         >
       </header>
 
-      <!-- Masthead -->
       <section class="hero flex flex-col gap-4 pt-12 pb-6 border-b border-line">
         <span appEyebrow>{{ 'styleguide.eyebrow' | transloco }}</span>
         <h1
@@ -84,7 +83,6 @@ interface TypeRow {
         </div>
       </section>
 
-      <!-- Colour -->
       <section class="section">
         <h2 class="section-title">
           {{ 'styleguide.paletteSemantic' | transloco }}
@@ -124,7 +122,6 @@ interface TypeRow {
         </div>
       </section>
 
-      <!-- Type -->
       <section class="section">
         <h2 class="section-title">{{ 'styleguide.typeScale' | transloco }}</h2>
         <div class="typelist" appPanel>
@@ -144,7 +141,6 @@ interface TypeRow {
         </div>
       </section>
 
-      <!-- Spacing & radii -->
       <section class="section is-split">
         <div>
           <h2 class="section-title">{{ 'styleguide.spacing' | transloco }}</h2>
@@ -173,7 +169,6 @@ interface TypeRow {
         </div>
       </section>
 
-      <!-- Components -->
       <section class="section">
         <h2 class="section-title">{{ 'styleguide.components' | transloco }}</h2>
         <div class="specimens">
@@ -295,7 +290,6 @@ A walled town where the forest road meets the river ford.</textarea
 
     /* Styleguide — layout only; specimens use the primitives and global classes. */
 
-    /* ----- Hero ------------------------------------------------------------- */
     .hero-lede {
       @apply text-md leading-normal text-ink-muted;
       max-width: var(--container-reading);
@@ -307,7 +301,6 @@ A walled town where the forest road meets the river ford.</textarea
       font-size: 0.86em;
     }
 
-    /* ----- Sections --------------------------------------------------------- */
     .section {
       @apply flex flex-col gap-4;
     }
@@ -321,7 +314,6 @@ A walled town where the forest road meets the river ford.</textarea
       @apply -mt-3 text-sm text-ink-muted;
     }
 
-    /* ----- Colour swatches -------------------------------------------------- */
     .swatches {
       @apply grid gap-3;
       grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -339,7 +331,6 @@ A walled town where the forest road meets the river ford.</textarea
       @apply font-mono text-2xs text-ink-faint;
     }
 
-    /* ----- Type ------------------------------------------------------------- */
     .typelist {
       @apply py-2 px-6;
     }
@@ -356,7 +347,6 @@ A walled town where the forest road meets the river ford.</textarea
       @apply flex gap-3 flex-none font-mono text-2xs text-ink-faint;
     }
 
-    /* ----- Spacing & radii -------------------------------------------------- */
     .ramp {
       @apply flex flex-col gap-3;
     }
@@ -381,7 +371,6 @@ A walled town where the forest road meets the river ford.</textarea
       @apply w-16 h-16 bg-surface-sunken border border-gold;
     }
 
-    /* ----- Component specimens --------------------------------------------- */
     .specimens {
       @apply grid gap-4;
       grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -396,7 +385,6 @@ A walled town where the forest road meets the river ford.</textarea
       @apply flex flex-col gap-3;
     }
 
-    /* ----- Footer ----------------------------------------------------------- */
     .guide-foot {
       @apply flex justify-between items-center pt-6 border-t border-line text-sm text-ink-muted;
     }

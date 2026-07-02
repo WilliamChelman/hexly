@@ -5,7 +5,7 @@ import { EntitySession } from '../services/entity-session';
 
 /**
  * Free-text tag editor for the open Entity (CONTEXT.md → Tag, #72).
- * Version-checked Save (shared with Content) actually persists changes; type-agnostic across entity types.
+ * Changes persist through the version-checked Save, shared with Content.
  */
 @Component({
   selector: 'app-entity-tags',

@@ -33,8 +33,6 @@ describe('AuthClient.sessionLoading', () => {
   });
 
   it('is true from the moment the service is constructed (rxResource pre-loads)', () => {
-    // rxResource starts in "loading" state before any CD — guards must wait for
-    // sessionLoading to settle, not assume it starts false.
     expect(client.sessionLoading()).toBe(true);
   });
 
@@ -42,7 +40,7 @@ describe('AuthClient.sessionLoading', () => {
     TestBed.createComponent(TestHost).detectChanges();
     expect(client.sessionLoading()).toBe(true);
     http.expectOne('/api/auth/me').flush(null, { status: 401, statusText: 'Unauthorized' });
-    await tick(); // rxResource defers status → resolved via queueMicrotask
+    await tick();
     expect(client.sessionLoading()).toBe(false);
   });
 

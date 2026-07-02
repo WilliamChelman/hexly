@@ -37,7 +37,6 @@ describe('reconcileWorldSegment', () => {
     });
   });
 
-  /** Invoke the guard the way the router would for `w/:worldId/entities/:id`. */
   function run(worldId: string, id = 'e1') {
     return TestBed.runInInjectionContext(() =>
       reconcileWorldSegment(
@@ -51,6 +50,7 @@ describe('reconcileWorldSegment', () => {
   }
 
   function settle(result: unknown): Promise<boolean | UrlTree> {
+    // Helper to unify Observable and Promise guard results.
     return isObservable(result)
       ? firstValueFrom(result as Observable<boolean | UrlTree>)
       : Promise.resolve(result as boolean | UrlTree);
