@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { Observable, of } from 'rxjs';
 import { WorldStore } from '../../../core/services/world.store';
+import { worldRoute } from '../../../core/utils/routes';
 import { Command, CommandProvider } from '../command';
 
 /**
@@ -25,7 +26,7 @@ export class WorldQuickOpen implements CommandProvider {
     return of(
       worlds.map(
         (world): Command => {
-          const route = ['/w', world.id, 'entities'];
+          const route = worldRoute(world.id);
           return {
             id: world.id,
             label: world.name,

@@ -188,13 +188,15 @@ export class CommandPalette {
     ),
   );
 
-  private readonly flatCommands = computed(() =>
-    this.rows().map((row) => row.command),
-  );
-
-  protected readonly activeCommand = computed(
-    () => this.flatCommands()[this.activeIndex()] ?? null,
-  );
+  // Clamp the highlight to the current rows: an in-flight query can resolve to
+  // fewer rows than the stale-while-revalidate seed the user already arrowed
+  // into, so a raw activeIndex would point past the list and leave Enter and
+  // aria-activedescendant dead until the next keystroke.
+  protected readonly activeCommand = computed(() => {
+    const rows = this.rows();
+    if (!rows.length) return null;
+    return rows[Math.min(this.activeIndex(), rows.length - 1)].command;
+  });
 
   // Stable per-option DOM ids so the input's aria-activedescendant can point at
   // the highlighted row — the same listbox idiom as SuggestionMenu's pickers.
@@ -269,15 +271,17 @@ export class CommandPalette {
       }
       return;
     }
-    const items = this.flatCommands();
+    const items = this.rows();
     if (!items.length) return;
-    // Delegate list navigation (arrows, Home/End, wrap) to CDK's ListKeyManager
-    // instead of hand-rolling index math. We render the highlight ourselves from
-    // activeIndex (aria-activedescendant), so a transient manager seeded with the
-    // current index is enough: it computes the next index for this one keystroke.
+    // Delegate arrow navigation (with wrap) to CDK's ListKeyManager instead of
+    // hand-rolling index math. We render the highlight ourselves from activeIndex
+    // (aria-activedescendant), so a transient manager seeded with the current
+    // index is enough: it computes the next index for this one keystroke. No
+    // withHomeAndEnd — the manager would preventDefault Home/End and steal them
+    // from caret navigation in the search input; those keys fall through instead.
     // getLabel gives it a ListKeyManagerOption (and leaves typeahead available).
-    const options = items.map((command) => ({ getLabel: () => command.label }));
-    const manager = new ListKeyManager(options).withWrap().withHomeAndEnd();
+    const options = items.map((row) => ({ getLabel: () => row.command.label }));
+    const manager = new ListKeyManager(options).withWrap();
     manager.setActiveItem(Math.min(this.activeIndex(), items.length - 1));
     manager.onKeydown(event);
     if (manager.activeItemIndex != null) {

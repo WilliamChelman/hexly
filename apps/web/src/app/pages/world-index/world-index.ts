@@ -12,6 +12,7 @@ import { AuthClient } from '../../core/services/auth.client';
 import { WorldStore } from '../../core/services/world.store';
 import { WorldsClient } from '../../core/services/worlds.client';
 import { ToasterService } from '../../core/services/toaster.service';
+import { entityRoute } from '../../core/utils/routes';
 import { Button } from '../../ui/button';
 import { Eyebrow } from '../../ui/eyebrow';
 import { Panel } from '../../ui/panel';
@@ -419,12 +420,7 @@ export class WorldIndex {
       .pipe(finalize(() => this.creating.set(false)))
       .subscribe({
         next: (world) =>
-          this.router.navigate([
-            '/w',
-            world.id,
-            'entities',
-            world.homeEntityId,
-          ]),
+          this.router.navigate(entityRoute(world.id, world.homeEntityId)),
         error: () =>
           this.toaster.show(
             this.transloco.translate('worlds.createError'),

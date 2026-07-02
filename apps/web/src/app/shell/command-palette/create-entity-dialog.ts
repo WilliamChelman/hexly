@@ -14,6 +14,7 @@ import { EntityType } from '@hexly/domain';
 import { ActiveWorld } from '../../core/services/active-world';
 import { EntitiesClient } from '../../core/services/entities.client';
 import { WorldStore } from '../../core/services/world.store';
+import { entityRoute } from '../../core/utils/routes';
 import { Button } from '../../ui/button';
 import { Field } from '../../ui/field';
 import { Input } from '../../ui/input';
@@ -149,12 +150,7 @@ export class CreateEntityDialog {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((entity) => {
         this.dialogState.close();
-        void this.router.navigate([
-          '/w',
-          entity.worldId,
-          'entities',
-          entity.id,
-        ]);
+        void this.router.navigate(entityRoute(entity.worldId, entity.id));
       });
   }
 }
