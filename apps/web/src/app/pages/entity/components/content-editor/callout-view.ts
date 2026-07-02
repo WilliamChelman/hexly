@@ -92,6 +92,7 @@ export function createCalloutNodeView(
   });
 
   const dom = ref.location.nativeElement as HTMLElement;
+  const header = dom.querySelector('.callout-header') as HTMLElement;
   const contentDOM = dom.querySelector('[data-callout-body]') as HTMLElement;
 
   return {
@@ -102,6 +103,10 @@ export function createCalloutNodeView(
       apply(updated);
       return true;
     },
+    // Leave header-chrome events (the type <input>: keys, caret, clicks) to the
+    // browser — otherwise PM's keymap catches e.g. Backspace and deletes the node.
+    // Body events fall through to PM as normal editable content.
+    stopEvent: (event) => header.contains(event.target as globalThis.Node),
     // PM handles mutations inside the editable body; ignore Angular re-rendering the header.
     ignoreMutation: (mutation) =>
       mutation.type !== 'selection' && !contentDOM.contains(mutation.target as globalThis.Node),

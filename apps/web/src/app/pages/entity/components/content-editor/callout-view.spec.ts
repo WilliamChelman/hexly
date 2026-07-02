@@ -74,6 +74,21 @@ describe('CalloutView node view', () => {
     editor.destroy();
   });
 
+  it('stops ProseMirror from handling events in the header, so the type input edits natively', () => {
+    // Without this, a Backspace in the type input bubbles to ProseMirror's keymap
+    // and deletes the whole callout node — the reported bug.
+    const { editor, view } = nodeViewFor({ type: 'note', title: null });
+    const input = (view.dom as HTMLElement).querySelector('input') as HTMLInputElement;
+
+    // Events from the header chrome are the browser's to handle...
+    expect(view.stopEvent?.({ target: input } as unknown as Event)).toBe(true);
+    // ...while events in the editable body stay with ProseMirror.
+    expect(view.stopEvent?.({ target: view.contentDOM } as unknown as Event)).toBe(false);
+
+    view.destroy?.();
+    editor.destroy();
+  });
+
   it('shows an arbitrary (imported) type verbatim in the input', () => {
     const { editor, view } = nodeViewFor({ type: 'custom-obsidian', title: null });
     const input = (view.dom as HTMLElement).querySelector('input') as HTMLInputElement;
