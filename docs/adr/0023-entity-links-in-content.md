@@ -4,6 +4,8 @@ An Entity Link (CONTEXT.md) can now live **inline in prose Content**, not just o
 
 Adding a schema node changes the `tiptap-v1` extension contract (ADR-0019), so the `format` tag **bumps to `tiptap-v2`**. `contentSchema` accepts both `tiptap-v1` and `tiptap-v2`; reads load either losslessly (the node is additive, so a v1 doc simply has none and needs no transform); saves always write `tiptap-v2`. This is the first format bump and establishes the dual-read migration pattern.
 
+**Update — `tiptap-v3` (ADR-0033):** to carry Obsidian wikilink semantics, `entityLink` gains two optional attrs. `display` holds `[[Target|display text]]` custom text and, when set, renders **statically** in place of the live target name (the live name still renders when it's unset) — the one exception to the live-name rule, needed because narrative TTRPG prose leans on custom link phrasing. `heading` holds a `[[Target#Heading]]` anchor; navigation opens the target and best-effort scrolls to the first heading whose text matches, and it round-trips verbatim. Block anchors (`#^id`) are dropped on import. Both attrs are additive (`tiptap-v3` per ADR-0019).
+
 ## Insertion and characterisation — three inline triggers (`@tiptap/suggestion`)
 
 - **`@`** — autocomplete over a server-side name search (`EntitiesClient.list({ q })`, owner-scoped, ADR-0025), so a library past one page is still fully linkable; pick inserts the `entityLink` atom.

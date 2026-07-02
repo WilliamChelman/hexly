@@ -5,7 +5,7 @@ A web application for TTRPG worldbuilding: authoring interlinked **Entities** �
 ## Entities
 
 **Entity**:
-The top-level thing a user creates, owns, and shares. Carries an `id`, a `name`, a `type`, `tags`, created/modified timestamps, and a rich-text **Content** body. A **Hex Map** is one kind of Entity. The unit of ownership, sharing, and saving.
+The top-level thing a user creates, owns, and shares. Carries an `id`, a `name`, a `type`, `tags`, created/modified timestamps, an optional **Metadata** map, and a rich-text **Content** body. A **Hex Map** is one kind of Entity. The unit of ownership, sharing, and saving.
 _Avoid_: Document, page, record, object
 
 **Entity Type**:
@@ -15,6 +15,14 @@ _Avoid_: Kind, category, class
 **Content**:
 The rich-text body every Entity carries — the result of block-based editing (TipTap; see ADR-0019). Stored as an opaque, format-tagged snapshot the domain never parses, so the editor can change without touching the Entity model. Replaces the old per-element "Note".
 _Avoid_: Body, rich text, document, prose
+
+**Metadata**:
+An arbitrary key→value map on an Entity, mirroring Obsidian frontmatter/properties. Populated from a note's frontmatter on import and re-emitted as YAML frontmatter on export. Keys under the reserved `hexly.` namespace (e.g. `hexly.sourcePath`, the vault-relative path of the source file) carry Hexly's own provenance and are consumed on export rather than written back to frontmatter. Displayed read-only for now; editing is deferred.
+_Avoid_: Frontmatter, properties, attributes, custom fields
+
+**Asset**:
+A binary file — typically an image, but also a PDF or other media — belonging to a World and referenced from an Entity's Content. Stored per-World and served by an unguessable, unauthenticated link, so possession of the link is the only access control (even for an Asset referenced from a `private` Entity).
+_Avoid_: Attachment, file, blob, media, upload
 
 **Tag**:
 A free-text label on an Entity, for flavour and informal grouping (e.g. "deity", "ruined", "northern reach"). Carries no behaviour; distinct from the structured Entity Type.
@@ -199,3 +207,17 @@ _Avoid_: Source, matcher
 **Command Registry**:
 Where Command Providers make themselves known to the Command Palette. A Provider may be registered for the app's whole lifetime, or only while the part of the UI it belongs to (e.g. an editor) is present — so Commands become contextual without the Palette itself knowing what a context is.
 _Avoid_: Provider list, command bus
+
+## Entity Browser
+
+**Entity Browser**:
+The durable, in-World surface (`/w/:worldId/entities`) that lists a single World's Entities as a card grid and lets the user find them by full-text search and Facets. Scoped to one World — distinct from the Command Palette (global, transient, cross-World) and the World Index (lists Worlds, not Entities).
+_Avoid_: Entity list, library, catalog, explorer
+
+**Facet**:
+A filterable dimension of a World's Entities offered in the Entity Browser with its distinct values and their counts — Type, Tag, and Visibility. Selecting values within one Facet is OR; across Facets is AND; the combined filter is AND-ed with the text query. Faceting on arbitrary Metadata keys is deferred.
+_Avoid_: Filter, dimension, aspect
+
+**Full-text search**:
+In the Entity Browser, matching a text query against an Entity's name, Tags, and the prose of its Content — ranked by relevance. Backed server-side by a plain-text projection of Content produced by a format-tagged extractor, so the domain still never parses Content (ADR-0019, ADR-0035).
+_Avoid_: Fulltext, keyword search, fuzzy search
