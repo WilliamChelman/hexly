@@ -6,7 +6,7 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { firstValueFrom } from 'rxjs';
+import { Subject, firstValueFrom, share } from 'rxjs';
 import { ENTITY_LIST_MAX_LIMIT, EntitySummary } from '@hexly/domain';
 import { EntitiesClient } from '../../../core/services/entities.client';
 import { searchEntities } from '../../../core/utils/search-entities';
@@ -55,13 +55,25 @@ export class EntityNameResolver {
     return entry();
   }
 
+  // The `@` picker's live query stream. `share()` lets a fast-typing burst's
+  // overlapping awaits collapse onto one debounced, superseding server search.
+  private readonly pickerQuery$ = new Subject<string>();
+  private readonly pickerResults$ = searchEntities(
+    this.client,
+    this.pickerQuery$,
+  ).pipe(share());
+
   /**
    * The owner's entities matching `query`, server-filtered (ADR-0025 `q`) — the
-   * `@` picker's source. `@tiptap/suggestion` awaits this per keystroke; a failed
-   * search yields an empty list rather than rejecting the popup.
+   * `@` picker's source. `@tiptap/suggestion` awaits this per keystroke; the
+   * shared search debounces the burst and a failed search yields an empty list
+   * rather than rejecting the popup.
    */
   search(query: string): Promise<EntitySummary[]> {
-    return firstValueFrom(searchEntities(this.client, query));
+    // Subscribe before pushing so the live search catches this query.
+    const result = firstValueFrom(this.pickerResults$);
+    this.pickerQuery$.next(query);
+    return result;
   }
 
   private scheduleFlush(): void {

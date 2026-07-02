@@ -17,7 +17,7 @@ export interface Command {
    * (middle-click, Ctrl/Cmd+click, Ctrl/Cmd+Enter). `run()` remains the plain
    * activation — for a link Command it navigates in place.
    */
-  readonly route?: readonly unknown[];
+  readonly route?: readonly string[];
   run(): void;
 }
 

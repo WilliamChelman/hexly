@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { firstValueFrom, of } from 'rxjs';
-import { ENTITY_LIST_MAX_LIMIT, EntitySummary } from '@hexly/domain';
+import { EntitySummary } from '@hexly/domain';
 import { EntitiesClient } from '../../../core/services/entities.client';
 import { MockEntitiesClient } from '../../../core/testing/entities-client.mock';
 import { EntityQuickOpen } from './entity-quick-open';
@@ -53,7 +53,7 @@ describe('EntityQuickOpen', () => {
 
     expect(entitiesClient.list).toHaveBeenCalledWith({
       q: 'alder',
-      limit: ENTITY_LIST_MAX_LIMIT,
+      limit: 20,
     });
     expect(commands).toEqual([
       expect.objectContaining({ id: 'e1', label: 'Aldermoor' }),

@@ -311,10 +311,8 @@ export class CommandPalette {
     this.close();
   }
 
-  private openInNewTab(route: readonly unknown[]): void {
-    const url = this.router.serializeUrl(
-      this.router.createUrlTree(route as unknown[]),
-    );
+  private openInNewTab(route: readonly string[]): void {
+    const url = this.router.serializeUrl(this.router.createUrlTree([...route]));
     window.open(url, '_blank', 'noopener');
   }
 

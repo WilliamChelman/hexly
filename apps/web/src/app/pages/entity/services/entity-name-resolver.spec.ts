@@ -96,7 +96,7 @@ describe('EntityNameResolver', () => {
 
     const items = await resolver.search('aval');
 
-    expect(client.list).toHaveBeenCalledWith({ q: 'aval', limit: 200 });
+    expect(client.list).toHaveBeenCalledWith({ q: 'aval', limit: 20 });
     expect(items.map((e) => e.id)).toEqual(['n1']);
   });
 });
