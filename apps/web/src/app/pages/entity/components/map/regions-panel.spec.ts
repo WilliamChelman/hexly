@@ -23,11 +23,9 @@ describe('RegionsPanel', () => {
 
   it('lists every Region with its name and colour swatch, including emptied ones', () => {
     const store = TestBed.inject(HexMapStore);
-    // A populated Region and an emptied one (zero member hexes, so invisible on the
-    // canvas) must both appear — the panel must not assume non-empty membership.
     const populated = store.createRegion('The Kingdom of Avalon', '#b08a4e');
     store.addHexToRegion(populated, { q: 0, r: 0 });
-    store.createRegion('The Whisperwood', '#6f7fae'); // never painted: stays empty
+    store.createRegion('The Whisperwood', '#6f7fae');
 
     const rows = items(render().nativeElement);
 
@@ -36,10 +34,9 @@ describe('RegionsPanel', () => {
       expect.stringContaining('The Kingdom of Avalon'),
       expect.stringContaining('The Whisperwood'),
     ]);
-    // Each row carries the Region's colour, on a swatch.
     const swatches = rows.map((row) => row.querySelector('[appSwatch]') as HTMLElement);
     expect(swatches.every((s) => s !== null)).toBe(true);
-    expect(swatches[1].style.background).toContain('rgb(111, 127, 174)'); // #6f7fae
+    expect(swatches[1].style.background).toContain('rgb(111, 127, 174)');
   });
 
   it('creates a Region through New Region, listing it without any painting', () => {
@@ -51,8 +48,6 @@ describe('RegionsPanel', () => {
     ).click();
     fixture.detectChanges();
 
-    // The fresh Region is appended to the document with no member hexes, and shows
-    // up in the list as "Region 1".
     expect(store.document().regions).toHaveLength(1);
     expect(store.document().regions[0].name).toBe('Region 1');
     expect(store.document().regions[0].hexes).toEqual({});
@@ -90,16 +85,12 @@ describe('RegionsPanel', () => {
 
   it('routes a list selection through the shared store selection, even for an empty Region', () => {
     const store = TestBed.inject(HexMapStore);
-    // An emptied Region — reachable only by id — proves the row goes through the
-    // same store selection the canvas uses, not a coordinate click.
     const id = store.createRegion('The Whisperwood', '#6f7fae');
     store.showRegionsPanel();
     const fixture = render();
 
     items(fixture.nativeElement)[0].click();
 
-    // Selecting in the list is identical to selecting on the canvas: the shared
-    // store selection points at the Region, and the column flips to the Inspector.
     expect(store.selection()).toEqual({ kind: 'region', id });
     expect(store.selectedRegion()?.name).toBe('The Whisperwood');
     expect(store.rightPanel()).toBe('inspector');

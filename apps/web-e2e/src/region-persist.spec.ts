@@ -16,32 +16,23 @@ test('creates a region in the panel, paints a hex, saves, and the region survive
   await enterLibrary(page);
   await page.getByTestId('new-map').click();
 
-  // Creating a map opens the editor at /entities/:id.
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const mapId = page.url().split('/').pop();
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
 
-  // Creation lives in the Regions panel now (ADR-0012). Open the right-edge rail's
-  // Regions panel and create a Region: New Region mints 'Region 1', selects it (so
-  // the Inspector opens on its name field — the earliest observable checkpoint, as
-  // membership has no status counter) and arms the Add brush.
+  // Create Region in the Regions panel (ADR-0012). New Region arms the Add brush.
   await page.getByTestId('rail-regions').click();
   await page.getByTestId('new-region').click();
   await expect(page.getByTestId('region-name')).toHaveValue('Region 1');
 
-  // Click the centre hex (the canvas centres the world origin on load, so a plain
-  // click lands on (0,0)): with the new Region armed in Add, the stroke paints (0,0)
-  // into its membership. No terrain needed.
+  // Click the centre hex to paint (0,0) into its membership.
   await canvas.click();
 
   await flushSave(page);
 
-  // The seam under test: a fresh load re-fetches the saved map.
   await page.reload();
 
-  // Read the persisted document: it proves the round trip held the region with that
-  // coordinate in its membership set, and its auto-assigned 'Region 1' name.
   const res = await request.get(`/api/entities/${mapId}`);
   expect(res.ok()).toBeTruthy();
   const detail = await res.json();
@@ -49,9 +40,7 @@ test('creates a region in the panel, paints a hex, saves, and the region survive
   expect(detail.document.regions[0].hexes).toEqual({ '0,0': true });
   expect(detail.document.regions[0].name).toBe('Region 1');
 
-  // The reloaded map boots in Select (issue #27). Clicking the centre hex selects
-  // the Region that contains (0,0) — a Void coordinate inside a Region selects it
-  // (ADR-0011) — and the Inspector re-renders its loaded name.
+  // The reloaded map boots in Select (issue #27). Void inside a Region selects it (ADR-0011).
   await canvas.click();
   await expect(page.getByTestId('region-name')).toHaveValue('Region 1');
 });

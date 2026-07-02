@@ -18,14 +18,12 @@ test('names a painted hex in the Inspector, and the name survives a reload', asy
   await enterLibrary(page);
   await page.getByTestId('new-map').click();
 
-  // Creating a map opens the editor at /entities/:id.
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const mapId = page.url().split('/').pop();
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
 
-  // Paint the centre hex (the canvas centres the world origin on load), picking a
-  // non-default terrain so the saved document is unambiguous.
+  // Paint a non-default terrain so the saved document is unambiguous.
   await page.getByTestId('tool-terrain').click();
   await page
     .getByRole('group', { name: 'Terrain' })
@@ -34,9 +32,7 @@ test('names a painted hex in the Inspector, and the name survives a reload', asy
   await canvas.click();
   await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
 
-  // The journey under test: select that hex with the universal Select tool, so the
-  // Inspector opens on it, and name it. Tab blurs the field, firing the (change)
-  // the Inspector commits on.
+  // Tab blurs the field, firing the (change) the Inspector commits on.
   await page.getByTestId('tool-select').click();
   await canvas.click();
   const name = page.getByTestId('entity-name');
@@ -46,17 +42,14 @@ test('names a painted hex in the Inspector, and the name survives a reload', asy
 
   await flushSave(page);
 
-  // The seam under test: a fresh load re-fetches the saved map.
   await page.reload();
 
-  // The persisted document really holds the named hex.
   const res = await request.get(`/api/entities/${mapId}`);
   expect(res.ok()).toBeTruthy();
   const detail = await res.json();
   expect(detail.document.hexes['0,0']).toEqual({ terrain: 'ocean', name: 'Riverbend' });
 
-  // The reloaded map boots in Select (issue #27). Clicking the centre re-selects the
-  // re-rendered hex, and the Inspector shows its persisted name, ready to re-edit.
+  // The reloaded map boots in Select (issue #27). Clicking the centre re-selects the hex.
   await canvas.click();
   await expect(page.getByTestId('entity-name')).toHaveValue('Riverbend');
 });

@@ -49,7 +49,6 @@ describe('SlashMenu', () => {
     expect(handled).toBe(true);
 
     expect(menu.onKeyDown(new KeyboardEvent('keydown', { key: 'Enter' }))).toBe(true);
-    // First item is index 0; ArrowDown moved to index 1 before Enter.
     expect(command).toHaveBeenCalledWith(SLASH_ITEMS[1]);
   });
 
@@ -88,5 +87,21 @@ describe('SlashMenu', () => {
     const { menu } = open();
 
     expect(menu.onKeyDown(new KeyboardEvent('keydown', { key: 'a' }))).toBe(false);
+  });
+
+  it('keeps the current items on a loading update, so an async query never blanks', () => {
+    const { fixture, menu } = open([
+      SLASH_ITEMS.find((i) => i.id === 'heading1')!,
+    ]);
+
+    menu.update({
+      items: [],
+      command: vi.fn(),
+      clientRect: () => ({ left: 100, bottom: 200 }) as DOMRect,
+      loading: true,
+    });
+    fixture.detectChanges();
+
+    expect(el(fixture).textContent ?? '').toContain('Heading 1');
   });
 });

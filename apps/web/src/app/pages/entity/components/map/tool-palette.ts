@@ -16,12 +16,9 @@ import {
   ToolId,
 } from '../../services/hexmap-store';
 
-/** A top-level Tool button in the floating icon strip (issue #27, ADR-0013). */
 interface ToolDef {
   readonly id: ToolId;
-  /** The keycap that arms this Tool — surfaced in the tooltip (`Terrain (T)`). */
   readonly key: string;
-  /** The glyph drawn in the button (ADR-0007). */
   readonly glyph: IconName;
 }
 
@@ -46,24 +43,10 @@ function glyphFor(subtool: SelectSubtool): IconName {
 }
 
 /**
- * The floating tool palette: a compact icon strip in the top-left of the map —
- * one icon button per Tool (Select, Terrain, Feature, Label, Erase), plus Undo
- * and Redo below a divider — and a contextual flyout to its right that shows the
- * armed Tool's Subtools as an icon grid (terrain swatches, or feature icons +
- * Clear). The strip and flyout float as cards over the full-bleed canvas; the
- * shell positions this component top-left (ADR-0013).
- *
- * The flyout is bound to the armed Tool: it opens **only** for the Tools that
- * have Subtools (Select with Pick/Marquee, Terrain, and Feature — ADR-0017) and
- * is absent for Label and Erase, which have none — so the map stays maximally
- * clear with nothing to configure.
- * Region is not a palette Tool (ADR-0012): while the membership brush is armed
- * (internal `region` state), the strip highlights no Tool and opens no flyout —
- * the active affordance is the Inspector's Add/Remove (issue #38, story 25).
- *
- * The armed Tool and its Subtools live in the shared {@link HexMapStore} so the
- * canvas applies them (ADR-0005). Discoverability moves from inline labels to
- * `title` tooltips of the form `Terrain (T)` (name + keycap), per ADR-0013.
+ * Floating tool palette: icon strip + contextual flyout of Subtools (ADR-0013, ADR-0017).
+ * Flyout opens only for Tools with Subtools (Select, Terrain, Feature). Region is not
+ * a palette Tool (ADR-0012): affordance is the Inspector's Add/Remove.
+ * Armed Tool lives in {@link HexMapStore} so canvas applies it (ADR-0005).
  */
 @Component({
   selector: 'app-tool-palette',
@@ -214,17 +197,9 @@ function glyphFor(subtool: SelectSubtool): IconName {
 export class ToolPalette {
   protected readonly store = inject(HexMapStore);
 
-  /** The floating strip's Tool buttons, in palette order (issue #27). */
   protected readonly tools = TOOLS;
 
-  /**
-   * The Select tool's Subtools — Pick then Marquee — each placeable from the
-   * Select flyout (ADR-0017). The keycap is the Subtool's slot in
-   * {@link selectSubtools}, the shared ordering the keyboard `1`/`2` indexes — so
-   * the tooltip can never disagree with what its key arms. The glyph is the arrow
-   * cursor for Pick, a dashed box for Marquee; the name resolves from the stable
-   * id (`editorShell.toolPalette.<id>`, ADR-0014).
-   */
+  // Select Subtools: keycap is the slot in selectSubtools, shared with keyboard 1/2.
   protected readonly selectTools = selectSubtools.map((id, i) => ({
     id,
     nameKey: `editorShell.toolPalette.${id}`,
@@ -232,11 +207,6 @@ export class ToolPalette {
     key: String(i + 1),
   }));
 
-  /**
-   * The built-in feature library, each placeable from the flyout. The keycap is
-   * the feature's slot in {@link featureSubtools}, the shared ordering the
-   * keyboard indexes — so the tooltip can never disagree with what its key arms.
-   */
   protected readonly features = featureLibrary.map((f) => ({
     id: f.id,
     nameKey: featureKey(f.id),
@@ -244,11 +214,8 @@ export class ToolPalette {
     key: String(featureSubtools.indexOf(f.id) + 1),
   }));
 
-  /** The keycap for the Clear feature Subtool — its slot in {@link featureSubtools}. */
   protected readonly clearKey = String(featureSubtools.indexOf('clear') + 1);
 
-  /** The built-in terrain palette, with a 1-based number key per entry. The name
-   * is resolved from the id (`domain.terrain.<id>`, ADR-0014). */
   protected readonly terrainTools = terrainPalette.map((t, i) => ({
     id: t.id,
     nameKey: terrainKey(t.id),

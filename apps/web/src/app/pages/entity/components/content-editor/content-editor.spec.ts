@@ -14,7 +14,6 @@ import { noteDetail } from '../entity-detail.fixtures';
 describe('ContentEditor', () => {
   const note = noteDetail;
 
-  // Note whose stored snapshot carries prose, to prove re-seeding.
   const noteWithProse = (text: string): EntityDetail => ({
     ...note('Lady Mara'),
     document: {
@@ -42,7 +41,6 @@ describe('ContentEditor', () => {
       return typeof key === 'string' && key.startsWith('formattingBubbleMenu');
     });
 
-  /** Create the editor with a (required) aria-label set, like every caller. */
   function create() {
     const fixture = TestBed.createComponent(ContentEditor);
     (fixture.componentRef as ComponentRef<ContentEditor>).setInput(
@@ -73,8 +71,6 @@ describe('ContentEditor', () => {
 
     const fixture = create();
 
-    // Stored prose renders into the surface — the snapshot was loaded into the
-    // editor, not just held in the session.
     const surface = fixture.nativeElement.querySelector(
       '[data-testid=note-content]',
     ) as HTMLElement;
@@ -111,8 +107,6 @@ describe('ContentEditor', () => {
 
     const fixture = create();
 
-    // Toolbar is rendered (hidden until selection); the plugin owns show/hide,
-    // so presence is all the wiring guarantees.
     expect(fixture.nativeElement.querySelector('[role=toolbar]')).not.toBeNull();
   });
 
@@ -134,7 +128,6 @@ describe('ContentEditor', () => {
 
     expect(second).not.toBe(first);
     expect(first.isDestroyed).toBe(true);
-    // The bubble menu must follow onto the fresh editor.
     expect(hasBubbleMenu(second)).toBe(true);
 
     const surface = fixture.nativeElement.querySelector(
@@ -187,7 +180,6 @@ describe('ContentEditor', () => {
 
     const spy = vi.spyOn(session, 'setContent');
     editorOf(fixture).commands.insertContent('!');
-    // The new editor's update listener must be wired, or edits silently stop saving.
     expect(spy).toHaveBeenCalled();
   });
 });

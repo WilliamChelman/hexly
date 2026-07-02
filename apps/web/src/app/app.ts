@@ -3,6 +3,8 @@ import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter, map, of, switchMap, timer } from 'rxjs';
 import { AppShellStore } from './shell/app-shell.store';
+import { CommandPalette } from './shell/command-palette/command-palette';
+import { CreateEntityDialog } from './shell/command-palette/create-entity-dialog';
 import { NavRail } from './shell/nav-rail';
 import { Toaster } from './shell/toaster';
 import { Icon } from './ui/icon/icon';
@@ -14,7 +16,7 @@ const FULL_CURTAIN_DELAY_MS = 150;
 @Component({
   selector: 'app-root',
   host: { class: 'flex h-screen' },
-  imports: [RouterOutlet, NavRail, Toaster, Icon],
+  imports: [RouterOutlet, NavRail, Toaster, CommandPalette, CreateEntityDialog, Icon],
   template: `
     @if (navigated() && !shell.standalone()) {
       <app-nav-rail />
@@ -62,14 +64,15 @@ const FULL_CURTAIN_DELAY_MS = 150;
       </div>
     }
     <app-toaster />
+    <app-command-palette />
+    <app-create-entity-dialog />
   `,
 })
 export class App {
   protected readonly shell = inject(AppShellStore);
 
-  // Defer the full curtain's appearance by FULL_CURTAIN_DELAY_MS so a quick
-  // (cached) language switch never flashes it; drop it the instant loading
-  // leaves 'full'. switchMap cancels the pending timer if that happens first.
+  // Debounce so a cached (instant) language switch never flashes the curtain;
+  // switchMap cancels the pending timer if loading resolves early.
   protected readonly showFull = toSignal(
     toObservable(this.shell.loading).pipe(
       switchMap((level) =>
@@ -81,15 +84,12 @@ export class App {
     { initialValue: false },
   );
 
-  // Standalone pages (e.g. login) hide the rail, so its brand-mark pulse can't
-  // carry the subtle signal — fall back to a corner pulse there.
   protected readonly showSubtleFallback = computed(
     () => this.shell.loading() === 'subtle' && this.shell.standalone(),
   );
 
-  // Hold the rail back until the first navigation resolves; by then the landing
-  // page's constructor has set `standalone`, so a cold load on /login never
-  // flashes the rail.
+  // Wait for first navigation so the landing page's `standalone` flag is set,
+  // preventing the rail flash on cold /login loads.
   protected readonly navigated = toSignal(
     inject(Router).events.pipe(
       filter((e) => e instanceof NavigationEnd),

@@ -51,7 +51,7 @@ export class WorldsController {
     return world;
   }
 
-  // Body is the same `{ name }` shape as create — reuse its schema rather than mint a twin.
+  // Reuse create schema (both use { name } shape).
   @Patch(':id')
   rename(
     @CurrentUser() user: AuthUser,

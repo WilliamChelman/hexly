@@ -28,7 +28,6 @@ import { EntityNameResolver } from '../../services/entity-name-resolver';
   selector: 'app-entity-link-view',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink, TranslocoPipe],
-  // Inline so it flows within the paragraph rather than breaking the line.
   host: { class: 'inline' },
   template: `
     @if (dangling()) {

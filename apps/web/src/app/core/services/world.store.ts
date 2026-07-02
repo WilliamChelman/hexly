@@ -31,11 +31,8 @@ export class WorldStore {
   // ever change out-of-band.
   private hasLoaded = false;
 
-  /** The caller's Worlds (owned + member), as last loaded. */
   readonly worlds = this._worlds.asReadonly();
-  /** True once load() has resolved (whether with Worlds or empty) — gates the empty state. */
   readonly loaded = this._loaded.asReadonly();
-  /** True when the last load() call failed — gates the error state in the World Index. */
   readonly loadError = this._loadError.asReadonly();
 
   // The authenticated user's *identity*, not the mirror object: refresh() re-mirrors
@@ -78,14 +75,14 @@ export class WorldStore {
     });
   }
 
-  /** Create a World (server mints its Home Entity) and append it to the list. */
+  // Server mints the Home Entity atomically; append the result to the list.
   create(name: string): Observable<WorldDetail> {
     return this.client.create(name).pipe(
       tap((world) => this._worlds.update((ws) => [...ws, world])),
     );
   }
 
-  /** Rename a World (Owner-only server-side, ADR-0024) and update it in place. */
+  // Owner-only server-side (ADR-0024); update in place after save.
   rename(id: string, name: string): Observable<WorldDetail> {
     return this.client.rename(id, name).pipe(
       tap((world) =>
@@ -96,7 +93,7 @@ export class WorldStore {
     );
   }
 
-  /** Delete a World (Owner-only server-side, cascades its Entities) and drop it from the list. */
+  // Owner-only server-side, cascades its Entities; remove from list after delete.
   delete(id: string): Observable<void> {
     return this.client.delete(id).pipe(
       tap(() => this._worlds.update((ws) => ws.filter((w) => w.id !== id))),

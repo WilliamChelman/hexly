@@ -2,6 +2,7 @@ import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
 import { EntitiesClient } from '../services/entities.client';
+import { entityRoute } from '../utils/routes';
 
 /**
  * Resolves an Entity's World from its id and redirects the World-agnostic
@@ -20,7 +21,7 @@ export const entityWorldRedirect: CanActivateFn = (route) => {
       map((page) => {
         const target = page.items[0];
         return target
-          ? router.createUrlTree(['/w', target.worldId, 'entities', id])
+          ? router.createUrlTree(entityRoute(target.worldId, id))
           : true;
       }),
       catchError(() => of(true)),

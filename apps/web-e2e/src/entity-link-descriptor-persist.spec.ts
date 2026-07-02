@@ -13,20 +13,17 @@ test('characterises a Content Entity Link via :: , persists the descriptor, and 
   page,
   request,
 }) => {
-  // Seed the link target.
   await enterLibrary(page);
   await page.getByTestId('new-note').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const targetId = page.url().split('/').pop();
 
-  // The source note that will carry the characterised link.
   await enterLibrary(page);
   await page.getByTestId('new-note').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const sourceId = page.url().split('/').pop();
 
-  // Insert the link via @, then characterise it via :: — the cursor sits right after the
-  // link on insert, which is exactly where :: arms.
+  // The cursor sits right after link insert, which is exactly where :: arms.
   const surface = page.getByTestId('note-content');
   await surface.click();
   await page.keyboard.type('Married to ');
@@ -34,13 +31,11 @@ test('characterises a Content Entity Link via :: , persists the descriptor, and 
   await expect(page.getByTestId('entity-picker')).toBeVisible();
   await page.getByTestId(`entity-picker-option-${targetId}`).click();
 
-  // :: arms the descriptor picker (a link precedes the cursor); type a brand-new descriptor.
   await page.keyboard.type('::');
   await expect(page.getByTestId('descriptor-picker')).toBeVisible();
   await page.keyboard.type('spouse');
   await page.getByTestId('descriptor-picker-option-spouse').click();
 
-  // The atom now renders the live name with the descriptor as a parenthetical suffix.
   const link = page.getByTestId('entity-link');
   await expect(link).toHaveText('Untitled note (spouse)');
 
@@ -53,6 +48,5 @@ test('characterises a Content Entity Link via :: , persists the descriptor, and 
   const vocab = await (await request.get('/api/entities/descriptors')).json();
   expect(vocab).toContain('spouse');
 
-  // After reload it re-renders as Name (descriptor) with the target's live name.
   await expect(page.getByTestId('entity-link')).toHaveText('Untitled note (spouse)');
 });

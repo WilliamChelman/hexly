@@ -9,7 +9,7 @@ import { AuthModule } from '../auth/auth.module';
 import { EntitiesModule } from './entities.module';
 import { WorldsModule } from '../worlds/worlds.module';
 
-/** An empty hexmap body — the shape create mints and the editor round-trips. */
+// Empty hexmap body shape (what create mints; what editor round-trips).
 const emptyHexmapBody = {
   type: 'hexmap',
   content: emptyContent(),
@@ -23,8 +23,7 @@ describe('Entities endpoints', () => {
   let db: Db;
 
   beforeEach(async () => {
-    // Real Drizzle, real schema, isolated per-test (ADR-0002).
-    db = createDb(':memory:');
+    db = createDb(':memory:'); // Isolated per-test (ADR-0002).
     const moduleRef = await Test.createTestingModule({
       imports: [AuthModule, EntitiesModule, WorldsModule],
     })
@@ -54,7 +53,6 @@ describe('Entities endpoints', () => {
     mintWorldWithHome(db.$client, userId, name);
   }
 
-  /** Log a seeded user in and return an agent that carries their session. */
   async function signIn(email: string, password: string) {
     const agent = request.agent(app.getHttpServer());
     await agent.post('/auth/login').send({ email, password }).expect(200);
@@ -115,8 +113,7 @@ describe('Entities endpoints', () => {
 
     const res = await ada.get('/entities').expect(200);
 
-    // The response is always the envelope — never a bare array (ADR-0025).
-    // 'Ada' is the World's Home note, auto-created when Ada was seeded (ADR-0024).
+    // Response is always an envelope (ADR-0025). 'Ada' is the auto-created Home note (ADR-0024).
     expect(res.body.nextCursor).toBeNull();
     expect(res.body.items.map((e: { name: string }) => e.name).sort()).toEqual([
       'Ada',
@@ -136,7 +133,7 @@ describe('Entities endpoints', () => {
       await ada.post('/entities').send({ name, type: 'note' });
     }
 
-    // Walk the whole list two-at-a-time, following nextCursor to the end.
+    // Walk list two-at-a-time via nextCursor.
     const seen: string[] = [];
     let cursor: string | null = null;
     let pages = 0;
@@ -151,10 +148,10 @@ describe('Entities endpoints', () => {
       pages++;
     } while (cursor);
 
-    // Every entity surfaced exactly once — no duplicates, no gaps.
+    // All entities seen exactly once (no duplicates or gaps).
     expect(seen.slice().sort()).toEqual(names.slice().sort());
     expect(seen.length).toBe(names.length);
-    // 6 entities (5 + Home note) at 2 per page = 3 pages (2 + 2 + 2), last cursor null.
+    // 6 entities at 2/page = 3 pages.
     expect(pages).toBe(3);
   });
 
@@ -164,14 +161,12 @@ describe('Entities endpoints', () => {
     await ada.post('/entities').send({ name: 'Aldermoor Town', type: 'note' });
     await ada.post('/entities').send({ name: 'The Whisperwood', type: 'note' });
 
-    // q matches a substring of the name, case-insensitively.
     const byName = await ada.get('/entities').query({ q: 'aldermoor' }).expect(200);
     expect(byName.body.items.map((e: { name: string }) => e.name).sort()).toEqual([
       'Aldermoor Keep',
       'Aldermoor Town',
     ]);
 
-    // type filters by Entity Type — including the World's Home note 'Ada'.
     const byType = await ada.get('/entities').query({ type: 'note' }).expect(200);
     expect(byType.body.items.map((e: { name: string }) => e.name).sort()).toEqual([
       'Ada',
@@ -179,7 +174,6 @@ describe('Entities endpoints', () => {
       'The Whisperwood',
     ]);
 
-    // The two compose — only the note named like "aldermoor".
     const both = await ada
       .get('/entities')
       .query({ q: 'aldermoor', type: 'note' })
@@ -195,8 +189,7 @@ describe('Entities endpoints', () => {
     await ada.post('/entities').send({ name: 'The Whisperwood', type: 'note' });
     const c = await ada.post('/entities').send({ name: 'Lady A', type: 'note' });
 
-    // ids selects the given set through the same envelope — and silently drops
-    // an unknown id rather than erroring (the picker's display-resolve path).
+    // ids silently drops unknown ids (picker's display-resolve path).
     const res = await ada
       .get('/entities')
       .query({ ids: [a.body.id, c.body.id, 'no-such-id'] })
@@ -209,21 +202,18 @@ describe('Entities endpoints', () => {
 
   it('filters the entity list to one World via worldId', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
-    // Ada's seeded World holds Home note 'Ada' plus this new map.
     const seeded = await ada
       .post('/entities')
       .send({ name: 'In Seeded World', type: 'note' })
       .expect(201);
     const worldA = seeded.body.worldId;
 
-    // A second World for Ada, with its own entity.
     const worldB = await ada.post('/worlds').send({ name: 'Second' }).expect(201);
     await ada
       .post('/entities')
       .send({ name: 'In Second World', type: 'note', worldId: worldB.body.id })
       .expect(201);
 
-    // worldId scopes the list to that World's entities only.
     const inA = await ada.get('/entities').query({ worldId: worldA }).expect(200);
     expect(inA.body.items.map((e: { name: string }) => e.name).sort()).toEqual([
       'Ada',
@@ -309,14 +299,12 @@ describe('Entities endpoints', () => {
     const id = created.body.id;
     const body = { type: 'note', content: emptyContent() };
 
-    // Case and surrounding whitespace fold together; duplicates collapse (#88).
     const res = await ada
       .put(`/entities/${id}`)
       .send({ document: body, version: 1, tags: [' Deity ', 'deity', 'RUINED'] })
       .expect(200);
     expect(res.body.tags).toEqual(['deity', 'ruined']);
 
-    // A whitespace-only tag is rejected, not stored as a blank chip (#88).
     await ada
       .put(`/entities/${id}`)
       .send({ document: body, version: 2, tags: ['   '] })
@@ -328,7 +316,7 @@ describe('Entities endpoints', () => {
     const created = await ada
       .post('/entities')
       .send({ name: 'Lady A', type: 'note' });
-    // An editor-defined snapshot the domain has no knowledge of (ADR-0019).
+    // Editor-defined snapshot; domain has no knowledge of it (ADR-0019).
     const snapshot = { type: 'doc', content: [{ type: 'futureBlock', attrs: { z: [1] } }] };
     const body = { type: 'note', content: { format: 'tiptap-v1', snapshot } };
 
@@ -362,7 +350,7 @@ describe('Entities endpoints', () => {
       .put(`/entities/${id}`)
       .send({ document: stale, version: 1, tags: [] })
       .expect(409);
-    // The 409 carries the server's current Entity so the client can re-pull.
+    // 409 includes server's current Entity for client re-pull.
     expect(conflict.body.version).toBe(2);
     expect(conflict.body.document).toEqual(first);
 
@@ -413,12 +401,11 @@ describe('Entities endpoints', () => {
   it('refuses to delete a World’s Home Entity with 409', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
 
-    // The Home note 'Ada' was minted with Ada's World (ADR-0024); it can't be deleted.
+    // Home note can't be deleted (minted with World, ADR-0024).
     const list = await ada.get('/entities').expect(200);
     const home = list.body.items.find((e: { name: string }) => e.name === 'Ada');
 
     await ada.delete(`/entities/${home.id}`).expect(409);
-    // Still loadable — the rejected delete left it intact.
     await ada.get(`/entities/${home.id}`).expect(200);
   });
 
@@ -432,12 +419,10 @@ describe('Entities endpoints', () => {
     await seedUserWithWorld('bob@hexly.test', 'battery staple', 'Bob');
     const bob = await signIn('bob@hexly.test', 'battery staple');
 
-    // Bob sees only his own World's Home note 'Bob' (ADR-0024) — never Ada's Entity.
+    // Bob sees only his Home note (ADR-0024); ownership never leaks (ADR-0004).
     const bobsList = await bob.get('/entities').expect(200);
     expect(bobsList.body.items.map((e: { name: string }) => e.name)).toEqual(['Bob']);
     expect(bobsList.body.items.map((e: { id: string }) => e.id)).not.toContain(id);
-
-    // 404, not 403 — ownership never leaks (ADR-0004).
     await bob.get(`/entities/${id}`).expect(404);
     await bob
       .put(`/entities/${id}`)
@@ -460,11 +445,9 @@ describe('Entities endpoints', () => {
     const bob = await signIn('bob@hexly.test', 'battery staple');
     await bob.post('/entities').send({ name: 'Aldermoor', type: 'hexmap' });
 
-    // ids can't reach across owners — asking for Ada's id as Bob resolves to nothing.
     const byId = await bob.get('/entities').query({ ids: [adas.body.id] }).expect(200);
     expect(byId.body.items).toEqual([]);
 
-    // q/type only ever match Bob's own rows, never Ada's same-named hexmap.
     const byQ = await bob.get('/entities').query({ q: 'aldermoor', type: 'hexmap' }).expect(200);
     expect(byQ.body.items).toHaveLength(1);
     expect(byQ.body.items.map((e: { id: string }) => e.id)).not.toContain(adas.body.id);
@@ -473,14 +456,10 @@ describe('Entities endpoints', () => {
   it('rejects a malformed cursor or limit with 400, not a 500', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
 
-    // A cursor that doesn't decode to a valid offset is a client error (ADR-0001).
     await ada.get('/entities').query({ cursor: 'not-a-real-cursor!!' }).expect(400);
-    // Non-numeric, zero, and negative limits are all malformed.
     await ada.get('/entities').query({ limit: 'lots' }).expect(400);
     await ada.get('/entities').query({ limit: '0' }).expect(400);
     await ada.get('/entities').query({ limit: '-5' }).expect(400);
-
-    // A sane cursor/limit still works — the guard rejects only the malformed.
     await ada.get('/entities').query({ limit: '10' }).expect(200);
   });
 
@@ -509,7 +488,6 @@ describe('Entities endpoints', () => {
         })
         .expect(200);
 
-      // DISTINCT, case-folded, sorted for a stable suggestion order.
       const res = await ada.get('/entities/descriptors').expect(200);
       expect(res.body).toEqual(['capital of', 'spouse']);
     });
@@ -545,7 +523,6 @@ describe('Entities endpoints', () => {
           descriptors: ['spouse', 'rival'],
         })
         .expect(200);
-      // The note's last link to "rival" was removed: the next save no longer harvests it.
       await ada
         .put(`/entities/${id}`)
         .send({ document: noteBody, version: 2, tags: [], descriptors: ['spouse'] })
@@ -577,7 +554,6 @@ describe('Entities endpoints', () => {
         .put(`/entities/${id}`)
         .send({ document: noteBody, version: 1, tags: [], descriptors: ['spouse'] })
         .expect(200);
-      // A save built on the stale base version is a 409 and must not touch the index.
       await ada
         .put(`/entities/${id}`)
         .send({ document: noteBody, version: 1, tags: [], descriptors: ['rival'] })
@@ -633,7 +609,7 @@ describe('Entities endpoints', () => {
       .send({ name: 'Aldermoor', type: 'hexmap' });
     const id = created.body.id;
 
-    // Out-of-band corruption: read path must surface 500, not serve malformed data (ADR-0001).
+    // Corruption must surface 500, not serve malformed data (ADR-0001).
     app.get<{ $client: import('better-sqlite3').Database }>(DB).$client
       .prepare('UPDATE entities SET tags = ? WHERE id = ?')
       .run('"not-an-array"', id);
@@ -650,12 +626,9 @@ describe('Entities endpoints', () => {
     const id = created.body.id;
 
     await ada.post('/entities').send({ name: '', type: 'note' }).expect(400);
-    // A whitespace-only name trims to "" and is likewise rejected.
     await ada.post('/entities').send({ name: '   ', type: 'note' }).expect(400);
-    // An unknown type is rejected before anything is stored.
     await ada.post('/entities').send({ name: 'X', type: 'spreadsheet' }).expect(400);
     await ada.put(`/entities/${id}`).send({ document: emptyHexmapBody }).expect(400);
-    // A hexmap body with an unknown terrain is rejected before it is ever stored.
     await ada
       .put(`/entities/${id}`)
       .send({

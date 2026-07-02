@@ -35,12 +35,11 @@ test('drags one label of a multi-label selection and the whole group moves', asy
   const cy = box.y + box.height / 2;
   const gap = 150; // labels far enough apart that their hit boxes never overlap
 
-  // Drop two labels at distinct points.
   await page.getByTestId('tool-label').click();
   await canvas.click({ position: { x: box.width / 2, y: box.height / 2 } });
   await canvas.click({ position: { x: box.width / 2 + gap, y: box.height / 2 } });
 
-  // Select both: click the first, Shift-click the second to add it.
+  // Select both: click the first, Shift-click the second.
   await page.getByTestId('tool-select').click();
   await canvas.click({ position: { x: box.width / 2, y: box.height / 2 } });
   await canvas.click({
@@ -48,15 +47,13 @@ test('drags one label of a multi-label selection and the whole group moves', asy
     modifiers: ['Shift'],
   });
 
-  // Capture where the two labels sit before the drag.
   const before = (await savedDocument(page, request, mapId)).labels as {
     id: string;
     position: { x: number; y: number };
   }[];
   expect(before).toHaveLength(2);
 
-  // Press the first label and drag ~80px right. With a labels-only selection the
-  // move is free pixels, so both labels ride by the same delta.
+  // Drag ~80px right. Labels-only selection moves all by the same delta.
   const dx = 80;
   await page.mouse.move(cx, cy);
   await page.mouse.down();
@@ -70,8 +67,7 @@ test('drags one label of a multi-label selection and the whole group moves', asy
   }[];
   expect(after).toHaveLength(2);
 
-  // Every label moved by the same ~+80px in x and held its y — the group rode
-  // together rather than collapsing to the one that was grabbed.
+  // Every label moved by the same ~+80px in x and held its y.
   for (const b of before) {
     const a = after.find((l) => l.id === b.id);
     expect(a, `label ${b.id} survived`).toBeTruthy();
@@ -98,14 +94,13 @@ test('drags a region on its own and its whole footprint moves', async ({
   const cy = box.y + box.height / 2;
   const dx = 100; // one column right (offset q+1)
 
-  // Create a region and paint the centre (0,0) into its membership (no terrain).
+  // Create a region and paint the centre (0,0) into its membership.
   await page.getByTestId('rail-regions').click();
   await page.getByTestId('new-region').click();
   await expect(page.getByTestId('region-name')).toHaveValue('Region 1');
   await canvas.click();
 
-  // The region is still selected from creation. Arm Select and drag it by grabbing
-  // its member cell at the centre — the only handle a region has on the canvas.
+  // The region is still selected. Drag by grabbing its member cell.
   await page.getByTestId('tool-select').click();
   await page.mouse.move(cx, cy);
   await page.mouse.down();
@@ -113,7 +108,7 @@ test('drags a region on its own and its whole footprint moves', async ({
   await page.mouse.move(cx + dx, cy);
   await page.mouse.up();
 
-  // The footprint translated by the offset: the member moved from (0,0) to (1,0).
+  // The footprint translated by the offset.
   const doc = await savedDocument(page, request, mapId);
   expect(doc.regions).toHaveLength(1);
   expect(doc.regions[0].hexes).toEqual({ '1,0': true });

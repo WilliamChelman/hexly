@@ -14,8 +14,7 @@ describe('Worlds endpoints', () => {
   let adaId: string;
 
   beforeEach(async () => {
-    // Real Drizzle, real schema, isolated per-test (ADR-0002).
-    db = createDb(':memory:');
+    db = createDb(':memory:'); // Isolated per-test (ADR-0002).
     const moduleRef = await Test.createTestingModule({
       imports: [AuthModule, WorldsModule, EntitiesModule],
     })
@@ -36,7 +35,6 @@ describe('Worlds endpoints', () => {
     await app.close();
   });
 
-  /** Log a seeded user in and return an agent that carries their session. */
   async function signIn(email: string, password: string) {
     const agent = request.agent(app.getHttpServer());
     await agent.post('/auth/login').send({ email, password }).expect(200);
@@ -53,13 +51,12 @@ describe('Worlds endpoints', () => {
       name: 'Aldermoor',
       ownerId: expect.any(String),
       homeEntityId: expect.any(String),
-      // A fresh World holds exactly its Home Entity (#120).
+      // Fresh World holds only its Home Entity (#120).
       entityCount: 1,
       createdAt: expect.any(Number),
       updatedAt: expect.any(Number),
     });
 
-    // The Home Entity exists, belongs to the new World, and is a note.
     const home = await ada.get(`/entities/${res.body.homeEntityId}`).expect(200);
     expect(home.body.worldId).toBe(res.body.id);
     expect(home.body.type).toBe('note');
@@ -76,7 +73,7 @@ describe('Worlds endpoints', () => {
       'Aldermoor',
       'Whisperwood',
     ]);
-    // A summary carries no homeEntityId — that's a Detail concern.
+    // Summary carries no homeEntityId (Detail concern).
     expect(res.body[0]).not.toHaveProperty('homeEntityId');
     expect(res.body[0]).toEqual({
       id: expect.any(String),
@@ -92,7 +89,6 @@ describe('Worlds endpoints', () => {
     await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob');
     const bob = await signIn('bob@hexly.test', 'battery staple');
 
-    // Bob owns two worlds; he makes Ada a contributor on one.
     const shared = await bob.post('/worlds').send({ name: 'Shared' }).expect(201);
     await bob.post('/worlds').send({ name: 'Private' }).expect(201);
     db.$client
@@ -119,10 +115,7 @@ describe('Worlds endpoints', () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const created = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
 
-    // A fresh World has just its Home Entity.
     expect((await ada.get(`/worlds/${created.body.id}`).expect(200)).body.entityCount).toBe(1);
-
-    // Each Entity added to the World bumps the count (the cascade target, #120).
     await ada
       .post('/entities')
       .send({ name: 'Lady Mara', type: 'note', worldId: created.body.id })
@@ -137,7 +130,7 @@ describe('Worlds endpoints', () => {
     await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob');
     const bob = await signIn('bob@hexly.test', 'battery staple');
 
-    // 404, not 403 — a World the caller has no part in never leaks (ADR-0004).
+    // 404, not 403 (ownership never leaks, ADR-0004).
     await bob.get(`/worlds/${created.body.id}`).expect(404);
     await bob.get('/worlds/does-not-exist').expect(404);
   });
@@ -162,7 +155,6 @@ describe('Worlds endpoints', () => {
     const created = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
     const homeId = created.body.homeEntityId;
 
-    // Seeded equal: the Home note opens named after its World.
     expect((await ada.get(`/entities/${homeId}`).expect(200)).body.name).toBe('Aldermoor');
 
     await ada
@@ -170,7 +162,7 @@ describe('Worlds endpoints', () => {
       .send({ name: 'The Reach of Aldermoor' })
       .expect(200);
 
-    // The World name is the source of truth — the Home title follows it.
+    // World name is source of truth for Home title (ADR-0029).
     const home = await ada.get(`/entities/${homeId}`).expect(200);
     expect(home.body.name).toBe('The Reach of Aldermoor');
     expect(home.body.isHome).toBe(true);
@@ -200,7 +192,7 @@ describe('Worlds endpoints', () => {
     await ada.delete(`/worlds/${created.body.id}`).expect(204);
 
     await ada.get(`/worlds/${created.body.id}`).expect(404);
-    // The Home Entity goes with the World — the container is gone.
+    // Home Entity cascades with World.
     await ada.get(`/entities/${homeId}`).expect(404);
   });
 
@@ -214,7 +206,6 @@ describe('Worlds endpoints', () => {
     await bob.delete(`/worlds/${created.body.id}`).expect(403);
     await ada.delete('/worlds/does-not-exist').expect(404);
 
-    // Still there after the rejected delete.
     await ada.get(`/worlds/${created.body.id}`).expect(200);
   });
 

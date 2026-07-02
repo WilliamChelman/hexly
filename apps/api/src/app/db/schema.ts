@@ -40,7 +40,7 @@ export const sessions = sqliteTable(
     expiresAt: integer('expires_at').notNull(),
   },
   (table) => [
-    // Speeds up the expired-session sweep that runs on every login.
+    // Speeds up expired-session sweep (runs on every login).
     index('idx_sessions_expires_at').on(table.expiresAt),
   ]
 );
@@ -60,34 +60,29 @@ export const entities = sqliteTable(
     ownerId: text('owner_id')
       .notNull()
       .references(() => users.id),
-    // The World this Entity belongs to (ADR-0024); every Entity belongs to exactly
-    // one. `() =>` is the standard lazy ref to a table defined below.
+    // The World this Entity belongs to (ADR-0024).
     worldId: text('world_id')
       .notNull()
       .references(() => worlds.id),
-    // The World's Home Entity is the one flagged here (ADR-0024) — its landing
-    // page. At most one per World (partial unique index below). Keeping the flag
-    // on the Entity avoids a circular FK and makes the home intrinsically in-world.
+    // The World's Home Entity landing page (ADR-0024). At most one per World
+    // (partial unique index). Flag avoids circular FK and keeps home in-world.
     isHome: integer('is_home', { mode: 'boolean' }).notNull().default(false),
     name: text('name').notNull(),
-    // The closed Entity type enum (note | hexmap), validated at the edge.
     type: text('type').notNull(),
-    // Free-text tags as a JSON array; `mode: 'json'` serializes on the way in.
     tags: text('tags', { mode: 'json' }).$type<string[]>().notNull(),
-    // Entity Visibility (ADR-0024): `private` | `shared`, default `private`.
+    // Entity Visibility (ADR-0024): private | shared.
     visibility: text('visibility').notNull().default('private'),
     version: integer('version').notNull(),
-    // The serialized Entity body (entityBodySchema), parsed/validated at the edge.
+    // Serialized Entity body (entityBodySchema), validated at the edge.
     document: text('document').notNull(),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
   (table) => [
-    // The list endpoint and every access check filter by owner.
     index('idx_entities_owner_id').on(table.ownerId),
-    // Reads scope to a World (ADR-0024 → in-world link picker, world sharing).
+    // Scoped to World (ADR-0024).
     index('idx_entities_world_id').on(table.worldId),
-    // Exactly one Home Entity per World — partial unique over the flagged rows.
+    // Exactly one Home Entity per World.
     uniqueIndex('idx_world_home')
       .on(table.worldId)
       .where(sql`${table.isHome} = 1`),
@@ -111,10 +106,7 @@ export const worlds = sqliteTable(
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
-  (table) => [
-    // A user's Worlds list filters by owner.
-    index('idx_worlds_owner_id').on(table.ownerId),
-  ]
+  (table) => [index('idx_worlds_owner_id').on(table.ownerId)]
 );
 
 /**
@@ -133,7 +125,9 @@ export const worldMembers = sqliteTable(
       .references(() => users.id),
     role: text('role').notNull(),
   },
-  (table) => [primaryKey({ columns: [table.worldId, table.userId] })]
+  (table) => [
+    primaryKey({ columns: [table.worldId, table.userId] }),
+  ]
 );
 
 /**
@@ -149,7 +143,9 @@ export const worldLinks = sqliteTable(
       .references(() => worlds.id, { onDelete: 'cascade' }),
     createdAt: integer('created_at').notNull(),
   },
-  (table) => [index('idx_world_links_world_id').on(table.worldId)]
+  (table) => [
+    index('idx_world_links_world_id').on(table.worldId),
+  ]
 );
 
 /**
@@ -169,7 +165,6 @@ export const entityDescriptors = sqliteTable(
     descriptor: text('descriptor').notNull(),
   },
   (table) => [
-    // One row per (entity, descriptor); the harvested set is already distinct per entity.
     primaryKey({ columns: [table.entityId, table.descriptor] }),
   ]
 );

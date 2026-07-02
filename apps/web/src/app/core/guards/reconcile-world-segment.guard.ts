@@ -2,6 +2,7 @@ import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
 import { EntitiesClient } from '../services/entities.client';
+import { entityRoute } from '../utils/routes';
 
 /**
  * Reconcile guard for `/w/:worldId/entities/:id` (ADR-0028, issue #119): the
@@ -26,7 +27,7 @@ export const reconcileWorldSegment: CanActivateFn = (route) => {
       map((page) => {
         const target = page.items[0];
         return target && target.worldId !== segment
-          ? router.createUrlTree(['/w', target.worldId, 'entities', id])
+          ? router.createUrlTree(entityRoute(target.worldId, id))
           : true;
       }),
       catchError(() => of(true)),

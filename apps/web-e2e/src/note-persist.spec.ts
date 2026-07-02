@@ -14,7 +14,7 @@ test('types into a note, saves, and the Content survives a reload', async ({
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const noteId = page.url().split('/').pop();
 
-  // Click below the text (60% down) to prove the whole box focuses the editor, not just prose.
+  // Click 60% down to prove the whole box focuses the editor.
   const surface = page.getByTestId('note-content');
   const content = 'Lady Mara rules the northern reach.';
   const box = await surface.boundingBox();
@@ -28,7 +28,6 @@ test('types into a note, saves, and the Content survives a reload', async ({
   await expect(page.getByTestId('note-content')).toContainText(content);
   await expect(page.getByTestId('title')).toHaveText('Untitled note');
 
-  // Confirm the snapshot was stored opaquely — format tag present, text inside.
   const res = await request.get(`/api/entities/${noteId}`);
   expect(res.ok()).toBeTruthy();
   const detail = await res.json();

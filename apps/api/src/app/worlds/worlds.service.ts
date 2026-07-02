@@ -5,19 +5,16 @@ import { DB, Db, mintWorldWithHome } from '../db/db';
 import { entities, worldMembers, worlds } from '../db/schema';
 
 /**
- * World persistence (ADR-0024). A World groups Entities for one campaign; its
- * Home Entity is the in-world note flagged `is_home`, minted in the same
- * transaction as the World row so the two can never exist apart.
+ * World persistence (ADR-0024). Home Entity (flagged is_home) minted in same
+ * transaction as World row so the two can never diverge.
  */
 @Injectable()
 export class WorldsService {
   constructor(@Inject(DB) private readonly db: Db) {}
 
   /**
-   * Every World the caller can reach (ADR-0024): the ones they own plus the ones
-   * they're a named member of. A left join to `world_members` on the caller's id
-   * means a row surfaces if they own it OR have a membership — `DISTINCT` collapses
-   * the (unlikely) owner-and-member double.
+   * Every World the caller can reach (ADR-0024): owned or member of.
+   * Left join on world_members collapses owner-and-member double via DISTINCT.
    */
   list(userId: string): WorldSummary[] {
     return this.db
@@ -36,16 +33,15 @@ export class WorldsService {
   }
 
   /**
-   * One World as a Detail if the caller can reach it (owns it or is a member),
-   * else `null` — a World the caller has no part in is indistinguishable from one
-   * that doesn't exist, so reachability never leaks (ADR-0004).
+   * World Detail if reachable (owned or member), else null.
+   * Unreachable World indistinguishable from nonexistent (ADR-0004).
    */
   get(userId: string, id: string): WorldDetail | null {
     const world = this.reachableWorld(userId, id);
     return world ? this.toDetail(world) : null;
   }
 
-  /** Create a World for `ownerId` with a fresh blank Home note, atomically (ADR-0024). */
+  // Create World with fresh Home note, atomically (ADR-0024).
   create(ownerId: string, req: CreateWorldRequest): WorldDetail {
     const now = Date.now();
     const { worldId, homeEntityId } = mintWorldWithHome(
@@ -59,7 +55,7 @@ export class WorldsService {
       name: req.name,
       ownerId,
       homeEntityId,
-      // A fresh World holds exactly its Home Entity (#120).
+      // Fresh World holds only Home Entity (#120).
       entityCount: 1,
       createdAt: now,
       updatedAt: now,
@@ -67,12 +63,10 @@ export class WorldsService {
   }
 
   /**
-   * Rename a World, Owner only (ADR-0024): `'forbidden'` when the caller can't
-   * own it, `null` when no such World exists. The World name is the source of
-   * truth for its Home Entity's title (ADR-0029), so one transaction writes both
-   * `worlds.name` and the Home Entity's `name` — they can never diverge. The Home
-   * row's `version` is left untouched (metadata-only, like an entity rename) so a
-   * rename never invalidates an in-progress edit's base version.
+   * Rename World (Owner only, ADR-0024): forbidden if not owner, null if not found.
+   * World name is source of truth for Home title (ADR-0029); one transaction
+   * ensures sync. Home version untouched (metadata-only) so rename doesn't
+   * invalidate in-progress edits.
    */
   rename(
     userId: string,
@@ -95,12 +89,9 @@ export class WorldsService {
   }
 
   /**
-   * Delete a World, Owner only (ADR-0024): `'forbidden'` for a non-Owner, `null`
-   * for no such World. The World is the container, so its Entities go with it —
-   * deleted first in the same transaction (the Home Entity included), which also
-   * satisfies the `entities.world_id` foreign key. `world_members`/`world_links`
-   * cascade on the World row; `entity_descriptors` cascade on each Entity.
-   * ponytail: hard cascade-delete; add a soft-delete/confirm flow only if users ask.
+   * Delete World (Owner only, ADR-0024): forbidden if not owner, null if not found.
+   * World is container; Entities cascade (Home included, satisfies FK).
+   * ponytail: hard cascade-delete; soft-delete/confirm only if users ask.
    */
   delete(userId: string, id: string): 'ok' | 'forbidden' | null {
     const world = this.db
@@ -117,17 +108,16 @@ export class WorldsService {
     return 'ok';
   }
 
-  /** Attach the World's Home Entity id (the `is_home` row) to the stored record. */
+  // Attach World's Home Entity id (is_home row) to stored record.
   private toDetail(world: typeof worlds.$inferSelect): WorldDetail {
     const home = this.db
       .select({ id: entities.id })
       .from(entities)
       .where(and(eq(entities.worldId, world.id), eq(entities.isHome, true)))
       .get();
-    // Every World is minted with a Home Entity in one transaction, so this is
-    // present for any World that exists; a missing one is corruption (a clear 500).
+    // Home Entity minted with World (one transaction); missing = corruption (500).
     if (!home) throw new Error(`World ${world.id} has no Home Entity`);
-    // The cascade target (#120): every Entity in the World, the Home included.
+    // Cascade target (#120): all Entities in World (Home included).
     const [{ value: entityCount }] = this.db
       .select({ value: count() })
       .from(entities)
@@ -144,7 +134,7 @@ export class WorldsService {
     };
   }
 
-  /** The World row if `userId` owns it or is a member of it, else undefined (ADR-0024). */
+  // World row if userId owns or is member, else undefined (ADR-0024).
   private reachableWorld(
     userId: string,
     id: string,

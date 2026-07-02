@@ -6,9 +6,10 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { catchError, firstValueFrom, map, of } from 'rxjs';
+import { Subject, firstValueFrom, share } from 'rxjs';
 import { ENTITY_LIST_MAX_LIMIT, EntitySummary } from '@hexly/domain';
 import { EntitiesClient } from '../../../core/services/entities.client';
+import { searchEntities } from '../../../core/utils/search-entities';
 
 /** A link's resolution against the owner's entities (issue #95, ADR-0023). */
 export type EntityResolution =
@@ -17,28 +18,20 @@ export type EntityResolution =
   | { status: 'missing' };
 
 /**
- * The shared id→name resolver behind every Content Entity Link in a note
- * (ADR-0023). Resolution reads the target's **live** name, so a renamed target
- * reflects automatically while a deleted one resolves to `missing` (the node view
- * then renders its stored `label` as a dangling link).
- *
- * Rather than fetch the whole owner library up front (which capped links at one
- * page), it fetches only the ids notes actually reference: a `resolve(id)` queues
- * the id and a microtask coalesces a render's worth of links into one (chunked)
- * `list({ ids })` call. The `@` picker no longer shares an in-memory list — it
- * searches the server directly via {@link search}.
- *
- * Provided per note surface so navigating to another Entity gets a fresh cache.
+ * Shared id→name resolver for Entity Links in notes (ADR-0023). Resolves targets'
+ * live names: renamed targets reflect automatically, deleted ones resolve to `missing`.
+ * Fetches only referenced ids (one chunked `list({ ids })` per render). The `@`
+ * picker searches the server directly via {@link search}.
+ * Provided per note surface for a fresh cache on navigation.
  */
 @Injectable()
 export class EntityNameResolver {
   private readonly client = inject(EntitiesClient);
   private readonly destroyRef = inject(DestroyRef);
 
-  // One signal per requested id, created on first resolve and filled when its
-  // batch lands; persists for the surface's life so each id is fetched once.
+  // One signal per requested id, created on first resolve and filled when its batch lands.
   private readonly cache = new Map<string, WritableSignal<EntityResolution>>();
-  // Ids awaiting the next flush — coalesced so a page of links is one request.
+  // Ids awaiting the next flush, coalesced into one request.
   private readonly pending = new Set<string>();
   private flushQueued = false;
 
@@ -54,18 +47,24 @@ export class EntityNameResolver {
     return entry();
   }
 
+  // Picker's live query stream, shared so overlapping awaits collapse onto one debounced search.
+  private readonly pickerQuery$ = new Subject<string>();
+  private readonly pickerResults$ = searchEntities(
+    this.client,
+    this.pickerQuery$,
+  ).pipe(share());
+
   /**
    * The owner's entities matching `query`, server-filtered (ADR-0025 `q`) — the
-   * `@` picker's source. `@tiptap/suggestion` awaits this per keystroke; a failed
-   * search yields an empty list rather than rejecting the popup.
+   * `@` picker's source. `@tiptap/suggestion` awaits this per keystroke; the
+   * shared search debounces the burst and a failed search yields an empty list
+   * rather than rejecting the popup.
    */
   search(query: string): Promise<EntitySummary[]> {
-    return firstValueFrom(
-      this.client.list({ q: query.trim(), limit: ENTITY_LIST_MAX_LIMIT }).pipe(
-        map((page) => page.items),
-        catchError(() => of<EntitySummary[]>([])),
-      ),
-    );
+    // Subscribe before pushing so the live search catches this query.
+    const result = firstValueFrom(this.pickerResults$);
+    this.pickerQuery$.next(query);
+    return result;
   }
 
   private scheduleFlush(): void {
@@ -74,8 +73,7 @@ export class EntityNameResolver {
     queueMicrotask(() => this.flush());
   }
 
-  // Batch every id queued this tick into id-set list() calls (chunked to the page
-  // cap), then fill each id's signal: found, or missing → dangling link.
+  // Batch queued ids into chunked list() calls, then fill each id's signal.
   private flush(): void {
     this.flushQueued = false;
     const ids = [...this.pending];
@@ -87,8 +85,7 @@ export class EntityNameResolver {
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe({
           next: (page) => this.fill(chunk, page.items),
-          // A failed batch resolves its ids to missing (dangling) — the link still
-          // shows its stored label, matching the old list-fetch error path.
+          // Failed batch resolves ids to missing (dangling).
           error: () => this.fill(chunk, []),
         });
     }

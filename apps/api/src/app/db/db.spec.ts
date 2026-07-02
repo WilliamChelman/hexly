@@ -31,8 +31,7 @@ describe('createDb boot migration (ADR-0027)', () => {
   });
 
   it('is safe to run twice — the migration ledger skips applied files', () => {
-    // Call migrate() a second time on the SAME handle. If drizzle re-ran 0000
-    // the bare CREATE TABLE statements would throw "table already exists".
+    // Re-running migrate() skips already-applied files (not CREATE TABLE again).
     const db = createDb(':memory:');
     expect(() =>
       migrate(db, { migrationsFolder: resolve(__dirname, 'migrations') }),

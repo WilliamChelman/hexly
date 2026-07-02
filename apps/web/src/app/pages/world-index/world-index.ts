@@ -12,6 +12,7 @@ import { AuthClient } from '../../core/services/auth.client';
 import { WorldStore } from '../../core/services/world.store';
 import { WorldsClient } from '../../core/services/worlds.client';
 import { ToasterService } from '../../core/services/toaster.service';
+import { entityRoute } from '../../core/utils/routes';
 import { Button } from '../../ui/button';
 import { Eyebrow } from '../../ui/eyebrow';
 import { Panel } from '../../ui/panel';
@@ -317,15 +318,11 @@ export class WorldIndex {
   }
   protected readonly mono = monogram;
   protected readonly creating = signal(false);
-  /** The World whose name is being edited inline, or `null`. */
   protected readonly renamingId = signal<string | null>(null);
-  /** The World pending a type-to-confirm delete, or `null` when the modal is closed. */
   protected readonly pendingDelete = signal<{ id: string; name: string } | null>(
     null,
   );
-  /** Entities the pending delete would destroy; `null` while the count is loading. */
   protected readonly deleteCount = signal<number | null>(null);
-  /** The name the user has typed into the confirm field. */
   protected readonly confirmText = signal('');
   /** Delete is armed only once the typed name matches the World's exactly. */
   protected readonly canConfirmDelete = computed(
@@ -419,12 +416,7 @@ export class WorldIndex {
       .pipe(finalize(() => this.creating.set(false)))
       .subscribe({
         next: (world) =>
-          this.router.navigate([
-            '/w',
-            world.id,
-            'entities',
-            world.homeEntityId,
-          ]),
+          this.router.navigate(entityRoute(world.id, world.homeEntityId)),
         error: () =>
           this.toaster.show(
             this.transloco.translate('worlds.createError'),

@@ -6,7 +6,6 @@ import {
   signal,
 } from '@angular/core';
 
-/** The two themes of Hexly's "cartographer's table": day paper, night sky. */
 export type Theme = 'light' | 'dark';
 
 const STORAGE_KEY = 'hexly-theme';
@@ -37,7 +36,6 @@ export class ThemeService {
 
   private readonly _theme = signal<Theme>(this.read());
 
-  /** The active theme, readable by the UI (e.g. to label the toggle). */
   readonly theme = this._theme.asReadonly();
 
   constructor() {

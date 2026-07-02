@@ -272,7 +272,8 @@
     },
     "cancel": "Annuler",
     "close": "Fermer",
-    "delete": "Supprimer"
+    "delete": "Supprimer",
+    "create": "Créer"
   },
   "nav": {
     "primary": "Navigation principale",
@@ -281,6 +282,18 @@
     "expand": "Déployer la navigation",
     "collapse": "Réduire la navigation",
     "home": "Accueil Hexly"
+  },
+  "commandPalette": {
+    "searchLabel": "Rechercher ou exécuter une commande",
+    "placeholder": "Rechercher ou taper > pour les commandes…",
+    "empty": "Aucun résultat",
+    "entities": "Entités",
+    "worlds": "Mondes",
+    "commands": "Commandes",
+    "createNote": "Créer une note",
+    "createMap": "Créer une carte",
+    "nameLabel": "Nom",
+    "worldLabel": "Monde"
   },
   "worlds": {
     "switcherLabel": "Monde actif",

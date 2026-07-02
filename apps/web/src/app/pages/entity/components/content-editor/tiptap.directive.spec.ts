@@ -45,7 +45,6 @@ describe('TiptapDirective', () => {
     const host = fixture.nativeElement.querySelector('.host') as HTMLElement;
     expect(host.textContent).toContain('Lord Brand');
     expect(host.textContent).not.toContain('Lady Mara');
-    // Exactly one editable surface — the old one was relocated out, not left behind.
     expect(host.querySelectorAll('.ProseMirror')).toHaveLength(1);
 
     first.destroy();

@@ -87,7 +87,6 @@ describe('WorldStore', () => {
     store.load();
     expect(store.worlds()).toHaveLength(1);
 
-    // Logout clears the user — the next user must not see u1's Worlds.
     auth.setUser(null);
     TestBed.flushEffects();
 
@@ -102,8 +101,6 @@ describe('WorldStore', () => {
     store.load();
     expect(store.worlds()).toHaveLength(1);
 
-    // Re-login as the same user (fresh object, same id) must not wipe the list —
-    // the always-mounted switcher relies on having loaded once.
     login('u1');
     TestBed.flushEffects();
 

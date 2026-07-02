@@ -13,10 +13,9 @@ function titledRoutes(routes: Route[]): Route[] {
 }
 
 describe('appRoutes titles', () => {
-  // A translation key is dot-namespaced with no spaces ("editorShell.tabTitle");
-  // a literal title ("Hexly", "Hexly — Design system") is not. The
-  // TranslationTitleStrategy (ADR-0014) localizes the former; the latter would
-  // leak untranslated copy into the tab/history.
+  // Translation keys are dot-namespaced (e.g. "editorShell.tabTitle") and
+  // automatically localized by TranslationTitleStrategy (ADR-0014).
+  // Literal strings leak untranslated copy.
   const TRANSLATION_KEY = /^[a-z][a-zA-Z]*(\.[a-zA-Z]+)+$/;
 
   it('routes every title through a translation key, never a literal string', () => {
@@ -49,7 +48,6 @@ describe('appRoutes structure (ADR-0028)', () => {
   it('nests the entity routes under a :worldId parent that pins and clears the active World', () => {
     const parent = appRoutes.find((r) => r.path === 'w/:worldId');
     expect(parent).toBeDefined();
-    // The parent owns the World scope: resolver pins, canDeactivate clears, no component.
     expect(parent?.resolve).toBeDefined();
     expect(parent?.canDeactivate).toBeDefined();
     expect(parent?.loadComponent).toBeUndefined();
@@ -58,15 +56,13 @@ describe('appRoutes structure (ADR-0028)', () => {
     expect(childPaths).toContain('entities');
     expect(childPaths).toContain('entities/:id');
 
-    // The World-less Entity *browser* is gone; only the World-scoped one remains.
+    // World-less entity browser route removed; only World-scoped one remains.
     const topPaths = appRoutes.map((r) => r.path);
     expect(topPaths).not.toContain('entities');
     expect(topPaths).not.toContain('w/:worldId/entities');
   });
 
   it('keeps a World-agnostic entities/:id route that resolves and redirects to its World (#118)', () => {
-    // Content Links don't know their target's World, so a top-level entities/:id
-    // route looks it up (entityWorldRedirect) and redirects to the World-scoped page.
     const redirect = appRoutes.find((r) => r.path === 'entities/:id');
     expect(redirect).toBeDefined();
     expect(redirect?.canActivate).toBeDefined();

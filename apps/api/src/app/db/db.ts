@@ -27,15 +27,12 @@ export const DB = Symbol('DB');
 export function createDb(path: string): Db {
   const sqlite = new Database(path);
   sqlite.pragma('journal_mode = WAL');
-  // SQLite ignores `REFERENCES` clauses unless foreign keys are enabled, and the
-  // pragma is per-connection — so it must be set on every connection we open.
+  // Foreign keys are per-connection and must be enabled on every connection.
   sqlite.pragma('foreign_keys = ON');
   const db = drizzle(sqlite, { schema });
-  // Apply unapplied migrations at boot (ADR-0027). `schema.ts` is the single
-  // source of truth; the SQL files in `./migrations` are generated from it by
-  // `pnpm db:generate` and shipped beside the bundle (webpack asset-map), so
-  // `__dirname` resolves them in prod and in source-run tests alike — the same
-  // `__dirname` convention `resolveDbPath` relies on.
+  // Apply unapplied migrations at boot (ADR-0027). Migrations are generated
+  // from schema.ts and shipped in the bundle; __dirname resolves them in both
+  // prod and tests (same __dirname pattern as resolveDbPath).
   migrate(db, { migrationsFolder: resolve(__dirname, 'migrations') });
   return db;
 }

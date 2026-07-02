@@ -16,39 +16,31 @@ test('selects a Region on the canvas, renames it in the Inspector, and the renam
   await enterLibrary(page);
   await page.getByTestId('new-map').click();
 
-  // Creating a map opens the editor at /entities/:id.
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const mapId = page.url().split('/').pop();
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
 
-  // Seed a Region from the Regions panel (ADR-0012): open the rail's Regions panel and
-  // create one. New Region mints 'Region 1', selects it, and arms the Add brush, so a
-  // click on the centre hex (the canvas centres the world origin on load, so a plain
-  // click lands on (0,0)) paints (0,0) into its membership.
+  // Create Region from the Regions panel (ADR-0012). New Region arms the Add brush.
   await page.getByTestId('rail-regions').click();
   await page.getByTestId('new-region').click();
   await canvas.click();
 
-  // Now the journey under test: select that Region on the canvas with the universal
-  // Select tool. Clicking (0,0) — a Void coordinate inside the Region — selects it
-  // (ADR-0011), so the Inspector opens on its name field.
+  // Select that Region on the canvas. Clicking (0,0) — a Void inside the Region —
+  // selects it (ADR-0011), opening the Inspector on its name field.
   await page.getByTestId('tool-select').click();
   await canvas.click();
   await expect(page.getByTestId('region-name')).toHaveValue('Region 1');
 
-  // Edit the selected Region's name in the Inspector. Tab blurs the field, which
-  // fires the (change) the Inspector commits on.
+  // Tab blurs the field, firing the (change) the Inspector commits on.
   const name = page.getByTestId('region-name');
   await name.fill('The Whisperwood');
   await name.press('Tab');
 
   await flushSave(page);
 
-  // The seam under test: a fresh load re-fetches the saved map.
   await page.reload();
 
-  // The persisted document really holds the renamed Region with its membership.
   const res = await request.get(`/api/entities/${mapId}`);
   expect(res.ok()).toBeTruthy();
   const detail = await res.json();
@@ -56,8 +48,7 @@ test('selects a Region on the canvas, renames it in the Inspector, and the renam
   expect(detail.document.regions[0].name).toBe('The Whisperwood');
   expect(detail.document.regions[0].hexes).toEqual({ '0,0': true });
 
-  // The reloaded map boots in Select (issue #27). Clicking the centre re-selects the
-  // re-rendered Region, and the Inspector shows its persisted, renamed value.
+  // The reloaded map boots in Select (issue #27).
   await canvas.click();
   await expect(page.getByTestId('region-name')).toHaveValue('The Whisperwood');
 });

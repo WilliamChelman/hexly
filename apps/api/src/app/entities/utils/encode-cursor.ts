@@ -1,8 +1,6 @@
 /**
- * Encode a server-internal offset as the opaque list cursor (ADR-0025). Clients
- * treat the result as a black box and only echo it back as `cursor`, so the
- * encoding can switch from today's trivial offset to a keyset/ranking cursor
- * with no consumer change.
+ * Encode server-internal offset as opaque list cursor (ADR-0025).
+ * Clients treat as black box; encoding can evolve to keyset/ranking cursor.
  */
 export function encodeCursor(offset: number): string {
   return Buffer.from(String(offset), 'utf8').toString('base64url');

@@ -15,7 +15,7 @@ import { EntitySession } from '../services/entity-session';
 import { HexMapStore } from '../services/hexmap-store';
 import { SaveStatus } from './save-status';
 
-// SaveStatus is the autosave feedback chip that replaced the Save button (ADR-0026):
+// Autosave feedback chip that replaced the Save button (ADR-0026):
 // one aria-live surface over the session's saving/dirty/error/conflict state.
 describe('SaveStatus', () => {
   let session: EntitySession;
@@ -122,7 +122,7 @@ describe('SaveStatus', () => {
     session.save().subscribe();
     fixture.detectChanges();
 
-    // The re-pull fails: the conflict stands, but the user must be told Reload failed —
+    // Re-pull fails: the conflict stands, but the user must be told Reload failed
     // else the chip looks unchanged and Reload appears to do nothing (ADR-0026).
     entities.load.mockReturnValue(throwError(() => new Error('network')));
     (
@@ -137,7 +137,6 @@ describe('SaveStatus', () => {
     expect(
       fixture.nativeElement.querySelector('[data-testid=reload-error]'),
     ).not.toBeNull();
-    // The Reload button is still there to try again.
     expect(
       fixture.nativeElement.querySelector('[data-testid=conflict-reload]'),
     ).not.toBeNull();

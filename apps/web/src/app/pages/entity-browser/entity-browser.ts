@@ -277,7 +277,6 @@ export class EntityBrowser {
   protected readonly worldId = this.activeWorld.worldId;
 
   private readonly _entities = signal<EntitySummary[]>([]);
-  /** The user's entities, newest first. */
   protected readonly entities = computed(() =>
     [...this._entities()].sort((a, b) => b.updatedAt - a.updatedAt),
   );
@@ -295,17 +294,11 @@ export class EntityBrowser {
       edited: formatEdited(entity.updatedAt, lang),
     }));
   });
-  /** The cursor for the next page, or `null` on the last page — gates load-more (ADR-0025). */
   protected readonly nextCursor = signal<string | null>(null);
-  /** Whether a load-more is in flight — disables the control so a double-click can't double-append. */
   protected readonly loadingMore = signal(false);
-  /** Whether the initial load has resolved — gates the empty state. */
   protected readonly loaded = signal(false);
-  /** Whether the initial load failed — shows an error panel instead. */
   protected readonly loadError = signal(false);
-  /** Whether a create is in flight — disables the create buttons. */
   protected readonly creating = signal(false);
-  /** The id of the Entity whose name is being edited inline, or `null`. */
   protected readonly renamingId = signal<string | null>(null);
 
   private fetchSub?: Subscription;

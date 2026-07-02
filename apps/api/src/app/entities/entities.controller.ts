@@ -46,8 +46,7 @@ export class EntitiesController {
     if (!parsed.success) throw new BadRequestException();
     const { cursor, limit, ids, q, type, worldId } = parsed.data;
 
-    // An absent cursor is page one; a present-but-undecodable one is a 400, not
-    // a 500 (ADR-0001). The opaque cursor decodes to a server-internal offset.
+    // Absent cursor is page one; undecodable is a 400 (ADR-0001).
     const offset = cursor === undefined ? 0 : decodeCursor(cursor);
     if (offset === null) throw new BadRequestException();
 
@@ -69,8 +68,7 @@ export class EntitiesController {
     return this.entities.create(user.id, parsed.data);
   }
 
-  // Declared before `:id` so the literal path isn't captured as an entity id. The owner's
-  // `::` Link Descriptor vocabulary — DISTINCT descriptors across their entities (#96).
+  // Before `:id` so literal path isn't captured. Owner's `::` Link Descriptor vocabulary (#96).
   @Get('descriptors')
   descriptors(@CurrentUser() user: AuthUser): string[] {
     return this.entities.listDescriptors(user.id);
@@ -100,8 +98,7 @@ export class EntitiesController {
       case 'not-found':
         throw new NotFoundException();
       case 'conflict':
-        // The base version had moved: reject with 409 and hand back the current
-        // Entity so the client can surface the conflict and re-pull (ADR-0018).
+        // Version conflict: hand back current Entity for client re-pull (ADR-0018).
         throw new ConflictException(result.current);
     }
   }

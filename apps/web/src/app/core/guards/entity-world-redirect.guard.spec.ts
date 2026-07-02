@@ -37,7 +37,6 @@ describe('entityWorldRedirect', () => {
     });
   });
 
-  /** Invoke the functional guard the way the router would for `entities/:id`. */
   function run(id = 'e1') {
     return TestBed.runInInjectionContext(() =>
       entityWorldRedirect(
@@ -48,6 +47,7 @@ describe('entityWorldRedirect', () => {
   }
 
   function settle(result: unknown): Promise<boolean | UrlTree> {
+    // Helper to unify Observable and Promise guard results.
     return isObservable(result)
       ? firstValueFrom(result as Observable<boolean | UrlTree>)
       : Promise.resolve(result as boolean | UrlTree);

@@ -24,10 +24,9 @@ export type EntityListParams = Partial<EntityListQuery>;
 export class EntitiesClient {
   private readonly http = inject(HttpClient);
 
-  /** One page of the entities read surface (ADR-0025); `opts` filter and page it. */
   list(opts: EntityListParams = {}): Observable<EntityPage> {
     let params = new HttpParams();
-    // `ids` repeats the param once per id; the others are single-valued.
+    // `ids` repeats in query string; others are single-valued.
     for (const id of opts.ids ?? []) params = params.append('ids', id);
     if (opts.q) params = params.set('q', opts.q);
     if (opts.type) params = params.set('type', opts.type);
@@ -46,7 +45,7 @@ export class EntitiesClient {
     return this.http.delete<void>(`/api/entities/${id}`);
   }
 
-  /** `worldId` scopes the new Entity to a World (ADR-0024); omitted, the server defaults to the caller's first World. */
+  // worldId scopes to a World (ADR-0024); omitted, server defaults to caller's first.
   create(
     name: string,
     type: EntityType,
@@ -63,7 +62,7 @@ export class EntitiesClient {
     return this.http.get<EntityDetail>(`/api/entities/${id}`);
   }
 
-  /** The owner's `::` Link Descriptor vocabulary — DISTINCT, last-saved state (#96, ADR-0023). */
+  // Owner's Link Descriptor vocabulary — DISTINCT, last-saved state (#96, ADR-0023).
   listDescriptors(): Observable<string[]> {
     return this.http.get<string[]>('/api/entities/descriptors');
   }

@@ -10,10 +10,8 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { Icon } from '../../../../ui/icon/icon';
 
 /**
- * The map's zoom cluster — a single frosted pill of borderless controls: zoom
- * out, the current level, zoom in, then fit-to-content. Purely presentational:
- * it renders the {@link percent} it's handed and emits intent; the canvas owns
- * the camera (ADR-0003) and wires the actions. Owns its own chrome (ADR-0007).
+ * Map's zoom cluster: zoom out, level, zoom in, fit-to-content. Purely
+ * presentational; canvas owns camera (ADR-0003) and wires actions (ADR-0007).
  */
 @Component({
   selector: 'app-zoom-control',
@@ -56,8 +54,6 @@ import { Icon } from '../../../../ui/icon/icon';
   styles: `
     @reference '#app-styles.css';
 
-    /* Frosted surface kept scoped: a color-mix() over a theme token re-themes
-       where the 'bg-surface/NN' modifier's baked fallback would not (ADR-0021). */
     :host {
       background: color-mix(in oklab, var(--color-surface) 88%, transparent);
     }
@@ -84,14 +80,12 @@ import { Icon } from '../../../../ui/icon/icon';
 export class ZoomControl {
   private readonly transloco = inject(TranslocoService);
 
-  /** The current zoom level as a whole percent (e.g. 100). */
   readonly percent = input.required<number>();
 
   readonly zoomIn = output<void>();
   readonly zoomOut = output<void>();
   readonly fit = output<void>();
 
-  /** The group's accessible name, kept reactive to the active locale. */
   protected readonly groupLabel = toSignal(
     this.transloco.selectTranslate('editorShell.canvas.zoom'),
     { initialValue: '' },

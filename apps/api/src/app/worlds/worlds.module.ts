@@ -5,8 +5,8 @@ import { WorldsController } from './worlds.controller';
 import { WorldsService } from './worlds.service';
 
 /**
- * The World feature module (ADR-0024). Imports DbModule for the shared DB token
- * (ADR-0002) and AuthModule for the {@link SessionAuthGuard} guarding every route.
+ * World feature module (ADR-0024). Imports DbModule (shared DB, ADR-0002)
+ * and AuthModule (SessionAuthGuard on routes).
  */
 @Module({
   imports: [DbModule, AuthModule],

@@ -39,6 +39,7 @@ import {
 import { JSONContent } from '@tiptap/core';
 import { EntitiesClient } from '../../../core/services/entities.client';
 import { ActiveWorld } from '../../../core/services/active-world';
+import { worldRoute } from '../../../core/utils/routes';
 import { harvestDescriptors } from '../components/content-editor/descriptors';
 import { TitleService } from '../../../core/i18n/title.service';
 import { AppShellStore } from '../../../shell/app-shell.store';
@@ -221,7 +222,7 @@ export class EntitySession {
             catchError((err) => {
               if (err instanceof HttpErrorResponse && err.status === 404) {
                 const worldId = this.activeWorld.worldId();
-                this.router.navigate(worldId ? ['/w', worldId, 'entities'] : ['/']);
+                this.router.navigate(worldId ? worldRoute(worldId) : ['/']);
               } else {
                 this._error.set('reload');
               }

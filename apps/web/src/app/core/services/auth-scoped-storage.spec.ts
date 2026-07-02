@@ -35,8 +35,8 @@ describe('AuthScopedStorage', () => {
       login('u1');
       storage.setItem('foo', 'bar');
       expect(storage.getItem('foo')).toBe('bar');
-      expect(localStorage.getItem('hexly-u:foo')).toBe('bar'); // namespaced internally
-      expect(localStorage.getItem('foo')).toBeNull(); // bare key untouched
+      expect(localStorage.getItem('hexly-u:foo')).toBe('bar');
+      expect(localStorage.getItem('foo')).toBeNull();
     });
 
     it('getItem returns null when nothing is stored', () => {
@@ -81,19 +81,15 @@ describe('AuthScopedStorage', () => {
       login('u2');
 
       expect(storage.getItem('foo')).toBeNull();
-      // User B writes their own value under the same key
       storage.setItem('foo', 'from-u2');
       expect(storage.getItem('foo')).toBe('from-u2');
     });
 
     it('cleans up stale keys from a prior session when a different user logs in', () => {
-      // Simulate a prior session: login as u1, write a key, then logout.
-      // Logout keeps SCOPE_KEY so the next login can compare and wipe.
       login('u1');
       storage.setItem('pref', 'stale-value');
       logout();
 
-      // A different user logs in — the prior-session keys must be wiped.
       login('u2');
 
       expect(storage.getItem('pref')).toBeNull();
@@ -104,7 +100,6 @@ describe('AuthScopedStorage', () => {
       storage.setItem('foo', 'kept');
       logout();
 
-      // Same user logs back in — preferences survive the logout/re-login cycle.
       login('u1');
 
       expect(storage.getItem('foo')).toBe('kept');

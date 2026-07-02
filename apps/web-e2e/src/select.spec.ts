@@ -43,22 +43,17 @@ test('under Select, clicking a painted Hex inspects it and clicking empty space 
 }) => {
   const { canvas } = await newMap(page);
 
-  // Paint the centre hex (default terrain, Forest), then re-arm the
-  // non-destructive Select tool.
   await page.getByTestId('tool-terrain').click();
   await canvas.click();
   await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
   await page.getByTestId('tool-select').click();
 
-  // Clicking the painted hex selects it: the inspector shows the Hex panel with
-  // its coordinate and terrain, and no Label editor.
   await canvas.click();
   await expect(page.getByTestId('entity-coord')).toContainText('q 0');
   await expect(page.getByTestId('entity-detail')).toHaveText('Forest');
   await expect(page.getByTestId('label-text')).toHaveCount(0);
 
-  // Clicking a far, Void coordinate with no label hit deselects (the inspector
-  // falls back to its empty-state hint).
+  // Clicking Void with no label hit deselects.
   await clickVoid(canvas);
   await expect(page.getByTestId('entity-coord')).toHaveCount(0);
 });
@@ -68,8 +63,6 @@ test('under Select, clicking a Feature selects the Feature, not the Hex beneath 
 }) => {
   const { canvas } = await newMap(page);
 
-  // A Feature rides on a Hex, so paint the centre hex first, then place a
-  // Settlement on it.
   await page.getByTestId('tool-terrain').click();
   await canvas.click();
   await page.getByTestId('tool-feature').click();
@@ -79,8 +72,7 @@ test('under Select, clicking a Feature selects the Feature, not the Hex beneath 
     .click();
   await canvas.click();
 
-  // Under Select, clicking that hex selects the Feature over the Hex: the panel
-  // is labelled as a feature and shows the feature's identity.
+  // Under Select, Features have priority over the Hex beneath.
   await page.getByTestId('tool-select').click();
   await canvas.click();
   await expect(page.locator('header')).toContainText('feature');
@@ -92,16 +84,13 @@ test('under Select, clicking a Label floating over a painted hex selects the Lab
 }) => {
   const { canvas } = await newMap(page);
 
-  // Paint the centre hex, then drop a Label at that same point so the label
-  // floats over a painted hex.
+  // Paint centre hex, then drop a Label at that same point.
   await page.getByTestId('tool-terrain').click();
   await canvas.click();
   await page.getByTestId('tool-label').click();
   await canvas.click();
 
-  // Deselect (the drop auto-selected the new label), then click the same point
-  // under Select. Label wins the precedence over the painted hex beneath it, so
-  // the Label editor — not the Hex panel — opens.
+  // Deselect (drop auto-selects), then click under Select. Labels have priority.
   await page.getByTestId('tool-select').click();
   await clickVoid(canvas);
   await expect(page.getByTestId('label-text')).toHaveCount(0);
@@ -123,19 +112,17 @@ test('a painting Tool over a floating Label paints the hex beneath instead of gr
   await page.getByTestId('tool-label').click();
   await canvas.click();
 
-  // Record where the label landed (it auto-selects on drop) so we can later prove
-  // the painting Tool left it exactly where it was — never grabbed or nudged it.
+  // Record Label position to prove the painting Tool didn't move it.
   const labelX = Number(await page.getByTestId('label-x').inputValue());
   const labelY = Number(await page.getByTestId('label-y').inputValue());
 
-  // Clear the auto-selection so a stray Label editor can't mask the result.
+  // Clear selection.
   await page.getByTestId('tool-select').click();
   await clickVoid(canvas);
   await expect(page.getByTestId('label-text')).toHaveCount(0);
 
-  // Arm Terrain → Ocean and click right where the Label floats. The Label is
-  // inert to painting Tools (issue #28): the click paints the hex beneath rather
-  // than selecting or grabbing the Label, so no Label editor opens.
+  // Arm Terrain → Ocean. Labels are inert to painting Tools (issue #28):
+  // the click paints the hex beneath rather than moving or selecting the Label.
   await page.getByTestId('tool-terrain').click();
   await page
     .getByRole('group', { name: 'Terrain' })
@@ -144,8 +131,6 @@ test('a painting Tool over a floating Label paints the hex beneath instead of gr
   await canvas.click();
   await expect(page.getByTestId('label-text')).toHaveCount(0);
 
-  // Save and read back: the hex beneath the Label took the new terrain, and the
-  // Label still exists (it was never moved or deleted).
   await flushSave(page);
 
   const res = await request.get(`/api/entities/${mapId}`);
@@ -154,7 +139,7 @@ test('a painting Tool over a floating Label paints the hex beneath instead of gr
   const hexes = Object.values(detail.document.hexes) as Array<{ terrain: string }>;
   expect(hexes).toHaveLength(1);
   expect(hexes[0].terrain).toBe('ocean');
-  // The Label survived AND stayed put: a painting Tool over it must not move it.
+  // Label survived and stayed put.
   const labels = detail.document.labels as Array<{ position: { x: number; y: number } }>;
   expect(labels).toHaveLength(1);
   expect(labels[0].position.x).toBeCloseTo(labelX, 1);
@@ -170,19 +155,16 @@ test('Cmd/Ctrl-click adds a second entity to the Selection, shown in the Inspect
   const cx = box.width / 2;
   const cy = box.height / 2;
 
-  // Paint the centre hex (0,0) and its east neighbour (~70px right at zoom 1).
   await page.getByTestId('tool-terrain').click();
   await canvas.click({ position: { x: cx, y: cy } });
   await canvas.click({ position: { x: cx + 70, y: cy } });
   await expect(page.getByTestId('hex-count')).toHaveText('2 hexes');
 
-  // Arm Select and plain-click the first hex: the single-entity Inspector opens.
   await page.getByTestId('tool-select').click();
   await canvas.click({ position: { x: cx, y: cy } });
   await expect(page.getByTestId('entity-coord')).toBeVisible();
 
-  // Cmd/Ctrl-click the second hex: the Selection becomes a set, so the Inspector
-  // switches from the single-entity editor to the count + Delete all (ADR-0017).
+  // Cmd/Ctrl-click adds to the Selection, showing the count + Delete all (ADR-0017).
   await canvas.click({
     position: { x: cx + 70, y: cy },
     modifiers: ['ControlOrMeta'],
@@ -201,15 +183,14 @@ test('holding Cmd/Ctrl and dragging sweeps several hexes into the Selection', as
   const cx = box.x + box.width / 2;
   const cy = box.y + box.height / 2;
 
-  // Paint a row of three adjacent hexes (centre and its two east neighbours).
+  // Paint a row of three adjacent hexes.
   await page.getByTestId('tool-terrain').click();
   await canvas.click({ position: { x: box.width / 2, y: box.height / 2 } });
   await canvas.click({ position: { x: box.width / 2 + 70, y: box.height / 2 } });
   await canvas.click({ position: { x: box.width / 2 + 140, y: box.height / 2 } });
   await expect(page.getByTestId('hex-count')).toHaveText('3 hexes');
 
-  // Arm Select, then hold Cmd/Ctrl and drag across the row — each hex the pointer
-  // enters is swept into the set, no discrete clicks needed (ADR-0017).
+  // Hold Cmd/Ctrl and drag across the row (ADR-0017).
   await page.getByTestId('tool-select').click();
   await page.keyboard.down('ControlOrMeta');
   await page.mouse.move(cx, cy);
@@ -219,7 +200,6 @@ test('holding Cmd/Ctrl and dragging sweeps several hexes into the Selection', as
   await page.mouse.up();
   await page.keyboard.up('ControlOrMeta');
 
-  // All three hexes ended up selected: the Inspector shows the multi-selection count.
   await expect(page.getByTestId('selection-count')).toContainText('3');
 });
 
@@ -232,7 +212,6 @@ test('Delete removes the whole multi-selection in one gesture', async ({
   const cx = box.width / 2;
   const cy = box.height / 2;
 
-  // Paint two hexes and build a two-entity Selection over them.
   await page.getByTestId('tool-terrain').click();
   await canvas.click({ position: { x: cx, y: cy } });
   await canvas.click({ position: { x: cx + 70, y: cy } });
@@ -246,8 +225,7 @@ test('Delete removes the whole multi-selection in one gesture', async ({
   });
   await expect(page.getByTestId('selection-count')).toContainText('2');
 
-  // Delete erases every selected hex at once, back to an empty map — one gesture,
-  // the whole set (the Inspector's Delete all does the same through the store).
+  // Delete erases the entire selection at once.
   await page.keyboard.press('Delete');
   await expect(page.getByTestId('hex-count')).toHaveText('0 hexes');
 });
@@ -265,10 +243,7 @@ test('under Select, dragging a selected Label repositions it', async ({ page }) 
   await clickVoid(canvas);
   await expect(page.getByTestId('label-x')).toHaveCount(0);
 
-  // Press on the label and drag it ~120px to the right across the canvas. At
-  // zoom 1 a screen pixel is a world pixel, so its X should grow by roughly that
-  // much. Explicit intermediate moves: the canvas drives the drag off
-  // `pointermove`, so step the pointer across so each move is observed.
+  // Drag ~120px right. At zoom 1 a screen pixel is a world pixel.
   const box = await canvas.boundingBox();
   if (!box) throw new Error('canvas not laid out');
   const cx = box.x + box.width / 2;
@@ -280,11 +255,7 @@ test('under Select, dragging a selected Label repositions it', async ({ page }) 
   await page.mouse.move(cx + 120, cy);
   await page.mouse.up();
 
-  // The press grabbed the label (it is selected again) and the drag moved it.
-  // Poll the inspector's X field: the move commits in the pointerup handler and
-  // the inspector reflects it on the next change-detection tick, so a one-shot
-  // read can race ahead of that update. The pointer moved +120px in X only, so X
-  // should land near +120 (not merely "more than half") and Y must not budge.
+  // The drag moved it; poll for the update in the inspector.
   await expect(page.getByTestId('label-x')).toHaveCount(1);
   await expect
     .poll(async () => Number(await page.getByTestId('label-x').inputValue()))
@@ -321,14 +292,11 @@ test('Marquee box-selects the hexes and a label inside it, dragging over painted
   await canvas.click({ position: { x: box.width / 2 + 70, y: box.height / 2 } });
   await expect(page.getByTestId('hex-count')).toHaveText('2 hexes');
 
-  // Float a Label between them, inside the box-to-come. The drop auto-selects it.
+  // Float a Label between them.
   await page.getByTestId('tool-label').click();
   await canvas.click({ position: { x: box.width / 2 + 35, y: box.height / 2 } });
 
-  // Arm Select → Marquee, then drag a box from over the painted centre hex down
-  // and to the right, enclosing both hexes and the label. Starting ~8px up-left
-  // of the exact centre keeps the painted (0,0) safely inside the rectangle while
-  // still pressing down on painted terrain — a Pick press here would move the hex.
+  // Drag Marquee box over painted hexes and label (~8px offset keeps the hex inside).
   await page.getByTestId('tool-select').click();
   await page.getByTestId('select-marquee').click();
   await page.mouse.move(cx - 8, cy - 8);
@@ -337,13 +305,9 @@ test('Marquee box-selects the hexes and a label inside it, dragging over painted
   await page.mouse.move(cx + 110, cy + 20);
   await page.mouse.up();
 
-  // The release selected all three — two Hexes and the Label — so the Inspector
-  // switches to the multi-selection count + Delete all (ADR-0017).
+  // Selected all three (ADR-0017); hexes stayed put (Marquee, not Pick).
   await expect(page.getByTestId('selection-count')).toContainText('3');
   await expect(page.getByTestId('selection-delete-all')).toBeVisible();
-
-  // And the marquee selected rather than moved: still exactly two hexes, neither
-  // dragged off its coordinate (a Pick press over the hex would have moved it).
   await expect(page.getByTestId('hex-count')).toHaveText('2 hexes');
 });
 
@@ -361,15 +325,14 @@ test('Shift-marquee adds a second box to the Selection rather than replacing it'
   const cx = box.x + box.width / 2;
   const cy = box.y + box.height / 2;
 
-  // Paint a row of three adjacent hexes (centre and its two east neighbours).
+  // Paint a row of three adjacent hexes.
   await page.getByTestId('tool-terrain').click();
   await canvas.click({ position: { x: box.width / 2, y: box.height / 2 } });
   await canvas.click({ position: { x: box.width / 2 + 70, y: box.height / 2 } });
   await canvas.click({ position: { x: box.width / 2 + 140, y: box.height / 2 } });
   await expect(page.getByTestId('hex-count')).toHaveText('3 hexes');
 
-  // Arm Select → Marquee. A plain box tight around the first hex selects just it,
-  // so the single-entity Inspector opens (its coordinate is shown).
+  // Plain box around first hex selects just it.
   await page.getByTestId('tool-select').click();
   await page.getByTestId('select-marquee').click();
   await page.mouse.move(cx - 30, cy - 30);
@@ -378,8 +341,7 @@ test('Shift-marquee adds a second box to the Selection rather than replacing it'
   await page.mouse.up();
   await expect(page.getByTestId('entity-coord')).toContainText('q 0');
 
-  // A second box over the other two hexes, with Shift held, *adds* them rather
-  // than replacing — so all three end up selected (the count reads 3).
+  // Shift-marquee adds the other two rather than replacing.
   await page.keyboard.down('Shift');
   await page.mouse.move(cx + 45, cy - 30);
   await page.mouse.down();

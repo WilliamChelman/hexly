@@ -37,7 +37,6 @@ export class AuthClient {
 
   readonly currentUser: Signal<AuthUser | null> = this.session.value.asReadonly();
   readonly isAuthenticated = computed(() => this.currentUser() !== null);
-  // true from construction until the boot /auth/me resolves; guards wait on this.
   readonly sessionLoading = this.session.isLoading;
 
   login(email: string, password: string): Observable<AuthUser> {
@@ -46,7 +45,7 @@ export class AuthClient {
       .pipe(tap((user) => this.session.set(user)));
   }
 
-  // Mirror is cleared in finalize so a failed logout never leaves the UI stuck signed-in.
+  // Clear in finalize so failed logout never leaves UI signed-in.
   logout(): Observable<void> {
     return this.http.post<void>('/api/auth/logout', {}).pipe(
       catchError(() => of(void 0)),

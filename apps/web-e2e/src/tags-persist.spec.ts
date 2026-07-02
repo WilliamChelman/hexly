@@ -11,7 +11,7 @@ test('adds tags on a note, saves, and they survive reload and show in the librar
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const noteId = page.url().split('/').pop();
 
-  // Add two tags through the editor: comma-separated entry adds both at once.
+  // Comma-separated entry adds both tags at once.
   const tagInput = page.getByTestId('tag-input');
   await tagInput.fill('deity, ruined');
   await tagInput.press('Enter');
@@ -19,7 +19,7 @@ test('adds tags on a note, saves, and they survive reload and show in the librar
   await expect(tags).toContainText('deity');
   await expect(tags).toContainText('ruined');
 
-  // Remove one before saving, to prove removal persists too.
+  // Remove one before saving.
   await page.getByTestId('tag-remove-ruined').click();
   await expect(tags).not.toContainText('ruined');
 
@@ -33,7 +33,7 @@ test('adds tags on a note, saves, and they survive reload and show in the librar
   await expect(page.getByTestId(`tags-${noteId}`)).toContainText('deity');
   await expect(page.getByTestId(`tags-${noteId}`)).not.toContainText('ruined');
 
-  // And the tags are stored as Entity metadata, not in the document body.
+  // Tags are stored as Entity metadata, not in the document body.
   const res = await request.get(`/api/entities/${noteId}`);
   expect(res.ok()).toBeTruthy();
   expect((await res.json()).tags).toEqual(['deity']);

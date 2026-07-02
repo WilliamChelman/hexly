@@ -54,7 +54,6 @@ describe('FormattingMenu', () => {
     button(el, 'Bold').click();
     fixture.detectChanges();
 
-    // Empty selection → the bubble menu's shouldShow is false → it hides.
     expect(editor.state.selection.empty).toBe(true);
   });
 
@@ -71,7 +70,6 @@ describe('FormattingMenu', () => {
   it('reveals a URL input, links the selection on submit, then dismisses', () => {
     const { fixture, editor, el } = mount();
 
-    // No input until the link control asks for a URL.
     expect(el.querySelector('input[type=url]')).toBeNull();
 
     button(el, 'Link').click();
@@ -94,7 +92,6 @@ describe('FormattingMenu', () => {
   it('strips an existing link when its control is clicked', () => {
     const { fixture, editor, el } = mount();
 
-    // Selection already carries a link → the control reads active.
     editor.chain().focus().setLink({ href: 'https://example.com' }).run();
     fixture.detectChanges();
     expect(button(el, 'Link').getAttribute('aria-pressed')).toBe('true');
@@ -129,7 +126,6 @@ describe('FormattingMenu', () => {
     button(el, 'Bold').click();
     fixture.detectChanges();
 
-    // Should collapse to head (1), not to (10).
     expect(editor.state.selection.head).toBe(1);
   });
 

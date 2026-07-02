@@ -10,7 +10,6 @@ test('a note round-trips: create → appears → open → rename → delete', as
   await enterLibrary(page);
   await expect(page.getByTestId('empty')).toBeVisible();
 
-  // Create a note: opens the minimal note view at /entities/:id.
   await page.getByTestId('new-note').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const id = page.url().split('/').pop();
@@ -21,7 +20,6 @@ test('a note round-trips: create → appears → open → rename → delete', as
   await expect(page.getByTestId(`open-${id}`)).toBeVisible();
   await expect(page.getByTestId(`type-${id}`)).toHaveText('Note');
 
-  // Rename in place (name only — not body content).
   await page.getByTestId(`rename-${id}`).click();
   const input = page.getByTestId(`rename-input-${id}`);
   await input.fill('Lady Mara');

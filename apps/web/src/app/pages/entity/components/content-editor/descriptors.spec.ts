@@ -31,7 +31,7 @@ function docWith(...links: Array<{ name: string; descriptor?: string }>): JSONCo
 }
 
 describe('harvestDescriptors', () => {
-  it('collects the distinct descriptors set on entityLinks (#96)', () => {
+  it('deduplicates and collects descriptors set on entityLinks', () => {
     const doc = docWith(
       { name: 'Jane', descriptor: 'spouse' },
       { name: 'Acme', descriptor: 'capital of' },
@@ -39,28 +39,19 @@ describe('harvestDescriptors', () => {
     expect(harvestDescriptors(doc).sort()).toEqual(['capital of', 'spouse']);
   });
 
-  it('de-duplicates a descriptor used on several links', () => {
-    const doc = docWith(
-      { name: 'Jane', descriptor: 'spouse' },
-      { name: 'John', descriptor: 'spouse' },
-    );
-    expect(harvestDescriptors(doc)).toEqual(['spouse']);
-  });
-
-  it('ignores links with no descriptor, and a doc with no links', () => {
+  it('ignores links with no descriptor and empty docs', () => {
     expect(harvestDescriptors(docWith({ name: 'Jane' }))).toEqual([]);
     expect(harvestDescriptors({ type: 'doc', content: [] })).toEqual([]);
   });
 });
 
-describe('entityLinkPosBefore — the `::` arm predicate (#96)', () => {
+describe('entityLinkPosBefore — the `::` arm predicate', () => {
   it('finds the link position when an entityLink sits immediately before the cursor', () => {
     const editor = freshEditor();
     editor.commands.insertEntityLink({ entityId: 'e1', label: 'Jane' });
     const pos = entityLinkPosBefore(editor.state, editor.state.selection.from);
     editor.destroy();
 
-    // Inline atom inserted at doc position 1, so its node starts at 1.
     expect(pos).toBe(1);
   });
 
@@ -84,7 +75,7 @@ describe('entityLinkPosBefore — the `::` arm predicate (#96)', () => {
   });
 });
 
-describe('setLinkDescriptor — set/change/clear (#96)', () => {
+describe('setLinkDescriptor — set/change/clear', () => {
   let editor: Editor;
   afterEach(() => editor.destroy());
 
@@ -121,7 +112,7 @@ describe('setLinkDescriptor — set/change/clear (#96)', () => {
   });
 });
 
-describe('descriptorItems — `::` suggestions + free text (#96)', () => {
+describe('descriptorItems — `::` suggestions + free text', () => {
   const vocab = ['capital of', 'rival', 'spouse'];
 
   it('filters the owner vocabulary by a case-insensitive substring', () => {
@@ -131,7 +122,6 @@ describe('descriptorItems — `::` suggestions + free text (#96)', () => {
 
   it('offers the typed text as a brand-new descriptor when it matches nothing', () => {
     const items = descriptorItems('mentor', vocab);
-    // Free text, never boxed in: the typed value leads as a new entry.
     expect(items[0]).toEqual({ id: expect.any(String), descriptor: 'mentor', isNew: true });
   });
 

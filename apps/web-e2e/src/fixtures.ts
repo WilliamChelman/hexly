@@ -27,9 +27,8 @@ export const test = base.extend<{ resetDb: void }>({
 export { expect };
 
 /**
- * Wait for a successful entity PUT — shared across all persist specs. Since the Save
- * button is gone (ADR-0026), specs register this, then press `ControlOrMeta+s` to flush
- * the autosave immediately rather than waiting out the debounce.
+ * Wait for a successful entity PUT. Since the Save button is gone (ADR-0026),
+ * this is used with Cmd/Ctrl+S to flush autosave immediately.
  */
 export function waitForSave(page: Page): Promise<Response> {
   return page.waitForResponse(

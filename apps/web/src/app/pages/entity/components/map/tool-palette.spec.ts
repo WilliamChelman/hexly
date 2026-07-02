@@ -75,15 +75,12 @@ describe('ToolPalette contextual Subtool panel', () => {
   it('shows the Select Subtools Pick and Marquee, with Pick active at cold-start', () => {
     const { fixture } = setup();
 
-    // A fresh map boots in Select, which now has two Subtools (ADR-0017): the
-    // flyout shows Pick and Marquee, with Pick (the boot default) active.
     expect(has(fixture, 'select-pick')).toBe(true);
     expect(has(fixture, 'select-marquee')).toBe(true);
     const pick = fixture.nativeElement.querySelector(
       '[data-testid=select-pick]',
     ) as HTMLButtonElement;
     expect(pick.classList.contains('is-active')).toBe(true);
-    // The painting Tools' Subtools stay scoped to their own flyouts.
     expect(has(fixture, 'feature-settlement')).toBe(false);
     expect(fixture.nativeElement.querySelector('[aria-label=Ocean]')).toBeNull();
   });
@@ -219,7 +216,6 @@ describe('ToolPalette flyout binding', () => {
     for (const tool of ['label', 'erase'] as const) {
       store.armTool(tool);
       fixture.detectChanges();
-      // Tools without Subtools render no flyout at all, keeping the map clear (story 10).
       expect(fixture.nativeElement.querySelector('.flyout')).toBeNull();
     }
   });
@@ -227,7 +223,6 @@ describe('ToolPalette flyout binding', () => {
   it('opens a flyout bound to the armed Tool — Select, Terrain, and Feature', () => {
     const { fixture, store } = setup();
 
-    // Select now carries Pick/Marquee Subtools, so it opens a flyout too (ADR-0017).
     store.armTool('select');
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.flyout')).not.toBeNull();
@@ -271,14 +266,11 @@ describe('ToolPalette localization', () => {
     const { fixture, store } = setup();
     TestBed.inject(TranslocoService).setActiveLang('fr');
 
-    // Terrain swatches render under the Terrain tool; their aria-label is keyed
-    // by id (domain.terrain.ocean), not the English domain label.
     store.armTool('terrain');
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('[aria-label=Océan]')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('[aria-label=Ocean]')).toBeNull();
 
-    // Feature icons likewise key by id (domain.feature.settlement → Colonie).
     store.armTool('feature');
     fixture.detectChanges();
     const settlement = fixture.nativeElement.querySelector(

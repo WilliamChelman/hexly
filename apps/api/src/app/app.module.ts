@@ -22,8 +22,6 @@ const e2eTestingEnabled =
   (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development');
 
 @Module({
-  // DbModule is @Global, but registered at the root so it owns the shared
-  // connection's lifecycle (opened once, closed on shutdown).
   imports: [
     DbModule,
     AuthModule,

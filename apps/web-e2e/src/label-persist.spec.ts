@@ -15,27 +15,22 @@ test('places a label, edits its text, saves, and it survives a reload', async ({
   await enterLibrary(page);
   await page.getByTestId('new-map').click();
 
-  // Creating a map opens the editor at /entities/:id.
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const mapId = page.url().split('/').pop();
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
 
-  // Arm the Label tool and drop a label at the canvas centre (the canvas centres
-  // the world origin on load, so a plain click lands a label at world (0,0)).
-  // Placing it selects it, so the inspector opens on its fields.
+  // Placing a label at the canvas centre selects it, opening the inspector.
   await page.getByTestId('tool-label').click();
   await canvas.click();
 
-  // Edit the placed label's text in the inspector. Tab blurs the field, which
-  // fires the (change) the inspector commits on.
+  // Tab blurs the field, firing the (change) the inspector commits on.
   const text = page.getByTestId('label-text');
   await text.fill('The Whisperwood');
   await text.press('Tab');
 
   await flushSave(page);
 
-  // The persisted document really holds the label, free-positioned at a point.
   const res = await request.get(`/api/entities/${mapId}`);
   expect(res.ok()).toBeTruthy();
   const detail = await res.json();
@@ -46,9 +41,7 @@ test('places a label, edits its text, saves, and it survives a reload', async ({
     y: expect.any(Number),
   });
 
-  // The seam under test: a fresh load re-fetches and re-renders the saved map.
-  // Clicking the centre re-selects the re-rendered label (proving it drew where
-  // it was saved), and the inspector shows its persisted text.
+  // Clicking the centre re-selects the re-rendered label (proving it drew where saved).
   await page.reload();
   await canvas.click();
   await expect(page.getByTestId('label-text')).toHaveValue('The Whisperwood');

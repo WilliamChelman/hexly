@@ -10,7 +10,6 @@ import { TEST_USER } from './test-user';
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test('guards the app, signs in, and signs out', async ({ page }) => {
-  // Unauthenticated: the World Index at / is gated, so the guard bounces to /login.
   await page.goto('/');
   await expect(page).toHaveURL(/\/login/);
 
@@ -25,12 +24,11 @@ test('guards the app, signs in, and signs out', async ({ page }) => {
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole('heading', { name: /Welcome back/ })).toBeVisible();
 
-  // Sign out returns to /login (the action lives behind the rail avatar, ADR-0022)...
+  // Sign out returns to /login (the action lives behind the rail avatar, ADR-0022).
   await page.getByRole('button', { name: 'Open user menu' }).click();
   await page.getByRole('menuitem', { name: 'Sign out' }).click();
   await expect(page).toHaveURL(/\/login/);
 
-  // ...and the guard blocks the app again.
   await page.goto('/');
   await expect(page).toHaveURL(/\/login/);
 });

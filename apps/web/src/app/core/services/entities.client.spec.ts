@@ -71,7 +71,6 @@ describe('EntitiesClient', () => {
 
     const req = http.expectOne('/api/entities');
     expect(req.request.method).toBe('GET');
-    // No options → no query params.
     expect(req.request.params.keys()).toEqual([]);
     req.flush(page);
 
@@ -203,9 +202,8 @@ describe('EntitiesClient', () => {
   });
 
   it('errors (does not fake a conflict) when a 409 carries a non-object body', () => {
-    // A 409 from a proxy/gateway can arrive as an HTML/text body, not an
-    // EntityDetail. It must not be reported as a conflict (which would break the
-    // conflict UI reading .name/.version off a string) — surface it as an error.
+    // 409 from a proxy/gateway can be HTML/text, not EntityDetail. Must not
+    // be reported as a conflict to avoid breaking the conflict UI.
     let errored = false;
     client.save('e1', emptyHexmapBody, 1, [], []).subscribe({
       error: () => (errored = true),
