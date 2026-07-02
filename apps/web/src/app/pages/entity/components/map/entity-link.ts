@@ -211,15 +211,21 @@ export class EntityLink {
 
     // Search server-side as the query changes while the picker is open (ADR-0025).
     // onCleanup cancels the prior search, so responses can't land out of order.
+    // The previous query's options stay put until the new ones arrive rather than
+    // blanking first (stale-while-revalidate), so refining the query doesn't
+    // flicker the list; options clear when the picker closes (so a reopen never
+    // shows the last session's results) or when a search fails (so a failed
+    // refine never leaves the prior query's non-matching results clickable).
     // ponytail: no debounce — small lists, fine until import.
     effect((onCleanup) => {
-      if (!this.open()) return;
+      if (!this.open()) {
+        this.options.set([]);
+        return;
+      }
       const q = this.query().trim();
-      this.options.set([]);
       const sub = this.entitiesClient.list({ q }).subscribe({
         next: (page) => this.options.set(page.items),
-        // eslint-disable-next-line @typescript-eslint/no-empty-function
-        error: () => {},
+        error: () => this.options.set([]),
       });
       onCleanup(() => sub.unsubscribe());
     });

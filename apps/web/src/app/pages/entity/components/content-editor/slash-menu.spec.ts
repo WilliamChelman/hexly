@@ -89,4 +89,22 @@ describe('SlashMenu', () => {
 
     expect(menu.onKeyDown(new KeyboardEvent('keydown', { key: 'a' }))).toBe(false);
   });
+
+  it('keeps the current items on a loading update, so an async query never blanks', () => {
+    const { fixture, menu } = open([
+      SLASH_ITEMS.find((i) => i.id === 'heading1')!,
+    ]);
+
+    // tiptap's interim "loading" render carries empty items; the menu must ignore
+    // it and keep showing the previous results until the resolved render lands.
+    menu.update({
+      items: [],
+      command: vi.fn(),
+      clientRect: () => ({ left: 100, bottom: 200 }) as DOMRect,
+      loading: true,
+    });
+    fixture.detectChanges();
+
+    expect(el(fixture).textContent ?? '').toContain('Heading 1');
+  });
 });

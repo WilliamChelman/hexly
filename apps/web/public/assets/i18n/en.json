@@ -272,7 +272,8 @@
     },
     "cancel": "Cancel",
     "close": "Close",
-    "delete": "Delete"
+    "delete": "Delete",
+    "create": "Create"
   },
   "nav": {
     "primary": "Primary navigation",
@@ -281,6 +282,18 @@
     "expand": "Expand navigation",
     "collapse": "Collapse navigation",
     "home": "Hexly home"
+  },
+  "commandPalette": {
+    "searchLabel": "Search or run a command",
+    "placeholder": "Search or type > for commands…",
+    "empty": "No matches",
+    "entities": "Entities",
+    "worlds": "Worlds",
+    "commands": "Commands",
+    "createNote": "Create Note",
+    "createMap": "Create Map",
+    "nameLabel": "Name",
+    "worldLabel": "World"
   },
   "worlds": {
     "switcherLabel": "Active world",

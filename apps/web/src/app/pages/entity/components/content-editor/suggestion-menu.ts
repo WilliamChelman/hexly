@@ -5,6 +5,11 @@ export interface SuggestionMenuProps<T> {
   items: T[];
   command: (item: T) => void;
   clientRect?: (() => DOMRect | null) | null;
+  /**
+   * True on the interim render `@tiptap/suggestion` emits with empty `items`
+   * while an async `items()` search is in flight, before the resolved render.
+   */
+  loading?: boolean;
 }
 
 /**
@@ -37,8 +42,13 @@ export abstract class SuggestionMenu<T extends { id: string }> {
 
   update(props: SuggestionMenuProps<T>): void {
     this.command = props.command;
-    this.items.set(props.items);
-    this.activeIndex.set(0);
+    // While an async search is in flight tiptap sends an interim update with
+    // empty items (loading); keep the previous results until the resolved ones
+    // arrive so refining the query doesn't blank the list (stale-while-revalidate).
+    if (!props.loading) {
+      this.items.set(props.items);
+      this.activeIndex.set(0);
+    }
     const pos = toPosition(props.clientRect);
     if (pos) this.position.set(pos);
   }

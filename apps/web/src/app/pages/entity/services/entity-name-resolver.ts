@@ -6,9 +6,10 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { catchError, firstValueFrom, map, of } from 'rxjs';
+import { firstValueFrom } from 'rxjs';
 import { ENTITY_LIST_MAX_LIMIT, EntitySummary } from '@hexly/domain';
 import { EntitiesClient } from '../../../core/services/entities.client';
+import { searchEntities } from '../../../core/utils/search-entities';
 
 /** A link's resolution against the owner's entities (issue #95, ADR-0023). */
 export type EntityResolution =
@@ -60,12 +61,7 @@ export class EntityNameResolver {
    * search yields an empty list rather than rejecting the popup.
    */
   search(query: string): Promise<EntitySummary[]> {
-    return firstValueFrom(
-      this.client.list({ q: query.trim(), limit: ENTITY_LIST_MAX_LIMIT }).pipe(
-        map((page) => page.items),
-        catchError(() => of<EntitySummary[]>([])),
-      ),
-    );
+    return firstValueFrom(searchEntities(this.client, query));
   }
 
   private scheduleFlush(): void {
