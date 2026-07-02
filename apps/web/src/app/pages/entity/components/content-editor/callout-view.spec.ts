@@ -22,8 +22,11 @@ describe('CalloutView node view', () => {
       },
     });
     const node = editor.state.doc.firstChild!;
+    // The callout is the first (and only) top-level node, so its position is 0.
     const view = createCalloutNodeView(
       node,
+      editor,
+      () => 0,
       TestBed.inject(EnvironmentInjector),
       TestBed.inject(ApplicationRef),
     );
@@ -50,6 +53,35 @@ describe('CalloutView node view', () => {
     // renders the block children, keeping inner entityLinks clickable (ADR-0033).
     expect(view.contentDOM).toBeTruthy();
     expect(dom.contains(view.contentDOM!)).toBe(true);
+
+    view.destroy?.();
+    editor.destroy();
+  });
+
+  it('lets the reader change the callout type — updating the node attr', () => {
+    const { editor, view } = nodeViewFor({ type: 'note', title: null });
+    const select = (view.dom as HTMLElement).querySelector('select') as HTMLSelectElement;
+    expect(select).toBeTruthy();
+    expect(select.value).toBe('note');
+
+    // Pick a different type as a user would; the change flows back into the doc.
+    select.value = 'warning';
+    select.dispatchEvent(new Event('change'));
+
+    expect(editor.state.doc.firstChild?.attrs['type']).toBe('warning');
+
+    view.destroy?.();
+    editor.destroy();
+  });
+
+  it('keeps an unknown (imported) type selectable rather than dropping it', () => {
+    const { editor, view } = nodeViewFor({ type: 'custom-obsidian', title: null });
+    const select = (view.dom as HTMLElement).querySelector('select') as HTMLSelectElement;
+
+    expect(select.value).toBe('custom-obsidian');
+    expect(
+      Array.from(select.options).some((o) => o.value === 'custom-obsidian'),
+    ).toBe(true);
 
     view.destroy?.();
     editor.destroy();

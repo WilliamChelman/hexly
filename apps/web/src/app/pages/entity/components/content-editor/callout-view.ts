@@ -3,17 +3,22 @@ import {
   ChangeDetectionStrategy,
   Component,
   EnvironmentInjector,
+  computed,
   createComponent,
   input,
+  output,
 } from '@angular/core';
+import { Editor } from '@tiptap/core';
 import { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { NodeView } from '@tiptap/pm/view';
+import { CALLOUT_TYPES } from './callout-node';
 
 /**
  * The `callout` node view (ADR-0033): renders an Obsidian admonition as a coloured
- * box with a non-editable header (its `type` badge + optional `title`) above an
- * **editable body**. The body element is handed to ProseMirror as `contentDOM`, so
- * the block children render into it natively — inner `entityLink`s and other nodes
+ * box with a non-editable header above an **editable body**. The header carries a
+ * `<select>` to change the callout `type` (a native control — no custom dropdown)
+ * and the optional `title`. The body element is handed to ProseMirror as `contentDOM`,
+ * so the block children render into it natively — inner `entityLink`s and other nodes
  * stay live and clickable, the point of modelling callout as block content.
  */
 @Component({
@@ -24,7 +29,15 @@ import { NodeView } from '@tiptap/pm/view';
     <div class="callout" [attr.data-callout]="type()">
       <!-- contenteditable=false: the chrome is ours; ProseMirror only owns the body. -->
       <div class="callout-header" contenteditable="false">
-        <span class="callout-type">{{ type() }}</span>
+        <select
+          class="callout-type"
+          aria-label="Callout type"
+          (change)="typeChange.emit($any($event.target).value)"
+        >
+          @for (option of options(); track option) {
+            <option [value]="option" [selected]="option === type()">{{ option }}</option>
+          }
+        </select>
         @if (title()) {
           <span class="callout-title">{{ title() }}</span>
         }
@@ -37,6 +50,16 @@ import { NodeView } from '@tiptap/pm/view';
 export class CalloutView {
   readonly type = input.required<string>();
   readonly title = input<string | null>(null);
+  /** The reader picked a new type; the bridge writes it back to the node attr. */
+  readonly typeChange = output<string>();
+
+  /** Known types, plus the current one when it's an unknown (imported) value so it stays selectable. */
+  protected readonly options = computed<readonly string[]>(() => {
+    const current = this.type();
+    return CALLOUT_TYPES.includes(current as (typeof CALLOUT_TYPES)[number])
+      ? CALLOUT_TYPES
+      : [current, ...CALLOUT_TYPES];
+  });
 }
 
 /**
@@ -46,11 +69,15 @@ export class CalloutView {
  * blanket blocks; `ignoreMutation` only shields Angular's own chrome re-renders
  * (the header) from ProseMirror's mutation observer, leaving the body to PM.
  *
- * No `elementInjector` needed (unlike entityLink): the callout chrome carries no
+ * `editor` + `getPos` let the type `<select>` write back: on change it dispatches a
+ * `setNodeMarkup` at the node's position, and PM's resulting `update()` re-renders
+ * the header. No `elementInjector` needed (unlike entityLink): the chrome carries no
  * `routerLink`, so it doesn't reach for `ActivatedRoute`.
  */
 export function createCalloutNodeView(
   node: ProseMirrorNode,
+  editor: Editor,
+  getPos: () => number | undefined,
   environmentInjector: EnvironmentInjector,
   appRef: ApplicationRef,
 ): NodeView {
@@ -64,6 +91,17 @@ export function createCalloutNodeView(
   };
   apply(node);
   appRef.attachView(ref.hostView);
+
+  // Write a picked type back into the document at the node's live position.
+  const sub = ref.instance.typeChange.subscribe((type: string) => {
+    const pos = getPos();
+    if (pos == null) return;
+    const current = editor.state.doc.nodeAt(pos);
+    if (!current) return;
+    editor.view.dispatch(
+      editor.state.tr.setNodeMarkup(pos, undefined, { ...current.attrs, type }),
+    );
+  });
 
   const dom = ref.location.nativeElement as HTMLElement;
   const contentDOM = dom.querySelector('[data-callout-body]') as HTMLElement;
@@ -80,6 +118,7 @@ export function createCalloutNodeView(
     ignoreMutation: (mutation) =>
       mutation.type !== 'selection' && !contentDOM.contains(mutation.target as globalThis.Node),
     destroy: () => {
+      sub.unsubscribe();
       appRef.detachView(ref.hostView);
       ref.destroy();
     },

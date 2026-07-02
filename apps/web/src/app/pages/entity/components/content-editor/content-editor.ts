@@ -5,6 +5,7 @@ import {
   DestroyRef,
   EnvironmentInjector,
   Injector,
+  afterRenderEffect,
   effect,
   inject,
   input,
@@ -186,9 +187,16 @@ import { BubbleMenuDirective } from './bubble-menu.directive';
       font-size: 0.8em;
       margin-bottom: 0.25em;
     }
+    /* The type <select>: a bare inline control, not a chunky native dropdown. */
     :host ::ng-deep .ProseMirror .callout-type {
-      @apply font-semibold uppercase;
+      @apply font-semibold uppercase cursor-pointer bg-transparent border-none text-ink-muted;
       letter-spacing: 0.04em;
+      font-size: inherit;
+      padding: 0;
+      appearance: none;
+    }
+    :host ::ng-deep .ProseMirror .callout-type:hover {
+      @apply text-ink;
     }
     :host ::ng-deep .ProseMirror .callout-title {
       @apply font-semibold text-ink;
@@ -303,7 +311,11 @@ export class ContentEditor {
     // changes, best-effort scroll to the first heading whose text matches — how a
     // `[[Target#Heading]]` link lands on its heading. Re-runs on re-seed so a jump
     // that also swaps the open Entity still finds the heading in the fresh doc.
-    effect(() => {
+    // afterRenderEffect, not effect: on a re-seed the fresh editor.view.dom is only
+    // mounted into the page by TiptapDirective *after* this CD's DOM write, and
+    // scrollIntoView on a still-detached node is a silent no-op — so the cross-note
+    // jump (new Entity, new editor) needs the post-render beat, not just in-note.
+    afterRenderEffect(() => {
       const editor = this.editor();
       const fragment = this.fragment();
       if (!editor || !fragment) return;
@@ -336,7 +348,8 @@ export class ContentEditor {
     // callout chrome has no routerLink to resolve.
     const calloutWithView = calloutNode.extend({
       addNodeView() {
-        return ({ node }) => createCalloutNodeView(node, environmentInjector, appRef);
+        return ({ node, editor, getPos }) =>
+          createCalloutNodeView(node, editor, getPos, environmentInjector, appRef);
       },
     });
 
