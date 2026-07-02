@@ -50,7 +50,7 @@ test('inserts a Content Entity Link via @, persists it, navigates it, and dangle
   const res = await request.get(`/api/entities/${sourceId}`);
   expect(res.ok()).toBeTruthy();
   const detail = await res.json();
-  expect(detail.document.content.format).toBe('tiptap-v2');
+  expect(detail.document.content.format).toBe('tiptap-v3');
   const snapshot = JSON.stringify(detail.document.content.snapshot);
   expect(snapshot).toContain('entityLink');
   expect(snapshot).toContain(targetId);

@@ -108,6 +108,47 @@ export const SLASH_ITEMS: SlashItem[] = [
     apply: (editor, range) => chainFrom(editor, range).setHorizontalRule().run(),
   },
   {
+    // The custom `callout` node (ADR-0033): insert an empty admonition with one
+    // paragraph, ready to type into. No dedicated command — `insertContent` from
+    // the node's own schema shape is enough (ponytail).
+    id: 'callout',
+    labelKey: 'noteView.slashMenu.callout',
+    keywords: ['callout', 'admonition', 'note', 'warning', 'aside', 'box'],
+    apply: (editor, range) =>
+      chainFrom(editor, range)
+        .insertContent({ type: 'callout', attrs: { type: 'note' }, content: [{ type: 'paragraph' }] })
+        .run(),
+  },
+  {
+    id: 'table',
+    labelKey: 'noteView.slashMenu.table',
+    keywords: ['table', 'grid', 'rows', 'columns'],
+    apply: (editor, range) =>
+      chainFrom(editor, range).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+  },
+  {
+    id: 'taskList',
+    labelKey: 'noteView.slashMenu.taskList',
+    keywords: ['task', 'todo', 'checklist', 'checkbox'],
+    apply: (editor, range) => {
+      chainFrom(editor, range).run();
+      if (!editor.isActive('taskList')) editor.chain().focus().toggleTaskList().run();
+    },
+  },
+  {
+    // Image (ADR-0034): no upload/asset picker yet (assets arrive via vault import),
+    // so prompt for a URL — external URLs pass through as the src. ponytail: swap the
+    // prompt for a real picker when asset upload lands.
+    id: 'image',
+    labelKey: 'noteView.slashMenu.image',
+    keywords: ['image', 'picture', 'photo', 'img', 'asset'],
+    apply: (editor, range) => {
+      const src = globalThis.prompt?.('Image URL')?.trim();
+      const chain = chainFrom(editor, range);
+      (src ? chain.setImage({ src }) : chain).run();
+    },
+  },
+  {
     // Routes into the same `@` Entity picker (issue #95, ADR-0023): replace the
     // typed "/link" with "@", letting the mention suggestion drive the one picker.
     id: 'link',

@@ -12,6 +12,8 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { ActivatedRoute } from '@angular/router';
 import { Editor, JSONContent } from '@tiptap/core';
 import { catchError, firstValueFrom, of } from 'rxjs';
 import { EntitiesClient } from '../../../../core/services/entities.client';
@@ -20,6 +22,8 @@ import { EntitySession } from '../../services/entity-session';
 import { EntityNameResolver } from '../../services/entity-name-resolver';
 import { CONTENT_EXTENSIONS } from './content-extensions';
 import { entityLinkNode } from './entity-link-node';
+import { calloutNode } from './callout-node';
+import { createCalloutNodeView } from './callout-view';
 import { SlashMenu } from './slash-menu';
 import { slashCommands } from './slash-commands';
 import { SLASH_ITEMS } from './slash-menu-items';
@@ -170,6 +174,60 @@ import { BubbleMenuDirective } from './bubble-menu.directive';
     :host ::ng-deep .ProseMirror a {
       @apply text-gold underline;
     }
+    /* Callout (ADR-0033): a bordered box; the header carries its type + title, the
+       body holds live block content (contentDOM). Colour-by-type is deferred. */
+    :host ::ng-deep .ProseMirror .callout {
+      @apply border border-line rounded-md bg-surface-sunken;
+      margin: 0.8em 0;
+      padding: 0.5em 0.85em;
+    }
+    :host ::ng-deep .ProseMirror .callout-header {
+      @apply text-ink-muted;
+      font-size: 0.8em;
+      margin-bottom: 0.25em;
+    }
+    :host ::ng-deep .ProseMirror .callout-type {
+      @apply font-semibold uppercase;
+      letter-spacing: 0.04em;
+    }
+    :host ::ng-deep .ProseMirror .callout-title {
+      @apply font-semibold text-ink;
+      margin-left: 0.5em;
+    }
+    /* Table: bordered cells so a table reads as a grid, not stacked text. */
+    :host ::ng-deep .ProseMirror table {
+      @apply border-collapse;
+      margin: 0.8em 0;
+      width: 100%;
+    }
+    :host ::ng-deep .ProseMirror :is(th, td) {
+      @apply border border-line;
+      padding: 0.35em 0.6em;
+      text-align: left;
+    }
+    :host ::ng-deep .ProseMirror th {
+      @apply bg-surface-sunken font-semibold;
+    }
+    /* Task list: hang the checkbox beside its item, drop the list marker. */
+    :host ::ng-deep .ProseMirror ul[data-type='taskList'] {
+      list-style: none;
+      padding-left: 0.25em;
+    }
+    :host ::ng-deep .ProseMirror ul[data-type='taskList'] li {
+      @apply flex items-start gap-2;
+    }
+    :host ::ng-deep .ProseMirror img {
+      @apply rounded-md;
+      max-width: 100%;
+      height: auto;
+    }
+    /* Highlight mark (==text==): a warm wash that reads on the app's surface. */
+    :host ::ng-deep .ProseMirror mark {
+      background: color-mix(in srgb, var(--color-gold) 30%, transparent);
+      border-radius: 0.15em;
+      padding: 0 0.1em;
+      color: inherit;
+    }
   `,
 })
 export class ContentEditor {
@@ -187,6 +245,9 @@ export class ContentEditor {
   // entityLink node views created from it can resolve ActivatedRoute for routerLink.
   private readonly injector = inject(Injector);
   private readonly appRef = inject(ApplicationRef);
+  // The `[[Target#Heading]]` anchor a link navigated to (ADR-0033), read from the
+  // route fragment so an in-note or cross-note jump both land on the right heading.
+  private readonly fragment = toSignal(inject(ActivatedRoute).fragment);
 
   /** The editor's accessible name, localized by the caller (ADR-0014). */
   readonly ariaLabel = input.required<string>();
@@ -238,6 +299,17 @@ export class ContentEditor {
       queueMicrotask(() => previous?.destroy());
     });
 
+    // Anchor scroll (ADR-0033): when the route fragment or the mounted editor
+    // changes, best-effort scroll to the first heading whose text matches — how a
+    // `[[Target#Heading]]` link lands on its heading. Re-runs on re-seed so a jump
+    // that also swaps the open Entity still finds the heading in the fresh doc.
+    effect(() => {
+      const editor = this.editor();
+      const fragment = this.fragment();
+      if (!editor || !fragment) return;
+      scrollToHeading(editor.view.dom, fragment);
+    });
+
     this.destroyRef.onDestroy(() => this.editor()?.destroy());
   }
 
@@ -256,6 +328,15 @@ export class ContentEditor {
       addNodeView() {
         return ({ node }) =>
           createEntityLinkNodeView(node, environmentInjector, elementInjector, appRef);
+      },
+    });
+
+    // Same pattern for the callout node view (ADR-0033): swap the framework-free
+    // schema node for one carrying the Angular view. No elementInjector — the
+    // callout chrome has no routerLink to resolve.
+    const calloutWithView = calloutNode.extend({
+      addNodeView() {
+        return ({ node }) => createCalloutNodeView(node, environmentInjector, appRef);
       },
     });
 
@@ -292,16 +373,45 @@ export class ContentEditor {
 
     return new Editor({
       extensions: [
-        ...CONTENT_EXTENSIONS.filter(
-          (e) => (e as { name?: string }).name !== entityLinkNode.name,
-        ),
+        ...CONTENT_EXTENSIONS.filter((e) => {
+          const name = (e as { name?: string }).name;
+          return name !== entityLinkNode.name && name !== calloutNode.name;
+        }),
         entityLinkWithView,
+        calloutWithView,
         slashCommands(() => this.slashMenu(), slashItems),
         mention.extension,
         descriptor,
       ],
       content,
     });
+  }
+}
+
+/**
+ * Best-effort scroll to the first heading whose text matches `fragment` (ADR-0033).
+ * Case-insensitive on trimmed text, so `[[Target#History]]` finds `## History`. No
+ * match is a silent no-op — anchors are advisory, a renamed/removed heading must not
+ * error. `fragment` arrives percent-encoded (a heading may have spaces), so decode it.
+ */
+function scrollToHeading(root: HTMLElement, fragment: string): void {
+  const target = decodeFragment(fragment).trim().toLowerCase();
+  if (!target) return;
+  const headings = Array.from(root.querySelectorAll<HTMLElement>('h1, h2, h3, h4, h5, h6'));
+  for (const heading of headings) {
+    if ((heading.textContent ?? '').trim().toLowerCase() === target) {
+      heading.scrollIntoView({ block: 'start' });
+      return;
+    }
+  }
+}
+
+/** A malformed percent-sequence must not throw (best-effort anchor); fall back to the raw fragment. */
+function decodeFragment(fragment: string): string {
+  try {
+    return decodeURIComponent(fragment);
+  } catch {
+    return fragment;
   }
 }
 

@@ -60,6 +60,10 @@
       "blockquote": "Quote",
       "codeBlock": "Code block",
       "horizontalRule": "Divider",
+      "callout": "Callout",
+      "table": "Table",
+      "taskList": "Task list",
+      "image": "Image",
       "entityLink": "Link to entity"
     },
     "entityPicker": {
@@ -81,6 +85,7 @@
       "underline": "Underline",
       "strike": "Strikethrough",
       "code": "Inline code",
+      "highlight": "Highlight",
       "link": "Link",
       "linkPlaceholder": "Paste or type a URL"
     }

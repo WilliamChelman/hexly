@@ -37,6 +37,9 @@ describe('SlashItem.apply', () => {
     blockquote: 'blockquote',
     codeBlock: 'codeBlock',
     horizontalRule: 'horizontalRule',
+    callout: 'callout',
+    table: 'table',
+    taskList: 'taskList',
   };
 
   function applyToFreshDoc(id: string) {
@@ -66,6 +69,38 @@ describe('SlashItem.apply', () => {
     editor.destroy();
 
     expect(text).toBe('@');
+  });
+
+  it('inserts an image with the prompted URL, and nothing if the prompt is cancelled', () => {
+    const item = SLASH_ITEMS.find((i) => i.id === 'image')!;
+
+    const withUrl = () => {
+      const editor = new Editor({ extensions: CONTENT_EXTENSIONS });
+      editor.commands.insertContent('/image');
+      vi.spyOn(globalThis, 'prompt').mockReturnValue('  /assets/w1/abc.png  ');
+      item.apply(editor, { from: 1, to: editor.state.doc.content.size });
+      const json = editor.getJSON();
+      editor.destroy();
+      return json;
+    };
+
+    const cancelled = () => {
+      const editor = new Editor({ extensions: CONTENT_EXTENSIONS });
+      editor.commands.insertContent('/image');
+      vi.spyOn(globalThis, 'prompt').mockReturnValue(null);
+      item.apply(editor, { from: 1, to: editor.state.doc.content.size });
+      const json = editor.getJSON();
+      editor.destroy();
+      return json;
+    };
+
+    const image = (json: ReturnType<typeof withUrl>) =>
+      (json.content ?? []).find((n) => n.type === 'image');
+
+    // Prompted src is trimmed before insertion.
+    expect(image(withUrl())?.attrs?.['src']).toBe('/assets/w1/abc.png');
+    // Cancelling still clears the "/image" query but inserts no image.
+    expect(image(cancelled())).toBeUndefined();
   });
 
   it('produces a snapshot that round-trips losslessly through the editor', () => {

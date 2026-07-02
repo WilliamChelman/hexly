@@ -2,7 +2,8 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentRef } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { ActivatedRoute, provideRouter } from '@angular/router';
+import { BehaviorSubject } from 'rxjs';
 import { CONTENT_FORMAT, EntityDetail } from '@hexly/domain';
 import { Editor } from '@tiptap/core';
 import { EntitySession } from '../../services/entity-session';
@@ -13,6 +14,10 @@ import { noteDetail } from '../entity-detail.fixtures';
 
 describe('ContentEditor', () => {
   const note = noteDetail;
+
+  // The route fragment a `[[Target#Heading]]` link navigates to; ContentEditor
+  // watches it to scroll the open note to the matching heading (ADR-0033).
+  const fragment$ = new BehaviorSubject<string | null>(null);
 
   const noteWithProse = (text: string): EntityDetail => ({
     ...note('Lady Mara'),
@@ -52,6 +57,7 @@ describe('ContentEditor', () => {
   }
 
   beforeEach(async () => {
+    fragment$.next(null);
     await TestBed.configureTestingModule({
       imports: [ContentEditor, provideTranslocoTesting()],
       providers: [
@@ -60,6 +66,7 @@ describe('ContentEditor', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
+        { provide: ActivatedRoute, useValue: { fragment: fragment$ } },
       ],
     }).compileComponents();
   });
@@ -75,6 +82,87 @@ describe('ContentEditor', () => {
       '[data-testid=note-content]',
     ) as HTMLElement;
     expect(surface.textContent).toContain('Lady Mara rules the north.');
+  });
+
+  it('renders a callout’s node view — its type/title chrome around live body content', () => {
+    TestBed.inject(EntitySession).adopt({
+      ...note('Lady Mara'),
+      document: {
+        type: 'note',
+        content: {
+          format: CONTENT_FORMAT,
+          snapshot: {
+            type: 'doc',
+            content: [
+              {
+                type: 'callout',
+                attrs: { type: 'warning', title: 'Beware' },
+                content: [
+                  { type: 'paragraph', content: [{ type: 'text', text: 'The pass is watched.' }] },
+                ],
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    const fixture = create();
+
+    const callout = fixture.nativeElement.querySelector('.callout') as HTMLElement;
+    expect(callout).not.toBeNull();
+    expect(callout.textContent).toContain('Beware');
+    expect(callout.textContent).toContain('The pass is watched.');
+  });
+
+  it('scrolls to the first heading matching the route fragment (ADR-0033)', () => {
+    // jsdom has no layout; stub scrollIntoView so we can assert which node got it.
+    HTMLElement.prototype.scrollIntoView ??= () => undefined;
+    const scrollSpy = vi
+      .spyOn(HTMLElement.prototype, 'scrollIntoView')
+      .mockImplementation(() => undefined);
+
+    TestBed.inject(EntitySession).adopt({
+      ...note('Lady Mara'),
+      document: {
+        type: 'note',
+        content: {
+          format: CONTENT_FORMAT,
+          snapshot: {
+            type: 'doc',
+            content: [
+              { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Origins' }] },
+              { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'History' }] },
+            ],
+          },
+        },
+      },
+    });
+
+    const fixture = create();
+    fragment$.next('History');
+    fixture.detectChanges();
+
+    expect(scrollSpy).toHaveBeenCalledTimes(1);
+    const scrolled = scrollSpy.mock.instances[0] as HTMLElement;
+    expect(scrolled.textContent).toBe('History');
+
+    scrollSpy.mockRestore();
+  });
+
+  it('does not scroll when the fragment matches no heading (best-effort anchor)', () => {
+    HTMLElement.prototype.scrollIntoView ??= () => undefined;
+    const scrollSpy = vi
+      .spyOn(HTMLElement.prototype, 'scrollIntoView')
+      .mockImplementation(() => undefined);
+
+    TestBed.inject(EntitySession).adopt(noteWithProse('Just a paragraph.'));
+    const fixture = create();
+    fragment$.next('Nowhere');
+    fixture.detectChanges();
+
+    expect(scrollSpy).not.toHaveBeenCalled();
+    scrollSpy.mockRestore();
   });
 
   it('labels the editable surface with the supplied aria-label', () => {

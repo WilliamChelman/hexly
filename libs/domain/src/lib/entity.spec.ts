@@ -6,6 +6,7 @@ import {
   entityBodySchema,
   renameEntityRequestSchema,
   saveEntityRequestSchema,
+  tiptapContent,
   visibilitySchema,
 } from './entity';
 
@@ -36,6 +37,23 @@ describe('contentSchema', () => {
     const parsed = contentSchema.parse(envelope);
 
     expect(parsed).toEqual(envelope);
+  });
+
+  it('round-trips a tiptap-v3 snapshot untouched — the Obsidian-import schema bump (ADR-0033)', () => {
+    // v3 is additive over v2 (callout/image/table/taskList/highlight, entityLink display/heading).
+    const envelope = {
+      format: 'tiptap-v3' as const,
+      snapshot: {
+        type: 'doc',
+        content: [{ type: 'callout', attrs: { type: 'note', title: 'Beware' }, content: [] }],
+      },
+    };
+
+    expect(contentSchema.parse(envelope)).toEqual(envelope);
+  });
+
+  it('stamps new Content with the tiptap-v3 write format (ADR-0033)', () => {
+    expect(tiptapContent({ type: 'doc', content: [] }).format).toBe('tiptap-v3');
   });
 
   it('rejects a Content envelope tagged with an unknown format', () => {
@@ -81,7 +99,7 @@ describe('emptyEntityBody', () => {
     expect(entityBodySchema.parse(body)).toEqual(body);
     expect(body).toEqual({
       type: 'note',
-      content: { format: 'tiptap-v2', snapshot: { type: 'doc', content: [] } },
+      content: { format: 'tiptap-v3', snapshot: { type: 'doc', content: [] } },
     });
   });
 
