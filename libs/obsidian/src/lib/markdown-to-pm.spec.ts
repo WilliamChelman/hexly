@@ -11,6 +11,17 @@ describe('markdownToProseMirror', () => {
     ]);
   });
 
+  it('degrades malformed YAML frontmatter instead of throwing', () => {
+    const md = '---\na: b: [unclosed\n---\nBody text';
+    const { doc, metadata, degraded } = markdownToProseMirror(md);
+
+    expect(metadata).toEqual({});
+    expect(degraded).toEqual({ frontmatter: 1 });
+    expect(doc.content).toEqual([
+      { type: 'paragraph', content: [{ type: 'text', text: 'Body text' }] },
+    ]);
+  });
+
   it('converts a paragraph of plain text into a doc with a paragraph node', () => {
     const { doc } = markdownToProseMirror('Hello world');
 
@@ -64,6 +75,13 @@ describe('markdownToProseMirror', () => {
     expect(degraded).toEqual({ math: 1 });
   });
 
+  it('leaves prose with two dollar amounts untouched (not inline math)', () => {
+    const { doc, degraded } = markdownToProseMirror('You owe $5 and $10 total');
+
+    expect(doc.content?.[0].content).toEqual([{ type: 'text', text: 'You owe $5 and $10 total' }]);
+    expect(degraded).toEqual({});
+  });
+
   it('converts ==text== into a highlight mark, splitting the surrounding text', () => {
     const { doc } = markdownToProseMirror('plain ==lit up== plain');
 
@@ -93,6 +111,13 @@ describe('markdownToProseMirror', () => {
       { type: 'text', text: 'Some Note', marks: [{ type: 'link', attrs: { href: 'Some Note' } }] },
     ]);
     expect(degraded).toEqual({ embed: 1 });
+  });
+
+  it('tallies an unrecognized block (raw HTML) as degraded instead of dropping it silently', () => {
+    const { doc, degraded } = markdownToProseMirror('<div>raw</div>');
+
+    expect(doc.content).toEqual([]);
+    expect(degraded).toEqual({ html: 1 });
   });
 
   it('converts a heading, carrying its level as an attr', () => {

@@ -35,7 +35,15 @@ export function markdownToProseMirror(markdown: string): MarkdownToProseMirror {
   const degraded: Record<string, number> = {};
 
   const front = tree.children.find((n) => n.type === 'yaml');
-  const metadata = front ? (parseYaml((front as { value: string }).value) ?? {}) : {};
+  let metadata: Record<string, unknown> = {};
+  if (front) {
+    try {
+      metadata = parseYaml((front as { value: string }).value) ?? {};
+    } catch {
+      // Malformed frontmatter degrades to empty metadata rather than crashing the import.
+      count(degraded, 'frontmatter');
+    }
+  }
 
   const content = tree.children
     .filter((node) => node.type !== 'yaml')
@@ -84,6 +92,8 @@ function blockToPM(node: RootContent, degraded: Record<string, number>): PMNode[
     case 'footnoteDefinition':
       return node.children.flatMap((child) => blockToPM(child, degraded));
     default:
+      // No PM node for this block (e.g. raw HTML) — tally it rather than drop it silently.
+      count(degraded, node.type);
       return [];
   }
 }
@@ -253,8 +263,10 @@ function mergeAdjacentText(nodes: PMNode[]): PMNode[] {
  * highlight-marked run; the surrounding text stays plain. Wikilinks and the degrading
  * constructs (comments, math) extend the same token regex.
  */
+// Inline `$…$` requires non-space at both ends and no trailing digit, per Obsidian —
+// so ordinary prose with two dollar amounts (`$5 and $10`) isn't mistaken for math.
 const INLINE_TOKEN =
-  /(!?)\[\[([^\]\n]+)\]\]|==(.+?)==|%%([\s\S]*?)%%|\$\$([\s\S]+?)\$\$|\$([^$\n]+)\$/;
+  /(!?)\[\[([^\]\n]+)\]\]|==(.+?)==|%%([\s\S]*?)%%|\$\$([\s\S]+?)\$\$|\$(\S|\S[^$\n]*?\S)\$(?!\d)/;
 
 /** Splits an mdast text value around Obsidian inline tokens into PM inline nodes. */
 function splitInlineText(
@@ -352,6 +364,8 @@ function inlineToPM(
       count(degraded, 'footnote');
       return [withMarks({ type: 'text', text: `[^${node.identifier}]` }, marks)];
     default:
+      // No PM node for this inline (e.g. raw HTML) — tally it rather than drop it silently.
+      count(degraded, node.type);
       return [];
   }
 }
