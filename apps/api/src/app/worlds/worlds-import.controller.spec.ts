@@ -19,6 +19,40 @@ function vaultZip(files: Record<string, string | Uint8Array>): Buffer {
   return Buffer.from(zipSync(entries));
 }
 
+/** Collect every `entityLink` node in a converted doc snapshot, in document order. */
+function entityLinks(snapshot: {
+  content?: unknown[];
+  type?: string;
+}): { attrs: Record<string, unknown> }[] {
+  const found: { attrs: Record<string, unknown> }[] = [];
+  const walk = (node: { type?: string; content?: unknown[]; attrs?: Record<string, unknown> }) => {
+    if (node.type === 'entityLink') found.push({ attrs: node.attrs ?? {} });
+    for (const child of node.content ?? []) walk(child as typeof node);
+  };
+  walk(snapshot);
+  return found;
+}
+
+/** Fetch a note by name and return its entityLink nodes. */
+async function linksOf(agent: request.Agent, worldId: string, name: string) {
+  const list = await agent.get(`/entities?worldId=${worldId}`).expect(200);
+  const summary = list.body.items.find((e: { name: string }) => e.name === name);
+  const detail = await agent.get(`/entities/${summary.id}`).expect(200);
+  return { id: summary.id, links: entityLinks(detail.body.document.content.snapshot) };
+}
+
+/** Map every imported note's `hexly.sourcePath` to its entity id (for notes that share a name). */
+async function pathsToIds(agent: request.Agent, worldId: string): Promise<Record<string, string>> {
+  const list = await agent.get(`/entities?worldId=${worldId}`).expect(200);
+  const out: Record<string, string> = {};
+  for (const item of list.body.items as { id: string }[]) {
+    const detail = await agent.get(`/entities/${item.id}`).expect(200);
+    const path = detail.body.document.metadata?.['hexly.sourcePath'];
+    if (path) out[path] = item.id;
+  }
+  return out;
+}
+
 describe('Vault import endpoint', () => {
   let app: INestApplication;
   let db: Db;
@@ -134,6 +168,144 @@ describe('Vault import endpoint', () => {
     expect(res.body.assetsStored).toBe(0);
     // A construct with no native node (the footnote) is degraded and tallied, not silently lost.
     expect(res.body.constructsDegraded).toEqual({ footnote: 1 });
+  });
+
+  it('resolves [[Note]] to an entityLink pointing at the created note', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const zip = vaultZip({
+      'Keep.md': 'Guarded by [[Lady Mara]].',
+      'Lady Mara.md': '# Lady Mara',
+    });
+
+    const res = await ada
+      .post('/worlds/import')
+      .attach('file', zip, 'Aldermoor.zip')
+      .expect(201);
+
+    expect(res.body.linksResolved).toBe(1);
+    expect(res.body.linksDangling).toBe(0);
+
+    const mara = await linksOf(ada, res.body.worldId, 'Lady Mara');
+    const keep = await linksOf(ada, res.body.worldId, 'Keep');
+    expect(keep.links).toHaveLength(1);
+    expect(keep.links[0].attrs.entityId).toBe(mara.id);
+  });
+
+  it('path-disambiguates [[folder/Note]] and resolves a bare ambiguous basename to a deterministic first match', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    // Two notes share the basename "Guard"; a third links to each — one by path, one bare.
+    const zip = vaultZip({
+      'North/Guard.md': '# North Guard',
+      'South/Guard.md': '# South Guard',
+      'Keep.md': 'The [[South/Guard]] and the bare [[Guard]].',
+    });
+
+    const res = await ada
+      .post('/worlds/import')
+      .attach('file', zip, 'Aldermoor.zip')
+      .expect(201);
+
+    expect(res.body.linksResolved).toBe(2);
+    expect(res.body.linksDangling).toBe(0);
+
+    // Both Guard notes share a name, so resolve their ids by vault path instead.
+    const byPath = await pathsToIds(ada, res.body.worldId);
+    const keep = await linksOf(ada, res.body.worldId, 'Keep');
+
+    // Path-qualified link lands on the right note despite the shared basename.
+    expect(keep.links[0].attrs.entityId).toBe(byPath['South/Guard.md']);
+    // Bare ambiguous basename resolves to the first in path-sorted order (North/ before South/).
+    expect(keep.links[1].attrs.entityId).toBe(byPath['North/Guard.md']);
+  });
+
+  it('leaves a wikilink to a nonexistent note dangling, resolving only the ones that exist', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const zip = vaultZip({
+      'Keep.md': 'Held by [[Lady Mara]] against the [[Shadow King]].',
+      'Lady Mara.md': '# Lady Mara',
+    });
+
+    const res = await ada
+      .post('/worlds/import')
+      .attach('file', zip, 'Aldermoor.zip')
+      .expect(201);
+
+    // One target exists, one does not.
+    expect(res.body.linksResolved).toBe(1);
+    expect(res.body.linksDangling).toBe(1);
+
+    const mara = await linksOf(ada, res.body.worldId, 'Lady Mara');
+    const keep = await linksOf(ada, res.body.worldId, 'Keep');
+    expect(keep.links[0].attrs.entityId).toBe(mara.id);
+    // The unresolved link keeps its intent — a dangling entityLink, not plain text.
+    expect(keep.links[1].attrs.entityId).toBeNull();
+    expect(keep.links[1].attrs.label).toBe('Shadow King');
+  });
+
+  it('resolves display/heading links to entityIds while leaving ![[embed]] a plain, uncounted link', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const zip = vaultZip({
+      'Keep.md': 'See [[Lady Mara#Backstory]] and [[Lady Mara|the ranger]]; ![[Lady Mara]] is embedded.',
+      'Lady Mara.md': '# Lady Mara',
+    });
+
+    const res = await ada
+      .post('/worlds/import')
+      .attach('file', zip, 'Aldermoor.zip')
+      .expect(201);
+
+    // Two real wikilinks resolve; the embed is a plain link, not an entityLink, so it isn't counted.
+    expect(res.body.linksResolved).toBe(2);
+    expect(res.body.linksDangling).toBe(0);
+
+    const mara = await linksOf(ada, res.body.worldId, 'Lady Mara');
+    const keep = await linksOf(ada, res.body.worldId, 'Keep');
+    expect(keep.links).toHaveLength(2);
+    // Resolution fills entityId without disturbing the display/heading the converter parsed.
+    expect(keep.links[0].attrs).toMatchObject({ entityId: mara.id, heading: 'Backstory' });
+    expect(keep.links[1].attrs).toMatchObject({ entityId: mara.id, display: 'the ranger' });
+  });
+
+  it('strips a wrapping vault directory (detected via .obsidian/) so vault-relative links still resolve', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    // A zip made by compressing the vault folder nests everything under `Aldermoor/`; the
+    // `.obsidian/` config marks the true vault root, so the wrapper is stripped.
+    const zip = vaultZip({
+      'Aldermoor/.obsidian/app.json': '{}',
+      'Aldermoor/North/Guard.md': '# North Guard',
+      'Aldermoor/South/Guard.md': '# South Guard',
+      'Aldermoor/Keep.md': 'The [[South/Guard]] holds.',
+    });
+
+    const res = await ada
+      .post('/worlds/import')
+      .attach('file', zip, 'Aldermoor.zip')
+      .expect(201);
+
+    // The vault-relative link resolves despite the wrapper, and sourcePath is stored wrapper-free.
+    expect(res.body.linksResolved).toBe(1);
+    expect(res.body.linksDangling).toBe(0);
+
+    const byPath = await pathsToIds(ada, res.body.worldId);
+    expect(byPath).toHaveProperty('South/Guard.md');
+    const keep = await linksOf(ada, res.body.worldId, 'Keep');
+    expect(keep.links[0].attrs.entityId).toBe(byPath['South/Guard.md']);
+  });
+
+  it('treats a same-note anchor [[#heading]] as neither resolved nor dangling', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const zip = vaultZip({
+      'Keep.md': 'Jump to [[#Defenses]] below.',
+    });
+
+    const res = await ada
+      .post('/worlds/import')
+      .attach('file', zip, 'Aldermoor.zip')
+      .expect(201);
+
+    // An in-note anchor names no note, so it is not a lost link.
+    expect(res.body.linksResolved).toBe(0);
+    expect(res.body.linksDangling).toBe(0);
   });
 
   it('ignores .obsidian config and non-note files, importing only markdown', async () => {

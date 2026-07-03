@@ -118,11 +118,12 @@ export class EntitiesService {
   importNote(
     ownerId: string,
     worldId: string,
+    id: string,
     name: string,
     tags: readonly string[],
     body: EntityBody,
   ): void {
-    this.insertEntity({ ownerId, worldId, name, tags, body });
+    this.insertEntity({ id, ownerId, worldId, name, tags, body });
   }
 
   /**
@@ -132,6 +133,8 @@ export class EntitiesService {
    * Returns the inserted row so a caller can build its {@link EntityDetail} without a re-read.
    */
   private insertEntity(input: {
+    /** Pre-generated id — the import path assigns ids up front so it can resolve wikilinks before insert (#147). */
+    id?: string;
     ownerId: string;
     worldId: string;
     name: string;
@@ -140,7 +143,7 @@ export class EntitiesService {
   }) {
     const now = Date.now();
     const row = {
-      id: randomUUID(),
+      id: input.id ?? randomUUID(),
       ownerId: input.ownerId,
       worldId: input.worldId,
       name: input.name,
