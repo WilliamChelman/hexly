@@ -3,11 +3,12 @@ import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import { coordKey, emptyContent } from '@hexly/domain';
-import { DB, Db, createDb, mintWorldWithHome } from '../db/db';
+import { DB, Db, createDb } from '../db/db';
 import { AuthService } from '../auth/auth.service';
 import { AuthModule } from '../auth/auth.module';
 import { EntitiesModule } from './entities.module';
 import { WorldsModule } from '../worlds/worlds.module';
+import { WorldsService } from '../worlds/worlds.service';
 
 // Empty hexmap body shape (what create mints; what editor round-trips).
 const emptyHexmapBody = {
@@ -50,7 +51,7 @@ describe('Entities endpoints', () => {
    */
   async function seedUserWithWorld(email: string, password: string, name: string) {
     const userId = await app.get(AuthService).seedUser(email, password, name);
-    mintWorldWithHome(db.$client, userId, name);
+    app.get(WorldsService).mintWorldWithHome(userId, name);
   }
 
   async function signIn(email: string, password: string) {

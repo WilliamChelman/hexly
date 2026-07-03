@@ -1,9 +1,7 @@
-import { randomUUID } from 'node:crypto';
 import { isAbsolute, resolve } from 'node:path';
 import Database from 'better-sqlite3';
 import { drizzle, BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
-import { emptyEntityBody } from '@hexly/domain';
 import * as schema from './schema';
 
 /**
@@ -35,38 +33,6 @@ export function createDb(path: string): Db {
   // prod and tests (same __dirname pattern as resolveDbPath).
   migrate(db, { migrationsFolder: resolve(__dirname, 'migrations') });
   return db;
-}
-
-/**
- * Create a World for `ownerId` with a freshly minted blank Home note (ADR-0024).
- * Used when there is no existing Entity to home in — by {@link migrateToWorlds}
- * for an entity-less user, and to stand in for the future World-creation flow.
- * The World is inserted first, then its Home note (`is_home = 1`) references it —
- * no cycle, so a plain transaction (atomicity only) suffices.
- */
-export function mintWorldWithHome(
-  sqlite: Database.Database,
-  ownerId: string,
-  name: string,
-  now: number = Date.now(),
-): { worldId: string; homeEntityId: string } {
-  const worldId = randomUUID();
-  const homeEntityId = randomUUID();
-  const document = JSON.stringify(emptyEntityBody('note'));
-  sqlite.transaction(() => {
-    sqlite
-      .prepare(
-        `INSERT INTO worlds (id, name, owner_id, created_at, updated_at) VALUES (?,?,?,?,?)`,
-      )
-      .run(worldId, name, ownerId, now, now);
-    sqlite
-      .prepare(
-        `INSERT INTO entities (id, owner_id, world_id, is_home, name, type, tags, visibility, version, document, created_at, updated_at)
-         VALUES (?, ?, ?, 1, ?, 'note', '[]', 'private', 1, ?, ?, ?)`,
-      )
-      .run(homeEntityId, ownerId, worldId, name, document, now, now);
-  })();
-  return { worldId, homeEntityId };
 }
 
 /**

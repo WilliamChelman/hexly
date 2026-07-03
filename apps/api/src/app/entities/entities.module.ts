@@ -13,5 +13,7 @@ import { EntitiesService } from './entities.service';
   imports: [DbModule, AuthModule],
   controllers: [EntitiesController],
   providers: [EntitiesService],
+  // Exported so the vault import (ADR-0033) can bulk-insert notes through it.
+  exports: [EntitiesService],
 })
 export class EntitiesModule {}

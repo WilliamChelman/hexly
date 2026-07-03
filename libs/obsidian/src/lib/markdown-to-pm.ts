@@ -38,7 +38,15 @@ export function markdownToProseMirror(markdown: string): MarkdownToProseMirror {
   let metadata: Record<string, unknown> = {};
   if (front) {
     try {
-      metadata = parseYaml((front as { value: string }).value) ?? {};
+      const parsed = parseYaml((front as { value: string }).value);
+      // Frontmatter must be a key/value map. A top-level YAML list or scalar has no
+      // Metadata shape — degrade it to empty rather than letting a non-object flow
+      // downstream (where `{ ...meta }` would spread it into index-keyed junk).
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        metadata = parsed as Record<string, unknown>;
+      } else if (parsed != null) {
+        count(degraded, 'frontmatter');
+      }
     } catch {
       // Malformed frontmatter degrades to empty metadata rather than crashing the import.
       count(degraded, 'frontmatter');

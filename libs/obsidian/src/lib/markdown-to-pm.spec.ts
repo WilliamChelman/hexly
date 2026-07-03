@@ -11,6 +11,14 @@ describe('markdownToProseMirror', () => {
     ]);
   });
 
+  it('degrades non-object frontmatter (a top-level list) to empty metadata, not index-keyed junk', () => {
+    const md = '---\n- one\n- two\n---\nBody text';
+    const { metadata, degraded } = markdownToProseMirror(md);
+
+    expect(metadata).toEqual({});
+    expect(degraded).toEqual({ frontmatter: 1 });
+  });
+
   it('degrades malformed YAML frontmatter instead of throwing', () => {
     const md = '---\na: b: [unclosed\n---\nBody text';
     const { doc, metadata, degraded } = markdownToProseMirror(md);

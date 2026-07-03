@@ -53,3 +53,21 @@ export interface WorldDetail extends WorldSummary {
    */
   readonly entityCount: number;
 }
+
+/**
+ * The result of a vault import (ADR-0033, #146) — the primary "what did we lose"
+ * instrument. Every markdown file that became a note is counted; unreadable files
+ * are skipped (never abort the import) and tallied. `constructsDegraded` sums the
+ * per-file degradation tallies from the markdown converter (footnotes, math,
+ * mermaid, comments, …). `linksResolved`/`assetsStored` are 0 until their slices
+ * land; every wikilink is currently a dangling link.
+ */
+export interface ImportSummary {
+  readonly worldId: string;
+  readonly notesImported: number;
+  readonly filesSkipped: number;
+  readonly linksResolved: number;
+  readonly linksDangling: number;
+  readonly assetsStored: number;
+  readonly constructsDegraded: Record<string, number>;
+}

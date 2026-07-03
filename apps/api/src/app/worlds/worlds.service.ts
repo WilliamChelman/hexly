@@ -1,7 +1,8 @@
+import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
-import { CreateWorldRequest, WorldDetail, WorldSummary } from '@hexly/domain';
+import { CreateWorldRequest, emptyEntityBody, WorldDetail, WorldSummary } from '@hexly/domain';
 import { and, asc, count, eq, or } from 'drizzle-orm';
-import { DB, Db, mintWorldWithHome } from '../db/db';
+import { DB, Db } from '../db/db';
 import { entities, worldMembers, worlds } from '../db/schema';
 
 /**
@@ -44,12 +45,7 @@ export class WorldsService {
   // Create World with fresh Home note, atomically (ADR-0024).
   create(ownerId: string, req: CreateWorldRequest): WorldDetail {
     const now = Date.now();
-    const { worldId, homeEntityId } = mintWorldWithHome(
-      this.db.$client,
-      ownerId,
-      req.name,
-      now,
-    );
+    const { worldId, homeEntityId } = this.mintWorldWithHome(ownerId, req.name, now);
     return {
       id: worldId,
       name: req.name,
@@ -60,6 +56,37 @@ export class WorldsService {
       createdAt: now,
       updatedAt: now,
     };
+  }
+
+  /**
+   * Mint a World for `ownerId` with a freshly minted blank Home note (ADR-0024) —
+   * the shared trunk behind {@link create}, the vault import (ADR-0033), and the
+   * seed CLI. The World row is inserted first, then its Home note (`is_home = 1`)
+   * references it — no cycle, so a plain transaction (atomicity only) suffices.
+   */
+  mintWorldWithHome(
+    ownerId: string,
+    name: string,
+    now: number = Date.now(),
+  ): { worldId: string; homeEntityId: string } {
+    const worldId = randomUUID();
+    const homeEntityId = randomUUID();
+    const document = JSON.stringify(emptyEntityBody('note'));
+    const sqlite = this.db.$client;
+    sqlite.transaction(() => {
+      sqlite
+        .prepare(
+          `INSERT INTO worlds (id, name, owner_id, created_at, updated_at) VALUES (?,?,?,?,?)`,
+        )
+        .run(worldId, name, ownerId, now, now);
+      sqlite
+        .prepare(
+          `INSERT INTO entities (id, owner_id, world_id, is_home, name, type, tags, visibility, version, document, created_at, updated_at)
+           VALUES (?, ?, ?, 1, ?, 'note', '[]', 'private', 1, ?, ?, ?)`,
+        )
+        .run(homeEntityId, ownerId, worldId, name, document, now, now);
+    })();
+    return { worldId, homeEntityId };
   }
 
   /**

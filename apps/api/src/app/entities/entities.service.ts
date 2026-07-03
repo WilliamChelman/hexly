@@ -97,25 +97,64 @@ export class EntitiesService {
   }
 
   create(ownerId: string, req: CreateEntityRequest): EntityDetail {
-    const now = Date.now();
     const body = emptyEntityBody(req.type);
-    const row = {
-      id: randomUUID(),
+    const row = this.insertEntity({
       ownerId,
       worldId: this.resolveWorldId(ownerId, req.worldId),
       name: req.name,
-      type: req.type,
       tags: req.tags,
-      visibility: 'private',
+      body,
+    });
+    // Already have valid body; return without re-parsing.
+    return detailOf(row, body);
+  }
+
+  /**
+   * Insert a fully-built Entity for the vault import path (ADR-0033, #146): unlike
+   * {@link create} (which mints an empty body server-side), the Content and Metadata
+   * come pre-converted from the source markdown. The target World is the caller's
+   * freshly minted import World, so no ownership resolution is needed.
+   */
+  importNote(
+    ownerId: string,
+    worldId: string,
+    name: string,
+    tags: readonly string[],
+    body: EntityBody,
+  ): void {
+    this.insertEntity({ ownerId, worldId, name, tags, body });
+  }
+
+  /**
+   * The single INSERT trunk both {@link create} and {@link importNote} share, so the
+   * row shape (id, initial version, private, serialized body, timestamps) lives in one
+   * place and can't drift. Callers vary only what they own — World, name, tags, body.
+   * Returns the inserted row so a caller can build its {@link EntityDetail} without a re-read.
+   */
+  private insertEntity(input: {
+    ownerId: string;
+    worldId: string;
+    name: string;
+    tags: readonly string[];
+    body: EntityBody;
+  }) {
+    const now = Date.now();
+    const row = {
+      id: randomUUID(),
+      ownerId: input.ownerId,
+      worldId: input.worldId,
+      name: input.name,
+      type: input.body.type,
+      tags: [...input.tags],
+      visibility: 'private' as const,
       version: INITIAL_VERSION,
-      document: serialize(body),
+      document: serialize(input.body),
       isHome: false,
       createdAt: now,
       updatedAt: now,
     };
     this.db.insert(entities).values(row).run();
-    // Already have valid body; return without re-parsing.
-    return detailOf(row, body);
+    return row;
   }
 
   /**

@@ -44,14 +44,28 @@ export const entityTypeSchema = z.enum(['note', 'hexmap']);
 export type EntityType = z.infer<typeof entityTypeSchema>;
 
 /**
+ * The Entity's Metadata map (CONTEXT.md → Metadata), stored inside the document
+ * JSON — no dedicated column (ADR-0033, #146). Mirrors Obsidian frontmatter on
+ * import (`aliases` and every non-`tags` key) and carries Hexly provenance under
+ * the reserved `hexly.` namespace (e.g. `hexly.sourcePath`). Optional so pre-import
+ * bodies validate unchanged; the domain never interprets the values.
+ */
+export const metadataSchema = z.record(z.string(), z.unknown()).optional();
+
+/**
  * The type-discriminated Entity body — what the `document` column holds
  * (ADR-0018): `{ type, content, ...typedPayload }`. A `note` adds no payload; a
  * `hexmap` spreads the hex grid alongside the Content. Discriminating on `type`
  * keeps each arm exhaustively known at compile time.
  */
 export const entityBodySchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('note'), content: contentSchema }),
-  z.object({ type: z.literal('hexmap'), content: contentSchema, ...hexMapSchema.shape }),
+  z.object({ type: z.literal('note'), content: contentSchema, metadata: metadataSchema }),
+  z.object({
+    type: z.literal('hexmap'),
+    content: contentSchema,
+    metadata: metadataSchema,
+    ...hexMapSchema.shape,
+  }),
 ]);
 
 export type EntityBody = z.infer<typeof entityBodySchema>;
