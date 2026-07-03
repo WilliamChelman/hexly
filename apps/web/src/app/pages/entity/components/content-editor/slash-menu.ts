@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { SlashItem } from './slash-menu-items';
 import { SuggestionMenu, SuggestionMenuProps } from './suggestion-menu';
+import { SuggestionEmpty, SuggestionOption } from './suggestion-option';
 
 /** What the slash suggestion plugin hands the menu on open/update. */
 export type SlashMenuProps = SuggestionMenuProps<SlashItem>;
@@ -15,7 +16,7 @@ export type SlashMenuProps = SuggestionMenuProps<SlashItem>;
 @Component({
   selector: 'app-slash-menu',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe],
+  imports: [TranslocoPipe, SuggestionOption, SuggestionEmpty],
   template: `
     @if (visible()) {
       <ul
@@ -28,25 +29,17 @@ export type SlashMenuProps = SuggestionMenuProps<SlashItem>;
         [style.top.px]="position()!.y"
       >
         @for (item of items(); track item.id; let i = $index) {
-          <li role="presentation">
-            <button
-              type="button"
-              role="option"
-              [id]="optionId(item.id)"
-              [attr.data-testid]="'slash-item-' + item.id"
-              [attr.aria-selected]="i === activeIndex()"
-              class="block w-full cursor-pointer px-3 py-1 text-left text-sm text-ink"
-              [class.bg-surface-sunken]="i === activeIndex()"
-              (mousedown)="$event.preventDefault()"
-              (click)="select(item)"
-            >
-              {{ item.labelKey | transloco }}
-            </button>
+          <li
+            appSuggestionOption
+            [optionId]="optionId(item.id)"
+            [testid]="'slash-item-' + item.id"
+            [selected]="i === activeIndex()"
+            (pick)="select(item)"
+          >
+            {{ item.labelKey | transloco }}
           </li>
         } @empty {
-          <li class="px-3 py-1 text-sm text-ink-muted">
-            {{ 'noteView.slashMenu.empty' | transloco }}
-          </li>
+          <li appSuggestionEmpty>{{ 'noteView.slashMenu.empty' | transloco }}</li>
         }
       </ul>
     }

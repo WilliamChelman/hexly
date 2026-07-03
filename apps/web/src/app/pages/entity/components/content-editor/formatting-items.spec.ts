@@ -28,6 +28,7 @@ describe('FORMAT_ITEMS', () => {
     underline: 'underline',
     strike: 'strike',
     code: 'code',
+    highlight: 'highlight',
   };
 
   for (const id of Object.keys(markFor)) {

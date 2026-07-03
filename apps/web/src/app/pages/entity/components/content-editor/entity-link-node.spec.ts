@@ -22,12 +22,30 @@ describe('entityLink node', () => {
     expect(node?.attrs?.['label']).toBe('Avalon');
   });
 
+  it('carries the optional display and heading attrs (ADR-0033 wikilink semantics)', () => {
+    const editor = freshEditor();
+    editor.commands.insertEntityLink({
+      entityId: 'e1',
+      label: 'Avalon',
+      display: 'the White City',
+      heading: 'History',
+    });
+    const json = editor.getJSON();
+    editor.destroy();
+
+    const node = findEntityLink(json);
+    expect(node?.attrs?.['display']).toBe('the White City');
+    expect(node?.attrs?.['heading']).toBe('History');
+  });
+
   it('round-trips losslessly through the opaque save/reload cycle (ADR-0019)', () => {
     const editor = freshEditor();
     editor.commands.insertEntityLink({
       entityId: 'e1',
       label: 'Avalon',
       descriptor: 'capital of',
+      display: 'the White City',
+      heading: 'History',
     });
     const json = editor.getJSON();
     editor.destroy();

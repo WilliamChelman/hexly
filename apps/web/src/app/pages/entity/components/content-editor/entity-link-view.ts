@@ -38,7 +38,7 @@ import { EntityNameResolver } from '../../services/entity-name-resolver';
         [attr.data-entity-id]="entityId()"
         [attr.title]="'noteView.entityLink.dangling' | transloco"
         class="italic text-ink-muted"
-        >{{ display() }}@if (descriptor()) {<span> ({{ descriptor() }})</span>}</span
+        >{{ text() }}@if (descriptor()) {<span> ({{ descriptor() }})</span>}</span
       >
     } @else {
       <!-- routerLink gives a real href, so the browser handles Ctrl/Cmd/middle-click
@@ -50,8 +50,9 @@ import { EntityNameResolver } from '../../services/entity-name-resolver';
         data-testid="entity-link"
         [attr.data-entity-id]="entityId()"
         [routerLink]="['/entities', entityId()]"
+        [fragment]="heading() || undefined"
         class="cursor-pointer text-gold no-underline hover:underline"
-        >{{ display()
+        >{{ text()
         }}@if (descriptor()) {<span class="text-ink-muted"> ({{ descriptor() }})</span>}</a
       >
     }
@@ -61,6 +62,10 @@ export class EntityLinkView {
   readonly entityId = input.required<string>();
   readonly label = input.required<string>();
   readonly descriptor = input<string | null>(null);
+  /** `[[Target|display]]` static override text (ADR-0033); when set it replaces the live name. */
+  readonly display = input<string | null>(null);
+  /** `[[Target#Heading]]` anchor (ADR-0033); rendered as the routerLink fragment so navigation scrolls to it. */
+  readonly heading = input<string | null>(null);
 
   private readonly resolver = inject(EntityNameResolver);
 
@@ -69,8 +74,14 @@ export class EntityLinkView {
   /** Target missing/deleted: render the last-known label, non-navigable. */
   protected readonly dangling = computed(() => this.resolution().status === 'missing');
 
-  /** Live name when resolved; the stored label while loading or dangling. */
-  protected readonly display = computed(() => {
+  /**
+   * What the link shows: the static `display` override when set (the one exception
+   * to the live-name rule, ADR-0033); otherwise the live name when resolved, and
+   * the stored label while loading or dangling.
+   */
+  protected readonly text = computed(() => {
+    const override = this.display();
+    if (override) return override;
     const r = this.resolution();
     return r.status === 'found' ? r.entity.name : this.label();
   });
@@ -98,6 +109,8 @@ export function createEntityLinkNodeView(
     ref.setInput('entityId', n.attrs['entityId'] ?? '');
     ref.setInput('label', n.attrs['label'] ?? '');
     ref.setInput('descriptor', n.attrs['descriptor'] ?? null);
+    ref.setInput('display', n.attrs['display'] ?? null);
+    ref.setInput('heading', n.attrs['heading'] ?? null);
   };
   apply(node);
   appRef.attachView(ref.hostView);

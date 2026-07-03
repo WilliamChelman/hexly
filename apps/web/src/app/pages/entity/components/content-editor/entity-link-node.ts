@@ -5,11 +5,17 @@ import { Node, mergeAttributes } from '@tiptap/core';
  * Entity by id, living in prose. `entityId` is the reference; `label` is a
  * snapshot of the target's name at insert time (the dangling fallback); the
  * optional `descriptor` characterises the relationship ("spouse", "capital of").
+ *
+ * Two optional Obsidian-wikilink attrs (ADR-0033): `display` is `[[Target|text]]`
+ * custom text that renders **statically** in place of the live target name; `heading`
+ * is a `[[Target#Heading]]` anchor navigation scrolls to (round-trips verbatim).
  */
 export interface EntityLinkAttrs {
   entityId: string;
   label: string;
   descriptor?: string | null;
+  display?: string | null;
+  heading?: string | null;
 }
 
 declare module '@tiptap/core' {
@@ -22,11 +28,12 @@ declare module '@tiptap/core' {
 }
 
 /**
- * The `entityLink` inline atom node — part of the `tiptap-v2` format contract
- * (ADR-0019/0023). Schema only: the live-name Angular node view is attached at
- * the editor via `editorProps.nodeViews`, so this stays framework-free and loads
- * in plain `new Editor({ extensions: CONTENT_EXTENSIONS })` specs. `renderHTML`
- * is the copy-paste / no-node-view fallback, showing the stored `label`.
+ * The `entityLink` inline atom node — part of the `tiptap-v2`/`tiptap-v3` format
+ * contract (ADR-0019/0023/0033). Schema only: the live-name Angular node view is
+ * attached at the editor via `editorProps.nodeViews`, so this stays framework-free
+ * and loads in plain `new Editor({ extensions: CONTENT_EXTENSIONS })` specs.
+ * `renderHTML` is the copy-paste / no-node-view fallback, showing the static
+ * `display` text when set, else the stored `label`.
  */
 export const entityLinkNode = Node.create({
   name: 'entityLink',
@@ -53,6 +60,19 @@ export const entityLinkNode = Node.create({
         renderHTML: (attrs) =>
           attrs['descriptor'] ? { 'data-descriptor': attrs['descriptor'] } : {},
       },
+      // Optional wikilink semantics (ADR-0033), each omitted from HTML when unset.
+      display: {
+        default: null,
+        parseHTML: (el) => el.getAttribute('data-display'),
+        renderHTML: (attrs) =>
+          attrs['display'] ? { 'data-display': attrs['display'] } : {},
+      },
+      heading: {
+        default: null,
+        parseHTML: (el) => el.getAttribute('data-heading'),
+        renderHTML: (attrs) =>
+          attrs['heading'] ? { 'data-heading': attrs['heading'] } : {},
+      },
     };
   },
 
@@ -67,7 +87,7 @@ export const entityLinkNode = Node.create({
         'data-entity-link': '',
         href: `/entities/${node.attrs['entityId'] ?? ''}`,
       }),
-      node.attrs['label'] ?? '',
+      node.attrs['display'] ?? node.attrs['label'] ?? '',
     ];
   },
 

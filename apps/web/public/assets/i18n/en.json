@@ -60,6 +60,10 @@
       "blockquote": "Quote",
       "codeBlock": "Code block",
       "horizontalRule": "Divider",
+      "callout": "Callout",
+      "table": "Table",
+      "taskList": "Task list",
+      "image": "Image",
       "entityLink": "Link to entity"
     },
     "entityPicker": {
@@ -71,6 +75,16 @@
       "empty": "Type a descriptor",
       "create": "(new)"
     },
+    "displayPicker": {
+      "label": "Display text",
+      "empty": "Type display text",
+      "remove": "Remove display text"
+    },
+    "headingPicker": {
+      "label": "Link to heading",
+      "empty": "Type a heading",
+      "remove": "Remove heading link"
+    },
     "entityLink": {
       "dangling": "This entity is unavailable"
     },
@@ -81,6 +95,7 @@
       "underline": "Underline",
       "strike": "Strikethrough",
       "code": "Inline code",
+      "highlight": "Highlight",
       "link": "Link",
       "linkPlaceholder": "Paste or type a URL"
     }

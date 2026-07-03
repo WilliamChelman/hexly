@@ -60,6 +60,10 @@
       "blockquote": "Citation",
       "codeBlock": "Bloc de code",
       "horizontalRule": "Séparateur",
+      "callout": "Encadré",
+      "table": "Tableau",
+      "taskList": "Liste de tâches",
+      "image": "Image",
       "entityLink": "Lier une entité"
     },
     "entityPicker": {
@@ -71,6 +75,16 @@
       "empty": "Saisir un descripteur",
       "create": "(nouveau)"
     },
+    "displayPicker": {
+      "label": "Texte affiché",
+      "empty": "Saisir le texte affiché",
+      "remove": "Retirer le texte affiché"
+    },
+    "headingPicker": {
+      "label": "Lier à un titre",
+      "empty": "Saisir un titre",
+      "remove": "Retirer le lien vers le titre"
+    },
     "entityLink": {
       "dangling": "Cette entité est indisponible"
     },
@@ -81,6 +95,7 @@
       "underline": "Souligné",
       "strike": "Barré",
       "code": "Code en ligne",
+      "highlight": "Surlignage",
       "link": "Lien",
       "linkPlaceholder": "Collez ou saisissez une URL"
     }

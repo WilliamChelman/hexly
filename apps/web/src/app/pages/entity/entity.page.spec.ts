@@ -82,6 +82,8 @@ describe('EntityPage routing', () => {
           useValue: {
             paramMap: of(convertToParamMap({ id })),
             queryParamMap: of(convertToParamMap({})),
+            // ContentEditor reads the fragment for `[[Target#Heading]]` anchor scroll (ADR-0033).
+            fragment: of(null),
           },
         },
       ],

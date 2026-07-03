@@ -53,6 +53,14 @@ export const FORMAT_ITEMS: FormatItem[] = [
     isActive: (editor) => editor.isActive('code'),
     run: (editor) => editor.chain().focus().toggleCode().run(),
   },
+  {
+    // The `highlight` mark (ADR-0033) — `==text==` in Obsidian.
+    id: 'highlight',
+    labelKey: 'noteView.formatMenu.highlight',
+    glyph: '▍',
+    isActive: (editor) => editor.isActive('highlight'),
+    run: (editor) => editor.chain().focus().toggleHighlight().run(),
+  },
   ...([1, 2, 3, 4, 5, 6] as const).map((level) => ({
     id: `heading${level}`,
     labelKey: `noteView.slashMenu.heading${level}`,
