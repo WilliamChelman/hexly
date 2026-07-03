@@ -4,7 +4,8 @@ import {
   descriptorItems,
   entityLinkPosBefore,
   harvestDescriptors,
-  setLinkDescriptor,
+  linkTextRows,
+  setLinkAttr,
 } from './descriptors';
 
 function freshEditor() {
@@ -75,14 +76,14 @@ describe('entityLinkPosBefore — the `::` arm predicate', () => {
   });
 });
 
-describe('setLinkDescriptor — set/change/clear', () => {
+describe('setLinkAttr — set/change/clear', () => {
   let editor: Editor;
   afterEach(() => editor.destroy());
 
   it('sets the descriptor on the link at the given position', () => {
     editor = freshEditor();
     editor.commands.insertEntityLink({ entityId: 'e1', label: 'Jane' });
-    setLinkDescriptor(editor, 1, 'spouse');
+    setLinkAttr(editor, 1, 'descriptor', 'spouse');
 
     expect(linkAttrs(editor)?.['descriptor']).toBe('spouse');
   });
@@ -94,7 +95,7 @@ describe('setLinkDescriptor — set/change/clear', () => {
       label: 'Jane',
       descriptor: 'spouse',
     });
-    setLinkDescriptor(editor, 1, 'rival');
+    setLinkAttr(editor, 1, 'descriptor', 'rival');
 
     expect(linkAttrs(editor)?.['descriptor']).toBe('rival');
   });
@@ -106,9 +107,58 @@ describe('setLinkDescriptor — set/change/clear', () => {
       label: 'Jane',
       descriptor: 'spouse',
     });
-    setLinkDescriptor(editor, 1, '   ');
+    setLinkAttr(editor, 1, 'descriptor', '   ');
 
     expect(linkAttrs(editor)?.['descriptor'] ?? null).toBeNull();
+  });
+
+  it('sets the display override text on the link (`[[Target|display]]`, ADR-0033)', () => {
+    editor = freshEditor();
+    editor.commands.insertEntityLink({ entityId: 'e1', label: 'Jane' });
+    setLinkAttr(editor, 1, 'display', 'my wife');
+
+    expect(linkAttrs(editor)?.['display']).toBe('my wife');
+  });
+
+  it('sets the heading anchor on the link (`[[Target#Heading]]`, ADR-0033)', () => {
+    editor = freshEditor();
+    editor.commands.insertEntityLink({ entityId: 'e1', label: 'Jane' });
+    setLinkAttr(editor, 1, 'heading', 'Early life');
+
+    expect(linkAttrs(editor)?.['heading']).toBe('Early life');
+  });
+
+  it('clears the heading when applied with blank text', () => {
+    editor = freshEditor();
+    editor.commands.insertEntityLink({
+      entityId: 'e1',
+      label: 'Jane',
+      heading: 'Early life',
+    });
+    setLinkAttr(editor, 1, 'heading', '');
+
+    expect(linkAttrs(editor)?.['heading'] ?? null).toBeNull();
+  });
+});
+
+describe('linkTextRows — `|`/`#` free-text rows with a clear affordance', () => {
+  it('offers only the typed text as a new value', () => {
+    const rows = linkTextRows('my wife', null);
+    expect(rows).toEqual([{ id: expect.any(String), descriptor: 'my wife', isNew: true }]);
+  });
+
+  it('offers a clear row on an empty query when the attr is already set', () => {
+    const rows = linkTextRows('', 'my wife');
+    expect(rows).toEqual([{ id: expect.any(String), descriptor: '', isNew: false }]);
+  });
+
+  it('offers nothing on an empty query when the attr is unset (plain insert)', () => {
+    expect(linkTextRows('   ', null)).toEqual([]);
+  });
+
+  it('drops the clear row once the user types a replacement', () => {
+    const rows = linkTextRows('new text', 'old');
+    expect(rows).toEqual([{ id: expect.any(String), descriptor: 'new text', isNew: true }]);
   });
 });
 

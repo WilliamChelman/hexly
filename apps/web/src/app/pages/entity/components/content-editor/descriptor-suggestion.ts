@@ -9,7 +9,7 @@ import {
   DescriptorItem,
   descriptorItems,
   entityLinkPosBefore,
-  setLinkDescriptor,
+  setLinkAttr,
 } from './descriptors';
 
 /**
@@ -36,6 +36,9 @@ export function descriptorSuggestion(
           // and entityMention own the others).
           pluginKey: new PluginKey('descriptorSuggestion'),
           char: '::',
+          // Descriptors are multi-word ("capital of") — keep the query open across spaces
+          // (default stops at the first), committing on Enter/Tab.
+          allowSpaces: true,
           // The single rule: a link must sit immediately before the `::` (and not in code),
           // so `::` is plain text in ordinary prose.
           allow: ({ state, range }) =>
@@ -46,7 +49,7 @@ export function descriptorSuggestion(
             // Recompute against the live state: the link sits just before the `::query`.
             const linkPos = entityLinkPosBefore(editor.state, range.from);
             if (linkPos === null) return;
-            setLinkDescriptor(editor, linkPos, props.descriptor, range);
+            setLinkAttr(editor, linkPos, 'descriptor', props.descriptor, range);
           },
           render: () => ({
             onStart: (props: SuggestionProps<DescriptorItem, DescriptorItem>) =>

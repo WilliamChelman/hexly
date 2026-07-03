@@ -40,6 +40,9 @@ export function entityMention(
             // and two suggestion plugins can't share one in the same editor.
             pluginKey: new PluginKey('entityMention'),
             char: '@',
+            // Entity names are multi-word ("Jane Doe") — keep the query open across spaces so
+            // the server search sees the full name (default stops at the first space).
+            allowSpaces: true,
             allow: ({ state }) => {
               const { $from } = state.selection;
               return (

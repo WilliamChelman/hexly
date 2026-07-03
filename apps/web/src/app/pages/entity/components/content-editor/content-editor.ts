@@ -32,6 +32,8 @@ import { EntityPicker } from './entity-picker';
 import { entityMention } from './entity-mention';
 import { DescriptorPicker } from './descriptor-picker';
 import { descriptorSuggestion } from './descriptor-suggestion';
+import { LinkTextPicker } from './link-text-picker';
+import { linkTextSuggestion } from './link-text-suggestion';
 import { createEntityLinkNodeView } from './entity-link-view';
 import { FormattingMenu } from './formatting-menu';
 import { BubbleMenuDirective } from './bubble-menu.directive';
@@ -51,6 +53,7 @@ import { BubbleMenuDirective } from './bubble-menu.directive';
     SlashMenu,
     EntityPicker,
     DescriptorPicker,
+    LinkTextPicker,
     FormattingMenu,
     BubbleMenuDirective,
     TiptapDirective,
@@ -72,6 +75,8 @@ import { BubbleMenuDirective } from './bubble-menu.directive';
     <app-slash-menu />
     <app-entity-picker />
     <app-descriptor-picker />
+    <app-link-text-picker #displayPicker kind="display" />
+    <app-link-text-picker #headingPicker kind="heading" />
   `,
   styles: `
     @reference '#app-styles.css';
@@ -263,6 +268,9 @@ export class ContentEditor {
   private readonly slashMenu = viewChild(SlashMenu);
   private readonly entityPicker = viewChild(EntityPicker);
   private readonly descriptorPicker = viewChild(DescriptorPicker);
+  // Two instances of the one free-text picker, keyed by template ref (ADR-0033).
+  private readonly displayPicker = viewChild('displayPicker', { read: LinkTextPicker });
+  private readonly headingPicker = viewChild('headingPicker', { read: LinkTextPicker });
 
   // Recreated on every seed rather than reset: a fresh Editor gets empty undo
   // history for free (Ctrl-Z can't reach past the seed), and the directives re-bind
@@ -375,6 +383,21 @@ export class ContentEditor {
         )),
     );
 
+    // The `|` display and `#` heading triggers (ADR-0033): free-text siblings of `::`,
+    // armed only directly after an entityLink so both chars stay literal in prose.
+    const display = linkTextSuggestion({
+      name: 'displaySuggestion',
+      char: '|',
+      attr: 'display',
+      getPicker: () => this.displayPicker(),
+    });
+    const heading = linkTextSuggestion({
+      name: 'headingSuggestion',
+      char: '#',
+      attr: 'heading',
+      getPicker: () => this.headingPicker(),
+    });
+
     // Patch /link to flag the mention extension before inserting @, so onExit knows
     // to clean up the stray @ if the user escapes instead of picking (finding #5/#9).
     const slashItems = SLASH_ITEMS.map((item) =>
@@ -400,6 +423,8 @@ export class ContentEditor {
         slashCommands(() => this.slashMenu(), slashItems),
         mention.extension,
         descriptor,
+        display,
+        heading,
       ],
       content,
     });
