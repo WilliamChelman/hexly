@@ -108,29 +108,35 @@ function blockToPM(node: RootContent, degraded: Record<string, number>): PMNode[
 
 /**
  * Maps an mdast paragraph to PM blocks. The editor's `image` is a block node, so a
- * paragraph is split around any top-level images: text runs become paragraphs and
- * each image becomes its own block, in order.
+ * paragraph is split around any image node — a standard-markdown `![](…)` (an mdast image
+ * child) or an Obsidian `![[media]]` embed (surfaced as an image node by the inline
+ * tokenizer, {@link tokenToPM}). Text runs become paragraphs; each image becomes its own
+ * block, in order.
  */
 function paragraphToPM(
   node: Extract<RootContent, { type: 'paragraph' }>,
   degraded: Record<string, number>
 ): PMNode[] {
+  // Assemble the full inline sequence first (mdast images become image nodes here; embed
+  // images come from inlineToPM), then hoist every image node out to block level.
+  const seq = node.children.flatMap((child) =>
+    child.type === 'image'
+      ? [{ type: 'image', attrs: { src: child.url, alt: child.alt ?? null, title: child.title ?? null } }]
+      : inlineToPM(child, degraded, [])
+  );
+
   const blocks: PMNode[] = [];
   let inline: PMNode[] = [];
   const flush = () => {
     if (inline.length) blocks.push({ type: 'paragraph', content: mergeAdjacentText(inline) });
     inline = [];
   };
-
-  for (const child of node.children) {
-    if (child.type === 'image') {
+  for (const n of seq) {
+    if (n.type === 'image') {
       flush();
-      blocks.push({
-        type: 'image',
-        attrs: { src: child.url, alt: child.alt ?? null, title: child.title ?? null },
-      });
+      blocks.push(n);
     } else {
-      inline.push(...inlineToPM(child, degraded, []));
+      inline.push(n);
     }
   }
   flush();
@@ -269,7 +275,21 @@ function inlineChildren(
   degraded: Record<string, number>,
   marks: Mark[] = []
 ): PMNode[] {
-  return mergeAdjacentText(parent.children.flatMap((child) => inlineToPM(child, degraded, marks)));
+  const nodes = parent.children.flatMap((child) => inlineToPM(child, degraded, marks));
+  return mergeAdjacentText(nodes.flatMap((n) => inlineOnly(n, marks, degraded)));
+}
+
+/**
+ * Coerce a node into valid inline content. Only {@link paragraphToPM} hoists a block `image`
+ * node to block level; reached here (a heading, a table cell, or inside a mark) an `![[media]]`
+ * embed can't be a block image without breaking the editor schema, so it degrades to a plain
+ * link — the same fallback a non-media `![[…]]` embed already takes. Everything else passes through.
+ */
+function inlineOnly(node: PMNode, marks: Mark[], degraded: Record<string, number>): PMNode[] {
+  if (node.type !== 'image') return [node];
+  count(degraded, 'embed');
+  const src = String(node.attrs?.src ?? '');
+  return [withMarks({ type: 'text', text: src }, [...marks, { type: 'link', attrs: { href: src } }])];
 }
 
 /**
@@ -333,13 +353,33 @@ function splitInlineText(
   return out;
 }
 
+/**
+ * Extensions Obsidian embeds as media rather than as a note transclusion (ADR-0034). An
+ * `![[X]]` whose target ends in one of these is an Asset the importer stores; anything else
+ * (a bare note name) stays a degraded link. This is the source of truth the API's asset MIME
+ * map must cover — a parity test in the API asserts the two lists agree, so drift fails CI.
+ */
+export const ASSET_EMBED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'avif', 'pdf'];
+const ASSET_EMBED_EXT = new RegExp(`\\.(${ASSET_EMBED_EXTENSIONS.join('|')})$`, 'i');
+
+/** Is this `![[target]]` an embedded media Asset (vs. a note transclusion)? */
+function isAssetEmbed(target: string): boolean {
+  return ASSET_EMBED_EXT.test(target);
+}
+
 /** Converts one matched {@link INLINE_TOKEN} into its PM node(s). */
 function tokenToPM(m: RegExpExecArray, marks: Mark[], degraded: Record<string, number>): PMNode[] {
   const [, bang, wikilink, highlight, comment, blockMath, inlineMath] = m;
 
   if (wikilink !== undefined) {
-    // `![[X]]` embeds have no native node — degrade to a plain link (nearest readable).
     if (bang === '!') {
+      // `![[media.ext]]` is an embedded Asset — surface it as a block image node (src = the
+      // vault path) so the importer can store it (ADR-0034); the `|size`/alias part is dropped.
+      const target = wikilink.split('|', 1)[0].trim();
+      if (isAssetEmbed(target)) {
+        return [{ type: 'image', attrs: { src: target, alt: null, title: null } }];
+      }
+      // A non-media embed (`![[Some Note]]`) has no native node — degrade to a plain link.
       count(degraded, 'embed');
       return [withMarks({ type: 'text', text: wikilink }, [...marks, { type: 'link', attrs: { href: wikilink } }])];
     }

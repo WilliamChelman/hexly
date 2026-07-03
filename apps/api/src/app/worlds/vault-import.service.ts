@@ -1,4 +1,4 @@
-import { basename } from 'node:path';
+import { basename, extname, posix } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import {
   BadRequestException,
@@ -16,6 +16,7 @@ import {
 import { markdownToProseMirror, type PMNode } from '@hexly/obsidian';
 import { Unzip, UnzipInflate } from 'fflate';
 import { HEXLY_CONFIG, type HexlyConfig } from '../config/config.module';
+import { ASSET_EXTENSIONS, AssetsService } from '../assets/assets.service';
 import { EntitiesService } from '../entities/entities.service';
 import { WorldsService } from './worlds.service';
 
@@ -25,19 +26,25 @@ const PUSH_CHUNK = 1 << 16;
 /** Internal signal: cumulative decompressed output crossed the configured ceiling. */
 class VaultTooLargeError extends Error {}
 
+/** A decompressed vault: markdown `notes` and binary `assets`, each a vault-relative-path → bytes map. */
+export interface UnzippedVault {
+  readonly notes: Record<string, Uint8Array>;
+  readonly assets: Record<string, Uint8Array>;
+}
+
 /**
  * Facade over the vault unzipper (ADR-0036): holds the decompressed-size ceiling from
  * the Instance Configuration so callers unzip an archive without threading the limit
  * through. The actual streaming/zip-bomb logic stays in the file-private
- * {@link unzipVaultNotes}.
+ * {@link unzipVault}.
  */
 @Injectable()
 export class VaultUnzipper {
   constructor(@Inject(HEXLY_CONFIG) private readonly config: HexlyConfig) {}
 
-  /** Stream-decompress a `.zip` to a `path → bytes` map of vault notes; bounded by the configured ceiling. */
-  unzip(archive: Buffer): Record<string, Uint8Array> {
-    return unzipVaultNotes(archive, this.config.import.maxDecompressed);
+  /** Stream-decompress a `.zip` into its notes and assets; both metered against the configured ceiling. */
+  unzip(archive: Buffer): UnzippedVault {
+    return unzipVault(archive, this.config.import.maxDecompressed);
   }
 }
 
@@ -56,13 +63,14 @@ export class VaultImportService {
     private readonly worlds: WorldsService,
     private readonly entities: EntitiesService,
     private readonly unzipper: VaultUnzipper,
+    private readonly assets: AssetsService,
   ) {}
 
   import(ownerId: string, filename: string, archive: Buffer): ImportSummary {
     // Decompress first: a malformed or oversized archive fails here (400/413) BEFORE any
     // World is minted, so a bad upload never leaves an orphan empty World behind. The
     // ceiling is baked into the injected VaultUnzipper (ADR-0036).
-    const files = this.unzipper.unzip(archive);
+    const { notes: files, assets: assetFiles } = this.unzipper.unzip(archive);
 
     // World name from the upload (sans .zip), run through nameSchema so a blank or
     // whitespace-only filename can't mint a whitespace-named World; falls back if it fails.
@@ -92,14 +100,18 @@ export class VaultImportService {
     }
 
     // Pass 2: resolve each note's wikilinks against the index (mutating the docs in place),
-    // then persist with the resolved content and a single insert per note.
+    // store any embedded images content-addressed and rewrite their src to the capability URL
+    // (ADR-0034), then persist with the resolved content and a single insert per note.
     const index = new NoteIndex(notes);
+    const assetIndex = new AssetIndex(assetFiles);
     let linksResolved = 0;
     let linksDangling = 0;
+    let assetsStored = 0;
     for (const note of notes) {
       const { resolved, dangling } = resolveLinks(note.doc, index);
       linksResolved += resolved;
       linksDangling += dangling;
+      assetsStored += this.storeImages(note.doc, posix.dirname(note.path), assetIndex, assetFiles, worldId);
       const { tags, ...rest } = note.metadata;
       const body: EntityBody = {
         type: 'note',
@@ -117,9 +129,42 @@ export class VaultImportService {
       filesSkipped,
       linksResolved,
       linksDangling,
-      assetsStored: 0,
+      assetsStored,
       constructsDegraded,
     };
+  }
+
+  /**
+   * Walk a converted doc's `image` nodes (mutating in place): a vault-relative src is resolved
+   * against the vault's asset files, stored content-addressed (ADR-0034), and its src rewritten
+   * to the served `/assets/...` capability URL. External URLs (`https://…`, `data:`) and images
+   * that resolve to no vault file are left untouched. Returns how many *new* assets it stored
+   * (dedup makes a repeat reference cost nothing), so the summary counts unique stored assets.
+   */
+  private storeImages(
+    doc: PMNode,
+    noteDir: string,
+    index: AssetIndex,
+    assetFiles: Record<string, Uint8Array>,
+    worldId: string,
+  ): number {
+    let stored = 0;
+    const walk = (n: PMNode) => {
+      if (n.type === 'image' && n.attrs) {
+        const src = String(n.attrs.src ?? '');
+        if (src && !isExternalUrl(src)) {
+          const path = index.resolve(src, noteDir);
+          if (path) {
+            const result = this.assets.store(worldId, path, assetFiles[path]);
+            n.attrs.src = result.url;
+            if (!result.deduped) stored++;
+          }
+        }
+      }
+      n.content?.forEach(walk);
+    };
+    walk(doc);
+    return stored;
   }
 }
 
@@ -166,6 +211,60 @@ function normalizeKey(value: string): string {
 }
 
 /**
+ * Resolves an `image` node's src to the vault asset file it names (ADR-0034). Handles both link
+ * shapes a converted doc carries: a standard-markdown path (`attachments/x.png`, resolved
+ * relative to the note's folder, then vault-root) and an Obsidian embed's bare filename
+ * (`![[x.png]]` → `x.png`, resolved vault-wide by basename, first in path-sorted order for a
+ * duplicate name). Matching is case-insensitive with URL-escapes decoded.
+ */
+class AssetIndex {
+  private readonly byPath = new Map<string, string>();
+  private readonly byBasename = new Map<string, string>();
+
+  constructor(assetFiles: Record<string, Uint8Array>) {
+    for (const path of Object.keys(assetFiles).sort()) {
+      this.byPath.set(normalizeAssetKey(path), path);
+      const base = posix.basename(path).toLowerCase();
+      if (!this.byBasename.has(base)) this.byBasename.set(base, path);
+    }
+  }
+
+  /** The original asset-file key (map into `assetFiles`), or null when the src names no vault asset. */
+  resolve(src: string, noteDir: string): string | null {
+    const decoded = decodeUri(src);
+    const candidates = [
+      normalizeAssetKey(posix.join(noteDir, decoded)), // note-relative (standard markdown)
+      normalizeAssetKey(decoded), // vault-root-relative
+    ];
+    for (const key of candidates) {
+      const hit = this.byPath.get(key);
+      if (hit) return hit;
+    }
+    // Obsidian embeds resolve by filename across the whole vault.
+    return this.byBasename.get(posix.basename(decoded).toLowerCase()) ?? null;
+  }
+}
+
+/** Normalize a vault path for asset matching: resolve `./`/`../`, drop a leading `./`, lower-case. */
+function normalizeAssetKey(value: string): string {
+  return posix.normalize(value).replace(/^\.\//, '').toLowerCase();
+}
+
+/** Decode `%20`-style escapes an editor writes into image src; a malformed escape falls back to raw. */
+function decodeUri(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+/** An external image src (has a URL scheme like `https:`/`data:`, or is protocol-relative) — not a vault path. */
+function isExternalUrl(src: string): boolean {
+  return /^([a-z][a-z0-9+.-]*:|\/\/)/i.test(src);
+}
+
+/**
  * Walks a converted doc, resolving each `entityLink`'s `label` to an `entityId` via the index
  * (mutating in place) and tallying resolved vs. dangling. An unresolved link keeps `entityId: null`
  * so its intent survives as a dangling link (#147). Only `entityLink` nodes count — a `![[X]]`
@@ -209,11 +308,17 @@ function toTags(raw: unknown): readonly string[] {
   return tagsSchema.parse(list.filter((t) => typeof t === 'string' && t.trim() !== ''));
 }
 
-/** A vault note is a `.md` file (not a directory) outside Obsidian's `.obsidian/` config. */
-function isVaultNote(path: string): boolean {
-  if (path.endsWith('/')) return false; // directory entry
-  if (path.split('/').includes('.obsidian')) return false;
-  return path.toLowerCase().endsWith('.md');
+/**
+ * Classify a zip entry: a `.md` file is a `note`, a file with a known importable Asset
+ * extension is an `asset` (ADR-0034), and everything else — directory entries, Obsidian's
+ * `.obsidian/` config, and unsupported files (videos, nested zips, stray `.txt`) — is
+ * `skip`ped and never inflated, so an unreferenced non-Asset attachment can't balloon memory.
+ */
+function classifyEntry(path: string): 'note' | 'asset' | 'skip' {
+  if (path.endsWith('/')) return 'skip'; // directory entry
+  if (path.split('/').includes('.obsidian')) return 'skip';
+  if (path.toLowerCase().endsWith('.md')) return 'note';
+  return ASSET_EXTENSIONS.has(extname(path).toLowerCase()) ? 'asset' : 'skip';
 }
 
 /** Strict UTF-8 decode: invalid bytes throw so an unreadable file is skipped, not mojibake'd. */
@@ -222,21 +327,20 @@ function decodeUtf8(bytes: Uint8Array): string {
 }
 
 /**
- * Stream-decompress the archive to a `path → bytes` map of vault notes only (assets and
- * `.obsidian/` config are skipped without inflating). Airtight against zip bombs: the
- * archive is pushed in small slices and cumulative *decompressed* output is metered, so a
- * bomb trips `maxBytes` mid-inflate — long before it can materialize. A non-zip/corrupt
- * archive throws {@link BadRequestException} (400); an oversized one
- * {@link PayloadTooLargeException} (413) — never a 500.
+ * Stream-decompress the archive into its vault notes and assets (`.obsidian/` config and
+ * directory entries are skipped without inflating). Airtight against zip bombs: the archive is
+ * pushed in small slices and cumulative *decompressed* output — notes AND assets — is metered,
+ * so a bomb trips `maxBytes` mid-inflate, long before it can materialize (ADR-0034 stores assets
+ * uncapped, but this ceiling still backstops a malicious archive). A non-zip/corrupt archive
+ * throws {@link BadRequestException} (400); an oversized one {@link PayloadTooLargeException}
+ * (413) — never a 500.
  *
  * File-private: callers go through {@link VaultUnzipper}, which supplies `maxBytes` from
  * the Instance Configuration (ADR-0036).
  */
-function unzipVaultNotes(
-  archive: Buffer,
-  maxBytes: number,
-): Record<string, Uint8Array> {
+function unzipVault(archive: Buffer, maxBytes: number): UnzippedVault {
   const notes: Record<string, Uint8Array> = {};
+  const assets: Record<string, Uint8Array> = {};
   let totalBytes = 0;
   // A zip made by compressing the vault *folder* nests everything under `VaultName/`, but
   // wikilinks and `hexly.sourcePath` are vault-relative (ADR-0033). Obsidian's `.obsidian/`
@@ -247,14 +351,16 @@ function unzipVaultNotes(
   const unzip = new Unzip((file) => {
     const marker = /^(.*\/)?\.obsidian\//.exec(file.name);
     if (marker) rootPrefix = marker[1] ?? '';
-    if (!isVaultNote(file.name)) return; // never inflate assets or config
+    const kind = classifyEntry(file.name);
+    if (kind === 'skip') return; // never inflate config or directory entries
+    const bucket = kind === 'note' ? notes : assets;
     const chunks: Uint8Array[] = [];
     file.ondata = (err, chunk, final) => {
       if (err) throw err;
       totalBytes += chunk.length;
       if (totalBytes > maxBytes) throw new VaultTooLargeError();
       chunks.push(chunk);
-      if (final) notes[file.name] = Buffer.concat(chunks);
+      if (final) bucket[file.name] = Buffer.concat(chunks);
     };
     file.start();
   });
@@ -280,11 +386,16 @@ function unzipVaultNotes(
     throw new BadRequestException('Not a readable .zip archive');
   }
   // Re-root once all entries are seen (zip order isn't guaranteed, so `rootPrefix` may be
-  // discovered after some notes). A note outside the detected root is left untouched.
-  if (!rootPrefix) return notes;
-  const rerooted: Record<string, Uint8Array> = {};
-  for (const [name, bytes] of Object.entries(notes)) {
-    rerooted[name.startsWith(rootPrefix) ? name.slice(rootPrefix.length) : name] = bytes;
+  // discovered after some entries). An entry outside the detected root is left untouched.
+  return { notes: reroot(notes, rootPrefix), assets: reroot(assets, rootPrefix) };
+}
+
+/** Strip the detected wrapper directory from every path so entries are vault-relative. */
+function reroot(files: Record<string, Uint8Array>, rootPrefix: string): Record<string, Uint8Array> {
+  if (!rootPrefix) return files;
+  const out: Record<string, Uint8Array> = {};
+  for (const [name, bytes] of Object.entries(files)) {
+    out[name.startsWith(rootPrefix) ? name.slice(rootPrefix.length) : name] = bytes;
   }
-  return rerooted;
+  return out;
 }

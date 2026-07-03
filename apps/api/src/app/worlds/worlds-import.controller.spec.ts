@@ -2,8 +2,12 @@ import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import { strToU8, zipSync, type Zippable } from 'fflate';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import request from 'supertest';
 import { DB, Db, createDb } from '../db/db';
+import { ASSETS_DIR } from '../assets/assets.service';
 import { AuthService } from '../auth/auth.service';
 import { AuthModule } from '../auth/auth.module';
 import { EntitiesModule } from '../entities/entities.module';
@@ -53,17 +57,40 @@ async function pathsToIds(agent: request.Agent, worldId: string): Promise<Record
   return out;
 }
 
+/** Collect every `image` node's `src` in a converted doc snapshot, in document order. */
+function imageSrcs(snapshot: { content?: unknown[]; type?: string }): string[] {
+  const found: string[] = [];
+  const walk = (node: { type?: string; content?: unknown[]; attrs?: Record<string, unknown> }) => {
+    if (node.type === 'image') found.push(String(node.attrs?.['src'] ?? ''));
+    for (const child of node.content ?? []) walk(child as typeof node);
+  };
+  walk(snapshot);
+  return found;
+}
+
+/** Fetch a note by name and return its image `src`s. */
+async function imagesOf(agent: request.Agent, worldId: string, name: string): Promise<string[]> {
+  const list = await agent.get(`/entities?worldId=${worldId}`).expect(200);
+  const summary = list.body.items.find((e: { name: string }) => e.name === name);
+  const detail = await agent.get(`/entities/${summary.id}`).expect(200);
+  return imageSrcs(detail.body.document.content.snapshot);
+}
+
 describe('Vault import endpoint', () => {
   let app: INestApplication;
   let db: Db;
+  let assetsDir: string;
 
   beforeEach(async () => {
     db = createDb(':memory:'); // Isolated per-test (ADR-0002).
+    assetsDir = mkdtempSync(join(tmpdir(), 'hexly-import-assets-'));
     const moduleRef = await Test.createTestingModule({
       imports: [ConfigModule, AuthModule, WorldsModule, EntitiesModule],
     })
       .overrideProvider(DB)
       .useValue(db)
+      .overrideProvider(ASSETS_DIR)
+      .useValue(assetsDir)
       .compile();
 
     app = moduleRef.createNestApplication();
@@ -75,6 +102,7 @@ describe('Vault import endpoint', () => {
 
   afterEach(async () => {
     await app.close();
+    rmSync(assetsDir, { recursive: true, force: true });
   });
 
   async function signIn(email: string, password: string) {
@@ -378,6 +406,60 @@ describe('Vault import endpoint', () => {
 
     const world = await ada.get(`/worlds/${res.body.worldId}`).expect(200);
     expect(world.body.name).toBe('Imported Vault');
+  });
+
+  it('stores embedded images content-addressed (deduped), rewrites their src, passes external URLs through, and serves the bytes', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
+    const zip = vaultZip({
+      'attachments/portrait.png': png,
+      // Two notes embed the SAME image (Obsidian `![[filename]]`, resolved vault-wide by name).
+      'Hero.md': 'Hero\n\n![[portrait.png]]',
+      // Villain re-embeds the same image and also references an external URL that must pass through.
+      'Villain.md': 'Villain\n\n![[portrait.png]]\n\n![logo](https://example.com/logo.png)',
+    });
+
+    const res = await ada
+      .post('/worlds/import')
+      .attach('file', zip, 'Aldermoor.zip')
+      .expect(201);
+
+    // Referenced once effectively, stored once (content-addressed dedup, ADR-0034).
+    expect(res.body.assetsStored).toBe(1);
+    const worldId = res.body.worldId;
+
+    const heroImages = await imagesOf(ada, worldId, 'Hero');
+    const villainImages = await imagesOf(ada, worldId, 'Villain');
+
+    // Both notes point at the same capability URL; external URL is untouched.
+    expect(heroImages).toHaveLength(1);
+    expect(heroImages[0]).toMatch(new RegExp(`^/assets/${worldId}/[0-9a-f]{64}\\.png$`));
+    expect(villainImages).toEqual([heroImages[0], 'https://example.com/logo.png']);
+
+    // The rewritten src resolves: the bytes are served unauthenticated at that URL.
+    const anon = request(app.getHttpServer());
+    const served = await anon.get(heroImages[0]).expect(200);
+    expect(new Uint8Array(served.body)).toEqual(png);
+  });
+
+  it('removes a World\'s asset folder when the World is deleted', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 5, 6, 7, 8]);
+    const zip = vaultZip({
+      'attachments/portrait.png': png,
+      'Hero.md': 'Hero\n\n![[portrait.png]]',
+    });
+
+    const worldId = (await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201)).body.worldId;
+    const [assetUrl] = await imagesOf(ada, worldId, 'Hero');
+    await request(app.getHttpServer()).get(assetUrl).expect(200); // present before delete
+    expect(existsSync(join(assetsDir, worldId))).toBe(true);
+
+    await ada.delete(`/worlds/${worldId}`).expect(204);
+
+    // The World's whole asset folder is gone; the bytes no longer serve.
+    expect(existsSync(join(assetsDir, worldId))).toBe(false);
+    await request(app.getHttpServer()).get(assetUrl).expect(404);
   });
 
   it('refuses the import route without a session cookie', async () => {

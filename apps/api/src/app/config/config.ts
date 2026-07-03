@@ -51,8 +51,8 @@ const rawConfigSchema = z.object({
     .object({
       // Generous by default: an image-heavy vault balloons the *compressed* upload
       // (assets ride inside the .zip), so maxUpload is the ceiling that actually bites.
-      // maxDecompressed meters only inflated markdown (assets are skipped), so a real
-      // vault never approaches it — it's a high zip-bomb backstop, not a tuning knob.
+      // maxDecompressed meters all inflated bytes — markdown AND assets (ADR-0034) — so a
+      // real vault stays well under it; it's a high zip-bomb backstop, not a tuning knob.
       maxUpload: sizeString('500mb'),
       maxDecompressed: sizeString('5gb'),
     })

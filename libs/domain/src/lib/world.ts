@@ -59,8 +59,8 @@ export interface WorldDetail extends WorldSummary {
  * instrument. Every markdown file that became a note is counted; unreadable files
  * are skipped (never abort the import) and tallied. `constructsDegraded` sums the
  * per-file degradation tallies from the markdown converter (footnotes, math,
- * mermaid, comments, …). `linksResolved`/`assetsStored` are 0 until their slices
- * land; every wikilink is currently a dangling link.
+ * mermaid, comments, …). `assetsStored` counts the unique embedded images pulled into
+ * per-World content-addressed storage (ADR-0034), deduped by content.
  */
 export interface ImportSummary {
   readonly worldId: string;

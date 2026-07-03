@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { CreateWorldRequest, emptyEntityBody, WorldDetail, WorldSummary } from '@hexly/domain';
 import { and, asc, count, eq, or } from 'drizzle-orm';
+import { AssetsService } from '../assets/assets.service';
 import { DB, Db } from '../db/db';
 import { entities, worldMembers, worlds } from '../db/schema';
 
@@ -11,7 +12,10 @@ import { entities, worldMembers, worlds } from '../db/schema';
  */
 @Injectable()
 export class WorldsService {
-  constructor(@Inject(DB) private readonly db: Db) {}
+  constructor(
+    @Inject(DB) private readonly db: Db,
+    private readonly assets: AssetsService,
+  ) {}
 
   /**
    * Every World the caller can reach (ADR-0024): owned or member of.
@@ -132,6 +136,9 @@ export class WorldsService {
       this.db.delete(entities).where(eq(entities.worldId, id)).run();
       this.db.delete(worlds).where(eq(worlds.id, id)).run();
     });
+    // Rows (incl. `assets`) cascade with the World; the on-disk Asset bytes don't, so
+    // drop the World's whole Asset folder here (ADR-0034). Best-effort, after the commit.
+    this.assets.deleteWorld(id);
     return 'ok';
   }
 

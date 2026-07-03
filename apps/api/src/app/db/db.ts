@@ -1,4 +1,6 @@
-import { isAbsolute, resolve } from 'node:path';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { isAbsolute, join, resolve } from 'node:path';
 import Database from 'better-sqlite3';
 import { drizzle, BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
@@ -60,4 +62,15 @@ export function resolveInstanceDir(): string {
 export function resolveDbPath(): string {
   const dir = resolveInstanceDir();
   return dir === ':memory:' ? ':memory:' : resolve(dir, 'hexly.db');
+}
+
+/**
+ * The Asset bytes folder beside the database (ADR-0034), `<instanceDir>/assets`. For a
+ * `:memory:` instance (no real directory) it falls back to a throwaway OS temp dir, so an
+ * in-memory run still has somewhere real to write bytes.
+ */
+export function resolveAssetsDir(instanceDir: string = resolveInstanceDir()): string {
+  return instanceDir === ':memory:'
+    ? mkdtempSync(join(tmpdir(), 'hexly-assets-'))
+    : join(instanceDir, 'assets');
 }

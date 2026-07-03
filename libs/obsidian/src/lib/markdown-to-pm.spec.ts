@@ -141,6 +141,51 @@ describe('markdownToProseMirror', () => {
     expect(degraded).toEqual({ embed: 1 });
   });
 
+  it('converts an ![[media.ext]] embed into a block image node (not a degraded link)', () => {
+    const { doc, degraded } = markdownToProseMirror('![[portrait.png]]');
+
+    // A media embed is a faithful image, so it is NOT a degraded construct.
+    expect(doc.content).toEqual([
+      { type: 'image', attrs: { src: 'portrait.png', alt: null, title: null } },
+    ]);
+    expect(degraded).toEqual({});
+  });
+
+  it('strips an ![[image|size]] embed alias, keeping the vault path as the image src', () => {
+    const { doc } = markdownToProseMirror('![[folder/Map.jpg|300]]');
+
+    expect(doc.content).toEqual([
+      { type: 'image', attrs: { src: 'folder/Map.jpg', alt: null, title: null } },
+    ]);
+  });
+
+  it('splits a paragraph so an inline ![[media]] embed becomes its own block', () => {
+    const { doc } = markdownToProseMirror('see ![[cat.png]] here');
+
+    expect(doc.content).toEqual([
+      { type: 'paragraph', content: [{ type: 'text', text: 'see ' }] },
+      { type: 'image', attrs: { src: 'cat.png', alt: null, title: null } },
+      { type: 'paragraph', content: [{ type: 'text', text: ' here' }] },
+    ]);
+  });
+
+  it('degrades an ![[media]] embed to a link where a block image is not allowed (heading)', () => {
+    // A heading holds inline content only, so the block `image` node can't be hoisted there —
+    // it degrades to a plain link rather than emitting a schema-invalid document.
+    const { doc } = markdownToProseMirror('# Cover ![[cover.png]]');
+
+    expect(doc.content).toEqual([
+      {
+        type: 'heading',
+        attrs: { level: 1 },
+        content: [
+          { type: 'text', text: 'Cover ' },
+          { type: 'text', text: 'cover.png', marks: [{ type: 'link', attrs: { href: 'cover.png' } }] },
+        ],
+      },
+    ]);
+  });
+
   it('tallies an unrecognized block (raw HTML) as degraded instead of dropping it silently', () => {
     const { doc, degraded } = markdownToProseMirror('<div>raw</div>');
 

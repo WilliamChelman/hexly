@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MulterModule } from '@nestjs/platform-express';
+import { AssetsModule } from '../assets/assets.module';
 import { AuthModule } from '../auth/auth.module';
 import { HEXLY_CONFIG, type HexlyConfig } from '../config/config.module';
 import { DbModule } from '../db/db.module';
@@ -23,6 +24,7 @@ import { WorldsService } from './worlds.service';
     DbModule,
     AuthModule,
     EntitiesModule,
+    AssetsModule,
     MulterModule.registerAsync({
       inject: [HEXLY_CONFIG],
       useFactory: (config: HexlyConfig) => ({

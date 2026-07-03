@@ -5,7 +5,7 @@
 
 import { existsSync } from 'node:fs';
 import { extname, join } from 'node:path';
-import { Logger } from '@nestjs/common';
+import { Logger, RequestMethod } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
@@ -18,7 +18,11 @@ async function bootstrap() {
   // with the web app's client-side routes (e.g. the SPA owns `/maps/:id` while
   // the API owns `/api/maps/:id`). One reverse-proxy/static-host split — `/api`
   // to this server, everything else to the SPA — works in dev and prod alike.
-  app.setGlobalPrefix('api');
+  // Asset serving is excluded so it stays at `/assets/...` (not `/api/assets/...`),
+  // matching the capability `src` written into Content (ADR-0034, ADR-0008).
+  app.setGlobalPrefix('api', {
+    exclude: [{ path: 'assets/:worldId/:file', method: RequestMethod.GET }],
+  });
   // Parse the session cookie off incoming requests (read by AuthController).
   app.use(cookieParser());
   // Run module shutdown hooks (DbModule closes the SQLite handle) on SIGTERM/SIGINT.

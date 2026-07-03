@@ -149,6 +149,31 @@ export const worldLinks = sqliteTable(
 );
 
 /**
+ * Per-World content-addressed Assets (ADR-0034): binary files (images, PDFs) pulled
+ * out of an imported vault. The row is metadata only — the bytes live on disk at
+ * `assets/<worldId>/<hash>.<ext>` beside the SQLite DB (ADR-0002). The primary key is
+ * `(worldId, hash)`, so dedup is per-World: the same image referenced from many notes
+ * rows once, but the same image in two Worlds rows (and stores) twice. `originalFilename`
+ * survives here (the on-disk name is the hash) so export can write human-readable names
+ * back into the vault. Deleting a World cascades these rows away; the on-disk folder is
+ * removed separately by {@link AssetsService.deleteWorld}.
+ */
+export const assets = sqliteTable(
+  'assets',
+  {
+    hash: text('hash').notNull(),
+    worldId: text('world_id')
+      .notNull()
+      .references(() => worlds.id, { onDelete: 'cascade' }),
+    originalFilename: text('original_filename').notNull(),
+    mime: text('mime').notNull(),
+    size: integer('size').notNull(),
+    createdAt: integer('created_at').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.worldId, table.hash] })]
+);
+
+/**
  * The owner's Link Descriptor vocabulary (#96, ADR-0023): the distinct relationship
  * labels each Entity's Content currently uses ("spouse", "capital of"). The client
  * harvests these from its opaque snapshot and a successful save *replaces* the entity's
