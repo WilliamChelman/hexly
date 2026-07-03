@@ -89,6 +89,63 @@ describe('CalloutView node view', () => {
     editor.destroy();
   });
 
+  // A doc where the callout follows a paragraph, so both exit directions land somewhere.
+  function calloutAfterParagraph() {
+    const editor = new Editor({
+      extensions: CONTENT_EXTENSIONS,
+      content: {
+        type: 'doc',
+        content: [
+          { type: 'paragraph', content: [{ type: 'text', text: 'above' }] },
+          {
+            type: 'callout',
+            attrs: { type: 'note', title: null },
+            content: [{ type: 'paragraph', content: [{ type: 'text', text: 'body' }] }],
+          },
+        ],
+      },
+    });
+    const calloutPos = editor.state.doc.child(0).nodeSize; // position just before the callout
+    const view = createCalloutNodeView(
+      editor.state.doc.child(1),
+      editor,
+      () => calloutPos,
+      TestBed.inject(EnvironmentInjector),
+      TestBed.inject(ApplicationRef),
+    );
+    const input = (view.dom as HTMLElement).querySelector('input') as HTMLInputElement;
+    return { editor, view, input };
+  }
+
+  const press = (el: HTMLElement, key: string) =>
+    el.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+
+  it('drops the caret into the callout body on ArrowDown / Enter / Escape', () => {
+    for (const key of ['ArrowDown', 'Enter', 'Escape']) {
+      const { editor, view, input } = calloutAfterParagraph();
+      press(input, key);
+      expect(editor.state.selection.$head.parent.textContent).toBe('body');
+      view.destroy?.();
+      editor.destroy();
+    }
+  });
+
+  it('moves the caret above the callout on ArrowUp (no trap — you can leave upward)', () => {
+    const { editor, view, input } = calloutAfterParagraph();
+    press(input, 'ArrowUp');
+    expect(editor.state.selection.$head.parent.textContent).toBe('above');
+    view.destroy?.();
+    editor.destroy();
+  });
+
+  it('keeps the type input out of the Tab order so Tab never jumps to it', () => {
+    const { editor, view } = nodeViewFor({ type: 'note', title: null });
+    const input = (view.dom as HTMLElement).querySelector('input') as HTMLInputElement;
+    expect(input.tabIndex).toBe(-1);
+    view.destroy?.();
+    editor.destroy();
+  });
+
   it('shows an arbitrary (imported) type verbatim in the input', () => {
     const { editor, view } = nodeViewFor({ type: 'custom-obsidian', title: null });
     const input = (view.dom as HTMLElement).querySelector('input') as HTMLInputElement;

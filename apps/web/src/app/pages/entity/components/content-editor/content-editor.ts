@@ -24,7 +24,7 @@ import { EntityNameResolver } from '../../services/entity-name-resolver';
 import { CONTENT_EXTENSIONS } from './content-extensions';
 import { entityLinkNode } from './entity-link-node';
 import { calloutNode } from './callout-node';
-import { createCalloutNodeView } from './callout-view';
+import { createCalloutNodeView, focusCalloutTypeAtTop } from './callout-view';
 import { SlashMenu } from './slash-menu';
 import { slashCommands } from './slash-commands';
 import { SLASH_ITEMS } from './slash-menu-items';
@@ -350,6 +350,11 @@ export class ContentEditor {
       addNodeView() {
         return ({ node, editor, getPos }) =>
           createCalloutNodeView(node, editor, getPos, environmentInjector, appRef);
+      },
+      // ArrowUp from the top line of a callout body focuses its type input (arrow-key
+      // navigation into the chrome); elsewhere it returns false and cursor motion is normal.
+      addKeyboardShortcuts() {
+        return { ArrowUp: () => focusCalloutTypeAtTop(this.editor) };
       },
     });
 
