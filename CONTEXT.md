@@ -221,3 +221,17 @@ _Avoid_: Filter, dimension, aspect
 **Full-text search**:
 In the Entity Browser, matching a text query against an Entity's name, Tags, and the prose of its Content — ranked by relevance. Backed server-side by a plain-text projection of Content produced by a format-tagged extractor, so the domain still never parses Content (ADR-0019, ADR-0035).
 _Avoid_: Fulltext, keyword search, fuzzy search
+
+## Self-hosting
+
+**Instance**:
+A single self-hosted deployment of Hexly — one API process over one Instance Directory (ADR-0002, ADR-0036). The unit an operator runs, configures, and backs up.
+_Avoid_: Server, deployment, tenant
+
+**Instance Directory**:
+The folder an operator points Hexly at (`HEXLY_DIR`), holding its SQLite database (`hexly.db`) and Instance Configuration (`hexly.yml`) — named for holding both data and config. The boot input — Hexly is given this folder, not a database-file path (ADR-0036).
+_Avoid_: Data directory, data folder, db path, storage dir
+
+**Instance Configuration**:
+Operator-facing settings for one Instance, in `hexly.yml` beside the database — the vault-import size limits today, feature flags next. The single source for these settings (no env-var override); a missing or partial file falls back to built-in defaults, an invalid one fails boot (ADR-0036). Distinct from per-User or per-World settings, which live in the database.
+_Avoid_: Config, settings, preferences, environment

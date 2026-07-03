@@ -6,6 +6,7 @@ import { DB, Db, createDb } from '../db/db';
 import { AuthService } from '../auth/auth.service';
 import { AuthModule } from '../auth/auth.module';
 import { EntitiesModule } from '../entities/entities.module';
+import { ConfigModule } from '../config/config.module';
 import { WorldsModule } from './worlds.module';
 
 describe('Worlds endpoints', () => {
@@ -16,7 +17,7 @@ describe('Worlds endpoints', () => {
   beforeEach(async () => {
     db = createDb(':memory:'); // Isolated per-test (ADR-0002).
     const moduleRef = await Test.createTestingModule({
-      imports: [AuthModule, WorldsModule, EntitiesModule],
+      imports: [ConfigModule, AuthModule, WorldsModule, EntitiesModule],
     })
       .overrideProvider(DB)
       .useValue(db)

@@ -88,23 +88,40 @@ are stored as argon2 hashes; the plaintext is never persisted.
 
 ### Where the data lives
 
-The API stores everything in a single SQLite file (WAL mode). The dev scripts
-pin it to `hexly.db` at the repo root via `HEXLY_DB_PATH`, so:
+You point the API at an **Instance Directory** via `HEXLY_DIR`; inside it live
+the SQLite database `hexly.db` (WAL mode) and the optional config file
+`hexly.yml` (see below). The dev scripts pin it to `hexly-data/` at the repo
+root, so:
 
-- `pnpm seed` and `pnpm dev`/`pnpm dev:api` always agree on the same file, and
+- `pnpm seed` and `pnpm dev`/`pnpm dev:api` always agree on the same folder, and
 - the database **survives rebuilds** (the API build cleans `dist/`, so the
   default in-bundle location would be wiped on every serve).
 
-`hexly.db*` is git-ignored. To start fresh, delete it and re-seed:
+`hexly-data/` is git-ignored. To start fresh, delete the db and re-seed:
 
 ```sh
-rm -f hexly.db hexly.db-wal hexly.db-shm
+rm -f hexly-data/hexly.db hexly-data/hexly.db-wal hexly-data/hexly.db-shm
 pnpm seed dev@hexly.test devpass "Dev User"
 ```
 
-Set `HEXLY_DB_PATH` to an absolute path to point at a different/shared database
-(it's honored as-is when absolute; a relative value resolves against the current
+Set `HEXLY_DIR` to an absolute path to point at a different/shared folder
+(honored as-is when absolute; a relative value resolves against the current
 working directory).
+
+### Instance configuration (`hexly.yml`)
+
+Drop an optional `hexly.yml` in the Instance Directory to tune per-instance
+settings (ADR-0036). It's the single source for these — there are no env-var
+overrides. A missing or partial file falls back to built-in defaults; an invalid
+file fails boot with the offending key named. Sizes are human-readable
+(`500mb`, `1.5gb`).
+
+```yaml
+# hexly-data/hexly.yml — all keys optional; shown with their defaults
+import:
+  maxUpload: 500mb        # ceiling on an uploaded vault .zip (images ride inside it)
+  maxDecompressed: 5gb    # ceiling on inflated markdown (zip-bomb backstop; assets are skipped)
+```
 
 ## Build, test, lint
 

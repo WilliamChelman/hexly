@@ -21,7 +21,10 @@ const apiDist = join(workspaceRoot, 'dist', 'apps', 'api');
 const mainJs = join(apiDist, 'main.js');
 const seedJs = join(apiDist, 'seed.js');
 const webIndex = join(workspaceRoot, 'dist', 'apps', 'web', 'browser', 'index.html');
-const dbPath = join(workspaceRoot, 'tmp', 'web-e2e', 'hexly-e2e.db');
+// A throwaway Instance Directory (ADR-0036): the API derives hexly.db inside it, and
+// with no hexly.yml present the Instance Configuration falls back to defaults.
+const instanceDir = join(workspaceRoot, 'tmp', 'web-e2e');
+const dbPath = join(instanceDir, 'hexly.db');
 
 const user = {
   email: process.env.E2E_USER_EMAIL,
@@ -59,7 +62,7 @@ for (const suffix of ['', '-wal', '-shm']) rmSync(dbPath + suffix, { force: true
 
 const childEnv = {
   ...process.env,
-  HEXLY_DB_PATH: dbPath,
+  HEXLY_DIR: instanceDir,
   // Never production (secure cookies break over http), default to test.
   NODE_ENV: !process.env.NODE_ENV || process.env.NODE_ENV === 'production' ? 'test' : process.env.NODE_ENV,
 };

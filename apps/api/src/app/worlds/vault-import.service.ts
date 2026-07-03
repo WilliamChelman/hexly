@@ -1,6 +1,7 @@
 import { basename } from 'node:path';
 import {
   BadRequestException,
+  Inject,
   Injectable,
   PayloadTooLargeException,
 } from '@nestjs/common';
@@ -13,22 +14,31 @@ import {
 } from '@hexly/domain';
 import { markdownToProseMirror, type PMNode } from '@hexly/obsidian';
 import { Unzip, UnzipInflate } from 'fflate';
+import { HEXLY_CONFIG, type HexlyConfig } from '../config/config.module';
 import { EntitiesService } from '../entities/entities.service';
 import { WorldsService } from './worlds.service';
-
-/**
- * Decompressed-size ceiling (ADR-0033). A real vault is a few MB of markdown; this
- * sits well past any genuine vault and well short of OOM. It bounds the *actual*
- * inflated bytes — not the zip's declared sizes, which a bomb forges — so it holds
- * against a zip bomb whose headers lie.
- */
-export const MAX_DECOMPRESSED_BYTES = 256 * 1024 * 1024;
 
 /** Feed the archive in 64 KB slices so a single bomb file trips the ceiling mid-inflate, before it fully materializes. */
 const PUSH_CHUNK = 1 << 16;
 
-/** Internal signal: cumulative decompressed output crossed {@link MAX_DECOMPRESSED_BYTES}. */
+/** Internal signal: cumulative decompressed output crossed the configured ceiling. */
 class VaultTooLargeError extends Error {}
+
+/**
+ * Facade over the vault unzipper (ADR-0036): holds the decompressed-size ceiling from
+ * the Instance Configuration so callers unzip an archive without threading the limit
+ * through. The actual streaming/zip-bomb logic stays in the file-private
+ * {@link unzipVaultNotes}.
+ */
+@Injectable()
+export class VaultUnzipper {
+  constructor(@Inject(HEXLY_CONFIG) private readonly config: HexlyConfig) {}
+
+  /** Stream-decompress a `.zip` to a `path → bytes` map of vault notes; bounded by the configured ceiling. */
+  unzip(archive: Buffer): Record<string, Uint8Array> {
+    return unzipVaultNotes(archive, this.config.import.maxDecompressed);
+  }
+}
 
 /**
  * Vault import (ADR-0033, #146): unzip a `.zip` server-side and turn each markdown
@@ -42,12 +52,14 @@ export class VaultImportService {
   constructor(
     private readonly worlds: WorldsService,
     private readonly entities: EntitiesService,
+    private readonly unzipper: VaultUnzipper,
   ) {}
 
   import(ownerId: string, filename: string, archive: Buffer): ImportSummary {
     // Decompress first: a malformed or oversized archive fails here (400/413) BEFORE any
-    // World is minted, so a bad upload never leaves an orphan empty World behind.
-    const files = unzipVaultNotes(archive);
+    // World is minted, so a bad upload never leaves an orphan empty World behind. The
+    // ceiling is baked into the injected VaultUnzipper (ADR-0036).
+    const files = this.unzipper.unzip(archive);
 
     // World name from the upload (sans .zip), run through nameSchema so a blank or
     // whitespace-only filename can't mint a whitespace-named World; falls back if it fails.
@@ -133,13 +145,16 @@ function decodeUtf8(bytes: Uint8Array): string {
  * Stream-decompress the archive to a `path → bytes` map of vault notes only (assets and
  * `.obsidian/` config are skipped without inflating). Airtight against zip bombs: the
  * archive is pushed in small slices and cumulative *decompressed* output is metered, so a
- * bomb trips {@link MAX_DECOMPRESSED_BYTES} mid-inflate — long before it can materialize.
- * A non-zip/corrupt archive throws {@link BadRequestException} (400); an oversized one
+ * bomb trips `maxBytes` mid-inflate — long before it can materialize. A non-zip/corrupt
+ * archive throws {@link BadRequestException} (400); an oversized one
  * {@link PayloadTooLargeException} (413) — never a 500.
+ *
+ * File-private: callers go through {@link VaultUnzipper}, which supplies `maxBytes` from
+ * the Instance Configuration (ADR-0036).
  */
-export function unzipVaultNotes(
+function unzipVaultNotes(
   archive: Buffer,
-  maxBytes = MAX_DECOMPRESSED_BYTES,
+  maxBytes: number,
 ): Record<string, Uint8Array> {
   const notes: Record<string, Uint8Array> = {};
   let totalBytes = 0;

@@ -36,20 +36,28 @@ export function createDb(path: string): Db {
 }
 
 /**
- * Resolve the SQLite file path, identically for every entry point (server, seed
- * CLI) so they agree on one file.
+ * Resolve the Instance Directory (ADR-0036) — the folder holding `hexly.db` and
+ * `hexly.yml` — identically for every entry point (server, seed CLI) so they
+ * agree on one location.
  *
- * - `':memory:'` verbatim (tests rely on a fresh per-process DB).
- * - `HEXLY_DB_PATH` honoured as-is if absolute, else resolved against cwd.
+ * - `':memory:'` verbatim (tests rely on a fresh per-process DB; config falls
+ *   back to defaults for it).
+ * - `HEXLY_DIR` honoured as-is if absolute, else resolved against cwd.
  * - Nothing set: default to `__dirname` (where both entry points bundle), not
  *   cwd, which differs between the server and the seed CLI.
  */
-export function resolveDbPath(): string {
-  const configured = process.env.HEXLY_DB_PATH;
+export function resolveInstanceDir(): string {
+  const configured = process.env.HEXLY_DIR;
   if (configured) {
     return configured === ':memory:' || isAbsolute(configured)
       ? configured
       : resolve(process.cwd(), configured);
   }
-  return resolve(__dirname, 'hexly.db');
+  return __dirname;
+}
+
+/** The SQLite file inside the Instance Directory (or `':memory:'` verbatim for tests). */
+export function resolveDbPath(): string {
+  const dir = resolveInstanceDir();
+  return dir === ':memory:' ? ':memory:' : resolve(dir, 'hexly.db');
 }

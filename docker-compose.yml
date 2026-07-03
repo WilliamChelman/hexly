@@ -6,5 +6,5 @@ services:
     volumes:
       - ./hexly-data:/data
     environment:
-      HEXLY_DB_PATH: /data/hexly.db
+      HEXLY_DIR: /data
     restart: unless-stopped

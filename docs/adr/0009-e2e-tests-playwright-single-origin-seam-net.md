@@ -15,7 +15,7 @@ Tests run against the **real production build**: the api serves the built SPA on
 ## Consequences
 
 - The dedicated **login/logout journey uses its own fresh session**, not the shared `storageState` — `logout` deletes its session row server-side, and sharing the token would invalidate every other test's reused cookie.
-- The e2e DB is a throwaway file (`HEXLY_DB_PATH` → `tmp/`), seeded with one fixed user at server start; it never touches the real `hexly.db`.
+- The e2e DB is a throwaway file (`HEXLY_DIR` → `tmp/`), seeded with one fixed user at server start; it never touches the real `hexly.db`.
 - The suite can only assert what the app makes **observable**; today that is the hex count, auth, and navigation. It grows as the inspector/coords get wired (currently static mockups).
 - Initial journeys: (1) auth & guard, (2) paint → save → reload persistence + API data check, (3) map-library CRUD. Deferred to unit specs: pan/zoom, undo/redo, pixel correctness. Stretch: the version-conflict path.
 - CI runs e2e as a dedicated job (install chromium → `nx e2e web-e2e` → upload the HTML report on failure), separate from `lint/test/build`.

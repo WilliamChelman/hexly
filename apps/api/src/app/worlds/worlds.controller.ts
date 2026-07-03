@@ -57,11 +57,10 @@ export class WorldsController {
    * synchronously, and the {@link ImportSummary} reports what landed and what was lost.
    */
   @Post('import')
-  // Compressed-size cap: stops a giant upload from buffering in memory before we even
-  // decompress. The decompressed ceiling (the real zip-bomb guard) lives in the importer.
-  @UseInterceptors(
-    FileInterceptor('file', { limits: { fileSize: 100 * 1024 * 1024, files: 1 } }),
-  )
+  // Compressed-size cap (stops a giant upload buffering in memory before we decompress)
+  // is set instance-wide via MulterModule (ADR-0036) and inherited here. The decompressed
+  // ceiling (the real zip-bomb guard) lives in the importer, also config-driven.
+  @UseInterceptors(FileInterceptor('file'))
   import(
     @CurrentUser() user: AuthUser,
     @UploadedFile() file: UploadedZip | undefined,

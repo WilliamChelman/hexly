@@ -7,6 +7,7 @@ import { DB, Db, createDb } from '../db/db';
 import { AuthService } from '../auth/auth.service';
 import { AuthModule } from '../auth/auth.module';
 import { EntitiesModule } from '../entities/entities.module';
+import { ConfigModule } from '../config/config.module';
 import { WorldsModule } from './worlds.module';
 
 /** Build an in-memory `.zip` from a vault-relative path → text (or raw bytes) map. */
@@ -25,7 +26,7 @@ describe('Vault import endpoint', () => {
   beforeEach(async () => {
     db = createDb(':memory:'); // Isolated per-test (ADR-0002).
     const moduleRef = await Test.createTestingModule({
-      imports: [AuthModule, WorldsModule, EntitiesModule],
+      imports: [ConfigModule, AuthModule, WorldsModule, EntitiesModule],
     })
       .overrideProvider(DB)
       .useValue(db)

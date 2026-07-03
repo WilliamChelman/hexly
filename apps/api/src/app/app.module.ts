@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from './auth/auth.module';
+import { ConfigModule } from './config/config.module';
 import { DbModule } from './db/db.module';
 import { EntitiesModule } from './entities/entities.module';
 import { WorldsModule } from './worlds/worlds.module';
@@ -23,6 +24,7 @@ const e2eTestingEnabled =
 
 @Module({
   imports: [
+    ConfigModule,
     DbModule,
     AuthModule,
     EntitiesModule,

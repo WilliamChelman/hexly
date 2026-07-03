@@ -2,7 +2,7 @@
  * Out-of-band user provisioning for the closed set (ADR-0004) — there is no
  * signup endpoint, so this is how members are added. Boots a standalone Nest
  * context and delegates to the same {@link AuthService.seedUser} the tests
- * exercise. Run against the configured `HEXLY_DB_PATH`:
+ * exercise. Run against the configured `HEXLY_DIR`:
  *
  *   node dist/apps/api/seed.js <email> <password> "<display name>"
  */
