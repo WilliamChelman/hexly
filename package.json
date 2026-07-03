@@ -56,6 +56,7 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.6",
+    "@types/mdast": "^4.0.4",
     "@types/node": "^22.0.0",
     "@types/supertest": "^7.2.0",
     "@typescript-eslint/utils": "^8.40.0",
@@ -113,8 +114,15 @@
     "cookie-parser": "^1.4.7",
     "drizzle-orm": "^0.45.2",
     "immer": "^11.1.8",
+    "mdast-util-to-markdown": "^2.1.2",
     "reflect-metadata": "^0.2.0",
+    "remark-frontmatter": "^5.0.0",
+    "remark-gfm": "^4.0.1",
+    "remark-parse": "^11.0.0",
+    "remark-stringify": "^11.0.0",
     "rxjs": "^7.8.0",
+    "unified": "^11.0.5",
+    "yaml": "^2.9.0",
     "zod": "^4.4.3"
   },
   "imports": {

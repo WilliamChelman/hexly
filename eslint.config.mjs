@@ -38,12 +38,18 @@ export default [
     ],
     // Override or add rules here
     rules: {
-      'no-restricted-imports': ['error', {
-        paths: [{
-          name: 'immer',
-          message: "Import from '@hexly/immer' instead — it boots enablePatches() and is the single Immer entrypoint.",
-        }],
-      }],
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'immer',
+              message:
+                "Import from '@hexly/immer' instead — it boots enablePatches() and is the single Immer entrypoint.",
+            },
+          ],
+        },
+      ],
     },
   },
 ];
