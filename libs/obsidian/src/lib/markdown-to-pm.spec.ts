@@ -33,6 +33,14 @@ describe('markdownToProseMirror', () => {
     });
   });
 
+  it('merges adjacent text runs whose marks are equal but built in a different order', () => {
+    const { doc } = markdownToProseMirror('**_a_**_**b**_');
+
+    expect(doc.content?.[0].content).toEqual([
+      { type: 'text', text: 'ab', marks: expect.arrayContaining([{ type: 'bold' }, { type: 'italic' }]) },
+    ]);
+  });
+
   it('carries emphasis, strong, strikethrough, and code as PM marks on text', () => {
     const { doc } = markdownToProseMirror('a **b** *c* ~~d~~ `e`');
 
@@ -102,6 +110,18 @@ describe('markdownToProseMirror', () => {
     expect(link('[[Alice|Al]]')?.attrs).toMatchObject({ label: 'Alice', display: 'Al', heading: null });
     expect(link('[[Alice#Bio]]')?.attrs).toMatchObject({ label: 'Alice', display: null, heading: 'Bio' });
     expect(link('[[Alice#Bio|Al]]')?.attrs).toMatchObject({ label: 'Alice', display: 'Al', heading: 'Bio' });
+  });
+
+  it('keeps a display alias intact even if it contains a literal "|"', () => {
+    const link = (md: string) => markdownToProseMirror(md).doc.content?.[0].content?.[0];
+
+    expect(link('[[Alice|A|B]]')?.attrs).toMatchObject({ label: 'Alice', display: 'A|B' });
+  });
+
+  it('keeps the full heading anchor even if it contains a literal "#"', () => {
+    const link = (md: string) => markdownToProseMirror(md).doc.content?.[0].content?.[0];
+
+    expect(link('[[Alice#Head#ing]]')?.attrs).toMatchObject({ label: 'Alice', heading: 'Head#ing' });
   });
 
   it('degrades an ![[embed]] to a plain link and counts it', () => {
@@ -237,6 +257,15 @@ describe('markdownToProseMirror', () => {
   it('reads a callout with no title as title:null', () => {
     const { doc } = markdownToProseMirror('> [!note]\n> Just body.');
     expect(doc.content?.[0].attrs).toEqual({ type: 'note', title: null });
+  });
+
+  it('keeps a bolded callout title as plain text instead of dropping it into the body', () => {
+    const { doc } = markdownToProseMirror('> [!warning] **Be careful**\n> rest of body');
+
+    expect(doc.content?.[0].attrs).toEqual({ type: 'warning', title: 'Be careful' });
+    expect(doc.content?.[0].content).toEqual([
+      { type: 'paragraph', content: [{ type: 'text', text: 'rest of body' }] },
+    ]);
   });
 
   it('converts a blockquote and a thematic break', () => {

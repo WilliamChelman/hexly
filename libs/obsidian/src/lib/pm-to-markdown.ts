@@ -31,16 +31,18 @@ export function proseMirrorToMarkdown(
 }
 
 /**
- * remark-stringify escapes a leading `[` (it could begin a link), turning our
- * synthetic `[[wikilink]]`, `[!callout]`, and `[^footnote]` text back into `\[…`,
- * which Obsidian would render literally rather than as the construct. These escaped
- * sequences only ever originate from those tokens, so unescaping them is safe.
+ * remark-stringify escapes every literal `[` in text (it could begin a link), with
+ * no way to tell our synthetic `[[wikilink]]`/`[!callout]` brackets apart from a
+ * user's own literal `[[...]]` text — blanket-unescaping would revive the latter as
+ * live Obsidian syntax. {@link RAW_MARK} tags the brackets *we* emit (in
+ * {@link entityLinkToWikilink} and {@link calloutToMdast}) with an invisible marker
+ * that survives stringification; only those tagged, escaped brackets are unescaped
+ * here, leaving any coincidentally-identical user text alone.
  */
+const RAW_MARK = '⁣';
+
 function unescapeObsidianTokens(markdown: string): string {
-  return markdown
-    .replace(/\\\[\\\[/g, '[[')
-    .replace(/\\\[!/g, '[!')
-    .replace(/\\\[\^/g, '[^');
+  return markdown.replaceAll(`${RAW_MARK}\\[`, '[');
 }
 
 /** Maps a PM block node to mdast block content. */
@@ -79,7 +81,7 @@ function blockToMdast(node: PMNode): RootContent[] {
         {
           type: 'code',
           lang: (node.attrs?.['language'] as string) ?? null,
-          value: node.content?.[0]?.text ?? '',
+          value: (node.content ?? []).map((child) => child.text ?? '').join(''),
         },
       ];
     case 'blockquote':
@@ -126,7 +128,7 @@ function blockChildren(node: PMNode): BlockContent[] {
 function calloutToMdast(node: PMNode): RootContent {
   const type = (node.attrs?.['type'] as string) ?? 'note';
   const title = node.attrs?.['title'] as string | null;
-  const header = `[!${type}]${title ? ` ${title}` : ''}`;
+  const header = `${RAW_MARK}[!${type}]${title ? ` ${title}` : ''}`;
   return {
     type: 'blockquote',
     children: [
@@ -144,10 +146,22 @@ function tableToMdast(node: PMNode): RootContent {
       type: 'tableRow',
       children: (row.content ?? []).map((cell) => ({
         type: 'tableCell',
-        children: inlineChildren(cell.content?.[0] ?? { type: 'paragraph' }),
+        children: cellToPhrasing(cell),
       })),
     })),
   } as RootContent;
+}
+
+/**
+ * A markdown table cell holds one line of phrasing content; a PM cell with more than
+ * one block (the editor's table cells are `block+`) degrades to that one line, with
+ * blocks joined by a space rather than losing every block after the first.
+ */
+function cellToPhrasing(cell: PMNode): PhrasingContent[] {
+  const blocks = cell.content?.length ? cell.content : [{ type: 'paragraph' }];
+  return blocks.flatMap((block, i) =>
+    i === 0 ? inlineChildren(block) : [{ type: 'text', value: ' ' } as PhrasingContent, ...inlineChildren(block)]
+  );
 }
 
 /** Maps a PM parent's inline children to mdast phrasing content. */
@@ -174,7 +188,7 @@ function entityLinkToWikilink(node: PMNode): string {
   const label = (node.attrs?.['label'] as string) ?? '';
   const heading = node.attrs?.['heading'] as string | null;
   const display = node.attrs?.['display'] as string | null;
-  return `[[${label}${heading ? `#${heading}` : ''}${display ? `|${display}` : ''}]]`;
+  return `${RAW_MARK}[${RAW_MARK}[${label}${heading ? `#${heading}` : ''}${display ? `|${display}` : ''}]]`;
 }
 
 /**

@@ -129,8 +129,21 @@ function paragraphToPM(
   return blocks;
 }
 
-/** The Obsidian callout header: `[!type]` with an optional fold marker and title. */
-const CALLOUT_HEADER = /^\[!([^\]]+)\][+-]?[ \t]*([^\n]*)/;
+/** The Obsidian callout marker prefix: `[!type]` with an optional fold marker. */
+const CALLOUT_MARKER = /^\[!([^\]]+)\][+-]?[ \t]*/;
+
+/** Flattens phrasing content into plain text, dropping any inline formatting. */
+function flattenToText(nodes: RootContent[]): string {
+  return nodes
+    .map((n) =>
+      n.type === 'text' || n.type === 'inlineCode'
+        ? n.value
+        : 'children' in n
+          ? flattenToText(n.children as RootContent[])
+          : ''
+    )
+    .join('');
+}
 
 /**
  * A callout is a blockquote whose first line is `[!type] Title`. Returns the PM
@@ -146,24 +159,40 @@ function calloutFromBlockquote(
   const lead = first.children[0];
   if (lead?.type !== 'text') return null;
 
-  const header = CALLOUT_HEADER.exec(lead.value);
-  if (!header) return null;
+  const marker = CALLOUT_MARKER.exec(lead.value);
+  if (!marker) return null;
+  const type = marker[1].trim().toLowerCase();
 
-  const type = header[1].trim().toLowerCase();
-  const title = header[2].trim() || null;
+  // The header line may carry inline formatting (e.g. `**Title**`), spanning several
+  // sibling nodes; walk them until the first literal newline to find where it ends.
+  const afterMarker = lead.value.slice(marker[0].length);
+  const remaining: RootContent[] = [
+    ...(afterMarker ? [{ type: 'text' as const, value: afterMarker }] : []),
+    ...first.children.slice(1),
+  ];
 
-  // The header shares its paragraph with any body on the next line; keep that body.
-  const newline = lead.value.indexOf('\n');
-  const remainder = newline === -1 ? '' : lead.value.slice(newline + 1);
-  const leadSiblings = first.children.slice(1);
+  const headerLine: RootContent[] = [];
+  const bodyLead: RootContent[] = [];
+  let inHeader = true;
+  for (const child of remaining) {
+    if (inHeader && child.type === 'text' && child.value.includes('\n')) {
+      const newline = child.value.indexOf('\n');
+      if (newline > 0) headerLine.push({ type: 'text', value: child.value.slice(0, newline) });
+      const rest = child.value.slice(newline + 1);
+      if (rest) bodyLead.push({ type: 'text', value: rest });
+      inHeader = false;
+    } else if (inHeader) {
+      headerLine.push(child);
+    } else {
+      bodyLead.push(child);
+    }
+  }
+
+  const title = flattenToText(headerLine).trim() || null;
 
   const body: PMNode[] = [];
-  const rebuiltLead: RootContent[] = [
-    ...(remainder ? [{ type: 'text' as const, value: remainder }] : []),
-    ...leadSiblings,
-  ];
-  if (rebuiltLead.length) {
-    body.push(...blockToPM({ type: 'paragraph', children: rebuiltLead } as RootContent, degraded));
+  if (bodyLead.length) {
+    body.push(...blockToPM({ type: 'paragraph', children: bodyLead } as RootContent, degraded));
   }
   for (const child of node.children.slice(1)) body.push(...blockToPM(child, degraded));
 
@@ -244,17 +273,24 @@ function mergeAdjacentText(nodes: PMNode[]): PMNode[] {
   const out: PMNode[] = [];
   for (const node of nodes) {
     const prev = out[out.length - 1];
-    if (
-      node.type === 'text' &&
-      prev?.type === 'text' &&
-      JSON.stringify(prev.marks ?? null) === JSON.stringify(node.marks ?? null)
-    ) {
+    if (node.type === 'text' && prev?.type === 'text' && sameMarks(prev.marks, node.marks)) {
       prev.text = (prev.text ?? '') + (node.text ?? '');
     } else {
       out.push(node);
     }
   }
   return out;
+}
+
+/** Compares two mark sets for equality regardless of order. */
+function sameMarks(a: Mark[] | undefined, b: Mark[] | undefined): boolean {
+  const marksA = a ?? [];
+  const marksB = b ?? [];
+  if (marksA.length !== marksB.length) return false;
+  const key = (m: Mark) => JSON.stringify(m);
+  const sortedA = marksA.map(key).sort();
+  const sortedB = marksB.map(key).sort();
+  return sortedA.every((m, i) => m === sortedB[i]);
 }
 
 /**
@@ -317,10 +353,20 @@ function tokenToPM(m: RegExpExecArray, marks: Mark[], degraded: Record<string, n
   return [withMarks({ type: 'text', text: (blockMath ?? inlineMath).trim() }, [...marks, { type: 'code' }])];
 }
 
-/** Parses `Target#heading|display` inner text into an `entityLink` atom (entityId unresolved). */
+/**
+ * Parses `Target#heading|display` inner text into an `entityLink` atom (entityId
+ * unresolved). `display` and `heading` are the trailing fields, so each splits on
+ * only the *first* delimiter and keeps any further `|`/`#` as part of its value.
+ */
 function wikilinkToEntityLink(inner: string): PMNode {
-  const [target, display = null] = inner.split('|');
-  const [label, heading = null] = target.split('#');
+  const pipe = inner.indexOf('|');
+  const target = pipe === -1 ? inner : inner.slice(0, pipe);
+  const display = pipe === -1 ? null : inner.slice(pipe + 1);
+
+  const hash = target.indexOf('#');
+  const label = hash === -1 ? target : target.slice(0, hash);
+  const heading = hash === -1 ? null : target.slice(hash + 1);
+
   return {
     type: 'entityLink',
     attrs: { entityId: null, label: label.trim(), descriptor: null, display, heading },
