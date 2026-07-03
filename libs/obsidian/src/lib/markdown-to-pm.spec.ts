@@ -1,0 +1,293 @@
+import { markdownToProseMirror } from './markdown-to-pm';
+
+describe('markdownToProseMirror', () => {
+  it('parses YAML frontmatter into metadata and drops it from the body', () => {
+    const md = '---\ntitle: Hello\ntags:\n  - a\n  - b\n---\nBody text';
+    const { doc, metadata } = markdownToProseMirror(md);
+
+    expect(metadata).toEqual({ title: 'Hello', tags: ['a', 'b'] });
+    expect(doc.content).toEqual([
+      { type: 'paragraph', content: [{ type: 'text', text: 'Body text' }] },
+    ]);
+  });
+
+  it('degrades malformed YAML frontmatter instead of throwing', () => {
+    const md = '---\na: b: [unclosed\n---\nBody text';
+    const { doc, metadata, degraded } = markdownToProseMirror(md);
+
+    expect(metadata).toEqual({});
+    expect(degraded).toEqual({ frontmatter: 1 });
+    expect(doc.content).toEqual([
+      { type: 'paragraph', content: [{ type: 'text', text: 'Body text' }] },
+    ]);
+  });
+
+  it('converts a paragraph of plain text into a doc with a paragraph node', () => {
+    const { doc } = markdownToProseMirror('Hello world');
+
+    expect(doc).toEqual({
+      type: 'doc',
+      content: [
+        { type: 'paragraph', content: [{ type: 'text', text: 'Hello world' }] },
+      ],
+    });
+  });
+
+  it('merges adjacent text runs whose marks are equal but built in a different order', () => {
+    const { doc } = markdownToProseMirror('**_a_**_**b**_');
+
+    expect(doc.content?.[0].content).toEqual([
+      { type: 'text', text: 'ab', marks: expect.arrayContaining([{ type: 'bold' }, { type: 'italic' }]) },
+    ]);
+  });
+
+  it('carries emphasis, strong, strikethrough, and code as PM marks on text', () => {
+    const { doc } = markdownToProseMirror('a **b** *c* ~~d~~ `e`');
+
+    expect(doc.content?.[0].content).toEqual([
+      { type: 'text', text: 'a ' },
+      { type: 'text', text: 'b', marks: [{ type: 'bold' }] },
+      { type: 'text', text: ' ' },
+      { type: 'text', text: 'c', marks: [{ type: 'italic' }] },
+      { type: 'text', text: ' ' },
+      { type: 'text', text: 'd', marks: [{ type: 'strike' }] },
+      { type: 'text', text: ' ' },
+      { type: 'text', text: 'e', marks: [{ type: 'code' }] },
+    ]);
+  });
+
+  it('degrades footnote references to plain markers and counts them', () => {
+    const { doc, degraded } = markdownToProseMirror('Cite this[^1].\n\n[^1]: A source.');
+
+    expect(doc.content?.[0].content).toEqual([{ type: 'text', text: 'Cite this[^1].' }]);
+    // The definition survives as readable prose.
+    expect(doc.content?.[1]).toEqual({ type: 'paragraph', content: [{ type: 'text', text: 'A source.' }] });
+    expect(degraded).toEqual({ footnote: 1 });
+  });
+
+  it('drops %%comments%% from the body but counts them as degraded', () => {
+    const { doc, degraded } = markdownToProseMirror('keep %%secret note%% this');
+
+    expect(doc.content?.[0].content).toEqual([{ type: 'text', text: 'keep  this' }]);
+    expect(degraded).toEqual({ comment: 1 });
+  });
+
+  it('degrades $inline math$ to inline code and counts it', () => {
+    const { doc, degraded } = markdownToProseMirror('mass $E = mc^2$ here');
+
+    expect(doc.content?.[0].content).toEqual([
+      { type: 'text', text: 'mass ' },
+      { type: 'text', text: 'E = mc^2', marks: [{ type: 'code' }] },
+      { type: 'text', text: ' here' },
+    ]);
+    expect(degraded).toEqual({ math: 1 });
+  });
+
+  it('leaves prose with two dollar amounts untouched (not inline math)', () => {
+    const { doc, degraded } = markdownToProseMirror('You owe $5 and $10 total');
+
+    expect(doc.content?.[0].content).toEqual([{ type: 'text', text: 'You owe $5 and $10 total' }]);
+    expect(degraded).toEqual({});
+  });
+
+  it('converts ==text== into a highlight mark, splitting the surrounding text', () => {
+    const { doc } = markdownToProseMirror('plain ==lit up== plain');
+
+    expect(doc.content?.[0].content).toEqual([
+      { type: 'text', text: 'plain ' },
+      { type: 'text', text: 'lit up', marks: [{ type: 'highlight' }] },
+      { type: 'text', text: ' plain' },
+    ]);
+  });
+
+  it('parses wikilink variants into entityLink atoms carrying target/display/heading', () => {
+    const link = (md: string) => markdownToProseMirror(md).doc.content?.[0].content?.[0];
+
+    expect(link('[[Alice]]')).toEqual({
+      type: 'entityLink',
+      attrs: { entityId: null, label: 'Alice', descriptor: null, display: null, heading: null },
+    });
+    expect(link('[[Alice|Al]]')?.attrs).toMatchObject({ label: 'Alice', display: 'Al', heading: null });
+    expect(link('[[Alice#Bio]]')?.attrs).toMatchObject({ label: 'Alice', display: null, heading: 'Bio' });
+    expect(link('[[Alice#Bio|Al]]')?.attrs).toMatchObject({ label: 'Alice', display: 'Al', heading: 'Bio' });
+  });
+
+  it('keeps a display alias intact even if it contains a literal "|"', () => {
+    const link = (md: string) => markdownToProseMirror(md).doc.content?.[0].content?.[0];
+
+    expect(link('[[Alice|A|B]]')?.attrs).toMatchObject({ label: 'Alice', display: 'A|B' });
+  });
+
+  it('keeps the full heading anchor even if it contains a literal "#"', () => {
+    const link = (md: string) => markdownToProseMirror(md).doc.content?.[0].content?.[0];
+
+    expect(link('[[Alice#Head#ing]]')?.attrs).toMatchObject({ label: 'Alice', heading: 'Head#ing' });
+  });
+
+  it('degrades an ![[embed]] to a plain link and counts it', () => {
+    const { doc, degraded } = markdownToProseMirror('![[Some Note]]');
+
+    expect(doc.content?.[0].content).toEqual([
+      { type: 'text', text: 'Some Note', marks: [{ type: 'link', attrs: { href: 'Some Note' } }] },
+    ]);
+    expect(degraded).toEqual({ embed: 1 });
+  });
+
+  it('tallies an unrecognized block (raw HTML) as degraded instead of dropping it silently', () => {
+    const { doc, degraded } = markdownToProseMirror('<div>raw</div>');
+
+    expect(doc.content).toEqual([]);
+    expect(degraded).toEqual({ html: 1 });
+  });
+
+  it('converts a heading, carrying its level as an attr', () => {
+    const { doc } = markdownToProseMirror('## Chapter One');
+
+    expect(doc.content).toEqual([
+      { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Chapter One' }] },
+    ]);
+  });
+
+  it('converts bullet and ordered lists into the StarterKit list nodes', () => {
+    const bullet = markdownToProseMirror('- one\n- two').doc.content?.[0];
+    expect(bullet).toEqual({
+      type: 'bulletList',
+      content: [
+        { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'one' }] }] },
+        { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'two' }] }] },
+      ],
+    });
+
+    const ordered = markdownToProseMirror('1. first\n2. second').doc.content?.[0];
+    expect(ordered?.type).toBe('orderedList');
+    expect(ordered?.attrs).toEqual({ start: 1 });
+  });
+
+  it('converts a markdown link into text carrying a link mark with href', () => {
+    const { doc } = markdownToProseMirror('see [the docs](https://x/docs)');
+
+    expect(doc.content?.[0].content).toEqual([
+      { type: 'text', text: 'see ' },
+      { type: 'text', text: 'the docs', marks: [{ type: 'link', attrs: { href: 'https://x/docs' } }] },
+    ]);
+  });
+
+  it('converts an image into a block image node with src/alt/title attrs', () => {
+    const { doc } = markdownToProseMirror('![a cat](https://x/cat.png "Tabby")');
+
+    expect(doc.content).toEqual([
+      { type: 'image', attrs: { src: 'https://x/cat.png', alt: 'a cat', title: 'Tabby' } },
+    ]);
+  });
+
+  it('splits a paragraph so an inline image becomes its own block, keeping the text', () => {
+    const { doc } = markdownToProseMirror('before ![a](b.png) after');
+
+    expect(doc.content).toEqual([
+      { type: 'paragraph', content: [{ type: 'text', text: 'before ' }] },
+      { type: 'image', attrs: { src: 'b.png', alt: 'a', title: null } },
+      { type: 'paragraph', content: [{ type: 'text', text: ' after' }] },
+    ]);
+  });
+
+  it('converts a GFM table with a header row into the table node set', () => {
+    const md = '| A | B |\n| - | - |\n| 1 | 2 |';
+    const { doc } = markdownToProseMirror(md);
+
+    expect(doc.content?.[0]).toEqual({
+      type: 'table',
+      content: [
+        {
+          type: 'tableRow',
+          content: [
+            { type: 'tableHeader', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'A' }] }] },
+            { type: 'tableHeader', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'B' }] }] },
+          ],
+        },
+        {
+          type: 'tableRow',
+          content: [
+            { type: 'tableCell', content: [{ type: 'paragraph', content: [{ type: 'text', text: '1' }] }] },
+            { type: 'tableCell', content: [{ type: 'paragraph', content: [{ type: 'text', text: '2' }] }] },
+          ],
+        },
+      ],
+    });
+  });
+
+  it('keeps a mermaid block as a fenced code block but counts it as degraded', () => {
+    const { doc, degraded } = markdownToProseMirror('```mermaid\ngraph TD\n```');
+
+    expect(doc.content?.[0]).toEqual({
+      type: 'codeBlock',
+      attrs: { language: 'mermaid' },
+      content: [{ type: 'text', text: 'graph TD' }],
+    });
+    expect(degraded).toEqual({ mermaid: 1 });
+  });
+
+  it('converts a fenced code block, carrying its language', () => {
+    const { doc } = markdownToProseMirror('```ts\nconst x = 1;\n```');
+
+    expect(doc.content).toEqual([
+      { type: 'codeBlock', attrs: { language: 'ts' }, content: [{ type: 'text', text: 'const x = 1;' }] },
+    ]);
+  });
+
+  it('converts an Obsidian callout to a callout node with type, title, and live body', () => {
+    const md = '> [!warning] Be careful\n> Body with [[Alice]].';
+    const { doc } = markdownToProseMirror(md);
+
+    expect(doc.content?.[0]).toEqual({
+      type: 'callout',
+      attrs: { type: 'warning', title: 'Be careful' },
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'Body with ' },
+            { type: 'entityLink', attrs: { entityId: null, label: 'Alice', descriptor: null, display: null, heading: null } },
+            { type: 'text', text: '.' },
+          ],
+        },
+      ],
+    });
+  });
+
+  it('reads a callout with no title as title:null', () => {
+    const { doc } = markdownToProseMirror('> [!note]\n> Just body.');
+    expect(doc.content?.[0].attrs).toEqual({ type: 'note', title: null });
+  });
+
+  it('keeps a bolded callout title as plain text instead of dropping it into the body', () => {
+    const { doc } = markdownToProseMirror('> [!warning] **Be careful**\n> rest of body');
+
+    expect(doc.content?.[0].attrs).toEqual({ type: 'warning', title: 'Be careful' });
+    expect(doc.content?.[0].content).toEqual([
+      { type: 'paragraph', content: [{ type: 'text', text: 'rest of body' }] },
+    ]);
+  });
+
+  it('converts a blockquote and a thematic break', () => {
+    const quote = markdownToProseMirror('> quoted').doc.content?.[0];
+    expect(quote).toEqual({
+      type: 'blockquote',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'quoted' }] }],
+    });
+
+    const rule = markdownToProseMirror('---').doc.content?.[0];
+    expect(rule).toEqual({ type: 'horizontalRule' });
+  });
+
+  it('converts a GFM checklist into a taskList with per-item checked state', () => {
+    const { doc } = markdownToProseMirror('- [x] done\n- [ ] todo');
+
+    expect(doc.content?.[0]).toEqual({
+      type: 'taskList',
+      content: [
+        { type: 'taskItem', attrs: { checked: true }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'done' }] }] },
+        { type: 'taskItem', attrs: { checked: false }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'todo' }] }] },
+      ],
+    });
+  });
+});
