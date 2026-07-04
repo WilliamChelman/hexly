@@ -30,6 +30,12 @@ const GLYPHS = {
       'stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"',
     body: '<path d="M6 6l12 12M18 6 6 18" />',
   },
+  outline: {
+    // A heading over two indented rows — reads as a document outline / TOC.
+    attrs:
+      'stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"',
+    body: '<path d="M4 6h16M9 12h11M9 18h11" />',
+  },
   erase: {
     attrs:
       'stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"',

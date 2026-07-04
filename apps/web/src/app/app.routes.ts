@@ -9,6 +9,7 @@ import {
 import { flushOnLeave } from './pages/entity/flush-on-leave.guard';
 import { EntitySession } from './pages/entity/services/entity-session';
 import { EntityNameResolver } from './pages/entity/services/entity-name-resolver';
+import { OutlineStore } from './pages/entity/services/outline-store';
 
 export const appRoutes: Route[] = [
   {
@@ -77,7 +78,7 @@ export const appRoutes: Route[] = [
         // resets implicitly (#70). EntityNameResolver batches id→name lookups for the
         // entityLink node views (the `@` picker searches the server directly); route-scoped
         // so navigating to another Entity re-resolves names against a fresh cache (ADR-0023).
-        providers: [EntitySession, EntityNameResolver],
+        providers: [EntitySession, EntityNameResolver, OutlineStore],
         // Tab title is the open Entity's name composed with the brand ("Aldermoor —
         // Hexly") via documentTitleKey; `title` is the pre-load fallback (ADR-0014).
         title: 'editorShell.tabTitle',

@@ -66,6 +66,11 @@
     "homeTitleHint": "Renamed with the world",
     "backToLibrary": "Back to library",
     "editorLabel": "Note content",
+    "outline": {
+      "title": "Outline",
+      "toggle": "Toggle outline",
+      "empty": "No headings yet"
+    },
     "slashMenu": {
       "label": "Insert block",
       "empty": "No matching blocks",

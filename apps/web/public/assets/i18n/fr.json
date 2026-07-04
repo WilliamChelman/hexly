@@ -66,6 +66,11 @@
     "homeTitleHint": "Renommé avec le monde",
     "backToLibrary": "Retour à la bibliothèque",
     "editorLabel": "Contenu de la note",
+    "outline": {
+      "title": "Plan",
+      "toggle": "Afficher/masquer le plan",
+      "empty": "Aucun titre pour l’instant"
+    },
     "slashMenu": {
       "label": "Insérer un bloc",
       "empty": "Aucun bloc correspondant",

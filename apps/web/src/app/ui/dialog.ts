@@ -33,6 +33,11 @@ let nextDialogId = 0;
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [Panel],
   template: `
+    <!-- Backdrop-click-to-dismiss on the native <dialog>: the platform already gives the
+         keyboard equivalent (Escape → close, wired via (close)), and the <dialog> itself must
+         not be focusable — so these a11y rules, which don't model the native element, would
+         only be satisfied by an incorrect handler/tabindex. -->
+    <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
     <dialog
       #dialog
       appPanel
