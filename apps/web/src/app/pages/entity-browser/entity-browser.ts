@@ -6,25 +6,41 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
-import { Subscription, finalize } from 'rxjs';
+import { ActivatedRoute, Router } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import {
+  Subject,
+  Subscription,
+  debounceTime,
+  distinctUntilChanged,
+  finalize,
+  map,
+} from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { EntitySummary, EntityType } from '@hexly/domain';
+import { EntityPage, EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient } from '../../core/services/entities.client';
 import { ActiveWorld } from '../../core/services/active-world';
 import { ToasterService } from '../../core/services/toaster.service';
 import { AppShellStore } from '../../shell/app-shell.store';
-import { Autofocus } from '../../ui/autofocus';
 import { Button } from '../../ui/button';
 import { Eyebrow } from '../../ui/eyebrow';
 import { PageHeader } from '../../ui/page-header';
-import { Panel } from '../../ui/panel';
-import { Icon, IconName } from '../../ui/icon/icon';
-import { ACCENT_BAR, ACCENT_SIGIL, accentFor } from '../../ui/sigil';
+import { Icon } from '../../ui/icon/icon';
+import { EntityCard } from './entity-card';
+import { EntitySearch } from './entity-search';
+import { EmptyState } from './empty-state';
 
 // ponytail: bounded first page so a large vault loads fast; bump or make
 // configurable only if a real page size proves wrong in use.
 const PAGE_SIZE = 50;
+
+// Trailing-debounce window so fast typing fires one search, not one per key —
+// same 150ms the shared searchEntities helper uses for autocomplete.
+const SEARCH_DEBOUNCE_MS = 150;
+
+// ponytail: cap the per-session first-page cache so a marathon session of distinct
+// queries can't grow it without bound; oldest-out is plenty for backspace/retype.
+const FIRST_PAGE_CACHE_LIMIT = 50;
 
 /**
  * Format an epoch-millis timestamp for `lang` using native `Intl` (ADR-0014 — no
@@ -58,11 +74,11 @@ function formatEdited(updatedAt: number, lang: string): string {
     Button,
     Eyebrow,
     PageHeader,
-    Panel,
     Icon,
     TranslocoPipe,
-    Autofocus,
-    RouterLink,
+    EntityCard,
+    EntitySearch,
+    EmptyState,
   ],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
@@ -108,119 +124,22 @@ function formatEdited(updatedAt: number, lang: string): string {
     </app-page-header>
 
     <main class="max-w-[60rem] mx-auto py-8 px-6">
+      <app-entity-search [value]="query()" (queryChange)="onSearch($event)" />
       @if (cards().length > 0) {
         <ul
           class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 m-0 p-0 list-none"
         >
           @for (card of cards(); track card.id) {
             <li>
-              <section
-                class="group relative flex gap-4 p-4 pl-6 overflow-hidden h-full transition-shadow hover:shadow-3 has-[a:focus-visible]:[outline:2px_solid_var(--color-gold)] has-[a:focus-visible]:outline-offset-2"
-                appPanel
-                raised
-              >
-                <span
-                  class="absolute left-0 top-0 bottom-0 w-1.5 {{ bar(card.id) }}"
-                ></span>
-                <span
-                  class="shrink-0 size-12 rounded-full flex items-center justify-center {{
-                    sigil(card.id)
-                  }}"
-                >
-                  <app-icon [name]="typeIcon(card.type)" [size]="20" />
-                </span>
-                <div class="min-w-0 flex-1">
-                  @if (renamingId() === card.id) {
-                    <input
-                      type="text"
-                      appAutofocus
-                      class="w-full font-display text-md text-ink-strong bg-surface-sunken border border-gold rounded-sm py-1 px-2 outline-none"
-                      [value]="card.title"
-                      [attr.data-testid]="'rename-input-' + card.id"
-                      [attr.aria-label]="'entityBrowser.renameLabel' | transloco"
-                      (keydown.enter)="
-                        commitRename(card.id, $any($event.target).value)
-                      "
-                      (keydown.escape)="cancelRename()"
-                    />
-                  } @else {
-                    <!-- Stretched link (inset ::after) makes the whole tile open
-                         the Entity; the action buttons sit OUTSIDE this anchor,
-                         lifted above the overlay with z-10 so they stay clickable
-                         and the markup keeps no nested interactives (a11y). -->
-                    <a
-                      class="block w-full no-underline outline-none focus-visible:shadow-none after:content-[''] after:absolute after:inset-0"
-                      [routerLink]="['/w', worldId(), 'entities', card.id]"
-                      [attr.data-testid]="'open-' + card.id"
-                      [attr.aria-label]="card.title"
-                    >
-                      <span
-                        class="font-display text-lg text-ink-strong leading-tight line-clamp-2 group-hover:text-gold transition-colors"
-                        data-testid="entity-title"
-                        >{{ card.title }}</span
-                      >
-                    </a>
-                    <hr class="border-0 border-t border-line my-2" />
-                    <div class="flex items-center gap-2">
-                      <span
-                        class="text-2xs uppercase tracking-wider text-ink-muted"
-                        [attr.data-testid]="'type-' + card.id"
-                        >{{
-                          'entityBrowser.type.' + card.type | transloco
-                        }}</span
-                      >
-                      <span class="text-2xs text-ink-faint">·</span>
-                      <span class="meta text-2xs text-ink-muted">{{
-                        'entityBrowser.edited' | transloco: { date: card.edited }
-                      }}</span>
-                      <span
-                        class="relative z-10 ml-auto flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
-                      >
-                        <button
-                          type="button"
-                          appButton
-                          icon
-                          variant="ghost"
-                          size="sm"
-                          [attr.data-testid]="'rename-' + card.id"
-                          [attr.aria-label]="'entityBrowser.rename' | transloco"
-                          [attr.title]="'entityBrowser.rename' | transloco"
-                          (click)="startRename(card.id)"
-                        >
-                          <app-icon name="label" [size]="16" />
-                        </button>
-                        <button
-                          type="button"
-                          appButton
-                          icon
-                          variant="ghost"
-                          size="sm"
-                          danger
-                          [attr.data-testid]="'delete-' + card.id"
-                          [attr.aria-label]="'common.delete' | transloco"
-                          [attr.title]="'common.delete' | transloco"
-                          (click)="remove(card.id)"
-                        >
-                          <app-icon name="erase" [size]="16" />
-                        </button>
-                      </span>
-                    </div>
-                    @if (card.tags.length > 0) {
-                      <span
-                        class="flex flex-wrap gap-1 mt-2"
-                        [attr.data-testid]="'tags-' + card.id"
-                      >
-                        @for (tag of card.tags; track tag) {
-                          <span
-                            class="text-2xs text-ink-muted bg-surface-sunken rounded-sm py-px px-1"
-                            >{{ tag }}</span
-                          >
-                        }
-                      </span>
-                    }
-                  }
-                </div>
-              </section>
+              <app-entity-card
+                [card]="card"
+                [worldId]="worldId()"
+                [renaming]="renamingId() === card.id"
+                (startRename)="startRename(card.id)"
+                (commitRename)="commitRename(card.id, $event)"
+                (cancelRename)="cancelRename()"
+                (remove)="remove(card.id)"
+              />
             </li>
           }
         </ul>
@@ -244,23 +163,23 @@ function formatEdited(updatedAt: number, lang: string): string {
           </div>
         }
       } @else if (loadError()) {
-        <section
-          class="p-8 text-center text-ink-muted"
-          data-testid="load-error"
-          appPanel
-        >
-          <p>{{ 'entityBrowser.loadErrorTitle' | transloco }}</p>
-          <p class="text-sm">{{ 'entityBrowser.loadErrorHint' | transloco }}</p>
-        </section>
+        <app-empty-state
+          testid="load-error"
+          [title]="'entityBrowser.loadErrorTitle' | transloco"
+          [hint]="'entityBrowser.loadErrorHint' | transloco"
+        />
+      } @else if (loaded() && query()) {
+        <app-empty-state
+          testid="no-matches"
+          [title]="'entityBrowser.noMatchTitle' | transloco"
+          [hint]="'entityBrowser.noMatchHint' | transloco"
+        />
       } @else if (loaded()) {
-        <section
-          class="p-8 text-center text-ink-muted"
-          data-testid="empty"
-          appPanel
-        >
-          <p>{{ 'entityBrowser.emptyTitle' | transloco }}</p>
-          <p class="text-sm">{{ 'entityBrowser.emptyHint' | transloco }}</p>
-        </section>
+        <app-empty-state
+          testid="empty"
+          [title]="'entityBrowser.emptyTitle' | transloco"
+          [hint]="'entityBrowser.emptyHint' | transloco"
+        />
       }
     </main>
   `,
@@ -269,6 +188,7 @@ export class EntityBrowser {
   private readonly entitiesClient = inject(EntitiesClient);
   private readonly activeWorld = inject(ActiveWorld);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
   private readonly shell = inject(AppShellStore);
@@ -277,16 +197,15 @@ export class EntityBrowser {
   protected readonly worldId = this.activeWorld.worldId;
 
   private readonly _entities = signal<EntitySummary[]>([]);
-  protected readonly entities = computed(() =>
-    [...this._entities()].sort((a, b) => b.updatedAt - a.updatedAt),
-  );
   /** The entities as view rows, with the last-edited date pre-formatted for the
-   * active language (ADR-0014). Keyed on `entities` and the active lang, so each
-   * date formats once per list/language change and reflows live on a switch — not
-   * on every change-detection pass, as a template method call would. */
+   * active language (ADR-0014). Keyed on the accumulated pages and the active lang,
+   * so each date formats once per list/language change and reflows live on a switch —
+   * not on every change-detection pass, as a template method call would. Server order
+   * is authoritative (#154): bm25 relevance under a query, updatedAt desc otherwise —
+   * so the list is rendered verbatim, never re-sorted client-side. */
   protected readonly cards = computed(() => {
     const lang = this.transloco.activeLang();
-    return this.entities().map((entity) => ({
+    return this._entities().map((entity) => ({
       id: entity.id,
       title: entity.name,
       type: entity.type,
@@ -301,15 +220,71 @@ export class EntityBrowser {
   protected readonly creating = signal(false);
   protected readonly renamingId = signal<string | null>(null);
 
+  /** The active full-text query, debounced from the search box (#154). Empty means
+   * the default, last-edited view. Also the source of truth for the URL `q` mirror. */
+  protected readonly query = signal('');
+  /** Raw per-keystroke input, debounced before it becomes the committed `query`. */
+  private readonly typed = new Subject<string>();
+
   private fetchSub?: Subscription;
+  /** The in-flight load-more, cancelled on any first-page refetch so a late page
+   * from a prior query/World can't append its rows or restore its stale cursor. */
+  private loadMoreSub?: Subscription;
+  /** The World the shown rows belong to, so a query change keeps them (stale-while-
+   * revalidate, no flash) while a World change flushes them (never show another
+   * World's rows). Undefined until the first fetch. */
+  private shownWorldId?: string;
+
+  /** First-page cache keyed by `worldId\0q`, so backspacing to a prior query paints
+   * instantly (stale-while-revalidate). Per-World so switching Worlds can't paint
+   * another World's rows. Bounded to shed the oldest entries in a long session. */
+  private readonly firstPageCache = new Map<
+    string,
+    { items: EntitySummary[]; nextCursor: string | null }
+  >();
 
   constructor() {
-    // Re-fetch page one whenever the World in the URL changes (ADR-0028). The
+    // Read the URL `q` back into the box: seeds it on a shared/refreshed link and
+    // follows back/forward. Subscribed before the fetch effect below, so the initial
+    // (synchronous) emission seeds `query` and the first fetch already carries it —
+    // one request on load, not empty-then-refetch. Setting `query` here never rewrites
+    // the URL (only the debounce below does), so there's no read/write loop.
+    this.route.queryParamMap
+      .pipe(
+        map((params) => params.get('q') ?? ''),
+        distinctUntilChanged(),
+        takeUntilDestroyed(),
+      )
+      .subscribe((q) => this.query.set(q));
+
+    this.typed
+      .pipe(debounceTime(SEARCH_DEBOUNCE_MS), takeUntilDestroyed())
+      .subscribe((raw) => {
+        const q = raw.trim();
+        this.query.set(q); // fast typing fires one search, not one per key
+        // Mirror to the URL so a filtered view is shareable and survives refresh —
+        // the entity-header view-toggle pattern: merge (keep the World scope),
+        // replaceUrl (don't push a history entry per keystroke), null to drop `?q=`.
+        this.router.navigate([], {
+          relativeTo: this.route,
+          queryParams: { q: q || null },
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        });
+      });
+
+    // Re-fetch page one whenever the World (ADR-0028) or the query changes. The
     // browser only mounts under /w/:worldId, so a worldId is always present;
     // reacting to it covers a param-only switch between Worlds (same component).
     effect(() => {
+      this.query(); // track: a new query refetches from page one under server order
       if (this.activeWorld.worldId()) this.fetchFirstPage();
     });
+  }
+
+  /** A keystroke in the search box — debounced into {@link query} before it fetches. */
+  protected onSearch(value: string): void {
+    this.typed.next(value);
   }
 
   /**
@@ -324,28 +299,66 @@ export class EntityBrowser {
     // Defensive: the browser only mounts under /w/:worldId, but never fetch the
     // whole owner list (every World) if the segment is somehow absent.
     if (!worldId) return;
-    // Cancel any in-flight request from a previous World (prevents stale data race).
+    // Cancel any in-flight request from a previous World/query (prevents stale race).
     this.fetchSub?.unsubscribe();
-    // Reset state so the template shows loading rather than stale data from the old World.
-    this._entities.set([]);
-    this.nextCursor.set(null);
-    this.loadingMore.set(false); // clear any stuck load-more from the previous World
-    this.loadError.set(false);
-    this.loaded.set(false);
+    this.loadMoreSub?.unsubscribe(); // and any load-more, so its late page can't append
+    this.loadingMore.set(false); // clear any stuck load-more from the previous page
+    const q = this.query();
+    const worldChanged = worldId !== this.shownWorldId;
+    this.shownWorldId = worldId;
+    const key = worldId + '\u0000' + q;
+    const cached = this.firstPageCache.get(key);
+    if (cached) {
+      // Stale-while-revalidate: paint the previously-seen page instantly (backspace
+      // to a prior query feels immediate), then refresh it from the server below.
+      this._entities.set(cached.items);
+      this.nextCursor.set(cached.nextCursor);
+      this.loaded.set(true);
+      this.loadError.set(false);
+    } else if (worldChanged) {
+      // A different World: flush to the loading state so no old-World rows linger.
+      this._entities.set([]);
+      this.nextCursor.set(null);
+      this.loaded.set(false);
+      this.loadError.set(false);
+    } else {
+      // Same World, uncached query: keep the current rows on screen through the fetch
+      // so switching searches doesn't flash empty (the quick-search does the same).
+      // Drop the load-more cursor — it belongs to the outgoing query; the incoming
+      // page restores it.
+      this.nextCursor.set(null);
+      this.loadError.set(false);
+    }
     this.fetchSub = this.entitiesClient
-      .list({ limit: PAGE_SIZE, worldId })
+      .list({ limit: PAGE_SIZE, worldId, ...(q ? { q } : {}) })
       .pipe(this.shell.withLoading('subtle'))
       .subscribe({
         next: (page) => {
+          this.cacheFirstPage(key, page);
           this._entities.set(page.items);
           this.nextCursor.set(page.nextCursor);
           this.loaded.set(true);
         },
+        // A failed fetch keeps whatever rows are already shown (stale-while-
+        // revalidate); only a load with nothing to fall back to surfaces the error.
         error: () => {
-          this.loaded.set(true);
-          this.loadError.set(true);
+          if (this._entities().length === 0) {
+            this.loaded.set(true);
+            this.loadError.set(true);
+          }
         },
       });
+  }
+
+  private cacheFirstPage(key: string, page: EntityPage): void {
+    this.firstPageCache.set(key, {
+      items: page.items,
+      nextCursor: page.nextCursor,
+    });
+    if (this.firstPageCache.size > FIRST_PAGE_CACHE_LIMIT)
+      this.firstPageCache.delete(
+        this.firstPageCache.keys().next().value as string,
+      );
   }
 
   /**
@@ -358,8 +371,16 @@ export class EntityBrowser {
     const cursor = this.nextCursor();
     if (cursor === null || this.loadingMore()) return;
     this.loadingMore.set(true);
-    this.entitiesClient
-      .list({ cursor, worldId: this.activeWorld.worldId() ?? undefined })
+    // The cursor is an opaque offset; the server re-applies the filter from `q`, so
+    // paging a filtered set must re-send the active query (#154) or it pages the
+    // unfiltered set from that offset.
+    const q = this.query();
+    this.loadMoreSub = this.entitiesClient
+      .list({
+        cursor,
+        worldId: this.activeWorld.worldId() ?? undefined,
+        ...(q ? { q } : {}),
+      })
       .pipe(finalize(() => this.loadingMore.set(false)))
       .subscribe({
         next: (page) => {
@@ -400,18 +421,6 @@ export class EntityBrowser {
     this.router.navigate(['/w', this.activeWorld.worldId(), 'entities', id]);
   }
 
-  /** The sigil glyph for an Entity's type — a hex map reads as terrain, a note as a label. */
-  protected typeIcon(type: EntityType): IconName {
-    return type === 'hexmap' ? 'terrain' : 'label';
-  }
-
-  protected sigil(id: string): string {
-    return ACCENT_SIGIL[accentFor(id)];
-  }
-  protected bar(id: string): string {
-    return ACCENT_BAR[accentFor(id)];
-  }
-
   protected startRename(id: string): void {
     this.renamingId.set(id);
   }
@@ -436,6 +445,7 @@ export class EntityBrowser {
       // can move the item under the server's sort, so re-fetching keeps the view honest.
       next: () => {
         this.renamingId.set(null);
+        this.invalidateCache();
         this.fetchFirstPage();
       },
       error: () => {
@@ -448,10 +458,19 @@ export class EntityBrowser {
     });
   }
 
+  /** Every cached first page is now stale (a rename/delete moved or removed a row);
+   * drop them so the next fetch is a cold, fresh read rather than a stale paint. */
+  private invalidateCache(): void {
+    this.firstPageCache.clear();
+  }
+
   /** Delete an entity, then refresh from page one once the server confirms (ADR-0025). */
   protected remove(id: string): void {
     this.entitiesClient.delete(id).subscribe({
-      next: () => this.fetchFirstPage(),
+      next: () => {
+        this.invalidateCache();
+        this.fetchFirstPage();
+      },
       error: () =>
         this.toaster.show(
           this.transloco.translate('entityBrowser.deleteError'),

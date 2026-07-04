@@ -16,6 +16,8 @@
     "newNote": "New note",
     "rename": "Rename",
     "renameLabel": "New name",
+    "searchLabel": "Search entities",
+    "searchPlaceholder": "Search by name, tag, or content…",
     "creating": "Creating…",
     "edited": "Edited {{date}}",
     "type": {
@@ -31,7 +33,9 @@
     "loadingMore": "Loading…",
     "loadMoreError": "Couldn't load more. Please try again.",
     "emptyTitle": "Your library is empty.",
-    "emptyHint": "Create a note or a map to begin."
+    "emptyHint": "Create a note or a map to begin.",
+    "noMatchTitle": "No entities match your search.",
+    "noMatchHint": "Try a different name, tag, or word."
   },
   "entityTags": {
     "addLabel": "Add a tag",

@@ -1,7 +1,13 @@
 import { TestBed } from '@angular/core/testing';
-import { provideRouter, Router } from '@angular/router';
+import {
+  ActivatedRoute,
+  convertToParamMap,
+  ParamMap,
+  provideRouter,
+  Router,
+} from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
-import { of, Subject, throwError } from 'rxjs';
+import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 import { EntityPage, EntitySummary } from '@hexly/domain';
 import { EntitiesClient } from '../../core/services/entities.client';
 import { MockEntitiesClient } from '../../core/testing/entities-client.mock';
@@ -13,6 +19,9 @@ import { EntityBrowser } from './entity-browser';
 describe('EntityBrowser', () => {
   let client: MockEntitiesClient;
   let navigate: ReturnType<typeof vi.spyOn>;
+  // The URL `q` mirror, controllable per test: push a new value to simulate a
+  // shared/refreshed link or a back/forward step (#154).
+  let queryParams$: BehaviorSubject<ParamMap>;
 
   const summary = (over: Partial<EntitySummary>): EntitySummary => ({
     id: 'x',
@@ -30,11 +39,18 @@ describe('EntityBrowser', () => {
 
   beforeEach(async () => {
     client = new MockEntitiesClient();
+    queryParams$ = new BehaviorSubject<ParamMap>(convertToParamMap({}));
     await TestBed.configureTestingModule({
       imports: [EntityBrowser, provideTranslocoTesting()],
       providers: [
         { provide: EntitiesClient, useValue: client },
         provideRouter([]),
+        // Stub the route's query-param stream so tests can seed `?q=` and step
+        // back/forward; absolute routerLinks don't consult it, so tiles still resolve.
+        {
+          provide: ActivatedRoute,
+          useValue: { queryParamMap: queryParams$.asObservable() },
+        },
       ],
     }).compileComponents();
     navigate = vi
@@ -116,16 +132,170 @@ describe('EntityBrowser', () => {
     expect(client.list).toHaveBeenCalledWith({ limit: 50, worldId: 'w2' });
   });
 
-  it('lists the entities the user owns, newest first', () => {
+  it('renders entities in the server-returned order, never re-sorted client-side (#154)', () => {
+    // The server owns ordering now: bm25 relevance while a query is active, updatedAt
+    // desc otherwise. The browser must render the page verbatim — the old client-side
+    // updatedAt re-sort would clobber relevance rank once a query narrows the set.
+    // Here the server deliberately returns the lower updatedAt first; the browser must
+    // NOT hoist the newer one to the top.
     const fixture = renderWith([
-      summary({ id: 'older', name: 'The Whisperwood', updatedAt: 100 }),
-      summary({ id: 'newest', name: 'Aldermoor', updatedAt: 300 }),
+      summary({ id: 'first', name: 'Aldermoor', updatedAt: 100 }),
+      summary({ id: 'second', name: 'The Whisperwood', updatedAt: 300 }),
     ]);
 
     const titles = Array.from(
       fixture.nativeElement.querySelectorAll('[data-testid=entity-title]'),
     ).map((el) => (el as HTMLElement).textContent?.trim());
     expect(titles).toEqual(['Aldermoor', 'The Whisperwood']);
+  });
+
+  const searchBox = (el: HTMLElement) =>
+    el.querySelector('[data-testid=entity-search]') as HTMLInputElement;
+
+  /** Type into the search box and flush the 150ms debounce so the fetch fires. */
+  function search(fixture: ReturnType<typeof renderWith>, q: string) {
+    const box = searchBox(fixture.nativeElement);
+    vi.useFakeTimers();
+    box.value = q;
+    box.dispatchEvent(new Event('input'));
+    vi.advanceTimersByTime(150);
+    vi.useRealTimers();
+    fixture.detectChanges();
+  }
+
+  it('filters the grid via the full-text API, scoped to the active World (#154)', () => {
+    const fixture = renderWith([summary({ id: 'm1', name: 'Aldermoor' })]);
+
+    // The server returns the query-narrowed, relevance-ordered page.
+    client.list.mockReturnValueOnce(
+      of({ items: [summary({ id: 'm2', name: 'Dragonspire' })], nextCursor: null }),
+    );
+    search(fixture, 'dragon');
+
+    // `q` rides along with the existing World scope and page limit.
+    expect(client.list).toHaveBeenLastCalledWith({
+      q: 'dragon',
+      limit: 50,
+      worldId: 'w1',
+    });
+    const titles = Array.from(
+      fixture.nativeElement.querySelectorAll('[data-testid=entity-title]'),
+    ).map((t) => (t as HTMLElement).textContent?.trim());
+    expect(titles).toEqual(['Dragonspire']);
+  });
+
+  it('mirrors the active query to the URL, dropping the param when cleared (#154)', () => {
+    const fixture = renderWith([summary({ id: 'm1', name: 'Aldermoor' })]);
+
+    client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+    search(fixture, 'dragon');
+    // Merges into existing params (keeps the World scope in the path) without
+    // polluting history — the same mirror pattern as the entity view toggle.
+    expect(navigate).toHaveBeenCalledWith(
+      [],
+      expect.objectContaining({
+        queryParams: { q: 'dragon' },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      }),
+    );
+
+    search(fixture, '');
+    // Clearing the box drops the param entirely rather than leaving `?q=`.
+    expect(navigate).toHaveBeenLastCalledWith(
+      [],
+      expect.objectContaining({ queryParams: { q: null } }),
+    );
+  });
+
+  it('seeds the search box and the first fetch from the URL ?q= (shareable, survives refresh) (#154)', () => {
+    // Arrive on a shared/refreshed link that already carries a query.
+    queryParams$.next(convertToParamMap({ q: 'dragon' }));
+    client.list.mockReturnValueOnce(
+      of({ items: [summary({ id: 'm2', name: 'Dragonspire' })], nextCursor: null }),
+    );
+    const fixture = TestBed.createComponent(EntityBrowser);
+    fixture.detectChanges();
+    fixture.detectChanges();
+
+    // The first fetch already carries the query — one request, not empty-then-refetch.
+    expect(client.list).toHaveBeenCalledWith({ q: 'dragon', limit: 50, worldId: 'w1' });
+    expect(client.list).toHaveBeenCalledTimes(1);
+    // The box shows the query it was opened with.
+    expect(searchBox(fixture.nativeElement).value).toBe('dragon');
+  });
+
+  it('reflects a back/forward URL change into the box and refetches (#154)', () => {
+    const fixture = renderWith([summary({ id: 'm1', name: 'Aldermoor' })]);
+
+    // The user presses Back/Forward: the URL query changes without a keystroke.
+    client.list.mockReturnValueOnce(
+      of({ items: [summary({ id: 'm2', name: 'Dragonspire' })], nextCursor: null }),
+    );
+    queryParams$.next(convertToParamMap({ q: 'dragon' }));
+    fixture.detectChanges();
+
+    expect(client.list).toHaveBeenLastCalledWith({
+      q: 'dragon',
+      limit: 50,
+      worldId: 'w1',
+    });
+    expect(searchBox(fixture.nativeElement).value).toBe('dragon');
+  });
+
+  const titlesOf = (el: HTMLElement) =>
+    Array.from(el.querySelectorAll('[data-testid=entity-title]')).map((t) =>
+      (t as HTMLElement).textContent?.trim(),
+    );
+
+  it('coalesces rapid keystrokes into a single request — the grid doesn’t thrash (#154)', () => {
+    const fixture = renderWith([]);
+    const box = searchBox(fixture.nativeElement);
+    client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+    const before = client.list.mock.calls.length;
+
+    vi.useFakeTimers();
+    for (const q of ['d', 'dr', 'dra', 'drag']) {
+      box.value = q;
+      box.dispatchEvent(new Event('input'));
+      vi.advanceTimersByTime(50); // each key lands within the 150ms window
+    }
+    vi.advanceTimersByTime(150); // let the trailing debounce fire
+    vi.useRealTimers();
+    fixture.detectChanges();
+
+    // Four keystrokes, one request — for the final query only.
+    expect(client.list.mock.calls.length - before).toBe(1);
+    expect(client.list).toHaveBeenLastCalledWith({
+      q: 'drag',
+      limit: 50,
+      worldId: 'w1',
+    });
+  });
+
+  it('paints a previously-seen query instantly from cache while it revalidates (#154)', () => {
+    const fixture = renderWith([]);
+    const el = fixture.nativeElement as HTMLElement;
+
+    // First 'dragon' search resolves — its page is cached.
+    client.list.mockReturnValueOnce(
+      of({ items: [summary({ id: 'd', name: 'Dragonspire' })], nextCursor: null }),
+    );
+    search(fixture, 'dragon');
+    expect(titlesOf(el)).toEqual(['Dragonspire']);
+
+    // Move to a different query.
+    client.list.mockReturnValueOnce(of({ items: [], nextCursor: null }));
+    search(fixture, 'castle');
+    expect(titlesOf(el)).toEqual([]);
+
+    // Backspace to 'dragon': the revalidation is held pending, but the cached page
+    // paints immediately — no blank flash, no waiting on the network.
+    const pending = new Subject<EntityPage>();
+    client.list.mockReturnValueOnce(pending.asObservable());
+    search(fixture, 'dragon');
+    expect(titlesOf(el)).toEqual(['Dragonspire']);
+    pending.complete();
   });
 
   it('shows each entity’s type', () => {
@@ -280,6 +450,34 @@ describe('EntityBrowser', () => {
     expect(loadMore(el)).toBeNull();
   });
 
+  it('carries the active query into load-more so a filtered result set pages completely (#154)', () => {
+    // The server's cursor is a bare offset; the filter is re-applied from `q`, so a
+    // next-page request under a query MUST re-send it or it pages the unfiltered set.
+    const fixture = renderWith([summary({ id: 'm1', name: 'Aldermoor' })]);
+
+    client.list.mockReturnValueOnce(
+      of({
+        items: [summary({ id: 'k1', name: 'Aldermoor Keep' })],
+        nextCursor: 'cursor-2',
+      }),
+    );
+    search(fixture, 'keep');
+    const el = fixture.nativeElement as HTMLElement;
+
+    client.list.mockReturnValueOnce(
+      of({ items: [summary({ id: 'k2', name: 'Keep of Thorns' })], nextCursor: null }),
+    );
+    loadMore(el)?.click();
+
+    expect(client.list).toHaveBeenLastCalledWith({
+      cursor: 'cursor-2',
+      worldId: 'w1',
+      q: 'keep',
+    });
+    fixture.detectChanges();
+    expect(titlesOf(el)).toEqual(['Aldermoor Keep', 'Keep of Thorns']);
+  });
+
   it('ignores a second load-more click while the first is still in flight (no double-append)', () => {
     const fixture = renderWith([summary({ id: 'm1', updatedAt: 300 })], 'cursor-2');
     const el = fixture.nativeElement as HTMLElement;
@@ -297,6 +495,45 @@ describe('EntityBrowser', () => {
     expect(client.list).toHaveBeenCalledTimes(2); // initial render + one load-more
     pending.next({ items: [summary({ id: 'm2', updatedAt: 200 })], nextCursor: null });
     pending.complete();
+  });
+
+  it('keeps the current results on screen while the next query loads — no empty flash between searches (#154)', () => {
+    const fixture = renderWith([summary({ id: 'a1', name: 'Aldermoor' })]);
+    const el = fixture.nativeElement as HTMLElement;
+
+    client.list.mockReturnValueOnce(
+      of({ items: [summary({ id: 'a1', name: 'Aldermoor' })], nextCursor: null }),
+    );
+    search(fixture, 'ald');
+    expect(titlesOf(el)).toEqual(['Aldermoor']);
+
+    // The next (uncached) query's fetch is held pending: the grid must keep showing
+    // the previous results rather than flush to empty — the quick-search SWR pattern.
+    const pending = new Subject<EntityPage>();
+    client.list.mockReturnValueOnce(pending.asObservable());
+    search(fixture, 'brea');
+    expect(titlesOf(el)).toEqual(['Aldermoor']);
+
+    // Once it resolves, the grid swaps to the new results in one step.
+    pending.next({
+      items: [summary({ id: 'b1', name: 'Breachwood' })],
+      nextCursor: null,
+    });
+    pending.complete();
+    fixture.detectChanges();
+    expect(titlesOf(el)).toEqual(['Breachwood']);
+  });
+
+  it('shows a distinct no-matches state (not the empty-library state) when a query matches nothing (#154)', () => {
+    const fixture = renderWith([summary({ id: 'm1', name: 'Aldermoor' })]);
+    const el = fixture.nativeElement as HTMLElement;
+
+    client.list.mockReturnValueOnce(of({ items: [], nextCursor: null }));
+    search(fixture, 'nothing matches this');
+
+    // A search that finds nothing reads as "no matches", never "your library is empty".
+    expect(el.querySelector('[data-testid=no-matches]')).not.toBeNull();
+    expect(el.querySelector('[data-testid=empty]')).toBeNull();
   });
 
   it('shows an empty state when the user has no entities', () => {

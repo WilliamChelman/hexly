@@ -16,6 +16,8 @@
     "newNote": "Nouvelle note",
     "rename": "Renommer",
     "renameLabel": "Nouveau nom",
+    "searchLabel": "Rechercher des entités",
+    "searchPlaceholder": "Rechercher par nom, étiquette ou contenu…",
     "creating": "Création…",
     "edited": "Modifié le {{date}}",
     "type": {
@@ -31,7 +33,9 @@
     "loadingMore": "Chargement…",
     "loadMoreError": "Chargement impossible. Veuillez réessayer.",
     "emptyTitle": "Votre bibliothèque est vide.",
-    "emptyHint": "Créez une note ou une carte pour commencer."
+    "emptyHint": "Créez une note ou une carte pour commencer.",
+    "noMatchTitle": "Aucune entité ne correspond à votre recherche.",
+    "noMatchHint": "Essayez un autre nom, une étiquette ou un mot."
   },
   "entityTags": {
     "addLabel": "Ajouter un tag",
