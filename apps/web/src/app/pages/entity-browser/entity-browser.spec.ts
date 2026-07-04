@@ -726,6 +726,135 @@ describe('EntityBrowser', () => {
     expect(titles).toEqual(['The Whisperwood']);
   });
 
+  describe('Facet rail (#155)', () => {
+    const facet = (el: HTMLElement, tid: string) =>
+      el.querySelector(`[data-testid=${tid}]`) as HTMLButtonElement | null;
+
+    it('renders each Facet category’s values with server counts', () => {
+      client.facets.mockReturnValue(
+        of({
+          type: [
+            { value: 'note', count: 3 },
+            { value: 'hexmap', count: 1 },
+          ],
+          tag: [{ value: 'deity', count: 2 }],
+          visibility: [{ value: 'private', count: 4 }],
+        }),
+      );
+      const el = renderWith([summary({ id: 'm1' })]).nativeElement as HTMLElement;
+
+      expect(facet(el, 'facet-type-note')?.textContent).toContain('Note');
+      expect(facet(el, 'facet-type-note')?.textContent).toContain('3');
+      expect(facet(el, 'facet-tag-deity')?.textContent).toContain('deity');
+      expect(facet(el, 'facet-tag-deity')?.textContent).toContain('2');
+      expect(facet(el, 'facet-visibility-private')).not.toBeNull();
+    });
+
+    it('toggles a Type Facet: filters the list and mirrors it to the URL', () => {
+      client.facets.mockReturnValue(
+        of({ type: [{ value: 'note', count: 1 }], tag: [], visibility: [] }),
+      );
+      const fixture = renderWith([summary({ id: 'm1' })]);
+      const el = fixture.nativeElement as HTMLElement;
+
+      client.list.mockReturnValueOnce(
+        of({ items: [summary({ id: 'n1', type: 'note' })], nextCursor: null }),
+      );
+      facet(el, 'facet-type-note')?.click();
+      fixture.detectChanges();
+
+      expect(client.list).toHaveBeenLastCalledWith({
+        limit: 50,
+        worldId: 'w1',
+        type: ['note'],
+      });
+      expect(navigate).toHaveBeenCalledWith(
+        [],
+        expect.objectContaining({
+          queryParams: expect.objectContaining({ type: ['note'] }),
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
+        }),
+      );
+    });
+
+    it('removes an individual active Facet by toggling it off', () => {
+      client.facets.mockReturnValue(
+        of({ type: [{ value: 'note', count: 1 }], tag: [], visibility: [] }),
+      );
+      const fixture = renderWith([summary({ id: 'm1' })]);
+      const el = fixture.nativeElement as HTMLElement;
+
+      client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+      facet(el, 'facet-type-note')?.click();
+      fixture.detectChanges();
+      // The value now reads as active.
+      expect(facet(el, 'facet-type-note')?.getAttribute('aria-pressed')).toBe('true');
+
+      // Toggling the same value off drops the whole category from the request/URL.
+      facet(el, 'facet-type-note')?.click();
+      fixture.detectChanges();
+      expect(client.list).toHaveBeenLastCalledWith({ limit: 50, worldId: 'w1' });
+      expect(navigate).toHaveBeenLastCalledWith(
+        [],
+        expect.objectContaining({ queryParams: expect.objectContaining({ type: null }) }),
+      );
+    });
+
+    it('Clear all resets the query and every Facet, dropping their URL params', () => {
+      client.facets.mockReturnValue(
+        of({ type: [{ value: 'note', count: 1 }], tag: [], visibility: [] }),
+      );
+      const fixture = renderWith([summary({ id: 'm1' })]);
+      const el = fixture.nativeElement as HTMLElement;
+
+      client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+      facet(el, 'facet-type-note')?.click();
+      fixture.detectChanges();
+      // Clear all only appears once something is active.
+      expect(facet(el, 'facet-clear')).not.toBeNull();
+
+      facet(el, 'facet-clear')?.click();
+      fixture.detectChanges();
+
+      expect(navigate).toHaveBeenLastCalledWith(
+        [],
+        expect.objectContaining({
+          queryParams: { q: null, type: null, tag: null, visibility: null },
+        }),
+      );
+      expect(client.list).toHaveBeenLastCalledWith({ limit: 50, worldId: 'w1' });
+    });
+
+    it('seeds active Facets from the URL and carries them into the first fetch', () => {
+      queryParams$.next(convertToParamMap({ type: 'note', tag: ['deity', 'ruined'] }));
+      client.list.mockReturnValueOnce(of({ items: [], nextCursor: null }));
+      const fixture = TestBed.createComponent(EntityBrowser);
+      fixture.detectChanges();
+      fixture.detectChanges();
+
+      // One request on load, already carrying the URL's Facets — no empty-then-refetch.
+      expect(client.list).toHaveBeenCalledWith({
+        limit: 50,
+        worldId: 'w1',
+        type: ['note'],
+        tag: ['deity', 'ruined'],
+      });
+      expect(client.list).toHaveBeenCalledTimes(1);
+    });
+
+    it('recomputes Facet counts under the active filters on a query change', () => {
+      const fixture = renderWith([summary({ id: 'm1' })]);
+      client.list.mockReturnValue(of({ items: [], nextCursor: null }));
+      const before = client.facets.mock.calls.length;
+
+      search(fixture, 'temple');
+
+      expect(client.facets.mock.calls.length).toBeGreaterThan(before);
+      expect(client.facets).toHaveBeenLastCalledWith({ worldId: 'w1', q: 'temple' });
+    });
+  });
+
   it('keeps the card and surfaces an error toast when a delete fails', () => {
     const fixture = renderWith([summary({ id: 'm1', name: 'Aldermoor' })]);
 

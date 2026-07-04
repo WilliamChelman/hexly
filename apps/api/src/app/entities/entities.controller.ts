@@ -18,6 +18,7 @@ import {
   AuthUser,
   createEntityRequestSchema,
   EntityDetail,
+  EntityFacets,
   entityListQuerySchema,
   EntityPage,
   renameEntityRequestSchema,
@@ -44,7 +45,7 @@ export class EntitiesController {
   list(@CurrentUser() user: AuthUser, @Query() query: unknown): EntityPage {
     const parsed = entityListQuerySchema.safeParse(query);
     if (!parsed.success) throw new BadRequestException();
-    const { cursor, limit, ids, q, type, worldId } = parsed.data;
+    const { cursor, limit, ids, q, type, tag, visibility, worldId } = parsed.data;
 
     // Absent cursor is page one; undecodable is a 400 (ADR-0001).
     const offset = cursor === undefined ? 0 : decodeCursor(cursor);
@@ -56,6 +57,8 @@ export class EntitiesController {
       ids,
       q,
       type,
+      tags: tag,
+      visibility,
       worldId,
     });
     return { items, nextCursor: hasMore ? encodeCursor(offset + limit) : null };
@@ -72,6 +75,22 @@ export class EntitiesController {
   @Get('descriptors')
   descriptors(@CurrentUser() user: AuthUser): string[] {
     return this.entities.listDescriptors(user.id);
+  }
+
+  // Before `:id` so the literal path isn't captured (#155). Facet rail counts: each
+  // category's live values under the active filters, drilled down (ADR-0035).
+  @Get('facets')
+  facets(@CurrentUser() user: AuthUser, @Query() query: unknown): EntityFacets {
+    const parsed = entityListQuerySchema.safeParse(query);
+    if (!parsed.success) throw new BadRequestException();
+    const { q, type, tag, visibility, worldId } = parsed.data;
+    return this.entities.facets(user.id, {
+      q,
+      type,
+      tags: tag,
+      visibility,
+      worldId,
+    });
   }
 
   @Get(':id')

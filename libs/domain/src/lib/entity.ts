@@ -159,6 +159,12 @@ export const saveEntityRequestSchema = z.object({
 
 export type SaveEntityRequest = z.infer<typeof saveEntityRequestSchema>;
 
+/** Entity Visibility (ADR-0024): `private` is owner-only; `shared` exposes the Entity to all World members. Replaces the retired `public` value — sharing is per-World now. */
+export const visibilitySchema = z.enum(['private', 'shared']);
+
+/** CONTEXT.md → Entity Visibility. */
+export type Visibility = z.infer<typeof visibilitySchema>;
+
 /** The list page size default and server-enforced cap (ADR-0025). Over-cap requests are clamped, not rejected. */
 export const ENTITY_LIST_DEFAULT_LIMIT = 50;
 export const ENTITY_LIST_MAX_LIMIT = 200;
@@ -178,7 +184,22 @@ export const entityListQuerySchema = z.object({
     .transform((v) => (Array.isArray(v) ? v : [v]))
     .optional(),
   q: z.string().optional(),
-  type: entityTypeSchema.optional(),
+  // Facet params (#155): each repeats in the query string (`?tag=a&tag=b`) and
+  // combines OR within its category, AND across categories, all AND-ed with `q`.
+  // A single occurrence arrives as a string, repeats as an array — normalize both
+  // to an array, like `ids`. `type` is likewise repeatable now (multi-select rail).
+  type: z
+    .union([entityTypeSchema, z.array(entityTypeSchema)])
+    .transform((v) => (Array.isArray(v) ? v : [v]))
+    .optional(),
+  tag: z
+    .union([z.string(), z.array(z.string())])
+    .transform((v) => (Array.isArray(v) ? v : [v]))
+    .optional(),
+  visibility: z
+    .union([visibilitySchema, z.array(visibilitySchema)])
+    .transform((v) => (Array.isArray(v) ? v : [v]))
+    .optional(),
   // Scope the list to one World (ADR-0024) — the entity browser's active-World filter.
   worldId: z.string().min(1).optional(),
   cursor: z.string().optional(),
@@ -192,11 +213,23 @@ export const entityListQuerySchema = z.object({
 
 export type EntityListQuery = z.infer<typeof entityListQuerySchema>;
 
-/** Entity Visibility (ADR-0024): `private` is owner-only; `shared` exposes the Entity to all World members. Replaces the retired `public` value — sharing is per-World now. */
-export const visibilitySchema = z.enum(['private', 'shared']);
+/** One Facet value and how many entities carry it under the active filters (#155). */
+export interface FacetCount {
+  readonly value: string;
+  readonly count: number;
+}
 
-/** CONTEXT.md → Entity Visibility. */
-export type Visibility = z.infer<typeof visibilitySchema>;
+/**
+ * `GET /entities/facets` (#155): each Facet category's live values with counts,
+ * for the Facet rail. Counts drill down — every category is computed against all
+ * *other* active constraints (query + the other Facets) but not its own, so a
+ * category still lists the sibling values you could add. Zero-count values are omitted.
+ */
+export interface EntityFacets {
+  readonly type: readonly FacetCount[];
+  readonly tag: readonly FacetCount[];
+  readonly visibility: readonly FacetCount[];
+}
 
 /** What `GET /entities` lists; body fetched only on open. `type`/`tags` ride along for grouping and filtering. */
 export interface EntitySummary {

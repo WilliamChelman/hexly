@@ -4,6 +4,7 @@ import {
   createEntityRequestSchema,
   emptyEntityBody,
   entityBodySchema,
+  entityListQuerySchema,
   renameEntityRequestSchema,
   saveEntityRequestSchema,
   tiptapContent,
@@ -108,6 +109,40 @@ describe('emptyEntityBody', () => {
 
     expect(entityBodySchema.parse(body)).toEqual(body);
     expect(body).toMatchObject({ type: 'hexmap', hexes: {}, regions: [], labels: [] });
+  });
+});
+
+describe('entityListQuerySchema Facet params (#155)', () => {
+  it('normalizes a single Facet value to an array (a lone query param arrives as a string)', () => {
+    const parsed = entityListQuerySchema.parse({
+      type: 'note',
+      tag: 'deity',
+      visibility: 'shared',
+    });
+    expect(parsed.type).toEqual(['note']);
+    expect(parsed.tag).toEqual(['deity']);
+    expect(parsed.visibility).toEqual(['shared']);
+  });
+
+  it('keeps repeated Facet values as an array (OR within a category)', () => {
+    const parsed = entityListQuerySchema.parse({
+      type: ['note', 'hexmap'],
+      tag: ['deity', 'ruined'],
+    });
+    expect(parsed.type).toEqual(['note', 'hexmap']);
+    expect(parsed.tag).toEqual(['deity', 'ruined']);
+  });
+
+  it('rejects an unknown type or visibility value at the boundary (ADR-0001)', () => {
+    expect(() => entityListQuerySchema.parse({ type: 'spreadsheet' })).toThrow();
+    expect(() => entityListQuerySchema.parse({ visibility: 'public' })).toThrow();
+  });
+
+  it('leaves Facet params undefined when absent', () => {
+    const parsed = entityListQuerySchema.parse({});
+    expect(parsed.type).toBeUndefined();
+    expect(parsed.tag).toBeUndefined();
+    expect(parsed.visibility).toBeUndefined();
   });
 });
 

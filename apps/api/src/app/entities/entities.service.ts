@@ -12,11 +12,14 @@ import {
   EntityBody,
   entityBodySchema,
   EntityDetail,
+  EntityFacets,
   EntitySaveOutcome,
   EntitySummary,
   EntityType,
+  FacetCount,
   entityTypeSchema,
   extractText,
+  Visibility,
   descriptorsSchema,
   harvestDescriptors,
   SaveEntityRequest,
@@ -38,11 +41,24 @@ export interface ListOptions {
   readonly ids?: readonly string[];
   /** Case-insensitive substring match on the name. */
   readonly q?: string;
-  /** Restrict to one Entity Type. */
-  readonly type?: EntityType;
+  /** Facet: restrict to any of these Entity Types (OR within category, #155). */
+  readonly type?: readonly EntityType[];
+  /** Facet: restrict to entities carrying any of these Tags (OR within category, #155). */
+  readonly tags?: readonly string[];
+  /** Facet: restrict to any of these Visibilities (OR within category, #155). */
+  readonly visibility?: readonly Visibility[];
   /** Restrict to one World (ADR-0024). */
   readonly worldId?: string;
 }
+
+/** The filter state a facet-count read narrows against (#155) — the list filters minus paging/ids. */
+export type FacetOptions = Pick<
+  ListOptions,
+  'worldId' | 'q' | 'type' | 'tags' | 'visibility'
+>;
+
+/** Everything {@link filters} reads — shared by the paged list and the facet-count reads (#155). */
+type FilterOptions = FacetOptions & Pick<ListOptions, 'ids'>;
 
 /** One page of summaries plus whether a further page exists (drives the cursor). */
 export interface ListPage {
@@ -143,6 +159,73 @@ export class EntitiesService implements OnApplicationBootstrap {
     const hasMore = rows.length > opts.limit;
     const items = rows.slice(0, opts.limit).map(toSummary);
     return { items, hasMore };
+  }
+
+  /**
+   * Facet-count read for the Facet rail (#155). For each category, count its
+   * distinct values under the *other* active constraints (query + the other
+   * Facets) but **not** its own — so drilling into one category still lists the
+   * sibling values you could add, each narrowed by everything else. `GROUP BY`
+   * naturally omits zero-count values (a value with no rows never appears).
+   * Owner- and World-scoped like {@link list}.
+   */
+  facets(ownerId: string, opts: FacetOptions): EntityFacets {
+    return {
+      // Drop a category's own selection before counting it (drill-down).
+      type: this.countColumn(ownerId, { ...opts, type: undefined }, entities.type),
+      visibility: this.countColumn(
+        ownerId,
+        { ...opts, visibility: undefined },
+        entities.visibility,
+      ),
+      tag: this.countTags(ownerId, { ...opts, tags: undefined }),
+    };
+  }
+
+  /** Count a denormalized column's values (type/visibility) under `opts`. */
+  private countColumn(
+    ownerId: string,
+    opts: FacetOptions,
+    column: typeof entities.type | typeof entities.visibility,
+  ): FacetCount[] {
+    const match = opts.q ? toFtsMatch(opts.q) : null;
+    const query = this.db
+      .select({ value: column, count: sql<number>`count(*)`.as('count') })
+      .from(entities)
+      .$dynamic();
+    if (match) {
+      query.innerJoin(sql`entities_fts`, sql`entities_fts.rowid = entities.rowid`);
+    }
+    return query
+      .where(facetWhere(ownerId, opts, match))
+      .groupBy(column)
+      .all()
+      .map((r) => ({ value: r.value as string, count: r.count }));
+  }
+
+  /**
+   * Count Tag-facet values under `opts`. Tags live in the JSON `tags` column, so
+   * `json_each` unrolls each entity's array into rows before grouping — an entity
+   * with two tags counts toward both values (ADR-0035, #155).
+   */
+  private countTags(ownerId: string, opts: FacetOptions): FacetCount[] {
+    const match = opts.q ? toFtsMatch(opts.q) : null;
+    const query = this.db
+      .select({
+        value: sql<string>`tag.value`.as('value'),
+        count: sql<number>`count(*)`.as('count'),
+      })
+      .from(entities)
+      .innerJoin(sql`json_each(${entities.tags}) as tag`, sql`1 = 1`)
+      .$dynamic();
+    if (match) {
+      query.innerJoin(sql`entities_fts`, sql`entities_fts.rowid = entities.rowid`);
+    }
+    return query
+      .where(facetWhere(ownerId, opts, match))
+      .groupBy(sql`tag.value`)
+      .all()
+      .map((r) => ({ value: r.value, count: r.count }));
   }
 
   /**
@@ -404,13 +487,44 @@ export class EntitiesService implements OnApplicationBootstrap {
  * text query `q` is handled by {@link list} (an FTS5 MATCH, ADR-0035), not here.
  * type/worldId: exact match; ids: explicit set.
  */
-function filters(opts: ListOptions) {
+function filters(opts: FilterOptions) {
   const predicates = [];
   // Empty id set selects nothing (inArray([]) is always-false).
   if (opts.ids) predicates.push(inArray(entities.id, [...opts.ids]));
-  if (opts.type) predicates.push(eq(entities.type, opts.type));
+  // Facets (#155): OR within a category (inArray / json_each IN), AND across them
+  // (separate predicates the caller ANDs). Empty arrays are skipped, not applied.
+  if (opts.type?.length) predicates.push(inArray(entities.type, [...opts.type]));
+  if (opts.visibility?.length)
+    predicates.push(inArray(entities.visibility, [...opts.visibility]));
+  if (opts.tags?.length) predicates.push(hasAnyTag(opts.tags));
   if (opts.worldId) predicates.push(eq(entities.worldId, opts.worldId));
   return predicates;
+}
+
+/**
+ * The shared owner + World + query + facet conjunction for a facet-count read
+ * (#155). Same predicates {@link EntitiesService.list} applies, minus paging, so a
+ * count and the page it annotates always agree on what's in the filtered set.
+ */
+function facetWhere(ownerId: string, opts: FacetOptions, match: string | null) {
+  return and(
+    eq(entities.ownerId, ownerId),
+    ...filters(opts),
+    match ? sql`entities_fts MATCH ${match}` : undefined,
+  );
+}
+
+/**
+ * A row matches the Tag facet if its JSON `tags` array contains any of `tags`
+ * (OR within the category, #155). `json_each` unrolls the stored array so a plain
+ * `value IN (...)` can test membership; EXISTS keeps it a per-row predicate.
+ */
+function hasAnyTag(tags: readonly string[]) {
+  const list = sql.join(
+    tags.map((t) => sql`${t}`),
+    sql`, `,
+  );
+  return sql`EXISTS (SELECT 1 FROM json_each(${entities.tags}) WHERE value IN (${list}))`;
 }
 
 /**

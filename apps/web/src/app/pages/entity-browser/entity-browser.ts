@@ -17,8 +17,17 @@ import {
   map,
 } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { EntityPage, EntitySummary, EntityType } from '@hexly/domain';
-import { EntitiesClient } from '../../core/services/entities.client';
+import {
+  EntityFacets,
+  EntityPage,
+  EntitySummary,
+  EntityType,
+  Visibility,
+} from '@hexly/domain';
+import {
+  EntitiesClient,
+  EntityFacetParams,
+} from '../../core/services/entities.client';
 import { ActiveWorld } from '../../core/services/active-world';
 import { ToasterService } from '../../core/services/toaster.service';
 import { AppShellStore } from '../../shell/app-shell.store';
@@ -29,6 +38,10 @@ import { Icon } from '../../ui/icon/icon';
 import { EntityCard } from './entity-card';
 import { EntitySearch } from './entity-search';
 import { EmptyState } from './empty-state';
+import { ActiveFacets, FacetRail, FacetToggle } from './facet-rail';
+
+/** No selections in any Facet category — the reset/initial state (#155). */
+const NO_FACETS: ActiveFacets = { type: [], tag: [], visibility: [] };
 
 // ponytail: bounded first page so a large vault loads fast; bump or make
 // configurable only if a real page size proves wrong in use.
@@ -79,6 +92,7 @@ function formatEdited(updatedAt: number, lang: string): string {
     EntityCard,
     EntitySearch,
     EmptyState,
+    FacetRail,
   ],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
@@ -123,8 +137,17 @@ function formatEdited(updatedAt: number, lang: string): string {
       </button>
     </app-page-header>
 
-    <main class="max-w-[60rem] mx-auto py-8 px-6">
+    <main class="max-w-[72rem] mx-auto py-8 px-6">
       <app-entity-search [value]="query()" (queryChange)="onSearch($event)" />
+      <div class="grid grid-cols-1 lg:grid-cols-[14rem_1fr] gap-8 items-start">
+        <app-facet-rail
+          [facetCounts]="facetCounts()"
+          [active]="activeFacets()"
+          [canClear]="hasFilters()"
+          (toggled)="toggleFacet($event)"
+          (clearAll)="clearAll()"
+        />
+        <div>
       @if (cards().length > 0) {
         <ul
           class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 m-0 p-0 list-none"
@@ -181,6 +204,8 @@ function formatEdited(updatedAt: number, lang: string): string {
           [hint]="'entityBrowser.emptyHint' | transloco"
         />
       }
+        </div>
+      </div>
     </main>
   `,
 })
@@ -226,6 +251,32 @@ export class EntityBrowser {
   /** Raw per-keystroke input, debounced before it becomes the committed `query`. */
   private readonly typed = new Subject<string>();
 
+  /** The selected Facet values per category (#155), mirrored to/from the URL like `q`.
+   * Value-equal so the URL round-trip's echo (a fresh object with the same values)
+   * is a no-op instead of re-triggering the fetch effect — one refetch per toggle. */
+  protected readonly activeFacets = signal<ActiveFacets>(NO_FACETS, {
+    equal: (a, b) => JSON.stringify(a) === JSON.stringify(b),
+  });
+  /** The live Facet counts for the rail, recomputed server-side on every filter change. */
+  protected readonly facetCounts = signal<EntityFacets>({
+    type: [],
+    tag: [],
+    visibility: [],
+  });
+  /** Any active filter (query or a Facet) — gates the rail's Clear all control. */
+  protected readonly hasFilters = computed(() => {
+    const f = this.activeFacets();
+    return (
+      this.query() !== '' ||
+      f.type.length > 0 ||
+      f.tag.length > 0 ||
+      f.visibility.length > 0
+    );
+  });
+
+  /** The in-flight Facet-count read, cancelled on any refetch so a late one can't overwrite. */
+  private facetsSub?: Subscription;
+
   private fetchSub?: Subscription;
   /** The in-flight load-more, cancelled on any first-page refetch so a late page
    * from a prior query/World can't append its rows or restore its stale cursor. */
@@ -244,18 +295,32 @@ export class EntityBrowser {
   >();
 
   constructor() {
-    // Read the URL `q` back into the box: seeds it on a shared/refreshed link and
-    // follows back/forward. Subscribed before the fetch effect below, so the initial
-    // (synchronous) emission seeds `query` and the first fetch already carries it —
-    // one request on load, not empty-then-refetch. Setting `query` here never rewrites
-    // the URL (only the debounce below does), so there's no read/write loop.
+    // Read the URL `q` + Facets back into state: seeds them on a shared/refreshed
+    // link and follows back/forward (#154, #155). Subscribed before the fetch effect
+    // below, so the initial (synchronous) emission seeds state and the first fetch
+    // already carries it — one request on load, not empty-then-refetch. Setting state
+    // here never rewrites the URL (only the toggles/debounce below do), and the JSON
+    // distinctUntilChanged absorbs the echo when a toggle's own navigate round-trips
+    // back through here, so there's no read/write loop.
     this.route.queryParamMap
       .pipe(
-        map((params) => params.get('q') ?? ''),
-        distinctUntilChanged(),
+        map((params) => ({
+          q: params.get('q') ?? '',
+          type: params.getAll('type'),
+          tag: params.getAll('tag'),
+          visibility: params.getAll('visibility'),
+        })),
+        distinctUntilChanged((a, b) => JSON.stringify(a) === JSON.stringify(b)),
         takeUntilDestroyed(),
       )
-      .subscribe((q) => this.query.set(q));
+      .subscribe((f) => {
+        this.query.set(f.q);
+        this.activeFacets.set({
+          type: f.type,
+          tag: f.tag,
+          visibility: f.visibility,
+        });
+      });
 
     this.typed
       .pipe(debounceTime(SEARCH_DEBOUNCE_MS), takeUntilDestroyed())
@@ -278,6 +343,7 @@ export class EntityBrowser {
     // reacting to it covers a param-only switch between Worlds (same component).
     effect(() => {
       this.query(); // track: a new query refetches from page one under server order
+      this.activeFacets(); // and any Facet change (#155) refetches + recomputes counts
       if (this.activeWorld.worldId()) this.fetchFirstPage();
     });
   }
@@ -285,6 +351,53 @@ export class EntityBrowser {
   /** A keystroke in the search box — debounced into {@link query} before it fetches. */
   protected onSearch(value: string): void {
     this.typed.next(value);
+  }
+
+  /**
+   * Toggle one Facet value on/off within its category (#155): OR within a category.
+   * Clicking an active value removes it (that's the per-filter remove). The new
+   * selection sets state (refetch + recount) and mirrors to the URL — merged so the
+   * World scope and other params survive, replaceUrl so a click isn't a history entry.
+   */
+  protected toggleFacet({ category, value }: FacetToggle): void {
+    const current = this.activeFacets();
+    const values = current[category];
+    const next = values.includes(value)
+      ? values.filter((v) => v !== value)
+      : [...values, value];
+    const updated = { ...current, [category]: next };
+    this.activeFacets.set(updated);
+    this.mirrorToUrl({
+      type: updated.type,
+      tag: updated.tag,
+      visibility: updated.visibility,
+    });
+  }
+
+  /** Clear the query and every Facet at once (#155), dropping all filter params from the URL. */
+  protected clearAll(): void {
+    this.query.set('');
+    this.activeFacets.set(NO_FACETS);
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { q: null, type: null, tag: null, visibility: null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  /** Mirror the active Facets to the URL; an empty category drops its param (`null`). */
+  private mirrorToUrl(facets: ActiveFacets): void {
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        type: facets.type.length ? [...facets.type] : null,
+        tag: facets.tag.length ? [...facets.tag] : null,
+        visibility: facets.visibility.length ? [...facets.visibility] : null,
+      },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   /**
@@ -303,10 +416,12 @@ export class EntityBrowser {
     this.fetchSub?.unsubscribe();
     this.loadMoreSub?.unsubscribe(); // and any load-more, so its late page can't append
     this.loadingMore.set(false); // clear any stuck load-more from the previous page
-    const q = this.query();
+    const params = this.activeFilterParams();
     const worldChanged = worldId !== this.shownWorldId;
     this.shownWorldId = worldId;
-    const key = worldId + '\u0000' + q;
+    // Key on World + the full filter state (query + Facets) so backspacing to any
+    // prior combination paints from cache; JSON of the params is a stable key.
+    const key = worldId + ' ' + JSON.stringify(params);
     const cached = this.firstPageCache.get(key);
     if (cached) {
       // Stale-while-revalidate: paint the previously-seen page instantly (backspace
@@ -330,7 +445,7 @@ export class EntityBrowser {
       this.loadError.set(false);
     }
     this.fetchSub = this.entitiesClient
-      .list({ limit: PAGE_SIZE, worldId, ...(q ? { q } : {}) })
+      .list({ limit: PAGE_SIZE, worldId, ...params })
       .pipe(this.shell.withLoading('subtle'))
       .subscribe({
         next: (page) => {
@@ -348,6 +463,35 @@ export class EntityBrowser {
           }
         },
       });
+    this.fetchFacetCounts(worldId, params);
+  }
+
+  /** The active query + Facets as list/facets params (#155); empty categories are omitted. */
+  private activeFilterParams(): EntityFacetParams {
+    const q = this.query();
+    const f = this.activeFacets();
+    return {
+      ...(q ? { q } : {}),
+      ...(f.type.length ? { type: [...f.type] as EntityType[] } : {}),
+      ...(f.tag.length ? { tag: [...f.tag] } : {}),
+      ...(f.visibility.length
+        ? { visibility: [...f.visibility] as Visibility[] }
+        : {}),
+    };
+  }
+
+  /**
+   * Recompute the Facet-rail counts alongside the paged list (#155), scoped to the
+   * World and the active filters — the server drills each category down against the
+   * others (ADR-0035). A failed read leaves the last-good counts on screen rather
+   * than blanking the rail, matching the list's stale-while-revalidate posture.
+   */
+  private fetchFacetCounts(worldId: string, params: EntityFacetParams): void {
+    this.facetsSub?.unsubscribe();
+    this.facetsSub = this.entitiesClient.facets({ worldId, ...params }).subscribe({
+      next: (facets) => this.facetCounts.set(facets),
+      error: () => undefined,
+    });
   }
 
   private cacheFirstPage(key: string, page: EntityPage): void {
@@ -371,15 +515,14 @@ export class EntityBrowser {
     const cursor = this.nextCursor();
     if (cursor === null || this.loadingMore()) return;
     this.loadingMore.set(true);
-    // The cursor is an opaque offset; the server re-applies the filter from `q`, so
-    // paging a filtered set must re-send the active query (#154) or it pages the
-    // unfiltered set from that offset.
-    const q = this.query();
+    // The cursor is an opaque offset; the server re-applies the filter from the
+    // query + Facets, so paging a filtered set must re-send them all (#154, #155)
+    // or it pages the unfiltered set from that offset.
     this.loadMoreSub = this.entitiesClient
       .list({
         cursor,
         worldId: this.activeWorld.worldId() ?? undefined,
-        ...(q ? { q } : {}),
+        ...this.activeFilterParams(),
       })
       .pipe(finalize(() => this.loadingMore.set(false)))
       .subscribe({

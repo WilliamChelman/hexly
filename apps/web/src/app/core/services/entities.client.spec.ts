@@ -79,16 +79,50 @@ describe('EntitiesClient', () => {
 
   it('serializes ids/q/type/cursor/limit into the query string', () => {
     client
-      .list({ ids: ['a', 'b'], q: 'river', type: 'note', cursor: 'CUR', limit: 25 })
+      .list({ ids: ['a', 'b'], q: 'river', type: ['note'], cursor: 'CUR', limit: 25 })
       .subscribe();
 
     const req = http.expectOne((r) => r.url === '/api/entities');
     expect(req.request.params.getAll('ids')).toEqual(['a', 'b']);
     expect(req.request.params.get('q')).toBe('river');
-    expect(req.request.params.get('type')).toBe('note');
+    expect(req.request.params.getAll('type')).toEqual(['note']);
     expect(req.request.params.get('cursor')).toBe('CUR');
     expect(req.request.params.get('limit')).toBe('25');
     req.flush({ items: [], nextCursor: null });
+  });
+
+  it('serializes multi-valued Facet params as repeats (OR within category, #155)', () => {
+    client
+      .list({ type: ['note', 'hexmap'], tag: ['deity', 'ruined'], visibility: ['shared'] })
+      .subscribe();
+
+    const req = http.expectOne((r) => r.url === '/api/entities');
+    expect(req.request.params.getAll('type')).toEqual(['note', 'hexmap']);
+    expect(req.request.params.getAll('tag')).toEqual(['deity', 'ruined']);
+    expect(req.request.params.getAll('visibility')).toEqual(['shared']);
+    req.flush({ items: [], nextCursor: null });
+  });
+
+  it('fetches Facet counts from /api/entities/facets under the active filters (#155)', () => {
+    const facets = {
+      type: [{ value: 'note', count: 3 }],
+      tag: [{ value: 'deity', count: 2 }],
+      visibility: [{ value: 'private', count: 3 }],
+    };
+
+    let got: unknown;
+    client
+      .facets({ q: 'temple', tag: ['deity'], worldId: 'w1' })
+      .subscribe((f) => (got = f));
+
+    const req = http.expectOne((r) => r.url === '/api/entities/facets');
+    expect(req.request.method).toBe('GET');
+    expect(req.request.params.get('q')).toBe('temple');
+    expect(req.request.params.getAll('tag')).toEqual(['deity']);
+    expect(req.request.params.get('worldId')).toBe('w1');
+    req.flush(facets);
+
+    expect(got).toEqual(facets);
   });
 
   it('creates an entity by name and type', () => {

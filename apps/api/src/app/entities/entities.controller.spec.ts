@@ -853,6 +853,208 @@ describe('Entities endpoints', () => {
     });
   });
 
+  describe('faceted filtering (#155)', () => {
+    async function note(agent: Awaited<ReturnType<typeof signIn>>, name: string) {
+      return (await agent.post('/entities').send({ name, type: 'note' })).body.id as string;
+    }
+    // Tags ride the version-checked save (#72) — set them by saving.
+    async function tag(
+      agent: Awaited<ReturnType<typeof signIn>>,
+      id: string,
+      ...tags: string[]
+    ) {
+      await agent
+        .put(`/entities/${id}`)
+        .send({ document: { type: 'note', content: emptyContent() }, version: 1, tags })
+        .expect(200);
+    }
+    // No sharing UI ships with #155, so flip Visibility straight in the column.
+    function share(id: string) {
+      db.$client.prepare('UPDATE entities SET visibility = ? WHERE id = ?').run('shared', id);
+    }
+    const names = (res: { body: { items: { name: string }[] } }) =>
+      res.body.items.map((e) => e.name).sort();
+
+    it('filters by a single tag', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const temple = await note(ada, 'Temple');
+      const tavern = await note(ada, 'Tavern');
+      await tag(ada, temple, 'deity');
+      await tag(ada, tavern, 'mundane');
+
+      const res = await ada.get('/entities').query({ tag: 'deity' }).expect(200);
+      expect(names(res)).toEqual(['Temple']);
+    });
+
+    it('filters by visibility', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const open = await note(ada, 'Public Temple');
+      await note(ada, 'Secret Vault');
+      share(open);
+
+      const res = await ada.get('/entities').query({ visibility: 'shared' }).expect(200);
+      expect(names(res)).toEqual(['Public Temple']);
+    });
+
+    it('ORs multiple tags within the Tag facet', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const a = await note(ada, 'Temple');
+      const b = await note(ada, 'Grove');
+      const c = await note(ada, 'Tavern');
+      await tag(ada, a, 'deity');
+      await tag(ada, b, 'nature');
+      await tag(ada, c, 'mundane');
+
+      const res = await ada
+        .get('/entities')
+        .query({ tag: ['deity', 'nature'] })
+        .expect(200);
+      expect(names(res)).toEqual(['Grove', 'Temple']);
+    });
+
+    it('ANDs across categories and AND-s the whole facet filter with the text query', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      // Target: a shared note tagged 'deity' whose name matches the query.
+      const target = await note(ada, 'Temple of the Sun');
+      await tag(ada, target, 'deity');
+      share(target);
+      // Decoys, each failing exactly one active constraint.
+      const wrongType = (await ada.post('/entities').send({ name: 'Temple Map', type: 'hexmap' })).body.id;
+      await ada
+        .put(`/entities/${wrongType}`)
+        .send({ document: emptyHexmapBody, version: 1, tags: ['deity'] })
+        .expect(200);
+      share(wrongType);
+      const wrongTag = await note(ada, 'Temple of Coin');
+      await tag(ada, wrongTag, 'mundane');
+      share(wrongTag);
+      const wrongVisibility = await note(ada, 'Temple in the Dark');
+      await tag(ada, wrongVisibility, 'deity'); // private, not shared
+      const wrongQuery = await note(ada, 'Tavern'); // no 'temple' in name
+      await tag(ada, wrongQuery, 'deity');
+      share(wrongQuery);
+
+      const res = await ada
+        .get('/entities')
+        .query({ q: 'temple', type: 'note', tag: 'deity', visibility: 'shared' })
+        .expect(200);
+      expect(names(res)).toEqual(['Temple of the Sun']);
+    });
+
+    // Facet-count reads: `GET /entities/facets` returns each category's live
+    // values with counts against the active filter state (drill-down).
+    const byValue = (facet: { value: string; count: number }[]) =>
+      [...facet].sort((a, b) => a.value.localeCompare(b.value));
+
+    it('returns each facet’s values with live counts for the World', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      // 'Ada' Home note already exists (type note, no tags, private).
+      const temple = await note(ada, 'Temple');
+      await tag(ada, temple, 'deity');
+      const grove = await note(ada, 'Grove');
+      await tag(ada, grove, 'nature', 'deity');
+      const worldId = (await ada.get(`/entities/${grove}`)).body.worldId;
+      await ada.post('/entities').send({ name: 'Map', type: 'hexmap' });
+      share(temple);
+
+      const res = await ada.get('/entities/facets').query({ worldId }).expect(200);
+
+      // Home + Temple + Grove = 3 notes; Map = 1 hexmap.
+      expect(byValue(res.body.type)).toEqual([
+        { value: 'hexmap', count: 1 },
+        { value: 'note', count: 3 },
+      ]);
+      // Temple + Grove carry 'deity'; only Grove carries 'nature'. Home is tagless.
+      expect(byValue(res.body.tag)).toEqual([
+        { value: 'deity', count: 2 },
+        { value: 'nature', count: 1 },
+      ]);
+      // Only Temple is shared; Home, Grove, Map stay private.
+      expect(byValue(res.body.visibility)).toEqual([
+        { value: 'private', count: 3 },
+        { value: 'shared', count: 1 },
+      ]);
+    });
+
+    it('drills counts down: a Type selection narrows Tag counts, omits zero, keeps sibling Types', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const temple = await note(ada, 'Temple');
+      await tag(ada, temple, 'deity');
+      const grove = await note(ada, 'Grove');
+      await tag(ada, grove, 'nature');
+      const worldId = (await ada.get(`/entities/${grove}`)).body.worldId;
+      const battle = (await ada.post('/entities').send({ name: 'Battlemap', type: 'hexmap' })).body.id;
+      await ada
+        .put(`/entities/${battle}`)
+        .send({ document: emptyHexmapBody, version: 1, tags: ['combat'] })
+        .expect(200);
+
+      const res = await ada
+        .get('/entities/facets')
+        .query({ worldId, type: 'note' })
+        .expect(200);
+
+      // Tag counts drill down to notes only: 'combat' (hexmap-only) drops to zero
+      // and is omitted; 'deity'/'nature' remain.
+      expect(byValue(res.body.tag)).toEqual([
+        { value: 'deity', count: 1 },
+        { value: 'nature', count: 1 },
+      ]);
+      // The Type facet ignores its own active selection, so it still lists the
+      // sibling 'hexmap' you could switch to (each narrowed by everything else).
+      expect(byValue(res.body.type)).toEqual([
+        { value: 'hexmap', count: 1 },
+        { value: 'note', count: 3 },
+      ]);
+    });
+
+    it('keeps facet counts owner- and World-scoped', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const adaNote = await note(ada, 'Ada Temple');
+      await tag(ada, adaNote, 'deity');
+      const worldA = (await ada.get(`/entities/${adaNote}`)).body.worldId;
+      // Ada's second World — its tags must not bleed into worldA's counts.
+      const worldB = (await ada.post('/worlds').send({ name: 'Second' }).expect(201)).body.id;
+      const inB = (await ada.post('/entities').send({ name: 'B Temple', type: 'note', worldId: worldB })).body.id;
+      await ada
+        .put(`/entities/${inB}`)
+        .send({ document: { type: 'note', content: emptyContent() }, version: 1, tags: ['otherworld'] })
+        .expect(200);
+      // Another owner's entity in a like-named tag — never counted for Ada.
+      await seedUserWithWorld('bob@hexly.test', 'battery staple', 'Bob');
+      const bob = await signIn('bob@hexly.test', 'battery staple');
+      const bobNote = await note(bob, 'Bob Temple');
+      await tag(bob, bobNote, 'deity');
+
+      const res = await ada.get('/entities/facets').query({ worldId: worldA }).expect(200);
+      // Only worldA's tags: 'deity' from Ada Temple, count 1 — not Bob's, not worldB's.
+      expect(byValue(res.body.tag)).toEqual([{ value: 'deity', count: 1 }]);
+    });
+
+    it('paginates completely and without repeats under a facet filter', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      for (const n of ['N1', 'N2', 'N3', 'N4', 'N5']) {
+        await tag(ada, await note(ada, n), 'deity');
+      }
+
+      const seen: string[] = [];
+      let cursor: string | null = null;
+      let pages = 0;
+      do {
+        const res: { body: { items: { name: string }[]; nextCursor: string | null } } = await ada
+          .get('/entities')
+          .query({ tag: 'deity', limit: 2, ...(cursor ? { cursor } : {}) })
+          .expect(200);
+        seen.push(...res.body.items.map((e) => e.name));
+        cursor = res.body.nextCursor;
+        pages++;
+      } while (cursor);
+
+      expect(seen.slice().sort()).toEqual(['N1', 'N2', 'N3', 'N4', 'N5']);
+      expect(pages).toBe(3); // 5 matches at 2/page.
+    });
+  });
+
   it('refuses every entity route without a session cookie', async () => {
     const server = app.getHttpServer();
 

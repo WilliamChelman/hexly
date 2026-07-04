@@ -35,7 +35,16 @@
     "emptyTitle": "Votre bibliothèque est vide.",
     "emptyHint": "Créez une note ou une carte pour commencer.",
     "noMatchTitle": "Aucune entité ne correspond à votre recherche.",
-    "noMatchHint": "Essayez un autre nom, une étiquette ou un mot."
+    "noMatchHint": "Essayez un autre nom, une étiquette ou un mot.",
+    "facets": {
+      "heading": "Filtres",
+      "type": "Type",
+      "tag": "Étiquette",
+      "visibility": "Visibilité",
+      "clearAll": "Tout effacer",
+      "private": "Privé",
+      "shared": "Partagé"
+    }
   },
   "entityTags": {
     "addLabel": "Ajouter un tag",

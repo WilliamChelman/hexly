@@ -8,6 +8,7 @@ import { catchError, map, Observable, of, throwError } from 'rxjs';
 import {
   EntityBody,
   EntityDetail,
+  EntityFacets,
   EntityListQuery,
   EntityPage,
   EntitySaveOutcome,
@@ -15,6 +16,12 @@ import {
 } from '@hexly/domain';
 
 export type EntityListParams = Partial<EntityListQuery>;
+
+/** The subset of list params the Facet-count read narrows against (#155) — no paging. */
+export type EntityFacetParams = Pick<
+  EntityListParams,
+  'q' | 'type' | 'tag' | 'visibility' | 'worldId'
+>;
 
 /**
  * HTTP client for the entities API (ADR-0018, ADR-0005).
@@ -25,15 +32,19 @@ export class EntitiesClient {
   private readonly http = inject(HttpClient);
 
   list(opts: EntityListParams = {}): Observable<EntityPage> {
-    let params = new HttpParams();
-    // `ids` repeats in query string; others are single-valued.
+    let params = facetParams(opts);
+    // `ids` repeats in query string; cursor/limit are single-valued paging.
     for (const id of opts.ids ?? []) params = params.append('ids', id);
-    if (opts.q) params = params.set('q', opts.q);
-    if (opts.type) params = params.set('type', opts.type);
-    if (opts.worldId) params = params.set('worldId', opts.worldId);
     if (opts.cursor) params = params.set('cursor', opts.cursor);
     if (opts.limit !== undefined) params = params.set('limit', opts.limit);
     return this.http.get<EntityPage>('/api/entities', { params });
+  }
+
+  /** Facet-rail counts under the active filters (#155), drilled down server-side (ADR-0035). */
+  facets(opts: EntityFacetParams = {}): Observable<EntityFacets> {
+    return this.http.get<EntityFacets>('/api/entities/facets', {
+      params: facetParams(opts),
+    });
   }
 
   /** Metadata only — never conflicts with an in-progress save. */
@@ -99,4 +110,19 @@ export class EntitiesClient {
         }),
       );
   }
+}
+
+/**
+ * Serialize the shared query + Facet filters (#155) — the params both the paged
+ * list and the Facet-count read carry. `type`/`tag`/`visibility` each repeat in the
+ * query string (`?tag=a&tag=b`, OR within category); `q`/`worldId` are single-valued.
+ */
+function facetParams(opts: EntityFacetParams): HttpParams {
+  let params = new HttpParams();
+  if (opts.q) params = params.set('q', opts.q);
+  for (const t of opts.type ?? []) params = params.append('type', t);
+  for (const t of opts.tag ?? []) params = params.append('tag', t);
+  for (const v of opts.visibility ?? []) params = params.append('visibility', v);
+  if (opts.worldId) params = params.set('worldId', opts.worldId);
+  return params;
 }

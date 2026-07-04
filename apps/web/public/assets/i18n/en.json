@@ -35,7 +35,16 @@
     "emptyTitle": "Your library is empty.",
     "emptyHint": "Create a note or a map to begin.",
     "noMatchTitle": "No entities match your search.",
-    "noMatchHint": "Try a different name, tag, or word."
+    "noMatchHint": "Try a different name, tag, or word.",
+    "facets": {
+      "heading": "Filters",
+      "type": "Type",
+      "tag": "Tag",
+      "visibility": "Visibility",
+      "clearAll": "Clear all",
+      "private": "Private",
+      "shared": "Shared"
+    }
   },
   "entityTags": {
     "addLabel": "Add a tag",
