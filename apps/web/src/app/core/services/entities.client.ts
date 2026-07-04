@@ -78,6 +78,11 @@ export class EntitiesClient {
     return this.http.get<string[]>('/api/entities/descriptors');
   }
 
+  // Owner's Tag suggestion vocabulary — DISTINCT across their entities.
+  listTags(): Observable<string[]> {
+    return this.http.get<string[]>('/api/entities/tags');
+  }
+
   /** Stale base → `conflict` outcome (ADR-0018), not a thrown error; caller branches, not catches. */
   save(
     id: string,

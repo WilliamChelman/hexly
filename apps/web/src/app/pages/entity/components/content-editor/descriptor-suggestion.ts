@@ -5,12 +5,8 @@ import Suggestion, {
   SuggestionProps,
 } from '@tiptap/suggestion';
 import { DescriptorPicker } from './descriptor-picker';
-import {
-  DescriptorItem,
-  descriptorItems,
-  entityLinkPosBefore,
-  setLinkAttr,
-} from './descriptors';
+import { entityLinkPosBefore, setLinkAttr } from './descriptors';
+import { VocabItem, vocabItems } from './vocab-items';
 
 /**
  * The `::` trigger that characterises a Content Entity Link (issue #96, ADR-0023). Like
@@ -30,7 +26,7 @@ export function descriptorSuggestion(
     name: 'descriptorSuggestion',
     addProseMirrorPlugins() {
       return [
-        Suggestion<DescriptorItem, DescriptorItem>({
+        Suggestion<VocabItem, VocabItem>({
           editor: this.editor,
           // Distinct key: each suggestion plugin in an editor needs its own (slashCommands
           // and entityMention own the others).
@@ -44,17 +40,17 @@ export function descriptorSuggestion(
           allow: ({ state, range }) =>
             !state.selection.$from.parent.type.spec.code &&
             entityLinkPosBefore(state, range.from) !== null,
-          items: async ({ query }) => descriptorItems(query, await loadVocab()),
+          items: async ({ query }) => vocabItems(query, await loadVocab()),
           command: ({ editor, range, props }) => {
             // Recompute against the live state: the link sits just before the `::query`.
             const linkPos = entityLinkPosBefore(editor.state, range.from);
             if (linkPos === null) return;
-            setLinkAttr(editor, linkPos, 'descriptor', props.descriptor, range);
+            setLinkAttr(editor, linkPos, 'descriptor', props.value, range);
           },
           render: () => ({
-            onStart: (props: SuggestionProps<DescriptorItem, DescriptorItem>) =>
+            onStart: (props: SuggestionProps<VocabItem, VocabItem>) =>
               getPicker()?.open(props),
-            onUpdate: (props: SuggestionProps<DescriptorItem, DescriptorItem>) =>
+            onUpdate: (props: SuggestionProps<VocabItem, VocabItem>) =>
               getPicker()?.update(props),
             onKeyDown: (props: SuggestionKeyDownProps) =>
               getPicker()?.onKeyDown(props.event) ?? false,

@@ -421,6 +421,23 @@ export class EntitiesService implements OnApplicationBootstrap {
   }
 
   /**
+   * Owner's tag suggestion vocabulary: DISTINCT Tags across their entities,
+   * sorted. Tags live in the JSON `tags` column, so `json_each` unrolls each array
+   * before DISTINCT (the shape countTags uses). No index table — unlike descriptors,
+   * tags are already a first-class column, so this reads live rather than harvested.
+   */
+  listTags(ownerId: string): string[] {
+    return this.db
+      .selectDistinct({ value: sql<string>`tag.value` })
+      .from(entities)
+      .innerJoin(sql`json_each(${entities.tags}) as tag`, sql`1 = 1`)
+      .where(eq(entities.ownerId, ownerId))
+      .orderBy(sql`tag.value`)
+      .all()
+      .map((row) => row.value);
+  }
+
+  /**
    * Replace entity's descriptor rows with harvested set (#96). Self-pruning:
    * dropped descriptors lose rows. Runs in save's transaction on success.
    */

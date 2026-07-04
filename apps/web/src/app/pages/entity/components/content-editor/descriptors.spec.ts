@@ -1,11 +1,6 @@
 import { Editor, JSONContent } from '@tiptap/core';
 import { CONTENT_EXTENSIONS } from './content-extensions';
-import {
-  descriptorItems,
-  entityLinkPosBefore,
-  linkTextRows,
-  setLinkAttr,
-} from './descriptors';
+import { entityLinkPosBefore, linkTextRows, setLinkAttr } from './descriptors';
 
 function freshEditor() {
   return new Editor({ extensions: CONTENT_EXTENSIONS });
@@ -114,12 +109,12 @@ describe('setLinkAttr — set/change/clear', () => {
 describe('linkTextRows — `|`/`#` free-text rows with a clear affordance', () => {
   it('offers only the typed text as a new value', () => {
     const rows = linkTextRows('my wife', null);
-    expect(rows).toEqual([{ id: expect.any(String), descriptor: 'my wife', isNew: true }]);
+    expect(rows).toEqual([{ id: expect.any(String), value: 'my wife', isNew: true }]);
   });
 
   it('offers a clear row on an empty query when the attr is already set', () => {
     const rows = linkTextRows('', 'my wife');
-    expect(rows).toEqual([{ id: expect.any(String), descriptor: '', isNew: false }]);
+    expect(rows).toEqual([{ id: expect.any(String), value: '', isNew: false }]);
   });
 
   it('offers nothing on an empty query when the attr is unset (plain insert)', () => {
@@ -128,32 +123,6 @@ describe('linkTextRows — `|`/`#` free-text rows with a clear affordance', () =
 
   it('drops the clear row once the user types a replacement', () => {
     const rows = linkTextRows('new text', 'old');
-    expect(rows).toEqual([{ id: expect.any(String), descriptor: 'new text', isNew: true }]);
-  });
-});
-
-describe('descriptorItems — `::` suggestions + free text', () => {
-  const vocab = ['capital of', 'rival', 'spouse'];
-
-  it('filters the owner vocabulary by a case-insensitive substring', () => {
-    const matches = descriptorItems('iv', vocab).filter((i) => !i.isNew);
-    expect(matches.map((i) => i.descriptor)).toEqual(['rival']);
-  });
-
-  it('offers the typed text as a brand-new descriptor when it matches nothing', () => {
-    const items = descriptorItems('mentor', vocab);
-    expect(items[0]).toEqual({ id: expect.any(String), descriptor: 'mentor', isNew: true });
-  });
-
-  it('does not duplicate an existing descriptor as a "new" entry (case-folded)', () => {
-    const items = descriptorItems('Spouse', vocab);
-    expect(items.filter((i) => i.isNew)).toEqual([]);
-    expect(items.map((i) => i.descriptor)).toEqual(['spouse']);
-  });
-
-  it('lists the whole vocabulary and offers no new entry for an empty query', () => {
-    const items = descriptorItems('   ', vocab);
-    expect(items.every((i) => !i.isNew)).toBe(true);
-    expect(items.map((i) => i.descriptor)).toEqual(vocab);
+    expect(rows).toEqual([{ id: expect.any(String), value: 'new text', isNew: true }]);
   });
 });

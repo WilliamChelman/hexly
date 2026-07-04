@@ -49,7 +49,12 @@
   "entityTags": {
     "addLabel": "Add a tag",
     "addPlaceholder": "Add tags…",
-    "removeLabel": "Remove tag: {{tag}}"
+    "removeLabel": "Remove tag: {{tag}}",
+    "picker": {
+      "label": "Suggested tags",
+      "create": "(new)",
+      "empty": "Type a tag"
+    }
   },
   "entityMetadata": {
     "heading": "Metadata"

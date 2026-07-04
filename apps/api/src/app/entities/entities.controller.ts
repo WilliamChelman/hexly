@@ -77,6 +77,12 @@ export class EntitiesController {
     return this.entities.listDescriptors(user.id);
   }
 
+  // Before `:id` so the literal path isn't captured. Owner's Tag suggestion vocabulary.
+  @Get('tags')
+  tags(@CurrentUser() user: AuthUser): string[] {
+    return this.entities.listTags(user.id);
+  }
+
   // Before `:id` so the literal path isn't captured (#155). Facet rail counts: each
   // category's live values under the active filters, drilled down (ADR-0035).
   @Get('facets')

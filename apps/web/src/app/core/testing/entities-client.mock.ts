@@ -24,6 +24,9 @@ export class MockEntitiesClient {
   >();
   load = vi.fn<(id: string) => Observable<EntityDetail>>();
   listDescriptors = vi.fn<() => Observable<string[]>>();
+  // Defaults to an empty vocabulary so a spec that drives the tag input (EntityTags.suggest)
+  // doesn't throw on an unstubbed listTags; override per test as needed.
+  listTags = vi.fn<() => Observable<string[]>>(() => of<string[]>([]));
   save = vi.fn<
     (
       id: string,

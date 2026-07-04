@@ -3,7 +3,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { SuggestionMenu } from './suggestion-menu';
 import { SuggestionMenuShell } from './suggestion-menu-shell';
 import { SuggestionEmpty, SuggestionOption } from './suggestion-option';
-import { DescriptorItem } from './descriptors';
+import { VocabItem } from './vocab-items';
 
 /** Which wikilink attr this picker edits — drives its testid and i18n only. */
 export type LinkTextKind = 'display' | 'heading';
@@ -11,8 +11,8 @@ export type LinkTextKind = 'display' | 'heading';
 /**
  * The keyboard-driven picker behind the `|` display (`[[Target|text]]`) and `#` heading
  * (`[[Target#Heading]]`) triggers on an `entityLink` (ADR-0033). Free text only — there is
- * no vocabulary, so it shows the single typed row (the {@link DescriptorItem} `isNew`
- * entry) that {@link descriptorItems} yields for an empty vocab, and an empty query shows
+ * no vocabulary, so it shows the single typed row (the {@link VocabItem} `isNew`
+ * entry) that {@link vocabItems} yields for an empty vocab, and an empty query shows
  * a "type something" prompt. One component drives both attrs: `kind` picks the testid and
  * the i18n strings; the `::` descriptor picker keeps its own because it lists a vocabulary.
  */
@@ -37,8 +37,8 @@ export type LinkTextKind = 'display' | 'heading';
             [selected]="i === activeIndex()"
             (pick)="select(item)"
           >
-            @if (item.descriptor) {
-              {{ item.descriptor }}
+            @if (item.value) {
+              {{ item.value }}
             } @else {
               <span class="text-ink-muted">{{ removeKey() | transloco }}</span>
             }
@@ -50,7 +50,7 @@ export type LinkTextKind = 'display' | 'heading';
     }
   `,
 })
-export class LinkTextPicker extends SuggestionMenu<DescriptorItem> {
+export class LinkTextPicker extends SuggestionMenu<VocabItem> {
   readonly kind = input.required<LinkTextKind>();
   protected readonly optionIdPrefix = 'link-text-opt-';
 

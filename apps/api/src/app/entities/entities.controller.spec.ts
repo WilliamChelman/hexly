@@ -599,6 +599,40 @@ describe('Entities endpoints', () => {
     });
   });
 
+  describe('tag vocabulary', () => {
+    async function saveTags(
+      agent: Awaited<ReturnType<typeof signIn>>,
+      tags: string[],
+      name = 'Lady A',
+    ) {
+      const created = await agent.post('/entities').send({ name, type: 'note' });
+      await agent
+        .put(`/entities/${created.body.id}`)
+        .send({ document: { type: 'note', content: emptyContent() }, version: 1, tags })
+        .expect(200);
+    }
+
+    it('serves the owner’s DISTINCT tags, sorted, unioned across entities', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      await saveTags(ada, ['ruined', 'deity'], 'A');
+      await saveTags(ada, ['deity', 'northern reach'], 'B');
+
+      const res = await ada.get('/entities/tags').expect(200);
+      expect(res.body).toEqual(['deity', 'northern reach', 'ruined']);
+    });
+
+    it('scopes the vocabulary to the owner', async () => {
+      await seedUserWithWorld('bob@hexly.test', 'correct horse', 'Bob');
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const bob = await signIn('bob@hexly.test', 'correct horse');
+      await saveTags(ada, ['deity']);
+      await saveTags(bob, ['ruined']);
+
+      expect((await ada.get('/entities/tags').expect(200)).body).toEqual(['deity']);
+      expect((await bob.get('/entities/tags').expect(200)).body).toEqual(['ruined']);
+    });
+  });
+
   describe('full-text search (ADR-0035)', () => {
     // A note whose Content prose carries `text`, saved at version 1.
     async function noteWithProse(

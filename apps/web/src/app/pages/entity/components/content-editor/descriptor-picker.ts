@@ -3,7 +3,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { SuggestionMenu } from './suggestion-menu';
 import { SuggestionMenuShell } from './suggestion-menu-shell';
 import { SuggestionEmpty, SuggestionOption } from './suggestion-option';
-import { DescriptorItem } from './descriptors';
+import { VocabItem } from './vocab-items';
 
 /**
  * The keyboard-driven Link Descriptor picker that opens on `::` directly after an
@@ -30,11 +30,11 @@ import { DescriptorItem } from './descriptors';
           <li
             appSuggestionOption
             [optionId]="optionId(item.id)"
-            [testid]="'descriptor-picker-option-' + item.descriptor"
+            [testid]="'descriptor-picker-option-' + item.value"
             [selected]="i === activeIndex()"
             (pick)="select(item)"
           >
-            {{ item.descriptor }}
+            {{ item.value }}
             @if (item.isNew) {
               <span class="text-2xs text-ink-muted">
                 {{ 'noteView.descriptorPicker.create' | transloco }}</span
@@ -48,6 +48,6 @@ import { DescriptorItem } from './descriptors';
     }
   `,
 })
-export class DescriptorPicker extends SuggestionMenu<DescriptorItem> {
+export class DescriptorPicker extends SuggestionMenu<VocabItem> {
   protected readonly optionIdPrefix = 'descriptor-opt-';
 }

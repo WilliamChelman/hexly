@@ -5,7 +5,8 @@ import Suggestion, {
   SuggestionProps,
 } from '@tiptap/suggestion';
 import { LinkTextPicker } from './link-text-picker';
-import { DescriptorItem, entityLinkPosBefore, linkTextRows, setLinkAttr } from './descriptors';
+import { entityLinkPosBefore, linkTextRows, setLinkAttr } from './descriptors';
+import { VocabItem } from './vocab-items';
 
 /**
  * The `|` display (`[[Target|text]]`) and `#` heading (`[[Target#Heading]]`) triggers on an
@@ -31,7 +32,7 @@ export function linkTextSuggestion(opts: {
     name,
     addProseMirrorPlugins() {
       return [
-        Suggestion<DescriptorItem, DescriptorItem>({
+        Suggestion<VocabItem, VocabItem>({
           editor: this.editor,
           // Distinct key: each suggestion plugin in an editor needs its own.
           pluginKey: new PluginKey(name),
@@ -56,12 +57,12 @@ export function linkTextSuggestion(opts: {
           command: ({ editor, range, props }) => {
             const linkPos = entityLinkPosBefore(editor.state, range.from);
             if (linkPos === null) return;
-            setLinkAttr(editor, linkPos, attr, props.descriptor, range);
+            setLinkAttr(editor, linkPos, attr, props.value, range);
           },
           render: () => ({
-            onStart: (props: SuggestionProps<DescriptorItem, DescriptorItem>) =>
+            onStart: (props: SuggestionProps<VocabItem, VocabItem>) =>
               getPicker()?.open(props),
-            onUpdate: (props: SuggestionProps<DescriptorItem, DescriptorItem>) =>
+            onUpdate: (props: SuggestionProps<VocabItem, VocabItem>) =>
               getPicker()?.update(props),
             onKeyDown: (props: SuggestionKeyDownProps) =>
               getPicker()?.onKeyDown(props.event) ?? false,
