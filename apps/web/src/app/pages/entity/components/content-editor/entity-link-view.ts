@@ -62,6 +62,7 @@ import { EntityNameResolver } from '../../services/entity-name-resolver';
          relationship reads as metadata rather than interrupting the prose. -->
     @if (descriptor()) {
       <span
+        data-testid="link-descriptor"
         class="pointer-events-none absolute -top-1.5 right-0 whitespace-nowrap rounded-full px-0.5 text-[0.6em] font-semibold leading-none text-ink-stroke shadow-1"
         [class.bg-gold]="!dangling()"
         [class.bg-ink-muted]="dangling()"

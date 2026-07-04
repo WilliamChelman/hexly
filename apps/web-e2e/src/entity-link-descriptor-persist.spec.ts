@@ -3,7 +3,7 @@ import { enterLibrary, expect, flushSave, test } from './fixtures';
 /**
  * The Link Descriptor journey (issue #96, ADR-0023): an author characterises a Content
  * Entity Link with a free-text descriptor via the `::` trigger, and it survives a save +
- * reload, rendering as `Name (descriptor)` with the target's live name. Crosses every
+ * reload, rendering the target's live name with the descriptor as a corner badge. Crosses every
  * seam: the `::` suggestion arming only after a link, the descriptor picker's free-text
  * entry, the versioned save, the server harvesting the descriptor from the saved Content
  * into its index (#96, ADR-0035), and an API read of the opaque snapshot (ADR-0009/0019).
@@ -37,7 +37,8 @@ test('characterises a Content Entity Link via :: , persists the descriptor, and 
   await page.getByTestId('descriptor-picker-option-spouse').click();
 
   const link = page.getByTestId('entity-link');
-  await expect(link).toHaveText('Untitled note (spouse)');
+  await expect(link).toHaveText('Untitled note');
+  await expect(page.getByTestId('link-descriptor')).toHaveText('spouse');
 
   await flushSave(page);
 
@@ -48,5 +49,6 @@ test('characterises a Content Entity Link via :: , persists the descriptor, and 
   const vocab = await (await request.get('/api/entities/descriptors')).json();
   expect(vocab).toContain('spouse');
 
-  await expect(page.getByTestId('entity-link')).toHaveText('Untitled note (spouse)');
+  await expect(page.getByTestId('entity-link')).toHaveText('Untitled note');
+  await expect(page.getByTestId('link-descriptor')).toHaveText('spouse');
 });
