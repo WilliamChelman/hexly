@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { of } from 'rxjs';
@@ -6,8 +7,13 @@ import { emptyContent, EntityDetail } from '@hexly/domain';
 import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
 import { EntitiesClient } from '../../../core/services/entities.client';
 import { MockEntitiesClient } from '../../../core/testing/entities-client.mock';
+import { UsersClient } from '../../../core/services/users.client';
+import { MockUsersClient } from '../../../core/testing/users-client.mock';
+import { AuthClient } from '../../../core/services/auth.client';
+import { MockAuthClient } from '../../../core/testing/auth-client.mock';
 import { EntitySession } from '../services/entity-session';
 import { HexMapStore } from '../services/hexmap-store';
+import { OwnerSet } from '../../../ui/owner-set';
 import { EntityHeader } from './entity-header';
 import { noteDetail } from './entity-detail.fixtures';
 
@@ -40,9 +46,42 @@ describe('EntityHeader', () => {
       providers: [
         EntitySession,
         { provide: EntitiesClient, useValue: entities },
+        { provide: UsersClient, useValue: new MockUsersClient() },
+        { provide: AuthClient, useValue: new MockAuthClient() },
         provideRouter([]),
       ],
     }).compileComponents();
+  });
+
+  it('opens the entity owner set from the Share action', () => {
+    open(aldermoor);
+    const fixture = TestBed.createComponent(EntityHeader);
+    fixture.detectChanges();
+
+    expect(fixture.debugElement.query(By.directive(OwnerSet))).toBeNull();
+
+    fixture.nativeElement
+      .querySelector('[data-testid=manage-owners]')
+      .click();
+    fixture.detectChanges();
+
+    const set = fixture.debugElement.query(By.directive(OwnerSet))
+      ?.componentInstance as OwnerSet;
+    expect(set.kind()).toBe('entity');
+    expect(set.id()).toBe('m1');
+  });
+
+  it('closes the owner set from its Close action', () => {
+    open(aldermoor);
+    const fixture = TestBed.createComponent(EntityHeader);
+    fixture.detectChanges();
+    fixture.nativeElement.querySelector('[data-testid=manage-owners]').click();
+    fixture.detectChanges();
+
+    fixture.nativeElement.querySelector('[data-testid=owners-close]').click();
+    fixture.detectChanges();
+
+    expect(fixture.debugElement.query(By.directive(OwnerSet))).toBeNull();
   });
 
   it('shows the open entity name', () => {

@@ -40,6 +40,7 @@ let nextDialogId = 0;
       [style.margin-top]="align() === 'top' ? '10vh' : null"
       [attr.aria-labelledby]="heading() ? titleId : null"
       (close)="closed.emit()"
+      (click)="onClick($event)"
     >
       @if (heading(); as h) {
         <h2 [id]="titleId" class="font-display text-md text-ink-strong m-0">
@@ -71,6 +72,17 @@ export class Dialog {
   readonly align = input<'center' | 'top'>('center');
   /** Fires whenever the dialog closes — Escape, or a programmatic close. */
   readonly closed = output<void>();
+
+  /**
+   * Dismiss on a backdrop click. The native `<dialog>` fills the top layer, so a
+   * click outside the content lands on the element itself (`target === dialog`)
+   * while a click on the projected body targets an inner node — closing the
+   * former mirrors the platform Escape-to-dismiss, without swallowing body clicks.
+   */
+  protected onClick(event: MouseEvent): void {
+    const el = this.dialog().nativeElement as HTMLDialogElement;
+    if (event.target === el) el.close();
+  }
 
   protected readonly titleId = `app-dialog-title-${nextDialogId++}`;
   // read: ElementRef — the #dialog element also hosts appPanel, so a bare query

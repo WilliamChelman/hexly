@@ -214,6 +214,20 @@ describe('WorldIndex', () => {
     expect($(el, '[data-testid=export-world-w2]')).toBeNull();
   });
 
+  it('links an owned World to its owner-management page, but not a member World', () => {
+    const el = render([
+      world('w1', 'Aldermoor'), // owned by the caller (u1)
+      world('w2', 'Whisperwood', 'someone-else'), // member
+    ]).nativeElement as HTMLElement;
+
+    expect(
+      ($(el, '[data-testid=owners-world-w1]') as HTMLAnchorElement).getAttribute(
+        'href',
+      ),
+    ).toBe('/w/w1');
+    expect($(el, '[data-testid=owners-world-w2]')).toBeNull();
+  });
+
   it('exports an owned World as a named .zip download', () => {
     const el = render([world('w1', 'Aldermoor')]).nativeElement as HTMLElement;
     const zip = new Blob([new Uint8Array([1, 2, 3])], { type: 'application/zip' });

@@ -52,6 +52,21 @@ describe('Dialog', () => {
     expect(fixture.componentInstance.closes).toBe(1);
   });
 
+  it('closes when the backdrop (the dialog element itself) is clicked', () => {
+    const { fixture, dialog } = render();
+    fixture.componentInstance.open.set(true);
+    fixture.detectChanges();
+    const close = vi.spyOn(dialog, 'close');
+
+    // A backdrop click lands on the <dialog> element; a click on the body does not.
+    dialog.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(close).toHaveBeenCalledOnce();
+
+    const body = dialog.querySelector('p') as HTMLElement;
+    body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(close).toHaveBeenCalledOnce();
+  });
+
   it('labels the dialog with the heading for assistive tech', () => {
     const { fixture, dialog } = render();
     expect(dialog.getAttribute('aria-labelledby')).toBeNull();

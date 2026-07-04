@@ -35,4 +35,9 @@ export class MockEntitiesClient {
       tags: readonly string[],
     ) => Observable<EntitySaveOutcome>
   >();
+  // Defaults to an empty set so a spec that mounts the owner-set panel without
+  // caring about it still renders; override per test as needed.
+  owners = vi.fn<(id: string) => Observable<string[]>>(() => of<string[]>([]));
+  addOwner = vi.fn<(id: string, userId: string) => Observable<string[]>>();
+  removeOwner = vi.fn<(id: string, userId: string) => Observable<string[]>>();
 }

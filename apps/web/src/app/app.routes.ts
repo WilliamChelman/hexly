@@ -40,6 +40,17 @@ export const appRoutes: Route[] = [
     resolve: { activeWorld: activeWorldResolver },
     children: [
       {
+        // The World settings page (#158): the World-level owner set — view, add,
+        // remove, resign. Bare by design; more World settings can join it later.
+        path: '',
+        pathMatch: 'full',
+        loadComponent: () =>
+          import('./pages/world-settings/world-settings').then(
+            (m) => m.WorldSettings,
+          ),
+        title: 'owners.tabTitle',
+      },
+      {
         // The Entity browser: every Entity in this World — notes and maps — plus
         // open / create / rename / delete (#70).
         path: 'entities',

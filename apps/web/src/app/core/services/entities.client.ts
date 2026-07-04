@@ -56,6 +56,21 @@ export class EntitiesClient {
     return this.http.delete<void>(`/api/entities/${id}`);
   }
 
+  /** The Entity's ownership set — Owner user ids (ADR-0037, #158). Owner-only server-side. */
+  owners(id: string): Observable<string[]> {
+    return this.http.get<string[]>(`/api/entities/${id}/owners`);
+  }
+
+  /** Add a co-Owner; returns the updated set. Idempotent (200), not a create. */
+  addOwner(id: string, userId: string): Observable<string[]> {
+    return this.http.post<string[]>(`/api/entities/${id}/owners`, { userId });
+  }
+
+  /** Remove an Owner or resign your own ownership; returns the updated set (ADR-0037). */
+  removeOwner(id: string, userId: string): Observable<string[]> {
+    return this.http.delete<string[]>(`/api/entities/${id}/owners/${userId}`);
+  }
+
   // worldId scopes to a World (ADR-0024); omitted, server defaults to caller's first.
   create(
     name: string,

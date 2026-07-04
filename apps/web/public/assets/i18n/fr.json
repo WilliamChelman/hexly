@@ -383,5 +383,22 @@
     "heading": "Introuvable.",
     "hint": "La page ou l'entité que vous cherchez n'existe pas, ou vous n'y avez pas accès.",
     "backToWorlds": "Retour à vos mondes"
+  },
+  "owners": {
+    "heading": "Propriétaires",
+    "subhead": "Chaque personne ici a un contrôle total et égal sur cette {kind}.",
+    "you": "vous",
+    "resign": "Se retirer",
+    "remove": "Retirer",
+    "addLabel": "Ajouter un propriétaire",
+    "addPlaceholder": "Choisir une personne…",
+    "add": "Ajouter",
+    "addError": "Impossible d’ajouter ce propriétaire. Veuillez réessayer.",
+    "removeError": "Impossible de retirer ce propriétaire. Veuillez réessayer.",
+    "lastOwner": "Une {kind} doit conserver au moins un propriétaire.",
+    "loadError": "Impossible de charger les propriétaires.",
+    "world": "monde",
+    "entity": "entité",
+    "tabTitle": "Hexly — Propriétaires"
   }
 }

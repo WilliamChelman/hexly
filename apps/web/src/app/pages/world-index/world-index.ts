@@ -181,6 +181,18 @@ import { ACCENT_SIGIL, accentFor, monogram } from '../../ui/sigil';
                     <span
                       class="relative z-10 ml-auto flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
                     >
+                      <a
+                        appButton
+                        icon
+                        variant="ghost"
+                        size="sm"
+                        [routerLink]="['/w', card.id]"
+                        [attr.data-testid]="'owners-world-' + card.id"
+                        [attr.aria-label]="'owners.heading' | transloco"
+                        [attr.title]="'owners.heading' | transloco"
+                      >
+                        <app-icon name="user" [size]="16" />
+                      </a>
                       <button
                         type="button"
                         appButton

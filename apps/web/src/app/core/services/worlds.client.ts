@@ -51,4 +51,19 @@ export class WorldsClient {
   delete(id: string): Observable<void> {
     return this.http.delete<void>(`/api/worlds/${id}`);
   }
+
+  /** The World's ownership set — Owner user ids (ADR-0037, #158). Owner-only server-side. */
+  owners(id: string): Observable<string[]> {
+    return this.http.get<string[]>(`/api/worlds/${id}/owners`);
+  }
+
+  /** Add a co-Owner; returns the updated set. Idempotent (200), not a create. */
+  addOwner(id: string, userId: string): Observable<string[]> {
+    return this.http.post<string[]>(`/api/worlds/${id}/owners`, { userId });
+  }
+
+  /** Remove an Owner or resign your own ownership; returns the updated set (ADR-0037). */
+  removeOwner(id: string, userId: string): Observable<string[]> {
+    return this.http.delete<string[]>(`/api/worlds/${id}/owners/${userId}`);
+  }
 }

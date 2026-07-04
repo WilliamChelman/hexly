@@ -14,6 +14,16 @@ export interface AuthUser {
 }
 
 /**
+ * A single Instance user in the directory `GET /users` (#158): just enough for
+ * the owner-set UI to name an owner and pick a co-Owner. Deliberately omits the
+ * email — that is private (ADR-0004), so it never enters the directory.
+ */
+export interface UserSummary {
+  readonly id: string;
+  readonly displayName: string;
+}
+
+/**
  * The body of `POST /auth/login`. Both fields must be present and non-empty;
  * the email is otherwise unconstrained — a malformed address simply matches no
  * user rather than being a distinct error (ADR-0004 — credentials are opaque).

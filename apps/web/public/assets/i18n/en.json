@@ -383,5 +383,22 @@
     "heading": "We couldn't find that.",
     "hint": "The page or entity you're looking for doesn't exist, or you don't have access to it.",
     "backToWorlds": "Back to your worlds"
+  },
+  "owners": {
+    "heading": "Owners",
+    "subhead": "Everyone here has full, equal control of this {kind}.",
+    "you": "you",
+    "resign": "Resign",
+    "remove": "Remove",
+    "addLabel": "Add an owner",
+    "addPlaceholder": "Choose a person…",
+    "add": "Add",
+    "addError": "Couldn't add that owner. Please try again.",
+    "removeError": "Couldn't remove that owner. Please try again.",
+    "lastOwner": "A {kind} must keep at least one owner.",
+    "loadError": "Couldn't load the owners.",
+    "world": "world",
+    "entity": "entity",
+    "tabTitle": "Hexly — Owners"
   }
 }

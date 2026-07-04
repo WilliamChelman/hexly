@@ -5,14 +5,17 @@ import {
   computed,
   effect,
   inject,
+  signal,
   viewChild,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Button } from '../../../ui/button';
 import { ButtonGroup } from '../../../ui/button-group';
+import { Dialog } from '../../../ui/dialog';
 import { Eyebrow } from '../../../ui/eyebrow';
 import { Icon } from '../../../ui/icon/icon';
+import { OwnerSet } from '../../../ui/owner-set';
 import { PageHeader } from '../../../ui/page-header';
 import { EntityTags } from './entity-tags';
 import { SaveStatus } from './save-status';
@@ -57,8 +60,10 @@ const TYPE_LABELS: Record<
   imports: [
     Button,
     ButtonGroup,
+    Dialog,
     Eyebrow,
     Icon,
+    OwnerSet,
     PageHeader,
     TranslocoPipe,
     EntityTags,
@@ -124,11 +129,38 @@ const TYPE_LABELS: Record<
         </div>
       }
 
-      <button type="button" pageHeaderActions appButton variant="primary" size="sm">
+      <button
+        type="button"
+        pageHeaderActions
+        appButton
+        variant="primary"
+        size="sm"
+        data-testid="manage-owners"
+        (click)="ownersOpen.set(true)"
+      >
         <app-icon name="share" [size]="16" />
         {{ 'editorShell.share' | transloco }}
       </button>
     </app-page-header>
+
+    @if (ownersOpen() && entityId(); as id) {
+      <app-dialog
+        [open]="true"
+        [heading]="'owners.heading' | transloco"
+        (closed)="ownersOpen.set(false)"
+      >
+        <app-owner-set kind="entity" [id]="id" (resigned)="onResigned()" />
+        <button
+          dialogFooter
+          type="button"
+          appButton
+          data-testid="owners-close"
+          (click)="ownersOpen.set(false)"
+        >
+          {{ 'common.close' | transloco }}
+        </button>
+      </app-dialog>
+    }
   `,
 })
 export class EntityHeader {
@@ -138,6 +170,17 @@ export class EntityHeader {
   /** Owns the Map/Note surface choice, shared with the {@link EntityPage} body (#75). */
   protected readonly store = inject(HexMapStore);
   protected readonly views = VIEWS;
+
+  /** Whether the entity owner-set dialog (#158) is open — toggled by the Share action. */
+  protected readonly ownersOpen = signal(false);
+  /** The open Entity's id — the owner set's target; empty when none is open. */
+  protected readonly entityId = computed(() => this.session.current()?.id ?? '');
+
+  /** Resigning can cost reach to this Entity, so drop back to the World Index. */
+  protected onResigned(): void {
+    this.ownersOpen.set(false);
+    this.router.navigate(['/']);
+  }
 
   /**
    * The Home Entity's title is the World's name (ADR-0029): read-only here, renamed
