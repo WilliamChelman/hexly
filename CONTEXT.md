@@ -222,6 +222,12 @@ _Avoid_: Filter, dimension, aspect
 In the Entity Browser, matching a text query against an Entity's name, Tags, and the prose of its Content — ranked by relevance. Backed server-side by a plain-text projection of Content produced by a format-tagged extractor, so the domain still never parses Content (ADR-0019, ADR-0035).
 _Avoid_: Fulltext, keyword search, fuzzy search
 
+## Outline
+
+**Outline**:
+A navigation view of a Content's headings — a nested, click-to-jump list that also marks the heading currently in view. Derived from the Content, never stored: the domain has no heading model of its own. Available wherever an Entity shows its Content body — a Note, or a Hex Map on its Note view. Sibling to the Inspector and Regions panel.
+_Avoid_: Table of contents, TOC, minimap, nav panel
+
 ## Self-hosting
 
 **Instance**:
