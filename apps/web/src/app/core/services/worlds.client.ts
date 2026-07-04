@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { ImportSummary, WorldDetail, WorldSummary } from '@hexly/domain';
+import { ImportSummary, MemberRole, WorldDetail, WorldMember, WorldSummary } from '@hexly/domain';
 
 /**
  * HTTP client for the worlds API (ADR-0024). Stateless: every call is a round
@@ -65,5 +65,25 @@ export class WorldsClient {
   /** Remove an Owner or resign your own ownership; returns the updated set (ADR-0037). */
   removeOwner(id: string, userId: string): Observable<string[]> {
     return this.http.delete<string[]>(`/api/worlds/${id}/owners/${userId}`);
+  }
+
+  /** The World's non-owner members — Contributors and Viewers (ADR-0037, #159). Owner-only server-side. */
+  members(id: string): Observable<WorldMember[]> {
+    return this.http.get<WorldMember[]>(`/api/worlds/${id}/members`);
+  }
+
+  /** Add a Contributor or World Viewer; returns the updated member set. Upsert (200), not a create. */
+  addMember(id: string, userId: string, role: MemberRole): Observable<WorldMember[]> {
+    return this.http.post<WorldMember[]>(`/api/worlds/${id}/members`, { userId, role });
+  }
+
+  /** Change a member's role between Contributor and Viewer; returns the updated member set. */
+  setMemberRole(id: string, userId: string, role: MemberRole): Observable<WorldMember[]> {
+    return this.http.patch<WorldMember[]>(`/api/worlds/${id}/members/${userId}`, { role });
+  }
+
+  /** Remove a member, or leave the World yourself (pass your own id); returns the updated member set. */
+  removeMember(id: string, userId: string): Observable<WorldMember[]> {
+    return this.http.delete<WorldMember[]>(`/api/worlds/${id}/members/${userId}`);
   }
 }

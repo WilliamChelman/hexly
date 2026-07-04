@@ -1,5 +1,5 @@
 import { Observable, of } from 'rxjs';
-import { ImportSummary, WorldDetail, WorldSummary } from '@hexly/domain';
+import { ImportSummary, MemberRole, WorldDetail, WorldMember, WorldSummary } from '@hexly/domain';
 
 /** Spy-backed stand-in for {@link WorldsClient} — set return values with `mockReturnValue`. */
 export class MockWorldsClient {
@@ -15,4 +15,12 @@ export class MockWorldsClient {
   owners = vi.fn<(id: string) => Observable<string[]>>(() => of<string[]>([]));
   addOwner = vi.fn<(id: string, userId: string) => Observable<string[]>>();
   removeOwner = vi.fn<(id: string, userId: string) => Observable<string[]>>();
+  // Defaults to an empty set so a spec mounting the member panel without caring
+  // about it still renders; override per test as needed.
+  members = vi.fn<(id: string) => Observable<WorldMember[]>>(() => of<WorldMember[]>([]));
+  addMember =
+    vi.fn<(id: string, userId: string, role: MemberRole) => Observable<WorldMember[]>>();
+  setMemberRole =
+    vi.fn<(id: string, userId: string, role: MemberRole) => Observable<WorldMember[]>>();
+  removeMember = vi.fn<(id: string, userId: string) => Observable<WorldMember[]>>();
 }

@@ -7,7 +7,7 @@ import {
   untracked,
 } from '@angular/core';
 import { Observable, tap } from 'rxjs';
-import { WorldDetail, WorldSummary } from '@hexly/domain';
+import { WorldDetail, WorldMember, WorldSummary } from '@hexly/domain';
 import { AuthClient } from './auth.client';
 import { WorldsClient } from './worlds.client';
 
@@ -27,8 +27,6 @@ export class WorldStore {
   private readonly _worlds = signal<readonly WorldSummary[]>([]);
   private readonly _loaded = signal(false);
   private readonly _loadError = signal(false);
-  // ponytail: no retry-on-error beyond the guard reset; add a refresh() if worlds
-  // ever change out-of-band.
   private hasLoaded = false;
 
   readonly worlds = this._worlds.asReadonly();
@@ -98,5 +96,22 @@ export class WorldStore {
     return this.client.delete(id).pipe(
       tap(() => this._worlds.update((ws) => ws.filter((w) => w.id !== id))),
     );
+  }
+
+  /**
+   * Leave a World (ADR-0037, #159): drop the caller's own membership row, then re-fetch
+   * the authoritative list. Not an optimistic remove — reachability is derived, so a
+   * member who still owns an Entity in the World keeps it, and only the server can say
+   * which Worlds survive leaving. The re-fetch reconciles both cases.
+   */
+  leave(id: string): Observable<WorldMember[]> {
+    return this.client.removeMember(id, this.userId() ?? '').pipe(
+      tap(() => this.refresh()),
+    );
+  }
+
+  // Re-fetch the reachable Worlds after an out-of-band change (e.g. leaving one).
+  private refresh(): void {
+    this.client.list().subscribe({ next: (worlds) => this._worlds.set(worlds) });
   }
 }

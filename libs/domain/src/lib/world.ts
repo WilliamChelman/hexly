@@ -28,6 +28,34 @@ export const worldRoleSchema = z.enum(['owner', 'contributor', 'viewer']);
 /** CONTEXT.md → World Owner / Contributor / World Viewer. */
 export type WorldRole = z.infer<typeof worldRoleSchema>;
 
+/**
+ * The roles a World Owner can assign through the membership endpoints (ADR-0037, #159):
+ * `contributor` (creates Entities, reads `shared`) and `viewer` (reads `shared` only).
+ * `owner` is excluded — it belongs to the ownership-set endpoints, not member management.
+ */
+export const memberRoleSchema = z.enum(['contributor', 'viewer']);
+
+export type MemberRole = z.infer<typeof memberRoleSchema>;
+
+/** A non-owner World member (ADR-0037): an Instance user with a Contributor or Viewer role. */
+export interface WorldMember {
+  readonly userId: string;
+  readonly role: MemberRole;
+}
+
+/** POST /worlds/:id/members: add an existing Instance user as a Contributor or Viewer. */
+export const addMemberRequestSchema = z.object({
+  userId: z.string().min(1),
+  role: memberRoleSchema,
+});
+
+export type AddMemberRequest = z.infer<typeof addMemberRequestSchema>;
+
+/** PATCH /worlds/:id/members/:userId: change a member's role between the two member roles. */
+export const setMemberRoleRequestSchema = z.object({ role: memberRoleSchema });
+
+export type SetMemberRoleRequest = z.infer<typeof setMemberRoleRequestSchema>;
+
 /** POST /worlds: only the name is client-supplied; the Home Entity is minted server-side. */
 export const createWorldRequestSchema = z.object({ name: nameSchema });
 

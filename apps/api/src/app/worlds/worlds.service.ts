@@ -1,11 +1,23 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
-import { CreateWorldRequest, emptyEntityBody, WorldDetail, WorldSummary } from '@hexly/domain';
-import { and, asc, count, eq, inArray } from 'drizzle-orm';
+import {
+  CreateWorldRequest,
+  emptyEntityBody,
+  MemberRole,
+  WorldDetail,
+  WorldMember,
+  WorldSummary,
+} from '@hexly/domain';
+import { and, asc, count, eq, inArray, ne, or } from 'drizzle-orm';
 import { AssetsService } from '../assets/assets.service';
-import { OwnerSetResult, removeOwnerOutcome, userExists } from '../acl/owner-set';
+import {
+  AclSetResult,
+  OwnerSetResult,
+  removeOwnerOutcome,
+  userExists,
+} from '../acl/owner-set';
 import { DB, Db } from '../db/db';
-import { entities, worldMembers, worlds } from '../db/schema';
+import { entities, entityOwners, worldMembers, worlds } from '../db/schema';
 
 /**
  * World persistence (ADR-0024). Home Entity (flagged is_home) minted in same
@@ -20,21 +32,42 @@ export class WorldsService {
   ) {}
 
   /**
-   * Every World the caller can reach (ADR-0024): owned or member of. Ownership is
-   * now a membership row (ADR-0037), so a single join on `world_members` covers
-   * both — DISTINCT guards against a user holding more than one row per World.
+   * Every World the caller can reach (ADR-0024, ADR-0037): reachability is derived —
+   * a member row (owner/contributor/viewer) OR ownership of any Entity inside the World
+   * (an ex-member who kept Entities keeps minimal reachability). The two id sets are
+   * unioned so a World is listed once whichever way it is reached.
    */
   list(userId: string): WorldSummary[] {
+    // Reachable = a member row OR ownership of any Entity inside, in one statement:
+    // two id-subqueries OR'd in the WHERE, so the DB does the union and de-dup (a World
+    // reached both ways is still returned once).
     const rows = this.db
-      .selectDistinct({
+      .select({
         id: worlds.id,
         name: worlds.name,
         createdAt: worlds.createdAt,
         updatedAt: worlds.updatedAt,
       })
       .from(worlds)
-      .innerJoin(worldMembers, eq(worldMembers.worldId, worlds.id))
-      .where(eq(worldMembers.userId, userId))
+      .where(
+        or(
+          inArray(
+            worlds.id,
+            this.db
+              .select({ id: worldMembers.worldId })
+              .from(worldMembers)
+              .where(eq(worldMembers.userId, userId)),
+          ),
+          inArray(
+            worlds.id,
+            this.db
+              .select({ id: entities.worldId })
+              .from(entities)
+              .innerJoin(entityOwners, eq(entityOwners.entityId, entities.id))
+              .where(eq(entityOwners.userId, userId)),
+          ),
+        ),
+      )
       .orderBy(asc(worlds.createdAt), asc(worlds.id))
       .all();
     if (rows.length === 0) return [];
@@ -46,7 +79,10 @@ export class WorldsService {
       .from(worldMembers)
       .where(
         and(
-          inArray(worldMembers.worldId, rows.map((w) => w.id)),
+          inArray(
+            worldMembers.worldId,
+            rows.map((w) => w.id),
+          ),
           eq(worldMembers.role, 'owner'),
         ),
       )
@@ -73,7 +109,11 @@ export class WorldsService {
   // Create World with fresh Home note, atomically (ADR-0024).
   create(ownerId: string, req: CreateWorldRequest): WorldDetail {
     const now = Date.now();
-    const { worldId, homeEntityId } = this.mintWorldWithHome(ownerId, req.name, now);
+    const { worldId, homeEntityId } = this.mintWorldWithHome(
+      ownerId,
+      req.name,
+      now,
+    );
     return {
       id: worldId,
       name: req.name,
@@ -143,7 +183,11 @@ export class WorldsService {
     if (!this.isOwner(userId, id)) return 'forbidden';
     const updatedAt = Date.now();
     this.db.transaction(() => {
-      this.db.update(worlds).set({ name, updatedAt }).where(eq(worlds.id, id)).run();
+      this.db
+        .update(worlds)
+        .set({ name, updatedAt })
+        .where(eq(worlds.id, id))
+        .run();
       this.db
         .update(entities)
         .set({ name, updatedAt })
@@ -183,7 +227,7 @@ export class WorldsService {
    */
   listOwners(userId: string, id: string): OwnerSetResult {
     const gate = this.gateOwnerManagement(userId, id);
-    return gate ?? { status: 'ok', owners: this.worldOwners(id) };
+    return gate ?? { status: 'ok', value: this.worldOwners(id) };
   }
 
   /**
@@ -201,7 +245,7 @@ export class WorldsService {
          ON CONFLICT(world_id, user_id) DO UPDATE SET role = 'owner'`,
       )
       .run(id, targetUserId);
-    return { status: 'ok', owners: this.worldOwners(id) };
+    return { status: 'ok', value: this.worldOwners(id) };
   }
 
   /**
@@ -209,7 +253,11 @@ export class WorldsService {
    * The ≥1-Owner invariant refuses removing the last Owner (`last-owner` → 409). A
    * co-Owner may evict any other Owner, including the creator — no hidden hierarchy.
    */
-  removeOwner(userId: string, id: string, targetUserId: string): OwnerSetResult {
+  removeOwner(
+    userId: string,
+    id: string,
+    targetUserId: string,
+  ): OwnerSetResult {
     const gate = this.gateOwnerManagement(userId, id);
     if (gate) return gate;
     const outcome = removeOwnerOutcome(this.worldOwners(id), targetUserId);
@@ -219,9 +267,116 @@ export class WorldsService {
     // land, an un-owned member must demote to their prior role here, not be ejected.
     this.db
       .delete(worldMembers)
-      .where(and(eq(worldMembers.worldId, id), eq(worldMembers.userId, targetUserId)))
+      .where(
+        and(
+          eq(worldMembers.worldId, id),
+          eq(worldMembers.userId, targetUserId),
+        ),
+      )
       .run();
     return outcome;
+  }
+
+  /**
+   * The World's non-owner member set, for an Owner (ADR-0037, #159). Reachable-but-not-Owner
+   * is a 403; unreachable a 404 — the controller maps the result.
+   */
+  listMembers(userId: string, id: string): AclSetResult<WorldMember[]> {
+    const gate = this.gateOwnerManagement(userId, id);
+    return gate ?? { status: 'ok', value: this.worldMembers(id) };
+  }
+
+  /**
+   * Add a member to a World, or change an existing member's role (ADR-0037, #159):
+   * Owner-only, the target must be an existing Instance user, role ∈ {contributor,
+   * viewer}. Upsert — re-adding an existing member updates their role rather than
+   * duplicating the row (the PK is (world, user)).
+   */
+  addMember(
+    userId: string,
+    id: string,
+    targetUserId: string,
+    role: MemberRole,
+  ): AclSetResult<WorldMember[]> {
+    const gate = this.gateOwnerManagement(userId, id);
+    if (gate) return gate;
+    if (!userExists(this.db, targetUserId)) return { status: 'no-such-user' };
+    // The `WHERE role != 'owner'` makes adding an existing Owner a no-op: a member role
+    // can never overwrite ownership here (that would risk orphaning the World, ADR-0037).
+    // Demoting an Owner belongs to the ownership-set endpoints, not member management.
+    this.db.$client
+      .prepare(
+        `INSERT INTO world_members (world_id, user_id, role) VALUES (?, ?, ?)
+         ON CONFLICT(world_id, user_id) DO UPDATE SET role = excluded.role
+         WHERE world_members.role != 'owner'`,
+      )
+      .run(id, targetUserId, role);
+    return { status: 'ok', value: this.worldMembers(id) };
+  }
+
+  /**
+   * Change an existing member's role (ADR-0037, #159): Owner-only, role ∈ {contributor,
+   * viewer}. Only touches non-owner member rows — an unknown user or an Owner is a 404
+   * (Owners are managed through the ownership-set endpoints, not here).
+   */
+  setMemberRole(
+    userId: string,
+    id: string,
+    targetUserId: string,
+    role: MemberRole,
+  ): AclSetResult<WorldMember[]> {
+    const gate = this.gateOwnerManagement(userId, id);
+    if (gate) return gate;
+    const updated = this.db
+      .update(worldMembers)
+      .set({ role })
+      .where(
+        and(
+          eq(worldMembers.worldId, id),
+          eq(worldMembers.userId, targetUserId),
+          ne(worldMembers.role, 'owner'),
+        ),
+      )
+      .run();
+    if (updated.changes === 0) return { status: 'not-found' };
+    return { status: 'ok', value: this.worldMembers(id) };
+  }
+
+  /**
+   * Remove a member, or leave a World yourself (ADR-0037, #159). Removing someone else
+   * is Owner-only; leaving (`targetUserId === userId`) is self-service for any member.
+   * The ≥1-Owner invariant refuses a removal that would orphan the World (`last-owner`
+   * → 409). The row is hard-deleted — access simply recomputes; a departed member who
+   * still owns an Entity in the World keeps minimal reachability (derived, not stored).
+   */
+  removeMember(
+    userId: string,
+    id: string,
+    targetUserId: string,
+  ): AclSetResult<WorldMember[]> {
+    if (!this.reachableWorld(userId, id)) return { status: 'not-found' };
+    const isLeave = targetUserId === userId;
+    if (!isLeave && !this.isOwner(userId, id)) return { status: 'forbidden' };
+    const owners = this.worldOwners(id);
+    if (owners.length === 1 && owners[0] === targetUserId)
+      return { status: 'last-owner' };
+    const deleted = this.db
+      .delete(worldMembers)
+      .where(
+        and(
+          eq(worldMembers.worldId, id),
+          eq(worldMembers.userId, targetUserId),
+          // Removing *someone else* only touches non-owner members — demoting a
+          // co-Owner is the ownership-set endpoints' job (ADR-0037), never member
+          // management. Leaving yourself may drop your own owner row (the ≥1-Owner
+          // guard above already refused orphaning the World).
+          ...(isLeave ? [] : [ne(worldMembers.role, 'owner')]),
+        ),
+      )
+      .run();
+    // No row matched: the target isn't a (removable) member — an Owner or unknown user.
+    if (deleted.changes === 0) return { status: 'not-found' };
+    return { status: 'ok', value: this.worldMembers(id) };
   }
 
   /**
@@ -269,29 +424,52 @@ export class WorldsService {
     return this.db
       .select({ userId: worldMembers.userId })
       .from(worldMembers)
-      .where(and(eq(worldMembers.worldId, worldId), eq(worldMembers.role, 'owner')))
+      .where(
+        and(eq(worldMembers.worldId, worldId), eq(worldMembers.role, 'owner')),
+      )
       .orderBy(asc(worldMembers.userId))
       .all()
       .map((r) => r.userId);
   }
 
-  // World row if userId owns or is a member, else undefined (ADR-0024, ADR-0037).
+  /** The World's non-owner members (ADR-0037): `world_members` rows with a member role, ordered stably. */
+  private worldMembers(worldId: string): WorldMember[] {
+    return this.db
+      .select({ userId: worldMembers.userId, role: worldMembers.role })
+      .from(worldMembers)
+      .where(
+        and(eq(worldMembers.worldId, worldId), ne(worldMembers.role, 'owner')),
+      )
+      .orderBy(asc(worldMembers.userId))
+      .all()
+      .map((r) => ({ userId: r.userId, role: r.role as MemberRole }));
+  }
+
+  /**
+   * World row if `userId` can reach it, else undefined (ADR-0024, ADR-0037). Reachability
+   * is derived, not stored: a member row (owner/contributor/viewer) OR ownership of any
+   * Entity inside the World (the ex-member residue — a departed member who kept Entities
+   * keeps minimal reachability). Unreachable is indistinguishable from nonexistent.
+   */
   private reachableWorld(
     userId: string,
     id: string,
   ): typeof worlds.$inferSelect | undefined {
-    const world = this.db
-      .select()
-      .from(worlds)
-      .where(eq(worlds.id, id))
-      .get();
+    const world = this.db.select().from(worlds).where(eq(worlds.id, id)).get();
     if (!world) return undefined;
     const member = this.db
       .select({ userId: worldMembers.userId })
       .from(worldMembers)
       .where(and(eq(worldMembers.worldId, id), eq(worldMembers.userId, userId)))
       .get();
-    return member ? world : undefined;
+    if (member) return world;
+    const ownsEntity = this.db
+      .select({ id: entities.id })
+      .from(entities)
+      .innerJoin(entityOwners, eq(entityOwners.entityId, entities.id))
+      .where(and(eq(entities.worldId, id), eq(entityOwners.userId, userId)))
+      .get();
+    return ownsEntity ? world : undefined;
   }
 
   /** Whether `userId` is an Owner of World `id` (a `world_members` row with role 'owner'). */

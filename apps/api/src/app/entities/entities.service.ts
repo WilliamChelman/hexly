@@ -494,7 +494,7 @@ export class EntitiesService implements OnApplicationBootstrap {
    */
   listOwners(userId: string, id: string): OwnerSetResult {
     if (!this.ownedRow(userId, id)) return { status: 'not-found' };
-    return { status: 'ok', owners: this.entityOwnersOf(id) };
+    return { status: 'ok', value: this.entityOwnersOf(id) };
   }
 
   /**
@@ -509,7 +509,7 @@ export class EntitiesService implements OnApplicationBootstrap {
       .values({ entityId: id, userId: targetUserId })
       .onConflictDoNothing()
       .run();
-    return { status: 'ok', owners: this.entityOwnersOf(id) };
+    return { status: 'ok', value: this.entityOwnersOf(id) };
   }
 
   /**

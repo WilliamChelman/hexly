@@ -108,7 +108,11 @@ describe('Owner sets', () => {
       const owners = await bob.delete(`/worlds/${id}/owners/${adaId}`).expect(200);
       expect(owners.body).toEqual([bobId]);
 
-      await ada.get(`/worlds/${id}`).expect(404);
+      // Ada lost her ownership powers — she can no longer manage the owner set (403).
+      await ada.post(`/worlds/${id}/owners`).send({ userId: carolId }).expect(403);
+      // But she keeps minimal reachability: she still owns the auto-minted Home Entity,
+      // so the World stays readable to her (ADR-0037 ex-member residue, derived).
+      await ada.get(`/worlds/${id}`).expect(200);
       await bob.get(`/worlds/${id}`).expect(200);
     });
 
@@ -118,11 +122,12 @@ describe('Owner sets', () => {
       const id = await makeWorld(ada);
       await ada.post(`/worlds/${id}/owners`).send({ userId: bobId }).expect(200);
 
-      // Resign is DELETE self.
-      await ada.delete(`/worlds/${id}/owners/${adaId}`).expect(200);
+      // Bob resigns (DELETE self). He owns no Entity in the World, so — unlike the
+      // creator — resigning strips his last thread of reachability entirely.
+      await bob.delete(`/worlds/${id}/owners/${bobId}`).expect(200);
 
-      await ada.get(`/worlds/${id}`).expect(404);
-      await bob.get(`/worlds/${id}`).expect(200);
+      await bob.get(`/worlds/${id}`).expect(404);
+      await ada.get(`/worlds/${id}`).expect(200);
     });
 
     it('refuses removing or resigning the last Owner (409), leaving the set intact', async () => {

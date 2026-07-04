@@ -17,17 +17,20 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
+  addMemberRequestSchema,
   addOwnerRequestSchema,
   AuthUser,
   createWorldRequestSchema,
   ImportSummary,
+  setMemberRoleRequestSchema,
   WorldDetail,
+  WorldMember,
   WorldSummary,
 } from '@hexly/domain';
 import type { Response } from 'express';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { SessionAuthGuard } from '../auth/session-auth.guard';
-import { ownerSetResponse } from '../acl/owner-set';
+import { aclSetResponse, lastOwnerMessage, ownerSetResponse } from '../acl/owner-set';
 import { VaultExportService } from './vault-export.service';
 import { VaultImportService } from './vault-import.service';
 import { WorldsService } from './worlds.service';
@@ -37,6 +40,9 @@ interface UploadedZip {
   originalname: string;
   buffer: Buffer;
 }
+
+/** The 409 body when a member mutation would leave the World without an Owner (ADR-0037). */
+const LAST_OWNER_MESSAGE = lastOwnerMessage('World');
 
 /**
  * The World REST surface (ADR-0024). Every route is guarded; World Owners are
@@ -166,5 +172,57 @@ export class WorldsController {
     @Param('userId') userId: string,
   ): string[] {
     return ownerSetResponse(this.worlds.removeOwner(user.id, id, userId), 'World');
+  }
+
+  // The World's non-owner member set (ADR-0037, #159), for an Owner. The 409 body is
+  // shared by the member routes — only removeMember can raise it, but the mapper needs
+  // it either way (the World that must keep an Owner is this same World).
+  @Get(':id/members')
+  members(@CurrentUser() user: AuthUser, @Param('id') id: string): WorldMember[] {
+    return aclSetResponse(this.worlds.listMembers(user.id, id), LAST_OWNER_MESSAGE);
+  }
+
+  // Add a Contributor or World Viewer (ADR-0037, #159): Owner-only, target must be an
+  // existing Instance user. Upsert — re-adding updates the role — so a 200, not a 201.
+  @Post(':id/members')
+  @HttpCode(200)
+  addMember(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ): WorldMember[] {
+    const parsed = addMemberRequestSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException();
+    return aclSetResponse(
+      this.worlds.addMember(user.id, id, parsed.data.userId, parsed.data.role),
+      LAST_OWNER_MESSAGE,
+    );
+  }
+
+  // Change a member's role between Contributor and World Viewer (ADR-0037, #159): Owner-only.
+  @Patch(':id/members/:userId')
+  setMemberRole(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @Body() body: unknown,
+  ): WorldMember[] {
+    const parsed = setMemberRoleRequestSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException();
+    return aclSetResponse(
+      this.worlds.setMemberRole(user.id, id, userId, parsed.data.role),
+      LAST_OWNER_MESSAGE,
+    );
+  }
+
+  // Remove a member (Owner-only) or leave the World yourself (ADR-0037, #159). The
+  // ≥1-Owner invariant refuses a removal that would orphan the World (409).
+  @Delete(':id/members/:userId')
+  removeMember(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+  ): WorldMember[] {
+    return aclSetResponse(this.worlds.removeMember(user.id, id, userId), LAST_OWNER_MESSAGE);
   }
 }

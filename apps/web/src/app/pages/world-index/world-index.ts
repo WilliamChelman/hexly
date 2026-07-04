@@ -235,6 +235,23 @@ import { ACCENT_SIGIL, accentFor, monogram } from '../../ui/sigil';
                         <app-icon name="erase" [size]="16" />
                       </button>
                     </span>
+                  } @else {
+                    <span
+                      class="relative z-10 ml-auto flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+                    >
+                      <button
+                        type="button"
+                        appButton
+                        variant="ghost"
+                        size="sm"
+                        danger
+                        [attr.data-testid]="'leave-world-' + card.id"
+                        [attr.title]="'members.leave' | transloco"
+                        (click)="leaveWorld(card.id)"
+                      >
+                        {{ 'members.leave' | transloco }}
+                      </button>
+                    </span>
                   }
                 </div>
               </div>
@@ -489,6 +506,14 @@ export class WorldIndex {
 
   protected cancelDelete(): void {
     this.pendingDelete.set(null);
+  }
+
+  /** Leave a World the caller is a member (not Owner) of (ADR-0037, #159), self-service. */
+  protected leaveWorld(id: string): void {
+    this.store.leave(id).subscribe({
+      error: () =>
+        this.toaster.show(this.transloco.translate('members.leaveError'), 'error'),
+    });
   }
 
   /** Delete the pending World once the typed name matches; cascades its Entities (ADR-0024). */

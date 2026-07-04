@@ -9,17 +9,20 @@ import { ActiveWorld } from '../../core/services/active-world';
 import { Eyebrow } from '../../ui/eyebrow';
 import { Panel } from '../../ui/panel';
 import { OwnerSet } from '../../ui/owner-set';
+import { MemberSet } from '../../ui/member-set';
 
 /**
- * The World settings page (#158): bare by design — just the World's symmetric
- * owner set (view, add, remove, resign). The active World id comes from
- * {@link ActiveWorld}, pinned by the `w/:worldId` resolver (ADR-0028). Resigning
- * can cost the user reach to this World, so it drops back to the World Index.
+ * The World settings page (#158, #159): the World's symmetric owner set (view, add,
+ * remove, resign) and, below it, the non-owner membership set (add/change-role/remove
+ * Contributors and World Viewers). The active World id comes from {@link ActiveWorld},
+ * pinned by the `w/:worldId` resolver (ADR-0028). Both surfaces are Owner-only, so a
+ * non-Owner who reaches this page sees load errors rather than management controls.
+ * Resigning can cost the user reach to this World, so it drops back to the World Index.
  */
 @Component({
   selector: 'app-world-settings',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, Eyebrow, Panel, OwnerSet],
+  imports: [TranslocoPipe, Eyebrow, Panel, OwnerSet, MemberSet],
   template: `
     @if (worldId(); as id) {
       <section class="world-settings">
@@ -30,6 +33,12 @@ import { OwnerSet } from '../../ui/owner-set';
         </p>
         <div appPanel>
           <app-owner-set kind="world" [id]="id" (resigned)="leave()" />
+        </div>
+
+        <h2 class="world-settings-heading">{{ 'members.heading' | transloco }}</h2>
+        <p class="world-settings-subhead">{{ 'members.subhead' | transloco }}</p>
+        <div appPanel>
+          <app-member-set [id]="id" />
         </div>
       </section>
     }

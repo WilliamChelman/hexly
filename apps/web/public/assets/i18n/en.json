@@ -405,5 +405,22 @@
     "world": "world",
     "entity": "entity",
     "tabTitle": "Hexly — Owners"
+  },
+  "members": {
+    "heading": "Members",
+    "subhead": "People you've added to this world as contributors or viewers.",
+    "contributor": "Contributor",
+    "viewer": "Viewer",
+    "remove": "Remove",
+    "empty": "No members yet.",
+    "addLabel": "Add a member",
+    "addPlaceholder": "Choose a person…",
+    "add": "Add",
+    "addError": "Couldn't add that member. Please try again.",
+    "roleError": "Couldn't change that member's role. Please try again.",
+    "removeError": "Couldn't remove that member. Please try again.",
+    "loadError": "Couldn't load the members.",
+    "leave": "Leave",
+    "leaveError": "Couldn't leave that world. Please try again."
   }
 }

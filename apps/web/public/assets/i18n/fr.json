@@ -405,5 +405,22 @@
     "world": "monde",
     "entity": "entité",
     "tabTitle": "Hexly — Propriétaires"
+  },
+  "members": {
+    "heading": "Membres",
+    "subhead": "Les personnes que vous avez ajoutées à ce monde comme contributeurs ou lecteurs.",
+    "contributor": "Contributeur",
+    "viewer": "Lecteur",
+    "remove": "Retirer",
+    "empty": "Aucun membre pour l’instant.",
+    "addLabel": "Ajouter un membre",
+    "addPlaceholder": "Choisir une personne…",
+    "add": "Ajouter",
+    "addError": "Impossible d’ajouter ce membre. Veuillez réessayer.",
+    "roleError": "Impossible de changer le rôle de ce membre. Veuillez réessayer.",
+    "removeError": "Impossible de retirer ce membre. Veuillez réessayer.",
+    "loadError": "Impossible de charger les membres.",
+    "leave": "Quitter",
+    "leaveError": "Impossible de quitter ce monde. Veuillez réessayer."
   }
 }
