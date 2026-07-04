@@ -8,7 +8,6 @@ function summary(id: string, name = id): EntitySummary {
     id,
     name,
     worldId: 'w1',
-    ownerId: 'u1',
     type: 'note',
     tags: [],
     visibility: 'private',

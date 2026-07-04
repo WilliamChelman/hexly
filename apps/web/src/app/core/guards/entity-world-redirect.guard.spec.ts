@@ -14,7 +14,6 @@ import { entityWorldRedirect } from './entity-world-redirect.guard';
 function summary(over: Partial<EntitySummary>): EntitySummary {
   return {
     id: 'e1',
-    ownerId: 'u1',
     worldId: 'w1',
     name: 'Aldermoor',
     type: 'note',

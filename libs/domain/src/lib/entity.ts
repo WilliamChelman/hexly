@@ -234,7 +234,6 @@ export interface EntityFacets {
 /** What `GET /entities` lists; body fetched only on open. `type`/`tags` ride along for grouping and filtering. */
 export interface EntitySummary {
   readonly id: string;
-  readonly ownerId: string;
   /** The World this Entity belongs to (ADR-0024). Every Entity belongs to exactly one. */
   readonly worldId: string;
   readonly name: string;

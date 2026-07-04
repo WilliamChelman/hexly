@@ -57,9 +57,7 @@ export const entities = sqliteTable(
   'entities',
   {
     id: text('id').primaryKey(),
-    ownerId: text('owner_id')
-      .notNull()
-      .references(() => users.id),
+    // Ownership is a symmetric set, not a column (ADR-0037): see `entityOwners`.
     // The World this Entity belongs to (ADR-0024).
     worldId: text('world_id')
       .notNull()
@@ -84,7 +82,6 @@ export const entities = sqliteTable(
     updatedAt: integer('updated_at').notNull(),
   },
   (table) => [
-    index('idx_entities_owner_id').on(table.ownerId),
     // Scoped to World (ADR-0024).
     index('idx_entities_world_id').on(table.worldId),
     // Exactly one Home Entity per World.
@@ -95,29 +92,44 @@ export const entities = sqliteTable(
 );
 
 /**
- * A World (ADR-0024): a lightweight container grouping Entities for one campaign.
- * `owner_id` is the World Owner (not a member row). The Home Entity landing page
- * is the World's `is_home` Entity, not a column here — so a World holds no FK back
- * to entities (no circular dependency).
+ * Entity ownership as a symmetric set (ADR-0037): one row per (entity, owner).
+ * Replaces the retired `entities.owner_id` column — an Entity has one or more
+ * equal Owners, guarded by the ≥1-Owner invariant (enforced in EntitiesService,
+ * not the schema). Deleting the Entity cascades its owner rows away.
  */
-export const worlds = sqliteTable(
-  'worlds',
+export const entityOwners = sqliteTable(
+  'entity_owners',
   {
-    id: text('id').primaryKey(),
-    name: text('name').notNull(),
-    ownerId: text('owner_id')
+    entityId: text('entity_id')
+      .notNull()
+      .references(() => entities.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
       .notNull()
       .references(() => users.id),
-    createdAt: integer('created_at').notNull(),
-    updatedAt: integer('updated_at').notNull(),
   },
-  (table) => [index('idx_worlds_owner_id').on(table.ownerId)]
+  (table) => [primaryKey({ columns: [table.entityId, table.userId] })]
 );
 
 /**
- * Named World membership below the Owner (ADR-0024): a user is a `contributor`
- * (creates Entities, owns them, reads `shared`) or a `viewer` (reads `shared`).
- * One row per (world, user).
+ * A World (ADR-0024): a lightweight container grouping Entities for one campaign.
+ * Ownership is a symmetric set (ADR-0037): World Owners are `world_members` rows
+ * with `role: 'owner'`, so a World carries no owner column. The Home Entity
+ * landing page is the World's `is_home` Entity, not a column here — so a World
+ * holds no FK back to entities (no circular dependency).
+ */
+export const worlds = sqliteTable('worlds', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  // Ownership is a symmetric set (ADR-0037): World Owners are `world_members`
+  // rows with `role: 'owner'`, not a column here.
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});
+
+/**
+ * World membership (ADR-0024, ADR-0037): a user is an `owner` (full symmetric
+ * control — the World's ownership set), a `contributor` (creates Entities, owns
+ * them, reads `shared`), or a `viewer` (reads `shared`). One row per (world, user).
  */
 export const worldMembers = sqliteTable(
   'world_members',

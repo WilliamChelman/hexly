@@ -11,7 +11,7 @@ import { CreateEntityDialogState } from './create-entity-dialog.state';
 import { CreateEntityDialog } from './create-entity-dialog';
 
 function world(id: string, name: string): WorldSummary {
-  return { id, name, ownerId: 'u1', createdAt: 1, updatedAt: 1 };
+  return { id, name, owners: ['u1'], createdAt: 1, updatedAt: 1 };
 }
 
 describe('CreateEntityDialog', () => {
@@ -81,7 +81,6 @@ describe('CreateEntityDialog', () => {
       id: 'e1',
       name: 'The Reach',
       worldId: 'w1',
-      ownerId: 'u1',
       type: 'note',
       tags: [],
       visibility: 'private',

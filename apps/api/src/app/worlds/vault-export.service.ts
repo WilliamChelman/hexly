@@ -27,7 +27,8 @@ export class VaultExportService {
   export(ownerId: string, worldId: string): ExportResult {
     const world = this.worlds.get(ownerId, worldId);
     if (!world) return 'not-found';
-    if (world.ownerId !== ownerId) return 'forbidden';
+    // Owner-only (ADR-0037): a member who can read the World still can't export it.
+    if (!world.owners.includes(ownerId)) return 'forbidden';
 
     const files: Zippable = {};
 

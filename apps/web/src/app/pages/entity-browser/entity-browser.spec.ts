@@ -25,7 +25,6 @@ describe('EntityBrowser', () => {
 
   const summary = (over: Partial<EntitySummary>): EntitySummary => ({
     id: 'x',
-    ownerId: 'u1',
     worldId: 'w1',
     name: 'A map',
     type: 'hexmap',

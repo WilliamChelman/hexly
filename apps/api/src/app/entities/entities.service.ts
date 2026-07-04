@@ -27,9 +27,26 @@ import {
   visibilitySchema,
 } from '@hexly/domain';
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { OwnerSetResult, removeOwnerOutcome, userExists } from '../acl/owner-set';
 import { DB, Db } from '../db/db';
-import { entities, entityDescriptors, worlds } from '../db/schema';
+import {
+  entities,
+  entityDescriptors,
+  entityOwners,
+  worldMembers,
+  worlds,
+} from '../db/schema';
 import { HEXLY_CONFIG, HexlyConfig } from '../config/config.module';
+
+/**
+ * Access predicate for this slice (ADR-0037, #158): a row is the caller's iff
+ * they are one of its Owners — an `entity_owners` row. An EXISTS keeps it a
+ * per-row predicate that composes into every owner-scoped query untouched (later
+ * slices widen it to grants and World-shared visibility).
+ */
+function ownsEntity(userId: string) {
+  return sql`EXISTS (SELECT 1 FROM ${entityOwners} WHERE ${entityOwners.entityId} = ${entities.id} AND ${entityOwners.userId} = ${userId})`;
+}
 
 const INITIAL_VERSION = 1;
 
@@ -74,8 +91,9 @@ export type SaveResult = EntitySaveOutcome | { status: 'not-found' };
 
 /**
  * Entity persistence: one JSON body per `entities` row (ADR-0018, ADR-0002).
- * All access is owner-scoped — the service never returns or mutates a row owned
- * by anyone else. Body serialization and `version` bookkeeping live here.
+ * Access is scoped to the Entity's ownership set (ADR-0037): the service only
+ * returns or mutates a row the caller is an Owner of — see {@link ownsEntity} and
+ * {@link ownedRow}. Body serialization and `version` bookkeeping live here.
  */
 @Injectable()
 export class EntitiesService implements OnApplicationBootstrap {
@@ -117,7 +135,6 @@ export class EntitiesService implements OnApplicationBootstrap {
     const query = this.db
       .select({
         id: entities.id,
-        ownerId: entities.ownerId,
         worldId: entities.worldId,
         name: entities.name,
         type: entities.type,
@@ -135,7 +152,7 @@ export class EntitiesService implements OnApplicationBootstrap {
     const rows = query
       .where(
         and(
-          eq(entities.ownerId, ownerId),
+          ownsEntity(ownerId),
           ...filters(opts),
           match ? sql`entities_fts MATCH ${match}` : undefined,
         ),
@@ -246,7 +263,7 @@ export class EntitiesService implements OnApplicationBootstrap {
     return this.db
       .select()
       .from(entities)
-      .where(and(eq(entities.ownerId, ownerId), eq(entities.worldId, worldId)))
+      .where(and(ownsEntity(ownerId), eq(entities.worldId, worldId)))
       .all()
       .map(toDetail);
   }
@@ -296,7 +313,7 @@ export class EntitiesService implements OnApplicationBootstrap {
         contentText: extractText(body.content),
         updatedAt: Date.now(),
       })
-      .where(and(eq(entities.id, homeEntityId), eq(entities.ownerId, ownerId)))
+      .where(and(eq(entities.id, homeEntityId), ownsEntity(ownerId)))
       .run();
   }
 
@@ -318,7 +335,6 @@ export class EntitiesService implements OnApplicationBootstrap {
     const now = Date.now();
     const row = {
       id: input.id ?? randomUUID(),
-      ownerId: input.ownerId,
       worldId: input.worldId,
       name: input.name,
       type: input.body.type,
@@ -332,7 +348,12 @@ export class EntitiesService implements OnApplicationBootstrap {
       createdAt: now,
       updatedAt: now,
     };
-    this.db.insert(entities).values(row).run();
+    // Row and its sole initial Owner land together (ADR-0037) — a new Entity is
+    // never ownerless. The creator is the initial sole member of its owner set.
+    this.db.transaction(() => {
+      this.db.insert(entities).values(row).run();
+      this.db.insert(entityOwners).values({ entityId: row.id, userId: input.ownerId }).run();
+    });
     return row;
   }
 
@@ -363,7 +384,7 @@ export class EntitiesService implements OnApplicationBootstrap {
         .where(
           and(
             eq(entities.id, id),
-            eq(entities.ownerId, ownerId),
+            ownsEntity(ownerId),
             eq(entities.version, req.version),
           ),
         )
@@ -400,7 +421,7 @@ export class EntitiesService implements OnApplicationBootstrap {
     this.db
       .update(entities)
       .set({ name, updatedAt })
-      .where(and(eq(entities.id, id), eq(entities.ownerId, ownerId)))
+      .where(and(eq(entities.id, id), ownsEntity(ownerId)))
       .run();
     return toDetail({ ...row, name, updatedAt });
   }
@@ -414,7 +435,7 @@ export class EntitiesService implements OnApplicationBootstrap {
       .selectDistinct({ descriptor: entityDescriptors.descriptor })
       .from(entityDescriptors)
       .innerJoin(entities, eq(entities.id, entityDescriptors.entityId))
-      .where(eq(entities.ownerId, ownerId))
+      .where(ownsEntity(ownerId))
       .orderBy(asc(entityDescriptors.descriptor))
       .all()
       .map((row) => row.descriptor);
@@ -431,7 +452,7 @@ export class EntitiesService implements OnApplicationBootstrap {
       .selectDistinct({ value: sql<string>`tag.value` })
       .from(entities)
       .innerJoin(sql`json_each(${entities.tags}) as tag`, sql`1 = 1`)
-      .where(eq(entities.ownerId, ownerId))
+      .where(ownsEntity(ownerId))
       .orderBy(sql`tag.value`)
       .all()
       .map((row) => row.value);
@@ -450,18 +471,72 @@ export class EntitiesService implements OnApplicationBootstrap {
       .run();
   }
 
-  // false: unknown id or not owner's (caller surfaces as 404).
+  // false: unknown id or not an Owner's (caller surfaces as 404).
   delete(ownerId: string, id: string): boolean {
     const row = this.db
-      .select({ ownerId: entities.ownerId, isHome: entities.isHome })
+      .select({ isHome: entities.isHome })
       .from(entities)
-      .where(eq(entities.id, id))
+      .where(and(eq(entities.id, id), ownsEntity(ownerId)))
       .get();
-    if (!row || row.ownerId !== ownerId) return false;
+    if (!row) return false;
     // 409, not 400: conflicts with World invariant (Home Entity always exists, ADR-0024).
     if (row.isHome) throw new ConflictException('The Home Entity cannot be deleted');
+    // entity_owners cascades with the row.
     this.db.delete(entities).where(eq(entities.id, id)).run();
     return true;
+  }
+
+  /**
+   * The Entity's ownership set, for an Owner (ADR-0037). A non-Owner can't reach the
+   * Entity at all this slice, so unreachable-and-forbidden both read as 404 (the
+   * controller maps `not-found`); the reachable-but-forbidden 403 arrives with the
+   * visibility slice.
+   */
+  listOwners(userId: string, id: string): OwnerSetResult {
+    if (!this.ownedRow(userId, id)) return { status: 'not-found' };
+    return { status: 'ok', owners: this.entityOwnersOf(id) };
+  }
+
+  /**
+   * Add a co-Owner to an Entity (ADR-0037): Owner-only, the target must be an existing
+   * Instance user. Idempotent — re-adding an existing Owner is a no-op returning the set.
+   */
+  addOwner(userId: string, id: string, targetUserId: string): OwnerSetResult {
+    if (!this.ownedRow(userId, id)) return { status: 'not-found' };
+    if (!userExists(this.db, targetUserId)) return { status: 'no-such-user' };
+    this.db
+      .insert(entityOwners)
+      .values({ entityId: id, userId: targetUserId })
+      .onConflictDoNothing()
+      .run();
+    return { status: 'ok', owners: this.entityOwnersOf(id) };
+  }
+
+  /**
+   * Remove an Owner from an Entity, or resign your own ownership (ADR-0037): Owner-only.
+   * The ≥1-Owner invariant refuses removing the last Owner (`last-owner` → 409). A
+   * co-Owner may evict any other Owner, including the creator.
+   */
+  removeOwner(userId: string, id: string, targetUserId: string): OwnerSetResult {
+    if (!this.ownedRow(userId, id)) return { status: 'not-found' };
+    const outcome = removeOwnerOutcome(this.entityOwnersOf(id), targetUserId);
+    if (outcome.status !== 'ok') return outcome;
+    this.db
+      .delete(entityOwners)
+      .where(and(eq(entityOwners.entityId, id), eq(entityOwners.userId, targetUserId)))
+      .run();
+    return outcome;
+  }
+
+  /** The Entity's Owner user ids (ADR-0037), ordered stably. */
+  private entityOwnersOf(id: string): string[] {
+    return this.db
+      .select({ userId: entityOwners.userId })
+      .from(entityOwners)
+      .where(eq(entityOwners.entityId, id))
+      .orderBy(asc(entityOwners.userId))
+      .all()
+      .map((r) => r.userId);
   }
 
   /**
@@ -469,14 +544,17 @@ export class EntitiesService implements OnApplicationBootstrap {
    * owned by ownerId. Absent worldId defaults to owner's oldest World.
    */
   private resolveWorldId(ownerId: string, requestedId?: string): string {
+    // World ownership is a membership row now (ADR-0037): the caller must be an
+    // Owner (role 'owner') of the target World.
+    const owned = and(
+      eq(worldMembers.userId, ownerId),
+      eq(worldMembers.role, 'owner'),
+    );
     const world = this.db
       .select({ id: worlds.id })
       .from(worlds)
-      .where(
-        requestedId
-          ? and(eq(worlds.id, requestedId), eq(worlds.ownerId, ownerId))
-          : eq(worlds.ownerId, ownerId),
-      )
+      .innerJoin(worldMembers, eq(worldMembers.worldId, worlds.id))
+      .where(requestedId ? and(eq(worlds.id, requestedId), owned) : owned)
       .orderBy(asc(worlds.createdAt), asc(worlds.id))
       .get();
     if (!world) throw new NotFoundException('World not found');
@@ -484,18 +562,19 @@ export class EntitiesService implements OnApplicationBootstrap {
   }
 
   /**
-   * Shared owner-scoping primitive: access control in one place.
+   * Shared owner-scoping primitive: access control in one place. The ownership
+   * predicate rides in the WHERE (a single query), so a non-Owner's row reads as
+   * absent — indistinguishable from a missing one (ADR-0004).
    */
   private ownedRow(
     ownerId: string,
     id: string,
   ): typeof entities.$inferSelect | undefined {
-    const row = this.db
+    return this.db
       .select()
       .from(entities)
-      .where(eq(entities.id, id))
+      .where(and(eq(entities.id, id), ownsEntity(ownerId)))
       .get();
-    return row && row.ownerId === ownerId ? row : undefined;
   }
 }
 
@@ -525,7 +604,7 @@ function filters(opts: FilterOptions) {
  */
 function facetWhere(ownerId: string, opts: FacetOptions, match: string | null) {
   return and(
-    eq(entities.ownerId, ownerId),
+    ownsEntity(ownerId),
     ...filters(opts),
     match ? sql`entities_fts MATCH ${match}` : undefined,
   );
@@ -565,7 +644,6 @@ type SummaryRow = Omit<typeof entities.$inferSelect, 'document'>;
 function toSummary(row: SummaryRow): EntitySummary {
   return {
     id: row.id,
-    ownerId: row.ownerId,
     worldId: row.worldId,
     name: row.name,
     // Validate against schema, not bare cast (ADR-0001).

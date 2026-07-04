@@ -72,7 +72,6 @@ describe('Entities endpoints', () => {
 
     expect(res.body).toEqual({
       id: expect.any(String),
-      ownerId: expect.any(String),
       worldId: expect.any(String),
       name: 'The Reach of Aldermoor',
       type: 'hexmap',
@@ -873,10 +872,18 @@ describe('Entities endpoints', () => {
       const now = Date.now();
       db.$client
         .prepare(
-          `INSERT INTO entities (id, owner_id, world_id, is_home, name, type, tags, visibility, version, document, content_text, created_at, updated_at)
-           VALUES (?, ?, ?, 0, 'Legacy', 'note', '[]', 'private', 1, ?, NULL, ?, ?)`,
+          `INSERT INTO entities (id, world_id, is_home, name, type, tags, visibility, version, document, content_text, created_at, updated_at)
+           VALUES (?, ?, 0, 'Legacy', 'note', '[]', 'private', 1, ?, NULL, ?, ?)`,
         )
-        .run('legacy-1', anchor.ownerId, anchor.worldId, document, now, now);
+        .run('legacy-1', anchor.worldId, document, now, now);
+      // Ownership is a set now (ADR-0037): make the legacy row Ada's by copying the
+      // anchor's Owner into entity_owners, so her Entity list can reach it.
+      db.$client
+        .prepare(
+          `INSERT INTO entity_owners (entity_id, user_id)
+           SELECT 'legacy-1', user_id FROM entity_owners WHERE entity_id = ?`,
+        )
+        .run(anchor.id);
 
       expect(names(await ada.get('/entities').query({ q: 'obelisk' }).expect(200))).toEqual([]);
 

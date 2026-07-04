@@ -9,7 +9,6 @@ import { EntityMetadata } from './entity-metadata';
 describe('EntityMetadata', () => {
   const noteWith = (metadata?: Record<string, unknown>): EntityDetail => ({
     id: 'n1',
-    ownerId: 'u1',
     worldId: 'w1',
     name: 'Lady Mara',
     type: 'note',

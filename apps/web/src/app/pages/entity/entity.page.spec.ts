@@ -31,7 +31,6 @@ function flushHealth(http: HttpTestingController) {
 // Hexmap with a populated Content body, to prove the Note view seeds it (#75).
 const hexmapWithContent = (text: string): EntityDetail => ({
   id: 'm1',
-  ownerId: 'u1',
   worldId: 'w1',
   name: 'The Reach of Aldermoor',
   type: 'hexmap',

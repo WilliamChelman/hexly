@@ -14,7 +14,6 @@ import { reconcileWorldSegment } from './reconcile-world-segment.guard';
 function summary(over: Partial<EntitySummary>): EntitySummary {
   return {
     id: 'e1',
-    ownerId: 'u1',
     worldId: 'w1',
     name: 'Aldermoor',
     type: 'note',

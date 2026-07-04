@@ -11,7 +11,6 @@ function entity(id: string, name: string, worldId = 'w1'): EntitySummary {
     id,
     name,
     worldId,
-    ownerId: 'u1',
     type: 'note',
     tags: [],
     visibility: 'private',

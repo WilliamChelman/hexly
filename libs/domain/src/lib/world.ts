@@ -9,20 +9,23 @@ import { z } from 'zod';
 import { nameSchema } from './entity';
 
 /**
- * A World container (CONTEXT.md → World): a `name` and its `ownerId`. The Home
+ * A World container (CONTEXT.md → World): a `name` and its `owners`. The Home
  * Entity is not a column here — it is the World's Entity flagged `is_home`
  * (ADR-0024), so a World never points back at an Entity (no circular FK).
  */
 export const worldSchema = z.object({
   id: z.string(),
   name: nameSchema,
-  ownerId: z.string(),
+  owners: z.array(z.string()),
 });
 
-/** The named World roles below the Owner (ADR-0024): Owner lives on `worlds.owner_id`, not a member row. */
-export const worldRoleSchema = z.enum(['contributor', 'viewer']);
+/**
+ * World membership roles (ADR-0024, ADR-0037): `owner` is the symmetric
+ * ownership set (full control); `contributor` and `viewer` sit below it.
+ */
+export const worldRoleSchema = z.enum(['owner', 'contributor', 'viewer']);
 
-/** CONTEXT.md → Contributor / World Viewer. */
+/** CONTEXT.md → World Owner / Contributor / World Viewer. */
 export type WorldRole = z.infer<typeof worldRoleSchema>;
 
 /** POST /worlds: only the name is client-supplied; the Home Entity is minted server-side. */
@@ -30,11 +33,20 @@ export const createWorldRequestSchema = z.object({ name: nameSchema });
 
 export type CreateWorldRequest = z.infer<typeof createWorldRequestSchema>;
 
+/**
+ * Add an Owner to a World or Entity's ownership set (ADR-0037): the target must be
+ * an existing Instance user. Shared by the Worlds and Entities owner-set endpoints.
+ */
+export const addOwnerRequestSchema = z.object({ userId: z.string().min(1) });
+
+export type AddOwnerRequest = z.infer<typeof addOwnerRequestSchema>;
+
 /** What a World read surface returns — the stored record plus its timestamps. */
 export interface WorldSummary {
   readonly id: string;
   readonly name: string;
-  readonly ownerId: string;
+  /** The World's ownership set (ADR-0037): one or more equal Owner user ids. */
+  readonly owners: readonly string[];
   readonly createdAt: number;
   readonly updatedAt: number;
 }

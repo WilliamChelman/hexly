@@ -29,8 +29,8 @@ import { ACCENT_SIGIL, accentFor, monogram } from '../../ui/sigil';
  * every World the caller can reach — owned and member — and the surface that owns
  * World create. It is the chooser, not an auto-redirect: a user with zero Worlds
  * sees an empty state with a Create affordance rather than an edge case to redirect
- * around. Owned-vs-member is derived by comparing each World's `ownerId` to the
- * current user. Creating opens the new World's Home Entity; activating an existing
+ * around. Owned-vs-member is derived by testing whether the current user is in each
+ * World's `owners` set (ADR-0037). Creating opens the new World's Home Entity; activating an existing
  * World enters its Entity browser.
  */
 @Component({
@@ -378,7 +378,9 @@ export class WorldIndex {
   /** The reachable Worlds, each tagged owned (caller is its Owner) or member. */
   protected readonly cards = computed(() => {
     const me = this.auth.currentUser()?.id;
-    return this.store.worlds().map((w) => ({ ...w, owned: w.ownerId === me }));
+    return this.store
+      .worlds()
+      .map((w) => ({ ...w, owned: !!me && w.owners.includes(me) }));
   });
   /** The rail order: most-recently-touched World first (continue where you left off). */
   protected readonly sorted = computed(() =>

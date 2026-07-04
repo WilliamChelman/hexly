@@ -50,7 +50,8 @@ describe('Worlds endpoints', () => {
     expect(res.body).toEqual({
       id: expect.any(String),
       name: 'Aldermoor',
-      ownerId: expect.any(String),
+      // Ownership is a symmetric set (ADR-0037): the creator is its sole Owner.
+      owners: [expect.any(String)],
       homeEntityId: expect.any(String),
       // Fresh World holds only its Home Entity (#120).
       entityCount: 1,
@@ -79,7 +80,7 @@ describe('Worlds endpoints', () => {
     expect(res.body[0]).toEqual({
       id: expect.any(String),
       name: expect.any(String),
-      ownerId: expect.any(String),
+      owners: [expect.any(String)],
       createdAt: expect.any(Number),
       updatedAt: expect.any(Number),
     });

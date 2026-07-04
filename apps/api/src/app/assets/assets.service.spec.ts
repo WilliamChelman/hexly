@@ -27,9 +27,8 @@ describe('AssetsService', () => {
     db = createDb(':memory:'); // migrations run at boot, incl. the new assets table.
     dir = mkdtempSync(join(tmpdir(), 'hexly-assets-test-'));
     assets = new AssetsService(db, dir);
-    // assets.world_id FKs to a real World (which FKs to a real user); seed both.
-    db.$client.prepare('INSERT INTO users (id, email, display_name, password_hash, created_at) VALUES (?,?,?,?,0)').run('u1', 'a@b.c', 'A', 'h');
-    db.$client.prepare('INSERT INTO worlds (id, name, owner_id, created_at, updated_at) VALUES (?,?,?,0,0)').run('world-1', 'W', 'u1');
+    // assets.world_id FKs to a real World; seed one (ADR-0037: no owner_id column).
+    db.$client.prepare('INSERT INTO worlds (id, name, created_at, updated_at) VALUES (?,?,0,0)').run('world-1', 'W');
   });
 
   afterEach(() => {

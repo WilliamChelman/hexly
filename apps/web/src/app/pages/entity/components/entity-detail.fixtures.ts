@@ -2,7 +2,6 @@ import { CONTENT_FORMAT, EntityDetail } from '@hexly/domain';
 
 export const noteDetail = (name: string): EntityDetail => ({
   id: 'n1',
-  ownerId: 'u1',
   worldId: 'w1',
   name,
   type: 'note',

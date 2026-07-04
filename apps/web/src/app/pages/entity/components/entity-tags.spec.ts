@@ -11,7 +11,6 @@ import { EntityTags } from './entity-tags';
 describe('EntityTags', () => {
   const noteWith = (tags: string[]): EntityDetail => ({
     id: 'n1',
-    ownerId: 'u1',
     worldId: 'w1',
     name: 'Lady Mara',
     type: 'note',

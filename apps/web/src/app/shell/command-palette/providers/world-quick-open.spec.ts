@@ -6,7 +6,7 @@ import { WorldStore } from '../../../core/services/world.store';
 import { WorldQuickOpen } from './world-quick-open';
 
 function world(id: string, name: string): WorldSummary {
-  return { id, name, ownerId: 'u1', createdAt: 1, updatedAt: 1 };
+  return { id, name, owners: ['u1'], createdAt: 1, updatedAt: 1 };
 }
 
 describe('WorldQuickOpen', () => {

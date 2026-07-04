@@ -16,7 +16,6 @@ describe('EntityHeader', () => {
 
   const aldermoor: EntityDetail = {
     id: 'm1',
-    ownerId: 'u1',
     worldId: 'w1',
     name: 'The Reach of Aldermoor',
     type: 'hexmap',

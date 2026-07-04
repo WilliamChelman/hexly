@@ -12,7 +12,7 @@ import { provideTranslocoTesting } from '../../core/i18n/transloco-testing';
 import { WorldIndex } from './world-index';
 
 function world(id: string, name = id, ownerId = 'u1'): WorldSummary {
-  return { id, name, ownerId, createdAt: 1, updatedAt: 1 };
+  return { id, name, owners: [ownerId], createdAt: 1, updatedAt: 1 };
 }
 
 describe('WorldIndex', () => {

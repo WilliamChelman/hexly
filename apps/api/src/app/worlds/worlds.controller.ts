@@ -17,6 +17,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
+  addOwnerRequestSchema,
   AuthUser,
   createWorldRequestSchema,
   ImportSummary,
@@ -26,6 +27,7 @@ import {
 import type { Response } from 'express';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { SessionAuthGuard } from '../auth/session-auth.guard';
+import { ownerSetResponse } from '../acl/owner-set';
 import { VaultExportService } from './vault-export.service';
 import { VaultImportService } from './vault-import.service';
 import { WorldsService } from './worlds.service';
@@ -37,9 +39,10 @@ interface UploadedZip {
 }
 
 /**
- * The World REST surface (ADR-0024). Every route is guarded; the World Owner
- * lives on `worlds.owner_id`. Bodies are validated against the shared Zod schema
- * (ADR-0001) so an invalid payload is a 400 here, never a 500 deeper down.
+ * The World REST surface (ADR-0024). Every route is guarded; World Owners are
+ * the World's `world_members` rows with role 'owner' (ADR-0037). Bodies are
+ * validated against the shared Zod schema (ADR-0001) so an invalid payload is a
+ * 400 here, never a 500 deeper down.
  */
 @Controller('worlds')
 @UseGuards(SessionAuthGuard)
@@ -132,5 +135,36 @@ export class WorldsController {
     const result = this.worlds.delete(user.id, id);
     if (result === null) throw new NotFoundException();
     if (result === 'forbidden') throw new ForbiddenException();
+  }
+
+  // The World's ownership set (ADR-0037), for an Owner.
+  @Get(':id/owners')
+  owners(@CurrentUser() user: AuthUser, @Param('id') id: string): string[] {
+    return ownerSetResponse(this.worlds.listOwners(user.id, id), 'World');
+  }
+
+  // Add a co-Owner (ADR-0037): Owner-only, target must be an existing Instance user.
+  // Returns the updated set (200), idempotent — not a 201 (adding is set membership).
+  @Post(':id/owners')
+  @HttpCode(200)
+  addOwner(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ): string[] {
+    const parsed = addOwnerRequestSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException();
+    return ownerSetResponse(this.worlds.addOwner(user.id, id, parsed.data.userId), 'World');
+  }
+
+  // Remove an Owner, or resign your own ownership (ADR-0037). The ≥1-Owner
+  // invariant refuses removing the last Owner (409).
+  @Delete(':id/owners/:userId')
+  removeOwner(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+  ): string[] {
+    return ownerSetResponse(this.worlds.removeOwner(user.id, id, userId), 'World');
   }
 }

@@ -15,6 +15,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  addOwnerRequestSchema,
   AuthUser,
   createEntityRequestSchema,
   EntityDetail,
@@ -24,6 +25,7 @@ import {
   renameEntityRequestSchema,
   saveEntityRequestSchema,
 } from '@hexly/domain';
+import { ownerSetResponse } from '../acl/owner-set';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { SessionAuthGuard } from '../auth/session-auth.guard';
 import { decodeCursor } from './utils/decode-cursor';
@@ -146,5 +148,36 @@ export class EntitiesController {
   @HttpCode(204)
   remove(@CurrentUser() user: AuthUser, @Param('id') id: string): void {
     if (!this.entities.delete(user.id, id)) throw new NotFoundException();
+  }
+
+  // The Entity's ownership set (ADR-0037), for an Owner.
+  @Get(':id/owners')
+  owners(@CurrentUser() user: AuthUser, @Param('id') id: string): string[] {
+    return ownerSetResponse(this.entities.listOwners(user.id, id), 'Entity');
+  }
+
+  // Add a co-Owner (ADR-0037): Owner-only, target must be an existing Instance user.
+  // Returns the updated set (200), idempotent — not a 201 (adding is set membership).
+  @Post(':id/owners')
+  @HttpCode(200)
+  addOwner(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ): string[] {
+    const parsed = addOwnerRequestSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException();
+    return ownerSetResponse(this.entities.addOwner(user.id, id, parsed.data.userId), 'Entity');
+  }
+
+  // Remove an Owner, or resign your own ownership (ADR-0037). The ≥1-Owner
+  // invariant refuses removing the last Owner (409).
+  @Delete(':id/owners/:userId')
+  removeOwner(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+  ): string[] {
+    return ownerSetResponse(this.entities.removeOwner(user.id, id, userId), 'Entity');
   }
 }
