@@ -81,8 +81,22 @@ export function emptyEntityBody(type: EntityType): EntityBody {
     : { type, content: emptyContent() };
 }
 
-/** `.trim()` before `.min(1)` rejects whitespace-only names and strips surrounding whitespace (issues #12, #15). Shared with the World name (ADR-0024). */
-export const nameSchema = z.string().trim().min(1);
+/** The reserved Metadata namespace (ADR-0033): Hexly provenance keys (`hexly.*`) that drive placement/typing on export and are stripped from author-facing frontmatter. Shared by the vault import/export pair so the strip prefix has one source of truth (#150). */
+export const HEXLY_METADATA_PREFIX = 'hexly.';
+
+/**
+ * `.trim()` before `.min(1)` rejects whitespace-only names and strips surrounding whitespace
+ * (issues #12, #15). Shared with the World name (ADR-0024). Bounded to 255 chars and free of
+ * control characters and path separators (`/`, `\`): names flow unescaped into filesystem paths,
+ * zip entry keys, and the vault-export `Content-Disposition` header, where a newline or slash
+ * corrupts the output or throws (#150).
+ */
+export const nameSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(255)
+  .refine((s) => !/[\p{Cc}/\\]/u.test(s), 'Name cannot contain control characters or slashes');
 
 /**
  * Free-text Tags on an Entity (CONTEXT.md → Tag), normalized on parse so the

@@ -10,6 +10,7 @@ import {
   Param,
   Patch,
   Post,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -22,8 +23,10 @@ import {
   WorldDetail,
   WorldSummary,
 } from '@hexly/domain';
+import type { Response } from 'express';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { SessionAuthGuard } from '../auth/session-auth.guard';
+import { VaultExportService } from './vault-export.service';
 import { VaultImportService } from './vault-import.service';
 import { WorldsService } from './worlds.service';
 
@@ -44,6 +47,7 @@ export class WorldsController {
   constructor(
     private readonly worlds: WorldsService,
     private readonly importer: VaultImportService,
+    private readonly exporter: VaultExportService,
   ) {}
 
   @Get()
@@ -81,6 +85,30 @@ export class WorldsController {
     const world = this.worlds.get(user.id, id);
     if (!world) throw new NotFoundException();
     return world;
+  }
+
+  /**
+   * Export a World to a `.zip` of markdown + assets in the original folder shape (ADR-0033, #150).
+   * Owner-only: a member who can read the World still can't export it (404 vs 403 mirror the
+   * rename/delete surface). Uses `@Res()` to stream the binary body — Nest's JSON serializer would
+   * otherwise mangle the Buffer.
+   */
+  @Get(':id/export')
+  export(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ): void {
+    const result = this.exporter.export(user.id, id);
+    if (result === 'not-found') throw new NotFoundException();
+    if (result === 'forbidden') throw new ForbiddenException();
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${result.filename.replace(/"/g, '')}"; ` +
+        `filename*=UTF-8''${encodeURIComponent(result.filename)}`,
+    );
+    res.send(result.zip);
   }
 
   // Reuse create schema (both use { name } shape).

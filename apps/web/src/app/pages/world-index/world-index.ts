@@ -187,6 +187,20 @@ import { ACCENT_SIGIL, accentFor, monogram } from '../../ui/sigil';
                         icon
                         variant="ghost"
                         size="sm"
+                        [disabled]="exportingId() === card.id"
+                        [attr.data-testid]="'export-world-' + card.id"
+                        [attr.aria-label]="'worlds.export' | transloco"
+                        [attr.title]="'worlds.export' | transloco"
+                        (click)="exportWorld(card.id, card.name)"
+                      >
+                        <app-icon name="download" [size]="16" />
+                      </button>
+                      <button
+                        type="button"
+                        appButton
+                        icon
+                        variant="ghost"
+                        size="sm"
                         [attr.data-testid]="'rename-world-' + card.id"
                         [attr.aria-label]="'worldIndex.rename' | transloco"
                         [attr.title]="'worldIndex.rename' | transloco"
@@ -386,6 +400,8 @@ export class WorldIndex {
   protected readonly creating = signal(false);
   /** True while a vault import is in flight — drives the Import affordance's spinner. */
   protected readonly importing = signal(false);
+  /** The id of the World whose export is in flight, if any — disables that card's Export button. */
+  protected readonly exportingId = signal<string | null>(null);
   /** The last import's result, shown in a summary modal until the user opens the World or dismisses it. */
   protected readonly importSummary = signal<ImportSummary | null>(null);
   protected readonly renamingId = signal<string | null>(null);
@@ -520,6 +536,27 @@ export class WorldIndex {
       });
   }
 
+  /**
+   * Export a World to a `.zip` and save it as a browser download (ADR-0033, #150).
+   * The download is named after the World; a failure just toasts. Owner-only, gated
+   * in the template — the server also refuses a non-owner (403).
+   */
+  protected exportWorld(id: string, name: string): void {
+    if (this.exportingId()) return;
+    this.exportingId.set(id);
+    this.worldsClient
+      .exportVault(id)
+      .pipe(finalize(() => this.exportingId.set(null)))
+      .subscribe({
+        next: (blob) => saveBlob(blob, `${name}.zip`),
+        error: () =>
+          this.toaster.show(
+            this.transloco.translate('worlds.exportError'),
+            'error',
+          ),
+      });
+  }
+
   /** Leave the summary modal and enter the freshly imported World's Entity browser. */
   protected openImported(): void {
     const summary = this.importSummary();
@@ -531,4 +568,14 @@ export class WorldIndex {
   protected dismissImport(): void {
     this.importSummary.set(null);
   }
+}
+
+/** Save a blob as a browser download under `filename` (the app's only blob-download, #150). */
+function saveBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
 }

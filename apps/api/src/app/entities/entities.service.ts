@@ -96,6 +96,20 @@ export class EntitiesService {
     return row ? toDetail(row) : null;
   }
 
+  /**
+   * Every Entity in a World, bodies included, for the vault export (ADR-0033, #150).
+   * Owner-scoped like the rest of the service — a member never reaches another owner's
+   * bodies. Unlike {@link list} this pulls the full `document` column (export serializes it).
+   */
+  listByWorld(ownerId: string, worldId: string): EntityDetail[] {
+    return this.db
+      .select()
+      .from(entities)
+      .where(and(eq(entities.ownerId, ownerId), eq(entities.worldId, worldId)))
+      .all()
+      .map(toDetail);
+  }
+
   create(ownerId: string, req: CreateEntityRequest): EntityDetail {
     const body = emptyEntityBody(req.type);
     const row = this.insertEntity({
@@ -124,6 +138,20 @@ export class EntitiesService {
     body: EntityBody,
   ): void {
     this.insertEntity({ id, ownerId, worldId, name, tags, body });
+  }
+
+  /**
+   * Populate a World's auto-created Home Entity from a re-imported `hexly.isHome` note
+   * (ADR-0033, #150): update its Content, Metadata, and Tags in place rather than inserting a
+   * duplicate note. The Home's name stays the World name (ADR-0029) and its `is_home` flag is
+   * untouched — only the body a Hexly export round-trips back is written.
+   */
+  importHome(ownerId: string, homeEntityId: string, tags: readonly string[], body: EntityBody): void {
+    this.db
+      .update(entities)
+      .set({ document: serialize(body), tags: [...tags], updatedAt: Date.now() })
+      .where(and(eq(entities.id, homeEntityId), eq(entities.ownerId, ownerId)))
+      .run();
   }
 
   /**

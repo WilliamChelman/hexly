@@ -103,6 +103,19 @@ describe('WorldsClient', () => {
     expect(got).toEqual(importSummary);
   });
 
+  it('exports a world as a binary zip blob', () => {
+    let got: Blob | undefined;
+    client.exportVault('w1').subscribe((b) => (got = b));
+
+    const req = http.expectOne('/api/worlds/w1/export');
+    expect(req.request.method).toBe('GET');
+    expect(req.request.responseType).toBe('blob');
+    const zip = new Blob([new Uint8Array([1, 2, 3])], { type: 'application/zip' });
+    req.flush(zip);
+
+    expect(got).toBe(zip);
+  });
+
   it('deletes a world by id', () => {
     let completed = false;
     client.delete('w1').subscribe({ complete: () => (completed = true) });

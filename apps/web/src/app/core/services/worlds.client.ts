@@ -35,6 +35,15 @@ export class WorldsClient {
     return this.http.get<WorldDetail>(`/api/worlds/${id}`);
   }
 
+  /**
+   * Export a World to a `.zip` of markdown + assets (ADR-0033, #150). The response is
+   * a binary blob (`responseType: 'blob'`), which the caller saves as a download; the
+   * filename is derived from the World's name rather than parsed from a header.
+   */
+  exportVault(id: string): Observable<Blob> {
+    return this.http.get(`/api/worlds/${id}/export`, { responseType: 'blob' });
+  }
+
   rename(id: string, name: string): Observable<WorldDetail> {
     return this.http.patch<WorldDetail>(`/api/worlds/${id}`, { name });
   }

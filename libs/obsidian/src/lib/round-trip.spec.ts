@@ -64,4 +64,46 @@ describe('markdown → PM → markdown round-trip', () => {
     const { first, back } = reimport(markdown);
     expect(back).toEqual(first);
   });
+
+  // A tight list must stay tight: remark defaults lists to loose, so without an explicit
+  // per-item `spread` the export injects a blank line between every item (the PM-doc pin above
+  // can't catch this — tight and loose parse to the same doc). Indentation normalizes to 2 spaces.
+  it('exports a tight nested list without injecting blank lines between items', () => {
+    const src = [
+      '- Doors in the west wing are more likely to be locked',
+      '- pomme = 2',
+      '- 4 po >= 5 apples + 5 bannas + 5 oranges = 50 steps',
+      '    - banne = 2 po = 3 steps',
+      '    - orange = ? po = 5 steps',
+      '- Drawing room',
+      '    - femme 4',
+      '    - homme canne 11',
+      '    - cheval 6',
+      '    - homme pp 15',
+      '    - enfant 5',
+    ].join('\n');
+    const expected = [
+      '- Doors in the west wing are more likely to be locked',
+      '- pomme = 2',
+      '- 4 po >= 5 apples + 5 bannas + 5 oranges = 50 steps',
+      '  - banne = 2 po = 3 steps',
+      '  - orange = ? po = 5 steps',
+      '- Drawing room',
+      '  - femme 4',
+      '  - homme canne 11',
+      '  - cheval 6',
+      '  - homme pp 15',
+      '  - enfant 5',
+    ].join('\n');
+    const back = proseMirrorToMarkdown(markdownToProseMirror(src).doc);
+    expect(back.trimEnd()).toBe(expected);
+  });
+
+  // The flip side: a genuinely loose item (two paragraphs) must keep its blank line, or the two
+  // paragraphs merge into one on reparse. Guards the tight-list fix from over-tightening.
+  it('keeps a loose list item that has two paragraphs loose', () => {
+    const src = '- item one\n\n  second paragraph of item one\n\n- item two';
+    const back = proseMirrorToMarkdown(markdownToProseMirror(src).doc);
+    expect(back).toContain('- item one\n\n  second paragraph of item one');
+  });
 });

@@ -58,24 +58,28 @@ function blockToMdast(node: PMNode): RootContent[] {
           children: inlineChildren(node),
         },
       ];
-    case 'bulletList':
-      return [{ type: 'list', ordered: false, children: listItems(node) }];
-    case 'orderedList':
+    case 'bulletList': {
+      const children = listItems(node);
+      return [{ type: 'list', ordered: false, spread: listSpread(children), children }];
+    }
+    case 'orderedList': {
+      const children = listItems(node);
       return [
-        { type: 'list', ordered: true, start: (node.attrs?.['start'] as number) ?? 1, children: listItems(node) },
+        { type: 'list', ordered: true, start: (node.attrs?.['start'] as number) ?? 1, spread: listSpread(children), children },
       ];
-    case 'taskList':
-      return [
-        {
-          type: 'list',
-          ordered: false,
-          children: (node.content ?? []).map((item) => ({
-            type: 'listItem' as const,
-            checked: Boolean(item.attrs?.['checked']),
-            children: blockChildren(item),
-          })) as ListItem[],
-        },
-      ];
+    }
+    case 'taskList': {
+      const children = (node.content ?? []).map((item) => {
+        const itemChildren = blockChildren(item);
+        return {
+          type: 'listItem' as const,
+          checked: Boolean(item.attrs?.['checked']),
+          spread: itemSpread(itemChildren),
+          children: itemChildren,
+        };
+      }) as ListItem[];
+      return [{ type: 'list', ordered: false, spread: listSpread(children), children }];
+    }
     case 'codeBlock':
       return [
         {
@@ -111,12 +115,27 @@ function blockToMdast(node: PMNode): RootContent[] {
   }
 }
 
-/** Maps PM listItem children to mdast listItems. */
+/** Maps PM listItem children to mdast listItems, tagging each with its looseness. */
 function listItems(node: PMNode): ListItem[] {
-  return (node.content ?? []).map((item) => ({
-    type: 'listItem',
-    children: blockChildren(item),
-  })) as ListItem[];
+  return (node.content ?? []).map((item) => {
+    const children = blockChildren(item);
+    return { type: 'listItem', spread: itemSpread(children), children };
+  }) as ListItem[];
+}
+
+/**
+ * mdast list looseness (#150). PM has no tight/loose flag, so we derive one: an item is "spread"
+ * (rendered with blank lines around its later blocks) only when two of its paragraphs are adjacent
+ * and would otherwise merge into one on reparse — a paragraph followed by a nested list stays tight.
+ * A list is loose iff any item is, matching CommonMark. Without this, remark defaults every list to
+ * loose and a tight source list gains a blank line between every item on round-trip.
+ */
+function itemSpread(children: BlockContent[]): boolean {
+  return children.some((c, i) => i > 0 && c.type === 'paragraph' && children[i - 1].type === 'paragraph');
+}
+
+function listSpread(items: ListItem[]): boolean {
+  return items.some((item) => item.spread === true);
 }
 
 /** Maps a PM parent's block children to mdast block content. */

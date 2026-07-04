@@ -462,6 +462,28 @@ describe('Vault import endpoint', () => {
     await request(app.getHttpServer()).get(assetUrl).expect(404);
   });
 
+  it('routes a hexly.isHome note into the World Home Entity instead of duplicating it', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    // A vault Hexly exported: the Home note carries `hexly.isHome` (and no sourcePath → root).
+    const zip = vaultZip({
+      'Aldermoor.md': ['---', 'hexly.isHome: true', '---', '# Aldermoor', '', 'The frontier realm.'].join('\n'),
+      'Lady Mara.md': '# Lady Mara',
+    });
+
+    const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
+    const worldId = res.body.worldId;
+
+    // Home + the one regular note = 2: the isHome note updated Home, it did not add a third entity.
+    const world = await ada.get(`/worlds/${worldId}`).expect(200);
+    expect(world.body.entityCount).toBe(2);
+
+    // The Home Entity now carries the imported lore, and hexly.* keys aren't persisted as Metadata.
+    const home = await ada.get(`/entities/${world.body.homeEntityId}`).expect(200);
+    expect(home.body.isHome).toBe(true);
+    expect(JSON.stringify(home.body.document.content.snapshot)).toContain('The frontier realm.');
+    expect(home.body.document.metadata ?? {}).not.toHaveProperty('hexly.isHome');
+  });
+
   it('refuses the import route without a session cookie', async () => {
     await request(app.getHttpServer()).post('/worlds/import').expect(401);
   });

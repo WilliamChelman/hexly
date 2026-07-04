@@ -324,6 +324,8 @@
     "import": "Importer un coffre",
     "importing": "Importation…",
     "importError": "Impossible d'importer ce coffre. Veuillez réessayer.",
+    "export": "Exporter le coffre",
+    "exportError": "Impossible d'exporter ce monde. Veuillez réessayer.",
     "importSummaryHeading": "Coffre importé",
     "importNotes": "Notes importées",
     "importLinksResolved": "Liens résolus",

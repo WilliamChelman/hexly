@@ -208,8 +208,42 @@ describe('WorldIndex', () => {
 
     expect($(el, '[data-testid=rename-world-w1]')).not.toBeNull();
     expect($(el, '[data-testid=delete-world-w1]')).not.toBeNull();
+    expect($(el, '[data-testid=export-world-w1]')).not.toBeNull();
     expect($(el, '[data-testid=rename-world-w2]')).toBeNull();
     expect($(el, '[data-testid=delete-world-w2]')).toBeNull();
+    expect($(el, '[data-testid=export-world-w2]')).toBeNull();
+  });
+
+  it('exports an owned World as a named .zip download', () => {
+    const el = render([world('w1', 'Aldermoor')]).nativeElement as HTMLElement;
+    const zip = new Blob([new Uint8Array([1, 2, 3])], { type: 'application/zip' });
+    worldsClient.exportVault.mockReturnValue(of(zip));
+
+    // happy-dom doesn't implement object URLs or a real anchor click — stub them.
+    URL.createObjectURL = vi.fn(() => 'blob:zip');
+    URL.revokeObjectURL = vi.fn();
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => undefined);
+
+    ($(el, '[data-testid=export-world-w1]') as HTMLButtonElement).click();
+
+    expect(worldsClient.exportVault).toHaveBeenCalledWith('w1');
+    expect(URL.createObjectURL).toHaveBeenCalledWith(zip);
+    // The download anchor fires with the World's name as the filename.
+    expect(click).toHaveBeenCalled();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:zip');
+  });
+
+  it('surfaces an error toast when exporting a World fails', () => {
+    const el = render([world('w1', 'Aldermoor')]).nativeElement as HTMLElement;
+    worldsClient.exportVault.mockReturnValue(throwError(() => new Error('boom')));
+
+    ($(el, '[data-testid=export-world-w1]') as HTMLButtonElement).click();
+
+    expect(TestBed.inject(ToasterService).toasts().map((t) => t.tone)).toEqual([
+      'error',
+    ]);
   });
 
   it('renames an owned World from the Index, updating the list', () => {

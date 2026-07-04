@@ -118,6 +118,11 @@ const GLYPHS = {
       'stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"',
     body: '<path d="M12 15V4" /><path d="M8 8l4-4 4 4" /><path d="M5 15v3a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 18v-3" />',
   },
+  download: {
+    attrs:
+      'stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"',
+    body: '<path d="M12 4v11" /><path d="M8 11l4 4 4-4" /><path d="M5 15v3a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 18v-3" />',
+  },
   user: {
     attrs:
       'stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"',

@@ -98,6 +98,28 @@ export class AssetsService {
     return { bytes: readFileSync(path), mime: MIME_BY_EXT[extname(file).toLowerCase()] ?? 'application/octet-stream' };
   }
 
+  /**
+   * Every stored Asset for a World, for the vault export (ADR-0033, #150): the capability URL its
+   * docs reference (built by the same {@link url} helper the store path uses, so the export's src
+   * rewrite can't drift from the stored format), the human-readable `originalFilename` to write
+   * into the zip, and its bytes. A row whose file is missing on disk is skipped rather than
+   * aborting the export.
+   */
+  exportAssets(worldId: string): { servedUrl: string; originalFilename: string; bytes: Buffer }[] {
+    const rows = this.db
+      .select({ hash: assets.hash, originalFilename: assets.originalFilename })
+      .from(assets)
+      .where(eq(assets.worldId, worldId))
+      .all();
+    const out: { servedUrl: string; originalFilename: string; bytes: Buffer }[] = [];
+    for (const row of rows) {
+      const ext = extname(row.originalFilename).toLowerCase();
+      const found = this.read(worldId, row.hash + ext);
+      if (found) out.push({ servedUrl: this.url(worldId, row.hash, ext), originalFilename: row.originalFilename, bytes: found.bytes });
+    }
+    return out;
+  }
+
   /** Remove a World's entire Asset folder (its rows cascade away with the World). Best-effort: a missing folder is fine. */
   deleteWorld(worldId: string): void {
     rmSync(join(this.dir, worldId), { recursive: true, force: true });
