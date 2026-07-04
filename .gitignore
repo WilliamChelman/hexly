@@ -67,3 +67,4 @@ __screenshots__/
 /apps/web-e2e/blob-report
 /playwright/.cache
 .playwright-mcp/
+hexly-data/

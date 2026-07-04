@@ -4,7 +4,7 @@ import {
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { WorldDetail, WorldSummary } from '@hexly/domain';
+import { ImportSummary, WorldDetail, WorldSummary } from '@hexly/domain';
 import { WorldsClient } from './worlds.client';
 
 describe('WorldsClient', () => {
@@ -74,6 +74,33 @@ describe('WorldsClient', () => {
     req.flush({ ...detail, name: 'The Reach' });
 
     expect(renamed?.name).toBe('The Reach');
+  });
+
+  it('imports a vault zip as multipart and returns the summary', () => {
+    const file = new File([new Uint8Array([1, 2, 3])], 'Aldermoor.zip', {
+      type: 'application/zip',
+    });
+    const importSummary: ImportSummary = {
+      worldId: 'w9',
+      notesImported: 3,
+      filesSkipped: 0,
+      linksResolved: 1,
+      linksDangling: 0,
+      assetsStored: 0,
+      constructsDegraded: {},
+    };
+    let got: ImportSummary | undefined;
+    client.importVault(file).subscribe((s) => (got = s));
+
+    const req = http.expectOne('/api/worlds/import');
+    expect(req.request.method).toBe('POST');
+    // Multipart: the browser sets the Content-Type boundary, so we must not.
+    expect(req.request.headers.has('Content-Type')).toBe(false);
+    const body = req.request.body as FormData;
+    expect(body.get('file')).toBe(file);
+    req.flush(importSummary);
+
+    expect(got).toEqual(importSummary);
   });
 
   it('deletes a world by id', () => {

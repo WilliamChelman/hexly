@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { WorldDetail, WorldSummary } from '@hexly/domain';
+import { ImportSummary, WorldDetail, WorldSummary } from '@hexly/domain';
 
 /**
  * HTTP client for the worlds API (ADR-0024). Stateless: every call is a round
@@ -18,6 +18,17 @@ export class WorldsClient {
   // Server mints the Home Entity atomically.
   create(name: string): Observable<WorldDetail> {
     return this.http.post<WorldDetail>('/api/worlds', { name });
+  }
+
+  /**
+   * Import an Obsidian vault `.zip` into a fresh World (ADR-0033). Multipart under
+   * the `file` field the server expects; the browser sets the multipart boundary,
+   * so we deliberately don't touch Content-Type. Returns the {@link ImportSummary}.
+   */
+  importVault(file: File): Observable<ImportSummary> {
+    const form = new FormData();
+    form.append('file', file);
+    return this.http.post<ImportSummary>('/api/worlds/import', form);
   }
 
   get(id: string): Observable<WorldDetail> {

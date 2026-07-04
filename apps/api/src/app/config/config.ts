@@ -55,6 +55,11 @@ const rawConfigSchema = z.object({
       // real vault stays well under it; it's a high zip-bomb backstop, not a tuning knob.
       maxUpload: sizeString('500mb'),
       maxDecompressed: sizeString('5gb'),
+      // Default false: batch-decompress fast, guarding on the zip's *declared* uncompressed
+      // size (a maliciously crafted archive can spoof it) — the right trade for the common
+      // trusted/personal deployment. Set true on an untrusted/public instance to stream and
+      // meter *actual* output, aborting a zip bomb mid-inflate at the cost of a slower import.
+      strictZipGuard: z.boolean().default(false),
     })
     .prefault({}),
 });
@@ -69,6 +74,8 @@ export interface HexlyConfig {
     maxUpload: number;
     /** Max decompressed vault size, in bytes (the zip-bomb guard). */
     maxDecompressed: number;
+    /** Meter actual decompressed output (airtight, slower) vs. trust the zip's declared sizes (fast). */
+    strictZipGuard: boolean;
   };
 }
 
@@ -83,6 +90,7 @@ function processConfig(raw: HexlyConfigRaw): HexlyConfig {
     import: {
       maxUpload: parseSize(raw.import.maxUpload),
       maxDecompressed: parseSize(raw.import.maxDecompressed),
+      strictZipGuard: raw.import.strictZipGuard,
     },
   };
 }

@@ -120,8 +120,13 @@ file fails boot with the offending key named. Sizes are human-readable
 # hexly-data/hexly.yml — all keys optional; shown with their defaults
 import:
   maxUpload: 500mb        # ceiling on an uploaded vault .zip (images ride inside it)
-  maxDecompressed: 5gb    # ceiling on inflated markdown (zip-bomb backstop; assets are skipped)
+  maxDecompressed: 5gb    # ceiling on the inflated vault (markdown + assets); zip-bomb backstop
+  strictZipGuard: false   # false: fast import, guard on the zip's *declared* size.
+                          # true: slower, streams and meters *actual* output to abort a
+                          #       bomb mid-inflate — set on an untrusted/public instance.
 ```
+
+`strictZipGuard` is a speed-vs-safety trade (ADR-0036). The default (`false`) batch-decompresses — several times faster on a large vault — and trusts the archive's declared sizes, which is right for a trusted personal/LAN instance importing your own vault. A maliciously crafted `.zip` can under-declare its size to slip past that check, so an **untrusted or public** instance should set `strictZipGuard: true`, which streams the archive and meters actual decompressed bytes to abort a zip bomb before it materializes. Either way `maxDecompressed` is enforced.
 
 ## Build, test, lint
 

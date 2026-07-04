@@ -38,6 +38,9 @@
     "addPlaceholder": "Add tags…",
     "removeLabel": "Remove tag: {{tag}}"
   },
+  "entityMetadata": {
+    "heading": "Metadata"
+  },
   "noteView": {
     "eyebrow": "Note",
     "titleLabel": "Note title",
@@ -317,7 +320,17 @@
     "allWorlds": "All worlds",
     "new": "New world",
     "untitled": "Untitled world",
-    "createError": "Couldn't create that world. Please try again."
+    "createError": "Couldn't create that world. Please try again.",
+    "import": "Import vault",
+    "importing": "Importing…",
+    "importError": "Couldn't import that vault. Please try again.",
+    "importSummaryHeading": "Vault imported",
+    "importNotes": "Notes imported",
+    "importLinksResolved": "Links resolved",
+    "importLinksDangling": "Links dangling",
+    "importAssets": "Assets stored",
+    "importSkipped": "Files skipped",
+    "openImported": "Open world"
   },
   "worldIndex": {
     "tabTitle": "Hexly — Worlds",

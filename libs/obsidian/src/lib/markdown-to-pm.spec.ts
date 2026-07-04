@@ -1,4 +1,4 @@
-import { markdownToProseMirror } from './markdown-to-pm';
+import { markdownToProseMirror, type PMNode } from './markdown-to-pm';
 
 describe('markdownToProseMirror', () => {
   it('parses YAML frontmatter into metadata and drops it from the body', () => {
@@ -342,5 +342,78 @@ describe('markdownToProseMirror', () => {
         { type: 'taskItem', attrs: { checked: false }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'todo' }] }] },
       ],
     });
+  });
+
+  it('splits a list mixing plain and task items so plain items stay bullets, not stray checkboxes', () => {
+    // GFM allows one list to mix `-` and `- [ ]` items; PM's bulletList/taskList
+    // can't mix, so each consecutive run becomes its own sibling list (#149).
+    const { doc } = markdownToProseMirror('- plain one\n- plain two\n- [ ] task three\n- [x] task four');
+
+    expect(doc.content?.map((n) => n.type)).toEqual(['bulletList', 'taskList']);
+    expect(doc.content?.[0]).toEqual({
+      type: 'bulletList',
+      content: [
+        { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'plain one' }] }] },
+        { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'plain two' }] }] },
+      ],
+    });
+    expect(doc.content?.[1].content?.map((i) => i.attrs?.['checked'])).toEqual([false, true]);
+  });
+
+  it('continues ordered numbering across a task-item split instead of restarting at the list start', () => {
+    // A task item between ordered items splits the list into orderedList/taskList/orderedList.
+    // The trailing plain run must keep counting (`3.`), not reset to the list's start (`1.`).
+    const { doc } = markdownToProseMirror('1. plain a\n2. [ ] task b\n3. plain c');
+
+    expect(doc.content?.map((n) => n.type)).toEqual(['orderedList', 'taskList', 'orderedList']);
+    expect(doc.content?.[0].attrs?.['start']).toBe(1);
+    expect(doc.content?.[2].attrs?.['start']).toBe(3);
+  });
+
+  it('keeps task-splitting per-run inside a deeply nested list, not promoting siblings (#149)', () => {
+    // A nested sub-list interleaving prose bullets and `- [x]` tasks: only the two
+    // tasks may become checkboxes; the plain siblings stay bullets.
+    const md = [
+      '- Pyramide',
+      '    - Chrysée',
+      '        - CA 15-',
+      '        - immunité radian',
+      '        - [x] gwayn au sol, 2x',
+      '        - biiiim morte',
+      '        - [x] Bigby au sol',
+    ].join('\n');
+    const { doc } = markdownToProseMirror(md);
+
+    const taskItems: PMNode[] = [];
+    const walk = (nodes?: PMNode[]) => {
+      for (const n of nodes ?? []) {
+        if (n.type === 'taskItem') taskItems.push(n);
+        walk(n.content);
+      }
+    };
+    walk(doc.content);
+
+    // Exactly the two `- [x]` markers become checkboxes — nothing else.
+    expect(taskItems).toHaveLength(2);
+    expect(taskItems.every((t) => t.attrs?.['checked'] === true)).toBe(true);
+  });
+
+  it('does not turn a loose bullet list into checkboxes just because later items are tasks (#149)', () => {
+    // A real-world Obsidian session note: prose bullets and a checklist share one
+    // loose `-` list. Only the `- [ ]` items should carry checkboxes.
+    const md = [
+      '- Temple du vent',
+      '- Go temple central',
+      '',
+      '- Bragear, par ton nom',
+      '- [ ] Gabriel knows something',
+      '- [ ] What did I discover?',
+    ].join('\n');
+    const { doc } = markdownToProseMirror(md);
+
+    // The three prose bullets are one bulletList; the two tasks are one taskList.
+    expect(doc.content?.map((n) => n.type)).toEqual(['bulletList', 'taskList']);
+    expect(doc.content?.[0].content).toHaveLength(3);
+    expect(doc.content?.[1].content).toHaveLength(2);
   });
 });

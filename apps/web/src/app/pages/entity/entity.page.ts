@@ -17,6 +17,7 @@ import { RegionsPanel } from './components/map/regions-panel';
 import { EditorRail } from './components/map/editor-rail';
 import { StatusBar } from './components/map/status-bar';
 import { ContentEditor } from './components/content-editor/content-editor';
+import { EntityMetadata } from './components/entity-metadata';
 
 /**
  * The open-Entity route (`/entities/:id`, #70): the routed page that loads the
@@ -47,6 +48,7 @@ import { ContentEditor } from './components/content-editor/content-editor';
     EditorRail,
     StatusBar,
     ContentEditor,
+    EntityMetadata,
   ],
   template: `
     @if (session.current()) {
@@ -86,6 +88,7 @@ import { ContentEditor } from './components/content-editor/content-editor';
             <!-- Content body in a centred reading column: a note, or a hexmap on its Note view (#75). -->
             <div class="absolute inset-0 overflow-y-auto bg-surface-sunken">
               <div class="max-w-[60rem] mx-auto py-6 px-6">
+                <app-entity-metadata />
                 <app-content-editor [ariaLabel]="editorLabel()" />
               </div>
             </div>

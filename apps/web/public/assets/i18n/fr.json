@@ -38,6 +38,9 @@
     "addPlaceholder": "Ajouter des tags…",
     "removeLabel": "Supprimer le tag : {{tag}}"
   },
+  "entityMetadata": {
+    "heading": "Métadonnées"
+  },
   "noteView": {
     "eyebrow": "Note",
     "titleLabel": "Titre de la note",
@@ -317,7 +320,17 @@
     "allWorlds": "Tous les mondes",
     "new": "Nouveau monde",
     "untitled": "Monde sans titre",
-    "createError": "Impossible de créer ce monde. Veuillez réessayer."
+    "createError": "Impossible de créer ce monde. Veuillez réessayer.",
+    "import": "Importer un coffre",
+    "importing": "Importation…",
+    "importError": "Impossible d'importer ce coffre. Veuillez réessayer.",
+    "importSummaryHeading": "Coffre importé",
+    "importNotes": "Notes importées",
+    "importLinksResolved": "Liens résolus",
+    "importLinksDangling": "Liens orphelins",
+    "importAssets": "Ressources stockées",
+    "importSkipped": "Fichiers ignorés",
+    "openImported": "Ouvrir le monde"
   },
   "worldIndex": {
     "tabTitle": "Hexly — Mondes",

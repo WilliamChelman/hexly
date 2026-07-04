@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { Subject, of, throwError } from 'rxjs';
-import { WorldSummary } from '@hexly/domain';
+import { ImportSummary, WorldSummary } from '@hexly/domain';
 import { AuthClient } from '../../core/services/auth.client';
 import { MockAuthClient } from '../../core/testing/auth-client.mock';
 import { WorldsClient } from '../../core/services/worlds.client';
@@ -121,6 +121,83 @@ describe('WorldIndex', () => {
       'entities',
       'home9',
     ]);
+  });
+
+  const importSummary = (over: Partial<ImportSummary> = {}): ImportSummary => ({
+    worldId: 'w9',
+    notesImported: 3,
+    filesSkipped: 0,
+    linksResolved: 1,
+    linksDangling: 0,
+    assetsStored: 0,
+    constructsDegraded: {},
+    ...over,
+  });
+
+  /** Pick a `.zip` on the hidden file input (jsdom can't build a real FileList). */
+  function pickVault(el: HTMLElement, name = 'Aldermoor.zip') {
+    const input = $(el, '[data-testid=import-vault-input]') as HTMLInputElement;
+    const file = new File([new Uint8Array([1, 2, 3])], name, {
+      type: 'application/zip',
+    });
+    Object.defineProperty(input, 'files', { value: [file], configurable: true });
+    input.dispatchEvent(new Event('change'));
+    return file;
+  }
+
+  it('imports a picked vault and, from the summary, lands in the new World', () => {
+    const fixture = render([]);
+    const el = fixture.nativeElement as HTMLElement;
+
+    worldsClient.importVault.mockReturnValue(of(importSummary()));
+    const file = pickVault(el);
+    fixture.detectChanges();
+
+    expect(worldsClient.importVault).toHaveBeenCalledWith(file);
+    // Summary modal reports what landed (ADR-0033 "what did we lose").
+    const modal = $(el, '[data-testid=import-summary]');
+    expect(modal).not.toBeNull();
+    expect(modal?.textContent).toContain('3');
+
+    ($(el, '[data-testid=open-imported]') as HTMLButtonElement).click();
+    expect(navigate).toHaveBeenCalledWith(['/w', 'w9', 'entities']);
+  });
+
+  it('shows a spinner on the Import affordance while the import runs', () => {
+    const fixture = render([]);
+    const el = fixture.nativeElement as HTMLElement;
+
+    const pending = new Subject<ImportSummary>();
+    worldsClient.importVault.mockReturnValue(pending);
+    pickVault(el);
+    fixture.detectChanges();
+
+    const trigger = $(el, '[data-testid=import-vault]') as HTMLButtonElement;
+    expect(trigger.disabled).toBe(true);
+
+    pending.next(importSummary());
+    pending.complete();
+    fixture.detectChanges();
+    expect(trigger.disabled).toBe(false);
+  });
+
+  it('surfaces an error toast when importing a vault fails', () => {
+    const fixture = render([]);
+    const el = fixture.nativeElement as HTMLElement;
+
+    worldsClient.importVault.mockReturnValue(
+      throwError(() => new Error('bad zip')),
+    );
+    pickVault(el);
+    fixture.detectChanges();
+
+    expect(TestBed.inject(ToasterService).toasts().map((t) => t.tone)).toEqual([
+      'error',
+    ]);
+    expect($(el, '[data-testid=import-summary]')).toBeNull();
+    expect(
+      ($(el, '[data-testid=import-vault]') as HTMLButtonElement).disabled,
+    ).toBe(false);
   });
 
   it('offers rename + delete on owned Worlds only, not on member Worlds', () => {

@@ -5,6 +5,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
@@ -12,7 +13,8 @@ import { AuthClient } from '../../core/services/auth.client';
 import { WorldStore } from '../../core/services/world.store';
 import { WorldsClient } from '../../core/services/worlds.client';
 import { ToasterService } from '../../core/services/toaster.service';
-import { entityRoute } from '../../core/utils/routes';
+import { ImportSummary } from '@hexly/domain';
+import { entityRoute, worldRoute } from '../../core/utils/routes';
 import { Button } from '../../ui/button';
 import { Eyebrow } from '../../ui/eyebrow';
 import { Panel } from '../../ui/panel';
@@ -44,9 +46,49 @@ import { ACCENT_SIGIL, accentFor, monogram } from '../../ui/sigil';
     Input,
     Dialog,
     RouterLink,
+    NgTemplateOutlet,
   ],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
+    <!-- One hidden picker, triggered by every Import affordance (a top-level ref is
+         in scope across the whole template, including inside the @if branches). -->
+    <input
+      #vaultInput
+      type="file"
+      accept=".zip,application/zip"
+      class="hidden"
+      data-testid="import-vault-input"
+      [attr.aria-label]="'worlds.import' | transloco"
+      (change)="onVaultPicked($event)"
+    />
+    <!-- The two page actions, defined once and placed (in either order) by the
+         populated header and the empty state below. -->
+    <ng-template #importBtn>
+      <button
+        type="button"
+        appButton
+        variant="default"
+        data-testid="import-vault"
+        [disabled]="importing()"
+        (click)="vaultInput.click()"
+      >
+        <app-icon name="upload" [size]="16" />
+        {{ (importing() ? 'worlds.importing' : 'worlds.import') | transloco }}
+      </button>
+    </ng-template>
+    <ng-template #createBtn>
+      <button
+        type="button"
+        appButton
+        variant="primary"
+        data-testid="create-world"
+        [disabled]="creating()"
+        (click)="create()"
+      >
+        <app-icon name="plus" [size]="16" />
+        {{ (creating() ? 'worldIndex.creating' : 'worlds.new') | transloco }}
+      </button>
+    </ng-template>
     @if (cards().length > 0) {
       <header
         class="bg-linear-[180deg] from-surface to-bg-deep border-b border-line"
@@ -65,17 +107,10 @@ import { ACCENT_SIGIL, accentFor, monogram } from '../../ui/sigil';
               {{ 'worldIndex.subhead' | transloco }}
             </p>
           </div>
-          <button
-            type="button"
-            appButton
-            variant="primary"
-            data-testid="create-world"
-            [disabled]="creating()"
-            (click)="create()"
-          >
-            <app-icon name="plus" [size]="16" />
-            {{ (creating() ? 'worldIndex.creating' : 'worlds.new') | transloco }}
-          </button>
+          <div class="flex items-center gap-2">
+            <ng-container [ngTemplateOutlet]="importBtn" />
+            <ng-container [ngTemplateOutlet]="createBtn" />
+          </div>
         </div>
       </header>
 
@@ -214,17 +249,10 @@ import { ACCENT_SIGIL, accentFor, monogram } from '../../ui/sigil';
         >
           <p class="m-0">{{ 'worldIndex.emptyTitle' | transloco }}</p>
           <p class="text-sm m-0">{{ 'worldIndex.emptyHint' | transloco }}</p>
-          <button
-            type="button"
-            appButton
-            variant="primary"
-            data-testid="create-world"
-            [disabled]="creating()"
-            (click)="create()"
-          >
-            <app-icon name="plus" [size]="16" />
-            {{ (creating() ? 'worldIndex.creating' : 'worlds.new') | transloco }}
-          </button>
+          <div class="flex items-center gap-2">
+            <ng-container [ngTemplateOutlet]="createBtn" />
+            <ng-container [ngTemplateOutlet]="importBtn" />
+          </div>
         </section>
       </main>
     }
@@ -283,6 +311,44 @@ import { ACCENT_SIGIL, accentFor, monogram } from '../../ui/sigil';
         </button>
       </app-dialog>
     }
+
+    @if (importSummary(); as summary) {
+      <!-- The import's "what did we lose" report (ADR-0033), surfaced before the
+           user enters the new World. -->
+      <app-dialog
+        [open]="true"
+        [heading]="'worlds.importSummaryHeading' | transloco"
+        (closed)="dismissImport()"
+        data-testid="import-summary"
+      >
+        <dl
+          class="grid grid-cols-[1fr_auto] gap-x-8 gap-y-1 text-sm text-ink-muted m-0"
+        >
+          <dt>{{ 'worlds.importNotes' | transloco }}</dt>
+          <dd class="m-0 text-ink text-right">{{ summary.notesImported }}</dd>
+          <dt>{{ 'worlds.importLinksResolved' | transloco }}</dt>
+          <dd class="m-0 text-ink text-right">{{ summary.linksResolved }}</dd>
+          <dt>{{ 'worlds.importLinksDangling' | transloco }}</dt>
+          <dd class="m-0 text-ink text-right">{{ summary.linksDangling }}</dd>
+          <dt>{{ 'worlds.importAssets' | transloco }}</dt>
+          <dd class="m-0 text-ink text-right">{{ summary.assetsStored }}</dd>
+          @if (summary.filesSkipped > 0) {
+            <dt>{{ 'worlds.importSkipped' | transloco }}</dt>
+            <dd class="m-0 text-ink text-right">{{ summary.filesSkipped }}</dd>
+          }
+        </dl>
+        <button
+          dialogFooter
+          type="button"
+          appButton
+          variant="primary"
+          data-testid="open-imported"
+          (click)="openImported()"
+        >
+          {{ 'worlds.openImported' | transloco }}
+        </button>
+      </app-dialog>
+    }
   `,
 })
 export class WorldIndex {
@@ -318,6 +384,10 @@ export class WorldIndex {
   }
   protected readonly mono = monogram;
   protected readonly creating = signal(false);
+  /** True while a vault import is in flight — drives the Import affordance's spinner. */
+  protected readonly importing = signal(false);
+  /** The last import's result, shown in a summary modal until the user opens the World or dismisses it. */
+  protected readonly importSummary = signal<ImportSummary | null>(null);
   protected readonly renamingId = signal<string | null>(null);
   protected readonly pendingDelete = signal<{ id: string; name: string } | null>(
     null,
@@ -423,5 +493,42 @@ export class WorldIndex {
             'error',
           ),
       });
+  }
+
+  /**
+   * Import the picked Obsidian vault `.zip` into a fresh World (ADR-0033). Runs
+   * synchronously server-side behind a spinner; on success the {@link ImportSummary}
+   * opens a modal (the "what did we lose" report) whose action lands in the new World.
+   * The input is cleared so re-picking the same file fires `change` again.
+   */
+  protected onVaultPicked(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file || this.importing()) return;
+    this.importing.set(true);
+    this.worldsClient
+      .importVault(file)
+      .pipe(finalize(() => this.importing.set(false)))
+      .subscribe({
+        next: (summary) => this.importSummary.set(summary),
+        error: () =>
+          this.toaster.show(
+            this.transloco.translate('worlds.importError'),
+            'error',
+          ),
+      });
+  }
+
+  /** Leave the summary modal and enter the freshly imported World's Entity browser. */
+  protected openImported(): void {
+    const summary = this.importSummary();
+    if (!summary) return;
+    this.importSummary.set(null);
+    this.router.navigate(worldRoute(summary.worldId));
+  }
+
+  protected dismissImport(): void {
+    this.importSummary.set(null);
   }
 }

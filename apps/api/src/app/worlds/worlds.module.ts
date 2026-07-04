@@ -5,7 +5,8 @@ import { AuthModule } from '../auth/auth.module';
 import { HEXLY_CONFIG, type HexlyConfig } from '../config/config.module';
 import { DbModule } from '../db/db.module';
 import { EntitiesModule } from '../entities/entities.module';
-import { VaultImportService, VaultUnzipper } from './vault-import.service';
+import { VaultImportService } from './vault-import.service';
+import { VaultUnzipper } from './vault-unzipper';
 import { WorldsController } from './worlds.controller';
 import { WorldsService } from './worlds.service';
 

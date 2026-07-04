@@ -19,6 +19,18 @@ function hasNode(json: JSONContent, type: string): boolean {
   return (json.content ?? []).some((c) => hasNode(c, type));
 }
 
+function renderHtml(doc: JSONContent): string {
+  const editor = new Editor({ element: document.createElement('div'), extensions: CONTENT_EXTENSIONS, content: doc });
+  const html = editor.getHTML();
+  editor.destroy();
+  return html;
+}
+
+function countNode(json: JSONContent, type: string): number {
+  const self = json.type === type ? 1 : 0;
+  return self + (json.content ?? []).reduce((n, c) => n + countNode(c, type), 0);
+}
+
 describe('CONTENT_EXTENSIONS — tiptap-v3 schema', () => {
   it('loads the highlight mark losslessly', () => {
     const doc = {
@@ -89,6 +101,42 @@ describe('CONTENT_EXTENSIONS — tiptap-v3 schema', () => {
     const json = survives(doc);
     expect(hasNode(json, 'taskList')).toBe(true);
     expect(json.content?.[0]?.content?.[0]?.attrs?.['checked']).toBe(true);
+  });
+
+  it('renders a listItem holding sibling bulletList+taskList runs faithfully — plain items stay bullets, not checkboxes (#149)', () => {
+    // The shape a mixed Obsidian list imports to (ADR-0033): one listItem whose
+    // body interleaves plain bullets and task runs. TipTap must keep the plain
+    // items as listItems (bullets, no checkbox) and only the tasks as taskItems.
+    const li = (text: string) => ({ type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] });
+    const ti = (text: string) => ({ type: 'taskItem', attrs: { checked: true }, content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] });
+    const doc = {
+      type: 'doc',
+      content: [
+        {
+          type: 'bulletList',
+          content: [
+            {
+              type: 'listItem',
+              content: [
+                { type: 'paragraph', content: [{ type: 'text', text: 'Chrysee' }] },
+                { type: 'bulletList', content: [li('CA 15-'), li('immunite')] },
+                { type: 'taskList', content: [ti('gwayn')] },
+                { type: 'bulletList', content: [li('biiiim')] },
+                { type: 'taskList', content: [ti('Bigby')] },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const json = survives(doc);
+    // Only the two `- [ ]` items are tasks; the three prose bullets stay listItems.
+    expect(countNode(json, 'taskItem')).toBe(2);
+
+    const html = renderHtml(doc);
+    // Exactly two checkboxes render — one per task, none on the plain bullets.
+    expect((html.match(/type="checkbox"/g) ?? []).length).toBe(2);
   });
 
   it('loads a callout losslessly — its type/title attrs and live inner links (ADR-0033)', () => {

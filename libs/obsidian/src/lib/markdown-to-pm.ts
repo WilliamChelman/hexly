@@ -74,7 +74,7 @@ function blockToPM(node: RootContent, degraded: Record<string, number>): PMNode[
         },
       ];
     case 'list':
-      return [listToPM(node, degraded)];
+      return listToPM(node, degraded);
     case 'code':
       // Mermaid has no native node; the fenced code block IS its nearest readable form.
       if (node.lang === 'mermaid') count(degraded, 'mermaid');
@@ -233,31 +233,56 @@ function tableToPM(
   };
 }
 
-/** Maps an mdast list to a PM bulletList/orderedList of listItems. */
+/**
+ * Maps an mdast list to PM list nodes. GFM lets one list mix plain `-` items and
+ * `- [ ]` task items, but PM's bulletList/taskList can't mix, so each consecutive
+ * run of the same kind becomes its own sibling list — a plain item next to a task
+ * stays a bullet rather than a stray checkbox (#149). A uniform list is one run,
+ * so ordinary bullet/ordered/checklist output is unchanged.
+ */
 function listToPM(
   node: Extract<RootContent, { type: 'list' }>,
   degraded: Record<string, number>
-): PMNode {
-  const isTaskList = node.children.some((item) => item.checked != null);
-  if (isTaskList) {
-    return {
-      type: 'taskList',
-      content: node.children.map((item) => ({
-        type: 'taskItem',
-        attrs: { checked: item.checked === true },
+): PMNode[] {
+  const out: PMNode[] = [];
+  let run: typeof node.children = [];
+  let runIsTask = false;
+  // Items emitted so far. A split ordered list must keep counting across runs, so a plain
+  // run after a task run continues the source numbering (`3.`) instead of restarting at `1.`.
+  let consumed = 0;
+  const flush = () => {
+    if (!run.length) return;
+    if (runIsTask) {
+      out.push({
+        type: 'taskList',
+        content: run.map((item) => ({
+          type: 'taskItem',
+          attrs: { checked: item.checked === true },
+          content: item.children.flatMap((child) => blockToPM(child, degraded)),
+        })),
+      });
+    } else {
+      const items: PMNode[] = run.map((item) => ({
+        type: 'listItem',
         content: item.children.flatMap((child) => blockToPM(child, degraded)),
-      })),
-    };
+      }));
+      out.push(
+        node.ordered
+          ? { type: 'orderedList', attrs: { start: (node.start ?? 1) + consumed }, content: items }
+          : { type: 'bulletList', content: items }
+      );
+    }
+    consumed += run.length;
+    run = [];
+  };
+  for (const item of node.children) {
+    const isTask = item.checked != null;
+    if (run.length && isTask !== runIsTask) flush();
+    runIsTask = isTask;
+    run.push(item);
   }
-
-  const items: PMNode[] = node.children.map((item) => ({
-    type: 'listItem',
-    content: item.children.flatMap((child) => blockToPM(child, degraded)),
-  }));
-
-  return node.ordered
-    ? { type: 'orderedList', attrs: { start: node.start ?? 1 }, content: items }
-    : { type: 'bulletList', content: items };
+  flush();
+  return out;
 }
 
 type Mark = { type: string; attrs?: Record<string, unknown> };
@@ -288,7 +313,7 @@ function inlineChildren(
 function inlineOnly(node: PMNode, marks: Mark[], degraded: Record<string, number>): PMNode[] {
   if (node.type !== 'image') return [node];
   count(degraded, 'embed');
-  const src = String(node.attrs?.src ?? '');
+  const src = String(node.attrs?.['src'] ?? '');
   return [withMarks({ type: 'text', text: src }, [...marks, { type: 'link', attrs: { href: src } }])];
 }
 

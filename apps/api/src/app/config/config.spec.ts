@@ -38,8 +38,15 @@ describe('parseSize', () => {
 describe('loadConfig', () => {
   it('falls back to defaults when no file is present', () => {
     expect(loadConfig(dataDir())).toEqual({
-      import: { maxUpload: 500 * MB, maxDecompressed: 5 * 1024 * MB },
+      import: { maxUpload: 500 * MB, maxDecompressed: 5 * 1024 * MB, strictZipGuard: false },
     });
+  });
+
+  it('defaults strictZipGuard off (fast) and lets a file turn it on (airtight)', () => {
+    expect(loadConfig(dataDir()).import.strictZipGuard).toBe(false);
+    expect(
+      loadConfig(dataDir('import:\n  strictZipGuard: true\n')).import.strictZipGuard,
+    ).toBe(true);
   });
 
   it('merges a partial file over defaults, resolving sizes to bytes', () => {
@@ -60,7 +67,7 @@ describe('loadConfig', () => {
 
   it('yields defaults for the :memory: dir without touching disk', () => {
     expect(loadConfig(':memory:')).toEqual({
-      import: { maxUpload: 500 * MB, maxDecompressed: 5 * 1024 * MB },
+      import: { maxUpload: 500 * MB, maxDecompressed: 5 * 1024 * MB, strictZipGuard: false },
     });
   });
 });
