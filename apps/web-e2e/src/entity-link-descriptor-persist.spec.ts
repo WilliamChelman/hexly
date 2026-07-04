@@ -5,8 +5,8 @@ import { enterLibrary, expect, flushSave, test } from './fixtures';
  * Entity Link with a free-text descriptor via the `::` trigger, and it survives a save +
  * reload, rendering as `Name (descriptor)` with the target's live name. Crosses every
  * seam: the `::` suggestion arming only after a link, the descriptor picker's free-text
- * entry, the client-harvested descriptors riding a versioned save, the server's
- * descriptor index, and an API read of the opaque snapshot (ADR-0009/0019).
+ * entry, the versioned save, the server harvesting the descriptor from the saved Content
+ * into its index (#96, ADR-0035), and an API read of the opaque snapshot (ADR-0009/0019).
  * Prior art: entity-link-content-persist.spec.ts (the `@` link itself).
  */
 test('characterises a Content Entity Link via :: , persists the descriptor, and reloads as Name (descriptor)', async ({

@@ -36,10 +36,13 @@ describe('parseSize', () => {
 });
 
 describe('loadConfig', () => {
+  const DEFAULTS = {
+    import: { maxUpload: 500 * MB, maxDecompressed: 5 * 1024 * MB, strictZipGuard: false },
+    search: { weights: { name: 10, tags: 5, content: 1 } },
+  };
+
   it('falls back to defaults when no file is present', () => {
-    expect(loadConfig(dataDir())).toEqual({
-      import: { maxUpload: 500 * MB, maxDecompressed: 5 * 1024 * MB, strictZipGuard: false },
-    });
+    expect(loadConfig(dataDir())).toEqual(DEFAULTS);
   });
 
   it('defaults strictZipGuard off (fast) and lets a file turn it on (airtight)', () => {
@@ -66,8 +69,15 @@ describe('loadConfig', () => {
   });
 
   it('yields defaults for the :memory: dir without touching disk', () => {
-    expect(loadConfig(':memory:')).toEqual({
-      import: { maxUpload: 500 * MB, maxDecompressed: 5 * 1024 * MB, strictZipGuard: false },
-    });
+    expect(loadConfig(':memory:')).toEqual(DEFAULTS);
+  });
+
+  it('overrides a single search weight, leaving the others at their default', () => {
+    const cfg = loadConfig(dataDir('search:\n  weights:\n    name: 20\n'));
+    expect(cfg.search.weights).toEqual({ name: 20, tags: 5, content: 1 });
+  });
+
+  it('rejects a non-positive search weight, naming the key', () => {
+    expect(() => loadConfig(dataDir('search:\n  weights:\n    name: 0\n'))).toThrow(/name/);
   });
 });

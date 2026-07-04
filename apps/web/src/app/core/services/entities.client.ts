@@ -73,14 +73,12 @@ export class EntitiesClient {
     body: EntityBody,
     version: number,
     tags: readonly string[],
-    descriptors: readonly string[],
   ): Observable<EntitySaveOutcome> {
     return this.http
       .put<EntityDetail>(`/api/entities/${id}`, {
         document: body,
         version,
         tags,
-        descriptors,
       })
       .pipe(
         map((saved): EntitySaveOutcome => ({ status: 'saved', entity: saved })),

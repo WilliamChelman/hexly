@@ -36,11 +36,9 @@ import {
   hexMapSchema,
   tiptapContent,
 } from '@hexly/domain';
-import { JSONContent } from '@tiptap/core';
 import { EntitiesClient } from '../../../core/services/entities.client';
 import { ActiveWorld } from '../../../core/services/active-world';
 import { worldRoute } from '../../../core/utils/routes';
-import { harvestDescriptors } from '../components/content-editor/descriptors';
 import { TitleService } from '../../../core/i18n/title.service';
 import { AppShellStore } from '../../../shell/app-shell.store';
 import { EntityView, HexMapStore } from './hexmap-store';
@@ -67,8 +65,6 @@ interface SaveSnapshot {
   grid: HexMap;
   content: Content;
   tags: readonly string[];
-  /** Distinct Link Descriptors harvested from {@link content} (#96) — derived, not a separate signal. */
-  descriptors: readonly string[];
 }
 
 @Injectable()
@@ -338,9 +334,6 @@ export class EntitySession {
         grid: this.editor.document(),
         content,
         tags: this._tags(),
-        // Harvested from the same Content reference being sent, so the index the server
-        // writes matches exactly the links this save persists (#96, ADR-0023).
-        descriptors: harvestDescriptors(content.snapshot as JSONContent),
       },
       showLoading,
     );
@@ -355,10 +348,10 @@ export class EntitySession {
     this._saving.set(true);
     this._error.set(null);
     this.failed = null;
-    const { grid, content, tags, descriptors } = snapshot;
+    const { grid, content, tags } = snapshot;
     const body = withContent(withGrid(open.document, grid), content);
     const save$ = this.entities
-      .save(open.id, body, open.version, tags, descriptors)
+      .save(open.id, body, open.version, tags)
       .pipe(
       tap((outcome) => {
         // Drop a late response if the user has since navigated to another Entity — it

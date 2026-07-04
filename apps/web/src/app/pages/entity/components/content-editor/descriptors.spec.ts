@@ -3,7 +3,6 @@ import { CONTENT_EXTENSIONS } from './content-extensions';
 import {
   descriptorItems,
   entityLinkPosBefore,
-  harvestDescriptors,
   linkTextRows,
   setLinkAttr,
 } from './descriptors';
@@ -16,35 +15,6 @@ function linkAttrs(editor: Editor): JSONContent['attrs'] {
   const json: JSONContent = editor.getJSON();
   return json.content?.[0]?.content?.find((n) => n.type === 'entityLink')?.attrs;
 }
-
-function docWith(...links: Array<{ name: string; descriptor?: string }>): JSONContent {
-  const editor = new Editor({ extensions: CONTENT_EXTENSIONS });
-  for (const { name, descriptor } of links) {
-    editor.commands.insertEntityLink({
-      entityId: 'e-' + name,
-      label: name,
-      descriptor: descriptor ?? null,
-    });
-  }
-  const json = editor.getJSON();
-  editor.destroy();
-  return json;
-}
-
-describe('harvestDescriptors', () => {
-  it('deduplicates and collects descriptors set on entityLinks', () => {
-    const doc = docWith(
-      { name: 'Jane', descriptor: 'spouse' },
-      { name: 'Acme', descriptor: 'capital of' },
-    );
-    expect(harvestDescriptors(doc).sort()).toEqual(['capital of', 'spouse']);
-  });
-
-  it('ignores links with no descriptor and empty docs', () => {
-    expect(harvestDescriptors(docWith({ name: 'Jane' }))).toEqual([]);
-    expect(harvestDescriptors({ type: 'doc', content: [] })).toEqual([]);
-  });
-});
 
 describe('entityLinkPosBefore — the `::` arm predicate', () => {
   it('finds the link position when an entityLink sits immediately before the cursor', () => {

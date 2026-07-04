@@ -75,6 +75,11 @@ export const entities = sqliteTable(
     version: integer('version').notNull(),
     // Serialized Entity body (entityBodySchema), validated at the edge.
     document: text('document').notNull(),
+    // Plain-text prose extracted from Content for full-text search (ADR-0035),
+    // populated server-side by extractText on every write. Nullable so existing
+    // rows migrate in before the boot backfill fills them; the FTS table and its
+    // sync triggers (migration 0002) live outside Drizzle's typed API as raw SQL.
+    contentText: text('content_text'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },

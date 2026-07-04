@@ -92,7 +92,6 @@ describe('EntitySession', () => {
       bodyOf(editor.document()),
       3,
       [],
-      [],
     );
     expect(outcome).toEqual({ status: 'saved', entity: saved });
   });
@@ -118,43 +117,8 @@ describe('EntitySession', () => {
       bodyOf(editor.document()),
       3,
       ['deity', 'ruined'],
-      [],
     );
     expect(session.current()?.tags).toEqual(['deity', 'ruined']);
-  });
-
-  it('harvests link descriptors from the live Content and sends them with the save (#96)', () => {
-    openAldermoor();
-    // A Content snapshot carrying a characterised entityLink — the descriptor rides the
-    // save so the server can index the owner's vocabulary (it never parses the snapshot).
-    session.setContent({
-      type: 'doc',
-      content: [
-        {
-          type: 'paragraph',
-          content: [
-            {
-              type: 'entityLink',
-              attrs: { entityId: 'x', label: 'Jane', descriptor: 'Spouse' },
-            },
-          ],
-        },
-      ],
-    });
-
-    entities.save.mockReturnValue(
-      of({ status: 'saved', entity: { ...aldermoor, version: 4 } }),
-    );
-    session.save().subscribe();
-
-    // Sent verbatim (the server normalizes); links with no descriptor contribute nothing.
-    expect(entities.save).toHaveBeenCalledWith(
-      'm1',
-      expect.anything(),
-      3,
-      [],
-      ['Spouse'],
-    );
   });
 
   it('surfaces a stale save as a conflict and keeps the editor edit', () => {
@@ -273,7 +237,7 @@ describe('EntitySession', () => {
       expect(entities.save).not.toHaveBeenCalled(); // not yet
 
       vi.advanceTimersByTime(1);
-      expect(entities.save).toHaveBeenCalledWith('m1', expect.anything(), 3, [], []);
+      expect(entities.save).toHaveBeenCalledWith('m1', expect.anything(), 3, []);
 
       settle(); // let the post-save effect settle (no follow-up save)
       expect(entities.save).toHaveBeenCalledTimes(1);
@@ -525,7 +489,7 @@ describe('EntitySession', () => {
     // in-app swap reuses this session, so the edit must land while the live signals still
     // hold it; the m2 load only starts once the flush PUT resolves.
     session.openRoute('m2').subscribe();
-    expect(entities.save).toHaveBeenCalledWith('m1', expect.anything(), 3, [], []);
+    expect(entities.save).toHaveBeenCalledWith('m1', expect.anything(), 3, []);
 
     // Previous canvas cleared while the load is in flight — and re-baselined, so this
     // empty placeholder doesn't read as dirty (else a 404 leave would PUT it over m1).
@@ -556,7 +520,7 @@ describe('EntitySession', () => {
     );
     session.save().subscribe();
 
-    expect(entities.save).toHaveBeenCalledWith('n1', noteBody, 3, [], []);
+    expect(entities.save).toHaveBeenCalledWith('n1', noteBody, 3, []);
   });
 
   it('saves a note’s edited Content opaquely, round-tripping the snapshot untouched', () => {
@@ -592,7 +556,6 @@ describe('EntitySession', () => {
       { type: 'note', content: { format: CONTENT_FORMAT, snapshot } },
       3,
       [],
-      [],
     );
   });
 
@@ -625,7 +588,6 @@ describe('EntitySession', () => {
         ...editor.document(),
       },
       3,
-      [],
       [],
     );
   });
@@ -708,7 +670,7 @@ describe('EntitySession', () => {
     window.dispatchEvent(event);
 
     expect(event.defaultPrevented).toBe(true); // suppresses the browser "save page" dialog
-    expect(entities.save).toHaveBeenCalledWith('m1', expect.anything(), 3, [], []);
+    expect(entities.save).toHaveBeenCalledWith('m1', expect.anything(), 3, []);
   });
 
   it('is a safe no-op with no entity open (no request, no throw)', () => {

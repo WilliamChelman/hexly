@@ -192,27 +192,21 @@ describe('saveEntityRequestSchema', () => {
 
     expect(
       saveEntityRequestSchema.parse({ document: body, version: 3, tags: [] }),
-    ).toEqual({ document: body, version: 3, tags: [], descriptors: [] });
+    ).toEqual({ document: body, version: 3, tags: [] });
   });
 
-  it('accepts harvested descriptors, normalizing them like tags and defaulting to empty (#96)', () => {
+  it('ignores a descriptors field a stale client still sends (server harvests them now, #96)', () => {
     const body = { type: 'note' as const, content };
 
-    // Trim, lower-case, dedupe — the same vocabulary normalization as tags.
-    expect(
-      saveEntityRequestSchema.parse({
-        document: body,
-        version: 1,
-        tags: [],
-        descriptors: [' Spouse ', 'spouse', 'Capital Of'],
-      }).descriptors,
-    ).toEqual(['spouse', 'capital of']);
-
-    // Absent descriptors default to empty — an older client (or a save with none) is valid.
-    expect(
-      saveEntityRequestSchema.parse({ document: body, version: 1, tags: [] })
-        .descriptors,
-    ).toEqual([]);
+    // The wire no longer carries descriptors — the server derives them from the
+    // saved Content — so an old client's field is a stripped unknown key.
+    const parsed = saveEntityRequestSchema.parse({
+      document: body,
+      version: 1,
+      tags: [],
+      descriptors: ['spouse'],
+    });
+    expect(parsed).not.toHaveProperty('descriptors');
   });
 
   it('requires tags on save — the save always carries the full current set', () => {

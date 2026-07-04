@@ -159,16 +159,16 @@ describe('EntitiesClient', () => {
 
     let outcome: unknown;
     client
-      .save('e1', painted, 1, ['deity', 'ruined'], ['spouse'])
+      .save('e1', painted, 1, ['deity', 'ruined'])
       .subscribe((o) => (outcome = o));
 
     const req = http.expectOne('/api/entities/e1');
     expect(req.request.method).toBe('PUT');
+    // Descriptors are no longer sent — the server harvests them from the document (#96).
     expect(req.request.body).toEqual({
       document: painted,
       version: 1,
       tags: ['deity', 'ruined'],
-      descriptors: ['spouse'],
     });
 
     const saved: EntityDetail = { ...aldermoor, version: 2, document: painted };
@@ -192,7 +192,7 @@ describe('EntitiesClient', () => {
     const serverCurrent: EntityDetail = { ...aldermoor, version: 5 };
 
     let outcome: unknown;
-    client.save('e1', emptyHexmapBody, 1, [], []).subscribe((o) => (outcome = o));
+    client.save('e1', emptyHexmapBody, 1, []).subscribe((o) => (outcome = o));
 
     http
       .expectOne('/api/entities/e1')
@@ -205,7 +205,7 @@ describe('EntitiesClient', () => {
     // 409 from a proxy/gateway can be HTML/text, not EntityDetail. Must not
     // be reported as a conflict to avoid breaking the conflict UI.
     let errored = false;
-    client.save('e1', emptyHexmapBody, 1, [], []).subscribe({
+    client.save('e1', emptyHexmapBody, 1, []).subscribe({
       error: () => (errored = true),
     });
     http

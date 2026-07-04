@@ -1,5 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  OnApplicationBootstrap,
+} from '@nestjs/common';
 import {
   CreateEntityRequest,
   emptyEntityBody,
@@ -10,13 +16,17 @@ import {
   EntitySummary,
   EntityType,
   entityTypeSchema,
+  extractText,
+  descriptorsSchema,
+  harvestDescriptors,
   SaveEntityRequest,
   tagsSchema,
   visibilitySchema,
 } from '@hexly/domain';
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
 import { entities, entityDescriptors, worlds } from '../db/schema';
+import { HEXLY_CONFIG, HexlyConfig } from '../config/config.module';
 
 const INITIAL_VERSION = 1;
 
@@ -52,8 +62,30 @@ export type SaveResult = EntitySaveOutcome | { status: 'not-found' };
  * by anyone else. Body serialization and `version` bookkeeping live here.
  */
 @Injectable()
-export class EntitiesService {
-  constructor(@Inject(DB) private readonly db: Db) {}
+export class EntitiesService implements OnApplicationBootstrap {
+  constructor(
+    @Inject(DB) private readonly db: Db,
+    @Inject(HEXLY_CONFIG) private readonly config: HexlyConfig,
+  ) {}
+
+  /**
+   * One-time boot backfill (ADR-0035): populate `content_text` — and, through the
+   * FTS triggers, the search index — for rows written before the column existed, so
+   * an already-imported vault becomes searchable without re-saving a single note.
+   * Scoped to still-`NULL` rows, so it is a no-op on every boot after the first
+   * (a written note always has a non-null, possibly empty, `content_text`).
+   */
+  onApplicationBootstrap(): void {
+    const stale = this.db
+      .select({ id: entities.id, document: entities.document })
+      .from(entities)
+      .where(isNull(entities.contentText))
+      .all();
+    for (const row of stale) {
+      const contentText = extractText(parseDocument(row.id, row.document).content);
+      this.db.update(entities).set({ contentText }).where(eq(entities.id, row.id)).run();
+    }
+  }
 
   /**
    * One owner-scoped page of summaries (ADR-0025), metadata only. Stable sort
@@ -61,8 +93,12 @@ export class EntitiesService {
    * to detect further pages without phantom empty page.
    */
   list(ownerId: string, opts: ListOptions): ListPage {
-    // Skip potentially large document column.
-    const rows = this.db
+    // A text query becomes an FTS5 MATCH (ADR-0035): full-text over name, tags,
+    // and Content prose, ranked by bm25. Absent (or all-punctuation) → keep the
+    // last-edited order. Skip potentially large document column.
+    const match = opts.q ? toFtsMatch(opts.q) : null;
+    const w = this.config.search.weights;
+    const query = this.db
       .select({
         id: entities.id,
         ownerId: entities.ownerId,
@@ -76,8 +112,30 @@ export class EntitiesService {
         updatedAt: entities.updatedAt,
       })
       .from(entities)
-      .where(and(eq(entities.ownerId, ownerId), ...filters(opts)))
-      .orderBy(desc(entities.updatedAt), asc(entities.id))
+      .$dynamic();
+    if (match) {
+      query.innerJoin(sql`entities_fts`, sql`entities_fts.rowid = entities.rowid`);
+    }
+    const rows = query
+      .where(
+        and(
+          eq(entities.ownerId, ownerId),
+          ...filters(opts),
+          match ? sql`entities_fts MATCH ${match}` : undefined,
+        ),
+      )
+      // With a query, best match first (bm25 ascending), id for a stable page
+      // boundary; without one, the existing newest-first order (ADR-0025). The
+      // per-column weights (name/tags/content) are the configured relevance tuning
+      // (ADR-0035) — column order must match the FTS DDL: name, tags, content_text.
+      .orderBy(
+        ...(match
+          ? [
+              sql`bm25(entities_fts, ${w.name}, ${w.tags}, ${w.content})`,
+              asc(entities.id),
+            ]
+          : [desc(entities.updatedAt), asc(entities.id)]),
+      )
       .limit(opts.limit + 1)
       .offset(opts.offset)
       .all();
@@ -149,7 +207,12 @@ export class EntitiesService {
   importHome(ownerId: string, homeEntityId: string, tags: readonly string[], body: EntityBody): void {
     this.db
       .update(entities)
-      .set({ document: serialize(body), tags: [...tags], updatedAt: Date.now() })
+      .set({
+        document: serialize(body),
+        tags: [...tags],
+        contentText: extractText(body.content),
+        updatedAt: Date.now(),
+      })
       .where(and(eq(entities.id, homeEntityId), eq(entities.ownerId, ownerId)))
       .run();
   }
@@ -180,6 +243,8 @@ export class EntitiesService {
       visibility: 'private' as const,
       version: INITIAL_VERSION,
       document: serialize(input.body),
+      // Search index text (ADR-0035); the FTS triggers pick it up from the column.
+      contentText: extractText(input.body.content),
       isHome: false,
       createdAt: now,
       updatedAt: now,
@@ -200,6 +265,10 @@ export class EntitiesService {
     // Set only columns a save owns so concurrent renames aren't clobbered.
     // Tags always fully replace (save carries full set, #72).
     const document = serialize(req.document);
+    const contentText = extractText(req.document.content);
+    // Descriptors are derived from the saved Content, not sent by the client (#96,
+    // ADR-0023/0035): harvest the links' relationship labels, normalized like tags.
+    const descriptors = descriptorsSchema.parse(harvestDescriptors(req.document.content));
     const version = req.version + 1;
     const updatedAt = Date.now();
     // Body write and descriptor-index replace in one transaction (ADR-0023) so
@@ -207,7 +276,7 @@ export class EntitiesService {
     const saved = this.db.transaction(() => {
       const res = this.db
         .update(entities)
-        .set({ document, version, updatedAt, tags: req.tags })
+        .set({ document, contentText, version, updatedAt, tags: req.tags })
         .where(
           and(
             eq(entities.id, id),
@@ -217,7 +286,7 @@ export class EntitiesService {
         )
         .run();
       if (res.changes === 0) return false;
-      this.replaceDescriptors(id, req.descriptors);
+      this.replaceDescriptors(id, descriptors);
       return true;
     });
     if (!saved) {
@@ -331,20 +400,29 @@ export class EntitiesService {
 }
 
 /**
- * Composable list predicates (ADR-0025). Owner-scoping applied by caller.
- * q: case-insensitive substring. type: exact Entity Type match.
+ * Composable list predicates (ADR-0025). Owner-scoping applied by caller. The
+ * text query `q` is handled by {@link list} (an FTS5 MATCH, ADR-0035), not here.
+ * type/worldId: exact match; ids: explicit set.
  */
 function filters(opts: ListOptions) {
   const predicates = [];
   // Empty id set selects nothing (inArray([]) is always-false).
   if (opts.ids) predicates.push(inArray(entities.id, [...opts.ids]));
-  if (opts.q) {
-    const escaped = opts.q.replace(/[%_\\]/g, '\\$&');
-    predicates.push(sql`${entities.name} LIKE ${'%' + escaped + '%'} ESCAPE '\\'`);
-  }
   if (opts.type) predicates.push(eq(entities.type, opts.type));
   if (opts.worldId) predicates.push(eq(entities.worldId, opts.worldId));
   return predicates;
+}
+
+/**
+ * Turn a user's raw query into a safe FTS5 MATCH string (ADR-0035): split on
+ * non-alphanumeric so the user can never inject FTS operators, quote each token
+ * as a string literal, and append `*` for prefix matching ("cita" → "citadel").
+ * Tokens combine with implicit AND. All-punctuation input yields `''`, which the
+ * caller reads as "no query" (an empty MATCH string is an FTS5 error).
+ */
+function toFtsMatch(q: string): string {
+  const tokens = q.match(/[\p{L}\p{N}]+/gu) ?? [];
+  return tokens.map((t) => `"${t}"*`).join(' ');
 }
 
 function serialize(body: EntityBody): string {

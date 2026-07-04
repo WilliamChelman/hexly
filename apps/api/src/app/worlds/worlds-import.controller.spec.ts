@@ -139,6 +139,24 @@ describe('Vault import endpoint', () => {
     expect(mara.type).toBe('note');
   });
 
+  it('makes an imported note findable by its Content prose with no re-save (ADR-0035)', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const zip = vaultZip({ 'Lady Mara.md': '# Lady Mara\n\nA ranger of the sunken citadel.' });
+
+    const res = await ada
+      .post('/worlds/import')
+      .attach('file', zip, 'Aldermoor.zip')
+      .expect(201);
+
+    // The import path (not a save) populated content_text, so the extractor ran
+    // and the FTS INSERT trigger indexed it — searchable straight out of import.
+    const found = await ada
+      .get('/entities')
+      .query({ q: 'citadel', worldId: res.body.worldId })
+      .expect(200);
+    expect(found.body.items.map((e: { name: string }) => e.name)).toEqual(['Lady Mara']);
+  });
+
   it('preserves the folder path as hexly.sourcePath, frontmatter as Metadata, and tags as Hexly Tags', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const zip = vaultZip({

@@ -62,6 +62,21 @@ const rawConfigSchema = z.object({
       strictZipGuard: z.boolean().default(false),
     })
     .prefault({}),
+  // Full-text search relevance tuning (ADR-0035). bm25 multiplies each indexed
+  // column's contribution by its weight, so a name hit outranks a body hit at the
+  // same frequency. Defaults favour name > tags > body; a deployment with, say,
+  // very long notes can retune without a code change. Positive numbers only.
+  search: z
+    .object({
+      weights: z
+        .object({
+          name: z.number().positive().default(10),
+          tags: z.number().positive().default(5),
+          content: z.number().positive().default(1),
+        })
+        .prefault({}),
+    })
+    .prefault({}),
 });
 
 /** The validated-but-unprocessed config: what `hexly.yml` literally says (sizes as strings). */
@@ -76,6 +91,10 @@ export interface HexlyConfig {
     maxDecompressed: number;
     /** Meter actual decompressed output (airtight, slower) vs. trust the zip's declared sizes (fast). */
     strictZipGuard: boolean;
+  };
+  search: {
+    /** bm25 per-column multipliers (ADR-0035): higher = that column influences relevance more. */
+    weights: { name: number; tags: number; content: number };
   };
 }
 
@@ -92,6 +111,7 @@ function processConfig(raw: HexlyConfigRaw): HexlyConfig {
       maxDecompressed: parseSize(raw.import.maxDecompressed),
       strictZipGuard: raw.import.strictZipGuard,
     },
+    search: { weights: { ...raw.search.weights } },
   };
 }
 

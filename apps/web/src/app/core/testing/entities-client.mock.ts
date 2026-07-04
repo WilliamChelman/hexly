@@ -24,7 +24,6 @@ export class MockEntitiesClient {
       body: EntityBody,
       version: number,
       tags: readonly string[],
-      descriptors: readonly string[],
     ) => Observable<EntitySaveOutcome>
   >();
 }

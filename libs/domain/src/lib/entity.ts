@@ -17,7 +17,11 @@ export const CONTENT_FORMAT = 'tiptap-v3';
  * taskList nodes, the highlight mark, and entityLink `display`/`heading` (ADR-0033).
  * Saves always write CONTENT_FORMAT.
  */
-export const READABLE_CONTENT_FORMATS = ['tiptap-v1', 'tiptap-v2', 'tiptap-v3'] as const;
+export const READABLE_CONTENT_FORMATS = [
+  'tiptap-v1',
+  'tiptap-v2',
+  'tiptap-v3',
+] as const;
 
 /** Opaque, format-tagged Content (ADR-0019). `snapshot` is `z.unknown()` — the domain never parses it. */
 export const contentSchema = z.object({
@@ -59,7 +63,11 @@ export const metadataSchema = z.record(z.string(), z.unknown()).optional();
  * keeps each arm exhaustively known at compile time.
  */
 export const entityBodySchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('note'), content: contentSchema, metadata: metadataSchema }),
+  z.object({
+    type: z.literal('note'),
+    content: contentSchema,
+    metadata: metadataSchema,
+  }),
   z.object({
     type: z.literal('hexmap'),
     content: contentSchema,
@@ -96,7 +104,10 @@ export const nameSchema = z
   .trim()
   .min(1)
   .max(255)
-  .refine((s) => !/[\p{Cc}/\\]/u.test(s), 'Name cannot contain control characters or slashes');
+  .refine(
+    (s) => !/[\p{Cc}/\\]/u.test(s),
+    'Name cannot contain control characters or slashes',
+  );
 
 /**
  * Free-text Tags on an Entity (CONTEXT.md → Tag), normalized on parse so the
@@ -112,12 +123,12 @@ const dedupedTags = z
 export const tagsSchema = dedupedTags.default([]);
 
 /**
- * Link Descriptors harvested from a note's live Content and sent on save (#96,
- * ADR-0023): the distinct relationship labels ("spouse", "capital of") this Entity
- * currently uses. Normalized exactly like {@link tagsSchema} — trimmed, lower-cased,
- * deduped, blanks rejected — so the owner vocabulary folds case the same way. Defaults
- * to empty so a save with no links still carries an (empty) set, which the server's
- * replace-on-save then prunes.
+ * The normalization contract for Link Descriptors (#96, ADR-0023): the distinct
+ * relationship labels ("spouse", "capital of") an Entity's links use. The server
+ * harvests them from the saved Content ({@link harvestDescriptors}) and runs them
+ * through this — trimmed, lower-cased, deduped, blanks rejected, exactly like
+ * {@link tagsSchema} — so the owner vocabulary folds case the same way. Defaults to
+ * empty so a linkless doc yields an (empty) set, which replace-on-save then prunes.
  */
 export const descriptorsSchema = dedupedTags.default([]);
 
@@ -144,10 +155,6 @@ export const saveEntityRequestSchema = z.object({
   // Tags ride the version-checked save (#72): always the full current set, so a
   // save replaces the stored tags — an empty array clears them.
   tags: dedupedTags,
-  // Distinct Link Descriptors harvested from the live doc (#96): ride the same save,
-  // replacing the server's per-entity index. Optional/defaulted so an older client omitting
-  // them saves cleanly (and prunes nothing it didn't know about — it just sends []).
-  descriptors: descriptorsSchema,
 });
 
 export type SaveEntityRequest = z.infer<typeof saveEntityRequestSchema>;

@@ -124,6 +124,11 @@ import:
   strictZipGuard: false   # false: fast import, guard on the zip's *declared* size.
                           # true: slower, streams and meters *actual* output to abort a
                           #       bomb mid-inflate — set on an untrusted/public instance.
+search:
+  weights:                # bm25 relevance multipliers per indexed column (ADR-0035)
+    name: 10              # a query word in the name outranks the same word...
+    tags: 5               # ...in a tag...
+    content: 1            # ...in the body. Retune if e.g. very long notes skew results.
 ```
 
 `strictZipGuard` is a speed-vs-safety trade (ADR-0036). The default (`false`) batch-decompresses — several times faster on a large vault — and trusts the archive's declared sizes, which is right for a trusted personal/LAN instance importing your own vault. A maliciously crafted `.zip` can under-declare its size to slip past that check, so an **untrusted or public** instance should set `strictZipGuard: true`, which streams the archive and meters actual decompressed bytes to abort a zip bomb before it materializes. Either way `maxDecompressed` is enforced.

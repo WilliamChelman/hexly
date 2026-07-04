@@ -8,4 +8,6 @@ export * from './lib/hex/marquee';
 export * from './lib/hex/move-planner';
 export * from './lib/hex/hex-map';
 export * from './lib/entity';
+export * from './lib/extract-text';
+export * from './lib/harvest-descriptors';
 export * from './lib/world';

@@ -25,7 +25,24 @@ describe('createDb boot migration (ADR-0027)', () => {
         'world_members',
         'world_links',
         'entity_descriptors',
+        // The full-text search virtual table (ADR-0035).
+        'entities_fts',
       ])
+    );
+    db.$client.close();
+  });
+
+  it('builds the FTS index and its three sync triggers (ADR-0035)', () => {
+    const db = createDb(':memory:');
+    const triggers = (
+      db.$client
+        .prepare(`SELECT name FROM sqlite_master WHERE type = 'trigger'`)
+        .all() as { name: string }[]
+    ).map((r) => r.name);
+
+    // INSERT/UPDATE/DELETE triggers keep entities_fts in sync with entities.
+    expect(triggers).toEqual(
+      expect.arrayContaining(['entities_fts_ai', 'entities_fts_au', 'entities_fts_ad']),
     );
     db.$client.close();
   });
