@@ -89,11 +89,11 @@ A lightweight container record that groups Entities for a single campaign or set
 _Avoid_: Space, container, campaign
 
 **Home Entity**:
-A `note` Entity auto-created when a World is created, flagged `is_home = true` in the `entities` table. The partial unique index `idx_world_home` enforces at most one per World. Serves as the World's landing page. Cannot be deleted and cannot be moved to another World. Its title is not its own — it is the World's name (the World name is the source of truth; ADR-0029), so it reads as derived rather than freely edited.
+A `note` Entity auto-created when a World is created, flagged `is_home = true` in the `entities` table. The partial unique index `idx_world_home` enforces at most one per World. Serves as the World's landing page. Cannot be deleted, cannot be moved to another World, and is always `shared` (its visibility is locked, like its title). Its title is not its own — it is the World's name (the World name is the source of truth; ADR-0029), so it reads as derived rather than freely edited.
 _Avoid_: World page, index, overview
 
 **World Index**:
-The page at `/` listing every World the caller can reach (owned and member), and the surface that owns World create, rename, and delete. The durable directory of Worlds — distinct from the World Switcher (a transient quick-hop control) and from a World's own Home Entity (its in-world landing note).
+The page at `/` listing every World the caller can reach — owned, member, or holding any Entity the caller owns or is granted (reachability is derived, not a stored flag) — and the surface that owns World create, rename, and delete. The durable directory of Worlds — distinct from the World Switcher (a transient quick-hop control) and from a World's own Home Entity (its in-world landing note).
 _Avoid_: World home, world library, dashboard, world picker
 
 **World Switcher**:
@@ -101,11 +101,11 @@ The compact in-app control (docked by the user menu) for hopping to another reac
 _Avoid_: World selector, world dropdown
 
 **World Owner**:
-The user who created the World. Full control over membership, roles, and the public link. Exactly one per World.
-_Avoid_: Admin, GM (user vocabulary, not system vocabulary)
+A user holding full control of a World: membership, roles, the public link, World rename/delete, and full control (edit, delete, change visibility) over every `shared` Entity in the World. No special access to others' `private` Entities. Ownership is a symmetric set — one or more Owners, all equal, any Owner may add or remove other Owners; the creator holds no special status after creation. Invariant: at least one Owner (the last cannot be removed or resign).
+_Avoid_: Admin, GM (user vocabulary, not system vocabulary), co-owner (an Owner is an Owner)
 
 **Contributor**:
-A named user granted the ability to create Entities inside a World (and own what they create) and to read all `shared` Entities. Cannot edit Entities they do not own unless granted entity-level Editor access separately.
+A named user granted the ability to create Entities inside a World (becoming each created Entity's initial sole Owner) and to read all `shared` Entities. Cannot edit Entities they do not own unless granted entity-level Editor access separately.
 _Avoid_: Editor, member, player
 
 **World Viewer**:
@@ -118,26 +118,26 @@ _Avoid_: Share link, invite link
 
 ## Sharing
 
-Sharing is per **World** (ADR-0024). A World's sharing cascades to all `shared` Entities within it. Entity-level Editor/Viewer grants (ADR-0004) remain available for finer-grained control on top.
+Sharing is per **World** (ADR-0024; cemented in ADR-0037). A World's sharing cascades to all `shared` Entities within it. Entity-level Editor/Viewer grants (ADR-0004) provide finer-grained control on top — including per-user visibility, via a grant on a `private` Entity.
 
 **Entity Visibility**:
-A two-value field on every Entity: `private` (default) or `shared`. A `private` Entity is accessible only to its Owner and any entity-level Editor/Viewer grants. A `shared` Entity is accessible to all World members (Contributor, World Viewer, World Public Link holders). Per-user visibility is deferred.
+A two-value field on every Entity: `private` (default) or `shared`. A `private` Entity is accessible only to its Owners and any entity-level grants (named Editor/Viewer, or anonymous via its Public Link) — World Owners and Instance Admins have no special access to it; private is absolute within the collaboration model (only a Superadmin, outside the model, can reach it). A `shared` Entity is accessible to all World members (Contributor, World Viewer, World Public Link holders). Per-user visibility is not a separate feature — it is what an entity-level grant on a `private` Entity delivers.
 _Avoid_: Published, public, visible
 
 **Owner**:
-The user who created an Entity. Full control, including granting entity-level roles and managing entity-level access. Exactly one per Entity.
-_Avoid_: Admin, creator
+A user holding full control of an Entity — substance, lifecycle (delete), exposure (visibility), and grant/link management. Ownership is a symmetric set — one or more Owners, all equal, any Owner may add or remove other Owners; the creator (initially the sole Owner) holds no special status after creation. Invariant: at least one Owner. A `private` Entity is private to its Owner set.
+_Avoid_: Admin, creator, co-owner
 
 **Editor**:
-A named user granted permission to edit a specific Entity. Edits are asynchronous and last-write-wins, guarded by the Entity's version (a stale save is rejected). Real-time co-editing is deferred, not precluded (ADR-0019).
+A named user — any user on the Instance, World membership not required — granted permission to edit a specific Entity's substance: Content, name, Tags, Metadata. Never its lifecycle or exposure: no delete, no visibility change, no grant management. Edits are asynchronous and last-write-wins, guarded by the Entity's version (a stale save is rejected). Real-time co-editing is deferred, not precluded (ADR-0019).
 _Avoid_: Collaborator, contributor
 
 **Viewer**:
-A named user granted read-only access to a specific Entity.
+A named user — any user on the Instance, World membership not required — granted read-only access to a specific Entity.
 _Avoid_: Reader, guest
 
 **Public Link**:
-An unguessable, unlisted URL that grants read-only access to a specific Entity without an account. Distinct from the World Public Link, which covers all `shared` Entities in a World.
+An unguessable, unlisted URL that grants read-only access to a specific Entity without an account — an anonymous Viewer grant, so it pierces `private` like any entity-level grant; revoking the link is how access is withdrawn. Distinct from the World Public Link, which covers all `shared` Entities in a World.
 _Avoid_: Share link, public URL, share token
 
 **EntityView**:
@@ -231,6 +231,14 @@ _Avoid_: Server, deployment, tenant
 **Instance Directory**:
 The folder an operator points Hexly at (`HEXLY_DIR`), holding its SQLite database (`hexly.db`) and Instance Configuration (`hexly.yml`) — named for holding both data and config. The boot input — Hexly is given this folder, not a database-file path (ADR-0036).
 _Avoid_: Data directory, data folder, db path, storage dir
+
+**Instance Admin**:
+A user flag granting account management on an Instance — create, disable, and delete users, reset passwords, grant/revoke the Admin flag — plus future instance-settings surfaces. Carries zero content powers: an Admin reads and edits nothing they aren't otherwise an Owner, member, or grantee of. Deleting a user is refused while that user solely owns any World or Entity; disabling (login locked, data and memberships intact) is the immediate lever.
+_Avoid_: Admin (alone, ambiguous with Superadmin), moderator, staff
+
+**Superadmin**:
+The in-app embodiment of the operator: unrestricted access, sitting outside the collaboration model entirely. Exists for repair — orphaned data, accidental deletions — not for daily administration (that is the Instance Admin's job). At least one per Instance, seeded at setup.
+_Avoid_: Root, god mode, owner
 
 **Instance Configuration**:
 Operator-facing settings for one Instance, in `hexly.yml` beside the database — the vault-import size limits today, feature flags next. The single source for these settings (no env-var override); a missing or partial file falls back to built-in defaults, an invalid one fails boot (ADR-0036). Distinct from per-User or per-World settings, which live in the database.
