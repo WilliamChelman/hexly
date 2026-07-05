@@ -17,7 +17,7 @@ import {
   userExists,
 } from '../acl/owner-set';
 import { DB, Db } from '../db/db';
-import { entities, entityOwners, worldMembers, worlds } from '../db/schema';
+import { entities, entityGrants, worldMembers, worlds } from '../db/schema';
 
 /**
  * World persistence (ADR-0024). Home Entity (flagged is_home) minted in same
@@ -33,14 +33,16 @@ export class WorldsService {
 
   /**
    * Every World the caller can reach (ADR-0024, ADR-0037): reachability is derived —
-   * a member row (owner/contributor/viewer) OR ownership of any Entity inside the World
-   * (an ex-member who kept Entities keeps minimal reachability). The two id sets are
-   * unioned so a World is listed once whichever way it is reached.
+   * a member row (owner/contributor/viewer), OR any row in an Entity's ACE set inside the
+   * World. That one set now spans ownership *and* entity-level grants (owner folded into
+   * entity_grants, migration 0007): an ex-member who kept Entities keeps minimal reachability,
+   * and a grantee can navigate to what they were given even as a non-member (#161). The id
+   * sets are unioned so a World is listed once however reached.
    */
   list(userId: string): WorldSummary[] {
-    // Reachable = a member row OR ownership of any Entity inside, in one statement:
-    // two id-subqueries OR'd in the WHERE, so the DB does the union and de-dup (a World
-    // reached both ways is still returned once).
+    // Reachable = a member row OR any entity_grants row (owner/editor/viewer) on an Entity
+    // inside, in one statement: id-subqueries OR'd in the WHERE, so the DB does the union
+    // and de-dup (a World reached more than one way is still returned once).
     const rows = this.db
       .select({
         id: worlds.id,
@@ -63,8 +65,8 @@ export class WorldsService {
             this.db
               .select({ id: entities.worldId })
               .from(entities)
-              .innerJoin(entityOwners, eq(entityOwners.entityId, entities.id))
-              .where(eq(entityOwners.userId, userId)),
+              .innerJoin(entityGrants, eq(entityGrants.entityId, entities.id))
+              .where(eq(entityGrants.userId, userId)),
           ),
         ),
       )
@@ -163,7 +165,7 @@ export class WorldsService {
         )
         .run(homeEntityId, worldId, name, document, now, now);
       sqlite
-        .prepare(`INSERT INTO entity_owners (entity_id, user_id) VALUES (?, ?)`)
+        .prepare(`INSERT INTO entity_grants (entity_id, user_id, role) VALUES (?, ?, 'owner')`)
         .run(homeEntityId, ownerId);
     })();
     return { worldId, homeEntityId };
@@ -213,7 +215,7 @@ export class WorldsService {
     if (!world) return null;
     if (!this.isOwner(userId, id)) return 'forbidden';
     this.db.transaction(() => {
-      // entity_owners cascades with its entities; delete entities explicitly.
+      // entity_grants cascades with its entities; delete entities explicitly.
       this.db.delete(entities).where(eq(entities.worldId, id)).run();
       this.db.delete(worlds).where(eq(worlds.id, id)).run();
     });
@@ -449,9 +451,11 @@ export class WorldsService {
 
   /**
    * World row if `userId` can reach it, else undefined (ADR-0024, ADR-0037). Reachability
-   * is derived, not stored: a member row (owner/contributor/viewer) OR ownership of any
-   * Entity inside the World (the ex-member residue — a departed member who kept Entities
-   * keeps minimal reachability). Unreachable is indistinguishable from nonexistent.
+   * is derived, not stored: a member row (owner/contributor/viewer), OR any row in an
+   * Entity's ACE set inside the World — ownership *and* entity-level grants, one table since
+   * owner folded into entity_grants (migration 0007). Covers both the ex-member residue (a
+   * departed member who kept Entities keeps minimal reachability) and a grantee navigating to
+   * what they were given (#161). Unreachable is indistinguishable from nonexistent.
    */
   private reachableWorld(
     userId: string,
@@ -465,13 +469,13 @@ export class WorldsService {
       .where(and(eq(worldMembers.worldId, id), eq(worldMembers.userId, userId)))
       .get();
     if (member) return world;
-    const ownsEntity = this.db
+    const grantedEntity = this.db
       .select({ id: entities.id })
       .from(entities)
-      .innerJoin(entityOwners, eq(entityOwners.entityId, entities.id))
-      .where(and(eq(entities.worldId, id), eq(entityOwners.userId, userId)))
+      .innerJoin(entityGrants, eq(entityGrants.entityId, entities.id))
+      .where(and(eq(entities.worldId, id), eq(entityGrants.userId, userId)))
       .get();
-    return ownsEntity ? world : undefined;
+    return grantedEntity ? world : undefined;
   }
 
   /** Whether `userId` is an Owner of World `id` (a `world_members` row with role 'owner'). */

@@ -15,17 +15,19 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  addGrantRequestSchema,
   addOwnerRequestSchema,
   AuthUser,
   createEntityRequestSchema,
   EntityDetail,
   EntityFacets,
+  EntityGrant,
   entityListQuerySchema,
   EntityPage,
   patchEntityRequestSchema,
   saveEntityRequestSchema,
 } from '@hexly/domain';
-import { ownerSetResponse } from '../acl/owner-set';
+import { aclSetResponse, ownerSetResponse } from '../acl/owner-set';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { SessionAuthGuard } from '../auth/session-auth.guard';
 import { decodeCursor } from './utils/decode-cursor';
@@ -182,4 +184,41 @@ export class EntitiesController {
   ): string[] {
     return ownerSetResponse(this.entities.removeOwner(user.id, id, userId), 'Entity');
   }
+
+  // The Entity's grant set (ADR-0037, #161), for an Owner. Grants have no ≥1 invariant,
+  // so the 409 message aclSetResponse takes is unreachable here (a placeholder).
+  @Get(':id/grants')
+  grants(@CurrentUser() user: AuthUser, @Param('id') id: string): EntityGrant[] {
+    return aclSetResponse(this.entities.listGrants(user.id, id), GRANT_CONFLICT);
+  }
+
+  // Grant an Instance user Editor or Viewer (ADR-0037, #161): Owner-only, target must be
+  // an existing user (member or not). Upsert — re-granting updates the role — so 200.
+  @Post(':id/grants')
+  @HttpCode(200)
+  addGrant(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ): EntityGrant[] {
+    const parsed = addGrantRequestSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException();
+    return aclSetResponse(
+      this.entities.addGrant(user.id, id, parsed.data.userId, parsed.data.role),
+      GRANT_CONFLICT,
+    );
+  }
+
+  // Revoke a grant (ADR-0037, #161): Owner-only. Revocation is how entity-level access ends.
+  @Delete(':id/grants/:userId')
+  removeGrant(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+  ): EntityGrant[] {
+    return aclSetResponse(this.entities.removeGrant(user.id, id, userId), GRANT_CONFLICT);
+  }
 }
+
+/** Unreachable placeholder — grants carry no ≥1-Owner invariant, so no 409 arises. */
+const GRANT_CONFLICT = 'Entity grants have no owner invariant';

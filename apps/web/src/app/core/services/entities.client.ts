@@ -9,10 +9,12 @@ import {
   EntityBody,
   EntityDetail,
   EntityFacets,
+  EntityGrant,
   EntityListQuery,
   EntityPage,
   EntitySaveOutcome,
   EntityType,
+  GrantRole,
   Visibility,
 } from '@hexly/domain';
 
@@ -76,6 +78,21 @@ export class EntitiesClient {
   /** Remove an Owner or resign your own ownership; returns the updated set (ADR-0037). */
   removeOwner(id: string, userId: string): Observable<string[]> {
     return this.http.delete<string[]>(`/api/entities/${id}/owners/${userId}`);
+  }
+
+  /** The Entity's grant set — named Editor/Viewer grants (ADR-0037, #161). Owner-only server-side. */
+  grants(id: string): Observable<EntityGrant[]> {
+    return this.http.get<EntityGrant[]>(`/api/entities/${id}/grants`);
+  }
+
+  /** Grant an Instance user Editor or Viewer; returns the updated set. Upsert (200), not a create. */
+  addGrant(id: string, userId: string, role: GrantRole): Observable<EntityGrant[]> {
+    return this.http.post<EntityGrant[]>(`/api/entities/${id}/grants`, { userId, role });
+  }
+
+  /** Revoke a grant; returns the updated set (ADR-0037, #161). */
+  removeGrant(id: string, userId: string): Observable<EntityGrant[]> {
+    return this.http.delete<EntityGrant[]>(`/api/entities/${id}/grants/${userId}`);
   }
 
   // worldId scopes to a World (ADR-0024); omitted, server defaults to caller's first.

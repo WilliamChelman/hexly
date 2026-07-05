@@ -418,6 +418,21 @@
     "entity": "entité",
     "tabTitle": "Hexly — Propriétaires"
   },
+  "grants": {
+    "heading": "Partagé avec",
+    "subhead": "Donnez à une personne précise l’accès à cette seule entité — même si elle n’est pas dans ce monde.",
+    "editor": "Éditeur",
+    "viewer": "Lecteur",
+    "revoke": "Révoquer",
+    "empty": "Partagé avec personne pour l’instant.",
+    "addLabel": "Partager avec une personne",
+    "addPlaceholder": "Choisir une personne…",
+    "add": "Partager",
+    "addError": "Impossible de partager avec cette personne. Veuillez réessayer.",
+    "roleError": "Impossible de modifier l’accès de cette personne. Veuillez réessayer.",
+    "revokeError": "Impossible de révoquer cet accès. Veuillez réessayer.",
+    "loadError": "Impossible de charger les partages."
+  },
   "members": {
     "heading": "Membres",
     "subhead": "Les personnes que vous avez ajoutées à ce monde comme contributeurs ou lecteurs.",

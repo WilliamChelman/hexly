@@ -22,18 +22,25 @@ import {
   extractText,
   Visibility,
   descriptorsSchema,
+  EntityGrant,
+  GrantRole,
   harvestDescriptors,
   SaveEntityRequest,
   tagsSchema,
   visibilitySchema,
 } from '@hexly/domain';
-import { and, asc, desc, eq, getTableColumns, inArray, isNull, sql } from 'drizzle-orm';
-import { OwnerSetResult, removeOwnerOutcome, userExists } from '../acl/owner-set';
+import { and, asc, desc, eq, getTableColumns, inArray, isNull, ne, sql } from 'drizzle-orm';
+import {
+  AclSetResult,
+  OwnerSetResult,
+  removeOwnerOutcome,
+  userExists,
+} from '../acl/owner-set';
 import { DB, Db } from '../db/db';
 import {
   entities,
   entityDescriptors,
-  entityOwners,
+  entityGrants,
   worldMembers,
   worlds,
 } from '../db/schema';
@@ -41,12 +48,19 @@ import { HEXLY_CONFIG, HexlyConfig } from '../config/config.module';
 
 /**
  * Ownership predicate (ADR-0037): the caller is one of the Entity's Owners — an
- * `entity_owners` row. An EXISTS keeps it a per-row predicate that composes into a
- * query's WHERE untouched. The read/write predicates below build on it.
+ * `owner`-role grant row (folded from `entity_owners`, migration 0007). Just the
+ * top-role case of {@link hasGrant}. The read/write predicates below build on it.
  */
 function ownsEntity(userId: string) {
-  return sql`EXISTS (SELECT 1 FROM ${entityOwners} WHERE ${entityOwners.entityId} = ${entities.id} AND ${entityOwners.userId} = ${userId})`;
+  return hasGrant(userId, ['owner']);
 }
+
+/**
+ * The stored `entity_grants.role` vocabulary (ADR-0037): the API-facing {@link GrantRole}
+ * (`editor`/`viewer`) plus `owner`, the top role folded in from the retired `entity_owners`
+ * (migration 0007). Owner is a *stored* role only — it never appears in a grant request body.
+ */
+type StoredEntityRole = 'owner' | GrantRole;
 
 /** The caller has any membership row in the Entity's World (owner/contributor/viewer). */
 function isWorldMember(userId: string) {
@@ -59,23 +73,49 @@ function isWorldOwner(userId: string) {
 }
 
 /**
- * The read predicate (ADR-0037): `owner ∨ (member ∧ shared)`. The choke point every
- * read path shares — an Entity the caller can't read is indistinguishable from a
- * missing one (ADR-0004), so `private` things don't even leak their existence.
- * (The entity-level-grant term joins here in the grants slice.)
+ * The caller holds a row in the entity ACE set (ADR-0037) whose role is one of `roles`. A
+ * per-row EXISTS that composes into any WHERE, like the others. `roles` spans the *stored*
+ * vocabulary — `owner` (folded in, migration 0007) plus the `editor`/`viewer` grant roles —
+ * which is broader than the API-facing {@link GrantRole}, so it takes {@link StoredEntityRole}.
  */
-function canReadEntity(userId: string) {
-  return sql`(${ownsEntity(userId)} OR (${entities.visibility} = 'shared' AND ${isWorldMember(userId)}))`;
+function hasGrant(userId: string, roles: readonly StoredEntityRole[]) {
+  const list = sql.join(
+    roles.map((r) => sql`${r}`),
+    sql`, `,
+  );
+  return sql`EXISTS (SELECT 1 FROM ${entityGrants} WHERE ${entityGrants.entityId} = ${entities.id} AND ${entityGrants.userId} = ${userId} AND ${entityGrants.role} IN (${list}))`;
 }
 
 /**
- * The write predicate (ADR-0037): `owner ∨ (world-owner ∧ shared)`. An Owner mutates
- * their Entity at any visibility; a World Owner curates only the *shared* surface (edit,
- * delete, re-hide) and this power stops dead at `private`. Rides the atomic UPDATE WHERE
- * so a World Owner's write actually lands (a plain `ownsEntity` would touch zero rows).
+ * The read predicate (ADR-0037): `owner ∨ grant(editor|viewer) ∨ (member ∧ shared)`. The
+ * choke point every read path shares — an Entity the caller can't read is indistinguishable
+ * from a missing one (ADR-0004), so `private` things don't even leak their existence. An
+ * entity-level grant pierces `private`: it reveals the Entity to exactly that user (#161).
+ */
+function canReadEntity(userId: string) {
+  return sql`(${hasGrant(userId, ['owner', 'editor', 'viewer'])} OR (${entities.visibility} = 'shared' AND ${isWorldMember(userId)}))`;
+}
+
+/**
+ * The management predicate (ADR-0037): `owner ∨ (world-owner ∧ shared)`. Governs the
+ * powers a grant never confers — delete, visibility change, grant management. An Owner
+ * mutates their Entity at any visibility; a World Owner curates only the *shared* surface
+ * and this power stops dead at `private`. Rides the atomic UPDATE WHERE so a World Owner's
+ * write actually lands (a plain `ownsEntity` would touch zero rows).
  */
 function canWriteEntity(userId: string) {
   return sql`(${ownsEntity(userId)} OR (${entities.visibility} = 'shared' AND ${isWorldOwner(userId)}))`;
+}
+
+/**
+ * The substance predicate (ADR-0037, #161): `canWrite ∨ grant(editor)`. Governs the
+ * autosave surface — Content, name, Tags, Metadata — so an entity-level Editor edits
+ * substance without gaining the lifecycle/exposure powers {@link canWriteEntity} keeps.
+ */
+function canEditSubstanceEntity(userId: string) {
+  // canWrite is `owner ∨ (shared ∧ world-owner)`; folding the extra `∨ grant(editor)` in as
+  // a single `grant(owner|editor)` scan keeps one EXISTS on entity_grants, not two.
+  return sql`(${hasGrant(userId, ['owner', 'editor'])} OR (${entities.visibility} = 'shared' AND ${isWorldOwner(userId)}))`;
 }
 
 const INITIAL_VERSION = 1;
@@ -281,9 +321,12 @@ export class EntitiesService implements OnApplicationBootstrap {
    */
   load(userId: string, id: string): EntityDetail | null {
     const access = this.access(userId, id);
-    // Surface canWrite so the editor gates itself (ADR-0037): a read-only member opens
-    // a shared Entity read-only rather than autosaving into a wall of 403s.
-    return access?.canRead ? { ...toDetail(access.row), canWrite: access.canWrite } : null;
+    // Surface substance-write power so the editor gates itself (ADR-0037): a read-only
+    // member or a Viewer grant opens read-only rather than autosaving into a wall of 403s,
+    // while an entity-level Editor (canWrite false, canEditSubstance true) opens writable.
+    return access?.canRead
+      ? { ...toDetail(access.row), canWrite: access.canEditSubstance }
+      : null;
   }
 
   /**
@@ -381,10 +424,11 @@ export class EntitiesService implements OnApplicationBootstrap {
       updatedAt: now,
     };
     // Row and its sole initial Owner land together (ADR-0037) — a new Entity is
-    // never ownerless. The creator is the initial sole member of its owner set.
+    // never ownerless. The creator is the initial sole member of its owner set, an
+    // `owner`-role grant row (migration 0007).
     this.db.transaction(() => {
       this.db.insert(entities).values(row).run();
-      this.db.insert(entityOwners).values({ entityId: row.id, userId: input.ownerId }).run();
+      this.db.insert(entityGrants).values({ entityId: row.id, userId: input.ownerId, role: 'owner' }).run();
     });
     return row;
   }
@@ -399,7 +443,8 @@ export class EntitiesService implements OnApplicationBootstrap {
     // Read first for not-found and to preserve untouched columns in response.
     const access = this.access(userId, id);
     if (!access?.canRead) return { status: 'not-found' };
-    if (!access.canWrite) throw new ForbiddenException();
+    // Substance edit (ADR-0037, #161): an entity-level Editor may save Content/Tags too.
+    if (!access.canEditSubstance) throw new ForbiddenException();
     const row = access.row;
 
     // Set only columns a save owns so concurrent renames aren't clobbered.
@@ -420,7 +465,7 @@ export class EntitiesService implements OnApplicationBootstrap {
         .where(
           and(
             eq(entities.id, id),
-            canWriteEntity(userId),
+            canEditSubstanceEntity(userId),
             eq(entities.version, req.version),
           ),
         )
@@ -460,7 +505,12 @@ export class EntitiesService implements OnApplicationBootstrap {
   ): EntityDetail | null {
     const access = this.access(userId, id);
     if (!access?.canRead) return null;
-    if (!access.canWrite) throw new ForbiddenException();
+    // Visibility is exposure — never a grant power (ADR-0037, #161), so a visibility
+    // change needs full management rights; a name-only patch is substance, which an
+    // entity-level Editor may make. The WHERE below mirrors whichever gate applies.
+    const changesVisibility = changes.visibility !== undefined;
+    const permitted = changesVisibility ? access.canWrite : access.canEditSubstance;
+    if (!permitted) throw new ForbiddenException();
     if (access.row.isHome && changes.visibility && changes.visibility !== 'shared') {
       // 409, like delete: conflicts with the World invariant that a shared World keeps a landing page.
       throw new ConflictException('The Home Entity is always shared');
@@ -468,10 +518,16 @@ export class EntitiesService implements OnApplicationBootstrap {
     const updatedAt = Date.now();
     const res = this.db
       .update(entities)
-      // canWrite in the WHERE (not ownsEntity) so a World Owner's write on a shared
-      // Entity actually lands; evaluated pre-SET, so a shared→private re-hide still matches.
+      // The gate predicate in the WHERE (not ownsEntity) so a World Owner's — or an
+      // Editor's name — write actually lands; evaluated pre-SET, so a shared→private
+      // re-hide still matches.
       .set({ ...changes, updatedAt })
-      .where(and(eq(entities.id, id), canWriteEntity(userId)))
+      .where(
+        and(
+          eq(entities.id, id),
+          changesVisibility ? canWriteEntity(userId) : canEditSubstanceEntity(userId),
+        ),
+      )
       .run();
     // 0 rows means the write predicate no longer matched between the access read and this
     // UPDATE (e.g. the row was concurrently flipped `private`): the write never landed, so
@@ -536,7 +592,7 @@ export class EntitiesService implements OnApplicationBootstrap {
     if (!access.canWrite) throw new ForbiddenException();
     // 409, not 400: conflicts with World invariant (Home Entity always exists, ADR-0024).
     if (access.row.isHome) throw new ConflictException('The Home Entity cannot be deleted');
-    // entity_owners cascades with the row.
+    // entity_grants (owner + grant rows) cascades with the row.
     this.db.delete(entities).where(eq(entities.id, id)).run();
     return true;
   }
@@ -581,10 +637,15 @@ export class EntitiesService implements OnApplicationBootstrap {
     const gate = this.gateOwnerManagement(userId, id);
     if (gate) return gate;
     if (!userExists(this.db, targetUserId)) return { status: 'no-such-user' };
+    // Owner wins (ADR-0037, migration 0007): promoting a user who already holds an
+    // editor/viewer grant overwrites it to owner; re-adding an existing Owner is a no-op.
     this.db
-      .insert(entityOwners)
-      .values({ entityId: id, userId: targetUserId })
-      .onConflictDoNothing()
+      .insert(entityGrants)
+      .values({ entityId: id, userId: targetUserId, role: 'owner' })
+      .onConflictDoUpdate({
+        target: [entityGrants.entityId, entityGrants.userId],
+        set: { role: 'owner' },
+      })
       .run();
     return { status: 'ok', value: this.entityOwnersOf(id) };
   }
@@ -599,20 +660,109 @@ export class EntitiesService implements OnApplicationBootstrap {
     if (gate) return gate;
     const outcome = removeOwnerOutcome(this.entityOwnersOf(id), targetUserId);
     if (outcome.status !== 'ok') return outcome;
+    // Delete the owner-role row (their access ends; they hold no other row post-fold).
     this.db
-      .delete(entityOwners)
-      .where(and(eq(entityOwners.entityId, id), eq(entityOwners.userId, targetUserId)))
+      .delete(entityGrants)
+      .where(
+        and(
+          eq(entityGrants.entityId, id),
+          eq(entityGrants.userId, targetUserId),
+          eq(entityGrants.role, 'owner'),
+        ),
+      )
       .run();
     return outcome;
   }
 
-  /** The Entity's Owner user ids (ADR-0037), ordered stably. */
+  /**
+   * The Entity's grant set, for an Owner (ADR-0037, #161). Grant management belongs to
+   * the Owners alone (same gate as the owner set) — unreachable → 404, reachable but not
+   * an Owner → 403 (the controller maps the outcome).
+   */
+  listGrants(userId: string, id: string): AclSetResult<EntityGrant[]> {
+    const gate = this.gateOwnerManagement(userId, id);
+    return gate ?? { status: 'ok', value: this.entityGrantsOf(id) };
+  }
+
+  /**
+   * Grant an Instance user Editor or Viewer on an Entity (ADR-0037, #161): Owner-only,
+   * the target must be an existing Instance user (World membership is *not* required —
+   * an outsider can be handed one note). Upsert — re-granting a different role updates it.
+   */
+  addGrant(
+    userId: string,
+    id: string,
+    targetUserId: string,
+    role: GrantRole,
+  ): AclSetResult<EntityGrant[]> {
+    const gate = this.gateOwnerManagement(userId, id);
+    if (gate) return gate;
+    if (!userExists(this.db, targetUserId)) return { status: 'no-such-user' };
+    // A grant is editor/viewer only — the `setWhere` guard makes an existing `owner` row win,
+    // so granting a current Owner viewer/editor never demotes them (that would silently strip
+    // ownership through the wrong endpoint, past the ≥1-Owner invariant). Owners are managed
+    // via addOwner/removeOwner; the grant surface (entityGrantsOf) excludes them.
+    this.db
+      .insert(entityGrants)
+      .values({ entityId: id, userId: targetUserId, role })
+      .onConflictDoUpdate({
+        target: [entityGrants.entityId, entityGrants.userId],
+        set: { role },
+        setWhere: ne(entityGrants.role, 'owner'),
+      })
+      .run();
+    return { status: 'ok', value: this.entityGrantsOf(id) };
+  }
+
+  /**
+   * Revoke a grant (ADR-0037, #161): Owner-only. Revocation is how entity-level access
+   * ends — a plain row delete, after which the read/write predicates simply recompute.
+   * Revoking a non-existent grant is a no-op that still returns the (unchanged) set.
+   */
+  removeGrant(
+    userId: string,
+    id: string,
+    targetUserId: string,
+  ): AclSetResult<EntityGrant[]> {
+    const gate = this.gateOwnerManagement(userId, id);
+    if (gate) return gate;
+    // Editor/viewer rows only — an `owner` row is removed via removeOwner (which enforces the
+    // ≥1-Owner invariant), never silently deleted here through the grant-revoke endpoint.
+    this.db
+      .delete(entityGrants)
+      .where(
+        and(
+          eq(entityGrants.entityId, id),
+          eq(entityGrants.userId, targetUserId),
+          inArray(entityGrants.role, ['editor', 'viewer']),
+        ),
+      )
+      .run();
+    return { status: 'ok', value: this.entityGrantsOf(id) };
+  }
+
+  /**
+   * The Entity's grants (ADR-0037, #161), ordered stably by user id. Owner rows share the
+   * table post-fold (migration 0007) but aren't grants — the grant surface is editor/viewer
+   * only, so they're filtered out here (owners are the {@link entityOwnersOf} surface).
+   */
+  private entityGrantsOf(id: string): EntityGrant[] {
+    return this.db
+      .select({ userId: entityGrants.userId, role: entityGrants.role })
+      .from(entityGrants)
+      .where(and(eq(entityGrants.entityId, id), inArray(entityGrants.role, ['editor', 'viewer'])))
+      .orderBy(asc(entityGrants.userId))
+      .all()
+      .map((r) => ({ userId: r.userId, role: r.role as GrantRole }));
+  }
+
+  /** The Entity's Owner user ids (ADR-0037) — the `owner`-role rows, ordered stably. */
   private entityOwnersOf(id: string): string[] {
     return this.db
-      .select({ userId: entityOwners.userId })
-      .from(entityOwners)
-      .where(eq(entityOwners.entityId, id))
-      .orderBy(asc(entityOwners.userId))
+      .select({ userId: entityGrants.userId })
+      .from(entityGrants)
+      .where(and(eq(entityGrants.entityId, id), eq(entityGrants.role, 'owner')))
+      .orderBy(asc(entityGrants.userId))
       .all()
       .map((r) => r.userId);
   }
@@ -654,14 +804,20 @@ export class EntitiesService implements OnApplicationBootstrap {
         ...getTableColumns(entities),
         canRead: canReadEntity(userId),
         canWrite: canWriteEntity(userId),
+        canEditSubstance: canEditSubstanceEntity(userId),
       })
       .from(entities)
       .where(eq(entities.id, id))
       .get();
     if (!result) return undefined;
     // Split the computed 0/1 columns off so `.row` is a clean entity row for toDetail.
-    const { canRead, canWrite, ...row } = result;
-    return { row, canRead: !!canRead, canWrite: !!canWrite };
+    const { canRead, canWrite, canEditSubstance, ...row } = result;
+    return {
+      row,
+      canRead: !!canRead,
+      canWrite: !!canWrite,
+      canEditSubstance: !!canEditSubstance,
+    };
   }
 }
 

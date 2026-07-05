@@ -418,6 +418,21 @@
     "entity": "entity",
     "tabTitle": "Hexly — Owners"
   },
+  "grants": {
+    "heading": "Shared with",
+    "subhead": "Give a specific person access to just this entity — even someone who isn't in this world.",
+    "editor": "Editor",
+    "viewer": "Viewer",
+    "revoke": "Revoke",
+    "empty": "Not shared with anyone yet.",
+    "addLabel": "Share with a person",
+    "addPlaceholder": "Choose a person…",
+    "add": "Share",
+    "addError": "Couldn't share with that person. Please try again.",
+    "roleError": "Couldn't change that person's access. Please try again.",
+    "revokeError": "Couldn't revoke that access. Please try again.",
+    "loadError": "Couldn't load who this is shared with."
+  },
   "members": {
     "heading": "Members",
     "subhead": "People you've added to this world as contributors or viewers.",

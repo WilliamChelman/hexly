@@ -15,6 +15,7 @@ import { ButtonGroup } from '../../../ui/button-group';
 import { Dialog } from '../../../ui/dialog';
 import { Eyebrow } from '../../../ui/eyebrow';
 import { Icon } from '../../../ui/icon/icon';
+import { GrantSet } from '../../../ui/grant-set';
 import { OwnerSet } from '../../../ui/owner-set';
 import { PageHeader } from '../../../ui/page-header';
 import { EntityTags } from './entity-tags';
@@ -63,6 +64,7 @@ const TYPE_LABELS: Record<
     Dialog,
     Eyebrow,
     Icon,
+    GrantSet,
     OwnerSet,
     PageHeader,
     TranslocoPipe,
@@ -174,6 +176,11 @@ const TYPE_LABELS: Record<
         (closed)="ownersOpen.set(false)"
       >
         <app-owner-set kind="entity" [id]="id" (resigned)="onResigned()" />
+        <!-- Named per-Entity grants (ADR-0037, #161): the surgical layer below ownership —
+             hand a specific user Editor/Viewer on just this Entity, piercing private. -->
+        <h3 class="grants-heading">{{ 'grants.heading' | transloco }}</h3>
+        <p class="grants-subhead">{{ 'grants.subhead' | transloco }}</p>
+        <app-grant-set [id]="id" />
         <button
           dialogFooter
           type="button"
@@ -184,6 +191,16 @@ const TYPE_LABELS: Record<
           {{ 'common.close' | transloco }}
         </button>
       </app-dialog>
+    }
+  `,
+  styles: `
+    @reference '#app-styles.css';
+    /* Separates the grant set from the owner set above it in the Share dialog. */
+    .grants-heading {
+      @apply mt-6 border-t border-line pt-4 text-sm font-semibold text-ink;
+    }
+    .grants-subhead {
+      @apply mb-3 text-sm text-ink-muted;
     }
   `,
 })

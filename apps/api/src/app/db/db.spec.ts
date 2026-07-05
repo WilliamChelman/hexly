@@ -32,6 +32,8 @@ describe('createDb boot migration (ADR-0027)', () => {
         'world_members',
         'world_links',
         'entity_descriptors',
+        // Entity-level grants (ADR-0037, #161) — the boot migration adds this.
+        'entity_grants',
         // The full-text search virtual table (ADR-0035).
         'entities_fts',
       ])
@@ -107,7 +109,8 @@ describe('symmetric-owners migration round-trip (0003)', () => {
     expect(
       sqlite.prepare(`SELECT user_id FROM world_members WHERE world_id = 'w1' AND role = 'owner'`).all(),
     ).toEqual([{ user_id: 'u1' }]);
-    // The Entity Owner is now an `entity_owners` row.
+    // The Entity Owner is now an `entity_owners` row (folded into entity_grants by 0007,
+    // which this test predates — it applies only 0003, so the standalone table still exists here).
     expect(sqlite.prepare(`SELECT user_id FROM entity_owners WHERE entity_id = 'e1'`).all()).toEqual([
       { user_id: 'u1' },
     ]);
@@ -133,6 +136,60 @@ describe('symmetric-owners migration round-trip (0003)', () => {
         .prepare(`SELECT e.id FROM entities_fts f JOIN entities e ON e.rowid = f.rowid WHERE entities_fts MATCH 'obelisk'`)
         .all(),
     ).toEqual([{ id: 'e1' }]);
+    sqlite.close();
+  });
+});
+
+/**
+ * The entity_owners fold (ADR-0037, 0007): entity ownership stops being its own table and
+ * becomes a `role: 'owner'` row in `entity_grants`, mirroring `world_members`. The migration
+ * backfills every `entity_owners` row as an owner grant, then drops the table. Owner wins the
+ * merge — a user who was both an Owner and held an editor/viewer grant collapses to one owner
+ * row. A fresh DB folds an empty table, so this seeds the pre-fold shape and asserts the move.
+ */
+describe('entity_owners fold migration (0007)', () => {
+  it('backfills owners as owner grants (owner wins the merge), preserves other grants, drops the table', () => {
+    const sqlite = new Database(':memory:');
+    sqlite.pragma('foreign_keys = OFF');
+    for (const file of [
+      '0000_amused_nomad.sql',
+      '0001_supreme_sersi.sql',
+      '0002_past_randall_flagg.sql',
+      '0003_symmetric_owner_sets.sql',
+      '0004_elite_sleepwalker.sql',
+      '0005_open_hearth.sql',
+      '0006_smart_maddog.sql',
+    ]) {
+      applyMigration(sqlite, file);
+    }
+    sqlite
+      .prepare(
+        `INSERT INTO entities (id, world_id, is_home, name, type, tags, visibility, version, document, content_text, created_at, updated_at)
+         VALUES ('e1', 'w1', 0, 'Lady Mara', 'note', '[]', 'private', 1, '{"type":"note"}', '', 0, 0)`,
+      )
+      .run();
+    // u1 and u2 are Owners; u2 *also* holds an editor grant (the collision); u3 is a plain viewer.
+    for (const u of ['u1', 'u2']) {
+      sqlite.prepare(`INSERT INTO entity_owners (entity_id, user_id) VALUES ('e1', ?)`).run(u);
+    }
+    sqlite.prepare(`INSERT INTO entity_grants (entity_id, user_id, role) VALUES ('e1', 'u2', 'editor')`).run();
+    sqlite.prepare(`INSERT INTO entity_grants (entity_id, user_id, role) VALUES ('e1', 'u3', 'viewer')`).run();
+
+    applyMigration(sqlite, '0007_fold_entity_owners.sql');
+
+    // Owners are now owner grants; u2's editor grant lost to owner; u3's viewer grant survives.
+    expect(
+      sqlite.prepare(`SELECT user_id, role FROM entity_grants WHERE entity_id = 'e1' ORDER BY user_id`).all(),
+    ).toEqual([
+      { user_id: 'u1', role: 'owner' },
+      { user_id: 'u2', role: 'owner' },
+      { user_id: 'u3', role: 'viewer' },
+    ]);
+    // The table is gone.
+    const tables = (
+      sqlite.prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`).all() as { name: string }[]
+    ).map((r) => r.name);
+    expect(tables).not.toContain('entity_owners');
     sqlite.close();
   });
 });

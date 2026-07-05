@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
 import { authFile } from './src/auth-file';
-import { TEST_USER } from './src/test-user';
+import { TEST_GRANTEE, TEST_USER } from './src/test-user';
 
 // `__dirname` (not `import.meta`) because Playwright loads this config as CommonJS.
 const workspaceRoot = join(__dirname, '..', '..');
@@ -51,6 +51,10 @@ export default defineConfig({
       E2E_USER_EMAIL: TEST_USER.email,
       E2E_USER_PASSWORD: TEST_USER.password,
       E2E_USER_NAME: TEST_USER.displayName,
+      // A second directory user for grant/ownership specs to share with (#161).
+      E2E_GRANTEE_EMAIL: TEST_GRANTEE.email,
+      E2E_GRANTEE_PASSWORD: TEST_GRANTEE.password,
+      E2E_GRANTEE_NAME: TEST_GRANTEE.displayName,
     },
   },
 });

@@ -3,9 +3,9 @@ import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import { coordKey, emptyContent, tiptapContent } from '@hexly/domain';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { DB, Db, createDb } from '../db/db';
-import { entities, entityOwners } from '../db/schema';
+import { entities, entityGrants } from '../db/schema';
 import { AuthService } from '../auth/auth.service';
 import { AuthModule } from '../auth/auth.module';
 import { EntitiesModule } from './entities.module';
@@ -72,8 +72,9 @@ describe('Entities endpoints', () => {
 
   /** Reassign sole ownership of a row — seeds a member-owned Entity inside another user's World. */
   function setOwner(id: string, userId: string) {
-    db.delete(entityOwners).where(eq(entityOwners.entityId, id)).run();
-    db.insert(entityOwners).values({ entityId: id, userId }).run();
+    // Ownership is an `owner`-role grant row post-fold (ADR-0037, migration 0007).
+    db.delete(entityGrants).where(and(eq(entityGrants.entityId, id), eq(entityGrants.role, 'owner'))).run();
+    db.insert(entityGrants).values({ entityId: id, userId, role: 'owner' }).run();
   }
 
   async function signIn(email: string, password: string) {
@@ -899,11 +900,11 @@ describe('Entities endpoints', () => {
         )
         .run('legacy-1', anchor.worldId, document, now, now);
       // Ownership is a set now (ADR-0037): make the legacy row Ada's by copying the
-      // anchor's Owner into entity_owners, so her Entity list can reach it.
+      // anchor's owner grant (folded into entity_grants, migration 0007) onto it.
       db.$client
         .prepare(
-          `INSERT INTO entity_owners (entity_id, user_id)
-           SELECT 'legacy-1', user_id FROM entity_owners WHERE entity_id = ?`,
+          `INSERT INTO entity_grants (entity_id, user_id, role)
+           SELECT 'legacy-1', user_id, 'owner' FROM entity_grants WHERE entity_id = ? AND role = 'owner'`,
         )
         .run(anchor.id);
 
@@ -1380,7 +1381,13 @@ describe('Entities endpoints', () => {
       vi.spyOn(
         service as unknown as { access(u: string, i: string): unknown },
         'access',
-      ).mockReturnValue({ row: sharedRow, isOwner: false, canRead: true, canWrite: true });
+      ).mockReturnValue({
+        row: sharedRow,
+        isOwner: false,
+        canRead: true,
+        canWrite: true,
+        canEditSubstance: true,
+      });
       setVisibility(hall.body.id, 'private');
 
       // The lost write must not be faked as a 200 → null (a 404 at the controller), not a detail.

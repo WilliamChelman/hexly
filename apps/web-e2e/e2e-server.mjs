@@ -32,6 +32,14 @@ const user = {
   name: process.env.E2E_USER_NAME,
 };
 
+// A second user the suite never logs in as — it only populates the Instance user
+// directory so grant/ownership specs have someone to share with (ADR-0037, #161).
+const grantee = {
+  email: process.env.E2E_GRANTEE_EMAIL,
+  password: process.env.E2E_GRANTEE_PASSWORD,
+  name: process.env.E2E_GRANTEE_NAME,
+};
+
 /** Fail loudly with a fix-it hint rather than a cryptic ENOENT mid-run. */
 function requireBuilt(path, what) {
   if (!existsSync(path)) {
@@ -67,20 +75,24 @@ const childEnv = {
   NODE_ENV: !process.env.NODE_ENV || process.env.NODE_ENV === 'production' ? 'test' : process.env.NODE_ENV,
 };
 
-// Seed the one e2e user before serving (synchronous: the server must not accept
-// logins before the user exists).
-const seeded = spawnSync(
-  process.execPath,
-  [seedJs, user.email, user.password, user.name],
-  { env: childEnv, stdio: 'inherit' },
-);
-if (seeded.error) {
-  console.error('[e2e-server] Failed to spawn the seed process:', seeded.error);
-  process.exit(1);
-}
-if (seeded.status !== 0) {
-  console.error('[e2e-server] Seeding the test user failed.');
-  process.exit(seeded.status ?? 1);
+// Seed the e2e users before serving (synchronous: the server must not accept logins
+// before the users exist). The grantee is optional — only present when the config
+// passes it — so the loop skips it if unset, keeping single-user runs working.
+const toSeed = [user, ...(grantee.email ? [grantee] : [])];
+for (const u of toSeed) {
+  const seeded = spawnSync(
+    process.execPath,
+    [seedJs, u.email, u.password, u.name],
+    { env: childEnv, stdio: 'inherit' },
+  );
+  if (seeded.error) {
+    console.error('[e2e-server] Failed to spawn the seed process:', seeded.error);
+    process.exit(1);
+  }
+  if (seeded.status !== 0) {
+    console.error(`[e2e-server] Seeding the user ${u.email} failed.`);
+    process.exit(seeded.status ?? 1);
+  }
 }
 
 // Serve. HEXLY_E2E=1 mounts the test-reset endpoint (and only here — ADR-0009).

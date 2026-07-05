@@ -61,7 +61,8 @@ export const entities = sqliteTable(
   'entities',
   {
     id: text('id').primaryKey(),
-    // Ownership is a symmetric set, not a column (ADR-0037): see `entityOwners`.
+    // Ownership is a symmetric set, not a column (ADR-0037): an `owner`-role row in
+    // `entityGrants` (folded from the retired `entity_owners` table, migration 0007).
     // The World this Entity belongs to (ADR-0024).
     worldId: text('world_id')
       .notNull()
@@ -96,13 +97,18 @@ export const entities = sqliteTable(
 );
 
 /**
- * Entity ownership as a symmetric set (ADR-0037): one row per (entity, owner).
- * Replaces the retired `entities.owner_id` column — an Entity has one or more
- * equal Owners, guarded by the ≥1-Owner invariant (enforced in EntitiesService,
- * not the schema). Deleting the Entity cascades its owner rows away.
+ * The entity access-control set (ADR-0037): one row per (entity, user) with a `role` of
+ * `owner` | `editor` | `viewer`. Mirrors `worldMembers` — owner is the top role, not a
+ * separate table (the retired `entity_owners` folded in here, migration 0007). `owner` is
+ * constitutive: manages grants, carries the ≥1-Owner invariant (enforced in EntitiesService,
+ * not the schema), and pierces `private` unconditionally; `editor`/`viewer` are grants that
+ * may target any Instance user (World membership is not a precondition) and pierce `private`
+ * per-user. One row per user per Entity (the PK), so re-granting a role upserts and a promotion
+ * to owner overwrites a lower role. Deleting the Entity cascades these rows away; revocation
+ * is a plain row delete.
  */
-export const entityOwners = sqliteTable(
-  'entity_owners',
+export const entityGrants = sqliteTable(
+  'entity_grants',
   {
     entityId: text('entity_id')
       .notNull()
@@ -110,6 +116,7 @@ export const entityOwners = sqliteTable(
     userId: text('user_id')
       .notNull()
       .references(() => users.id),
+    role: text('role').notNull(),
   },
   (table) => [primaryKey({ columns: [table.entityId, table.userId] })]
 );

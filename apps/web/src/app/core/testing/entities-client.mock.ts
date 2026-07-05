@@ -3,9 +3,11 @@ import {
   EntityBody,
   EntityDetail,
   EntityFacets,
+  EntityGrant,
   EntityPage,
   EntitySaveOutcome,
   EntityType,
+  GrantRole,
 } from '@hexly/domain';
 import { EntityFacetParams, EntityListParams } from '../services/entities.client';
 
@@ -46,4 +48,10 @@ export class MockEntitiesClient {
   owners = vi.fn<(id: string) => Observable<string[]>>(() => of<string[]>([]));
   addOwner = vi.fn<(id: string, userId: string) => Observable<string[]>>();
   removeOwner = vi.fn<(id: string, userId: string) => Observable<string[]>>();
+  // Defaults to an empty set so a spec that mounts the grant-set panel (#161) without
+  // caring about it still renders; override per test as needed.
+  grants = vi.fn<(id: string) => Observable<EntityGrant[]>>(() => of<EntityGrant[]>([]));
+  addGrant =
+    vi.fn<(id: string, userId: string, role: GrantRole) => Observable<EntityGrant[]>>();
+  removeGrant = vi.fn<(id: string, userId: string) => Observable<EntityGrant[]>>();
 }

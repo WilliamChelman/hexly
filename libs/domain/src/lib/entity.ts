@@ -177,6 +177,37 @@ export const patchEntityRequestSchema = z
 
 export type PatchEntityRequest = z.infer<typeof patchEntityRequestSchema>;
 
+/**
+ * Entity-level grant roles (ADR-0037, #161): `editor` may edit the Entity's substance
+ * (Content, name, Tags, Metadata) but never its lifecycle or exposure; `viewer` is
+ * read-only. Owner is excluded — it belongs to the ownership-set endpoints, not grants.
+ */
+export const grantRoleSchema = z.enum(['editor', 'viewer']);
+
+/** CONTEXT.md → Editor / Viewer. */
+export type GrantRole = z.infer<typeof grantRoleSchema>;
+
+/**
+ * An entity-level grant (ADR-0037, #161): a named Instance user (member of the World or
+ * not) holding Editor or Viewer access to one Entity. A grant pierces `private` — a
+ * Viewer grant on a `private` Entity is per-user visibility.
+ */
+export interface EntityGrant {
+  readonly userId: string;
+  readonly role: GrantRole;
+}
+
+/**
+ * POST /entities/:id/grants: grant an existing Instance user Editor or Viewer on the
+ * Entity. Upsert — re-granting a different role updates it. Owner-only server-side.
+ */
+export const addGrantRequestSchema = z.object({
+  userId: z.string().min(1),
+  role: grantRoleSchema,
+});
+
+export type AddGrantRequest = z.infer<typeof addGrantRequestSchema>;
+
 /** The list page size default and server-enforced cap (ADR-0025). Over-cap requests are clamped, not rejected. */
 export const ENTITY_LIST_DEFAULT_LIMIT = 50;
 export const ENTITY_LIST_MAX_LIMIT = 200;
