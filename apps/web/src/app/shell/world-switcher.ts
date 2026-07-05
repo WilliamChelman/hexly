@@ -140,6 +140,7 @@ export class WorldSwitcher {
   }
 
   protected switch(id: string): void {
-    this.router.navigate(worldRoute(id));
+    const name = this.worlds().find((w) => w.id === id)?.name;
+    this.router.navigate(worldRoute(id, name));
   }
 }

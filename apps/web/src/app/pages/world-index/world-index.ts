@@ -547,7 +547,10 @@ export class WorldIndex {
       .pipe(finalize(() => this.creating.set(false)))
       .subscribe({
         next: (world) =>
-          this.router.navigate(entityRoute(world.id, world.homeEntityId)),
+          this.router.navigate(
+            // Home Entity's title is the World's name (ADR-0029), so both slugs derive from it.
+            entityRoute(world.id, world.homeEntityId, world.name, world.name),
+          ),
         error: () =>
           this.toaster.show(
             this.transloco.translate('worlds.createError'),

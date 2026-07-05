@@ -9,12 +9,17 @@ import { firstValueFrom, isObservable, Observable, of, throwError } from 'rxjs';
 import { EntitySummary } from '@hexly/domain';
 import { EntitiesClient } from '../services/entities.client';
 import { MockEntitiesClient } from '../testing/entities-client.mock';
+import { segment } from '../utils/pretty-id';
 import { reconcileWorldSegment } from './reconcile-world-segment.guard';
+
+const W1 = '11111111-1111-4111-8111-111111111111';
+const W9 = '99999999-9999-4999-8999-999999999999';
+const E1 = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
 function summary(over: Partial<EntitySummary>): EntitySummary {
   return {
-    id: 'e1',
-    worldId: 'w1',
+    id: E1,
+    worldId: W1,
     name: 'Aldermoor',
     type: 'note',
     tags: [],
@@ -36,12 +41,13 @@ describe('reconcileWorldSegment', () => {
     });
   });
 
-  function run(worldId: string, id = 'e1') {
+  function run(worldSeg: string, entitySeg: string, queryParams = {}) {
     return TestBed.runInInjectionContext(() =>
       reconcileWorldSegment(
         {
-          paramMap: convertToParamMap({ id }),
-          parent: { paramMap: convertToParamMap({ worldId }) },
+          paramMap: convertToParamMap({ id: entitySeg }),
+          queryParams,
+          parent: { paramMap: convertToParamMap({ worldId: worldSeg }) },
         } as unknown as ActivatedRouteSnapshot,
         {} as RouterStateSnapshot,
       ),
@@ -49,39 +55,61 @@ describe('reconcileWorldSegment', () => {
   }
 
   function settle(result: unknown): Promise<boolean | UrlTree> {
-    // Helper to unify Observable and Promise guard results.
     return isObservable(result)
       ? firstValueFrom(result as Observable<boolean | UrlTree>)
       : Promise.resolve(result as boolean | UrlTree);
   }
 
-  it("redirects to the Entity's real World when the segment is stale", async () => {
+  it("redirects to the Entity's real World (bare — the parent heals its slug)", async () => {
     entities.list.mockReturnValue(
-      of({ items: [summary({ id: 'e1', worldId: 'w9' })], nextCursor: null }),
+      of({ items: [summary({ worldId: W9 })], nextCursor: null }),
     );
 
-    const value = await settle(run('w1', 'e1'));
-    expect(value).toBeInstanceOf(UrlTree);
-    expect((value as UrlTree).toString()).toBe('/w/w9/entities/e1');
+    const value = await settle(run(segment(W1, 'Avalon'), segment(E1, 'Aldermoor')));
+    expect((value as UrlTree).toString()).toBe(
+      `/w/${segment(W9)}/entities/${segment(E1, 'Aldermoor')}`,
+    );
   });
 
-  it('passes through without redirecting when the segment matches', async () => {
-    entities.list.mockReturnValue(
-      of({ items: [summary({ id: 'e1', worldId: 'w1' })], nextCursor: null }),
-    );
+  it('passes through when the Entity slug is already canonical', async () => {
+    entities.list.mockReturnValue(of({ items: [summary({})], nextCursor: null }));
 
-    expect(await settle(run('w1', 'e1'))).toBe(true);
+    expect(
+      await settle(run(segment(W1, 'Avalon'), segment(E1, 'Aldermoor'))),
+    ).toBe(true);
+  });
+
+  it('canonicalises a bare Entity slug, preserves the World segment and query', async () => {
+    entities.list.mockReturnValue(of({ items: [summary({})], nextCursor: null }));
+
+    const value = await settle(
+      run(segment(W1, 'Avalon'), segment(E1), { view: 'note' }),
+    );
+    expect(entities.list).toHaveBeenCalledWith({ ids: [E1] });
+    expect((value as UrlTree).toString()).toBe(
+      `/w/${segment(W1, 'Avalon')}/entities/${segment(E1, 'Aldermoor')}?view=note`,
+    );
+  });
+
+  it('resolves a legacy bare-UUID Entity URL and heals its slug', async () => {
+    entities.list.mockReturnValue(of({ items: [summary({})], nextCursor: null }));
+
+    const value = await settle(run(W1, E1));
+    expect(entities.list).toHaveBeenCalledWith({ ids: [E1] });
+    expect((value as UrlTree).toString()).toBe(
+      `/w/${W1}/entities/${segment(E1, 'Aldermoor')}`,
+    );
   });
 
   it('falls through (renders the page) when the target is missing', async () => {
     entities.list.mockReturnValue(of({ items: [], nextCursor: null }));
 
-    expect(await settle(run('w1', 'ghost'))).toBe(true);
+    expect(await settle(run(segment(W1), segment(E1)))).toBe(true);
   });
 
   it('falls through when the lookup errors', async () => {
     entities.list.mockReturnValue(throwError(() => new Error('boom')));
 
-    expect(await settle(run('w1', 'boom'))).toBe(true);
+    expect(await settle(run(segment(W1), segment(E1)))).toBe(true);
   });
 });

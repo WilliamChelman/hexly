@@ -30,6 +30,7 @@ import {
 } from '../../core/services/entities.client';
 import { ActiveWorld } from '../../core/services/active-world';
 import { ToasterService } from '../../core/services/toaster.service';
+import { entityRoute } from '../../core/utils/routes';
 import { AppShellStore } from '../../shell/app-shell.store';
 import { Button } from '../../ui/button';
 import { Eyebrow } from '../../ui/eyebrow';
@@ -547,7 +548,10 @@ export class EntityBrowser {
   }
 
   protected open(id: string): void {
-    this.router.navigate(['/w', this.activeWorld.worldId(), 'entities', id]);
+    // Pretty World slug from the loaded detail; the Entity slug self-heals on load.
+    this.router.navigate(
+      entityRoute(this.activeWorld.worldId()!, id, this.activeWorld.name() ?? undefined),
+    );
   }
 
   protected startRename(id: string): void {

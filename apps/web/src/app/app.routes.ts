@@ -3,7 +3,7 @@ import { adminGuard, authGuard, loginGuard } from './core/guards/auth.guard';
 import { entityWorldRedirect } from './core/guards/entity-world-redirect.guard';
 import { reconcileWorldSegment } from './core/guards/reconcile-world-segment.guard';
 import {
-  activeWorldResolver,
+  activeWorldGuard,
   clearActiveWorld,
 } from './core/services/active-world';
 import { flushOnLeave } from './pages/entity/flush-on-leave.guard';
@@ -49,14 +49,14 @@ export const appRoutes: Route[] = [
   },
   {
     // The World scope (ADR-0028): a componentless parent that owns the `:worldId`
-    // segment. Its resolver pins the active World before any child renders; its
-    // canDeactivate clears it when navigation leaves the scope, so the Index never
-    // shows a stale World. Children share the root outlet; the segment is navigation
-    // context while an Entity's own world_id stays the data source of truth.
+    // segment. Its guard fetches and pins the active World detail (ADR-0042) — and
+    // self-heals the World slug — before any child renders; its canDeactivate clears
+    // it when navigation leaves the scope, so the Index never shows a stale World.
+    // Children share the root outlet; the segment is navigation context while an
+    // Entity's own world_id stays the data source of truth.
     path: 'w/:worldId',
-    canActivate: [authGuard],
+    canActivate: [authGuard, activeWorldGuard],
     canDeactivate: [clearActiveWorld],
-    resolve: { activeWorld: activeWorldResolver },
     children: [
       {
         // The World settings page (#158): the World-level owner set — view, add,

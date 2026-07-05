@@ -39,6 +39,7 @@ import {
 } from '@hexly/domain';
 import { EntitiesClient } from '../../../core/services/entities.client';
 import { ActiveWorld } from '../../../core/services/active-world';
+import { idFromSegment } from '../../../core/utils/pretty-id';
 import { worldRoute } from '../../../core/utils/routes';
 import { TitleService } from '../../../core/i18n/title.service';
 import { AppShellStore } from '../../../shell/app-shell.store';
@@ -243,7 +244,8 @@ export class EntitySession {
     route.paramMap
       .pipe(
         map((params) => params.get('id')),
-        filter((id): id is string => id !== null),
+        filter((seg): seg is string => seg !== null),
+        map((seg) => idFromSegment(seg)),
         switchMap((id) =>
           this.openRoute(id).pipe(
             catchError((err) => {
