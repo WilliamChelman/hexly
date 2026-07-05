@@ -10,7 +10,7 @@ import { authGuard, loginGuard } from './auth.guard';
 import { AuthClient } from '../services/auth.client';
 import { MockAuthClient } from '../testing/auth-client.mock';
 
-const ada = { id: 'u1', email: 'ada@hexly.test', displayName: 'Ada', preferences: {} };
+const ada = { id: 'u1', email: 'ada@hexly.test', displayName: 'Ada', preferences: {}, isAdmin: false, isSuperadmin: false };
 
 function settle(result: unknown): Promise<boolean | UrlTree> {
   // Helper to unify Observable and Promise guard results.

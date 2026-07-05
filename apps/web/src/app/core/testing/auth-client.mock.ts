@@ -6,6 +6,11 @@ export class MockAuthClient {
   private readonly _user = signal<AuthUser | null>(null);
   readonly currentUser = this._user.asReadonly();
   readonly isAuthenticated = computed(() => this._user() !== null);
+  readonly canAdminister = computed(() => {
+    const u = this._user();
+    return !!u && (u.isAdmin || u.isSuperadmin);
+  });
+  readonly isSuperadmin = computed(() => this._user()?.isSuperadmin ?? false);
 
   private readonly _loading = signal(false);
   readonly sessionLoading = this._loading.asReadonly();

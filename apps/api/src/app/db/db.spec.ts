@@ -56,6 +56,18 @@ describe('createDb boot migration (ADR-0027)', () => {
     db.$client.close();
   });
 
+  it('adds the admin-tier columns to users (ADR-0037, #163)', () => {
+    const db = createDb(':memory:');
+    const columns = (
+      db.$client.prepare(`PRAGMA table_info(users)`).all() as { name: string }[]
+    ).map((c) => c.name);
+    // The boot migration (0009) adds the two tier flags and the disable stamp.
+    expect(columns).toEqual(
+      expect.arrayContaining(['is_admin', 'is_superadmin', 'disabled_at']),
+    );
+    db.$client.close();
+  });
+
   it('is safe to run twice — the migration ledger skips applied files', () => {
     // Re-running migrate() skips already-applied files (not CREATE TABLE again).
     const db = createDb(':memory:');

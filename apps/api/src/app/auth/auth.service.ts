@@ -37,13 +37,17 @@ export class AuthService {
   constructor(@Inject(DB) private readonly db: Db) {}
 
   /**
-   * Provision a user out-of-band (ADR-0004 — no public signup). The password is
-   * hashed with argon2; the plaintext is never stored.
+   * Provision a user out-of-band (ADR-0004 — no public signup): the seed CLI, the
+   * `--superadmin` setup path, and the Instance Admin's create-user endpoint all
+   * route through here. The password is hashed with argon2; the plaintext is never
+   * stored. `roles` seeds the admin tiers (ADR-0037, #163) — both default off, so a
+   * plain member is the common case.
    */
   async seedUser(
     email: string,
     password: string,
     displayName: string,
+    roles: { isAdmin?: boolean; isSuperadmin?: boolean } = {},
   ): Promise<string> {
     const id = randomUUID();
     const passwordHash = await hash(password);
@@ -54,6 +58,8 @@ export class AuthService {
         email: normalizeEmail(email),
         displayName,
         passwordHash,
+        isAdmin: roles.isAdmin ?? false,
+        isSuperadmin: roles.isSuperadmin ?? false,
         createdAt: Date.now(),
       })
       .run();
@@ -87,6 +93,9 @@ export class AuthService {
       return null;
     }
     if (!user || !passwordOk) return null;
+    // A disabled account cannot open a session (ADR-0037, #163) — the login lock.
+    // Checked after the password verify so timing doesn't reveal disabled accounts.
+    if (user.disabledAt !== null) return null;
 
     // Opportunistic sweep on login to prevent unbounded table growth (ADR-0002).
     this.purgeExpiredSessions();
@@ -120,7 +129,11 @@ export class AuthService {
       .from(users)
       .where(eq(users.id, session.userId))
       .get();
-    return user ? toAuthUser(user) : null;
+    if (!user) return null;
+    // A disabled account's live sessions stop resolving immediately (ADR-0037,
+    // #163) — disable is the immediate lever, not just a future-login block.
+    if (user.disabledAt !== null) return null;
+    return toAuthUser(user);
   }
 
   /**
@@ -205,6 +218,17 @@ export class AuthService {
     return true;
   }
 
+  /**
+   * Set a user's password unconditionally — the Instance Admin reset path (ADR-0037,
+   * #163), which carries no current-password check because the Admin acts on the
+   * user's behalf. Same argon2 hashing as {@link changePassword}; length rules live
+   * in the request schema at the edge.
+   */
+  async setPassword(userId: string, newPassword: string): Promise<void> {
+    const passwordHash = await hash(newPassword);
+    this.db.update(users).set({ passwordHash }).where(eq(users.id, userId)).run();
+  }
+
   /** End a session by deleting its row; a no-op for an unknown token. */
   async logout(token: string | undefined): Promise<void> {
     if (!token) return;
@@ -233,6 +257,8 @@ function toAuthUser(row: typeof users.$inferSelect): AuthUser {
     email: row.email,
     displayName: row.displayName,
     preferences: parsePreferences(row.preferences),
+    isAdmin: row.isAdmin,
+    isSuperadmin: row.isSuperadmin,
   };
 }
 

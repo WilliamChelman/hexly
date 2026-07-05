@@ -72,6 +72,17 @@ export interface AuthUser {
   readonly email: string;
   readonly displayName: string;
   readonly preferences: Preferences;
+  /**
+   * Instance Admin (ADR-0037, #163): account management, zero content powers.
+   * Surfaced so the web nav/route guard can offer the admin panel, and so the
+   * server guard reads it off the session.
+   */
+  readonly isAdmin: boolean;
+  /**
+   * Superadmin (ADR-0037, #163): the operator's in-app self, outside the
+   * collaboration model. Implies Admin's account powers (Superadmin ⊇ Admin).
+   */
+  readonly isSuperadmin: boolean;
 }
 
 /**

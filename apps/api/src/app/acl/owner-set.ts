@@ -4,9 +4,10 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { AclErrorCode, AclResourceKind, ApiError } from '@hexly/domain';
+import { eq, sql } from 'drizzle-orm';
 import { Db } from '../db/db';
-import { users } from '../db/schema';
+import { entityGrants, users, worldMembers } from '../db/schema';
 
 /**
  * The outcome of an ACL "set" mutation (ADR-0037) — an ownership set or a membership
@@ -24,11 +25,13 @@ export type AclSetResult<T> =
   | { status: 'last-owner' };
 
 /**
- * Map an ACL-set outcome to its HTTP shape: the payload on success, or the 4xx the
- * failure reason names. `conflictMessage` is the 409 body — the one line that varies by
- * caller (which resource must keep an Owner), so it stays a parameter.
+ * Map an ACL-set outcome to its HTTP shape: the payload on success, or the 4xx the failure
+ * reason names, as a structured `{ code }` body — never prose (ADR-0037, #163). `kind` names
+ * the resource for the `last-owner` conflict's `data` (a World or Entity must keep ≥1 Owner);
+ * routes with no owner invariant (links, grants) never reach that arm but still pass their
+ * own kind, which is harmless.
  */
-export function aclSetResponse<T>(result: AclSetResult<T>, conflictMessage: string): T {
+export function aclSetResponse<T>(result: AclSetResult<T>, kind: AclResourceKind): T {
   switch (result.status) {
     case 'ok':
       return result.value;
@@ -37,9 +40,12 @@ export function aclSetResponse<T>(result: AclSetResult<T>, conflictMessage: stri
     case 'forbidden':
       throw new ForbiddenException();
     case 'no-such-user':
-      throw new BadRequestException('No such user');
+      throw new BadRequestException({ code: AclErrorCode.NoSuchUser } satisfies ApiError);
     case 'last-owner':
-      throw new ConflictException(conflictMessage);
+      throw new ConflictException({
+        code: AclErrorCode.LastOwner,
+        data: { kind },
+      } satisfies ApiError);
   }
 }
 
@@ -47,20 +53,11 @@ export function aclSetResponse<T>(result: AclSetResult<T>, conflictMessage: stri
 export type OwnerSetResult = AclSetResult<string[]>;
 
 /**
- * The 409 body when the ≥1-Owner invariant refuses emptying a resource's owner set
- * (ADR-0037). The single source for both the owner-set and member routes — the member
- * DELETE can raise the same World invariant, so the literal must not drift between them.
+ * Map an owner-set outcome to its HTTP shape (the updated Owner set). A thin, named alias
+ * of {@link aclSetResponse} for the owner-set routes — the `kind` tags the `last-owner` body.
  */
-export function lastOwnerMessage(kind: 'World' | 'Entity'): string {
-  return `${kind === 'World' ? 'A World' : 'An Entity'} must keep at least one Owner`;
-}
-
-/**
- * Map an owner-set outcome to its HTTP shape (the updated Owner set). A thin wrapper over
- * {@link aclSetResponse} that tailors the 409 message by resource `kind`.
- */
-export function ownerSetResponse(result: OwnerSetResult, kind: 'World' | 'Entity'): string[] {
-  return aclSetResponse(result, lastOwnerMessage(kind));
+export function ownerSetResponse(result: OwnerSetResult, kind: AclResourceKind): string[] {
+  return aclSetResponse(result, kind);
 }
 
 /**
@@ -70,6 +67,37 @@ export function ownerSetResponse(result: OwnerSetResult, kind: 'World' | 'Entity
  */
 export function userExists(db: Db, userId: string): boolean {
   return !!db.select({ id: users.id }).from(users).where(eq(users.id, userId)).get();
+}
+
+/**
+ * Whether `userId` is the *sole* Owner of any World or Entity (ADR-0037, #163) — the
+ * ≥1-Owner invariant extended to account deletion, so orphans are impossible by
+ * construction: deleting a user is refused while this holds. A resource counts when the
+ * user holds its `owner` role AND it has exactly one owner. Worlds carry ownership in
+ * `world_members`, Entities in `entity_grants` (owner folded in, migration 0007) — the
+ * same shape, checked once each.
+ */
+export function solelyOwnsAnything(db: Db, userId: string): boolean {
+  const soleWorld = db
+    .select({ n: sql<number>`1` })
+    .from(worldMembers)
+    .where(
+      sql`${worldMembers.userId} = ${userId} AND ${worldMembers.role} = 'owner'
+        AND (SELECT count(*) FROM ${worldMembers} o
+             WHERE o.world_id = ${worldMembers.worldId} AND o.role = 'owner') = 1`,
+    )
+    .get();
+  if (soleWorld) return true;
+  const soleEntity = db
+    .select({ n: sql<number>`1` })
+    .from(entityGrants)
+    .where(
+      sql`${entityGrants.userId} = ${userId} AND ${entityGrants.role} = 'owner'
+        AND (SELECT count(*) FROM ${entityGrants} o
+             WHERE o.entity_id = ${entityGrants.entityId} AND o.role = 'owner') = 1`,
+    )
+    .get();
+  return !!soleEntity;
 }
 
 /**

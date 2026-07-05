@@ -1,5 +1,5 @@
 import { Route } from '@angular/router';
-import { authGuard, loginGuard } from './core/guards/auth.guard';
+import { adminGuard, authGuard, loginGuard } from './core/guards/auth.guard';
 import { entityWorldRedirect } from './core/guards/entity-world-redirect.guard';
 import { reconcileWorldSegment } from './core/guards/reconcile-world-segment.guard';
 import {
@@ -37,6 +37,15 @@ export const appRoutes: Route[] = [
     loadComponent: () =>
       import('./pages/settings/settings').then((m) => m.Settings),
     title: 'settings.tabTitle',
+  },
+  {
+    // The Instance Admin panel (ADR-0037, #163): account management, gated by
+    // {@link adminGuard} (Admin or Superadmin). Account-scoped like Settings, so it
+    // sits outside the World scope. The server re-checks every action.
+    path: 'admin',
+    canActivate: [adminGuard],
+    loadComponent: () => import('./pages/admin/admin').then((m) => m.Admin),
+    title: 'admin.tabTitle',
   },
   {
     // The World scope (ADR-0028): a componentless parent that owns the `:worldId`

@@ -36,7 +36,7 @@ describe('WorldIndex', () => {
       .mockResolvedValue(true);
 
     // The caller (u1) — used to tell owned Worlds from member Worlds.
-    auth.setUser({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada', preferences: {} });
+    auth.setUser({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada', preferences: {}, isAdmin: false, isSuperadmin: false });
   });
 
   /**

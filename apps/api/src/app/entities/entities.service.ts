@@ -8,11 +8,13 @@ import {
   OnApplicationBootstrap,
 } from '@nestjs/common';
 import {
+  ApiError,
   CreateEntityRequest,
   emptyEntityBody,
   EntityBody,
   entityBodySchema,
   EntityDetail,
+  EntityErrorCode,
   EntityFacets,
   EntitySaveOutcome,
   EntitySummary,
@@ -49,6 +51,7 @@ import {
   entityDescriptors,
   entityGrants,
   entityLinks,
+  users,
   worldMembers,
   worlds,
 } from '../db/schema';
@@ -63,12 +66,25 @@ const ENTITY_LINK: PublicLinkTable = {
 };
 
 /**
- * Ownership predicate (ADR-0037): the caller is one of the Entity's Owners — an
- * `owner`-role grant row (folded from `entity_owners`, migration 0007). Just the
- * top-role case of {@link hasGrant}. The read/write predicates below build on it.
+ * The Superadmin bypass (ADR-0037, #163): the operator's in-app self, outside the
+ * collaboration model. Resolved to a plain boolean *once per request* (see
+ * {@link EntitiesService.isSuperadmin}) and passed into the predicates below — a Superadmin
+ * short-circuits each to match-all (`sql`1``), so a repair read/write reaches anything and
+ * the set-based `list`/`facets` reads return everything, without a per-row `users` subquery
+ * bolted onto every predicate. A Superadmin never appears in an owner *listing*
+ * (`entityOwnersOf` queries grants directly), and no admin tier reaches `private` as a role
+ * — the Superadmin is explicitly outside the model. `superadmin === false` emits the exact
+ * collaboration-model SQL, unchanged.
  */
-function ownsEntity(userId: string) {
-  return hasGrant(userId, ['owner']);
+const MATCH_ALL = sql`1`;
+
+/**
+ * Ownership predicate (ADR-0037): the caller is one of the Entity's Owners — an
+ * `owner`-role grant row (folded from `entity_owners`, migration 0007). A Superadmin
+ * short-circuits to match-all (repair). The top-role case of {@link hasGrant}.
+ */
+function ownsEntity(userId: string, superadmin: boolean) {
+  return superadmin ? MATCH_ALL : hasGrant(userId, ['owner']);
 }
 
 /**
@@ -108,7 +124,8 @@ function hasGrant(userId: string, roles: readonly StoredEntityRole[]) {
  * from a missing one (ADR-0004), so `private` things don't even leak their existence. An
  * entity-level grant pierces `private`: it reveals the Entity to exactly that user (#161).
  */
-function canReadEntity(userId: string) {
+function canReadEntity(userId: string, superadmin: boolean) {
+  if (superadmin) return MATCH_ALL;
   return sql`(${hasGrant(userId, ['owner', 'editor', 'viewer'])} OR (${entities.visibility} = 'shared' AND ${isWorldMember(userId)}))`;
 }
 
@@ -119,8 +136,9 @@ function canReadEntity(userId: string) {
  * and this power stops dead at `private`. Rides the atomic UPDATE WHERE so a World Owner's
  * write actually lands (a plain `ownsEntity` would touch zero rows).
  */
-function canWriteEntity(userId: string) {
-  return sql`(${ownsEntity(userId)} OR (${entities.visibility} = 'shared' AND ${isWorldOwner(userId)}))`;
+function canWriteEntity(userId: string, superadmin: boolean) {
+  if (superadmin) return MATCH_ALL;
+  return sql`(${hasGrant(userId, ['owner'])} OR (${entities.visibility} = 'shared' AND ${isWorldOwner(userId)}))`;
 }
 
 /**
@@ -128,7 +146,8 @@ function canWriteEntity(userId: string) {
  * autosave surface — Content, name, Tags, Metadata — so an entity-level Editor edits
  * substance without gaining the lifecycle/exposure powers {@link canWriteEntity} keeps.
  */
-function canEditSubstanceEntity(userId: string) {
+function canEditSubstanceEntity(userId: string, superadmin: boolean) {
+  if (superadmin) return MATCH_ALL;
   // canWrite is `owner ∨ (shared ∧ world-owner)`; folding the extra `∨ grant(editor)` in as
   // a single `grant(owner|editor)` scan keeps one EXISTS on entity_grants, not two.
   return sql`(${hasGrant(userId, ['owner', 'editor'])} OR (${entities.visibility} = 'shared' AND ${isWorldOwner(userId)}))`;
@@ -238,7 +257,7 @@ export class EntitiesService implements OnApplicationBootstrap {
     const rows = query
       .where(
         and(
-          canReadEntity(ownerId),
+          canReadEntity(ownerId, this.isSuperadmin(ownerId)),
           ...filters(opts),
           match ? sql`entities_fts MATCH ${match}` : undefined,
         ),
@@ -273,15 +292,18 @@ export class EntitiesService implements OnApplicationBootstrap {
    * Owner- and World-scoped like {@link list}.
    */
   facets(ownerId: string, opts: FacetOptions): EntityFacets {
+    // Resolve the Superadmin bypass once, then thread it through every count.
+    const superadmin = this.isSuperadmin(ownerId);
     return {
       // Drop a category's own selection before counting it (drill-down).
-      type: this.countColumn(ownerId, { ...opts, type: undefined }, entities.type),
+      type: this.countColumn(ownerId, { ...opts, type: undefined }, entities.type, superadmin),
       visibility: this.countColumn(
         ownerId,
         { ...opts, visibility: undefined },
         entities.visibility,
+        superadmin,
       ),
-      tag: this.countTags(ownerId, { ...opts, tags: undefined }),
+      tag: this.countTags(ownerId, { ...opts, tags: undefined }, superadmin),
     };
   }
 
@@ -290,6 +312,7 @@ export class EntitiesService implements OnApplicationBootstrap {
     ownerId: string,
     opts: FacetOptions,
     column: typeof entities.type | typeof entities.visibility,
+    superadmin: boolean,
   ): FacetCount[] {
     const match = opts.q ? toFtsMatch(opts.q) : null;
     const query = this.db
@@ -300,7 +323,7 @@ export class EntitiesService implements OnApplicationBootstrap {
       query.innerJoin(sql`entities_fts`, sql`entities_fts.rowid = entities.rowid`);
     }
     return query
-      .where(facetWhere(ownerId, opts, match))
+      .where(facetWhere(ownerId, opts, match, superadmin))
       .groupBy(column)
       .all()
       .map((r) => ({ value: r.value as string, count: r.count }));
@@ -311,7 +334,7 @@ export class EntitiesService implements OnApplicationBootstrap {
    * `json_each` unrolls each entity's array into rows before grouping — an entity
    * with two tags counts toward both values (ADR-0035, #155).
    */
-  private countTags(ownerId: string, opts: FacetOptions): FacetCount[] {
+  private countTags(ownerId: string, opts: FacetOptions, superadmin: boolean): FacetCount[] {
     const match = opts.q ? toFtsMatch(opts.q) : null;
     const query = this.db
       .select({
@@ -325,7 +348,7 @@ export class EntitiesService implements OnApplicationBootstrap {
       query.innerJoin(sql`entities_fts`, sql`entities_fts.rowid = entities.rowid`);
     }
     return query
-      .where(facetWhere(ownerId, opts, match))
+      .where(facetWhere(ownerId, opts, match, superadmin))
       .groupBy(sql`tag.value`)
       .all()
       .map((r) => ({ value: r.value, count: r.count }));
@@ -356,7 +379,7 @@ export class EntitiesService implements OnApplicationBootstrap {
     return this.db
       .select()
       .from(entities)
-      .where(and(ownsEntity(userId), eq(entities.worldId, worldId)))
+      .where(and(ownsEntity(userId, this.isSuperadmin(userId)), eq(entities.worldId, worldId)))
       .all()
       .map(toDetail);
   }
@@ -406,7 +429,8 @@ export class EntitiesService implements OnApplicationBootstrap {
         contentText: extractText(body.content),
         updatedAt: Date.now(),
       })
-      .where(and(eq(entities.id, homeEntityId), ownsEntity(ownerId)))
+      // The importer minted this World, so they are its Home Owner — no bypass needed.
+      .where(and(eq(entities.id, homeEntityId), ownsEntity(ownerId, false)))
       .run();
   }
 
@@ -483,7 +507,7 @@ export class EntitiesService implements OnApplicationBootstrap {
         .where(
           and(
             eq(entities.id, id),
-            canEditSubstanceEntity(userId),
+            canEditSubstanceEntity(userId, this.isSuperadmin(userId)),
             eq(entities.version, req.version),
           ),
         )
@@ -531,7 +555,7 @@ export class EntitiesService implements OnApplicationBootstrap {
     if (!permitted) throw new ForbiddenException();
     if (access.row.isHome && changes.visibility && changes.visibility !== 'shared') {
       // 409, like delete: conflicts with the World invariant that a shared World keeps a landing page.
-      throw new ConflictException('The Home Entity is always shared');
+      throw new ConflictException({ code: EntityErrorCode.HomeLockedShared } satisfies ApiError);
     }
     const updatedAt = Date.now();
     const res = this.db
@@ -543,7 +567,9 @@ export class EntitiesService implements OnApplicationBootstrap {
       .where(
         and(
           eq(entities.id, id),
-          changesVisibility ? canWriteEntity(userId) : canEditSubstanceEntity(userId),
+          changesVisibility
+            ? canWriteEntity(userId, this.isSuperadmin(userId))
+            : canEditSubstanceEntity(userId, this.isSuperadmin(userId)),
         ),
       )
       .run();
@@ -563,7 +589,9 @@ export class EntitiesService implements OnApplicationBootstrap {
       .selectDistinct({ descriptor: entityDescriptors.descriptor })
       .from(entityDescriptors)
       .innerJoin(entities, eq(entities.id, entityDescriptors.entityId))
-      .where(ownsEntity(ownerId))
+      // A personal suggestion vocabulary — the caller's *own* descriptors, so no
+      // Superadmin bypass (repair reaches content, not another user's autocomplete).
+      .where(ownsEntity(ownerId, false))
       .orderBy(asc(entityDescriptors.descriptor))
       .all()
       .map((row) => row.descriptor);
@@ -580,7 +608,8 @@ export class EntitiesService implements OnApplicationBootstrap {
       .selectDistinct({ value: sql<string>`tag.value` })
       .from(entities)
       .innerJoin(sql`json_each(${entities.tags}) as tag`, sql`1 = 1`)
-      .where(ownsEntity(ownerId))
+      // Personal suggestion vocabulary — the caller's own tags; no Superadmin bypass.
+      .where(ownsEntity(ownerId, false))
       .orderBy(sql`tag.value`)
       .all()
       .map((row) => row.value);
@@ -609,7 +638,8 @@ export class EntitiesService implements OnApplicationBootstrap {
     if (!access?.canRead) return false;
     if (!access.canWrite) throw new ForbiddenException();
     // 409, not 400: conflicts with World invariant (Home Entity always exists, ADR-0024).
-    if (access.row.isHome) throw new ConflictException('The Home Entity cannot be deleted');
+    if (access.row.isHome)
+      throw new ConflictException({ code: EntityErrorCode.HomeUndeletable } satisfies ApiError);
     // entity_grants (owner + grant rows) cascades with the row.
     this.db.delete(entities).where(eq(entities.id, id)).run();
     return true;
@@ -627,8 +657,9 @@ export class EntitiesService implements OnApplicationBootstrap {
     id: string,
   ): Extract<OwnerSetResult, { status: 'not-found' | 'forbidden' }> | undefined {
     // Only needs read + ownership, so it skips access()'s full row (no document blob).
+    const superadmin = this.isSuperadmin(userId);
     const row = this.db
-      .select({ canRead: canReadEntity(userId), isOwner: ownsEntity(userId) })
+      .select({ canRead: canReadEntity(userId, superadmin), isOwner: ownsEntity(userId, superadmin) })
       .from(entities)
       .where(eq(entities.id, id))
       .get();
@@ -883,7 +914,8 @@ export class EntitiesService implements OnApplicationBootstrap {
       .where(requestedId ? and(eq(worlds.id, requestedId), owned) : owned)
       .orderBy(asc(worlds.createdAt), asc(worlds.id))
       .get();
-    if (!world) throw new NotFoundException('World not found');
+    if (!world)
+      throw new NotFoundException({ code: EntityErrorCode.NoWritableWorld } satisfies ApiError);
     return world.id;
   }
 
@@ -896,14 +928,29 @@ export class EntitiesService implements OnApplicationBootstrap {
    * re-derivation to drift). `undefined` means no such row — the caller maps that and a
    * failed `canRead` alike to 404, but a reachable-yet-forbidden write (canRead ∧ ¬canWrite) to 403.
    */
+  /**
+   * Whether `userId` is a Superadmin (ADR-0037, #163) — resolved once per request and
+   * passed into the predicates, which then short-circuit to match-all. One indexed PK
+   * lookup, versus a per-row `users` subquery embedded in every predicate.
+   */
+  private isSuperadmin(userId: string): boolean {
+    return !!this.db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.id, userId), eq(users.isSuperadmin, true)))
+      .get();
+  }
+
   private access(userId: string, id: string) {
+    // Resolve the Superadmin bypass once for all four predicates (repair reaches anything).
+    const superadmin = this.isSuperadmin(userId);
     const result = this.db
       .select({
         ...getTableColumns(entities),
-        canRead: canReadEntity(userId),
-        canWrite: canWriteEntity(userId),
-        canEditSubstance: canEditSubstanceEntity(userId),
-        isOwner: ownsEntity(userId),
+        canRead: canReadEntity(userId, superadmin),
+        canWrite: canWriteEntity(userId, superadmin),
+        canEditSubstance: canEditSubstanceEntity(userId, superadmin),
+        isOwner: ownsEntity(userId, superadmin),
       })
       .from(entities)
       .where(eq(entities.id, id))
@@ -945,9 +992,14 @@ function filters(opts: FilterOptions) {
  * (#155). Same predicates {@link EntitiesService.list} applies, minus paging, so a
  * count and the page it annotates always agree on what's in the filtered set.
  */
-function facetWhere(ownerId: string, opts: FacetOptions, match: string | null) {
+function facetWhere(
+  ownerId: string,
+  opts: FacetOptions,
+  match: string | null,
+  superadmin: boolean,
+) {
   return and(
-    canReadEntity(ownerId),
+    canReadEntity(ownerId, superadmin),
     ...filters(opts),
     match ? sql`entities_fts MATCH ${match}` : undefined,
   );

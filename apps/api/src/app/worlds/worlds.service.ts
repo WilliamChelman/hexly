@@ -24,7 +24,7 @@ import {
   revokePublicLink,
 } from '../acl/public-link-store';
 import { DB, Db } from '../db/db';
-import { entities, entityGrants, worldLinks, worldMembers, worlds } from '../db/schema';
+import { entities, entityGrants, users, worldLinks, worldMembers, worlds } from '../db/schema';
 
 /** The World Public Link table for the shared get/mint/revoke helpers (ADR-0037, #162). */
 const WORLD_LINK: PublicLinkTable = {
@@ -55,6 +55,9 @@ export class WorldsService {
    * sets are unioned so a World is listed once however reached.
    */
   list(userId: string): WorldSummary[] {
+    // The Superadmin sees every World (ADR-0037, #163) — the reachability bypass, inside
+    // this choke point: drop the derived filter entirely rather than bolt on a role check.
+    const superadmin = this.isSuperadmin(userId);
     // Reachable = a member row OR any entity_grants row (owner/editor/viewer) on an Entity
     // inside, in one statement: id-subqueries OR'd in the WHERE, so the DB does the union
     // and de-dup (a World reached more than one way is still returned once).
@@ -67,7 +70,7 @@ export class WorldsService {
       })
       .from(worlds)
       .where(
-        or(
+        superadmin ? undefined : or(
           inArray(
             worlds.id,
             this.db
@@ -512,6 +515,9 @@ export class WorldsService {
   ): typeof worlds.$inferSelect | undefined {
     const world = this.db.select().from(worlds).where(eq(worlds.id, id)).get();
     if (!world) return undefined;
+    // The Superadmin reaches any World (ADR-0037, #163) — the reachability bypass, inside
+    // the choke point every read routes through, so `get` and the owner-set gates all honour it.
+    if (this.isSuperadmin(userId)) return world;
     const member = this.db
       .select({ userId: worldMembers.userId })
       .from(worldMembers)
@@ -527,8 +533,21 @@ export class WorldsService {
     return grantedEntity ? world : undefined;
   }
 
-  /** Whether `userId` is an Owner of World `id` (a `world_members` row with role 'owner'). */
+  /** Whether `userId` is a Superadmin — the outside-the-model repair bypass (ADR-0037, #163). */
+  private isSuperadmin(userId: string): boolean {
+    return !!this.db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.id, userId), eq(users.isSuperadmin, true)))
+      .get();
+  }
+
+  /**
+   * Whether `userId` is an Owner of World `id` (a `world_members` row with role 'owner'), or
+   * the Superadmin — so rename/delete/owner-management (ADR-0037, #163) accept the repair tier.
+   */
   private isOwner(userId: string, id: string): boolean {
+    if (this.isSuperadmin(userId)) return true;
     return !!this.db
       .select({ userId: worldMembers.userId })
       .from(worldMembers)

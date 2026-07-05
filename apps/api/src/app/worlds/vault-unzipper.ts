@@ -5,6 +5,7 @@ import {
   Injectable,
   PayloadTooLargeException,
 } from '@nestjs/common';
+import { ApiError, ImportErrorCode } from '@hexly/domain';
 import { Unzip, UnzipInflate, unzipSync } from 'fflate';
 import { HEXLY_CONFIG, type HexlyConfig } from '../config/config.module';
 import { ASSET_EXTENSIONS } from '../assets/assets.service';
@@ -109,7 +110,7 @@ function unzipVault(archive: Buffer, maxBytes: number): UnzippedVault {
   // so a non-zip would slip through as an empty import. Gate on the zip magic "PK" up front
   // (local-file-header `PK\x03\x04`, or `PK\x05\x06` for an empty archive) → a clean 400.
   if (data.length < 4 || data[0] !== 0x50 || data[1] !== 0x4b) {
-    throw new BadRequestException('Not a .zip archive');
+    throw new BadRequestException({ code: ImportErrorCode.NotAZip } satisfies ApiError);
   }
   try {
     for (let off = 0; off < data.length; off += PUSH_CHUNK) {
@@ -118,10 +119,10 @@ function unzipVault(archive: Buffer, maxBytes: number): UnzippedVault {
     }
   } catch (err) {
     if (err instanceof VaultTooLargeError) {
-      throw new PayloadTooLargeException('Vault exceeds the decompressed-size limit');
+      throw new PayloadTooLargeException({ code: ImportErrorCode.TooLarge } satisfies ApiError);
     }
     // fflate throws on a truncated/garbage/non-zip archive.
-    throw new BadRequestException('Not a readable .zip archive');
+    throw new BadRequestException({ code: ImportErrorCode.UnreadableZip } satisfies ApiError);
   }
   // Re-root once all entries are seen (zip order isn't guaranteed, so `rootPrefix` may be
   // discovered after some entries). An entry outside the detected root is left untouched.
@@ -139,7 +140,7 @@ function unzipVault(archive: Buffer, maxBytes: number): UnzippedVault {
 function unzipVaultFast(archive: Buffer, maxBytes: number): UnzippedVault {
   const data = new Uint8Array(archive);
   if (data.length < 4 || data[0] !== 0x50 || data[1] !== 0x4b) {
-    throw new BadRequestException('Not a .zip archive');
+    throw new BadRequestException({ code: ImportErrorCode.NotAZip } satisfies ApiError);
   }
   let rootPrefix = '';
   let declared = 0;
@@ -157,10 +158,10 @@ function unzipVaultFast(archive: Buffer, maxBytes: number): UnzippedVault {
     });
   } catch (err) {
     if (err instanceof VaultTooLargeError) {
-      throw new PayloadTooLargeException('Vault exceeds the decompressed-size limit');
+      throw new PayloadTooLargeException({ code: ImportErrorCode.TooLarge } satisfies ApiError);
     }
     // fflate throws on a truncated/garbage/non-zip archive.
-    throw new BadRequestException('Not a readable .zip archive');
+    throw new BadRequestException({ code: ImportErrorCode.UnreadableZip } satisfies ApiError);
   }
   const notes: Record<string, Uint8Array> = {};
   const assets: Record<string, Uint8Array> = {};

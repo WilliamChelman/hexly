@@ -39,6 +39,19 @@ export class AuthClient {
   readonly isAuthenticated = computed(() => this.currentUser() !== null);
   readonly sessionLoading = this.session.isLoading;
 
+  /**
+   * Whether the caller may reach the Instance Admin surface (ADR-0037, #163):
+   * the Admin flag, or a Superadmin (Superadmin ⊇ Admin). Drives the nav link
+   * and the admin route guard.
+   */
+  readonly canAdminister = computed(() => {
+    const u = this.currentUser();
+    return !!u && (u.isAdmin || u.isSuperadmin);
+  });
+
+  /** Whether the caller is a Superadmin — gates the Superadmin-only controls (ADR-0037, #163). */
+  readonly isSuperadmin = computed(() => this.currentUser()?.isSuperadmin ?? false);
+
   login(email: string, password: string): Observable<AuthUser> {
     return this.http
       .post<AuthUser>('/api/auth/login', { email, password })

@@ -31,7 +31,7 @@ describe('UserMenu', () => {
   });
 
   function signIn(displayName = 'Ada Lovelace'): void {
-    auth.setUser({ id: 'u1', email: 'ada@hexly.test', displayName, preferences: {} });
+    auth.setUser({ id: 'u1', email: 'ada@hexly.test', displayName, preferences: {}, isAdmin: false, isSuperadmin: false });
   }
 
   type Fixture = ReturnType<typeof TestBed.createComponent>;

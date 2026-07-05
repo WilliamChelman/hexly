@@ -334,7 +334,8 @@
     "styleguide": "Guide de style",
     "expand": "Déployer la navigation",
     "collapse": "Réduire la navigation",
-    "home": "Accueil Hexly"
+    "home": "Accueil Hexly",
+    "admin": "Admin"
   },
   "commandPalette": {
     "searchLabel": "Rechercher ou exécuter une commande",
@@ -503,6 +504,56 @@
       "tooShort": "Le nouveau mot de passe doit contenir au moins 8 caractères.",
       "wrongCurrent": "Le mot de passe actuel est incorrect.",
       "error": "Impossible de changer le mot de passe."
+    }
+  },
+  "admin": {
+    "tabTitle": "Admin — Hexly",
+    "heading": "Administration de l'instance",
+    "subhead": "Gérez les comptes de cette instance. L'administrateur n'a accès à aucun Monde ni aucune Entité — le contenu reste privé au sein du modèle de collaboration.",
+    "create": {
+      "heading": "Créer un utilisateur",
+      "displayName": "Nom affiché",
+      "email": "E-mail",
+      "password": "Mot de passe",
+      "submit": "Créer l'utilisateur"
+    },
+    "users": {
+      "heading": "Comptes",
+      "empty": "Aucun compte."
+    },
+    "badge": {
+      "superadmin": "Superadmin",
+      "admin": "Admin",
+      "disabled": "Désactivé"
+    },
+    "actions": {
+      "disable": "Désactiver",
+      "enable": "Activer",
+      "grantAdmin": "Nommer admin",
+      "revokeAdmin": "Retirer admin",
+      "grantSuperadmin": "Nommer superadmin",
+      "revokeSuperadmin": "Retirer superadmin",
+      "reset": "Réinitialiser le mot de passe",
+      "resetSave": "Enregistrer",
+      "delete": "Supprimer"
+    },
+    "confirmDelete": "Supprimer {{name}} ? Cette action est irréversible.",
+    "toast": {
+      "created": "Utilisateur créé",
+      "saved": "Enregistré",
+      "reset": "Mot de passe réinitialisé",
+      "deleted": "Utilisateur supprimé",
+      "error": "Une erreur est survenue."
+    },
+    "error": {
+      "email-in-use": "Cet e-mail est déjà utilisé par un autre compte.",
+      "sole-owner": "Cet utilisateur est l'unique propriétaire d'un Monde ou d'une Entité. Réattribuez la propriété avant de le supprimer.",
+      "last-superadmin": "C'est le dernier Superadmin — il ne peut être ni supprimé, ni rétrogradé, ni désactivé.",
+      "self-delete": "Vous ne pouvez pas supprimer votre propre compte.",
+      "self-disable": "Vous ne pouvez pas désactiver votre propre compte.",
+      "self-admin-revoke": "Vous ne pouvez pas retirer votre propre accès Admin.",
+      "superadmin-managed-by-superadmin": "Seul un Superadmin peut gérer un compte Superadmin.",
+      "user-not-found": "Ce compte n'existe plus."
     }
   }
 }

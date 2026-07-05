@@ -52,6 +52,9 @@ describe('Auth endpoints', () => {
       // A fresh user has expressed no Preferences: an empty bag, so the client
       // falls back to its own detection (browser language, OS theme) (ADR-0038).
       preferences: {},
+      // A plain seeded member carries neither admin tier (ADR-0037, #163).
+      isAdmin: false,
+      isSuperadmin: false,
     });
   });
 

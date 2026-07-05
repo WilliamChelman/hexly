@@ -158,7 +158,7 @@ export class EntitiesController {
   // The Entity's ownership set (ADR-0037), for an Owner.
   @Get(':id/owners')
   owners(@CurrentUser() user: AuthUser, @Param('id') id: string): string[] {
-    return ownerSetResponse(this.entities.listOwners(user.id, id), 'Entity');
+    return ownerSetResponse(this.entities.listOwners(user.id, id), 'entity');
   }
 
   // Add a co-Owner (ADR-0037): Owner-only, target must be an existing Instance user.
@@ -172,7 +172,7 @@ export class EntitiesController {
   ): string[] {
     const parsed = addOwnerRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
-    return ownerSetResponse(this.entities.addOwner(user.id, id, parsed.data.userId), 'Entity');
+    return ownerSetResponse(this.entities.addOwner(user.id, id, parsed.data.userId), 'entity');
   }
 
   // Remove an Owner, or resign your own ownership (ADR-0037). The ≥1-Owner
@@ -183,14 +183,15 @@ export class EntitiesController {
     @Param('id') id: string,
     @Param('userId') userId: string,
   ): string[] {
-    return ownerSetResponse(this.entities.removeOwner(user.id, id, userId), 'Entity');
+    return ownerSetResponse(this.entities.removeOwner(user.id, id, userId), 'entity');
   }
 
   // The Entity's grant set (ADR-0037, #161), for an Owner. Grants have no ≥1 invariant,
-  // so the 409 message aclSetResponse takes is unreachable here (a placeholder).
+  // so the `last-owner` arm aclSetResponse maps is unreachable here — the 'entity' kind
+  // it tags is never emitted.
   @Get(':id/grants')
   grants(@CurrentUser() user: AuthUser, @Param('id') id: string): EntityGrant[] {
-    return aclSetResponse(this.entities.listGrants(user.id, id), GRANT_CONFLICT);
+    return aclSetResponse(this.entities.listGrants(user.id, id), 'entity');
   }
 
   // Grant an Instance user Editor or Viewer (ADR-0037, #161): Owner-only, target must be
@@ -205,8 +206,7 @@ export class EntitiesController {
     const parsed = addGrantRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
     return aclSetResponse(
-      this.entities.addGrant(user.id, id, parsed.data.userId, parsed.data.role),
-      GRANT_CONFLICT,
+      this.entities.addGrant(user.id, id, parsed.data.userId, parsed.data.role), 'entity',
     );
   }
 
@@ -217,13 +217,13 @@ export class EntitiesController {
     @Param('id') id: string,
     @Param('userId') userId: string,
   ): EntityGrant[] {
-    return aclSetResponse(this.entities.removeGrant(user.id, id, userId), GRANT_CONFLICT);
+    return aclSetResponse(this.entities.removeGrant(user.id, id, userId), 'entity');
   }
 
   // The Entity's per-entity Public Link (ADR-0037, #162), for an Owner: the active token or null.
   @Get(':id/link')
   link(@CurrentUser() user: AuthUser, @Param('id') id: string): PublicLink | null {
-    return aclSetResponse(this.entities.getLink(user.id, id), LINK_CONFLICT);
+    return aclSetResponse(this.entities.getLink(user.id, id), 'entity');
   }
 
   // Mint (or return the existing) per-entity Public Link (ADR-0037, #162): Owner-only. One
@@ -231,19 +231,13 @@ export class EntitiesController {
   @Post(':id/link')
   @HttpCode(200)
   mintLink(@CurrentUser() user: AuthUser, @Param('id') id: string): PublicLink {
-    return aclSetResponse(this.entities.mintLink(user.id, id), LINK_CONFLICT);
+    return aclSetResponse(this.entities.mintLink(user.id, id), 'entity');
   }
 
   // Revoke the per-entity Public Link (ADR-0037, #162): Owner-only, the kill-switch.
   @Delete(':id/link')
   @HttpCode(204)
   revokeLink(@CurrentUser() user: AuthUser, @Param('id') id: string): void {
-    aclSetResponse(this.entities.revokeLink(user.id, id), LINK_CONFLICT);
+    aclSetResponse(this.entities.revokeLink(user.id, id), 'entity');
   }
 }
-
-/** Unreachable placeholder — grants carry no ≥1-Owner invariant, so no 409 arises. */
-const GRANT_CONFLICT = 'Entity grants have no owner invariant';
-
-/** Unreachable placeholder — a Public Link carries no ≥1-Owner invariant, so no 409 arises. */
-const LINK_CONFLICT = 'Public links have no owner invariant';

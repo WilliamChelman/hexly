@@ -31,7 +31,7 @@ import {
 import type { Response } from 'express';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { SessionAuthGuard } from '../auth/session-auth.guard';
-import { aclSetResponse, lastOwnerMessage, ownerSetResponse } from '../acl/owner-set';
+import { aclSetResponse, ownerSetResponse } from '../acl/owner-set';
 import { VaultExportService } from './vault-export.service';
 import { VaultImportService } from './vault-import.service';
 import { WorldsService } from './worlds.service';
@@ -42,8 +42,6 @@ interface UploadedZip {
   buffer: Buffer;
 }
 
-/** The 409 body when a member mutation would leave the World without an Owner (ADR-0037). */
-const LAST_OWNER_MESSAGE = lastOwnerMessage('World');
 
 /**
  * The World REST surface (ADR-0024). Every route is guarded; World Owners are
@@ -147,7 +145,7 @@ export class WorldsController {
   // The World's ownership set (ADR-0037), for an Owner.
   @Get(':id/owners')
   owners(@CurrentUser() user: AuthUser, @Param('id') id: string): string[] {
-    return ownerSetResponse(this.worlds.listOwners(user.id, id), 'World');
+    return ownerSetResponse(this.worlds.listOwners(user.id, id), 'world');
   }
 
   // Add a co-Owner (ADR-0037): Owner-only, target must be an existing Instance user.
@@ -161,7 +159,7 @@ export class WorldsController {
   ): string[] {
     const parsed = addOwnerRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
-    return ownerSetResponse(this.worlds.addOwner(user.id, id, parsed.data.userId), 'World');
+    return ownerSetResponse(this.worlds.addOwner(user.id, id, parsed.data.userId), 'world');
   }
 
   // Remove an Owner, or resign your own ownership (ADR-0037). The ≥1-Owner
@@ -172,7 +170,7 @@ export class WorldsController {
     @Param('id') id: string,
     @Param('userId') userId: string,
   ): string[] {
-    return ownerSetResponse(this.worlds.removeOwner(user.id, id, userId), 'World');
+    return ownerSetResponse(this.worlds.removeOwner(user.id, id, userId), 'world');
   }
 
   // The World's non-owner member set (ADR-0037, #159), for an Owner. The 409 body is
@@ -180,7 +178,7 @@ export class WorldsController {
   // it either way (the World that must keep an Owner is this same World).
   @Get(':id/members')
   members(@CurrentUser() user: AuthUser, @Param('id') id: string): WorldMember[] {
-    return aclSetResponse(this.worlds.listMembers(user.id, id), LAST_OWNER_MESSAGE);
+    return aclSetResponse(this.worlds.listMembers(user.id, id), 'world');
   }
 
   // Add a Contributor or World Viewer (ADR-0037, #159): Owner-only, target must be an
@@ -195,8 +193,7 @@ export class WorldsController {
     const parsed = addMemberRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
     return aclSetResponse(
-      this.worlds.addMember(user.id, id, parsed.data.userId, parsed.data.role),
-      LAST_OWNER_MESSAGE,
+      this.worlds.addMember(user.id, id, parsed.data.userId, parsed.data.role), 'world',
     );
   }
 
@@ -211,8 +208,7 @@ export class WorldsController {
     const parsed = setMemberRoleRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
     return aclSetResponse(
-      this.worlds.setMemberRole(user.id, id, userId, parsed.data.role),
-      LAST_OWNER_MESSAGE,
+      this.worlds.setMemberRole(user.id, id, userId, parsed.data.role), 'world',
     );
   }
 
@@ -224,13 +220,13 @@ export class WorldsController {
     @Param('id') id: string,
     @Param('userId') userId: string,
   ): WorldMember[] {
-    return aclSetResponse(this.worlds.removeMember(user.id, id, userId), LAST_OWNER_MESSAGE);
+    return aclSetResponse(this.worlds.removeMember(user.id, id, userId), 'world');
   }
 
   // The World's Public Link (ADR-0037, #162), for an Owner: the active token or null.
   @Get(':id/link')
   link(@CurrentUser() user: AuthUser, @Param('id') id: string): PublicLink | null {
-    return aclSetResponse(this.worlds.getLink(user.id, id), LINK_CONFLICT);
+    return aclSetResponse(this.worlds.getLink(user.id, id), 'world');
   }
 
   // Mint (or return the existing) World Public Link (ADR-0037, #162): World-Owner-only. One
@@ -238,16 +234,13 @@ export class WorldsController {
   @Post(':id/link')
   @HttpCode(200)
   mintLink(@CurrentUser() user: AuthUser, @Param('id') id: string): PublicLink {
-    return aclSetResponse(this.worlds.mintLink(user.id, id), LINK_CONFLICT);
+    return aclSetResponse(this.worlds.mintLink(user.id, id), 'world');
   }
 
   // Revoke the World Public Link (ADR-0037, #162): World-Owner-only, the kill-switch.
   @Delete(':id/link')
   @HttpCode(204)
   revokeLink(@CurrentUser() user: AuthUser, @Param('id') id: string): void {
-    aclSetResponse(this.worlds.revokeLink(user.id, id), LINK_CONFLICT);
+    aclSetResponse(this.worlds.revokeLink(user.id, id), 'world');
   }
 }
-
-/** Unreachable placeholder — a Public Link carries no ≥1-Owner invariant, so no 409 arises. */
-const LINK_CONFLICT = 'Public links have no owner invariant';

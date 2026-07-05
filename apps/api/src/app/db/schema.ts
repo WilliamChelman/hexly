@@ -25,6 +25,19 @@ export const users = sqliteTable('users', {
   // DB-queried, so a single column beats per-pref columns; `'{}'` = app
   // defaults, which is also the migration backfill for existing rows.
   preferences: text('preferences').notNull().default('{}'),
+  // Instance Admin (ADR-0037, #163): account management (create/disable/delete
+  // users, resets, the Admin flag itself) with zero content powers — it pierces
+  // no World or Entity. Toggled in-app by another Admin.
+  isAdmin: integer('is_admin', { mode: 'boolean' }).notNull().default(false),
+  // Superadmin (ADR-0037, #163): the operator's in-app self, outside the
+  // collaboration model — its bypass is OR'd into the read/reachability
+  // predicates (repair, not administration). Seeded via the `--superadmin` seed
+  // flag; the last one is irremovable so the repair capability can't be lost.
+  isSuperadmin: integer('is_superadmin', { mode: 'boolean' }).notNull().default(false),
+  // Disable (ADR-0037, #163): the immediate lever — a non-null timestamp locks
+  // login (rejected in `authenticate`, killing live sessions too) while leaving
+  // the user's data and memberships intact. Null = active.
+  disabledAt: integer('disabled_at'),
   createdAt: integer('created_at').notNull(),
 });
 

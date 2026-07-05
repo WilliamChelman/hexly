@@ -208,6 +208,11 @@ export class NavRail {
         exact: !worldId,
       },
       ...STATIC_ENTRIES,
+      // The Instance Admin panel link (ADR-0037, #163) shows only for an Admin or
+      // Superadmin — the same gate the route enforces server-side.
+      ...(this.auth.canAdminister()
+        ? [{ link: '/admin', testid: 'nav-admin', icon: 'user' as const, labelKey: 'nav.admin' }]
+        : []),
     ];
   });
 
