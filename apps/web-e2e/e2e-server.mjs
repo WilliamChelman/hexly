@@ -78,11 +78,14 @@ const childEnv = {
 // Seed the e2e users before serving (synchronous: the server must not accept logins
 // before the users exist). The grantee is optional — only present when the config
 // passes it — so the loop skips it if unset, keeping single-user runs working.
-const toSeed = [user, ...(grantee.email ? [grantee] : [])];
+// Only the login user gets a starter World: `enterLibrary` reaches its library by
+// clicking a World card on the Index, so the suite is dead without one. The grantee
+// is never logged in as — it only populates the directory for share specs (#161).
+const toSeed = [{ ...user, withWorld: true }, ...(grantee.email ? [grantee] : [])];
 for (const u of toSeed) {
   const seeded = spawnSync(
     process.execPath,
-    [seedJs, u.email, u.password, u.name],
+    [seedJs, u.email, u.password, u.name, ...(u.withWorld ? ['--with-world'] : [])],
     { env: childEnv, stdio: 'inherit' },
   );
   if (seeded.error) {

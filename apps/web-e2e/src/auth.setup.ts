@@ -14,8 +14,11 @@ setup('authenticate', async ({ page }) => {
   await page.getByRole('button', { name: 'Sign in' }).click();
 
   // Landing on the World Index proves the cookie was set and the auth guard passed
-  // (post-login default is the Index now — ADR-0028).
-  await expect(page.getByRole('heading', { name: /Welcome back/ })).toBeVisible();
+  // (post-login default is the Index now — ADR-0028). Assert the route's own tab title,
+  // not the greeting heading: a freshly-seeded user owns no worlds, so the Index shows its
+  // empty state and the "Welcome back" header never renders. The title is set only after
+  // authGuard resolves, so it proves both the landing and the auth in one world-count-independent check.
+  await expect(page).toHaveTitle(/Worlds/);
 
   await page.context().storageState({ path: authFile });
 });

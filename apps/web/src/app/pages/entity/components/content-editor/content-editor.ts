@@ -299,7 +299,10 @@ export class ContentEditor {
     effect(() => {
       const editor = this.editor();
       if (!editor) return;
-      editor.setEditable(this.session.writable());
+      // emitUpdate=false: setEditable defaults to firing an `update`, which would push the
+      // editor's current prose back into the session and clobber a just-adopted re-seed before
+      // the seed effect reads it (Reseeded → Original race). Toggling editability isn't an edit.
+      editor.setEditable(this.session.writable(), false);
     });
 
     // Seed on load/swap/conflict-reload, keyed off seed() so a keystroke never
