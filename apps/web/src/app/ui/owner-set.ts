@@ -18,6 +18,7 @@ import { UsersClient } from '../core/services/users.client';
 import { AuthClient } from '../core/services/auth.client';
 import { ToasterService } from '../core/services/toaster.service';
 import { Button } from './button';
+import { Select } from './select';
 
 /**
  * The symmetric ownership set of a World or Entity (ADR-0037, #158): view every
@@ -32,7 +33,7 @@ import { Button } from './button';
 @Component({
   selector: 'app-owner-set',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, Button],
+  imports: [TranslocoPipe, Button, Select],
   template: `
     <ul class="owner-list">
       @for (o of rows(); track o.id) {
@@ -72,6 +73,7 @@ import { Button } from './button';
       }}</label>
       <div class="owner-add-row">
         <select
+          appSelect
           id="owner-add-select"
           class="owner-select"
           data-testid="add-select"
@@ -115,9 +117,9 @@ import { Button } from './button';
     .owner-add-row {
       @apply flex items-center gap-2;
     }
+    /* Layout only — the look is the appSelect primitive's. */
     .owner-select {
-      @apply flex-1 py-2 px-3 text-sm text-ink-strong bg-surface-sunken border
-        border-line-strong rounded-md shadow-inset;
+      @apply flex-1;
     }
   `,
 })

@@ -282,6 +282,7 @@
     "chipRegion": "Region",
     "fieldMapName": "Map name",
     "fieldNote": "Note",
+    "fieldTerrain": "Terrain",
     "footerTokens": "Design tokens"
   },
   "domain": {
@@ -314,7 +315,12 @@
     "cancel": "Cancel",
     "close": "Close",
     "delete": "Delete",
-    "create": "Create"
+    "create": "Create",
+    "settings": "Settings",
+    "locale": {
+      "en": "English",
+      "fr": "Français"
+    }
   },
   "nav": {
     "primary": "Primary navigation",
@@ -422,5 +428,39 @@
     "loadError": "Couldn't load the members.",
     "leave": "Leave",
     "leaveError": "Couldn't leave that world. Please try again."
+  },
+  "settings": {
+    "tabTitle": "Settings",
+    "heading": "User Settings",
+    "subhead": "Your preferences follow your account on every device.",
+    "preferences": {
+      "heading": "Preferences",
+      "theme": "Theme",
+      "language": "Language",
+      "formatLocale": "Regional formatting",
+      "formatLocaleHint": "How dates and numbers read, independent of the language.",
+      "format": {
+        "same": "Same as language"
+      }
+    },
+    "profile": {
+      "heading": "Profile",
+      "email": "Email",
+      "emailHint": "Your email is your login; only an administrator can change it.",
+      "displayName": "Display name",
+      "save": "Save",
+      "saved": "Display name saved.",
+      "saveError": "Could not save the display name."
+    },
+    "password": {
+      "heading": "Change password",
+      "current": "Current password",
+      "new": "New password",
+      "submit": "Change password",
+      "changed": "Password changed.",
+      "tooShort": "The new password must be at least 8 characters.",
+      "wrongCurrent": "The current password is incorrect.",
+      "error": "Could not change the password."
+    }
   }
 }

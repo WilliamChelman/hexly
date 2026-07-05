@@ -14,6 +14,7 @@ import { MockEntitiesClient } from '../../core/testing/entities-client.mock';
 import { ActiveWorld } from '../../core/services/active-world';
 import { ToasterService } from '../../core/services/toaster.service';
 import { provideTranslocoTesting } from '../../core/i18n/transloco-testing';
+import { LocaleService } from '../../core/i18n/locale.service';
 import { EntityBrowser } from './entity-browser';
 
 describe('EntityBrowser', () => {
@@ -35,6 +36,10 @@ describe('EntityBrowser', () => {
     updatedAt: 1,
     ...over,
   });
+
+  // Locale/Format Locale tests seed preferences; never let them cross tests.
+  beforeEach(() => localStorage.clear());
+  afterEach(() => localStorage.clear());
 
   beforeEach(async () => {
     client = new MockEntitiesClient();
@@ -382,20 +387,33 @@ describe('EntityBrowser', () => {
     const frDate = new Date(updatedAt).toLocaleDateString('fr');
     expect(frDate).not.toBe(enDate); // sanity: the date distinguishes the locales
 
+    // French remembered before render — LocaleService applies the stored
+    // choice on construction; the pure hexlyDate pipe formats at render time,
+    // a mid-view language flip reformats on the next render (ADR-0038).
+    localStorage.setItem('hexly-u:hexly-locale', 'fr');
     const fixture = renderWith([summary({ id: 'm1', name: 'Aldermoor', updatedAt })]);
-    const meta = () =>
+    const meta =
       (fixture.nativeElement.querySelector('.meta') as HTMLElement).textContent ?? '';
 
-    // English is the default lang: month-first format, English prefix.
-    expect(meta()).toContain(`Edited ${enDate}`);
+    expect(meta).toContain(`Modifié le ${frDate}`);
+    expect(meta).not.toContain(enDate);
+    expect(meta).not.toContain('Edited');
+  });
 
-    TestBed.inject(TranslocoService).setActiveLang('fr');
-    fixture.detectChanges();
+  it('formats the “Edited” date with the Format Locale, independent of the language (ADR-0038)', () => {
+    // 22 June: en-US reads month-first, en-GB day-first — same language, so
+    // only the Format Locale axis can explain a change.
+    const updatedAt = Date.UTC(2026, 5, 22, 12, 0, 0);
+    const gbDate = new Date(updatedAt).toLocaleDateString('en-GB');
 
-    // French active: the date reflows to day-first and the prefix translates.
-    expect(meta()).toContain(`Modifié le ${frDate}`);
-    expect(meta()).not.toContain(enDate);
-    expect(meta()).not.toContain('Edited');
+    // Chosen before render (the pipe is pure — it formats what renders next).
+    TestBed.inject(LocaleService).setFormatLocale('en-GB');
+    const fixture = renderWith([summary({ id: 'm1', name: 'Aldermoor', updatedAt })]);
+
+    const meta =
+      (fixture.nativeElement.querySelector('.meta') as HTMLElement).textContent ?? '';
+    // Copy still English, date now day-first.
+    expect(meta).toContain(`Edited ${gbDate}`);
   });
 
   it('renders an entity name verbatim — never translated — even when it collides with a UI string', () => {

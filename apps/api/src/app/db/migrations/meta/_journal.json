@@ -29,6 +29,13 @@
       "when": 1783179486303,
       "tag": "0003_symmetric_owner_sets",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1783202111358,
+      "tag": "0004_elite_sleepwalker",
+      "breakpoints": true
     }
   ]
 }

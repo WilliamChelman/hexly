@@ -16,4 +16,8 @@ export class MockAuthClient {
   login = vi.fn<(email: string, password: string) => Observable<AuthUser>>(() => EMPTY);
   logout = vi.fn<() => Observable<void>>(() => of(undefined));
   signOut = vi.fn();
+  updateProfile = vi.fn<(displayName: string) => Observable<AuthUser>>(() => EMPTY);
+  changePassword = vi.fn<(currentPassword: string, newPassword: string) => Observable<void>>(
+    () => of(undefined),
+  );
 }

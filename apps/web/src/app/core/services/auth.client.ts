@@ -45,6 +45,21 @@ export class AuthClient {
       .pipe(tap((user) => this.session.set(user)));
   }
 
+  /** Rename the account (ADR-0038); the fresh AuthUser replaces the session state. */
+  updateProfile(displayName: string): Observable<AuthUser> {
+    return this.http
+      .patch<AuthUser>('/api/auth/me/profile', { displayName })
+      .pipe(tap((user) => this.session.set(user)));
+  }
+
+  /** Change the password (ADR-0038). Errors (wrong current, too short) pass through. */
+  changePassword(currentPassword: string, newPassword: string): Observable<void> {
+    return this.http.post<void>('/api/auth/me/password', {
+      currentPassword,
+      newPassword,
+    });
+  }
+
   // Clear in finalize so failed logout never leaves UI signed-in.
   logout(): Observable<void> {
     return this.http.post<void>('/api/auth/logout', {}).pipe(

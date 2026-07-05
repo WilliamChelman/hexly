@@ -2,7 +2,12 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { hash, verify } from '@node-rs/argon2';
 import { eq, lt } from 'drizzle-orm';
-import { AuthUser } from '@hexly/domain';
+import {
+  AuthUser,
+  Preferences,
+  PreferencesPatch,
+  preferencesSchema,
+} from '@hexly/domain';
 import { DB, Db } from '../db/db';
 import { sessions, users } from '../db/schema';
 
@@ -118,6 +123,88 @@ export class AuthService {
     return user ? toAuthUser(user) : null;
   }
 
+  /**
+   * Merge a Preferences patch into the user's stored bag and return the merged
+   * result (ADR-0038). PATCH semantics: absent fields keep their stored value
+   * (so the theme and locale writers never clobber each other), an explicit
+   * `null` clears a field back to "no choice".
+   */
+  async updatePreferences(
+    userId: string,
+    patch: PreferencesPatch,
+  ): Promise<Preferences> {
+    const row = this.db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .get();
+    const merged: Record<string, unknown> = {
+      ...parsePreferences(row?.preferences ?? '{}'),
+    };
+    for (const [key, value] of Object.entries(patch)) {
+      if (value === null) delete merged[key];
+      else if (value !== undefined) merged[key] = value;
+    }
+    this.db
+      .update(users)
+      .set({ preferences: JSON.stringify(merged) })
+      .where(eq(users.id, userId))
+      .run();
+    return merged as Preferences;
+  }
+
+  /** Update the user's display name and return their fresh {@link AuthUser}. */
+  async updateProfile(userId: string, displayName: string): Promise<AuthUser> {
+    this.db
+      .update(users)
+      .set({ displayName })
+      .where(eq(users.id, userId))
+      .run();
+    const row = this.db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .get();
+    if (!row) throw new Error(`user ${userId} vanished mid-session`);
+    return toAuthUser(row);
+  }
+
+  /**
+   * Change the user's password (ADR-0038): verify the current one against the
+   * stored hash, then re-hash and store the new one. Returns `false` — with
+   * nothing written — when the current password does not verify. Length rules
+   * live in the request schema at the edge; invalidating the user's other
+   * sessions is deferred (ADR-0038).
+   */
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<boolean> {
+    const row = this.db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .get();
+    if (!row) return false;
+
+    let currentOk = false;
+    try {
+      currentOk = await verify(row.passwordHash, currentPassword);
+    } catch {
+      return false;
+    }
+    if (!currentOk) return false;
+
+    const passwordHash = await hash(newPassword);
+    this.db
+      .update(users)
+      .set({ passwordHash })
+      .where(eq(users.id, userId))
+      .run();
+    return true;
+  }
+
   /** End a session by deleting its row; a no-op for an unknown token. */
   async logout(token: string | undefined): Promise<void> {
     if (!token) return;
@@ -141,5 +228,23 @@ function normalizeEmail(email: string): string {
 
 /** Strip a user row down to the public {@link AuthUser} shape. */
 function toAuthUser(row: typeof users.$inferSelect): AuthUser {
-  return { id: row.id, email: row.email, displayName: row.displayName };
+  return {
+    id: row.id,
+    email: row.email,
+    displayName: row.displayName,
+    preferences: parsePreferences(row.preferences),
+  };
+}
+
+/**
+ * Parse the stored Preferences JSON through the domain schema. A corrupt or
+ * hand-edited bag degrades to app defaults rather than breaking auth.
+ */
+function parsePreferences(raw: string): Preferences {
+  try {
+    const parsed = preferencesSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : {};
+  } catch {
+    return {};
+  }
 }

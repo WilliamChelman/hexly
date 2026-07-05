@@ -30,6 +30,15 @@ export const appRoutes: Route[] = [
     title: 'worldIndex.tabTitle',
   },
   {
+    // User Settings (ADR-0038): the account-owned Preferences + profile page.
+    // Account-scoped, so it sits outside the World scope.
+    path: 'settings',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./pages/settings/settings').then((m) => m.Settings),
+    title: 'settings.tabTitle',
+  },
+  {
     // The World scope (ADR-0028): a componentless parent that owns the `:worldId`
     // segment. Its resolver pins the active World before any child renders; its
     // canDeactivate clears it when navigation leaves the scope, so the Index never

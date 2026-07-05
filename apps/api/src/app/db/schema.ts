@@ -21,6 +21,10 @@ export const users = sqliteTable('users', {
   email: text('email').notNull().unique(),
   displayName: text('display_name').notNull(),
   passwordHash: text('password_hash').notNull(),
+  // Roaming Preferences as one zod-validated JSON bag (ADR-0038). Never
+  // DB-queried, so a single column beats per-pref columns; `'{}'` = app
+  // defaults, which is also the migration backfill for existing rows.
+  preferences: text('preferences').notNull().default('{}'),
   createdAt: integer('created_at').notNull(),
 });
 

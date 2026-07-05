@@ -54,7 +54,7 @@ describe('Login', () => {
 
   it('submits the typed credentials and enters the app on success', () => {
     auth.login.mockReturnValue(
-      of({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada' }),
+      of({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada', preferences: {} }),
     );
     const fixture = TestBed.createComponent(Login);
     const el = fixture.nativeElement as HTMLElement;
@@ -77,7 +77,7 @@ describe('Login', () => {
 
   it('trims the typed email before sending it', () => {
     auth.login.mockReturnValue(
-      of({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada' }),
+      of({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada', preferences: {} }),
     );
     const fixture = TestBed.createComponent(Login);
     const el = fixture.nativeElement as HTMLElement;
@@ -92,7 +92,7 @@ describe('Login', () => {
 
   it('navigates to returnUrl when one is present', () => {
     auth.login.mockReturnValue(
-      of({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada' }),
+      of({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada', preferences: {} }),
     );
     queryParams = { returnUrl: '/atlas/42' };
     const fixture = TestBed.createComponent(Login);

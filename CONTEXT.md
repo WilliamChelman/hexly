@@ -228,6 +228,24 @@ _Avoid_: Fulltext, keyword search, fuzzy search
 A navigation view of a Content's headings — a nested, click-to-jump list that also marks the heading currently in view. Derived from the Content, never stored: the domain has no heading model of its own. Available wherever an Entity shows its Content body — a Note, or a Hex Map on its Note view. Sibling to the Inspector and Regions panel.
 _Avoid_: Table of contents, TOC, minimap, nav panel
 
+## User preferences
+
+**User Settings**:
+The account-owned page where a signed-in user edits their own **Preferences** and profile — display name and password (email is shown read-only). Distinct from a World's membership settings (World Owner surface) and from Instance Configuration (operator settings).
+_Avoid_: Account settings, profile page, options
+
+**Preferences**:
+A user's roaming presentation choices — UI **Locale**, **Format Locale**, and theme — bound to the account so they follow the user across devices. Anonymous public-link viewers, who have no account, still get these choices locally. Distinct from Instance Configuration (operator, per-Instance) and World membership settings.
+_Avoid_: Settings, options, config
+
+**Locale**:
+A user's chosen **interface language** (English or French today) — which strings the UI renders. Distinct from Format Locale: Locale picks the words, Format Locale picks how dates and numbers read.
+_Avoid_: Language (as a field name), i18n, region
+
+**Format Locale**:
+A user's chosen **regional formatting** (a BCP-47 tag) governing how dates, numbers, and times are rendered, independent of the UI **Locale** — so an English reader can see day-month dates. Defaults to the UI Locale when unset.
+_Avoid_: Date format, regional settings, locale (bare — that means the UI language)
+
 ## Self-hosting
 
 **Instance**:

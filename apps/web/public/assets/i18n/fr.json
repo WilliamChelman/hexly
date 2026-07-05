@@ -282,6 +282,7 @@
     "chipRegion": "Région",
     "fieldMapName": "Nom de la carte",
     "fieldNote": "Note",
+    "fieldTerrain": "Terrain",
     "footerTokens": "Jetons de design"
   },
   "domain": {
@@ -314,7 +315,12 @@
     "cancel": "Annuler",
     "close": "Fermer",
     "delete": "Supprimer",
-    "create": "Créer"
+    "create": "Créer",
+    "settings": "Paramètres",
+    "locale": {
+      "en": "English",
+      "fr": "Français"
+    }
   },
   "nav": {
     "primary": "Navigation principale",
@@ -422,5 +428,39 @@
     "loadError": "Impossible de charger les membres.",
     "leave": "Quitter",
     "leaveError": "Impossible de quitter ce monde. Veuillez réessayer."
+  },
+  "settings": {
+    "tabTitle": "Paramètres",
+    "heading": "Paramètres du compte",
+    "subhead": "Vos préférences suivent votre compte sur tous vos appareils.",
+    "preferences": {
+      "heading": "Préférences",
+      "theme": "Thème",
+      "language": "Langue",
+      "formatLocale": "Format régional",
+      "formatLocaleHint": "Le format des dates et des nombres, indépendant de la langue.",
+      "format": {
+        "same": "Comme la langue"
+      }
+    },
+    "profile": {
+      "heading": "Profil",
+      "email": "E-mail",
+      "emailHint": "Votre e-mail est votre identifiant ; seul un administrateur peut le changer.",
+      "displayName": "Nom affiché",
+      "save": "Enregistrer",
+      "saved": "Nom affiché enregistré.",
+      "saveError": "Impossible d’enregistrer le nom affiché."
+    },
+    "password": {
+      "heading": "Changer le mot de passe",
+      "current": "Mot de passe actuel",
+      "new": "Nouveau mot de passe",
+      "submit": "Changer le mot de passe",
+      "changed": "Mot de passe changé.",
+      "tooShort": "Le nouveau mot de passe doit contenir au moins 8 caractères.",
+      "wrongCurrent": "Le mot de passe actuel est incorrect.",
+      "error": "Impossible de changer le mot de passe."
+    }
   }
 }

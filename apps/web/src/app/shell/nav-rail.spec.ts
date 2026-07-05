@@ -60,7 +60,7 @@ describe('NavRail', () => {
   });
 
   function signIn(displayName = 'Ada Lovelace'): void {
-    auth.setUser({ id: 'u1', email: 'ada@hexly.test', displayName });
+    auth.setUser({ id: 'u1', email: 'ada@hexly.test', displayName, preferences: {} });
   }
 
   function render() {

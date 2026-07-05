@@ -8,20 +8,22 @@ import {
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { EntityType } from '@hexly/domain';
+import { HexlyDatePipe } from '../../core/i18n/hexly-date.pipe';
 import { Autofocus } from '../../ui/autofocus';
 import { Button } from '../../ui/button';
 import { Panel } from '../../ui/panel';
 import { Icon, IconName } from '../../ui/icon/icon';
 import { ACCENT_BAR, ACCENT_SIGIL, accentFor } from '../../ui/sigil';
 
-/** A row of the Entity browser grid, with its last-edited date pre-formatted for
- * the active language (ADR-0014) — the parent owns list/order, the card owns the tile. */
+/** A row of the Entity browser grid — the parent owns list/order, the card owns
+ * the tile. The last-edited instant stays raw; the template formats it via
+ * `| hexlyDate` so it tracks the user's Format Locale live (ADR-0038). */
 export interface EntityCardVm {
   id: string;
   title: string;
   type: EntityType;
   tags: readonly string[];
-  edited: string;
+  updatedAt: number;
 }
 
 /**
@@ -34,7 +36,7 @@ export interface EntityCardVm {
 @Component({
   selector: 'app-entity-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Panel, Icon, Autofocus, TranslocoPipe, RouterLink],
+  imports: [Button, Panel, Icon, Autofocus, TranslocoPipe, RouterLink, HexlyDatePipe],
   host: { class: 'contents' },
   template: `
     <section
@@ -88,7 +90,7 @@ export interface EntityCardVm {
             >
             <span class="text-2xs text-ink-faint">·</span>
             <span class="meta text-2xs text-ink-muted">{{
-              'entityBrowser.edited' | transloco: { date: card().edited }
+              'entityBrowser.edited' | transloco: { date: (card().updatedAt | hexlyDate) }
             }}</span>
             <span
               class="relative z-10 ml-auto flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"

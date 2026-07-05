@@ -14,6 +14,7 @@ import { WorldsClient } from '../core/services/worlds.client';
 import { UsersClient } from '../core/services/users.client';
 import { ToasterService } from '../core/services/toaster.service';
 import { Button } from './button';
+import { Select } from './select';
 
 /**
  * A World's non-owner membership set (ADR-0037, #159): the layer below the owner set.
@@ -28,13 +29,14 @@ import { Button } from './button';
 @Component({
   selector: 'app-member-set',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, Button],
+  imports: [TranslocoPipe, Button, Select],
   template: `
     <ul class="member-list">
       @for (m of rows(); track m.userId) {
         <li class="member-row" [attr.data-testid]="'member-' + m.userId">
           <span class="member-name">{{ m.name }}</span>
           <select
+            appSelect
             class="member-select"
             [attr.data-testid]="'role-' + m.userId"
             [value]="m.role"
@@ -64,6 +66,7 @@ import { Button } from './button';
       }}</label>
       <div class="member-add-row">
         <select
+          appSelect
           id="member-add-select"
           class="member-select"
           data-testid="add-select"
@@ -76,6 +79,7 @@ import { Button } from './button';
           }
         </select>
         <select
+          appSelect
           class="member-select"
           data-testid="add-role"
           [value]="selectedRole()"
@@ -119,10 +123,7 @@ import { Button } from './button';
     .member-add-row {
       @apply flex items-center gap-2;
     }
-    .member-select {
-      @apply py-2 px-3 text-sm text-ink-strong bg-surface-sunken border
-        border-line-strong rounded-md shadow-inset;
-    }
+    /* Layout only — the look is the appSelect primitive's. */
     .member-add-row .member-select:first-child {
       @apply flex-1;
     }

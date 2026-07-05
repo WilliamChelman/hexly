@@ -35,7 +35,7 @@ describe('OwnerSet', () => {
       ],
     }).compileComponents();
     toaster = TestBed.inject(ToasterService);
-    auth.setUser({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada' });
+    auth.setUser({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada', preferences: {} });
     users.list.mockReturnValue(
       of([
         { id: 'u1', displayName: 'Ada' },

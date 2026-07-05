@@ -56,21 +56,6 @@ const SEARCH_DEBOUNCE_MS = 150;
 const FIRST_PAGE_CACHE_LIMIT = 50;
 
 /**
- * Format an epoch-millis timestamp for `lang` using native `Intl` (ADR-0014 — no
- * DatePipe/registerLocaleData). Falls back to the runtime default if `lang` is
- * somehow not a valid BCP-47 tag, so a misconfigured locale can't throw and take
- * the whole card list's render down with it.
- */
-function formatEdited(updatedAt: number, lang: string): string {
-  const date = new Date(updatedAt);
-  try {
-    return date.toLocaleDateString(lang);
-  } catch {
-    return date.toLocaleDateString();
-  }
-}
-
-/**
  * The Entity browser: the in-World surface (`/w/:worldId/entities`) where a user
  * sees every Entity in that World — notes and maps together — with name, type, tags,
  * and last-edited date, and runs the lifecycle: create (note or map), open,
@@ -222,22 +207,20 @@ export class EntityBrowser {
   protected readonly worldId = this.activeWorld.worldId;
 
   private readonly _entities = signal<EntitySummary[]>([]);
-  /** The entities as view rows, with the last-edited date pre-formatted for the
-   * active language (ADR-0014). Keyed on the accumulated pages and the active lang,
-   * so each date formats once per list/language change and reflows live on a switch —
-   * not on every change-detection pass, as a template method call would. Server order
-   * is authoritative (#154): bm25 relevance under a query, updatedAt desc otherwise —
-   * so the list is rendered verbatim, never re-sorted client-side. */
-  protected readonly cards = computed(() => {
-    const lang = this.transloco.activeLang();
-    return this._entities().map((entity) => ({
+  /** The entities as view rows. The last-edited date stays a raw timestamp —
+   * the card formats it via `| hexlyDate`, tracking language and Format Locale
+   * live (ADR-0038). Server order is authoritative (#154): bm25 relevance under
+   * a query, updatedAt desc otherwise — the list is rendered verbatim, never
+   * re-sorted client-side. */
+  protected readonly cards = computed(() =>
+    this._entities().map((entity) => ({
       id: entity.id,
       title: entity.name,
       type: entity.type,
       tags: entity.tags,
-      edited: formatEdited(entity.updatedAt, lang),
-    }));
-  });
+      updatedAt: entity.updatedAt,
+    })),
+  );
   protected readonly nextCursor = signal<string | null>(null);
   protected readonly loadingMore = signal(false);
   protected readonly loaded = signal(false);

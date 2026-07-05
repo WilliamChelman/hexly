@@ -115,7 +115,7 @@ import { Rule } from '../ui/rule';
               class="flex items-center justify-between gap-2 w-full px-3 py-2 text-sm text-ink text-left bg-transparent border-0 rounded-sm cursor-pointer hover:bg-gold-soft"
               (cdkMenuItemTriggered)="selectLocale(locale)"
             >
-              <span>{{ localeNames[locale] }}</span>
+              <span>{{ 'common.locale.' + locale | transloco }}</span>
               @if (locale === currentLocale()) {
                 <span class="text-gold" aria-hidden="true">✓</span>
               }
@@ -124,6 +124,13 @@ import { Rule } from '../ui/rule';
         </div>
         <hr appRule class="mx-1 my-1" />
         @if (user()) {
+          <a
+            cdkMenuItem
+            routerLink="/settings"
+            class="flex items-center gap-2 px-3 py-2 text-sm text-ink no-underline rounded-sm cursor-pointer hover:bg-gold-soft"
+          >
+            {{ 'common.settings' | transloco }}
+          </a>
           <button
             type="button"
             cdkMenuItem
@@ -160,10 +167,6 @@ export class UserMenu {
   /** The languages offered, sourced from {@link LocaleService}, and the active one. */
   protected readonly locales = this.locale.locales;
   protected readonly currentLocale = this.locale.lang;
-  protected readonly localeNames: Record<Locale, string> = {
-    en: 'English',
-    fr: 'Français',
-  };
 
   /** The user's initials for the avatar (e.g. "Ada Lovelace" → "AL"). */
   protected readonly initials = computed(() => {
