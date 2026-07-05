@@ -19,6 +19,8 @@ export interface AdminUser {
   readonly displayName: string;
   readonly isAdmin: boolean;
   readonly isSuperadmin: boolean;
+  /** World Creation capability (ADR-0040): whether this user may create Worlds. */
+  readonly canCreateWorlds: boolean;
   /** Epoch ms the account was disabled, or null when active. */
   readonly disabledAt: number | null;
 }
@@ -85,6 +87,16 @@ export const setAdminRequestSchema = z.object({ isAdmin: z.boolean() }).strict()
 
 /** A validated Admin-flag toggle. */
 export type SetAdminRequest = z.infer<typeof setAdminRequestSchema>;
+
+/** The body of `PATCH /admin/users/:id/can-create-worlds` — grant (or revoke) World Creation (ADR-0040). */
+export const setCanCreateWorldsRequestSchema = z
+  .object({ canCreateWorlds: z.boolean() })
+  .strict();
+
+/** A validated World-Creation-capability toggle. */
+export type SetCanCreateWorldsRequest = z.infer<
+  typeof setCanCreateWorldsRequestSchema
+>;
 
 /** The body of `PATCH /admin/users/:id/disabled` — disable (or re-enable) the account. */
 export const setDisabledRequestSchema = z.object({ disabled: z.boolean() }).strict();

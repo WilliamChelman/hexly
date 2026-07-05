@@ -26,6 +26,7 @@ describe('PreferencesSync (ADR-0038)', () => {
     preferences,
     isAdmin: false,
     isSuperadmin: false,
+    canCreateWorlds: true,
   });
 
   beforeEach(() => {

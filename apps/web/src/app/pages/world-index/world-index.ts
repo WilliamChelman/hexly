@@ -107,10 +107,12 @@ import { ACCENT_SIGIL, accentFor, monogram } from '../../ui/sigil';
               {{ 'worldIndex.subhead' | transloco }}
             </p>
           </div>
-          <div class="flex items-center gap-2">
-            <ng-container [ngTemplateOutlet]="importBtn" />
-            <ng-container [ngTemplateOutlet]="createBtn" />
-          </div>
+          @if (canCreateWorlds()) {
+            <div class="flex items-center gap-2">
+              <ng-container [ngTemplateOutlet]="importBtn" />
+              <ng-container [ngTemplateOutlet]="createBtn" />
+            </div>
+          }
         </div>
       </header>
 
@@ -257,19 +259,21 @@ import { ACCENT_SIGIL, accentFor, monogram } from '../../ui/sigil';
               </div>
             </li>
           }
-          <li class="snap-start shrink-0 w-56">
-            <button
-              type="button"
-              class="h-44 w-full rounded-lg border border-dashed border-line-strong text-ink-muted hover:text-gold hover:border-gold bg-surface-sunken/40 flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors outline-none focus-visible:shadow-none focus-visible:[outline:2px_solid_var(--color-gold)] focus-visible:[outline-offset:-2px]"
-              [disabled]="creating()"
-              (click)="create()"
-            >
-              <app-icon name="plus" [size]="24" />
-              <span class="font-display text-md">{{
-                'worlds.new' | transloco
-              }}</span>
-            </button>
-          </li>
+          @if (canCreateWorlds()) {
+            <li class="snap-start shrink-0 w-56">
+              <button
+                type="button"
+                class="h-44 w-full rounded-lg border border-dashed border-line-strong text-ink-muted hover:text-gold hover:border-gold bg-surface-sunken/40 flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors outline-none focus-visible:shadow-none focus-visible:[outline:2px_solid_var(--color-gold)] focus-visible:[outline-offset:-2px]"
+                [disabled]="creating()"
+                (click)="create()"
+              >
+                <app-icon name="plus" [size]="24" />
+                <span class="font-display text-md">{{
+                  'worlds.new' | transloco
+                }}</span>
+              </button>
+            </li>
+          }
         </ul>
       </main>
     } @else if (loadError()) {
@@ -292,10 +296,12 @@ import { ACCENT_SIGIL, accentFor, monogram } from '../../ui/sigil';
         >
           <p class="m-0">{{ 'worldIndex.emptyTitle' | transloco }}</p>
           <p class="text-sm m-0">{{ 'worldIndex.emptyHint' | transloco }}</p>
-          <div class="flex items-center gap-2">
-            <ng-container [ngTemplateOutlet]="createBtn" />
-            <ng-container [ngTemplateOutlet]="importBtn" />
-          </div>
+          @if (canCreateWorlds()) {
+            <div class="flex items-center gap-2">
+              <ng-container [ngTemplateOutlet]="createBtn" />
+              <ng-container [ngTemplateOutlet]="importBtn" />
+            </div>
+          }
         </section>
       </main>
     }
@@ -398,6 +404,9 @@ export class WorldIndex {
   private readonly store = inject(WorldStore);
   private readonly worldsClient = inject(WorldsClient);
   private readonly auth = inject(AuthClient);
+  // World Creation capability (ADR-0040): gates every "New World" / import affordance —
+  // the server 403s a creation attempt without it, so the button is hidden to match.
+  protected readonly canCreateWorlds = this.auth.canCreateWorlds;
   private readonly router = inject(Router);
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);

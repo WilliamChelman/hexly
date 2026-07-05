@@ -524,6 +524,7 @@
     "badge": {
       "superadmin": "Superadmin",
       "admin": "Admin",
+      "worldCreator": "World creator",
       "disabled": "Disabled"
     },
     "actions": {
@@ -531,6 +532,8 @@
       "enable": "Enable",
       "grantAdmin": "Make admin",
       "revokeAdmin": "Revoke admin",
+      "grantWorldCreation": "Allow world creation",
+      "revokeWorldCreation": "Disallow world creation",
       "grantSuperadmin": "Make superadmin",
       "revokeSuperadmin": "Revoke superadmin",
       "reset": "Reset password",

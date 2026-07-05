@@ -34,6 +34,10 @@ export const users = sqliteTable('users', {
   // predicates (repair, not administration). Seeded via the `--superadmin` seed
   // flag; the last one is irremovable so the repair capability can't be lost.
   isSuperadmin: integer('is_superadmin', { mode: 'boolean' }).notNull().default(false),
+  // World Creation (ADR-0040): a per-user Instance capability, orthogonal to Instance
+  // Admin, gating whether the user may create a World. Off by default — the clean-slate
+  // migration backfills every existing user to false; an Instance Admin grants it.
+  canCreateWorlds: integer('can_create_worlds', { mode: 'boolean' }).notNull().default(false),
   // Disable (ADR-0037, #163): the immediate lever — a non-null timestamp locks
   // login (rejected in `authenticate`, killing live sessions too) while leaving
   // the user's data and memberships intact. Null = active.

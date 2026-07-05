@@ -83,6 +83,13 @@ export interface AuthUser {
    * collaboration model. Implies Admin's account powers (Superadmin ⊇ Admin).
    */
   readonly isSuperadmin: boolean;
+  /**
+   * World Creation (ADR-0040): a per-user Instance capability, orthogonal to
+   * Instance Admin, gating whether this user may create a World. Surfaced so the
+   * web nav gates the "New World" affordance on exactly what the server enforces.
+   * A Superadmin always may create (repair), regardless of this flag.
+   */
+  readonly canCreateWorlds: boolean;
 }
 
 /**

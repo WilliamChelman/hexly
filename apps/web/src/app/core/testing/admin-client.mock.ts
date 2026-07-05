@@ -8,6 +8,7 @@ export class MockAdminClient {
   setDisabled = vi.fn<(id: string, disabled: boolean) => Observable<void>>(() => of(undefined));
   resetPassword = vi.fn<(id: string, password: string) => Observable<void>>(() => of(undefined));
   setAdmin = vi.fn<(id: string, isAdmin: boolean) => Observable<void>>(() => of(undefined));
+  setCanCreateWorlds = vi.fn<(id: string, canCreateWorlds: boolean) => Observable<void>>(() => of(undefined));
   setSuperadmin = vi.fn<(id: string, isSuperadmin: boolean) => Observable<void>>(() => of(undefined));
   deleteUser = vi.fn<(id: string) => Observable<void>>(() => of(undefined));
 }

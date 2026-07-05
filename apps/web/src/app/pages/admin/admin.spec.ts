@@ -27,6 +27,7 @@ describe('Admin panel', () => {
     displayName: 'Bob',
     isAdmin: false,
     isSuperadmin: false,
+    canCreateWorlds: true,
     disabledAt: null,
   };
 
@@ -42,7 +43,7 @@ describe('Admin panel', () => {
     }).compileComponents();
     toaster = TestBed.inject(ToasterService);
     // The caller is an Instance Admin (not a Superadmin) unless a test says otherwise.
-    auth.setUser({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada', preferences: {}, isAdmin: true, isSuperadmin: false });
+    auth.setUser({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada', preferences: {}, isAdmin: true, isSuperadmin: false, canCreateWorlds: true });
   });
 
   function render(users: AdminUser[]) {
@@ -72,7 +73,7 @@ describe('Admin panel', () => {
   });
 
   it('shows the Superadmin toggle to a Superadmin', () => {
-    auth.setUser({ id: 'u1', email: 'root@hexly.test', displayName: 'Root', preferences: {}, isAdmin: false, isSuperadmin: true });
+    auth.setUser({ id: 'u1', email: 'root@hexly.test', displayName: 'Root', preferences: {}, isAdmin: false, isSuperadmin: true, canCreateWorlds: true });
     const { nativeElement: el } = render([bob]);
     expect($(el, '[data-testid="superadmin-u2"]')).not.toBeNull();
   });
@@ -99,6 +100,13 @@ describe('Admin panel', () => {
     });
     // Initial load + reload after create.
     expect(admin.list).toHaveBeenCalledTimes(2);
+  });
+
+  it('toggles the World Creation capability through the client (ADR-0040)', () => {
+    // Bob already holds it, so the toggle revokes.
+    const { nativeElement: el } = render([bob]);
+    ($(el, '[data-testid="world-creation-u2"]') as HTMLButtonElement).click();
+    expect(admin.setCanCreateWorlds).toHaveBeenCalledWith('u2', false);
   });
 
   it('deletes a user through the client', () => {

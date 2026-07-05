@@ -28,7 +28,7 @@ describe('Auth endpoints', () => {
     // Provision a member of the closed user set out-of-band (ADR-0004).
     await app
       .get(AuthService)
-      .seedUser('ada@hexly.test', 'correct horse', 'Ada');
+      .seedUser('ada@hexly.test', 'correct horse', 'Ada', { canCreateWorlds: true });
   });
 
   afterEach(async () => {
@@ -55,6 +55,9 @@ describe('Auth endpoints', () => {
       // A plain seeded member carries neither admin tier (ADR-0037, #163).
       isAdmin: false,
       isSuperadmin: false,
+      // This account was seeded with World Creation granted (ADR-0040); the web
+      // nav gates the "New World" affordance on this flag.
+      canCreateWorlds: true,
     });
   });
 

@@ -40,14 +40,19 @@ export class AuthService {
    * Provision a user out-of-band (ADR-0004 — no public signup): the seed CLI, the
    * `--superadmin` setup path, and the Instance Admin's create-user endpoint all
    * route through here. The password is hashed with argon2; the plaintext is never
-   * stored. `roles` seeds the admin tiers (ADR-0037, #163) — both default off, so a
-   * plain member is the common case.
+   * stored. `roles` seeds the admin tiers (ADR-0037, #163) and the World Creation
+   * capability (ADR-0040) — all default off, so a plain gated member is the common
+   * case; callers that want a bootstrap-ready account opt in explicitly.
    */
   async seedUser(
     email: string,
     password: string,
     displayName: string,
-    roles: { isAdmin?: boolean; isSuperadmin?: boolean } = {},
+    roles: {
+      isAdmin?: boolean;
+      isSuperadmin?: boolean;
+      canCreateWorlds?: boolean;
+    } = {},
   ): Promise<string> {
     const id = randomUUID();
     const passwordHash = await hash(password);
@@ -60,6 +65,10 @@ export class AuthService {
         passwordHash,
         isAdmin: roles.isAdmin ?? false,
         isSuperadmin: roles.isSuperadmin ?? false,
+        // World Creation is off-by-default (ADR-0040), matching the DB column
+        // default — a caller that omits the flag provisions a gated user. The
+        // seed CLI opts in explicitly for its bootstrap account.
+        canCreateWorlds: roles.canCreateWorlds ?? false,
         createdAt: Date.now(),
       })
       .run();
@@ -259,6 +268,7 @@ function toAuthUser(row: typeof users.$inferSelect): AuthUser {
     preferences: parsePreferences(row.preferences),
     isAdmin: row.isAdmin,
     isSuperadmin: row.isSuperadmin,
+    canCreateWorlds: row.canCreateWorlds,
   };
 }
 

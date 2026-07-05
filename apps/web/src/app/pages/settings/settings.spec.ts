@@ -20,6 +20,7 @@ describe('Settings page (ADR-0038)', () => {
       preferences: {},
       isAdmin: false,
       isSuperadmin: false,
+      canCreateWorlds: true,
     });
     TestBed.configureTestingModule({
       imports: [provideTranslocoTesting()],
@@ -85,7 +86,7 @@ describe('Settings page (ADR-0038)', () => {
   it('saves the display name through AuthClient', () => {
     const fixture = render();
     auth.updateProfile.mockReturnValue(
-      of({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada Lovelace', preferences: {}, isAdmin: false, isSuperadmin: false }),
+      of({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada Lovelace', preferences: {}, isAdmin: false, isSuperadmin: false, canCreateWorlds: true }),
     );
 
     const input = el<HTMLInputElement>(fixture, 'display-name');

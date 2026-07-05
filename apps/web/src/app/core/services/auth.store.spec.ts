@@ -46,7 +46,7 @@ describe('AuthClient.sessionLoading', () => {
 
   it('is false once the boot check resolves to a user', async () => {
     TestBed.createComponent(TestHost).detectChanges();
-    http.expectOne('/api/auth/me').flush({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada', preferences: {}, isAdmin: false, isSuperadmin: false });
+    http.expectOne('/api/auth/me').flush({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada', preferences: {}, isAdmin: false, isSuperadmin: false, canCreateWorlds: true });
     await tick();
     expect(client.sessionLoading()).toBe(false);
   });
@@ -64,7 +64,7 @@ describe('AuthClient', () => {
   let client: AuthClient;
   let http: HttpTestingController;
 
-  const ada = { id: 'u1', email: 'ada@hexly.test', displayName: 'Ada', preferences: {}, isAdmin: false, isSuperadmin: false };
+  const ada = { id: 'u1', email: 'ada@hexly.test', displayName: 'Ada', preferences: {}, isAdmin: false, isSuperadmin: false, canCreateWorlds: true };
 
   beforeEach(() => {
     TestBed.configureTestingModule({

@@ -16,6 +16,7 @@ import {
   createUserRequestSchema,
   resetPasswordRequestSchema,
   setAdminRequestSchema,
+  setCanCreateWorldsRequestSchema,
   setDisabledRequestSchema,
   setSuperadminRequestSchema,
 } from '@hexly/domain';
@@ -70,6 +71,19 @@ export class AdminController {
     const parsed = setAdminRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
     this.admin.setAdmin(user, id, parsed.data.isAdmin);
+  }
+
+  // Grant or revoke the World Creation capability (ADR-0040): account management,
+  // Instance-Admin-gated like setAdmin. Orthogonal to Admin — never implied by it.
+  @Patch('users/:id/can-create-worlds')
+  setCanCreateWorlds(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ): void {
+    const parsed = setCanCreateWorldsRequestSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException();
+    this.admin.setCanCreateWorlds(user, id, parsed.data.canCreateWorlds);
   }
 
   // Superadmin-only (ADR-0037, #163): promoting/demoting the operator's own tier is the

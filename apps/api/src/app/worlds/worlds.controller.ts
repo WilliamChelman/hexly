@@ -31,6 +31,7 @@ import {
 import type { Response } from 'express';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { SessionAuthGuard } from '../auth/session-auth.guard';
+import { CanCreateWorldsGuard } from './can-create-worlds.guard';
 import { aclSetResponse, ownerSetResponse } from '../acl/owner-set';
 import { VaultExportService } from './vault-export.service';
 import { VaultImportService } from './vault-import.service';
@@ -69,6 +70,8 @@ export class WorldsController {
    * synchronously, and the {@link ImportSummary} reports what landed and what was lost.
    */
   @Post('import')
+  // Import mints a World, so it needs the World Creation capability too (ADR-0040).
+  @UseGuards(CanCreateWorldsGuard)
   // Compressed-size cap (stops a giant upload buffering in memory before we decompress)
   // is set instance-wide via MulterModule (ADR-0036) and inherited here. The decompressed
   // ceiling (the real zip-bomb guard) lives in the importer, also config-driven.
@@ -81,7 +84,9 @@ export class WorldsController {
     return this.importer.import(user.id, file.originalname, file.buffer);
   }
 
+  // World Creation capability required (ADR-0040); Superadmin bypasses in the guard.
   @Post()
+  @UseGuards(CanCreateWorldsGuard)
   create(@CurrentUser() user: AuthUser, @Body() body: unknown): WorldDetail {
     const parsed = createWorldRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();

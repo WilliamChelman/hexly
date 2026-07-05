@@ -15,7 +15,6 @@ import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app/app.module';
 import { AuthService } from './app/auth/auth.service';
-import { WorldsService } from './app/worlds/worlds.service';
 
 async function seed() {
   const args = process.argv.slice(2);
@@ -31,10 +30,9 @@ async function seed() {
     logger: ['error', 'warn', 'log'],
   });
   try {
-    const userId = await app
+    await app
       .get(AuthService)
-      .seedUser(email, password, displayName, { isSuperadmin });
-    app.get(WorldsService).mintWorldWithHome(userId, displayName);
+      .seedUser(email, password, displayName, { isSuperadmin, canCreateWorlds: true });
     Logger.log(`Seeded ${isSuperadmin ? 'Superadmin' : 'user'} ${email}`);
   } catch (err) {
     Logger.error(`Could not seed ${email}: ${(err as Error).message}`);

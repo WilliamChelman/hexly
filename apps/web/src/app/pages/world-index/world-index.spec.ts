@@ -46,7 +46,7 @@ describe('WorldIndex', () => {
       .mockResolvedValue(true);
 
     // The caller (u1) — used to tell owned Worlds from member Worlds.
-    auth.setUser({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada', preferences: {}, isAdmin: false, isSuperadmin: false });
+    auth.setUser({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada', preferences: {}, isAdmin: false, isSuperadmin: false, canCreateWorlds: true });
   });
 
   /**
@@ -111,6 +111,29 @@ describe('WorldIndex', () => {
 
     expect($(el, '[data-testid=worlds-empty]')).not.toBeNull();
     expect($(el, '[data-testid=create-world]')).not.toBeNull();
+  });
+
+  it('hides the create affordance from a user without World Creation (ADR-0040)', () => {
+    // A user the operator has gated from World Creation — the server would 403 a
+    // create attempt, so the button is hidden to match.
+    auth.setUser({
+      id: 'u1',
+      email: 'ada@hexly.test',
+      displayName: 'Ada',
+      preferences: {},
+      isAdmin: false,
+      isSuperadmin: false,
+      canCreateWorlds: false,
+    });
+
+    // Present in a populated list…
+    const populated = render([world('w1', 'Aldermoor')]).nativeElement as HTMLElement;
+    expect($(populated, '[data-testid=create-world]')).toBeNull();
+
+    // …and in the empty state.
+    const empty = render([]).nativeElement as HTMLElement;
+    expect($(empty, '[data-testid=worlds-empty]')).not.toBeNull();
+    expect($(empty, '[data-testid=create-world]')).toBeNull();
   });
 
   it('creating a World opens its Home Entity', () => {

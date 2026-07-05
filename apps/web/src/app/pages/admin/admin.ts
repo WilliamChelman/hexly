@@ -65,6 +65,7 @@ import { Chip } from '../../ui/chip';
                 <span class="admin-badges">
                   @if (u.isSuperadmin) { <app-chip tone="gold">{{ 'admin.badge.superadmin' | transloco }}</app-chip> }
                   @if (u.isAdmin) { <app-chip tone="sea">{{ 'admin.badge.admin' | transloco }}</app-chip> }
+                  @if (u.canCreateWorlds) { <app-chip tone="astra">{{ 'admin.badge.worldCreator' | transloco }}</app-chip> }
                   @if (u.disabledAt !== null) { <app-chip>{{ 'admin.badge.disabled' | transloco }}</app-chip> }
                 </span>
               </div>
@@ -84,6 +85,11 @@ import { Chip } from '../../ui/chip';
                   <button appButton size="sm" [attr.data-testid]="'admin-' + u.id" (click)="toggleAdmin(u)">
                     {{ (u.isAdmin ? 'admin.actions.revokeAdmin' : 'admin.actions.grantAdmin') | transloco }}
                   </button>
+                  @if (!u.isSuperadmin || isSuperadmin()) {
+                    <button appButton size="sm" [attr.data-testid]="'world-creation-' + u.id" (click)="toggleCanCreateWorlds(u)">
+                      {{ (u.canCreateWorlds ? 'admin.actions.revokeWorldCreation' : 'admin.actions.grantWorldCreation') | transloco }}
+                    </button>
+                  }
                   @if (isSuperadmin()) {
                     <button appButton size="sm" [attr.data-testid]="'superadmin-' + u.id" (click)="toggleSuperadmin(u)">
                       {{ (u.isSuperadmin ? 'admin.actions.revokeSuperadmin' : 'admin.actions.grantSuperadmin') | transloco }}
@@ -174,6 +180,13 @@ export class Admin {
 
   protected toggleAdmin(u: AdminUser): void {
     this.run(this.admin.setAdmin(u.id, !u.isAdmin), 'admin.toast.saved');
+  }
+
+  protected toggleCanCreateWorlds(u: AdminUser): void {
+    this.run(
+      this.admin.setCanCreateWorlds(u.id, !u.canCreateWorlds),
+      'admin.toast.saved',
+    );
   }
 
   protected toggleSuperadmin(u: AdminUser): void {

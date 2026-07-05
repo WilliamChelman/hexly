@@ -524,6 +524,7 @@
     "badge": {
       "superadmin": "Superadmin",
       "admin": "Admin",
+      "worldCreator": "Créateur de mondes",
       "disabled": "Désactivé"
     },
     "actions": {
@@ -531,6 +532,8 @@
       "enable": "Activer",
       "grantAdmin": "Nommer admin",
       "revokeAdmin": "Retirer admin",
+      "grantWorldCreation": "Autoriser la création de mondes",
+      "revokeWorldCreation": "Interdire la création de mondes",
       "grantSuperadmin": "Nommer superadmin",
       "revokeSuperadmin": "Retirer superadmin",
       "reset": "Réinitialiser le mot de passe",

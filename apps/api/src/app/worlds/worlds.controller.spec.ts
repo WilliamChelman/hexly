@@ -29,7 +29,7 @@ describe('Worlds endpoints', () => {
 
     adaId = await app
       .get(AuthService)
-      .seedUser('ada@hexly.test', 'correct horse', 'Ada');
+      .seedUser('ada@hexly.test', 'correct horse', 'Ada', { canCreateWorlds: true });
   });
 
   afterEach(async () => {
@@ -65,6 +65,30 @@ describe('Worlds endpoints', () => {
     expect(home.body.type).toBe('note');
   });
 
+  it('forbids creating a World without the World Creation capability (ADR-0040)', async () => {
+    // A user provisioned without World Creation — the in-app default — is gated.
+    await app
+      .get(AuthService)
+      .seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob', {
+        canCreateWorlds: false,
+      });
+    const bob = await signIn('bob@hexly.test', 'hunter2 stationery');
+
+    await bob.post('/worlds').send({ name: 'Nope' }).expect(403);
+  });
+
+  it('lets a Superadmin create a World even without the capability (repair, ADR-0040)', async () => {
+    await app
+      .get(AuthService)
+      .seedUser('root@hexly.test', 'repair the realm', 'Root', {
+        isSuperadmin: true,
+        canCreateWorlds: false,
+      });
+    const root = await signIn('root@hexly.test', 'repair the realm');
+
+    await root.post('/worlds').send({ name: 'Recovered' }).expect(201);
+  });
+
   it('lists the worlds the caller owns, as summaries', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
@@ -90,7 +114,7 @@ describe('Worlds endpoints', () => {
 
   it('includes worlds the caller is a member of, and excludes the rest', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
-    await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob');
+    await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob', { canCreateWorlds: true });
     const bob = await signIn('bob@hexly.test', 'battery staple');
 
     const shared = await bob.post('/worlds').send({ name: 'Shared' }).expect(201);

@@ -42,7 +42,11 @@ export class AdminService {
       .where(eq(users.email, req.email.trim().toLowerCase()))
       .get();
     if (existing) throw this.conflict(AdminErrorCode.EmailInUse);
-    await this.auth.seedUser(req.email, req.password, req.displayName);
+    // In-app provisioned accounts start gated from World Creation (ADR-0040) — an
+    // Admin grants it deliberately. Only the out-of-band seed CLI leaves it on.
+    await this.auth.seedUser(req.email, req.password, req.displayName, {
+      canCreateWorlds: false,
+    });
   }
 
   /**
@@ -81,6 +85,7 @@ export class AdminService {
         displayName: users.displayName,
         isAdmin: users.isAdmin,
         isSuperadmin: users.isSuperadmin,
+        canCreateWorlds: users.canCreateWorlds,
         disabledAt: users.disabledAt,
       })
       .from(users)
@@ -109,6 +114,18 @@ export class AdminService {
     this.assertCanManage(actor, this.loadTarget(id));
     if (!isAdmin && actor.id === id) throw this.conflict(AdminErrorCode.SelfAdminRevoke);
     this.db.update(users).set({ isAdmin }).where(eq(users.id, id)).run();
+  }
+
+  /**
+   * Grant or revoke the World Creation capability (ADR-0040): account management, so
+   * Instance-Admin-gated like {@link setAdmin}. No self-revoke guard — losing your own
+   * World Creation causes no lockout (unlike demoting yourself out of the admin surface).
+   * An Admin may grant it to themselves, an explicit, visible act — the capability is
+   * orthogonal to Admin, so it is never implied. An unknown id is a 404.
+   */
+  setCanCreateWorlds(actor: AuthUser, id: string, canCreateWorlds: boolean): void {
+    this.assertCanManage(actor, this.loadTarget(id));
+    this.db.update(users).set({ canCreateWorlds }).where(eq(users.id, id)).run();
   }
 
   /**

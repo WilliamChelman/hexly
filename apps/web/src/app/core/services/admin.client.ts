@@ -33,6 +33,13 @@ export class AdminClient {
     return this.http.patch<void>(`/api/admin/users/${id}/admin`, { isAdmin });
   }
 
+  /** Grant or revoke the World Creation capability (ADR-0040). */
+  setCanCreateWorlds(id: string, canCreateWorlds: boolean): Observable<void> {
+    return this.http.patch<void>(`/api/admin/users/${id}/can-create-worlds`, {
+      canCreateWorlds,
+    });
+  }
+
   setSuperadmin(id: string, isSuperadmin: boolean): Observable<void> {
     return this.http.patch<void>(`/api/admin/users/${id}/superadmin`, { isSuperadmin });
   }

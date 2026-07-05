@@ -60,7 +60,7 @@ describe('Vault export endpoint', () => {
     app.use(cookieParser());
     await app.init();
 
-    adaId = await app.get(AuthService).seedUser('ada@hexly.test', 'correct horse', 'Ada');
+    adaId = await app.get(AuthService).seedUser('ada@hexly.test', 'correct horse', 'Ada', { canCreateWorlds: true });
   });
 
   afterEach(async () => {

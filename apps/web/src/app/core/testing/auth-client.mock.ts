@@ -11,6 +11,10 @@ export class MockAuthClient {
     return !!u && (u.isAdmin || u.isSuperadmin);
   });
   readonly isSuperadmin = computed(() => this._user()?.isSuperadmin ?? false);
+  readonly canCreateWorlds = computed(() => {
+    const u = this._user();
+    return !!u && (u.canCreateWorlds || u.isSuperadmin);
+  });
 
   private readonly _loading = signal(false);
   readonly sessionLoading = this._loading.asReadonly();

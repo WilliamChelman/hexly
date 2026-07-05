@@ -55,7 +55,7 @@ describe('Entities endpoints', () => {
    * World's Home note, so it surfaces in the owner's Entity list.
    */
   async function seedUserWithWorld(email: string, password: string, name: string) {
-    const userId = await app.get(AuthService).seedUser(email, password, name);
+    const userId = await app.get(AuthService).seedUser(email, password, name, { canCreateWorlds: true });
     app.get(WorldsService).mintWorldWithHome(userId, name);
     return userId;
   }

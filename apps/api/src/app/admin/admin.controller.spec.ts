@@ -46,7 +46,7 @@ describe('Admin tiers', () => {
 
   /** Seed a plain Instance user (no admin flags). Returns their id. */
   async function seedUser(email: string, name: string) {
-    return app.get(AuthService).seedUser(email, PASSWORD, name);
+    return app.get(AuthService).seedUser(email, PASSWORD, name, { canCreateWorlds: true });
   }
 
   /** Seed an Instance Admin (`is_admin`), the account-management tier. */
@@ -79,6 +79,45 @@ describe('Admin tiers', () => {
       .post('/auth/login')
       .send({ email: 'bob@hexly.test', password: PASSWORD })
       .expect(200);
+  });
+
+  it('provisions users gated from World Creation, until an Admin grants it (ADR-0040)', async () => {
+    await seedAdmin('ada@hexly.test', 'Ada');
+    const ada = await signIn('ada@hexly.test');
+
+    await ada
+      .post('/admin/users')
+      .send({ email: 'bob@hexly.test', password: PASSWORD, displayName: 'Bob' })
+      .expect(201);
+    // In-app provisioned accounts start unable to create (unlike seeded bootstrap users).
+    const listed = (await ada.get('/admin/users').expect(200)).body as {
+      id: string;
+      email: string;
+      canCreateWorlds: boolean;
+    }[];
+    const bobRow = listed.find((u) => u.email === 'bob@hexly.test');
+    expect(bobRow?.canCreateWorlds).toBe(false);
+
+    const bob = await signIn('bob@hexly.test');
+    await bob.post('/worlds').send({ name: 'Nope' }).expect(403);
+
+    // The Admin grants World Creation; Bob can now create.
+    await ada
+      .patch(`/admin/users/${bobRow!.id}/can-create-worlds`)
+      .send({ canCreateWorlds: true })
+      .expect(200);
+    await bob.post('/worlds').send({ name: 'Bobland' }).expect(201);
+  });
+
+  it('refuses the World-Creation grant to a signed-in non-Admin (403)', async () => {
+    const bobId = await seedUser('bob@hexly.test', 'Bob');
+    await seedUser('mallory@hexly.test', 'Mallory');
+    const mallory = await signIn('mallory@hexly.test');
+
+    await mallory
+      .patch(`/admin/users/${bobId}/can-create-worlds`)
+      .send({ canCreateWorlds: true })
+      .expect(403);
   });
 
   it('refuses the admin surface to a signed-in non-Admin (403)', async () => {

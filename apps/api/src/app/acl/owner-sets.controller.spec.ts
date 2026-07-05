@@ -45,7 +45,7 @@ describe('Owner sets', () => {
   });
 
   async function seed(email: string, name: string): Promise<string> {
-    return app.get(AuthService).seedUser(email, 'correct horse', name);
+    return app.get(AuthService).seedUser(email, 'correct horse', name, { canCreateWorlds: true });
   }
 
   async function signIn(email: string) {
