@@ -5,7 +5,7 @@ import {
   emptyEntityBody,
   entityBodySchema,
   entityListQuerySchema,
-  renameEntityRequestSchema,
+  patchEntityRequestSchema,
   saveEntityRequestSchema,
   tiptapContent,
   visibilitySchema,
@@ -211,13 +211,14 @@ describe('visibilitySchema', () => {
   });
 });
 
-describe('renameEntityRequestSchema', () => {
-  it('accepts a new, non-empty name and rejects an empty one', () => {
+describe('patchEntityRequestSchema', () => {
+  it('accepts a name change, a visibility change, or both — and rejects an empty patch', () => {
     // Metadata-only (no body, no base version) — never races with the save's optimistic-concurrency check.
-    expect(renameEntityRequestSchema.parse({ name: 'Aldermoor' }).name).toBe(
-      'Aldermoor',
-    );
-    expect(() => renameEntityRequestSchema.parse({ name: '   ' })).toThrow();
+    expect(patchEntityRequestSchema.parse({ name: 'Aldermoor' }).name).toBe('Aldermoor');
+    expect(patchEntityRequestSchema.parse({ visibility: 'shared' }).visibility).toBe('shared');
+    expect(() => patchEntityRequestSchema.parse({ name: '   ' })).toThrow();
+    // At least one field must change — an empty body is a no-op, not a valid patch.
+    expect(() => patchEntityRequestSchema.parse({})).toThrow();
   });
 });
 

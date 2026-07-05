@@ -135,6 +135,11 @@
     "reload": "Reload",
     "saving": "Saving…",
     "share": "Share",
+    "visibility": {
+      "shared": "Shared",
+      "private": "Private",
+      "toggle": "Toggle visibility"
+    },
     "view": {
       "switchLabel": "Switch view",
       "map": "Map",
@@ -147,6 +152,7 @@
       "unsaved": "Unsaved…",
       "failed": "Save failed",
       "retry": "Retry",
+      "readonly": "Read-only — you don't have permission to edit.",
       "reloadFailed": "Reload failed — couldn't reach the server."
     },
     "moveBlocked": "Move blocked — something's in the way.",

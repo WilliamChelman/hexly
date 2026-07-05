@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 import {
@@ -242,6 +243,18 @@ describe('EntitySession', () => {
       expect(entities.save).toHaveBeenCalledTimes(1);
     });
 
+    it('never autosaves a read-only entity (canWrite:false)', () => {
+      entities.load.mockReturnValue(of({ ...aldermoor, canWrite: false }));
+      session.open('m1').subscribe();
+
+      // An edit would arm the scheduler for a writable entity; here every debounce is a no-op.
+      session.setContent({ type: 'doc', content: [{ type: 'paragraph' }] });
+      settle();
+      settle();
+
+      expect(entities.save).not.toHaveBeenCalled();
+    });
+
     it('flush() persists a pending edit on leave, completing when it lands', () => {
       openAldermoor();
       editor.paintAt({ q: 5, r: 5 }, 'ocean'); // dirty, debounce not yet elapsed
@@ -452,11 +465,47 @@ describe('EntitySession', () => {
   it('renames the open entity', () => {
     openAldermoor();
 
-    entities.rename.mockReturnValue(of({ ...aldermoor, name: 'The Whisperwood' }));
+    entities.patch.mockReturnValue(of({ ...aldermoor, name: 'The Whisperwood' }));
     session.rename('The Whisperwood').subscribe();
 
-    expect(entities.rename).toHaveBeenCalledWith('m1', 'The Whisperwood');
+    expect(entities.patch).toHaveBeenCalledWith('m1', { name: 'The Whisperwood' });
     expect(session.current()?.name).toBe('The Whisperwood');
+  });
+
+  it('flips the open entity’s visibility (ADR-0037, #160)', () => {
+    openAldermoor();
+
+    entities.patch.mockReturnValue(of({ ...aldermoor, visibility: 'shared' }));
+    session.setVisibility('shared').subscribe();
+
+    expect(entities.patch).toHaveBeenCalledWith('m1', { visibility: 'shared' });
+    expect(session.current()?.visibility).toBe('shared');
+  });
+
+  it('treats a canWrite:false entity as read-only and never attempts a save', () => {
+    // A read-only World member opens a shared entity. Even an edit + explicit save
+    // (Cmd/Ctrl+S) must not fire a PUT — the root of the permanent save-failed banner.
+    entities.load.mockReturnValue(of({ ...aldermoor, canWrite: false }));
+    session.open('m1').subscribe();
+    expect(session.writable()).toBe(false);
+
+    session.setContent({ type: 'doc', content: [{ type: 'paragraph' }] });
+    session.save(true).subscribe();
+
+    expect(entities.save).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a 403 save as a terminal read-only state, not the retryable save error', () => {
+    openAldermoor(); // canWrite absent → writable, so the save is actually attempted
+    editor.paintAt({ q: 5, r: 5 }, 'ocean');
+    entities.save.mockReturnValue(
+      throwError(() => new HttpErrorResponse({ status: 403 })),
+    );
+
+    session.save().subscribe();
+
+    // Read-only, not the generic 'save' banner (which offers a Retry the user can't clear).
+    expect(session.error()).toBe('readonly');
   });
 
   it('re-fetches on openRoute even when the same entity is already open', () => {
@@ -610,7 +659,7 @@ describe('EntitySession', () => {
     session.save().subscribe();
     session.rename('Nope').subscribe();
     expect(entities.save).toHaveBeenCalledTimes(1); // only the leave-flush, no late save
-    expect(entities.rename).not.toHaveBeenCalled();
+    expect(entities.patch).not.toHaveBeenCalled();
 
     // The pending load still resolves normally.
     load$.next({ ...aldermoor, id: 'm2', document: bodyOf(forestAt00) });
@@ -680,7 +729,7 @@ describe('EntitySession', () => {
     expect(() => session.reload().subscribe()).not.toThrow();
 
     expect(entities.save).not.toHaveBeenCalled();
-    expect(entities.rename).not.toHaveBeenCalled();
+    expect(entities.patch).not.toHaveBeenCalled();
     expect(entities.load).not.toHaveBeenCalled();
     // `_saving` was never flipped, so the Save button can't stick on "Saving…".
     expect(session.saving()).toBe(false);

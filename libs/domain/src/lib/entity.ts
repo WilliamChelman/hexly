@@ -143,11 +143,6 @@ export const createEntityRequestSchema = z.object({
 
 export type CreateEntityRequest = z.infer<typeof createEntityRequestSchema>;
 
-/** PATCH /entities/:id: metadata-only — no `version`, so a rename is outside the document's concurrency check. */
-export const renameEntityRequestSchema = z.object({ name: nameSchema });
-
-export type RenameEntityRequest = z.infer<typeof renameEntityRequestSchema>;
-
 /** PUT /entities/:id (ADR-0018): stale `version` is rejected with 409 (ADR-0004). */
 export const saveEntityRequestSchema = z.object({
   document: entityBodySchema,
@@ -164,6 +159,23 @@ export const visibilitySchema = z.enum(['private', 'shared']);
 
 /** CONTEXT.md → Entity Visibility. */
 export type Visibility = z.infer<typeof visibilitySchema>;
+
+/**
+ * PATCH /entities/:id: a metadata patch (ADR-0037) — the `name` and/or the Visibility,
+ * no `version` (outside the document's concurrency check). At least one field must be
+ * present. Visibility rides here so an Owner can flip `private`↔`shared` without a
+ * document round-trip — a toggle straight from the Entity Browser (#160).
+ */
+export const patchEntityRequestSchema = z
+  .object({
+    name: nameSchema.optional(),
+    visibility: visibilitySchema.optional(),
+  })
+  .refine((p) => p.name !== undefined || p.visibility !== undefined, {
+    message: 'A patch must change at least one field',
+  });
+
+export type PatchEntityRequest = z.infer<typeof patchEntityRequestSchema>;
 
 /** The list page size default and server-enforced cap (ADR-0025). Over-cap requests are clamped, not rejected. */
 export const ENTITY_LIST_DEFAULT_LIMIT = 50;
@@ -255,6 +267,13 @@ export interface EntityDetail extends EntitySummary {
    * page. Absent/false for every ordinary Entity.
    */
   readonly isHome?: boolean;
+  /**
+   * Whether the caller may WRITE this Entity (ADR-0037): an Owner, or the World Owner of a
+   * `shared` one. Present on the single-entity editor fetch (`GET /entities/:id`) so the
+   * editor can present a read-only opener as read-only; absent on list/summary paths.
+   * Absent → treated as writable (the owner default), so pre-flag payloads round-trip.
+   */
+  readonly canWrite?: boolean;
 }
 
 /**

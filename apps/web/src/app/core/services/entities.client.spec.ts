@@ -158,9 +158,9 @@ describe('EntitiesClient', () => {
     expect(loaded).toEqual(aldermoor);
   });
 
-  it('renames an entity (metadata only)', () => {
+  it('patches an entity’s name (metadata only)', () => {
     let renamed: EntityDetail | undefined;
-    client.rename('e1', 'The Whisperwood').subscribe((e) => (renamed = e));
+    client.patch('e1', { name: 'The Whisperwood' }).subscribe((e) => (renamed = e));
 
     const req = http.expectOne('/api/entities/e1');
     expect(req.request.method).toBe('PATCH');
@@ -170,6 +170,20 @@ describe('EntitiesClient', () => {
     req.flush(result);
 
     expect(renamed).toEqual(result);
+  });
+
+  it('patches an entity’s visibility (metadata only, ADR-0037)', () => {
+    let updated: EntityDetail | undefined;
+    client.patch('e1', { visibility: 'shared' }).subscribe((e) => (updated = e));
+
+    const req = http.expectOne('/api/entities/e1');
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ visibility: 'shared' });
+
+    const result: EntityDetail = { ...aldermoor, visibility: 'shared' };
+    req.flush(result);
+
+    expect(updated).toEqual(result);
   });
 
   it('deletes an entity by id', () => {

@@ -136,3 +136,39 @@ describe('symmetric-owners migration round-trip (0003)', () => {
     sqlite.close();
   });
 });
+
+/**
+ * The Home-visibility backfill (ADR-0037, 0005) flips every pre-existing Home Entity to
+ * 'shared'. New Homes are created locked-shared, but old rows stored 'private' became
+ * unreadable to members. A fresh DB has no old Homes, so this seeds a 'private' Home the
+ * old way, applies 0005, and asserts the flip.
+ */
+describe('Home-visibility backfill migration (0005)', () => {
+  it('flips every pre-existing private Home Entity to shared', () => {
+    const sqlite = new Database(':memory:');
+    sqlite.pragma('foreign_keys = OFF');
+    for (const file of [
+      '0000_amused_nomad.sql',
+      '0001_supreme_sersi.sql',
+      '0002_past_randall_flagg.sql',
+      '0003_symmetric_owner_sets.sql',
+      '0004_elite_sleepwalker.sql',
+    ]) {
+      applyMigration(sqlite, file);
+    }
+    // A Home Entity stored 'private', as pre-ADR-0037 worlds created it.
+    sqlite
+      .prepare(
+        `INSERT INTO entities (id, world_id, is_home, name, type, tags, visibility, version, document, content_text, created_at, updated_at)
+         VALUES ('home1', 'w1', 1, 'Aldermoor', 'note', '[]', 'private', 1, '{"type":"note"}', '', 0, 0)`,
+      )
+      .run();
+
+    applyMigration(sqlite, '0005_open_hearth.sql');
+
+    expect(
+      sqlite.prepare(`SELECT visibility FROM entities WHERE id = 'home1'`).get(),
+    ).toEqual({ visibility: 'shared' });
+    sqlite.close();
+  });
+});

@@ -129,6 +129,30 @@ const TYPE_LABELS: Record<
         </div>
       }
 
+      @if (editable()) {
+        <!-- Visibility toggle (ADR-0037, #160): an Owner flips the Entity between
+             private and shared. Hidden on the Home Entity, which is locked shared
+             (like its read-only title). A non-Owner's flip is refused server-side (403). -->
+        <button
+          type="button"
+          pageHeaderActions
+          appButton
+          variant="ghost"
+          size="sm"
+          data-testid="visibility-toggle"
+          [active]="shared()"
+          [attr.aria-pressed]="shared()"
+          [attr.aria-label]="'editorShell.visibility.toggle' | transloco"
+          (click)="toggleVisibility()"
+        >
+          {{
+            (shared()
+              ? 'editorShell.visibility.shared'
+              : 'editorShell.visibility.private') | transloco
+          }}
+        </button>
+      }
+
       <button
         type="button"
         pageHeaderActions
@@ -189,9 +213,13 @@ export class EntityHeader {
   protected readonly isHome = computed(
     () => this.session.current()?.isHome === true,
   );
-  /** The title is editable when an Entity is open and it isn't the Home Entity's (World-owned) name. */
+  /**
+   * The title is editable when an Entity is open, it isn't the Home Entity's (World-owned)
+   * name, and the caller may write it (ADR-0037) — a read-only member sees it, can't rename
+   * it, and gets no visibility toggle (also `@if (editable())`), like the Home Entity's title.
+   */
   protected readonly editable = computed(
-    () => this.session.current() !== null && !this.isHome(),
+    () => this.session.current() !== null && !this.isHome() && this.session.writable(),
   );
   /** Tooltip key: the in-place rename affordance, or — for the Home Entity — where its name really comes from. */
   protected readonly titleHint = computed(() =>
@@ -207,6 +235,20 @@ export class EntityHeader {
   protected readonly title = computed(
     () => this.session.current()?.name ?? '',
   );
+  /** Whether the open Entity is `shared` (drives the toggle's pressed state and label). */
+  protected readonly shared = computed(
+    () => this.session.current()?.visibility === 'shared',
+  );
+
+  /** Flip the open Entity's Visibility (ADR-0037, #160); a rejected flip leaves state as the server has it. */
+  protected toggleVisibility(): void {
+    // Swallow like commit()'s rename: a rejected flip (e.g. a 403 from a writable-then-revoked
+    // race) is a graceful no-op — the pressed state stays bound to the server's Visibility, so
+    // there's nothing to revert — not an unhandled RxJS error.
+    this.session
+      .setVisibility(this.shared() ? 'private' : 'shared')
+      .subscribe({ error: () => undefined });
+  }
 
   private readonly titleEl =
     viewChild.required<ElementRef<HTMLElement>>('titleEl');

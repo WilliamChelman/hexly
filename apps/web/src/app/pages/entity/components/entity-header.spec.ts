@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { emptyContent, EntityDetail } from '@hexly/domain';
 import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
 import { EntitiesClient } from '../../../core/services/entities.client';
@@ -110,14 +110,14 @@ describe('EntityHeader', () => {
     fixture.detectChanges();
 
     // Edit in place (contenteditable), commit on blur.
-    entities.rename.mockReturnValue(of({ ...aldermoor, name: 'The Whisperwood' }));
+    entities.patch.mockReturnValue(of({ ...aldermoor, name: 'The Whisperwood' }));
     const title = fixture.nativeElement.querySelector(
       '[data-testid=title]',
     ) as HTMLElement;
     title.textContent = 'The Whisperwood';
     title.dispatchEvent(new Event('blur'));
 
-    expect(entities.rename).toHaveBeenCalledWith('m1', 'The Whisperwood');
+    expect(entities.patch).toHaveBeenCalledWith('m1', { name: 'The Whisperwood' });
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('The Whisperwood');
@@ -132,7 +132,81 @@ describe('EntityHeader', () => {
       fixture.nativeElement.querySelector('[data-testid=title]') as HTMLElement
     ).dispatchEvent(new Event('blur'));
 
-    expect(entities.rename).not.toHaveBeenCalled();
+    expect(entities.patch).not.toHaveBeenCalled();
+  });
+
+  it('toggles the open entity’s visibility from the header', () => {
+    open(aldermoor); // private
+    const fixture = TestBed.createComponent(EntityHeader);
+    fixture.detectChanges();
+
+    const toggle = fixture.nativeElement.querySelector(
+      '[data-testid=visibility-toggle]',
+    ) as HTMLButtonElement;
+    expect(toggle).not.toBeNull();
+    // Reflects current visibility: private → not shared.
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+
+    entities.patch.mockReturnValue(of({ ...aldermoor, visibility: 'shared' }));
+    toggle.click();
+    fixture.detectChanges();
+
+    expect(entities.patch).toHaveBeenCalledWith('m1', { visibility: 'shared' });
+    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  // FIX #5: a rejected flip (e.g. a writable-then-revoked 403 race) must be a graceful
+  // no-op — handled like a failed rename — not an unhandled RxJS error on a macrotask.
+  it('handles a rejected visibility flip gracefully, without an unhandled error', () => {
+    vi.useFakeTimers();
+    try {
+      open(aldermoor); // private
+      const fixture = TestBed.createComponent(EntityHeader);
+      fixture.detectChanges();
+
+      entities.patch.mockReturnValue(throwError(() => new Error('403')));
+      const toggle = fixture.nativeElement.querySelector(
+        '[data-testid=visibility-toggle]',
+      ) as HTMLButtonElement;
+      toggle.click();
+      fixture.detectChanges();
+
+      // A bare subscribe would report the rejection as an unhandled error on a timer;
+      // the error handler makes it a no-op, so draining timers throws nothing.
+      expect(() => vi.runOnlyPendingTimers()).not.toThrow();
+      // State stays as the server has it: still private.
+      expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // The Home Entity is locked `shared` (ADR-0037) — no toggle, like its read-only title.
+  it('hides the visibility toggle on the Home Entity', () => {
+    open({ ...noteDetail('Aldermoor'), isHome: true });
+    const fixture = TestBed.createComponent(EntityHeader);
+    fixture.detectChanges();
+
+    expect(
+      fixture.nativeElement.querySelector('[data-testid=visibility-toggle]'),
+    ).toBeNull();
+  });
+
+  // A read-only World member (canWrite:false, ADR-0037) sees the entity but can't edit it:
+  // the title is read-only and the owner-only visibility toggle is hidden, like the Home Entity.
+  it('renders a read-only entity’s title non-editable, with no visibility toggle', () => {
+    open({ ...aldermoor, canWrite: false });
+    const fixture = TestBed.createComponent(EntityHeader);
+    fixture.detectChanges();
+
+    const title = fixture.nativeElement.querySelector(
+      '[data-testid=title]',
+    ) as HTMLElement;
+    expect(title.getAttribute('contenteditable')).toBeNull();
+    expect(title.getAttribute('tabindex')).toBeNull();
+    expect(
+      fixture.nativeElement.querySelector('[data-testid=visibility-toggle]'),
+    ).toBeNull();
   });
 
   it('no longer carries app-level navigation — that lives in the rail (ADR-0022)', () => {
@@ -177,7 +251,7 @@ describe('EntityHeader', () => {
       fixture.nativeElement.querySelector('[data-testid=title]') as HTMLElement
     ).dispatchEvent(new Event('blur'));
 
-    expect(entities.rename).not.toHaveBeenCalled();
+    expect(entities.patch).not.toHaveBeenCalled();
   });
 
   it('renders its chrome and actions in French when French is the active language', () => {

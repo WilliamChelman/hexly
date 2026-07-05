@@ -35,6 +35,7 @@ import {
   HexMap,
   hexMapSchema,
   tiptapContent,
+  Visibility,
 } from '@hexly/domain';
 import { EntitiesClient } from '../../../core/services/entities.client';
 import { ActiveWorld } from '../../../core/services/active-world';
@@ -89,8 +90,15 @@ export class EntitySession {
   private readonly _seed = signal<EntityDetail | null>(null);
   readonly seed = this._seed.asReadonly();
 
-  private readonly _error = signal<'save' | 'reload' | null>(null);
+  private readonly _error = signal<'save' | 'reload' | 'readonly' | null>(null);
   readonly error = this._error.asReadonly();
+
+  /**
+   * Whether the caller may write the open Entity (ADR-0037). Server-sourced from the
+   * load's `canWrite`; an absent flag (older payloads, owner default) reads as writable.
+   * False → a read-only opener: {@link save} no-ops so no autosave ever hits a 403 wall.
+   */
+  readonly writable = computed(() => this._current()?.canWrite !== false);
 
   /** Live Content envelope (ADR-0019); here not in {@link HexMapStore} since Content spans every Entity type. */
   private readonly _content = signal<Content | null>(null);
@@ -299,11 +307,27 @@ export class EntitySession {
 
   /** Rename the open Entity (metadata only — does not affect the body save). */
   rename(name: string): Observable<EntityDetail> {
-    // None open, or one loading under navigation → no-op (not a throw), so a stale
-    // rename can't write to the Entity the user navigated away from (#4).
+    return this.patch({ name });
+  }
+
+  /** Flip the open Entity's Visibility (ADR-0037, #160) — metadata only, like {@link rename}. */
+  setVisibility(visibility: Visibility): Observable<EntityDetail> {
+    return this.patch({ visibility });
+  }
+
+  /**
+   * The shared metadata PATCH behind {@link rename} and {@link setVisibility} — both hit
+   * the same endpoint and share the same bookkeeping, so the guard lives in one place.
+   * None open, or one loading under navigation → no-op (not a throw), so a stale patch
+   * can't write to the Entity the user navigated away from (#4).
+   */
+  private patch(changes: {
+    name?: string;
+    visibility?: Visibility;
+  }): Observable<EntityDetail> {
     const open = this._current();
     if (!open || this._loading()) return EMPTY;
-    return this.entities.rename(open.id, name).pipe(
+    return this.entities.patch(open.id, changes).pipe(
       tap((updated) => {
         this._current.set(updated);
         this._conflict.set(null); // fresh state clears any stale 409 chip
@@ -324,6 +348,9 @@ export class EntitySession {
     // mid-flight edits into one follow-up once this resolves, ADR-0026).
     const open = this._current();
     if (!open || this._loading() || this._saving()) return EMPTY;
+    // Read-only opener → no write is ever attempted (the root of the stuck-banner bug):
+    // gating here covers every path (autosave scheduler, Cmd/Ctrl+S, leave flush).
+    if (!this.writable()) return EMPTY;
     // Snapshot the exact references being sent. A clean save advances the baseline to
     // *these*, not the live signals, so keystrokes that land mid-flight stay dirty and
     // ride the next save instead of being silently marked clean (ADR-0026).
@@ -369,8 +396,14 @@ export class EntitySession {
           this._baseTags.set(tags);
         }
       }),
-      catchError(() => {
-        this._error.set('save');
+      catchError((err: unknown) => {
+        // A 403 means write permission was lost server-side (a shared Entity re-hidden or
+        // a role revoked mid-session): a terminal read-only state, not a retryable blip —
+        // the chip offers no Retry. `failed` still pauses the scheduler so it can't loop
+        // the same rejected PUT every 800ms (it only re-attempts once per fresh edit).
+        this._error.set(
+          err instanceof HttpErrorResponse && err.status === 403 ? 'readonly' : 'save',
+        );
         this.failed = snapshot;
         return EMPTY;
       }),

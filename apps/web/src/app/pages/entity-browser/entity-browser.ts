@@ -566,7 +566,7 @@ export class EntityBrowser {
       this.cancelRename();
       return;
     }
-    this.entitiesClient.rename(id, trimmed).subscribe({
+    this.entitiesClient.patch(id, { name: trimmed }).subscribe({
       // Refresh from page one (ADR-0025) rather than reconcile in place: a rename
       // can move the item under the server's sort, so re-fetching keeps the view honest.
       next: () => {

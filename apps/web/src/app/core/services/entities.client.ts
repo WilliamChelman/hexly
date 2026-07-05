@@ -13,6 +13,7 @@ import {
   EntityPage,
   EntitySaveOutcome,
   EntityType,
+  Visibility,
 } from '@hexly/domain';
 
 export type EntityListParams = Partial<EntityListQuery>;
@@ -47,9 +48,15 @@ export class EntitiesClient {
     });
   }
 
-  /** Metadata only — never conflicts with an in-progress save. */
-  rename(id: string, name: string): Observable<EntityDetail> {
-    return this.http.patch<EntityDetail>(`/api/entities/${id}`, { name });
+  /**
+   * Patch an Entity's metadata — name and/or Visibility (ADR-0037, #160). One PATCH for
+   * both: metadata never conflicts with an in-progress save. Owner-gated server-side.
+   */
+  patch(
+    id: string,
+    changes: { name?: string; visibility?: Visibility },
+  ): Observable<EntityDetail> {
+    return this.http.patch<EntityDetail>(`/api/entities/${id}`, changes);
   }
 
   delete(id: string): Observable<void> {

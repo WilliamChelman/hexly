@@ -294,6 +294,14 @@ export class ContentEditor {
       editor.view.dom.setAttribute('aria-label', this.ariaLabel());
     });
 
+    // A read-only opener (canWrite:false, ADR-0037) can't edit the prose — so autosave
+    // never fires and the session never hits a 403. Reacts to the editor swap and writable.
+    effect(() => {
+      const editor = this.editor();
+      if (!editor) return;
+      editor.setEditable(this.session.writable());
+    });
+
     // Seed on load/swap/conflict-reload, keyed off seed() so a keystroke never
     // recreates the editor. Snapshot comes from the *live* Content, not the seed
     // detail: a clean save advances live Content but not seed, so a mid-session

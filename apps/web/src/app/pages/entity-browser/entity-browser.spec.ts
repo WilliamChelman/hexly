@@ -651,7 +651,7 @@ describe('EntityBrowser', () => {
     input.value = 'Aldermoor Keep';
     input.dispatchEvent(new Event('input'));
 
-    client.rename.mockReturnValueOnce(
+    client.patch.mockReturnValueOnce(
       of({
         ...summary({ id: 'm1', name: 'Aldermoor Keep', version: 4 }),
         document: { type: 'hexmap', content: { format: 'tiptap-v1', snapshot: {} }, hexes: {}, regions: [], labels: [] },
@@ -667,7 +667,7 @@ describe('EntityBrowser', () => {
     );
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
 
-    expect(client.rename).toHaveBeenCalledWith('m1', 'Aldermoor Keep');
+    expect(client.patch).toHaveBeenCalledWith('m1', { name: 'Aldermoor Keep' });
     expect(client.list).toHaveBeenCalledWith({ limit: 50, worldId: 'w1' });
     fixture.detectChanges();
 
@@ -687,7 +687,7 @@ describe('EntityBrowser', () => {
     const input = el.querySelector('[data-testid=rename-input-m1]') as HTMLInputElement;
     input.value = 'Aldermoor Keep';
     input.dispatchEvent(new Event('input'));
-    client.rename.mockReturnValueOnce(throwError(() => new Error('boom')));
+    client.patch.mockReturnValueOnce(throwError(() => new Error('boom')));
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
     fixture.detectChanges();
 
@@ -711,7 +711,7 @@ describe('EntityBrowser', () => {
     fixture.detectChanges();
 
     // No PATCH, and the original name stays put with the editor closed.
-    expect(client.rename).not.toHaveBeenCalled();
+    expect(client.patch).not.toHaveBeenCalled();
     expect(el.querySelector('[data-testid=rename-input-m1]')).toBeNull();
     expect(
       (el.querySelector('[data-testid=entity-title]') as HTMLElement).textContent?.trim(),

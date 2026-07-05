@@ -17,7 +17,13 @@ export class MockEntitiesClient {
   facets = vi.fn<(opts?: EntityFacetParams) => Observable<EntityFacets>>(() =>
     of({ type: [], tag: [], visibility: [] }),
   );
-  rename = vi.fn<(id: string, name: string) => Observable<EntityDetail>>();
+  patch =
+    vi.fn<
+      (
+        id: string,
+        changes: { name?: string; visibility?: EntityDetail['visibility'] },
+      ) => Observable<EntityDetail>
+    >();
   delete = vi.fn<(id: string) => Observable<void>>();
   create = vi.fn<
     (name: string, type: EntityType, worldId?: string) => Observable<EntityDetail>

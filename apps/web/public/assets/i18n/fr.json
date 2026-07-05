@@ -135,6 +135,11 @@
     "reload": "Recharger",
     "saving": "Enregistrement…",
     "share": "Partager",
+    "visibility": {
+      "shared": "Partagé",
+      "private": "Privé",
+      "toggle": "Changer la visibilité"
+    },
     "view": {
       "switchLabel": "Changer de vue",
       "map": "Carte",
@@ -147,6 +152,7 @@
       "unsaved": "Non enregistré…",
       "failed": "Échec de l'enregistrement",
       "retry": "Réessayer",
+      "readonly": "Lecture seule — vous n'avez pas la permission de modifier.",
       "reloadFailed": "Échec du rechargement — serveur injoignable."
     },
     "moveBlocked": "Déplacement bloqué — un obstacle gêne le passage.",

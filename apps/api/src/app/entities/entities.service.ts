@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -26,7 +27,7 @@ import {
   tagsSchema,
   visibilitySchema,
 } from '@hexly/domain';
-import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, getTableColumns, inArray, isNull, sql } from 'drizzle-orm';
 import { OwnerSetResult, removeOwnerOutcome, userExists } from '../acl/owner-set';
 import { DB, Db } from '../db/db';
 import {
@@ -39,13 +40,42 @@ import {
 import { HEXLY_CONFIG, HexlyConfig } from '../config/config.module';
 
 /**
- * Access predicate for this slice (ADR-0037, #158): a row is the caller's iff
- * they are one of its Owners — an `entity_owners` row. An EXISTS keeps it a
- * per-row predicate that composes into every owner-scoped query untouched (later
- * slices widen it to grants and World-shared visibility).
+ * Ownership predicate (ADR-0037): the caller is one of the Entity's Owners — an
+ * `entity_owners` row. An EXISTS keeps it a per-row predicate that composes into a
+ * query's WHERE untouched. The read/write predicates below build on it.
  */
 function ownsEntity(userId: string) {
   return sql`EXISTS (SELECT 1 FROM ${entityOwners} WHERE ${entityOwners.entityId} = ${entities.id} AND ${entityOwners.userId} = ${userId})`;
+}
+
+/** The caller has any membership row in the Entity's World (owner/contributor/viewer). */
+function isWorldMember(userId: string) {
+  return sql`EXISTS (SELECT 1 FROM ${worldMembers} WHERE ${worldMembers.worldId} = ${entities.worldId} AND ${worldMembers.userId} = ${userId})`;
+}
+
+/** The caller is a World Owner (role 'owner') of the Entity's World. */
+function isWorldOwner(userId: string) {
+  return sql`EXISTS (SELECT 1 FROM ${worldMembers} WHERE ${worldMembers.worldId} = ${entities.worldId} AND ${worldMembers.userId} = ${userId} AND ${worldMembers.role} = 'owner')`;
+}
+
+/**
+ * The read predicate (ADR-0037): `owner ∨ (member ∧ shared)`. The choke point every
+ * read path shares — an Entity the caller can't read is indistinguishable from a
+ * missing one (ADR-0004), so `private` things don't even leak their existence.
+ * (The entity-level-grant term joins here in the grants slice.)
+ */
+function canReadEntity(userId: string) {
+  return sql`(${ownsEntity(userId)} OR (${entities.visibility} = 'shared' AND ${isWorldMember(userId)}))`;
+}
+
+/**
+ * The write predicate (ADR-0037): `owner ∨ (world-owner ∧ shared)`. An Owner mutates
+ * their Entity at any visibility; a World Owner curates only the *shared* surface (edit,
+ * delete, re-hide) and this power stops dead at `private`. Rides the atomic UPDATE WHERE
+ * so a World Owner's write actually lands (a plain `ownsEntity` would touch zero rows).
+ */
+function canWriteEntity(userId: string) {
+  return sql`(${ownsEntity(userId)} OR (${entities.visibility} = 'shared' AND ${isWorldOwner(userId)}))`;
 }
 
 const INITIAL_VERSION = 1;
@@ -90,10 +120,10 @@ export interface ListPage {
 export type SaveResult = EntitySaveOutcome | { status: 'not-found' };
 
 /**
- * Entity persistence: one JSON body per `entities` row (ADR-0018, ADR-0002).
- * Access is scoped to the Entity's ownership set (ADR-0037): the service only
- * returns or mutates a row the caller is an Owner of — see {@link ownsEntity} and
- * {@link ownedRow}. Body serialization and `version` bookkeeping live here.
+ * Entity persistence: one JSON body per `entities` row (ADR-0018, ADR-0002). Access
+ * routes through the read/write predicate (ADR-0037): a read needs `canRead` (owner ∨
+ * member-and-shared), a mutation `canWrite` (owner ∨ world-owner-and-shared) — the choke
+ * point is {@link access}. Body serialization and `version` bookkeeping live here.
  */
 @Injectable()
 export class EntitiesService implements OnApplicationBootstrap {
@@ -152,7 +182,7 @@ export class EntitiesService implements OnApplicationBootstrap {
     const rows = query
       .where(
         and(
-          ownsEntity(ownerId),
+          canReadEntity(ownerId),
           ...filters(opts),
           match ? sql`entities_fts MATCH ${match}` : undefined,
         ),
@@ -249,9 +279,11 @@ export class EntitiesService implements OnApplicationBootstrap {
    * An Entity owned by someone else is indistinguishable from one that does not
    * exist, so ownership never leaks (ADR-0004).
    */
-  load(ownerId: string, id: string): EntityDetail | null {
-    const row = this.ownedRow(ownerId, id);
-    return row ? toDetail(row) : null;
+  load(userId: string, id: string): EntityDetail | null {
+    const access = this.access(userId, id);
+    // Surface canWrite so the editor gates itself (ADR-0037): a read-only member opens
+    // a shared Entity read-only rather than autosaving into a wall of 403s.
+    return access?.canRead ? { ...toDetail(access.row), canWrite: access.canWrite } : null;
   }
 
   /**
@@ -259,11 +291,11 @@ export class EntitiesService implements OnApplicationBootstrap {
    * Owner-scoped like the rest of the service — a member never reaches another owner's
    * bodies. Unlike {@link list} this pulls the full `document` column (export serializes it).
    */
-  listByWorld(ownerId: string, worldId: string): EntityDetail[] {
+  listByWorld(userId: string, worldId: string): EntityDetail[] {
     return this.db
       .select()
       .from(entities)
-      .where(and(ownsEntity(ownerId), eq(entities.worldId, worldId)))
+      .where(and(ownsEntity(userId), eq(entities.worldId, worldId)))
       .all()
       .map(toDetail);
   }
@@ -358,13 +390,17 @@ export class EntitiesService implements OnApplicationBootstrap {
   }
 
   /**
-   * Version-checked save (ADR-0018, ADR-0004). Concurrent edit is a conflict,
-   * not silent overwrite. Guard is atomic: base version in WHERE predicate.
+   * Version-checked save (ADR-0018, ADR-0004). Concurrent edit is a conflict, not silent
+   * overwrite — the base version rides the atomic WHERE. Write-gated through {@link access}
+   * (ADR-0037): an Owner or the World Owner of a `shared` Entity may edit its substance; an
+   * unreachable Entity is a 404 (`not-found`), a reachable one the caller can't write a 403.
    */
-  save(ownerId: string, id: string, req: SaveEntityRequest): SaveResult {
+  save(userId: string, id: string, req: SaveEntityRequest): SaveResult {
     // Read first for not-found and to preserve untouched columns in response.
-    const row = this.ownedRow(ownerId, id);
-    if (!row) return { status: 'not-found' };
+    const access = this.access(userId, id);
+    if (!access?.canRead) return { status: 'not-found' };
+    if (!access.canWrite) throw new ForbiddenException();
+    const row = access.row;
 
     // Set only columns a save owns so concurrent renames aren't clobbered.
     // Tags always fully replace (save carries full set, #72).
@@ -384,7 +420,7 @@ export class EntitiesService implements OnApplicationBootstrap {
         .where(
           and(
             eq(entities.id, id),
-            ownsEntity(ownerId),
+            canWriteEntity(userId),
             eq(entities.version, req.version),
           ),
         )
@@ -395,9 +431,9 @@ export class EntitiesService implements OnApplicationBootstrap {
     });
     if (!saved) {
       // Version moved between read and write; re-read to report current state.
-      const current = this.ownedRow(ownerId, id);
-      return current
-        ? { status: 'conflict', current: toDetail(current) }
+      const current = this.access(userId, id);
+      return current?.canRead
+        ? { status: 'conflict', current: toDetail(current.row) }
         : { status: 'not-found' };
     }
     // Return validated body we just wrote directly.
@@ -411,19 +447,37 @@ export class EntitiesService implements OnApplicationBootstrap {
   }
 
   /**
-   * Metadata only: leaves body and version untouched so rename doesn't
-   * invalidate an in-progress edit's base version.
+   * A metadata patch (ADR-0037): the `name` and/or the Visibility, no version bump — it
+   * leaves the body and version untouched so it never invalidates an in-progress edit.
+   * Write-gated through {@link access}: an unreachable Entity is a 404 (null), a reachable
+   * one the caller can't write a 403. The Home Entity is locked `shared` (like its title
+   * and undeletability), so a visibility change away from `shared` on it is refused (409).
    */
-  rename(ownerId: string, id: string, name: string): EntityDetail | null {
-    const row = this.ownedRow(ownerId, id);
-    if (!row) return null;
+  patch(
+    userId: string,
+    id: string,
+    changes: { name?: string; visibility?: Visibility },
+  ): EntityDetail | null {
+    const access = this.access(userId, id);
+    if (!access?.canRead) return null;
+    if (!access.canWrite) throw new ForbiddenException();
+    if (access.row.isHome && changes.visibility && changes.visibility !== 'shared') {
+      // 409, like delete: conflicts with the World invariant that a shared World keeps a landing page.
+      throw new ConflictException('The Home Entity is always shared');
+    }
     const updatedAt = Date.now();
-    this.db
+    const res = this.db
       .update(entities)
-      .set({ name, updatedAt })
-      .where(and(eq(entities.id, id), ownsEntity(ownerId)))
+      // canWrite in the WHERE (not ownsEntity) so a World Owner's write on a shared
+      // Entity actually lands; evaluated pre-SET, so a shared→private re-hide still matches.
+      .set({ ...changes, updatedAt })
+      .where(and(eq(entities.id, id), canWriteEntity(userId)))
       .run();
-    return toDetail({ ...row, name, updatedAt });
+    // 0 rows means the write predicate no longer matched between the access read and this
+    // UPDATE (e.g. the row was concurrently flipped `private`): the write never landed, so
+    // don't fake a 200. Mirror save()'s lost-write arm — an unreachable row is `null` (404).
+    if (res.changes === 0) return null;
+    return toDetail({ ...access.row, ...changes, updatedAt });
   }
 
   /**
@@ -471,29 +525,51 @@ export class EntitiesService implements OnApplicationBootstrap {
       .run();
   }
 
-  // false: unknown id or not an Owner's (caller surfaces as 404).
-  delete(ownerId: string, id: string): boolean {
-    const row = this.db
-      .select({ isHome: entities.isHome })
-      .from(entities)
-      .where(and(eq(entities.id, id), ownsEntity(ownerId)))
-      .get();
-    if (!row) return false;
+  /**
+   * Delete an Entity (ADR-0037): an Owner, or the World Owner of a `shared` one (the
+   * nuclear revoke) — write-gated through {@link access}. false → unreachable (404); a
+   * reachable Entity the caller can't write is a 403. The Home Entity is undeletable (409).
+   */
+  delete(userId: string, id: string): boolean {
+    const access = this.access(userId, id);
+    if (!access?.canRead) return false;
+    if (!access.canWrite) throw new ForbiddenException();
     // 409, not 400: conflicts with World invariant (Home Entity always exists, ADR-0024).
-    if (row.isHome) throw new ConflictException('The Home Entity cannot be deleted');
+    if (access.row.isHome) throw new ConflictException('The Home Entity cannot be deleted');
     // entity_owners cascades with the row.
     this.db.delete(entities).where(eq(entities.id, id)).run();
     return true;
   }
 
   /**
-   * The Entity's ownership set, for an Owner (ADR-0037). A non-Owner can't reach the
-   * Entity at all this slice, so unreachable-and-forbidden both read as 404 (the
-   * controller maps `not-found`); the reachable-but-forbidden 403 arrives with the
-   * visibility slice.
+   * Gate the owner-set endpoints (ADR-0037): grant/owner management belongs to the Entity's
+   * Owners *alone* — not the World Owner, even over a `shared` Entity (grants pierce `private`
+   * and outlive visibility flips, so they stay with the accountable party). Returns the failing
+   * outcome — `not-found` when the Entity is unreachable (404), `forbidden` when it is reachable
+   * but the caller isn't an Owner (403) — or undefined when the caller is an Owner and may proceed.
+   */
+  private gateOwnerManagement(
+    userId: string,
+    id: string,
+  ): Extract<OwnerSetResult, { status: 'not-found' | 'forbidden' }> | undefined {
+    // Only needs read + ownership, so it skips access()'s full row (no document blob).
+    const row = this.db
+      .select({ canRead: canReadEntity(userId), isOwner: ownsEntity(userId) })
+      .from(entities)
+      .where(eq(entities.id, id))
+      .get();
+    if (!row?.canRead) return { status: 'not-found' };
+    if (!row.isOwner) return { status: 'forbidden' };
+    return undefined;
+  }
+
+  /**
+   * The Entity's ownership set, for an Owner (ADR-0037). Unreachable → 404; reachable but
+   * not an Owner → 403 (the controller maps the outcome via {@link gateOwnerManagement}).
    */
   listOwners(userId: string, id: string): OwnerSetResult {
-    if (!this.ownedRow(userId, id)) return { status: 'not-found' };
+    const gate = this.gateOwnerManagement(userId, id);
+    if (gate) return gate;
     return { status: 'ok', value: this.entityOwnersOf(id) };
   }
 
@@ -502,7 +578,8 @@ export class EntitiesService implements OnApplicationBootstrap {
    * Instance user. Idempotent — re-adding an existing Owner is a no-op returning the set.
    */
   addOwner(userId: string, id: string, targetUserId: string): OwnerSetResult {
-    if (!this.ownedRow(userId, id)) return { status: 'not-found' };
+    const gate = this.gateOwnerManagement(userId, id);
+    if (gate) return gate;
     if (!userExists(this.db, targetUserId)) return { status: 'no-such-user' };
     this.db
       .insert(entityOwners)
@@ -518,7 +595,8 @@ export class EntitiesService implements OnApplicationBootstrap {
    * co-Owner may evict any other Owner, including the creator.
    */
   removeOwner(userId: string, id: string, targetUserId: string): OwnerSetResult {
-    if (!this.ownedRow(userId, id)) return { status: 'not-found' };
+    const gate = this.gateOwnerManagement(userId, id);
+    if (gate) return gate;
     const outcome = removeOwnerOutcome(this.entityOwnersOf(id), targetUserId);
     if (outcome.status !== 'ok') return outcome;
     this.db
@@ -562,19 +640,28 @@ export class EntitiesService implements OnApplicationBootstrap {
   }
 
   /**
-   * Shared owner-scoping primitive: access control in one place. The ownership
-   * predicate rides in the WHERE (a single query), so a non-Owner's row reads as
-   * absent — indistinguishable from a missing one (ADR-0004).
+   * The per-Entity access decision (ADR-0037) — the generalized choke point that
+   * replaces the owner-only `ownedRow`. One query pulls the full row plus the caller's
+   * standing computed by the same SQL predicates the read/write paths use: `canRead`
+   * (owner ∨ member-and-shared) gates every read, `canWrite` (owner ∨ world-owner-and-shared)
+   * gates edit/delete/visibility — so the rule lives *only* in those predicates (no JS
+   * re-derivation to drift). `undefined` means no such row — the caller maps that and a
+   * failed `canRead` alike to 404, but a reachable-yet-forbidden write (canRead ∧ ¬canWrite) to 403.
    */
-  private ownedRow(
-    ownerId: string,
-    id: string,
-  ): typeof entities.$inferSelect | undefined {
-    return this.db
-      .select()
+  private access(userId: string, id: string) {
+    const result = this.db
+      .select({
+        ...getTableColumns(entities),
+        canRead: canReadEntity(userId),
+        canWrite: canWriteEntity(userId),
+      })
       .from(entities)
-      .where(and(eq(entities.id, id), ownsEntity(ownerId)))
+      .where(eq(entities.id, id))
       .get();
+    if (!result) return undefined;
+    // Split the computed 0/1 columns off so `.row` is a clean entity row for toDetail.
+    const { canRead, canWrite, ...row } = result;
+    return { row, canRead: !!canRead, canWrite: !!canWrite };
   }
 }
 
@@ -604,7 +691,7 @@ function filters(opts: FilterOptions) {
  */
 function facetWhere(ownerId: string, opts: FacetOptions, match: string | null) {
   return and(
-    ownsEntity(ownerId),
+    canReadEntity(ownerId),
     ...filters(opts),
     match ? sql`entities_fts MATCH ${match}` : undefined,
   );

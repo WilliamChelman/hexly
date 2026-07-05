@@ -156,8 +156,10 @@ export class WorldsService {
         .run(worldId, ownerId);
       sqlite
         .prepare(
+          // The Home is locked `shared` (ADR-0037): a World shared with anyone always
+          // has a landing page. Its visibility is fixed, like its title and undeletability.
           `INSERT INTO entities (id, world_id, is_home, name, type, tags, visibility, version, document, created_at, updated_at)
-           VALUES (?, ?, 1, ?, 'note', '[]', 'private', 1, ?, ?, ?)`,
+           VALUES (?, ?, 1, ?, 'note', '[]', 'shared', 1, ?, ?, ?)`,
         )
         .run(homeEntityId, worldId, name, document, now, now);
       sqlite

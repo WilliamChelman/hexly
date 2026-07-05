@@ -22,7 +22,7 @@ import {
   EntityFacets,
   entityListQuerySchema,
   EntityPage,
-  renameEntityRequestSchema,
+  patchEntityRequestSchema,
   saveEntityRequestSchema,
 } from '@hexly/domain';
 import { ownerSetResponse } from '../acl/owner-set';
@@ -130,16 +130,18 @@ export class EntitiesController {
     }
   }
 
+  // A metadata patch (ADR-0037): the name and/or the Visibility. Reachable-but-forbidden
+  // is a 403 (thrown in the service), an unreachable Entity a 404.
   @Patch(':id')
-  rename(
+  patch(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Body() body: unknown,
   ): EntityDetail {
-    const parsed = renameEntityRequestSchema.safeParse(body);
+    const parsed = patchEntityRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
 
-    const entity = this.entities.rename(user.id, id, parsed.data.name);
+    const entity = this.entities.patch(user.id, id, parsed.data);
     if (!entity) throw new NotFoundException();
     return entity;
   }
