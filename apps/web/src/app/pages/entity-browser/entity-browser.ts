@@ -219,6 +219,8 @@ export class EntityBrowser {
       type: entity.type,
       tags: entity.tags,
       updatedAt: entity.updatedAt,
+      // Opt-in Rights (ADR-0039), always requested here — the card gates rename/delete on them.
+      rights: entity.rights,
     })),
   );
   protected readonly nextCursor = signal<string | null>(null);
@@ -428,7 +430,7 @@ export class EntityBrowser {
       this.loadError.set(false);
     }
     this.fetchSub = this.entitiesClient
-      .list({ limit: PAGE_SIZE, worldId, ...params })
+      .list({ limit: PAGE_SIZE, worldId, rights: true, ...params })
       .pipe(this.shell.withLoading('subtle'))
       .subscribe({
         next: (page) => {
@@ -505,6 +507,7 @@ export class EntityBrowser {
       .list({
         cursor,
         worldId: this.activeWorld.worldId() ?? undefined,
+        rights: true,
         ...this.activeFilterParams(),
       })
       .pipe(finalize(() => this.loadingMore.set(false)))

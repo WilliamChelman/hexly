@@ -253,6 +253,21 @@ describe('Entities endpoints', () => {
     ]);
   });
 
+  it('attaches Rights to list summaries only when the caller opts in (ADR-0039)', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const created = await ada.post('/entities').send({ name: 'Aldermoor', type: 'note' });
+    const worldId = created.body.worldId;
+
+    // Opted in: each summary carries the caller's Rights (Owner → all five verbs).
+    const withRights = await ada.get(`/entities?worldId=${worldId}&rights=1`).expect(200);
+    const mine = withRights.body.items.find((e: { id: string }) => e.id === created.body.id);
+    expect(mine.rights).toEqual(['read', 'edit', 'delete', 'set-visibility', 'manage']);
+
+    // Default: no per-row Rights — the suggestion/palette path stays a pure read-filter.
+    const plain = await ada.get(`/entities?worldId=${worldId}`).expect(200);
+    expect(plain.body.items[0]).not.toHaveProperty('rights');
+  });
+
   it('loads an entity by id with its full body', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const created = await ada
@@ -261,9 +276,12 @@ describe('Entities endpoints', () => {
 
     const res = await ada.get(`/entities/${created.body.id}`).expect(200);
 
-    // The single-entity fetch also carries the caller's write + manage permission (ADR-0037);
-    // the owner may do both, so canWrite/canManage:true — the create response omits both flags.
-    expect(res.body).toEqual({ ...created.body, canWrite: true, canManage: true });
+    // The single-entity fetch carries the caller's Rights (ADR-0039) — the closed verb set
+    // they may exercise on it; an Owner holds all five. The create response omits `rights`.
+    expect(res.body).toEqual({
+      ...created.body,
+      rights: ['read', 'edit', 'delete', 'set-visibility', 'manage'],
+    });
     expect(res.body.document).toEqual(emptyHexmapBody);
   });
 
@@ -1185,8 +1203,40 @@ describe('Entities endpoints', () => {
 
       const res = await bob.get(`/entities/${note.body.id}`).expect(200);
       expect(res.body.name).toBe('The Citadel');
-      // A plain member reads but can't write it — the editor gates on this flag (ADR-0037).
-      expect(res.body.canWrite).toBe(false);
+      // A plain member of a shared Entity holds read-only Rights (ADR-0039) — the editor
+      // gates its writable surface on the absence of `edit`.
+      expect(res.body.rights).toEqual(['read']);
+    });
+
+    it('grants an entity-level Editor read+edit only — not delete, set-visibility, or manage (ADR-0039)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const note = await ada.post('/entities').send({ name: 'Shared Draft', type: 'note' });
+
+      // An outsider (not a World member) handed an Editor grant on this one note (#161).
+      // The grant pierces `private`, so the Entity is left at the create default.
+      const bobId = await seedUser('bob@hexly.test', 'battery staple', 'Bob');
+      db.insert(entityGrants).values({ entityId: note.body.id, userId: bobId, role: 'editor' }).run();
+      const bob = await signIn('bob@hexly.test', 'battery staple');
+
+      const res = await bob.get(`/entities/${note.body.id}`).expect(200);
+      // The Editor edits substance but never the lifecycle/exposure gate — so the webapp
+      // shows no visibility toggle and no delete, closing the old show-then-403.
+      expect(res.body.rights).toEqual(['read', 'edit']);
+    });
+
+    it('gives a World Owner of a shared Entity the curate verbs but not manage (ADR-0039)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const note = await ada.post('/entities').send({ name: 'Town Lore', type: 'note' });
+      setVisibility(note.body.id, 'shared');
+
+      // Bob owns the shared Entity; Ada owns the World it lives in.
+      const bobId = await seedUser('bob@hexly.test', 'battery staple', 'Bob');
+      setOwner(note.body.id, bobId);
+
+      const res = await ada.get(`/entities/${note.body.id}`).expect(200);
+      // World Owner curates the shared surface — edit/delete/visibility — but grant/owner
+      // management stays with the Entity's Owner, so no `manage`.
+      expect(res.body.rights).toEqual(['read', 'edit', 'delete', 'set-visibility']);
     });
 
     it('denies a World member a private entity they do not own — 404, no existence leak', async () => {

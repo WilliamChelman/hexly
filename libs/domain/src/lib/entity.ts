@@ -161,6 +161,19 @@ export const visibilitySchema = z.enum(['private', 'shared']);
 export type Visibility = z.infer<typeof visibilitySchema>;
 
 /**
+ * The closed set of actions a caller may exercise on an Entity (CONTEXT.md → Rights,
+ * ADR-0039). Each verb maps to an ADR-0037 access predicate: `read` (canRead), `edit`
+ * (substance — content/name/tags/metadata), `delete` and `set-visibility` (the lifecycle
+ * gate — Owner or World Owner of a shared Entity), `manage` (owners/grants/Public Link —
+ * Owner only). Reported *with* the Entity so a surface gates its controls on exactly what
+ * the server enforces, never re-deriving standing.
+ */
+export const entityVerbSchema = z.enum(['read', 'edit', 'delete', 'set-visibility', 'manage']);
+
+/** CONTEXT.md → Rights (Entity). */
+export type EntityVerb = z.infer<typeof entityVerbSchema>;
+
+/**
  * PATCH /entities/:id: a metadata patch (ADR-0037) — the `name` and/or the Visibility,
  * no `version` (outside the document's concurrency check). At least one field must be
  * present. Visibility rides here so an Owner can flip `private`↔`shared` without a
@@ -246,6 +259,12 @@ export const entityListQuerySchema = z.object({
   // Scope the list to one World (ADR-0024) — the entity browser's active-World filter.
   worldId: z.string().min(1).optional(),
   cursor: z.string().optional(),
+  // Opt-in per-row Rights (ADR-0039): the Entity Browser sets `rights=1` to gate per-card
+  // actions; suggestion/palette/export paths omit it so `list` stays a pure read-filter.
+  rights: z
+    .string()
+    .optional()
+    .transform((v) => v === '1' || v === 'true'),
   limit: z.coerce
     .number()
     .int()
@@ -287,6 +306,12 @@ export interface EntitySummary {
   readonly version: number;
   readonly createdAt: number;
   readonly updatedAt: number;
+  /**
+   * The caller's Rights on this Entity (ADR-0039), present only when the list request opted
+   * in (`rights=1`) — the Entity Browser gates per-card actions on it. Absent on the default
+   * read-filter path (suggestions, Command Palette, export), which never pays the per-row cost.
+   */
+  readonly rights?: readonly EntityVerb[];
 }
 
 /** What `GET /entities/:id` and saves return. */
@@ -299,20 +324,14 @@ export interface EntityDetail extends EntitySummary {
    */
   readonly isHome?: boolean;
   /**
-   * Whether the caller may WRITE this Entity (ADR-0037): an Owner, or the World Owner of a
-   * `shared` one. Present on the single-entity editor fetch (`GET /entities/:id`) so the
-   * editor can present a read-only opener as read-only; absent on list/summary paths.
-   * Absent → treated as writable (the owner default), so pre-flag payloads round-trip.
+   * The caller's Rights on this Entity (CONTEXT.md → Rights, ADR-0039): the closed verb set
+   * they may exercise, computed on read from the ADR-0037 predicates. Present and non-empty on
+   * the single-entity fetch (`GET /entities/:id`) and anonymous link reads — an Owner gets all
+   * five, an entity-level Editor `read`+`edit`, an anonymous link `read`. Absent on the
+   * create/save/patch responses (the server computes Rights only on read); the client carries
+   * the load-time Rights forward across an in-place mutation. Inherited optional (EntitySummary).
    */
-  readonly canWrite?: boolean;
-  /**
-   * Whether the caller may MANAGE this Entity's sharing (ADR-0037): owners, ownership grants,
-   * and its Public Link — the owner-only surface behind the Share dialog. True only for an
-   * Entity Owner (not a World Owner, not an entity-level Editor), matching the server's
-   * owner-management gate. Present on `GET /entities/:id`; absent → treated as NOT manageable,
-   * so the Share action stays hidden unless the caller is provably an Owner.
-   */
-  readonly canManage?: boolean;
+  readonly rights?: readonly EntityVerb[];
 }
 
 /**

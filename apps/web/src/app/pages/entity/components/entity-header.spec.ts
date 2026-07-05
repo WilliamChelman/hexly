@@ -30,8 +30,8 @@ describe('EntityHeader', () => {
     version: 3,
     createdAt: 1,
     updatedAt: 1,
-    // The default opener is an Owner: writable and can manage sharing (ADR-0037).
-    canManage: true,
+    // The default opener is an Owner — full Rights (ADR-0039): writable and can manage sharing.
+    rights: ['read', 'edit', 'delete', 'set-visibility', 'manage'],
     document: { type: 'hexmap', content: emptyContent(), hexes: {}, regions: [], labels: [] },
   };
 
@@ -86,20 +86,20 @@ describe('EntityHeader', () => {
     expect(fixture.debugElement.query(By.directive(OwnerSet))).toBeNull();
   });
 
-  it('hides the Share action for a read-only opener (canManage:false)', () => {
-    // A Viewer grant / read-only member / Public Link reader (ADR-0037): content shows,
+  it('hides the Share action for a read-only opener (no manage Right)', () => {
+    // A Viewer grant / read-only member / Public Link reader (ADR-0039): content shows,
     // but Share (owner/grant/link management) is owner-only and must be withheld.
-    open({ ...aldermoor, canWrite: false, canManage: false });
+    open({ ...aldermoor, rights: ['read'] });
     const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('[data-testid=manage-owners]')).toBeNull();
   });
 
-  it('hides the Share action for a writer who is not an Owner (canManage:false)', () => {
-    // An entity-level Editor or a World Owner opens writable (canWrite:true) but can't manage
+  it('hides the Share action for a writer who is not an Owner (no manage Right)', () => {
+    // An entity-level Editor or a World Owner opens writable (has `edit`) but can't manage
     // sharing — the dialog is owner-only, so the button must stay hidden or it opens onto 403s.
-    open({ ...aldermoor, canWrite: true, canManage: false });
+    open({ ...aldermoor, rights: ['read', 'edit'] });
     const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 
@@ -214,10 +214,10 @@ describe('EntityHeader', () => {
     ).toBeNull();
   });
 
-  // A read-only World member (canWrite:false, ADR-0037) sees the entity but can't edit it:
+  // A read-only World member (no edit Right, ADR-0039) sees the entity but can't edit it:
   // the title is read-only and the owner-only visibility toggle is hidden, like the Home Entity.
   it('renders a read-only entity’s title non-editable, with no visibility toggle', () => {
-    open({ ...aldermoor, canWrite: false });
+    open({ ...aldermoor, rights: ['read'] });
     const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 

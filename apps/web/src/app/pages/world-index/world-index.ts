@@ -404,13 +404,10 @@ export class WorldIndex {
 
   protected readonly loaded = this.store.loaded;
   protected readonly loadError = this.store.loadError;
-  /** The reachable Worlds, each tagged owned (caller is its Owner) or member. */
-  protected readonly cards = computed(() => {
-    const me = this.auth.currentUser()?.id;
-    return this.store
-      .worlds()
-      .map((w) => ({ ...w, owned: !!me && w.owners.includes(me) }));
-  });
+  /** The reachable Worlds, each tagged owned (caller holds the `manage` Right, ADR-0039) or member. */
+  protected readonly cards = computed(() =>
+    this.store.worlds().map((w) => ({ ...w, owned: !!w.rights?.includes('manage') })),
+  );
   /** The rail order: most-recently-touched World first (continue where you left off). */
   protected readonly sorted = computed(() =>
     [...this.cards()].sort((a, b) => b.updatedAt - a.updatedAt),

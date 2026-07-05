@@ -29,6 +29,17 @@ export const worldRoleSchema = z.enum(['owner', 'contributor', 'viewer']);
 export type WorldRole = z.infer<typeof worldRoleSchema>;
 
 /**
+ * The closed set of actions a caller may exercise on a World (CONTEXT.md → Rights, ADR-0039):
+ * `read` (reachable) and `manage` (World Owner — rename, delete, members, owners, Public Link;
+ * all one `isOwner` gate today). Reported with the World so the World Index and settings gate
+ * on what the server enforces. Per-resource by design — a World has no substance to `edit`.
+ */
+export const worldVerbSchema = z.enum(['read', 'manage']);
+
+/** CONTEXT.md → Rights (World). */
+export type WorldVerb = z.infer<typeof worldVerbSchema>;
+
+/**
  * The roles a World Owner can assign through the membership endpoints (ADR-0037, #159):
  * `contributor` (creates Entities, reads `shared`) and `viewer` (reads `shared` only).
  * `owner` is excluded — it belongs to the ownership-set endpoints, not member management.
@@ -75,6 +86,12 @@ export interface WorldSummary {
   readonly name: string;
   /** The World's ownership set (ADR-0037): one or more equal Owner user ids. */
   readonly owners: readonly string[];
+  /**
+   * The caller's Rights on this World (CONTEXT.md → Rights, ADR-0039): always present and
+   * non-empty — a reachable World carries at least `read`, an Owner also `manage`. The World
+   * Index gates its owner badge and settings entry on this, not on scanning `owners`.
+   */
+  readonly rights: readonly WorldVerb[];
   readonly createdAt: number;
   readonly updatedAt: number;
 }

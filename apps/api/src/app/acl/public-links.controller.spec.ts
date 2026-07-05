@@ -110,9 +110,10 @@ describe('Public links', () => {
 
     const res = await anon().get(`/public/entities/${token}`).expect(200);
     expect(res.body.id).toBe(entityId);
-    // The link is an anonymous Viewer grant: it pierces `private` yet stays read-only.
+    // The link is an anonymous Viewer grant: it pierces `private` yet stays read-only —
+    // read-only Rights, nothing more (ADR-0039).
     expect(res.body.visibility).toBe('private');
-    expect(res.body.canWrite).toBe(false);
+    expect(res.body.rights).toEqual(['read']);
   });
 
   it('revoking an entity link makes its token stop resolving immediately', async () => {
@@ -188,7 +189,7 @@ describe('Public links', () => {
 
     // The shared Entity opens read-only through the token; the private one is a 404.
     const opened = (await anon().get(`/public/worlds/${token}/entities/${sharedId}`).expect(200)).body;
-    expect(opened.canWrite).toBe(false);
+    expect(opened.rights).toEqual(['read']);
     await anon().get(`/public/worlds/${token}/entities/${secretId}`).expect(404);
   });
 

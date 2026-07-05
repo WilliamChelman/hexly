@@ -94,19 +94,19 @@ export class EntitySession {
   readonly error = this._error.asReadonly();
 
   /**
-   * Whether the caller may write the open Entity (ADR-0037). Server-sourced from the
-   * load's `canWrite`; an absent flag (older payloads, owner default) reads as writable.
-   * False → a read-only opener: {@link save} no-ops so no autosave ever hits a 403 wall.
+   * Whether the caller may write the open Entity (ADR-0039): the load-time Rights carry the
+   * `edit` verb (substance — content, name, tags). False → a read-only opener: {@link save}
+   * no-ops so no autosave ever hits a 403 wall.
    */
-  readonly writable = computed(() => this._current()?.canWrite !== false);
+  readonly writable = computed(() => !!this._current()?.rights?.includes('edit'));
 
   /**
-   * Whether the caller may MANAGE this Entity's sharing (ADR-0037): the owner-only surface
-   * behind the Share dialog (owners, grants, Public Link). Server-sourced `canManage`; absent
-   * → false, so Share stays hidden for a writer who isn't an Owner (an entity-level Editor or
-   * a World Owner) — clicking it would only hit owner-gated endpoints and 403.
+   * Whether the caller may MANAGE this Entity's sharing (ADR-0039): the owner-only surface
+   * behind the Share dialog (owners, grants, Public Link) — the `manage` verb. Absent → Share
+   * stays hidden for a writer who isn't an Owner (an entity-level Editor or a World Owner),
+   * whose Rights carry `edit` but not `manage`.
    */
-  readonly manageable = computed(() => this._current()?.canManage === true);
+  readonly manageable = computed(() => !!this._current()?.rights?.includes('manage'));
 
   /** Live Content envelope (ADR-0019); here not in {@link HexMapStore} since Content spans every Entity type. */
   private readonly _content = signal<Content | null>(null);
@@ -292,16 +292,16 @@ export class EntitySession {
   }
 
   /**
-   * Carry the caller's load-time permission flags (canWrite/canManage, ADR-0037) onto an
-   * in-place update response. A save/rename/visibility PATCH returns the Entity *without* these
-   * flags — the server only computes them on the single-entity load — but a content mutation
-   * never changes the caller's standing, so we preserve them from the pre-mutation Entity.
-   * Dropping them would silently flip an Owner read-only (canWrite absent → default true masks
-   * it) and, worse, hide the owner-only Share action (canManage absent → not manageable) the
-   * moment the user renames or autosaves.
+   * Carry the caller's load-time Rights (ADR-0039) onto an in-place update response. A
+   * save/rename returns the Entity *without* `rights` — the server computes Rights only on read —
+   * and never changes the caller's standing, so we preserve them from the pre-mutation Entity.
+   * Dropping them would flip an Owner read-only (no `edit` verb) and hide the owner-only Share
+   * action (no `manage`) the moment they save. A *visibility* PATCH is the exception: it can
+   * revoke the caller's own access (a World Owner loses write when a shared Entity goes private),
+   * so the server ships fresh `rights` on that response and we prefer them over the stale set.
    */
   private withPermissions(updated: EntityDetail, prev: EntityDetail): EntityDetail {
-    return { ...updated, canWrite: prev.canWrite, canManage: prev.canManage };
+    return { ...updated, rights: updated.rights ?? prev.rights };
   }
 
   /** Wrap the editor's latest snapshot in the format envelope (ADR-0019). */

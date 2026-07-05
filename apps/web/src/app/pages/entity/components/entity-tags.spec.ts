@@ -19,6 +19,8 @@ describe('EntityTags', () => {
     version: 1,
     createdAt: 1,
     updatedAt: 1,
+    // Owner by default (ADR-0039): the `edit` Right makes the tag controls editable.
+    rights: ['read', 'edit', 'delete', 'set-visibility', 'manage'],
     document: { type: 'note', content: { format: 'tiptap-v1', snapshot: {} } },
   });
 
@@ -49,9 +51,9 @@ describe('EntityTags', () => {
     return fixture;
   }
 
-  it('hides the add input and remove buttons for a read-only opener (canWrite:false)', () => {
-    // A Viewer grant / Public Link reader (ADR-0037) sees the tags but can't edit them.
-    session.adopt({ ...noteWith(['deity']), canWrite: false });
+  it('hides the add input and remove buttons for a read-only opener (no edit Right)', () => {
+    // A Viewer grant / Public Link reader (ADR-0039) sees the tags but can't edit them.
+    session.adopt({ ...noteWith(['deity']), rights: ['read'] });
     const fixture = TestBed.createComponent(EntityTags);
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;

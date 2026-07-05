@@ -120,6 +120,10 @@ _Avoid_: Share link, invite link
 
 Sharing is per **World** (ADR-0024; cemented in ADR-0037). A World's sharing cascades to all `shared` Entities within it. Entity-level Editor/Viewer grants (ADR-0004) provide finer-grained control on top — including per-user visibility, via a grant on a `private` Entity.
 
+**Rights**:
+The closed set of actions a given caller may perform on a specific Entity or World — e.g. reading it, editing its substance, deleting it, changing its visibility, managing its sharing. Derived from the sharing rules (a caller's standing as Owner, grantee, or member) rather than granted directly, and reported *with* the resource when it is fetched, so a surface knows what to offer without re-deriving standing. The vocabulary is per resource kind: a World is not something one "edits the substance" of. Distinct from a role (Owner, Editor, Contributor…), which is *why* a caller holds a Right; the Rights are the resolved *what*.
+_Avoid_: Permissions, ACL, capabilities, grants (a grant is one input to Rights, not the Rights)
+
 **Entity Visibility**:
 A two-value field on every Entity: `private` (default) or `shared`. A `private` Entity is accessible only to its Owners and any entity-level grants (named Editor/Viewer, or anonymous via its Public Link) — World Owners and Instance Admins have no special access to it; private is absolute within the collaboration model (only a Superadmin, outside the model, can reach it). A `shared` Entity is accessible to all World members (Contributor, World Viewer, World Public Link holders). Per-user visibility is not a separate feature — it is what an entity-level grant on a `private` Entity delivers.
 _Avoid_: Published, public, visible
@@ -257,8 +261,12 @@ The folder an operator points Hexly at (`HEXLY_DIR`), holding its SQLite databas
 _Avoid_: Data directory, data folder, db path, storage dir
 
 **Instance Admin**:
-A user flag granting account management on an Instance — create, disable, and delete users, reset passwords, grant/revoke the Admin flag — plus future instance-settings surfaces. Carries zero content powers: an Admin reads and edits nothing they aren't otherwise an Owner, member, or grantee of. Deleting a user is refused while that user solely owns any World or Entity; disabling (login locked, data and memberships intact) is the immediate lever.
+A user flag granting account management on an Instance — create, disable, and delete users, reset passwords, grant/revoke the Admin flag, and grant/revoke the World Creation capability — plus future instance-settings surfaces. Carries zero content powers: an Admin reads and edits nothing they aren't otherwise an Owner, member, or grantee of, and does not inherently hold World Creation (granting it to oneself is an explicit, visible act). Deleting a user is refused while that user solely owns any World or Entity; disabling (login locked, data and memberships intact) is the immediate lever.
 _Avoid_: Admin (alone, ambiguous with Superadmin), moderator, staff
+
+**World Creation**:
+A per-user Instance capability deciding whether that user may create a World (from the World Index, the Command Palette, or a vault import). One of a closed, code-known set of **orthogonal** instance capabilities — held independently of Instance Admin, so an account manager need not create Worlds and a creator need not manage accounts, and the "zero content powers" boundary holds (ADR-0040). Off by default: a freshly provisioned user cannot create Worlds until an Instance Admin grants it; a Superadmin always may (repair). Revoking is not retroactive — it gates the create action only, never touching Worlds the user already owns or manages.
+_Avoid_: World Creator, Author (persona), role, permission
 
 **Superadmin**:
 The in-app embodiment of the operator: unrestricted access, sitting outside the collaboration model entirely. Exists for repair — orphaned data, accidental deletions — not for daily administration (that is the Instance Admin's job). At least one per Instance, seeded at setup.

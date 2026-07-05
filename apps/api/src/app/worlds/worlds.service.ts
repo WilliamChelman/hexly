@@ -8,6 +8,7 @@ import {
   WorldDetail,
   WorldMember,
   WorldSummary,
+  WorldVerb,
 } from '@hexly/domain';
 import { and, asc, count, eq, inArray, ne, or } from 'drizzle-orm';
 import { AssetsService } from '../assets/assets.service';
@@ -25,6 +26,14 @@ import {
 } from '../acl/public-link-store';
 import { DB, Db } from '../db/db';
 import { entities, entityGrants, users, worldLinks, worldMembers, worlds } from '../db/schema';
+
+/**
+ * The caller's World Rights (ADR-0039): every reachable World carries `read`; a World Owner
+ * (or Superadmin) also `manage` — the one `isOwner` gate behind rename/delete/members/link.
+ */
+function worldRights(canManage: boolean): WorldVerb[] {
+  return canManage ? ['read', 'manage'] : ['read'];
+}
 
 /** The World Public Link table for the shared get/mint/revoke helpers (ADR-0037, #162). */
 const WORLD_LINK: PublicLinkTable = {
@@ -114,7 +123,12 @@ export class WorldsService {
       if (list) list.push(userId);
       else ownersByWorld.set(worldId, [userId]);
     }
-    return rows.map((w) => ({ ...w, owners: ownersByWorld.get(w.id) ?? [] }));
+    return rows.map((w) => {
+      const owners = ownersByWorld.get(w.id) ?? [];
+      // Rights fall out of the owner set already fetched — free, so summaries always carry them
+      // (ADR-0039). Superadmin manages every World (outside the model, #163).
+      return { ...w, owners, rights: worldRights(superadmin || owners.includes(userId)) };
+    });
   }
 
   /**
@@ -123,7 +137,7 @@ export class WorldsService {
    */
   get(userId: string, id: string): WorldDetail | null {
     const world = this.reachableWorld(userId, id);
-    return world ? this.toDetail(world) : null;
+    return world ? this.toDetail(world, userId) : null;
   }
 
   // Create World with fresh Home note, atomically (ADR-0024).
@@ -139,6 +153,8 @@ export class WorldsService {
       name: req.name,
       // Fresh World's ownership set is its creator alone (ADR-0037).
       owners: [ownerId],
+      // Creator is the sole Owner, so full Rights (ADR-0039).
+      rights: worldRights(true),
       homeEntityId,
       // Fresh World holds only Home Entity (#120).
       entityCount: 1,
@@ -216,7 +232,8 @@ export class WorldsService {
         .where(and(eq(entities.worldId, id), eq(entities.isHome, true)))
         .run();
     });
-    return this.toDetail({ ...world, name, updatedAt });
+    // Only an Owner reaches rename (checked above), so full Rights.
+    return this.toDetail({ ...world, name, updatedAt }, userId);
   }
 
   /**
@@ -449,8 +466,8 @@ export class WorldsService {
     return null;
   }
 
-  // Attach World's Home Entity id (is_home row) and ownership set to stored record.
-  private toDetail(world: typeof worlds.$inferSelect): WorldDetail {
+  // Attach World's Home Entity id (is_home row), ownership set, and the caller's Rights.
+  private toDetail(world: typeof worlds.$inferSelect, callerId: string): WorldDetail {
     const home = this.db
       .select({ id: entities.id })
       .from(entities)
@@ -464,10 +481,14 @@ export class WorldsService {
       .from(entities)
       .where(eq(entities.worldId, world.id))
       .all();
+    const owners = this.worldOwners(world.id);
     return {
       id: world.id,
       name: world.name,
-      owners: this.worldOwners(world.id),
+      owners,
+      // Rights fall out of the owner set already fetched (ADR-0039) — free, the same
+      // derivation list() uses, no extra isOwner query. Superadmin manages every World (#163).
+      rights: worldRights(owners.includes(callerId) || this.isSuperadmin(callerId)),
       homeEntityId: home.id,
       entityCount,
       createdAt: world.createdAt,

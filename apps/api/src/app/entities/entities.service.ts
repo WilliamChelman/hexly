@@ -25,6 +25,7 @@ import {
   Visibility,
   descriptorsSchema,
   EntityGrant,
+  EntityVerb,
   GrantRole,
   harvestDescriptors,
   PublicLink,
@@ -153,13 +154,33 @@ function canEditSubstanceEntity(userId: string, superadmin: boolean) {
   return sql`(${hasGrant(userId, ['owner', 'editor'])} OR (${entities.visibility} = 'shared' AND ${isWorldOwner(userId)}))`;
 }
 
+/**
+ * The caller's Entity Rights from a resolved access decision (ADR-0039) — the single place
+ * the verb↔predicate correspondence lives. Each ADR-0037 predicate the `access()` query
+ * already computes projects to its verb(s): `set-visibility` and `delete` share `canWrite`
+ * (the lifecycle gate), two UI affordances over one rule. Order is stable for assertions.
+ */
+function entityRightsOf(a: {
+  canRead: boolean;
+  canEditSubstance: boolean;
+  canWrite: boolean;
+  isOwner: boolean;
+}): EntityVerb[] {
+  const rights: EntityVerb[] = [];
+  if (a.canRead) rights.push('read');
+  if (a.canEditSubstance) rights.push('edit');
+  if (a.canWrite) rights.push('delete', 'set-visibility');
+  if (a.isOwner) rights.push('manage');
+  return rights;
+}
+
 const INITIAL_VERSION = 1;
 
-/** Owner-scoped paging + filtering options for {@link EntitiesService.list} (ADR-0025). */
+/** Reader-scoped paging + filtering options for {@link EntitiesService.list} (ADR-0025, ADR-0037). */
 export interface ListOptions {
   readonly offset: number;
   readonly limit: number;
-  /** Restrict to an explicit id set (owner-scoped); unknown ids drop out silently. */
+  /** Restrict to an explicit id set (reader-scoped); unknown ids drop out silently. */
   readonly ids?: readonly string[];
   /** Case-insensitive substring match on the name. */
   readonly q?: string;
@@ -171,6 +192,8 @@ export interface ListOptions {
   readonly visibility?: readonly Visibility[];
   /** Restrict to one World (ADR-0024). */
   readonly worldId?: string;
+  /** Attach the caller's Rights to each summary (ADR-0039) — opt-in, the Entity Browser sets it. */
+  readonly withRights?: boolean;
 }
 
 /** The filter state a facet-count read narrows against (#155) — the list filters minus paging/ids. */
@@ -227,16 +250,17 @@ export class EntitiesService implements OnApplicationBootstrap {
   }
 
   /**
-   * One owner-scoped page of summaries (ADR-0025), metadata only. Stable sort
+   * One reader-scoped page of summaries (ADR-0025, ADR-0037), metadata only. Stable sort
    * (newest first, tied by id) prevents overlaps/skips. Reads limit + 1 rows
    * to detect further pages without phantom empty page.
    */
-  list(ownerId: string, opts: ListOptions): ListPage {
+  list(readerId: string, opts: ListOptions): ListPage {
     // A text query becomes an FTS5 MATCH (ADR-0035): full-text over name, tags,
     // and Content prose, ranked by bm25. Absent (or all-punctuation) → keep the
     // last-edited order. Skip potentially large document column.
     const match = opts.q ? toFtsMatch(opts.q) : null;
     const w = this.config.search.weights;
+    const superadmin = this.isSuperadmin(readerId);
     const query = this.db
       .select({
         id: entities.id,
@@ -248,6 +272,16 @@ export class EntitiesService implements OnApplicationBootstrap {
         version: entities.version,
         createdAt: entities.createdAt,
         updatedAt: entities.updatedAt,
+        // Opt-in per-row Rights (ADR-0039): project the same predicate columns access()
+        // does so each summary can carry the caller's verbs. Omitted → pure read-filter.
+        ...(opts.withRights
+          ? {
+              canRead: canReadEntity(readerId, superadmin),
+              canEditSubstance: canEditSubstanceEntity(readerId, superadmin),
+              canWrite: canWriteEntity(readerId, superadmin),
+              isOwner: ownsEntity(readerId, superadmin),
+            }
+          : {}),
       })
       .from(entities)
       .$dynamic();
@@ -257,7 +291,7 @@ export class EntitiesService implements OnApplicationBootstrap {
     const rows = query
       .where(
         and(
-          canReadEntity(ownerId, this.isSuperadmin(ownerId)),
+          canReadEntity(readerId, superadmin),
           ...filters(opts),
           match ? sql`entities_fts MATCH ${match}` : undefined,
         ),
@@ -279,7 +313,21 @@ export class EntitiesService implements OnApplicationBootstrap {
       .all();
 
     const hasMore = rows.length > opts.limit;
-    const items = rows.slice(0, opts.limit).map(toSummary);
+    const items = rows.slice(0, opts.limit).map((row) => {
+      const summary = toSummary(row);
+      if (!opts.withRights) return summary;
+      // The predicate columns arrive as SQLite 0/1; entityRightsOf reads them truthily.
+      const r = row as typeof row & Record<'canRead' | 'canEditSubstance' | 'canWrite' | 'isOwner', unknown>;
+      return {
+        ...summary,
+        rights: entityRightsOf({
+          canRead: !!r.canRead,
+          canEditSubstance: !!r.canEditSubstance,
+          canWrite: !!r.canWrite,
+          isOwner: !!r.isOwner,
+        }),
+      };
+    });
     return { items, hasMore };
   }
 
@@ -289,27 +337,27 @@ export class EntitiesService implements OnApplicationBootstrap {
    * Facets) but **not** its own — so drilling into one category still lists the
    * sibling values you could add, each narrowed by everything else. `GROUP BY`
    * naturally omits zero-count values (a value with no rows never appears).
-   * Owner- and World-scoped like {@link list}.
+   * Reader- and World-scoped like {@link list}.
    */
-  facets(ownerId: string, opts: FacetOptions): EntityFacets {
+  facets(readerId: string, opts: FacetOptions): EntityFacets {
     // Resolve the Superadmin bypass once, then thread it through every count.
-    const superadmin = this.isSuperadmin(ownerId);
+    const superadmin = this.isSuperadmin(readerId);
     return {
       // Drop a category's own selection before counting it (drill-down).
-      type: this.countColumn(ownerId, { ...opts, type: undefined }, entities.type, superadmin),
+      type: this.countColumn(readerId, { ...opts, type: undefined }, entities.type, superadmin),
       visibility: this.countColumn(
-        ownerId,
+        readerId,
         { ...opts, visibility: undefined },
         entities.visibility,
         superadmin,
       ),
-      tag: this.countTags(ownerId, { ...opts, tags: undefined }, superadmin),
+      tag: this.countTags(readerId, { ...opts, tags: undefined }, superadmin),
     };
   }
 
   /** Count a denormalized column's values (type/visibility) under `opts`. */
   private countColumn(
-    ownerId: string,
+    readerId: string,
     opts: FacetOptions,
     column: typeof entities.type | typeof entities.visibility,
     superadmin: boolean,
@@ -323,7 +371,7 @@ export class EntitiesService implements OnApplicationBootstrap {
       query.innerJoin(sql`entities_fts`, sql`entities_fts.rowid = entities.rowid`);
     }
     return query
-      .where(facetWhere(ownerId, opts, match, superadmin))
+      .where(facetWhere(readerId, opts, match, superadmin))
       .groupBy(column)
       .all()
       .map((r) => ({ value: r.value as string, count: r.count }));
@@ -334,7 +382,7 @@ export class EntitiesService implements OnApplicationBootstrap {
    * `json_each` unrolls each entity's array into rows before grouping — an entity
    * with two tags counts toward both values (ADR-0035, #155).
    */
-  private countTags(ownerId: string, opts: FacetOptions, superadmin: boolean): FacetCount[] {
+  private countTags(readerId: string, opts: FacetOptions, superadmin: boolean): FacetCount[] {
     const match = opts.q ? toFtsMatch(opts.q) : null;
     const query = this.db
       .select({
@@ -348,7 +396,7 @@ export class EntitiesService implements OnApplicationBootstrap {
       query.innerJoin(sql`entities_fts`, sql`entities_fts.rowid = entities.rowid`);
     }
     return query
-      .where(facetWhere(ownerId, opts, match, superadmin))
+      .where(facetWhere(readerId, opts, match, superadmin))
       .groupBy(sql`tag.value`)
       .all()
       .map((r) => ({ value: r.value, count: r.count }));
@@ -365,9 +413,7 @@ export class EntitiesService implements OnApplicationBootstrap {
     // while an entity-level Editor (canWrite false, canEditSubstance true) opens writable.
     // canManage rides the owner-only gate so the Share dialog (owners/grants/link — all
     // owner-only) is only offered to someone who can actually use it, not every writer.
-    return access?.canRead
-      ? { ...toDetail(access.row), canWrite: access.canEditSubstance, canManage: access.isOwner }
-      : null;
+    return access?.canRead ? { ...toDetail(access.row), rights: entityRightsOf(access) } : null;
   }
 
   /**
@@ -577,7 +623,17 @@ export class EntitiesService implements OnApplicationBootstrap {
     // UPDATE (e.g. the row was concurrently flipped `private`): the write never landed, so
     // don't fake a 200. Mirror save()'s lost-write arm — an unreachable row is `null` (404).
     if (res.changes === 0) return null;
-    return toDetail({ ...access.row, ...changes, updatedAt });
+    // A visibility flip changes the *caller's own* standing (a World Owner loses write, hence
+    // read+edit, when a shared Entity goes private — ADR-0037): the one metadata patch where the
+    // load-time Rights the client carries forward go stale. Recompute post-update and ship them
+    // so the editor reflects the caller's real standing instead of a stale writable state (a
+    // name-only patch leaves standing untouched, so this is a no-op there). Cold path — a
+    // rename/visibility toggle, never the autosave hot path — so the extra access read is fine.
+    const after = this.access(userId, id);
+    return {
+      ...toDetail({ ...access.row, ...changes, updatedAt }),
+      ...(after && { rights: entityRightsOf(after) }),
+    };
   }
 
   /**
@@ -839,7 +895,7 @@ export class EntitiesService implements OnApplicationBootstrap {
       .get();
     if (!link) return null;
     const row = this.db.select().from(entities).where(eq(entities.id, link.entityId)).get();
-    return row ? { ...toDetail(row), canWrite: false } : null;
+    return row ? { ...toDetail(row), rights: ['read'] } : null;
   }
 
   /**
@@ -856,7 +912,7 @@ export class EntitiesService implements OnApplicationBootstrap {
         and(eq(entities.id, id), eq(entities.worldId, worldId), eq(entities.visibility, 'shared')),
       )
       .get();
-    return row ? { ...toDetail(row), canWrite: false } : null;
+    return row ? { ...toDetail(row), rights: ['read'] } : null;
   }
 
   /** Summaries of a World's `shared` Entities (ADR-0037, #162), ordered like {@link list}. */
@@ -993,13 +1049,13 @@ function filters(opts: FilterOptions) {
  * count and the page it annotates always agree on what's in the filtered set.
  */
 function facetWhere(
-  ownerId: string,
+  readerId: string,
   opts: FacetOptions,
   match: string | null,
   superadmin: boolean,
 ) {
   return and(
-    canReadEntity(ownerId, superadmin),
+    canReadEntity(readerId, superadmin),
     ...filters(opts),
     match ? sql`entities_fts MATCH ${match}` : undefined,
   );
@@ -1036,7 +1092,10 @@ function serialize(body: EntityBody): string {
 
 type SummaryRow = Omit<typeof entities.$inferSelect, 'document'>;
 
-function toSummary(row: SummaryRow): EntitySummary {
+/** Exactly the columns {@link toSummary} reads — narrower than {@link SummaryRow}, so the `list` projection (which skips `isHome`/`contentText` for weight) satisfies it. */
+type SummaryColumns = Omit<SummaryRow, 'isHome' | 'contentText'>;
+
+function toSummary(row: SummaryColumns): EntitySummary {
   return {
     id: row.id,
     worldId: row.worldId,

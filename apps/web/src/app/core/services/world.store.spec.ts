@@ -8,7 +8,7 @@ import { MockWorldsClient } from '../testing/worlds-client.mock';
 import { WorldStore } from './world.store';
 
 function world(id: string, name = id): WorldSummary {
-  return { id, name, owners: ['u1'], createdAt: 1, updatedAt: 1 };
+  return { id, name, owners: ['u1'], rights: ['read', 'manage'], createdAt: 1, updatedAt: 1 };
 }
 
 describe('WorldStore', () => {

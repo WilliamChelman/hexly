@@ -90,8 +90,9 @@ describe('Entity grants', () => {
       .send({ userId: bobId, role: 'editor' })
       .expect(200);
 
-    // The editor opens the Entity writable (canWrite surfaced true) and saves substance.
-    expect((await bob.get(`/entities/${entity}`).expect(200)).body.canWrite).toBe(true);
+    // The editor opens the Entity writable — Rights carry `edit` but not the lifecycle
+    // verbs (delete/set-visibility) or `manage` (ADR-0039).
+    expect((await bob.get(`/entities/${entity}`).expect(200)).body.rights).toEqual(['read', 'edit']);
     await resave(bob, entity, 200);
     // Name is substance too — an Editor may rename.
     await bob.patch(`/entities/${entity}`).send({ name: 'Renamed' }).expect(200);
@@ -162,6 +163,33 @@ describe('Entity grants', () => {
     expect((await ada.delete(`/entities/${entity}/grants/${bobId}`).expect(200)).body).toEqual([]);
     expect((await ada.get(`/entities/${entity}/owners`).expect(200)).body).toContain(bobId);
     await resave(bob, entity, 200);
+  });
+
+  it('recomputes a World Owner’s own Rights on the visibility PATCH that revokes their access', async () => {
+    const ada = await signIn('ada@hexly.test');
+    const bob = await signIn('bob@hexly.test');
+    const world = await makeWorld(ada);
+    const entity = await makeEntity(ada, world); // Ada-owned, born private.
+    // Share the Entity, and make Bob a co-Owner of the *World* (not the Entity).
+    await ada.patch(`/entities/${entity}`).send({ visibility: 'shared' }).expect(200);
+    await ada.post(`/worlds/${world}/owners`).send({ userId: bobId }).expect(200);
+
+    // As a World Owner of a shared Entity, Bob writes it — Rights carry edit + the lifecycle
+    // verbs, but not `manage` (he owns the World, not the Entity).
+    expect((await bob.get(`/entities/${entity}`).expect(200)).body.rights).toEqual([
+      'read',
+      'edit',
+      'delete',
+      'set-visibility',
+    ]);
+
+    // Bob flips it private. The write lands, but it revokes his OWN standing (his access ran
+    // through shared-and-world-owner) — the PATCH must ship the recomputed (now empty) Rights,
+    // not let the client keep the stale writable set and autosave into a 403 wall.
+    const patched = await bob.patch(`/entities/${entity}`).send({ visibility: 'private' }).expect(200);
+    expect(patched.body.rights).toEqual([]);
+    // The loss is real: the Entity is now invisible to him.
+    await bob.get(`/entities/${entity}`).expect(404);
   });
 
   it('surfaces a grantee’s World in their Index via derived reachability, without membership', async () => {

@@ -11,7 +11,7 @@ import { CreateEntityDialogState } from './create-entity-dialog.state';
 import { CreateEntityDialog } from './create-entity-dialog';
 
 function world(id: string, name: string): WorldSummary {
-  return { id, name, owners: ['u1'], createdAt: 1, updatedAt: 1 };
+  return { id, name, owners: ['u1'], rights: ['read', 'manage'], createdAt: 1, updatedAt: 1 };
 }
 
 describe('CreateEntityDialog', () => {

@@ -15,6 +15,7 @@ describe('WorldsClient', () => {
     id: 'w1',
     name: 'Aldermoor',
     owners: ['u1'],
+    rights: ['read', 'manage'],
     createdAt: 1,
     updatedAt: 1,
   };

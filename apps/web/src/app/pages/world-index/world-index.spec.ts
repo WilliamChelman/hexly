@@ -12,7 +12,17 @@ import { provideTranslocoTesting } from '../../core/i18n/transloco-testing';
 import { WorldIndex } from './world-index';
 
 function world(id: string, name = id, ownerId = 'u1'): WorldSummary {
-  return { id, name, owners: [ownerId], createdAt: 1, updatedAt: 1 };
+  // Rights drive the owned/member distinction now (ADR-0039): the caller (u1) owning it
+  // carries `manage`; anyone else's World is reachable read-only.
+  const owned = ownerId === 'u1';
+  return {
+    id,
+    name,
+    owners: [ownerId],
+    rights: owned ? ['read', 'manage'] : ['read'],
+    createdAt: 1,
+    updatedAt: 1,
+  };
 }
 
 describe('WorldIndex', () => {

@@ -40,6 +40,8 @@ describe('SaveStatus', () => {
     version: 3,
     createdAt: 1,
     updatedAt: 1,
+    // Owner opener (ADR-0039): the `edit` Right keeps saves flowing.
+    rights: ['read', 'edit', 'delete', 'set-visibility', 'manage'],
     document: bodyOf(forestAt00),
   };
 

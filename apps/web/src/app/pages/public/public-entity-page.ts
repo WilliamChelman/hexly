@@ -16,8 +16,8 @@ import { EntityPage } from '../entity/entity.page';
  * read-only mode rather than a bespoke renderer, so a public reader gets full-fidelity
  * Content and hex maps for free. The entity comes from the token route (not the
  * authenticated load), so this fetches via {@link PublicClient} and hands it to
- * {@link EntitySession.adopt}; the server marks it `canWrite: false`, which drives the whole
- * editor read-only (no autosave, no edit chrome).
+ * {@link EntitySession.adopt}; the server ships it with `rights: ['read']` (no `edit`), which
+ * drives the whole editor read-only (no autosave, no edit chrome).
  *
  * It provides the same route-scoped stores as `/entities/:id` so the reused EntityPage and
  * its content editor resolve one shared session — but marks that session externally driven

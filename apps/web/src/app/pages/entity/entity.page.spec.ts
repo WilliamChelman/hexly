@@ -47,6 +47,8 @@ const hexmapWithContent = (text: string): EntityDetail => ({
   version: 1,
   createdAt: 1,
   updatedAt: 1,
+  // Owner opener (ADR-0039): the `edit` Right keeps the map/editor writable.
+  rights: ['read', 'edit', 'delete', 'set-visibility', 'manage'],
   document: {
     type: 'hexmap',
     content: {

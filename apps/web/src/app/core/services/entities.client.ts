@@ -41,6 +41,9 @@ export class EntitiesClient {
     for (const id of opts.ids ?? []) params = params.append('ids', id);
     if (opts.cursor) params = params.set('cursor', opts.cursor);
     if (opts.limit !== undefined) params = params.set('limit', opts.limit);
+    // Opt-in per-row Rights (ADR-0039): the Entity Browser sets it to gate per-card actions;
+    // other list callers omit it so the server stays a pure read-filter (no per-row EXISTS).
+    if (opts.rights) params = params.set('rights', '1');
     return this.http.get<EntityPage>('/api/entities', { params });
   }
 

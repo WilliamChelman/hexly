@@ -45,8 +45,13 @@ describe('EntitySession', () => {
     version: 3,
     createdAt: 1,
     updatedAt: 1,
+    // The default opener is an Owner — full Rights (ADR-0039), so writable and manageable.
+    rights: ['read', 'edit', 'delete', 'set-visibility', 'manage'],
     document: bodyOf(forestAt00),
   };
+
+  /** The server computes Rights only on read — save/patch responses omit them (ADR-0039). */
+  const stripRights = ({ rights: _rights, ...rest }: EntityDetail): EntityDetail => rest;
 
   beforeEach(() => {
     entities = new MockEntitiesClient();
@@ -121,28 +126,28 @@ describe('EntitySession', () => {
     expect(session.current()?.tags).toEqual(['deity', 'ruined']);
   });
 
-  it('preserves the caller’s load-time permission flags across a save (ADR-0037)', () => {
-    // Load carries canWrite/canManage (an Owner); the server's save response omits them.
-    // A content save mustn't drop the caller's standing — else Share vanishes after autosave.
-    entities.load.mockReturnValue(of({ ...aldermoor, canWrite: true, canManage: true }));
+  it('preserves the caller’s load-time Rights across a save (ADR-0039)', () => {
+    // Load carries the Owner's Rights; the server's save response omits them. A content
+    // save mustn't drop the caller's standing — else Share vanishes after autosave.
+    entities.load.mockReturnValue(of(aldermoor));
     session.open('m1').subscribe();
     editor.paintAt({ q: 5, r: 5 }, 'ocean');
 
-    const saved: EntityDetail = { ...aldermoor, version: 4, document: bodyOf(editor.document()) };
+    const saved = stripRights({ ...aldermoor, version: 4, document: bodyOf(editor.document()) });
     entities.save.mockReturnValue(of({ status: 'saved', entity: saved }));
     session.save().subscribe();
 
-    expect(session.current()?.canManage).toBe(true);
+    expect(session.current()?.rights).toContain('manage');
     expect(session.manageable()).toBe(true);
     expect(session.writable()).toBe(true);
   });
 
-  it('preserves the caller’s permission flags across a rename/visibility patch (ADR-0037)', () => {
-    entities.load.mockReturnValue(of({ ...aldermoor, canWrite: true, canManage: true }));
+  it('preserves the caller’s Rights across a rename/visibility patch (ADR-0039)', () => {
+    entities.load.mockReturnValue(of(aldermoor));
     session.open('m1').subscribe();
 
-    // The PATCH response (like the server's) carries no permission flags.
-    entities.patch.mockReturnValue(of({ ...aldermoor, name: 'Renamed' }));
+    // The PATCH response (like the server's) carries no Rights.
+    entities.patch.mockReturnValue(of(stripRights({ ...aldermoor, name: 'Renamed' })));
     session.rename('Renamed').subscribe();
 
     expect(session.current()?.name).toBe('Renamed');
@@ -285,8 +290,8 @@ describe('EntitySession', () => {
       expect(entities.save).toHaveBeenCalledTimes(1);
     });
 
-    it('never autosaves a read-only entity (canWrite:false)', () => {
-      entities.load.mockReturnValue(of({ ...aldermoor, canWrite: false }));
+    it('never autosaves a read-only entity (no edit Right)', () => {
+      entities.load.mockReturnValue(of({ ...aldermoor, rights: ['read'] }));
       session.open('m1').subscribe();
 
       // An edit would arm the scheduler for a writable entity; here every debounce is a no-op.
@@ -524,10 +529,10 @@ describe('EntitySession', () => {
     expect(session.current()?.visibility).toBe('shared');
   });
 
-  it('treats a canWrite:false entity as read-only and never attempts a save', () => {
+  it('treats an entity with no edit Right as read-only and never attempts a save', () => {
     // A read-only World member opens a shared entity. Even an edit + explicit save
     // (Cmd/Ctrl+S) must not fire a PUT — the root of the permanent save-failed banner.
-    entities.load.mockReturnValue(of({ ...aldermoor, canWrite: false }));
+    entities.load.mockReturnValue(of({ ...aldermoor, rights: ['read'] }));
     session.open('m1').subscribe();
     expect(session.writable()).toBe(false);
 
@@ -538,7 +543,7 @@ describe('EntitySession', () => {
   });
 
   it('surfaces a 403 save as a terminal read-only state, not the retryable save error', () => {
-    openAldermoor(); // canWrite absent → writable, so the save is actually attempted
+    openAldermoor(); // Owner Rights → writable, so the save is actually attempted
     editor.paintAt({ q: 5, r: 5 }, 'ocean');
     entities.save.mockReturnValue(
       throwError(() => new HttpErrorResponse({ status: 403 })),
