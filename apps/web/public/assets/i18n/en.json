@@ -521,6 +521,19 @@
       "heading": "Accounts",
       "empty": "No accounts."
     },
+    "filter": "Filter accounts",
+    "col": {
+      "account": "Account",
+      "admin": "Admin",
+      "worlds": "Worlds",
+      "superadmin": "Super",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "status": {
+      "active": "Active",
+      "disabled": "Disabled"
+    },
     "badge": {
       "superadmin": "Superadmin",
       "admin": "Admin",

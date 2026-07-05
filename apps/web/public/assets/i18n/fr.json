@@ -521,6 +521,19 @@
       "heading": "Comptes",
       "empty": "Aucun compte."
     },
+    "filter": "Filtrer les comptes",
+    "col": {
+      "account": "Compte",
+      "admin": "Admin",
+      "worlds": "Mondes",
+      "superadmin": "Super",
+      "status": "Statut",
+      "actions": "Actions"
+    },
+    "status": {
+      "active": "Actif",
+      "disabled": "Désactivé"
+    },
     "badge": {
       "superadmin": "Superadmin",
       "admin": "Admin",

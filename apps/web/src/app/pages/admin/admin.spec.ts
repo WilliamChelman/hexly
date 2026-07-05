@@ -55,16 +55,30 @@ describe('Admin panel', () => {
 
   const $ = (el: HTMLElement, sel: string) => el.querySelector(sel) as HTMLElement | null;
 
-  it('lists each account with its email and tier badges', () => {
+  it('lists each account with its email, capability state, and status', () => {
     const { nativeElement: el } = render([
       { ...bob, isAdmin: true, disabledAt: 123 },
     ]);
     const row = $(el, '[data-testid="user-u2"]');
     expect(row?.textContent).toContain('Bob');
     expect(row?.textContent).toContain('bob@hexly.test');
-    // Admin + Disabled badges render; Superadmin does not.
-    expect(row?.textContent).toContain('Admin');
+    // The Admin capability toggle reads as pressed; the row shows the Disabled status.
+    expect($(el, '[data-testid="admin-u2"]')?.getAttribute('aria-pressed')).toBe('true');
     expect(row?.textContent).toContain('Disabled');
+  });
+
+  it('filters the roster by name or email', () => {
+    const fixture = render([
+      bob,
+      { ...bob, id: 'u3', displayName: 'Carol', email: 'carol@hexly.test' },
+    ]);
+    const el = fixture.nativeElement as HTMLElement;
+    const search = $(el, '[data-testid="filter"]') as HTMLInputElement;
+    search.value = 'carol';
+    search.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect($(el, '[data-testid="user-u3"]')).not.toBeNull();
+    expect($(el, '[data-testid="user-u2"]')).toBeNull();
   });
 
   it('hides the Superadmin toggle from a plain Instance Admin', () => {

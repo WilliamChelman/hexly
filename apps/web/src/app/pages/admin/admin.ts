@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   inject,
   signal,
 } from '@angular/core';
@@ -16,7 +17,6 @@ import { Field } from '../../ui/field';
 import { Input } from '../../ui/input';
 import { Panel } from '../../ui/panel';
 import { Button } from '../../ui/button';
-import { Chip } from '../../ui/chip';
 
 /**
  * The Instance Admin panel (ADR-0037, #163): account management with zero content powers.
@@ -29,7 +29,7 @@ import { Chip } from '../../ui/chip';
 @Component({
   selector: 'app-admin',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, Eyebrow, Field, Input, Panel, Button, Chip],
+  imports: [TranslocoPipe, Eyebrow, Field, Input, Panel, Button],
   template: `
     <section class="admin">
       <span appEyebrow>{{ 'admin.heading' | transloco }}</span>
@@ -55,78 +55,111 @@ import { Chip } from '../../ui/chip';
       </div>
 
       <h2 class="admin-heading text-xl">{{ 'admin.users.heading' | transloco }}</h2>
-      <div appPanel class="admin-panel">
-        <ul class="admin-list">
-          @for (u of users(); track u.id) {
-            <li class="admin-row" [attr.data-testid]="'user-' + u.id">
-              <div class="admin-identity">
-                <span class="admin-name">{{ u.displayName }}</span>
-                <span class="admin-email">{{ u.email }}</span>
-                <span class="admin-badges">
-                  @if (u.isSuperadmin) { <app-chip tone="gold">{{ 'admin.badge.superadmin' | transloco }}</app-chip> }
-                  @if (u.isAdmin) { <app-chip tone="sea">{{ 'admin.badge.admin' | transloco }}</app-chip> }
-                  @if (u.canCreateWorlds) { <app-chip tone="astra">{{ 'admin.badge.worldCreator' | transloco }}</app-chip> }
-                  @if (u.disabledAt !== null) { <app-chip>{{ 'admin.badge.disabled' | transloco }}</app-chip> }
-                </span>
-              </div>
 
-              @if (resettingId() === u.id) {
-                <form class="admin-reset" (submit)="submitReset($event, u)">
-                  <input appInput type="password" [attr.data-testid]="'reset-input-' + u.id" [value]="resetDraft()" (input)="resetDraft.set($any($event.target).value)" />
-                  <button appButton size="sm" type="submit" [attr.data-testid]="'reset-save-' + u.id" [disabled]="resetDraft().length < minPassword">
-                    {{ 'admin.actions.resetSave' | transloco }}
-                  </button>
-                </form>
-              } @else {
-                <div class="admin-actions">
-                  <button appButton size="sm" [attr.data-testid]="'disable-' + u.id" (click)="toggleDisabled(u)">
-                    {{ (u.disabledAt !== null ? 'admin.actions.enable' : 'admin.actions.disable') | transloco }}
-                  </button>
-                  <button appButton size="sm" [attr.data-testid]="'admin-' + u.id" (click)="toggleAdmin(u)">
-                    {{ (u.isAdmin ? 'admin.actions.revokeAdmin' : 'admin.actions.grantAdmin') | transloco }}
-                  </button>
+      <label appField [label]="'admin.filter' | transloco" class="max-w-xs">
+        <input appInput type="search" data-testid="filter" [value]="query()" (input)="query.set($any($event.target).value)" />
+      </label>
+
+      <section appPanel class="admin-table-panel">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th class="text-left">{{ 'admin.col.account' | transloco }}</th>
+              <th class="text-center">{{ 'admin.col.admin' | transloco }}</th>
+              <th class="text-center">{{ 'admin.col.worlds' | transloco }}</th>
+              @if (isSuperadmin()) { <th class="text-center">{{ 'admin.col.superadmin' | transloco }}</th> }
+              <th class="text-center">{{ 'admin.col.status' | transloco }}</th>
+              <th class="text-right">{{ 'admin.col.actions' | transloco }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (u of filtered(); track u.id) {
+              <tr [attr.data-testid]="'user-' + u.id" [class.is-disabled]="u.disabledAt !== null">
+                <td>
+                  <div class="admin-name">{{ u.displayName }}</div>
+                  <div class="admin-email">{{ u.email }}</div>
+                </td>
+                <td class="text-center">
+                  <button appButton icon size="sm" [attr.data-testid]="'admin-' + u.id"
+                    [active]="u.isAdmin" [attr.aria-pressed]="u.isAdmin"
+                    [title]="(u.isAdmin ? 'admin.actions.revokeAdmin' : 'admin.actions.grantAdmin') | transloco"
+                    (click)="toggleAdmin(u)">{{ u.isAdmin ? '✓' : '–' }}</button>
+                </td>
+                <td class="text-center">
                   @if (!u.isSuperadmin || isSuperadmin()) {
-                    <button appButton size="sm" [attr.data-testid]="'world-creation-' + u.id" (click)="toggleCanCreateWorlds(u)">
-                      {{ (u.canCreateWorlds ? 'admin.actions.revokeWorldCreation' : 'admin.actions.grantWorldCreation') | transloco }}
-                    </button>
+                    <button appButton icon size="sm" [attr.data-testid]="'world-creation-' + u.id"
+                      [active]="u.canCreateWorlds" [attr.aria-pressed]="u.canCreateWorlds"
+                      [title]="(u.canCreateWorlds ? 'admin.actions.revokeWorldCreation' : 'admin.actions.grantWorldCreation') | transloco"
+                      (click)="toggleCanCreateWorlds(u)">{{ u.canCreateWorlds ? '✓' : '–' }}</button>
+                  } @else {
+                    <span class="admin-na">—</span>
                   }
-                  @if (isSuperadmin()) {
-                    <button appButton size="sm" [attr.data-testid]="'superadmin-' + u.id" (click)="toggleSuperadmin(u)">
-                      {{ (u.isSuperadmin ? 'admin.actions.revokeSuperadmin' : 'admin.actions.grantSuperadmin') | transloco }}
-                    </button>
+                </td>
+                @if (isSuperadmin()) {
+                  <td class="text-center">
+                    <button appButton icon size="sm" [attr.data-testid]="'superadmin-' + u.id"
+                      [active]="u.isSuperadmin" [attr.aria-pressed]="u.isSuperadmin"
+                      [title]="(u.isSuperadmin ? 'admin.actions.revokeSuperadmin' : 'admin.actions.grantSuperadmin') | transloco"
+                      (click)="toggleSuperadmin(u)">{{ u.isSuperadmin ? '✓' : '–' }}</button>
+                  </td>
+                }
+                <td class="admin-status text-center">
+                  {{ (u.disabledAt !== null ? 'admin.status.disabled' : 'admin.status.active') | transloco }}
+                </td>
+                <td>
+                  @if (resettingId() === u.id) {
+                    <form class="admin-reset" (submit)="submitReset($event, u)">
+                      <input appInput type="password" [attr.data-testid]="'reset-input-' + u.id" [value]="resetDraft()" (input)="resetDraft.set($any($event.target).value)" />
+                      <button appButton size="sm" type="submit" [attr.data-testid]="'reset-save-' + u.id" [disabled]="resetDraft().length < minPassword">
+                        {{ 'admin.actions.resetSave' | transloco }}
+                      </button>
+                    </form>
+                  } @else {
+                    <div class="admin-actions">
+                      <button appButton variant="ghost" size="sm" [attr.data-testid]="'disable-' + u.id" (click)="toggleDisabled(u)">
+                        {{ (u.disabledAt !== null ? 'admin.actions.enable' : 'admin.actions.disable') | transloco }}
+                      </button>
+                      <button appButton variant="ghost" size="sm" [attr.data-testid]="'reset-' + u.id" (click)="startReset(u)">
+                        {{ 'admin.actions.reset' | transloco }}
+                      </button>
+                      <button appButton size="sm" danger [attr.data-testid]="'delete-' + u.id" (click)="remove(u)">
+                        {{ 'admin.actions.delete' | transloco }}
+                      </button>
+                    </div>
                   }
-                  <button appButton size="sm" [attr.data-testid]="'reset-' + u.id" (click)="startReset(u)">
-                    {{ 'admin.actions.reset' | transloco }}
-                  </button>
-                  <button appButton size="sm" danger [attr.data-testid]="'delete-' + u.id" (click)="remove(u)">
-                    {{ 'admin.actions.delete' | transloco }}
-                  </button>
-                </div>
-              }
-            </li>
-          } @empty {
-            <li class="admin-empty">{{ 'admin.users.empty' | transloco }}</li>
-          }
-        </ul>
-      </div>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td class="admin-empty" [attr.colspan]="isSuperadmin() ? 6 : 5">{{ 'admin.users.empty' | transloco }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </section>
     </section>
   `,
   styles: `
     @reference '#app-styles.css';
-    .admin { @apply mx-auto flex w-full max-w-3xl flex-col gap-3 p-6; }
+    .admin { @apply mx-auto flex w-full max-w-5xl flex-col gap-3 p-6; }
     .admin-heading { @apply font-display text-2xl text-ink-strong; }
     .admin-subhead { @apply text-sm text-ink-muted; }
-    .admin-panel { @apply flex flex-col gap-3; }
+    .admin-panel { @apply flex flex-col gap-3 p-4; }
     .admin-create { @apply flex flex-wrap items-end gap-3; }
-    .admin-list { @apply flex flex-col divide-y divide-line; }
-    .admin-row { @apply flex flex-wrap items-center justify-between gap-3 py-3; }
-    .admin-identity { @apply flex flex-col gap-1; }
-    .admin-name { @apply text-sm font-semibold text-ink-strong; }
+    .admin-create > label { @apply flex-1 basis-40; }
+    .admin-table-panel { @apply overflow-x-auto p-0; }
+    .admin-table { @apply w-full border-collapse text-sm; }
+    .admin-table th { @apply px-3 py-2 text-2xs font-semibold uppercase tracking-widest text-ink-muted border-b border-line; }
+    .admin-table td { @apply px-3 py-2 align-middle border-b border-line/60; }
+    .admin-table tbody tr:last-child td { @apply border-b-0; }
+    .admin-table tr.is-disabled { @apply opacity-60; }
+    .admin-name { @apply font-semibold text-ink-strong; }
     .admin-email { @apply text-xs text-ink-muted; }
-    .admin-badges { @apply flex flex-wrap gap-1; }
-    .admin-actions { @apply flex flex-wrap gap-2; }
+    .admin-status { @apply text-xs text-ink-muted; }
+    .admin-na { @apply text-ink-faint; }
+    .admin-actions { @apply flex flex-wrap justify-end gap-2; }
     .admin-reset { @apply flex items-center gap-2; }
-    .admin-empty { @apply py-3 text-sm text-ink-muted; }
+    .admin-empty { @apply py-4 text-center text-sm text-ink-muted; }
   `,
 })
 export class Admin {
@@ -138,6 +171,18 @@ export class Admin {
   protected readonly minPassword = MIN_PASSWORD_LENGTH;
 
   protected readonly users = signal<readonly AdminUser[]>([]);
+
+  /** Case-insensitive filter over display name + email (#163). */
+  protected readonly query = signal('');
+  protected readonly filtered = computed(() => {
+    const q = this.query().trim().toLowerCase();
+    if (!q) return this.users();
+    return this.users().filter(
+      (u) =>
+        u.displayName.toLowerCase().includes(q) ||
+        u.email.toLowerCase().includes(q),
+    );
+  });
 
   protected readonly newName = signal('');
   protected readonly newEmail = signal('');
