@@ -76,7 +76,7 @@ describe('NavRail', () => {
     return fixture.nativeElement.querySelector(`[data-testid="${testid}"]`);
   }
 
-  it('shows the brand and the primary destinations to a signed-in user', () => {
+  it('inside a World shows the World destinations, not the instance ones (ADR-0041)', () => {
     signIn();
     // The Library link follows the active World (ADR-0028), pinned by the resolver.
     TestBed.inject(ActiveWorld).set('w1');
@@ -89,9 +89,51 @@ describe('NavRail', () => {
     expect(library?.getAttribute('href')).toBe('/w/w1/entities');
     expect(library?.textContent).toContain('Library');
 
+    // Styleguide and Admin are instance-scoped: hidden while inside a World.
+    expect(q(fixture, 'nav-styleguide')).toBeNull();
+    expect(q(fixture, 'nav-admin')).toBeNull();
+  });
+
+  it('outside a World shows the instance destinations, not the World ones (ADR-0041)', () => {
+    signIn();
+    // No active World: sitting on the World Index (`/`).
+    const fixture = render();
+
     const styleguide = q(fixture, 'nav-styleguide') as HTMLAnchorElement;
     expect(styleguide?.getAttribute('href')).toBe('/styleguide');
     expect(styleguide?.textContent).toContain('Styleguide');
+
+    // Library and the World Switcher are World-scoped: absent on the Index.
+    expect(q(fixture, 'nav-entities')).toBeNull();
+    expect(q(fixture, 'nav-world-settings')).toBeNull();
+    expect(fixture.nativeElement.querySelector('app-world-switcher')).toBeNull();
+  });
+
+  it('shows World Settings only to a caller who may manage the World (ADR-0041)', () => {
+    signIn();
+    const worlds = TestBed.inject(WorldsClient) as unknown as MockWorldsClient;
+    worlds.list.mockReturnValue(
+      of([{ id: 'w1', name: 'Aldermoor', owners: ['u1'], rights: ['manage'], createdAt: 1, updatedAt: 1 }]),
+    );
+    TestBed.inject(ActiveWorld).set('w1');
+    const fixture = render();
+
+    const settings = q(fixture, 'nav-world-settings') as HTMLAnchorElement;
+    expect(settings?.getAttribute('href')).toBe('/w/w1');
+  });
+
+  it('hides World Settings from a caller who lacks the manage right (ADR-0041)', () => {
+    signIn();
+    const worlds = TestBed.inject(WorldsClient) as unknown as MockWorldsClient;
+    worlds.list.mockReturnValue(
+      of([{ id: 'w1', name: 'Aldermoor', owners: ['u2'], rights: ['read'], createdAt: 1, updatedAt: 1 }]),
+    );
+    TestBed.inject(ActiveWorld).set('w1');
+    const fixture = render();
+
+    expect(q(fixture, 'nav-world-settings')).toBeNull();
+    // Library still shows — reading the World is enough.
+    expect(q(fixture, 'nav-entities')).not.toBeNull();
   });
 
   it('starts collapsed and expands when the toggle is pressed', () => {
@@ -125,9 +167,8 @@ describe('NavRail', () => {
     expect(q(fixture, 'nav-entities')?.getAttribute('aria-current')).toBe(
       'page',
     );
-    expect(
-      q(fixture, 'nav-styleguide')?.getAttribute('aria-current'),
-    ).toBeNull();
+    // Styleguide is instance-scoped and absent inside a World (ADR-0041).
+    expect(q(fixture, 'nav-styleguide')).toBeNull();
   });
 
   it('houses account and appearance behind the avatar', () => {

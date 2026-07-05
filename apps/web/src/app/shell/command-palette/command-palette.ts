@@ -26,6 +26,7 @@ import { CommandRegistry, CommandSection } from './command-registry';
 import { EntityQuickOpen } from './providers/entity-quick-open';
 import { WorldQuickOpen } from './providers/world-quick-open';
 import { CreateCommands } from './providers/create-commands';
+import { NavCommands } from './providers/nav-commands';
 
 /**
  * The built-in Command Providers, supplied at bootstrap (ADR-0032) and registered
@@ -42,6 +43,7 @@ export function provideBuiltInCommands(): Provider[] {
     { provide: COMMAND_PROVIDERS, useExisting: EntityQuickOpen, multi: true },
     { provide: COMMAND_PROVIDERS, useExisting: WorldQuickOpen, multi: true },
     { provide: COMMAND_PROVIDERS, useExisting: CreateCommands, multi: true },
+    { provide: COMMAND_PROVIDERS, useExisting: NavCommands, multi: true },
   ];
 }
 

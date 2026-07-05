@@ -130,7 +130,11 @@ const STATIC_ENTRIES: readonly NavEntry[] = [
            the active World stays legible at both widths and no longer twins the
            foot avatar — a square gilt tile against the round personal avatar. -->
       @if (isAuthenticated()) {
-        <app-world-switcher [expanded]="expanded" />
+        <!-- The Switcher is a World-scoped control, so it shows only inside a
+             World (ADR-0041); on the Index the Index itself is the chooser. -->
+        @if (activeWorldId()) {
+          <app-world-switcher [expanded]="expanded" />
+        }
 
         <nav
           class="flex flex-col gap-1 mt-1"
@@ -195,18 +199,28 @@ export class NavRail {
 
   protected readonly isAuthenticated = this.auth.isAuthenticated;
   protected readonly loading = inject(AppShellStore).loading;
-  // The Library link follows the World in the URL (ADR-0028); on the Index (no
-  // World) it points back at the Index itself.
+  protected readonly activeWorldId = this.activeWorld.worldId;
+  // The rail's destinations are contextual (ADR-0041): World-scoped ones inside a
+  // World, instance-scoped ones on the Index — the active World is the pivot.
   protected readonly entries = computed<readonly NavEntry[]>(() => {
     const worldId = this.activeWorld.worldId();
+    if (worldId) {
+      // World Settings shows only to a caller who may manage the World — the same
+      // `manage` right the World Index gates its own settings entry on (ADR-0039).
+      const canManage = !!this.worlds
+        .worlds()
+        .find((w) => w.id === worldId)
+        ?.rights?.includes('manage');
+      return [
+        { link: `/w/${worldId}/entities`, testid: 'nav-entities', icon: 'library', labelKey: 'nav.library' },
+        // Bare `/w/:id` prefixes the Library link, so match it exactly or it stays
+        // active on the entity pages too.
+        ...(canManage
+          ? [{ link: `/w/${worldId}`, testid: 'nav-world-settings', icon: 'settings' as const, labelKey: 'nav.worldSettings', exact: true }]
+          : []),
+      ];
+    }
     return [
-      {
-        link: worldId ? `/w/${worldId}/entities` : '/',
-        testid: 'nav-entities',
-        icon: 'library',
-        labelKey: 'nav.library',
-        exact: !worldId,
-      },
       ...STATIC_ENTRIES,
       // The Instance Admin panel link (ADR-0037, #163) shows only for an Admin or
       // Superadmin — the same gate the route enforces server-side.
