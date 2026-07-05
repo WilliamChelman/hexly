@@ -177,6 +177,25 @@ export const worldLinks = sqliteTable(
 );
 
 /**
+ * A per-entity Public Link (ADR-0037): an unguessable token granting anonymous read-only
+ * access to one Entity without an account. `id` is the token. The link is an anonymous
+ * Viewer grant, so it pierces `private` exactly like a named grant — the token *is* the
+ * grant, no visibility check on the read. One active link per Entity (rotate = revoke +
+ * re-mint) is enforced in the service, mirroring `world_links`. Deleting the Entity cascades.
+ */
+export const entityLinks = sqliteTable(
+  'entity_links',
+  {
+    id: text('id').primaryKey(),
+    entityId: text('entity_id')
+      .notNull()
+      .references(() => entities.id, { onDelete: 'cascade' }),
+    createdAt: integer('created_at').notNull(),
+  },
+  (table) => [index('idx_entity_links_entity_id').on(table.entityId)]
+);
+
+/**
  * Per-World content-addressed Assets (ADR-0034): binary files (images, PDFs) pulled
  * out of an imported vault. The row is metadata only — the bytes live on disk at
  * `assets/<worldId>/<hash>.<ext>` beside the SQLite DB (ADR-0002). The primary key is

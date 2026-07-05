@@ -22,6 +22,7 @@ import {
   AuthUser,
   createWorldRequestSchema,
   ImportSummary,
+  PublicLink,
   setMemberRoleRequestSchema,
   WorldDetail,
   WorldMember,
@@ -225,4 +226,28 @@ export class WorldsController {
   ): WorldMember[] {
     return aclSetResponse(this.worlds.removeMember(user.id, id, userId), LAST_OWNER_MESSAGE);
   }
+
+  // The World's Public Link (ADR-0037, #162), for an Owner: the active token or null.
+  @Get(':id/link')
+  link(@CurrentUser() user: AuthUser, @Param('id') id: string): PublicLink | null {
+    return aclSetResponse(this.worlds.getLink(user.id, id), LINK_CONFLICT);
+  }
+
+  // Mint (or return the existing) World Public Link (ADR-0037, #162): World-Owner-only. One
+  // active link per World, so a re-mint returns the current token — idempotent, hence 200.
+  @Post(':id/link')
+  @HttpCode(200)
+  mintLink(@CurrentUser() user: AuthUser, @Param('id') id: string): PublicLink {
+    return aclSetResponse(this.worlds.mintLink(user.id, id), LINK_CONFLICT);
+  }
+
+  // Revoke the World Public Link (ADR-0037, #162): World-Owner-only, the kill-switch.
+  @Delete(':id/link')
+  @HttpCode(204)
+  revokeLink(@CurrentUser() user: AuthUser, @Param('id') id: string): void {
+    aclSetResponse(this.worlds.revokeLink(user.id, id), LINK_CONFLICT);
+  }
 }
+
+/** Unreachable placeholder — a Public Link carries no ≥1-Owner invariant, so no 409 arises. */
+const LINK_CONFLICT = 'Public links have no owner invariant';

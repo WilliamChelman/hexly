@@ -100,6 +100,14 @@ export class EntitySession {
    */
   readonly writable = computed(() => this._current()?.canWrite !== false);
 
+  /**
+   * Whether the caller may MANAGE this Entity's sharing (ADR-0037): the owner-only surface
+   * behind the Share dialog (owners, grants, Public Link). Server-sourced `canManage`; absent
+   * → false, so Share stays hidden for a writer who isn't an Owner (an entity-level Editor or
+   * a World Owner) — clicking it would only hit owner-gated endpoints and 403.
+   */
+  readonly manageable = computed(() => this._current()?.canManage === true);
+
   /** Live Content envelope (ADR-0019); here not in {@link HexMapStore} since Content spans every Entity type. */
   private readonly _content = signal<Content | null>(null);
   /**
@@ -216,7 +224,22 @@ export class EntitySession {
    * the World's library (ADR-0028) via ActiveWorld; other load errors set the
    * reload-error state so the user sees feedback without a silent redirect.
    */
+  /**
+   * A Public Link page fetches its Entity through the token-scoped public read surface and
+   * {@link adopt}s it directly (ADR-0037, #162). Marking the session externally driven makes
+   * {@link watchRoute} a no-op, so the reused {@link EntityPage} can't *also* fire an
+   * authenticated `/api/entities/:id` load — an explicit read-only mode, not a reliance on the
+   * public route merely naming its param `entityId` instead of `id`.
+   */
+  private externallyDriven = false;
+  markExternallyDriven(): void {
+    this.externallyDriven = true;
+  }
+
   watchRoute(route: ActivatedRoute): void {
+    // A public reader already has its Entity (adopted from the public surface, #162) — never
+    // fire an authenticated load over it, regardless of how the route params are named.
+    if (this.externallyDriven) return;
     route.paramMap
       .pipe(
         map((params) => params.get('id')),
@@ -266,6 +289,19 @@ export class EntitySession {
     this._baseGrid.set(this.editor.document());
     this._baseContent.set(this._content());
     this._baseTags.set(this._tags());
+  }
+
+  /**
+   * Carry the caller's load-time permission flags (canWrite/canManage, ADR-0037) onto an
+   * in-place update response. A save/rename/visibility PATCH returns the Entity *without* these
+   * flags — the server only computes them on the single-entity load — but a content mutation
+   * never changes the caller's standing, so we preserve them from the pre-mutation Entity.
+   * Dropping them would silently flip an Owner read-only (canWrite absent → default true masks
+   * it) and, worse, hide the owner-only Share action (canManage absent → not manageable) the
+   * moment the user renames or autosaves.
+   */
+  private withPermissions(updated: EntityDetail, prev: EntityDetail): EntityDetail {
+    return { ...updated, canWrite: prev.canWrite, canManage: prev.canManage };
   }
 
   /** Wrap the editor's latest snapshot in the format envelope (ADR-0019). */
@@ -329,7 +365,7 @@ export class EntitySession {
     if (!open || this._loading()) return EMPTY;
     return this.entities.patch(open.id, changes).pipe(
       tap((updated) => {
-        this._current.set(updated);
+        this._current.set(this.withPermissions(updated, open));
         this._conflict.set(null); // fresh state clears any stale 409 chip
       }),
     );
@@ -390,7 +426,7 @@ export class EntitySession {
           this._conflict.set(outcome.current);
         } else {
           this._conflict.set(null);
-          this._current.set(outcome.entity);
+          this._current.set(this.withPermissions(outcome.entity, open));
           this._baseGrid.set(grid);
           this._baseContent.set(content);
           this._baseTags.set(tags);

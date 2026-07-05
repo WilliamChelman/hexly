@@ -4,6 +4,7 @@ import { AuthModule } from './auth/auth.module';
 import { ConfigModule } from './config/config.module';
 import { DbModule } from './db/db.module';
 import { EntitiesModule } from './entities/entities.module';
+import { PublicLinksModule } from './acl/public-links.module';
 import { WorldsModule } from './worlds/worlds.module';
 import { HealthController } from './health.controller';
 import { TestModule } from './test/test.module';
@@ -30,6 +31,7 @@ const e2eTestingEnabled =
     AuthModule,
     EntitiesModule,
     WorldsModule,
+    PublicLinksModule,
     AssetsModule,
     ...(e2eTestingEnabled ? [TestModule] : []),
   ],

@@ -261,9 +261,9 @@ describe('Entities endpoints', () => {
 
     const res = await ada.get(`/entities/${created.body.id}`).expect(200);
 
-    // The single-entity fetch also carries the caller's write permission (ADR-0037); the
-    // owner may write, so canWrite:true — the create response omits the editor-only flag.
-    expect(res.body).toEqual({ ...created.body, canWrite: true });
+    // The single-entity fetch also carries the caller's write + manage permission (ADR-0037);
+    // the owner may do both, so canWrite/canManage:true — the create response omits both flags.
+    expect(res.body).toEqual({ ...created.body, canWrite: true, canManage: true });
     expect(res.body.document).toEqual(emptyHexmapBody);
   });
 

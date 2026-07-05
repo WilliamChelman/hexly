@@ -17,6 +17,7 @@ import { Eyebrow } from '../../../ui/eyebrow';
 import { Icon } from '../../../ui/icon/icon';
 import { GrantSet } from '../../../ui/grant-set';
 import { OwnerSet } from '../../../ui/owner-set';
+import { PublicLinkControl } from '../../../ui/public-link';
 import { PageHeader } from '../../../ui/page-header';
 import { EntityTags } from './entity-tags';
 import { SaveStatus } from './save-status';
@@ -66,6 +67,7 @@ const TYPE_LABELS: Record<
     Icon,
     GrantSet,
     OwnerSet,
+    PublicLinkControl,
     PageHeader,
     TranslocoPipe,
     EntityTags,
@@ -155,18 +157,23 @@ const TYPE_LABELS: Record<
         </button>
       }
 
-      <button
-        type="button"
-        pageHeaderActions
-        appButton
-        variant="primary"
-        size="sm"
-        data-testid="manage-owners"
-        (click)="ownersOpen.set(true)"
-      >
-        <app-icon name="share" [size]="16" />
-        {{ 'editorShell.share' | transloco }}
-      </button>
+      <!-- Share (owner/grant/link management) is an owner-only power (ADR-0037) — hidden
+           for every non-Owner opener, including writers (an entity-level Editor, a World
+           Owner) whose write access wouldn't carry the owner-gated dialog endpoints. -->
+      @if (manageable()) {
+        <button
+          type="button"
+          pageHeaderActions
+          appButton
+          variant="primary"
+          size="sm"
+          data-testid="manage-owners"
+          (click)="ownersOpen.set(true)"
+        >
+          <app-icon name="share" [size]="16" />
+          {{ 'editorShell.share' | transloco }}
+        </button>
+      }
     </app-page-header>
 
     @if (ownersOpen() && entityId(); as id) {
@@ -181,6 +188,11 @@ const TYPE_LABELS: Record<
         <h3 class="grants-heading">{{ 'grants.heading' | transloco }}</h3>
         <p class="grants-subhead">{{ 'grants.subhead' | transloco }}</p>
         <app-grant-set [id]="id" />
+        <!-- Anonymous per-entity Public Link (ADR-0037, #162): one revocable read-only URL
+             for someone without an account — pierces private, like a named Viewer grant. -->
+        <h3 class="grants-heading">{{ 'publicLink.entityHeading' | transloco }}</h3>
+        <p class="grants-subhead">{{ 'publicLink.entitySubhead' | transloco }}</p>
+        <app-public-link kind="entity" [id]="id" />
         <button
           dialogFooter
           type="button"
@@ -211,6 +223,20 @@ export class EntityHeader {
   /** Owns the Map/Note surface choice, shared with the {@link EntityPage} body (#75). */
   protected readonly store = inject(HexMapStore);
   protected readonly views = VIEWS;
+
+  /**
+   * Whether the caller may write the open Entity (ADR-0037). Gates the whole editing surface
+   * (Share, tags, map tools) so a read-only opener — a Viewer grant, a member on a `shared`
+   * Entity, or an anonymous Public Link reader — sees the content but none of the edit chrome.
+   */
+  protected readonly writable = this.session.writable;
+
+  /**
+   * Whether the caller owns the open Entity (ADR-0037) — gates the Share action, whose dialog
+   * (owners, grants, Public Link) is owner-only server-side. A writer who isn't an Owner never
+   * sees it, so the button can't open onto a dialog that only 403s.
+   */
+  protected readonly manageable = this.session.manageable;
 
   /** Whether the entity owner-set dialog (#158) is open — toggled by the Share action. */
   protected readonly ownersOpen = signal(false);

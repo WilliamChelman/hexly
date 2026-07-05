@@ -71,28 +71,32 @@ import { Icon } from '../../ui/icon/icon';
         <app-entity-header />
         <main class="body relative min-h-0">
           @if (showMap()) {
-            <!-- Full-bleed canvas; all side chrome floats over it (ADR-0013). -->
+            <!-- Full-bleed canvas; all side chrome floats over it (ADR-0013). The canvas
+                 itself is a read affordance (pan/zoom); every editing dock below is gated on
+                 writable() so a read-only opener sees the map but no tools (ADR-0037, #162). -->
             <app-map-canvas class="absolute inset-0" />
-            <app-tool-palette class="absolute top-3 left-3 z-[1]" />
-            <!--
-              Right dock: panel (Inspector / Regions) + edge rail as a flex row, no
-              hand-computed offsets (ADR-0013). pointer-events-none so the canvas stays
-              interactive below a short panel; each child re-enables it.
-            -->
-            <div
-              class="absolute top-3 right-3 bottom-3 flex items-start gap-2 z-[1] pointer-events-none"
-            >
-              @if (store.rightPanel() === 'regions') {
-                <app-regions-panel
-                  class="w-[var(--rail-inspector)] max-h-full border border-line rounded-lg shadow-2 pointer-events-auto"
-                />
-              } @else if (store.rightPanel() === 'inspector') {
-                <app-inspector
-                  class="w-[var(--rail-inspector)] max-h-full border border-line rounded-lg shadow-2 pointer-events-auto"
-                />
-              }
-              <app-editor-rail class="pointer-events-auto" />
-            </div>
+            @if (writable()) {
+              <app-tool-palette class="absolute top-3 left-3 z-[1]" />
+              <!--
+                Right dock: panel (Inspector / Regions) + edge rail as a flex row, no
+                hand-computed offsets (ADR-0013). pointer-events-none so the canvas stays
+                interactive below a short panel; each child re-enables it.
+              -->
+              <div
+                class="absolute top-3 right-3 bottom-3 flex items-start gap-2 z-[1] pointer-events-none"
+              >
+                @if (store.rightPanel() === 'regions') {
+                  <app-regions-panel
+                    class="w-[var(--rail-inspector)] max-h-full border border-line rounded-lg shadow-2 pointer-events-auto"
+                  />
+                } @else if (store.rightPanel() === 'inspector') {
+                  <app-inspector
+                    class="w-[var(--rail-inspector)] max-h-full border border-line rounded-lg shadow-2 pointer-events-auto"
+                  />
+                }
+                <app-editor-rail class="pointer-events-auto" />
+              </div>
+            }
           } @else {
             <!-- Content body in a centred reading column: a note, or a hexmap on its Note view (#75).
                  Opening the Outline reflows this column left (extra right padding) so the panel never
@@ -150,6 +154,12 @@ import { Icon } from '../../ui/icon/icon';
 })
 export class EntityPage {
   protected readonly session = inject(EntitySession);
+  /**
+   * Whether the caller may edit (ADR-0037). Gates the map's editing docks — a read-only
+   * opener (Viewer grant, read-only member, or Public Link reader, #162) gets the canvas
+   * as pan/zoom-only, with the tool palette, inspector, and editor rail withheld.
+   */
+  protected readonly writable = this.session.writable;
   /** Drives the Map/Note surface swap and which view occupies the right column. */
   protected readonly store = inject(HexMapStore);
   /** The heading-navigation Outline shown beside the Content body. */

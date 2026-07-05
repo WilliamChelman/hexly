@@ -4,6 +4,7 @@ import {
   CreateWorldRequest,
   emptyEntityBody,
   MemberRole,
+  PublicLink,
   WorldDetail,
   WorldMember,
   WorldSummary,
@@ -16,8 +17,22 @@ import {
   removeOwnerOutcome,
   userExists,
 } from '../acl/owner-set';
+import {
+  mintPublicLink,
+  PublicLinkTable,
+  readPublicLink,
+  revokePublicLink,
+} from '../acl/public-link-store';
 import { DB, Db } from '../db/db';
-import { entities, entityGrants, worldMembers, worlds } from '../db/schema';
+import { entities, entityGrants, worldLinks, worldMembers, worlds } from '../db/schema';
+
+/** The World Public Link table for the shared get/mint/revoke helpers (ADR-0037, #162). */
+const WORLD_LINK: PublicLinkTable = {
+  table: worldLinks,
+  id: worldLinks.id,
+  fk: worldLinks.worldId,
+  newRow: (token, worldId) => ({ id: token, worldId, createdAt: Date.now() }),
+};
 
 /**
  * World persistence (ADR-0024). Home Entity (flagged is_home) minted in same
@@ -381,6 +396,40 @@ export class WorldsService {
     // No row matched: the target isn't a (removable) member — an Owner or unknown user.
     if (deleted.changes === 0) return { status: 'not-found' };
     return { status: 'ok', value: this.worldMembers(id) };
+  }
+
+  /**
+   * The World's Public Link, for an Owner (ADR-0037, #162): the active token or null. Link
+   * administration is a World Owner power (like membership) — unreachable → 404, reachable
+   * but not an Owner → 403 (the controller maps the outcome).
+   */
+  getLink(userId: string, id: string): AclSetResult<PublicLink | null> {
+    const gate = this.gateOwnerManagement(userId, id);
+    if (gate) return gate;
+    return { status: 'ok', value: readPublicLink(this.db, WORLD_LINK, id) };
+  }
+
+  /**
+   * Mint (or return the existing) World Public Link (ADR-0037, #162): World-Owner-only. One
+   * active link per World — a re-mint returns the current token rather than rotating it, so
+   * the shared URL stays stable (rotate = revoke + re-mint). The token grants anonymous World
+   * Viewer over `shared` Entities; revoking it is the kill-switch (ADR-0004).
+   */
+  mintLink(userId: string, id: string): AclSetResult<PublicLink> {
+    const gate = this.gateOwnerManagement(userId, id);
+    if (gate) return gate;
+    return { status: 'ok', value: mintPublicLink(this.db, WORLD_LINK, id) };
+  }
+
+  /**
+   * Revoke the World Public Link (ADR-0037, #162): World-Owner-only, the kill-switch. A plain
+   * row delete after which the token route stops resolving immediately. Idempotent.
+   */
+  revokeLink(userId: string, id: string): AclSetResult<null> {
+    const gate = this.gateOwnerManagement(userId, id);
+    if (gate) return gate;
+    revokePublicLink(this.db, WORLD_LINK, id);
+    return { status: 'ok', value: null };
   }
 
   /**

@@ -116,6 +116,32 @@ export const appRoutes: Route[] = [
     // Title key resolved by TranslationTitleStrategy to the "Hexly" brand (ADR-0014).
     title: 'styleguide.tabTitle',
   },
+  // The unauthenticated Public Link surface (ADR-0037, #162): token-scoped, read-only pages a
+  // person without an account reaches by URL. Deliberately outside authGuard — possession of the
+  // token is the credential. A per-entity link, a World link, and a World-scoped page open.
+  {
+    path: 'public/e/:token',
+    data: { mode: 'entity' },
+    loadComponent: () =>
+      import('./pages/public/public-entity-page').then((m) => m.PublicEntityPage),
+    title: 'publicView.tabTitle',
+  },
+  {
+    path: 'public/w/:token',
+    loadComponent: () =>
+      import('./pages/public/public-world-page').then((m) => m.PublicWorldPage),
+    title: 'publicView.tabTitle',
+  },
+  {
+    // `:entityId` (not `:id`) keeps the reused EntityPage's watchRoute from matching, but the
+    // real guard is PublicEntityPage marking the session externally driven — it is the sole
+    // data source (#162), adopting the Entity from the token-scoped public surface.
+    path: 'public/w/:token/e/:entityId',
+    data: { mode: 'worldEntity' },
+    loadComponent: () =>
+      import('./pages/public/public-entity-page').then((m) => m.PublicEntityPage),
+    title: 'publicView.tabTitle',
+  },
   // Anything unmatched renders the error page rather than silently bouncing to
   // the World Index, so a wrong URL is visible, not papered over. authGuard keeps
   // an unauthenticated visitor going to login first.

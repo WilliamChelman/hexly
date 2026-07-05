@@ -10,6 +10,7 @@ import { Eyebrow } from '../../ui/eyebrow';
 import { Panel } from '../../ui/panel';
 import { OwnerSet } from '../../ui/owner-set';
 import { MemberSet } from '../../ui/member-set';
+import { PublicLinkControl } from '../../ui/public-link';
 
 /**
  * The World settings page (#158, #159): the World's symmetric owner set (view, add,
@@ -22,7 +23,7 @@ import { MemberSet } from '../../ui/member-set';
 @Component({
   selector: 'app-world-settings',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, Eyebrow, Panel, OwnerSet, MemberSet],
+  imports: [TranslocoPipe, Eyebrow, Panel, OwnerSet, MemberSet, PublicLinkControl],
   template: `
     @if (worldId(); as id) {
       <section class="world-settings">
@@ -39,6 +40,12 @@ import { MemberSet } from '../../ui/member-set';
         <p class="world-settings-subhead">{{ 'members.subhead' | transloco }}</p>
         <div appPanel>
           <app-member-set [id]="id" />
+        </div>
+
+        <h2 class="world-settings-heading">{{ 'publicLink.worldHeading' | transloco }}</h2>
+        <p class="world-settings-subhead">{{ 'publicLink.worldSubhead' | transloco }}</p>
+        <div appPanel>
+          <app-public-link kind="world" [id]="id" />
         </div>
       </section>
     }

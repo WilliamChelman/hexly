@@ -305,6 +305,14 @@ export interface EntityDetail extends EntitySummary {
    * Absent → treated as writable (the owner default), so pre-flag payloads round-trip.
    */
   readonly canWrite?: boolean;
+  /**
+   * Whether the caller may MANAGE this Entity's sharing (ADR-0037): owners, ownership grants,
+   * and its Public Link — the owner-only surface behind the Share dialog. True only for an
+   * Entity Owner (not a World Owner, not an entity-level Editor), matching the server's
+   * owner-management gate. Present on `GET /entities/:id`; absent → treated as NOT manageable,
+   * so the Share action stays hidden unless the caller is provably an Owner.
+   */
+  readonly canManage?: boolean;
 }
 
 /**

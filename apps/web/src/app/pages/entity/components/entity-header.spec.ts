@@ -30,6 +30,8 @@ describe('EntityHeader', () => {
     version: 3,
     createdAt: 1,
     updatedAt: 1,
+    // The default opener is an Owner: writable and can manage sharing (ADR-0037).
+    canManage: true,
     document: { type: 'hexmap', content: emptyContent(), hexes: {}, regions: [], labels: [] },
   };
 
@@ -82,6 +84,26 @@ describe('EntityHeader', () => {
     fixture.detectChanges();
 
     expect(fixture.debugElement.query(By.directive(OwnerSet))).toBeNull();
+  });
+
+  it('hides the Share action for a read-only opener (canManage:false)', () => {
+    // A Viewer grant / read-only member / Public Link reader (ADR-0037): content shows,
+    // but Share (owner/grant/link management) is owner-only and must be withheld.
+    open({ ...aldermoor, canWrite: false, canManage: false });
+    const fixture = TestBed.createComponent(EntityHeader);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('[data-testid=manage-owners]')).toBeNull();
+  });
+
+  it('hides the Share action for a writer who is not an Owner (canManage:false)', () => {
+    // An entity-level Editor or a World Owner opens writable (canWrite:true) but can't manage
+    // sharing — the dialog is owner-only, so the button must stay hidden or it opens onto 403s.
+    open({ ...aldermoor, canWrite: true, canManage: false });
+    const fixture = TestBed.createComponent(EntityHeader);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('[data-testid=manage-owners]')).toBeNull();
   });
 
   it('shows the open entity name', () => {

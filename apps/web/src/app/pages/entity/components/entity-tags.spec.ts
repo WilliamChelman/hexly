@@ -49,6 +49,18 @@ describe('EntityTags', () => {
     return fixture;
   }
 
+  it('hides the add input and remove buttons for a read-only opener (canWrite:false)', () => {
+    // A Viewer grant / Public Link reader (ADR-0037) sees the tags but can't edit them.
+    session.adopt({ ...noteWith(['deity']), canWrite: false });
+    const fixture = TestBed.createComponent(EntityTags);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(el.querySelector('[data-testid=entity-tags]')?.textContent).toContain('deity');
+    expect(el.querySelector('[data-testid=tag-input]')).toBeNull();
+    expect(el.querySelector('[data-testid=tag-remove-deity]')).toBeNull();
+  });
+
   it('renders the open entity’s tags as chips', () => {
     const fixture = render(['deity', 'ruined']);
 

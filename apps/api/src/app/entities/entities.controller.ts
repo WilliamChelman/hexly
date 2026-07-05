@@ -25,6 +25,7 @@ import {
   entityListQuerySchema,
   EntityPage,
   patchEntityRequestSchema,
+  PublicLink,
   saveEntityRequestSchema,
 } from '@hexly/domain';
 import { aclSetResponse, ownerSetResponse } from '../acl/owner-set';
@@ -218,7 +219,31 @@ export class EntitiesController {
   ): EntityGrant[] {
     return aclSetResponse(this.entities.removeGrant(user.id, id, userId), GRANT_CONFLICT);
   }
+
+  // The Entity's per-entity Public Link (ADR-0037, #162), for an Owner: the active token or null.
+  @Get(':id/link')
+  link(@CurrentUser() user: AuthUser, @Param('id') id: string): PublicLink | null {
+    return aclSetResponse(this.entities.getLink(user.id, id), LINK_CONFLICT);
+  }
+
+  // Mint (or return the existing) per-entity Public Link (ADR-0037, #162): Owner-only. One
+  // active link per Entity, so a re-mint returns the current token — idempotent, hence 200.
+  @Post(':id/link')
+  @HttpCode(200)
+  mintLink(@CurrentUser() user: AuthUser, @Param('id') id: string): PublicLink {
+    return aclSetResponse(this.entities.mintLink(user.id, id), LINK_CONFLICT);
+  }
+
+  // Revoke the per-entity Public Link (ADR-0037, #162): Owner-only, the kill-switch.
+  @Delete(':id/link')
+  @HttpCode(204)
+  revokeLink(@CurrentUser() user: AuthUser, @Param('id') id: string): void {
+    aclSetResponse(this.entities.revokeLink(user.id, id), LINK_CONFLICT);
+  }
 }
 
 /** Unreachable placeholder — grants carry no ≥1-Owner invariant, so no 409 arises. */
 const GRANT_CONFLICT = 'Entity grants have no owner invariant';
+
+/** Unreachable placeholder — a Public Link carries no ≥1-Owner invariant, so no 409 arises. */
+const LINK_CONFLICT = 'Public links have no owner invariant';

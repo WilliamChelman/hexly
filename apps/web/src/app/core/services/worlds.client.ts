@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { ImportSummary, MemberRole, WorldDetail, WorldMember, WorldSummary } from '@hexly/domain';
+import { ImportSummary, MemberRole, PublicLink, WorldDetail, WorldMember, WorldSummary } from '@hexly/domain';
 
 /**
  * HTTP client for the worlds API (ADR-0024). Stateless: every call is a round
@@ -85,5 +85,20 @@ export class WorldsClient {
   /** Remove a member, or leave the World yourself (pass your own id); returns the updated member set. */
   removeMember(id: string, userId: string): Observable<WorldMember[]> {
     return this.http.delete<WorldMember[]>(`/api/worlds/${id}/members/${userId}`);
+  }
+
+  /** The World's Public Link — the active token or null (ADR-0037, #162). Owner-only server-side. */
+  link(id: string): Observable<PublicLink | null> {
+    return this.http.get<PublicLink | null>(`/api/worlds/${id}/link`);
+  }
+
+  /** Mint (or return the existing) World Public Link; idempotent (200). */
+  mintLink(id: string): Observable<PublicLink> {
+    return this.http.post<PublicLink>(`/api/worlds/${id}/link`, {});
+  }
+
+  /** Revoke the World Public Link — the kill-switch (ADR-0037, #162). */
+  revokeLink(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/worlds/${id}/link`);
   }
 }

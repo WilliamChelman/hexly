@@ -25,6 +25,7 @@ import {
   EntityGrant,
   GrantRole,
   harvestDescriptors,
+  PublicLink,
   SaveEntityRequest,
   tagsSchema,
   visibilitySchema,
@@ -36,15 +37,30 @@ import {
   removeOwnerOutcome,
   userExists,
 } from '../acl/owner-set';
+import {
+  mintPublicLink,
+  PublicLinkTable,
+  readPublicLink,
+  revokePublicLink,
+} from '../acl/public-link-store';
 import { DB, Db } from '../db/db';
 import {
   entities,
   entityDescriptors,
   entityGrants,
+  entityLinks,
   worldMembers,
   worlds,
 } from '../db/schema';
 import { HEXLY_CONFIG, HexlyConfig } from '../config/config.module';
+
+/** The per-entity Public Link table for the shared get/mint/revoke helpers (ADR-0037, #162). */
+const ENTITY_LINK: PublicLinkTable = {
+  table: entityLinks,
+  id: entityLinks.id,
+  fk: entityLinks.entityId,
+  newRow: (token, entityId) => ({ id: token, entityId, createdAt: Date.now() }),
+};
 
 /**
  * Ownership predicate (ADR-0037): the caller is one of the Entity's Owners — an
@@ -324,8 +340,10 @@ export class EntitiesService implements OnApplicationBootstrap {
     // Surface substance-write power so the editor gates itself (ADR-0037): a read-only
     // member or a Viewer grant opens read-only rather than autosaving into a wall of 403s,
     // while an entity-level Editor (canWrite false, canEditSubstance true) opens writable.
+    // canManage rides the owner-only gate so the Share dialog (owners/grants/link — all
+    // owner-only) is only offered to someone who can actually use it, not every writer.
     return access?.canRead
-      ? { ...toDetail(access.row), canWrite: access.canEditSubstance }
+      ? { ...toDetail(access.row), canWrite: access.canEditSubstance, canManage: access.isOwner }
       : null;
   }
 
@@ -742,6 +760,86 @@ export class EntitiesService implements OnApplicationBootstrap {
   }
 
   /**
+   * The Entity's per-entity Public Link, for an Owner (ADR-0037, #162): the active token or
+   * null. Link administration belongs to the Entity's Owners alone (same gate as grants) —
+   * unreachable → 404, reachable but not an Owner → 403 (the controller maps the outcome).
+   */
+  getLink(userId: string, id: string): AclSetResult<PublicLink | null> {
+    const gate = this.gateOwnerManagement(userId, id);
+    if (gate) return gate;
+    return { status: 'ok', value: readPublicLink(this.db, ENTITY_LINK, id) };
+  }
+
+  /**
+   * Mint (or return the existing) per-entity Public Link (ADR-0037, #162): Owner-only. One
+   * active link per Entity — a re-mint returns the current token rather than rotating it, so
+   * the shared URL stays stable (rotate = revoke + re-mint). The token is an anonymous Viewer
+   * grant that pierces `private`; revoking it is the kill-switch (ADR-0004).
+   */
+  mintLink(userId: string, id: string): AclSetResult<PublicLink> {
+    const gate = this.gateOwnerManagement(userId, id);
+    if (gate) return gate;
+    return { status: 'ok', value: mintPublicLink(this.db, ENTITY_LINK, id) };
+  }
+
+  /**
+   * Revoke the per-entity Public Link (ADR-0037, #162): Owner-only, the kill-switch. A plain
+   * row delete after which the token route stops resolving immediately. Idempotent — revoking
+   * an absent link is a no-op that still succeeds.
+   */
+  revokeLink(userId: string, id: string): AclSetResult<null> {
+    const gate = this.gateOwnerManagement(userId, id);
+    if (gate) return gate;
+    revokePublicLink(this.db, ENTITY_LINK, id);
+    return { status: 'ok', value: null };
+  }
+
+  /**
+   * Resolve a per-entity Public Link token to its Entity, read-only (ADR-0037, #162). The
+   * token *is* an anonymous Viewer grant, so it pierces `private` — no visibility check. null
+   * when the token doesn't resolve (revoked or never minted). `canWrite: false` so the reader
+   * renders read-only.
+   */
+  loadByEntityLink(token: string): EntityDetail | null {
+    const link = this.db
+      .select({ entityId: entityLinks.entityId })
+      .from(entityLinks)
+      .where(eq(entityLinks.id, token))
+      .get();
+    if (!link) return null;
+    const row = this.db.select().from(entities).where(eq(entities.id, link.entityId)).get();
+    return row ? { ...toDetail(row), canWrite: false } : null;
+  }
+
+  /**
+   * The `shared` Entity in World `worldId` with this id, read-only (ADR-0037, #162) — the
+   * per-entity read behind a World Public Link. Scoped to the token's World *and* `shared`,
+   * so the World link reaches that World's shared surface and nothing else; a `private` or
+   * out-of-World id is null (→ 404, a non-navigable dangling label for the reader).
+   */
+  loadSharedInWorld(worldId: string, id: string): EntityDetail | null {
+    const row = this.db
+      .select()
+      .from(entities)
+      .where(
+        and(eq(entities.id, id), eq(entities.worldId, worldId), eq(entities.visibility, 'shared')),
+      )
+      .get();
+    return row ? { ...toDetail(row), canWrite: false } : null;
+  }
+
+  /** Summaries of a World's `shared` Entities (ADR-0037, #162), ordered like {@link list}. */
+  listSharedByWorld(worldId: string): EntitySummary[] {
+    return this.db
+      .select()
+      .from(entities)
+      .where(and(eq(entities.worldId, worldId), eq(entities.visibility, 'shared')))
+      .orderBy(desc(entities.updatedAt), asc(entities.id))
+      .all()
+      .map(toSummary);
+  }
+
+  /**
    * The Entity's grants (ADR-0037, #161), ordered stably by user id. Owner rows share the
    * table post-fold (migration 0007) but aren't grants — the grant surface is editor/viewer
    * only, so they're filtered out here (owners are the {@link entityOwnersOf} surface).
@@ -805,18 +903,20 @@ export class EntitiesService implements OnApplicationBootstrap {
         canRead: canReadEntity(userId),
         canWrite: canWriteEntity(userId),
         canEditSubstance: canEditSubstanceEntity(userId),
+        isOwner: ownsEntity(userId),
       })
       .from(entities)
       .where(eq(entities.id, id))
       .get();
     if (!result) return undefined;
     // Split the computed 0/1 columns off so `.row` is a clean entity row for toDetail.
-    const { canRead, canWrite, canEditSubstance, ...row } = result;
+    const { canRead, canWrite, canEditSubstance, isOwner, ...row } = result;
     return {
       row,
       canRead: !!canRead,
       canWrite: !!canWrite,
       canEditSubstance: !!canEditSubstance,
+      isOwner: !!isOwner,
     };
   }
 }

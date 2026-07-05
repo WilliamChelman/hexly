@@ -15,6 +15,7 @@ import {
   EntitySaveOutcome,
   EntityType,
   GrantRole,
+  PublicLink,
   Visibility,
 } from '@hexly/domain';
 
@@ -93,6 +94,21 @@ export class EntitiesClient {
   /** Revoke a grant; returns the updated set (ADR-0037, #161). */
   removeGrant(id: string, userId: string): Observable<EntityGrant[]> {
     return this.http.delete<EntityGrant[]>(`/api/entities/${id}/grants/${userId}`);
+  }
+
+  /** The Entity's per-entity Public Link — the active token or null (ADR-0037, #162). Owner-only server-side. */
+  link(id: string): Observable<PublicLink | null> {
+    return this.http.get<PublicLink | null>(`/api/entities/${id}/link`);
+  }
+
+  /** Mint (or return the existing) per-entity Public Link; idempotent (200). */
+  mintLink(id: string): Observable<PublicLink> {
+    return this.http.post<PublicLink>(`/api/entities/${id}/link`, {});
+  }
+
+  /** Revoke the per-entity Public Link — the kill-switch (ADR-0037, #162). */
+  revokeLink(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/entities/${id}/link`);
   }
 
   // worldId scopes to a World (ADR-0024); omitted, server defaults to caller's first.

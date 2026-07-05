@@ -6,7 +6,7 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Subject, firstValueFrom, share } from 'rxjs';
+import { Observable, Subject, firstValueFrom, map, share } from 'rxjs';
 import { ENTITY_LIST_MAX_LIMIT, EntitySummary } from '@hexly/domain';
 import { EntitiesClient } from '../../../core/services/entities.client';
 import { searchEntities } from '../../../core/utils/search-entities';
@@ -27,7 +27,7 @@ export type EntityResolution =
 @Injectable()
 export class EntityNameResolver {
   private readonly client = inject(EntitiesClient);
-  private readonly destroyRef = inject(DestroyRef);
+  protected readonly destroyRef = inject(DestroyRef);
 
   // One signal per requested id, created on first resolve and filled when its batch lands.
   private readonly cache = new Map<string, WritableSignal<EntityResolution>>();
@@ -73,22 +73,32 @@ export class EntityNameResolver {
     queueMicrotask(() => this.flush());
   }
 
-  // Batch queued ids into chunked list() calls, then fill each id's signal.
+  // Batch queued ids into chunked fetches, then fill each id's signal.
   private flush(): void {
     this.flushQueued = false;
     const ids = [...this.pending];
     this.pending.clear();
     for (let i = 0; i < ids.length; i += ENTITY_LIST_MAX_LIMIT) {
       const chunk = ids.slice(i, i + ENTITY_LIST_MAX_LIMIT);
-      this.client
-        .list({ ids: chunk, limit: chunk.length })
+      this.fetchByIds(chunk)
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe({
-          next: (page) => this.fill(chunk, page.items),
+          next: (items) => this.fill(chunk, items),
           // Failed batch resolves ids to missing (dangling).
           error: () => this.fill(chunk, []),
         });
     }
+  }
+
+  /**
+   * Fetch summaries for one batch of ids — the only server dependency of the id→name
+   * resolution, split out so a read-only Public Link page can resolve against the token-scoped
+   * public read surface instead of the session-guarded `/api/entities` (ADR-0037, #162).
+   */
+  protected fetchByIds(ids: string[]): Observable<EntitySummary[]> {
+    return this.client
+      .list({ ids, limit: ids.length })
+      .pipe(map((page) => page.items));
   }
 
   private fill(ids: string[], items: EntitySummary[]): void {

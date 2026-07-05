@@ -8,6 +8,7 @@ import {
   EntitySaveOutcome,
   EntityType,
   GrantRole,
+  PublicLink,
 } from '@hexly/domain';
 import { EntityFacetParams, EntityListParams } from '../services/entities.client';
 
@@ -54,4 +55,9 @@ export class MockEntitiesClient {
   addGrant =
     vi.fn<(id: string, userId: string, role: GrantRole) => Observable<EntityGrant[]>>();
   removeGrant = vi.fn<(id: string, userId: string) => Observable<EntityGrant[]>>();
+  // Defaults to no active link so a spec mounting the Public Link control (#162) without
+  // caring about it still renders; override per test as needed.
+  link = vi.fn<(id: string) => Observable<PublicLink | null>>(() => of<PublicLink | null>(null));
+  mintLink = vi.fn<(id: string) => Observable<PublicLink>>();
+  revokeLink = vi.fn<(id: string) => Observable<void>>();
 }

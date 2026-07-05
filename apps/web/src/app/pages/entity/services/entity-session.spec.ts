@@ -121,6 +121,35 @@ describe('EntitySession', () => {
     expect(session.current()?.tags).toEqual(['deity', 'ruined']);
   });
 
+  it('preserves the caller’s load-time permission flags across a save (ADR-0037)', () => {
+    // Load carries canWrite/canManage (an Owner); the server's save response omits them.
+    // A content save mustn't drop the caller's standing — else Share vanishes after autosave.
+    entities.load.mockReturnValue(of({ ...aldermoor, canWrite: true, canManage: true }));
+    session.open('m1').subscribe();
+    editor.paintAt({ q: 5, r: 5 }, 'ocean');
+
+    const saved: EntityDetail = { ...aldermoor, version: 4, document: bodyOf(editor.document()) };
+    entities.save.mockReturnValue(of({ status: 'saved', entity: saved }));
+    session.save().subscribe();
+
+    expect(session.current()?.canManage).toBe(true);
+    expect(session.manageable()).toBe(true);
+    expect(session.writable()).toBe(true);
+  });
+
+  it('preserves the caller’s permission flags across a rename/visibility patch (ADR-0037)', () => {
+    entities.load.mockReturnValue(of({ ...aldermoor, canWrite: true, canManage: true }));
+    session.open('m1').subscribe();
+
+    // The PATCH response (like the server's) carries no permission flags.
+    entities.patch.mockReturnValue(of({ ...aldermoor, name: 'Renamed' }));
+    session.rename('Renamed').subscribe();
+
+    expect(session.current()?.name).toBe('Renamed');
+    expect(session.manageable()).toBe(true);
+    expect(session.writable()).toBe(true);
+  });
+
   it('surfaces a stale save as a conflict and keeps the editor edit', () => {
     openAldermoor();
     editor.paintAt({ q: 5, r: 5 }, 'ocean');
