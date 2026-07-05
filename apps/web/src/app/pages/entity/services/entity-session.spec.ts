@@ -214,6 +214,19 @@ describe('EntitySession', () => {
     expect(session.dirty()).toBe(false);
   });
 
+  it('stays clean when a re-wrapped value-equal snapshot is pushed on load (#164)', () => {
+    // TipTap fires an `update` on load/normalization; the editor re-pushes the loaded
+    // snapshot through setContent, which mints a new Content each call. A value-equal push
+    // must collapse to the baseline reference — else reference-equality dirty trips an
+    // autosave PUT with no user edit.
+    openAldermoor();
+    session.setContent({ type: 'doc', content: [] }); // same value as the loaded content
+    expect(session.dirty()).toBe(false);
+
+    session.setContent({ type: 'doc', content: [{ type: 'paragraph' }] }); // a real edit
+    expect(session.dirty()).toBe(true);
+  });
+
   it('keeps a mid-flight Content edit dirty across a clean save (linchpin, ADR-0026)', () => {
     openAldermoor();
     const first = {

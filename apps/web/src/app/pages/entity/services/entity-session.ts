@@ -306,6 +306,18 @@ export class EntitySession {
 
   /** Wrap the editor's latest snapshot in the format envelope (ADR-0019). */
   setContent(snapshot: unknown): void {
+    // TipTap fires `update` on load/schema-normalization, not only on a real edit — and
+    // tiptapContent mints a new Content each call. Re-wrapping then would move _content off
+    // its baseline reference and trip the reference-equality dirty check into autosaving a PUT
+    // with no user change (#164). Collapse a snapshot value-equal to the persisted one back to
+    // the baseline reference, so only real prose changes read as dirty (ADR-0005 invariant).
+    const base = this._baseContent();
+    // ponytail: JSON.stringify equality — ProseMirror JSON has deterministic key order, so this
+    // is sound for doc snapshots; swap for a deep-equal if snapshot ever holds non-PM data.
+    if (base && JSON.stringify(snapshot) === JSON.stringify(base.snapshot)) {
+      this._content.set(base);
+      return;
+    }
     this._content.set(tiptapContent(snapshot));
   }
 
