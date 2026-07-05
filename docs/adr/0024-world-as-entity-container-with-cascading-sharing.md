@@ -11,6 +11,8 @@ world_links:   { world_id, token }   -- World Public Link
 entities:      { ..., world_id NOT NULL, is_home, visibility: private | shared }
 ```
 
+> **The Home Entity is superseded by ADR-0043** — a World's landing is now the derived World Dashboard, and the `is_home` flag / `idx_world_home` index are removed. The rest of this ADR (World as container, cascading sharing) stands.
+
 A `note` Entity is auto-created alongside every new World and designated as its **Home Entity** by an `is_home` flag on the Entity (a partial unique index over `world_id` enforces at most one per World). The flag lives on the Entity — rather than a `worlds.home_entity_id` FK — so a World holds no reference back to entities: no circular FK, the home is intrinsically in-world, and World deletion cascades through `entities.world_id` without a hand-written teardown order. The Home Entity cannot be deleted or moved to another World.
 
 The trade is that "every World has a Home" is no longer a NOT NULL guarantee but an invariant upheld at the one creation point (the World-create path always mints a Home note). The migration onto Worlds is also simpler — a World is inserted first, then its Entities reference it, with no deferred-FK dance.

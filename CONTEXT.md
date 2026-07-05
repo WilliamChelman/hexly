@@ -85,19 +85,23 @@ _Avoid_: Text, caption, title, annotation
 ## Worlds
 
 **World**:
-A lightweight container record that groups Entities for a single campaign or setting. Not an Entity type — it lives outside the entity model. Every Entity belongs to exactly one World (`world_id NOT NULL`). Carries a `name` and an `owner_id`. The Home Entity is identified by the `is_home` flag on the Entity, not a column on the World.
+A lightweight container record that groups Entities for a single campaign or setting. Not an Entity type — it lives outside the entity model. Every Entity belongs to exactly one World (`world_id NOT NULL`). Carries a `name` and an `owner_id`. Its landing surface is the derived World Dashboard; it holds an ordered `pinned_entity_ids` set surfaced there.
 _Avoid_: Space, container, campaign
 
-**Home Entity**:
-A `note` Entity auto-created when a World is created, flagged `is_home = true` in the `entities` table. The partial unique index `idx_world_home` enforces at most one per World. Serves as the World's landing page. Cannot be deleted, cannot be moved to another World, and is always `shared` (its visibility is locked, like its title). Its title is not its own — it is the World's name (the World name is the source of truth; ADR-0029), so it reads as derived rather than freely edited.
-_Avoid_: World page, index, overview
+**World Dashboard**:
+The per-World landing surface at `/w/:worldId` — the front door on entering a World. A read-only *derived* view (recent Entities, Hex Maps, at-a-glance counts) plus the Owners' curated Pinned Entities. It authors nothing of its own — no stored body, only queries over the World's Entities (ADR-0043) — so authored landing prose, if wanted, is just a Note the Owner pins. Distinct from the World Index (lists Worlds, at `/`) and the Entity Browser (lists this World's Entities, at `/entities`).
+_Avoid_: Home Entity, world home, landing page, overview
+
+**Pinned Entity**:
+An Entity an Owner has featured on the World Dashboard. The pin set is a World property — one shared, ordered list (`pinned_entity_ids` on the World), the same for everyone, curated only by World Owners. A pin is a reference by id, not an enforced FK: resolved per viewer through the ordinary access filter, so a pinned Entity the caller can't reach (`private` without a grant, or deleted) simply drops off their Dashboard.
+_Avoid_: Bookmark, favourite, featured note
 
 **World Index**:
-The page at `/` listing every World the caller can reach — owned, member, or holding any Entity the caller owns or is granted (reachability is derived, not a stored flag) — and the surface that owns World create, rename, and delete. The durable directory of Worlds — distinct from the World Switcher (a transient quick-hop control) and from a World's own Home Entity (its in-world landing note).
-_Avoid_: World home, world library, dashboard, world picker
+The page at `/` listing every World the caller can reach — owned, member, or holding any Entity the caller owns or is granted (reachability is derived, not a stored flag) — and the surface that owns World create, rename, and delete. The durable directory of Worlds — distinct from the World Switcher (a transient quick-hop control) and from a World's own World Dashboard (its in-world landing surface).
+_Avoid_: World home, world library, world picker
 
 **World Switcher**:
-The compact in-app control (docked by the user menu) for hopping to another reachable World without returning to the World Index. Pure navigation — it shows the current World and switches the URL scope; it does not manage Worlds.
+The compact in-app control at the nav-rail masthead for hopping to another reachable World without returning to the World Index. Pure navigation — it shows the current World and switches the URL scope; it does not manage Worlds. Shown only inside a World (ADR-0041); on the World Index the Index itself is the chooser, so the Switcher is absent.
 _Avoid_: World selector, world dropdown
 
 **World Owner**:
