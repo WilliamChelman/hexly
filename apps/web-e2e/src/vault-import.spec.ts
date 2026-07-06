@@ -1,5 +1,5 @@
 import { strToU8, zipSync } from 'fflate';
-import { expect, test } from './fixtures';
+import { expect, segRe, test } from './fixtures';
 
 /**
  * Vault-import smoke (#149, ADR-0033). Proves the wiring end to end: the World
@@ -56,7 +56,7 @@ test('imports a vault from the World Index, landing in the new World with a reso
 
   // Land in the new World's Entity browser, showing the imported notes.
   await page.getByTestId('open-imported').click();
-  await expect(page).toHaveURL(new RegExp(`/w/${summary.worldId}/entities$`));
+  await expect(page).toHaveURL(new RegExp(`/w/${segRe(summary.worldId)}/entities$`));
   await expect(page.getByRole('link', { name: 'Mara' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Keep' })).toBeVisible();
 

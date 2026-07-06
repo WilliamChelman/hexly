@@ -1,4 +1,4 @@
-import { enterLibrary, expect, flushSave, test } from './fixtures';
+import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtures';
 
 /**
  * The Region select-and-edit journey (issue #39): a Region selected on the canvas
@@ -17,7 +17,7 @@ test('selects a Region on the canvas, renames it in the Inspector, and the renam
   await page.getByTestId('new-map').click();
 
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const mapId = page.url().split('/').pop();
+  const mapId = entityIdFromUrl(page);
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
 

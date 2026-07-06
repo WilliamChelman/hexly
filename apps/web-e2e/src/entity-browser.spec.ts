@@ -1,4 +1,4 @@
-import { enterLibrary, expect, test } from './fixtures';
+import { enterLibrary, entityIdFromUrl, expect, segRe, test } from './fixtures';
 
 /**
  * Entity browser lifecycle (#70): create → list → open → rename → delete, over
@@ -12,7 +12,7 @@ test('a note round-trips: create → appears → open → rename → delete', as
 
   await page.getByTestId('new-note').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const id = page.url().split('/').pop();
+  const id = entityIdFromUrl(page);
   await expect(page.getByTestId('title')).toHaveText('Untitled note');
 
   await page.getByRole('link', { name: 'Library' }).click();
@@ -27,7 +27,7 @@ test('a note round-trips: create → appears → open → rename → delete', as
   await expect(page.getByTestId('entity-title')).toHaveText('Lady Mara');
 
   await page.getByTestId(`open-${id}`).click();
-  await expect(page).toHaveURL(new RegExp(`/entities/${id}$`));
+  await expect(page).toHaveURL(new RegExp(`/entities/${segRe(id)}$`));
   await expect(page.getByTestId('title')).toHaveText('Lady Mara');
 
   await page.getByRole('link', { name: 'Library' }).click();
@@ -47,7 +47,7 @@ test('an owner toggles a note to shared and the Visibility facet reflects it', a
 
   await page.getByTestId('new-note').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const id = page.url().split('/').pop();
+  const id = entityIdFromUrl(page);
 
   // New notes default to private: the header toggle reads "not shared".
   await expect(page.getByTestId('visibility-toggle')).toHaveAttribute('aria-pressed', 'false');

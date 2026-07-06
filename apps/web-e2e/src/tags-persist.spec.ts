@@ -1,4 +1,4 @@
-import { enterLibrary, expect, flushSave, test } from './fixtures';
+import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtures';
 
 /** #72 — tags share the version-checked save path and are stored as Entity metadata (ADR-0018). */
 test('adds tags on a note, saves, and they survive reload and show in the library', async ({
@@ -9,7 +9,7 @@ test('adds tags on a note, saves, and they survive reload and show in the librar
   await page.getByTestId('new-note').click();
 
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const noteId = page.url().split('/').pop();
+  const noteId = entityIdFromUrl(page);
 
   // Comma-separated entry adds both tags at once.
   const tagInput = page.getByTestId('tag-input');

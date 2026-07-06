@@ -1,4 +1,4 @@
-import { enterLibrary, expect, flushSave, test } from './fixtures';
+import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtures';
 
 /**
  * The whole-Hex move journey (issue #30, ADR-0010). It crosses the one seam the
@@ -19,7 +19,7 @@ test('drags a hex under Select to a new coordinate, and the move survives a relo
   await enterLibrary(page);
   await page.getByTestId('new-map').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const mapId = page.url().split('/').pop();
+  const mapId = entityIdFromUrl(page);
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
 
@@ -90,7 +90,7 @@ test('drags a hex onto an occupied hex and swaps the two, surviving a reload', a
   await enterLibrary(page);
   await page.getByTestId('new-map').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const mapId = page.url().split('/').pop();
+  const mapId = entityIdFromUrl(page);
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
   const box = await canvas.boundingBox();
@@ -205,7 +205,7 @@ test('drags a multi-hex selection so the whole group moves by one offset', async
   await enterLibrary(page);
   await page.getByTestId('new-map').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const mapId = page.url().split('/').pop();
+  const mapId = entityIdFromUrl(page);
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
   const box = await canvas.boundingBox();
@@ -267,7 +267,7 @@ test('refuses a blocked group move, leaving every hex where it was', async ({
   await enterLibrary(page);
   await page.getByTestId('new-map').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const mapId = page.url().split('/').pop();
+  const mapId = entityIdFromUrl(page);
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
   const box = await canvas.boundingBox();

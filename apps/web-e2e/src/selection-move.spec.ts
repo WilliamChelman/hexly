@@ -1,4 +1,4 @@
-import { enterLibrary, expect, flushSave, test } from './fixtures';
+import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtures';
 
 /**
  * Group moves for non-hex selections (issue #64 follow-up, ADR-0017). Two bugs the
@@ -26,7 +26,7 @@ test('drags one label of a multi-label selection and the whole group moves', asy
   await enterLibrary(page);
   await page.getByTestId('new-map').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const mapId = page.url().split('/').pop() as string;
+  const mapId = entityIdFromUrl(page);
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
   const box = await canvas.boundingBox();
@@ -85,7 +85,7 @@ test('drags a region on its own and its whole footprint moves', async ({
   await enterLibrary(page);
   await page.getByTestId('new-map').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const mapId = page.url().split('/').pop() as string;
+  const mapId = entityIdFromUrl(page);
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
   const box = await canvas.boundingBox();

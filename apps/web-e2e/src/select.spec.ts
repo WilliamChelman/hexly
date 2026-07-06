@@ -1,4 +1,4 @@
-import { enterLibrary, expect, flushSave, test } from './fixtures';
+import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtures';
 
 /**
  * The universal Select journey (issue #28, ADR-0010). These cross the one seam
@@ -19,7 +19,7 @@ async function newMap(page: import('@playwright/test').Page) {
   await enterLibrary(page);
   await page.getByTestId('new-map').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const mapId = page.url().split('/').pop() as string;
+  const mapId = entityIdFromUrl(page);
   const canvas = page.getByRole('img', { name: 'Hex map' });
   return { canvas, mapId };
 }

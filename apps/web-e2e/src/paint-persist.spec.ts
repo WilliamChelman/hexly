@@ -1,4 +1,4 @@
-import { enterLibrary, expect, flushSave, test } from './fixtures';
+import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtures';
 
 /**
  * The keystone journey: it crosses every seam — the session cookie on API calls,
@@ -15,7 +15,7 @@ test('paints a hex, saves, and the hex survives a reload', async ({
   await page.getByTestId('new-map').click();
 
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const mapId = page.url().split('/').pop();
+  const mapId = entityIdFromUrl(page);
 
   // A map opens armed with Select, so a stray click never paints (issue #27).
   await page.getByRole('img', { name: 'Hex map' }).click();

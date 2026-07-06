@@ -1,4 +1,4 @@
-import { expect, test, type Page } from './fixtures';
+import { entityIdFromUrl, expect, segRe, test, type Page } from './fixtures';
 
 /**
  * URL-scoped Worlds + World Index (#118, ADR-0028): the root `/` is the World
@@ -22,7 +22,7 @@ async function createWorldFromIndex(
   await page.getByTestId('create-world').click();
   const world = await (await created).json();
   await page.waitForURL(
-    new RegExp(`/w/${world.id}/entities/${world.homeEntityId}$`),
+    new RegExp(`/w/${segRe(world.id)}/entities/${segRe(world.homeEntityId)}$`),
   );
   return world;
 }
@@ -49,7 +49,7 @@ test('the World Index lists reachable Worlds; creating one opens its Home Entity
 
   // Activating it enters its Entity browser (URL carries the World).
   await page.getByTestId(`world-${world.id}`).click();
-  await expect(page).toHaveURL(new RegExp(`/w/${world.id}/entities$`));
+  await expect(page).toHaveURL(new RegExp(`/w/${segRe(world.id)}/entities$`));
 });
 
 test('renaming the World renames its Home Entity, read-only on its page (ADR-0029)', async ({
@@ -106,7 +106,7 @@ test('a stale World segment reconciles to the Entity’s real World (ADR-0028, #
 
   // Reconcile guard lands on the Entity under its correct World segment.
   await expect(page).toHaveURL(
-    new RegExp(`/w/${worldA.id}/entities/${worldA.homeEntityId}$`),
+    new RegExp(`/w/${segRe(worldA.id)}/entities/${segRe(worldA.homeEntityId)}$`),
   );
 });
 
@@ -115,12 +115,12 @@ test('the entity browser is scoped by the URL World; switching Worlds filters it
 }) => {
   const worldA = await createWorldFromIndex(page);
   await page.getByRole('link', { name: 'Library' }).click();
-  await expect(page).toHaveURL(new RegExp(`/w/${worldA.id}/entities$`));
+  await expect(page).toHaveURL(new RegExp(`/w/${segRe(worldA.id)}/entities$`));
   await page.getByTestId('new-note').click();
   await expect(page).toHaveURL(
-    new RegExp(`/w/${worldA.id}/entities/[\\w-]+$`),
+    new RegExp(`/w/${segRe(worldA.id)}/entities/[\\w-]+$`),
   );
-  const noteId = page.url().split('/').pop();
+  const noteId = entityIdFromUrl(page);
   await page.getByRole('link', { name: 'Library' }).click();
   await page.getByTestId(`rename-${noteId}`).click();
   const input = page.getByTestId(`rename-input-${noteId}`);
@@ -131,13 +131,13 @@ test('the entity browser is scoped by the URL World; switching Worlds filters it
   // World B is a different scope; A's note is out of scope.
   const worldB = await createWorldFromIndex(page);
   await page.getByRole('link', { name: 'Library' }).click();
-  await expect(page).toHaveURL(new RegExp(`/w/${worldB.id}/entities$`));
+  await expect(page).toHaveURL(new RegExp(`/w/${segRe(worldB.id)}/entities$`));
   await expect(page.getByText('Alpha in A')).toHaveCount(0);
   expect(worldB.id).not.toBe(worldA.id);
 
   // Switch back to World A via the switcher; its note returns.
   await switchToWorld(page, worldA.id);
-  await expect(page).toHaveURL(new RegExp(`/w/${worldA.id}/entities$`));
+  await expect(page).toHaveURL(new RegExp(`/w/${segRe(worldA.id)}/entities$`));
   await expect(page.getByText('Alpha in A')).toBeVisible();
 });
 
@@ -159,6 +159,6 @@ test('the masthead switcher shows the current World and hops to another (#121)',
 
   // Hopping to World A re-scopes the URL.
   await switchToWorld(page, worldA.id);
-  await expect(page).toHaveURL(new RegExp(`/w/${worldA.id}/entities$`));
+  await expect(page).toHaveURL(new RegExp(`/w/${segRe(worldA.id)}/entities$`));
   await expect(page.getByTestId('switcher')).toContainText('Aldermoor');
 });

@@ -1,4 +1,4 @@
-import { enterLibrary, expect, flushSave, test } from './fixtures';
+import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtures';
 
 /**
  * Full-stack note round-trip: real TipTap keyboard input → versioned save → reload
@@ -12,7 +12,7 @@ test('types into a note, saves, and the Content survives a reload', async ({
   await page.getByTestId('new-note').click();
 
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const noteId = page.url().split('/').pop();
+  const noteId = entityIdFromUrl(page);
 
   // Click 60% down to prove the whole box focuses the editor.
   const surface = page.getByTestId('note-content');

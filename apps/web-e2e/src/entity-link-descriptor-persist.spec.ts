@@ -1,4 +1,4 @@
-import { enterLibrary, expect, flushSave, test } from './fixtures';
+import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtures';
 
 /**
  * The Link Descriptor journey (issue #96, ADR-0023): an author characterises a Content
@@ -16,12 +16,12 @@ test('characterises a Content Entity Link via :: , persists the descriptor, and 
   await enterLibrary(page);
   await page.getByTestId('new-note').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const targetId = page.url().split('/').pop();
+  const targetId = entityIdFromUrl(page);
 
   await enterLibrary(page);
   await page.getByTestId('new-note').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const sourceId = page.url().split('/').pop();
+  const sourceId = entityIdFromUrl(page);
 
   // The cursor sits right after link insert, which is exactly where :: arms.
   const surface = page.getByTestId('note-content');
