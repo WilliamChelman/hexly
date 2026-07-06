@@ -92,7 +92,8 @@ describe('WorldSwitcher', () => {
     open(fixture);
     item('switcher-option-w2').click();
 
-    expect(navigate).toHaveBeenCalledWith(['/w', 'w2', 'entities']);
+    // Switching lands on the World Dashboard — the World's front door (ADR-0043).
+    expect(navigate).toHaveBeenCalledWith(['/w', 'w2']);
   });
 
   it('offers a path to the World Index', () => {

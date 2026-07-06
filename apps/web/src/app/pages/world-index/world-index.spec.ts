@@ -94,16 +94,17 @@ describe('WorldIndex', () => {
     expect($(el, '[data-testid=owned-w2]')).toBeNull();
   });
 
-  it('links a World’s card to its Entity browser', () => {
+  it('links a World’s card to its Dashboard (ADR-0043)', () => {
     const el = render([world('w1', 'Aldermoor')]).nativeElement as HTMLElement;
 
     // The whole card is a routerLink anchor (stretched-link inset), so assert the
-    // resolved href rather than a navigate() call.
+    // resolved href rather than a navigate() call. The card's front door is the
+    // World Dashboard now, not the Entity Browser.
     expect(
       ($(el, '[data-testid=world-w1]') as HTMLAnchorElement).getAttribute(
         'href',
       ),
-    ).toBe('/w/w1/entities');
+    ).toBe('/w/w1');
   });
 
   it('shows an empty state with a create affordance when there are no Worlds', () => {
@@ -241,17 +242,18 @@ describe('WorldIndex', () => {
     expect($(el, '[data-testid=export-world-w2]')).toBeNull();
   });
 
-  it('links an owned World to its owner-management page, but not a member World', () => {
+  it('links an owned World to its settings page, but not a member World', () => {
     const el = render([
       world('w1', 'Aldermoor'), // owned by the caller (u1)
       world('w2', 'Whisperwood', 'someone-else'), // member
     ]).nativeElement as HTMLElement;
 
+    // World Settings moved to /settings when the World root became the Dashboard (ADR-0043).
     expect(
       ($(el, '[data-testid=owners-world-w1]') as HTMLAnchorElement).getAttribute(
         'href',
       ),
-    ).toBe('/w/w1');
+    ).toBe('/w/w1/settings');
     expect($(el, '[data-testid=owners-world-w2]')).toBeNull();
   });
 

@@ -397,6 +397,16 @@
     "deleteConfirmLabel": "Type the world name to confirm deletion",
     "deleteError": "Couldn't delete that world. Please try again."
   },
+  "worldDashboard": {
+    "tabTitle": "Hexly — Dashboard",
+    "eyebrow": "World",
+    "recentsHeading": "Recently edited",
+    "mapsHeading": "Hex maps",
+    "countsHeading": "At a glance",
+    "browseAll": "Browse all entities",
+    "emptyTitle": "Your world is a blank map.",
+    "emptyHint": "Create your first note or hex map to begin."
+  },
   "error": {
     "tabTitle": "Hexly — Not found",
     "eyebrow": "Hexly",

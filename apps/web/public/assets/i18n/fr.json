@@ -397,6 +397,16 @@
     "deleteConfirmLabel": "Tapez le nom du monde pour confirmer la suppression",
     "deleteError": "Impossible de supprimer ce monde. Veuillez réessayer."
   },
+  "worldDashboard": {
+    "tabTitle": "Hexly — Tableau de bord",
+    "eyebrow": "Monde",
+    "recentsHeading": "Modifié récemment",
+    "mapsHeading": "Cartes hexagonales",
+    "countsHeading": "Aperçu",
+    "browseAll": "Parcourir toutes les entités",
+    "emptyTitle": "Votre monde est une carte vierge.",
+    "emptyHint": "Créez votre première note ou carte hexagonale pour commencer."
+  },
   "error": {
     "tabTitle": "Hexly — Introuvable",
     "eyebrow": "Hexly",

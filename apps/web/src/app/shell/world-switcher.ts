@@ -10,7 +10,7 @@ import { Router, RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { WorldStore } from '../core/services/world.store';
 import { ActiveWorld } from '../core/services/active-world';
-import { worldRoute } from '../core/utils/routes';
+import { worldDashboardRoute } from '../core/utils/routes';
 import { Icon } from '../ui/icon/icon';
 import { Rule } from '../ui/rule';
 
@@ -141,6 +141,6 @@ export class WorldSwitcher {
 
   protected switch(id: string): void {
     const name = this.worlds().find((w) => w.id === id)?.name;
-    this.router.navigate(worldRoute(id, name));
+    this.router.navigate(worldDashboardRoute(id, name));
   }
 }

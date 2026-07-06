@@ -56,6 +56,7 @@ describe('WorldQuickOpen', () => {
     const [command] = await firstValueFrom(provider.search(''));
     command.run();
 
-    expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities']);
+    // Picking a World lands on its Dashboard — the World's front door (ADR-0043).
+    expect(navigate).toHaveBeenCalledWith(['/w', 'w1']);
   });
 });

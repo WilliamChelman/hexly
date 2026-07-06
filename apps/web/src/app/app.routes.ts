@@ -59,9 +59,20 @@ export const appRoutes: Route[] = [
     canDeactivate: [clearActiveWorld],
     children: [
       {
-        // The World settings page (#158): the World-level owner set — view, add,
-        // remove, resign. Bare by design; more World settings can join it later.
+        // The World Dashboard (ADR-0043): the World's front door — a read-only derived
+        // view (recents, Hex Maps, at-a-glance counts) over the World's Entities.
         path: '',
+        pathMatch: 'full',
+        loadComponent: () =>
+          import('./pages/world-dashboard/world-dashboard').then(
+            (m) => m.WorldDashboard,
+          ),
+        title: 'worldDashboard.tabTitle',
+      },
+      {
+        // World Settings (#158, moved from the World root by ADR-0043): the World-level
+        // owner set — view, add, remove, resign. Owner-only.
+        path: 'settings',
         pathMatch: 'full',
         loadComponent: () =>
           import('./pages/world-settings/world-settings').then(

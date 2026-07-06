@@ -1,0 +1,297 @@
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
+import { Router, RouterLink } from '@angular/router';
+import { finalize } from 'rxjs';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+import { EntityFacets, EntitySummary, EntityType } from '@hexly/domain';
+import { EntitiesClient } from '../../core/services/entities.client';
+import { ActiveWorld } from '../../core/services/active-world';
+import { ToasterService } from '../../core/services/toaster.service';
+import { HexlyDatePipe } from '../../core/i18n/hexly-date.pipe';
+import { entityRoute, worldRoute } from '../../core/utils/routes';
+import { Button } from '../../ui/button';
+import { Eyebrow } from '../../ui/eyebrow';
+import { Panel } from '../../ui/panel';
+import { PageHeader } from '../../ui/page-header';
+import { Icon, IconName } from '../../ui/icon/icon';
+import { ACCENT_BAR, accentFor } from '../../ui/sigil';
+
+/** How many recent Entities / Hex Maps the Dashboard surfaces at a glance. */
+const RECENTS_LIMIT = 8;
+const MAPS_LIMIT = 8;
+
+/**
+ * The World Dashboard (ADR-0043, CONTEXT.md → World Dashboard): the per-World
+ * landing surface at `/w/:worldId`. A read-only *derived* view — it authors
+ * nothing, only queries the existing list/facets endpoints over this World's
+ * Entities: recents (most-recently-edited), Hex Maps, and at-a-glance Type counts,
+ * with a link to the full Entity Browser. A brand-new empty World gets a purposeful
+ * empty state that creates the first Note or Hex Map, not a blank page. Pins come
+ * in a later slice. The active World is pinned by the `w/:worldId` guard (ADR-0028).
+ */
+@Component({
+  selector: 'app-world-dashboard',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [
+    NgTemplateOutlet,
+    RouterLink,
+    TranslocoPipe,
+    HexlyDatePipe,
+    Button,
+    Eyebrow,
+    Panel,
+    PageHeader,
+    Icon,
+  ],
+  host: { class: 'block min-h-full bg-surface-sunken' },
+  template: `
+    <!-- One tile template, placed by both the recents and the maps grid. The
+         data-testid prefix distinguishes them so a hex map showing in both lists
+         keeps a distinct selector per section. -->
+    <ng-template #tile let-e let-prefix="prefix">
+      <section
+        class="group relative flex gap-3 p-4 pl-5 overflow-hidden h-full transition-shadow hover:shadow-3 has-[a:focus-visible]:[outline:2px_solid_var(--color-gold)] has-[a:focus-visible]:outline-offset-2"
+        appPanel
+        raised
+      >
+        <span class="absolute left-0 top-0 bottom-0 w-1.5 {{ bar(e.id) }}"></span>
+        <app-icon
+          [name]="typeIcon(e.type)"
+          [size]="18"
+          class="shrink-0 mt-0.5 text-ink-muted"
+        />
+        <div class="min-w-0 flex-1">
+          <a
+            class="block no-underline outline-none focus-visible:shadow-none after:content-[''] after:absolute after:inset-0"
+            [routerLink]="entityLink(e)"
+            [attr.data-testid]="prefix + '-' + e.id"
+            [attr.aria-label]="e.name"
+          >
+            <span
+              class="font-display text-md text-ink-strong leading-tight line-clamp-2 group-hover:text-gold transition-colors"
+              >{{ e.name }}</span
+            >
+          </a>
+          <span class="mt-1 block text-2xs text-ink-muted">
+            {{ 'entityBrowser.type.' + e.type | transloco }}
+            <span class="text-ink-faint">·</span>
+            {{ 'entityBrowser.edited' | transloco: { date: (e.updatedAt | hexlyDate) } }}
+          </span>
+        </div>
+      </section>
+    </ng-template>
+
+    <app-page-header sticky>
+      <div pageHeaderTitle class="flex flex-col">
+        <span appEyebrow class="text-gold! tracking-[0.28em]">{{
+          'worldDashboard.eyebrow' | transloco
+        }}</span>
+        <h1 class="font-display text-[22px] text-ink-strong m-0 leading-tight">
+          {{ worldName() }}
+        </h1>
+      </div>
+      @if (!isEmpty()) {
+        <a
+          pageHeaderActions
+          appButton
+          variant="default"
+          [routerLink]="browseAllLink()"
+          data-testid="browse-all"
+        >
+          <app-icon name="library" [size]="16" />
+          {{ 'worldDashboard.browseAll' | transloco }}
+        </a>
+      }
+    </app-page-header>
+
+    <main class="max-w-[72rem] mx-auto py-8 px-6 flex flex-col gap-10">
+      @if (isEmpty()) {
+        <section
+          class="p-16 text-center text-ink-muted flex flex-col items-center gap-3"
+          data-testid="dashboard-empty"
+          appPanel
+        >
+          <p class="m-0 font-display text-lg text-ink-strong">
+            {{ 'worldDashboard.emptyTitle' | transloco }}
+          </p>
+          <p class="text-sm m-0">{{ 'worldDashboard.emptyHint' | transloco }}</p>
+          <div class="flex items-center gap-2 mt-1">
+            <button
+              type="button"
+              appButton
+              variant="default"
+              data-testid="create-note"
+              [disabled]="creating()"
+              (click)="create('note')"
+            >
+              <app-icon name="plus" [size]="16" />
+              {{ (creating() ? 'entityBrowser.creating' : 'entityBrowser.newNote') | transloco }}
+            </button>
+            <button
+              type="button"
+              appButton
+              variant="primary"
+              data-testid="create-map"
+              [disabled]="creating()"
+              (click)="create('hexmap')"
+            >
+              <app-icon name="plus" [size]="16" />
+              {{ (creating() ? 'entityBrowser.creating' : 'entityBrowser.newMap') | transloco }}
+            </button>
+          </div>
+        </section>
+      } @else {
+        @if (typeCounts().length > 0) {
+          <section>
+            <h2 appEyebrow mark class="mb-3">
+              {{ 'worldDashboard.countsHeading' | transloco }}
+            </h2>
+            <ul class="flex flex-wrap gap-3 m-0 p-0 list-none">
+              @for (c of typeCounts(); track c.value) {
+                <li
+                  class="flex items-baseline gap-2 px-4 py-3 min-w-32"
+                  appPanel
+                  [attr.data-testid]="'count-type-' + c.value"
+                >
+                  <span class="font-display text-2xl text-ink-strong">{{ c.count }}</span>
+                  <span class="text-sm text-ink-muted">{{
+                    'entityBrowser.type.' + c.value | transloco
+                  }}</span>
+                </li>
+              }
+            </ul>
+          </section>
+        }
+
+        <section>
+          <h2 appEyebrow mark class="mb-3">
+            {{ 'worldDashboard.recentsHeading' | transloco }}
+          </h2>
+          <ul
+            class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 m-0 p-0 list-none"
+          >
+            @for (e of recents(); track e.id) {
+              <li>
+                <ng-container
+                  [ngTemplateOutlet]="tile"
+                  [ngTemplateOutletContext]="{ $implicit: e, prefix: 'recent' }"
+                />
+              </li>
+            }
+          </ul>
+        </section>
+
+        @if (maps().length > 0) {
+          <section>
+            <h2 appEyebrow mark class="mb-3">
+              {{ 'worldDashboard.mapsHeading' | transloco }}
+            </h2>
+            <ul
+              class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 m-0 p-0 list-none"
+            >
+              @for (e of maps(); track e.id) {
+                <li>
+                  <ng-container
+                    [ngTemplateOutlet]="tile"
+                    [ngTemplateOutletContext]="{ $implicit: e, prefix: 'map' }"
+                  />
+                </li>
+              }
+            </ul>
+          </section>
+        }
+      }
+    </main>
+  `,
+})
+export class WorldDashboard {
+  private readonly entitiesClient = inject(EntitiesClient);
+  private readonly activeWorld = inject(ActiveWorld);
+  private readonly router = inject(Router);
+  private readonly toaster = inject(ToasterService);
+  private readonly transloco = inject(TranslocoService);
+
+  protected readonly worldName = this.activeWorld.name;
+  protected readonly recents = signal<EntitySummary[]>([]);
+  protected readonly maps = signal<EntitySummary[]>([]);
+  /** The Type facet's live counts (note/hexmap), the Dashboard's at-a-glance tally. */
+  protected readonly typeCounts = signal<EntityFacets['type']>([]);
+  /** Set once the recents read resolves — gates the empty state so it never flashes pre-load. */
+  protected readonly loaded = signal(false);
+  protected readonly creating = signal(false);
+  /** A loaded World with no Entities: show the purposeful empty state, not a blank page. */
+  protected readonly isEmpty = computed(
+    () => this.loaded() && this.recents().length === 0,
+  );
+
+  constructor() {
+    const worldId = this.activeWorld.worldId();
+    if (!worldId) return;
+    this.entitiesClient
+      .list({ worldId, limit: RECENTS_LIMIT })
+      .subscribe((page) => {
+        this.recents.set(page.items);
+        this.loaded.set(true);
+      });
+    this.entitiesClient
+      .list({ worldId, type: ['hexmap'], limit: MAPS_LIMIT })
+      .subscribe((page) => this.maps.set(page.items));
+    this.entitiesClient
+      .facets({ worldId })
+      .subscribe((facets) => this.typeCounts.set(facets.type));
+  }
+
+  protected entityLink(e: EntitySummary): string[] {
+    return entityRoute(e.worldId, e.id, this.activeWorld.name() ?? undefined, e.name);
+  }
+
+  /** The full Entity Browser for this World ("show me everything"). */
+  protected browseAllLink(): string[] {
+    return worldRoute(this.activeWorld.worldId()!, this.activeWorld.name() ?? undefined);
+  }
+
+  protected bar(id: string): string {
+    return ACCENT_BAR[accentFor(id)];
+  }
+
+  /** A hex map reads as terrain, a note as a label — matching the Entity Browser card. */
+  protected typeIcon(type: EntityType): IconName {
+    return type === 'hexmap' ? 'terrain' : 'label';
+  }
+
+  /** Create the first Note or Hex Map from the empty state and open it (mirrors the Browser). */
+  protected create(type: EntityType): void {
+    if (this.creating()) return;
+    this.creating.set(true);
+    this.entitiesClient
+      .create(
+        this.transloco.translate(
+          type === 'note' ? 'domain.untitledNote' : 'domain.untitledMap',
+        ),
+        type,
+        this.activeWorld.worldId() ?? undefined,
+      )
+      .pipe(finalize(() => this.creating.set(false)))
+      .subscribe({
+        next: (entity) =>
+          this.router.navigate(
+            entityRoute(
+              this.activeWorld.worldId()!,
+              entity.id,
+              this.activeWorld.name() ?? undefined,
+            ),
+          ),
+        error: () =>
+          this.toaster.show(
+            this.transloco.translate('entityBrowser.createError'),
+            'error',
+          ),
+      });
+  }
+}

@@ -213,10 +213,9 @@ export class NavRail {
         ?.rights?.includes('manage');
       return [
         { link: `/w/${worldId}/entities`, testid: 'nav-entities', icon: 'library', labelKey: 'nav.library' },
-        // Bare `/w/:id` prefixes the Library link, so match it exactly or it stays
-        // active on the entity pages too.
+        // World Settings moved off the World root (now the Dashboard, ADR-0043).
         ...(canManage
-          ? [{ link: `/w/${worldId}`, testid: 'nav-world-settings', icon: 'settings' as const, labelKey: 'nav.worldSettings', exact: true }]
+          ? [{ link: `/w/${worldId}/settings`, testid: 'nav-world-settings', icon: 'settings' as const, labelKey: 'nav.worldSettings' }]
           : []),
       ];
     }

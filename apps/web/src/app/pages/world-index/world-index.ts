@@ -30,8 +30,8 @@ import { ACCENT_SIGIL, accentFor, monogram } from '../../ui/sigil';
  * World create. It is the chooser, not an auto-redirect: a user with zero Worlds
  * sees an empty state with a Create affordance rather than an edge case to redirect
  * around. Owned-vs-member is derived by testing whether the current user is in each
- * World's `owners` set (ADR-0037). Creating lands on the new World's Dashboard (ADR-0043);
- * activating an existing World enters its Entity browser.
+ * World's `owners` set (ADR-0037). Both creating a World and opening an existing one's
+ * card land on the World Dashboard (ADR-0043).
  */
 @Component({
   selector: 'app-world-index',
@@ -156,7 +156,7 @@ import { ACCENT_SIGIL, accentFor, monogram } from '../../ui/sigil';
                        interactives (a11y). -->
                   <a
                     class="flex-1 px-3 pt-2 no-underline outline-none focus-visible:shadow-none after:content-[''] after:absolute after:inset-0"
-                    [routerLink]="['/w', card.id, 'entities']"
+                    [routerLink]="dashboardRoute(card.id, card.name)"
                     [attr.data-testid]="'world-' + card.id"
                     [attr.aria-label]="card.name"
                   >
@@ -188,7 +188,7 @@ import { ACCENT_SIGIL, accentFor, monogram } from '../../ui/sigil';
                         icon
                         variant="ghost"
                         size="sm"
-                        [routerLink]="['/w', card.id]"
+                        [routerLink]="['/w', card.id, 'settings']"
                         [attr.data-testid]="'owners-world-' + card.id"
                         [attr.aria-label]="'owners.heading' | transloco"
                         [attr.title]="'owners.heading' | transloco"
@@ -429,6 +429,9 @@ export class WorldIndex {
       ? local.charAt(0).toUpperCase() + local.slice(1)
       : this.transloco.translate('worldIndex.greetingFallback');
   }
+
+  /** The World's Dashboard landing (ADR-0043) — the one `/w/:id` source, name-slugged. */
+  protected readonly dashboardRoute = worldDashboardRoute;
 
   protected sigil(id: string): string {
     return ACCENT_SIGIL[accentFor(id)];

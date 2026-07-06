@@ -70,6 +70,20 @@ describe('appRoutes structure (ADR-0028)', () => {
     expect(redirect?.loadComponent).toBeDefined();
   });
 
+  it('lands the World root on the Dashboard and moves Settings to /settings (ADR-0043)', async () => {
+    const parent = appRoutes.find((r) => r.path === 'w/:worldId');
+    const index = parent?.children?.find((c) => c.path === '');
+    const settings = parent?.children?.find((c) => c.path === 'settings');
+    expect(index?.loadComponent).toBeDefined();
+    expect(settings?.loadComponent).toBeDefined();
+
+    // Angular's compiler prefixes the emitted class name with an underscore.
+    const dashboard = await index!.loadComponent!();
+    const settingsPage = await settings!.loadComponent!();
+    expect((dashboard as { name: string }).name).toMatch(/WorldDashboard$/);
+    expect((settingsPage as { name: string }).name).toMatch(/WorldSettings$/);
+  });
+
   it('serves the World Index at the root and renders the error page for unmatched URLs', () => {
     const root = appRoutes.find((r) => r.path === '');
     expect(root?.loadComponent).toBeDefined();

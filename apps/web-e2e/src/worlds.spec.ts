@@ -52,9 +52,10 @@ test('the World Index lists reachable Worlds; creating one lands on its root', a
   await expect(page.getByTestId(`world-${world.id}`)).toBeVisible();
   await expect(page.getByTestId(`owned-${world.id}`)).toBeVisible();
 
-  // Activating it enters its Entity browser (URL carries the World).
+  // Activating the card lands on the World Dashboard — the World root (ADR-0043).
   await page.getByTestId(`world-${world.id}`).click();
-  await expect(page).toHaveURL(new RegExp(`/w/${segRe(world.id)}/entities$`));
+  await expect(page).toHaveURL(new RegExp(`/w/${segRe(world.id)}$`));
+  await expect(page.getByTestId('dashboard-empty')).toBeVisible();
 });
 
 test('type-to-confirm delete shows the entity count, enables on match, and removes the World (#120)', async ({
@@ -124,8 +125,11 @@ test('the entity browser is scoped by the URL World; switching Worlds filters it
   await expect(page.getByText('Alpha in A')).toHaveCount(0);
   expect(worldB.id).not.toBe(worldA.id);
 
-  // Switch back to World A via the switcher; its note returns.
+  // Switch back to World A via the switcher — it lands on A's Dashboard (ADR-0043).
   await switchToWorld(page, worldA.id);
+  await expect(page).toHaveURL(new RegExp(`/w/${segRe(worldA.id)}$`));
+  // Back in A's Library, its note returns.
+  await page.getByRole('link', { name: 'Library' }).click();
   await expect(page).toHaveURL(new RegExp(`/w/${segRe(worldA.id)}/entities$`));
   await expect(page.getByText('Alpha in A')).toBeVisible();
 });
@@ -146,8 +150,8 @@ test('the masthead switcher shows the current World and hops to another (#121)',
   await page.goto(`/w/${worldB.id}/entities`);
   await expect(page.getByTestId('switcher')).toContainText('Whisperwood');
 
-  // Hopping to World A re-scopes the URL.
+  // Hopping to World A re-scopes the URL — landing on A's Dashboard (ADR-0043).
   await switchToWorld(page, worldA.id);
-  await expect(page).toHaveURL(new RegExp(`/w/${segRe(worldA.id)}/entities$`));
+  await expect(page).toHaveURL(new RegExp(`/w/${segRe(worldA.id)}$`));
   await expect(page.getByTestId('switcher')).toContainText('Aldermoor');
 });

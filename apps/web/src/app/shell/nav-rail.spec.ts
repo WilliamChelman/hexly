@@ -119,7 +119,7 @@ describe('NavRail', () => {
     const fixture = render();
 
     const settings = q(fixture, 'nav-world-settings') as HTMLAnchorElement;
-    expect(settings?.getAttribute('href')).toBe('/w/w1');
+    expect(settings?.getAttribute('href')).toBe('/w/w1/settings');
   });
 
   it('hides World Settings from a caller who lacks the manage right (ADR-0041)', () => {
