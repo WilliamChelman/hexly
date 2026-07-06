@@ -762,7 +762,11 @@ describe('Entities endpoints', () => {
     it('falls back to newest-first order when no query is given', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       await ada.post('/entities').send({ name: 'First', type: 'note' });
-      await ada.post('/entities').send({ name: 'Second', type: 'note' });
+      const second = await ada.post('/entities').send({ name: 'Second', type: 'note' });
+      // Both POSTs can land in the same millisecond, tying updatedAt — then the sort
+      // falls to its `id asc` cursor tiebreak (ADR-0025), a random UUID, and the order
+      // of First/Second is a coin flip. Bump Second so it's unambiguously newest.
+      db.update(entities).set({ updatedAt: Date.now() + 1000 }).where(eq(entities.id, second.body.id)).run();
 
       // No q → updatedAt desc, id asc (ADR-0025). 'Ada' (Home) was created first.
       const res = await ada.get('/entities').expect(200);

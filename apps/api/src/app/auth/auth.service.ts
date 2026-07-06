@@ -20,11 +20,24 @@ function newToken(): string {
 }
 
 /**
+ * argon2's memory-hard defaults are the production security cost (~20ms/hash).
+ * The test suite runs hundreds of hashes; under parallel workers that cost
+ * oversubscribes the cores and pushes auth-heavy specs past the 5s timeout —
+ * flaky, unrelated failures. Under NODE_ENV=test (set by vitest) drop to a
+ * throwaway cost: still a real `$argon2` hash, just cheap. Never hit in
+ * production (NODE_ENV=production).
+ */
+const HASH_OPTIONS: Parameters<typeof hash>[1] | undefined =
+  process.env.NODE_ENV === 'test'
+    ? { memoryCost: 512, timeCost: 2, parallelism: 1, outputLen: 32 }
+    : undefined;
+
+/**
  * A precomputed argon2 hash verified against when no user matches, so the
  * unknown-email path costs roughly the same as the wrong-password path and
  * response timing cannot be used to enumerate which emails exist.
  */
-const DUMMY_PASSWORD_HASH = hash('hexly-dummy-password');
+const DUMMY_PASSWORD_HASH = hash('hexly-dummy-password', HASH_OPTIONS);
 
 /**
  * The auth domain behind a small interface: provisioning members of the closed
@@ -55,7 +68,7 @@ export class AuthService {
     } = {},
   ): Promise<string> {
     const id = randomUUID();
-    const passwordHash = await hash(password);
+    const passwordHash = await hash(password, HASH_OPTIONS);
     this.db
       .insert(users)
       .values({
@@ -218,7 +231,7 @@ export class AuthService {
     }
     if (!currentOk) return false;
 
-    const passwordHash = await hash(newPassword);
+    const passwordHash = await hash(newPassword, HASH_OPTIONS);
     this.db
       .update(users)
       .set({ passwordHash })
@@ -234,7 +247,7 @@ export class AuthService {
    * in the request schema at the edge.
    */
   async setPassword(userId: string, newPassword: string): Promise<void> {
-    const passwordHash = await hash(newPassword);
+    const passwordHash = await hash(newPassword, HASH_OPTIONS);
     this.db.update(users).set({ passwordHash }).where(eq(users.id, userId)).run();
   }
 
