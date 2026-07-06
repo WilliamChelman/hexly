@@ -10,6 +10,7 @@ import { AuthService } from '../auth/auth.service';
 import { AuthModule } from '../auth/auth.module';
 import { EntitiesModule } from './entities.module';
 import { EntitiesService } from './entities.service';
+import * as entityAccessModule from '../acl/entity-access';
 import { ConfigModule } from '../config/config.module';
 import { WorldsModule } from '../worlds/worlds.module';
 import { WorldsService } from '../worlds/worlds.service';
@@ -45,6 +46,7 @@ describe('Entities endpoints', () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await app.close();
   });
 
@@ -1429,18 +1431,20 @@ describe('Entities endpoints', () => {
 
       const service = app.get(EntitiesService);
       const sharedRow = db.select().from(entities).where(eq(entities.id, hall.body.id)).get()!;
-      // Simulate the TOCTOU race: access() still reports the pre-flip decision (writable),
-      // but the row is flipped `private` before the UPDATE runs — so the canWriteEntity
-      // predicate on the WHERE now matches 0 rows and the write never lands.
-      vi.spyOn(
-        service as unknown as { access(u: string, i: string): unknown },
-        'access',
-      ).mockReturnValue({
-        row: sharedRow,
-        isOwner: false,
-        canRead: true,
-        canWrite: true,
-        canEditSubstance: true,
+      // Simulate the TOCTOU race: the access context still reports the pre-flip decision
+      // (writable), but the row is flipped `private` before the UPDATE runs — so the real
+      // writeFilter on the WHERE now matches 0 rows and the write never lands. Keep the real
+      // predicates (spread) so only the stale decision is faked, not the atomic re-check.
+      const realAccess = entityAccessModule.entityAccess(db, adaId);
+      vi.spyOn(entityAccessModule, 'entityAccess').mockReturnValue({
+        ...realAccess,
+        decide: () => ({
+          row: sharedRow,
+          isOwner: false,
+          canRead: true,
+          canWrite: true,
+          canEditSubstance: true,
+        }),
       });
       setVisibility(hall.body.id, 'private');
 

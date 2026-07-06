@@ -10,10 +10,12 @@ import {
   WorldSummary,
   WorldVerb,
 } from '@hexly/domain';
-import { and, asc, count, eq, inArray, ne, or } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, ne } from 'drizzle-orm';
 import { AssetsService } from '../assets/assets.service';
 import {
   AclSetResult,
+  gate,
+  isSuperadmin,
   OwnerSetResult,
   removeOwnerOutcome,
   userExists,
@@ -25,7 +27,8 @@ import {
   revokePublicLink,
 } from '../acl/public-link-store';
 import { DB, Db } from '../db/db';
-import { entities, entityGrants, users, worldLinks, worldMembers, worlds } from '../db/schema';
+import { worldAccess } from '../acl/world-access';
+import { entities, worldLinks, worldMembers, worlds } from '../db/schema';
 
 /**
  * The caller's World Rights (ADR-0039): every reachable World carries `read`; a World Owner
@@ -64,12 +67,10 @@ export class WorldsService {
    * sets are unioned so a World is listed once however reached.
    */
   list(userId: string): WorldSummary[] {
-    // The Superadmin sees every World (ADR-0037, #163) — the reachability bypass, inside
-    // this choke point: drop the derived filter entirely rather than bolt on a role check.
-    const superadmin = this.isSuperadmin(userId);
-    // Reachable = a member row OR any entity_grants row (owner/editor/viewer) on an Entity
-    // inside, in one statement: id-subqueries OR'd in the WHERE, so the DB does the union
-    // and de-dup (a World reached more than one way is still returned once).
+    // Reachability (member row OR any entity grant inside) is the one derived predicate the
+    // access context owns — a Superadmin's context returns match-all, so `list` sees every
+    // World without a special case here (ADR-0037, #163).
+    const access = worldAccess(this.db, userId);
     const rows = this.db
       .select({
         id: worlds.id,
@@ -78,25 +79,7 @@ export class WorldsService {
         updatedAt: worlds.updatedAt,
       })
       .from(worlds)
-      .where(
-        superadmin ? undefined : or(
-          inArray(
-            worlds.id,
-            this.db
-              .select({ id: worldMembers.worldId })
-              .from(worldMembers)
-              .where(eq(worldMembers.userId, userId)),
-          ),
-          inArray(
-            worlds.id,
-            this.db
-              .select({ id: entities.worldId })
-              .from(entities)
-              .innerJoin(entityGrants, eq(entityGrants.entityId, entities.id))
-              .where(eq(entityGrants.userId, userId)),
-          ),
-        ),
-      )
+      .where(access.reachFilter)
       .orderBy(asc(worlds.createdAt), asc(worlds.id))
       .all();
     if (rows.length === 0) return [];
@@ -127,7 +110,7 @@ export class WorldsService {
       const owners = ownersByWorld.get(w.id) ?? [];
       // Rights fall out of the owner set already fetched — free, so summaries always carry them
       // (ADR-0039). Superadmin manages every World (outside the model, #163).
-      return { ...w, owners, rights: worldRights(superadmin || owners.includes(userId)) };
+      return { ...w, owners, rights: worldRights(access.superadmin || owners.includes(userId)) };
     });
   }
 
@@ -136,7 +119,7 @@ export class WorldsService {
    * Unreachable World indistinguishable from nonexistent (ADR-0004).
    */
   get(userId: string, id: string): WorldDetail | null {
-    const world = this.reachableWorld(userId, id);
+    const world = worldAccess(this.db, userId).decide(id);
     return world ? this.toDetail(world, userId) : null;
   }
 
@@ -393,11 +376,14 @@ export class WorldsService {
     id: string,
     targetUserId: string,
   ): AclSetResult<WorldMember[]> {
-    if (!this.reachableWorld(userId, id)) return { status: 'not-found' };
+    if (!worldAccess(this.db, userId).decide(id)) return { status: 'not-found' };
     const isLeave = targetUserId === userId;
     if (!isLeave && !this.isOwner(userId, id)) return { status: 'forbidden' };
+    // The ≥1-Owner invariant, shared with the owner-set endpoints (ADR-0037): refuse a removal
+    // that would empty the set. A non-owner member isn't in `owners`, so removeOwnerOutcome
+    // returns `not-found` (not `last-owner`) for them and this never blocks their removal.
     const owners = this.worldOwners(id);
-    if (owners.length === 1 && owners[0] === targetUserId)
+    if (removeOwnerOutcome(owners, targetUserId).status === 'last-owner')
       return { status: 'last-owner' };
     const deleted = this.db
       .delete(worldMembers)
@@ -460,10 +446,9 @@ export class WorldsService {
   private gateOwnerManagement(
     userId: string,
     id: string,
-  ): Extract<OwnerSetResult, { status: 'not-found' | 'forbidden' }> | null {
-    if (!this.reachableWorld(userId, id)) return { status: 'not-found' };
-    if (!this.isOwner(userId, id)) return { status: 'forbidden' };
-    return null;
+  ): Extract<OwnerSetResult, { status: 'not-found' | 'forbidden' }> | undefined {
+    const reachable = !!worldAccess(this.db, userId).decide(id);
+    return gate({ reachable, isOwner: reachable && this.isOwner(userId, id) });
   }
 
   // Attach World's Home Entity id (is_home row), ownership set, and the caller's Rights.
@@ -522,45 +507,9 @@ export class WorldsService {
       .map((r) => ({ userId: r.userId, role: r.role as MemberRole }));
   }
 
-  /**
-   * World row if `userId` can reach it, else undefined (ADR-0024, ADR-0037). Reachability
-   * is derived, not stored: a member row (owner/contributor/viewer), OR any row in an
-   * Entity's ACE set inside the World — ownership *and* entity-level grants, one table since
-   * owner folded into entity_grants (migration 0007). Covers both the ex-member residue (a
-   * departed member who kept Entities keeps minimal reachability) and a grantee navigating to
-   * what they were given (#161). Unreachable is indistinguishable from nonexistent.
-   */
-  private reachableWorld(
-    userId: string,
-    id: string,
-  ): typeof worlds.$inferSelect | undefined {
-    const world = this.db.select().from(worlds).where(eq(worlds.id, id)).get();
-    if (!world) return undefined;
-    // The Superadmin reaches any World (ADR-0037, #163) — the reachability bypass, inside
-    // the choke point every read routes through, so `get` and the owner-set gates all honour it.
-    if (this.isSuperadmin(userId)) return world;
-    const member = this.db
-      .select({ userId: worldMembers.userId })
-      .from(worldMembers)
-      .where(and(eq(worldMembers.worldId, id), eq(worldMembers.userId, userId)))
-      .get();
-    if (member) return world;
-    const grantedEntity = this.db
-      .select({ id: entities.id })
-      .from(entities)
-      .innerJoin(entityGrants, eq(entityGrants.entityId, entities.id))
-      .where(and(eq(entities.worldId, id), eq(entityGrants.userId, userId)))
-      .get();
-    return grantedEntity ? world : undefined;
-  }
-
   /** Whether `userId` is a Superadmin — the outside-the-model repair bypass (ADR-0037, #163). */
   private isSuperadmin(userId: string): boolean {
-    return !!this.db
-      .select({ id: users.id })
-      .from(users)
-      .where(and(eq(users.id, userId), eq(users.isSuperadmin, true)))
-      .get();
+    return isSuperadmin(this.db, userId);
   }
 
   /**

@@ -25,7 +25,6 @@ import {
   Visibility,
   descriptorsSchema,
   EntityGrant,
-  EntityVerb,
   GrantRole,
   harvestDescriptors,
   PublicLink,
@@ -33,13 +32,21 @@ import {
   tagsSchema,
   visibilitySchema,
 } from '@hexly/domain';
-import { and, asc, desc, eq, getTableColumns, inArray, isNull, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, ne, sql, SQL } from 'drizzle-orm';
 import {
   AclSetResult,
+  gate,
+  isSuperadmin,
   OwnerSetResult,
   removeOwnerOutcome,
   userExists,
 } from '../acl/owner-set';
+import {
+  entityAccess,
+  ownsEntity,
+  READ_ONLY_RIGHTS,
+  sharedVisibility,
+} from '../acl/entity-access';
 import {
   mintPublicLink,
   PublicLinkTable,
@@ -52,7 +59,6 @@ import {
   entityDescriptors,
   entityGrants,
   entityLinks,
-  users,
   worldMembers,
   worlds,
 } from '../db/schema';
@@ -65,114 +71,6 @@ const ENTITY_LINK: PublicLinkTable = {
   fk: entityLinks.entityId,
   newRow: (token, entityId) => ({ id: token, entityId, createdAt: Date.now() }),
 };
-
-/**
- * The Superadmin bypass (ADR-0037, #163): the operator's in-app self, outside the
- * collaboration model. Resolved to a plain boolean *once per request* (see
- * {@link EntitiesService.isSuperadmin}) and passed into the predicates below — a Superadmin
- * short-circuits each to match-all (`sql`1``), so a repair read/write reaches anything and
- * the set-based `list`/`facets` reads return everything, without a per-row `users` subquery
- * bolted onto every predicate. A Superadmin never appears in an owner *listing*
- * (`entityOwnersOf` queries grants directly), and no admin tier reaches `private` as a role
- * — the Superadmin is explicitly outside the model. `superadmin === false` emits the exact
- * collaboration-model SQL, unchanged.
- */
-const MATCH_ALL = sql`1`;
-
-/**
- * Ownership predicate (ADR-0037): the caller is one of the Entity's Owners — an
- * `owner`-role grant row (folded from `entity_owners`, migration 0007). A Superadmin
- * short-circuits to match-all (repair). The top-role case of {@link hasGrant}.
- */
-function ownsEntity(userId: string, superadmin: boolean) {
-  return superadmin ? MATCH_ALL : hasGrant(userId, ['owner']);
-}
-
-/**
- * The stored `entity_grants.role` vocabulary (ADR-0037): the API-facing {@link GrantRole}
- * (`editor`/`viewer`) plus `owner`, the top role folded in from the retired `entity_owners`
- * (migration 0007). Owner is a *stored* role only — it never appears in a grant request body.
- */
-type StoredEntityRole = 'owner' | GrantRole;
-
-/** The caller has any membership row in the Entity's World (owner/contributor/viewer). */
-function isWorldMember(userId: string) {
-  return sql`EXISTS (SELECT 1 FROM ${worldMembers} WHERE ${worldMembers.worldId} = ${entities.worldId} AND ${worldMembers.userId} = ${userId})`;
-}
-
-/** The caller is a World Owner (role 'owner') of the Entity's World. */
-function isWorldOwner(userId: string) {
-  return sql`EXISTS (SELECT 1 FROM ${worldMembers} WHERE ${worldMembers.worldId} = ${entities.worldId} AND ${worldMembers.userId} = ${userId} AND ${worldMembers.role} = 'owner')`;
-}
-
-/**
- * The caller holds a row in the entity ACE set (ADR-0037) whose role is one of `roles`. A
- * per-row EXISTS that composes into any WHERE, like the others. `roles` spans the *stored*
- * vocabulary — `owner` (folded in, migration 0007) plus the `editor`/`viewer` grant roles —
- * which is broader than the API-facing {@link GrantRole}, so it takes {@link StoredEntityRole}.
- */
-function hasGrant(userId: string, roles: readonly StoredEntityRole[]) {
-  const list = sql.join(
-    roles.map((r) => sql`${r}`),
-    sql`, `,
-  );
-  return sql`EXISTS (SELECT 1 FROM ${entityGrants} WHERE ${entityGrants.entityId} = ${entities.id} AND ${entityGrants.userId} = ${userId} AND ${entityGrants.role} IN (${list}))`;
-}
-
-/**
- * The read predicate (ADR-0037): `owner ∨ grant(editor|viewer) ∨ (member ∧ shared)`. The
- * choke point every read path shares — an Entity the caller can't read is indistinguishable
- * from a missing one (ADR-0004), so `private` things don't even leak their existence. An
- * entity-level grant pierces `private`: it reveals the Entity to exactly that user (#161).
- */
-function canReadEntity(userId: string, superadmin: boolean) {
-  if (superadmin) return MATCH_ALL;
-  return sql`(${hasGrant(userId, ['owner', 'editor', 'viewer'])} OR (${entities.visibility} = 'shared' AND ${isWorldMember(userId)}))`;
-}
-
-/**
- * The management predicate (ADR-0037): `owner ∨ (world-owner ∧ shared)`. Governs the
- * powers a grant never confers — delete, visibility change, grant management. An Owner
- * mutates their Entity at any visibility; a World Owner curates only the *shared* surface
- * and this power stops dead at `private`. Rides the atomic UPDATE WHERE so a World Owner's
- * write actually lands (a plain `ownsEntity` would touch zero rows).
- */
-function canWriteEntity(userId: string, superadmin: boolean) {
-  if (superadmin) return MATCH_ALL;
-  return sql`(${hasGrant(userId, ['owner'])} OR (${entities.visibility} = 'shared' AND ${isWorldOwner(userId)}))`;
-}
-
-/**
- * The substance predicate (ADR-0037, #161): `canWrite ∨ grant(editor)`. Governs the
- * autosave surface — Content, name, Tags, Metadata — so an entity-level Editor edits
- * substance without gaining the lifecycle/exposure powers {@link canWriteEntity} keeps.
- */
-function canEditSubstanceEntity(userId: string, superadmin: boolean) {
-  if (superadmin) return MATCH_ALL;
-  // canWrite is `owner ∨ (shared ∧ world-owner)`; folding the extra `∨ grant(editor)` in as
-  // a single `grant(owner|editor)` scan keeps one EXISTS on entity_grants, not two.
-  return sql`(${hasGrant(userId, ['owner', 'editor'])} OR (${entities.visibility} = 'shared' AND ${isWorldOwner(userId)}))`;
-}
-
-/**
- * The caller's Entity Rights from a resolved access decision (ADR-0039) — the single place
- * the verb↔predicate correspondence lives. Each ADR-0037 predicate the `access()` query
- * already computes projects to its verb(s): `set-visibility` and `delete` share `canWrite`
- * (the lifecycle gate), two UI affordances over one rule. Order is stable for assertions.
- */
-function entityRightsOf(a: {
-  canRead: boolean;
-  canEditSubstance: boolean;
-  canWrite: boolean;
-  isOwner: boolean;
-}): EntityVerb[] {
-  const rights: EntityVerb[] = [];
-  if (a.canRead) rights.push('read');
-  if (a.canEditSubstance) rights.push('edit');
-  if (a.canWrite) rights.push('delete', 'set-visibility');
-  if (a.isOwner) rights.push('manage');
-  return rights;
-}
 
 const INITIAL_VERSION = 1;
 
@@ -260,7 +158,7 @@ export class EntitiesService implements OnApplicationBootstrap {
     // last-edited order. Skip potentially large document column.
     const match = opts.q ? toFtsMatch(opts.q) : null;
     const w = this.config.search.weights;
-    const superadmin = this.isSuperadmin(readerId);
+    const access = entityAccess(this.db, readerId);
     const query = this.db
       .select({
         id: entities.id,
@@ -272,16 +170,9 @@ export class EntitiesService implements OnApplicationBootstrap {
         version: entities.version,
         createdAt: entities.createdAt,
         updatedAt: entities.updatedAt,
-        // Opt-in per-row Rights (ADR-0039): project the same predicate columns access()
+        // Opt-in per-row Rights (ADR-0039): project the same predicate columns the decision
         // does so each summary can carry the caller's verbs. Omitted → pure read-filter.
-        ...(opts.withRights
-          ? {
-              canRead: canReadEntity(readerId, superadmin),
-              canEditSubstance: canEditSubstanceEntity(readerId, superadmin),
-              canWrite: canWriteEntity(readerId, superadmin),
-              isOwner: ownsEntity(readerId, superadmin),
-            }
-          : {}),
+        ...(opts.withRights ? access.rightsColumns : {}),
       })
       .from(entities)
       .$dynamic();
@@ -291,7 +182,7 @@ export class EntitiesService implements OnApplicationBootstrap {
     const rows = query
       .where(
         and(
-          canReadEntity(readerId, superadmin),
+          access.filter,
           ...filters(opts),
           match ? sql`entities_fts MATCH ${match}` : undefined,
         ),
@@ -316,11 +207,11 @@ export class EntitiesService implements OnApplicationBootstrap {
     const items = rows.slice(0, opts.limit).map((row) => {
       const summary = toSummary(row);
       if (!opts.withRights) return summary;
-      // The predicate columns arrive as SQLite 0/1; entityRightsOf reads them truthily.
+      // The predicate columns arrive as SQLite 0/1; rightsOf reads them truthily.
       const r = row as typeof row & Record<'canRead' | 'canEditSubstance' | 'canWrite' | 'isOwner', unknown>;
       return {
         ...summary,
-        rights: entityRightsOf({
+        rights: access.rightsOf({
           canRead: !!r.canRead,
           canEditSubstance: !!r.canEditSubstance,
           canWrite: !!r.canWrite,
@@ -340,27 +231,25 @@ export class EntitiesService implements OnApplicationBootstrap {
    * Reader- and World-scoped like {@link list}.
    */
   facets(readerId: string, opts: FacetOptions): EntityFacets {
-    // Resolve the Superadmin bypass once, then thread it through every count.
-    const superadmin = this.isSuperadmin(readerId);
+    // Resolve the read filter once (Superadmin bypass folded in), then reuse it in every count.
+    const { filter } = entityAccess(this.db, readerId);
     return {
       // Drop a category's own selection before counting it (drill-down).
-      type: this.countColumn(readerId, { ...opts, type: undefined }, entities.type, superadmin),
+      type: this.countColumn({ ...opts, type: undefined }, entities.type, filter),
       visibility: this.countColumn(
-        readerId,
         { ...opts, visibility: undefined },
         entities.visibility,
-        superadmin,
+        filter,
       ),
-      tag: this.countTags(readerId, { ...opts, tags: undefined }, superadmin),
+      tag: this.countTags({ ...opts, tags: undefined }, filter),
     };
   }
 
   /** Count a denormalized column's values (type/visibility) under `opts`. */
   private countColumn(
-    readerId: string,
     opts: FacetOptions,
     column: typeof entities.type | typeof entities.visibility,
-    superadmin: boolean,
+    filter: SQL,
   ): FacetCount[] {
     const match = opts.q ? toFtsMatch(opts.q) : null;
     const query = this.db
@@ -371,7 +260,7 @@ export class EntitiesService implements OnApplicationBootstrap {
       query.innerJoin(sql`entities_fts`, sql`entities_fts.rowid = entities.rowid`);
     }
     return query
-      .where(facetWhere(readerId, opts, match, superadmin))
+      .where(facetWhere(opts, match, filter))
       .groupBy(column)
       .all()
       .map((r) => ({ value: r.value as string, count: r.count }));
@@ -382,7 +271,7 @@ export class EntitiesService implements OnApplicationBootstrap {
    * `json_each` unrolls each entity's array into rows before grouping — an entity
    * with two tags counts toward both values (ADR-0035, #155).
    */
-  private countTags(readerId: string, opts: FacetOptions, superadmin: boolean): FacetCount[] {
+  private countTags(opts: FacetOptions, filter: SQL): FacetCount[] {
     const match = opts.q ? toFtsMatch(opts.q) : null;
     const query = this.db
       .select({
@@ -396,7 +285,7 @@ export class EntitiesService implements OnApplicationBootstrap {
       query.innerJoin(sql`entities_fts`, sql`entities_fts.rowid = entities.rowid`);
     }
     return query
-      .where(facetWhere(readerId, opts, match, superadmin))
+      .where(facetWhere(opts, match, filter))
       .groupBy(sql`tag.value`)
       .all()
       .map((r) => ({ value: r.value, count: r.count }));
@@ -407,13 +296,16 @@ export class EntitiesService implements OnApplicationBootstrap {
    * exist, so ownership never leaks (ADR-0004).
    */
   load(userId: string, id: string): EntityDetail | null {
-    const access = this.access(userId, id);
+    const access = entityAccess(this.db, userId);
+    const decision = access.decide(id);
     // Surface substance-write power so the editor gates itself (ADR-0037): a read-only
     // member or a Viewer grant opens read-only rather than autosaving into a wall of 403s,
     // while an entity-level Editor (canWrite false, canEditSubstance true) opens writable.
     // canManage rides the owner-only gate so the Share dialog (owners/grants/link — all
     // owner-only) is only offered to someone who can actually use it, not every writer.
-    return access?.canRead ? { ...toDetail(access.row), rights: entityRightsOf(access) } : null;
+    return decision?.canRead
+      ? { ...toDetail(decision.row), rights: access.rightsOf(decision) }
+      : null;
   }
 
   /**
@@ -529,11 +421,12 @@ export class EntitiesService implements OnApplicationBootstrap {
    */
   save(userId: string, id: string, req: SaveEntityRequest): SaveResult {
     // Read first for not-found and to preserve untouched columns in response.
-    const access = this.access(userId, id);
-    if (!access?.canRead) return { status: 'not-found' };
+    const access = entityAccess(this.db, userId);
+    const decision = access.decide(id);
+    if (!decision?.canRead) return { status: 'not-found' };
     // Substance edit (ADR-0037, #161): an entity-level Editor may save Content/Tags too.
-    if (!access.canEditSubstance) throw new ForbiddenException();
-    const row = access.row;
+    if (!decision.canEditSubstance) throw new ForbiddenException();
+    const row = decision.row;
 
     // Set only columns a save owns so concurrent renames aren't clobbered.
     // Tags always fully replace (save carries full set, #72).
@@ -553,7 +446,7 @@ export class EntitiesService implements OnApplicationBootstrap {
         .where(
           and(
             eq(entities.id, id),
-            canEditSubstanceEntity(userId, this.isSuperadmin(userId)),
+            access.editFilter,
             eq(entities.version, req.version),
           ),
         )
@@ -564,7 +457,7 @@ export class EntitiesService implements OnApplicationBootstrap {
     });
     if (!saved) {
       // Version moved between read and write; re-read to report current state.
-      const current = this.access(userId, id);
+      const current = access.decide(id);
       return current?.canRead
         ? { status: 'conflict', current: toDetail(current.row) }
         : { status: 'not-found' };
@@ -591,15 +484,16 @@ export class EntitiesService implements OnApplicationBootstrap {
     id: string,
     changes: { name?: string; visibility?: Visibility },
   ): EntityDetail | null {
-    const access = this.access(userId, id);
-    if (!access?.canRead) return null;
+    const access = entityAccess(this.db, userId);
+    const decision = access.decide(id);
+    if (!decision?.canRead) return null;
     // Visibility is exposure — never a grant power (ADR-0037, #161), so a visibility
     // change needs full management rights; a name-only patch is substance, which an
     // entity-level Editor may make. The WHERE below mirrors whichever gate applies.
     const changesVisibility = changes.visibility !== undefined;
-    const permitted = changesVisibility ? access.canWrite : access.canEditSubstance;
+    const permitted = changesVisibility ? decision.canWrite : decision.canEditSubstance;
     if (!permitted) throw new ForbiddenException();
-    if (access.row.isHome && changes.visibility && changes.visibility !== 'shared') {
+    if (decision.row.isHome && changes.visibility && changes.visibility !== 'shared') {
       // 409, like delete: conflicts with the World invariant that a shared World keeps a landing page.
       throw new ConflictException({ code: EntityErrorCode.HomeLockedShared } satisfies ApiError);
     }
@@ -613,9 +507,7 @@ export class EntitiesService implements OnApplicationBootstrap {
       .where(
         and(
           eq(entities.id, id),
-          changesVisibility
-            ? canWriteEntity(userId, this.isSuperadmin(userId))
-            : canEditSubstanceEntity(userId, this.isSuperadmin(userId)),
+          changesVisibility ? access.writeFilter : access.editFilter,
         ),
       )
       .run();
@@ -629,10 +521,10 @@ export class EntitiesService implements OnApplicationBootstrap {
     // so the editor reflects the caller's real standing instead of a stale writable state (a
     // name-only patch leaves standing untouched, so this is a no-op there). Cold path — a
     // rename/visibility toggle, never the autosave hot path — so the extra access read is fine.
-    const after = this.access(userId, id);
+    const after = access.decide(id);
     return {
-      ...toDetail({ ...access.row, ...changes, updatedAt }),
-      ...(after && { rights: entityRightsOf(after) }),
+      ...toDetail({ ...decision.row, ...changes, updatedAt }),
+      ...(after && { rights: access.rightsOf(after) }),
     };
   }
 
@@ -690,7 +582,7 @@ export class EntitiesService implements OnApplicationBootstrap {
    * reachable Entity the caller can't write is a 403. The Home Entity is undeletable (409).
    */
   delete(userId: string, id: string): boolean {
-    const access = this.access(userId, id);
+    const access = entityAccess(this.db, userId).decide(id);
     if (!access?.canRead) return false;
     if (!access.canWrite) throw new ForbiddenException();
     // 409, not 400: conflicts with World invariant (Home Entity always exists, ADR-0024).
@@ -712,16 +604,10 @@ export class EntitiesService implements OnApplicationBootstrap {
     userId: string,
     id: string,
   ): Extract<OwnerSetResult, { status: 'not-found' | 'forbidden' }> | undefined {
-    // Only needs read + ownership, so it skips access()'s full row (no document blob).
-    const superadmin = this.isSuperadmin(userId);
-    const row = this.db
-      .select({ canRead: canReadEntity(userId, superadmin), isOwner: ownsEntity(userId, superadmin) })
-      .from(entities)
-      .where(eq(entities.id, id))
-      .get();
-    if (!row?.canRead) return { status: 'not-found' };
-    if (!row.isOwner) return { status: 'forbidden' };
-    return undefined;
+    // Only needs reachability + ownership, so it uses the blob-free decideMeta (no document),
+    // then the shared gate maps it to the not-found/forbidden/proceed split (ADR-0037).
+    const meta = entityAccess(this.db, userId).decideMeta(id);
+    return gate({ reachable: !!meta?.canRead, isOwner: !!meta?.isOwner });
   }
 
   /**
@@ -895,7 +781,7 @@ export class EntitiesService implements OnApplicationBootstrap {
       .get();
     if (!link) return null;
     const row = this.db.select().from(entities).where(eq(entities.id, link.entityId)).get();
-    return row ? { ...toDetail(row), rights: ['read'] } : null;
+    return row ? { ...toDetail(row), rights: [...READ_ONLY_RIGHTS] } : null;
   }
 
   /**
@@ -908,11 +794,9 @@ export class EntitiesService implements OnApplicationBootstrap {
     const row = this.db
       .select()
       .from(entities)
-      .where(
-        and(eq(entities.id, id), eq(entities.worldId, worldId), eq(entities.visibility, 'shared')),
-      )
+      .where(and(eq(entities.id, id), eq(entities.worldId, worldId), sharedVisibility))
       .get();
-    return row ? { ...toDetail(row), rights: ['read'] } : null;
+    return row ? { ...toDetail(row), rights: [...READ_ONLY_RIGHTS] } : null;
   }
 
   /** Summaries of a World's `shared` Entities (ADR-0037, #162), ordered like {@link list}. */
@@ -920,7 +804,7 @@ export class EntitiesService implements OnApplicationBootstrap {
     return this.db
       .select()
       .from(entities)
-      .where(and(eq(entities.worldId, worldId), eq(entities.visibility, 'shared')))
+      .where(and(eq(entities.worldId, worldId), sharedVisibility))
       .orderBy(desc(entities.updatedAt), asc(entities.id))
       .all()
       .map(toSummary);
@@ -976,51 +860,11 @@ export class EntitiesService implements OnApplicationBootstrap {
   }
 
   /**
-   * The per-Entity access decision (ADR-0037) — the generalized choke point that
-   * replaces the owner-only `ownedRow`. One query pulls the full row plus the caller's
-   * standing computed by the same SQL predicates the read/write paths use: `canRead`
-   * (owner ∨ member-and-shared) gates every read, `canWrite` (owner ∨ world-owner-and-shared)
-   * gates edit/delete/visibility — so the rule lives *only* in those predicates (no JS
-   * re-derivation to drift). `undefined` means no such row — the caller maps that and a
-   * failed `canRead` alike to 404, but a reachable-yet-forbidden write (canRead ∧ ¬canWrite) to 403.
-   */
-  /**
-   * Whether `userId` is a Superadmin (ADR-0037, #163) — resolved once per request and
-   * passed into the predicates, which then short-circuit to match-all. One indexed PK
-   * lookup, versus a per-row `users` subquery embedded in every predicate.
+   * Whether `userId` is a Superadmin (ADR-0037, #163) — the repair bypass, for the
+   * ownership-only scans ({@link listByWorld}) that don't route through an access context.
    */
   private isSuperadmin(userId: string): boolean {
-    return !!this.db
-      .select({ id: users.id })
-      .from(users)
-      .where(and(eq(users.id, userId), eq(users.isSuperadmin, true)))
-      .get();
-  }
-
-  private access(userId: string, id: string) {
-    // Resolve the Superadmin bypass once for all four predicates (repair reaches anything).
-    const superadmin = this.isSuperadmin(userId);
-    const result = this.db
-      .select({
-        ...getTableColumns(entities),
-        canRead: canReadEntity(userId, superadmin),
-        canWrite: canWriteEntity(userId, superadmin),
-        canEditSubstance: canEditSubstanceEntity(userId, superadmin),
-        isOwner: ownsEntity(userId, superadmin),
-      })
-      .from(entities)
-      .where(eq(entities.id, id))
-      .get();
-    if (!result) return undefined;
-    // Split the computed 0/1 columns off so `.row` is a clean entity row for toDetail.
-    const { canRead, canWrite, canEditSubstance, isOwner, ...row } = result;
-    return {
-      row,
-      canRead: !!canRead,
-      canWrite: !!canWrite,
-      canEditSubstance: !!canEditSubstance,
-      isOwner: !!isOwner,
-    };
+    return isSuperadmin(this.db, userId);
   }
 }
 
@@ -1048,14 +892,9 @@ function filters(opts: FilterOptions) {
  * (#155). Same predicates {@link EntitiesService.list} applies, minus paging, so a
  * count and the page it annotates always agree on what's in the filtered set.
  */
-function facetWhere(
-  readerId: string,
-  opts: FacetOptions,
-  match: string | null,
-  superadmin: boolean,
-) {
+function facetWhere(opts: FacetOptions, match: string | null, filter: SQL) {
   return and(
-    canReadEntity(readerId, superadmin),
+    filter,
     ...filters(opts),
     match ? sql`entities_fts MATCH ${match}` : undefined,
   );

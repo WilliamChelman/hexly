@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { AclErrorCode, AclResourceKind, ApiError } from '@hexly/domain';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { Db } from '../db/db';
 import { entityGrants, users, worldMembers } from '../db/schema';
 
@@ -114,4 +114,35 @@ export function removeOwnerOutcome(
   if (!owners.includes(targetUserId)) return { status: 'not-found' };
   if (owners.length === 1) return { status: 'last-owner' };
   return { status: 'ok', value: owners.filter((u) => u !== targetUserId) };
+}
+
+/**
+ * Whether `userId` is a Superadmin (ADR-0037, #163) — the operator's in-app self, outside
+ * the collaboration model. Resolved once per request and handed to the predicates, which
+ * short-circuit to match-all: one indexed PK lookup versus a per-row `users` subquery bolted
+ * onto every predicate. Both the Entity and World access contexts share this one definition
+ * so the repair bypass can't drift between them.
+ */
+export function isSuperadmin(db: Db, userId: string): boolean {
+  return !!db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(eq(users.id, userId), eq(users.isSuperadmin, true)))
+    .get();
+}
+
+/**
+ * The shared owner-management gate (ADR-0037): the no-existence-leak split every owner/link/
+ * grant endpoint routes through, fed a resolved `{ reachable, isOwner }`. `not-found` when the
+ * resource is unreachable — indistinguishable from missing (404, ADR-0004) — `forbidden` when
+ * it's reachable but the caller isn't an Owner (403), else `undefined` = proceed (composes with
+ * `return gate(...) ?? { status: 'ok', … }`). One rule, so the two services can't diverge.
+ */
+export function gate(outcome: {
+  reachable: boolean;
+  isOwner: boolean;
+}): Extract<AclSetResult<never>, { status: 'not-found' | 'forbidden' }> | undefined {
+  if (!outcome.reachable) return { status: 'not-found' };
+  if (!outcome.isOwner) return { status: 'forbidden' };
+  return undefined;
 }
