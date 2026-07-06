@@ -1,36 +1,8 @@
 import { test as base, expect, type Page, type Response } from '@playwright/test';
-
-// ponytail: mirror of the app's pretty-URL codec (apps/web/.../core/utils/pretty-id.ts,
-// ADR-0042) — the nx boundary rule forbids importing across projects, and the `slug-base62(id)`
-// scheme is a frozen contract, so a tiny local copy is cheaper than promoting it to a lib.
-const B62 = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-/** The bare base62 code for a UUID (the suffix of a pretty segment). */
-function codeOf(uuid: string): string {
-  let n = BigInt('0x' + uuid.replace(/-/g, ''));
-  if (n === 0n) return '0';
-  let s = '';
-  while (n > 0n) {
-    s = B62[Number(n % 62n)] + s;
-    n /= 62n;
-  }
-  return s;
-}
-
-/** Recover the canonical UUID from a `slug-base62` (or legacy bare-UUID) segment. */
-function idFromSegment(seg: string): string {
-  if (UUID_RE.test(seg)) return seg;
-  const code = seg.slice(seg.lastIndexOf('-') + 1);
-  let n = 0n;
-  for (const ch of code) {
-    const i = B62.indexOf(ch);
-    if (i < 0) return seg; // not base62 — pass through
-    n = n * 62n + BigInt(i);
-  }
-  const hex = n.toString(16).padStart(32, '0');
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
+// Reuse the app's own pretty-URL codec (ADR-0042): URL segments are `slug-base62(id)`,
+// so specs decode a segment back to the canonical id and build loose matchers from it.
+// The nx boundary rule allows web-e2e → web imports (see eslint.config.mjs).
+import { idFromSegment, segment } from '../../web/src/app/core/utils/pretty-id';
 
 /**
  * The base test for the authenticated suite. An auto fixture resets the database
@@ -73,7 +45,7 @@ export function entityIdFromUrl(page: Page): string {
  * the `[^/]*` absorbs the optional cosmetic slug prefix.
  */
 export function segRe(id: string): string {
-  return `[^/]*${codeOf(id)}`;
+  return `[^/]*${segment(id)}`;
 }
 
 /**
