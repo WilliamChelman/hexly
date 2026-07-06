@@ -29,7 +29,8 @@ import {
 import { ThemeService } from '../../../../core/services/theme.service';
 import { ToasterService } from '../../../../core/services/toaster.service';
 import { terrainKey } from '../../utils/catalog-keys';
-import { HexMapStore, SelectMode, ToolId } from '../../services/hexmap-store';
+import { HexMapStore, SelectMode } from '../../services/hexmap-store';
+import { toolForHotkey } from './tools';
 import { CoordReadout } from './coord-readout';
 import { ZoomControl } from './zoom-control';
 import { Camera } from '../../utils/camera';
@@ -63,19 +64,6 @@ const NEW_LABEL_TEXT = 'Label';
  * it, a whole-Hex move begins with a live preview, committed once on release.
  */
 const HEX_DRAG_THRESHOLD = 4;
-
-/**
- * The letter that arms each top-level Tool from the keyboard (issue #27). Region has
- * no key (ADR-0012): regions are created in the Regions panel and painted via the
- * Inspector's Add/Remove brush.
- */
-const TOOL_HOTKEYS: Readonly<Record<string, ToolId>> = {
-  s: 'select',
-  t: 'terrain',
-  f: 'feature',
-  l: 'label',
-  e: 'erase',
-};
 
 /**
  * The live map surface: an infinite, pannable, zoomable hex plane on a Canvas
@@ -869,7 +857,7 @@ export class MapCanvas {
       return;
     }
 
-    const tool = TOOL_HOTKEYS[event.key.toLowerCase()];
+    const tool = toolForHotkey(event.key);
     if (tool) {
       this.store.armTool(tool);
       return;

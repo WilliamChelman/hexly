@@ -13,29 +13,8 @@ import {
   featureSubtools,
   SelectSubtool,
   selectSubtools,
-  ToolId,
 } from '../../services/hexmap-store';
-
-interface ToolDef {
-  readonly id: ToolId;
-  readonly key: string;
-  readonly glyph: IconName;
-}
-
-/**
- * The floating tool strip's Tools, in palette order. Each arms a top-level Tool;
- * the flyout then shows only that Tool's Subtools (issue #27). The keycaps mirror
- * the keyboard bindings in {@link map-canvas} and are surfaced in the tooltips.
- * The visible name is resolved at the UI layer from the Tool's stable `id`
- * (`editorShell.toolPalette.<id>`, ADR-0014), so it can localize.
- */
-const TOOLS: readonly ToolDef[] = [
-  { id: 'select', key: 'S', glyph: 'select' },
-  { id: 'terrain', key: 'T', glyph: 'terrain' },
-  { id: 'feature', key: 'F', glyph: 'settlement' },
-  { id: 'label', key: 'L', glyph: 'label' },
-  { id: 'erase', key: 'E', glyph: 'erase' },
-];
+import { TOOLS } from './tools';
 
 /** The glyph for a Select Subtool: the arrow cursor for Pick, a dashed box for Marquee. */
 function glyphFor(subtool: SelectSubtool): IconName {
@@ -197,7 +176,13 @@ function glyphFor(subtool: SelectSubtool): IconName {
 export class ToolPalette {
   protected readonly store = inject(HexMapStore);
 
-  protected readonly tools = TOOLS;
+  // Keycap is the hotkey upper-cased for display; the letter itself lives in TOOLS,
+  // shared with the keyboard so the tooltip can't disagree with what the key arms.
+  protected readonly tools = TOOLS.map((t) => ({
+    id: t.id,
+    glyph: t.glyph,
+    key: t.hotkey.toUpperCase(),
+  }));
 
   // Select Subtools: keycap is the slot in selectSubtools, shared with keyboard 1/2.
   protected readonly selectTools = selectSubtools.map((id, i) => ({
