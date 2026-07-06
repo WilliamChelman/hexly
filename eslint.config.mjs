@@ -26,29 +26,6 @@ export default [
     },
   },
   {
-    // The e2e project drives the real web app, so it may reuse web's own source
-    // helpers (e.g. the pretty-URL codec) directly rather than duplicating them.
-    files: ['apps/web-e2e/**/*.ts'],
-    rules: {
-      '@nx/enforce-module-boundaries': [
-        'error',
-        {
-          enforceBuildableLibDependency: true,
-          allow: [
-            '^.*/eslint(\\.base)?\\.config\\.[cm]?[jt]s$',
-            '/web/src/',
-          ],
-          depConstraints: [
-            {
-              sourceTag: '*',
-              onlyDependOnLibsWithTags: ['*'],
-            },
-          ],
-        },
-      ],
-    },
-  },
-  {
     files: [
       '**/*.ts',
       '**/*.tsx',
