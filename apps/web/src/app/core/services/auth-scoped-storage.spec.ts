@@ -8,7 +8,7 @@ describe('AuthScopedStorage', () => {
   let auth: MockAuthClient;
 
   function login(id: string): void {
-    auth.setUser({ id, email: `${id}@test.com`, displayName: id });
+    auth.setUser({ id, email: `${id}@test.com`, displayName: id, preferences: {}, isAdmin: false, isSuperadmin: false, canCreateWorlds: true });
     TestBed.flushEffects();
   }
 

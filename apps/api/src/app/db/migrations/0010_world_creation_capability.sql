@@ -1,0 +1,1 @@
+ALTER TABLE `users` ADD `can_create_worlds` integer DEFAULT false NOT NULL;

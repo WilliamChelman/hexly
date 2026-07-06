@@ -1,4 +1,8 @@
 import { test as base, expect, type Page, type Response } from '@playwright/test';
+// Reuse the app's own pretty-URL codec (ADR-0042): URL segments are `slug-base62(id)`,
+// so specs decode a segment back to the canonical id and build loose matchers from it.
+// The nx boundary rule allows web-e2e → web imports (see eslint.config.mjs).
+import { idFromSegment, segment } from '../../web/src/app/core/utils/pretty-id';
 
 /**
  * The base test for the authenticated suite. An auto fixture resets the database
@@ -25,6 +29,24 @@ export const test = base.extend<{ resetDb: void }>({
 });
 
 export { expect };
+
+/**
+ * The open Entity's canonical id, decoded from the pretty URL segment (ADR-0042).
+ * The last path segment is `slug-base62(id)`; specs need the raw id for testid
+ * selectors (`open-<id>`) and `/api/entities/<id>` calls.
+ */
+export function entityIdFromUrl(page: Page): string {
+  return idFromSegment(page.url().split('/').pop()!);
+}
+
+/**
+ * A regex fragment matching a pretty URL segment (`slug-base62(id)` or bare code)
+ * carrying `id` (ADR-0042). The base62 suffix is alnum-only, so it needs no escaping;
+ * the `[^/]*` absorbs the optional cosmetic slug prefix.
+ */
+export function segRe(id: string): string {
+  return `[^/]*${segment(id)}`;
+}
 
 /**
  * Wait for a successful entity PUT. Since the Save button is gone (ADR-0026),

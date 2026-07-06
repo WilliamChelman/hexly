@@ -31,11 +31,15 @@ plus the anonymous equivalents: a per-entity Public Link (an anonymous Viewer gr
 
 ```
 world_members:  role gains 'owner'          -- world ownership becomes member rows; worlds.owner_id retires
-entity_owners:  { entity_id, user_id }      -- entities.owner_id retires into a set
-entity_grants:  { entity_id, user_id, role: editor | viewer }
+entity_owners:  { entity_id, user_id }      -- entities.owner_id retires into a set (later folded away, see Amendment)
+entity_grants:  { entity_id, user_id, role: editor | viewer }   -- role gains 'owner' (see Amendment)
 entity_links:   { id (token), entity_id }   -- per-entity Public Link (world_links already exists)
 users:          + is_admin, is_superadmin, disabled_at
 ```
+
+### Amendment (migration 0007): entity_owners folds into entity_grants
+
+The two entity-level tables above shipped separately, but they are the same shape — `(entity, user, role)` — and `world_members` already proved owner-as-a-role works. So `entity_owners` is folded into `entity_grants` as `role: 'owner'`, making the entity ACE set match the world one: one table, `role ∈ owner | editor | viewer`. Owner stays constitutive (manages grants, carries the ≥1-Owner invariant, pierces `private` unconditionally); `editor`/`viewer` remain the API-facing grant roles — `owner` is a *stored* role only, never accepted in a grant request body. The backfill maps each owner row to an `owner` grant, **owner winning** any pre-existing editor/viewer grant for the same user (they collapse to one row). `canRead` becomes a single lookup, and World reachability drops its redundant owner-join (the grant-join already spans all roles). No externally observable behaviour changes — the read/write/substance predicates keep their exact shapes.
 
 ## Considered Options
 

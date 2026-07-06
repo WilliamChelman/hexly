@@ -85,19 +85,23 @@ _Avoid_: Text, caption, title, annotation
 ## Worlds
 
 **World**:
-A lightweight container record that groups Entities for a single campaign or setting. Not an Entity type — it lives outside the entity model. Every Entity belongs to exactly one World (`world_id NOT NULL`). Carries a `name` and an `owner_id`. The Home Entity is identified by the `is_home` flag on the Entity, not a column on the World.
+A lightweight container record that groups Entities for a single campaign or setting. Not an Entity type — it lives outside the entity model. Every Entity belongs to exactly one World (`world_id NOT NULL`). Carries a `name` and an `owner_id`. Its landing surface is the derived World Dashboard; it holds an ordered `pinned_entity_ids` set surfaced there.
 _Avoid_: Space, container, campaign
 
-**Home Entity**:
-A `note` Entity auto-created when a World is created, flagged `is_home = true` in the `entities` table. The partial unique index `idx_world_home` enforces at most one per World. Serves as the World's landing page. Cannot be deleted, cannot be moved to another World, and is always `shared` (its visibility is locked, like its title). Its title is not its own — it is the World's name (the World name is the source of truth; ADR-0029), so it reads as derived rather than freely edited.
-_Avoid_: World page, index, overview
+**World Dashboard**:
+The per-World landing surface at `/w/:worldId` — the front door on entering a World. A read-only *derived* view (recent Entities, Hex Maps, at-a-glance counts) plus the Owners' curated Pinned Entities. It authors nothing of its own — no stored body, only queries over the World's Entities (ADR-0043) — so authored landing prose, if wanted, is just a Note the Owner pins. Distinct from the World Index (lists Worlds, at `/`) and the Entity Browser (lists this World's Entities, at `/entities`).
+_Avoid_: Home Entity, world home, landing page, overview
+
+**Pinned Entity**:
+An Entity an Owner has featured on the World Dashboard. The pin set is a World property — one shared, ordered list (`pinned_entity_ids` on the World), the same for everyone, curated only by World Owners. A pin is a reference by id, not an enforced FK: resolved per viewer through the ordinary access filter, so a pinned Entity the caller can't reach (`private` without a grant, or deleted) simply drops off their Dashboard.
+_Avoid_: Bookmark, favourite, featured note
 
 **World Index**:
-The page at `/` listing every World the caller can reach — owned, member, or holding any Entity the caller owns or is granted (reachability is derived, not a stored flag) — and the surface that owns World create, rename, and delete. The durable directory of Worlds — distinct from the World Switcher (a transient quick-hop control) and from a World's own Home Entity (its in-world landing note).
-_Avoid_: World home, world library, dashboard, world picker
+The page at `/` listing every World the caller can reach — owned, member, or holding any Entity the caller owns or is granted (reachability is derived, not a stored flag) — and the surface that owns World create, rename, and delete. The durable directory of Worlds — distinct from the World Switcher (a transient quick-hop control) and from a World's own World Dashboard (its in-world landing surface).
+_Avoid_: World home, world library, world picker
 
 **World Switcher**:
-The compact in-app control (docked by the user menu) for hopping to another reachable World without returning to the World Index. Pure navigation — it shows the current World and switches the URL scope; it does not manage Worlds.
+The compact in-app control at the nav-rail masthead for hopping to another reachable World without returning to the World Index. Pure navigation — it shows the current World and switches the URL scope; it does not manage Worlds. Shown only inside a World (ADR-0041); on the World Index the Index itself is the chooser, so the Switcher is absent.
 _Avoid_: World selector, world dropdown
 
 **World Owner**:
@@ -119,6 +123,10 @@ _Avoid_: Share link, invite link
 ## Sharing
 
 Sharing is per **World** (ADR-0024; cemented in ADR-0037). A World's sharing cascades to all `shared` Entities within it. Entity-level Editor/Viewer grants (ADR-0004) provide finer-grained control on top — including per-user visibility, via a grant on a `private` Entity.
+
+**Rights**:
+The closed set of actions a given caller may perform on a specific Entity or World — e.g. reading it, editing its substance, deleting it, changing its visibility, managing its sharing. Derived from the sharing rules (a caller's standing as Owner, grantee, or member) rather than granted directly, and reported *with* the resource when it is fetched, so a surface knows what to offer without re-deriving standing. The vocabulary is per resource kind: a World is not something one "edits the substance" of. Distinct from a role (Owner, Editor, Contributor…), which is *why* a caller holds a Right; the Rights are the resolved *what*.
+_Avoid_: Permissions, ACL, capabilities, grants (a grant is one input to Rights, not the Rights)
 
 **Entity Visibility**:
 A two-value field on every Entity: `private` (default) or `shared`. A `private` Entity is accessible only to its Owners and any entity-level grants (named Editor/Viewer, or anonymous via its Public Link) — World Owners and Instance Admins have no special access to it; private is absolute within the collaboration model (only a Superadmin, outside the model, can reach it). A `shared` Entity is accessible to all World members (Contributor, World Viewer, World Public Link holders). Per-user visibility is not a separate feature — it is what an entity-level grant on a `private` Entity delivers.
@@ -222,6 +230,30 @@ _Avoid_: Filter, dimension, aspect
 In the Entity Browser, matching a text query against an Entity's name, Tags, and the prose of its Content — ranked by relevance. Backed server-side by a plain-text projection of Content produced by a format-tagged extractor, so the domain still never parses Content (ADR-0019, ADR-0035).
 _Avoid_: Fulltext, keyword search, fuzzy search
 
+## Outline
+
+**Outline**:
+A navigation view of a Content's headings — a nested, click-to-jump list that also marks the heading currently in view. Derived from the Content, never stored: the domain has no heading model of its own. Available wherever an Entity shows its Content body — a Note, or a Hex Map on its Note view. Sibling to the Inspector and Regions panel.
+_Avoid_: Table of contents, TOC, minimap, nav panel
+
+## User preferences
+
+**User Settings**:
+The account-owned page where a signed-in user edits their own **Preferences** and profile — display name and password (email is shown read-only). Distinct from a World's membership settings (World Owner surface) and from Instance Configuration (operator settings).
+_Avoid_: Account settings, profile page, options
+
+**Preferences**:
+A user's roaming presentation choices — UI **Locale**, **Format Locale**, and theme — bound to the account so they follow the user across devices. Anonymous public-link viewers, who have no account, still get these choices locally. Distinct from Instance Configuration (operator, per-Instance) and World membership settings.
+_Avoid_: Settings, options, config
+
+**Locale**:
+A user's chosen **interface language** (English or French today) — which strings the UI renders. Distinct from Format Locale: Locale picks the words, Format Locale picks how dates and numbers read.
+_Avoid_: Language (as a field name), i18n, region
+
+**Format Locale**:
+A user's chosen **regional formatting** (a BCP-47 tag) governing how dates, numbers, and times are rendered, independent of the UI **Locale** — so an English reader can see day-month dates. Defaults to the UI Locale when unset.
+_Avoid_: Date format, regional settings, locale (bare — that means the UI language)
+
 ## Self-hosting
 
 **Instance**:
@@ -233,8 +265,12 @@ The folder an operator points Hexly at (`HEXLY_DIR`), holding its SQLite databas
 _Avoid_: Data directory, data folder, db path, storage dir
 
 **Instance Admin**:
-A user flag granting account management on an Instance — create, disable, and delete users, reset passwords, grant/revoke the Admin flag — plus future instance-settings surfaces. Carries zero content powers: an Admin reads and edits nothing they aren't otherwise an Owner, member, or grantee of. Deleting a user is refused while that user solely owns any World or Entity; disabling (login locked, data and memberships intact) is the immediate lever.
+A user flag granting account management on an Instance — create, disable, and delete users, reset passwords, grant/revoke the Admin flag, and grant/revoke the World Creation capability — plus future instance-settings surfaces. Carries zero content powers: an Admin reads and edits nothing they aren't otherwise an Owner, member, or grantee of, and does not inherently hold World Creation (granting it to oneself is an explicit, visible act). Deleting a user is refused while that user solely owns any World or Entity; disabling (login locked, data and memberships intact) is the immediate lever.
 _Avoid_: Admin (alone, ambiguous with Superadmin), moderator, staff
+
+**World Creation**:
+A per-user Instance capability deciding whether that user may create a World (from the World Index, the Command Palette, or a vault import). One of a closed, code-known set of **orthogonal** instance capabilities — held independently of Instance Admin, so an account manager need not create Worlds and a creator need not manage accounts, and the "zero content powers" boundary holds (ADR-0040). Off by default: a freshly provisioned user cannot create Worlds until an Instance Admin grants it; a Superadmin always may (repair). Revoking is not retroactive — it gates the create action only, never touching Worlds the user already owns or manages.
+_Avoid_: World Creator, Author (persona), role, permission
 
 **Superadmin**:
 The in-app embodiment of the operator: unrestricted access, sitting outside the collaboration model entirely. Exists for repair — orphaned data, accidental deletions — not for daily administration (that is the Instance Admin's job). At least one per Instance, seeded at setup.

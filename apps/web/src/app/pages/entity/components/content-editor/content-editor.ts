@@ -294,6 +294,17 @@ export class ContentEditor {
       editor.view.dom.setAttribute('aria-label', this.ariaLabel());
     });
 
+    // A read-only opener (canWrite:false, ADR-0037) can't edit the prose — so autosave
+    // never fires and the session never hits a 403. Reacts to the editor swap and writable.
+    effect(() => {
+      const editor = this.editor();
+      if (!editor) return;
+      // emitUpdate=false: setEditable defaults to firing an `update`, which would push the
+      // editor's current prose back into the session and clobber a just-adopted re-seed before
+      // the seed effect reads it (Reseeded → Original race). Toggling editability isn't an edit.
+      editor.setEditable(this.session.writable(), false);
+    });
+
     // Seed on load/swap/conflict-reload, keyed off seed() so a keystroke never
     // recreates the editor. Snapshot comes from the *live* Content, not the seed
     // detail: a clean save advances live Content but not seed, so a mid-session

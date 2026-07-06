@@ -27,28 +27,34 @@ import { tagItems } from './tag-suggestions';
       @for (tag of tags(); track tag) {
         <app-chip>
           {{ tag }}
-          <button
-            type="button"
-            class="-mr-1 leading-none opacity-70 hover:opacity-100 cursor-pointer bg-transparent border-0 text-current"
-            [attr.aria-label]="'entityTags.removeLabel' | transloco: { tag }"
-            [attr.data-testid]="'tag-remove-' + tag"
-            (click)="remove(tag)"
-          >
-            &times;
-          </button>
+          <!-- The remove affordance is edit-only: a read-only opener sees the tag, can't drop it. -->
+          @if (writable()) {
+            <button
+              type="button"
+              class="-mr-1 leading-none opacity-70 hover:opacity-100 cursor-pointer bg-transparent border-0 text-current"
+              [attr.aria-label]="'entityTags.removeLabel' | transloco: { tag }"
+              [attr.data-testid]="'tag-remove-' + tag"
+              (click)="remove(tag)"
+            >
+              &times;
+            </button>
+          }
         </app-chip>
       }
-      <input
-        #tagInput
-        type="text"
-        data-testid="tag-input"
-        class="min-w-32 flex-1 bg-transparent border-0 text-sm text-ink outline-none placeholder:text-ink-muted"
-        [attr.aria-label]="addLabel()"
-        [attr.placeholder]="addPlaceholder()"
-        (input)="suggest()"
-        (keydown)="onKeyDown($event)"
-        (blur)="add($event)"
-      />
+      <!-- The add input is edit-only (ADR-0037); read-only shows just the existing tags. -->
+      @if (writable()) {
+        <input
+          #tagInput
+          type="text"
+          data-testid="tag-input"
+          class="min-w-32 flex-1 bg-transparent border-0 text-sm text-ink outline-none placeholder:text-ink-muted"
+          [attr.aria-label]="addLabel()"
+          [attr.placeholder]="addPlaceholder()"
+          (input)="suggest()"
+          (keydown)="onKeyDown($event)"
+          (blur)="add($event)"
+        />
+      }
     </div>
     <app-tag-picker (picked)="commit($event)" />
   `,
@@ -57,6 +63,8 @@ export class EntityTags {
   private readonly session = inject(EntitySession);
   private readonly entities = inject(EntitiesClient);
   protected readonly tags = this.session.tags;
+  /** Read-only openers (ADR-0037) see the tags but not the add/remove affordances. */
+  protected readonly writable = this.session.writable;
   protected readonly addLabel = translateSignal('entityTags.addLabel');
   protected readonly addPlaceholder = translateSignal('entityTags.addPlaceholder');
   private readonly input =

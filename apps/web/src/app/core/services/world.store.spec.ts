@@ -8,7 +8,7 @@ import { MockWorldsClient } from '../testing/worlds-client.mock';
 import { WorldStore } from './world.store';
 
 function world(id: string, name = id): WorldSummary {
-  return { id, name, ownerId: 'u1', createdAt: 1, updatedAt: 1 };
+  return { id, name, owners: ['u1'], rights: ['read', 'manage'], createdAt: 1, updatedAt: 1 };
 }
 
 describe('WorldStore', () => {
@@ -33,7 +33,7 @@ describe('WorldStore', () => {
   }
 
   function login(id = 'u1'): void {
-    auth.setUser({ id, email: 'ada@hexly.test', displayName: 'Ada' });
+    auth.setUser({ id, email: 'ada@hexly.test', displayName: 'Ada', preferences: {}, isAdmin: false, isSuperadmin: false, canCreateWorlds: true });
   }
 
   it('loads the caller’s Worlds and marks loaded', () => {

@@ -9,6 +9,7 @@ import { translateSignal } from '@jsverse/transloco';
 import { Observable, concat, ignoreElements, of } from 'rxjs';
 import { EntitySession } from './services/entity-session';
 import { HexMapStore } from './services/hexmap-store';
+import { OutlineStore } from './services/outline-store';
 import { EntityHeader } from './components/entity-header';
 import { ToolPalette } from './components/map/tool-palette';
 import { MapCanvas } from './components/map/map-canvas';
@@ -18,6 +19,10 @@ import { EditorRail } from './components/map/editor-rail';
 import { StatusBar } from './components/map/status-bar';
 import { ContentEditor } from './components/content-editor/content-editor';
 import { EntityMetadata } from './components/entity-metadata';
+import { OutlinePanel } from './components/outline-panel';
+import { OutlineSource } from './components/outline-source';
+import { IconButton } from '../../ui/icon-button';
+import { Icon } from '../../ui/icon/icon';
 
 /**
  * The open-Entity route (`/entities/:id`, #70): the routed page that loads the
@@ -49,6 +54,10 @@ import { EntityMetadata } from './components/entity-metadata';
     StatusBar,
     ContentEditor,
     EntityMetadata,
+    OutlinePanel,
+    OutlineSource,
+    IconButton,
+    Icon,
   ],
   template: `
     @if (session.current()) {
@@ -62,35 +71,68 @@ import { EntityMetadata } from './components/entity-metadata';
         <app-entity-header />
         <main class="body relative min-h-0">
           @if (showMap()) {
-            <!-- Full-bleed canvas; all side chrome floats over it (ADR-0013). -->
+            <!-- Full-bleed canvas; all side chrome floats over it (ADR-0013). The canvas
+                 itself is a read affordance (pan/zoom); every editing dock below is gated on
+                 writable() so a read-only opener sees the map but no tools (ADR-0037, #162). -->
             <app-map-canvas class="absolute inset-0" />
-            <app-tool-palette class="absolute top-3 left-3 z-[1]" />
-            <!--
-              Right dock: panel (Inspector / Regions) + edge rail as a flex row, no
-              hand-computed offsets (ADR-0013). pointer-events-none so the canvas stays
-              interactive below a short panel; each child re-enables it.
-            -->
+            @if (writable()) {
+              <app-tool-palette class="absolute top-3 left-3 z-[1]" />
+              <!--
+                Right dock: panel (Inspector / Regions) + edge rail as a flex row, no
+                hand-computed offsets (ADR-0013). pointer-events-none so the canvas stays
+                interactive below a short panel; each child re-enables it.
+              -->
+              <div
+                class="absolute top-3 right-3 bottom-3 flex items-start gap-2 z-[1] pointer-events-none"
+              >
+                @if (store.rightPanel() === 'regions') {
+                  <app-regions-panel
+                    class="w-[var(--rail-inspector)] max-h-full border border-line rounded-lg shadow-2 pointer-events-auto"
+                  />
+                } @else if (store.rightPanel() === 'inspector') {
+                  <app-inspector
+                    class="w-[var(--rail-inspector)] max-h-full border border-line rounded-lg shadow-2 pointer-events-auto"
+                  />
+                }
+                <app-editor-rail class="pointer-events-auto" />
+              </div>
+            }
+          } @else {
+            <!-- Content body in a centred reading column: a note, or a hexmap on its Note view (#75).
+                 Opening the Outline reflows this column left (extra right padding) so the panel never
+                 overlaps prose; closed still reserves room for the floating toggle. -->
+            <div
+              data-content-scroll
+              class="absolute inset-0 overflow-y-auto bg-surface-sunken transition-[padding] duration-200"
+              [style.paddingRight]="outline.isOpen() ? '20rem' : '3.5rem'"
+            >
+              <div class="max-w-[60rem] mx-auto py-6 px-6">
+                <app-entity-metadata />
+                <app-content-editor appOutlineSource [ariaLabel]="editorLabel()" />
+              </div>
+            </div>
+            <!-- Outline dock floating top-right (mirrors the map dock, ADR-0013): panel left of a
+                 single toggle button; pointer-events re-enabled per child. -->
             <div
               class="absolute top-3 right-3 bottom-3 flex items-start gap-2 z-[1] pointer-events-none"
             >
-              @if (store.rightPanel() === 'regions') {
-                <app-regions-panel
-                  class="w-[var(--rail-inspector)] max-h-full border border-line rounded-lg shadow-2 pointer-events-auto"
-                />
-              } @else if (store.rightPanel() === 'inspector') {
-                <app-inspector
-                  class="w-[var(--rail-inspector)] max-h-full border border-line rounded-lg shadow-2 pointer-events-auto"
+              @if (outline.isOpen()) {
+                <app-outline-panel
+                  class="w-[16rem] max-h-full border border-line rounded-lg shadow-2 pointer-events-auto"
                 />
               }
-              <app-editor-rail class="pointer-events-auto" />
-            </div>
-          } @else {
-            <!-- Content body in a centred reading column: a note, or a hexmap on its Note view (#75). -->
-            <div class="absolute inset-0 overflow-y-auto bg-surface-sunken">
-              <div class="max-w-[60rem] mx-auto py-6 px-6">
-                <app-entity-metadata />
-                <app-content-editor [ariaLabel]="editorLabel()" />
-              </div>
+              <button
+                appIconButton
+                toggle
+                class="pointer-events-auto"
+                [active]="outline.isOpen()"
+                [title]="outlineToggleLabel()"
+                [attr.aria-label]="outlineToggleLabel()"
+                data-testid="outline-toggle"
+                (click)="outline.toggle()"
+              >
+                <app-icon name="outline" [size]="20" />
+              </button>
             </div>
           }
         </main>
@@ -112,8 +154,19 @@ import { EntityMetadata } from './components/entity-metadata';
 })
 export class EntityPage {
   protected readonly session = inject(EntitySession);
+  /**
+   * Whether the caller may edit (ADR-0037). Gates the map's editing docks — a read-only
+   * opener (Viewer grant, read-only member, or Public Link reader, #162) gets the canvas
+   * as pan/zoom-only, with the tool palette, inspector, and editor rail withheld.
+   */
+  protected readonly writable = this.session.writable;
   /** Drives the Map/Note surface swap and which view occupies the right column. */
   protected readonly store = inject(HexMapStore);
+  /** The heading-navigation Outline shown beside the Content body. */
+  protected readonly outline = inject(OutlineStore);
+
+  /** Accessible name / tooltip for the Outline toggle (ADR-0014). */
+  protected readonly outlineToggleLabel = translateSignal('noteView.outline.toggle');
 
   /** Only a hexmap carries a grid surface — and so the status bar and Map/Note toggle (#75). */
   protected readonly isHexmap = computed(

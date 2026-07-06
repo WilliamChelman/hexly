@@ -11,7 +11,7 @@ import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
 import { WorldSwitcher } from './world-switcher';
 
 function world(id: string, name = id): WorldSummary {
-  return { id, name, ownerId: 'u1', createdAt: 1, updatedAt: 1 };
+  return { id, name, owners: ['u1'], rights: ['read', 'manage'], createdAt: 1, updatedAt: 1 };
 }
 
 describe('WorldSwitcher', () => {

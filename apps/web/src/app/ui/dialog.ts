@@ -33,6 +33,11 @@ let nextDialogId = 0;
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [Panel],
   template: `
+    <!-- Backdrop-click-to-dismiss on the native <dialog>: the platform already gives the
+         keyboard equivalent (Escape → close, wired via (close)), and the <dialog> itself must
+         not be focusable — so these a11y rules, which don't model the native element, would
+         only be satisfied by an incorrect handler/tabindex. -->
+    <!-- eslint-disable-next-line @angular-eslint/template/click-events-have-key-events, @angular-eslint/template/interactive-supports-focus -->
     <dialog
       #dialog
       appPanel
@@ -40,6 +45,7 @@ let nextDialogId = 0;
       [style.margin-top]="align() === 'top' ? '10vh' : null"
       [attr.aria-labelledby]="heading() ? titleId : null"
       (close)="closed.emit()"
+      (click)="onClick($event)"
     >
       @if (heading(); as h) {
         <h2 [id]="titleId" class="font-display text-md text-ink-strong m-0">
@@ -71,6 +77,17 @@ export class Dialog {
   readonly align = input<'center' | 'top'>('center');
   /** Fires whenever the dialog closes — Escape, or a programmatic close. */
   readonly closed = output<void>();
+
+  /**
+   * Dismiss on a backdrop click. The native `<dialog>` fills the top layer, so a
+   * click outside the content lands on the element itself (`target === dialog`)
+   * while a click on the projected body targets an inner node — closing the
+   * former mirrors the platform Escape-to-dismiss, without swallowing body clicks.
+   */
+  protected onClick(event: MouseEvent): void {
+    const el = this.dialog().nativeElement as HTMLDialogElement;
+    if (event.target === el) el.close();
+  }
 
   protected readonly titleId = `app-dialog-title-${nextDialogId++}`;
   // read: ElementRef — the #dialog element also hosts appPanel, so a bare query

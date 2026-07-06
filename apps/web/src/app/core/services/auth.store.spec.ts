@@ -46,7 +46,7 @@ describe('AuthClient.sessionLoading', () => {
 
   it('is false once the boot check resolves to a user', async () => {
     TestBed.createComponent(TestHost).detectChanges();
-    http.expectOne('/api/auth/me').flush({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada' });
+    http.expectOne('/api/auth/me').flush({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada', preferences: {}, isAdmin: false, isSuperadmin: false, canCreateWorlds: true });
     await tick();
     expect(client.sessionLoading()).toBe(false);
   });
@@ -64,7 +64,7 @@ describe('AuthClient', () => {
   let client: AuthClient;
   let http: HttpTestingController;
 
-  const ada = { id: 'u1', email: 'ada@hexly.test', displayName: 'Ada' };
+  const ada = { id: 'u1', email: 'ada@hexly.test', displayName: 'Ada', preferences: {}, isAdmin: false, isSuperadmin: false, canCreateWorlds: true };
 
   beforeEach(() => {
     TestBed.configureTestingModule({
@@ -92,6 +92,36 @@ describe('AuthClient', () => {
 
     expect(client.currentUser()).toEqual(ada);
     expect(client.isAuthenticated()).toBe(true);
+  });
+
+  it('updates the display name and reflects it on currentUser (ADR-0038)', () => {
+    client.login('ada@hexly.test', 'correct horse').subscribe();
+    http.expectOne('/api/auth/login').flush(ada);
+
+    client.updateProfile('Ada Lovelace').subscribe();
+    const req = http.expectOne('/api/auth/me/profile');
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ displayName: 'Ada Lovelace' });
+    req.flush({ ...ada, displayName: 'Ada Lovelace' });
+
+    // The header initials/name read currentUser: the rename shows immediately.
+    expect(client.currentUser()?.displayName).toBe('Ada Lovelace');
+  });
+
+  it('submits a password change with both passwords (ADR-0038)', () => {
+    let completed = false;
+    client
+      .changePassword('correct horse', 'battery staple')
+      .subscribe({ complete: () => (completed = true) });
+
+    const req = http.expectOne('/api/auth/me/password');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({
+      currentPassword: 'correct horse',
+      newPassword: 'battery staple',
+    });
+    req.flush(null);
+    expect(completed).toBe(true);
   });
 
   it('clears the current user on logout', () => {

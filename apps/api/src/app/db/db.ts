@@ -27,13 +27,20 @@ export const DB = Symbol('DB');
 export function createDb(path: string): Db {
   const sqlite = new Database(path);
   sqlite.pragma('journal_mode = WAL');
-  // Foreign keys are per-connection and must be enabled on every connection.
-  sqlite.pragma('foreign_keys = ON');
   const db = drizzle(sqlite, { schema });
   // Apply unapplied migrations at boot (ADR-0027). Migrations are generated
   // from schema.ts and shipped in the bundle; __dirname resolves them in both
   // prod and tests (same __dirname pattern as resolveDbPath).
+  //
+  // Foreign keys stay OFF for the migration window: drizzle runs every migration
+  // inside one transaction, where `PRAGMA foreign_keys` is a no-op, so a table
+  // rebuild (SQLite's only way to drop a FK-referenced column, e.g. ADR-0037's
+  // owner_id retirement) would fire ON DELETE CASCADE on the implicit DROP TABLE
+  // and wipe dependent rows mid-migration. Enable enforcement only afterwards, for
+  // the runtime connection. Foreign keys are per-connection (set on every one).
+  sqlite.pragma('foreign_keys = OFF');
   migrate(db, { migrationsFolder: resolve(__dirname, 'migrations') });
+  sqlite.pragma('foreign_keys = ON');
   return db;
 }
 

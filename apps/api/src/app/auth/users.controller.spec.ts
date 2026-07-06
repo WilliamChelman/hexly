@@ -1,0 +1,66 @@
+import { INestApplication } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import cookieParser from 'cookie-parser';
+import request from 'supertest';
+import { DB, Db, createDb } from '../db/db';
+import { AuthService } from './auth.service';
+import { AuthModule } from './auth.module';
+import { ConfigModule } from '../config/config.module';
+
+/**
+ * The Instance user directory (#158): the owner-set UI needs to name owners and
+ * pick a co-Owner, but only the current user's identity is otherwise reachable.
+ * This surface exposes id + displayName for every Instance user — never the
+ * email, which is private (ADR-0004).
+ */
+describe('User directory', () => {
+  let app: INestApplication;
+  let db: Db;
+  let adaId: string;
+  let bobId: string;
+
+  beforeEach(async () => {
+    db = createDb(':memory:');
+    const moduleRef = await Test.createTestingModule({
+      imports: [ConfigModule, AuthModule],
+    })
+      .overrideProvider(DB)
+      .useValue(db)
+      .compile();
+
+    app = moduleRef.createNestApplication();
+    app.use(cookieParser());
+    await app.init();
+
+    adaId = await app.get(AuthService).seedUser('ada@hexly.test', 'correct horse', 'Ada');
+    bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'correct horse', 'Bob');
+  });
+
+  afterEach(async () => {
+    await app.close();
+  });
+
+  async function signIn(email: string) {
+    const agent = request.agent(app.getHttpServer());
+    await agent.post('/auth/login').send({ email, password: 'correct horse' }).expect(200);
+    return agent;
+  }
+
+  it('lists every Instance user as id + displayName, without email', async () => {
+    const ada = await signIn('ada@hexly.test');
+
+    const res = await ada.get('/users').expect(200);
+
+    expect(res.body).toEqual(
+      expect.arrayContaining([
+        { id: adaId, displayName: 'Ada' },
+        { id: bobId, displayName: 'Bob' },
+      ]),
+    );
+    for (const u of res.body) expect(u).not.toHaveProperty('email');
+  });
+
+  it('rejects an unauthenticated request', async () => {
+    await request(app.getHttpServer()).get('/users').expect(401);
+  });
+});

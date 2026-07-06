@@ -20,8 +20,14 @@ describe('LocaleService', () => {
 
   afterEach(() => {
     localStorage.clear();
+    // `navigator.language` is a prototype accessor, so there's no *own*
+    // descriptor to capture — `setBrowserLang` shadows it with an own property.
+    // Delete that shadow (or restore a captured own descriptor) so the leak
+    // never crosses into another spec file sharing this jsdom environment.
     if (originalLanguage) {
       Object.defineProperty(navigator, 'language', originalLanguage);
+    } else {
+      delete (navigator as unknown as { language?: unknown }).language;
     }
   });
 
@@ -72,6 +78,46 @@ describe('LocaleService', () => {
     expect(transloco.getActiveLang()).toBe('fr');
     // Remembered: persisted so the next visit reads it back.
     expect(localStorage.getItem('hexly-u:hexly-locale')).toBe('fr');
+  });
+
+  describe('Format Locale (ADR-0038)', () => {
+    // 3 February 2026 — a day/month pair that disambiguates US from EU order.
+    const ts = Date.UTC(2026, 1, 3, 12);
+
+    it('follows the UI Locale when no Format Locale is chosen', () => {
+      setBrowserLang('fr-FR');
+      const { locale } = build();
+      expect(locale.formatLocale()).toBe('');
+      expect(locale.formatDate(ts)).toBe(new Date(ts).toLocaleDateString('fr'));
+    });
+
+    it('formats with the chosen Format Locale without touching the language', () => {
+      setBrowserLang('en-US');
+      const { locale, transloco } = build();
+
+      locale.setFormatLocale('en-GB');
+
+      expect(locale.formatDate(ts)).toBe(
+        new Date(ts).toLocaleDateString('en-GB'),
+      );
+      // The UI language is a separate axis: still English.
+      expect(locale.lang()).toBe('en');
+      expect(transloco.getActiveLang()).toBe('en');
+    });
+
+    it('remembers the Format Locale choice', () => {
+      setBrowserLang('en-US');
+      build().locale.setFormatLocale('de-DE');
+      expect(localStorage.getItem('hexly-u:hexly-format-locale')).toBe('de-DE');
+    });
+
+    it('ignores a stored value outside the curated list', () => {
+      setBrowserLang('en-US');
+      localStorage.setItem('hexly-u:hexly-format-locale', 'not-a-tag');
+      const { locale } = build();
+      expect(locale.formatLocale()).toBe('');
+      expect(locale.formatDate(ts)).toBe(new Date(ts).toLocaleDateString('en'));
+    });
   });
 
   /**

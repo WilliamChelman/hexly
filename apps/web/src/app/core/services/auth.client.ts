@@ -39,10 +39,47 @@ export class AuthClient {
   readonly isAuthenticated = computed(() => this.currentUser() !== null);
   readonly sessionLoading = this.session.isLoading;
 
+  /**
+   * Whether the caller may reach the Instance Admin surface (ADR-0037, #163):
+   * the Admin flag, or a Superadmin (Superadmin ⊇ Admin). Drives the nav link
+   * and the admin route guard.
+   */
+  readonly canAdminister = computed(() => {
+    const u = this.currentUser();
+    return !!u && (u.isAdmin || u.isSuperadmin);
+  });
+
+  /** Whether the caller is a Superadmin — gates the Superadmin-only controls (ADR-0037, #163). */
+  readonly isSuperadmin = computed(() => this.currentUser()?.isSuperadmin ?? false);
+
+  /**
+   * Whether the caller holds the World Creation capability (ADR-0040) — gates the
+   * "New World" affordance. A Superadmin always may create (repair), regardless of the flag.
+   */
+  readonly canCreateWorlds = computed(() => {
+    const u = this.currentUser();
+    return !!u && (u.canCreateWorlds || u.isSuperadmin);
+  });
+
   login(email: string, password: string): Observable<AuthUser> {
     return this.http
       .post<AuthUser>('/api/auth/login', { email, password })
       .pipe(tap((user) => this.session.set(user)));
+  }
+
+  /** Rename the account (ADR-0038); the fresh AuthUser replaces the session state. */
+  updateProfile(displayName: string): Observable<AuthUser> {
+    return this.http
+      .patch<AuthUser>('/api/auth/me/profile', { displayName })
+      .pipe(tap((user) => this.session.set(user)));
+  }
+
+  /** Change the password (ADR-0038). Errors (wrong current, too short) pass through. */
+  changePassword(currentPassword: string, newPassword: string): Observable<void> {
+    return this.http.post<void>('/api/auth/me/password', {
+      currentPassword,
+      newPassword,
+    });
   }
 
   // Clear in finalize so failed logout never leaves UI signed-in.

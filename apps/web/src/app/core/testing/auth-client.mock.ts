@@ -6,6 +6,15 @@ export class MockAuthClient {
   private readonly _user = signal<AuthUser | null>(null);
   readonly currentUser = this._user.asReadonly();
   readonly isAuthenticated = computed(() => this._user() !== null);
+  readonly canAdminister = computed(() => {
+    const u = this._user();
+    return !!u && (u.isAdmin || u.isSuperadmin);
+  });
+  readonly isSuperadmin = computed(() => this._user()?.isSuperadmin ?? false);
+  readonly canCreateWorlds = computed(() => {
+    const u = this._user();
+    return !!u && (u.canCreateWorlds || u.isSuperadmin);
+  });
 
   private readonly _loading = signal(false);
   readonly sessionLoading = this._loading.asReadonly();
@@ -16,4 +25,8 @@ export class MockAuthClient {
   login = vi.fn<(email: string, password: string) => Observable<AuthUser>>(() => EMPTY);
   logout = vi.fn<() => Observable<void>>(() => of(undefined));
   signOut = vi.fn();
+  updateProfile = vi.fn<(displayName: string) => Observable<AuthUser>>(() => EMPTY);
+  changePassword = vi.fn<(currentPassword: string, newPassword: string) => Observable<void>>(
+    () => of(undefined),
+  );
 }

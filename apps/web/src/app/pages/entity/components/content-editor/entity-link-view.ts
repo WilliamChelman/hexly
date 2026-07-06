@@ -28,7 +28,9 @@ import { EntityNameResolver } from '../../services/entity-name-resolver';
   selector: 'app-entity-link-view',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink, TranslocoPipe],
-  host: { class: 'inline' },
+  // `relative inline-block` makes each link its own positioning context so the
+  // descriptor badge can anchor to the pill's top-right corner (see below).
+  host: { class: 'relative inline-block align-baseline' },
   template: `
     @if (dangling()) {
       <!-- Target missing/deleted: last-known label, non-navigable (issue #78). -->
@@ -37,8 +39,8 @@ import { EntityNameResolver } from '../../services/entity-name-resolver';
         data-dangling=""
         [attr.data-entity-id]="entityId()"
         [attr.title]="'noteView.entityLink.dangling' | transloco"
-        class="italic text-ink-muted"
-        >{{ text() }}@if (descriptor()) {<span> ({{ descriptor() }})</span>}</span
+        class="inline-block rounded bg-ink-faint/15 px-1.5 py-0.5 italic leading-tight text-ink-muted"
+        >{{ text() }}</span
       >
     } @else {
       <!-- routerLink gives a real href, so the browser handles Ctrl/Cmd/middle-click
@@ -51,9 +53,20 @@ import { EntityNameResolver } from '../../services/entity-name-resolver';
         [attr.data-entity-id]="entityId()"
         [routerLink]="['/entities', entityId()]"
         [fragment]="heading() || undefined"
-        class="cursor-pointer text-gold no-underline hover:underline"
-        >{{ text()
-        }}@if (descriptor()) {<span class="text-ink-muted"> ({{ descriptor() }})</span>}</a
+        class="cursor-pointer inline-block rounded bg-gold-soft px-1.5 py-0.5 leading-tight text-gold-strong no-underline transition-colors hover:bg-gold/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold"
+        >{{ text() }}</a
+      >
+    }
+    <!-- The Link Descriptor (#96) rides on the pill's top-right corner as a small
+         badge: right edge flush with the pill (right-0), growing leftward, so the
+         relationship reads as metadata rather than interrupting the prose. -->
+    @if (descriptor()) {
+      <span
+        data-testid="link-descriptor"
+        class="pointer-events-none absolute -top-1.5 right-0 whitespace-nowrap rounded-full px-0.5 text-[0.6em] font-semibold leading-none text-ink-stroke shadow-1"
+        [class.bg-gold]="!dangling()"
+        [class.bg-ink-muted]="dangling()"
+        >{{ descriptor() }}</span
       >
     }
   `,

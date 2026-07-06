@@ -1,5 +1,7 @@
 export * from './lib/health';
 export * from './lib/auth';
+export * from './lib/admin';
+export * from './lib/errors';
 export * from './lib/hex/coordinates';
 export * from './lib/hex/layout';
 export * from './lib/hex/edges';
@@ -9,5 +11,7 @@ export * from './lib/hex/move-planner';
 export * from './lib/hex/hex-map';
 export * from './lib/entity';
 export * from './lib/extract-text';
+export * from './lib/extract-outline';
 export * from './lib/harvest-descriptors';
 export * from './lib/world';
+export * from './lib/public-link';

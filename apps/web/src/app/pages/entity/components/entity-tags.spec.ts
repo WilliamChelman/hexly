@@ -11,7 +11,6 @@ import { EntityTags } from './entity-tags';
 describe('EntityTags', () => {
   const noteWith = (tags: string[]): EntityDetail => ({
     id: 'n1',
-    ownerId: 'u1',
     worldId: 'w1',
     name: 'Lady Mara',
     type: 'note',
@@ -20,6 +19,8 @@ describe('EntityTags', () => {
     version: 1,
     createdAt: 1,
     updatedAt: 1,
+    // Owner by default (ADR-0039): the `edit` Right makes the tag controls editable.
+    rights: ['read', 'edit', 'delete', 'set-visibility', 'manage'],
     document: { type: 'note', content: { format: 'tiptap-v1', snapshot: {} } },
   });
 
@@ -49,6 +50,18 @@ describe('EntityTags', () => {
     fixture.detectChanges();
     return fixture;
   }
+
+  it('hides the add input and remove buttons for a read-only opener (no edit Right)', () => {
+    // A Viewer grant / Public Link reader (ADR-0039) sees the tags but can't edit them.
+    session.adopt({ ...noteWith(['deity']), rights: ['read'] });
+    const fixture = TestBed.createComponent(EntityTags);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    expect(el.querySelector('[data-testid=entity-tags]')?.textContent).toContain('deity');
+    expect(el.querySelector('[data-testid=tag-input]')).toBeNull();
+    expect(el.querySelector('[data-testid=tag-remove-deity]')).toBeNull();
+  });
 
   it('renders the open entity’s tags as chips', () => {
     const fixture = render(['deity', 'ruined']);

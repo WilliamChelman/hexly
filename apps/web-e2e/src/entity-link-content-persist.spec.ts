@@ -1,4 +1,4 @@
-import { enterLibrary, expect, flushSave, test } from './fixtures';
+import { enterLibrary, entityIdFromUrl, expect, flushSave, segRe, test } from './fixtures';
 
 /**
  * The Content Entity Link journey (issue #95, ADR-0023): an author drops a live
@@ -17,13 +17,13 @@ test('inserts a Content Entity Link via @, persists it, navigates it, and dangle
   await enterLibrary(page);
   await page.getByTestId('new-note').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const targetId = page.url().split('/').pop();
+  const targetId = entityIdFromUrl(page);
 
   // The source note that will carry the link in its prose.
   await enterLibrary(page);
   await page.getByTestId('new-note').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const sourceId = page.url().split('/').pop();
+  const sourceId = entityIdFromUrl(page);
   // The source's full world-scoped path (ADR-0028) — reused to reopen it later.
   const sourcePath = new URL(page.url()).pathname;
 
@@ -57,7 +57,7 @@ test('inserts a Content Entity Link via @, persists it, navigates it, and dangle
 
   await expect(page.getByTestId('entity-link')).toHaveText('Untitled note');
   await page.getByTestId('entity-link').click();
-  await expect(page).toHaveURL(new RegExp(`/entities/${targetId}$`));
+  await expect(page).toHaveURL(new RegExp(`/entities/${segRe(targetId)}$`));
 
   // Delete the target: the link now dangles (last-known label, non-navigable).
   const del = await request.delete(`/api/entities/${targetId}`);

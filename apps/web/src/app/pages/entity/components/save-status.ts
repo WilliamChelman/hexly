@@ -31,6 +31,10 @@ import { EntitySession } from '../services/entity-session';
             }}</span>
           }
         </app-chip>
+      } @else if (error() === 'readonly') {
+        <app-chip data-testid="readonly">{{
+          'editorShell.save.readonly' | transloco
+        }}</app-chip>
       } @else if (error() === 'save') {
         <app-chip tone="gold" data-testid="save-error">
           {{ 'editorShell.save.failed' | transloco }}

@@ -7,7 +7,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import request from 'supertest';
-import { tiptapContent } from '@hexly/domain';
+import { emptyEntityBody, tiptapContent } from '@hexly/domain';
 import { DB, Db, createDb } from '../db/db';
 import { worldMembers } from '../db/schema';
 import { EntitiesService } from '../entities/entities.service';
@@ -60,7 +60,7 @@ describe('Vault export endpoint', () => {
     app.use(cookieParser());
     await app.init();
 
-    adaId = await app.get(AuthService).seedUser('ada@hexly.test', 'correct horse', 'Ada');
+    adaId = await app.get(AuthService).seedUser('ada@hexly.test', 'correct horse', 'Ada', { canCreateWorlds: true });
   });
 
   afterEach(async () => {
@@ -298,7 +298,7 @@ describe('Vault export endpoint', () => {
     // Rename the link target; the wikilink was authored as [[Lady Mara]].
     const entities = app.get(EntitiesService);
     const mara = entities.listByWorld(adaId, worldId).find((e) => e.name === 'Lady Mara');
-    entities.rename(adaId, mara!.id, 'Mara');
+    entities.patch(adaId, mara!.id, { name: 'Mara' });
 
     const { files } = await exportZip(ada, worldId);
 
@@ -315,6 +315,25 @@ describe('Vault export endpoint', () => {
   it('404s an unknown or unreachable World', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     await ada.get('/worlds/does-not-exist/export').expect(404);
+  });
+
+  it('excludes another member’s shared entity — the export serializes only what the exporter owns', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const worldId = await importVault(ada, { 'Note.md': '# Note' });
+
+    // Bob is a member of Ada's World and owns a *shared* entity in it. A read-scoped export
+    // would sweep it up (Ada can read shared member entities); an owner-scoped one must not.
+    const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'correct horse', 'Bob');
+    db.insert(worldMembers).values({ worldId, userId: bobId, role: 'contributor' }).run();
+    const entities = app.get(EntitiesService);
+    const bobNoteId = 'bob-shared-note';
+    entities.importNote(bobId, worldId, bobNoteId, 'Bob Secret', [], emptyEntityBody('note'));
+    entities.patch(bobId, bobNoteId, { visibility: 'shared' });
+
+    const { files } = await exportZip(ada, worldId);
+
+    // Ada's owner-only export never contains a note she does not own.
+    expect(files).not.toHaveProperty('Bob Secret.md');
   });
 
   it('403s a member who is not the World Owner', async () => {

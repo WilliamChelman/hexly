@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
+import { AdminModule } from './admin/admin.module';
 import { AssetsModule } from './assets/assets.module';
 import { AuthModule } from './auth/auth.module';
 import { ConfigModule } from './config/config.module';
 import { DbModule } from './db/db.module';
 import { EntitiesModule } from './entities/entities.module';
+import { PublicLinksModule } from './acl/public-links.module';
 import { WorldsModule } from './worlds/worlds.module';
 import { HealthController } from './health.controller';
 import { TestModule } from './test/test.module';
@@ -28,8 +30,10 @@ const e2eTestingEnabled =
     ConfigModule,
     DbModule,
     AuthModule,
+    AdminModule,
     EntitiesModule,
     WorldsModule,
+    PublicLinksModule,
     AssetsModule,
     ...(e2eTestingEnabled ? [TestModule] : []),
   ],

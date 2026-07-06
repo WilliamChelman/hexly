@@ -12,7 +12,17 @@ import { provideTranslocoTesting } from '../../core/i18n/transloco-testing';
 import { WorldIndex } from './world-index';
 
 function world(id: string, name = id, ownerId = 'u1'): WorldSummary {
-  return { id, name, ownerId, createdAt: 1, updatedAt: 1 };
+  // Rights drive the owned/member distinction now (ADR-0039): the caller (u1) owning it
+  // carries `manage`; anyone else's World is reachable read-only.
+  const owned = ownerId === 'u1';
+  return {
+    id,
+    name,
+    owners: [ownerId],
+    rights: owned ? ['read', 'manage'] : ['read'],
+    createdAt: 1,
+    updatedAt: 1,
+  };
 }
 
 describe('WorldIndex', () => {
@@ -36,7 +46,7 @@ describe('WorldIndex', () => {
       .mockResolvedValue(true);
 
     // The caller (u1) — used to tell owned Worlds from member Worlds.
-    auth.setUser({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada' });
+    auth.setUser({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada', preferences: {}, isAdmin: false, isSuperadmin: false, canCreateWorlds: true });
   });
 
   /**
@@ -101,6 +111,29 @@ describe('WorldIndex', () => {
 
     expect($(el, '[data-testid=worlds-empty]')).not.toBeNull();
     expect($(el, '[data-testid=create-world]')).not.toBeNull();
+  });
+
+  it('hides the create affordance from a user without World Creation (ADR-0040)', () => {
+    // A user the operator has gated from World Creation — the server would 403 a
+    // create attempt, so the button is hidden to match.
+    auth.setUser({
+      id: 'u1',
+      email: 'ada@hexly.test',
+      displayName: 'Ada',
+      preferences: {},
+      isAdmin: false,
+      isSuperadmin: false,
+      canCreateWorlds: false,
+    });
+
+    // Present in a populated list…
+    const populated = render([world('w1', 'Aldermoor')]).nativeElement as HTMLElement;
+    expect($(populated, '[data-testid=create-world]')).toBeNull();
+
+    // …and in the empty state.
+    const empty = render([]).nativeElement as HTMLElement;
+    expect($(empty, '[data-testid=worlds-empty]')).not.toBeNull();
+    expect($(empty, '[data-testid=create-world]')).toBeNull();
   });
 
   it('creating a World opens its Home Entity', () => {
@@ -212,6 +245,20 @@ describe('WorldIndex', () => {
     expect($(el, '[data-testid=rename-world-w2]')).toBeNull();
     expect($(el, '[data-testid=delete-world-w2]')).toBeNull();
     expect($(el, '[data-testid=export-world-w2]')).toBeNull();
+  });
+
+  it('links an owned World to its owner-management page, but not a member World', () => {
+    const el = render([
+      world('w1', 'Aldermoor'), // owned by the caller (u1)
+      world('w2', 'Whisperwood', 'someone-else'), // member
+    ]).nativeElement as HTMLElement;
+
+    expect(
+      ($(el, '[data-testid=owners-world-w1]') as HTMLAnchorElement).getAttribute(
+        'href',
+      ),
+    ).toBe('/w/w1');
+    expect($(el, '[data-testid=owners-world-w2]')).toBeNull();
   });
 
   it('exports an owned World as a named .zip download', () => {

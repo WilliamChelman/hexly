@@ -1,13 +1,19 @@
 import { TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { emptyContent, EntityDetail } from '@hexly/domain';
 import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
 import { EntitiesClient } from '../../../core/services/entities.client';
 import { MockEntitiesClient } from '../../../core/testing/entities-client.mock';
+import { UsersClient } from '../../../core/services/users.client';
+import { MockUsersClient } from '../../../core/testing/users-client.mock';
+import { AuthClient } from '../../../core/services/auth.client';
+import { MockAuthClient } from '../../../core/testing/auth-client.mock';
 import { EntitySession } from '../services/entity-session';
 import { HexMapStore } from '../services/hexmap-store';
+import { OwnerSet } from '../../../ui/owner-set';
 import { EntityHeader } from './entity-header';
 import { noteDetail } from './entity-detail.fixtures';
 
@@ -16,7 +22,6 @@ describe('EntityHeader', () => {
 
   const aldermoor: EntityDetail = {
     id: 'm1',
-    ownerId: 'u1',
     worldId: 'w1',
     name: 'The Reach of Aldermoor',
     type: 'hexmap',
@@ -25,6 +30,8 @@ describe('EntityHeader', () => {
     version: 3,
     createdAt: 1,
     updatedAt: 1,
+    // The default opener is an Owner — full Rights (ADR-0039): writable and can manage sharing.
+    rights: ['read', 'edit', 'delete', 'set-visibility', 'manage'],
     document: { type: 'hexmap', content: emptyContent(), hexes: {}, regions: [], labels: [] },
   };
 
@@ -41,9 +48,62 @@ describe('EntityHeader', () => {
       providers: [
         EntitySession,
         { provide: EntitiesClient, useValue: entities },
+        { provide: UsersClient, useValue: new MockUsersClient() },
+        { provide: AuthClient, useValue: new MockAuthClient() },
         provideRouter([]),
       ],
     }).compileComponents();
+  });
+
+  it('opens the entity owner set from the Share action', () => {
+    open(aldermoor);
+    const fixture = TestBed.createComponent(EntityHeader);
+    fixture.detectChanges();
+
+    expect(fixture.debugElement.query(By.directive(OwnerSet))).toBeNull();
+
+    fixture.nativeElement
+      .querySelector('[data-testid=manage-owners]')
+      .click();
+    fixture.detectChanges();
+
+    const set = fixture.debugElement.query(By.directive(OwnerSet))
+      ?.componentInstance as OwnerSet;
+    expect(set.kind()).toBe('entity');
+    expect(set.id()).toBe('m1');
+  });
+
+  it('closes the owner set from its Close action', () => {
+    open(aldermoor);
+    const fixture = TestBed.createComponent(EntityHeader);
+    fixture.detectChanges();
+    fixture.nativeElement.querySelector('[data-testid=manage-owners]').click();
+    fixture.detectChanges();
+
+    fixture.nativeElement.querySelector('[data-testid=owners-close]').click();
+    fixture.detectChanges();
+
+    expect(fixture.debugElement.query(By.directive(OwnerSet))).toBeNull();
+  });
+
+  it('hides the Share action for a read-only opener (no manage Right)', () => {
+    // A Viewer grant / read-only member / Public Link reader (ADR-0039): content shows,
+    // but Share (owner/grant/link management) is owner-only and must be withheld.
+    open({ ...aldermoor, rights: ['read'] });
+    const fixture = TestBed.createComponent(EntityHeader);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('[data-testid=manage-owners]')).toBeNull();
+  });
+
+  it('hides the Share action for a writer who is not an Owner (no manage Right)', () => {
+    // An entity-level Editor or a World Owner opens writable (has `edit`) but can't manage
+    // sharing — the dialog is owner-only, so the button must stay hidden or it opens onto 403s.
+    open({ ...aldermoor, rights: ['read', 'edit'] });
+    const fixture = TestBed.createComponent(EntityHeader);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('[data-testid=manage-owners]')).toBeNull();
   });
 
   it('shows the open entity name', () => {
@@ -72,14 +132,14 @@ describe('EntityHeader', () => {
     fixture.detectChanges();
 
     // Edit in place (contenteditable), commit on blur.
-    entities.rename.mockReturnValue(of({ ...aldermoor, name: 'The Whisperwood' }));
+    entities.patch.mockReturnValue(of({ ...aldermoor, name: 'The Whisperwood' }));
     const title = fixture.nativeElement.querySelector(
       '[data-testid=title]',
     ) as HTMLElement;
     title.textContent = 'The Whisperwood';
     title.dispatchEvent(new Event('blur'));
 
-    expect(entities.rename).toHaveBeenCalledWith('m1', 'The Whisperwood');
+    expect(entities.patch).toHaveBeenCalledWith('m1', { name: 'The Whisperwood' });
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('The Whisperwood');
@@ -94,7 +154,81 @@ describe('EntityHeader', () => {
       fixture.nativeElement.querySelector('[data-testid=title]') as HTMLElement
     ).dispatchEvent(new Event('blur'));
 
-    expect(entities.rename).not.toHaveBeenCalled();
+    expect(entities.patch).not.toHaveBeenCalled();
+  });
+
+  it('toggles the open entity’s visibility from the header', () => {
+    open(aldermoor); // private
+    const fixture = TestBed.createComponent(EntityHeader);
+    fixture.detectChanges();
+
+    const toggle = fixture.nativeElement.querySelector(
+      '[data-testid=visibility-toggle]',
+    ) as HTMLButtonElement;
+    expect(toggle).not.toBeNull();
+    // Reflects current visibility: private → not shared.
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+
+    entities.patch.mockReturnValue(of({ ...aldermoor, visibility: 'shared' }));
+    toggle.click();
+    fixture.detectChanges();
+
+    expect(entities.patch).toHaveBeenCalledWith('m1', { visibility: 'shared' });
+    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  // FIX #5: a rejected flip (e.g. a writable-then-revoked 403 race) must be a graceful
+  // no-op — handled like a failed rename — not an unhandled RxJS error on a macrotask.
+  it('handles a rejected visibility flip gracefully, without an unhandled error', () => {
+    vi.useFakeTimers();
+    try {
+      open(aldermoor); // private
+      const fixture = TestBed.createComponent(EntityHeader);
+      fixture.detectChanges();
+
+      entities.patch.mockReturnValue(throwError(() => new Error('403')));
+      const toggle = fixture.nativeElement.querySelector(
+        '[data-testid=visibility-toggle]',
+      ) as HTMLButtonElement;
+      toggle.click();
+      fixture.detectChanges();
+
+      // A bare subscribe would report the rejection as an unhandled error on a timer;
+      // the error handler makes it a no-op, so draining timers throws nothing.
+      expect(() => vi.runOnlyPendingTimers()).not.toThrow();
+      // State stays as the server has it: still private.
+      expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // The Home Entity is locked `shared` (ADR-0037) — no toggle, like its read-only title.
+  it('hides the visibility toggle on the Home Entity', () => {
+    open({ ...noteDetail('Aldermoor'), isHome: true });
+    const fixture = TestBed.createComponent(EntityHeader);
+    fixture.detectChanges();
+
+    expect(
+      fixture.nativeElement.querySelector('[data-testid=visibility-toggle]'),
+    ).toBeNull();
+  });
+
+  // A read-only World member (no edit Right, ADR-0039) sees the entity but can't edit it:
+  // the title is read-only and the owner-only visibility toggle is hidden, like the Home Entity.
+  it('renders a read-only entity’s title non-editable, with no visibility toggle', () => {
+    open({ ...aldermoor, rights: ['read'] });
+    const fixture = TestBed.createComponent(EntityHeader);
+    fixture.detectChanges();
+
+    const title = fixture.nativeElement.querySelector(
+      '[data-testid=title]',
+    ) as HTMLElement;
+    expect(title.getAttribute('contenteditable')).toBeNull();
+    expect(title.getAttribute('tabindex')).toBeNull();
+    expect(
+      fixture.nativeElement.querySelector('[data-testid=visibility-toggle]'),
+    ).toBeNull();
   });
 
   it('no longer carries app-level navigation — that lives in the rail (ADR-0022)', () => {
@@ -139,7 +273,7 @@ describe('EntityHeader', () => {
       fixture.nativeElement.querySelector('[data-testid=title]') as HTMLElement
     ).dispatchEvent(new Event('blur'));
 
-    expect(entities.rename).not.toHaveBeenCalled();
+    expect(entities.patch).not.toHaveBeenCalled();
   });
 
   it('renders its chrome and actions in French when French is the active language', () => {

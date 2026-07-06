@@ -3,7 +3,9 @@ import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import { coordKey, emptyContent, tiptapContent } from '@hexly/domain';
+import { and, eq } from 'drizzle-orm';
 import { DB, Db, createDb } from '../db/db';
+import { entities, entityGrants } from '../db/schema';
 import { AuthService } from '../auth/auth.service';
 import { AuthModule } from '../auth/auth.module';
 import { EntitiesModule } from './entities.module';
@@ -24,6 +26,7 @@ const emptyHexmapBody = {
 describe('Entities endpoints', () => {
   let app: INestApplication;
   let db: Db;
+  let adaId: string;
 
   beforeEach(async () => {
     db = createDb(':memory:'); // Isolated per-test (ADR-0002).
@@ -38,7 +41,7 @@ describe('Entities endpoints', () => {
     app.use(cookieParser());
     await app.init();
 
-    await seedUserWithWorld('ada@hexly.test', 'correct horse', 'Ada');
+    adaId = await seedUserWithWorld('ada@hexly.test', 'correct horse', 'Ada');
   });
 
   afterEach(async () => {
@@ -52,8 +55,26 @@ describe('Entities endpoints', () => {
    * World's Home note, so it surfaces in the owner's Entity list.
    */
   async function seedUserWithWorld(email: string, password: string, name: string) {
-    const userId = await app.get(AuthService).seedUser(email, password, name);
+    const userId = await app.get(AuthService).seedUser(email, password, name, { canCreateWorlds: true });
     app.get(WorldsService).mintWorldWithHome(userId, name);
+    return userId;
+  }
+
+  /** Seed a bare Instance user (no World) — a member reads someone else's World. */
+  async function seedUser(email: string, password: string, name: string) {
+    return app.get(AuthService).seedUser(email, password, name);
+  }
+
+  /** Flip an existing row's visibility directly — decouples read-predicate tests from the mutation feature (ADR-0037, #160). */
+  function setVisibility(id: string, visibility: 'private' | 'shared') {
+    db.update(entities).set({ visibility }).where(eq(entities.id, id)).run();
+  }
+
+  /** Reassign sole ownership of a row — seeds a member-owned Entity inside another user's World. */
+  function setOwner(id: string, userId: string) {
+    // Ownership is an `owner`-role grant row post-fold (ADR-0037, migration 0007).
+    db.delete(entityGrants).where(and(eq(entityGrants.entityId, id), eq(entityGrants.role, 'owner'))).run();
+    db.insert(entityGrants).values({ entityId: id, userId, role: 'owner' }).run();
   }
 
   async function signIn(email: string, password: string) {
@@ -72,7 +93,6 @@ describe('Entities endpoints', () => {
 
     expect(res.body).toEqual({
       id: expect.any(String),
-      ownerId: expect.any(String),
       worldId: expect.any(String),
       name: 'The Reach of Aldermoor',
       type: 'hexmap',
@@ -233,6 +253,21 @@ describe('Entities endpoints', () => {
     ]);
   });
 
+  it('attaches Rights to list summaries only when the caller opts in (ADR-0039)', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const created = await ada.post('/entities').send({ name: 'Aldermoor', type: 'note' });
+    const worldId = created.body.worldId;
+
+    // Opted in: each summary carries the caller's Rights (Owner → all five verbs).
+    const withRights = await ada.get(`/entities?worldId=${worldId}&rights=1`).expect(200);
+    const mine = withRights.body.items.find((e: { id: string }) => e.id === created.body.id);
+    expect(mine.rights).toEqual(['read', 'edit', 'delete', 'set-visibility', 'manage']);
+
+    // Default: no per-row Rights — the suggestion/palette path stays a pure read-filter.
+    const plain = await ada.get(`/entities?worldId=${worldId}`).expect(200);
+    expect(plain.body.items[0]).not.toHaveProperty('rights');
+  });
+
   it('loads an entity by id with its full body', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const created = await ada
@@ -241,7 +276,12 @@ describe('Entities endpoints', () => {
 
     const res = await ada.get(`/entities/${created.body.id}`).expect(200);
 
-    expect(res.body).toEqual(created.body);
+    // The single-entity fetch carries the caller's Rights (ADR-0039) — the closed verb set
+    // they may exercise on it; an Owner holds all five. The create response omits `rights`.
+    expect(res.body).toEqual({
+      ...created.body,
+      rights: ['read', 'edit', 'delete', 'set-visibility', 'manage'],
+    });
     expect(res.body.document).toEqual(emptyHexmapBody);
   });
 
@@ -722,7 +762,11 @@ describe('Entities endpoints', () => {
     it('falls back to newest-first order when no query is given', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       await ada.post('/entities').send({ name: 'First', type: 'note' });
-      await ada.post('/entities').send({ name: 'Second', type: 'note' });
+      const second = await ada.post('/entities').send({ name: 'Second', type: 'note' });
+      // Both POSTs can land in the same millisecond, tying updatedAt — then the sort
+      // falls to its `id asc` cursor tiebreak (ADR-0025), a random UUID, and the order
+      // of First/Second is a coin flip. Bump Second so it's unambiguously newest.
+      db.update(entities).set({ updatedAt: Date.now() + 1000 }).where(eq(entities.id, second.body.id)).run();
 
       // No q → updatedAt desc, id asc (ADR-0025). 'Ada' (Home) was created first.
       const res = await ada.get('/entities').expect(200);
@@ -873,10 +917,18 @@ describe('Entities endpoints', () => {
       const now = Date.now();
       db.$client
         .prepare(
-          `INSERT INTO entities (id, owner_id, world_id, is_home, name, type, tags, visibility, version, document, content_text, created_at, updated_at)
-           VALUES (?, ?, ?, 0, 'Legacy', 'note', '[]', 'private', 1, ?, NULL, ?, ?)`,
+          `INSERT INTO entities (id, world_id, is_home, name, type, tags, visibility, version, document, content_text, created_at, updated_at)
+           VALUES (?, ?, 0, 'Legacy', 'note', '[]', 'private', 1, ?, NULL, ?, ?)`,
         )
-        .run('legacy-1', anchor.ownerId, anchor.worldId, document, now, now);
+        .run('legacy-1', anchor.worldId, document, now, now);
+      // Ownership is a set now (ADR-0037): make the legacy row Ada's by copying the
+      // anchor's owner grant (folded into entity_grants, migration 0007) onto it.
+      db.$client
+        .prepare(
+          `INSERT INTO entity_grants (entity_id, user_id, role)
+           SELECT 'legacy-1', user_id, 'owner' FROM entity_grants WHERE entity_id = ? AND role = 'owner'`,
+        )
+        .run(anchor.id);
 
       expect(names(await ada.get('/entities').query({ q: 'obelisk' }).expect(200))).toEqual([]);
 
@@ -927,7 +979,8 @@ describe('Entities endpoints', () => {
       share(open);
 
       const res = await ada.get('/entities').query({ visibility: 'shared' }).expect(200);
-      expect(names(res)).toEqual(['Public Temple']);
+      // The Home ('Ada') is locked `shared` (ADR-0037), so it joins the shared surface.
+      expect(names(res)).toEqual(['Ada', 'Public Temple']);
     });
 
     it('ORs multiple tags within the Tag facet', async () => {
@@ -982,7 +1035,7 @@ describe('Entities endpoints', () => {
 
     it('returns each facet’s values with live counts for the World', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      // 'Ada' Home note already exists (type note, no tags, private).
+      // 'Ada' Home note already exists (type note, no tags, locked `shared`).
       const temple = await note(ada, 'Temple');
       await tag(ada, temple, 'deity');
       const grove = await note(ada, 'Grove');
@@ -1003,10 +1056,10 @@ describe('Entities endpoints', () => {
         { value: 'deity', count: 2 },
         { value: 'nature', count: 1 },
       ]);
-      // Only Temple is shared; Home, Grove, Map stay private.
+      // Temple + Home (locked shared) are shared; Grove + Map stay private.
       expect(byValue(res.body.visibility)).toEqual([
-        { value: 'private', count: 3 },
-        { value: 'shared', count: 1 },
+        { value: 'private', count: 2 },
+        { value: 'shared', count: 2 },
       ]);
     });
 
@@ -1138,5 +1191,296 @@ describe('Entities endpoints', () => {
       })
       .expect(400);
     await ada.patch(`/entities/${id}`).send({ name: '' }).expect(400);
+  });
+
+  describe('Entity Visibility & read access (ADR-0037, #160)', () => {
+    it('lets a World member read a shared entity they do not own', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const note = await ada
+        .post('/entities')
+        .send({ name: 'The Citadel', type: 'note' });
+      setVisibility(note.body.id, 'shared');
+
+      const bobId = await seedUser('bob@hexly.test', 'battery staple', 'Bob');
+      app.get(WorldsService).addMember(adaId, note.body.worldId, bobId, 'contributor');
+      const bob = await signIn('bob@hexly.test', 'battery staple');
+
+      const res = await bob.get(`/entities/${note.body.id}`).expect(200);
+      expect(res.body.name).toBe('The Citadel');
+      // A plain member of a shared Entity holds read-only Rights (ADR-0039) — the editor
+      // gates its writable surface on the absence of `edit`.
+      expect(res.body.rights).toEqual(['read']);
+    });
+
+    it('grants an entity-level Editor read+edit only — not delete, set-visibility, or manage (ADR-0039)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const note = await ada.post('/entities').send({ name: 'Shared Draft', type: 'note' });
+
+      // An outsider (not a World member) handed an Editor grant on this one note (#161).
+      // The grant pierces `private`, so the Entity is left at the create default.
+      const bobId = await seedUser('bob@hexly.test', 'battery staple', 'Bob');
+      db.insert(entityGrants).values({ entityId: note.body.id, userId: bobId, role: 'editor' }).run();
+      const bob = await signIn('bob@hexly.test', 'battery staple');
+
+      const res = await bob.get(`/entities/${note.body.id}`).expect(200);
+      // The Editor edits substance but never the lifecycle/exposure gate — so the webapp
+      // shows no visibility toggle and no delete, closing the old show-then-403.
+      expect(res.body.rights).toEqual(['read', 'edit']);
+    });
+
+    it('gives a World Owner of a shared Entity the curate verbs but not manage (ADR-0039)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const note = await ada.post('/entities').send({ name: 'Town Lore', type: 'note' });
+      setVisibility(note.body.id, 'shared');
+
+      // Bob owns the shared Entity; Ada owns the World it lives in.
+      const bobId = await seedUser('bob@hexly.test', 'battery staple', 'Bob');
+      setOwner(note.body.id, bobId);
+
+      const res = await ada.get(`/entities/${note.body.id}`).expect(200);
+      // World Owner curates the shared surface — edit/delete/visibility — but grant/owner
+      // management stays with the Entity's Owner, so no `manage`.
+      expect(res.body.rights).toEqual(['read', 'edit', 'delete', 'set-visibility']);
+    });
+
+    it('denies a World member a private entity they do not own — 404, no existence leak', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const secret = await ada
+        .post('/entities')
+        .send({ name: 'Unrevealed Lore', type: 'note' });
+      // Left private (the create default).
+
+      const bobId = await seedUser('bob@hexly.test', 'battery staple', 'Bob');
+      app.get(WorldsService).addMember(adaId, secret.body.worldId, bobId, 'contributor');
+      const bob = await signIn('bob@hexly.test', 'battery staple');
+
+      await bob.get(`/entities/${secret.body.id}`).expect(404);
+    });
+
+    it('denies a World Owner another member’s private entity — private is absolute', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const created = await ada.post('/entities').send({ name: 'Bob’s Diary', type: 'note' });
+
+      // Bob is a contributor who owns a private Entity in Ada's World; Ada owns the World.
+      const bobId = await seedUser('bob@hexly.test', 'battery staple', 'Bob');
+      app.get(WorldsService).addMember(adaId, created.body.worldId, bobId, 'contributor');
+      setOwner(created.body.id, bobId);
+
+      // No role pierces private: the World Owner reaches neither read, edit, nor delete.
+      await ada.get(`/entities/${created.body.id}`).expect(404);
+      await ada.patch(`/entities/${created.body.id}`).send({ name: 'Peeked' }).expect(404);
+      await ada.delete(`/entities/${created.body.id}`).expect(404);
+    });
+
+    it('scopes the list and facet counts to canRead — shared surface only, no private leak', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const shared = await ada.post('/entities').send({ name: 'Shared Keep', type: 'note' });
+      await ada.post('/entities').send({ name: 'Private Vault', type: 'note' }); // stays private
+      setVisibility(shared.body.id, 'shared');
+      const worldId = shared.body.worldId;
+
+      const bobId = await seedUser('bob@hexly.test', 'battery staple', 'Bob');
+      app.get(WorldsService).addMember(adaId, worldId, bobId, 'viewer');
+      const bob = await signIn('bob@hexly.test', 'battery staple');
+
+      const list = await bob.get('/entities').query({ worldId }).expect(200);
+      const names = list.body.items.map((e: { name: string }) => e.name);
+      expect(names).toContain('Shared Keep');
+      expect(names).not.toContain('Private Vault');
+
+      // Facet counts scope the same way: `private` never appears in a member's counts.
+      const facets = await bob.get('/entities/facets').query({ worldId }).expect(200);
+      const visValues = facets.body.visibility.map((f: { value: string }) => f.value);
+      expect(visValues).toContain('shared');
+      expect(visValues).not.toContain('private');
+    });
+
+    it('lets an Owner toggle an Entity’s visibility via PATCH, either direction', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const note = await ada.post('/entities').send({ name: 'Reveal Me', type: 'note' });
+      expect(note.body.visibility).toBe('private'); // New Entities default private.
+
+      const shown = await ada
+        .patch(`/entities/${note.body.id}`)
+        .send({ visibility: 'shared' })
+        .expect(200);
+      expect(shown.body.visibility).toBe('shared');
+
+      const hidden = await ada
+        .patch(`/entities/${note.body.id}`)
+        .send({ visibility: 'private' })
+        .expect(200);
+      expect(hidden.body.visibility).toBe('private');
+    });
+
+    it('locks the Home Entity shared and refuses a visibility change (409)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const list = await ada.get('/entities').expect(200);
+      const home = list.body.items.find((e: { name: string }) => e.name === 'Ada');
+      expect(home.visibility).toBe('shared'); // A shared World always has a landing page.
+
+      // Un-revealing the Home would leave a shared World with no landing page → refused.
+      await ada.patch(`/entities/${home.id}`).send({ visibility: 'private' }).expect(409);
+      // Re-asserting `shared` is a harmless no-op.
+      await ada.patch(`/entities/${home.id}`).send({ visibility: 'shared' }).expect(200);
+      // The rename side of the same patch surface still works on the Home.
+      const reread = await ada.get(`/entities/${home.id}`).expect(200);
+      expect(reread.body.visibility).toBe('shared');
+    });
+
+    it('lets a World Owner edit a shared Entity they don’t own, but denies a plain member (403)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse'); // World Owner
+      const hall = await ada.post('/entities').send({ name: 'Shared Hall', type: 'note' });
+      setVisibility(hall.body.id, 'shared');
+      const worldId = hall.body.worldId;
+
+      // Bob is a contributor who owns the shared Entity.
+      const bobId = await seedUser('bob@hexly.test', 'battery staple', 'Bob');
+      app.get(WorldsService).addMember(adaId, worldId, bobId, 'contributor');
+      setOwner(hall.body.id, bobId);
+
+      // Carol is another plain member — a reader of the shared surface, not an editor of it.
+      const carolId = await seedUser('carol@hexly.test', 'purple monkey', 'Carol');
+      app.get(WorldsService).addMember(adaId, worldId, carolId, 'contributor');
+      const carol = await signIn('carol@hexly.test', 'purple monkey');
+
+      const doc = { type: 'note', content: emptyContent() };
+      // The World Owner curates the shared surface: editing another's shared Entity → 200.
+      await ada
+        .put(`/entities/${hall.body.id}`)
+        .send({ document: doc, version: 1, tags: [] })
+        .expect(200);
+
+      // A plain member reaches it (shared) but may not write it → 403, not 404.
+      await carol
+        .put(`/entities/${hall.body.id}`)
+        .send({ document: doc, version: 2, tags: [] })
+        .expect(403);
+    });
+
+    it('lets a World Owner rename and re-hide a shared Entity — and then loses all access once it’s private', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse'); // World Owner
+      const hall = await ada.post('/entities').send({ name: 'Shared Hall', type: 'note' });
+      setVisibility(hall.body.id, 'shared');
+      const worldId = hall.body.worldId;
+
+      const bobId = await seedUser('bob@hexly.test', 'battery staple', 'Bob');
+      app.get(WorldsService).addMember(adaId, worldId, bobId, 'contributor');
+      setOwner(hall.body.id, bobId); // Bob owns it; Ada owns the World.
+
+      const carolId = await seedUser('carol@hexly.test', 'purple monkey', 'Carol');
+      app.get(WorldsService).addMember(adaId, worldId, carolId, 'contributor');
+      const carol = await signIn('carol@hexly.test', 'purple monkey');
+
+      // A plain member can't rename another's shared Entity → 403 (reachable, not permitted).
+      await carol.patch(`/entities/${hall.body.id}`).send({ name: 'Hijacked' }).expect(403);
+
+      // The World Owner curates the shared surface: rename → 200.
+      const renamed = await ada
+        .patch(`/entities/${hall.body.id}`)
+        .send({ name: 'Great Hall' })
+        .expect(200);
+      expect(renamed.body.name).toBe('Great Hall');
+
+      // …and re-hide (un-reveal something shared by mistake) → 200.
+      const hidden = await ada
+        .patch(`/entities/${hall.body.id}`)
+        .send({ visibility: 'private' })
+        .expect(200);
+      expect(hidden.body.visibility).toBe('private');
+
+      // The power stops dead at `private`: the World Owner no longer even reaches it → 404.
+      await ada.patch(`/entities/${hall.body.id}`).send({ name: 'X' }).expect(404);
+      await ada.get(`/entities/${hall.body.id}`).expect(404);
+    });
+
+    it('lets a World Owner delete a shared Entity they don’t own; a plain member can’t (403), a private one is unreachable (404)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse'); // World Owner
+      const ruin = await ada.post('/entities').send({ name: 'Shared Ruin', type: 'note' });
+      const cache = await ada.post('/entities').send({ name: 'Private Cache', type: 'note' });
+      setVisibility(ruin.body.id, 'shared'); // cache stays private
+      const worldId = ruin.body.worldId;
+
+      const bobId = await seedUser('bob@hexly.test', 'battery staple', 'Bob');
+      app.get(WorldsService).addMember(adaId, worldId, bobId, 'contributor');
+      setOwner(ruin.body.id, bobId);
+      setOwner(cache.body.id, bobId); // Bob owns both; Ada owns the World.
+
+      const carolId = await seedUser('carol@hexly.test', 'purple monkey', 'Carol');
+      app.get(WorldsService).addMember(adaId, worldId, carolId, 'viewer');
+      const carol = await signIn('carol@hexly.test', 'purple monkey');
+
+      // A plain member can read the shared Entity but can't delete it → 403.
+      await carol.delete(`/entities/${ruin.body.id}`).expect(403);
+      // Private is absolute: the World Owner can't delete another's private Entity → 404.
+      await ada.delete(`/entities/${cache.body.id}`).expect(404);
+      // But the World Owner's nuclear revoke reaches the shared surface → 204.
+      await ada.delete(`/entities/${ruin.body.id}`).expect(204);
+      await ada.get(`/entities/${ruin.body.id}`).expect(404);
+    });
+
+    it('does not report a metadata patch as saved when the write lands 0 rows (concurrent flip)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse'); // World Owner
+      const hall = await ada.post('/entities').send({ name: 'Shared Hall', type: 'note' });
+      setVisibility(hall.body.id, 'shared');
+      const bobId = await seedUser('bob@hexly.test', 'battery staple', 'Bob');
+      app.get(WorldsService).addMember(adaId, hall.body.worldId, bobId, 'contributor');
+      setOwner(hall.body.id, bobId); // Bob owns it; Ada may curate the shared surface.
+
+      const service = app.get(EntitiesService);
+      const sharedRow = db.select().from(entities).where(eq(entities.id, hall.body.id)).get()!;
+      // Simulate the TOCTOU race: access() still reports the pre-flip decision (writable),
+      // but the row is flipped `private` before the UPDATE runs — so the canWriteEntity
+      // predicate on the WHERE now matches 0 rows and the write never lands.
+      vi.spyOn(
+        service as unknown as { access(u: string, i: string): unknown },
+        'access',
+      ).mockReturnValue({
+        row: sharedRow,
+        isOwner: false,
+        canRead: true,
+        canWrite: true,
+        canEditSubstance: true,
+      });
+      setVisibility(hall.body.id, 'private');
+
+      // The lost write must not be faked as a 200 → null (a 404 at the controller), not a detail.
+      expect(service.patch(adaId, hall.body.id, { name: 'Ghost Edit' })).toBeNull();
+      // And nothing was written: the name is untouched.
+      const after = db.select().from(entities).where(eq(entities.id, hall.body.id)).get()!;
+      expect(after.name).toBe('Shared Hall');
+    });
+
+    it('confines owner-set management to the Entity’s Owners — reachable non-owner 403, non-reader 404', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse'); // World Owner
+      const hall = await ada.post('/entities').send({ name: 'Shared Hall', type: 'note' });
+      setVisibility(hall.body.id, 'shared');
+      const worldId = hall.body.worldId;
+
+      const bobId = await seedUser('bob@hexly.test', 'battery staple', 'Bob');
+      app.get(WorldsService).addMember(adaId, worldId, bobId, 'contributor');
+      setOwner(hall.body.id, bobId); // Bob owns it; Ada owns the World.
+
+      const carolId = await seedUser('carol@hexly.test', 'purple monkey', 'Carol');
+      app.get(WorldsService).addMember(adaId, worldId, carolId, 'contributor');
+
+      // Even the World Owner reaches the shared Entity but isn't its Owner: grant/owner
+      // management belongs to the Entity's Owners alone (ADR-0037) → 403, not 404.
+      await ada.get(`/entities/${hall.body.id}/owners`).expect(403);
+      await ada.post(`/entities/${hall.body.id}/owners`).send({ userId: carolId }).expect(403);
+
+      // A non-member can't even reach the Entity → 404, no existence leak.
+      await seedUser('dave@hexly.test', 'stormy petrel', 'Dave');
+      const dave = await signIn('dave@hexly.test', 'stormy petrel');
+      await dave.get(`/entities/${hall.body.id}/owners`).expect(404);
+
+      // The actual Owner manages the set → 200.
+      const bob = await signIn('bob@hexly.test', 'battery staple');
+      const owners = await bob
+        .post(`/entities/${hall.body.id}/owners`)
+        .send({ userId: carolId })
+        .expect(200);
+      expect(owners.body).toContain(carolId);
+    });
   });
 });

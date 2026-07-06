@@ -9,32 +9,89 @@ import { z } from 'zod';
 import { nameSchema } from './entity';
 
 /**
- * A World container (CONTEXT.md → World): a `name` and its `ownerId`. The Home
+ * A World container (CONTEXT.md → World): a `name` and its `owners`. The Home
  * Entity is not a column here — it is the World's Entity flagged `is_home`
  * (ADR-0024), so a World never points back at an Entity (no circular FK).
  */
 export const worldSchema = z.object({
   id: z.string(),
   name: nameSchema,
-  ownerId: z.string(),
+  owners: z.array(z.string()),
 });
 
-/** The named World roles below the Owner (ADR-0024): Owner lives on `worlds.owner_id`, not a member row. */
-export const worldRoleSchema = z.enum(['contributor', 'viewer']);
+/**
+ * World membership roles (ADR-0024, ADR-0037): `owner` is the symmetric
+ * ownership set (full control); `contributor` and `viewer` sit below it.
+ */
+export const worldRoleSchema = z.enum(['owner', 'contributor', 'viewer']);
 
-/** CONTEXT.md → Contributor / World Viewer. */
+/** CONTEXT.md → World Owner / Contributor / World Viewer. */
 export type WorldRole = z.infer<typeof worldRoleSchema>;
+
+/**
+ * The closed set of actions a caller may exercise on a World (CONTEXT.md → Rights, ADR-0039):
+ * `read` (reachable) and `manage` (World Owner — rename, delete, members, owners, Public Link;
+ * all one `isOwner` gate today). Reported with the World so the World Index and settings gate
+ * on what the server enforces. Per-resource by design — a World has no substance to `edit`.
+ */
+export const worldVerbSchema = z.enum(['read', 'manage']);
+
+/** CONTEXT.md → Rights (World). */
+export type WorldVerb = z.infer<typeof worldVerbSchema>;
+
+/**
+ * The roles a World Owner can assign through the membership endpoints (ADR-0037, #159):
+ * `contributor` (creates Entities, reads `shared`) and `viewer` (reads `shared` only).
+ * `owner` is excluded — it belongs to the ownership-set endpoints, not member management.
+ */
+export const memberRoleSchema = z.enum(['contributor', 'viewer']);
+
+export type MemberRole = z.infer<typeof memberRoleSchema>;
+
+/** A non-owner World member (ADR-0037): an Instance user with a Contributor or Viewer role. */
+export interface WorldMember {
+  readonly userId: string;
+  readonly role: MemberRole;
+}
+
+/** POST /worlds/:id/members: add an existing Instance user as a Contributor or Viewer. */
+export const addMemberRequestSchema = z.object({
+  userId: z.string().min(1),
+  role: memberRoleSchema,
+});
+
+export type AddMemberRequest = z.infer<typeof addMemberRequestSchema>;
+
+/** PATCH /worlds/:id/members/:userId: change a member's role between the two member roles. */
+export const setMemberRoleRequestSchema = z.object({ role: memberRoleSchema });
+
+export type SetMemberRoleRequest = z.infer<typeof setMemberRoleRequestSchema>;
 
 /** POST /worlds: only the name is client-supplied; the Home Entity is minted server-side. */
 export const createWorldRequestSchema = z.object({ name: nameSchema });
 
 export type CreateWorldRequest = z.infer<typeof createWorldRequestSchema>;
 
+/**
+ * Add an Owner to a World or Entity's ownership set (ADR-0037): the target must be
+ * an existing Instance user. Shared by the Worlds and Entities owner-set endpoints.
+ */
+export const addOwnerRequestSchema = z.object({ userId: z.string().min(1) });
+
+export type AddOwnerRequest = z.infer<typeof addOwnerRequestSchema>;
+
 /** What a World read surface returns — the stored record plus its timestamps. */
 export interface WorldSummary {
   readonly id: string;
   readonly name: string;
-  readonly ownerId: string;
+  /** The World's ownership set (ADR-0037): one or more equal Owner user ids. */
+  readonly owners: readonly string[];
+  /**
+   * The caller's Rights on this World (CONTEXT.md → Rights, ADR-0039): always present and
+   * non-empty — a reachable World carries at least `read`, an Owner also `manage`. The World
+   * Index gates its owner badge and settings entry on this, not on scanning `owners`.
+   */
+  readonly rights: readonly WorldVerb[];
   readonly createdAt: number;
   readonly updatedAt: number;
 }

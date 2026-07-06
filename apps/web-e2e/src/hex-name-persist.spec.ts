@@ -1,4 +1,4 @@
-import { enterLibrary, expect, flushSave, test } from './fixtures';
+import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtures';
 
 /**
  * The hex-name journey (issue #60, ADR-0016): a painted Hex is named in the
@@ -19,7 +19,7 @@ test('names a painted hex in the Inspector, and the name survives a reload', asy
   await page.getByTestId('new-map').click();
 
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const mapId = page.url().split('/').pop();
+  const mapId = entityIdFromUrl(page);
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
 

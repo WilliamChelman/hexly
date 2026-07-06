@@ -16,6 +16,7 @@ import { EntitiesClient } from '../../core/services/entities.client';
 import { MockEntitiesClient } from '../../core/testing/entities-client.mock';
 import { EntitySession } from './services/entity-session';
 import { EntityNameResolver } from './services/entity-name-resolver';
+import { OutlineStore } from './services/outline-store';
 import { ActiveWorld } from '../../core/services/active-world';
 import { TitleService } from '../../core/i18n/title.service';
 import { provideTranslocoTesting } from '../../core/i18n/transloco-testing';
@@ -28,10 +29,16 @@ function flushHealth(http: HttpTestingController) {
   http.expectOne('/api/health').flush({ status: 'ok', service: 'api' });
 }
 
+/** Resolve AuthClient's boot `/auth/me` as anonymous so `whenStable()` settles. */
+function flushAuth(http: HttpTestingController) {
+  http
+    .match('/api/auth/me')
+    .forEach((req) => req.flush(null, { status: 401, statusText: 'Unauthorized' }));
+}
+
 // Hexmap with a populated Content body, to prove the Note view seeds it (#75).
 const hexmapWithContent = (text: string): EntityDetail => ({
   id: 'm1',
-  ownerId: 'u1',
   worldId: 'w1',
   name: 'The Reach of Aldermoor',
   type: 'hexmap',
@@ -40,6 +47,8 @@ const hexmapWithContent = (text: string): EntityDetail => ({
   version: 1,
   createdAt: 1,
   updatedAt: 1,
+  // Owner opener (ADR-0039): the `edit` Right keeps the map/editor writable.
+  rights: ['read', 'edit', 'delete', 'set-visibility', 'manage'],
   document: {
     type: 'hexmap',
     content: {
@@ -74,6 +83,7 @@ describe('EntityPage routing', () => {
       providers: [
         EntitySession,
         EntityNameResolver,
+        OutlineStore,
         { provide: EntitiesClient, useValue: entities },
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -101,7 +111,11 @@ describe('EntityPage routing', () => {
     return fixture;
   }
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    // AuthClient's session resource fires on boot; not under test here.
+    http.match('/api/auth/me');
+    http.verify();
+  });
 
   it('shows the Content body for a note', async () => {
     await configure('n1');
@@ -131,6 +145,7 @@ describe('EntityPage routing', () => {
     const fixture = mount();
     fixture.detectChanges();
     flushHealth(http);
+    flushAuth(http);
     await fixture.whenStable();
     fixture.detectChanges();
 
@@ -160,6 +175,7 @@ describe('EntityPage layout', () => {
       providers: [
         EntitySession,
         EntityNameResolver,
+        OutlineStore,
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
@@ -168,7 +184,11 @@ describe('EntityPage layout', () => {
     http = TestBed.inject(HttpTestingController);
   });
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    // AuthClient's session resource fires on boot; not under test here.
+    http.match('/api/auth/me');
+    http.verify();
+  });
 
   it('arms the non-destructive Select tool by default', () => {
     TestBed.inject(EntitySession).adopt(hexmapWithContent('The reach lies north.'));
@@ -203,6 +223,7 @@ describe('EntityPage layout', () => {
     const fixture = TestBed.createComponent(EntityPage);
     fixture.detectChanges(); // status bar -> GET /health
     http.expectOne('/api/health').flush({ status: 'ok', service: 'api' });
+    flushAuth(http);
     await fixture.whenStable();
     fixture.detectChanges();
 

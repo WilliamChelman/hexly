@@ -26,6 +26,29 @@ export const authGuard: CanActivateFn = (_route, state) => {
 };
 
 /**
+ * Like {@link authGuard}, but also requires the caller to reach the Instance Admin
+ * surface (ADR-0037, #163) — the Admin flag or Superadmin. A signed-in non-Admin is
+ * bounced to the root rather than shown a panel the server would 403 anyway. The
+ * server stays the source of truth; this only hides an unusable page.
+ */
+export const adminGuard: CanActivateFn = (_route, state) => {
+  const auth = inject(AuthClient);
+  const router = inject(Router);
+  const injector = inject(Injector);
+  const toLogin = () =>
+    router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
+
+  return toObservable(auth.sessionLoading, { injector }).pipe(
+    filter((loading) => !loading),
+    first(),
+    map(() => {
+      if (!auth.isAuthenticated()) return toLogin();
+      return auth.canAdminister() ? true : router.parseUrl('/');
+    }),
+  );
+};
+
+/**
  * The mirror image of {@link authGuard} for the `/login` route: an already
  * authenticated user has no business on the sign-in screen, so bounce them to
  * where they were headed (`returnUrl`) or the editor root.

@@ -21,6 +21,27 @@ export const users = sqliteTable('users', {
   email: text('email').notNull().unique(),
   displayName: text('display_name').notNull(),
   passwordHash: text('password_hash').notNull(),
+  // Roaming Preferences as one zod-validated JSON bag (ADR-0038). Never
+  // DB-queried, so a single column beats per-pref columns; `'{}'` = app
+  // defaults, which is also the migration backfill for existing rows.
+  preferences: text('preferences').notNull().default('{}'),
+  // Instance Admin (ADR-0037, #163): account management (create/disable/delete
+  // users, resets, the Admin flag itself) with zero content powers — it pierces
+  // no World or Entity. Toggled in-app by another Admin.
+  isAdmin: integer('is_admin', { mode: 'boolean' }).notNull().default(false),
+  // Superadmin (ADR-0037, #163): the operator's in-app self, outside the
+  // collaboration model — its bypass is OR'd into the read/reachability
+  // predicates (repair, not administration). Seeded via the `--superadmin` seed
+  // flag; the last one is irremovable so the repair capability can't be lost.
+  isSuperadmin: integer('is_superadmin', { mode: 'boolean' }).notNull().default(false),
+  // World Creation (ADR-0040): a per-user Instance capability, orthogonal to Instance
+  // Admin, gating whether the user may create a World. Off by default — the clean-slate
+  // migration backfills every existing user to false; an Instance Admin grants it.
+  canCreateWorlds: integer('can_create_worlds', { mode: 'boolean' }).notNull().default(false),
+  // Disable (ADR-0037, #163): the immediate lever — a non-null timestamp locks
+  // login (rejected in `authenticate`, killing live sessions too) while leaving
+  // the user's data and memberships intact. Null = active.
+  disabledAt: integer('disabled_at'),
   createdAt: integer('created_at').notNull(),
 });
 
@@ -57,9 +78,8 @@ export const entities = sqliteTable(
   'entities',
   {
     id: text('id').primaryKey(),
-    ownerId: text('owner_id')
-      .notNull()
-      .references(() => users.id),
+    // Ownership is a symmetric set, not a column (ADR-0037): an `owner`-role row in
+    // `entityGrants` (folded from the retired `entity_owners` table, migration 0007).
     // The World this Entity belongs to (ADR-0024).
     worldId: text('world_id')
       .notNull()
@@ -84,7 +104,6 @@ export const entities = sqliteTable(
     updatedAt: integer('updated_at').notNull(),
   },
   (table) => [
-    index('idx_entities_owner_id').on(table.ownerId),
     // Scoped to World (ADR-0024).
     index('idx_entities_world_id').on(table.worldId),
     // Exactly one Home Entity per World.
@@ -95,29 +114,50 @@ export const entities = sqliteTable(
 );
 
 /**
- * A World (ADR-0024): a lightweight container grouping Entities for one campaign.
- * `owner_id` is the World Owner (not a member row). The Home Entity landing page
- * is the World's `is_home` Entity, not a column here — so a World holds no FK back
- * to entities (no circular dependency).
+ * The entity access-control set (ADR-0037): one row per (entity, user) with a `role` of
+ * `owner` | `editor` | `viewer`. Mirrors `worldMembers` — owner is the top role, not a
+ * separate table (the retired `entity_owners` folded in here, migration 0007). `owner` is
+ * constitutive: manages grants, carries the ≥1-Owner invariant (enforced in EntitiesService,
+ * not the schema), and pierces `private` unconditionally; `editor`/`viewer` are grants that
+ * may target any Instance user (World membership is not a precondition) and pierce `private`
+ * per-user. One row per user per Entity (the PK), so re-granting a role upserts and a promotion
+ * to owner overwrites a lower role. Deleting the Entity cascades these rows away; revocation
+ * is a plain row delete.
  */
-export const worlds = sqliteTable(
-  'worlds',
+export const entityGrants = sqliteTable(
+  'entity_grants',
   {
-    id: text('id').primaryKey(),
-    name: text('name').notNull(),
-    ownerId: text('owner_id')
+    entityId: text('entity_id')
+      .notNull()
+      .references(() => entities.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
       .notNull()
       .references(() => users.id),
-    createdAt: integer('created_at').notNull(),
-    updatedAt: integer('updated_at').notNull(),
+    role: text('role').notNull(),
   },
-  (table) => [index('idx_worlds_owner_id').on(table.ownerId)]
+  (table) => [primaryKey({ columns: [table.entityId, table.userId] })]
 );
 
 /**
- * Named World membership below the Owner (ADR-0024): a user is a `contributor`
- * (creates Entities, owns them, reads `shared`) or a `viewer` (reads `shared`).
- * One row per (world, user).
+ * A World (ADR-0024): a lightweight container grouping Entities for one campaign.
+ * Ownership is a symmetric set (ADR-0037): World Owners are `world_members` rows
+ * with `role: 'owner'`, so a World carries no owner column. The Home Entity
+ * landing page is the World's `is_home` Entity, not a column here — so a World
+ * holds no FK back to entities (no circular dependency).
+ */
+export const worlds = sqliteTable('worlds', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  // Ownership is a symmetric set (ADR-0037): World Owners are `world_members`
+  // rows with `role: 'owner'`, not a column here.
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+});
+
+/**
+ * World membership (ADR-0024, ADR-0037): a user is an `owner` (full symmetric
+ * control — the World's ownership set), a `contributor` (creates Entities, owns
+ * them, reads `shared`), or a `viewer` (reads `shared`). One row per (world, user).
  */
 export const worldMembers = sqliteTable(
   'world_members',
@@ -151,6 +191,25 @@ export const worldLinks = sqliteTable(
   (table) => [
     index('idx_world_links_world_id').on(table.worldId),
   ]
+);
+
+/**
+ * A per-entity Public Link (ADR-0037): an unguessable token granting anonymous read-only
+ * access to one Entity without an account. `id` is the token. The link is an anonymous
+ * Viewer grant, so it pierces `private` exactly like a named grant — the token *is* the
+ * grant, no visibility check on the read. One active link per Entity (rotate = revoke +
+ * re-mint) is enforced in the service, mirroring `world_links`. Deleting the Entity cascades.
+ */
+export const entityLinks = sqliteTable(
+  'entity_links',
+  {
+    id: text('id').primaryKey(),
+    entityId: text('entity_id')
+      .notNull()
+      .references(() => entities.id, { onDelete: 'cascade' }),
+    createdAt: integer('created_at').notNull(),
+  },
+  (table) => [index('idx_entity_links_entity_id').on(table.entityId)]
 );
 
 /**

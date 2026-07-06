@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 import {
@@ -36,7 +37,6 @@ describe('EntitySession', () => {
   };
   const aldermoor: EntityDetail = {
     id: 'm1',
-    ownerId: 'u1',
     worldId: 'w1',
     name: 'Aldermoor',
     type: 'hexmap',
@@ -45,8 +45,13 @@ describe('EntitySession', () => {
     version: 3,
     createdAt: 1,
     updatedAt: 1,
+    // The default opener is an Owner — full Rights (ADR-0039), so writable and manageable.
+    rights: ['read', 'edit', 'delete', 'set-visibility', 'manage'],
     document: bodyOf(forestAt00),
   };
+
+  /** The server computes Rights only on read — save/patch responses omit them (ADR-0039). */
+  const stripRights = ({ rights: _rights, ...rest }: EntityDetail): EntityDetail => rest;
 
   beforeEach(() => {
     entities = new MockEntitiesClient();
@@ -121,6 +126,35 @@ describe('EntitySession', () => {
     expect(session.current()?.tags).toEqual(['deity', 'ruined']);
   });
 
+  it('preserves the caller’s load-time Rights across a save (ADR-0039)', () => {
+    // Load carries the Owner's Rights; the server's save response omits them. A content
+    // save mustn't drop the caller's standing — else Share vanishes after autosave.
+    entities.load.mockReturnValue(of(aldermoor));
+    session.open('m1').subscribe();
+    editor.paintAt({ q: 5, r: 5 }, 'ocean');
+
+    const saved = stripRights({ ...aldermoor, version: 4, document: bodyOf(editor.document()) });
+    entities.save.mockReturnValue(of({ status: 'saved', entity: saved }));
+    session.save().subscribe();
+
+    expect(session.current()?.rights).toContain('manage');
+    expect(session.manageable()).toBe(true);
+    expect(session.writable()).toBe(true);
+  });
+
+  it('preserves the caller’s Rights across a rename/visibility patch (ADR-0039)', () => {
+    entities.load.mockReturnValue(of(aldermoor));
+    session.open('m1').subscribe();
+
+    // The PATCH response (like the server's) carries no Rights.
+    entities.patch.mockReturnValue(of(stripRights({ ...aldermoor, name: 'Renamed' })));
+    session.rename('Renamed').subscribe();
+
+    expect(session.current()?.name).toBe('Renamed');
+    expect(session.manageable()).toBe(true);
+    expect(session.writable()).toBe(true);
+  });
+
   it('surfaces a stale save as a conflict and keeps the editor edit', () => {
     openAldermoor();
     editor.paintAt({ q: 5, r: 5 }, 'ocean');
@@ -185,6 +219,19 @@ describe('EntitySession', () => {
     expect(session.dirty()).toBe(false);
   });
 
+  it('stays clean when a re-wrapped value-equal snapshot is pushed on load (#164)', () => {
+    // TipTap fires an `update` on load/normalization; the editor re-pushes the loaded
+    // snapshot through setContent, which mints a new Content each call. A value-equal push
+    // must collapse to the baseline reference — else reference-equality dirty trips an
+    // autosave PUT with no user edit.
+    openAldermoor();
+    session.setContent({ type: 'doc', content: [] }); // same value as the loaded content
+    expect(session.dirty()).toBe(false);
+
+    session.setContent({ type: 'doc', content: [{ type: 'paragraph' }] }); // a real edit
+    expect(session.dirty()).toBe(true);
+  });
+
   it('keeps a mid-flight Content edit dirty across a clean save (linchpin, ADR-0026)', () => {
     openAldermoor();
     const first = {
@@ -241,6 +288,18 @@ describe('EntitySession', () => {
 
       settle(); // let the post-save effect settle (no follow-up save)
       expect(entities.save).toHaveBeenCalledTimes(1);
+    });
+
+    it('never autosaves a read-only entity (no edit Right)', () => {
+      entities.load.mockReturnValue(of({ ...aldermoor, rights: ['read'] }));
+      session.open('m1').subscribe();
+
+      // An edit would arm the scheduler for a writable entity; here every debounce is a no-op.
+      session.setContent({ type: 'doc', content: [{ type: 'paragraph' }] });
+      settle();
+      settle();
+
+      expect(entities.save).not.toHaveBeenCalled();
     });
 
     it('flush() persists a pending edit on leave, completing when it lands', () => {
@@ -453,11 +512,47 @@ describe('EntitySession', () => {
   it('renames the open entity', () => {
     openAldermoor();
 
-    entities.rename.mockReturnValue(of({ ...aldermoor, name: 'The Whisperwood' }));
+    entities.patch.mockReturnValue(of({ ...aldermoor, name: 'The Whisperwood' }));
     session.rename('The Whisperwood').subscribe();
 
-    expect(entities.rename).toHaveBeenCalledWith('m1', 'The Whisperwood');
+    expect(entities.patch).toHaveBeenCalledWith('m1', { name: 'The Whisperwood' });
     expect(session.current()?.name).toBe('The Whisperwood');
+  });
+
+  it('flips the open entity’s visibility (ADR-0037, #160)', () => {
+    openAldermoor();
+
+    entities.patch.mockReturnValue(of({ ...aldermoor, visibility: 'shared' }));
+    session.setVisibility('shared').subscribe();
+
+    expect(entities.patch).toHaveBeenCalledWith('m1', { visibility: 'shared' });
+    expect(session.current()?.visibility).toBe('shared');
+  });
+
+  it('treats an entity with no edit Right as read-only and never attempts a save', () => {
+    // A read-only World member opens a shared entity. Even an edit + explicit save
+    // (Cmd/Ctrl+S) must not fire a PUT — the root of the permanent save-failed banner.
+    entities.load.mockReturnValue(of({ ...aldermoor, rights: ['read'] }));
+    session.open('m1').subscribe();
+    expect(session.writable()).toBe(false);
+
+    session.setContent({ type: 'doc', content: [{ type: 'paragraph' }] });
+    session.save(true).subscribe();
+
+    expect(entities.save).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a 403 save as a terminal read-only state, not the retryable save error', () => {
+    openAldermoor(); // Owner Rights → writable, so the save is actually attempted
+    editor.paintAt({ q: 5, r: 5 }, 'ocean');
+    entities.save.mockReturnValue(
+      throwError(() => new HttpErrorResponse({ status: 403 })),
+    );
+
+    session.save().subscribe();
+
+    // Read-only, not the generic 'save' banner (which offers a Retry the user can't clear).
+    expect(session.error()).toBe('readonly');
   });
 
   it('re-fetches on openRoute even when the same entity is already open', () => {
@@ -611,7 +706,7 @@ describe('EntitySession', () => {
     session.save().subscribe();
     session.rename('Nope').subscribe();
     expect(entities.save).toHaveBeenCalledTimes(1); // only the leave-flush, no late save
-    expect(entities.rename).not.toHaveBeenCalled();
+    expect(entities.patch).not.toHaveBeenCalled();
 
     // The pending load still resolves normally.
     load$.next({ ...aldermoor, id: 'm2', document: bodyOf(forestAt00) });
@@ -681,7 +776,7 @@ describe('EntitySession', () => {
     expect(() => session.reload().subscribe()).not.toThrow();
 
     expect(entities.save).not.toHaveBeenCalled();
-    expect(entities.rename).not.toHaveBeenCalled();
+    expect(entities.patch).not.toHaveBeenCalled();
     expect(entities.load).not.toHaveBeenCalled();
     // `_saving` was never flipped, so the Save button can't stick on "Saving…".
     expect(session.saving()).toBe(false);

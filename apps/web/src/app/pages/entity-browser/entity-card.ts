@@ -7,21 +7,25 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { EntityType } from '@hexly/domain';
+import { EntityType, EntityVerb } from '@hexly/domain';
+import { HexlyDatePipe } from '../../core/i18n/hexly-date.pipe';
 import { Autofocus } from '../../ui/autofocus';
 import { Button } from '../../ui/button';
 import { Panel } from '../../ui/panel';
 import { Icon, IconName } from '../../ui/icon/icon';
 import { ACCENT_BAR, ACCENT_SIGIL, accentFor } from '../../ui/sigil';
 
-/** A row of the Entity browser grid, with its last-edited date pre-formatted for
- * the active language (ADR-0014) — the parent owns list/order, the card owns the tile. */
+/** A row of the Entity browser grid — the parent owns list/order, the card owns
+ * the tile. The last-edited instant stays raw; the template formats it via
+ * `| hexlyDate` so it tracks the user's Format Locale live (ADR-0038). */
 export interface EntityCardVm {
   id: string;
   title: string;
   type: EntityType;
   tags: readonly string[];
-  edited: string;
+  updatedAt: number;
+  /** The caller's Rights on this Entity (ADR-0039) — gates the rename/delete actions. */
+  rights?: readonly EntityVerb[];
 }
 
 /**
@@ -34,7 +38,7 @@ export interface EntityCardVm {
 @Component({
   selector: 'app-entity-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Panel, Icon, Autofocus, TranslocoPipe, RouterLink],
+  imports: [Button, Panel, Icon, Autofocus, TranslocoPipe, RouterLink, HexlyDatePipe],
   host: { class: 'contents' },
   template: `
     <section
@@ -88,38 +92,44 @@ export interface EntityCardVm {
             >
             <span class="text-2xs text-ink-faint">·</span>
             <span class="meta text-2xs text-ink-muted">{{
-              'entityBrowser.edited' | transloco: { date: card().edited }
+              'entityBrowser.edited' | transloco: { date: (card().updatedAt | hexlyDate) }
             }}</span>
+            <!-- Rename gates on the edit verb (substance), delete on the delete verb
+                 (ADR-0039): a reader never sees an action the server would 403. -->
             <span
               class="relative z-10 ml-auto flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
             >
-              <button
-                type="button"
-                appButton
-                icon
-                variant="ghost"
-                size="sm"
-                [attr.data-testid]="'rename-' + card().id"
-                [attr.aria-label]="'entityBrowser.rename' | transloco"
-                [attr.title]="'entityBrowser.rename' | transloco"
-                (click)="startRename.emit()"
-              >
-                <app-icon name="label" [size]="16" />
-              </button>
-              <button
-                type="button"
-                appButton
-                icon
-                variant="ghost"
-                size="sm"
-                danger
-                [attr.data-testid]="'delete-' + card().id"
-                [attr.aria-label]="'common.delete' | transloco"
-                [attr.title]="'common.delete' | transloco"
-                (click)="remove.emit()"
-              >
-                <app-icon name="erase" [size]="16" />
-              </button>
+              @if (canRename()) {
+                <button
+                  type="button"
+                  appButton
+                  icon
+                  variant="ghost"
+                  size="sm"
+                  [attr.data-testid]="'rename-' + card().id"
+                  [attr.aria-label]="'entityBrowser.rename' | transloco"
+                  [attr.title]="'entityBrowser.rename' | transloco"
+                  (click)="startRename.emit()"
+                >
+                  <app-icon name="label" [size]="16" />
+                </button>
+              }
+              @if (canDelete()) {
+                <button
+                  type="button"
+                  appButton
+                  icon
+                  variant="ghost"
+                  size="sm"
+                  danger
+                  [attr.data-testid]="'delete-' + card().id"
+                  [attr.aria-label]="'common.delete' | transloco"
+                  [attr.title]="'common.delete' | transloco"
+                  (click)="remove.emit()"
+                >
+                  <app-icon name="erase" [size]="16" />
+                </button>
+              }
             </span>
           </div>
           @if (card().tags.length > 0) {
@@ -161,4 +171,7 @@ export class EntityCard {
   protected readonly typeIcon = computed<IconName>(() =>
     this.card().type === 'hexmap' ? 'terrain' : 'label',
   );
+  /** Rename is a substance edit; delete the lifecycle verb (ADR-0039). Absent Rights → hidden (fail-closed). */
+  protected readonly canRename = computed(() => !!this.card().rights?.includes('edit'));
+  protected readonly canDelete = computed(() => !!this.card().rights?.includes('delete'));
 }

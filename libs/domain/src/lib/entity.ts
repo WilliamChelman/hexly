@@ -143,11 +143,6 @@ export const createEntityRequestSchema = z.object({
 
 export type CreateEntityRequest = z.infer<typeof createEntityRequestSchema>;
 
-/** PATCH /entities/:id: metadata-only — no `version`, so a rename is outside the document's concurrency check. */
-export const renameEntityRequestSchema = z.object({ name: nameSchema });
-
-export type RenameEntityRequest = z.infer<typeof renameEntityRequestSchema>;
-
 /** PUT /entities/:id (ADR-0018): stale `version` is rejected with 409 (ADR-0004). */
 export const saveEntityRequestSchema = z.object({
   document: entityBodySchema,
@@ -164,6 +159,67 @@ export const visibilitySchema = z.enum(['private', 'shared']);
 
 /** CONTEXT.md → Entity Visibility. */
 export type Visibility = z.infer<typeof visibilitySchema>;
+
+/**
+ * The closed set of actions a caller may exercise on an Entity (CONTEXT.md → Rights,
+ * ADR-0039). Each verb maps to an ADR-0037 access predicate: `read` (canRead), `edit`
+ * (substance — content/name/tags/metadata), `delete` and `set-visibility` (the lifecycle
+ * gate — Owner or World Owner of a shared Entity), `manage` (owners/grants/Public Link —
+ * Owner only). Reported *with* the Entity so a surface gates its controls on exactly what
+ * the server enforces, never re-deriving standing.
+ */
+export const entityVerbSchema = z.enum(['read', 'edit', 'delete', 'set-visibility', 'manage']);
+
+/** CONTEXT.md → Rights (Entity). */
+export type EntityVerb = z.infer<typeof entityVerbSchema>;
+
+/**
+ * PATCH /entities/:id: a metadata patch (ADR-0037) — the `name` and/or the Visibility,
+ * no `version` (outside the document's concurrency check). At least one field must be
+ * present. Visibility rides here so an Owner can flip `private`↔`shared` without a
+ * document round-trip — a toggle straight from the Entity Browser (#160).
+ */
+export const patchEntityRequestSchema = z
+  .object({
+    name: nameSchema.optional(),
+    visibility: visibilitySchema.optional(),
+  })
+  .refine((p) => p.name !== undefined || p.visibility !== undefined, {
+    message: 'A patch must change at least one field',
+  });
+
+export type PatchEntityRequest = z.infer<typeof patchEntityRequestSchema>;
+
+/**
+ * Entity-level grant roles (ADR-0037, #161): `editor` may edit the Entity's substance
+ * (Content, name, Tags, Metadata) but never its lifecycle or exposure; `viewer` is
+ * read-only. Owner is excluded — it belongs to the ownership-set endpoints, not grants.
+ */
+export const grantRoleSchema = z.enum(['editor', 'viewer']);
+
+/** CONTEXT.md → Editor / Viewer. */
+export type GrantRole = z.infer<typeof grantRoleSchema>;
+
+/**
+ * An entity-level grant (ADR-0037, #161): a named Instance user (member of the World or
+ * not) holding Editor or Viewer access to one Entity. A grant pierces `private` — a
+ * Viewer grant on a `private` Entity is per-user visibility.
+ */
+export interface EntityGrant {
+  readonly userId: string;
+  readonly role: GrantRole;
+}
+
+/**
+ * POST /entities/:id/grants: grant an existing Instance user Editor or Viewer on the
+ * Entity. Upsert — re-granting a different role updates it. Owner-only server-side.
+ */
+export const addGrantRequestSchema = z.object({
+  userId: z.string().min(1),
+  role: grantRoleSchema,
+});
+
+export type AddGrantRequest = z.infer<typeof addGrantRequestSchema>;
 
 /** The list page size default and server-enforced cap (ADR-0025). Over-cap requests are clamped, not rejected. */
 export const ENTITY_LIST_DEFAULT_LIMIT = 50;
@@ -203,6 +259,12 @@ export const entityListQuerySchema = z.object({
   // Scope the list to one World (ADR-0024) — the entity browser's active-World filter.
   worldId: z.string().min(1).optional(),
   cursor: z.string().optional(),
+  // Opt-in per-row Rights (ADR-0039): the Entity Browser sets `rights=1` to gate per-card
+  // actions; suggestion/palette/export paths omit it so `list` stays a pure read-filter.
+  rights: z
+    .string()
+    .optional()
+    .transform((v) => v === '1' || v === 'true'),
   limit: z.coerce
     .number()
     .int()
@@ -234,7 +296,6 @@ export interface EntityFacets {
 /** What `GET /entities` lists; body fetched only on open. `type`/`tags` ride along for grouping and filtering. */
 export interface EntitySummary {
   readonly id: string;
-  readonly ownerId: string;
   /** The World this Entity belongs to (ADR-0024). Every Entity belongs to exactly one. */
   readonly worldId: string;
   readonly name: string;
@@ -245,6 +306,12 @@ export interface EntitySummary {
   readonly version: number;
   readonly createdAt: number;
   readonly updatedAt: number;
+  /**
+   * The caller's Rights on this Entity (ADR-0039), present only when the list request opted
+   * in (`rights=1`) — the Entity Browser gates per-card actions on it. Absent on the default
+   * read-filter path (suggestions, Command Palette, export), which never pays the per-row cost.
+   */
+  readonly rights?: readonly EntityVerb[];
 }
 
 /** What `GET /entities/:id` and saves return. */
@@ -256,6 +323,15 @@ export interface EntityDetail extends EntitySummary {
    * page. Absent/false for every ordinary Entity.
    */
   readonly isHome?: boolean;
+  /**
+   * The caller's Rights on this Entity (CONTEXT.md → Rights, ADR-0039): the closed verb set
+   * they may exercise, computed on read from the ADR-0037 predicates. Present and non-empty on
+   * the single-entity fetch (`GET /entities/:id`) and anonymous link reads — an Owner gets all
+   * five, an entity-level Editor `read`+`edit`, an anonymous link `read`. Absent on the
+   * create/save/patch responses (the server computes Rights only on read); the client carries
+   * the load-time Rights forward across an in-place mutation. Inherited optional (EntitySummary).
+   */
+  readonly rights?: readonly EntityVerb[];
 }
 
 /**

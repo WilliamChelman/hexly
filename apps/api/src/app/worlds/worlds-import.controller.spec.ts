@@ -97,7 +97,7 @@ describe('Vault import endpoint', () => {
     app.use(cookieParser());
     await app.init();
 
-    await app.get(AuthService).seedUser('ada@hexly.test', 'correct horse', 'Ada');
+    await app.get(AuthService).seedUser('ada@hexly.test', 'correct horse', 'Ada', { canCreateWorlds: true });
   });
 
   afterEach(async () => {
@@ -110,6 +110,19 @@ describe('Vault import endpoint', () => {
     await agent.post('/auth/login').send({ email, password }).expect(200);
     return agent;
   }
+
+  it('forbids importing a vault without the World Creation capability (ADR-0040)', async () => {
+    // Import mints a World too, so it is gated identically to POST /worlds.
+    await app
+      .get(AuthService)
+      .seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob', {
+        canCreateWorlds: false,
+      });
+    const bob = await signIn('bob@hexly.test', 'hunter2 stationery');
+    const zip = vaultZip({ 'Note.md': '# Note' });
+
+    await bob.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(403);
+  });
 
   it('imports a vault .zip into a new World named after the file, one note per markdown file', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');

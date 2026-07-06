@@ -9,3 +9,15 @@ export const TEST_USER = {
   password: 'hexly-e2e-password',
   displayName: 'E2E Tester',
 } as const;
+
+/**
+ * A second seeded user the suite never logs in as — it exists only to populate the
+ * Instance user directory so entity-grant / ownership specs have someone to share with
+ * (ADR-0037, #161). Same source-of-truth wiring as {@link TEST_USER}: the config passes
+ * it to the seed, the specs pick it by display name.
+ */
+export const TEST_GRANTEE = {
+  email: 'grantee@hexly.test',
+  password: 'hexly-e2e-grantee',
+  displayName: 'Grantee Gwen',
+} as const;

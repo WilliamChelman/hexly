@@ -29,8 +29,8 @@ import { ACCENT_SIGIL, accentFor, monogram } from '../../ui/sigil';
  * every World the caller can reach — owned and member — and the surface that owns
  * World create. It is the chooser, not an auto-redirect: a user with zero Worlds
  * sees an empty state with a Create affordance rather than an edge case to redirect
- * around. Owned-vs-member is derived by comparing each World's `ownerId` to the
- * current user. Creating opens the new World's Home Entity; activating an existing
+ * around. Owned-vs-member is derived by testing whether the current user is in each
+ * World's `owners` set (ADR-0037). Creating opens the new World's Home Entity; activating an existing
  * World enters its Entity browser.
  */
 @Component({
@@ -107,10 +107,12 @@ import { ACCENT_SIGIL, accentFor, monogram } from '../../ui/sigil';
               {{ 'worldIndex.subhead' | transloco }}
             </p>
           </div>
-          <div class="flex items-center gap-2">
-            <ng-container [ngTemplateOutlet]="importBtn" />
-            <ng-container [ngTemplateOutlet]="createBtn" />
-          </div>
+          @if (canCreateWorlds()) {
+            <div class="flex items-center gap-2">
+              <ng-container [ngTemplateOutlet]="importBtn" />
+              <ng-container [ngTemplateOutlet]="createBtn" />
+            </div>
+          }
         </div>
       </header>
 
@@ -181,6 +183,18 @@ import { ACCENT_SIGIL, accentFor, monogram } from '../../ui/sigil';
                     <span
                       class="relative z-10 ml-auto flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
                     >
+                      <a
+                        appButton
+                        icon
+                        variant="ghost"
+                        size="sm"
+                        [routerLink]="['/w', card.id]"
+                        [attr.data-testid]="'owners-world-' + card.id"
+                        [attr.aria-label]="'owners.heading' | transloco"
+                        [attr.title]="'owners.heading' | transloco"
+                      >
+                        <app-icon name="user" [size]="16" />
+                      </a>
                       <button
                         type="button"
                         appButton
@@ -223,24 +237,43 @@ import { ACCENT_SIGIL, accentFor, monogram } from '../../ui/sigil';
                         <app-icon name="erase" [size]="16" />
                       </button>
                     </span>
+                  } @else {
+                    <span
+                      class="relative z-10 ml-auto flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
+                    >
+                      <button
+                        type="button"
+                        appButton
+                        variant="ghost"
+                        size="sm"
+                        danger
+                        [attr.data-testid]="'leave-world-' + card.id"
+                        [attr.title]="'members.leave' | transloco"
+                        (click)="leaveWorld(card.id)"
+                      >
+                        {{ 'members.leave' | transloco }}
+                      </button>
+                    </span>
                   }
                 </div>
               </div>
             </li>
           }
-          <li class="snap-start shrink-0 w-56">
-            <button
-              type="button"
-              class="h-44 w-full rounded-lg border border-dashed border-line-strong text-ink-muted hover:text-gold hover:border-gold bg-surface-sunken/40 flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors outline-none focus-visible:shadow-none focus-visible:[outline:2px_solid_var(--color-gold)] focus-visible:[outline-offset:-2px]"
-              [disabled]="creating()"
-              (click)="create()"
-            >
-              <app-icon name="plus" [size]="24" />
-              <span class="font-display text-md">{{
-                'worlds.new' | transloco
-              }}</span>
-            </button>
-          </li>
+          @if (canCreateWorlds()) {
+            <li class="snap-start shrink-0 w-56">
+              <button
+                type="button"
+                class="h-44 w-full rounded-lg border border-dashed border-line-strong text-ink-muted hover:text-gold hover:border-gold bg-surface-sunken/40 flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors outline-none focus-visible:shadow-none focus-visible:[outline:2px_solid_var(--color-gold)] focus-visible:[outline-offset:-2px]"
+                [disabled]="creating()"
+                (click)="create()"
+              >
+                <app-icon name="plus" [size]="24" />
+                <span class="font-display text-md">{{
+                  'worlds.new' | transloco
+                }}</span>
+              </button>
+            </li>
+          }
         </ul>
       </main>
     } @else if (loadError()) {
@@ -263,10 +296,12 @@ import { ACCENT_SIGIL, accentFor, monogram } from '../../ui/sigil';
         >
           <p class="m-0">{{ 'worldIndex.emptyTitle' | transloco }}</p>
           <p class="text-sm m-0">{{ 'worldIndex.emptyHint' | transloco }}</p>
-          <div class="flex items-center gap-2">
-            <ng-container [ngTemplateOutlet]="createBtn" />
-            <ng-container [ngTemplateOutlet]="importBtn" />
-          </div>
+          @if (canCreateWorlds()) {
+            <div class="flex items-center gap-2">
+              <ng-container [ngTemplateOutlet]="createBtn" />
+              <ng-container [ngTemplateOutlet]="importBtn" />
+            </div>
+          }
         </section>
       </main>
     }
@@ -369,17 +404,19 @@ export class WorldIndex {
   private readonly store = inject(WorldStore);
   private readonly worldsClient = inject(WorldsClient);
   private readonly auth = inject(AuthClient);
+  // World Creation capability (ADR-0040): gates every "New World" / import affordance —
+  // the server 403s a creation attempt without it, so the button is hidden to match.
+  protected readonly canCreateWorlds = this.auth.canCreateWorlds;
   private readonly router = inject(Router);
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
 
   protected readonly loaded = this.store.loaded;
   protected readonly loadError = this.store.loadError;
-  /** The reachable Worlds, each tagged owned (caller is its Owner) or member. */
-  protected readonly cards = computed(() => {
-    const me = this.auth.currentUser()?.id;
-    return this.store.worlds().map((w) => ({ ...w, owned: w.ownerId === me }));
-  });
+  /** The reachable Worlds, each tagged owned (caller holds the `manage` Right, ADR-0039) or member. */
+  protected readonly cards = computed(() =>
+    this.store.worlds().map((w) => ({ ...w, owned: !!w.rights?.includes('manage') })),
+  );
   /** The rail order: most-recently-touched World first (continue where you left off). */
   protected readonly sorted = computed(() =>
     [...this.cards()].sort((a, b) => b.updatedAt - a.updatedAt),
@@ -477,6 +514,14 @@ export class WorldIndex {
     this.pendingDelete.set(null);
   }
 
+  /** Leave a World the caller is a member (not Owner) of (ADR-0037, #159), self-service. */
+  protected leaveWorld(id: string): void {
+    this.store.leave(id).subscribe({
+      error: () =>
+        this.toaster.show(this.transloco.translate('members.leaveError'), 'error'),
+    });
+  }
+
   /** Delete the pending World once the typed name matches; cascades its Entities (ADR-0024). */
   protected confirmDelete(): void {
     const target = this.pendingDelete();
@@ -502,7 +547,10 @@ export class WorldIndex {
       .pipe(finalize(() => this.creating.set(false)))
       .subscribe({
         next: (world) =>
-          this.router.navigate(entityRoute(world.id, world.homeEntityId)),
+          this.router.navigate(
+            // Home Entity's title is the World's name (ADR-0029), so both slugs derive from it.
+            entityRoute(world.id, world.homeEntityId, world.name, world.name),
+          ),
         error: () =>
           this.toaster.show(
             this.transloco.translate('worlds.createError'),

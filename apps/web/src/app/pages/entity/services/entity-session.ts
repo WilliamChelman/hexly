@@ -35,9 +35,11 @@ import {
   HexMap,
   hexMapSchema,
   tiptapContent,
+  Visibility,
 } from '@hexly/domain';
 import { EntitiesClient } from '../../../core/services/entities.client';
 import { ActiveWorld } from '../../../core/services/active-world';
+import { idFromSegment } from '../../../core/utils/pretty-id';
 import { worldRoute } from '../../../core/utils/routes';
 import { TitleService } from '../../../core/i18n/title.service';
 import { AppShellStore } from '../../../shell/app-shell.store';
@@ -89,8 +91,23 @@ export class EntitySession {
   private readonly _seed = signal<EntityDetail | null>(null);
   readonly seed = this._seed.asReadonly();
 
-  private readonly _error = signal<'save' | 'reload' | null>(null);
+  private readonly _error = signal<'save' | 'reload' | 'readonly' | null>(null);
   readonly error = this._error.asReadonly();
+
+  /**
+   * Whether the caller may write the open Entity (ADR-0039): the load-time Rights carry the
+   * `edit` verb (substance — content, name, tags). False → a read-only opener: {@link save}
+   * no-ops so no autosave ever hits a 403 wall.
+   */
+  readonly writable = computed(() => !!this._current()?.rights?.includes('edit'));
+
+  /**
+   * Whether the caller may MANAGE this Entity's sharing (ADR-0039): the owner-only surface
+   * behind the Share dialog (owners, grants, Public Link) — the `manage` verb. Absent → Share
+   * stays hidden for a writer who isn't an Owner (an entity-level Editor or a World Owner),
+   * whose Rights carry `edit` but not `manage`.
+   */
+  readonly manageable = computed(() => !!this._current()?.rights?.includes('manage'));
 
   /** Live Content envelope (ADR-0019); here not in {@link HexMapStore} since Content spans every Entity type. */
   private readonly _content = signal<Content | null>(null);
@@ -208,11 +225,27 @@ export class EntitySession {
    * the World's library (ADR-0028) via ActiveWorld; other load errors set the
    * reload-error state so the user sees feedback without a silent redirect.
    */
+  /**
+   * A Public Link page fetches its Entity through the token-scoped public read surface and
+   * {@link adopt}s it directly (ADR-0037, #162). Marking the session externally driven makes
+   * {@link watchRoute} a no-op, so the reused {@link EntityPage} can't *also* fire an
+   * authenticated `/api/entities/:id` load — an explicit read-only mode, not a reliance on the
+   * public route merely naming its param `entityId` instead of `id`.
+   */
+  private externallyDriven = false;
+  markExternallyDriven(): void {
+    this.externallyDriven = true;
+  }
+
   watchRoute(route: ActivatedRoute): void {
+    // A public reader already has its Entity (adopted from the public surface, #162) — never
+    // fire an authenticated load over it, regardless of how the route params are named.
+    if (this.externallyDriven) return;
     route.paramMap
       .pipe(
         map((params) => params.get('id')),
-        filter((id): id is string => id !== null),
+        filter((seg): seg is string => seg !== null),
+        map((seg) => idFromSegment(seg)),
         switchMap((id) =>
           this.openRoute(id).pipe(
             catchError((err) => {
@@ -260,8 +293,33 @@ export class EntitySession {
     this._baseTags.set(this._tags());
   }
 
+  /**
+   * Carry the caller's load-time Rights (ADR-0039) onto an in-place update response. A
+   * save/rename returns the Entity *without* `rights` — the server computes Rights only on read —
+   * and never changes the caller's standing, so we preserve them from the pre-mutation Entity.
+   * Dropping them would flip an Owner read-only (no `edit` verb) and hide the owner-only Share
+   * action (no `manage`) the moment they save. A *visibility* PATCH is the exception: it can
+   * revoke the caller's own access (a World Owner loses write when a shared Entity goes private),
+   * so the server ships fresh `rights` on that response and we prefer them over the stale set.
+   */
+  private withPermissions(updated: EntityDetail, prev: EntityDetail): EntityDetail {
+    return { ...updated, rights: updated.rights ?? prev.rights };
+  }
+
   /** Wrap the editor's latest snapshot in the format envelope (ADR-0019). */
   setContent(snapshot: unknown): void {
+    // TipTap fires `update` on load/schema-normalization, not only on a real edit — and
+    // tiptapContent mints a new Content each call. Re-wrapping then would move _content off
+    // its baseline reference and trip the reference-equality dirty check into autosaving a PUT
+    // with no user change (#164). Collapse a snapshot value-equal to the persisted one back to
+    // the baseline reference, so only real prose changes read as dirty (ADR-0005 invariant).
+    const base = this._baseContent();
+    // ponytail: JSON.stringify equality — ProseMirror JSON has deterministic key order, so this
+    // is sound for doc snapshots; swap for a deep-equal if snapshot ever holds non-PM data.
+    if (base && JSON.stringify(snapshot) === JSON.stringify(base.snapshot)) {
+      this._content.set(base);
+      return;
+    }
     this._content.set(tiptapContent(snapshot));
   }
 
@@ -299,13 +357,29 @@ export class EntitySession {
 
   /** Rename the open Entity (metadata only — does not affect the body save). */
   rename(name: string): Observable<EntityDetail> {
-    // None open, or one loading under navigation → no-op (not a throw), so a stale
-    // rename can't write to the Entity the user navigated away from (#4).
+    return this.patch({ name });
+  }
+
+  /** Flip the open Entity's Visibility (ADR-0037, #160) — metadata only, like {@link rename}. */
+  setVisibility(visibility: Visibility): Observable<EntityDetail> {
+    return this.patch({ visibility });
+  }
+
+  /**
+   * The shared metadata PATCH behind {@link rename} and {@link setVisibility} — both hit
+   * the same endpoint and share the same bookkeeping, so the guard lives in one place.
+   * None open, or one loading under navigation → no-op (not a throw), so a stale patch
+   * can't write to the Entity the user navigated away from (#4).
+   */
+  private patch(changes: {
+    name?: string;
+    visibility?: Visibility;
+  }): Observable<EntityDetail> {
     const open = this._current();
     if (!open || this._loading()) return EMPTY;
-    return this.entities.rename(open.id, name).pipe(
+    return this.entities.patch(open.id, changes).pipe(
       tap((updated) => {
-        this._current.set(updated);
+        this._current.set(this.withPermissions(updated, open));
         this._conflict.set(null); // fresh state clears any stale 409 chip
       }),
     );
@@ -324,6 +398,9 @@ export class EntitySession {
     // mid-flight edits into one follow-up once this resolves, ADR-0026).
     const open = this._current();
     if (!open || this._loading() || this._saving()) return EMPTY;
+    // Read-only opener → no write is ever attempted (the root of the stuck-banner bug):
+    // gating here covers every path (autosave scheduler, Cmd/Ctrl+S, leave flush).
+    if (!this.writable()) return EMPTY;
     // Snapshot the exact references being sent. A clean save advances the baseline to
     // *these*, not the live signals, so keystrokes that land mid-flight stay dirty and
     // ride the next save instead of being silently marked clean (ADR-0026).
@@ -363,14 +440,20 @@ export class EntitySession {
           this._conflict.set(outcome.current);
         } else {
           this._conflict.set(null);
-          this._current.set(outcome.entity);
+          this._current.set(this.withPermissions(outcome.entity, open));
           this._baseGrid.set(grid);
           this._baseContent.set(content);
           this._baseTags.set(tags);
         }
       }),
-      catchError(() => {
-        this._error.set('save');
+      catchError((err: unknown) => {
+        // A 403 means write permission was lost server-side (a shared Entity re-hidden or
+        // a role revoked mid-session): a terminal read-only state, not a retryable blip —
+        // the chip offers no Retry. `failed` still pauses the scheduler so it can't loop
+        // the same rejected PUT every 800ms (it only re-attempts once per fresh edit).
+        this._error.set(
+          err instanceof HttpErrorResponse && err.status === 403 ? 'readonly' : 'save',
+        );
         this.failed = snapshot;
         return EMPTY;
       }),

@@ -66,6 +66,11 @@
     "homeTitleHint": "Renommé avec le monde",
     "backToLibrary": "Retour à la bibliothèque",
     "editorLabel": "Contenu de la note",
+    "outline": {
+      "title": "Plan",
+      "toggle": "Afficher/masquer le plan",
+      "empty": "Aucun titre pour l’instant"
+    },
     "slashMenu": {
       "label": "Insérer un bloc",
       "empty": "Aucun bloc correspondant",
@@ -130,6 +135,11 @@
     "reload": "Recharger",
     "saving": "Enregistrement…",
     "share": "Partager",
+    "visibility": {
+      "shared": "Partagé",
+      "private": "Privé",
+      "toggle": "Changer la visibilité"
+    },
     "view": {
       "switchLabel": "Changer de vue",
       "map": "Carte",
@@ -142,6 +152,7 @@
       "unsaved": "Non enregistré…",
       "failed": "Échec de l'enregistrement",
       "retry": "Réessayer",
+      "readonly": "Lecture seule — vous n'avez pas la permission de modifier.",
       "reloadFailed": "Échec du rechargement — serveur injoignable."
     },
     "moveBlocked": "Déplacement bloqué — un obstacle gêne le passage.",
@@ -277,6 +288,7 @@
     "chipRegion": "Région",
     "fieldMapName": "Nom de la carte",
     "fieldNote": "Note",
+    "fieldTerrain": "Terrain",
     "footerTokens": "Jetons de design"
   },
   "domain": {
@@ -309,7 +321,12 @@
     "cancel": "Annuler",
     "close": "Fermer",
     "delete": "Supprimer",
-    "create": "Créer"
+    "create": "Créer",
+    "settings": "Paramètres",
+    "locale": {
+      "en": "English",
+      "fr": "Français"
+    }
   },
   "nav": {
     "primary": "Navigation principale",
@@ -317,7 +334,9 @@
     "styleguide": "Guide de style",
     "expand": "Déployer la navigation",
     "collapse": "Réduire la navigation",
-    "home": "Accueil Hexly"
+    "home": "Accueil Hexly",
+    "admin": "Admin",
+    "worldSettings": "Paramètres du monde"
   },
   "commandPalette": {
     "searchLabel": "Rechercher ou exécuter une commande",
@@ -328,6 +347,8 @@
     "commands": "Commandes",
     "createNote": "Créer une note",
     "createMap": "Créer une carte",
+    "goToAdmin": "Aller à l'administration",
+    "goToStyleguide": "Aller au guide de style",
     "nameLabel": "Nom",
     "worldLabel": "Monde"
   },
@@ -383,5 +404,175 @@
     "heading": "Introuvable.",
     "hint": "La page ou l'entité que vous cherchez n'existe pas, ou vous n'y avez pas accès.",
     "backToWorlds": "Retour à vos mondes"
+  },
+  "owners": {
+    "heading": "Propriétaires",
+    "subhead": "Chaque personne ici a un contrôle total et égal sur cette {kind}.",
+    "you": "vous",
+    "resign": "Se retirer",
+    "remove": "Retirer",
+    "addLabel": "Ajouter un propriétaire",
+    "addPlaceholder": "Choisir une personne…",
+    "add": "Ajouter",
+    "addError": "Impossible d’ajouter ce propriétaire. Veuillez réessayer.",
+    "removeError": "Impossible de retirer ce propriétaire. Veuillez réessayer.",
+    "lastOwner": "Une {kind} doit conserver au moins un propriétaire.",
+    "loadError": "Impossible de charger les propriétaires.",
+    "world": "monde",
+    "entity": "entité",
+    "tabTitle": "Hexly — Propriétaires"
+  },
+  "grants": {
+    "heading": "Partagé avec",
+    "subhead": "Donnez à une personne précise l’accès à cette seule entité — même si elle n’est pas dans ce monde.",
+    "editor": "Éditeur",
+    "viewer": "Lecteur",
+    "revoke": "Révoquer",
+    "empty": "Partagé avec personne pour l’instant.",
+    "addLabel": "Partager avec une personne",
+    "addPlaceholder": "Choisir une personne…",
+    "add": "Partager",
+    "addError": "Impossible de partager avec cette personne. Veuillez réessayer.",
+    "roleError": "Impossible de modifier l’accès de cette personne. Veuillez réessayer.",
+    "revokeError": "Impossible de révoquer cet accès. Veuillez réessayer.",
+    "loadError": "Impossible de charger les partages."
+  },
+  "members": {
+    "heading": "Membres",
+    "subhead": "Les personnes que vous avez ajoutées à ce monde comme contributeurs ou lecteurs.",
+    "contributor": "Contributeur",
+    "viewer": "Lecteur",
+    "remove": "Retirer",
+    "empty": "Aucun membre pour l’instant.",
+    "addLabel": "Ajouter un membre",
+    "addPlaceholder": "Choisir une personne…",
+    "add": "Ajouter",
+    "addError": "Impossible d’ajouter ce membre. Veuillez réessayer.",
+    "roleError": "Impossible de changer le rôle de ce membre. Veuillez réessayer.",
+    "removeError": "Impossible de retirer ce membre. Veuillez réessayer.",
+    "loadError": "Impossible de charger les membres.",
+    "leave": "Quitter",
+    "leaveError": "Impossible de quitter ce monde. Veuillez réessayer."
+  },
+  "publicLink": {
+    "worldHeading": "Lien public",
+    "worldSubhead": "Toute personne disposant de ce lien peut lire les entités partagées de ce monde — sans compte.",
+    "entityHeading": "Lien public",
+    "entitySubhead": "Toute personne disposant de ce lien peut lire cette entité — sans compte. Il fonctionne même lorsque l’entité est privée.",
+    "create": "Créer un lien public",
+    "copy": "Copier",
+    "revoke": "Révoquer",
+    "copied": "Lien copié dans le presse-papiers.",
+    "copyError": "Impossible de copier le lien.",
+    "loadError": "Impossible de charger le lien public.",
+    "mintError": "Impossible de créer le lien public. Veuillez réessayer.",
+    "revokeError": "Impossible de révoquer le lien public. Veuillez réessayer."
+  },
+  "publicView": {
+    "tabTitle": "Partagé — Hexly",
+    "banner": "Vous consultez une page partagée en lecture seule.",
+    "worldEntities": "Pages de ce monde",
+    "notFound": "Ce lien n’est plus actif.",
+    "notFoundBody": "Le lien a peut-être été révoqué, ou l’adresse est incorrecte."
+  },
+  "settings": {
+    "tabTitle": "Paramètres",
+    "heading": "Paramètres du compte",
+    "subhead": "Vos préférences suivent votre compte sur tous vos appareils.",
+    "preferences": {
+      "heading": "Préférences",
+      "theme": "Thème",
+      "language": "Langue",
+      "formatLocale": "Format régional",
+      "formatLocaleHint": "Le format des dates et des nombres, indépendant de la langue.",
+      "format": {
+        "same": "Comme la langue"
+      }
+    },
+    "profile": {
+      "heading": "Profil",
+      "email": "E-mail",
+      "emailHint": "Votre e-mail est votre identifiant ; seul un administrateur peut le changer.",
+      "displayName": "Nom affiché",
+      "save": "Enregistrer",
+      "saved": "Nom affiché enregistré.",
+      "saveError": "Impossible d’enregistrer le nom affiché."
+    },
+    "password": {
+      "heading": "Changer le mot de passe",
+      "current": "Mot de passe actuel",
+      "new": "Nouveau mot de passe",
+      "submit": "Changer le mot de passe",
+      "changed": "Mot de passe changé.",
+      "tooShort": "Le nouveau mot de passe doit contenir au moins 8 caractères.",
+      "wrongCurrent": "Le mot de passe actuel est incorrect.",
+      "error": "Impossible de changer le mot de passe."
+    }
+  },
+  "admin": {
+    "tabTitle": "Admin — Hexly",
+    "heading": "Administration de l'instance",
+    "subhead": "Gérez les comptes de cette instance. L'administrateur n'a accès à aucun Monde ni aucune Entité — le contenu reste privé au sein du modèle de collaboration.",
+    "create": {
+      "heading": "Créer un utilisateur",
+      "displayName": "Nom affiché",
+      "email": "E-mail",
+      "password": "Mot de passe",
+      "submit": "Créer l'utilisateur"
+    },
+    "users": {
+      "heading": "Comptes",
+      "empty": "Aucun compte."
+    },
+    "filter": "Filtrer les comptes",
+    "col": {
+      "account": "Compte",
+      "admin": "Admin",
+      "worlds": "Mondes",
+      "superadmin": "Super",
+      "status": "Statut",
+      "actions": "Actions"
+    },
+    "status": {
+      "active": "Actif",
+      "disabled": "Désactivé"
+    },
+    "badge": {
+      "superadmin": "Superadmin",
+      "admin": "Admin",
+      "worldCreator": "Créateur de mondes",
+      "disabled": "Désactivé"
+    },
+    "actions": {
+      "disable": "Désactiver",
+      "enable": "Activer",
+      "grantAdmin": "Nommer admin",
+      "revokeAdmin": "Retirer admin",
+      "grantWorldCreation": "Autoriser la création de mondes",
+      "revokeWorldCreation": "Interdire la création de mondes",
+      "grantSuperadmin": "Nommer superadmin",
+      "revokeSuperadmin": "Retirer superadmin",
+      "reset": "Réinitialiser le mot de passe",
+      "resetSave": "Enregistrer",
+      "delete": "Supprimer"
+    },
+    "confirmDelete": "Supprimer {{name}} ? Cette action est irréversible.",
+    "toast": {
+      "created": "Utilisateur créé",
+      "saved": "Enregistré",
+      "reset": "Mot de passe réinitialisé",
+      "deleted": "Utilisateur supprimé",
+      "error": "Une erreur est survenue."
+    },
+    "error": {
+      "email-in-use": "Cet e-mail est déjà utilisé par un autre compte.",
+      "sole-owner": "Cet utilisateur est l'unique propriétaire d'un Monde ou d'une Entité. Réattribuez la propriété avant de le supprimer.",
+      "last-superadmin": "C'est le dernier Superadmin — il ne peut être ni supprimé, ni rétrogradé, ni désactivé.",
+      "self-delete": "Vous ne pouvez pas supprimer votre propre compte.",
+      "self-disable": "Vous ne pouvez pas désactiver votre propre compte.",
+      "self-admin-revoke": "Vous ne pouvez pas retirer votre propre accès Admin.",
+      "superadmin-managed-by-superadmin": "Seul un Superadmin peut gérer un compte Superadmin.",
+      "user-not-found": "Ce compte n'existe plus."
+    }
   }
 }

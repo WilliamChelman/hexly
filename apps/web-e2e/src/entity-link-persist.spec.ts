@@ -1,4 +1,4 @@
-import { enterLibrary, expect, flushSave, test } from './fixtures';
+import { enterLibrary, entityIdFromUrl, expect, flushSave, segRe, test } from './fixtures';
 
 /**
  * The Entity Link journey (issue #76, CONTEXT.md → Entity Link): a Map element —
@@ -17,12 +17,12 @@ test('links a Hex to an Entity in the Inspector; the link survives a reload and 
   await enterLibrary(page);
   await page.getByTestId('new-note').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const noteId = page.url().split('/').pop();
+  const noteId = entityIdFromUrl(page);
 
   await enterLibrary(page);
   await page.getByTestId('new-map').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const mapId = page.url().split('/').pop();
+  const mapId = entityIdFromUrl(page);
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
 
@@ -53,5 +53,5 @@ test('links a Hex to an Entity in the Inspector; the link survives a reload and 
   await expect(page.getByTestId('entity-link-name')).toBeVisible();
 
   await page.getByTestId('entity-link-name').click();
-  await expect(page).toHaveURL(new RegExp(`/entities/${noteId}$`));
+  await expect(page).toHaveURL(new RegExp(`/entities/${segRe(noteId)}$`));
 });

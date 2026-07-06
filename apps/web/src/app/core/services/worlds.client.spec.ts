@@ -14,7 +14,8 @@ describe('WorldsClient', () => {
   const summary: WorldSummary = {
     id: 'w1',
     name: 'Aldermoor',
-    ownerId: 'u1',
+    owners: ['u1'],
+    rights: ['read', 'manage'],
     createdAt: 1,
     updatedAt: 1,
   };

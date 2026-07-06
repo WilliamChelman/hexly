@@ -12,6 +12,7 @@ import { Icon } from '../../ui/icon/icon';
 import { Input } from '../../ui/input';
 import { Kbd } from '../../ui/kbd';
 import { Panel } from '../../ui/panel';
+import { Select } from '../../ui/select';
 import { Swatch } from '../../ui/swatch';
 import { Textarea } from '../../ui/textarea';
 
@@ -41,6 +42,7 @@ interface TypeRow {
     Cartouche,
     Chip,
     Coord,
+    Select,
     Eyebrow,
     Field,
     Input,
@@ -270,6 +272,14 @@ interface TypeRow {
                 <textarea appTextarea>
 A walled town where the forest road meets the river ford.</textarea
                 >
+              </label>
+              <label appField [label]="'styleguide.fieldTerrain' | transloco">
+                <select appSelect>
+                  <option>Grassland</option>
+                  <option selected>Whisperwood</option>
+                  <option>Mountains</option>
+                  <option>Ocean</option>
+                </select>
               </label>
             </div>
           </figure>

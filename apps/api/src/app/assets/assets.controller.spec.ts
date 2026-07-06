@@ -28,7 +28,7 @@ describe('Asset serving endpoint', () => {
     await app.init();
 
     db.$client.prepare('INSERT INTO users (id, email, display_name, password_hash, created_at) VALUES (?,?,?,?,0)').run('u1', 'a@b.c', 'A', 'h');
-    db.$client.prepare('INSERT INTO worlds (id, name, owner_id, created_at, updated_at) VALUES (?,?,?,0,0)').run('world-1', 'W', 'u1');
+    db.$client.prepare('INSERT INTO worlds (id, name, created_at, updated_at) VALUES (?,?,0,0)').run('world-1', 'W');
   });
 
   afterEach(async () => {

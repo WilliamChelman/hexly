@@ -29,7 +29,7 @@ describe('Worlds endpoints', () => {
 
     adaId = await app
       .get(AuthService)
-      .seedUser('ada@hexly.test', 'correct horse', 'Ada');
+      .seedUser('ada@hexly.test', 'correct horse', 'Ada', { canCreateWorlds: true });
   });
 
   afterEach(async () => {
@@ -50,7 +50,9 @@ describe('Worlds endpoints', () => {
     expect(res.body).toEqual({
       id: expect.any(String),
       name: 'Aldermoor',
-      ownerId: expect.any(String),
+      // Ownership is a symmetric set (ADR-0037): the creator is its sole Owner.
+      owners: [expect.any(String)],
+      rights: ['read', 'manage'],
       homeEntityId: expect.any(String),
       // Fresh World holds only its Home Entity (#120).
       entityCount: 1,
@@ -61,6 +63,30 @@ describe('Worlds endpoints', () => {
     const home = await ada.get(`/entities/${res.body.homeEntityId}`).expect(200);
     expect(home.body.worldId).toBe(res.body.id);
     expect(home.body.type).toBe('note');
+  });
+
+  it('forbids creating a World without the World Creation capability (ADR-0040)', async () => {
+    // A user provisioned without World Creation — the in-app default — is gated.
+    await app
+      .get(AuthService)
+      .seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob', {
+        canCreateWorlds: false,
+      });
+    const bob = await signIn('bob@hexly.test', 'hunter2 stationery');
+
+    await bob.post('/worlds').send({ name: 'Nope' }).expect(403);
+  });
+
+  it('lets a Superadmin create a World even without the capability (repair, ADR-0040)', async () => {
+    await app
+      .get(AuthService)
+      .seedUser('root@hexly.test', 'repair the realm', 'Root', {
+        isSuperadmin: true,
+        canCreateWorlds: false,
+      });
+    const root = await signIn('root@hexly.test', 'repair the realm');
+
+    await root.post('/worlds').send({ name: 'Recovered' }).expect(201);
   });
 
   it('lists the worlds the caller owns, as summaries', async () => {
@@ -79,7 +105,8 @@ describe('Worlds endpoints', () => {
     expect(res.body[0]).toEqual({
       id: expect.any(String),
       name: expect.any(String),
-      ownerId: expect.any(String),
+      owners: [expect.any(String)],
+      rights: ['read', 'manage'],
       createdAt: expect.any(Number),
       updatedAt: expect.any(Number),
     });
@@ -87,7 +114,7 @@ describe('Worlds endpoints', () => {
 
   it('includes worlds the caller is a member of, and excludes the rest', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
-    await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob');
+    await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob', { canCreateWorlds: true });
     const bob = await signIn('bob@hexly.test', 'battery staple');
 
     const shared = await bob.post('/worlds').send({ name: 'Shared' }).expect(201);
@@ -110,6 +137,28 @@ describe('Worlds endpoints', () => {
 
     const res = await ada.get(`/worlds/${created.body.id}`).expect(200);
     expect(res.body).toEqual(created.body);
+  });
+
+  it('carries the caller’s Rights: manage for an Owner, read-only for a member (ADR-0039)', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+
+    // Owner holds read + manage on both Detail and summary.
+    expect(world.body.rights).toEqual(['read', 'manage']);
+    const adaList = await ada.get('/worlds').expect(200);
+    expect(adaList.body.find((w: { id: string }) => w.id === world.body.id).rights).toEqual([
+      'read',
+      'manage',
+    ]);
+
+    // A plain member reaches the World read-only — no manage.
+    const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob');
+    db.$client
+      .prepare(`INSERT INTO world_members (world_id, user_id, role) VALUES (?, ?, 'contributor')`)
+      .run(world.body.id, bobId);
+    const bob = await signIn('bob@hexly.test', 'battery staple');
+    expect((await bob.get(`/worlds/${world.body.id}`).expect(200)).body.rights).toEqual(['read']);
+    expect((await bob.get('/worlds').expect(200)).body[0].rights).toEqual(['read']);
   });
 
   it('reports the count of Entities a delete would destroy on the Detail', async () => {

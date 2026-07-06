@@ -48,7 +48,8 @@ describe('appRoutes structure (ADR-0028)', () => {
   it('nests the entity routes under a :worldId parent that pins and clears the active World', () => {
     const parent = appRoutes.find((r) => r.path === 'w/:worldId');
     expect(parent).toBeDefined();
-    expect(parent?.resolve).toBeDefined();
+    // The parent guard pins the active World detail and heals its slug (ADR-0042).
+    expect(parent?.canActivate?.length).toBeGreaterThan(1);
     expect(parent?.canDeactivate).toBeDefined();
     expect(parent?.loadComponent).toBeUndefined();
 

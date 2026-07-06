@@ -3,9 +3,12 @@ import {
   EntityBody,
   EntityDetail,
   EntityFacets,
+  EntityGrant,
   EntityPage,
   EntitySaveOutcome,
   EntityType,
+  GrantRole,
+  PublicLink,
 } from '@hexly/domain';
 import { EntityFacetParams, EntityListParams } from '../services/entities.client';
 
@@ -17,7 +20,13 @@ export class MockEntitiesClient {
   facets = vi.fn<(opts?: EntityFacetParams) => Observable<EntityFacets>>(() =>
     of({ type: [], tag: [], visibility: [] }),
   );
-  rename = vi.fn<(id: string, name: string) => Observable<EntityDetail>>();
+  patch =
+    vi.fn<
+      (
+        id: string,
+        changes: { name?: string; visibility?: EntityDetail['visibility'] },
+      ) => Observable<EntityDetail>
+    >();
   delete = vi.fn<(id: string) => Observable<void>>();
   create = vi.fn<
     (name: string, type: EntityType, worldId?: string) => Observable<EntityDetail>
@@ -35,4 +44,20 @@ export class MockEntitiesClient {
       tags: readonly string[],
     ) => Observable<EntitySaveOutcome>
   >();
+  // Defaults to an empty set so a spec that mounts the owner-set panel without
+  // caring about it still renders; override per test as needed.
+  owners = vi.fn<(id: string) => Observable<string[]>>(() => of<string[]>([]));
+  addOwner = vi.fn<(id: string, userId: string) => Observable<string[]>>();
+  removeOwner = vi.fn<(id: string, userId: string) => Observable<string[]>>();
+  // Defaults to an empty set so a spec that mounts the grant-set panel (#161) without
+  // caring about it still renders; override per test as needed.
+  grants = vi.fn<(id: string) => Observable<EntityGrant[]>>(() => of<EntityGrant[]>([]));
+  addGrant =
+    vi.fn<(id: string, userId: string, role: GrantRole) => Observable<EntityGrant[]>>();
+  removeGrant = vi.fn<(id: string, userId: string) => Observable<EntityGrant[]>>();
+  // Defaults to no active link so a spec mounting the Public Link control (#162) without
+  // caring about it still renders; override per test as needed.
+  link = vi.fn<(id: string) => Observable<PublicLink | null>>(() => of<PublicLink | null>(null));
+  mintLink = vi.fn<(id: string) => Observable<PublicLink>>();
+  revokeLink = vi.fn<(id: string) => Observable<void>>();
 }

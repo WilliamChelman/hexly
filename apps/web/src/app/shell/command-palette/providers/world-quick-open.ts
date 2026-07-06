@@ -26,7 +26,7 @@ export class WorldQuickOpen implements CommandProvider {
     return of(
       worlds.map(
         (world): Command => {
-          const route = worldRoute(world.id);
+          const route = worldRoute(world.id, world.name);
           return {
             id: world.id,
             label: world.name,

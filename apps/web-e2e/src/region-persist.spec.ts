@@ -1,4 +1,4 @@
-import { enterLibrary, expect, flushSave, test } from './fixtures';
+import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtures';
 
 /**
  * The Region journey (issue #8, #38, #39, ADR-0012): a region created in the Regions
@@ -17,7 +17,7 @@ test('creates a region in the panel, paints a hex, saves, and the region survive
   await page.getByTestId('new-map').click();
 
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const mapId = page.url().split('/').pop();
+  const mapId = entityIdFromUrl(page);
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
 

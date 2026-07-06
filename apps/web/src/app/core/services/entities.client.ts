@@ -9,10 +9,14 @@ import {
   EntityBody,
   EntityDetail,
   EntityFacets,
+  EntityGrant,
   EntityListQuery,
   EntityPage,
   EntitySaveOutcome,
   EntityType,
+  GrantRole,
+  PublicLink,
+  Visibility,
 } from '@hexly/domain';
 
 export type EntityListParams = Partial<EntityListQuery>;
@@ -37,6 +41,9 @@ export class EntitiesClient {
     for (const id of opts.ids ?? []) params = params.append('ids', id);
     if (opts.cursor) params = params.set('cursor', opts.cursor);
     if (opts.limit !== undefined) params = params.set('limit', opts.limit);
+    // Opt-in per-row Rights (ADR-0039): the Entity Browser sets it to gate per-card actions;
+    // other list callers omit it so the server stays a pure read-filter (no per-row EXISTS).
+    if (opts.rights) params = params.set('rights', '1');
     return this.http.get<EntityPage>('/api/entities', { params });
   }
 
@@ -47,13 +54,64 @@ export class EntitiesClient {
     });
   }
 
-  /** Metadata only — never conflicts with an in-progress save. */
-  rename(id: string, name: string): Observable<EntityDetail> {
-    return this.http.patch<EntityDetail>(`/api/entities/${id}`, { name });
+  /**
+   * Patch an Entity's metadata — name and/or Visibility (ADR-0037, #160). One PATCH for
+   * both: metadata never conflicts with an in-progress save. Owner-gated server-side.
+   */
+  patch(
+    id: string,
+    changes: { name?: string; visibility?: Visibility },
+  ): Observable<EntityDetail> {
+    return this.http.patch<EntityDetail>(`/api/entities/${id}`, changes);
   }
 
   delete(id: string): Observable<void> {
     return this.http.delete<void>(`/api/entities/${id}`);
+  }
+
+  /** The Entity's ownership set — Owner user ids (ADR-0037, #158). Owner-only server-side. */
+  owners(id: string): Observable<string[]> {
+    return this.http.get<string[]>(`/api/entities/${id}/owners`);
+  }
+
+  /** Add a co-Owner; returns the updated set. Idempotent (200), not a create. */
+  addOwner(id: string, userId: string): Observable<string[]> {
+    return this.http.post<string[]>(`/api/entities/${id}/owners`, { userId });
+  }
+
+  /** Remove an Owner or resign your own ownership; returns the updated set (ADR-0037). */
+  removeOwner(id: string, userId: string): Observable<string[]> {
+    return this.http.delete<string[]>(`/api/entities/${id}/owners/${userId}`);
+  }
+
+  /** The Entity's grant set — named Editor/Viewer grants (ADR-0037, #161). Owner-only server-side. */
+  grants(id: string): Observable<EntityGrant[]> {
+    return this.http.get<EntityGrant[]>(`/api/entities/${id}/grants`);
+  }
+
+  /** Grant an Instance user Editor or Viewer; returns the updated set. Upsert (200), not a create. */
+  addGrant(id: string, userId: string, role: GrantRole): Observable<EntityGrant[]> {
+    return this.http.post<EntityGrant[]>(`/api/entities/${id}/grants`, { userId, role });
+  }
+
+  /** Revoke a grant; returns the updated set (ADR-0037, #161). */
+  removeGrant(id: string, userId: string): Observable<EntityGrant[]> {
+    return this.http.delete<EntityGrant[]>(`/api/entities/${id}/grants/${userId}`);
+  }
+
+  /** The Entity's per-entity Public Link — the active token or null (ADR-0037, #162). Owner-only server-side. */
+  link(id: string): Observable<PublicLink | null> {
+    return this.http.get<PublicLink | null>(`/api/entities/${id}/link`);
+  }
+
+  /** Mint (or return the existing) per-entity Public Link; idempotent (200). */
+  mintLink(id: string): Observable<PublicLink> {
+    return this.http.post<PublicLink>(`/api/entities/${id}/link`, {});
+  }
+
+  /** Revoke the per-entity Public Link — the kill-switch (ADR-0037, #162). */
+  revokeLink(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/entities/${id}/link`);
   }
 
   // worldId scopes to a World (ADR-0024); omitted, server defaults to caller's first.

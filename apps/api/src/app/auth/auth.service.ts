@@ -2,7 +2,12 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { hash, verify } from '@node-rs/argon2';
 import { eq, lt } from 'drizzle-orm';
-import { AuthUser } from '@hexly/domain';
+import {
+  AuthUser,
+  Preferences,
+  PreferencesPatch,
+  preferencesSchema,
+} from '@hexly/domain';
 import { DB, Db } from '../db/db';
 import { sessions, users } from '../db/schema';
 
@@ -15,11 +20,24 @@ function newToken(): string {
 }
 
 /**
+ * argon2's memory-hard defaults are the production security cost (~20ms/hash).
+ * The test suite runs hundreds of hashes; under parallel workers that cost
+ * oversubscribes the cores and pushes auth-heavy specs past the 5s timeout —
+ * flaky, unrelated failures. Under NODE_ENV=test (set by vitest) drop to a
+ * throwaway cost: still a real `$argon2` hash, just cheap. Never hit in
+ * production (NODE_ENV=production).
+ */
+const HASH_OPTIONS: Parameters<typeof hash>[1] | undefined =
+  process.env.NODE_ENV === 'test'
+    ? { memoryCost: 512, timeCost: 2, parallelism: 1, outputLen: 32 }
+    : undefined;
+
+/**
  * A precomputed argon2 hash verified against when no user matches, so the
  * unknown-email path costs roughly the same as the wrong-password path and
  * response timing cannot be used to enumerate which emails exist.
  */
-const DUMMY_PASSWORD_HASH = hash('hexly-dummy-password');
+const DUMMY_PASSWORD_HASH = hash('hexly-dummy-password', HASH_OPTIONS);
 
 /**
  * The auth domain behind a small interface: provisioning members of the closed
@@ -32,16 +50,25 @@ export class AuthService {
   constructor(@Inject(DB) private readonly db: Db) {}
 
   /**
-   * Provision a user out-of-band (ADR-0004 — no public signup). The password is
-   * hashed with argon2; the plaintext is never stored.
+   * Provision a user out-of-band (ADR-0004 — no public signup): the seed CLI, the
+   * `--superadmin` setup path, and the Instance Admin's create-user endpoint all
+   * route through here. The password is hashed with argon2; the plaintext is never
+   * stored. `roles` seeds the admin tiers (ADR-0037, #163) and the World Creation
+   * capability (ADR-0040) — all default off, so a plain gated member is the common
+   * case; callers that want a bootstrap-ready account opt in explicitly.
    */
   async seedUser(
     email: string,
     password: string,
     displayName: string,
+    roles: {
+      isAdmin?: boolean;
+      isSuperadmin?: boolean;
+      canCreateWorlds?: boolean;
+    } = {},
   ): Promise<string> {
     const id = randomUUID();
-    const passwordHash = await hash(password);
+    const passwordHash = await hash(password, HASH_OPTIONS);
     this.db
       .insert(users)
       .values({
@@ -49,6 +76,12 @@ export class AuthService {
         email: normalizeEmail(email),
         displayName,
         passwordHash,
+        isAdmin: roles.isAdmin ?? false,
+        isSuperadmin: roles.isSuperadmin ?? false,
+        // World Creation is off-by-default (ADR-0040), matching the DB column
+        // default — a caller that omits the flag provisions a gated user. The
+        // seed CLI opts in explicitly for its bootstrap account.
+        canCreateWorlds: roles.canCreateWorlds ?? false,
         createdAt: Date.now(),
       })
       .run();
@@ -82,6 +115,9 @@ export class AuthService {
       return null;
     }
     if (!user || !passwordOk) return null;
+    // A disabled account cannot open a session (ADR-0037, #163) — the login lock.
+    // Checked after the password verify so timing doesn't reveal disabled accounts.
+    if (user.disabledAt !== null) return null;
 
     // Opportunistic sweep on login to prevent unbounded table growth (ADR-0002).
     this.purgeExpiredSessions();
@@ -115,7 +151,104 @@ export class AuthService {
       .from(users)
       .where(eq(users.id, session.userId))
       .get();
-    return user ? toAuthUser(user) : null;
+    if (!user) return null;
+    // A disabled account's live sessions stop resolving immediately (ADR-0037,
+    // #163) — disable is the immediate lever, not just a future-login block.
+    if (user.disabledAt !== null) return null;
+    return toAuthUser(user);
+  }
+
+  /**
+   * Merge a Preferences patch into the user's stored bag and return the merged
+   * result (ADR-0038). PATCH semantics: absent fields keep their stored value
+   * (so the theme and locale writers never clobber each other), an explicit
+   * `null` clears a field back to "no choice".
+   */
+  async updatePreferences(
+    userId: string,
+    patch: PreferencesPatch,
+  ): Promise<Preferences> {
+    const row = this.db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .get();
+    const merged: Record<string, unknown> = {
+      ...parsePreferences(row?.preferences ?? '{}'),
+    };
+    for (const [key, value] of Object.entries(patch)) {
+      if (value === null) delete merged[key];
+      else if (value !== undefined) merged[key] = value;
+    }
+    this.db
+      .update(users)
+      .set({ preferences: JSON.stringify(merged) })
+      .where(eq(users.id, userId))
+      .run();
+    return merged as Preferences;
+  }
+
+  /** Update the user's display name and return their fresh {@link AuthUser}. */
+  async updateProfile(userId: string, displayName: string): Promise<AuthUser> {
+    this.db
+      .update(users)
+      .set({ displayName })
+      .where(eq(users.id, userId))
+      .run();
+    const row = this.db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .get();
+    if (!row) throw new Error(`user ${userId} vanished mid-session`);
+    return toAuthUser(row);
+  }
+
+  /**
+   * Change the user's password (ADR-0038): verify the current one against the
+   * stored hash, then re-hash and store the new one. Returns `false` — with
+   * nothing written — when the current password does not verify. Length rules
+   * live in the request schema at the edge; invalidating the user's other
+   * sessions is deferred (ADR-0038).
+   */
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<boolean> {
+    const row = this.db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .get();
+    if (!row) return false;
+
+    let currentOk = false;
+    try {
+      currentOk = await verify(row.passwordHash, currentPassword);
+    } catch {
+      return false;
+    }
+    if (!currentOk) return false;
+
+    const passwordHash = await hash(newPassword, HASH_OPTIONS);
+    this.db
+      .update(users)
+      .set({ passwordHash })
+      .where(eq(users.id, userId))
+      .run();
+    return true;
+  }
+
+  /**
+   * Set a user's password unconditionally — the Instance Admin reset path (ADR-0037,
+   * #163), which carries no current-password check because the Admin acts on the
+   * user's behalf. Same argon2 hashing as {@link changePassword}; length rules live
+   * in the request schema at the edge.
+   */
+  async setPassword(userId: string, newPassword: string): Promise<void> {
+    const passwordHash = await hash(newPassword, HASH_OPTIONS);
+    this.db.update(users).set({ passwordHash }).where(eq(users.id, userId)).run();
   }
 
   /** End a session by deleting its row; a no-op for an unknown token. */
@@ -141,5 +274,26 @@ function normalizeEmail(email: string): string {
 
 /** Strip a user row down to the public {@link AuthUser} shape. */
 function toAuthUser(row: typeof users.$inferSelect): AuthUser {
-  return { id: row.id, email: row.email, displayName: row.displayName };
+  return {
+    id: row.id,
+    email: row.email,
+    displayName: row.displayName,
+    preferences: parsePreferences(row.preferences),
+    isAdmin: row.isAdmin,
+    isSuperadmin: row.isSuperadmin,
+    canCreateWorlds: row.canCreateWorlds,
+  };
+}
+
+/**
+ * Parse the stored Preferences JSON through the domain schema. A corrupt or
+ * hand-edited bag degrades to app defaults rather than breaking auth.
+ */
+function parsePreferences(raw: string): Preferences {
+  try {
+    const parsed = preferencesSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : {};
+  } catch {
+    return {};
+  }
 }

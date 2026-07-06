@@ -66,6 +66,11 @@
     "homeTitleHint": "Renamed with the world",
     "backToLibrary": "Back to library",
     "editorLabel": "Note content",
+    "outline": {
+      "title": "Outline",
+      "toggle": "Toggle outline",
+      "empty": "No headings yet"
+    },
     "slashMenu": {
       "label": "Insert block",
       "empty": "No matching blocks",
@@ -130,6 +135,11 @@
     "reload": "Reload",
     "saving": "Saving…",
     "share": "Share",
+    "visibility": {
+      "shared": "Shared",
+      "private": "Private",
+      "toggle": "Toggle visibility"
+    },
     "view": {
       "switchLabel": "Switch view",
       "map": "Map",
@@ -142,6 +152,7 @@
       "unsaved": "Unsaved…",
       "failed": "Save failed",
       "retry": "Retry",
+      "readonly": "Read-only — you don't have permission to edit.",
       "reloadFailed": "Reload failed — couldn't reach the server."
     },
     "moveBlocked": "Move blocked — something's in the way.",
@@ -277,6 +288,7 @@
     "chipRegion": "Region",
     "fieldMapName": "Map name",
     "fieldNote": "Note",
+    "fieldTerrain": "Terrain",
     "footerTokens": "Design tokens"
   },
   "domain": {
@@ -309,7 +321,12 @@
     "cancel": "Cancel",
     "close": "Close",
     "delete": "Delete",
-    "create": "Create"
+    "create": "Create",
+    "settings": "Settings",
+    "locale": {
+      "en": "English",
+      "fr": "Français"
+    }
   },
   "nav": {
     "primary": "Primary navigation",
@@ -317,7 +334,9 @@
     "styleguide": "Styleguide",
     "expand": "Expand navigation",
     "collapse": "Collapse navigation",
-    "home": "Hexly home"
+    "home": "Hexly home",
+    "admin": "Admin",
+    "worldSettings": "World Settings"
   },
   "commandPalette": {
     "searchLabel": "Search or run a command",
@@ -328,6 +347,8 @@
     "commands": "Commands",
     "createNote": "Create Note",
     "createMap": "Create Map",
+    "goToAdmin": "Go to Admin",
+    "goToStyleguide": "Go to Styleguide",
     "nameLabel": "Name",
     "worldLabel": "World"
   },
@@ -383,5 +404,175 @@
     "heading": "We couldn't find that.",
     "hint": "The page or entity you're looking for doesn't exist, or you don't have access to it.",
     "backToWorlds": "Back to your worlds"
+  },
+  "owners": {
+    "heading": "Owners",
+    "subhead": "Everyone here has full, equal control of this {kind}.",
+    "you": "you",
+    "resign": "Resign",
+    "remove": "Remove",
+    "addLabel": "Add an owner",
+    "addPlaceholder": "Choose a person…",
+    "add": "Add",
+    "addError": "Couldn't add that owner. Please try again.",
+    "removeError": "Couldn't remove that owner. Please try again.",
+    "lastOwner": "A {kind} must keep at least one owner.",
+    "loadError": "Couldn't load the owners.",
+    "world": "world",
+    "entity": "entity",
+    "tabTitle": "Hexly — Owners"
+  },
+  "grants": {
+    "heading": "Shared with",
+    "subhead": "Give a specific person access to just this entity — even someone who isn't in this world.",
+    "editor": "Editor",
+    "viewer": "Viewer",
+    "revoke": "Revoke",
+    "empty": "Not shared with anyone yet.",
+    "addLabel": "Share with a person",
+    "addPlaceholder": "Choose a person…",
+    "add": "Share",
+    "addError": "Couldn't share with that person. Please try again.",
+    "roleError": "Couldn't change that person's access. Please try again.",
+    "revokeError": "Couldn't revoke that access. Please try again.",
+    "loadError": "Couldn't load who this is shared with."
+  },
+  "members": {
+    "heading": "Members",
+    "subhead": "People you've added to this world as contributors or viewers.",
+    "contributor": "Contributor",
+    "viewer": "Viewer",
+    "remove": "Remove",
+    "empty": "No members yet.",
+    "addLabel": "Add a member",
+    "addPlaceholder": "Choose a person…",
+    "add": "Add",
+    "addError": "Couldn't add that member. Please try again.",
+    "roleError": "Couldn't change that member's role. Please try again.",
+    "removeError": "Couldn't remove that member. Please try again.",
+    "loadError": "Couldn't load the members.",
+    "leave": "Leave",
+    "leaveError": "Couldn't leave that world. Please try again."
+  },
+  "publicLink": {
+    "worldHeading": "Public link",
+    "worldSubhead": "Anyone with this link can read this world's shared entities — no account needed.",
+    "entityHeading": "Public link",
+    "entitySubhead": "Anyone with this link can read this entity — no account needed. It works even while the entity is private.",
+    "create": "Create public link",
+    "copy": "Copy",
+    "revoke": "Revoke",
+    "copied": "Link copied to clipboard.",
+    "copyError": "Couldn't copy the link.",
+    "loadError": "Couldn't load the public link.",
+    "mintError": "Couldn't create the public link. Please try again.",
+    "revokeError": "Couldn't revoke the public link. Please try again."
+  },
+  "publicView": {
+    "tabTitle": "Shared — Hexly",
+    "banner": "You're viewing a read-only shared page.",
+    "worldEntities": "Pages in this world",
+    "notFound": "This link is no longer active.",
+    "notFoundBody": "The link may have been revoked, or the address is wrong."
+  },
+  "settings": {
+    "tabTitle": "Settings",
+    "heading": "User Settings",
+    "subhead": "Your preferences follow your account on every device.",
+    "preferences": {
+      "heading": "Preferences",
+      "theme": "Theme",
+      "language": "Language",
+      "formatLocale": "Regional formatting",
+      "formatLocaleHint": "How dates and numbers read, independent of the language.",
+      "format": {
+        "same": "Same as language"
+      }
+    },
+    "profile": {
+      "heading": "Profile",
+      "email": "Email",
+      "emailHint": "Your email is your login; only an administrator can change it.",
+      "displayName": "Display name",
+      "save": "Save",
+      "saved": "Display name saved.",
+      "saveError": "Could not save the display name."
+    },
+    "password": {
+      "heading": "Change password",
+      "current": "Current password",
+      "new": "New password",
+      "submit": "Change password",
+      "changed": "Password changed.",
+      "tooShort": "The new password must be at least 8 characters.",
+      "wrongCurrent": "The current password is incorrect.",
+      "error": "Could not change the password."
+    }
+  },
+  "admin": {
+    "tabTitle": "Admin — Hexly",
+    "heading": "Instance Admin",
+    "subhead": "Manage accounts for this instance. Admin has no access to anyone's Worlds or Entities — content stays private within the collaboration model.",
+    "create": {
+      "heading": "Create a user",
+      "displayName": "Display name",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Create user"
+    },
+    "users": {
+      "heading": "Accounts",
+      "empty": "No accounts."
+    },
+    "filter": "Filter accounts",
+    "col": {
+      "account": "Account",
+      "admin": "Admin",
+      "worlds": "Worlds",
+      "superadmin": "Super",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "status": {
+      "active": "Active",
+      "disabled": "Disabled"
+    },
+    "badge": {
+      "superadmin": "Superadmin",
+      "admin": "Admin",
+      "worldCreator": "World creator",
+      "disabled": "Disabled"
+    },
+    "actions": {
+      "disable": "Disable",
+      "enable": "Enable",
+      "grantAdmin": "Make admin",
+      "revokeAdmin": "Revoke admin",
+      "grantWorldCreation": "Allow world creation",
+      "revokeWorldCreation": "Disallow world creation",
+      "grantSuperadmin": "Make superadmin",
+      "revokeSuperadmin": "Revoke superadmin",
+      "reset": "Reset password",
+      "resetSave": "Save",
+      "delete": "Delete"
+    },
+    "confirmDelete": "Delete {{name}}? This cannot be undone.",
+    "toast": {
+      "created": "User created",
+      "saved": "Saved",
+      "reset": "Password reset",
+      "deleted": "User deleted",
+      "error": "Something went wrong."
+    },
+    "error": {
+      "email-in-use": "That email is already in use by another account.",
+      "sole-owner": "This user is the sole Owner of a World or Entity. Reassign ownership before deleting them.",
+      "last-superadmin": "This is the last Superadmin — it cannot be removed, demoted, or disabled.",
+      "self-delete": "You cannot delete your own account.",
+      "self-disable": "You cannot disable your own account.",
+      "self-admin-revoke": "You cannot remove your own Admin access.",
+      "superadmin-managed-by-superadmin": "Only a Superadmin can manage a Superadmin account.",
+      "user-not-found": "That account no longer exists."
+    }
   }
 }

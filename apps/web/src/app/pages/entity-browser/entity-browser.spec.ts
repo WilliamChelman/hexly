@@ -14,6 +14,7 @@ import { MockEntitiesClient } from '../../core/testing/entities-client.mock';
 import { ActiveWorld } from '../../core/services/active-world';
 import { ToasterService } from '../../core/services/toaster.service';
 import { provideTranslocoTesting } from '../../core/i18n/transloco-testing';
+import { LocaleService } from '../../core/i18n/locale.service';
 import { EntityBrowser } from './entity-browser';
 
 describe('EntityBrowser', () => {
@@ -25,7 +26,6 @@ describe('EntityBrowser', () => {
 
   const summary = (over: Partial<EntitySummary>): EntitySummary => ({
     id: 'x',
-    ownerId: 'u1',
     worldId: 'w1',
     name: 'A map',
     type: 'hexmap',
@@ -34,8 +34,15 @@ describe('EntityBrowser', () => {
     version: 1,
     createdAt: 1,
     updatedAt: 1,
+    // The Browser opts into per-row Rights (ADR-0039); default to the Owner's full set so
+    // the rename/delete actions render — a reader-only case overrides `rights` to assert gating.
+    rights: ['read', 'edit', 'delete', 'set-visibility', 'manage'],
     ...over,
   });
+
+  // Locale/Format Locale tests seed preferences; never let them cross tests.
+  beforeEach(() => localStorage.clear());
+  afterEach(() => localStorage.clear());
 
   beforeEach(async () => {
     client = new MockEntitiesClient();
@@ -119,7 +126,7 @@ describe('EntityBrowser', () => {
     const fixture = TestBed.createComponent(EntityBrowser);
     fixture.detectChanges();
 
-    expect(client.list).toHaveBeenCalledWith({ limit: 50, worldId: 'w1' });
+    expect(client.list).toHaveBeenCalledWith({ limit: 50, worldId: 'w1', rights: true });
   });
 
   it('re-fetches scoped to the new World when the active World changes', () => {
@@ -129,7 +136,7 @@ describe('EntityBrowser', () => {
     TestBed.inject(ActiveWorld).set('w2');
     fixture.detectChanges();
 
-    expect(client.list).toHaveBeenCalledWith({ limit: 50, worldId: 'w2' });
+    expect(client.list).toHaveBeenCalledWith({ limit: 50, worldId: 'w2', rights: true });
   });
 
   it('renders entities in the server-returned order, never re-sorted client-side (#154)', () => {
@@ -177,6 +184,7 @@ describe('EntityBrowser', () => {
       q: 'dragon',
       limit: 50,
       worldId: 'w1',
+      rights: true,
     });
     const titles = Array.from(
       fixture.nativeElement.querySelectorAll('[data-testid=entity-title]'),
@@ -219,7 +227,7 @@ describe('EntityBrowser', () => {
     fixture.detectChanges();
 
     // The first fetch already carries the query — one request, not empty-then-refetch.
-    expect(client.list).toHaveBeenCalledWith({ q: 'dragon', limit: 50, worldId: 'w1' });
+    expect(client.list).toHaveBeenCalledWith({ q: 'dragon', limit: 50, worldId: 'w1', rights: true });
     expect(client.list).toHaveBeenCalledTimes(1);
     // The box shows the query it was opened with.
     expect(searchBox(fixture.nativeElement).value).toBe('dragon');
@@ -239,6 +247,7 @@ describe('EntityBrowser', () => {
       q: 'dragon',
       limit: 50,
       worldId: 'w1',
+      rights: true,
     });
     expect(searchBox(fixture.nativeElement).value).toBe('dragon');
   });
@@ -270,6 +279,7 @@ describe('EntityBrowser', () => {
       q: 'drag',
       limit: 50,
       worldId: 'w1',
+      rights: true,
     });
   });
 
@@ -374,6 +384,26 @@ describe('EntityBrowser', () => {
     expect(del.getAttribute('aria-label')).toBe('Supprimer');
   });
 
+  it('hides a card’s rename/delete actions when the caller lacks the Rights (ADR-0039)', () => {
+    // A reader-only Entity (e.g. a shared one the caller can't edit): the server ships
+    // `rights: ['read']`, so the Browser must not offer actions it would then 403.
+    const el = renderWith([
+      summary({ id: 'ro', name: 'Read only', rights: ['read'] }),
+    ]).nativeElement as HTMLElement;
+
+    expect(el.querySelector('[data-testid=rename-ro]')).toBeNull();
+    expect(el.querySelector('[data-testid=delete-ro]')).toBeNull();
+    // The tile itself (open link) still renders — read is intact.
+    expect(el.querySelector('[data-testid=open-ro]')).not.toBeNull();
+  });
+
+  it('requests per-row Rights on the list so the cards can gate their actions (ADR-0039)', () => {
+    renderWith([summary({ id: 'm1' })]);
+    expect(client.list).toHaveBeenCalledWith(
+      expect.objectContaining({ rights: true }),
+    );
+  });
+
   it('formats the “Edited” timestamp for the active language, not the browser default', () => {
     // A fixed instant at midday UTC so the calendar day is stable across the
     // runner's timezone; June (month 06) and day 22 read differently in EN
@@ -383,20 +413,33 @@ describe('EntityBrowser', () => {
     const frDate = new Date(updatedAt).toLocaleDateString('fr');
     expect(frDate).not.toBe(enDate); // sanity: the date distinguishes the locales
 
+    // French remembered before render — LocaleService applies the stored
+    // choice on construction; the pure hexlyDate pipe formats at render time,
+    // a mid-view language flip reformats on the next render (ADR-0038).
+    localStorage.setItem('hexly-u:hexly-locale', 'fr');
     const fixture = renderWith([summary({ id: 'm1', name: 'Aldermoor', updatedAt })]);
-    const meta = () =>
+    const meta =
       (fixture.nativeElement.querySelector('.meta') as HTMLElement).textContent ?? '';
 
-    // English is the default lang: month-first format, English prefix.
-    expect(meta()).toContain(`Edited ${enDate}`);
+    expect(meta).toContain(`Modifié le ${frDate}`);
+    expect(meta).not.toContain(enDate);
+    expect(meta).not.toContain('Edited');
+  });
 
-    TestBed.inject(TranslocoService).setActiveLang('fr');
-    fixture.detectChanges();
+  it('formats the “Edited” date with the Format Locale, independent of the language (ADR-0038)', () => {
+    // 22 June: en-US reads month-first, en-GB day-first — same language, so
+    // only the Format Locale axis can explain a change.
+    const updatedAt = Date.UTC(2026, 5, 22, 12, 0, 0);
+    const gbDate = new Date(updatedAt).toLocaleDateString('en-GB');
 
-    // French active: the date reflows to day-first and the prefix translates.
-    expect(meta()).toContain(`Modifié le ${frDate}`);
-    expect(meta()).not.toContain(enDate);
-    expect(meta()).not.toContain('Edited');
+    // Chosen before render (the pipe is pure — it formats what renders next).
+    TestBed.inject(LocaleService).setFormatLocale('en-GB');
+    const fixture = renderWith([summary({ id: 'm1', name: 'Aldermoor', updatedAt })]);
+
+    const meta =
+      (fixture.nativeElement.querySelector('.meta') as HTMLElement).textContent ?? '';
+    // Copy still English, date now day-first.
+    expect(meta).toContain(`Edited ${gbDate}`);
   });
 
   it('renders an entity name verbatim — never translated — even when it collides with a UI string', () => {
@@ -438,7 +481,7 @@ describe('EntityBrowser', () => {
       }),
     );
     loadMore(el)?.click();
-    expect(client.list).toHaveBeenCalledWith({ cursor: 'cursor-2', worldId: 'w1' });
+    expect(client.list).toHaveBeenCalledWith({ cursor: 'cursor-2', worldId: 'w1', rights: true });
     fixture.detectChanges();
 
     // The next page is appended after the first — no duplicates, no gaps.
@@ -472,6 +515,7 @@ describe('EntityBrowser', () => {
     expect(client.list).toHaveBeenLastCalledWith({
       cursor: 'cursor-2',
       worldId: 'w1',
+      rights: true,
       q: 'keep',
     });
     fixture.detectChanges();
@@ -634,7 +678,7 @@ describe('EntityBrowser', () => {
     input.value = 'Aldermoor Keep';
     input.dispatchEvent(new Event('input'));
 
-    client.rename.mockReturnValueOnce(
+    client.patch.mockReturnValueOnce(
       of({
         ...summary({ id: 'm1', name: 'Aldermoor Keep', version: 4 }),
         document: { type: 'hexmap', content: { format: 'tiptap-v1', snapshot: {} }, hexes: {}, regions: [], labels: [] },
@@ -650,8 +694,8 @@ describe('EntityBrowser', () => {
     );
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
 
-    expect(client.rename).toHaveBeenCalledWith('m1', 'Aldermoor Keep');
-    expect(client.list).toHaveBeenCalledWith({ limit: 50, worldId: 'w1' });
+    expect(client.patch).toHaveBeenCalledWith('m1', { name: 'Aldermoor Keep' });
+    expect(client.list).toHaveBeenCalledWith({ limit: 50, worldId: 'w1', rights: true });
     fixture.detectChanges();
 
     // The card shows the new name and the input is gone (back to read mode).
@@ -670,7 +714,7 @@ describe('EntityBrowser', () => {
     const input = el.querySelector('[data-testid=rename-input-m1]') as HTMLInputElement;
     input.value = 'Aldermoor Keep';
     input.dispatchEvent(new Event('input'));
-    client.rename.mockReturnValueOnce(throwError(() => new Error('boom')));
+    client.patch.mockReturnValueOnce(throwError(() => new Error('boom')));
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
     fixture.detectChanges();
 
@@ -694,7 +738,7 @@ describe('EntityBrowser', () => {
     fixture.detectChanges();
 
     // No PATCH, and the original name stays put with the editor closed.
-    expect(client.rename).not.toHaveBeenCalled();
+    expect(client.patch).not.toHaveBeenCalled();
     expect(el.querySelector('[data-testid=rename-input-m1]')).toBeNull();
     expect(
       (el.querySelector('[data-testid=entity-title]') as HTMLElement).textContent?.trim(),
@@ -717,7 +761,7 @@ describe('EntityBrowser', () => {
     ).click();
 
     expect(client.delete).toHaveBeenCalledWith('m1');
-    expect(client.list).toHaveBeenCalledWith({ limit: 50, worldId: 'w1' });
+    expect(client.list).toHaveBeenCalledWith({ limit: 50, worldId: 'w1', rights: true });
     fixture.detectChanges();
 
     const titles = Array.from(
@@ -766,6 +810,7 @@ describe('EntityBrowser', () => {
       expect(client.list).toHaveBeenLastCalledWith({
         limit: 50,
         worldId: 'w1',
+        rights: true,
         type: ['note'],
       });
       expect(navigate).toHaveBeenCalledWith(
@@ -794,7 +839,7 @@ describe('EntityBrowser', () => {
       // Toggling the same value off drops the whole category from the request/URL.
       facet(el, 'facet-type-note')?.click();
       fixture.detectChanges();
-      expect(client.list).toHaveBeenLastCalledWith({ limit: 50, worldId: 'w1' });
+      expect(client.list).toHaveBeenLastCalledWith({ limit: 50, worldId: 'w1', rights: true });
       expect(navigate).toHaveBeenLastCalledWith(
         [],
         expect.objectContaining({ queryParams: expect.objectContaining({ type: null }) }),
@@ -823,7 +868,7 @@ describe('EntityBrowser', () => {
           queryParams: { q: null, type: null, tag: null, visibility: null },
         }),
       );
-      expect(client.list).toHaveBeenLastCalledWith({ limit: 50, worldId: 'w1' });
+      expect(client.list).toHaveBeenLastCalledWith({ limit: 50, worldId: 'w1', rights: true });
     });
 
     it('seeds active Facets from the URL and carries them into the first fetch', () => {
@@ -837,6 +882,7 @@ describe('EntityBrowser', () => {
       expect(client.list).toHaveBeenCalledWith({
         limit: 50,
         worldId: 'w1',
+        rights: true,
         type: ['note'],
         tag: ['deity', 'ruined'],
       });

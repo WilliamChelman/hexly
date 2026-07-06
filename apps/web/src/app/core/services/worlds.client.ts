@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { ImportSummary, WorldDetail, WorldSummary } from '@hexly/domain';
+import { ImportSummary, MemberRole, PublicLink, WorldDetail, WorldMember, WorldSummary } from '@hexly/domain';
 
 /**
  * HTTP client for the worlds API (ADR-0024). Stateless: every call is a round
@@ -50,5 +50,55 @@ export class WorldsClient {
 
   delete(id: string): Observable<void> {
     return this.http.delete<void>(`/api/worlds/${id}`);
+  }
+
+  /** The World's ownership set — Owner user ids (ADR-0037, #158). Owner-only server-side. */
+  owners(id: string): Observable<string[]> {
+    return this.http.get<string[]>(`/api/worlds/${id}/owners`);
+  }
+
+  /** Add a co-Owner; returns the updated set. Idempotent (200), not a create. */
+  addOwner(id: string, userId: string): Observable<string[]> {
+    return this.http.post<string[]>(`/api/worlds/${id}/owners`, { userId });
+  }
+
+  /** Remove an Owner or resign your own ownership; returns the updated set (ADR-0037). */
+  removeOwner(id: string, userId: string): Observable<string[]> {
+    return this.http.delete<string[]>(`/api/worlds/${id}/owners/${userId}`);
+  }
+
+  /** The World's non-owner members — Contributors and Viewers (ADR-0037, #159). Owner-only server-side. */
+  members(id: string): Observable<WorldMember[]> {
+    return this.http.get<WorldMember[]>(`/api/worlds/${id}/members`);
+  }
+
+  /** Add a Contributor or World Viewer; returns the updated member set. Upsert (200), not a create. */
+  addMember(id: string, userId: string, role: MemberRole): Observable<WorldMember[]> {
+    return this.http.post<WorldMember[]>(`/api/worlds/${id}/members`, { userId, role });
+  }
+
+  /** Change a member's role between Contributor and Viewer; returns the updated member set. */
+  setMemberRole(id: string, userId: string, role: MemberRole): Observable<WorldMember[]> {
+    return this.http.patch<WorldMember[]>(`/api/worlds/${id}/members/${userId}`, { role });
+  }
+
+  /** Remove a member, or leave the World yourself (pass your own id); returns the updated member set. */
+  removeMember(id: string, userId: string): Observable<WorldMember[]> {
+    return this.http.delete<WorldMember[]>(`/api/worlds/${id}/members/${userId}`);
+  }
+
+  /** The World's Public Link — the active token or null (ADR-0037, #162). Owner-only server-side. */
+  link(id: string): Observable<PublicLink | null> {
+    return this.http.get<PublicLink | null>(`/api/worlds/${id}/link`);
+  }
+
+  /** Mint (or return the existing) World Public Link; idempotent (200). */
+  mintLink(id: string): Observable<PublicLink> {
+    return this.http.post<PublicLink>(`/api/worlds/${id}/link`, {});
+  }
+
+  /** Revoke the World Public Link — the kill-switch (ADR-0037, #162). */
+  revokeLink(id: string): Observable<void> {
+    return this.http.delete<void>(`/api/worlds/${id}/link`);
   }
 }

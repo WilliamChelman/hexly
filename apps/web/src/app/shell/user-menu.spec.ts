@@ -31,7 +31,7 @@ describe('UserMenu', () => {
   });
 
   function signIn(displayName = 'Ada Lovelace'): void {
-    auth.setUser({ id: 'u1', email: 'ada@hexly.test', displayName });
+    auth.setUser({ id: 'u1', email: 'ada@hexly.test', displayName, preferences: {}, isAdmin: false, isSuperadmin: false, canCreateWorlds: true });
   }
 
   type Fixture = ReturnType<typeof TestBed.createComponent>;
@@ -113,6 +113,22 @@ describe('UserMenu', () => {
     fixture.detectChanges();
 
     expect(openMenu(fixture).textContent).toContain('Ada Lovelace');
+  });
+
+  it('links to the User Settings page when signed in (ADR-0038)', () => {
+    signIn();
+    const fixture = TestBed.createComponent(UserMenu);
+    fixture.detectChanges();
+
+    const settings = item(openMenu(fixture), /settings|paramètres/i);
+    expect(settings.getAttribute('href')).toBe('/settings');
+  });
+
+  it('offers no Settings link to anonymous viewers — there is no account to edit', () => {
+    const fixture = TestBed.createComponent(UserMenu);
+    fixture.detectChanges();
+
+    expect(() => item(openMenu(fixture), /settings|paramètres/i)).toThrow();
   });
 
   it('calls auth.signOut() when the sign-out item is clicked', () => {
