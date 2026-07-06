@@ -8,14 +8,12 @@ import {
   WorldDetail,
   WorldMember,
   WorldSummary,
-  WorldVerb,
 } from '@hexly/domain';
 import { and, asc, count, eq, inArray, ne } from 'drizzle-orm';
 import { AssetsService } from '../assets/assets.service';
 import {
   AclSetResult,
   gate,
-  isSuperadmin,
   OwnerSetResult,
   removeOwnerOutcome,
   userExists,
@@ -27,16 +25,8 @@ import {
   revokePublicLink,
 } from '../acl/public-link-store';
 import { DB, Db } from '../db/db';
-import { worldAccess } from '../acl/world-access';
+import { worldAccess, worldRightsOf } from '../acl/world-access';
 import { entities, worldLinks, worldMembers, worlds } from '../db/schema';
-
-/**
- * The caller's World Rights (ADR-0039): every reachable World carries `read`; a World Owner
- * (or Superadmin) also `manage` — the one `isOwner` gate behind rename/delete/members/link.
- */
-function worldRights(canManage: boolean): WorldVerb[] {
-  return canManage ? ['read', 'manage'] : ['read'];
-}
 
 /** The World Public Link table for the shared get/mint/revoke helpers (ADR-0037, #162). */
 const WORLD_LINK: PublicLinkTable = {
@@ -109,8 +99,8 @@ export class WorldsService {
     return rows.map((w) => {
       const owners = ownersByWorld.get(w.id) ?? [];
       // Rights fall out of the owner set already fetched — free, so summaries always carry them
-      // (ADR-0039). Superadmin manages every World (outside the model, #163).
-      return { ...w, owners, rights: worldRights(access.superadmin || owners.includes(userId)) };
+      // (ADR-0039). `managedBy` folds the Superadmin bypass (outside the model, #163).
+      return { ...w, owners, rights: access.rightsOf({ isOwner: access.managedBy(owners) }) };
     });
   }
 
@@ -137,7 +127,7 @@ export class WorldsService {
       // Fresh World's ownership set is its creator alone (ADR-0037).
       owners: [ownerId],
       // Creator is the sole Owner, so full Rights (ADR-0039).
-      rights: worldRights(true),
+      rights: worldRightsOf({ isOwner: true }),
       homeEntityId,
       // Fresh World holds only Home Entity (#120).
       entityCount: 1,
@@ -201,7 +191,7 @@ export class WorldsService {
   ): WorldDetail | 'forbidden' | null {
     const world = this.db.select().from(worlds).where(eq(worlds.id, id)).get();
     if (!world) return null;
-    if (!this.isOwner(userId, id)) return 'forbidden';
+    if (!worldAccess(this.db, userId).decideMeta(id)?.isOwner) return 'forbidden';
     const updatedAt = Date.now();
     this.db.transaction(() => {
       this.db
@@ -225,13 +215,10 @@ export class WorldsService {
    * ponytail: hard cascade-delete; soft-delete/confirm only if users ask.
    */
   delete(userId: string, id: string): 'ok' | 'forbidden' | null {
-    const world = this.db
-      .select({ id: worlds.id })
-      .from(worlds)
-      .where(eq(worlds.id, id))
-      .get();
-    if (!world) return null;
-    if (!this.isOwner(userId, id)) return 'forbidden';
+    // One query resolves existence + ownership (undefined ≡ no such World → 404).
+    const meta = worldAccess(this.db, userId).decideMeta(id);
+    if (!meta) return null;
+    if (!meta.isOwner) return 'forbidden';
     this.db.transaction(() => {
       // entity_grants cascades with its entities; delete entities explicitly.
       this.db.delete(entities).where(eq(entities.worldId, id)).run();
@@ -376,9 +363,11 @@ export class WorldsService {
     id: string,
     targetUserId: string,
   ): AclSetResult<WorldMember[]> {
-    if (!worldAccess(this.db, userId).decide(id)) return { status: 'not-found' };
+    // One query resolves reachability + ownership (unreachable ≡ missing → 404, ADR-0004).
+    const meta = worldAccess(this.db, userId).decideMeta(id);
+    if (!meta?.reachable) return { status: 'not-found' };
     const isLeave = targetUserId === userId;
-    if (!isLeave && !this.isOwner(userId, id)) return { status: 'forbidden' };
+    if (!isLeave && !meta.isOwner) return { status: 'forbidden' };
     // The ≥1-Owner invariant, shared with the owner-set endpoints (ADR-0037): refuse a removal
     // that would empty the set. A non-owner member isn't in `owners`, so removeOwnerOutcome
     // returns `not-found` (not `last-owner`) for them and this never blocks their removal.
@@ -447,8 +436,9 @@ export class WorldsService {
     userId: string,
     id: string,
   ): Extract<OwnerSetResult, { status: 'not-found' | 'forbidden' }> | undefined {
-    const reachable = !!worldAccess(this.db, userId).decide(id);
-    return gate({ reachable, isOwner: reachable && this.isOwner(userId, id) });
+    // One query for both facts — decideMeta collapses the former decide()-then-isOwner() pair.
+    const meta = worldAccess(this.db, userId).decideMeta(id);
+    return gate({ reachable: !!meta?.reachable, isOwner: !!meta?.isOwner });
   }
 
   // Attach World's Home Entity id (is_home row), ownership set, and the caller's Rights.
@@ -467,13 +457,14 @@ export class WorldsService {
       .where(eq(entities.worldId, world.id))
       .all();
     const owners = this.worldOwners(world.id);
+    const access = worldAccess(this.db, callerId);
     return {
       id: world.id,
       name: world.name,
       owners,
-      // Rights fall out of the owner set already fetched (ADR-0039) — free, the same
-      // derivation list() uses, no extra isOwner query. Superadmin manages every World (#163).
-      rights: worldRights(owners.includes(callerId) || this.isSuperadmin(callerId)),
+      // Rights fall out of the owner set already fetched (ADR-0039) — free, the same derivation
+      // list() uses, no extra isOwner query. `managedBy` folds the Superadmin bypass (#163).
+      rights: access.rightsOf({ isOwner: access.managedBy(owners) }),
       homeEntityId: home.id,
       entityCount,
       createdAt: world.createdAt,
@@ -505,29 +496,5 @@ export class WorldsService {
       .orderBy(asc(worldMembers.userId))
       .all()
       .map((r) => ({ userId: r.userId, role: r.role as MemberRole }));
-  }
-
-  /** Whether `userId` is a Superadmin — the outside-the-model repair bypass (ADR-0037, #163). */
-  private isSuperadmin(userId: string): boolean {
-    return isSuperadmin(this.db, userId);
-  }
-
-  /**
-   * Whether `userId` is an Owner of World `id` (a `world_members` row with role 'owner'), or
-   * the Superadmin — so rename/delete/owner-management (ADR-0037, #163) accept the repair tier.
-   */
-  private isOwner(userId: string, id: string): boolean {
-    if (this.isSuperadmin(userId)) return true;
-    return !!this.db
-      .select({ userId: worldMembers.userId })
-      .from(worldMembers)
-      .where(
-        and(
-          eq(worldMembers.worldId, id),
-          eq(worldMembers.userId, userId),
-          eq(worldMembers.role, 'owner'),
-        ),
-      )
-      .get();
   }
 }

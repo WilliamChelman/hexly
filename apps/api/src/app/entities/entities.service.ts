@@ -47,6 +47,7 @@ import {
   READ_ONLY_RIGHTS,
   sharedVisibility,
 } from '../acl/entity-access';
+import { canCreateEntityFilter, worldOwnerFilter } from '../acl/world-access';
 import {
   mintPublicLink,
   PublicLinkTable,
@@ -59,7 +60,6 @@ import {
   entityDescriptors,
   entityGrants,
   entityLinks,
-  worldMembers,
   worlds,
 } from '../db/schema';
 import { HEXLY_CONFIG, HexlyConfig } from '../config/config.module';
@@ -837,21 +837,23 @@ export class EntitiesService implements OnApplicationBootstrap {
   }
 
   /**
-   * Resolve target World for new Entity (ADR-0024). Supplied worldId must be
-   * owned by ownerId. Absent worldId defaults to owner's oldest World.
+   * Resolve target World for new Entity (ADR-0024). The two branches carry *different* rules, so
+   * the predicates differ (both homed in `acl/world-access.ts`, not re-derived here):
+   *
+   * - A **supplied** worldId may be any World the caller can author in — a World Owner or
+   *   Contributor (CONTEXT.md → Contributor), or a Superadmin (repair). The caller named it.
+   * - An **absent** worldId defaults to the caller's *own* oldest World (owner role only). It must
+   *   never silently land in a World the caller merely contributes to, nor — for a Superadmin —
+   *   the globally-oldest World; `worldOwnerFilter` has no match-all bypass for exactly this reason.
    */
   private resolveWorldId(ownerId: string, requestedId?: string): string {
-    // World ownership is a membership row now (ADR-0037): the caller must be an
-    // Owner (role 'owner') of the target World.
-    const owned = and(
-      eq(worldMembers.userId, ownerId),
-      eq(worldMembers.role, 'owner'),
-    );
+    const predicate = requestedId
+      ? and(eq(worlds.id, requestedId), canCreateEntityFilter(ownerId, this.isSuperadmin(ownerId)))
+      : worldOwnerFilter(ownerId);
     const world = this.db
       .select({ id: worlds.id })
       .from(worlds)
-      .innerJoin(worldMembers, eq(worldMembers.worldId, worlds.id))
-      .where(requestedId ? and(eq(worlds.id, requestedId), owned) : owned)
+      .where(predicate)
       .orderBy(asc(worlds.createdAt), asc(worlds.id))
       .get();
     if (!world)

@@ -123,6 +123,20 @@ describe('entityAccess', () => {
     it('returns undefined for a non-existent Entity', () => {
       expect(entityAccess(db, eOwner).decideMeta(randomUUID())).toBeUndefined();
     });
+
+    // Regression: the read predicate rides a SELECT projection in decideMeta, where a naive
+    // `worldMembers.world_id = entities.world_id` correlation can strip to a tautology and report
+    // "member of *any* World" as readable. A member of a DIFFERENT World, with no membership or
+    // grant here, must not read this shared Entity.
+    it('does not read a shared Entity for a member of a different World', () => {
+      const otherWorld = randomUUID();
+      db.insert(worlds).values({ id: otherWorld, name: 'Elsewhere', createdAt: 1, updatedAt: 1 }).run();
+      const outsider = seedUser();
+      db.insert(worldMembers).values({ worldId: otherWorld, userId: outsider, role: 'contributor' }).run();
+      expect(entityAccess(db, outsider).decideMeta(shared)).toEqual({ canRead: false, isOwner: false });
+      // And the branch genuinely works — a member of THIS World does read the shared Entity.
+      expect(entityAccess(db, wContrib).decideMeta(shared)).toEqual({ canRead: true, isOwner: false });
+    });
   });
 
   describe('filter (read-scoped list predicate)', () => {

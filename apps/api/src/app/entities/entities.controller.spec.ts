@@ -131,6 +131,42 @@ describe('Entities endpoints', () => {
     expect(res.body.name).toBe('The Whisperwood');
   });
 
+  it('lets a Contributor create an Entity in a World they do not own (CONTEXT.md → Contributor)', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const bobId = await seedUser('bob@hexly.test', 'correct horse', 'Bob');
+    const bob = await signIn('bob@hexly.test', 'correct horse');
+    const worldId = (await ada.get('/worlds').expect(200)).body[0].id;
+
+    // Bob has no World of his own, so nothing is creatable → 404 NoWritableWorld.
+    await bob.post('/entities').send({ name: 'Premature', type: 'note', worldId }).expect(404);
+
+    // Ada grants Bob Contributor standing in her World; now he may author there.
+    await ada.post(`/worlds/${worldId}/members`).send({ userId: bobId, role: 'contributor' }).expect(200);
+    const res = await bob
+      .post('/entities')
+      .send({ name: 'Bob’s Note', type: 'note', worldId })
+      .expect(201);
+
+    expect(res.body.worldId).toBe(worldId);
+    // Contributor becomes the created Entity's sole Owner (ADR-0037) — he can read it back.
+    await bob.get(`/entities/${res.body.id}`).expect(200);
+  });
+
+  it('defaults an un-scoped create to the caller’s own World, not one they only contribute to', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const worldA = (await ada.get('/worlds').expect(200)).body[0].id; // Ada's World, the oldest
+    const bobId = await seedUser('bob@hexly.test', 'correct horse', 'Bob');
+    const { worldId: worldB } = app.get(WorldsService).mintWorldWithHome(bobId, 'Bob’s World');
+    // Bob owns his own (newer) World B, and merely contributes to Ada's older World A.
+    await ada.post(`/worlds/${worldA}/members`).send({ userId: bobId, role: 'contributor' }).expect(200);
+    const bob = await signIn('bob@hexly.test', 'correct horse');
+
+    // No worldId → defaults to Bob's OWN World (B), never Ada's (A) despite A being older and creatable.
+    const res = await bob.post('/entities').send({ name: 'Bob’s Note', type: 'note' }).expect(201);
+    expect(res.body.worldId).toBe(worldB);
+    expect(res.body.worldId).not.toBe(worldA);
+  });
+
   it('lists the owner’s entities as an envelope of summaries, last page → nextCursor null', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     await ada.post('/entities').send({ name: 'Aldermoor', type: 'hexmap' });
