@@ -55,8 +55,13 @@ describe('PreferencesSync (ADR-0038)', () => {
   afterEach(() => {
     http.verify();
     localStorage.clear();
+    // `navigator.language` is a prototype accessor: there's no *own* descriptor
+    // to capture, so delete the own property this spec shadowed it with (or
+    // restore a captured own descriptor) to avoid leaking into other spec files.
     if (originalLanguage) {
       Object.defineProperty(navigator, 'language', originalLanguage);
+    } else {
+      delete (navigator as unknown as { language?: unknown }).language;
     }
   });
 

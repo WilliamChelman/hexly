@@ -20,8 +20,14 @@ describe('LocaleService', () => {
 
   afterEach(() => {
     localStorage.clear();
+    // `navigator.language` is a prototype accessor, so there's no *own*
+    // descriptor to capture — `setBrowserLang` shadows it with an own property.
+    // Delete that shadow (or restore a captured own descriptor) so the leak
+    // never crosses into another spec file sharing this jsdom environment.
     if (originalLanguage) {
       Object.defineProperty(navigator, 'language', originalLanguage);
+    } else {
+      delete (navigator as unknown as { language?: unknown }).language;
     }
   });
 
