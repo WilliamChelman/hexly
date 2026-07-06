@@ -2133,6 +2133,21 @@ describe('HexMapStore shared right column', () => {
     expect(store.selection()).toEqual({ kind: 'region', id });
   });
 
+  it('leaves a rail-opened Regions list alone on a modifier-click that hits empty Void', () => {
+    const store = new HexMapStore();
+    store.paintAt({ q: 0, r: 0 }, 'forest');
+    store.marqueeSelect([{ q: 0, r: 0 }], [], false); // a selection exists
+    store.showRegionsPanel(); // the user flips to the Regions list
+    expect(store.rightPanel()).toBe('regions');
+
+    // A modifier-click on empty Void resolves to no candidate — a no-op that must not
+    // steal the panel back to the Inspector (the selection is unchanged).
+    store.select({ q: 9, r: 9 }, null, 'toggle-top');
+
+    expect(store.rightPanel()).toBe('regions');
+    expect(store.selections()).toHaveLength(1);
+  });
+
   it('flips the shared column back to the Inspector when a Label is selected', () => {
     const store = new HexMapStore();
     const id = store.addLabel('Pick me', { x: 0, y: 0 });
