@@ -44,8 +44,8 @@ export class VaultExportService {
       srcMap.set(asset.servedUrl, zipPath);
     }
 
-    // Two entities that resolve to the same path (e.g. the Home <WorldName>.md and a root note of
-    // the same name) would overwrite each other in `files`; uniquePath keeps both (#150).
+    // Two entities that resolve to the same path (e.g. two root notes of the same name)
+    // would overwrite each other in `files`; uniquePath keeps both (#150).
     const entities = this.entities.listByWorld(ownerId, worldId);
     const nameById = new Map(entities.map((e) => [e.id, e.name]));
     for (const entity of entities) {
@@ -116,8 +116,6 @@ function frontmatter(entity: EntityDetail): Record<string, unknown> | undefined 
   if (entity.tags.length) meta['tags'] = [...entity.tags];
   // A hexmap exports lore only (grid dropped); flag the type so the loss is visible (ADR-0033).
   if (entity.type === 'hexmap') meta['hexly.type'] = 'hexmap';
-  // Flag the Home Entity so a re-import routes it back to the World's Home rather than duplicating it.
-  if (entity.isHome) meta['hexly.isHome'] = true;
   return Object.keys(meta).length ? meta : undefined;
 }
 

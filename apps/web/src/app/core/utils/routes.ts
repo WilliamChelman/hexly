@@ -13,6 +13,15 @@ export function worldRoute(worldId: string, worldName?: string): string[] {
   return ['/w', segment(worldId, worldName), 'entities'];
 }
 
+/**
+ * The World root `/w/:worldId` — the World Dashboard landing surface (ADR-0043).
+ * Where "open this World" and "create a World" both land, distinct from the Entity
+ * browser (`worldRoute`).
+ */
+export function worldDashboardRoute(worldId: string, worldName?: string): string[] {
+  return ['/w', segment(worldId, worldName)];
+}
+
 export function entityRoute(
   worldId: string,
   entityId: string,

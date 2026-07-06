@@ -8,10 +8,8 @@ import { entityIdFromUrl, expect, segRe, test, type Page } from './fixtures';
  * dropdown docked by the user menu in the nav-rail foot, at both widths (#121).
  */
 
-/** Create a World from the Index and land on its Home Entity. Returns its id + homeEntityId. */
-async function createWorldFromIndex(
-  page: Page,
-): Promise<{ id: string; homeEntityId: string }> {
+/** Create a World from the Index and land on its Dashboard (the World root). Returns its id. */
+async function createWorldFromIndex(page: Page): Promise<{ id: string }> {
   await page.goto('/');
   const created = page.waitForResponse(
     (r) =>
@@ -21,10 +19,17 @@ async function createWorldFromIndex(
   );
   await page.getByTestId('create-world').click();
   const world = await (await created).json();
-  await page.waitForURL(
-    new RegExp(`/w/${segRe(world.id)}/entities/${segRe(world.homeEntityId)}$`),
-  );
+  // Creating a World lands on its root (the Dashboard, ADR-0043), not a seeded note.
+  await page.waitForURL(new RegExp(`/w/${segRe(world.id)}(/|$)`));
   return world;
+}
+
+/** Create a fresh note in a World's Library and return its entity id. */
+async function createNote(page: Page, worldId: string): Promise<string> {
+  await page.goto(`/w/${worldId}/entities`);
+  await page.getByTestId('new-note').click();
+  await page.waitForURL(new RegExp(`/w/${segRe(worldId)}/entities/[\\w-]+$`));
+  return entityIdFromUrl(page);
 }
 
 /** Open the masthead World switcher and hop to another World by id. */
@@ -33,15 +38,15 @@ async function switchToWorld(page: Page, worldId: string): Promise<void> {
   await page.getByTestId(`switcher-option-${worldId}`).click();
 }
 
-test('the World Index lists reachable Worlds; creating one opens its Home Entity', async ({
+test('the World Index lists reachable Worlds; creating one lands on its root', async ({
   page,
 }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: /Welcome back/ })).toBeVisible();
 
   const world = await createWorldFromIndex(page);
-  // The Home note is named after the World (ADR-0029).
-  await expect(page.getByTestId('title')).toHaveText('Untitled world');
+  // A fresh World seeds no Entities (ADR-0043) — creation lands on the World root.
+  await expect(page).toHaveURL(new RegExp(`/w/${segRe(world.id)}(/|$)`));
 
   await page.goto('/');
   await expect(page.getByTestId(`world-${world.id}`)).toBeVisible();
@@ -50,24 +55,6 @@ test('the World Index lists reachable Worlds; creating one opens its Home Entity
   // Activating it enters its Entity browser (URL carries the World).
   await page.getByTestId(`world-${world.id}`).click();
   await expect(page).toHaveURL(new RegExp(`/w/${segRe(world.id)}/entities$`));
-});
-
-test('renaming the World renames its Home Entity, read-only on its page (ADR-0029)', async ({
-  page,
-}) => {
-  const world = await createWorldFromIndex(page);
-  await expect(page.getByTestId('title')).toHaveText('Untitled world');
-  // The Home title is read-only (World's name is the source of truth; no rename UI yet).
-  await expect(page.getByTestId('title')).not.toHaveAttribute('contenteditable');
-
-  // Rename via the World API.
-  const renamed = await page.request.patch(`/api/worlds/${world.id}`, {
-    data: { name: 'The Reach of Aldermoor' },
-  });
-  expect(renamed.ok()).toBeTruthy();
-
-  await page.reload();
-  await expect(page.getByTestId('title')).toHaveText('The Reach of Aldermoor');
 });
 
 test('type-to-confirm delete shows the entity count, enables on match, and removes the World (#120)', async ({
@@ -82,7 +69,8 @@ test('type-to-confirm delete shows the entity count, enables on match, and remov
   );
   await page.getByTestId(`delete-world-${world.id}`).click();
   await counted;
-  await expect(page.getByTestId('delete-count')).toContainText('1');
+  // A fresh World holds no Entities (ADR-0043).
+  await expect(page.getByTestId('delete-count')).toContainText('0');
 
   // Delete is locked until the World's name is typed exactly.
   const confirm = page.getByTestId('confirm-delete');
@@ -98,15 +86,16 @@ test('a stale World segment reconciles to the Entity’s real World (ADR-0028, #
   page,
 }) => {
   const worldA = await createWorldFromIndex(page);
+  const noteA = await createNote(page, worldA.id);
   const worldB = await createWorldFromIndex(page);
   expect(worldB.id).not.toBe(worldA.id);
 
-  // Open A’s Home Entity under B’s (wrong) segment.
-  await page.goto(`/w/${worldB.id}/entities/${worldA.homeEntityId}`);
+  // Open A’s note under B’s (wrong) segment.
+  await page.goto(`/w/${worldB.id}/entities/${noteA}`);
 
   // Reconcile guard lands on the Entity under its correct World segment.
   await expect(page).toHaveURL(
-    new RegExp(`/w/${segRe(worldA.id)}/entities/${segRe(worldA.homeEntityId)}$`),
+    new RegExp(`/w/${segRe(worldA.id)}/entities/${segRe(noteA)}$`),
   );
 });
 

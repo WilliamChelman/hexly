@@ -42,7 +42,7 @@ async function seed() {
       .get(AuthService)
       .seedUser(email, password, displayName, { isSuperadmin, canCreateWorlds: true });
     if (withWorld) {
-      app.get(WorldsService).mintWorldWithHome(userId, `${displayName}'s World`);
+      app.get(WorldsService).mintWorld(userId, `${displayName}'s World`);
     }
     Logger.log(
       `Seeded ${isSuperadmin ? 'Superadmin' : 'user'} ${email}${withWorld ? ' with a starter World' : ''}`,

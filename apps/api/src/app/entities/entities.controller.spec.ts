@@ -53,12 +53,12 @@ describe('Entities endpoints', () => {
   /**
    * Seed a user and give them a World — the precondition for creating Entities
    * (ADR-0024). Seeding alone no longer mints a World; the future World-creation
-   * UI does, which this stands in for. `mintWorldWithHome` also creates the
-   * World's Home note, so it surfaces in the owner's Entity list.
+   * UI does, which this stands in for. The World is empty — its landing is a
+   * derived Dashboard (ADR-0043), so nothing surfaces in the owner's Entity list.
    */
   async function seedUserWithWorld(email: string, password: string, name: string) {
     const userId = await app.get(AuthService).seedUser(email, password, name, { canCreateWorlds: true });
-    app.get(WorldsService).mintWorldWithHome(userId, name);
+    app.get(WorldsService).mintWorld(userId, name);
     return userId;
   }
 
@@ -104,7 +104,6 @@ describe('Entities endpoints', () => {
       createdAt: expect.any(Number),
       updatedAt: expect.any(Number),
       document: emptyHexmapBody,
-      isHome: false,
     });
   });
 
@@ -156,7 +155,7 @@ describe('Entities endpoints', () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const worldA = (await ada.get('/worlds').expect(200)).body[0].id; // Ada's World, the oldest
     const bobId = await seedUser('bob@hexly.test', 'correct horse', 'Bob');
-    const { worldId: worldB } = app.get(WorldsService).mintWorldWithHome(bobId, 'Bob’s World');
+    const worldB = app.get(WorldsService).mintWorld(bobId, 'Bob’s World');
     // Bob owns his own (newer) World B, and merely contributes to Ada's older World A.
     await ada.post(`/worlds/${worldA}/members`).send({ userId: bobId, role: 'contributor' }).expect(200);
     const bob = await signIn('bob@hexly.test', 'correct horse');
@@ -174,10 +173,9 @@ describe('Entities endpoints', () => {
 
     const res = await ada.get('/entities').expect(200);
 
-    // Response is always an envelope (ADR-0025). 'Ada' is the auto-created Home note (ADR-0024).
+    // Response is always an envelope (ADR-0025). The World seeds no Entities (ADR-0043).
     expect(res.body.nextCursor).toBeNull();
     expect(res.body.items.map((e: { name: string }) => e.name).sort()).toEqual([
-      'Ada',
       'Aldermoor',
       'Lady A',
     ]);
@@ -188,9 +186,8 @@ describe('Entities endpoints', () => {
 
   it('walks every owner entity exactly once via cursor, with limit bounding each page', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
-    // 'Ada' is the Home note auto-created with Ada's World (ADR-0024); it lists too.
-    const names = ['Ada', 'A', 'B', 'C', 'D', 'E'];
-    for (const name of names.slice(1)) {
+    const names = ['A', 'B', 'C', 'D', 'E', 'F'];
+    for (const name of names) {
       await ada.post('/entities').send({ name, type: 'note' });
     }
 
@@ -230,7 +227,6 @@ describe('Entities endpoints', () => {
 
     const byType = await ada.get('/entities').query({ type: 'note' }).expect(200);
     expect(byType.body.items.map((e: { name: string }) => e.name).sort()).toEqual([
-      'Ada',
       'Aldermoor Town',
       'The Whisperwood',
     ]);
@@ -277,7 +273,6 @@ describe('Entities endpoints', () => {
 
     const inA = await ada.get('/entities').query({ worldId: worldA }).expect(200);
     expect(inA.body.items.map((e: { name: string }) => e.name).sort()).toEqual([
-      'Ada',
       'In Seeded World',
     ]);
 
@@ -287,7 +282,6 @@ describe('Entities endpoints', () => {
       .expect(200);
     expect(inB.body.items.map((e: { name: string }) => e.name).sort()).toEqual([
       'In Second World',
-      'Second',
     ]);
   });
 
@@ -479,15 +473,13 @@ describe('Entities endpoints', () => {
     await ada.delete('/entities/does-not-exist').expect(404);
   });
 
-  it('refuses to delete a World’s Home Entity with 409', async () => {
+  it('deletes any note, with no undeletable Home Entity special-case (ADR-0043)', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
+    // A note named after the World is the old Home shape — now an ordinary, deletable Note.
+    const note = await ada.post('/entities').send({ name: 'Ada', type: 'note' }).expect(201);
 
-    // Home note can't be deleted (minted with World, ADR-0024).
-    const list = await ada.get('/entities').expect(200);
-    const home = list.body.items.find((e: { name: string }) => e.name === 'Ada');
-
-    await ada.delete(`/entities/${home.id}`).expect(409);
-    await ada.get(`/entities/${home.id}`).expect(200);
+    await ada.delete(`/entities/${note.body.id}`).expect(204);
+    await ada.get(`/entities/${note.body.id}`).expect(404);
   });
 
   it('never lets another user reach an entity they do not own', async () => {
@@ -500,9 +492,9 @@ describe('Entities endpoints', () => {
     await seedUserWithWorld('bob@hexly.test', 'battery staple', 'Bob');
     const bob = await signIn('bob@hexly.test', 'battery staple');
 
-    // Bob sees only his Home note (ADR-0024); ownership never leaks (ADR-0004).
+    // Bob's own World is empty and Ada's Entity never leaks into his list (ADR-0004).
     const bobsList = await bob.get('/entities').expect(200);
-    expect(bobsList.body.items.map((e: { name: string }) => e.name)).toEqual(['Bob']);
+    expect(bobsList.body.items.map((e: { name: string }) => e.name)).toEqual([]);
     expect(bobsList.body.items.map((e: { id: string }) => e.id)).not.toContain(id);
     await bob.get(`/entities/${id}`).expect(404);
     await bob
@@ -806,12 +798,11 @@ describe('Entities endpoints', () => {
       // of First/Second is a coin flip. Bump Second so it's unambiguously newest.
       db.update(entities).set({ updatedAt: Date.now() + 1000 }).where(eq(entities.id, second.body.id)).run();
 
-      // No q → updatedAt desc, id asc (ADR-0025). 'Ada' (Home) was created first.
+      // No q → updatedAt desc, id asc (ADR-0025).
       const res = await ada.get('/entities').expect(200);
       expect(res.body.items.map((e: { name: string }) => e.name)).toEqual([
         'Second',
         'First',
-        'Ada',
       ]);
     });
 
@@ -955,8 +946,8 @@ describe('Entities endpoints', () => {
       const now = Date.now();
       db.$client
         .prepare(
-          `INSERT INTO entities (id, world_id, is_home, name, type, tags, visibility, version, document, content_text, created_at, updated_at)
-           VALUES (?, ?, 0, 'Legacy', 'note', '[]', 'private', 1, ?, NULL, ?, ?)`,
+          `INSERT INTO entities (id, world_id, name, type, tags, visibility, version, document, content_text, created_at, updated_at)
+           VALUES (?, ?, 'Legacy', 'note', '[]', 'private', 1, ?, NULL, ?, ?)`,
         )
         .run('legacy-1', anchor.worldId, document, now, now);
       // Ownership is a set now (ADR-0037): make the legacy row Ada's by copying the
@@ -1017,8 +1008,7 @@ describe('Entities endpoints', () => {
       share(open);
 
       const res = await ada.get('/entities').query({ visibility: 'shared' }).expect(200);
-      // The Home ('Ada') is locked `shared` (ADR-0037), so it joins the shared surface.
-      expect(names(res)).toEqual(['Ada', 'Public Temple']);
+      expect(names(res)).toEqual(['Public Temple']);
     });
 
     it('ORs multiple tags within the Tag facet', async () => {
@@ -1073,7 +1063,6 @@ describe('Entities endpoints', () => {
 
     it('returns each facet’s values with live counts for the World', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      // 'Ada' Home note already exists (type note, no tags, locked `shared`).
       const temple = await note(ada, 'Temple');
       await tag(ada, temple, 'deity');
       const grove = await note(ada, 'Grove');
@@ -1084,20 +1073,20 @@ describe('Entities endpoints', () => {
 
       const res = await ada.get('/entities/facets').query({ worldId }).expect(200);
 
-      // Home + Temple + Grove = 3 notes; Map = 1 hexmap.
+      // Temple + Grove = 2 notes; Map = 1 hexmap.
       expect(byValue(res.body.type)).toEqual([
         { value: 'hexmap', count: 1 },
-        { value: 'note', count: 3 },
+        { value: 'note', count: 2 },
       ]);
-      // Temple + Grove carry 'deity'; only Grove carries 'nature'. Home is tagless.
+      // Temple + Grove carry 'deity'; only Grove carries 'nature'.
       expect(byValue(res.body.tag)).toEqual([
         { value: 'deity', count: 2 },
         { value: 'nature', count: 1 },
       ]);
-      // Temple + Home (locked shared) are shared; Grove + Map stay private.
+      // Temple is shared; Grove + Map stay private.
       expect(byValue(res.body.visibility)).toEqual([
         { value: 'private', count: 2 },
-        { value: 'shared', count: 2 },
+        { value: 'shared', count: 1 },
       ]);
     });
 
@@ -1129,7 +1118,7 @@ describe('Entities endpoints', () => {
       // sibling 'hexmap' you could switch to (each narrowed by everything else).
       expect(byValue(res.body.type)).toEqual([
         { value: 'hexmap', count: 1 },
-        { value: 'note', count: 3 },
+        { value: 'note', count: 2 },
       ]);
     });
 
@@ -1351,19 +1340,16 @@ describe('Entities endpoints', () => {
       expect(hidden.body.visibility).toBe('private');
     });
 
-    it('locks the Home Entity shared and refuses a visibility change (409)', async () => {
+    it('changes any note’s visibility freely, with no locked-shared Home special-case (ADR-0043)', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      const list = await ada.get('/entities').expect(200);
-      const home = list.body.items.find((e: { name: string }) => e.name === 'Ada');
-      expect(home.visibility).toBe('shared'); // A shared World always has a landing page.
+      // A note named after the World is the old Home shape — now an ordinary Note whose
+      // visibility flips like any other, in either direction.
+      const note = await ada.post('/entities').send({ name: 'Ada', type: 'note' }).expect(201);
 
-      // Un-revealing the Home would leave a shared World with no landing page → refused.
-      await ada.patch(`/entities/${home.id}`).send({ visibility: 'private' }).expect(409);
-      // Re-asserting `shared` is a harmless no-op.
-      await ada.patch(`/entities/${home.id}`).send({ visibility: 'shared' }).expect(200);
-      // The rename side of the same patch surface still works on the Home.
-      const reread = await ada.get(`/entities/${home.id}`).expect(200);
-      expect(reread.body.visibility).toBe('shared');
+      const shared = await ada.patch(`/entities/${note.body.id}`).send({ visibility: 'shared' }).expect(200);
+      expect(shared.body.visibility).toBe('shared');
+      const hidden = await ada.patch(`/entities/${note.body.id}`).send({ visibility: 'private' }).expect(200);
+      expect(hidden.body.visibility).toBe('private');
     });
 
     it('lets a World Owner edit a shared Entity they don’t own, but denies a plain member (403)', async () => {

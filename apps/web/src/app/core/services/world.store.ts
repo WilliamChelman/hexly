@@ -16,8 +16,8 @@ import { WorldsClient } from './worlds.client';
  * ({@link ActiveWorld}), not a remembered selection — so this store no longer holds
  * an active id or persists anything to localStorage. It is just the loaded list plus
  * the create plumbing: the World Index and the switcher read {@link worlds}/{@link
- * loaded}, and {@link create} mints a World (the server creates its Home Entity
- * atomically); the caller navigates into it by URL.
+ * loaded}, and {@link create} mints an empty World (ADR-0043); the caller navigates
+ * into it by URL.
  */
 @Injectable({ providedIn: 'root' })
 export class WorldStore {
@@ -73,7 +73,7 @@ export class WorldStore {
     });
   }
 
-  // Server mints the Home Entity atomically; append the result to the list.
+  // Server mints an empty World (ADR-0043); append the result to the list.
   create(name: string): Observable<WorldDetail> {
     return this.client.create(name).pipe(
       tap((world) => this._worlds.update((ws) => [...ws, world])),

@@ -10,8 +10,8 @@ import { healWorldSegment, idFromSegment } from '../utils/pretty-id';
  * plus its loaded {@link WorldDetail}. Which World is active is a URL fact — the
  * `:worldId` path segment is the source of truth — but the detail is fetched and
  * pinned here by {@link activeWorldGuard} on the `w/:worldId` route, so the switcher,
- * nav rail, and world pages can read one loaded value (name, owners, rights,
- * homeEntityId) instead of each re-fetching. Both are `null` on the World Index (`/`).
+ * nav rail, and world pages can read one loaded value (name, owners, rights)
+ * instead of each re-fetching. Both are `null` on the World Index (`/`).
  */
 @Injectable({ providedIn: 'root' })
 export class ActiveWorld {

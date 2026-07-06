@@ -15,7 +15,7 @@ export class WorldsClient {
     return this.http.get<WorldSummary[]>('/api/worlds');
   }
 
-  // Server mints the Home Entity atomically.
+  // Server mints an empty World (ADR-0043).
   create(name: string): Observable<WorldDetail> {
     return this.http.post<WorldDetail>('/api/worlds', { name });
   }

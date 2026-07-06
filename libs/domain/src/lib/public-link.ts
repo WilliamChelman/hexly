@@ -19,9 +19,9 @@ export interface PublicLink {
 
 /**
  * What a World Public Link resolves to (ADR-0037): the World's identity plus the summaries
- * of its `shared` Entities — and nothing else. The Home Entity (always `shared`) appears in
- * that listing as the landing page; a reader opens any listed Entity's full body through the
- * token-scoped per-entity read route. `private` Entities never appear here — the token can't reach them.
+ * of its `shared` Entities — and nothing else. A reader opens any listed Entity's full body
+ * through the token-scoped per-entity read route. `private` Entities never appear here — the
+ * token can't reach them.
  */
 export interface PublicWorldView {
   readonly worldId: string;

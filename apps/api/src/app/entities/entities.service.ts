@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 import {
-  ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
@@ -353,26 +352,6 @@ export class EntitiesService implements OnApplicationBootstrap {
   }
 
   /**
-   * Populate a World's auto-created Home Entity from a re-imported `hexly.isHome` note
-   * (ADR-0033, #150): update its Content, Metadata, and Tags in place rather than inserting a
-   * duplicate note. The Home's name stays the World name (ADR-0029) and its `is_home` flag is
-   * untouched — only the body a Hexly export round-trips back is written.
-   */
-  importHome(ownerId: string, homeEntityId: string, tags: readonly string[], body: EntityBody): void {
-    this.db
-      .update(entities)
-      .set({
-        document: serialize(body),
-        tags: [...tags],
-        contentText: extractText(body.content),
-        updatedAt: Date.now(),
-      })
-      // The importer minted this World, so they are its Home Owner — no bypass needed.
-      .where(and(eq(entities.id, homeEntityId), ownsEntity(ownerId, false)))
-      .run();
-  }
-
-  /**
    * The single INSERT trunk both {@link create} and {@link importNote} share, so the
    * row shape (id, initial version, private, serialized body, timestamps) lives in one
    * place and can't drift. Callers vary only what they own — World, name, tags, body.
@@ -399,7 +378,6 @@ export class EntitiesService implements OnApplicationBootstrap {
       document: serialize(input.body),
       // Search index text (ADR-0035); the FTS triggers pick it up from the column.
       contentText: extractText(input.body.content),
-      isHome: false,
       createdAt: now,
       updatedAt: now,
     };
@@ -476,8 +454,7 @@ export class EntitiesService implements OnApplicationBootstrap {
    * A metadata patch (ADR-0037): the `name` and/or the Visibility, no version bump — it
    * leaves the body and version untouched so it never invalidates an in-progress edit.
    * Write-gated through {@link access}: an unreachable Entity is a 404 (null), a reachable
-   * one the caller can't write a 403. The Home Entity is locked `shared` (like its title
-   * and undeletability), so a visibility change away from `shared` on it is refused (409).
+   * one the caller can't write a 403.
    */
   patch(
     userId: string,
@@ -493,10 +470,6 @@ export class EntitiesService implements OnApplicationBootstrap {
     const changesVisibility = changes.visibility !== undefined;
     const permitted = changesVisibility ? decision.canWrite : decision.canEditSubstance;
     if (!permitted) throw new ForbiddenException();
-    if (decision.row.isHome && changes.visibility && changes.visibility !== 'shared') {
-      // 409, like delete: conflicts with the World invariant that a shared World keeps a landing page.
-      throw new ConflictException({ code: EntityErrorCode.HomeLockedShared } satisfies ApiError);
-    }
     const updatedAt = Date.now();
     const res = this.db
       .update(entities)
@@ -579,15 +552,12 @@ export class EntitiesService implements OnApplicationBootstrap {
   /**
    * Delete an Entity (ADR-0037): an Owner, or the World Owner of a `shared` one (the
    * nuclear revoke) — write-gated through {@link access}. false → unreachable (404); a
-   * reachable Entity the caller can't write is a 403. The Home Entity is undeletable (409).
+   * reachable Entity the caller can't write is a 403.
    */
   delete(userId: string, id: string): boolean {
     const access = entityAccess(this.db, userId).decide(id);
     if (!access?.canRead) return false;
     if (!access.canWrite) throw new ForbiddenException();
-    // 409, not 400: conflicts with World invariant (Home Entity always exists, ADR-0024).
-    if (access.row.isHome)
-      throw new ConflictException({ code: EntityErrorCode.HomeUndeletable } satisfies ApiError);
     // entity_grants (owner + grant rows) cascades with the row.
     this.db.delete(entities).where(eq(entities.id, id)).run();
     return true;
@@ -933,8 +903,8 @@ function serialize(body: EntityBody): string {
 
 type SummaryRow = Omit<typeof entities.$inferSelect, 'document'>;
 
-/** Exactly the columns {@link toSummary} reads — narrower than {@link SummaryRow}, so the `list` projection (which skips `isHome`/`contentText` for weight) satisfies it. */
-type SummaryColumns = Omit<SummaryRow, 'isHome' | 'contentText'>;
+/** Exactly the columns {@link toSummary} reads — narrower than {@link SummaryRow}, so the `list` projection (which skips `contentText` for weight) satisfies it. */
+type SummaryColumns = Omit<SummaryRow, 'contentText'>;
 
 function toSummary(row: SummaryColumns): EntitySummary {
   return {
@@ -957,7 +927,7 @@ function toDetail(row: typeof entities.$inferSelect): EntityDetail {
 
 // Write paths pass valid body; only toDetail re-parses.
 function detailOf(row: SummaryRow, document: EntityBody): EntityDetail {
-  return { ...toSummary(row), document, isHome: row.isHome };
+  return { ...toSummary(row), document };
 }
 
 /**

@@ -19,7 +19,7 @@ describe('WorldsClient', () => {
     createdAt: 1,
     updatedAt: 1,
   };
-  const detail: WorldDetail = { ...summary, homeEntityId: 'e1', entityCount: 1 };
+  const detail: WorldDetail = { ...summary, entityCount: 1 };
 
   beforeEach(() => {
     TestBed.configureTestingModule({

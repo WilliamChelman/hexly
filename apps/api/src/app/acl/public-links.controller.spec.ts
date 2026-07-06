@@ -183,8 +183,6 @@ describe('Public links', () => {
     expect(view.worldName).toBe('Aldermoor');
     const ids = view.entities.map((e: { id: string }) => e.id);
     expect(ids).toContain(sharedId);
-    // The Home Entity (name = World name) is always shared, so it lands in the listing.
-    expect(view.entities.map((e: { name: string }) => e.name)).toContain('Aldermoor');
     expect(ids).not.toContain(secretId); // private never appears
 
     // The shared Entity opens read-only through the token; the private one is a 404.

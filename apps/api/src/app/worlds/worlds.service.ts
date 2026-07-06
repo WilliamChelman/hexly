@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import {
   CreateWorldRequest,
-  emptyEntityBody,
   MemberRole,
   PublicLink,
   WorldDetail,
@@ -37,9 +36,10 @@ const WORLD_LINK: PublicLinkTable = {
 };
 
 /**
- * World persistence (ADR-0024). Home Entity (flagged is_home) minted in same
- * transaction as World row so the two can never diverge. Ownership is a symmetric
- * set (ADR-0037): World Owners are `world_members` rows with `role: 'owner'`.
+ * World persistence (ADR-0024). A World is minted as just its row plus the creator's
+ * ownership — its landing is a derived World Dashboard, not a stored Home Entity
+ * (ADR-0043). Ownership is a symmetric set (ADR-0037): World Owners are `world_members`
+ * rows with `role: 'owner'`.
  */
 @Injectable()
 export class WorldsService {
@@ -113,14 +113,10 @@ export class WorldsService {
     return world ? this.toDetail(world, userId) : null;
   }
 
-  // Create World with fresh Home note, atomically (ADR-0024).
+  // Create an empty World (ADR-0024, ADR-0043): just the World row and its creator's ownership.
   create(ownerId: string, req: CreateWorldRequest): WorldDetail {
     const now = Date.now();
-    const { worldId, homeEntityId } = this.mintWorldWithHome(
-      ownerId,
-      req.name,
-      now,
-    );
+    const worldId = this.mintWorld(ownerId, req.name, now);
     return {
       id: worldId,
       name: req.name,
@@ -128,29 +124,21 @@ export class WorldsService {
       owners: [ownerId],
       // Creator is the sole Owner, so full Rights (ADR-0039).
       rights: worldRightsOf({ isOwner: true }),
-      homeEntityId,
-      // Fresh World holds only Home Entity (#120).
-      entityCount: 1,
+      // A fresh World seeds no Entities — its landing is a derived Dashboard (ADR-0043).
+      entityCount: 0,
       createdAt: now,
       updatedAt: now,
     };
   }
 
   /**
-   * Mint a World for `ownerId` with a freshly minted blank Home note (ADR-0024) —
-   * the shared trunk behind {@link create}, the vault import (ADR-0033), and the
-   * seed CLI. The World row, its creator's `owner` membership row, the Home note
-   * (`is_home = 1`), and the Home's ownership row are inserted together — no cycle,
-   * so a plain transaction (atomicity only) suffices.
+   * Mint an empty World for `ownerId` (ADR-0024, ADR-0043) — the shared trunk behind
+   * {@link create}, the vault import (ADR-0033), and the seed CLI. The World row and its
+   * creator's `owner` membership row are inserted together; the landing page is a derived
+   * World Dashboard, so no Home note is minted. Returns the new World id.
    */
-  mintWorldWithHome(
-    ownerId: string,
-    name: string,
-    now: number = Date.now(),
-  ): { worldId: string; homeEntityId: string } {
+  mintWorld(ownerId: string, name: string, now: number = Date.now()): string {
     const worldId = randomUUID();
-    const homeEntityId = randomUUID();
-    const document = JSON.stringify(emptyEntityBody('note'));
     const sqlite = this.db.$client;
     sqlite.transaction(() => {
       sqlite
@@ -163,26 +151,13 @@ export class WorldsService {
           `INSERT INTO world_members (world_id, user_id, role) VALUES (?, ?, 'owner')`,
         )
         .run(worldId, ownerId);
-      sqlite
-        .prepare(
-          // The Home is locked `shared` (ADR-0037): a World shared with anyone always
-          // has a landing page. Its visibility is fixed, like its title and undeletability.
-          `INSERT INTO entities (id, world_id, is_home, name, type, tags, visibility, version, document, created_at, updated_at)
-           VALUES (?, ?, 1, ?, 'note', '[]', 'shared', 1, ?, ?, ?)`,
-        )
-        .run(homeEntityId, worldId, name, document, now, now);
-      sqlite
-        .prepare(`INSERT INTO entity_grants (entity_id, user_id, role) VALUES (?, ?, 'owner')`)
-        .run(homeEntityId, ownerId);
     })();
-    return { worldId, homeEntityId };
+    return worldId;
   }
 
   /**
    * Rename World (Owner only, ADR-0024): forbidden if not an Owner, null if not found.
-   * World name is source of truth for Home title (ADR-0029); one transaction
-   * ensures sync. Home version untouched (metadata-only) so rename doesn't
-   * invalidate in-progress edits.
+   * The World name stands alone now (ADR-0043 retires the Home-title sync of ADR-0029).
    */
   rename(
     userId: string,
@@ -193,18 +168,7 @@ export class WorldsService {
     if (!world) return null;
     if (!worldAccess(this.db, userId).decideMeta(id)?.isOwner) return 'forbidden';
     const updatedAt = Date.now();
-    this.db.transaction(() => {
-      this.db
-        .update(worlds)
-        .set({ name, updatedAt })
-        .where(eq(worlds.id, id))
-        .run();
-      this.db
-        .update(entities)
-        .set({ name, updatedAt })
-        .where(and(eq(entities.worldId, id), eq(entities.isHome, true)))
-        .run();
-    });
+    this.db.update(worlds).set({ name, updatedAt }).where(eq(worlds.id, id)).run();
     // Only an Owner reaches rename (checked above), so full Rights.
     return this.toDetail({ ...world, name, updatedAt }, userId);
   }
@@ -441,16 +405,9 @@ export class WorldsService {
     return gate({ reachable: !!meta?.reachable, isOwner: !!meta?.isOwner });
   }
 
-  // Attach World's Home Entity id (is_home row), ownership set, and the caller's Rights.
+  // Attach the World's Entity count, ownership set, and the caller's Rights.
   private toDetail(world: typeof worlds.$inferSelect, callerId: string): WorldDetail {
-    const home = this.db
-      .select({ id: entities.id })
-      .from(entities)
-      .where(and(eq(entities.worldId, world.id), eq(entities.isHome, true)))
-      .get();
-    // Home Entity minted with World (one transaction); missing = corruption (500).
-    if (!home) throw new Error(`World ${world.id} has no Home Entity`);
-    // Cascade target (#120): all Entities in World (Home included).
+    // Cascade target (#120): every Entity in the World.
     const [{ value: entityCount }] = this.db
       .select({ value: count() })
       .from(entities)
@@ -465,7 +422,6 @@ export class WorldsService {
       // Rights fall out of the owner set already fetched (ADR-0039) — free, the same derivation
       // list() uses, no extra isOwner query. `managedBy` folds the Superadmin bypass (#163).
       rights: access.rightsOf({ isOwner: access.managedBy(owners) }),
-      homeEntityId: home.id,
       entityCount,
       createdAt: world.createdAt,
       updatedAt: world.updatedAt,

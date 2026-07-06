@@ -27,9 +27,8 @@ export class PublicLinksService {
 
   /**
    * The World behind a World Public Link: its identity plus its `shared` Entity summaries,
-   * or null if the token doesn't resolve (revoked/never minted). The Home Entity (always
-   * `shared`) is listed among the shared Entities as the landing page; a reader opens any
-   * listed Entity through {@link readWorldEntity}. Token → World identity is one join.
+   * or null if the token doesn't resolve (revoked/never minted). A reader opens any listed
+   * Entity through {@link readWorldEntity}. Token → World identity is one join.
    */
   readWorld(token: string): PublicWorldView | null {
     const world = this.db

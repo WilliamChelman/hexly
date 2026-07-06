@@ -1,11 +1,9 @@
-import { sql } from 'drizzle-orm';
 import {
   index,
   integer,
   primaryKey,
   sqliteTable,
   text,
-  uniqueIndex,
 } from 'drizzle-orm/sqlite-core';
 
 // Keep in sync by hand with the `CREATE TABLE` DDL in `./db.ts`; column changes
@@ -84,9 +82,6 @@ export const entities = sqliteTable(
     worldId: text('world_id')
       .notNull()
       .references(() => worlds.id),
-    // The World's Home Entity landing page (ADR-0024). At most one per World
-    // (partial unique index). Flag avoids circular FK and keeps home in-world.
-    isHome: integer('is_home', { mode: 'boolean' }).notNull().default(false),
     name: text('name').notNull(),
     type: text('type').notNull(),
     tags: text('tags', { mode: 'json' }).$type<string[]>().notNull(),
@@ -106,10 +101,6 @@ export const entities = sqliteTable(
   (table) => [
     // Scoped to World (ADR-0024).
     index('idx_entities_world_id').on(table.worldId),
-    // Exactly one Home Entity per World.
-    uniqueIndex('idx_world_home')
-      .on(table.worldId)
-      .where(sql`${table.isHome} = 1`),
   ]
 );
 
@@ -141,15 +132,22 @@ export const entityGrants = sqliteTable(
 /**
  * A World (ADR-0024): a lightweight container grouping Entities for one campaign.
  * Ownership is a symmetric set (ADR-0037): World Owners are `world_members` rows
- * with `role: 'owner'`, so a World carries no owner column. The Home Entity
- * landing page is the World's `is_home` Entity, not a column here — so a World
- * holds no FK back to entities (no circular dependency).
+ * with `role: 'owner'`, so a World carries no owner column. The landing page is a
+ * derived World Dashboard (ADR-0043), not a stored Entity — a World holds no FK
+ * back to entities.
  */
 export const worlds = sqliteTable('worlds', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   // Ownership is a symmetric set (ADR-0037): World Owners are `world_members`
   // rows with `role: 'owner'`, not a column here.
+  // The Owner-curated Dashboard pins (ADR-0043): an ordered JSON array of Entity
+  // ids, one shared set per World. References, not enforced FKs — stale or
+  // inaccessible ids are filtered per-viewer on read, never pruned on delete.
+  pinnedEntityIds: text('pinned_entity_ids', { mode: 'json' })
+    .$type<string[]>()
+    .notNull()
+    .default([]),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 });

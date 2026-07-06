@@ -136,24 +136,18 @@ describe('WorldIndex', () => {
     expect($(empty, '[data-testid=create-world]')).toBeNull();
   });
 
-  it('creating a World opens its Home Entity', () => {
+  it('creating a World lands on its Dashboard (ADR-0043)', () => {
     const el = render([]).nativeElement as HTMLElement;
 
     worldsClient.create.mockReturnValue(
       of({
         ...world('w9', 'Untitled world'),
-        homeEntityId: 'home9',
-        entityCount: 1,
+        entityCount: 0,
       }),
     );
     ($(el, '[data-testid=create-world]') as HTMLButtonElement).click();
 
-    expect(navigate).toHaveBeenCalledWith([
-      '/w',
-      'w9',
-      'entities',
-      'home9',
-    ]);
+    expect(navigate).toHaveBeenCalledWith(['/w', 'w9']);
   });
 
   const importSummary = (over: Partial<ImportSummary> = {}): ImportSummary => ({
@@ -303,7 +297,6 @@ describe('WorldIndex', () => {
     worldsClient.rename.mockReturnValue(
       of({
         ...world('w1', 'The Reach of Aldermoor'),
-        homeEntityId: 'home1',
         entityCount: 1,
       }),
     );
@@ -329,7 +322,6 @@ describe('WorldIndex', () => {
     worldsClient.get.mockReturnValue(
       of({
         ...world('w1', 'Aldermoor'),
-        homeEntityId: 'home1',
         entityCount: 3,
       }),
     );
@@ -346,7 +338,7 @@ describe('WorldIndex', () => {
     const fixture = render([world('w1', name)]);
     const el = fixture.nativeElement as HTMLElement;
     worldsClient.get.mockReturnValue(
-      of({ ...world('w1', name), homeEntityId: 'home1', entityCount: count }),
+      of({ ...world('w1', name), entityCount: count }),
     );
     ($(el, '[data-testid=delete-world-w1]') as HTMLButtonElement).click();
     fixture.detectChanges();

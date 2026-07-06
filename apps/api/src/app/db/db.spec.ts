@@ -241,3 +241,87 @@ describe('Home-visibility backfill migration (0005)', () => {
     sqlite.close();
   });
 });
+
+/**
+ * The Home-Entity removal migration (ADR-0043, 0011): drops `entities.is_home` and the
+ * `idx_world_home` partial unique index, and adds `worlds.pinned_entity_ids`. Pre-launch, so
+ * an existing home note simply survives as an ordinary row — no demotion. A fresh DB has no
+ * old home, so this seeds one the old way, applies 0011, and asserts the column/index are gone,
+ * the note survives, and the new pins column defaults empty. The entities rebuild carries rowid
+ * forward, so the FTS index stays aligned (the round-trip below proves it still matches).
+ */
+describe('Home-Entity removal migration (0011)', () => {
+  function seededPre0011(): Database.Database {
+    const sqlite = new Database(':memory:');
+    sqlite.pragma('foreign_keys = OFF');
+    for (const file of [
+      '0000_amused_nomad.sql',
+      '0001_supreme_sersi.sql',
+      '0002_past_randall_flagg.sql',
+      '0003_symmetric_owner_sets.sql',
+      '0004_elite_sleepwalker.sql',
+      '0005_open_hearth.sql',
+      '0006_smart_maddog.sql',
+      '0007_fold_entity_owners.sql',
+      '0008_complex_ink.sql',
+      '0009_dry_lila_cheney.sql',
+      '0010_world_creation_capability.sql',
+    ]) {
+      applyMigration(sqlite, file);
+    }
+    sqlite
+      .prepare(`INSERT INTO worlds (id, name, created_at, updated_at) VALUES ('w1', 'Aldermoor', 0, 0)`)
+      .run();
+    // A home note stored the old way — flagged is_home, locked shared.
+    sqlite
+      .prepare(
+        `INSERT INTO entities (id, world_id, is_home, name, type, tags, visibility, version, document, content_text, created_at, updated_at)
+         VALUES ('home1', 'w1', 1, 'Aldermoor', 'note', '[]', 'shared', 1, '{"type":"note"}', 'the buried obelisk', 0, 0)`,
+      )
+      .run();
+    return sqlite;
+  }
+
+  it('drops is_home + idx_world_home, adds pinned_entity_ids, keeps the home note as a normal row', () => {
+    const sqlite = seededPre0011();
+    applyMigration(sqlite, '0011_remove_home_entity.sql');
+
+    const entityCols = (
+      sqlite.prepare(`PRAGMA table_info(entities)`).all() as { name: string }[]
+    ).map((c) => c.name);
+    expect(entityCols).not.toContain('is_home');
+
+    const indexes = (
+      sqlite.prepare(`SELECT name FROM sqlite_master WHERE type = 'index'`).all() as { name: string }[]
+    ).map((r) => r.name);
+    expect(indexes).not.toContain('idx_world_home');
+
+    const worldCols = (
+      sqlite.prepare(`PRAGMA table_info(worlds)`).all() as { name: string }[]
+    ).map((c) => c.name);
+    expect(worldCols).toContain('pinned_entity_ids');
+    // The pre-existing World backfills to an empty pin set.
+    expect(sqlite.prepare(`SELECT pinned_entity_ids FROM worlds WHERE id = 'w1'`).get()).toEqual({
+      pinned_entity_ids: '[]',
+    });
+
+    // The former home note survives intact as an ordinary Note — no demotion, no deletion.
+    expect(sqlite.prepare(`SELECT name, document FROM entities WHERE id = 'home1'`).get()).toEqual({
+      name: 'Aldermoor',
+      document: '{"type":"note"}',
+    });
+    sqlite.close();
+  });
+
+  it('carries rowid forward so the FTS index still matches by prose after the rebuild', () => {
+    const sqlite = seededPre0011();
+    applyMigration(sqlite, '0011_remove_home_entity.sql');
+
+    expect(
+      sqlite
+        .prepare(`SELECT e.id FROM entities_fts f JOIN entities e ON e.rowid = f.rowid WHERE entities_fts MATCH 'obelisk'`)
+        .all(),
+    ).toEqual([{ id: 'home1' }]);
+    sqlite.close();
+  });
+});

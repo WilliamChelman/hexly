@@ -44,7 +44,7 @@ export class VaultImportService {
     // World name from the upload (sans .zip), run through nameSchema so a blank or
     // whitespace-only filename can't mint a whitespace-named World; falls back if it fails.
     const vaultName = nameSchema.catch('Imported Vault').parse(filename.replace(/\.zip$/i, ''));
-    const { worldId, homeEntityId } = this.worlds.mintWorldWithHome(ownerId, vaultName);
+    const worldId = this.worlds.mintWorld(ownerId, vaultName);
 
     let filesSkipped = 0;
     const constructsDegraded: Record<string, number> = {};
@@ -53,19 +53,14 @@ export class VaultImportService {
     // the full set before anything is persisted (#147). A file that can't be read or named
     // is skipped here and never enters the index.
     const notes: ImportNote[] = [];
-    // A Hexly-exported vault flags its Home note with `hexly.isHome`; that note updates this World's
-    // auto-created Home rather than adding a duplicate (#150). First claimant wins — a World has
-    // exactly one Home — so any later isHome note imports as an ordinary note.
-    let homeClaimed = false;
     for (const [path, bytes] of Object.entries(files)) {
       try {
         const text = decodeUtf8(bytes);
         const name = nameSchema.parse(basename(path, '.md'));
         const { doc, metadata, degraded } = markdownToProseMirror(text);
-        const isHome = !homeClaimed && metadata['hexly.isHome'] === true;
-        if (isHome) homeClaimed = true;
-        // The Home note takes the pre-minted home id so wikilinks pointing at it resolve to Home.
-        notes.push({ id: isHome ? homeEntityId : randomUUID(), path, name, doc, metadata, isHome });
+        // Every file imports as an ordinary note — there is no Home Entity to route to (ADR-0043).
+        // A legacy `hexly.isHome` flag is just reserved frontmatter, stripped below like any `hexly.*`.
+        notes.push({ id: randomUUID(), path, name, doc, metadata });
         for (const [key, n] of Object.entries(degraded)) {
           constructsDegraded[key] = (constructsDegraded[key] ?? 0) + n;
         }
@@ -87,9 +82,9 @@ export class VaultImportService {
     // so a per-note implicit transaction would fsync once each — a big vault then pays
     // hundreds of fsyncs. Batching collapses them to a single commit, and makes the *notes*
     // all-or-nothing (no partially-populated note set if an insert throws mid-loop).
-    // Not a full rollback of the import: the World + home entity were already committed by
-    // mintWorldWithHome above, and storeImages' writeFileSync (below) isn't transactional —
-    // so a throw here leaves an empty World and any already-written asset files behind. That's
+    // Not a full rollback of the import: the World was already committed by mintWorld above,
+    // and storeImages' writeFileSync (below) isn't transactional — so a throw here leaves an
+    // empty World and any already-written asset files behind. That's
     // acceptable for a synchronous single-operator import (the caller sees the 500 and retries).
     this.db.transaction(() => {
       for (const note of notes) {
@@ -98,25 +93,19 @@ export class VaultImportService {
         linksDangling += dangling;
         assetsStored += this.storeImages(note.doc, posix.dirname(note.path), assetIndex, assetFiles, worldId);
         const { tags, ...rest } = note.metadata;
-        // Reserved `hexly.*` frontmatter is provenance a Hexly export writes (isHome/type), consumed
-        // here and re-derived on the next export — never stored back as author Metadata (ADR-0033).
+        // Reserved `hexly.*` frontmatter is provenance a Hexly export writes (type/sourcePath),
+        // consumed here and re-derived on the next export — never stored back as author Metadata (ADR-0033).
         const passThrough = Object.fromEntries(
           Object.entries(rest).filter(([key]) => !key.startsWith(HEXLY_METADATA_PREFIX)),
         );
         const content = tiptapContent(note.doc);
-        if (note.isHome) {
-          // The Home Entity has no source path (it exports at the vault root as <WorldName>.md).
-          const body: EntityBody = { type: 'note', content, metadata: passThrough };
-          this.entities.importHome(ownerId, homeEntityId, toTags(tags), body);
-        } else {
-          // Folder path recorded under the reserved namespace so export can rebuild the tree.
-          const body: EntityBody = {
-            type: 'note',
-            content,
-            metadata: { ...passThrough, 'hexly.sourcePath': note.path },
-          };
-          this.entities.importNote(ownerId, worldId, note.id, note.name, toTags(tags), body);
-        }
+        // Folder path recorded under the reserved namespace so export can rebuild the tree.
+        const body: EntityBody = {
+          type: 'note',
+          content,
+          metadata: { ...passThrough, 'hexly.sourcePath': note.path },
+        };
+        this.entities.importNote(ownerId, worldId, note.id, note.name, toTags(tags), body);
       }
     });
 
@@ -172,8 +161,6 @@ interface ImportNote {
   readonly name: string;
   readonly doc: PMNode;
   readonly metadata: Record<string, unknown>;
-  /** This note is the vault's Home (`hexly.isHome`): it updates the World's Home Entity, not a new note (#150). */
-  readonly isHome: boolean;
 }
 
 /**

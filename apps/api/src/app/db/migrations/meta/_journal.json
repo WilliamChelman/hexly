@@ -78,6 +78,13 @@
       "when": 1783283071327,
       "tag": "0010_world_creation_capability",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1783366544377,
+      "tag": "0011_remove_home_entity",
+      "breakpoints": true
     }
   ]
 }

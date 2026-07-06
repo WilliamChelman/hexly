@@ -168,17 +168,6 @@ describe('Vault export endpoint', () => {
     expect(hero).not.toContain(`/assets/${worldId}`);
   });
 
-  it('exports the Home Entity as <WorldName>.md flagged hexly.isHome', async () => {
-    const ada = await signIn('ada@hexly.test', 'correct horse');
-    const worldId = await importVault(ada, { 'Note.md': '# Note' });
-
-    const { files } = await exportZip(ada, worldId);
-
-    // The Home Entity's name is the World name (ADR-0029), so it lands at the root as Aldermoor.md.
-    expect(files).toHaveProperty('Aldermoor.md');
-    expect(frontmatter(text(files, 'Aldermoor.md'))['hexly.isHome']).toBe(true);
-  });
-
   it('exports a hexmap as lore-only markdown, grid dropped and flagged hexly.type: hexmap', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const worldId = await importVault(ada, { 'Note.md': '# Note' });
@@ -237,16 +226,14 @@ describe('Vault export endpoint', () => {
 
     const { res, files } = await exportZip(ada, worldId);
 
-    // Exact zip layout: Home at root (<WorldName>.md), notes under their original folders, assets/ folder.
+    // Exact zip layout: notes under their original folders, assets/ folder — no Home note (ADR-0043).
     expect(Object.keys(files).sort()).toEqual([
-      'Aldermoor.md',
       'Characters/Lady Mara.md',
       'Places/Keep.md',
       'assets/portrait.png',
     ]);
 
-    // Home flagged; assets kept byte-for-byte under their human-readable name.
-    expect(frontmatter(text(files, 'Aldermoor.md'))['hexly.isHome']).toBe(true);
+    // Assets kept byte-for-byte under their human-readable name.
     expect(files['assets/portrait.png']).toEqual(png);
 
     // Metadata + tags round-trip; the image src points back at the exported asset.
@@ -256,36 +243,15 @@ describe('Vault export endpoint', () => {
     // The resolved entityLink re-emits as an Obsidian wikilink.
     expect(text(files, 'Places/Keep.md')).toContain('[[Lady Mara]]');
 
-    // Re-importing the export reconstructs an equivalent World: Home routes back (no duplicate),
-    // the same two notes land, and the wikilink resolves again.
+    // Re-importing the export reconstructs an equivalent World: the same two notes land, and the
+    // wikilink resolves again.
     const reimport = await ada
       .post('/worlds/import')
       .attach('file', Buffer.from(res.body), 'Aldermoor.zip')
       .expect(201);
     expect(reimport.body.linksResolved).toBe(1);
     const world = await ada.get(`/worlds/${reimport.body.worldId}`).expect(200);
-    expect(world.body.entityCount).toBe(3); // Home + the two notes — the isHome note did not duplicate.
-  });
-
-  it('keeps both files when a note collides with the Home Entity path (no silent overwrite)', async () => {
-    const ada = await signIn('ada@hexly.test', 'correct horse');
-    // A root note named exactly like the vault exports to the same path as the Home (<WorldName>.md).
-    const worldId = await importVault(ada, {
-      'Aldermoor.md': '# Aldermoor\n\nA twin of the world name.',
-    });
-
-    const { files } = await exportZip(ada, worldId);
-
-    // Both survive: the collider is suffixed rather than overwriting (or overwritten by) the Home.
-    expect(files).toHaveProperty('Aldermoor.md');
-    expect(files).toHaveProperty('Aldermoor (2).md');
-    const both = ['Aldermoor.md', 'Aldermoor (2).md'].map((p) => text(files, p)).join('\n');
-    expect(both).toContain('A twin of the world name.'); // the note's body is not lost
-    // Exactly one of the two is the Home.
-    const homes = ['Aldermoor.md', 'Aldermoor (2).md'].filter(
-      (p) => frontmatter(text(files, p))['hexly.isHome'] === true,
-    );
-    expect(homes).toHaveLength(1);
+    expect(world.body.entityCount).toBe(2); // Just the two notes — no seeded Home Entity.
   });
 
   it('re-emits a wikilink with the target entity’s CURRENT name after a rename', async () => {

@@ -42,7 +42,7 @@ describe('Worlds endpoints', () => {
     return agent;
   }
 
-  it('creates a World and its Home Entity atomically, returning both', async () => {
+  it('creates an empty World, returning its Detail (no seeded Entities, ADR-0043)', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
 
     const res = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
@@ -53,16 +53,12 @@ describe('Worlds endpoints', () => {
       // Ownership is a symmetric set (ADR-0037): the creator is its sole Owner.
       owners: [expect.any(String)],
       rights: ['read', 'manage'],
-      homeEntityId: expect.any(String),
-      // Fresh World holds only its Home Entity (#120).
-      entityCount: 1,
+      // No Home Entity is minted — the landing is a derived Dashboard (ADR-0043).
+      entityCount: 0,
       createdAt: expect.any(Number),
       updatedAt: expect.any(Number),
     });
-
-    const home = await ada.get(`/entities/${res.body.homeEntityId}`).expect(200);
-    expect(home.body.worldId).toBe(res.body.id);
-    expect(home.body.type).toBe('note');
+    expect(res.body).not.toHaveProperty('homeEntityId');
   });
 
   it('forbids creating a World without the World Creation capability (ADR-0040)', async () => {
@@ -131,7 +127,7 @@ describe('Worlds endpoints', () => {
     ]);
   });
 
-  it('gets one reachable World as a Detail, with its Home Entity id', async () => {
+  it('gets one reachable World as a Detail', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const created = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
 
@@ -165,12 +161,13 @@ describe('Worlds endpoints', () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const created = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
 
-    expect((await ada.get(`/worlds/${created.body.id}`).expect(200)).body.entityCount).toBe(1);
+    // A fresh World seeds no Entities (ADR-0043).
+    expect((await ada.get(`/worlds/${created.body.id}`).expect(200)).body.entityCount).toBe(0);
     await ada
       .post('/entities')
       .send({ name: 'Lady Mara', type: 'note', worldId: created.body.id })
       .expect(201);
-    expect((await ada.get(`/worlds/${created.body.id}`).expect(200)).body.entityCount).toBe(2);
+    expect((await ada.get(`/worlds/${created.body.id}`).expect(200)).body.entityCount).toBe(1);
   });
 
   it('returns 404 for a World the caller cannot reach', async () => {
@@ -200,24 +197,6 @@ describe('Worlds endpoints', () => {
     expect(reloaded.body.name).toBe('The Reach of Aldermoor');
   });
 
-  it('renames the Home Entity alongside the World (one name, ADR-0029)', async () => {
-    const ada = await signIn('ada@hexly.test', 'correct horse');
-    const created = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
-    const homeId = created.body.homeEntityId;
-
-    expect((await ada.get(`/entities/${homeId}`).expect(200)).body.name).toBe('Aldermoor');
-
-    await ada
-      .patch(`/worlds/${created.body.id}`)
-      .send({ name: 'The Reach of Aldermoor' })
-      .expect(200);
-
-    // World name is source of truth for Home title (ADR-0029).
-    const home = await ada.get(`/entities/${homeId}`).expect(200);
-    expect(home.body.name).toBe('The Reach of Aldermoor');
-    expect(home.body.isHome).toBe(true);
-  });
-
   it('rejects a rename by a non-Owner with 403, leaving the World untouched', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const created = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
@@ -237,13 +216,16 @@ describe('Worlds endpoints', () => {
   it('deletes a World for its Owner, taking its Entities with it', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const created = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
-    const homeId = created.body.homeEntityId;
+    const note = await ada
+      .post('/entities')
+      .send({ name: 'Lady Mara', type: 'note', worldId: created.body.id })
+      .expect(201);
 
     await ada.delete(`/worlds/${created.body.id}`).expect(204);
 
     await ada.get(`/worlds/${created.body.id}`).expect(404);
-    // Home Entity cascades with World.
-    await ada.get(`/entities/${homeId}`).expect(404);
+    // The World's Entities cascade with it.
+    await ada.get(`/entities/${note.body.id}`).expect(404);
   });
 
   it('rejects a delete by a non-Owner with 403, and 404s an unknown World', async () => {

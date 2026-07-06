@@ -9,9 +9,9 @@ import { z } from 'zod';
 import { nameSchema } from './entity';
 
 /**
- * A World container (CONTEXT.md → World): a `name` and its `owners`. The Home
- * Entity is not a column here — it is the World's Entity flagged `is_home`
- * (ADR-0024), so a World never points back at an Entity (no circular FK).
+ * A World container (CONTEXT.md → World): a `name` and its `owners`. The landing
+ * page is a derived World Dashboard (ADR-0043), not a stored Entity, so a World
+ * never points back at an Entity (no circular FK).
  */
 export const worldSchema = z.object({
   id: z.string(),
@@ -67,7 +67,7 @@ export const setMemberRoleRequestSchema = z.object({ role: memberRoleSchema });
 
 export type SetMemberRoleRequest = z.infer<typeof setMemberRoleRequestSchema>;
 
-/** POST /worlds: only the name is client-supplied; the Home Entity is minted server-side. */
+/** POST /worlds: only the name is client-supplied; the World row is minted server-side. */
 export const createWorldRequestSchema = z.object({ name: nameSchema });
 
 export type CreateWorldRequest = z.infer<typeof createWorldRequestSchema>;
@@ -97,16 +97,15 @@ export interface WorldSummary {
 }
 
 /**
- * A single World plus its Home Entity id (ADR-0024) — what POST/GET/PATCH
- * `/worlds/:id` return. The id is enough for the client to navigate to the
- * landing page (`/entities/:homeEntityId`); the body is fetched on open.
+ * A single World — what POST/GET/PATCH `/worlds/:id` return. The landing page is a
+ * derived World Dashboard (ADR-0043), not a stored Entity, so the Detail carries no
+ * home id to navigate to.
  */
 export interface WorldDetail extends WorldSummary {
-  readonly homeEntityId: string;
   /**
-   * How many Entities live in this World (the Home Entity included) — the number a
-   * delete would destroy (ADR-0024, #120). Surfaced on the Detail so the World
-   * Index's type-to-confirm delete can state the cost without a heavy endpoint.
+   * How many Entities live in this World — the number a delete would destroy
+   * (ADR-0024, #120). Surfaced on the Detail so the World Index's type-to-confirm
+   * delete can state the cost without a heavy endpoint.
    */
   readonly entityCount: number;
 }

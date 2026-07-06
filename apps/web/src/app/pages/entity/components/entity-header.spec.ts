@@ -203,19 +203,8 @@ describe('EntityHeader', () => {
     }
   });
 
-  // The Home Entity is locked `shared` (ADR-0037) — no toggle, like its read-only title.
-  it('hides the visibility toggle on the Home Entity', () => {
-    open({ ...noteDetail('Aldermoor'), isHome: true });
-    const fixture = TestBed.createComponent(EntityHeader);
-    fixture.detectChanges();
-
-    expect(
-      fixture.nativeElement.querySelector('[data-testid=visibility-toggle]'),
-    ).toBeNull();
-  });
-
   // A read-only World member (no edit Right, ADR-0039) sees the entity but can't edit it:
-  // the title is read-only and the owner-only visibility toggle is hidden, like the Home Entity.
+  // the title is read-only and the owner-only visibility toggle is hidden.
   it('renders a read-only entity’s title non-editable, with no visibility toggle', () => {
     open({ ...aldermoor, rights: ['read'] });
     const fixture = TestBed.createComponent(EntityHeader);
@@ -244,36 +233,6 @@ describe('EntityHeader', () => {
     expect(
       fixture.nativeElement.querySelector('a[href="/styleguide"]'),
     ).toBeNull();
-  });
-
-  // The Home Entity's title is the World's name (ADR-0029): read-only here, renamed
-  // via the World. The note view shows it but never lets the user edit it in place.
-  it('renders the Home Entity title read-only, with a tooltip pointing to the World', () => {
-    open({ ...noteDetail('Aldermoor'), isHome: true });
-    const fixture = TestBed.createComponent(EntityHeader);
-    fixture.detectChanges();
-
-    const title = fixture.nativeElement.querySelector(
-      '[data-testid=title]',
-    ) as HTMLElement;
-    // Not editable: no contenteditable, no keyboard reach.
-    expect(title.getAttribute('contenteditable')).toBeNull();
-    expect(title.getAttribute('tabindex')).toBeNull();
-    // Renamed via the World, not here — the hint says so.
-    expect(title.getAttribute('title')).toBe('Renamed with the world');
-    expect(title.textContent).toContain('Aldermoor');
-  });
-
-  it('does not rename when an unchanged title blur fires on the Home Entity', () => {
-    open({ ...noteDetail('Aldermoor'), isHome: true });
-    const fixture = TestBed.createComponent(EntityHeader);
-    fixture.detectChanges();
-
-    (
-      fixture.nativeElement.querySelector('[data-testid=title]') as HTMLElement
-    ).dispatchEvent(new Event('blur'));
-
-    expect(entities.patch).not.toHaveBeenCalled();
   });
 
   it('renders its chrome and actions in French when French is the active language', () => {

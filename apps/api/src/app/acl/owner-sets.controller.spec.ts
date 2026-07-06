@@ -102,6 +102,8 @@ describe('Owner sets', () => {
       const ada = await signIn('ada@hexly.test');
       const bob = await signIn('bob@hexly.test');
       const id = await makeWorld(ada);
+      // Ada authors an Entity, so eviction leaves her the ADR-0037 ex-member residue.
+      await makeEntity(ada, id);
       await ada.post(`/worlds/${id}/owners`).send({ userId: bobId }).expect(200);
 
       // Bob, added second, evicts Ada the creator — no hidden hierarchy.
@@ -110,7 +112,7 @@ describe('Owner sets', () => {
 
       // Ada lost her ownership powers — she can no longer manage the owner set (403).
       await ada.post(`/worlds/${id}/owners`).send({ userId: carolId }).expect(403);
-      // But she keeps minimal reachability: she still owns the auto-minted Home Entity,
+      // But she keeps minimal reachability: she still owns the Entity she authored,
       // so the World stays readable to her (ADR-0037 ex-member residue, derived).
       await ada.get(`/worlds/${id}`).expect(200);
       await bob.get(`/worlds/${id}`).expect(200);

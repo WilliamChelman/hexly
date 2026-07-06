@@ -14,7 +14,7 @@ import { WorldStore } from '../../core/services/world.store';
 import { WorldsClient } from '../../core/services/worlds.client';
 import { ToasterService } from '../../core/services/toaster.service';
 import { ImportSummary } from '@hexly/domain';
-import { entityRoute, worldRoute } from '../../core/utils/routes';
+import { worldDashboardRoute, worldRoute } from '../../core/utils/routes';
 import { Button } from '../../ui/button';
 import { Eyebrow } from '../../ui/eyebrow';
 import { Panel } from '../../ui/panel';
@@ -30,8 +30,8 @@ import { ACCENT_SIGIL, accentFor, monogram } from '../../ui/sigil';
  * World create. It is the chooser, not an auto-redirect: a user with zero Worlds
  * sees an empty state with a Create affordance rather than an edge case to redirect
  * around. Owned-vs-member is derived by testing whether the current user is in each
- * World's `owners` set (ADR-0037). Creating opens the new World's Home Entity; activating an existing
- * World enters its Entity browser.
+ * World's `owners` set (ADR-0037). Creating lands on the new World's Dashboard (ADR-0043);
+ * activating an existing World enters its Entity browser.
  */
 @Component({
   selector: 'app-world-index',
@@ -467,8 +467,7 @@ export class WorldIndex {
 
   /**
    * Rename a World by name (ADR-0024). A blank, unchanged, or vanished card just
-   * closes the input without a round trip; the World name is the source of truth for
-   * its Home Entity's title (ADR-0029), reconciled server-side. On error, toasts.
+   * closes the input without a round trip. On error, toasts.
    */
   protected commitRename(id: string, name: string): void {
     const trimmed = name.trim();
@@ -538,7 +537,7 @@ export class WorldIndex {
     });
   }
 
-  /** Create a World and open its Home Entity (the server mints it atomically). */
+  /** Create a World and land on its Dashboard (ADR-0043). */
   protected create(): void {
     if (this.creating()) return;
     this.creating.set(true);
@@ -547,10 +546,7 @@ export class WorldIndex {
       .pipe(finalize(() => this.creating.set(false)))
       .subscribe({
         next: (world) =>
-          this.router.navigate(
-            // Home Entity's title is the World's name (ADR-0029), so both slugs derive from it.
-            entityRoute(world.id, world.homeEntityId, world.name, world.name),
-          ),
+          this.router.navigate(worldDashboardRoute(world.id, world.name)),
         error: () =>
           this.toaster.show(
             this.transloco.translate('worlds.createError'),

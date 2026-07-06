@@ -32,10 +32,6 @@ export type AclErrorCode = (typeof AclErrorCode)[keyof typeof AclErrorCode];
 
 /** The structured reasons an Entity lifecycle mutation refuses (ADR-0024, ADR-0037). */
 export const EntityErrorCode = {
-  /** The Home Entity's visibility is locked `shared` — it cannot be changed (409). */
-  HomeLockedShared: 'home-entity-locked-shared',
-  /** The Home Entity cannot be deleted — a World always keeps its landing page (409). */
-  HomeUndeletable: 'home-entity-undeletable',
   /** No World the caller may create an Entity in (404). */
   NoWritableWorld: 'no-writable-world',
 } as const;

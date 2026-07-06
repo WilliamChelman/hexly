@@ -381,9 +381,9 @@ describe('Vault import endpoint', () => {
       .expect(201);
 
     expect(res.body.notesImported).toBe(1);
-    // World holds only its Home Entity plus the one imported note.
+    // The World holds just the one imported note (no seeded Home Entity, ADR-0043).
     const world = await ada.get(`/worlds/${res.body.worldId}`).expect(200);
-    expect(world.body.entityCount).toBe(2);
+    expect(world.body.entityCount).toBe(1);
     const list = await ada.get(`/entities?worldId=${res.body.worldId}`).expect(200);
     const names = list.body.items.map((e: { name: string }) => e.name);
     expect(names).not.toContain('app');
@@ -493,9 +493,10 @@ describe('Vault import endpoint', () => {
     await request(app.getHttpServer()).get(assetUrl).expect(404);
   });
 
-  it('routes a hexly.isHome note into the World Home Entity instead of duplicating it', async () => {
+  it('imports a legacy hexly.isHome note as an ordinary Note (ADR-0043)', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
-    // A vault Hexly exported: the Home note carries `hexly.isHome` (and no sourcePath → root).
+    // A vault an older Hexly exported still flags one note `hexly.isHome`; with the Home Entity
+    // gone it imports as a plain note like any other — the reserved flag is just stripped.
     const zip = vaultZip({
       'Aldermoor.md': ['---', 'hexly.isHome: true', '---', '# Aldermoor', '', 'The frontier realm.'].join('\n'),
       'Lady Mara.md': '# Lady Mara',
@@ -504,15 +505,16 @@ describe('Vault import endpoint', () => {
     const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
     const worldId = res.body.worldId;
 
-    // Home + the one regular note = 2: the isHome note updated Home, it did not add a third entity.
+    // Both files land as ordinary notes — nothing was routed into or merged with a Home Entity.
     const world = await ada.get(`/worlds/${worldId}`).expect(200);
     expect(world.body.entityCount).toBe(2);
 
-    // The Home Entity now carries the imported lore, and hexly.* keys aren't persisted as Metadata.
-    const home = await ada.get(`/entities/${world.body.homeEntityId}`).expect(200);
-    expect(home.body.isHome).toBe(true);
-    expect(JSON.stringify(home.body.document.content.snapshot)).toContain('The frontier realm.');
-    expect(home.body.document.metadata ?? {}).not.toHaveProperty('hexly.isHome');
+    const list = await ada.get(`/entities?worldId=${worldId}`).expect(200);
+    const aldermoor = list.body.items.find((e: { name: string }) => e.name === 'Aldermoor');
+    const note = await ada.get(`/entities/${aldermoor.id}`).expect(200);
+    // It carries its lore, and the reserved `hexly.*` key isn't persisted as author Metadata.
+    expect(JSON.stringify(note.body.document.content.snapshot)).toContain('The frontier realm.');
+    expect(note.body.document.metadata ?? {}).not.toHaveProperty('hexly.isHome');
   });
 
   it('refuses the import route without a session cookie', async () => {

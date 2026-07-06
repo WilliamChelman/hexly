@@ -23,7 +23,8 @@ async function chooseFormatLocale(page: Page, tag: string): Promise<void> {
 test('Format Locale roams via the account and reflows the entity browser date', async ({
   page,
 }) => {
-  // A World whose Home note gives the browser one card with an "Edited" date.
+  // A fresh World is empty (ADR-0043), so seed one note to give the browser a card
+  // with an "Edited" date.
   await page.goto('/');
   const created = page.waitForResponse(
     (r) =>
@@ -33,6 +34,9 @@ test('Format Locale roams via the account and reflows the entity browser date', 
   );
   await page.getByTestId('create-world').click();
   const world = await (await created).json();
+  await page.goto(`/w/${world.id}/entities`);
+  await page.getByTestId('new-note').click();
+  await page.waitForURL(new RegExp(`/w/[\\w-]+/entities/[\\w-]+$`));
 
   await page.goto('/settings');
   await expect(page.getByTestId('email')).not.toBeEmpty();
