@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
   effect,
   inject,
 } from '@angular/core';
@@ -33,6 +34,9 @@ import { ToasterService } from '../core/services/toaster.service';
   host: {
     class:
       'fixed left-1/2 bottom-5 -translate-x-1/2 z-[1000] flex flex-col gap-2 items-center pointer-events-none',
+    // A manual popover so the stack rides the top layer, above a modal <dialog>'s backdrop
+    // (a plain z-index can't beat the top layer). `manual` = we own show/hide; no light-dismiss.
+    popover: 'manual',
   },
   imports: [NgClass, TranslocoPipe],
   template: `
@@ -59,10 +63,20 @@ import { ToasterService } from '../core/services/toaster.service';
       </div>
     }
   `,
+  styles: `
+    @reference '#app-styles.css';
+    /* As a top-layer popover the host inherits the UA popover box (centered, bordered,
+       opaque); neutralize it so the toaster keeps its own transparent, bottom-centered,
+       click-through chrome. Outranks the host's positioning utilities, so re-set them. */
+    :host:popover-open {
+      @apply inset-auto bottom-5 left-1/2 m-0 p-0 border-0 bg-transparent overflow-visible w-auto h-auto;
+    }
+  `,
 })
 export class Toaster {
   protected readonly toaster = inject(ToasterService);
   private readonly liveAnnouncer = inject(LiveAnnouncer);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   /** Toast ids already announced, reconciled to the live set so it stays bounded. */
   private announced = new Set<number>();
 
@@ -77,6 +91,31 @@ export class Toaster {
         );
       }
       this.announced = new Set(toasts.map((toast) => toast.id));
+      this.syncTopLayer(toasts.length > 0);
     });
+  }
+
+  /**
+   * Keep the toast stack in the top layer while any toast is showing. Re-showing on each
+   * change re-enters the top layer at the top of the stack — so a toast raised *while* a
+   * modal <dialog> is open lands above its backdrop (top-layer order is most-recent-first).
+   */
+  private syncTopLayer(hasToasts: boolean): void {
+    const el = this.host.nativeElement;
+    try {
+      const open = el.matches(':popover-open');
+      if (!hasToasts) {
+        if (open) el.hidePopover();
+        return;
+      }
+      if (open) el.hidePopover();
+      el.showPopover();
+    } catch {
+      // The Popover API is absent under jsdom (unit tests), where the `popover` attribute
+      // is inert — no UA `[popover]{display:none}` rule, so the toasts render in normal flow.
+      // In a popover-aware browser the host is display:none until showPopover() succeeds; a
+      // throw here (e.g. host transiently disconnected) leaves it hidden — but the host is an
+      // always-connected app-root singleton, so showPopover() doesn't throw in practice.
+    }
   }
 }

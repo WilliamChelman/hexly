@@ -228,7 +228,12 @@
       "zoomIn": "Zoom avant",
       "zoomOut": "Zoom arrière",
       "fit": "Ajuster la carte"
-    }
+    },
+    "pin": {
+      "pin": "Épingler au tableau de bord",
+      "toggle": "Épingler cette Entité au tableau de bord du monde"
+    },
+    "actionsMenu": "Actions de l’entité"
   },
   "styleguide": {
     "tabTitle": "Hexly — Système de design",

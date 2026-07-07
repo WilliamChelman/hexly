@@ -8,7 +8,9 @@ import {
 } from '@angular/router';
 import { firstValueFrom, isObservable, Observable, of, throwError } from 'rxjs';
 import { WorldDetail } from '@hexly/domain';
+import { TranslocoService } from '@jsverse/transloco';
 import { WorldsClient } from './worlds.client';
+import { ToasterService } from './toaster.service';
 import { MockWorldsClient } from '../testing/worlds-client.mock';
 import { segment } from '../utils/pretty-id';
 import { ActiveWorld, activeWorldGuard, clearActiveWorld } from './active-world';
@@ -25,11 +27,17 @@ function settle(result: unknown): Promise<boolean | UrlTree> {
 describe('ActiveWorld', () => {
   let active: ActiveWorld;
   let worlds: MockWorldsClient;
+  let toaster: { show: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     worlds = new MockWorldsClient();
+    toaster = { show: vi.fn() };
     TestBed.configureTestingModule({
-      providers: [{ provide: WorldsClient, useValue: worlds }],
+      providers: [
+        { provide: WorldsClient, useValue: worlds },
+        { provide: ToasterService, useValue: toaster },
+        { provide: TranslocoService, useValue: { translate: (k: string) => k } },
+      ],
     });
     active = TestBed.inject(ActiveWorld);
   });
@@ -88,6 +96,32 @@ describe('ActiveWorld', () => {
     expect(await settle(run(segment(WORLD_ID)))).toBe(true);
     expect(active.worldId()).toBe(WORLD_ID);
     expect(active.world()).toBeNull();
+  });
+
+  it('commitPins persists the set wholesale and re-pins from the returned Detail', () => {
+    active.set(detail, WORLD_ID);
+    const updated = { ...detail, pinnedEntityIds: ['a', 'b'] } as WorldDetail;
+    worlds.setPins.mockReturnValue(of(updated));
+
+    active.commitPins(['a', 'b']);
+
+    expect(worlds.setPins).toHaveBeenCalledWith(WORLD_ID, ['a', 'b']);
+    expect(active.world()).toBe(updated);
+  });
+
+  it('commitPins is a no-op with no active World', () => {
+    active.commitPins(['a']);
+    expect(worlds.setPins).not.toHaveBeenCalled();
+  });
+
+  it('commitPins toasts and leaves the pins untouched on a rejected curation', () => {
+    active.set(detail, WORLD_ID);
+    worlds.setPins.mockReturnValue(throwError(() => new Error('403')));
+
+    active.commitPins(['a']);
+
+    expect(toaster.show).toHaveBeenCalledWith('worldDashboard.pinError', 'error');
+    expect(active.world()).toBe(detail);
   });
 
   it('the deactivate guard clears the active World on leaving the World scope', () => {

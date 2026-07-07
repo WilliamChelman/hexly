@@ -12,7 +12,6 @@ import { finalize } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntityFacets, EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient } from '../../core/services/entities.client';
-import { WorldsClient } from '../../core/services/worlds.client';
 import { ActiveWorld } from '../../core/services/active-world';
 import { ToasterService } from '../../core/services/toaster.service';
 import { HexlyDatePipe } from '../../core/i18n/hexly-date.pipe';
@@ -311,7 +310,6 @@ const MAPS_LIMIT = 8;
 })
 export class WorldDashboard {
   private readonly entitiesClient = inject(EntitiesClient);
-  private readonly worldsClient = inject(WorldsClient);
   private readonly activeWorld = inject(ActiveWorld);
   private readonly router = inject(Router);
   private readonly toaster = inject(ToasterService);
@@ -439,12 +437,12 @@ export class WorldDashboard {
     this.pinPickerOpen.set(false);
     const ids = this.currentPinIds();
     if (ids.includes(e.id)) return;
-    this.commitPins([...ids, e.id]);
+    this.activeWorld.commitPins([...ids, e.id]);
   }
 
   /** Unpin an Entity by omitting its id from the set. */
   protected removePin(id: string): void {
-    this.commitPins(this.currentPinIds().filter((x) => x !== id));
+    this.activeWorld.commitPins(this.currentPinIds().filter((x) => x !== id));
   }
 
   /** Reorder a pin by one slot (`-1` up, `+1` down); a no-op at the ends. */
@@ -454,29 +452,11 @@ export class WorldDashboard {
     const j = i + delta;
     if (i < 0 || j < 0 || j >= ids.length) return;
     [ids[i], ids[j]] = [ids[j], ids[i]];
-    this.commitPins(ids);
+    this.activeWorld.commitPins(ids);
   }
 
   /** The World's stored pin set (references, not the resolved cards) — the edit source. */
   private currentPinIds(): string[] {
     return [...(this.activeWorld.world()?.pinnedEntityIds ?? [])];
-  }
-
-  /**
-   * Persist a new pin set wholesale (#168) and re-pin the active World from the returned
-   * Detail so the pins re-resolve. Owner-only server-side; a failure toasts and leaves
-   * the World's pins as they were.
-   */
-  private commitPins(pinnedEntityIds: string[]): void {
-    const worldId = this.activeWorld.worldId();
-    if (!worldId) return;
-    this.worldsClient.setPins(worldId, pinnedEntityIds).subscribe({
-      next: (detail) => this.activeWorld.set(detail),
-      error: () =>
-        this.toaster.show(
-          this.transloco.translate('worldDashboard.pinError'),
-          'error',
-        ),
-    });
   }
 }

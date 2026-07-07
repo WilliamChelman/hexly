@@ -1,4 +1,3 @@
-import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -13,6 +12,13 @@ import { ActiveWorld } from '../core/services/active-world';
 import { worldDashboardRoute } from '../core/utils/routes';
 import { Icon } from '../ui/icon/icon';
 import { Rule } from '../ui/rule';
+import {
+  MenuGroup,
+  MenuItem,
+  MenuItemRadio,
+  MenuPanel,
+  MenuTrigger,
+} from '../ui/menu';
 
 /**
  * The World Switcher (ADR-0028): a compact quick-hop dropdown that sits at the
@@ -27,9 +33,11 @@ import { Rule } from '../ui/rule';
   selector: 'app-world-switcher',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    CdkMenuTrigger,
-    CdkMenu,
-    CdkMenuItem,
+    MenuTrigger,
+    MenuPanel,
+    MenuItem,
+    MenuItemRadio,
+    MenuGroup,
     RouterLink,
     Icon,
     Rule,
@@ -47,7 +55,7 @@ import { Rule } from '../ui/rule';
       "
       [title]="activeName() ?? ('worlds.switcher' | transloco)"
       [attr.aria-label]="'worlds.switcherLabel' | transloco"
-      [cdkMenuTriggerFor]="menu"
+      [appMenuTrigger]="menu"
     >
       <!-- A square gilt tile with a gold ring marks the active World. Its shape
            (against the round personal avatar in the rail foot) is what keeps the
@@ -83,30 +91,25 @@ import { Rule } from '../ui/rule';
     </button>
 
     <ng-template #menu>
-      <div
-        cdkMenu
-        class="flex flex-col min-w-44 p-1 bg-surface-raised border border-line rounded-md shadow-2"
-      >
-        @for (world of worlds(); track world.id) {
-          <button
-            type="button"
-            cdkMenuItem
-            [attr.data-testid]="'switcher-option-' + world.id"
-            class="flex items-center justify-between gap-2 px-3 py-2 text-sm text-ink text-left bg-transparent border-0 rounded-sm cursor-pointer hover:bg-gold-soft"
-            (cdkMenuItemTriggered)="switch(world.id)"
-          >
-            <span class="truncate">{{ world.name }}</span>
-            @if (world.id === activeId()) {
-              <span class="text-gold" aria-hidden="true">✓</span>
-            }
-          </button>
-        }
+      <div appMenuPanel>
+        <div appMenuGroup>
+          @for (world of worlds(); track world.id) {
+            <button
+              type="button"
+              appMenuItemRadio
+              [checked]="world.id === activeId()"
+              [attr.data-testid]="'switcher-option-' + world.id"
+              (triggered)="switch(world.id)"
+            >
+              <span class="truncate">{{ world.name }}</span>
+            </button>
+          }
+        </div>
         <hr appRule class="mx-1 my-1" />
         <a
-          cdkMenuItem
+          appMenuItem
           routerLink="/"
           data-testid="switcher-index-link"
-          class="flex items-center gap-2 px-3 py-2 text-sm text-ink no-underline rounded-sm cursor-pointer hover:bg-gold-soft"
         >
           <app-icon name="library" [size]="18" />
           {{ 'worlds.allWorlds' | transloco }}

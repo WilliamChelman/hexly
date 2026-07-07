@@ -30,6 +30,12 @@ const GLYPHS = {
       'stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"',
     body: '<path d="M6 6l12 12M18 6 6 18" />',
   },
+  more: {
+    // A vertical kebab — the "more actions" overflow trigger. The svg root is fixed at
+    // fill="none", so the dots carry their own fill rather than relying on a root attr.
+    attrs: '',
+    body: '<circle cx="12" cy="5" r="1.7" fill="currentColor" /><circle cx="12" cy="12" r="1.7" fill="currentColor" /><circle cx="12" cy="19" r="1.7" fill="currentColor" />',
+  },
   outline: {
     // A heading over two indented rows — reads as a document outline / TOC.
     attrs:

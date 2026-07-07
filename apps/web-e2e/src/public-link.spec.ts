@@ -1,4 +1,4 @@
-import { enterLibrary, expect, flushSave, test } from './fixtures';
+import { enterLibrary, expect, flushSave, openEntityActions, test } from './fixtures';
 
 /**
  * Public Links (ADR-0037, #162): an Owner mints a per-entity Public Link from the Share
@@ -23,7 +23,8 @@ test('an Owner mints a public link; an anonymous visitor reads it, then loses it
   await page.keyboard.type(content);
   await flushSave(page);
 
-  // Mint the per-entity Public Link from the Share dialog and read its shareable URL.
+  // Mint the per-entity Public Link from the Share dialog (via the actions menu).
+  await openEntityActions(page);
   await page.getByTestId('manage-owners').click();
   const minted = page.waitForResponse(
     (r) => /\/api\/entities\/[\w-]+\/link$/.test(r.url()) && r.request().method() === 'POST' && r.ok(),
@@ -44,7 +45,8 @@ test('an Owner mints a public link; an anonymous visitor reads it, then loses it
   await expect(visitor.getByTestId('public-banner')).toBeVisible();
   await expect(visitor.getByTestId('note-content')).toContainText(content);
   await expect(visitor.locator('.ProseMirror')).toHaveAttribute('contenteditable', 'false');
-  await expect(visitor.getByTestId('manage-owners')).toHaveCount(0);
+  // A read-only anonymous viewer gets no actions menu at all (no Share within it).
+  await expect(visitor.getByTestId('entity-actions')).toHaveCount(0);
   await expect(visitor.getByTestId('tag-input')).toHaveCount(0);
 
   // Revoking is the kill-switch: the link stops resolving immediately.

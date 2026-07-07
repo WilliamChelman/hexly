@@ -24,7 +24,8 @@
   font-style: normal;
   font-weight: 200 900;
   font-display: optional;
-  src: url('/fonts/source-serif-4-latin-wght-normal.woff2') format('woff2-variations');
+  src: url('/fonts/source-serif-4-latin-wght-normal.woff2')
+    format('woff2-variations');
 }
 
 @import '@fontsource/marcellus/latin-400.css';
@@ -42,9 +43,11 @@
 @import './styles/tokens.css';
 @import './styles/base.css' layer(base);
 
-/* CDK overlay container chrome (positioning + z-index) for the user menu's
-   cdkMenu — the documented requirement; keeps the panel fixed under scroll. */
 @import '@angular/cdk/overlay-prebuilt.css';
+@import '@angular/cdk/a11y-prebuilt.css';
+
+/* Menu chrome utilities, co-located with the ui/menu primitives that apply them. */
+@import './app/ui/menu.css';
 
 /* Tell Tailwind where to scan for class names (Nx monorepo: be explicit). */
 @source './**/*.{html,ts}';
@@ -159,8 +162,18 @@
      tooth (codex vellum field). */
   --color-canvas-bg: #efe2bf;
   --color-canvas-mat: #e5d4a9;
-  --color-canvas-glow: rgba(255, 240, 202, 0.55); /* warm light at the field's top */
-  --color-canvas-edge: rgba(120, 86, 30, 0.14); /* soft sepia vignette           */
+  --color-canvas-glow: rgba(
+    255,
+    240,
+    202,
+    0.55
+  ); /* warm light at the field's top */
+  --color-canvas-edge: rgba(
+    120,
+    86,
+    30,
+    0.14
+  ); /* soft sepia vignette           */
   --color-hex-line: rgba(120, 96, 56, 0.42); /* grid ink                    */
   --color-feature-ink: #5a3e16; /* a placed Feature's marker — sepia ink    */
   --color-label-ink: #4a3a1e; /* free-positioned Label text — sepia ink     */

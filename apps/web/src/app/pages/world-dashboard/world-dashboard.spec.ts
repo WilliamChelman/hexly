@@ -81,6 +81,13 @@ describe('WorldDashboard', () => {
             name: signal('Aldermoor'),
             world,
             set: activeWorldSet,
+            // Delegates to the client like the real service, so the pin flow tests still
+            // assert the ids reaching setPins; the toast-on-error path is covered in active-world.spec.
+            commitPins: vi.fn((ids: string[]) =>
+              worlds.setPins('w1', ids).subscribe({
+                next: (d) => (activeWorldSet as (w: WorldDetail) => void)(d),
+              }),
+            ),
           },
         },
       ],

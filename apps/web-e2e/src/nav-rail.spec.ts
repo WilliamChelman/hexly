@@ -1,4 +1,4 @@
-import { enterLibrary, expect, test } from './fixtures';
+import { enterLibrary, expect, openEntityActions, test } from './fixtures';
 
 /**
  * The persistent nav rail and page-owned headers (ADR-0022, #89), driven as a
@@ -26,7 +26,10 @@ test('the rail navigates, exposes account controls, and pages own their headers'
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   await expect(page.getByTestId('title')).toBeVisible();
   await expect(page.getByTestId('save-status')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Share' })).toBeVisible();
+  // Share now lives in the entity actions overflow menu.
+  await openEntityActions(page);
+  await expect(page.getByRole('menuitem', { name: 'Share' })).toBeVisible();
+  await page.keyboard.press('Escape');
   // Old All Maps / Design System buttons now moved to rail navigation.
   await expect(page.getByRole('link', { name: 'All maps' })).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'Design system' })).toHaveCount(0);

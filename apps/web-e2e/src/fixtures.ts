@@ -82,6 +82,14 @@ export async function flushSave(page: Page): Promise<Response> {
  * cleared, never Worlds), so the Index is never empty here. Returns the entered
  * World's id for specs that want to assert the URL scope.
  */
+/**
+ * Open the entity header's actions overflow menu (Visibility, Pin, Share). The three
+ * are gathered behind one trigger, so a spec opens the menu before addressing an item.
+ */
+export async function openEntityActions(page: Page): Promise<void> {
+  await page.getByTestId('entity-actions').click();
+}
+
 export async function enterLibrary(page: Page): Promise<string> {
   await page.goto('/');
   // The card lands on the World Dashboard — the World root (ADR-0043); the rail's

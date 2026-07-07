@@ -1,12 +1,16 @@
-import { TestBed } from '@angular/core/testing';
+import { signal, WritableSignal } from '@angular/core';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { of, throwError } from 'rxjs';
-import { emptyContent, EntityDetail } from '@hexly/domain';
+import { emptyContent, EntityDetail, WorldDetail, WorldVerb } from '@hexly/domain';
 import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
 import { EntitiesClient } from '../../../core/services/entities.client';
 import { MockEntitiesClient } from '../../../core/testing/entities-client.mock';
+import { WorldsClient } from '../../../core/services/worlds.client';
+import { MockWorldsClient } from '../../../core/testing/worlds-client.mock';
+import { ActiveWorld } from '../../../core/services/active-world';
 import { UsersClient } from '../../../core/services/users.client';
 import { MockUsersClient } from '../../../core/testing/users-client.mock';
 import { AuthClient } from '../../../core/services/auth.client';
@@ -17,8 +21,28 @@ import { OwnerSet } from '../../../ui/owner-set';
 import { EntityHeader } from './entity-header';
 import { noteDetail } from './entity-detail.fixtures';
 
+/** The active World the header reads for pin state — 'm1' is the opened entity's id. */
+function worldDetail(
+  pinnedEntityIds: string[] = [],
+  rights: WorldVerb[] = ['read', 'manage'],
+): WorldDetail {
+  return {
+    id: 'w1',
+    name: 'Aldermoor',
+    owners: ['ada'],
+    rights,
+    entityCount: 1,
+    pinnedEntityIds,
+    createdAt: 1,
+    updatedAt: 1,
+  };
+}
+
 describe('EntityHeader', () => {
   let entities: MockEntitiesClient;
+  let worlds: MockWorldsClient;
+  let world: WritableSignal<WorldDetail | null>;
+  let activeWorldSet: ReturnType<typeof vi.fn>;
 
   const aldermoor: EntityDetail = {
     id: 'm1',
@@ -43,17 +67,60 @@ describe('EntityHeader', () => {
 
   beforeEach(async () => {
     entities = new MockEntitiesClient();
+    worlds = new MockWorldsClient();
+    world = signal<WorldDetail | null>(worldDetail());
+    activeWorldSet = vi.fn((w: WorldDetail | null) => world.set(w));
     await TestBed.configureTestingModule({
       imports: [EntityHeader, provideTranslocoTesting()],
       providers: [
         EntitySession,
         { provide: EntitiesClient, useValue: entities },
+        { provide: WorldsClient, useValue: worlds },
+        {
+          provide: ActiveWorld,
+          useValue: {
+            worldId: signal('w1'),
+            name: signal('Aldermoor'),
+            world,
+            set: activeWorldSet,
+            // Delegates to the client like the real service, so the pin-toggle tests still
+            // assert the ids reaching setPins; the toast-on-error path is covered in active-world.spec.
+            commitPins: vi.fn((ids: string[]) =>
+              worlds.setPins('w1', ids).subscribe({
+                next: (d) => (activeWorldSet as (w: WorldDetail) => void)(d),
+              }),
+            ),
+          },
+        },
         { provide: UsersClient, useValue: new MockUsersClient() },
         { provide: AuthClient, useValue: new MockAuthClient() },
         provideRouter([]),
       ],
     }).compileComponents();
   });
+
+  // The actions live in a CDK menu overlay (attached to the document body); tear it
+  // down between specs so a lingering menu never leaks into the next.
+  afterEach(() => {
+    document
+      .querySelectorAll('.cdk-overlay-container')
+      .forEach((el) => el.remove());
+  });
+
+  /** Open the entity actions overflow menu; its items render into the overlay. */
+  function openActions(fixture: ComponentFixture<EntityHeader>): void {
+    (
+      fixture.nativeElement.querySelector(
+        '[data-testid=entity-actions]',
+      ) as HTMLButtonElement
+    ).click();
+    fixture.detectChanges();
+  }
+
+  /** A menu item by its test id — the menu renders into the document, not the fixture. */
+  function menuItem(testid: string): HTMLButtonElement | null {
+    return document.querySelector(`[data-testid=${testid}]`);
+  }
 
   it('opens the entity owner set from the Share action', () => {
     open(aldermoor);
@@ -62,9 +129,8 @@ describe('EntityHeader', () => {
 
     expect(fixture.debugElement.query(By.directive(OwnerSet))).toBeNull();
 
-    fixture.nativeElement
-      .querySelector('[data-testid=manage-owners]')
-      .click();
+    openActions(fixture);
+    menuItem('manage-owners')!.click();
     fixture.detectChanges();
 
     const set = fixture.debugElement.query(By.directive(OwnerSet))
@@ -77,7 +143,8 @@ describe('EntityHeader', () => {
     open(aldermoor);
     const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
-    fixture.nativeElement.querySelector('[data-testid=manage-owners]').click();
+    openActions(fixture);
+    menuItem('manage-owners')!.click();
     fixture.detectChanges();
 
     fixture.nativeElement.querySelector('[data-testid=owners-close]').click();
@@ -93,17 +160,19 @@ describe('EntityHeader', () => {
     const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('[data-testid=manage-owners]')).toBeNull();
+    openActions(fixture);
+    expect(menuItem('manage-owners')).toBeNull();
   });
 
   it('hides the Share action for a writer who is not an Owner (no manage Right)', () => {
     // An entity-level Editor or a World Owner opens writable (has `edit`) but can't manage
-    // sharing — the dialog is owner-only, so the button must stay hidden or it opens onto 403s.
+    // sharing — the dialog is owner-only, so the item must stay hidden or it opens onto 403s.
     open({ ...aldermoor, rights: ['read', 'edit'] });
     const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('[data-testid=manage-owners]')).toBeNull();
+    openActions(fixture);
+    expect(menuItem('manage-owners')).toBeNull();
   });
 
   it('shows the open entity name', () => {
@@ -157,24 +226,25 @@ describe('EntityHeader', () => {
     expect(entities.patch).not.toHaveBeenCalled();
   });
 
-  it('toggles the open entity’s visibility from the header', () => {
+  it('toggles the open entity’s visibility from the actions menu', () => {
     open(aldermoor); // private
     const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 
-    const toggle = fixture.nativeElement.querySelector(
-      '[data-testid=visibility-toggle]',
-    ) as HTMLButtonElement;
+    openActions(fixture);
+    const toggle = menuItem('visibility-toggle')!;
     expect(toggle).not.toBeNull();
-    // Reflects current visibility: private → not shared.
-    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    // Reflects current visibility: private → unchecked.
+    expect(toggle.getAttribute('aria-checked')).toBe('false');
 
     entities.patch.mockReturnValue(of({ ...aldermoor, visibility: 'shared' }));
     toggle.click();
     fixture.detectChanges();
 
     expect(entities.patch).toHaveBeenCalledWith('m1', { visibility: 'shared' });
-    expect(toggle.getAttribute('aria-pressed')).toBe('true');
+    // Re-open the menu: the item now reads as shared (checked).
+    openActions(fixture);
+    expect(menuItem('visibility-toggle')!.getAttribute('aria-checked')).toBe('true');
   });
 
   // FIX #5: a rejected flip (e.g. a writable-then-revoked 403 race) must be a graceful
@@ -187,24 +257,23 @@ describe('EntityHeader', () => {
       fixture.detectChanges();
 
       entities.patch.mockReturnValue(throwError(() => new Error('403')));
-      const toggle = fixture.nativeElement.querySelector(
-        '[data-testid=visibility-toggle]',
-      ) as HTMLButtonElement;
-      toggle.click();
+      openActions(fixture);
+      menuItem('visibility-toggle')!.click();
       fixture.detectChanges();
 
       // A bare subscribe would report the rejection as an unhandled error on a timer;
       // the error handler makes it a no-op, so draining timers throws nothing.
       expect(() => vi.runOnlyPendingTimers()).not.toThrow();
-      // State stays as the server has it: still private.
-      expect(toggle.getAttribute('aria-pressed')).toBe('false');
+      // State stays as the server has it: still private (re-open to read the item).
+      openActions(fixture);
+      expect(menuItem('visibility-toggle')!.getAttribute('aria-checked')).toBe('false');
     } finally {
       vi.useRealTimers();
     }
   });
 
   // A read-only World member (no edit Right, ADR-0039) sees the entity but can't edit it:
-  // the title is read-only and the owner-only visibility toggle is hidden.
+  // the title is read-only and the owner-only visibility toggle is absent from the menu.
   it('renders a read-only entity’s title non-editable, with no visibility toggle', () => {
     open({ ...aldermoor, rights: ['read'] });
     const fixture = TestBed.createComponent(EntityHeader);
@@ -215,9 +284,8 @@ describe('EntityHeader', () => {
     ) as HTMLElement;
     expect(title.getAttribute('contenteditable')).toBeNull();
     expect(title.getAttribute('tabindex')).toBeNull();
-    expect(
-      fixture.nativeElement.querySelector('[data-testid=visibility-toggle]'),
-    ).toBeNull();
+    openActions(fixture);
+    expect(menuItem('visibility-toggle')).toBeNull();
   });
 
   it('no longer carries app-level navigation — that lives in the rail (ADR-0022)', () => {
@@ -245,7 +313,11 @@ describe('EntityHeader', () => {
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
-    expect(el.textContent).toContain('Partager');
+    // The Share action now lives in the overflow menu; open it to see its label.
+    openActions(fixture);
+    expect((document.querySelector('[role=menu]') as HTMLElement).textContent).toContain(
+      'Partager',
+    );
     // The autosave status chip (no Save button anymore, ADR-0026): clean → "Enregistré".
     expect(el.textContent).toContain('Enregistré');
     expect(el.textContent).not.toContain('Saved');
@@ -313,6 +385,73 @@ describe('EntityHeader', () => {
         fixture.nativeElement.querySelector('[data-testid=view-note]') as HTMLButtonElement
       ).getAttribute('aria-pressed'),
     ).toBe('true');
+  });
+
+  // Pin to Dashboard (ADR-0043, #169): a World Owner features the open Entity on the
+  // World Dashboard straight from its header, without a trip to the Dashboard picker.
+  it('shows the Pin toggle to a World Owner, reflecting the not-yet-pinned state', () => {
+    world.set(worldDetail([])); // Owner (manage), 'm1' not pinned
+    open(aldermoor);
+    const fixture = TestBed.createComponent(EntityHeader);
+    fixture.detectChanges();
+
+    openActions(fixture);
+    const toggle = menuItem('pin-toggle');
+    expect(toggle).not.toBeNull();
+    expect(toggle!.getAttribute('aria-checked')).toBe('false');
+  });
+
+  it('hides the Pin toggle for a non-Owner of the World (no manage Right)', () => {
+    world.set(worldDetail([], ['read'])); // a Contributor/Viewer of the World
+    open(aldermoor);
+    const fixture = TestBed.createComponent(EntityHeader);
+    fixture.detectChanges();
+
+    openActions(fixture);
+    expect(menuItem('pin-toggle')).toBeNull();
+  });
+
+  it('reflects that the open Entity is already pinned', () => {
+    world.set(worldDetail(['m1'])); // 'm1' is in the shared pin set
+    open(aldermoor);
+    const fixture = TestBed.createComponent(EntityHeader);
+    fixture.detectChanges();
+
+    openActions(fixture);
+    expect(menuItem('pin-toggle')!.getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('pins the open Entity, PATCHing the id onto the set and re-pinning the World', () => {
+    world.set(worldDetail(['p1']));
+    worlds.setPins.mockReturnValue(of(worldDetail(['p1', 'm1'])));
+    open(aldermoor);
+    const fixture = TestBed.createComponent(EntityHeader);
+    fixture.detectChanges();
+
+    openActions(fixture);
+    menuItem('pin-toggle')!.click();
+    fixture.detectChanges();
+
+    // The current Entity's id is appended and the set sent wholesale (ADR-0043).
+    expect(worlds.setPins).toHaveBeenCalledWith('w1', ['p1', 'm1']);
+    // The returned Detail re-pins the active World so the toggle reflects the new state.
+    expect(activeWorldSet).toHaveBeenCalledWith(worldDetail(['p1', 'm1']));
+    // Re-open the menu: the item now reads as pinned (checked).
+    openActions(fixture);
+    expect(menuItem('pin-toggle')!.getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('unpins the open Entity by omitting its id from the set', () => {
+    world.set(worldDetail(['p1', 'm1']));
+    worlds.setPins.mockReturnValue(of(worldDetail(['p1'])));
+    open(aldermoor);
+    const fixture = TestBed.createComponent(EntityHeader);
+    fixture.detectChanges();
+
+    openActions(fixture);
+    menuItem('pin-toggle')!.click();
+
+    expect(worlds.setPins).toHaveBeenCalledWith('w1', ['p1']);
   });
 
   it('mirrors the chosen view to the URL so a refresh keeps it (#75)', () => {

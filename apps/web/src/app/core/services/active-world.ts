@@ -1,8 +1,10 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { CanActivateFn, CanDeactivateFn, Router } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
+import { TranslocoService } from '@jsverse/transloco';
 import { WorldDetail } from '@hexly/domain';
 import { WorldsClient } from './worlds.client';
+import { ToasterService } from './toaster.service';
 import { healWorldSegment, idFromSegment } from '../utils/pretty-id';
 
 /**
@@ -15,6 +17,9 @@ import { healWorldSegment, idFromSegment } from '../utils/pretty-id';
  */
 @Injectable({ providedIn: 'root' })
 export class ActiveWorld {
+  private readonly worlds = inject(WorldsClient);
+  private readonly toaster = inject(ToasterService);
+  private readonly transloco = inject(TranslocoService);
   private readonly _world = signal<WorldDetail | null>(null);
   private readonly _worldId = signal<string | null>(null);
 
@@ -35,6 +40,25 @@ export class ActiveWorld {
     if (_worldId !== this._worldId()) {
       this._worldId.set(_worldId);
     }
+  }
+
+  /**
+   * Persist the active World's pin set wholesale (ADR-0043, #168/#169) and re-pin from the
+   * returned Detail so the pins re-resolve. Owner-only server-side; a failure toasts and
+   * leaves the World's pins as they were. The single home for both the Dashboard's curation
+   * controls and the Entity actions menu's Pin toggle, so both share the same error UX.
+   */
+  commitPins(pinnedEntityIds: string[]): void {
+    const worldId = this._worldId();
+    if (!worldId) return;
+    this.worlds.setPins(worldId, pinnedEntityIds).subscribe({
+      next: (detail) => this.set(detail),
+      error: () =>
+        this.toaster.show(
+          this.transloco.translate('worldDashboard.pinError'),
+          'error',
+        ),
+    });
   }
 }
 

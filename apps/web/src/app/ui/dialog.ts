@@ -31,6 +31,11 @@ let nextDialogId = 0;
 @Component({
   selector: 'app-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  // display:contents so the wrapper never becomes a flow/grid/flex item of its host.
+  // The native <dialog> renders in the top layer (modal) or display:none (closed), so a
+  // conditionally-inserted dialog must contribute no box — otherwise, dropped into a
+  // fixed grid (e.g. the entity page's `auto 1fr`), it steals a track and shoves siblings.
+  host: { class: 'contents' },
   imports: [Panel],
   template: `
     <!-- Backdrop-click-to-dismiss on the native <dialog>: the platform already gives the

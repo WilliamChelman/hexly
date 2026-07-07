@@ -1,4 +1,4 @@
-import { enterLibrary, expect, test } from './fixtures';
+import { enterLibrary, expect, openEntityActions, test } from './fixtures';
 import { TEST_GRANTEE } from './test-user';
 
 /**
@@ -13,7 +13,8 @@ test('an Owner shares an Entity with a named user, then revokes it', async ({ pa
   await page.getByTestId('new-note').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
 
-  // Open the Share dialog and share this note with Gwen as a Viewer.
+  // Open the Share dialog (from the actions menu) and share this note with Gwen as a Viewer.
+  await openEntityActions(page);
   await page.getByTestId('manage-owners').click();
   await expect(page.getByText('Not shared with anyone yet.')).toBeVisible();
 

@@ -1,11 +1,4 @@
 import {
-  CdkMenu,
-  CdkMenuGroup,
-  CdkMenuItem,
-  CdkMenuItemRadio,
-  CdkMenuTrigger,
-} from '@angular/cdk/menu';
-import {
   ChangeDetectionStrategy,
   Component,
   computed,
@@ -20,6 +13,13 @@ import { ThemeService } from '../core/services/theme.service';
 import { Button } from '../ui/button';
 import { Icon } from '../ui/icon/icon';
 import { Rule } from '../ui/rule';
+import {
+  MenuGroup,
+  MenuItem,
+  MenuItemRadio,
+  MenuPanel,
+  MenuTrigger,
+} from '../ui/menu';
 
 /**
  * The header's account control (ADR-0015): a single trigger that opens a CDK
@@ -33,11 +33,11 @@ import { Rule } from '../ui/rule';
   selector: 'app-user-menu',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    CdkMenuTrigger,
-    CdkMenu,
-    CdkMenuItem,
-    CdkMenuItemRadio,
-    CdkMenuGroup,
+    MenuTrigger,
+    MenuPanel,
+    MenuItem,
+    MenuItemRadio,
+    MenuGroup,
     RouterLink,
     Button,
     Icon,
@@ -52,7 +52,7 @@ import { Rule } from '../ui/rule';
       [icon]="!expanded()"
       [class.w-full]="expanded()"
       [class.!justify-start]="expanded()"
-      [cdkMenuTriggerFor]="menu"
+      [appMenuTrigger]="menu"
       [attr.aria-label]="'common.userMenu' | transloco"
     >
       @if (user(); as u) {
@@ -75,10 +75,7 @@ import { Rule } from '../ui/rule';
     </button>
 
     <ng-template #menu>
-      <div
-        cdkMenu
-        class="flex flex-col min-w-44 p-1 bg-surface-raised border border-line rounded-md shadow-2"
-      >
+      <div appMenuPanel>
         @if (user(); as u) {
           <span class="px-3 py-2 text-sm text-ink-strong">{{
             u.displayName
@@ -87,15 +84,14 @@ import { Rule } from '../ui/rule';
         }
         <button
           type="button"
-          cdkMenuItem
-          class="flex items-center gap-2 px-3 py-2 text-sm text-ink text-left bg-transparent border-0 rounded-sm cursor-pointer hover:bg-gold-soft"
+          appMenuItem
           [attr.aria-label]="
             (theme() === 'dark'
               ? 'common.theme.toSolar'
               : 'common.theme.toAstral'
             ) | transloco
           "
-          (cdkMenuItemTriggered)="themeService.toggle()"
+          (triggered)="themeService.toggle()"
         >
           @if (theme() === 'dark') {
             <app-icon name="sun" [size]="18" />
@@ -106,45 +102,28 @@ import { Rule } from '../ui/rule';
           }
         </button>
         <hr appRule class="mx-1 my-1" />
-        <div cdkMenuGroup [attr.aria-label]="'common.language' | transloco">
+        <div appMenuGroup [attr.aria-label]="'common.language' | transloco">
           @for (locale of locales; track locale) {
             <button
               type="button"
-              cdkMenuItemRadio
-              [cdkMenuItemChecked]="locale === currentLocale()"
-              class="flex items-center justify-between gap-2 w-full px-3 py-2 text-sm text-ink text-left bg-transparent border-0 rounded-sm cursor-pointer hover:bg-gold-soft"
-              (cdkMenuItemTriggered)="selectLocale(locale)"
+              appMenuItemRadio
+              [checked]="locale === currentLocale()"
+              (triggered)="selectLocale(locale)"
             >
               <span>{{ 'common.locale.' + locale | transloco }}</span>
-              @if (locale === currentLocale()) {
-                <span class="text-gold" aria-hidden="true">✓</span>
-              }
             </button>
           }
         </div>
         <hr appRule class="mx-1 my-1" />
         @if (user()) {
-          <a
-            cdkMenuItem
-            routerLink="/settings"
-            class="flex items-center gap-2 px-3 py-2 text-sm text-ink no-underline rounded-sm cursor-pointer hover:bg-gold-soft"
-          >
+          <a appMenuItem routerLink="/settings">
             {{ 'common.settings' | transloco }}
           </a>
-          <button
-            type="button"
-            cdkMenuItem
-            class="flex items-center gap-2 px-3 py-2 text-sm text-ink text-left bg-transparent border-0 rounded-sm cursor-pointer hover:bg-gold-soft"
-            (cdkMenuItemTriggered)="signOut()"
-          >
+          <button type="button" appMenuItem (triggered)="signOut()">
             {{ 'common.signOut' | transloco }}
           </button>
         } @else {
-          <a
-            cdkMenuItem
-            routerLink="/login"
-            class="flex items-center gap-2 px-3 py-2 text-sm text-ink no-underline rounded-sm cursor-pointer hover:bg-gold-soft"
-          >
+          <a appMenuItem routerLink="/login">
             {{ 'common.login' | transloco }}
           </a>
         }

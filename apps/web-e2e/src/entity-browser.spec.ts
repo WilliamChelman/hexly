@@ -1,4 +1,11 @@
-import { enterLibrary, entityIdFromUrl, expect, segRe, test } from './fixtures';
+import {
+  enterLibrary,
+  entityIdFromUrl,
+  expect,
+  openEntityActions,
+  segRe,
+  test,
+} from './fixtures';
 
 /**
  * Entity browser lifecycle (#70): create → list → open → rename → delete, over
@@ -49,18 +56,22 @@ test('an owner toggles a note to shared and the Visibility facet reflects it', a
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const id = entityIdFromUrl(page);
 
-  // New notes default to private: the header toggle reads "not shared".
-  await expect(page.getByTestId('visibility-toggle')).toHaveAttribute('aria-pressed', 'false');
+  // New notes default to private: the actions menu's Visibility item reads "not shared".
+  await openEntityActions(page);
+  await expect(page.getByTestId('visibility-toggle')).toHaveAttribute('aria-checked', 'false');
+  await page.keyboard.press('Escape');
 
   // In the browser it counts under the Private facet, not Shared.
   await page.getByRole('link', { name: 'Library' }).click();
   await page.getByTestId('facet-visibility-private').click();
   await expect(page.getByTestId(`open-${id}`)).toBeVisible();
-  // Clear the filter, reopen, and reveal it: the toggle flips to shared.
+  // Clear the filter, reopen, and reveal it from the actions menu: the item flips to shared.
   await page.getByTestId('facet-visibility-private').click();
   await page.getByTestId(`open-${id}`).click();
+  await openEntityActions(page);
   await page.getByTestId('visibility-toggle').click();
-  await expect(page.getByTestId('visibility-toggle')).toHaveAttribute('aria-pressed', 'true');
+  await openEntityActions(page);
+  await expect(page.getByTestId('visibility-toggle')).toHaveAttribute('aria-checked', 'true');
 
   // The access-scoped Visibility facet now lists it under Shared instead.
   await page.getByRole('link', { name: 'Library' }).click();

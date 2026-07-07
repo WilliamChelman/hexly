@@ -12,13 +12,10 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Button } from '../../../ui/button';
 import { ButtonGroup } from '../../../ui/button-group';
-import { Dialog } from '../../../ui/dialog';
 import { Eyebrow } from '../../../ui/eyebrow';
-import { Icon } from '../../../ui/icon/icon';
-import { GrantSet } from '../../../ui/grant-set';
-import { OwnerSet } from '../../../ui/owner-set';
-import { PublicLinkControl } from '../../../ui/public-link';
 import { PageHeader } from '../../../ui/page-header';
+import { EntityActionsMenu } from './entity-actions-menu';
+import { EntityShareDialog } from './entity-share-dialog';
 import { EntityTags } from './entity-tags';
 import { SaveStatus } from './save-status';
 import { EntitySession } from '../services/entity-session';
@@ -62,13 +59,10 @@ const TYPE_LABELS: Record<
   imports: [
     Button,
     ButtonGroup,
-    Dialog,
     Eyebrow,
-    Icon,
-    GrantSet,
-    OwnerSet,
-    PublicLinkControl,
     PageHeader,
+    EntityActionsMenu,
+    EntityShareDialog,
     TranslocoPipe,
     EntityTags,
     SaveStatus,
@@ -133,86 +127,19 @@ const TYPE_LABELS: Record<
         </div>
       }
 
-      @if (editable()) {
-        <!-- Visibility toggle (ADR-0037, #160): an Owner flips the Entity between
-             private and shared. A non-Owner's flip is refused server-side (403). -->
-        <button
-          type="button"
-          pageHeaderActions
-          appButton
-          variant="ghost"
-          size="sm"
-          data-testid="visibility-toggle"
-          [active]="shared()"
-          [attr.aria-pressed]="shared()"
-          [attr.aria-label]="'editorShell.visibility.toggle' | transloco"
-          (click)="toggleVisibility()"
-        >
-          {{
-            (shared()
-              ? 'editorShell.visibility.shared'
-              : 'editorShell.visibility.private') | transloco
-          }}
-        </button>
-      }
-
-      <!-- Share (owner/grant/link management) is an owner-only power (ADR-0037) — hidden
-           for every non-Owner opener, including writers (an entity-level Editor, a World
-           Owner) whose write access wouldn't carry the owner-gated dialog endpoints. -->
-      @if (manageable()) {
-        <button
-          type="button"
-          pageHeaderActions
-          appButton
-          variant="primary"
-          size="sm"
-          data-testid="manage-owners"
-          (click)="ownersOpen.set(true)"
-        >
-          <app-icon name="share" [size]="16" />
-          {{ 'editorShell.share' | transloco }}
-        </button>
-      }
+      <!-- The Entity's actions — Visibility, Pin, and Share — gathered behind one overflow
+           menu. Share is this header's dialog surface, so the menu emits (share) and we open it. -->
+      <app-entity-actions-menu
+        pageHeaderActions
+        (share)="ownersOpen.set(true)"
+      />
     </app-page-header>
 
-    @if (ownersOpen() && entityId(); as id) {
-      <app-dialog
-        [open]="true"
-        [heading]="'owners.heading' | transloco"
-        (closed)="ownersOpen.set(false)"
-      >
-        <app-owner-set kind="entity" [id]="id" (resigned)="onResigned()" />
-        <!-- Named per-Entity grants (ADR-0037, #161): the surgical layer below ownership —
-             hand a specific user Editor/Viewer on just this Entity, piercing private. -->
-        <h3 class="grants-heading">{{ 'grants.heading' | transloco }}</h3>
-        <p class="grants-subhead">{{ 'grants.subhead' | transloco }}</p>
-        <app-grant-set [id]="id" />
-        <!-- Anonymous per-entity Public Link (ADR-0037, #162): one revocable read-only URL
-             for someone without an account — pierces private, like a named Viewer grant. -->
-        <h3 class="grants-heading">{{ 'publicLink.entityHeading' | transloco }}</h3>
-        <p class="grants-subhead">{{ 'publicLink.entitySubhead' | transloco }}</p>
-        <app-public-link kind="entity" [id]="id" />
-        <button
-          dialogFooter
-          type="button"
-          appButton
-          data-testid="owners-close"
-          (click)="ownersOpen.set(false)"
-        >
-          {{ 'common.close' | transloco }}
-        </button>
-      </app-dialog>
-    }
-  `,
-  styles: `
-    @reference '#app-styles.css';
-    /* Separates the grant set from the owner set above it in the Share dialog. */
-    .grants-heading {
-      @apply mt-6 border-t border-line pt-4 text-sm font-semibold text-ink;
-    }
-    .grants-subhead {
-      @apply mb-3 text-sm text-ink-muted;
-    }
+    <app-entity-share-dialog
+      [open]="ownersOpen()"
+      (closed)="ownersOpen.set(false)"
+      (resigned)="onResigned()"
+    />
   `,
 })
 export class EntityHeader {
@@ -223,24 +150,8 @@ export class EntityHeader {
   protected readonly store = inject(HexMapStore);
   protected readonly views = VIEWS;
 
-  /**
-   * Whether the caller may write the open Entity (ADR-0037). Gates the whole editing surface
-   * (Share, tags, map tools) so a read-only opener — a Viewer grant, a member on a `shared`
-   * Entity, or an anonymous Public Link reader — sees the content but none of the edit chrome.
-   */
-  protected readonly writable = this.session.writable;
-
-  /**
-   * Whether the caller owns the open Entity (ADR-0037) — gates the Share action, whose dialog
-   * (owners, grants, Public Link) is owner-only server-side. A writer who isn't an Owner never
-   * sees it, so the button can't open onto a dialog that only 403s.
-   */
-  protected readonly manageable = this.session.manageable;
-
-  /** Whether the entity owner-set dialog (#158) is open — toggled by the Share action. */
+  /** Whether the entity Share dialog (#158) is open — toggled by the actions menu's Share item. */
   protected readonly ownersOpen = signal(false);
-  /** The open Entity's id — the owner set's target; empty when none is open. */
-  protected readonly entityId = computed(() => this.session.current()?.id ?? '');
 
   /** Resigning can cost reach to this Entity, so drop back to the World Index. */
   protected onResigned(): void {
@@ -268,20 +179,6 @@ export class EntityHeader {
   protected readonly title = computed(
     () => this.session.current()?.name ?? '',
   );
-  /** Whether the open Entity is `shared` (drives the toggle's pressed state and label). */
-  protected readonly shared = computed(
-    () => this.session.current()?.visibility === 'shared',
-  );
-
-  /** Flip the open Entity's Visibility (ADR-0037, #160); a rejected flip leaves state as the server has it. */
-  protected toggleVisibility(): void {
-    // Swallow like commit()'s rename: a rejected flip (e.g. a 403 from a writable-then-revoked
-    // race) is a graceful no-op — the pressed state stays bound to the server's Visibility, so
-    // there's nothing to revert — not an unhandled RxJS error.
-    this.session
-      .setVisibility(this.shared() ? 'private' : 'shared')
-      .subscribe({ error: () => undefined });
-  }
 
   private readonly titleEl =
     viewChild.required<ElementRef<HTMLElement>>('titleEl');

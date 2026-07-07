@@ -228,7 +228,12 @@
       "zoomIn": "Zoom in",
       "zoomOut": "Zoom out",
       "fit": "Fit map"
-    }
+    },
+    "pin": {
+      "pin": "Pin to Dashboard",
+      "toggle": "Pin this Entity to the World Dashboard"
+    },
+    "actionsMenu": "Entity actions"
   },
   "styleguide": {
     "tabTitle": "Hexly — Design system",
