@@ -84,7 +84,10 @@ export async function flushSave(page: Page): Promise<Response> {
  */
 export async function enterLibrary(page: Page): Promise<string> {
   await page.goto('/');
+  // The card lands on the World Dashboard — the World root (ADR-0043); the rail's
+  // Library link enters the Entity browser from there.
   await page.getByTestId(/^world-/).first().click();
+  await page.getByRole('link', { name: 'Library' }).click();
   await page.waitForURL(/\/w\/[\w-]+\/entities$/);
   return page.url().match(/\/w\/([\w-]+)\/entities/)![1];
 }
