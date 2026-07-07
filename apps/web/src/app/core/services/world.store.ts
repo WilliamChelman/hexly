@@ -10,6 +10,7 @@ import { Observable, tap } from 'rxjs';
 import { WorldDetail, WorldMember, WorldSummary } from '@hexly/domain';
 import { AuthClient } from './auth.client';
 import { WorldsClient } from './worlds.client';
+import { Logger } from './logger';
 
 /**
  * The caller's loaded Worlds (ADR-0028). Which World is *active* is a URL fact now
@@ -23,6 +24,7 @@ import { WorldsClient } from './worlds.client';
 export class WorldStore {
   private readonly client = inject(WorldsClient);
   private readonly auth = inject(AuthClient);
+  private readonly logger = inject(Logger);
 
   private readonly _worlds = signal<readonly WorldSummary[]>([]);
   private readonly _loaded = signal(false);
@@ -117,10 +119,9 @@ export class WorldStore {
   refresh(): void {
     this.client.list().subscribe({
       next: (worlds) => this._worlds.set(worlds),
-      error: () => {
-        // ponytail: keep the last-good list on a transient re-focus failure (expired
-        // session / network blip while the tab was hidden) — no toast, nothing propagated.
-      },
+      // Keep the last-good list on a transient failure (expired session / network blip
+      // while the tab was hidden) — no toast — but log it so it isn't silently lost.
+      error: (err) => this.logger.error('Failed to refresh the worlds list', err),
     });
   }
 }

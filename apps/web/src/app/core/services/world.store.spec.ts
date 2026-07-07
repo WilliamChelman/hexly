@@ -5,6 +5,7 @@ import { AuthClient } from './auth.client';
 import { MockAuthClient } from '../testing/auth-client.mock';
 import { WorldsClient } from './worlds.client';
 import { MockWorldsClient } from '../testing/worlds-client.mock';
+import { Logger } from './logger';
 import { WorldStore } from './world.store';
 
 function world(id: string, name = id): WorldSummary {
@@ -15,14 +16,17 @@ describe('WorldStore', () => {
   let store: WorldStore;
   let worldsClient: MockWorldsClient;
   let auth: MockAuthClient;
+  let logger: { error: ReturnType<typeof vi.fn>; warn: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     worldsClient = new MockWorldsClient();
     auth = new MockAuthClient();
+    logger = { error: vi.fn(), warn: vi.fn() };
     TestBed.configureTestingModule({
       providers: [
         { provide: WorldsClient, useValue: worldsClient },
         { provide: AuthClient, useValue: auth },
+        { provide: Logger, useValue: logger },
       ],
     });
     store = TestBed.inject(WorldStore);
@@ -60,6 +64,19 @@ describe('WorldStore', () => {
     flushList([world('w1')]);
     store.load();
     expect(store.worlds().map((w) => w.id)).toEqual(['w1']);
+  });
+
+  it('logs and keeps the last-good list when a re-focus refetch fails', () => {
+    flushList([world('w1', 'Aldermoor')]);
+    store.load();
+    expect(store.worlds().map((w) => w.id)).toEqual(['w1']);
+
+    worldsClient.list.mockReturnValue(throwError(() => new Error('offline')));
+    store.refresh();
+
+    // Stale-but-present beats a blank Index; the failure is logged, not swallowed.
+    expect(store.worlds().map((w) => w.id)).toEqual(['w1']);
+    expect(logger.error).toHaveBeenCalled();
   });
 
   it('creating a World appends it and returns its detail', () => {
