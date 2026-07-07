@@ -117,9 +117,10 @@ export class WorldStore {
   refresh(): void {
     this.client.list().subscribe({
       next: (worlds) => this._worlds.set(worlds),
-      // ponytail: keep the last-good list on a transient re-focus failure (expired
-      // session / network blip while the tab was hidden) — no toast, no error propagated.
-      error: () => {},
+      error: () => {
+        // ponytail: keep the last-good list on a transient re-focus failure (expired
+        // session / network blip while the tab was hidden) — no toast, nothing propagated.
+      },
     });
   }
 }
