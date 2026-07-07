@@ -62,6 +62,7 @@ import {
   worlds,
 } from '../db/schema';
 import { HEXLY_CONFIG, HexlyConfig } from '../config/config.module';
+import { NudgeBus } from '../events/nudge-bus';
 
 /** The per-entity Public Link table for the shared get/mint/revoke helpers (ADR-0037, #162). */
 const ENTITY_LINK: PublicLinkTable = {
@@ -125,6 +126,7 @@ export class EntitiesService implements OnApplicationBootstrap {
   constructor(
     @Inject(DB) private readonly db: Db,
     @Inject(HEXLY_CONFIG) private readonly config: HexlyConfig,
+    private readonly bus: NudgeBus,
   ) {}
 
   /**
@@ -440,6 +442,10 @@ export class EntitiesService implements OnApplicationBootstrap {
         ? { status: 'conflict', current: toDetail(current.row) }
         : { status: 'not-found' };
     }
+    // The single emit point (ADR-0044): after the atomic write lands, nudge every follower
+    // that this Entity is now at `version`. In the service layer — the one choke point — not
+    // the controller.
+    this.bus.emitEntityChange(id, version);
     // Return validated body we just wrote directly.
     return {
       status: 'saved',

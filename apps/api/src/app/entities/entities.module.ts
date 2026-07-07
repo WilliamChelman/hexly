@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { DbModule } from '../db/db.module';
+import { EventsModule } from '../events/events.module';
 import { EntitiesController } from './entities.controller';
 import { EntitiesService } from './entities.service';
 
@@ -10,7 +11,7 @@ import { EntitiesService } from './entities.service';
  * guards every route with.
  */
 @Module({
-  imports: [DbModule, AuthModule],
+  imports: [DbModule, AuthModule, EventsModule],
   controllers: [EntitiesController],
   providers: [EntitiesService],
   // Exported so the vault import (ADR-0033) can bulk-insert notes through it.

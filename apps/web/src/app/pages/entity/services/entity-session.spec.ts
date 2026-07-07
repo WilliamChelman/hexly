@@ -13,13 +13,16 @@ import {
 import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
 import { EntitiesClient } from '../../../core/services/entities.client';
 import { MockEntitiesClient } from '../../../core/testing/entities-client.mock';
-import { EntitySession } from './entity-session';
+import { NudgeBusClient } from '../../../core/services/nudge-bus.client';
+import { MockNudgeBusClient } from '../../../core/testing/nudge-bus.mock';
+import { EntitySession, NUDGE_DEBOUNCE_MS } from './entity-session';
 import { HexMapStore } from './hexmap-store';
 
 describe('EntitySession', () => {
   let session: EntitySession;
   let editor: HexMapStore;
   let entities: MockEntitiesClient;
+  let bus: MockNudgeBusClient;
 
   const content = emptyContent();
   /** Wrap a hex grid into the hexmap body the store carries end to end. */
@@ -55,9 +58,14 @@ describe('EntitySession', () => {
 
   beforeEach(() => {
     entities = new MockEntitiesClient();
+    bus = new MockNudgeBusClient();
     TestBed.configureTestingModule({
       imports: [provideTranslocoTesting()],
-      providers: [EntitySession, { provide: EntitiesClient, useValue: entities }],
+      providers: [
+        EntitySession,
+        { provide: EntitiesClient, useValue: entities },
+        { provide: NudgeBusClient, useValue: bus },
+      ],
     });
     session = TestBed.inject(EntitySession);
     editor = TestBed.inject(HexMapStore);
@@ -780,5 +788,108 @@ describe('EntitySession', () => {
     expect(entities.load).not.toHaveBeenCalled();
     // `_saving` was never flipped, so the Save button can't stick on "Saving…".
     expect(session.saving()).toBe(false);
+  });
+
+  /**
+   * Live-follow reconciliation (ADR-0044, #173): an incoming nudge whose version is newer than
+   * the held one triggers a debounced silent refetch — unless the buffer is dirty, in which case
+   * the nudge is ignored so a background event never clobbers unsaved edits.
+   */
+  describe('nudge reconciler', () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    /**
+     * Open Aldermoor (version 3) and flush effects so the reconciler's `toObservable(followedId)`
+     * subscribes to `bus.follow` — interest is declared async off the signal, so a nudge emitted
+     * before this settles would be missed (as it would be in production, pre-subscription).
+     */
+    function openAndFollow() {
+      openAldermoor();
+      TestBed.tick();
+    }
+
+    it('follows the open Entity so the server can nudge it', () => {
+      openAndFollow();
+      expect(bus.follow).toHaveBeenCalledWith({ kind: 'entity', id: 'm1' });
+    });
+
+    it('refetches once after the debounce and replaces the view on a newer-version nudge', () => {
+      openAndFollow(); // version 3
+      entities.load.mockClear();
+      // The silent refetch pulls the fresh Entity (version 4).
+      entities.load.mockReturnValue(of({ ...aldermoor, version: 4 }));
+
+      bus.emit({ id: 'm1', version: 4 });
+      expect(entities.load).not.toHaveBeenCalled(); // debounced, not yet
+
+      vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
+      expect(entities.load).toHaveBeenCalledTimes(1);
+      expect(entities.load).toHaveBeenCalledWith('m1');
+      expect(session.current()?.version).toBe(4);
+    });
+
+    it('coalesces a burst of nudges for one resource into a single refetch', () => {
+      openAndFollow();
+      entities.load.mockClear();
+      entities.load.mockReturnValue(of({ ...aldermoor, version: 6 }));
+
+      bus.emit({ id: 'm1', version: 4 });
+      bus.emit({ id: 'm1', version: 5 });
+      bus.emit({ id: 'm1', version: 6 });
+      vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
+
+      expect(entities.load).toHaveBeenCalledTimes(1);
+    });
+
+    it('does NOT refetch on a nudge while the buffer is dirty (clobber guard)', () => {
+      openAndFollow();
+      entities.load.mockClear();
+      editor.paintAt({ q: 5, r: 5 }, 'ocean'); // unsaved edit
+      expect(session.dirty()).toBe(true);
+
+      bus.emit({ id: 'm1', version: 4 });
+      vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
+
+      expect(entities.load).not.toHaveBeenCalled();
+    });
+
+    it('ignores a nudge at the already-held version (self / cross-tab echo dedupe)', () => {
+      openAndFollow(); // version 3
+      entities.load.mockClear();
+
+      bus.emit({ id: 'm1', version: 3 });
+      vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
+
+      expect(entities.load).not.toHaveBeenCalled();
+    });
+
+    it('ignores a nudge addressed to a different Entity', () => {
+      openAndFollow();
+      entities.load.mockClear();
+
+      bus.emit({ id: 'other', version: 99 });
+      vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
+
+      expect(entities.load).not.toHaveBeenCalled();
+    });
+
+    it('survives a failed refetch and still reconciles the next nudge (idempotent invalidation)', () => {
+      openAndFollow(); // version 3
+      entities.load.mockClear();
+
+      // A transient error on the background refetch must not kill live-follow for the session.
+      entities.load.mockReturnValueOnce(throwError(() => new Error('network blip')));
+      bus.emit({ id: 'm1', version: 4 });
+      vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
+      expect(entities.load).toHaveBeenCalledTimes(1); // attempted, failed, swallowed
+
+      // The next nudge still reconciles — the subscription is alive.
+      entities.load.mockReturnValue(of({ ...aldermoor, version: 5 }));
+      bus.emit({ id: 'm1', version: 5 });
+      vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
+      expect(entities.load).toHaveBeenCalledTimes(2);
+      expect(session.current()?.version).toBe(5);
+    });
   });
 });

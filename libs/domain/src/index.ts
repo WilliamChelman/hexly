@@ -15,3 +15,4 @@ export * from './lib/extract-outline';
 export * from './lib/harvest-descriptors';
 export * from './lib/world';
 export * from './lib/public-link';
+export * from './lib/nudge';

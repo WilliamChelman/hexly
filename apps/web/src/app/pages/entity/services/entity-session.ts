@@ -13,6 +13,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import {
   catchError,
   concat,
+  debounceTime,
   defer,
   distinctUntilChanged,
   EMPTY,
@@ -38,6 +39,7 @@ import {
   Visibility,
 } from '@hexly/domain';
 import { EntitiesClient } from '../../../core/services/entities.client';
+import { NudgeBusClient } from '../../../core/services/nudge-bus.client';
 import { ActiveWorld } from '../../../core/services/active-world';
 import { idFromSegment } from '../../../core/utils/pretty-id';
 import { worldRoute } from '../../../core/utils/routes';
@@ -56,6 +58,13 @@ import { EntityView, HexMapStore } from './hexmap-store';
 const AUTOSAVE_DELAY_MS = 800;
 
 /**
+ * Trailing-debounce window before an incoming nudge is reconciled (ADR-0044): a burst of rapid
+ * saves by another user coalesces into a single refetch, so following feels near-live but not
+ * janky. Per-resource in the bus; here one Entity is open, so it's one timer.
+ */
+export const NUDGE_DEBOUNCE_MS = 150;
+
+/**
  * Ceiling on how long a leave-flush blocks navigation (ADR-0026). Normal saves finish in
  * well under a second; this only bites a hung network, where we stop waiting and let the
  * route change proceed (the edit is best-effort lost, same as the `beforeunload` path).
@@ -72,6 +81,7 @@ interface SaveSnapshot {
 @Injectable()
 export class EntitySession {
   private readonly entities = inject(EntitiesClient);
+  private readonly bus = inject(NudgeBusClient);
   private readonly editor = inject(HexMapStore);
   private readonly title = inject(TitleService);
   private readonly router = inject(Router);
@@ -150,6 +160,15 @@ export class EntitySession {
   );
 
   /**
+   * The open Entity's id, or `null` with none open / a public reader (whose stream is
+   * externally driven, #162). Drives live-follow: the reconciler switches its server subscription
+   * to this id, so a swap unfollows the old and follows the new without any manual bookkeeping.
+   */
+  private readonly _followedId = computed(() =>
+    this.externallyDriven ? null : this._current()?.id ?? null,
+  );
+
+  /**
    * Route load in flight. `current` still holds the previous Entity until the new
    * one resolves, so writes are blocked — a header can't rename/save onto the
    * Entity the user just navigated away from.
@@ -217,6 +236,41 @@ export class EntitySession {
       const timer = setTimeout(() => this.save().subscribe(), AUTOSAVE_DELAY_MS);
       onCleanup(() => clearTimeout(timer));
     });
+
+    // Live-follow reconciler (ADR-0044). Follow the open Entity and, on a nudge newer than the
+    // held version, silently refetch-and-replace. `switchMap` off the followed id makes the whole
+    // thing subscription-scoped: swapping Entity tears down the old follow (withdrawing interest)
+    // and follows the new; `takeUntilDestroyed` withdraws on route leave — no manual unfollow.
+    toObservable(this._followedId)
+      .pipe(
+        // A computed already dedupes on ===, so toObservable only emits on a real id change.
+        switchMap((id) =>
+          id === null
+            ? EMPTY
+            : this.bus.follow({ kind: 'entity', id }).pipe(
+                // Echo dedupe up front (a tab already at that version ignores it), then debounce so
+                // a burst of the GM's saves coalesces into one refetch.
+                filter((n) => n.version > (this._current()?.version ?? 0)),
+                debounceTime(NUDGE_DEBOUNCE_MS),
+                // Re-check at fire time: the clobber guard (never refetch over unsaved edits — the
+                // editor still finds concurrent edits at save time via the 409 path), skip during a
+                // route load so a late nudge can't snap the view back, and re-check the version
+                // since our own save may have advanced it during the debounce window.
+                filter(
+                  (n) =>
+                    !this.dirty() &&
+                    !this._loading() &&
+                    n.version > (this._current()?.version ?? 0),
+                ),
+                // A nudge is an idempotent invalidation (ADR-0044): swallow a transient refetch
+                // failure rather than let it kill the subscription — the next nudge or a reconnect
+                // heals the staleness. Without this, one 5xx ends live-follow for the session.
+                switchMap(() => this.open(id).pipe(catchError(() => EMPTY))),
+              ),
+        ),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe();
   }
 
   /**
@@ -291,6 +345,8 @@ export class EntitySession {
     this._baseGrid.set(this.editor.document());
     this._baseContent.set(this._content());
     this._baseTags.set(this._tags());
+    // Live-follow tracks the open Entity reactively off _current (see the reconciler), so adopt
+    // needs no follow bookkeeping — swapping id re-points the subscription on its own.
   }
 
   /**
