@@ -12,20 +12,21 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { AuthClient, WorldStore, ActiveWorld, AuthScopedStorage, worldRoute, worldSettingsRoute, AppShellStore } from '@hexly/web-core';
-import { Button, Cartouche, Icon, IconName } from '@hexly/web-ui';
+import { AuthClient, WorldStore, ActiveWorld, AuthScopedStorage, AppShellStore } from '@hexly/web-core';
+import { Button, Cartouche, Icon } from '@hexly/web-ui';
 import { UserMenu } from './user-menu';
 import { WorldSwitcher } from './world-switcher';
-
-interface NavEntry {
-  readonly link: string | readonly string[];
-  readonly testid: string;
-  readonly icon: IconName;
-  readonly labelKey: string;
-  readonly exact?: boolean;
-}
+import { NavEntry, NavRailStore } from './nav-rail.store';
 
 const STATIC_ENTRIES: readonly NavEntry[] = [
+  {
+    // Back to the World Index (ADR-0028) — the chooser at the root.
+    link: '/',
+    testid: 'nav-worlds',
+    icon: 'globe',
+    labelKey: 'nav.worlds',
+    exact: true,
+  },
   {
     link: '/styleguide',
     testid: 'nav-styleguide',
@@ -190,31 +191,19 @@ export class NavRail {
   private readonly auth = inject(AuthClient);
   private readonly worlds = inject(WorldStore);
   private readonly activeWorld = inject(ActiveWorld);
+  private readonly rail = inject(NavRailStore);
 
   protected readonly isAuthenticated = this.auth.isAuthenticated;
   protected readonly loading = inject(AppShellStore).loading;
   protected readonly activeWorldId = this.activeWorld.worldId;
-  // The rail's destinations are contextual (ADR-0041): World-scoped ones inside a
-  // World, instance-scoped ones on the Index — the active World is the pivot.
+  // The rail renders destinations, it no longer builds them (ADR-0041): inside a World
+  // the World layout fills the slot; elsewhere the rail's own instance-scoped links show.
   protected readonly entries = computed<readonly NavEntry[]>(() => {
-    const worldId = this.activeWorld.worldId();
-    if (worldId) {
-      const world = this.worlds.worlds().find((w) => w.id === worldId);
-      // Route through the canonical slug-base62 helpers (ADR-0042), not a bare id — a
-      // bare-UUID link trips activeWorldGuard's heal redirect on every click, which
-      // tears down and rebuilds the World scope and blanks the rail for a frame.
-      const name = this.activeWorld.name() ?? world?.name;
-      // World Settings shows only to a caller who may manage the World — the same
-      // `manage` right the World Index gates its own settings entry on (ADR-0039).
-      const canManage = !!world?.rights?.includes('manage');
-      return [
-        { link: worldRoute(worldId, name), testid: 'nav-entities', icon: 'library', labelKey: 'nav.library' },
-        // World Settings moved off the World root (now the Dashboard, ADR-0043).
-        ...(canManage
-          ? [{ link: worldSettingsRoute(worldId, name), testid: 'nav-world-settings', icon: 'settings' as const, labelKey: 'nav.worldSettings' }]
-          : []),
-      ];
-    }
+    const injected = this.rail.entries();
+    if (injected.length) return injected;
+    // In a World but its layout hasn't filled the slot yet — show nothing rather than
+    // flash the instance nav for a frame on every World entry.
+    if (this.activeWorldId()) return [];
     return [
       ...STATIC_ENTRIES,
       // The Instance Admin panel link (ADR-0037, #163) shows only for an Admin or

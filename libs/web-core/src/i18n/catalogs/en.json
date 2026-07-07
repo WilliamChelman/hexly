@@ -338,6 +338,7 @@
   },
   "nav": {
     "primary": "Primary navigation",
+    "worlds": "Worlds",
     "library": "Library",
     "styleguide": "Styleguide",
     "expand": "Expand navigation",

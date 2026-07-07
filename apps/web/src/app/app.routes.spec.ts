@@ -51,7 +51,8 @@ describe('appRoutes structure (ADR-0028)', () => {
     // The parent guard pins the active World detail and heals its slug (ADR-0042).
     expect(parent?.canActivate?.length).toBeGreaterThan(1);
     expect(parent?.canDeactivate).toBeDefined();
-    expect(parent?.loadComponent).toBeUndefined();
+    // A thin layout owns the scope now — it fills the rail's contextual links (ADR-0041).
+    expect(parent?.loadComponent).toBeDefined();
 
     const childPaths = parent?.children?.map((c) => c.path);
     expect(childPaths).toContain('entities');

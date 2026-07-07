@@ -31,6 +31,7 @@ import {
   LucideUpload,
   LucideDownload,
   LucideUser,
+  LucideGlobe,
 } from '@lucide/angular';
 import { featureLibrary } from '@hexly/domain';
 import { IconHost } from './icon-host';
@@ -112,6 +113,7 @@ const LUCIDE: Record<string, LucideIconData> = {
   upload: LucideUpload.icon,
   download: LucideDownload.icon,
   user: LucideUser.icon,
+  globe: LucideGlobe.icon,
 };
 
 export type IconName = keyof typeof CUSTOM | keyof typeof LUCIDE;

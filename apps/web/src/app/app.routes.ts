@@ -42,15 +42,18 @@ export const appRoutes: Route[] = [
     title: 'admin.tabTitle',
   },
   {
-    // The World scope (ADR-0028): a componentless parent that owns the `:worldId`
-    // segment. Its guard fetches and pins the active World detail (ADR-0042) — and
-    // self-heals the World slug — before any child renders; its canDeactivate clears
-    // it when navigation leaves the scope, so the Index never shows a stale World.
-    // Children share the root outlet; the segment is navigation context while an
-    // Entity's own world_id stays the data source of truth.
+    // The World scope (ADR-0028): the parent that owns the `:worldId` segment. Its
+    // guard fetches and pins the active World detail (ADR-0042) — and self-heals the
+    // World slug — before any child renders; its canDeactivate clears it when
+    // navigation leaves the scope, so the Index never shows a stale World. The layout
+    // component fills the rail's contextual links from the pinned World (ADR-0041);
+    // the segment is navigation context while an Entity's own world_id stays the
+    // data source of truth.
     path: 'w/:worldId',
     canActivate: [authGuard, activeWorldGuard],
     canDeactivate: [clearActiveWorld],
+    loadComponent: () =>
+      import('./pages/world/world-layout').then((m) => m.WorldLayout),
     children: [
       {
         // The World Dashboard (ADR-0043): the World's front door — a read-only derived

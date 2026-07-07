@@ -6,6 +6,7 @@ import { BehaviorSubject, Observable, map, of } from 'rxjs';
 import { AuthClient, WorldsClient, ActiveWorld } from '@hexly/web-core';
 import { MockAuthClient, MockWorldsClient, provideTranslocoTesting } from '@hexly/web-core/testing';
 import { NavRail } from './nav-rail';
+import { NavRailStore } from './nav-rail.store';
 
 @Component({ template: '' })
 class Blank {}
@@ -72,10 +73,16 @@ describe('NavRail', () => {
     return fixture.nativeElement.querySelector(`[data-testid="${testid}"]`);
   }
 
-  it('inside a World shows the World destinations, not the instance ones (ADR-0041)', () => {
+  /** Fill the rail slot the way a routed scope (e.g. WorldLayout) does. */
+  function injectEntries(...entries: Parameters<NavRailStore['entries']['set']>[0]) {
+    TestBed.inject(NavRailStore).entries.set(entries);
+  }
+
+  it('renders the destinations the routed scope injects, hiding the instance ones (ADR-0041)', () => {
     signIn();
-    // The Library link follows the active World (ADR-0028), pinned by the resolver.
+    // Inside a World the layout fills the slot (ADR-0041); the rail only renders it.
     TestBed.inject(ActiveWorld).set('w1');
+    injectEntries({ link: '/w/w1/entities', testid: 'nav-entities', icon: 'library', labelKey: 'nav.library' });
     const fixture = render();
 
     const brand = q(fixture, 'brand') as HTMLAnchorElement;
@@ -105,32 +112,8 @@ describe('NavRail', () => {
     expect(fixture.nativeElement.querySelector('app-world-switcher')).toBeNull();
   });
 
-  it('shows World Settings only to a caller who may manage the World (ADR-0041)', () => {
-    signIn();
-    const worlds = TestBed.inject(WorldsClient) as unknown as MockWorldsClient;
-    worlds.list.mockReturnValue(
-      of([{ id: 'w1', name: 'Aldermoor', owners: ['u1'], rights: ['manage'], createdAt: 1, updatedAt: 1 }]),
-    );
-    TestBed.inject(ActiveWorld).set('w1');
-    const fixture = render();
-
-    const settings = q(fixture, 'nav-world-settings') as HTMLAnchorElement;
-    expect(settings?.getAttribute('href')).toBe('/w/w1/settings');
-  });
-
-  it('hides World Settings from a caller who lacks the manage right (ADR-0041)', () => {
-    signIn();
-    const worlds = TestBed.inject(WorldsClient) as unknown as MockWorldsClient;
-    worlds.list.mockReturnValue(
-      of([{ id: 'w1', name: 'Aldermoor', owners: ['u2'], rights: ['read'], createdAt: 1, updatedAt: 1 }]),
-    );
-    TestBed.inject(ActiveWorld).set('w1');
-    const fixture = render();
-
-    expect(q(fixture, 'nav-world-settings')).toBeNull();
-    // Library still shows — reading the World is enough.
-    expect(q(fixture, 'nav-entities')).not.toBeNull();
-  });
+  // Manage-gated World Settings + Library building now live in WorldLayout (ADR-0041);
+  // see world-layout.spec.ts. The rail only renders whatever entries it's handed.
 
   it('starts collapsed and expands when the toggle is pressed', () => {
     signIn();
@@ -150,8 +133,9 @@ describe('NavRail', () => {
 
   it('marks the current destination for assistive tech', async () => {
     signIn();
-    // Pin the active World (link href) and sit at its URL (routerLinkActive match).
+    // Pin the active World (switcher gate) and hand the rail the link the layout would.
     TestBed.inject(ActiveWorld).set('w1');
+    injectEntries({ link: '/w/w1/entities', testid: 'nav-entities', icon: 'library', labelKey: 'nav.library' });
     const fixture = render();
 
     await TestBed.inject(Router).navigateByUrl('/w/w1/entities');
