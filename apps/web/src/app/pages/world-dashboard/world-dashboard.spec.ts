@@ -1,5 +1,5 @@
-import { signal } from '@angular/core';
-import { TestBed } from '@angular/core/testing';
+import { signal, WritableSignal } from '@angular/core';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { of } from 'rxjs';
 import {
@@ -8,9 +8,13 @@ import {
   EntityPage,
   EntitySummary,
   EntityType,
+  WorldDetail,
+  WorldVerb,
 } from '@hexly/domain';
 import { EntitiesClient } from '../../core/services/entities.client';
 import { MockEntitiesClient } from '../../core/testing/entities-client.mock';
+import { WorldsClient } from '../../core/services/worlds.client';
+import { MockWorldsClient } from '../../core/testing/worlds-client.mock';
 import { ActiveWorld } from '../../core/services/active-world';
 import { provideTranslocoTesting } from '../../core/i18n/transloco-testing';
 import { WorldDashboard } from './world-dashboard';
@@ -36,19 +40,48 @@ function summary(
 
 const page = (items: EntitySummary[]): EntityPage => ({ items, nextCursor: null });
 
+function worldDetail(
+  pinnedEntityIds: string[] = [],
+  rights: WorldVerb[] = ['read', 'manage'],
+): WorldDetail {
+  return {
+    id: 'w1',
+    name: 'Aldermoor',
+    owners: ['ada'],
+    rights,
+    entityCount: 0,
+    pinnedEntityIds,
+    createdAt: 1,
+    updatedAt: 1,
+  };
+}
+
 describe('WorldDashboard', () => {
   let entities: MockEntitiesClient;
+  let worlds: MockWorldsClient;
+  let world: WritableSignal<WorldDetail | null>;
+  let activeWorldSet: ReturnType<typeof vi.fn>;
+  let fixture: ComponentFixture<WorldDashboard>;
 
   beforeEach(async () => {
     entities = new MockEntitiesClient();
+    worlds = new MockWorldsClient();
+    world = signal<WorldDetail | null>(worldDetail());
+    activeWorldSet = vi.fn((w: WorldDetail | null) => world.set(w));
     await TestBed.configureTestingModule({
       imports: [WorldDashboard, provideTranslocoTesting()],
       providers: [
         provideRouter([]),
         { provide: EntitiesClient, useValue: entities },
+        { provide: WorldsClient, useValue: worlds },
         {
           provide: ActiveWorld,
-          useValue: { worldId: signal('w1'), name: signal('Aldermoor') },
+          useValue: {
+            worldId: signal('w1'),
+            name: signal('Aldermoor'),
+            world,
+            set: activeWorldSet,
+          },
         },
       ],
     }).compileComponents();
@@ -64,17 +97,122 @@ describe('WorldDashboard', () => {
     recents?: EntitySummary[];
     maps?: EntitySummary[];
     facets?: EntityFacets;
+    /** Access-filtered summaries the `list({ ids })` pin-resolve returns (any order). */
+    pinResolve?: EntitySummary[];
   } = {}) {
-    entities.list.mockImplementation((o) =>
-      of(page(o?.type?.includes('hexmap') ? (opts.maps ?? []) : (opts.recents ?? []))),
-    );
+    entities.list.mockImplementation((o) => {
+      if (o?.ids) return of(page(opts.pinResolve ?? []));
+      return of(page(o?.type?.includes('hexmap') ? (opts.maps ?? []) : (opts.recents ?? [])));
+    });
     entities.facets.mockReturnValue(
       of(opts.facets ?? { type: [], tag: [], visibility: [] }),
     );
-    const fixture = TestBed.createComponent(WorldDashboard);
+    fixture = TestBed.createComponent(WorldDashboard);
     fixture.detectChanges();
     return fixture.nativeElement as HTMLElement;
   }
+
+  it('renders the Owner-curated pins, in pin order, dropping ids the reader can’t resolve', () => {
+    world.set(worldDetail(['p2', 'gone', 'p1']));
+    const el = render({
+      recents: [summary('e1')],
+      // The access-filtered read returns the reachable pins in server order;
+      // 'gone' (deleted or private-to-others) simply isn't in the response.
+      pinResolve: [summary('p1', 'Riverbend'), summary('p2', 'North Reach')],
+    });
+
+    // Resolved through the entity read path with the pin id set (the client sizes the
+    // page to the id count — covered in entities.client.spec).
+    expect(entities.list).toHaveBeenCalledWith(
+      expect.objectContaining({ ids: ['p2', 'gone', 'p1'] }),
+    );
+    // Rendered in pinnedEntityIds order (p2 before p1), with 'gone' absent.
+    const pins = Array.from(el.querySelectorAll('[data-testid^=pin-]'));
+    expect(pins.map((p) => p.getAttribute('data-testid'))).toEqual([
+      'pin-p2',
+      'pin-p1',
+    ]);
+    expect($(el, '[data-testid=pin-p2]')?.textContent).toContain('North Reach');
+  });
+
+  it('shows pins read-only to a non-Owner: no add, remove, or reorder controls', () => {
+    world.set(worldDetail(['p1'], ['read']));
+    const el = render({
+      recents: [summary('e1')],
+      pinResolve: [summary('p1', 'Riverbend')],
+    });
+
+    // The pinned card is there…
+    expect($(el, '[data-testid=pin-p1]')).not.toBeNull();
+    // …but none of the Owner-only curation affordances.
+    expect($(el, '[data-testid=add-pin]')).toBeNull();
+    expect($(el, '[data-testid=remove-pin-p1]')).toBeNull();
+    expect($(el, '[data-testid=move-pin-up-p1]')).toBeNull();
+  });
+
+  it('lets an Owner pin an Entity, PATCHing the replacement array and re-pinning the World', () => {
+    world.set(worldDetail(['p1']));
+    worlds.setPins.mockReturnValue(of(worldDetail(['p1', 'e1'])));
+    const el = render({
+      recents: [summary('e1', 'New pin')],
+      pinResolve: [summary('p1', 'Riverbend')],
+    });
+
+    ($(el, '[data-testid=add-pin]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    // The picker searches via list({q}) — the recents stub is its option source here.
+    ($(el, '[data-testid=pin-picker-option-e1]') as HTMLButtonElement).click();
+
+    // The picker is scoped to the active World so a pin can't be a foreign-World Entity.
+    expect(entities.list).toHaveBeenCalledWith(
+      expect.objectContaining({ q: '', worldId: 'w1' }),
+    );
+    // Appended to the existing set, sent wholesale.
+    expect(worlds.setPins).toHaveBeenCalledWith('w1', ['p1', 'e1']);
+    // The returned Detail re-pins the active World so the pins re-resolve.
+    expect(activeWorldSet).toHaveBeenCalledWith(worldDetail(['p1', 'e1']));
+  });
+
+  it('does not re-pin an Entity that is already pinned', () => {
+    world.set(worldDetail(['p1']));
+    const el = render({
+      recents: [summary('p1', 'Riverbend')],
+      pinResolve: [summary('p1', 'Riverbend')],
+    });
+
+    ($(el, '[data-testid=add-pin]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    ($(el, '[data-testid=pin-picker-option-p1]') as HTMLButtonElement).click();
+
+    expect(worlds.setPins).not.toHaveBeenCalled();
+  });
+
+  it('lets an Owner unpin an Entity, PATCHing the set without it', () => {
+    world.set(worldDetail(['p1', 'p2']));
+    worlds.setPins.mockReturnValue(of(worldDetail(['p2'])));
+    const el = render({
+      recents: [summary('e1')],
+      pinResolve: [summary('p1', 'Riverbend'), summary('p2', 'North Reach')],
+    });
+
+    ($(el, '[data-testid=remove-pin-p1]') as HTMLButtonElement).click();
+
+    expect(worlds.setPins).toHaveBeenCalledWith('w1', ['p2']);
+  });
+
+  it('lets an Owner reorder a pin, PATCHing the new order', () => {
+    world.set(worldDetail(['p1', 'p2']));
+    worlds.setPins.mockReturnValue(of(worldDetail(['p2', 'p1'])));
+    const el = render({
+      recents: [summary('e1')],
+      pinResolve: [summary('p1', 'Riverbend'), summary('p2', 'North Reach')],
+    });
+
+    // Move the second pin up past the first.
+    ($(el, '[data-testid=move-pin-up-p2]') as HTMLButtonElement).click();
+
+    expect(worlds.setPins).toHaveBeenCalledWith('w1', ['p2', 'p1']);
+  });
 
   it('renders the most-recently-edited Entities as recents', () => {
     const el = render({

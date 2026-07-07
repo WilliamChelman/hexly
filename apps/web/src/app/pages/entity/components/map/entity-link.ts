@@ -16,7 +16,7 @@ import { ActiveWorld } from '../../../../core/services/active-world';
 import { Button } from '../../../../ui/button';
 import { Field } from '../../../../ui/field';
 import { Icon } from '../../../../ui/icon/icon';
-import { Input } from '../../../../ui/input';
+import { EntitySearchPicker } from '../../../../ui/entity-search-picker';
 import { HexMapStore } from '../../services/hexmap-store';
 
 /**
@@ -30,7 +30,7 @@ import { HexMapStore } from '../../services/hexmap-store';
 @Component({
   selector: 'app-entity-link',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Field, Icon, Input, RouterLink, TranslocoPipe],
+  imports: [Button, Field, Icon, EntitySearchPicker, RouterLink, TranslocoPipe],
   template: `
     <div appField [label]="'editorShell.inspector.linkedEntity' | transloco">
       @let id = store.selectedEntityLink();
@@ -90,41 +90,17 @@ import { HexMapStore } from '../../services/hexmap-store';
       }
 
       @if (open()) {
-        <div
-          class="mt-2 rounded-md border border-line bg-surface p-1 shadow-2"
-          data-testid="entity-link-menu"
+        <app-entity-search-picker
+          class="mt-2 block"
+          testid="entity-link"
+          placeholderKey="editorShell.inspector.searchLink"
+          emptyKey="editorShell.inspector.linkEmpty"
+          [query]="query()"
+          (queryChange)="query.set($event)"
+          (pick)="pick($event.id)"
         >
-          <input
-            appInput
-            class="mb-1"
-            data-testid="entity-link-search"
-            [attr.placeholder]="'editorShell.inspector.searchLink' | transloco"
-            [value]="query()"
-            (input)="onQuery($event)"
-          />
-          <!-- Only the option list scrolls; the search box and create row stay pinned
-               so create-and-link is always reachable without scrolling past the list. -->
-          <div class="max-h-56 overflow-auto">
-            @for (e of options(); track e.id) {
-              <button
-                type="button"
-                appButton
-                variant="ghost"
-                size="sm"
-                class="w-full justify-start!"
-                [attr.data-testid]="'entity-link-option-' + e.id"
-                (click)="pick(e.id)"
-              >
-                {{ e.name }}
-              </button>
-            } @empty {
-              <p class="px-2 py-1 text-sm text-ink-muted">
-                {{ 'editorShell.inspector.linkEmpty' | transloco }}
-              </p>
-            }
-          </div>
-
-          <!-- Create-and-link in the same flow (issue #77): query names it, empty → default. -->
+          <!-- Create-and-link in the same flow (issue #77): query names it, empty → default.
+               Projected below the picker's option list; it stays pinned as the list scrolls. -->
           <div class="mt-1 flex gap-1 border-t border-line pt-1">
             <button
               type="button"
@@ -149,7 +125,7 @@ import { HexMapStore } from '../../services/hexmap-store';
               + {{ 'editorShell.inspector.newMap' | transloco }}
             </button>
           </div>
-        </div>
+        </app-entity-search-picker>
       }
     </div>
   `,
@@ -160,9 +136,6 @@ export class EntityLink {
   private readonly entitiesClient = inject(EntitiesClient);
   private readonly transloco = inject(TranslocoService);
   private readonly destroyRef = inject(DestroyRef);
-
-  /** The picker's options for the current query — a server-side search (ADR-0025). */
-  protected readonly options = signal<EntitySummary[]>([]);
 
   /**
    * Entities created via create-and-link (issue #77), resolved locally so their
@@ -206,21 +179,6 @@ export class EntityLink {
       onCleanup(() => sub.unsubscribe());
     });
 
-    // Search server-side as query changes (ADR-0025, stale-while-revalidate).
-    // ponytail: no debounce — small lists, fine until import.
-    effect((onCleanup) => {
-      if (!this.open()) {
-        this.options.set([]);
-        return;
-      }
-      const q = this.query().trim();
-      const sub = this.entitiesClient.list({ q }).subscribe({
-        next: (page) => this.options.set(page.items),
-        error: () => this.options.set([]),
-      });
-      onCleanup(() => sub.unsubscribe());
-    });
-
     // Close the picker and reset the query whenever the selected element changes so
     // a pick() always targets the element the picker was opened for.
     effect(() => {
@@ -233,10 +191,6 @@ export class EntityLink {
   protected toggle(): void {
     if (!this.open()) this.query.set('');
     this.open.update((v) => !v);
-  }
-
-  protected onQuery(event: Event): void {
-    this.query.set((event.target as HTMLInputElement).value);
   }
 
   protected pick(id: string): void {

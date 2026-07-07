@@ -403,9 +403,19 @@
     "recentsHeading": "Recently edited",
     "mapsHeading": "Hex maps",
     "countsHeading": "At a glance",
+    "pinsHeading": "Pinned",
+    "addPin": "Pin an entity",
+    "removePin": "Unpin",
+    "movePinUp": "Move up",
+    "movePinDown": "Move down",
+    "pinError": "Couldn't update the pins. Try again.",
     "browseAll": "Browse all entities",
     "emptyTitle": "Your world is a blank map.",
     "emptyHint": "Create your first note or hex map to begin."
+  },
+  "entitySearchPicker": {
+    "searchPlaceholder": "Search entities…",
+    "empty": "No matching entities"
   },
   "error": {
     "tabTitle": "Hexly — Not found",

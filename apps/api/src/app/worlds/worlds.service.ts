@@ -126,6 +126,8 @@ export class WorldsService {
       rights: worldRightsOf({ isOwner: true }),
       // A fresh World seeds no Entities — its landing is a derived Dashboard (ADR-0043).
       entityCount: 0,
+      // No Pinned Entities until an Owner curates them (ADR-0043, #168).
+      pinnedEntityIds: [],
       createdAt: now,
       updatedAt: now,
     };
@@ -156,21 +158,37 @@ export class WorldsService {
   }
 
   /**
-   * Rename World (Owner only, ADR-0024): forbidden if not an Owner, null if not found.
-   * The World name stands alone now (ADR-0043 retires the Home-title sync of ADR-0029).
+   * Update a World's Owner-curated fields (Owner only, ADR-0024, ADR-0043, #168):
+   * the `name` (rename) and/or the ordered `pinnedEntityIds` set. Forbidden if not an
+   * Owner, null if not found. Both fields optional — an absent one is left untouched.
+   * Pins are stored verbatim (references, not FKs): stale/inaccessible ids are filtered
+   * per-viewer on the read path, never pruned here.
+   * ponytail: stale pin ids filtered on read, not pruned on delete.
    */
-  rename(
+  update(
     userId: string,
     id: string,
-    name: string,
+    patch: { name?: string; pinnedEntityIds?: string[] },
   ): WorldDetail | 'forbidden' | null {
     const world = this.db.select().from(worlds).where(eq(worlds.id, id)).get();
     if (!world) return null;
     if (!worldAccess(this.db, userId).decideMeta(id)?.isOwner) return 'forbidden';
     const updatedAt = Date.now();
-    this.db.update(worlds).set({ name, updatedAt }).where(eq(worlds.id, id)).run();
-    // Only an Owner reaches rename (checked above), so full Rights.
-    return this.toDetail({ ...world, name, updatedAt }, userId);
+    const next = {
+      ...world,
+      ...(patch.name !== undefined ? { name: patch.name } : {}),
+      ...(patch.pinnedEntityIds !== undefined
+        ? { pinnedEntityIds: patch.pinnedEntityIds }
+        : {}),
+      updatedAt,
+    };
+    this.db
+      .update(worlds)
+      .set({ name: next.name, pinnedEntityIds: next.pinnedEntityIds, updatedAt })
+      .where(eq(worlds.id, id))
+      .run();
+    // Only an Owner reaches update (checked above), so full Rights.
+    return this.toDetail(next, userId);
   }
 
   /**
@@ -423,6 +441,8 @@ export class WorldsService {
       // list() uses, no extra isOwner query. `managedBy` folds the Superadmin bypass (#163).
       rights: access.rightsOf({ isOwner: access.managedBy(owners) }),
       entityCount,
+      // The stored Owner-curated pin set (ADR-0043, #168); [] on a fresh World.
+      pinnedEntityIds: world.pinnedEntityIds ?? [],
       createdAt: world.createdAt,
       updatedAt: world.updatedAt,
     };

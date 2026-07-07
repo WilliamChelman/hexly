@@ -6,7 +6,7 @@
  */
 
 import { z } from 'zod';
-import { nameSchema } from './entity';
+import { ENTITY_LIST_MAX_LIMIT, nameSchema } from './entity';
 
 /**
  * A World container (CONTEXT.md → World): a `name` and its `owners`. The landing
@@ -73,6 +73,28 @@ export const createWorldRequestSchema = z.object({ name: nameSchema });
 export type CreateWorldRequest = z.infer<typeof createWorldRequestSchema>;
 
 /**
+ * PATCH /worlds/:id (ADR-0043, #168): a partial update of the two Owner-curated fields —
+ * the `name` (rename) and/or the ordered `pinnedEntityIds` set. Pins are sent wholesale:
+ * add, remove, and reorder all collapse to "send the new array". Ids are references, not
+ * enforced FKs — a stale or inaccessible id is filtered per-viewer on read, never rejected
+ * here. Both fields optional so a rename and a re-pin are independent PATCHes.
+ */
+export const updateWorldRequestSchema = z.object({
+  name: nameSchema.optional(),
+  // Deduped at the trust boundary (mirroring dedupedTags): duplicate ids would resolve
+  // to duplicate Dashboard cards and crash the `@for` track-by. Capped at the pin-resolve
+  // ceiling so the stored set can never exceed what a single access-filtered read returns
+  // — an over-cap set is a 400 here, not a silently-truncated Dashboard.
+  pinnedEntityIds: z
+    .array(z.string())
+    .max(ENTITY_LIST_MAX_LIMIT)
+    .transform((ids) => [...new Set(ids)])
+    .optional(),
+});
+
+export type UpdateWorldRequest = z.infer<typeof updateWorldRequestSchema>;
+
+/**
  * Add an Owner to a World or Entity's ownership set (ADR-0037): the target must be
  * an existing Instance user. Shared by the Worlds and Entities owner-set endpoints.
  */
@@ -108,6 +130,13 @@ export interface WorldDetail extends WorldSummary {
    * delete can state the cost without a heavy endpoint.
    */
   readonly entityCount: number;
+  /**
+   * The Owner-curated Pinned Entities (ADR-0043, CONTEXT.md → Pinned Entity): one
+   * shared, ordered id list surfaced on the World Dashboard, the same for everyone.
+   * References, not enforced FKs — a pinned Entity a viewer can't reach simply drops
+   * off their Dashboard when the cards are resolved through the entity read path.
+   */
+  readonly pinnedEntityIds: readonly string[];
 }
 
 /**

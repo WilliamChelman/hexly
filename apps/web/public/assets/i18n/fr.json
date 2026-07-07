@@ -403,9 +403,19 @@
     "recentsHeading": "Modifié récemment",
     "mapsHeading": "Cartes hexagonales",
     "countsHeading": "Aperçu",
+    "pinsHeading": "Épinglés",
+    "addPin": "Épingler une entité",
+    "removePin": "Désépingler",
+    "movePinUp": "Déplacer vers le haut",
+    "movePinDown": "Déplacer vers le bas",
+    "pinError": "Impossible de mettre à jour les épingles. Réessayez.",
     "browseAll": "Parcourir toutes les entités",
     "emptyTitle": "Votre monde est une carte vierge.",
     "emptyHint": "Créez votre première note ou carte hexagonale pour commencer."
+  },
+  "entitySearchPicker": {
+    "searchPlaceholder": "Rechercher des entités…",
+    "empty": "Aucune entité correspondante"
   },
   "error": {
     "tabTitle": "Hexly — Introuvable",

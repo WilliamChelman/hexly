@@ -69,6 +69,7 @@ describe('WorldStore', () => {
     const detail: WorldDetail = {
       ...world('w2', 'New Realm'),
       entityCount: 1,
+      pinnedEntityIds: [],
     };
     worldsClient.create.mockReturnValue(of(detail));
 

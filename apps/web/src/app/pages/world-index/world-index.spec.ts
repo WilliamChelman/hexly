@@ -144,6 +144,7 @@ describe('WorldIndex', () => {
       of({
         ...world('w9', 'Untitled world'),
         entityCount: 0,
+        pinnedEntityIds: [],
       }),
     );
     ($(el, '[data-testid=create-world]') as HTMLButtonElement).click();
@@ -300,6 +301,7 @@ describe('WorldIndex', () => {
       of({
         ...world('w1', 'The Reach of Aldermoor'),
         entityCount: 1,
+        pinnedEntityIds: [],
       }),
     );
     const input = $(el, '[data-testid=rename-world-input-w1]') as HTMLInputElement;
@@ -325,6 +327,7 @@ describe('WorldIndex', () => {
       of({
         ...world('w1', 'Aldermoor'),
         entityCount: 3,
+        pinnedEntityIds: [],
       }),
     );
     ($(el, '[data-testid=delete-world-w1]') as HTMLButtonElement).click();
@@ -340,7 +343,7 @@ describe('WorldIndex', () => {
     const fixture = render([world('w1', name)]);
     const el = fixture.nativeElement as HTMLElement;
     worldsClient.get.mockReturnValue(
-      of({ ...world('w1', name), entityCount: count }),
+      of({ ...world('w1', name), entityCount: count, pinnedEntityIds: [] }),
     );
     ($(el, '[data-testid=delete-world-w1]') as HTMLButtonElement).click();
     fixture.detectChanges();

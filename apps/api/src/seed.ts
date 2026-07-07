@@ -48,8 +48,15 @@ async function seed() {
       `Seeded ${isSuperadmin ? 'Superadmin' : 'user'} ${email}${withWorld ? ' with a starter World' : ''}`,
     );
   } catch (err) {
-    Logger.error(`Could not seed ${email}: ${(err as Error).message}`);
-    process.exitCode = 1;
+    const message = (err as Error).message;
+    // Idempotent boot-seed: the container runs this on every start, so an already
+    // seeded email is a no-op, not a failure. Anything else is a real error.
+    if (/UNIQUE constraint failed: users\.email/.test(message)) {
+      Logger.log(`${email} already seeded, skipping`);
+    } else {
+      Logger.error(`Could not seed ${email}: ${message}`);
+      process.exitCode = 1;
+    }
   } finally {
     await app.close();
   }

@@ -19,7 +19,7 @@ describe('WorldsClient', () => {
     createdAt: 1,
     updatedAt: 1,
   };
-  const detail: WorldDetail = { ...summary, entityCount: 1 };
+  const detail: WorldDetail = { ...summary, entityCount: 1, pinnedEntityIds: [] };
 
   beforeEach(() => {
     TestBed.configureTestingModule({
@@ -75,6 +75,18 @@ describe('WorldsClient', () => {
     req.flush({ ...detail, name: 'The Reach' });
 
     expect(renamed?.name).toBe('The Reach');
+  });
+
+  it('sets the World pins via a wholesale PATCH', () => {
+    let updated: WorldDetail | undefined;
+    client.setPins('w1', ['p2', 'p1']).subscribe((w) => (updated = w));
+
+    const req = http.expectOne('/api/worlds/w1');
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ pinnedEntityIds: ['p2', 'p1'] });
+    req.flush({ ...detail, pinnedEntityIds: ['p2', 'p1'] });
+
+    expect(updated?.pinnedEntityIds).toEqual(['p2', 'p1']);
   });
 
   it('imports a vault zip as multipart and returns the summary', () => {

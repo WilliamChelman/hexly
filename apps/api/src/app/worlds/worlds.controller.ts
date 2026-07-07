@@ -24,6 +24,7 @@ import {
   ImportSummary,
   PublicLink,
   setMemberRoleRequestSchema,
+  updateWorldRequestSchema,
   WorldDetail,
   WorldMember,
   WorldSummary,
@@ -124,16 +125,17 @@ export class WorldsController {
     res.send(result.zip);
   }
 
-  // Reuse create schema (both use { name } shape).
+  // A partial update of the Owner-curated fields: `name` (rename) and/or `pinnedEntityIds`
+  // (Dashboard pins, #168). Owner-gated in the service; reachable-but-not-Owner is a 403.
   @Patch(':id')
-  rename(
+  update(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Body() body: unknown,
   ): WorldDetail {
-    const parsed = createWorldRequestSchema.safeParse(body);
+    const parsed = updateWorldRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
-    const result = this.worlds.rename(user.id, id, parsed.data.name);
+    const result = this.worlds.update(user.id, id, parsed.data);
     if (result === null) throw new NotFoundException();
     if (result === 'forbidden') throw new ForbiddenException();
     return result;

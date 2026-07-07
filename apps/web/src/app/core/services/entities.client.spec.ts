@@ -89,6 +89,24 @@ describe('EntitiesClient', () => {
     req.flush({ items: [], nextCursor: null });
   });
 
+  it('sizes the page to the id count for an ids read, so none is truncated', () => {
+    // No explicit limit: an `ids` read means "resolve exactly these", so the client
+    // defaults the limit to the id count rather than the default page size.
+    client.list({ ids: ['a', 'b', 'c'] }).subscribe();
+
+    const req = http.expectOne((r) => r.url === '/api/entities');
+    expect(req.request.params.get('limit')).toBe('3');
+    req.flush({ items: [], nextCursor: null });
+  });
+
+  it('lets an explicit limit override the ids-count default', () => {
+    client.list({ ids: ['a', 'b', 'c'], limit: 1 }).subscribe();
+
+    const req = http.expectOne((r) => r.url === '/api/entities');
+    expect(req.request.params.get('limit')).toBe('1');
+    req.flush({ items: [], nextCursor: null });
+  });
+
   it('serializes multi-valued Facet params as repeats (OR within category, #155)', () => {
     client
       .list({ type: ['note', 'hexmap'], tag: ['deity', 'ruined'], visibility: ['shared'] })

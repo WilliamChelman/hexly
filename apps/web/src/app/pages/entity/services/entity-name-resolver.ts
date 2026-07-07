@@ -96,9 +96,7 @@ export class EntityNameResolver {
    * public read surface instead of the session-guarded `/api/entities` (ADR-0037, #162).
    */
   protected fetchByIds(ids: string[]): Observable<EntitySummary[]> {
-    return this.client
-      .list({ ids, limit: ids.length })
-      .pipe(map((page) => page.items));
+    return this.client.list({ ids }).pipe(map((page) => page.items));
   }
 
   private fill(ids: string[], items: EntitySummary[]): void {

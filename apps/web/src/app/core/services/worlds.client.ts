@@ -48,6 +48,15 @@ export class WorldsClient {
     return this.http.patch<WorldDetail>(`/api/worlds/${id}`, { name });
   }
 
+  /**
+   * Replace the World's Owner-curated Pinned Entities wholesale (ADR-0043, #168):
+   * add, remove, and reorder all collapse to "send the new ordered array". Owner-gated
+   * server-side; returns the updated Detail so the caller can re-pin the active World.
+   */
+  setPins(id: string, pinnedEntityIds: string[]): Observable<WorldDetail> {
+    return this.http.patch<WorldDetail>(`/api/worlds/${id}`, { pinnedEntityIds });
+  }
+
   delete(id: string): Observable<void> {
     return this.http.delete<void>(`/api/worlds/${id}`);
   }

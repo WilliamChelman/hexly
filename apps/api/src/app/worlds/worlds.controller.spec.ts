@@ -55,6 +55,8 @@ describe('Worlds endpoints', () => {
       rights: ['read', 'manage'],
       // No Home Entity is minted — the landing is a derived Dashboard (ADR-0043).
       entityCount: 0,
+      // A fresh World carries no Owner-curated pins (ADR-0043, #168).
+      pinnedEntityIds: [],
       createdAt: expect.any(Number),
       updatedAt: expect.any(Number),
     });
@@ -239,6 +241,134 @@ describe('Worlds endpoints', () => {
     await ada.delete('/worlds/does-not-exist').expect(404);
 
     await ada.get(`/worlds/${created.body.id}`).expect(200);
+  });
+
+  it('lets an Owner set the World’s Pinned Entities via PATCH, reflected on the Detail (#168)', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+    // A fresh World has no pins.
+    expect(world.body.pinnedEntityIds).toEqual([]);
+
+    const a = await ada
+      .post('/entities')
+      .send({ name: 'A', type: 'note', worldId: world.body.id })
+      .expect(201);
+    const b = await ada
+      .post('/entities')
+      .send({ name: 'B', type: 'note', worldId: world.body.id })
+      .expect(201);
+
+    const res = await ada
+      .patch(`/worlds/${world.body.id}`)
+      .send({ pinnedEntityIds: [a.body.id, b.body.id] })
+      .expect(200);
+    expect(res.body.pinnedEntityIds).toEqual([a.body.id, b.body.id]);
+
+    const reloaded = await ada.get(`/worlds/${world.body.id}`).expect(200);
+    expect(reloaded.body.pinnedEntityIds).toEqual([a.body.id, b.body.id]);
+  });
+
+  it('reorders and removes pins via the replacement array, preserving order (#168)', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+    const ids: string[] = [];
+    for (const name of ['A', 'B', 'C']) {
+      const e = await ada
+        .post('/entities')
+        .send({ name, type: 'note', worldId: world.body.id })
+        .expect(201);
+      ids.push(e.body.id);
+    }
+    await ada.patch(`/worlds/${world.body.id}`).send({ pinnedEntityIds: ids }).expect(200);
+
+    // Reorder wholesale: reverse the set.
+    const reversed = [...ids].reverse();
+    const res = await ada
+      .patch(`/worlds/${world.body.id}`)
+      .send({ pinnedEntityIds: reversed })
+      .expect(200);
+    expect(res.body.pinnedEntityIds).toEqual(reversed);
+
+    // Remove the middle by omitting it from the array.
+    const withoutB = reversed.filter((id) => id !== ids[1]);
+    const removed = await ada
+      .patch(`/worlds/${world.body.id}`)
+      .send({ pinnedEntityIds: withoutB })
+      .expect(200);
+    expect(removed.body.pinnedEntityIds).toEqual(withoutB);
+
+    // A name-only PATCH leaves the pins untouched (independent fields).
+    const renamed = await ada
+      .patch(`/worlds/${world.body.id}`)
+      .send({ name: 'Renamed' })
+      .expect(200);
+    expect(renamed.body.name).toBe('Renamed');
+    expect(renamed.body.pinnedEntityIds).toEqual(withoutB);
+  });
+
+  it('dedupes pinned ids at the boundary so the Dashboard never gets duplicate cards (#168)', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+    const a = await ada
+      .post('/entities')
+      .send({ name: 'A', type: 'note', worldId: world.body.id })
+      .expect(201);
+    const b = await ada
+      .post('/entities')
+      .send({ name: 'B', type: 'note', worldId: world.body.id })
+      .expect(201);
+
+    // A duplicate id (reachable directly via the API) collapses to one, first-wins order.
+    const res = await ada
+      .patch(`/worlds/${world.body.id}`)
+      .send({ pinnedEntityIds: [a.body.id, b.body.id, a.body.id] })
+      .expect(200);
+    expect(res.body.pinnedEntityIds).toEqual([a.body.id, b.body.id]);
+  });
+
+  it('shares one pin set: a member reads the same pins the Owner curated (#168)', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+    const note = await ada
+      .post('/entities')
+      .send({ name: 'Shared lore', type: 'note', worldId: world.body.id })
+      .expect(201);
+    await ada
+      .patch(`/worlds/${world.body.id}`)
+      .send({ pinnedEntityIds: [note.body.id] })
+      .expect(200);
+
+    const bobId = await app
+      .get(AuthService)
+      .seedUser('bob@hexly.test', 'battery staple', 'Bob');
+    db.$client
+      .prepare(`INSERT INTO world_members (world_id, user_id, role) VALUES (?, ?, 'viewer')`)
+      .run(world.body.id, bobId);
+    const bob = await signIn('bob@hexly.test', 'battery staple');
+
+    // The pin set is a World property — the same list for everyone (ADR-0043).
+    expect((await bob.get(`/worlds/${world.body.id}`).expect(200)).body.pinnedEntityIds).toEqual([
+      note.body.id,
+    ]);
+  });
+
+  it('refuses a Contributor or Viewer setting pins with 403 (#168)', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
+    const bobId = await app
+      .get(AuthService)
+      .seedUser('bob@hexly.test', 'battery staple', 'Bob');
+    db.$client
+      .prepare(`INSERT INTO world_members (world_id, user_id, role) VALUES (?, ?, 'contributor')`)
+      .run(world.body.id, bobId);
+    const bob = await signIn('bob@hexly.test', 'battery staple');
+
+    await bob
+      .patch(`/worlds/${world.body.id}`)
+      .send({ pinnedEntityIds: ['x'] })
+      .expect(403);
+    // The pins stayed empty — a refused PATCH writes nothing.
+    expect((await ada.get(`/worlds/${world.body.id}`).expect(200)).body.pinnedEntityIds).toEqual([]);
   });
 
   it('refuses every World route without a session cookie', async () => {

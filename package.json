@@ -11,7 +11,8 @@
     "db:generate": "cd apps/api && drizzle-kit generate",
     "build": "nx run-many -t build -p api,web",
     "test": "nx run-many -t test",
-    "lint": "nx run-many -t lint"
+    "lint": "nx run-many -t lint",
+    "e2e": "nx e2e web-e2e"
   },
   "private": true,
   "pnpm": {

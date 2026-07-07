@@ -40,7 +40,11 @@ export class EntitiesClient {
     // `ids` repeats in query string; cursor/limit are single-valued paging.
     for (const id of opts.ids ?? []) params = params.append('ids', id);
     if (opts.cursor) params = params.set('cursor', opts.cursor);
-    if (opts.limit !== undefined) params = params.set('limit', opts.limit);
+    // An `ids` read is "resolve exactly these", not a paged browse: default the limit to
+    // the id count (server clamps to ENTITY_LIST_MAX_LIMIT) so a set larger than the
+    // default page size isn't silently truncated. An explicit limit still wins.
+    const limit = opts.limit ?? (opts.ids?.length || undefined);
+    if (limit !== undefined) params = params.set('limit', limit);
     // Opt-in per-row Rights (ADR-0039): the Entity Browser sets it to gate per-card actions;
     // other list callers omit it so the server stays a pure read-filter (no per-row EXISTS).
     if (opts.rights) params = params.set('rights', '1');
