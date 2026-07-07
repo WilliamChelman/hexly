@@ -148,6 +148,10 @@ _Avoid_: Reader, guest
 An unguessable, unlisted URL that grants read-only access to a specific Entity without an account — an anonymous Viewer grant, so it pierces `private` like any entity-level grant; revoking the link is how access is withdrawn. Distinct from the World Public Link, which covers all `shared` Entities in a World.
 _Avoid_: Share link, public URL, share token
 
+**Live-follow**:
+A viewer in read mode seeing another user's *committed* changes to the Entity or World they are looking at appear on their own screen without a manual refresh — e.g. a player watching a `shared` Hex Map the GM is editing, or a World Dashboard whose pins the Owner is reordering. Applies to committed versions, not keystrokes (real-time co-editing is a separate, deferred concept — ADR-0019). Extends to anonymous World/Entity Public Link viewers. If the followed resource becomes unreachable (made `private`, un-shared, link revoked, or deleted), the follower's view is evicted rather than left stale. Never overwrites the follower's own unsaved edits: an editor with local changes keeps them and resolves the concurrent edit at save time. See ADR-0044.
+_Avoid_: Real-time sync, live editing, collaboration, streaming
+
 **EntityView**:
 Which editor surface is currently showing for an Entity that has multiple surfaces — the hex `'map'` (grid) or the `'note'` (Content body). Mirrored to the URL `view` param so a refresh or shared link lands on the correct surface. Session-only state, never part of the Entity document. Applies only to `hexmap` Entities; Notes have a single surface.
 _Avoid_: Mode, surface, panel, view mode

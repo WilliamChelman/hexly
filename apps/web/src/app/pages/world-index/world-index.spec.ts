@@ -424,4 +424,68 @@ describe('WorldIndex', () => {
       'error',
     ]);
   });
+
+  /**
+   * Simulate a tab visibility transition: jsdom's `visibilityState` is a getter, so
+   * override it, then fire the event the Index listens on (ADR-0044: the Index refetches
+   * on focus, off the nudge bus).
+   */
+  function fireVisibility(state: DocumentVisibilityState) {
+    Object.defineProperty(document, 'visibilityState', {
+      value: state,
+      configurable: true,
+    });
+    document.dispatchEvent(new Event('visibilitychange'));
+  }
+
+  it('refetches the worlds directory when the tab is re-focused, reflecting changes made elsewhere (#172)', () => {
+    const fixture = render([world('w1', 'Aldermoor')]);
+    const el = fixture.nativeElement as HTMLElement;
+    expect($(el, '[data-testid=world-w1]')).not.toBeNull();
+
+    // While the tab was away, a World was renamed and another created elsewhere.
+    worldsClient.list.mockReturnValue(
+      of([world('w1', 'The Reach of Aldermoor'), world('w2', 'Whisperwood')]),
+    );
+    fireVisibility('visible');
+    fixture.detectChanges();
+
+    expect($(el, '[data-testid=world-w1]')?.textContent).toContain(
+      'The Reach of Aldermoor',
+    );
+    expect($(el, '[data-testid=world-w2]')).not.toBeNull();
+  });
+
+  it('does not refetch when the tab merely goes hidden (no redundant fire, #172)', () => {
+    render([world('w1', 'Aldermoor')]);
+    worldsClient.list.mockClear();
+
+    fireVisibility('hidden');
+
+    expect(worldsClient.list).not.toHaveBeenCalled();
+  });
+
+  it('keeps the last-good list when a re-focus refetch fails (#172)', () => {
+    const fixture = render([world('w1', 'Aldermoor')]);
+    const el = fixture.nativeElement as HTMLElement;
+
+    // Session expired / network blipped while the tab was hidden.
+    worldsClient.list.mockReturnValue(throwError(() => new Error('offline')));
+    fireVisibility('visible');
+    fixture.detectChanges();
+
+    // Stale-but-present beats a blank Index; no error toast either.
+    expect($(el, '[data-testid=world-w1]')?.textContent).toContain('Aldermoor');
+    expect(TestBed.inject(ToasterService).toasts()).toEqual([]);
+  });
+
+  it('stops refetching once the user has navigated away from the Index (#172)', () => {
+    const fixture = render([world('w1', 'Aldermoor')]);
+    worldsClient.list.mockClear();
+
+    fixture.destroy(); // navigate away → component (and its listener) torn down
+    fireVisibility('visible');
+
+    expect(worldsClient.list).not.toHaveBeenCalled();
+  });
 });

@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   computed,
   inject,
   signal,
@@ -457,6 +458,20 @@ export class WorldIndex {
 
   constructor() {
     this.store.load();
+
+    // Live-follow for the durable directory, off the nudge bus (ADR-0044): returning to
+    // the tab refetches the worlds list, so a World created/renamed/deleted elsewhere
+    // shows without a hard reload. `visibilitychange` fires only on hidden↔visible
+    // transitions, so guarding on `visible` refetches on re-focus without firing while
+    // the tab is already active. The listener lives on the Index component, so it's
+    // scoped to `/` and torn down on navigate-away.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') this.store.refresh();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    inject(DestroyRef).onDestroy(() =>
+      document.removeEventListener('visibilitychange', onVisible),
+    );
   }
 
   /** Open the inline rename input on a World (Owner-only, gated in the template). */

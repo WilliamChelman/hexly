@@ -110,8 +110,16 @@ export class WorldStore {
     );
   }
 
-  // Re-fetch the reachable Worlds after an out-of-band change (e.g. leaving one).
-  private refresh(): void {
-    this.client.list().subscribe({ next: (worlds) => this._worlds.set(worlds) });
+  // Re-fetch the reachable Worlds after an out-of-band change — e.g. leaving one, or
+  // the World Index returning to focus (ADR-0044: the durable directory refetches on
+  // focus, off the nudge bus). Unconditional, unlike load(): it bypasses the once-only
+  // guard so a re-focus reflects a World created/renamed/deleted elsewhere.
+  refresh(): void {
+    this.client.list().subscribe({
+      next: (worlds) => this._worlds.set(worlds),
+      // ponytail: keep the last-good list on a transient re-focus failure (expired
+      // session / network blip while the tab was hidden) — no toast, no error propagated.
+      error: () => {},
+    });
   }
 }
