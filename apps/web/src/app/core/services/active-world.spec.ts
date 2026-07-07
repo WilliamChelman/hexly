@@ -2,7 +2,6 @@ import { TestBed } from '@angular/core/testing';
 import {
   ActivatedRouteSnapshot,
   convertToParamMap,
-  Router,
   RouterStateSnapshot,
   UrlTree,
 } from '@angular/router';
@@ -124,20 +123,51 @@ describe('ActiveWorld', () => {
     expect(active.world()).toBe(detail);
   });
 
-  it('the deactivate guard clears the active World on leaving the World scope', () => {
-    active.set(detail, WORLD_ID);
+  // Build a nextState whose deepest route carries the given World segment (or none).
+  function nextState(worldSeg?: string): RouterStateSnapshot {
+    const root = {
+      paramMap: convertToParamMap(worldSeg ? { worldId: worldSeg } : {}),
+      firstChild: null,
+    } as unknown as ActivatedRouteSnapshot;
+    return { root } as RouterStateSnapshot;
+  }
 
-    const ok = TestBed.runInInjectionContext(() =>
+  function deactivate(next: RouterStateSnapshot) {
+    return TestBed.runInInjectionContext(() =>
       clearActiveWorld(
         null,
         {} as ActivatedRouteSnapshot,
         {} as RouterStateSnapshot,
-        {} as RouterStateSnapshot,
+        next,
       ),
     );
+  }
 
-    expect(ok).toBe(true);
+  it('the deactivate guard clears the active World on leaving the World scope', () => {
+    active.set(detail, WORLD_ID);
+
+    expect(deactivate(nextState())).toBe(true);
     expect(active.worldId()).toBeNull();
     expect(active.world()).toBeNull();
+  });
+
+  it('clears when switching to a different World', () => {
+    active.set(detail, WORLD_ID);
+    const other = '22222222-2222-4222-8222-222222222222';
+
+    deactivate(nextState(segment(other, 'Bramble')));
+
+    expect(active.worldId()).toBeNull();
+  });
+
+  // The slug self-heal re-segments the same World (uuid → slug-base62); the decoded id
+  // is unchanged, so the scope must stay pinned or the rail blanks mid-redirect.
+  it('keeps the World pinned when the destination is the same World (slug heal)', () => {
+    active.set(detail, WORLD_ID);
+
+    deactivate(nextState(WORLD_ID)); // bare-uuid form of the already-active World
+
+    expect(active.worldId()).toBe(WORLD_ID);
+    expect(active.world()).toBe(detail);
   });
 });

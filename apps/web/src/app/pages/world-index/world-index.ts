@@ -15,7 +15,11 @@ import { WorldStore } from '../../core/services/world.store';
 import { WorldsClient } from '../../core/services/worlds.client';
 import { ToasterService } from '../../core/services/toaster.service';
 import { ImportSummary } from '@hexly/domain';
-import { worldDashboardRoute, worldRoute } from '../../core/utils/routes';
+import {
+  worldDashboardRoute,
+  worldRoute,
+  worldSettingsRoute,
+} from '../../core/utils/routes';
 import { Button } from '../../ui/button';
 import { Eyebrow } from '../../ui/eyebrow';
 import { Panel } from '../../ui/panel';
@@ -189,7 +193,7 @@ import { ACCENT_SIGIL, accentFor, monogram } from '../../ui/sigil';
                         icon
                         variant="ghost"
                         size="sm"
-                        [routerLink]="['/w', card.id, 'settings']"
+                        [routerLink]="settingsRoute(card.id, card.name)"
                         [attr.data-testid]="'owners-world-' + card.id"
                         [attr.aria-label]="'owners.heading' | transloco"
                         [attr.title]="'owners.heading' | transloco"
@@ -433,6 +437,7 @@ export class WorldIndex {
 
   /** The World's Dashboard landing (ADR-0043) — the one `/w/:id` source, name-slugged. */
   protected readonly dashboardRoute = worldDashboardRoute;
+  protected readonly settingsRoute = worldSettingsRoute;
 
   protected sigil(id: string): string {
     return ACCENT_SIGIL[accentFor(id)];

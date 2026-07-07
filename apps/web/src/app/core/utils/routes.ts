@@ -22,6 +22,14 @@ export function worldDashboardRoute(worldId: string, worldName?: string): string
   return ['/w', segment(worldId, worldName)];
 }
 
+/**
+ * World Settings `/w/:worldId/settings` (#158). Pretty-segment like the others so a
+ * nav link matches the healed URL and never trips activeWorldGuard's heal redirect.
+ */
+export function worldSettingsRoute(worldId: string, worldName?: string): string[] {
+  return ['/w', segment(worldId, worldName), 'settings'];
+}
+
 export function entityRoute(
   worldId: string,
   entityId: string,

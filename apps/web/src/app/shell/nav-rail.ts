@@ -17,6 +17,7 @@ import { WorldStore } from '../core/services/world.store';
 import { ActiveWorld } from '../core/services/active-world';
 import { AppShellStore } from './app-shell.store';
 import { AuthScopedStorage } from '../core/services/auth-scoped-storage';
+import { worldRoute, worldSettingsRoute } from '../core/utils/routes';
 import { Button } from '../ui/button';
 import { Cartouche } from '../ui/cartouche';
 import { Icon, IconName } from '../ui/icon/icon';
@@ -24,7 +25,7 @@ import { UserMenu } from './user-menu';
 import { WorldSwitcher } from './world-switcher';
 
 interface NavEntry {
-  readonly link: string;
+  readonly link: string | readonly string[];
   readonly testid: string;
   readonly icon: IconName;
   readonly labelKey: string;
@@ -140,7 +141,7 @@ const STATIC_ENTRIES: readonly NavEntry[] = [
           class="flex flex-col gap-1 mt-1"
           [attr.aria-label]="'nav.primary' | transloco"
         >
-          @for (entry of entries(); track entry.link) {
+          @for (entry of entries(); track entry.testid) {
             <a
               [routerLink]="entry.link"
               [attr.data-testid]="entry.testid"
@@ -205,17 +206,19 @@ export class NavRail {
   protected readonly entries = computed<readonly NavEntry[]>(() => {
     const worldId = this.activeWorld.worldId();
     if (worldId) {
+      const world = this.worlds.worlds().find((w) => w.id === worldId);
+      // Route through the canonical slug-base62 helpers (ADR-0042), not a bare id — a
+      // bare-UUID link trips activeWorldGuard's heal redirect on every click, which
+      // tears down and rebuilds the World scope and blanks the rail for a frame.
+      const name = this.activeWorld.name() ?? world?.name;
       // World Settings shows only to a caller who may manage the World — the same
       // `manage` right the World Index gates its own settings entry on (ADR-0039).
-      const canManage = !!this.worlds
-        .worlds()
-        .find((w) => w.id === worldId)
-        ?.rights?.includes('manage');
+      const canManage = !!world?.rights?.includes('manage');
       return [
-        { link: `/w/${worldId}/entities`, testid: 'nav-entities', icon: 'library', labelKey: 'nav.library' },
+        { link: worldRoute(worldId, name), testid: 'nav-entities', icon: 'library', labelKey: 'nav.library' },
         // World Settings moved off the World root (now the Dashboard, ADR-0043).
         ...(canManage
-          ? [{ link: `/w/${worldId}/settings`, testid: 'nav-world-settings', icon: 'settings' as const, labelKey: 'nav.worldSettings' }]
+          ? [{ link: worldSettingsRoute(worldId, name), testid: 'nav-world-settings', icon: 'settings' as const, labelKey: 'nav.worldSettings' }]
           : []),
       ];
     }

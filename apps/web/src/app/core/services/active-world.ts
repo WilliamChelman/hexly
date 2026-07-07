@@ -1,5 +1,11 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { CanActivateFn, CanDeactivateFn, Router } from '@angular/router';
+import {
+  ActivatedRouteSnapshot,
+  CanActivateFn,
+  CanDeactivateFn,
+  Router,
+  RouterStateSnapshot,
+} from '@angular/router';
 import { catchError, map, of } from 'rxjs';
 import { TranslocoService } from '@jsverse/transloco';
 import { WorldDetail } from '@hexly/domain';
@@ -94,13 +100,32 @@ export const activeWorldGuard: CanActivateFn = (route, state) => {
     );
 };
 
+/** The World id the router state resolves to, or `null` when it isn't World-scoped. */
+function targetWorldId(state: RouterStateSnapshot): string | null {
+  for (let r: ActivatedRouteSnapshot | null = state.root; r; r = r.firstChild) {
+    const seg = r.paramMap.get('worldId');
+    if (seg) return idFromSegment(seg);
+  }
+  return null;
+}
+
 /**
  * Clears {@link ActiveWorld} when leaving the World scope (ADR-0028). On the
  * `w/:worldId` parent's `canDeactivate`, so stepping out to the Index (or login)
- * drops the scope; a param-only hop between Worlds keeps the route active and so
- * never fires this — the guard re-pins instead.
+ * drops the scope.
+ *
+ * Only clears when the destination truly leaves this World — the Index, login, or a
+ * *different* World. A within-World URL change keeps the same World active, so it must
+ * not clear: notably the slug self-heal (bare/legacy id → slug-base62, ADR-0042) bounces
+ * through a `replaceUrl` redirect that re-segments — and so deactivates — this parent.
+ * Clearing on that redirect would blank the World-scoped rail for the frame between the
+ * clear and the guard's re-pin (the flicker). The decoded id is the identity, not the
+ * segment string, so a uuid↔slug hop reads as "same World" and the scope stays pinned.
  */
-export const clearActiveWorld: CanDeactivateFn<unknown> = () => {
-  inject(ActiveWorld).set(null);
+export const clearActiveWorld: CanDeactivateFn<unknown> = (_c, _r, _s, nextState) => {
+  const active = inject(ActiveWorld);
+  if (targetWorldId(nextState) !== active.worldId()) {
+    active.set(null);
+  }
   return true;
 };
