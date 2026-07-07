@@ -3,12 +3,8 @@ import { provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { Subject, of, throwError } from 'rxjs';
 import { ImportSummary, WorldSummary } from '@hexly/domain';
-import { AuthClient } from '../../core/services/auth.client';
-import { MockAuthClient } from '../../core/testing/auth-client.mock';
-import { WorldsClient } from '../../core/services/worlds.client';
-import { MockWorldsClient } from '../../core/testing/worlds-client.mock';
-import { ToasterService } from '../../core/services/toaster.service';
-import { provideTranslocoTesting } from '../../core/i18n/transloco-testing';
+import { AuthClient, WorldsClient, ToasterService } from '@hexly/web-core';
+import { MockAuthClient, MockWorldsClient, provideTranslocoTesting } from '@hexly/web-core/testing';
 import { WorldIndex } from './world-index';
 
 function world(id: string, name = id, ownerId = 'u1'): WorldSummary {

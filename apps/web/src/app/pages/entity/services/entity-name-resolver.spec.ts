@@ -1,8 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { Subject, of } from 'rxjs';
-import { EntityListParams } from '../../../core/services/entities.client';
+import { EntityListParams, EntitiesClient } from '@hexly/web-core';
 import { EntityPage, EntitySummary } from '@hexly/domain';
-import { EntitiesClient } from '../../../core/services/entities.client';
 import { EntityNameResolver } from './entity-name-resolver';
 
 function summary(id: string, name: string): EntitySummary {

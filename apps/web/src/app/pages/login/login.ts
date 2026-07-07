@@ -8,12 +8,8 @@ import {
 import { ActivatedRoute, Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { translateSignal, TranslocoPipe } from '@jsverse/transloco';
-import { AuthClient } from '../../core/services/auth.client';
-import { Button } from '../../ui/button';
-import { Field } from '../../ui/field';
-import { Input } from '../../ui/input';
-import { Panel } from '../../ui/panel';
-import { AppShellStore } from '../../shell/app-shell.store';
+import { AuthClient, AppShellStore } from '@hexly/web-core';
+import { Button, Field, Input, Panel } from '@hexly/web-ui';
 
 @Component({
   selector: 'app-login',

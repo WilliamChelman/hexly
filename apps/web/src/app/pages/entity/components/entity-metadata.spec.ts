@@ -3,7 +3,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { EntityDetail } from '@hexly/domain';
 import { EntitySession } from '../services/entity-session';
-import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
+import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { EntityMetadata } from './entity-metadata';
 
 describe('EntityMetadata', () => {

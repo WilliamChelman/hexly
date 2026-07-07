@@ -2,8 +2,8 @@
  * Hexly design-token ESLint rules (ADR-0020).
  *
  * The design tokens and Tailwind's theme are one source of truth: every
- * utility-shaped token is declared in the `@theme` block (styles.css) or, for
- * the theme-variant / non-utility tokens, in tokens.css. These rules are the
+ * utility-shaped token is declared in the `@theme` block (web-styles/index.css)
+ * or, for the theme-variant / non-utility tokens, in tokens.css. These rules are the
  * load-bearing guard the ADR calls for — without it, token typos fail silently
  * (`var(--danger)` resolves to nothing). stylelint can't help here: component
  * styles are CSS-in-TS template strings, so the check lives in ESLint over the
@@ -16,13 +16,16 @@
  * scale to Tailwind's default linear multiplier, so every step is intentionally
  * open and `no-off-scale-spacing` was removed.
  *
- * The token allowlist is read from styles.css + tokens.css at lint time, so the
- * curation lives in the CSS and this rule stays in sync automatically.
+ * The token allowlist is read from web-styles/index.css + tokens.css at lint
+ * time, so the curation lives in the CSS and this rule stays in sync automatically.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 
-const TOKEN_FILES = ['apps/web/src/styles.css', 'apps/web/src/styles/tokens.css'];
+const TOKEN_FILES = [
+  'libs/web-styles/src/index.css',
+  'libs/web-styles/src/tokens.css',
+];
 
 /**
  * Tailwind built-ins a component may legitimately reference by name. `--spacing`

@@ -8,12 +8,8 @@ import {
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { EntityType, EntityVerb } from '@hexly/domain';
-import { HexlyDatePipe } from '../../core/i18n/hexly-date.pipe';
-import { Autofocus } from '../../ui/autofocus';
-import { Button } from '../../ui/button';
-import { Panel } from '../../ui/panel';
-import { Icon, IconName } from '../../ui/icon/icon';
-import { ACCENT_BAR, ACCENT_SIGIL, accentFor } from '../../ui/sigil';
+import { HexlyDatePipe } from '@hexly/web-core';
+import { Autofocus, Button, Panel, Icon, IconName, ACCENT_BAR, ACCENT_SIGIL, accentFor } from '@hexly/web-ui';
 
 /** A row of the Entity browser grid — the parent owns list/order, the card owns
  * the tile. The last-edited instant stays raw; the template formats it via

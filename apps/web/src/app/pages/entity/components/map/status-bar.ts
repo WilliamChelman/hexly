@@ -9,9 +9,7 @@ import {
 import { HttpClient } from '@angular/common/http';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { HealthStatus, isHealthy } from '@hexly/domain';
-import { Cartouche } from '../../../../ui/cartouche';
-import { Coord } from '../../../../ui/coord';
-import { Dot } from '../../../../ui/dot';
+import { Cartouche, Coord, Dot } from '@hexly/web-ui';
 import { HexMapStore } from '../../services/hexmap-store';
 
 /**

@@ -2,7 +2,7 @@ import { ComponentRef } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { EntitySummary } from '@hexly/domain';
-import { provideTranslocoTesting } from '../../../../core/i18n/transloco-testing';
+import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import {
   EntityNameResolver,
   EntityResolution,

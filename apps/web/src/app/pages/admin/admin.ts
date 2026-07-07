@@ -9,14 +9,8 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { AdminError, AdminUser, CreateUserRequest, MIN_PASSWORD_LENGTH } from '@hexly/domain';
 import { Observable } from 'rxjs';
-import { AdminClient } from '../../core/services/admin.client';
-import { AuthClient } from '../../core/services/auth.client';
-import { ToasterService } from '../../core/services/toaster.service';
-import { Eyebrow } from '../../ui/eyebrow';
-import { Field } from '../../ui/field';
-import { Input } from '../../ui/input';
-import { Panel } from '../../ui/panel';
-import { Button } from '../../ui/button';
+import { AdminClient, AuthClient, ToasterService } from '@hexly/web-core';
+import { Eyebrow, Field, Input, Panel, Button } from '@hexly/web-ui';
 
 /**
  * The Instance Admin panel (ADR-0037, #163): account management with zero content powers.

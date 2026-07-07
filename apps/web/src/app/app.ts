@@ -2,12 +2,12 @@ import { Component, computed, inject } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { filter, map, of, switchMap, timer } from 'rxjs';
-import { AppShellStore } from './shell/app-shell.store';
+import { AppShellStore } from '@hexly/web-core';
 import { CommandPalette } from './shell/command-palette/command-palette';
 import { CreateEntityDialog } from './shell/command-palette/create-entity-dialog';
 import { NavRail } from './shell/nav-rail';
 import { Toaster } from './shell/toaster';
-import { Icon } from './ui/icon/icon';
+import { Icon } from '@hexly/web-ui';
 
 /** How long `full` loading must persist before the curtain shows (debounce). */
 const FULL_CURTAIN_DELAY_MS = 150;

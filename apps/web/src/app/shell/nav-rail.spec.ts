@@ -3,12 +3,8 @@ import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { BehaviorSubject, Observable, map, of } from 'rxjs';
-import { AuthClient } from '../core/services/auth.client';
-import { MockAuthClient } from '../core/testing/auth-client.mock';
-import { WorldsClient } from '../core/services/worlds.client';
-import { MockWorldsClient } from '../core/testing/worlds-client.mock';
-import { ActiveWorld } from '../core/services/active-world';
-import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
+import { AuthClient, WorldsClient, ActiveWorld } from '@hexly/web-core';
+import { MockAuthClient, MockWorldsClient, provideTranslocoTesting } from '@hexly/web-core/testing';
 import { NavRail } from './nav-rail';
 
 @Component({ template: '' })

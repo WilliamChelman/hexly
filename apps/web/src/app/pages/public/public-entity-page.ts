@@ -13,9 +13,7 @@ import {
 } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { EntityNudge } from '@hexly/domain';
-import { PublicClient } from '../../core/services/public.client';
-import { NudgeBusClient } from '../../core/services/nudge-bus.client';
-import { AppShellStore } from '../../shell/app-shell.store';
+import { PublicClient, NudgeBusClient, AppShellStore } from '@hexly/web-core';
 import { EntitySession } from '../entity/services/entity-session';
 import { EntityNameResolver } from '../entity/services/entity-name-resolver';
 import { PublicEntityNameResolver } from './public-entity-name-resolver';

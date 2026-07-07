@@ -2,11 +2,8 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { of } from 'rxjs';
 import { emptyContent, EntityDetail, WorldSummary } from '@hexly/domain';
-import { ActiveWorld } from '../../core/services/active-world';
-import { EntitiesClient } from '../../core/services/entities.client';
-import { MockEntitiesClient } from '../../core/testing/entities-client.mock';
-import { WorldStore } from '../../core/services/world.store';
-import { provideTranslocoTesting } from '../../core/i18n/transloco-testing';
+import { ActiveWorld, EntitiesClient, WorldStore } from '@hexly/web-core';
+import { MockEntitiesClient, provideTranslocoTesting } from '@hexly/web-core/testing';
 import { CreateEntityDialogState } from './create-entity-dialog.state';
 import { CreateEntityDialog } from './create-entity-dialog';
 

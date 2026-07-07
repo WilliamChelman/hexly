@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { Route } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
-import { provideTranslocoTesting } from './core/i18n/transloco-testing';
+import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { appRoutes } from './app.routes';
 
 /** Every route in the tree (depth-first) that declares a `title`. */

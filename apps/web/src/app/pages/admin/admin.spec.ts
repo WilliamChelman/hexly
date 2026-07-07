@@ -2,12 +2,8 @@ import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { AdminUser } from '@hexly/domain';
-import { AdminClient } from '../../core/services/admin.client';
-import { MockAdminClient } from '../../core/testing/admin-client.mock';
-import { AuthClient } from '../../core/services/auth.client';
-import { MockAuthClient } from '../../core/testing/auth-client.mock';
-import { ToasterService } from '../../core/services/toaster.service';
-import { provideTranslocoTesting } from '../../core/i18n/transloco-testing';
+import { AdminClient, AuthClient, ToasterService } from '@hexly/web-core';
+import { MockAdminClient, MockAuthClient, provideTranslocoTesting } from '@hexly/web-core/testing';
 import { Admin } from './admin';
 
 /**

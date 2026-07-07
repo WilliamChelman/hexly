@@ -11,14 +11,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntityType } from '@hexly/domain';
-import { ActiveWorld } from '../../core/services/active-world';
-import { EntitiesClient } from '../../core/services/entities.client';
-import { WorldStore } from '../../core/services/world.store';
-import { entityRoute } from '../../core/utils/routes';
-import { Button } from '../../ui/button';
-import { Field } from '../../ui/field';
-import { Input } from '../../ui/input';
-import { Dialog } from '../../ui/dialog';
+import { ActiveWorld, EntitiesClient, WorldStore, entityRoute } from '@hexly/web-core';
+import { Button, Field, Input, Dialog } from '@hexly/web-ui';
 import { CreateEntityDialogState } from './create-entity-dialog.state';
 
 /**

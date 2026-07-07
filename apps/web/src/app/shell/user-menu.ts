@@ -7,19 +7,8 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { AuthClient } from '../core/services/auth.client';
-import { Locale, LocaleService } from '../core/i18n/locale.service';
-import { ThemeService } from '../core/services/theme.service';
-import { Button } from '../ui/button';
-import { Icon } from '../ui/icon/icon';
-import { Rule } from '../ui/rule';
-import {
-  MenuGroup,
-  MenuItem,
-  MenuItemRadio,
-  MenuPanel,
-  MenuTrigger,
-} from '../ui/menu';
+import { AuthClient, Locale, LocaleService, ThemeService } from '@hexly/web-core';
+import { Button, Icon, Rule, MenuGroup, MenuItem, MenuItemRadio, MenuPanel, MenuTrigger } from '@hexly/web-ui';
 
 /**
  * The header's account control (ADR-0015): a single trigger that opens a CDK

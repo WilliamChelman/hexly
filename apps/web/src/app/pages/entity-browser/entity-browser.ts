@@ -24,18 +24,8 @@ import {
   EntityType,
   Visibility,
 } from '@hexly/domain';
-import {
-  EntitiesClient,
-  EntityFacetParams,
-} from '../../core/services/entities.client';
-import { ActiveWorld } from '../../core/services/active-world';
-import { ToasterService } from '../../core/services/toaster.service';
-import { entityRoute } from '../../core/utils/routes';
-import { AppShellStore } from '../../shell/app-shell.store';
-import { Button } from '../../ui/button';
-import { Eyebrow } from '../../ui/eyebrow';
-import { PageHeader } from '../../ui/page-header';
-import { Icon } from '../../ui/icon/icon';
+import { EntitiesClient, EntityFacetParams, ActiveWorld, ToasterService, entityRoute, AppShellStore } from '@hexly/web-core';
+import { Button, Eyebrow, PageHeader, Icon } from '@hexly/web-ui';
 import { EntityCard } from './entity-card';
 import { EntitySearch } from './entity-search';
 import { EmptyState } from './empty-state';

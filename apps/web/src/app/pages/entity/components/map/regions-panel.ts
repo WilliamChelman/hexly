@@ -1,9 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Region } from '@hexly/domain';
-import { Button } from '../../../../ui/button';
-import { Eyebrow } from '../../../../ui/eyebrow';
-import { Swatch } from '../../../../ui/swatch';
+import { Button, Eyebrow, Swatch } from '@hexly/web-ui';
 import { HexMapStore } from '../../services/hexmap-store';
 
 /**

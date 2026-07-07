@@ -26,8 +26,7 @@ import {
   rectFromCorners,
   regionById,
 } from '@hexly/domain';
-import { ThemeService } from '../../../../core/services/theme.service';
-import { ToasterService } from '../../../../core/services/toaster.service';
+import { ThemeService, ToasterService } from '@hexly/web-core';
 import { terrainKey } from '../../utils/catalog-keys';
 import { HexMapStore, SelectMode } from '../../services/hexmap-store';
 import { toolForHotkey } from './tools';

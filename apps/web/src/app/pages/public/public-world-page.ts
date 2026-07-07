@@ -4,9 +4,8 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { catchError, of, switchMap } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { PublicWorldView } from '@hexly/domain';
-import { PublicClient } from '../../core/services/public.client';
-import { AppShellStore } from '../../shell/app-shell.store';
-import { Eyebrow } from '../../ui/eyebrow';
+import { PublicClient, AppShellStore } from '@hexly/web-core';
+import { Eyebrow } from '@hexly/web-ui';
 
 /**
  * A World Public Link landing page (ADR-0037, #162): lists the World's `shared` Entities —

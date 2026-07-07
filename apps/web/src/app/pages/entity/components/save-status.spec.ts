@@ -8,9 +8,8 @@ import {
   coordKey,
   emptyContent,
 } from '@hexly/domain';
-import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
-import { EntitiesClient } from '../../../core/services/entities.client';
-import { MockEntitiesClient } from '../../../core/testing/entities-client.mock';
+import { provideTranslocoTesting, MockEntitiesClient } from '@hexly/web-core/testing';
+import { EntitiesClient } from '@hexly/web-core';
 import { EntitySession } from '../services/entity-session';
 import { HexMapStore } from '../services/hexmap-store';
 import { SaveStatus } from './save-status';

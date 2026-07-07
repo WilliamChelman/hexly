@@ -1,8 +1,7 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { Button } from '../../ui/button';
-import { Eyebrow } from '../../ui/eyebrow';
+import { Button, Eyebrow } from '@hexly/web-ui';
 
 /**
  * The catch-all error page: shown for an unmatched URL and when `/entities/:id`

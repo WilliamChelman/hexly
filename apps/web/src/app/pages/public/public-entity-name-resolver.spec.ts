@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { EntitiesClient } from '../../core/services/entities.client';
+import { EntitiesClient } from '@hexly/web-core';
 import { EntityNameResolver } from '../entity/services/entity-name-resolver';
 import { PublicEntityNameResolver } from './public-entity-name-resolver';
 

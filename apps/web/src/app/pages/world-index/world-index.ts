@@ -10,24 +10,9 @@ import { NgTemplateOutlet } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { AuthClient } from '../../core/services/auth.client';
-import { WorldStore } from '../../core/services/world.store';
-import { WorldsClient } from '../../core/services/worlds.client';
-import { ToasterService } from '../../core/services/toaster.service';
+import { AuthClient, WorldStore, WorldsClient, ToasterService, worldDashboardRoute, worldRoute, worldSettingsRoute } from '@hexly/web-core';
 import { ImportSummary } from '@hexly/domain';
-import {
-  worldDashboardRoute,
-  worldRoute,
-  worldSettingsRoute,
-} from '../../core/utils/routes';
-import { Button } from '../../ui/button';
-import { Eyebrow } from '../../ui/eyebrow';
-import { Panel } from '../../ui/panel';
-import { Icon } from '../../ui/icon/icon';
-import { Autofocus } from '../../ui/autofocus';
-import { Input } from '../../ui/input';
-import { Dialog } from '../../ui/dialog';
-import { ACCENT_SIGIL, accentFor, monogram } from '../../ui/sigil';
+import { Button, Eyebrow, Panel, Icon, Autofocus, Input, Dialog, ACCENT_SIGIL, accentFor, monogram } from '@hexly/web-ui';
 
 /**
  * The World Index (ADR-0028, CONTEXT.md → World Index): the page at `/` listing

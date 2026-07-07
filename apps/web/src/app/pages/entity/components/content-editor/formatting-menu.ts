@@ -10,7 +10,7 @@ import {
 } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Editor } from '@tiptap/core';
-import { Button } from '../../../../ui/button';
+import { Button } from '@hexly/web-ui';
 import {
   FORMAT_ITEMS,
   FormatItem,

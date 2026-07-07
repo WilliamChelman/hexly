@@ -3,9 +3,8 @@ import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
-import { provideTranslocoTesting } from '../../core/i18n/transloco-testing';
-import { AuthClient } from '../../core/services/auth.client';
-import { MockAuthClient } from '../../core/testing/auth-client.mock';
+import { provideTranslocoTesting, MockAuthClient } from '@hexly/web-core/testing';
+import { AuthClient } from '@hexly/web-core';
 import { Login } from './login';
 
 describe('Login', () => {

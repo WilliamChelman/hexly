@@ -1,4 +1,4 @@
-import { IconName } from '../../../../ui/icon/icon';
+import { IconName } from '@hexly/web-ui';
 import { ToolId } from '../../services/hexmap-store';
 
 /** One top-level Tool's identity: its stable id, keyboard hotkey, and palette glyph. */

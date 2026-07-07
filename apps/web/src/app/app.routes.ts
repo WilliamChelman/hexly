@@ -1,11 +1,5 @@
 import { Route } from '@angular/router';
-import { adminGuard, authGuard, loginGuard } from './core/guards/auth.guard';
-import { entityWorldRedirect } from './core/guards/entity-world-redirect.guard';
-import { reconcileWorldSegment } from './core/guards/reconcile-world-segment.guard';
-import {
-  activeWorldGuard,
-  clearActiveWorld,
-} from './core/services/active-world';
+import { adminGuard, authGuard, loginGuard, entityWorldRedirect, reconcileWorldSegment, activeWorldGuard, clearActiveWorld } from '@hexly/web-core';
 import { flushOnLeave } from './pages/entity/flush-on-leave.guard';
 import { EntitySession } from './pages/entity/services/entity-session';
 import { EntityNameResolver } from './pages/entity/services/entity-name-resolver';
@@ -35,7 +29,7 @@ export const appRoutes: Route[] = [
     path: 'settings',
     canActivate: [authGuard],
     loadComponent: () =>
-      import('./pages/settings/settings').then((m) => m.Settings),
+      import('./pages/user-settings/user-settings').then((m) => m.UserSettings),
     title: 'settings.tabTitle',
   },
   {
@@ -64,9 +58,7 @@ export const appRoutes: Route[] = [
         path: '',
         pathMatch: 'full',
         loadComponent: () =>
-          import('./pages/world-dashboard/world-dashboard').then(
-            (m) => m.WorldDashboard,
-          ),
+          import('./pages/world/world-dashboard').then((m) => m.WorldDashboard),
         title: 'worldDashboard.tabTitle',
       },
       {
@@ -75,7 +67,7 @@ export const appRoutes: Route[] = [
         path: 'settings',
         pathMatch: 'full',
         loadComponent: () =>
-          import('./pages/world-settings/world-settings').then(
+          import('./pages/world/pages/world-settings/world-settings').then(
             (m) => m.WorldSettings,
           ),
         title: 'owners.tabTitle',
@@ -143,7 +135,9 @@ export const appRoutes: Route[] = [
     path: 'public/e/:token',
     data: { mode: 'entity' },
     loadComponent: () =>
-      import('./pages/public/public-entity-page').then((m) => m.PublicEntityPage),
+      import('./pages/public/public-entity-page').then(
+        (m) => m.PublicEntityPage,
+      ),
     title: 'publicView.tabTitle',
   },
   {
@@ -159,7 +153,9 @@ export const appRoutes: Route[] = [
     path: 'public/w/:token/e/:entityId',
     data: { mode: 'worldEntity' },
     loadComponent: () =>
-      import('./pages/public/public-entity-page').then((m) => m.PublicEntityPage),
+      import('./pages/public/public-entity-page').then(
+        (m) => m.PublicEntityPage,
+      ),
     title: 'publicView.tabTitle',
   },
   // Anything unmatched renders the error page rather than silently bouncing to

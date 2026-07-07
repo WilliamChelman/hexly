@@ -8,7 +8,7 @@ import {
   signal,
 } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { Eyebrow } from '../../../ui/eyebrow';
+import { Eyebrow } from '@hexly/web-ui';
 import { OutlineStore } from '../services/outline-store';
 
 /**

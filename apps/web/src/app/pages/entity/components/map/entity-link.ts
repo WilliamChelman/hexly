@@ -11,12 +11,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntitySummary, EntityType } from '@hexly/domain';
-import { EntitiesClient } from '../../../../core/services/entities.client';
-import { ActiveWorld } from '../../../../core/services/active-world';
-import { Button } from '../../../../ui/button';
-import { Field } from '../../../../ui/field';
-import { Icon } from '../../../../ui/icon/icon';
-import { EntitySearchPicker } from '../../../../ui/entity-search-picker';
+import { EntitiesClient, ActiveWorld } from '@hexly/web-core';
+import { Button, Field, Icon, EntitySearchPicker } from '@hexly/web-ui';
 import { HexMapStore } from '../../services/hexmap-store';
 
 /**

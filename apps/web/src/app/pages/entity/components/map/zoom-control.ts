@@ -7,7 +7,7 @@ import {
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { Icon } from '../../../../ui/icon/icon';
+import { Icon } from '@hexly/web-ui';
 
 /**
  * Map's zoom cluster: zoom out, level, zoom in, fit-to-content. Purely

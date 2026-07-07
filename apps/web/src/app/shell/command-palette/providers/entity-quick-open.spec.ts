@@ -2,8 +2,8 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { firstValueFrom, of } from 'rxjs';
 import { EntitySummary } from '@hexly/domain';
-import { EntitiesClient } from '../../../core/services/entities.client';
-import { MockEntitiesClient } from '../../../core/testing/entities-client.mock';
+import { EntitiesClient } from '@hexly/web-core';
+import { MockEntitiesClient } from '@hexly/web-core/testing';
 import { EntityQuickOpen } from './entity-quick-open';
 
 function entity(id: string, name: string, worldId = 'w1'): EntitySummary {

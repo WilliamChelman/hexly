@@ -21,8 +21,7 @@ import { ContentEditor } from './components/content-editor/content-editor';
 import { EntityMetadata } from './components/entity-metadata';
 import { OutlinePanel } from './components/outline-panel';
 import { OutlineSource } from './components/outline-source';
-import { IconButton } from '../../ui/icon-button';
-import { Icon } from '../../ui/icon/icon';
+import { IconButton, Icon } from '@hexly/web-ui';
 
 /**
  * The open-Entity route (`/entities/:id`, #70): the routed page that loads the

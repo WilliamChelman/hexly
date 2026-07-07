@@ -10,11 +10,8 @@ import {
   EntitySaveOutcome,
   HexMap,
 } from '@hexly/domain';
-import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
-import { EntitiesClient } from '../../../core/services/entities.client';
-import { MockEntitiesClient } from '../../../core/testing/entities-client.mock';
-import { NudgeBusClient } from '../../../core/services/nudge-bus.client';
-import { MockNudgeBusClient } from '../../../core/testing/nudge-bus.mock';
+import { provideTranslocoTesting, MockEntitiesClient, MockNudgeBusClient } from '@hexly/web-core/testing';
+import { EntitiesClient, NudgeBusClient } from '@hexly/web-core';
 import { EntitySession, NUDGE_DEBOUNCE_MS } from './entity-session';
 import { HexMapStore } from './hexmap-store';
 

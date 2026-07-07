@@ -39,13 +39,7 @@ import {
   tiptapContent,
   Visibility,
 } from '@hexly/domain';
-import { EntitiesClient } from '../../../core/services/entities.client';
-import { NudgeBusClient } from '../../../core/services/nudge-bus.client';
-import { ActiveWorld } from '../../../core/services/active-world';
-import { idFromSegment } from '../../../core/utils/pretty-id';
-import { worldRoute } from '../../../core/utils/routes';
-import { TitleService } from '../../../core/i18n/title.service';
-import { AppShellStore } from '../../../shell/app-shell.store';
+import { EntitiesClient, NudgeBusClient, ActiveWorld, idFromSegment, worldRoute, TitleService, AppShellStore } from '@hexly/web-core';
 import { EntityView, HexMapStore } from './hexmap-store';
 
 /**

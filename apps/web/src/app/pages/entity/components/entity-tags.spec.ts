@@ -4,8 +4,8 @@ import { TestBed } from '@angular/core/testing';
 import { EntityDetail } from '@hexly/domain';
 import { of } from 'rxjs';
 import { EntitySession } from '../services/entity-session';
-import { EntitiesClient } from '../../../core/services/entities.client';
-import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
+import { EntitiesClient } from '@hexly/web-core';
+import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { EntityTags } from './entity-tags';
 
 describe('EntityTags', () => {

@@ -1,20 +1,7 @@
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { Button } from '../../ui/button';
-import { Cartouche } from '../../ui/cartouche';
-import { Chip } from '../../ui/chip';
-import { Coord } from '../../ui/coord';
-import { Eyebrow } from '../../ui/eyebrow';
-import { Field } from '../../ui/field';
-import { IconButton } from '../../ui/icon-button';
-import { Icon } from '../../ui/icon/icon';
-import { Input } from '../../ui/input';
-import { Kbd } from '../../ui/kbd';
-import { Panel } from '../../ui/panel';
-import { Select } from '../../ui/select';
-import { Swatch } from '../../ui/swatch';
-import { Textarea } from '../../ui/textarea';
+import { Button, Cartouche, Chip, Coord, Eyebrow, Field, IconButton, Icon, Input, Kbd, Panel, Select, Swatch, Textarea } from '@hexly/web-ui';
 
 interface SwatchRow {
   readonly token: string;

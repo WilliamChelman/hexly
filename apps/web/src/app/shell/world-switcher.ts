@@ -7,18 +7,8 @@ import {
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { WorldStore } from '../core/services/world.store';
-import { ActiveWorld } from '../core/services/active-world';
-import { worldDashboardRoute } from '../core/utils/routes';
-import { Icon } from '../ui/icon/icon';
-import { Rule } from '../ui/rule';
-import {
-  MenuGroup,
-  MenuItem,
-  MenuItemRadio,
-  MenuPanel,
-  MenuTrigger,
-} from '../ui/menu';
+import { WorldStore, ActiveWorld, worldDashboardRoute } from '@hexly/web-core';
+import { Icon, Rule, MenuGroup, MenuItem, MenuItemRadio, MenuPanel, MenuTrigger } from '@hexly/web-ui';
 
 /**
  * The World Switcher (ADR-0028): a compact quick-hop dropdown that sits at the

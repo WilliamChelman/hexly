@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { Observable, of } from 'rxjs';
-import { AuthClient } from '../../../core/services/auth.client';
+import { AuthClient } from '@hexly/web-core';
 import { Command, CommandProvider } from '../command';
 
 /**

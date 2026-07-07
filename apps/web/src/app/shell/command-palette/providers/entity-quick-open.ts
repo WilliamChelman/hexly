@@ -2,9 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { Observable, Subject, map, of, shareReplay } from 'rxjs';
 import { EntitySummary } from '@hexly/domain';
-import { EntitiesClient } from '../../../core/services/entities.client';
-import { searchEntities } from '../../../core/utils/search-entities';
-import { entityRoute } from '../../../core/utils/routes';
+import { EntitiesClient, searchEntities, entityRoute } from '@hexly/web-core';
 import { Command, CommandProvider } from '../command';
 
 /**

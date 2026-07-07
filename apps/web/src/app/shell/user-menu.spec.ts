@@ -1,11 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
-import { AuthClient } from '../core/services/auth.client';
-import { MockAuthClient } from '../core/testing/auth-client.mock';
-import { LocaleService } from '../core/i18n/locale.service';
-import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
-import { ThemeService } from '../core/services/theme.service';
+import { AuthClient, LocaleService, ThemeService } from '@hexly/web-core';
+import { MockAuthClient, provideTranslocoTesting } from '@hexly/web-core/testing';
 import { UserMenu } from './user-menu';
 
 describe('UserMenu', () => {

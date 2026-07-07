@@ -7,8 +7,8 @@ import {
 } from '@angular/core';
 import { translateSignal, TranslocoPipe } from '@jsverse/transloco';
 import { catchError, firstValueFrom, of } from 'rxjs';
-import { Chip } from '../../../ui/chip';
-import { EntitiesClient } from '../../../core/services/entities.client';
+import { Chip } from '@hexly/web-ui';
+import { EntitiesClient } from '@hexly/web-core';
 import { EntitySession } from '../services/entity-session';
 import { TagPicker } from './tag-picker';
 import { tagItems } from './tag-suggestions';

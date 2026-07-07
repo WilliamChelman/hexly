@@ -6,16 +6,9 @@ import {
   output,
 } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { Button } from '../../../ui/button';
-import { Icon } from '../../../ui/icon/icon';
-import {
-  MenuItem,
-  MenuItemCheckbox,
-  MenuPanel,
-  MenuTrigger,
-} from '../../../ui/menu';
+import { Button, Icon, MenuItem, MenuItemCheckbox, MenuPanel, MenuTrigger } from '@hexly/web-ui';
 import { EntitySession } from '../services/entity-session';
-import { ActiveWorld } from '../../../core/services/active-world';
+import { ActiveWorld } from '@hexly/web-core';
 
 /**
  * The open Entity's actions overflow menu (like the account menu): Visibility, Pin, and

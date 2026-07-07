@@ -1,12 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { featureLibrary, terrainPalette } from '@hexly/domain';
-import { IconButton } from '../../../../ui/icon-button';
-import { Icon, IconName } from '../../../../ui/icon/icon';
-import { IconPath } from '../../../../ui/icon/icon-path';
-import { Panel } from '../../../../ui/panel';
-import { Rule } from '../../../../ui/rule';
-import { Swatch } from '../../../../ui/swatch';
+import { IconButton, Icon, IconName, IconPath, Panel, Rule, Swatch } from '@hexly/web-ui';
 import { featureKey, terrainKey } from '../../utils/catalog-keys';
 import {
   HexMapStore,

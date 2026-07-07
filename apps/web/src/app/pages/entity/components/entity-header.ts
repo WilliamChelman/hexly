@@ -10,10 +10,7 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { Button } from '../../../ui/button';
-import { ButtonGroup } from '../../../ui/button-group';
-import { Eyebrow } from '../../../ui/eyebrow';
-import { PageHeader } from '../../../ui/page-header';
+import { Button, ButtonGroup, Eyebrow, PageHeader } from '@hexly/web-ui';
 import { EntityActionsMenu } from './entity-actions-menu';
 import { EntityShareDialog } from './entity-share-dialog';
 import { EntityTags } from './entity-tags';

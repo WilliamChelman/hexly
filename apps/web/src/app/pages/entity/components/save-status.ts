@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { Chip } from '../../../ui/chip';
+import { Chip } from '@hexly/web-ui';
 import { EntitySession } from '../services/entity-session';
 
 /**

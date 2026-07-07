@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
-import { Panel } from '../../ui/panel';
+import { Panel } from '@hexly/web-ui';
 
 /**
  * A centered panel for a list's zero-row states — empty library, no search

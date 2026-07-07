@@ -8,7 +8,7 @@ import {
 import { NgClass } from '@angular/common';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { ToasterService } from '../core/services/toaster.service';
+import { ToasterService } from '@hexly/web-core';
 
 /**
  * Renders the {@link ToasterService}'s transient messages as a stack of toasts

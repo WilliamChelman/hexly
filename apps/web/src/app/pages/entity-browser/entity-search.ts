@@ -5,7 +5,7 @@ import {
   output,
 } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { Icon } from '../../ui/icon/icon';
+import { Icon } from '@hexly/web-ui';
 
 /**
  * The Entity browser's full-text search box (#154). Controlled: the parent owns

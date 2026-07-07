@@ -9,12 +9,8 @@ import {
 import { TranslocoService } from '@jsverse/transloco';
 import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 import { EntityPage, EntitySummary } from '@hexly/domain';
-import { EntitiesClient } from '../../core/services/entities.client';
-import { MockEntitiesClient } from '../../core/testing/entities-client.mock';
-import { ActiveWorld } from '../../core/services/active-world';
-import { ToasterService } from '../../core/services/toaster.service';
-import { provideTranslocoTesting } from '../../core/i18n/transloco-testing';
-import { LocaleService } from '../../core/i18n/locale.service';
+import { EntitiesClient, ActiveWorld, ToasterService, LocaleService } from '@hexly/web-core';
+import { MockEntitiesClient, provideTranslocoTesting } from '@hexly/web-core/testing';
 import { EntityBrowser } from './entity-browser';
 
 describe('EntityBrowser', () => {

@@ -1,9 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import { AuthClient } from '../../../core/services/auth.client';
-import { MockAuthClient } from '../../../core/testing/auth-client.mock';
-import { provideTranslocoTesting } from '../../../core/i18n/transloco-testing';
+import { AuthClient } from '@hexly/web-core';
+import { MockAuthClient, provideTranslocoTesting } from '@hexly/web-core/testing';
 import { NavCommands } from './nav-commands';
 
 describe('NavCommands', () => {

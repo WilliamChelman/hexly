@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { WorldSummary } from '@hexly/domain';
-import { WorldStore } from '../../../core/services/world.store';
+import { WorldStore } from '@hexly/web-core';
 import { WorldQuickOpen } from './world-quick-open';
 
 function world(id: string, name: string): WorldSummary {

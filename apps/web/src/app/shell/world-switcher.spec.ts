@@ -2,12 +2,8 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { WorldSummary } from '@hexly/domain';
-import { ActiveWorld } from '../core/services/active-world';
-import { AuthClient } from '../core/services/auth.client';
-import { MockAuthClient } from '../core/testing/auth-client.mock';
-import { WorldsClient } from '../core/services/worlds.client';
-import { MockWorldsClient } from '../core/testing/worlds-client.mock';
-import { provideTranslocoTesting } from '../core/i18n/transloco-testing';
+import { ActiveWorld, AuthClient, WorldsClient } from '@hexly/web-core';
+import { MockAuthClient, MockWorldsClient, provideTranslocoTesting } from '@hexly/web-core/testing';
 import { WorldSwitcher } from './world-switcher';
 
 function world(id: string, name = id): WorldSummary {

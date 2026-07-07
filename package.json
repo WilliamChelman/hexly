@@ -129,6 +129,6 @@
     "zod": "^4.4.3"
   },
   "imports": {
-    "#app-styles.css": "./apps/web/src/styles.css"
+    "#app-styles.css": "./libs/web-styles/src/index.css"
   }
 }

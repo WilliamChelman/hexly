@@ -1,6 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { extractOutline, OutlineHeading } from '@hexly/domain';
-import { AuthScopedStorage } from '../../../core/services/auth-scoped-storage';
+import { AuthScopedStorage } from '@hexly/web-core';
 import { EntitySession } from './entity-session';
 
 /** Per-user preference key (auth-scoped), so one user's choice never leaks to the next. */

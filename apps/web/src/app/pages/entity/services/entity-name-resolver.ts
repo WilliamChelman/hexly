@@ -8,8 +8,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Observable, Subject, firstValueFrom, map, share } from 'rxjs';
 import { ENTITY_LIST_MAX_LIMIT, EntitySummary } from '@hexly/domain';
-import { EntitiesClient } from '../../../core/services/entities.client';
-import { searchEntities } from '../../../core/utils/search-entities';
+import { EntitiesClient, searchEntities } from '@hexly/web-core';
 
 /** A link's resolution against the owner's entities (issue #95, ADR-0023). */
 export type EntityResolution =

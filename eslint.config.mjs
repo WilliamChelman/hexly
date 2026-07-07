@@ -14,7 +14,16 @@ export default [
         'error',
         {
           enforceBuildableLibDependency: true,
-          allow: ['^.*/eslint(\\.base)?\\.config\\.[cm]?[jt]s$'],
+          // web-core exposes its test doubles via a secondary entry point that
+          // is deliberately kept out of the production barrel (the mocks lean on
+          // the ambient `vi` global); allow specs to reach it.
+          allow: [
+            '^.*/eslint(\\.base)?\\.config\\.[cm]?[jt]s$',
+            '@hexly/web-core/testing',
+          ],
+          // ponytail: layering (core←ui←app) holds by construction and review;
+          // left permissive because a type:* matrix would need every existing
+          // lib (domain/immer/obsidian) tagged. Tighten when that's worth doing.
           depConstraints: [
             {
               sourceTag: '*',

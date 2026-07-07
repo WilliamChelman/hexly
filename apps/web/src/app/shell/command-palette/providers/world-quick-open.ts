@@ -1,8 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { Observable, of } from 'rxjs';
-import { WorldStore } from '../../../core/services/world.store';
-import { worldDashboardRoute } from '../../../core/utils/routes';
+import { WorldStore, worldDashboardRoute } from '@hexly/web-core';
 import { Command, CommandProvider } from '../command';
 
 /**

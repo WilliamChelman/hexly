@@ -3,8 +3,8 @@ import { provideRouter } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { of } from 'rxjs';
 import { EntityDetail, EntitySummary, EntityType } from '@hexly/domain';
-import { EntitiesClient } from '../../../../core/services/entities.client';
-import { provideTranslocoTesting } from '../../../../core/i18n/transloco-testing';
+import { EntitiesClient } from '@hexly/web-core';
+import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { HexMapStore } from '../../services/hexmap-store';
 import { Inspector } from './inspector';
 

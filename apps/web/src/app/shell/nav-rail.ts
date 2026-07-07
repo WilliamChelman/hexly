@@ -12,15 +12,8 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { AuthClient } from '../core/services/auth.client';
-import { WorldStore } from '../core/services/world.store';
-import { ActiveWorld } from '../core/services/active-world';
-import { AppShellStore } from './app-shell.store';
-import { AuthScopedStorage } from '../core/services/auth-scoped-storage';
-import { worldRoute, worldSettingsRoute } from '../core/utils/routes';
-import { Button } from '../ui/button';
-import { Cartouche } from '../ui/cartouche';
-import { Icon, IconName } from '../ui/icon/icon';
+import { AuthClient, WorldStore, ActiveWorld, AuthScopedStorage, worldRoute, worldSettingsRoute, AppShellStore } from '@hexly/web-core';
+import { Button, Cartouche, Icon, IconName } from '@hexly/web-ui';
 import { UserMenu } from './user-menu';
 import { WorldSwitcher } from './world-switcher';
 

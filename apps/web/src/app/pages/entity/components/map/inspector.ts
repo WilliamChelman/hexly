@@ -1,11 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { coordKey, Label, TerrainId } from '@hexly/domain';
-import { Button } from '../../../../ui/button';
-import { Coord } from '../../../../ui/coord';
-import { Eyebrow } from '../../../../ui/eyebrow';
-import { Field } from '../../../../ui/field';
-import { Input } from '../../../../ui/input';
+import { Button, Coord, Eyebrow, Field, Input } from '@hexly/web-ui';
 import { featureKey, terrainKey } from '../../utils/catalog-keys';
 import { inputValue } from '../../utils/dom';
 import { HexMapStore, Selection } from '../../services/hexmap-store';

@@ -1,10 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { Button } from '../../../ui/button';
-import { Dialog } from '../../../ui/dialog';
-import { GrantSet } from '../../../ui/grant-set';
-import { OwnerSet } from '../../../ui/owner-set';
-import { PublicLinkControl } from '../../../ui/public-link';
+import { Button, Dialog, GrantSet, OwnerSet, PublicLinkControl } from '@hexly/web-ui';
 import { EntitySession } from '../services/entity-session';
 
 /**

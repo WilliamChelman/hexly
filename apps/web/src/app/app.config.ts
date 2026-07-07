@@ -7,13 +7,7 @@ import { provideRouter, TitleStrategy } from '@angular/router';
 import { provideTransloco } from '@jsverse/transloco';
 import { provideTranslocoMessageformat } from '@jsverse/transloco-messageformat';
 import { appRoutes } from './app.routes';
-import { withCredentialsInterceptor } from './core/interceptors/with-credentials.interceptor';
-import { translocoAppConfig } from './core/i18n/transloco.config';
-import { TranslocoHttpLoader } from './core/i18n/transloco-http.loader';
-import { TranslationTitleStrategy } from './core/i18n/title-strategy';
-import { provideLocale } from './core/i18n/locale.service';
-import { provideTheme } from './core/services/theme.service';
-import { providePreferencesSync } from './core/services/preferences-sync';
+import { withCredentialsInterceptor, translocoAppConfig, TranslocoHttpLoader, TranslationTitleStrategy, provideLocale, provideTheme, providePreferencesSync } from '@hexly/web-core';
 import { provideBuiltInCommands } from './shell/command-palette/command-palette';
 
 export const appConfig: ApplicationConfig = {

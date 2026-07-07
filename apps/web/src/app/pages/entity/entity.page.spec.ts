@@ -12,16 +12,11 @@ import {
 } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { CONTENT_FORMAT, EntityDetail, EntityType } from '@hexly/domain';
-import { EntitiesClient } from '../../core/services/entities.client';
-import { NudgeBusClient } from '../../core/services/nudge-bus.client';
-import { MockEntitiesClient } from '../../core/testing/entities-client.mock';
-import { MockNudgeBusClient } from '../../core/testing/nudge-bus.mock';
+import { EntitiesClient, NudgeBusClient, ActiveWorld, TitleService } from '@hexly/web-core';
+import { MockEntitiesClient, MockNudgeBusClient, provideTranslocoTesting } from '@hexly/web-core/testing';
 import { EntitySession } from './services/entity-session';
 import { EntityNameResolver } from './services/entity-name-resolver';
 import { OutlineStore } from './services/outline-store';
-import { ActiveWorld } from '../../core/services/active-world';
-import { TitleService } from '../../core/i18n/title.service';
-import { provideTranslocoTesting } from '../../core/i18n/transloco-testing';
 import { HexMapStore } from './services/hexmap-store';
 import { noteDetail } from './components/entity-detail.fixtures';
 import { EntityPage } from './entity.page';

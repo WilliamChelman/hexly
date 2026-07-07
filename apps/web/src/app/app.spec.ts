@@ -4,8 +4,8 @@ import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { App } from './app';
-import { provideTranslocoTesting } from './core/i18n/transloco-testing';
-import { AppShellStore } from './shell/app-shell.store';
+import { provideTranslocoTesting } from '@hexly/web-core/testing';
+import { AppShellStore } from '@hexly/web-core';
 
 @Component({ template: 'page' })
 class Blank {}

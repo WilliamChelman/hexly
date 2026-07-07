@@ -20,6 +20,11 @@
             "input": "apps/web/public"
           },
           {
+            "glob": "*.json",
+            "input": "libs/web-core/src/i18n/catalogs",
+            "output": "assets/i18n"
+          },
+          {
             "glob": "marcellus-latin-400-normal.woff2",
             "input": "node_modules/@fontsource/marcellus/files",
             "output": "fonts"
@@ -39,7 +44,7 @@
             {
               "type": "initial",
               "maximumWarning": "500kb",
-              "maximumError": "1mb"
+              "maximumError": "1.1mb"
             },
             {
               "type": "anyComponentStyle",
