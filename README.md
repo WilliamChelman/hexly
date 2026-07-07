@@ -164,3 +164,15 @@ nx run-many -t test -p api,web,domain
 Full rationale: [ADR-0004](./docs/adr/0004-closed-user-set-role-based-sharing.md)
 (closed user set) and [ADR-0002](./docs/adr/0002-sqlite-json-document-storage.md)
 (SQLite storage).
+
+## Third-party notices
+
+UI glyphs are from [Lucide](https://lucide.dev), used via `@lucide/angular`.
+Lucide is ISC-licensed; the icons it derives from [Feather](https://feathericons.com)
+are MIT-licensed.
+
+> ISC License — Copyright (c) Lucide Contributors
+> MIT License — Copyright (c) 2013-present Cole Bemis (Feather)
+
+Full texts: [lucide.dev/license](https://lucide.dev/license) and the bundled
+`node_modules/@lucide/angular/LICENSE`.

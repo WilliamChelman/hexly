@@ -6,6 +6,32 @@ import {
   input,
 } from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
+import {
+  type LucideIconData,
+  LucideChevronsRight,
+  LucideX,
+  LucideEllipsisVertical,
+  LucideListTree,
+  LucideEraser,
+  LucideMaximize,
+  LucideType,
+  LucideLibrary,
+  LucidePalette,
+  LucideSquareDashed,
+  LucideMinus,
+  LucideMoon,
+  LucidePlus,
+  LucideRedo2,
+  LucideMousePointer2,
+  LucideSettings,
+  LucideShare2,
+  LucideSun,
+  LucideHexagon,
+  LucideUndo2,
+  LucideUpload,
+  LucideDownload,
+  LucideUser,
+} from '@lucide/angular';
 import { featureLibrary } from '@hexly/domain';
 import { IconHost } from './icon-host';
 
@@ -13,150 +39,89 @@ import { IconHost } from './icon-host';
 const SETTLEMENT_PATH =
   featureLibrary.find((f) => f.id === 'settlement')?.path ?? '';
 
+/** The `<svg>` root attrs Lucide glyphs are drawn with (its house stroke, lightened to 1.6). */
+const LUCIDE_ATTRS =
+  'stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"';
+
 /**
- * Every built-in glyph as data (ADR-0007): the `<svg>` root attributes that vary
- * per glyph plus its inner markup. The shared bits — `viewBox`, `fill="none"`,
- * size — are applied by {@link Icon}. One entry replaces one former component.
- * For a runtime/arbitrary path (e.g. a Feature's `path`), use {@link IconPath}.
+ * Serialize a Lucide icon's node list (`[tag, attrs]` pairs) to SVG inner markup.
+ * `key` is React-reconciliation metadata Lucide ships in the data — dropped here.
  */
-const GLYPHS = {
-  chevrons: {
-    attrs:
-      'stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"',
-    body: '<path d="M7 6l6 6-6 6M13 6l6 6-6 6" />',
-  },
-  close: {
-    attrs:
-      'stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"',
-    body: '<path d="M6 6l12 12M18 6 6 18" />',
-  },
-  more: {
-    // A vertical kebab — the "more actions" overflow trigger. The svg root is fixed at
-    // fill="none", so the dots carry their own fill rather than relying on a root attr.
-    attrs: '',
-    body: '<circle cx="12" cy="5" r="1.7" fill="currentColor" /><circle cx="12" cy="12" r="1.7" fill="currentColor" /><circle cx="12" cy="19" r="1.7" fill="currentColor" />',
-  },
-  outline: {
-    // A heading over two indented rows — reads as a document outline / TOC.
-    attrs:
-      'stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"',
-    body: '<path d="M4 6h16M9 12h11M9 18h11" />',
-  },
-  erase: {
-    attrs:
-      'stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"',
-    body: '<path d="M8 17l-3-3a1.8 1.8 0 0 1 0-2.6l6-6a1.8 1.8 0 0 1 2.6 0l3.4 3.4a1.8 1.8 0 0 1 0 2.6L13 17z" /><path d="M6 20h13" />',
-  },
-  fit: {
-    attrs:
-      'stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"',
-    body: '<path d="M5 9V5h4M19 9V5h-4M5 15v4h4M19 15v4h-4" />',
-  },
-  label: {
-    attrs: 'stroke="currentColor" stroke-width="1.5" stroke-linecap="round"',
-    body: '<path d="M6 6h12M12 6v12M9.5 18h5" />',
-  },
-  library: {
-    attrs:
-      'stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"',
-    body: '<path d="M4 5h6a2 2 0 0 1 2 2v12a2.5 2.5 0 0 0-2.5-2H4z" /><path d="M20 5h-6a2 2 0 0 0-2 2v12a2.5 2.5 0 0 1 2.5-2H20z" />',
-  },
+function lucideBody(data: LucideIconData): string {
+  return data.node
+    .map(([tag, attrs]) => {
+      const a = Object.entries(attrs)
+        .filter(([k]) => k !== 'key')
+        .map(([k, v]) => `${k}="${v}"`)
+        .join(' ');
+      return `<${tag} ${a} />`;
+    })
+    .join('');
+}
+
+/**
+ * The three bespoke glyphs that aren't Lucide: the app's hexagon `logo`, the
+ * `settlement` marker (domain art from `featureLibrary`, shared with the canvas),
+ * and the organic `region` blob. Each is the `<svg>` inner markup plus the root
+ * attrs that vary per glyph (ADR-0007). Everything else is Lucide — see {@link LUCIDE}.
+ */
+const CUSTOM = {
   logo: {
     attrs: '',
     body: '<path d="M12 2.2 20.5 7v10L12 21.8 3.5 17V7z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" /><path d="M12 7.4 16.2 9.9v4.2L12 16.6 7.8 14.1V9.9z" fill="currentColor" opacity=".5" />',
-  },
-  palette: {
-    attrs:
-      'stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"',
-    body: '<path d="M12 3a9 9 0 1 0 0 18 1.6 1.6 0 0 0 1.5-2.3 1.6 1.6 0 0 1 1.4-2.2H17a4 4 0 0 0 4-4c0-4.1-4-7.5-9-7.5z" /><circle cx="7.5" cy="11.5" r="1" fill="currentColor" /><circle cx="11" cy="7.5" r="1" fill="currentColor" /><circle cx="15.5" cy="8.5" r="1" fill="currentColor" />',
-  },
-  marquee: {
-    attrs:
-      'stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-dasharray="3 2.5"',
-    body: '<rect x="4" y="4" width="16" height="16" rx="1" />',
-  },
-  minus: {
-    attrs: 'stroke="currentColor" stroke-width="1.8" stroke-linecap="round"',
-    body: '<path d="M6 12h12" />',
-  },
-  moon: {
-    attrs: '',
-    body: '<path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" /><circle cx="15.5" cy="7.5" r=".9" fill="currentColor" /><circle cx="18" cy="11" r=".6" fill="currentColor" />',
-  },
-  plus: {
-    attrs: 'stroke="currentColor" stroke-width="1.8" stroke-linecap="round"',
-    body: '<path d="M12 6v12M6 12h12" />',
-  },
-  redo: {
-    attrs:
-      'stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"',
-    body: '<path d="M15 7H9a5 5 0 0 0 0 10h7" /><path d="M15 3l4 4-4 4" />',
   },
   region: {
     attrs:
       'stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-dasharray="3 2.5"',
     body: '<path d="M5 7c4-3 9-2 12 1s2 8-2 10-11 1-12-4 2-4 2-7z" />',
   },
-  select: {
-    attrs:
-      'stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"',
-    body: '<path d="M5 4l5 15 2.5-6 6-2.5z" />',
-  },
   settlement: {
     attrs:
       'stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"',
     body: `<path d="${SETTLEMENT_PATH}" />`,
   },
-  settings: {
-    // A cog: center hub plus the toothed ring — the conventional settings gear.
-    attrs:
-      'stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"',
-    body: '<circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />',
-  },
-  share: {
-    attrs:
-      'stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"',
-    body: '<circle cx="6" cy="12" r="2.4" /><circle cx="18" cy="6" r="2.4" /><circle cx="18" cy="18" r="2.4" /><path d="m8.1 10.8 7.8-3.6M8.1 13.2l7.8 3.6" />',
-  },
-  sun: {
-    attrs: 'stroke="currentColor" stroke-width="1.6" stroke-linecap="round"',
-    body: '<circle cx="12" cy="12" r="4" /><path d="M12 2.5v2M12 19.5v2M4.5 12h-2M21.5 12h-2M5.6 5.6 4.2 4.2M19.8 19.8l-1.4-1.4M18.4 5.6l1.4-1.4M4.2 19.8l1.4-1.4" />',
-  },
-  terrain: {
-    attrs: 'stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"',
-    body: '<path d="M12 3l7 4.5v9L12 21l-7-4.5v-9z" />',
-  },
-  undo: {
-    attrs:
-      'stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"',
-    body: '<path d="M9 7H15a5 5 0 0 1 0 10H8" /><path d="M9 3 5 7l4 4" />',
-  },
-  upload: {
-    attrs:
-      'stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"',
-    body: '<path d="M12 15V4" /><path d="M8 8l4-4 4 4" /><path d="M5 15v3a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 18v-3" />',
-  },
-  download: {
-    attrs:
-      'stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"',
-    body: '<path d="M12 4v11" /><path d="M8 11l4 4 4-4" /><path d="M5 15v3a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 18v-3" />',
-  },
-  user: {
-    attrs:
-      'stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"',
-    body: '<circle cx="12" cy="8" r="3.5" /><path d="M5.5 19a6.5 6.5 0 0 1 13 0" />',
-  },
 } as const;
 
-export type IconName = keyof typeof GLYPHS;
+/**
+ * Our stable, domain-facing glyph name → the Lucide icon data it renders. We read
+ * the icon's `node` data (not Lucide's `<svg lucideIcon>` directive) and draw it
+ * ourselves — the same trusted-inline-SVG path the bespoke glyphs use — so the
+ * dependency is honest and tree-shaken while call sites keep our vocabulary.
+ */
+const LUCIDE: Record<string, LucideIconData> = {
+  chevrons: LucideChevronsRight.icon,
+  close: LucideX.icon,
+  more: LucideEllipsisVertical.icon,
+  outline: LucideListTree.icon,
+  erase: LucideEraser.icon,
+  fit: LucideMaximize.icon,
+  label: LucideType.icon,
+  library: LucideLibrary.icon,
+  palette: LucidePalette.icon,
+  marquee: LucideSquareDashed.icon,
+  minus: LucideMinus.icon,
+  moon: LucideMoon.icon,
+  plus: LucidePlus.icon,
+  redo: LucideRedo2.icon,
+  select: LucideMousePointer2.icon,
+  settings: LucideSettings.icon,
+  share: LucideShare2.icon,
+  sun: LucideSun.icon,
+  terrain: LucideHexagon.icon,
+  undo: LucideUndo2.icon,
+  upload: LucideUpload.icon,
+  download: LucideDownload.icon,
+  user: LucideUser.icon,
+};
+
+export type IconName = keyof typeof CUSTOM | keyof typeof LUCIDE;
 
 /**
  * One built-in glyph, picked by `name` and drawn in `currentColor` at `size`
- * (ADR-0007). Replaces the per-glyph components: `<app-icon name="sun" />`,
- * usable statically or with a bound `[name]` for data-driven strips (the tool
- * palette, the rail). The glyph table is static, trusted markup we author, so it
- * is injected verbatim — `bypassSecurityTrustHtml` skips the sanitizer that
- * would otherwise strip the `<svg>`.
+ * (ADR-0007). Standard glyphs come from Lucide's icon data ({@link LUCIDE}); a few
+ * bespoke ones ({@link CUSTOM}) are authored inline. Either way the markup is trusted
+ * and injected verbatim — `bypassSecurityTrustHtml` skips the sanitizer that would
+ * strip the `<svg>`. For a runtime/arbitrary path, use {@link IconPath}.
  */
 @Component({
   selector: 'app-icon',
@@ -172,7 +137,14 @@ export class Icon {
   readonly size = input(24);
 
   protected readonly svg = computed(() => {
-    const { attrs, body } = GLYPHS[this.name()];
+    const name = this.name();
+    const custom = (CUSTOM as Record<string, { attrs: string; body: string }>)[
+      name
+    ];
+    const { attrs, body } = custom ?? {
+      attrs: LUCIDE_ATTRS,
+      body: lucideBody(LUCIDE[name]),
+    };
     const s = this.size();
     return this.sanitizer.bypassSecurityTrustHtml(
       `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" ${attrs}>${body}</svg>`,
