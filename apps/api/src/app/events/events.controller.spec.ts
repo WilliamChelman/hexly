@@ -66,7 +66,12 @@ describe('Events (SSE nudge bus) endpoints', () => {
    * with `data` JSON-parsed.
    */
   async function openSse(cookie: string) {
-    const res = await fetch(baseUrl + '/events', { headers: { cookie } });
+    return openSseAt('/events', { cookie });
+  }
+
+  /** Open the SSE stream at an arbitrary path/headers (cookie principal or `?token=`). */
+  async function openSseAt(path: string, headers: Record<string, string>) {
+    const res = await fetch(baseUrl + path, { headers });
     if (!res.body) throw new Error('no SSE body');
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
@@ -353,6 +358,212 @@ describe('Events (SSE nudge bus) endpoints', () => {
     const nudge = await sse.next();
     expect(nudge.event).toBe('nudge');
     expect(nudge.data).toEqual([{ id: entityId, unavailable: true }]);
+
+    await sse.close();
+  });
+
+  /**
+   * Seam B principal (ADR-0044, #175): a Public Link *token* opens the stream in place of a
+   * session cookie — the anonymous audience. Ada authors a note and mints its per-entity link;
+   * the token is the grant, resolving the same single access seam a `GET /public/…` does.
+   */
+  async function linkedEntity() {
+    const cookie = await sessionCookie('ada@hexly.test', 'correct horse');
+    const created = await request(app.getHttpServer())
+      .post('/entities')
+      .set('Cookie', cookie)
+      .send({ name: 'The Chronicle', type: 'note' })
+      .expect(201);
+    const entityId = created.body.id as string;
+    const link = await request(app.getHttpServer())
+      .post(`/entities/${entityId}/link`)
+      .set('Cookie', cookie)
+      .expect(200);
+    return { cookie, entityId, document: created.body.document, token: link.body.token as string };
+  }
+
+  /** Open the SSE stream authenticated by a Public Link token query param (no cookie). */
+  async function connectToken(token: string) {
+    const sse = await openSseAt(`/events?token=${token}`, {});
+    const ready = (await sse.next()).data as { connectionId: string };
+    return { sse, connectionId: ready.connectionId };
+  }
+
+  it('opens a stream for a Public Link token principal (no session cookie), minting a connectionId', async () => {
+    const { token } = await linkedEntity();
+    const sse = await openSseAt(`/events?token=${token}`, {});
+
+    expect(sse.contentType).toContain('text/event-stream');
+    const first = await sse.next();
+    expect(first.event).toBe('ready');
+    expect(first.data).toEqual({ connectionId: expect.any(String) });
+
+    await sse.close();
+  });
+
+  it('resolves a token principal like a cookie one: a link follower gets { id, version } when the GM saves', async () => {
+    const { cookie, entityId, document, token } = await linkedEntity();
+
+    // Anonymous viewer opens with the token and subscribes to the linked Entity.
+    const { sse, connectionId } = await connectToken(token);
+    await request(app.getHttpServer())
+      .put(`/events/${connectionId}/interest?token=${token}`)
+      .send({ refs: [{ kind: 'entity', id: entityId }] })
+      .expect(204);
+
+    // The GM (Ada) saves it (version 1 → 2).
+    await request(app.getHttpServer())
+      .put(`/entities/${entityId}`)
+      .set('Cookie', cookie)
+      .send({ document, version: 1, tags: [] })
+      .expect(200);
+
+    const nudge = await sse.next();
+    expect(nudge.event).toBe('nudge');
+    expect(nudge.data).toEqual([{ id: entityId, version: 2, updatedAt: expect.any(Number) }]);
+
+    await sse.close();
+  });
+
+  it('evicts a token follower to opaque { id, unavailable } when the Owner revokes the link', async () => {
+    const { cookie, entityId, token } = await linkedEntity();
+
+    const { sse, connectionId } = await connectToken(token);
+    await request(app.getHttpServer())
+      .put(`/events/${connectionId}/interest?token=${token}`)
+      .send({ refs: [{ kind: 'entity', id: entityId }] })
+      .expect(204);
+
+    // Revoke rides the same shaping event (ADR-0044, #175): the token now grants nothing, so the
+    // follower resolves to opaque, version-free eviction — access withdrawal on the open screen.
+    await request(app.getHttpServer())
+      .delete(`/entities/${entityId}/link`)
+      .set('Cookie', cookie)
+      .expect(204);
+
+    const nudge = await sse.next();
+    expect(nudge.event).toBe('nudge');
+    expect(nudge.data).toEqual([{ id: entityId, unavailable: true }]);
+
+    await sse.close();
+  });
+
+  it('resolves a World-link token (viaWorld branch) and evicts its followers when the World link is revoked', async () => {
+    const adaCookie = await sessionCookie('ada@hexly.test', 'correct horse');
+    const created = await request(app.getHttpServer())
+      .post('/entities')
+      .set('Cookie', adaCookie)
+      .send({ name: 'The Chronicle', type: 'note' })
+      .expect(201);
+    const entityId = created.body.id as string;
+    const worldId = created.body.worldId as string;
+    const document = created.body.document;
+    // A World link only reaches `shared` Entities (ADR-0037), so surface it before minting.
+    await request(app.getHttpServer())
+      .patch(`/entities/${entityId}`)
+      .set('Cookie', adaCookie)
+      .send({ visibility: 'shared' })
+      .expect(200);
+    const link = await request(app.getHttpServer())
+      .post(`/worlds/${worldId}/link`)
+      .set('Cookie', adaCookie)
+      .expect(200);
+    const token = link.body.token as string;
+
+    // Anon opens with the World token and subscribes to the shared Entity — reachable only through
+    // the viaWorld branch (no per-entity link exists).
+    const { sse, connectionId } = await connectToken(token);
+    await request(app.getHttpServer())
+      .put(`/events/${connectionId}/interest?token=${token}`)
+      .send({ refs: [{ kind: 'entity', id: entityId }] })
+      .expect(204);
+
+    // GM saves → the world-link follower gets the version nudge (viaWorld reachability holds).
+    await request(app.getHttpServer())
+      .put(`/entities/${entityId}`)
+      .set('Cookie', adaCookie)
+      .send({ document, version: 1, tags: [] })
+      .expect(200);
+    const nudge = await sse.next();
+    expect(nudge.data).toEqual([{ id: entityId, version: 2, updatedAt: expect.any(Number) }]);
+
+    // Revoking the World link evicts the world-link follower — the same guarantee as the entity path.
+    await request(app.getHttpServer())
+      .delete(`/worlds/${worldId}/link`)
+      .set('Cookie', adaCookie)
+      .expect(204);
+    const evicted = await sse.next();
+    expect(evicted.data).toEqual([{ id: entityId, unavailable: true }]);
+
+    await sse.close();
+  });
+
+  it('lets a `?token=` win over a present session cookie — a signed-in viewer follows as the link grants', async () => {
+    // Bob is signed in but has no standing on Ada's private Entity; the link token does. Opening
+    // with both his cookie and the token must follow as the *token* (readable), not as Bob (who
+    // would have the ref silently filtered) — the SSE connection is token-scoped like GET /public.
+    await app.get(AuthService).seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob');
+    const { cookie, entityId, document, token } = await linkedEntity();
+    const bobCookie = await sessionCookie('bob@hexly.test', 'hunter2 stationery');
+
+    const sse = await openSseAt(`/events?token=${token}`, { cookie: bobCookie });
+    const connectionId = (await sse.next()).data as { connectionId: string };
+    await request(app.getHttpServer())
+      .put(`/events/${connectionId.connectionId}/interest?token=${token}`)
+      .set('Cookie', bobCookie)
+      .send({ refs: [{ kind: 'entity', id: entityId }] })
+      .expect(204);
+
+    await request(app.getHttpServer())
+      .put(`/entities/${entityId}`)
+      .set('Cookie', cookie)
+      .send({ document, version: 1, tags: [] })
+      .expect(200);
+
+    const nudge = await sse.next();
+    expect(nudge.event).toBe('nudge');
+    expect(nudge.data).toEqual([{ id: entityId, version: 2, updatedAt: expect.any(Number) }]);
+
+    await sse.close();
+  });
+
+  it('confines a token principal to the Entity it grants — a sibling id it does not grant is silently not-subscribed', async () => {
+    const { cookie, entityId: grantedId, token } = await linkedEntity();
+    // A second, unlinked note the token grants no access to.
+    const other = await request(app.getHttpServer())
+      .post('/entities')
+      .set('Cookie', cookie)
+      .send({ name: 'Sealed Archive', type: 'note' })
+      .expect(201);
+    const forbiddenId = other.body.id as string;
+
+    const { sse, connectionId } = await connectToken(token);
+    await request(app.getHttpServer())
+      .put(`/events/${connectionId}/interest?token=${token}`)
+      .send({
+        refs: [
+          { kind: 'entity', id: forbiddenId },
+          { kind: 'entity', id: grantedId },
+        ],
+      })
+      .expect(204);
+
+    // Mutate the forbidden one first: if its ref had stuck, its nudge would arrive first. The
+    // granted one being the first (and only) frame proves the forbidden ref delivered nothing.
+    await request(app.getHttpServer())
+      .patch(`/entities/${forbiddenId}`)
+      .set('Cookie', cookie)
+      .send({ name: 'Sealed Deeper' })
+      .expect(200);
+    await request(app.getHttpServer())
+      .patch(`/entities/${grantedId}`)
+      .set('Cookie', cookie)
+      .send({ name: 'Open Wider' })
+      .expect(200);
+
+    const nudge = await sse.next();
+    expect(nudge.event).toBe('nudge');
+    expect(nudge.data).toEqual([{ id: grantedId, version: 1, updatedAt: expect.any(Number) }]);
 
     await sse.close();
   });

@@ -2,8 +2,28 @@ import { randomUUID } from 'node:crypto';
 import { Inject, Injectable, MessageEvent } from '@nestjs/common';
 import { Subject } from 'rxjs';
 import { InterestRef, NudgeDelta, NudgeEntry } from '@hexly/domain';
-import { entityAccess } from '../acl/entity-access';
+import { entityAccess, tokenReachesEntity } from '../acl/entity-access';
 import { DB, Db } from '../db/db';
+
+/**
+ * The principal that opened a connection (ADR-0044, #175). Either a signed-in user (cookie) or
+ * an anonymous **Public Link token** — the token *is* the grant, there is no anonymous user
+ * object. Reachability resolves the same single access seam for both ({@link canRead}), which is
+ * what makes an anonymous Public Link viewer a first-class live-follow participant.
+ */
+export type Principal =
+  | { kind: 'user'; userId: string }
+  | { kind: 'token'; token: string };
+
+/** A stable key identifying a principal, so per-emit shaping can memoize one entry per recipient. */
+function principalKey(p: Principal): string {
+  return p.kind === 'user' ? `user:${p.userId}` : `token:${p.token}`;
+}
+
+/** Same principal (owns-the-connection check for the interest PUT). */
+function principalsEqual(a: Principal, b: Principal): boolean {
+  return principalKey(a) === principalKey(b);
+}
 
 /**
  * The in-process nudge bus (ADR-0044, #173/#174). Fan-out is a per-connection rxjs `Subject`,
@@ -16,7 +36,7 @@ import { DB, Db } from '../db/db';
  * which is what delivers live eviction. Re-filtering recipients instead would silently break it.
  */
 interface Connection {
-  principal: string;
+  principal: Principal;
   interest: InterestRef[];
   stream: Subject<MessageEvent>;
 }
@@ -34,11 +54,22 @@ export class NudgeBus {
    * Register a new connection for `principal`, minting an unguessable `connectionId`. The
    * returned `stream` is what the SSE handler pipes to the client; nudges are pushed onto it.
    */
-  connect(principal: string): { connectionId: string; stream: Subject<MessageEvent> } {
+  connect(principal: Principal): { connectionId: string; stream: Subject<MessageEvent> } {
     const connectionId = randomUUID();
     const stream = new Subject<MessageEvent>();
     this.connections.set(connectionId, { principal, interest: [], stream });
     return { connectionId, stream };
+  }
+
+  /**
+   * Whether a principal can currently read Entity `id` — the boolean reachability seam shared by
+   * subscribe-time filtering and per-emit shaping (ADR-0044). A cookie principal resolves the
+   * ADR-0037 rule via {@link entityAccess}; a token principal resolves the Public Link grant.
+   */
+  private canRead(principal: Principal, id: string): boolean {
+    return principal.kind === 'user'
+      ? !!entityAccess(this.db, principal.userId).decideMeta(id)?.canRead
+      : tokenReachesEntity(this.db, principal.token, id);
   }
 
   /** Drop a connection (client closed the stream). Completes the stream so nothing leaks. */
@@ -58,14 +89,13 @@ export class NudgeBus {
    * still succeeds, so existence can't be probed by subscribing to guessed ids — a recipient
    * only ever hears about resources it could read when it subscribed.
    */
-  setInterest(connectionId: string, principal: string, refs: InterestRef[]): InterestOutcome {
+  setInterest(connectionId: string, principal: Principal, refs: InterestRef[]): InterestOutcome {
     const conn = this.connections.get(connectionId);
     if (!conn) return 'not-found';
-    if (conn.principal !== principal) return 'forbidden';
-    const access = entityAccess(this.db, principal);
+    if (!principalsEqual(conn.principal, principal)) return 'forbidden';
     // World refs pass through unfiltered: nothing emits for Worlds yet (#171 later slice).
     conn.interest = refs.filter(
-      (ref) => ref.kind !== 'entity' || !!access.decideMeta(ref.id)?.canRead,
+      (ref) => ref.kind !== 'entity' || this.canRead(principal, ref.id),
     );
     return 'ok';
   }
@@ -85,11 +115,13 @@ export class NudgeBus {
     const byPrincipal = new Map<string, NudgeEntry>();
     for (const conn of this.connections.values()) {
       if (!conn.interest.some((ref) => ref.kind === 'entity' && ref.id === id)) continue;
-      let entry = byPrincipal.get(conn.principal);
+      const key = principalKey(conn.principal);
+      let entry = byPrincipal.get(key);
       if (!entry) {
-        const canRead = !!entityAccess(this.db, conn.principal).decideMeta(id)?.canRead;
-        entry = canRead ? { id, version, updatedAt } : { id, unavailable: true };
-        byPrincipal.set(conn.principal, entry);
+        entry = this.canRead(conn.principal, id)
+          ? { id, version, updatedAt }
+          : { id, unavailable: true };
+        byPrincipal.set(key, entry);
       }
       const delta: NudgeDelta = [entry];
       conn.stream.next({ type: 'nudge', data: delta });

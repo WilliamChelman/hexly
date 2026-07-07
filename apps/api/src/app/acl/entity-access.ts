@@ -1,7 +1,7 @@
 import { EntityVerb, GrantRole } from '@hexly/domain';
-import { eq, getTableColumns, sql } from 'drizzle-orm';
+import { and, eq, getTableColumns, sql } from 'drizzle-orm';
 import { Db } from '../db/db';
-import { entities, entityGrants, worldMembers } from '../db/schema';
+import { entities, entityGrants, entityLinks, worldLinks, worldMembers } from '../db/schema';
 import { isSuperadmin } from './owner-set';
 
 /**
@@ -130,6 +130,37 @@ export const sharedVisibility = eq(entities.visibility, 'shared');
  * named here so the link paths stop repeating the literal.
  */
 export const READ_ONLY_RIGHTS: readonly EntityVerb[] = ['read'];
+
+/**
+ * Whether a Public Link *token* currently grants read of Entity `id` (ADR-0037/0044, #175). The
+ * token *is* the anonymous grant — there is no caller to derive Rights from — so this is the
+ * boolean reachability seam the nudge bus checks for a token principal, mirroring what the
+ * unguarded `GET /public/…` routes resolve. A token reaches an Entity two ways:
+ *
+ * - a per-entity link (`entity_links.id = token`) pointing straight at it (pierces `private`), or
+ * - a World link (`world_links.id = token`) whose World holds it *and* it is `shared`.
+ *
+ * A revoked (deleted-row) token reaches nothing → live eviction rides the same shaping event.
+ * Blob-free (no `document`), one cheap query, so it is fine on the per-emit path.
+ */
+export function tokenReachesEntity(db: Db, token: string, id: string): boolean {
+  const direct = db
+    .select({ id: entityLinks.entityId })
+    .from(entityLinks)
+    .where(and(eq(entityLinks.id, token), eq(entityLinks.entityId, id)))
+    .get();
+  if (direct) return true;
+  const viaWorld = db
+    .select({ id: entities.id })
+    .from(worldLinks)
+    .innerJoin(
+      entities,
+      and(eq(entities.worldId, worldLinks.worldId), eq(entities.id, id), sharedVisibility),
+    )
+    .where(eq(worldLinks.id, token))
+    .get();
+  return !!viaWorld;
+}
 
 /** A resolved single-row Entity decision (ADR-0039): the full row plus the caller's standing. */
 export interface EntityDecision {

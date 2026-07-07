@@ -748,6 +748,16 @@ export class EntitiesService implements OnApplicationBootstrap {
     const gate = this.gateOwnerManagement(userId, id);
     if (gate) return gate;
     revokePublicLink(this.db, ENTITY_LINK, id);
+    // Revoke *is* eviction (ADR-0044, #175): emit a change so the bus re-shapes per recipient — an
+    // anonymous token follower now resolves to `{ id, unavailable }` and blanks the open screen. The
+    // row itself is unchanged, so ship its real version/updatedAt: a still-authorized cookie follower
+    // (a World-share viewer, a grant holder) computes newer-than-held false and no-ops it.
+    const row = this.db
+      .select({ version: entities.version, updatedAt: entities.updatedAt })
+      .from(entities)
+      .where(eq(entities.id, id))
+      .get();
+    if (row) this.bus.emitEntityChange(id, row.version, row.updatedAt);
     return { status: 'ok', value: null };
   }
 

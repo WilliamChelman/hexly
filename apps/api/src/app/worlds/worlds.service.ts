@@ -25,6 +25,8 @@ import {
 } from '../acl/public-link-store';
 import { DB, Db } from '../db/db';
 import { worldAccess, worldRightsOf } from '../acl/world-access';
+import { sharedVisibility } from '../acl/entity-access';
+import { NudgeBus } from '../events/nudge-bus';
 import { entities, worldLinks, worldMembers, worlds } from '../db/schema';
 
 /** The World Public Link table for the shared get/mint/revoke helpers (ADR-0037, #162). */
@@ -46,6 +48,7 @@ export class WorldsService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly assets: AssetsService,
+    private readonly bus: NudgeBus,
   ) {}
 
   /**
@@ -406,6 +409,20 @@ export class WorldsService {
     const gate = this.gateOwnerManagement(userId, id);
     if (gate) return gate;
     revokePublicLink(this.db, WORLD_LINK, id);
+    // Revoke *is* eviction (ADR-0044, #175), mirroring the per-entity path: the World token now
+    // grants nothing, so re-emit each of the World's `shared` Entities and the bus shapes every
+    // world-link follower to `{ id, unavailable }` — access withdrawal on their open screen. A
+    // still-authorized follower (member, or a separate entity grant) computes newer-than-held
+    // false and no-ops it.
+    // ponytail: fans out over *all* the World's shared Entities, not just the followed ones — the
+    // bus keeps no per-World interest index. Fine on a small instance; add one if a huge shared
+    // World ever makes this loop hurt.
+    const shared = this.db
+      .select({ id: entities.id, version: entities.version, updatedAt: entities.updatedAt })
+      .from(entities)
+      .where(and(eq(entities.worldId, id), sharedVisibility))
+      .all();
+    for (const e of shared) this.bus.emitEntityChange(e.id, e.version, e.updatedAt);
     return { status: 'ok', value: null };
   }
 

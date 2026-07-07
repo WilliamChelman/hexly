@@ -30,6 +30,12 @@ export class NudgeBusClient {
 
   private source: EventSource | null = null;
   private connectionId: string | null = null;
+  /**
+   * The anonymous Public Link token this tab connects as, or null for a cookie principal (#175).
+   * When set it rides the `EventSource` URL and the interest `PUT` as `?token=`, so a viewer with
+   * no account still opens the stream and declares interest — the token *is* the grant.
+   */
+  private token: string | null = null;
   /** Live interest, reference-counted per ref key, so shared follows don't clobber each other. */
   private readonly interest = new Map<string, { ref: InterestRef; count: number }>();
   /** Coalesce flag: many acquire/release calls in one turn collapse to a single interest flush. */
@@ -43,6 +49,24 @@ export class NudgeBusClient {
    * leaves. So a follower is `bus.follow(ref).pipe(...)` under a `switchMap`/`takeUntilDestroyed`
    * — teardown handles withdrawal.
    */
+  /**
+   * Connect as an anonymous Public Link token principal instead of a session cookie (#175). A
+   * Public Link page calls this before following its Entity; passing `null` reverts to the cookie
+   * principal. Changing the token reopens the stream so the new principal takes effect.
+   */
+  useToken(token: string | null): void {
+    if (token === this.token) return;
+    this.token = token;
+    if (this.source) {
+      // Reopen under the new principal, preserving the declared interest set.
+      this.source.close();
+      this.source = null;
+      this.connectionId = null;
+      this.ensureOpen();
+      this.scheduleDeclare();
+    }
+  }
+
   follow(ref: InterestRef): Observable<NudgeEntry> {
     return new Observable<NudgeEntry>((subscriber) => {
       this.acquire(ref);
@@ -82,8 +106,9 @@ export class NudgeBusClient {
     // jsdom (unit tests) has no EventSource — stay inert rather than throw. The mock stands in
     // for the connection there; this guard keeps the real client harmless when injected.
     if (typeof EventSource === 'undefined') return;
-    // Relative URL → same origin, so the session cookie rides automatically (ADR-0008).
-    this.source = new EventSource('/api/events');
+    // Relative URL → same origin, so the session cookie rides automatically (ADR-0008). An
+    // anonymous Public Link viewer has no cookie, so its token rides the URL instead (#175).
+    this.source = new EventSource('/api/events' + this.tokenQuery());
     this.source.addEventListener('ready', (e) => {
       this.connectionId = (JSON.parse((e as MessageEvent).data) as ConnectionReady).connectionId;
       this.scheduleDeclare(); // flush interest gathered before the id arrived
@@ -109,6 +134,11 @@ export class NudgeBusClient {
     });
   }
 
+  /** `?token=…` for an anonymous principal, or '' for a cookie one — appended to both wire calls. */
+  private tokenQuery(): string {
+    return this.token ? `?token=${encodeURIComponent(this.token)}` : '';
+  }
+
   private flushInterest(): void {
     if (this.interest.size === 0) {
       // Nothing watched: drop the connection so an idle tab holds none (the server reaps it on
@@ -122,7 +152,7 @@ export class NudgeBusClient {
     // re-flushes once it lands, so nothing is lost.
     if (!this.connectionId) return;
     this.http
-      .put<void>(`/api/events/${this.connectionId}/interest`, {
+      .put<void>(`/api/events/${this.connectionId}/interest${this.tokenQuery()}`, {
         refs: [...this.interest.values()].map((e) => e.ref),
       })
       // A stale-connection 4xx (the server reaped it while EventSource silently reconnected) or a

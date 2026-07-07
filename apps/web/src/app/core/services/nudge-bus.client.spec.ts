@@ -99,6 +99,23 @@ describe('NudgeBusClient', () => {
     await Promise.resolve(); // idle-close, no PUT
   });
 
+  it('carries ?token= on the stream and interest for an anonymous principal, and reverts on useToken(null)', async () => {
+    // Anonymous Public Link viewer (#175): the token rides the EventSource URL and the PUT.
+    client.useToken('abc');
+    client.follow(entity('X')).subscribe();
+    await ready('c1');
+    expect(FakeEventSource.instances[0].url).toBe('/api/events?token=abc');
+    http.expectOne('/api/events/c1/interest?token=abc').flush(null);
+
+    // Reverting to the cookie principal (route leave) reopens the stream with no token, so the
+    // shared singleton bus can't stay pinned to a link on an authenticated page.
+    client.useToken(null);
+    expect(FakeEventSource.instances[0].closed).toBe(true);
+    await ready('c2');
+    expect(FakeEventSource.instances[1].url).toBe('/api/events');
+    http.expectOne('/api/events/c2/interest').flush(null);
+  });
+
   it('delivers nudges only to the matching follower', async () => {
     const seen: unknown[] = [];
     client.follow(entity('X')).subscribe((n) => seen.push(n));

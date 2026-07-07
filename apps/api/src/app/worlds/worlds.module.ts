@@ -5,6 +5,7 @@ import { AuthModule } from '../auth/auth.module';
 import { HEXLY_CONFIG, type HexlyConfig } from '../config/config.module';
 import { DbModule } from '../db/db.module';
 import { EntitiesModule } from '../entities/entities.module';
+import { EventsModule } from '../events/events.module';
 import { VaultExportService } from './vault-export.service';
 import { VaultImportService } from './vault-import.service';
 import { VaultUnzipper } from './vault-unzipper';
@@ -13,8 +14,9 @@ import { WorldsService } from './worlds.service';
 
 /**
  * World feature module (ADR-0024). Imports DbModule (shared DB, ADR-0002),
- * AuthModule (SessionAuthGuard on routes), and EntitiesModule so the vault
- * import (ADR-0033) can insert notes through EntitiesService.
+ * AuthModule (SessionAuthGuard on routes), EntitiesModule so the vault import
+ * (ADR-0033) can insert notes through EntitiesService, and EventsModule so a
+ * World-link revoke can emit live eviction into the nudge bus (ADR-0044, #175).
  *
  * `MulterModule.registerAsync` sets the upload `fileSize` from the Instance
  * Configuration (ADR-0036), which the import route's bare `FileInterceptor('file')`
@@ -26,6 +28,7 @@ import { WorldsService } from './worlds.service';
     DbModule,
     AuthModule,
     EntitiesModule,
+    EventsModule,
     AssetsModule,
     MulterModule.registerAsync({
       inject: [HEXLY_CONFIG],
