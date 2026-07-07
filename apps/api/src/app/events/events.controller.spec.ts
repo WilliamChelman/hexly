@@ -3,7 +3,7 @@ import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import { DB, Db, createDb } from '../db/db';
-import { entityGrants } from '../db/schema';
+import { entityGrants, worldMembers } from '../db/schema';
 import { AuthService } from '../auth/auth.service';
 import { AuthModule } from '../auth/auth.module';
 import { ConfigModule } from '../config/config.module';
@@ -225,8 +225,196 @@ describe('Events (SSE nudge bus) endpoints', () => {
     // Ada receives the nudge for exactly that resource, at the bumped version.
     const nudge = await sse.next();
     expect(nudge.event).toBe('nudge');
-    expect(nudge.data).toEqual([{ id: entityId, version: 2 }]);
+    expect(nudge.data).toEqual([
+      { id: entityId, version: 2, updatedAt: expect.any(Number) },
+    ]);
 
     await sse.close();
+  });
+
+  it('delivers { id, version } to a follower when the Entity is renamed', async () => {
+    const adaCookie = await sessionCookie('ada@hexly.test', 'correct horse');
+    const created = await request(app.getHttpServer())
+      .post('/entities')
+      .set('Cookie', adaCookie)
+      .send({ name: 'The Chronicle', type: 'note' })
+      .expect(201);
+    const entityId = created.body.id as string;
+
+    const { sse, connectionId } = await connect(adaCookie);
+    await request(app.getHttpServer())
+      .put(`/events/${connectionId}/interest`)
+      .set('Cookie', adaCookie)
+      .send({ refs: [{ kind: 'entity', id: entityId }] })
+      .expect(204);
+
+    await request(app.getHttpServer())
+      .patch(`/entities/${entityId}`)
+      .set('Cookie', adaCookie)
+      .send({ name: 'The Amended Chronicle' })
+      .expect(200);
+
+    // A patch never bumps version (it must not invalidate in-progress edits) — the fresh
+    // `updatedAt` is what lets a follower see a same-version rename as newer than held.
+    const nudge = await sse.next();
+    expect(nudge.event).toBe('nudge');
+    expect(nudge.data).toEqual([
+      { id: entityId, version: 1, updatedAt: expect.any(Number) },
+    ]);
+
+    await sse.close();
+  });
+
+  it('shapes one private-flip event per recipient: world-share follower evicted, grant holder kept (ADR-0044)', async () => {
+    // Bob follows via world-share (World Viewer); Carol holds a separate entity-level
+    // Viewer grant, which pierces `private`. One mutation event, correct per person.
+    const bobId = await app
+      .get(AuthService)
+      .seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob');
+    const carolId = await app
+      .get(AuthService)
+      .seedUser('carol@hexly.test', 'lovelace engine', 'Carol');
+    const adaCookie = await sessionCookie('ada@hexly.test', 'correct horse');
+    const bobCookie = await sessionCookie('bob@hexly.test', 'hunter2 stationery');
+    const carolCookie = await sessionCookie('carol@hexly.test', 'lovelace engine');
+
+    const created = await request(app.getHttpServer())
+      .post('/entities')
+      .set('Cookie', adaCookie)
+      .send({ name: 'The Chronicle', type: 'note' })
+      .expect(201);
+    const entityId = created.body.id as string;
+    const worldId = created.body.worldId as string;
+    await request(app.getHttpServer())
+      .patch(`/entities/${entityId}`)
+      .set('Cookie', adaCookie)
+      .send({ visibility: 'shared' })
+      .expect(200);
+    db.insert(worldMembers).values({ worldId, userId: bobId, role: 'viewer' }).run();
+    db.insert(entityGrants).values({ entityId, userId: carolId, role: 'viewer' }).run();
+
+    const bob = await connect(bobCookie);
+    await request(app.getHttpServer())
+      .put(`/events/${bob.connectionId}/interest`)
+      .set('Cookie', bobCookie)
+      .send({ refs: [{ kind: 'entity', id: entityId }] })
+      .expect(204);
+    const carol = await connect(carolCookie);
+    await request(app.getHttpServer())
+      .put(`/events/${carol.connectionId}/interest`)
+      .set('Cookie', carolCookie)
+      .send({ refs: [{ kind: 'entity', id: entityId }] })
+      .expect(204);
+
+    await request(app.getHttpServer())
+      .patch(`/entities/${entityId}`)
+      .set('Cookie', adaCookie)
+      .send({ visibility: 'private' })
+      .expect(200);
+
+    // Bob's world-share standing ends with the flip → opaque, version-free eviction.
+    const bobNudge = await bob.sse.next();
+    expect(bobNudge.event).toBe('nudge');
+    expect(bobNudge.data).toEqual([{ id: entityId, unavailable: true }]);
+    // Carol's grant survives the flip → she keeps following, same event.
+    const carolNudge = await carol.sse.next();
+    expect(carolNudge.event).toBe('nudge');
+    expect(carolNudge.data).toEqual([
+      { id: entityId, version: 1, updatedAt: expect.any(Number) },
+    ]);
+
+    await bob.sse.close();
+    await carol.sse.close();
+  });
+
+  it('evicts followers to opaque, version-free { id, unavailable } when the Entity is deleted', async () => {
+    const adaCookie = await sessionCookie('ada@hexly.test', 'correct horse');
+    const created = await request(app.getHttpServer())
+      .post('/entities')
+      .set('Cookie', adaCookie)
+      .send({ name: 'The Chronicle', type: 'note' })
+      .expect(201);
+    const entityId = created.body.id as string;
+
+    const { sse, connectionId } = await connect(adaCookie);
+    await request(app.getHttpServer())
+      .put(`/events/${connectionId}/interest`)
+      .set('Cookie', adaCookie)
+      .send({ refs: [{ kind: 'entity', id: entityId }] })
+      .expect(204);
+
+    await request(app.getHttpServer())
+      .delete(`/entities/${entityId}`)
+      .set('Cookie', adaCookie)
+      .expect(204);
+
+    // Deleted rides the same shaping path as unauthorized — the exact match proves the
+    // entry is byte-identical to the private-flip eviction and carries no version.
+    const nudge = await sse.next();
+    expect(nudge.event).toBe('nudge');
+    expect(nudge.data).toEqual([{ id: entityId, unavailable: true }]);
+
+    await sse.close();
+  });
+
+  it('silently drops forbidden and nonexistent refs at subscribe time — no nudge is ever delivered for them', async () => {
+    // Existence must not be probeable by subscribing to guessed ids (ADR-0044): the PUT
+    // still 204s (silent), but a follower only ever hears about resources it could read
+    // when it subscribed.
+    const bobId = await app
+      .get(AuthService)
+      .seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob');
+    const adaCookie = await sessionCookie('ada@hexly.test', 'correct horse');
+    const bobCookie = await sessionCookie('bob@hexly.test', 'hunter2 stationery');
+
+    // Ada's `private` Entities: `hidden` (no standing for Bob) and `granted` (Bob is Viewer).
+    const mkEntity = async (name: string) => {
+      const res = await request(app.getHttpServer())
+        .post('/entities')
+        .set('Cookie', adaCookie)
+        .send({ name, type: 'note' })
+        .expect(201);
+      return res.body.id as string;
+    };
+    const hiddenId = await mkEntity('Sealed Archive');
+    const grantedId = await mkEntity('Open Ledger');
+    db.insert(entityGrants).values({ entityId: grantedId, userId: bobId, role: 'viewer' }).run();
+
+    // Bob declares interest in the forbidden id, a guessed id, and the granted one: 204,
+    // indistinguishable from a fully honored PUT.
+    const bob = await connect(bobCookie);
+    await request(app.getHttpServer())
+      .put(`/events/${bob.connectionId}/interest`)
+      .set('Cookie', bobCookie)
+      .send({
+        refs: [
+          { kind: 'entity', id: hiddenId },
+          { kind: 'entity', id: 'no-such-entity' },
+          { kind: 'entity', id: grantedId },
+        ],
+      })
+      .expect(204);
+
+    // Mutate the forbidden Entity first, then the granted one. If the forbidden ref had
+    // stuck, its nudge would arrive first — so Bob's first frame being the granted one
+    // proves the forbidden ref delivered nothing.
+    await request(app.getHttpServer())
+      .patch(`/entities/${hiddenId}`)
+      .set('Cookie', adaCookie)
+      .send({ name: 'Sealed Deeper' })
+      .expect(200);
+    await request(app.getHttpServer())
+      .patch(`/entities/${grantedId}`)
+      .set('Cookie', adaCookie)
+      .send({ name: 'Open Wider' })
+      .expect(200);
+
+    const nudge = await bob.sse.next();
+    expect(nudge.event).toBe('nudge');
+    expect(nudge.data).toEqual([
+      { id: grantedId, version: 1, updatedAt: expect.any(Number) },
+    ]);
+
+    await bob.sse.close();
   });
 });

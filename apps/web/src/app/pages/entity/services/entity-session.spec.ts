@@ -820,7 +820,7 @@ describe('EntitySession', () => {
       // The silent refetch pulls the fresh Entity (version 4).
       entities.load.mockReturnValue(of({ ...aldermoor, version: 4 }));
 
-      bus.emit({ id: 'm1', version: 4 });
+      bus.emit({ id: 'm1', version: 4, updatedAt: 2 });
       expect(entities.load).not.toHaveBeenCalled(); // debounced, not yet
 
       vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
@@ -834,9 +834,9 @@ describe('EntitySession', () => {
       entities.load.mockClear();
       entities.load.mockReturnValue(of({ ...aldermoor, version: 6 }));
 
-      bus.emit({ id: 'm1', version: 4 });
-      bus.emit({ id: 'm1', version: 5 });
-      bus.emit({ id: 'm1', version: 6 });
+      bus.emit({ id: 'm1', version: 4, updatedAt: 2 });
+      bus.emit({ id: 'm1', version: 5, updatedAt: 3 });
+      bus.emit({ id: 'm1', version: 6, updatedAt: 4 });
       vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
 
       expect(entities.load).toHaveBeenCalledTimes(1);
@@ -848,30 +848,104 @@ describe('EntitySession', () => {
       editor.paintAt({ q: 5, r: 5 }, 'ocean'); // unsaved edit
       expect(session.dirty()).toBe(true);
 
-      bus.emit({ id: 'm1', version: 4 });
+      bus.emit({ id: 'm1', version: 4, updatedAt: 2 });
       vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
 
       expect(entities.load).not.toHaveBeenCalled();
     });
 
-    it('ignores a nudge at the already-held version (self / cross-tab echo dedupe)', () => {
-      openAndFollow(); // version 3
+    it('ignores a nudge at the already-held version and timestamp (self / cross-tab echo dedupe)', () => {
+      openAndFollow(); // version 3, updatedAt 1
       entities.load.mockClear();
 
-      bus.emit({ id: 'm1', version: 3 });
+      bus.emit({ id: 'm1', version: 3, updatedAt: 1 });
       vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
 
       expect(entities.load).not.toHaveBeenCalled();
+    });
+
+    it('refetches on a same-version nudge with a newer updatedAt (a rename patch never bumps version)', () => {
+      openAndFollow(); // version 3, updatedAt 1
+      entities.load.mockClear();
+      entities.load.mockReturnValue(
+        of({ ...aldermoor, name: 'Aldermoor, Renamed', updatedAt: 2 }),
+      );
+
+      bus.emit({ id: 'm1', version: 3, updatedAt: 2 });
+      vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
+
+      expect(entities.load).toHaveBeenCalledTimes(1);
+      expect(session.current()?.name).toBe('Aldermoor, Renamed');
     });
 
     it('ignores a nudge addressed to a different Entity', () => {
       openAndFollow();
       entities.load.mockClear();
 
-      bus.emit({ id: 'other', version: 99 });
+      bus.emit({ id: 'other', version: 99, updatedAt: 99 });
       vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
 
       expect(entities.load).not.toHaveBeenCalled();
+    });
+
+    it('blanks the view to an unavailable state on an { id, unavailable } nudge (live eviction)', () => {
+      openAndFollow();
+      entities.load.mockClear();
+
+      // Access ended server-side (private flip, revoked grant, or delete): the entry is
+      // opaque and version-free, and eviction never refetches — there is nothing to fetch.
+      bus.emit({ id: 'm1', unavailable: true });
+
+      expect(session.current()).toBeNull();
+      expect(session.evicted()).toBe(true);
+      vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
+      expect(entities.load).not.toHaveBeenCalled();
+    });
+
+    it('clears the evicted state when a new load starts, so it never masks that load’s real error', () => {
+      openAndFollow();
+      bus.emit({ id: 'm1', unavailable: true });
+      expect(session.evicted()).toBe(true);
+
+      // Navigate to another Entity whose load fails (transient 5xx): the page must render
+      // the load error, not last route's "no longer available".
+      entities.load.mockReturnValue(throwError(() => new Error('boom')));
+      session.openRoute('n2').subscribe({
+        error: () => {
+          // The failed load is the fixture, not the assertion — only evicted() is under test.
+        },
+      });
+
+      expect(session.evicted()).toBe(false);
+    });
+
+    it('does NOT evict over unsaved edits (clobber guard) — access loss surfaces at save time instead', () => {
+      openAndFollow();
+      editor.paintAt({ q: 5, r: 5 }, 'ocean'); // unsaved edit
+      expect(session.dirty()).toBe(true);
+
+      // Blanking now would destroy the user's work (ADR-0044: a background event never
+      // clobbers unsaved edits). The edits stay on screen; the save path's 403 → read-only
+      // state is where the lost access surfaces.
+      bus.emit({ id: 'm1', unavailable: true });
+
+      expect(session.current()).not.toBeNull();
+      expect(session.evicted()).toBe(false);
+    });
+
+    it('prunes the evicted ref from the interest set — a later nudge for it does nothing', () => {
+      openAndFollow();
+      entities.load.mockClear();
+      bus.emit({ id: 'm1', unavailable: true });
+      TestBed.tick(); // let the follow teardown (interest withdrawal) settle
+
+      // Were the ref still followed, a newer version would pass every filter and refetch —
+      // resurrecting a view the server just evicted.
+      bus.emit({ id: 'm1', version: 99, updatedAt: 99 });
+      vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
+
+      expect(entities.load).not.toHaveBeenCalled();
+      expect(session.current()).toBeNull();
     });
 
     it('survives a failed refetch and still reconciles the next nudge (idempotent invalidation)', () => {
@@ -880,13 +954,13 @@ describe('EntitySession', () => {
 
       // A transient error on the background refetch must not kill live-follow for the session.
       entities.load.mockReturnValueOnce(throwError(() => new Error('network blip')));
-      bus.emit({ id: 'm1', version: 4 });
+      bus.emit({ id: 'm1', version: 4, updatedAt: 2 });
       vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
       expect(entities.load).toHaveBeenCalledTimes(1); // attempted, failed, swallowed
 
       // The next nudge still reconciles — the subscription is alive.
       entities.load.mockReturnValue(of({ ...aldermoor, version: 5 }));
-      bus.emit({ id: 'm1', version: 5 });
+      bus.emit({ id: 'm1', version: 5, updatedAt: 3 });
       vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
       expect(entities.load).toHaveBeenCalledTimes(2);
       expect(session.current()?.version).toBe(5);

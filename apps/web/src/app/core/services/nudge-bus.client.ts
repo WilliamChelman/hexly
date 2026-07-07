@@ -3,9 +3,9 @@ import { HttpClient } from '@angular/common/http';
 import { EMPTY, Observable, Subject, catchError, filter } from 'rxjs';
 import {
   ConnectionReady,
-  EntityNudge,
   InterestRef,
   NudgeDelta,
+  NudgeEntry,
 } from '@hexly/domain';
 
 /**
@@ -20,8 +20,9 @@ import {
  *
  * The stream opens lazily on the first follower — a tab watching nothing holds no connection.
  *
- * Spine slice: entity refs, `{ id, version }` only. Reconnect re-sync, heartbeat, the
- * `unavailable` eviction entry, and World refs are additive later slices (#171).
+ * An entry is either a `{ id, version }` delta or an opaque `{ id, unavailable }` eviction
+ * (#174) — the bus relays both; what eviction means is the follower's business. Reconnect
+ * re-sync, heartbeat, and World refs are additive later slices (#171).
  */
 @Injectable({ providedIn: 'root' })
 export class NudgeBusClient {
@@ -34,7 +35,7 @@ export class NudgeBusClient {
   /** Coalesce flag: many acquire/release calls in one turn collapse to a single interest flush. */
   private declareScheduled = false;
 
-  private readonly nudges = new Subject<EntityNudge>();
+  private readonly nudges = new Subject<NudgeEntry>();
 
   /**
    * The stream of nudges for one resource. Subscribing declares interest in it (and opens the
@@ -42,8 +43,8 @@ export class NudgeBusClient {
    * leaves. So a follower is `bus.follow(ref).pipe(...)` under a `switchMap`/`takeUntilDestroyed`
    * — teardown handles withdrawal.
    */
-  follow(ref: InterestRef): Observable<EntityNudge> {
-    return new Observable<EntityNudge>((subscriber) => {
+  follow(ref: InterestRef): Observable<NudgeEntry> {
+    return new Observable<NudgeEntry>((subscriber) => {
       this.acquire(ref);
       const inner = this.nudges
         .pipe(filter((n) => n.id === ref.id))

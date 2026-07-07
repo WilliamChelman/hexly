@@ -233,7 +233,11 @@
       "pin": "Épingler au tableau de bord",
       "toggle": "Épingler cette Entité au tableau de bord du monde"
     },
-    "actionsMenu": "Actions de l’entité"
+    "actionsMenu": "Actions de l’entité",
+    "unavailable": {
+      "title": "N’est plus disponible",
+      "body": "Cette page a été supprimée ou son partage a changé, vous n’y avez donc plus accès."
+    }
   },
   "styleguide": {
     "tabTitle": "Hexly — Système de design",

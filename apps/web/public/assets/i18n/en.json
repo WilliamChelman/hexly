@@ -233,7 +233,11 @@
       "pin": "Pin to Dashboard",
       "toggle": "Pin this Entity to the World Dashboard"
     },
-    "actionsMenu": "Entity actions"
+    "actionsMenu": "Entity actions",
+    "unavailable": {
+      "title": "No longer available",
+      "body": "This page was deleted or its sharing changed, so you no longer have access to it."
+    }
   },
   "styleguide": {
     "tabTitle": "Hexly — Design system",

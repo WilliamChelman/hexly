@@ -1,5 +1,5 @@
 import { Observable, Subject, filter } from 'rxjs';
-import { EntityNudge, InterestRef } from '@hexly/domain';
+import { InterestRef, NudgeEntry } from '@hexly/domain';
 
 /**
  * Spy-backed stand-in for {@link NudgeBusClient} (ADR-0044). `follow` is a spy returning the
@@ -7,15 +7,15 @@ import { EntityNudge, InterestRef } from '@hexly/domain';
  * server sent one.
  */
 export class MockNudgeBusClient {
-  private readonly nudges = new Subject<EntityNudge>();
+  private readonly nudges = new Subject<NudgeEntry>();
 
   readonly follow = vi.fn(
-    (ref: InterestRef): Observable<EntityNudge> =>
+    (ref: InterestRef): Observable<NudgeEntry> =>
       this.nudges.pipe(filter((n) => n.id === ref.id)),
   );
 
-  /** Test helper: deliver a nudge to followers. */
-  emit(nudge: EntityNudge): void {
+  /** Test helper: deliver a nudge (a version delta or an `unavailable` eviction) to followers. */
+  emit(nudge: NudgeEntry): void {
     this.nudges.next(nudge);
   }
 }

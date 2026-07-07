@@ -5,7 +5,7 @@ import {
   inject,
 } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
-import { translateSignal } from '@jsverse/transloco';
+import { TranslocoPipe, translateSignal } from '@jsverse/transloco';
 import { Observable, concat, ignoreElements, of } from 'rxjs';
 import { EntitySession } from './services/entity-session';
 import { HexMapStore } from './services/hexmap-store';
@@ -58,6 +58,7 @@ import { Icon } from '../../ui/icon/icon';
     OutlineSource,
     IconButton,
     Icon,
+    TranslocoPipe,
   ],
   template: `
     @if (session.current()) {
@@ -139,6 +140,21 @@ import { Icon } from '../../ui/icon/icon';
         @if (isHexmap()) {
           <app-status-bar />
         }
+      </div>
+    } @else if (session.evicted()) {
+      <!-- Live eviction (ADR-0044, #174): the followed Entity became unreachable (deleted,
+           made private, or un-shared) — an honest empty state instead of stale content. -->
+      <div
+        data-testid="entity-unavailable"
+        class="h-full flex flex-col items-center justify-center gap-2 text-center px-6"
+        role="status"
+      >
+        <p class="text-lg font-medium">
+          {{ 'editorShell.unavailable.title' | transloco }}
+        </p>
+        <p class="text-ink-muted">
+          {{ 'editorShell.unavailable.body' | transloco }}
+        </p>
       </div>
     }
   `,

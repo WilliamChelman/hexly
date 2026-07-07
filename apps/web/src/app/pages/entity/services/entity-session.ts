@@ -32,6 +32,7 @@ import {
   emptyHexMap,
   EntityBody,
   EntityDetail,
+  EntityNudge,
   EntitySaveOutcome,
   HexMap,
   hexMapSchema,
@@ -103,6 +104,17 @@ export class EntitySession {
 
   private readonly _error = signal<'save' | 'reload' | 'readonly' | null>(null);
   readonly error = this._error.asReadonly();
+
+  /**
+   * The followed Entity became unreachable mid-view (ADR-0044, #174): made `private`,
+   * un-shared, or deleted — the nudge said only `unavailable`. Cleared when the next load
+   * starts. Eviction also prunes the ref from the interest set (per the ADR), so a later
+   * re-share is *not* discovered live — the user finds it by navigating to the Entity again.
+   * Distinct from {@link error}: nothing failed, the view was *evicted*, so the page renders
+   * an unavailable state instead of stale content.
+   */
+  private readonly _evicted = signal(false);
+  readonly evicted = this._evicted.asReadonly();
 
   /**
    * Whether the caller may write the open Entity (ADR-0039): the load-time Rights carry the
@@ -248,19 +260,27 @@ export class EntitySession {
           id === null
             ? EMPTY
             : this.bus.follow({ kind: 'entity', id }).pipe(
-                // Echo dedupe up front (a tab already at that version ignores it), then debounce so
-                // a burst of the GM's saves coalesces into one refetch.
-                filter((n) => n.version > (this._current()?.version ?? 0)),
+                // Live eviction (#174): our own access ended (private flip, revoked grant,
+                // delete) — blank the view rather than leave it stale. Nulling `current` also
+                // nulls `_followedId`, so this switchMap tears the follow down and its teardown
+                // prunes the ref from the interest set — no manual bookkeeping. The dirty guard
+                // holds here too (ADR-0044): blanking over unsaved edits would destroy them, so
+                // a dirty editor keeps its buffer and meets the access loss at save time (403 →
+                // read-only) instead.
+                tap((n) => {
+                  if ('unavailable' in n && !this.dirty()) this.evict();
+                }),
+                filter((n): n is EntityNudge => !('unavailable' in n)),
+                // Echo dedupe up front (a tab already holding this state ignores it), then
+                // debounce so a burst of the GM's saves coalesces into one refetch.
+                filter((n) => this.newerThanHeld(n)),
                 debounceTime(NUDGE_DEBOUNCE_MS),
                 // Re-check at fire time: the clobber guard (never refetch over unsaved edits — the
                 // editor still finds concurrent edits at save time via the 409 path), skip during a
-                // route load so a late nudge can't snap the view back, and re-check the version
+                // route load so a late nudge can't snap the view back, and re-check freshness
                 // since our own save may have advanced it during the debounce window.
                 filter(
-                  (n) =>
-                    !this.dirty() &&
-                    !this._loading() &&
-                    n.version > (this._current()?.version ?? 0),
+                  (n) => !this.dirty() && !this._loading() && this.newerThanHeld(n),
                 ),
                 // A nudge is an idempotent invalidation (ADR-0044): swallow a transient refetch
                 // failure rather than let it kill the subscription — the next nudge or a reconnect
@@ -332,9 +352,30 @@ export class EntitySession {
     return this.entities.load(id).pipe(tap((detail) => this.adopt(detail)));
   }
 
+  /**
+   * Whether a nudge describes state newer than the view holds (ADR-0044). A metadata patch
+   * (rename, visibility) touches `updatedAt` without bumping `version` — comparing both is what
+   * lets a follower see a same-version rename; comparing only the version would drop it.
+   */
+  private newerThanHeld(n: EntityNudge): boolean {
+    const held = this._current();
+    if (!held) return false;
+    return (
+      n.version > held.version ||
+      (n.version === held.version && n.updatedAt > held.updatedAt)
+    );
+  }
+
+  /** Blank the view on live eviction (#174): the unavailable state, not an error or a redirect. */
+  private evict(): void {
+    this._evicted.set(true);
+    this._current.set(null);
+  }
+
   adopt(detail: EntityDetail): void {
     this._conflict.set(null);
     this._error.set(null);
+    this._evicted.set(false);
     this.failed = null;
     this._current.set(detail);
     this._content.set(detail.document.content); // before seed: seed effect reads content()
@@ -402,6 +443,9 @@ export class EntitySession {
         this._baseGrid.set(this.editor.document());
         this._baseContent.set(this._content());
         this._baseTags.set(this._tags());
+        // Eviction belongs to the Entity just left (#174): clear it as the new load starts —
+        // waiting for a successful adopt() would let it mask this load's own failure state.
+        this._evicted.set(false);
         this._loading.set(true);
         return this.open(id).pipe(
           this.shell.withLoading('subtle'),

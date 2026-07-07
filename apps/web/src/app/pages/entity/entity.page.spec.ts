@@ -13,7 +13,9 @@ import {
 import { of, throwError } from 'rxjs';
 import { CONTENT_FORMAT, EntityDetail, EntityType } from '@hexly/domain';
 import { EntitiesClient } from '../../core/services/entities.client';
+import { NudgeBusClient } from '../../core/services/nudge-bus.client';
 import { MockEntitiesClient } from '../../core/testing/entities-client.mock';
+import { MockNudgeBusClient } from '../../core/testing/nudge-bus.mock';
 import { EntitySession } from './services/entity-session';
 import { EntityNameResolver } from './services/entity-name-resolver';
 import { OutlineStore } from './services/outline-store';
@@ -68,6 +70,7 @@ const hexmapWithContent = (text: string): EntityDetail => ({
 describe('EntityPage routing', () => {
   let http: HttpTestingController;
   let entities: MockEntitiesClient;
+  let bus: MockNudgeBusClient;
   let navigate: ReturnType<typeof vi.spyOn>;
 
   const detail = (id: string, type: EntityType): EntityDetail =>
@@ -78,6 +81,7 @@ describe('EntityPage routing', () => {
   /** Configure the TestBed for `:id` without mounting yet, so a test can arm `entities` first. */
   async function configure(id: string) {
     entities = new MockEntitiesClient();
+    bus = new MockNudgeBusClient();
     await TestBed.configureTestingModule({
       imports: [EntityPage, provideTranslocoTesting()],
       providers: [
@@ -85,6 +89,7 @@ describe('EntityPage routing', () => {
         EntityNameResolver,
         OutlineStore,
         { provide: EntitiesClient, useValue: entities },
+        { provide: NudgeBusClient, useValue: bus },
         provideHttpClient(),
         provideHttpClientTesting(),
         {
@@ -150,6 +155,22 @@ describe('EntityPage routing', () => {
     fixture.detectChanges();
 
     expect(TestBed.inject(TitleService).documentName()).toBe('Aldermoor');
+  });
+
+  it('blanks to an unavailable state when the followed Entity is evicted (ADR-0044)', async () => {
+    await configure('n1');
+    entities.load.mockReturnValue(of(detail('n1', 'note')));
+    const fixture = mount();
+    fixture.detectChanges();
+    TestBed.tick(); // settle the reconciler's follow subscription
+
+    // The server evicted this follower (private flip, revoked grant, or delete).
+    bus.emit({ id: 'n1', unavailable: true });
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('app-content-editor')).toBeNull();
+    expect(el.querySelector('[data-testid="entity-unavailable"]')).not.toBeNull();
   });
 
   it('returns to the World’s library when the Entity fails to load', async () => {

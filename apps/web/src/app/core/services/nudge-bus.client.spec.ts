@@ -100,14 +100,14 @@ describe('NudgeBusClient', () => {
   });
 
   it('delivers nudges only to the matching follower', async () => {
-    const seen: number[] = [];
-    client.follow(entity('X')).subscribe((n) => seen.push(n.version));
+    const seen: unknown[] = [];
+    client.follow(entity('X')).subscribe((n) => seen.push(n));
     await ready('c1');
     http.expectOne('/api/events/c1/interest').flush(null);
 
-    FakeEventSource.instances[0].fire('nudge', [{ id: 'X', version: 7 }]);
-    FakeEventSource.instances[0].fire('nudge', [{ id: 'other', version: 9 }]);
+    FakeEventSource.instances[0].fire('nudge', [{ id: 'X', version: 7, updatedAt: 1 }]);
+    FakeEventSource.instances[0].fire('nudge', [{ id: 'other', version: 9, updatedAt: 1 }]);
 
-    expect(seen).toEqual([7]);
+    expect(seen).toEqual([{ id: 'X', version: 7, updatedAt: 1 }]);
   });
 });

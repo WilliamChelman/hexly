@@ -445,7 +445,7 @@ export class EntitiesService implements OnApplicationBootstrap {
     // The single emit point (ADR-0044): after the atomic write lands, nudge every follower
     // that this Entity is now at `version`. In the service layer — the one choke point — not
     // the controller.
-    this.bus.emitEntityChange(id, version);
+    this.bus.emitEntityChange(id, version, updatedAt);
     // Return validated body we just wrote directly.
     return {
       status: 'saved',
@@ -494,6 +494,10 @@ export class EntitiesService implements OnApplicationBootstrap {
     // UPDATE (e.g. the row was concurrently flipped `private`): the write never landed, so
     // don't fake a 200. Mirror save()'s lost-write arm — an unreachable row is `null` (404).
     if (res.changes === 0) return null;
+    // Emit from the write path (ADR-0044): rename and visibility flip nudge followers. A
+    // patch never bumps version — the fresh `updatedAt` is what marks the nudge newer than
+    // what a follower holds.
+    this.bus.emitEntityChange(id, decision.row.version, updatedAt);
     // A visibility flip changes the *caller's own* standing (a World Owner loses write, hence
     // read+edit, when a shared Entity goes private — ADR-0037): the one metadata patch where the
     // load-time Rights the client carries forward go stale. Recompute post-update and ship them
@@ -566,6 +570,10 @@ export class EntitiesService implements OnApplicationBootstrap {
     if (!access.canWrite) throw new ForbiddenException();
     // entity_grants (owner + grant rows) cascades with the row.
     this.db.delete(entities).where(eq(entities.id, id)).run();
+    // Emit from the write path (ADR-0044): the row is gone, so the per-recipient shaping in
+    // the bus resolves every follower to `unavailable` — deletion *is* eviction. The version
+    // and timestamp passed are never delivered (nobody can read a deleted row).
+    this.bus.emitEntityChange(id, access.row.version, access.row.updatedAt);
     return true;
   }
 
