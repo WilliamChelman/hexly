@@ -1,19 +1,17 @@
 /**
- * Plain-text extraction from an Entity's Content, for full-text search (ADR-0035).
- * The *only* module allowed to read inside Content — it refines ADR-0019 rather
- * than breaking it: the Entity model, storage, and save/version logic still never
- * parse Content; format knowledge is isolated here behind the format tag, so a new
- * editor format means registering one more arm, not touching the API.
+ * Plain-text extraction from an Entity's Content, for full-text search. Format
+ * knowledge is isolated here behind the format tag — the Entity model, storage,
+ * and save/version logic never parse Content — so a new editor format means
+ * registering one more arm, not touching the API.
  */
 
 import { Content } from './entity';
 
 /**
  * Dispatch on the Content format tag and return its searchable prose. For any
- * `tiptap-*` format the snapshot is ProseMirror JSON, so we recursively collect
- * every `text` field — node-type-agnostic, no `@tiptap`/ProseMirror dependency,
- * so callout/image/table/etc. nodes (ADR-0033) need no per-node handling. An
- * unknown or future format tag yields `''` (indexed as no prose, not an error).
+ * `tiptap-*` format we recursively collect every `text` field — node-type-
+ * agnostic, so new node types need no per-node handling. An unknown format tag
+ * yields `''` (indexed as no prose, not an error).
  */
 export function extractText(content: Content): string {
   if (content.format.startsWith('tiptap-')) {

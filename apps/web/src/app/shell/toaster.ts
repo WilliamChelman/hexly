@@ -11,26 +11,17 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { ToasterService } from '@hexly/web-core';
 
 /**
- * Renders the {@link ToasterService}'s transient messages as a stack of toasts
- * floating above the editor's chrome (issue #64, ADR-0013). Mounted once in the
- * app root, it reads the service's `toasts` signal and offers a per-toast dismiss
- * control.
- *
- * Copy is owned at the call site (the message is already-resolved text, ADR-0014);
- * only the dismiss control's label is translated here, reusing `common.close`.
- *
- * Each new toast is announced through CDK's {@link LiveAnnouncer} — a single,
- * always-present live region — rather than a `role="alert"` element inserted into
- * the DOM together with its text, which assistive tech routinely fails to announce
- * because the live region did not pre-exist. An `error` toast announces
- * assertively; the rest are polite status updates.
+ * Renders the {@link ToasterService}'s messages as a toast stack; mounted once
+ * in the app root. New toasts are announced through CDK's {@link LiveAnnouncer}
+ * (an always-present live region) rather than an inserted `role="alert"`
+ * element, which assistive tech routinely fails to announce. An `error` toast
+ * announces assertively; the rest are polite.
  */
 @Component({
   selector: 'app-toaster',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  // A fixed column of toasts, bottom-centre, above the editor's floating chrome
-  // (ADR-0013). The host ignores the pointer so it never blocks the canvas; each
-  // toast re-enables it for its own controls (.toast below).
+  // The host ignores the pointer so it never blocks the canvas; each toast
+  // re-enables it for its own controls.
   host: {
     class:
       'fixed left-1/2 bottom-5 -translate-x-1/2 z-[1000] flex flex-col gap-2 items-center pointer-events-none',
@@ -41,7 +32,7 @@ import { ToasterService } from '@hexly/web-core';
   imports: [NgClass, TranslocoPipe],
   template: `
     @for (toast of toaster.toasts(); track toast.id) {
-      <!-- .toast is kept as a test/e2e hook (toaster.spec, move-hex.spec); its styling is inline. -->
+      <!-- .toast is a test/e2e hook; its styling is inline. -->
       <div
         class="toast pointer-events-auto flex items-center gap-3 max-w-[min(90vw,32rem)] py-2 px-3 bg-surface-raised text-ink border border-l-[3px] border-t-line border-r-line border-b-line rounded-md shadow-2 text-[0.9rem]"
         [ngClass]="{
@@ -111,11 +102,9 @@ export class Toaster {
       if (open) el.hidePopover();
       el.showPopover();
     } catch {
-      // The Popover API is absent under jsdom (unit tests), where the `popover` attribute
-      // is inert — no UA `[popover]{display:none}` rule, so the toasts render in normal flow.
-      // In a popover-aware browser the host is display:none until showPopover() succeeds; a
-      // throw here (e.g. host transiently disconnected) leaves it hidden — but the host is an
-      // always-connected app-root singleton, so showPopover() doesn't throw in practice.
+      // The Popover API is absent under jsdom, where the `popover` attribute is
+      // inert and toasts render in normal flow. In a real browser the host is an
+      // always-connected singleton, so showPopover() doesn't throw in practice.
     }
   }
 }

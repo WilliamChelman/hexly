@@ -1,10 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 
-/**
- * A toast's severity, which the {@link Toaster} component maps onto its tone
- * styling: a neutral `info`, a positive `success`, or a problem `error` (e.g. a
- * refused move). Presentation only — the service stays unaware of how it's drawn.
- */
+/** A toast's severity; the {@link Toaster} component maps it onto tone styling. */
 export type ToastTone = 'info' | 'success' | 'error';
 
 /** One transient on-screen message: a stable `id`, its `message`, and its `tone`. */
@@ -18,16 +14,10 @@ export interface Toast {
 const DEFAULT_TOAST_DURATION_MS = 4000;
 
 /**
- * The app's transient notifications (issue #64 follow-up): a small queue of
- * {@link Toast}s any feature can raise to tell the user something happened — a
- * refused drag, a saved map — without owning its own banner UI. Signal-backed in
- * the same shape as the other app services (a private writable signal exposed
- * read-only), so the {@link Toaster} component re-renders as toasts come and go.
- *
- * Deliberately copy-agnostic: callers pass an already-resolved string, so the
- * service carries no Transloco dependency and the i18n lives at the call site
- * (ADR-0014). Each `show` auto-dismisses after its duration; a duration of `0`
- * keeps the toast until {@link dismiss} or {@link clear}.
+ * The app's transient notifications: a signal-backed queue of {@link Toast}s any
+ * feature can raise. Deliberately copy-agnostic — callers pass an already-resolved
+ * string, so the i18n lives at the call site. Each `show` auto-dismisses after its
+ * duration; a duration of `0` keeps the toast until {@link dismiss} or {@link clear}.
  */
 @Injectable({ providedIn: 'root' })
 export class ToasterService {
@@ -38,17 +28,12 @@ export class ToasterService {
   /** A monotonic id source, so each toast is addressable for dismissal. */
   private nextId = 0;
 
-  /**
-   * The live auto-dismiss timers, keyed by toast id, so an early {@link dismiss} or
-   * {@link clear} can cancel the pending timer instead of leaving it to fire a late
-   * no-op (and pile up under bursty toasting).
-   */
+  /** Auto-dismiss timers by toast id, so an early dismiss/clear cancels the pending timer. */
   private readonly timers = new Map<number, ReturnType<typeof setTimeout>>();
 
   /**
-   * Raise a toast with `message` and `tone` (default `info`), returning its id so
-   * the caller can dismiss it early. It auto-dismisses after `durationMs`; pass
-   * `0` to keep it until dismissed. The timer is best-effort — it is skipped where
+   * Raise a toast, returning its id so the caller can dismiss it early. Pass
+   * `durationMs` of `0` to keep it until dismissed. The timer is skipped where
    * `setTimeout` is unavailable, so the service is safe to construct under SSR.
    */
   show(

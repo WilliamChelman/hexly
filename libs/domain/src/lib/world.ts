@@ -1,8 +1,8 @@
 /**
- * The World domain (ADR-0024): a lightweight container record that groups
- * Entities for one campaign or setting. Not an Entity type — it lives outside
- * the entity model in its own table. The single Zod source of truth (ADR-0001)
- * for the World model and its REST payloads.
+ * The World domain: a lightweight container record that groups Entities for one
+ * campaign or setting. Not an Entity type — it lives outside the entity model
+ * in its own table. The single Zod source of truth for the World model and its
+ * REST payloads.
  */
 
 import { z } from 'zod';
@@ -10,8 +10,8 @@ import { ENTITY_LIST_MAX_LIMIT, nameSchema } from './entity';
 
 /**
  * A World container (CONTEXT.md → World): a `name` and its `owners`. The landing
- * page is a derived World Dashboard (ADR-0043), not a stored Entity, so a World
- * never points back at an Entity (no circular FK).
+ * page is a derived World Dashboard, not a stored Entity, so a World never
+ * points back at an Entity (no circular FK).
  */
 export const worldSchema = z.object({
   id: z.string(),
@@ -20,8 +20,8 @@ export const worldSchema = z.object({
 });
 
 /**
- * World membership roles (ADR-0024, ADR-0037): `owner` is the symmetric
- * ownership set (full control); `contributor` and `viewer` sit below it.
+ * World membership roles: `owner` is the symmetric ownership set (full
+ * control); `contributor` and `viewer` sit below it.
  */
 export const worldRoleSchema = z.enum(['owner', 'contributor', 'viewer']);
 
@@ -29,10 +29,10 @@ export const worldRoleSchema = z.enum(['owner', 'contributor', 'viewer']);
 export type WorldRole = z.infer<typeof worldRoleSchema>;
 
 /**
- * The closed set of actions a caller may exercise on a World (CONTEXT.md → Rights, ADR-0039):
- * `read` (reachable) and `manage` (World Owner — rename, delete, members, owners, Public Link;
- * all one `isOwner` gate today). Reported with the World so the World Index and settings gate
- * on what the server enforces. Per-resource by design — a World has no substance to `edit`.
+ * The closed set of actions a caller may exercise on a World (CONTEXT.md →
+ * Rights): `read` (reachable) and `manage` (World Owner). Reported with the
+ * World so surfaces gate on what the server enforces — a World has no substance
+ * to `edit`.
  */
 export const worldVerbSchema = z.enum(['read', 'manage']);
 
@@ -40,15 +40,15 @@ export const worldVerbSchema = z.enum(['read', 'manage']);
 export type WorldVerb = z.infer<typeof worldVerbSchema>;
 
 /**
- * The roles a World Owner can assign through the membership endpoints (ADR-0037, #159):
- * `contributor` (creates Entities, reads `shared`) and `viewer` (reads `shared` only).
- * `owner` is excluded — it belongs to the ownership-set endpoints, not member management.
+ * The roles assignable through the membership endpoints: `contributor` (creates
+ * Entities, reads `shared`) and `viewer` (reads `shared` only). `owner` is
+ * excluded — it belongs to the ownership-set endpoints, not member management.
  */
 export const memberRoleSchema = z.enum(['contributor', 'viewer']);
 
 export type MemberRole = z.infer<typeof memberRoleSchema>;
 
-/** A non-owner World member (ADR-0037): an Instance user with a Contributor or Viewer role. */
+/** A non-owner World member: an Instance user with a Contributor or Viewer role. */
 export interface WorldMember {
   readonly userId: string;
   readonly role: MemberRole;
@@ -73,18 +73,16 @@ export const createWorldRequestSchema = z.object({ name: nameSchema });
 export type CreateWorldRequest = z.infer<typeof createWorldRequestSchema>;
 
 /**
- * PATCH /worlds/:id (ADR-0043, #168): a partial update of the two Owner-curated fields —
- * the `name` (rename) and/or the ordered `pinnedEntityIds` set. Pins are sent wholesale:
- * add, remove, and reorder all collapse to "send the new array". Ids are references, not
- * enforced FKs — a stale or inaccessible id is filtered per-viewer on read, never rejected
- * here. Both fields optional so a rename and a re-pin are independent PATCHes.
+ * PATCH /worlds/:id: the `name` and/or the ordered `pinnedEntityIds` set. Pins
+ * are sent wholesale — add, remove, and reorder all collapse to "send the new
+ * array". Ids are references, not enforced FKs: a stale or inaccessible id is
+ * filtered per-viewer on read, never rejected here.
  */
 export const updateWorldRequestSchema = z.object({
   name: nameSchema.optional(),
-  // Deduped at the trust boundary (mirroring dedupedTags): duplicate ids would resolve
-  // to duplicate Dashboard cards and crash the `@for` track-by. Capped at the pin-resolve
-  // ceiling so the stored set can never exceed what a single access-filtered read returns
-  // — an over-cap set is a 400 here, not a silently-truncated Dashboard.
+  // Deduped at the trust boundary: duplicate ids would resolve to duplicate Dashboard
+  // cards and crash the `@for` track-by. Capped at the pin-resolve ceiling so the stored
+  // set never exceeds what a single access-filtered read returns.
   pinnedEntityIds: z
     .array(z.string())
     .max(ENTITY_LIST_MAX_LIMIT)
@@ -95,8 +93,8 @@ export const updateWorldRequestSchema = z.object({
 export type UpdateWorldRequest = z.infer<typeof updateWorldRequestSchema>;
 
 /**
- * Add an Owner to a World or Entity's ownership set (ADR-0037): the target must be
- * an existing Instance user. Shared by the Worlds and Entities owner-set endpoints.
+ * Add an Owner to a World or Entity's ownership set; the target must be an
+ * existing Instance user. Shared by the Worlds and Entities owner-set endpoints.
  */
 export const addOwnerRequestSchema = z.object({ userId: z.string().min(1) });
 
@@ -106,46 +104,35 @@ export type AddOwnerRequest = z.infer<typeof addOwnerRequestSchema>;
 export interface WorldSummary {
   readonly id: string;
   readonly name: string;
-  /** The World's ownership set (ADR-0037): one or more equal Owner user ids. */
+  /** The World's ownership set: one or more equal Owner user ids. */
   readonly owners: readonly string[];
   /**
-   * The caller's Rights on this World (CONTEXT.md → Rights, ADR-0039): always present and
-   * non-empty — a reachable World carries at least `read`, an Owner also `manage`. The World
-   * Index gates its owner badge and settings entry on this, not on scanning `owners`.
+   * The caller's Rights: always present and non-empty — a reachable World
+   * carries at least `read`, an Owner also `manage`. Surfaces gate on this,
+   * not on scanning `owners`.
    */
   readonly rights: readonly WorldVerb[];
   readonly createdAt: number;
   readonly updatedAt: number;
 }
 
-/**
- * A single World — what POST/GET/PATCH `/worlds/:id` return. The landing page is a
- * derived World Dashboard (ADR-0043), not a stored Entity, so the Detail carries no
- * home id to navigate to.
- */
+/** A single World — what POST/GET/PATCH `/worlds/:id` return. */
 export interface WorldDetail extends WorldSummary {
-  /**
-   * How many Entities live in this World — the number a delete would destroy
-   * (ADR-0024, #120). Surfaced on the Detail so the World Index's type-to-confirm
-   * delete can state the cost without a heavy endpoint.
-   */
+  /** How many Entities live in this World — the number a delete would destroy. */
   readonly entityCount: number;
   /**
-   * The Owner-curated Pinned Entities (ADR-0043, CONTEXT.md → Pinned Entity): one
-   * shared, ordered id list surfaced on the World Dashboard, the same for everyone.
-   * References, not enforced FKs — a pinned Entity a viewer can't reach simply drops
-   * off their Dashboard when the cards are resolved through the entity read path.
+   * The Owner-curated Pinned Entities (CONTEXT.md → Pinned Entity): one shared,
+   * ordered id list, the same for everyone. References, not enforced FKs — a
+   * pinned Entity a viewer can't reach simply drops off their Dashboard.
    */
   readonly pinnedEntityIds: readonly string[];
 }
 
 /**
- * The result of a vault import (ADR-0033, #146) — the primary "what did we lose"
- * instrument. Every markdown file that became a note is counted; unreadable files
- * are skipped (never abort the import) and tallied. `constructsDegraded` sums the
- * per-file degradation tallies from the markdown converter (footnotes, math,
- * mermaid, comments, …). `assetsStored` counts the unique embedded images pulled into
- * per-World content-addressed storage (ADR-0034), deduped by content.
+ * The result of a vault import — the "what did we lose" instrument. Unreadable
+ * files are skipped (never abort the import) and tallied. `constructsDegraded`
+ * sums the per-file degradation tallies from the markdown converter;
+ * `assetsStored` counts unique embedded images, deduped by content.
  */
 export interface ImportSummary {
   readonly worldId: string;

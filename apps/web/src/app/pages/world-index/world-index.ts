@@ -15,13 +15,9 @@ import { ImportSummary } from '@hexly/domain';
 import { Button, Eyebrow, Panel, Icon, Autofocus, Input, Dialog, ACCENT_SIGIL, accentFor, monogram } from '@hexly/web-ui';
 
 /**
- * The World Index (ADR-0028, CONTEXT.md → World Index): the page at `/` listing
- * every World the caller can reach — owned and member — and the surface that owns
- * World create. It is the chooser, not an auto-redirect: a user with zero Worlds
- * sees an empty state with a Create affordance rather than an edge case to redirect
- * around. Owned-vs-member is derived by testing whether the current user is in each
- * World's `owners` set (ADR-0037). Both creating a World and opening an existing one's
- * card land on the World Dashboard (ADR-0043).
+ * The World Index (`/`): lists every World the caller can reach — owned and
+ * member — and owns World create. It is the chooser, not an auto-redirect:
+ * zero Worlds shows an empty state with a Create affordance.
  */
 @Component({
   selector: 'app-world-index',
@@ -40,8 +36,7 @@ import { Button, Eyebrow, Panel, Icon, Autofocus, Input, Dialog, ACCENT_SIGIL, a
   ],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
-    <!-- One hidden picker, triggered by every Import affordance (a top-level ref is
-         in scope across the whole template, including inside the @if branches). -->
+    <!-- One hidden picker, shared by every Import affordance. -->
     <input
       #vaultInput
       type="file"
@@ -51,8 +46,7 @@ import { Button, Eyebrow, Panel, Icon, Autofocus, Input, Dialog, ACCENT_SIGIL, a
       [attr.aria-label]="'worlds.import' | transloco"
       (change)="onVaultPicked($event)"
     />
-    <!-- The two page actions, defined once and placed (in either order) by the
-         populated header and the empty state below. -->
+    <!-- Page actions, defined once and placed by both the header and the empty state. -->
     <ng-template #importBtn>
       <button
         type="button"
@@ -140,10 +134,8 @@ import { Button, Eyebrow, Panel, Icon, Autofocus, Input, Dialog, ACCENT_SIGIL, a
                   />
                 } @else {
                   <!-- Stretched link (inset ::after) makes the whole card open the
-                       World; the action buttons live OUTSIDE this anchor as later
-                       siblings, lifted above the overlay with z-10 so they stay
-                       independently clickable and the markup keeps no nested
-                       interactives (a11y). -->
+                       World; action buttons sit outside the anchor, lifted with
+                       z-10, so there are no nested interactives (a11y). -->
                   <a
                     class="flex-1 px-3 pt-2 no-underline outline-none focus-visible:shadow-none after:content-[''] after:absolute after:inset-0"
                     [routerLink]="dashboardRoute(card.id, card.name)"
@@ -335,8 +327,8 @@ import { Button, Eyebrow, Panel, Icon, Autofocus, Input, Dialog, ACCENT_SIGIL, a
         >
           {{ 'common.cancel' | transloco }}
         </button>
-        <!-- aria-disabled (not the native attribute) keeps the gated button in
-             the tab order and announced; confirmDelete() guards the action. -->
+        <!-- aria-disabled (not disabled) keeps the gated button in the tab order
+             and announced; confirmDelete() guards the action. -->
         <button
           dialogFooter
           type="button"
@@ -352,8 +344,7 @@ import { Button, Eyebrow, Panel, Icon, Autofocus, Input, Dialog, ACCENT_SIGIL, a
     }
 
     @if (importSummary(); as summary) {
-      <!-- The import's "what did we lose" report (ADR-0033), surfaced before the
-           user enters the new World. -->
+      <!-- The import's "what did we lose" report, shown before entering the new World. -->
       <app-dialog
         [open]="true"
         [heading]="'worlds.importSummaryHeading' | transloco"
@@ -394,8 +385,7 @@ export class WorldIndex {
   private readonly store = inject(WorldStore);
   private readonly worldsClient = inject(WorldsClient);
   private readonly auth = inject(AuthClient);
-  // World Creation capability (ADR-0040): gates every "New World" / import affordance —
-  // the server 403s a creation attempt without it, so the button is hidden to match.
+  // The server 403s creation without the capability; the affordances hide to match.
   protected readonly canCreateWorlds = this.auth.canCreateWorlds;
   private readonly router = inject(Router);
   private readonly toaster = inject(ToasterService);
@@ -403,16 +393,14 @@ export class WorldIndex {
 
   protected readonly loaded = this.store.loaded;
   protected readonly loadError = this.store.loadError;
-  /** The reachable Worlds, each tagged owned (caller holds the `manage` Right, ADR-0039) or member. */
   protected readonly cards = computed(() =>
     this.store.worlds().map((w) => ({ ...w, owned: !!w.rights?.includes('manage') })),
   );
-  /** The rail order: most-recently-touched World first (continue where you left off). */
   protected readonly sorted = computed(() =>
     [...this.cards()].sort((a, b) => b.updatedAt - a.updatedAt),
   );
 
-  /** A capitalised display name derived from the signed-in user's email local part. */
+  /** Display name derived from the signed-in user's email local part. */
   protected who(): string {
     const local = (this.auth.currentUser()?.email ?? '').split('@')[0];
     return local
@@ -420,7 +408,6 @@ export class WorldIndex {
       : this.transloco.translate('worldIndex.greetingFallback');
   }
 
-  /** The World's Dashboard landing (ADR-0043) — the one `/w/:id` source, name-slugged. */
   protected readonly dashboardRoute = worldDashboardRoute;
   protected readonly settingsRoute = worldSettingsRoute;
 
@@ -429,11 +416,8 @@ export class WorldIndex {
   }
   protected readonly mono = monogram;
   protected readonly creating = signal(false);
-  /** True while a vault import is in flight — drives the Import affordance's spinner. */
   protected readonly importing = signal(false);
-  /** The id of the World whose export is in flight, if any — disables that card's Export button. */
   protected readonly exportingId = signal<string | null>(null);
-  /** The last import's result, shown in a summary modal until the user opens the World or dismisses it. */
   protected readonly importSummary = signal<ImportSummary | null>(null);
   protected readonly renamingId = signal<string | null>(null);
   protected readonly pendingDelete = signal<{ id: string; name: string } | null>(
@@ -441,7 +425,6 @@ export class WorldIndex {
   );
   protected readonly deleteCount = signal<number | null>(null);
   protected readonly confirmText = signal('');
-  /** Delete is armed only once the typed name matches the World's exactly. */
   protected readonly canConfirmDelete = computed(
     () => this.confirmText() === this.pendingDelete()?.name,
   );
@@ -449,12 +432,9 @@ export class WorldIndex {
   constructor() {
     this.store.load();
 
-    // Live-follow for the durable directory, off the nudge bus (ADR-0044): returning to
-    // the tab refetches the worlds list, so a World created/renamed/deleted elsewhere
-    // shows without a hard reload. `visibilitychange` fires only on hidden↔visible
-    // transitions, so guarding on `visible` refetches on re-focus without firing while
-    // the tab is already active. The listener lives on the Index component, so it's
-    // scoped to `/` and torn down on navigate-away.
+    // Refetch the worlds list when the tab becomes visible again, so a World
+    // created/renamed/deleted elsewhere shows without a hard reload. Component-
+    // scoped listener, torn down on navigate-away.
     const onVisible = () => {
       if (document.visibilityState === 'visible') this.store.refresh();
     };
@@ -464,7 +444,6 @@ export class WorldIndex {
     );
   }
 
-  /** Open the inline rename input on a World (Owner-only, gated in the template). */
   protected startRename(id: string): void {
     this.renamingId.set(id);
   }
@@ -473,10 +452,7 @@ export class WorldIndex {
     this.renamingId.set(null);
   }
 
-  /**
-   * Rename a World by name (ADR-0024). A blank, unchanged, or vanished card just
-   * closes the input without a round trip. On error, toasts.
-   */
+  /** A blank, unchanged, or vanished card closes the input without a round trip. */
   protected commitRename(id: string, name: string): void {
     const trimmed = name.trim();
     const current = this.store.worlds().find((w) => w.id === id);
@@ -496,11 +472,8 @@ export class WorldIndex {
     });
   }
 
-  /**
-   * Open the type-to-confirm delete modal for a World (Owner-only). Reads the
-   * World's Detail for the entity count it would destroy (#120) — a lightweight
-   * on-demand read, not a heavy endpoint. A failed count just closes and toasts.
-   */
+  /** Open the type-to-confirm delete modal; the World Detail supplies the
+   * entity count it would destroy. */
   protected askDelete(id: string, name: string): void {
     this.pendingDelete.set({ id, name });
     this.deleteCount.set(null);
@@ -521,7 +494,6 @@ export class WorldIndex {
     this.pendingDelete.set(null);
   }
 
-  /** Leave a World the caller is a member (not Owner) of (ADR-0037, #159), self-service. */
   protected leaveWorld(id: string): void {
     this.store.leave(id).subscribe({
       error: () =>
@@ -529,7 +501,7 @@ export class WorldIndex {
     });
   }
 
-  /** Delete the pending World once the typed name matches; cascades its Entities (ADR-0024). */
+  /** Deleting a World cascades its Entities. */
   protected confirmDelete(): void {
     const target = this.pendingDelete();
     if (!target || !this.canConfirmDelete()) return;
@@ -545,7 +517,6 @@ export class WorldIndex {
     });
   }
 
-  /** Create a World and land on its Dashboard (ADR-0043). */
   protected create(): void {
     if (this.creating()) return;
     this.creating.set(true);
@@ -563,12 +534,8 @@ export class WorldIndex {
       });
   }
 
-  /**
-   * Import the picked Obsidian vault `.zip` into a fresh World (ADR-0033). Runs
-   * synchronously server-side behind a spinner; on success the {@link ImportSummary}
-   * opens a modal (the "what did we lose" report) whose action lands in the new World.
-   * The input is cleared so re-picking the same file fires `change` again.
-   */
+  /** Import the picked vault `.zip` into a fresh World. The input is cleared so
+   * re-picking the same file fires `change` again. */
   protected onVaultPicked(event: Event): void {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
@@ -588,11 +555,8 @@ export class WorldIndex {
       });
   }
 
-  /**
-   * Export a World to a `.zip` and save it as a browser download (ADR-0033, #150).
-   * The download is named after the World; a failure just toasts. Owner-only, gated
-   * in the template — the server also refuses a non-owner (403).
-   */
+  /** Export a World to a `.zip` browser download. Owner-only, gated in the
+   * template; the server also refuses a non-owner. */
   protected exportWorld(id: string, name: string): void {
     if (this.exportingId()) return;
     this.exportingId.set(id);
@@ -609,7 +573,6 @@ export class WorldIndex {
       });
   }
 
-  /** Leave the summary modal and enter the freshly imported World's Entity browser. */
   protected openImported(): void {
     const summary = this.importSummary();
     if (!summary) return;
@@ -622,7 +585,6 @@ export class WorldIndex {
   }
 }
 
-/** Save a blob as a browser download under `filename` (the app's only blob-download, #150). */
 function saveBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');

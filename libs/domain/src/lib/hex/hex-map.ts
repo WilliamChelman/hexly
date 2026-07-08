@@ -1,9 +1,9 @@
 /**
- * The Hex Map document: the sparse, infinite plane a user paints (CONTEXT.md,
- * ADR-0003). A Hex exists *only* where painted, so the document stores hexes in
- * a Record keyed by coordinate — an absent key is Void, costing no storage. The
- * Zod schema here is the single source of truth (ADR-0005): the document types
- * are inferred from it, and it validates on the way in and out.
+ * The Hex Map document: the sparse, infinite plane a user paints (CONTEXT.md).
+ * A Hex exists *only* where painted, so the document stores hexes in a Record
+ * keyed by coordinate — an absent key is Void, costing no storage. The Zod
+ * schema here is the single source of truth: the document types are inferred
+ * from it, and it validates on the way in and out.
  */
 
 import { z } from 'zod';
@@ -26,16 +26,15 @@ export interface Terrain {
   readonly id: string;
   /** Human-facing name for the palette (CONTEXT.md vocabulary). */
   readonly label: string;
-  /** The CSS custom property the renderer fills painted hexes with (ADR-0006). */
+  /** The CSS custom property the renderer fills painted hexes with. */
   readonly fill: string;
 }
 
 /**
- * The built-in terrain palette: the fixed set a user can paint with for now.
- * Ids are stable (stored in documents); labels and fills are presentation.
- * `as const satisfies` keeps the ids as literals — so {@link TerrainId} is a
- * real union, not `string` — while still checking each entry against
- * {@link Terrain}.
+ * The built-in terrain palette. Ids are stable (stored in documents); labels
+ * and fills are presentation. `as const satisfies` keeps the ids as literals —
+ * so {@link TerrainId} is a real union, not `string` — while still checking
+ * each entry against {@link Terrain}.
  */
 export const terrainPalette = [
   { id: 'grass', label: 'Grassland', fill: '--color-terrain-grass' },
@@ -65,16 +64,14 @@ export interface Feature {
   readonly label: string;
   /**
    * The SVG path (`d`) of the marker, drawn in a 24×24 box. The single source
-   * of truth for both the canvas Path2D and the palette/icon component — the
-   * Feature analogue of a Terrain's `fill` token (ADR-0006/0007).
+   * of truth for both the canvas Path2D and the palette/icon component.
    */
   readonly path: string;
 }
 
 /**
- * The built-in Feature library: the fixed icon set a user can place for now
- * (no uploads — issue #7). Ids are stable (stored in documents); labels and
- * paths are presentation. `as const satisfies` keeps the ids as literals so
+ * The built-in Feature library. Ids are stable (stored in documents); labels
+ * and paths are presentation. `as const satisfies` keeps the ids as literals so
  * {@link FeatureId} is a real union, not `string`.
  */
 export const featureLibrary = [
@@ -86,9 +83,9 @@ export const featureLibrary = [
 export const featureIdSchema = idEnum(featureLibrary.map((f) => f.id));
 
 /**
- * A feature placed on a Hex: a reference to a built-in library id (issue #7),
- * plus an optional Entity Link of its own — distinct from the host Hex's link,
- * so a settlement icon can point at a different Entity than its tile (issue #76).
+ * A feature placed on a Hex: a reference to a built-in library id, plus an
+ * optional Entity Link of its own — distinct from the host Hex's link, so a
+ * settlement icon can point at a different Entity than its tile.
  */
 export const featureRefSchema = z.object({
   ref: featureIdSchema,
@@ -97,8 +94,8 @@ export const featureRefSchema = z.object({
 
 /**
  * A painted Hex. Carries exactly one Terrain, plus at most one Feature and an
- * optional name (CONTEXT.md → Hex; ADR-0016). `feature` and `name` are optional
- * and absent unless set, so a document saved before either existed parses
+ * optional name (CONTEXT.md → Hex). `feature` and `name` are optional and
+ * absent unless set, so a document saved before either existed parses
  * unchanged. The name is structured metadata bound to the coordinate — it
  * travels with the Hex on move/swap — distinct from a free-positioned Label.
  */
@@ -106,9 +103,8 @@ export const hexSchema = z.object({
   terrain: terrainIdSchema,
   feature: featureRefSchema.optional(),
   name: z.string().optional(),
-  /** An optional Entity Link: the id of another Entity this Hex points at
-   * (CONTEXT.md → Entity Link). Not referentially enforced — a dangling id is
-   * a valid document (issue #76). */
+  /** An optional Entity Link (CONTEXT.md → Entity Link). Not referentially
+   * enforced — a dangling id is a valid document. */
   entityId: z.string().optional(),
 });
 
@@ -116,11 +112,10 @@ export const hexSchema = z.object({
 const hexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 
 /**
- * A Region: a named, colored grouping of hex coordinates (CONTEXT.md → Region,
- * issue #8). Membership is a sparse set — `hexes` maps each member coordinate
- * key to `true`, mirroring how the document stores painted hexes — so a single
- * coordinate carries `true` in as many regions as own it. Regions overlap
- * freely, and the set is independent of whether a Hex is painted there.
+ * A Region: a named, colored grouping of hex coordinates (CONTEXT.md → Region).
+ * Membership is a sparse set — `hexes` maps each member coordinate key to
+ * `true`. Regions overlap freely, and membership is independent of whether a
+ * Hex is painted there.
  */
 export const regionSchema = z.object({
   /** Stable identifier the editor mints; referenced by the armed region tool. */
@@ -131,8 +126,7 @@ export const regionSchema = z.object({
   color: hexColorSchema,
   /** The member coordinate keys, each mapped to `true` — a JSON-friendly set. */
   hexes: z.record(z.string(), z.literal(true)),
-  /** An optional Entity Link: the id of another Entity this Region points at
-   * (issue #76). Not referentially enforced, like the Hex/Feature link. */
+  /** An optional Entity Link. Not referentially enforced, like the Hex/Feature link. */
   entityId: z.string().optional(),
 });
 
@@ -141,10 +135,8 @@ const pointSchema = z.object({ x: z.number(), y: z.number() });
 
 /**
  * A Label: free-positioned cartographic text drawn on the map, *not* snapped to
- * the hex grid (CONTEXT.md → Label, issue #10). Anchored at a world-space
- * `position`, drawn at `size` (world pixels at zoom 1), with an optional
- * `rotation` in degrees. Distinct from an entity's `name`, which the renderer
- * may draw but which is not a Label.
+ * the hex grid (CONTEXT.md → Label). Distinct from a Hex's `name`, which the
+ * renderer may draw but which is not a Label.
  */
 export const labelSchema = z.object({
   /** Stable identifier the editor mints; referenced by selection and edits. */
@@ -163,7 +155,7 @@ export const labelSchema = z.object({
  * The Hex Map document. `hexes` is sparse: a coordinate key (`coordKey`) is
  * present only where the user painted, absent everywhere else (Void). `regions`
  * and `labels` default to empty so documents saved before they existed still
- * parse and gain the fields on load (issues #8, #10).
+ * parse and gain the fields on load.
  */
 export const hexMapSchema = z.object({
   hexes: z.record(z.string(), hexSchema),
@@ -202,12 +194,7 @@ export function emptyHexMap(): HexMap {
   return { hexes: {}, regions: [], labels: [] };
 }
 
-/**
- * The {@link Region} with `id` in `map`, or `undefined` if none has it. The one
- * region-by-id lookup the store (selection self-heal, membership edits) and the
- * renderer (selection highlight) share, so "find a region" lives in one place
- * rather than being re-derived as `regions.find(...)` at each call site.
- */
+/** The {@link Region} with `id` in `map`, or `undefined` if none has it. */
 export function regionById(map: HexMap, id: string): Region | undefined {
   return map.regions.find((r) => r.id === id);
 }

@@ -12,9 +12,7 @@ export interface Rect {
 /**
  * The axis-aligned {@link Rect} spanning two corner points, in whichever order —
  * a drag from bottom-right to top-left yields the same rect as top-left to
- * bottom-right. The single place two-corner→Rect normalisation lives, shared by
- * the marquee's world-space hit-test (the canvas) and its screen-space outline
- * (the renderer) so the box geometry is defined once and the two can't drift.
+ * bottom-right. The single place two-corner→Rect normalisation lives.
  */
 export function rectFromCorners(a: Point, b: Point): Rect {
   return {
@@ -27,9 +25,9 @@ export function rectFromCorners(a: Point, b: Point): Rect {
 
 /**
  * Every hex intersecting the rectangle — the viewport-culling query the renderer
- * runs each frame so it paints only what's on screen, not the infinite plane
- * (ADR-0003). Over-includes by at most a one-hex margin (cheap and safe); never
- * misses a hex that is actually visible.
+ * runs each frame so it paints only what's on screen, not the infinite plane.
+ * Over-includes by at most a one-hex margin (cheap and safe); never misses a
+ * hex that is actually visible.
  */
 export function hexesInRect(layout: Layout, rect: Rect): Axial[] {
   const corners: Point[] = [

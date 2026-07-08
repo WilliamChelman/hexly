@@ -1,11 +1,7 @@
 /**
- * The heading Outline of an Entity's Content — the derived, never-stored
- * navigation tree behind the format tag (ADR-0019/0035), a sibling to
- * {@link extractText}. Node-*specific* like {@link harvestDescriptors}: it knows
- * the `heading` node and its `level` attr, plus the `entityLink` atom's visible
- * text (its `display`/`label`) — so a heading made only of an @mention still lists.
- * Client-derived live from the editor
- * for the Outline panel; the domain keeps no heading model of its own.
+ * The heading Outline of an Entity's Content — derived, never stored. Knows the
+ * `heading` node and its `level` attr, plus the `entityLink` atom's visible text,
+ * so a heading made only of an @mention still lists.
  */
 
 import { Content } from './entity';
@@ -42,12 +38,11 @@ function collect(node: unknown, found: OutlineHeading[]): void {
 }
 
 /**
- * Concatenate every `text` field under a heading — spans (bold, etc.) included —
- * plus an `entityLink` atom's rendered text (`display ?? label`, mirroring the node's
- * own renderHTML). The atom carries no `text` field but shows a name in the DOM, so
- * without this a mention-only heading reads as empty here while its `<h*>` does not —
- * and the panel's positional index (extractOutline row i ↔ i-th rendered heading)
- * would slip, jumping and highlighting the wrong heading.
+ * Concatenate every `text` field under a heading, plus an `entityLink` atom's
+ * rendered text (`display ?? label`, mirroring the node's own renderHTML). The
+ * atom carries no `text` field but shows a name in the DOM; skipping it would
+ * make a mention-only heading read as empty and slip the Outline panel's
+ * positional index (row i ↔ i-th rendered heading).
  */
 function headingText(node: unknown): string {
   if (Array.isArray(node)) return node.map(headingText).join('');

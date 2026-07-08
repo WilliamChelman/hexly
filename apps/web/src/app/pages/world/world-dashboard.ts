@@ -14,18 +14,14 @@ import { EntityFacets, EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient, ActiveWorld, ToasterService, HexlyDatePipe, entityRoute, worldRoute } from '@hexly/web-core';
 import { Button, Eyebrow, Panel, PageHeader, Icon, IconName, EntitySearchPicker, ACCENT_BAR, accentFor } from '@hexly/web-ui';
 
-/** How many recent Entities / Hex Maps the Dashboard surfaces at a glance. */
 const RECENTS_LIMIT = 8;
 const MAPS_LIMIT = 8;
 
 /**
- * The World Dashboard (ADR-0043, CONTEXT.md → World Dashboard): the per-World
- * landing surface at `/w/:worldId`. A read-only *derived* view — it authors
- * nothing, only queries the existing list/facets endpoints over this World's
- * Entities: recents (most-recently-edited), Hex Maps, and at-a-glance Type counts,
- * with a link to the full Entity Browser. A brand-new empty World gets a purposeful
- * empty state that creates the first Note or Hex Map, not a blank page. Pins come
- * in a later slice. The active World is pinned by the `w/:worldId` guard (ADR-0028).
+ * The World Dashboard: the per-World landing at `/w/:worldId`. A read-only
+ * *derived* view — it authors nothing, only queries the list/facets endpoints:
+ * pins, recents, Hex Maps, and at-a-glance Type counts. An empty World gets a
+ * purposeful empty state that creates the first Note or Hex Map.
  */
 @Component({
   selector: 'app-world-dashboard',
@@ -44,9 +40,8 @@ const MAPS_LIMIT = 8;
   ],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
-    <!-- One tile template, placed by both the recents and the maps grid. The
-         data-testid prefix distinguishes them so a hex map showing in both lists
-         keeps a distinct selector per section. -->
+    <!-- One tile template shared by the sections; the data-testid prefix keeps
+         a distinct selector for an Entity showing in more than one list. -->
     <ng-template #tile let-e let-prefix="prefix">
       <section
         class="group relative flex gap-3 p-4 pl-5 overflow-hidden h-full transition-shadow hover:shadow-3 has-[a:focus-visible]:[outline:2px_solid_var(--color-gold)] has-[a:focus-visible]:outline-offset-2"
@@ -306,26 +301,21 @@ export class WorldDashboard {
   private readonly transloco = inject(TranslocoService);
 
   protected readonly worldName = this.activeWorld.name;
-  /** The active World id — scopes the pin picker so pins stay same-World (ADR-0024). */
+  /** Scopes the pin picker so pins stay same-World. */
   protected readonly activeWorldId = this.activeWorld.worldId;
   protected readonly recents = signal<EntitySummary[]>([]);
   protected readonly maps = signal<EntitySummary[]>([]);
-  /** The resolved Pinned Entities, in `pinnedEntityIds` order (#168). */
+  /** The resolved Pinned Entities, in `pinnedEntityIds` order. */
   protected readonly pins = signal<EntitySummary[]>([]);
-  /** Owner-only: the curation controls (add/reorder/remove) show only with `manage`. */
   protected readonly canCurate = computed(
     () => this.activeWorld.world()?.rights.includes('manage') ?? false,
   );
-  /** Whether the add-pin search picker is open (Owner curation, #168). */
   protected readonly pinPickerOpen = signal(false);
-  /** The pin picker's controlled query. */
   protected readonly pinQuery = signal('');
-  /** The Type facet's live counts (note/hexmap), the Dashboard's at-a-glance tally. */
   protected readonly typeCounts = signal<EntityFacets['type']>([]);
   /** Set once the recents read resolves — gates the empty state so it never flashes pre-load. */
   protected readonly loaded = signal(false);
   protected readonly creating = signal(false);
-  /** A loaded World with no Entities: show the purposeful empty state, not a blank page. */
   protected readonly isEmpty = computed(
     () => this.loaded() && this.recents().length === 0,
   );
@@ -346,18 +336,17 @@ export class WorldDashboard {
       .facets({ worldId })
       .subscribe((facets) => this.typeCounts.set(facets.type));
 
-    // Resolve the Owner-curated pins through the entity read path so the per-caller
-    // access filter applies (#168): a pinned Entity the viewer can't reach drops out,
-    // and pin order is restored client-side (the list read is access-order, not pin-order).
-    // Re-runs when a curation PATCH re-pins the active World's Detail.
+    // Resolve pins through the entity read path so the per-caller access filter
+    // applies: an unreachable pinned Entity drops out, and pin order is restored
+    // client-side (the list read isn't pin-ordered).
     effect((onCleanup) => {
       const ids = this.activeWorld.world()?.pinnedEntityIds ?? [];
       if (ids.length === 0) {
         this.pins.set([]);
         return;
       }
-      // The client sizes an `ids` read to the id count, so no pin is dropped by the
-      // default page size (the schema caps the pin set at ENTITY_LIST_MAX_LIMIT).
+      // The client sizes an `ids` read to the id count, so no pin is dropped by
+      // the default page size.
       const sub = this.entitiesClient.list({ ids: [...ids] }).subscribe((page) => {
         const byId = new Map(page.items.map((e) => [e.id, e]));
         this.pins.set(
@@ -372,7 +361,6 @@ export class WorldDashboard {
     return entityRoute(e.worldId, e.id, this.activeWorld.name() ?? undefined, e.name);
   }
 
-  /** The full Entity Browser for this World ("show me everything"). */
   protected browseAllLink(): string[] {
     return worldRoute(this.activeWorld.worldId()!, this.activeWorld.name() ?? undefined);
   }
@@ -381,12 +369,10 @@ export class WorldDashboard {
     return ACCENT_BAR[accentFor(id)];
   }
 
-  /** A hex map reads as terrain, a note as a label — matching the Entity Browser card. */
   protected typeIcon(type: EntityType): IconName {
     return type === 'hexmap' ? 'terrain' : 'label';
   }
 
-  /** Create the first Note or Hex Map from the empty state and open it (mirrors the Browser). */
   protected create(type: EntityType): void {
     if (this.creating()) return;
     this.creating.set(true);
@@ -416,13 +402,11 @@ export class WorldDashboard {
       });
   }
 
-  /** Open/close the add-pin search picker, resetting its query each time (#168). */
   protected togglePinPicker(): void {
     this.pinQuery.set('');
     this.pinPickerOpen.update((v) => !v);
   }
 
-  /** Pin the chosen Entity by appending it to the set (a no-op if already pinned). */
   protected addPin(e: EntitySummary): void {
     this.pinPickerOpen.set(false);
     const ids = this.currentPinIds();
@@ -430,12 +414,10 @@ export class WorldDashboard {
     this.activeWorld.commitPins([...ids, e.id]);
   }
 
-  /** Unpin an Entity by omitting its id from the set. */
   protected removePin(id: string): void {
     this.activeWorld.commitPins(this.currentPinIds().filter((x) => x !== id));
   }
 
-  /** Reorder a pin by one slot (`-1` up, `+1` down); a no-op at the ends. */
   protected movePin(id: string, delta: number): void {
     const ids = this.currentPinIds();
     const i = ids.indexOf(id);
@@ -445,7 +427,6 @@ export class WorldDashboard {
     this.activeWorld.commitPins(ids);
   }
 
-  /** The World's stored pin set (references, not the resolved cards) — the edit source. */
   private currentPinIds(): string[] {
     return [...(this.activeWorld.world()?.pinnedEntityIds ?? [])];
   }

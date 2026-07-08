@@ -31,15 +31,13 @@ import { EntitySearch } from './entity-search';
 import { EmptyState } from './empty-state';
 import { ActiveFacets, FacetRail, FacetToggle } from './facet-rail';
 
-/** No selections in any Facet category — the reset/initial state (#155). */
 const NO_FACETS: ActiveFacets = { type: [], tag: [], visibility: [] };
 
 // ponytail: bounded first page so a large vault loads fast; bump or make
 // configurable only if a real page size proves wrong in use.
 const PAGE_SIZE = 50;
 
-// Trailing-debounce window so fast typing fires one search, not one per key —
-// same 150ms the shared searchEntities helper uses for autocomplete.
+// Same 150ms the shared searchEntities helper uses for autocomplete.
 const SEARCH_DEBOUNCE_MS = 150;
 
 // ponytail: cap the per-session first-page cache so a marathon session of distinct
@@ -47,14 +45,9 @@ const SEARCH_DEBOUNCE_MS = 150;
 const FIRST_PAGE_CACHE_LIMIT = 50;
 
 /**
- * The Entity browser: the in-World surface (`/w/:worldId/entities`) where a user
- * sees every Entity in that World — notes and maps together — with name, type, tags,
- * and last-edited date, and runs the lifecycle: create (note or map), open,
- * rename in place, delete (#70, generalizing issue #6's map list). It accumulates
- * the entities as cursor-paginated pages (ADR-0025): a bounded first page on load,
- * a load-more control that appends the next page, and a refresh from page one after
- * every rename/delete so the view stays coherent without reconciling a stale tail.
- * Opening or creating navigates to `/w/:worldId/entities/:id`, the one type-dispatching route.
+ * The Entity browser (`/w/:worldId/entities`): lists every Entity in the World
+ * and runs the lifecycle — create, open, rename in place, delete. Accumulates
+ * cursor-paginated pages and refreshes from page one after every mutation.
  */
 @Component({
   selector: 'app-entity-browser',
@@ -194,15 +187,11 @@ export class EntityBrowser {
   private readonly transloco = inject(TranslocoService);
   private readonly shell = inject(AppShellStore);
 
-  /** The active World id (always present under `/w/:worldId`) — the routerLink scope for each tile. */
   protected readonly worldId = this.activeWorld.worldId;
 
   private readonly _entities = signal<EntitySummary[]>([]);
-  /** The entities as view rows. The last-edited date stays a raw timestamp —
-   * the card formats it via `| hexlyDate`, tracking language and Format Locale
-   * live (ADR-0038). Server order is authoritative (#154): bm25 relevance under
-   * a query, updatedAt desc otherwise — the list is rendered verbatim, never
-   * re-sorted client-side. */
+  /** Server order is authoritative (relevance under a query, updatedAt desc
+   * otherwise) — rendered verbatim, never re-sorted client-side. */
   protected readonly cards = computed(() =>
     this._entities().map((entity) => ({
       id: entity.id,
@@ -210,7 +199,7 @@ export class EntityBrowser {
       type: entity.type,
       tags: entity.tags,
       updatedAt: entity.updatedAt,
-      // Opt-in Rights (ADR-0039), always requested here — the card gates rename/delete on them.
+      // The card gates rename/delete on rights.
       rights: entity.rights,
     })),
   );
@@ -221,25 +210,21 @@ export class EntityBrowser {
   protected readonly creating = signal(false);
   protected readonly renamingId = signal<string | null>(null);
 
-  /** The active full-text query, debounced from the search box (#154). Empty means
-   * the default, last-edited view. Also the source of truth for the URL `q` mirror. */
+  /** Debounced full-text query; empty means the default last-edited view.
+   * Source of truth for the URL `q` mirror. */
   protected readonly query = signal('');
-  /** Raw per-keystroke input, debounced before it becomes the committed `query`. */
   private readonly typed = new Subject<string>();
 
-  /** The selected Facet values per category (#155), mirrored to/from the URL like `q`.
-   * Value-equal so the URL round-trip's echo (a fresh object with the same values)
-   * is a no-op instead of re-triggering the fetch effect — one refetch per toggle. */
+  /** Value-equal so the URL round-trip's echo (a fresh object, same values)
+   * doesn't re-trigger the fetch effect — one refetch per toggle. */
   protected readonly activeFacets = signal<ActiveFacets>(NO_FACETS, {
     equal: (a, b) => JSON.stringify(a) === JSON.stringify(b),
   });
-  /** The live Facet counts for the rail, recomputed server-side on every filter change. */
   protected readonly facetCounts = signal<EntityFacets>({
     type: [],
     tag: [],
     visibility: [],
   });
-  /** Any active filter (query or a Facet) — gates the rail's Clear all control. */
   protected readonly hasFilters = computed(() => {
     const f = this.activeFacets();
     return (
@@ -250,34 +235,29 @@ export class EntityBrowser {
     );
   });
 
-  /** The in-flight Facet-count read, cancelled on any refetch so a late one can't overwrite. */
+  /** In-flight Facet-count read, cancelled on refetch so a late one can't overwrite. */
   private facetsSub?: Subscription;
 
   private fetchSub?: Subscription;
-  /** The in-flight load-more, cancelled on any first-page refetch so a late page
-   * from a prior query/World can't append its rows or restore its stale cursor. */
+  /** Cancelled on any first-page refetch so a late page from a prior query/World
+   * can't append its rows or restore its stale cursor. */
   private loadMoreSub?: Subscription;
-  /** The World the shown rows belong to, so a query change keeps them (stale-while-
-   * revalidate, no flash) while a World change flushes them (never show another
-   * World's rows). Undefined until the first fetch. */
+  /** The World the shown rows belong to: a query change keeps them (no flash),
+   * a World change flushes them (never show another World's rows). */
   private shownWorldId?: string;
 
-  /** First-page cache keyed by `worldId\0q`, so backspacing to a prior query paints
-   * instantly (stale-while-revalidate). Per-World so switching Worlds can't paint
-   * another World's rows. Bounded to shed the oldest entries in a long session. */
+  /** First-page cache keyed by World + filters, so returning to a prior query
+   * paints instantly (stale-while-revalidate). Bounded, oldest-out. */
   private readonly firstPageCache = new Map<
     string,
     { items: EntitySummary[]; nextCursor: string | null }
   >();
 
   constructor() {
-    // Read the URL `q` + Facets back into state: seeds them on a shared/refreshed
-    // link and follows back/forward (#154, #155). Subscribed before the fetch effect
-    // below, so the initial (synchronous) emission seeds state and the first fetch
-    // already carries it — one request on load, not empty-then-refetch. Setting state
-    // here never rewrites the URL (only the toggles/debounce below do), and the JSON
-    // distinctUntilChanged absorbs the echo when a toggle's own navigate round-trips
-    // back through here, so there's no read/write loop.
+    // Seed query + Facets from the URL and follow back/forward. Subscribed before
+    // the fetch effect so the synchronous first emission lands before the first
+    // fetch — one request on load. The distinctUntilChanged absorbs the echo when
+    // a toggle's own navigate round-trips back, so there's no read/write loop.
     this.route.queryParamMap
       .pipe(
         map((params) => ({
@@ -302,10 +282,9 @@ export class EntityBrowser {
       .pipe(debounceTime(SEARCH_DEBOUNCE_MS), takeUntilDestroyed())
       .subscribe((raw) => {
         const q = raw.trim();
-        this.query.set(q); // fast typing fires one search, not one per key
-        // Mirror to the URL so a filtered view is shareable and survives refresh —
-        // the entity-header view-toggle pattern: merge (keep the World scope),
-        // replaceUrl (don't push a history entry per keystroke), null to drop `?q=`.
+        this.query.set(q);
+        // Mirror to the URL: merge keeps the World scope, replaceUrl avoids a
+        // history entry per keystroke.
         this.router.navigate([], {
           relativeTo: this.route,
           queryParams: { q: q || null },
@@ -314,27 +293,19 @@ export class EntityBrowser {
         });
       });
 
-    // Re-fetch page one whenever the World (ADR-0028) or the query changes. The
-    // browser only mounts under /w/:worldId, so a worldId is always present;
-    // reacting to it covers a param-only switch between Worlds (same component).
+    // Refetch page one whenever the World, query, or Facets change — covers a
+    // param-only switch between Worlds (same component instance).
     effect(() => {
-      this.query(); // track: a new query refetches from page one under server order
-      this.activeFacets(); // and any Facet change (#155) refetches + recomputes counts
+      this.query(); // tracked
+      this.activeFacets(); // tracked
       if (this.activeWorld.worldId()) this.fetchFirstPage();
     });
   }
 
-  /** A keystroke in the search box — debounced into {@link query} before it fetches. */
   protected onSearch(value: string): void {
     this.typed.next(value);
   }
 
-  /**
-   * Toggle one Facet value on/off within its category (#155): OR within a category.
-   * Clicking an active value removes it (that's the per-filter remove). The new
-   * selection sets state (refetch + recount) and mirrors to the URL — merged so the
-   * World scope and other params survive, replaceUrl so a click isn't a history entry.
-   */
   protected toggleFacet({ category, value }: FacetToggle): void {
     const current = this.activeFacets();
     const values = current[category];
@@ -350,7 +321,6 @@ export class EntityBrowser {
     });
   }
 
-  /** Clear the query and every Facet at once (#155), dropping all filter params from the URL. */
   protected clearAll(): void {
     this.query.set('');
     this.activeFacets.set(NO_FACETS);
@@ -362,7 +332,6 @@ export class EntityBrowser {
     });
   }
 
-  /** Mirror the active Facets to the URL; an empty category drops its param (`null`). */
   private mirrorToUrl(facets: ActiveFacets): void {
     this.router.navigate([], {
       relativeTo: this.route,
@@ -377,46 +346,38 @@ export class EntityBrowser {
   }
 
   /**
-   * Fetch page one and replace the accumulated list with it (ADR-0025). Used on
-   * load and after every create/rename/delete: refreshing from page one keeps the
-   * view coherent without reconciling a stale accumulated tail, and page one is the
-   * only view a client can always re-request — it needs no cursor and is bounded by
-   * `limit`, so it survives any future opaque-cursor encoding change.
+   * Fetch page one and replace the accumulated list. Used on load and after every
+   * create/rename/delete: refreshing from page one keeps the view coherent
+   * without reconciling a stale accumulated tail.
    */
   private fetchFirstPage(): void {
     const worldId = this.activeWorld.worldId();
-    // Defensive: the browser only mounts under /w/:worldId, but never fetch the
-    // whole owner list (every World) if the segment is somehow absent.
+    // Never fetch the whole owner list (every World) if the segment is somehow absent.
     if (!worldId) return;
-    // Cancel any in-flight request from a previous World/query (prevents stale race).
+    // Cancel in-flight reads so a late page from a prior World/query can't land.
     this.fetchSub?.unsubscribe();
-    this.loadMoreSub?.unsubscribe(); // and any load-more, so its late page can't append
-    this.loadingMore.set(false); // clear any stuck load-more from the previous page
+    this.loadMoreSub?.unsubscribe();
+    this.loadingMore.set(false);
     const params = this.activeFilterParams();
     const worldChanged = worldId !== this.shownWorldId;
     this.shownWorldId = worldId;
-    // Key on World + the full filter state (query + Facets) so backspacing to any
-    // prior combination paints from cache; JSON of the params is a stable key.
     const key = worldId + ' ' + JSON.stringify(params);
     const cached = this.firstPageCache.get(key);
     if (cached) {
-      // Stale-while-revalidate: paint the previously-seen page instantly (backspace
-      // to a prior query feels immediate), then refresh it from the server below.
+      // Stale-while-revalidate: paint the cached page instantly, refresh below.
       this._entities.set(cached.items);
       this.nextCursor.set(cached.nextCursor);
       this.loaded.set(true);
       this.loadError.set(false);
     } else if (worldChanged) {
-      // A different World: flush to the loading state so no old-World rows linger.
+      // Different World: flush so no old-World rows linger.
       this._entities.set([]);
       this.nextCursor.set(null);
       this.loaded.set(false);
       this.loadError.set(false);
     } else {
-      // Same World, uncached query: keep the current rows on screen through the fetch
-      // so switching searches doesn't flash empty (the quick-search does the same).
-      // Drop the load-more cursor — it belongs to the outgoing query; the incoming
-      // page restores it.
+      // Same World, uncached filters: keep the current rows through the fetch (no
+      // empty flash), but drop the cursor — it belongs to the outgoing query.
       this.nextCursor.set(null);
       this.loadError.set(false);
     }
@@ -430,8 +391,7 @@ export class EntityBrowser {
           this.nextCursor.set(page.nextCursor);
           this.loaded.set(true);
         },
-        // A failed fetch keeps whatever rows are already shown (stale-while-
-        // revalidate); only a load with nothing to fall back to surfaces the error.
+        // Keep shown rows on failure; only surface the error with nothing to fall back to.
         error: () => {
           if (this._entities().length === 0) {
             this.loaded.set(true);
@@ -442,7 +402,6 @@ export class EntityBrowser {
     this.fetchFacetCounts(worldId, params);
   }
 
-  /** The active query + Facets as list/facets params (#155); empty categories are omitted. */
   private activeFilterParams(): EntityFacetParams {
     const q = this.query();
     const f = this.activeFacets();
@@ -456,12 +415,7 @@ export class EntityBrowser {
     };
   }
 
-  /**
-   * Recompute the Facet-rail counts alongside the paged list (#155), scoped to the
-   * World and the active filters — the server drills each category down against the
-   * others (ADR-0035). A failed read leaves the last-good counts on screen rather
-   * than blanking the rail, matching the list's stale-while-revalidate posture.
-   */
+  /** A failed read leaves the last-good counts on screen rather than blanking the rail. */
   private fetchFacetCounts(worldId: string, params: EntityFacetParams): void {
     this.facetsSub?.unsubscribe();
     this.facetsSub = this.entitiesClient.facets({ worldId, ...params }).subscribe({
@@ -481,19 +435,13 @@ export class EntityBrowser {
       );
   }
 
-  /**
-   * Fetch the next page via the opaque `nextCursor` and append it (ADR-0025). The
-   * `loadingMore` guard makes a double-click a no-op so a page can't be appended
-   * twice. A failed fetch just re-enables the control to retry — the list it already
-   * shows stays intact.
-   */
+  /** The `loadingMore` guard makes a double-click a no-op so a page can't append twice. */
   protected loadMore(): void {
     const cursor = this.nextCursor();
     if (cursor === null || this.loadingMore()) return;
     this.loadingMore.set(true);
-    // The cursor is an opaque offset; the server re-applies the filter from the
-    // query + Facets, so paging a filtered set must re-send them all (#154, #155)
-    // or it pages the unfiltered set from that offset.
+    // The cursor is an opaque offset; paging a filtered set must re-send all
+    // filters or it pages the unfiltered set from that offset.
     this.loadMoreSub = this.entitiesClient
       .list({
         cursor,
@@ -515,7 +463,6 @@ export class EntityBrowser {
       });
   }
 
-  /** Create an empty Entity of `type` and open it straight away. */
   protected create(type: EntityType): void {
     if (this.creating()) return;
     this.creating.set(true);
@@ -552,10 +499,7 @@ export class EntityBrowser {
     this.renamingId.set(null);
   }
 
-  /**
-   * Rename by name only (ADR-0018). A blank, unchanged, or concurrently-deleted card
-   * closes the input without a round trip. On error, closes and toasts.
-   */
+  /** A blank, unchanged, or concurrently-deleted card closes the input without a round trip. */
   protected commitRename(id: string, name: string): void {
     const trimmed = name.trim();
     const current = this._entities().find((entity) => entity.id === id);
@@ -564,8 +508,7 @@ export class EntityBrowser {
       return;
     }
     this.entitiesClient.patch(id, { name: trimmed }).subscribe({
-      // Refresh from page one (ADR-0025) rather than reconcile in place: a rename
-      // can move the item under the server's sort, so re-fetching keeps the view honest.
+      // A rename can move the item under the server's sort; refetch, don't reconcile.
       next: () => {
         this.renamingId.set(null);
         this.invalidateCache();
@@ -581,13 +524,10 @@ export class EntityBrowser {
     });
   }
 
-  /** Every cached first page is now stale (a rename/delete moved or removed a row);
-   * drop them so the next fetch is a cold, fresh read rather than a stale paint. */
   private invalidateCache(): void {
     this.firstPageCache.clear();
   }
 
-  /** Delete an entity, then refresh from page one once the server confirms (ADR-0025). */
   protected remove(id: string): void {
     this.entitiesClient.delete(id).subscribe({
       next: () => {

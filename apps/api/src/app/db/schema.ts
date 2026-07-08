@@ -10,43 +10,36 @@ import {
 // need a drizzle-kit migration to reach an existing database.
 
 /**
- * The closed user set (ADR-0004). Users are provisioned out-of-band — there is
- * no signup — so this table only ever grows via the seed mechanism. The
- * password is stored as an argon2 hash; the plaintext never touches the row.
+ * The closed user set: no signup, users are provisioned out-of-band via the seed
+ * mechanism. The password is stored as an argon2 hash; the plaintext never
+ * touches the row.
  */
 export const users = sqliteTable('users', {
   id: text('id').primaryKey(),
   email: text('email').notNull().unique(),
   displayName: text('display_name').notNull(),
   passwordHash: text('password_hash').notNull(),
-  // Roaming Preferences as one zod-validated JSON bag (ADR-0038). Never
-  // DB-queried, so a single column beats per-pref columns; `'{}'` = app
-  // defaults, which is also the migration backfill for existing rows.
+  // Roaming Preferences as one zod-validated JSON bag; never DB-queried.
   preferences: text('preferences').notNull().default('{}'),
-  // Instance Admin (ADR-0037, #163): account management (create/disable/delete
-  // users, resets, the Admin flag itself) with zero content powers — it pierces
-  // no World or Entity. Toggled in-app by another Admin.
+  // Instance Admin: account management with zero content powers — it pierces no
+  // World or Entity. Toggled in-app by another Admin.
   isAdmin: integer('is_admin', { mode: 'boolean' }).notNull().default(false),
-  // Superadmin (ADR-0037, #163): the operator's in-app self, outside the
-  // collaboration model — its bypass is OR'd into the read/reachability
-  // predicates (repair, not administration). Seeded via the `--superadmin` seed
-  // flag; the last one is irremovable so the repair capability can't be lost.
+  // Superadmin: the operator's repair bypass, OR'd into the read/reachability
+  // predicates. Seeded via `--superadmin`; the last one is irremovable so the
+  // repair capability can't be lost.
   isSuperadmin: integer('is_superadmin', { mode: 'boolean' }).notNull().default(false),
-  // World Creation (ADR-0040): a per-user Instance capability, orthogonal to Instance
-  // Admin, gating whether the user may create a World. Off by default — the clean-slate
-  // migration backfills every existing user to false; an Instance Admin grants it.
+  // Per-user capability gating World creation; orthogonal to Instance Admin,
+  // granted by an Instance Admin. Off by default.
   canCreateWorlds: integer('can_create_worlds', { mode: 'boolean' }).notNull().default(false),
-  // Disable (ADR-0037, #163): the immediate lever — a non-null timestamp locks
-  // login (rejected in `authenticate`, killing live sessions too) while leaving
-  // the user's data and memberships intact. Null = active.
+  // Non-null locks login (rejected in `authenticate`, killing live sessions too)
+  // while leaving the user's data and memberships intact. Null = active.
   disabledAt: integer('disabled_at'),
   createdAt: integer('created_at').notNull(),
 });
 
 /**
  * Server-side sessions: the cookie carries only the opaque `id` (token); this
- * row is the source of truth. Logout deletes the row, so revocation is
- * immediate (ADR-0004 — logout ends the session).
+ * row is the source of truth. Logout deletes the row, so revocation is immediate.
  */
 export const sessions = sqliteTable(
   'sessions',
@@ -65,55 +58,48 @@ export const sessions = sqliteTable(
 );
 
 /**
- * An Entity stored as a single JSON document (ADR-0018, ADR-0002). The columns
- * are the metadata the list view and access checks need; `document` holds the
- * whole type-discriminated body as JSON. `type`/`tags` are denormalized out so
- * a list can group/filter without loading each body. `version` is the
- * optimistic-concurrency counter (a stale save is a 409). A Hex Map is an
- * Entity of `type: 'hexmap'` (replaces the `maps` table — migration in `db.ts`).
+ * An Entity stored as a single JSON document. The columns are the metadata the
+ * list view and access checks need; `document` holds the whole type-discriminated
+ * body. `type`/`tags` are denormalized out so a list can group/filter without
+ * loading each body. `version` is the optimistic-concurrency counter (a stale
+ * save is a 409). Ownership is not a column — it is an `owner`-role row in
+ * `entityGrants`.
  */
 export const entities = sqliteTable(
   'entities',
   {
     id: text('id').primaryKey(),
-    // Ownership is a symmetric set, not a column (ADR-0037): an `owner`-role row in
-    // `entityGrants` (folded from the retired `entity_owners` table, migration 0007).
-    // The World this Entity belongs to (ADR-0024).
     worldId: text('world_id')
       .notNull()
       .references(() => worlds.id),
     name: text('name').notNull(),
     type: text('type').notNull(),
     tags: text('tags', { mode: 'json' }).$type<string[]>().notNull(),
-    // Entity Visibility (ADR-0024): private | shared.
+    // private | shared.
     visibility: text('visibility').notNull().default('private'),
     version: integer('version').notNull(),
     // Serialized Entity body (entityBodySchema), validated at the edge.
     document: text('document').notNull(),
-    // Plain-text prose extracted from Content for full-text search (ADR-0035),
-    // populated server-side by extractText on every write. Nullable so existing
-    // rows migrate in before the boot backfill fills them; the FTS table and its
-    // sync triggers (migration 0002) live outside Drizzle's typed API as raw SQL.
+    // Plain-text prose extracted from Content for full-text search, populated by
+    // extractText on every write. Nullable so rows can migrate in before the boot
+    // backfill fills them; the FTS table and its sync triggers are raw SQL,
+    // outside Drizzle's typed API.
     contentText: text('content_text'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
   (table) => [
-    // Scoped to World (ADR-0024).
     index('idx_entities_world_id').on(table.worldId),
   ]
 );
 
 /**
- * The entity access-control set (ADR-0037): one row per (entity, user) with a `role` of
- * `owner` | `editor` | `viewer`. Mirrors `worldMembers` — owner is the top role, not a
- * separate table (the retired `entity_owners` folded in here, migration 0007). `owner` is
- * constitutive: manages grants, carries the ≥1-Owner invariant (enforced in EntitiesService,
- * not the schema), and pierces `private` unconditionally; `editor`/`viewer` are grants that
- * may target any Instance user (World membership is not a precondition) and pierce `private`
- * per-user. One row per user per Entity (the PK), so re-granting a role upserts and a promotion
- * to owner overwrites a lower role. Deleting the Entity cascades these rows away; revocation
- * is a plain row delete.
+ * The entity access-control set: one row per (entity, user), `role` ∈ owner |
+ * editor | viewer. `owner` manages grants, carries the ≥1-Owner invariant
+ * (enforced in EntitiesService, not the schema), and pierces `private`;
+ * `editor`/`viewer` may target any Instance user (World membership is not a
+ * precondition) and pierce `private` per-user. The PK makes re-granting an
+ * upsert. Deleting the Entity cascades these rows away.
  */
 export const entityGrants = sqliteTable(
   'entity_grants',
@@ -130,20 +116,16 @@ export const entityGrants = sqliteTable(
 );
 
 /**
- * A World (ADR-0024): a lightweight container grouping Entities for one campaign.
- * Ownership is a symmetric set (ADR-0037): World Owners are `world_members` rows
- * with `role: 'owner'`, so a World carries no owner column. The landing page is a
- * derived World Dashboard (ADR-0043), not a stored Entity — a World holds no FK
- * back to entities.
+ * A World: a lightweight container grouping Entities for one campaign. World
+ * Owners are `world_members` rows with `role: 'owner'` — no owner column here.
+ * The landing page is a derived Dashboard, so a World holds no FK back to entities.
  */
 export const worlds = sqliteTable('worlds', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
-  // Ownership is a symmetric set (ADR-0037): World Owners are `world_members`
-  // rows with `role: 'owner'`, not a column here.
-  // The Owner-curated Dashboard pins (ADR-0043): an ordered JSON array of Entity
-  // ids, one shared set per World. References, not enforced FKs — stale or
-  // inaccessible ids are filtered per-viewer on read, never pruned on delete.
+  // Owner-curated Dashboard pins: an ordered JSON array of Entity ids, one shared
+  // set per World. References, not enforced FKs — stale or inaccessible ids are
+  // filtered per-viewer on read, never pruned on delete.
   pinnedEntityIds: text('pinned_entity_ids', { mode: 'json' })
     .$type<string[]>()
     .notNull()
@@ -153,9 +135,9 @@ export const worlds = sqliteTable('worlds', {
 });
 
 /**
- * World membership (ADR-0024, ADR-0037): a user is an `owner` (full symmetric
- * control — the World's ownership set), a `contributor` (creates Entities, owns
- * them, reads `shared`), or a `viewer` (reads `shared`). One row per (world, user).
+ * World membership: a user is an `owner` (full control — the World's ownership
+ * set), a `contributor` (creates Entities, owns them, reads `shared`), or a
+ * `viewer` (reads `shared`). One row per (world, user).
  */
 export const worldMembers = sqliteTable(
   'world_members',
@@ -174,8 +156,8 @@ export const worldMembers = sqliteTable(
 );
 
 /**
- * A World Public Link (ADR-0024): an unguessable token granting World Viewer
- * access to all `shared` Entities in a World without an account. `id` is the token.
+ * A World Public Link: an unguessable token granting anonymous Viewer access to
+ * all `shared` Entities in a World. `id` is the token.
  */
 export const worldLinks = sqliteTable(
   'world_links',
@@ -192,11 +174,10 @@ export const worldLinks = sqliteTable(
 );
 
 /**
- * A per-entity Public Link (ADR-0037): an unguessable token granting anonymous read-only
- * access to one Entity without an account. `id` is the token. The link is an anonymous
- * Viewer grant, so it pierces `private` exactly like a named grant — the token *is* the
- * grant, no visibility check on the read. One active link per Entity (rotate = revoke +
- * re-mint) is enforced in the service, mirroring `world_links`. Deleting the Entity cascades.
+ * A per-entity Public Link: an unguessable token granting anonymous read-only
+ * access to one Entity. `id` is the token — an anonymous Viewer grant, so it
+ * pierces `private` with no visibility check on the read. One active link per
+ * Entity is enforced in the service. Deleting the Entity cascades.
  */
 export const entityLinks = sqliteTable(
   'entity_links',
@@ -211,14 +192,11 @@ export const entityLinks = sqliteTable(
 );
 
 /**
- * Per-World content-addressed Assets (ADR-0034): binary files (images, PDFs) pulled
- * out of an imported vault. The row is metadata only — the bytes live on disk at
- * `assets/<worldId>/<hash>.<ext>` beside the SQLite DB (ADR-0002). The primary key is
- * `(worldId, hash)`, so dedup is per-World: the same image referenced from many notes
- * rows once, but the same image in two Worlds rows (and stores) twice. `originalFilename`
- * survives here (the on-disk name is the hash) so export can write human-readable names
- * back into the vault. Deleting a World cascades these rows away; the on-disk folder is
- * removed separately by {@link AssetsService.deleteWorld}.
+ * Per-World content-addressed Assets: metadata only — the bytes live on disk at
+ * `assets/<worldId>/<hash>.<ext>` beside the SQLite DB. The `(worldId, hash)` PK
+ * makes dedup per-World. `originalFilename` survives (the on-disk name is the
+ * hash) so export can write human-readable names. Rows cascade with the World;
+ * the on-disk folder is removed separately by {@link AssetsService.deleteWorld}.
  */
 export const assets = sqliteTable(
   'assets',
@@ -236,12 +214,9 @@ export const assets = sqliteTable(
 );
 
 /**
- * The owner's Link Descriptor vocabulary (#96, ADR-0023): the distinct relationship
- * labels each Entity's Content currently uses ("spouse", "capital of"). The client
- * harvests these from its opaque snapshot and a successful save *replaces* the entity's
- * rows, so the server never parses Content (ADR-0019). `::` suggestions are the owner's
- * `SELECT DISTINCT descriptor`. Self-pruning: a save that no longer carries a descriptor
- * drops its row; deleting the Entity cascades these away (FK `ON DELETE CASCADE`).
+ * The owner's Link Descriptor vocabulary: the distinct relationship labels each
+ * Entity's Content currently uses ("spouse", "capital of"). A successful save
+ * *replaces* the entity's rows (self-pruning); deleting the Entity cascades them away.
  */
 export const entityDescriptors = sqliteTable(
   'entity_descriptors',

@@ -64,7 +64,7 @@ import {
 import { HEXLY_CONFIG, HexlyConfig } from '../config/config.module';
 import { NudgeBus } from '../events/nudge-bus';
 
-/** The per-entity Public Link table for the shared get/mint/revoke helpers (ADR-0037, #162). */
+/** Per-entity Public Link table for the shared get/mint/revoke helpers. */
 const ENTITY_LINK: PublicLinkTable = {
   table: entityLinks,
   id: entityLinks.id,
@@ -74,7 +74,7 @@ const ENTITY_LINK: PublicLinkTable = {
 
 const INITIAL_VERSION = 1;
 
-/** Reader-scoped paging + filtering options for {@link EntitiesService.list} (ADR-0025, ADR-0037). */
+/** Reader-scoped paging + filtering options for {@link EntitiesService.list}. */
 export interface ListOptions {
   readonly offset: number;
   readonly limit: number;
@@ -82,25 +82,25 @@ export interface ListOptions {
   readonly ids?: readonly string[];
   /** Case-insensitive substring match on the name. */
   readonly q?: string;
-  /** Facet: restrict to any of these Entity Types (OR within category, #155). */
+  /** Facet: restrict to any of these Entity Types (OR within category). */
   readonly type?: readonly EntityType[];
-  /** Facet: restrict to entities carrying any of these Tags (OR within category, #155). */
+  /** Facet: restrict to entities carrying any of these Tags (OR within category). */
   readonly tags?: readonly string[];
-  /** Facet: restrict to any of these Visibilities (OR within category, #155). */
+  /** Facet: restrict to any of these Visibilities (OR within category). */
   readonly visibility?: readonly Visibility[];
-  /** Restrict to one World (ADR-0024). */
+  /** Restrict to one World. */
   readonly worldId?: string;
-  /** Attach the caller's Rights to each summary (ADR-0039) — opt-in, the Entity Browser sets it. */
+  /** Attach the caller's Rights to each summary — opt-in, the Entity Browser sets it. */
   readonly withRights?: boolean;
 }
 
-/** The filter state a facet-count read narrows against (#155) — the list filters minus paging/ids. */
+/** The filter state a facet-count read narrows against — the list filters minus paging/ids. */
 export type FacetOptions = Pick<
   ListOptions,
   'worldId' | 'q' | 'type' | 'tags' | 'visibility'
 >;
 
-/** Everything {@link filters} reads — shared by the paged list and the facet-count reads (#155). */
+/** Everything {@link filters} reads — shared by the paged list and the facet-count reads. */
 type FilterOptions = FacetOptions & Pick<ListOptions, 'ids'>;
 
 /** One page of summaries plus whether a further page exists (drives the cursor). */
@@ -111,15 +111,14 @@ export interface ListPage {
 
 /**
  * The shared {@link EntitySaveOutcome} (`saved`/`conflict`) plus an api-local
- * `not-found` arm that maps to a 404 rather than a JSON body (ADR-0018).
+ * `not-found` arm that maps to a 404 rather than a JSON body.
  */
 export type SaveResult = EntitySaveOutcome | { status: 'not-found' };
 
 /**
- * Entity persistence: one JSON body per `entities` row (ADR-0018, ADR-0002). Access
- * routes through the read/write predicate (ADR-0037): a read needs `canRead` (owner ∨
- * member-and-shared), a mutation `canWrite` (owner ∨ world-owner-and-shared) — the choke
- * point is {@link access}. Body serialization and `version` bookkeeping live here.
+ * Entity persistence: one JSON body per `entities` row. All access routes through
+ * {@link entityAccess} — reads need `canRead` (owner ∨ member-and-shared),
+ * mutations `canWrite` (owner ∨ world-owner-and-shared).
  */
 @Injectable()
 export class EntitiesService implements OnApplicationBootstrap {
@@ -130,11 +129,8 @@ export class EntitiesService implements OnApplicationBootstrap {
   ) {}
 
   /**
-   * One-time boot backfill (ADR-0035): populate `content_text` — and, through the
-   * FTS triggers, the search index — for rows written before the column existed, so
-   * an already-imported vault becomes searchable without re-saving a single note.
-   * Scoped to still-`NULL` rows, so it is a no-op on every boot after the first
-   * (a written note always has a non-null, possibly empty, `content_text`).
+   * Boot backfill: populate `content_text` (and, via the FTS triggers, the search
+   * index) for rows where it is still NULL. No-op once every row has a value.
    */
   onApplicationBootstrap(): void {
     const stale = this.db
@@ -149,14 +145,12 @@ export class EntitiesService implements OnApplicationBootstrap {
   }
 
   /**
-   * One reader-scoped page of summaries (ADR-0025, ADR-0037), metadata only. Stable sort
-   * (newest first, tied by id) prevents overlaps/skips. Reads limit + 1 rows
-   * to detect further pages without phantom empty page.
+   * One reader-scoped page of summaries, metadata only. Stable sort (newest first,
+   * tied by id) prevents overlaps/skips; reads limit + 1 rows to detect further pages.
    */
   list(readerId: string, opts: ListOptions): ListPage {
-    // A text query becomes an FTS5 MATCH (ADR-0035): full-text over name, tags,
-    // and Content prose, ranked by bm25. Absent (or all-punctuation) → keep the
-    // last-edited order. Skip potentially large document column.
+    // A text query becomes an FTS5 MATCH ranked by bm25; absent (or
+    // all-punctuation) keeps the last-edited order.
     const match = opts.q ? toFtsMatch(opts.q) : null;
     const w = this.config.search.weights;
     const access = entityAccess(this.db, readerId);
@@ -171,8 +165,7 @@ export class EntitiesService implements OnApplicationBootstrap {
         version: entities.version,
         createdAt: entities.createdAt,
         updatedAt: entities.updatedAt,
-        // Opt-in per-row Rights (ADR-0039): project the same predicate columns the decision
-        // does so each summary can carry the caller's verbs. Omitted → pure read-filter.
+        // Opt-in: project the predicate columns so each summary carries the caller's Rights.
         ...(opts.withRights ? access.rightsColumns : {}),
       })
       .from(entities)
@@ -188,10 +181,8 @@ export class EntitiesService implements OnApplicationBootstrap {
           match ? sql`entities_fts MATCH ${match}` : undefined,
         ),
       )
-      // With a query, best match first (bm25 ascending), id for a stable page
-      // boundary; without one, the existing newest-first order (ADR-0025). The
-      // per-column weights (name/tags/content) are the configured relevance tuning
-      // (ADR-0035) — column order must match the FTS DDL: name, tags, content_text.
+      // With a query: best match first (bm25 ascending), id for a stable page boundary;
+      // otherwise newest first. Weight order must match the FTS DDL: name, tags, content_text.
       .orderBy(
         ...(match
           ? [
@@ -224,15 +215,13 @@ export class EntitiesService implements OnApplicationBootstrap {
   }
 
   /**
-   * Facet-count read for the Facet rail (#155). For each category, count its
-   * distinct values under the *other* active constraints (query + the other
-   * Facets) but **not** its own — so drilling into one category still lists the
-   * sibling values you could add, each narrowed by everything else. `GROUP BY`
-   * naturally omits zero-count values (a value with no rows never appears).
+   * Facet-count read for the Facet rail: each category is counted under the other
+   * active constraints but *not* its own, so drilling into one category still lists
+   * the sibling values you could add. `GROUP BY` omits zero-count values.
    * Reader- and World-scoped like {@link list}.
    */
   facets(readerId: string, opts: FacetOptions): EntityFacets {
-    // Resolve the read filter once (Superadmin bypass folded in), then reuse it in every count.
+    // Resolve the read filter (Superadmin bypass folded in) once, reuse it in every count.
     const { filter } = entityAccess(this.db, readerId);
     return {
       // Drop a category's own selection before counting it (drill-down).
@@ -269,8 +258,8 @@ export class EntitiesService implements OnApplicationBootstrap {
 
   /**
    * Count Tag-facet values under `opts`. Tags live in the JSON `tags` column, so
-   * `json_each` unrolls each entity's array into rows before grouping — an entity
-   * with two tags counts toward both values (ADR-0035, #155).
+   * `json_each` unrolls each array before grouping — an entity with two tags
+   * counts toward both values.
    */
   private countTags(opts: FacetOptions, filter: SQL): FacetCount[] {
     const match = opts.q ? toFtsMatch(opts.q) : null;
@@ -294,25 +283,22 @@ export class EntitiesService implements OnApplicationBootstrap {
 
   /**
    * An Entity owned by someone else is indistinguishable from one that does not
-   * exist, so ownership never leaks (ADR-0004).
+   * exist, so ownership never leaks.
    */
   load(userId: string, id: string): EntityDetail | null {
     const access = entityAccess(this.db, userId);
     const decision = access.decide(id);
-    // Surface substance-write power so the editor gates itself (ADR-0037): a read-only
-    // member or a Viewer grant opens read-only rather than autosaving into a wall of 403s,
-    // while an entity-level Editor (canWrite false, canEditSubstance true) opens writable.
-    // canManage rides the owner-only gate so the Share dialog (owners/grants/link — all
-    // owner-only) is only offered to someone who can actually use it, not every writer.
+    // Rights let the editor gate itself: a Viewer opens read-only, an entity-level
+    // Editor (canWrite false, canEditSubstance true) opens writable. canManage rides
+    // the owner-only gate so the Share dialog is only offered to actual Owners.
     return decision?.canRead
       ? { ...toDetail(decision.row), rights: access.rightsOf(decision) }
       : null;
   }
 
   /**
-   * Every Entity in a World, bodies included, for the vault export (ADR-0033, #150).
-   * Owner-scoped like the rest of the service — a member never reaches another owner's
-   * bodies. Unlike {@link list} this pulls the full `document` column (export serializes it).
+   * Every Entity in a World, bodies included, for the vault export. Owner-scoped —
+   * a member never reaches another owner's bodies. Pulls the full `document` column.
    */
   listByWorld(userId: string, worldId: string): EntityDetail[] {
     return this.db
@@ -332,15 +318,12 @@ export class EntitiesService implements OnApplicationBootstrap {
       tags: req.tags,
       body,
     });
-    // Already have valid body; return without re-parsing.
     return detailOf(row, body);
   }
 
   /**
-   * Insert a fully-built Entity for the vault import path (ADR-0033, #146): unlike
-   * {@link create} (which mints an empty body server-side), the Content and Metadata
-   * come pre-converted from the source markdown. The target World is the caller's
-   * freshly minted import World, so no ownership resolution is needed.
+   * Insert a fully-built Entity for the vault import path: body and metadata come
+   * pre-converted, and the target World is the caller's fresh import World.
    */
   importNote(
     ownerId: string,
@@ -354,13 +337,11 @@ export class EntitiesService implements OnApplicationBootstrap {
   }
 
   /**
-   * The single INSERT trunk both {@link create} and {@link importNote} share, so the
-   * row shape (id, initial version, private, serialized body, timestamps) lives in one
-   * place and can't drift. Callers vary only what they own — World, name, tags, body.
-   * Returns the inserted row so a caller can build its {@link EntityDetail} without a re-read.
+   * The single INSERT trunk {@link create} and {@link importNote} share. Returns
+   * the inserted row so callers can build an {@link EntityDetail} without a re-read.
    */
   private insertEntity(input: {
-    /** Pre-generated id — the import path assigns ids up front so it can resolve wikilinks before insert (#147). */
+    /** Pre-generated id — the import path assigns ids up front to resolve wikilinks before insert. */
     id?: string;
     ownerId: string;
     worldId: string;
@@ -378,14 +359,12 @@ export class EntitiesService implements OnApplicationBootstrap {
       visibility: 'private' as const,
       version: INITIAL_VERSION,
       document: serialize(input.body),
-      // Search index text (ADR-0035); the FTS triggers pick it up from the column.
+      // Search index text; the FTS triggers pick it up from the column.
       contentText: extractText(input.body.content),
       createdAt: now,
       updatedAt: now,
     };
-    // Row and its sole initial Owner land together (ADR-0037) — a new Entity is
-    // never ownerless. The creator is the initial sole member of its owner set, an
-    // `owner`-role grant row (migration 0007).
+    // Row and its initial Owner land together — a new Entity is never ownerless.
     this.db.transaction(() => {
       this.db.insert(entities).values(row).run();
       this.db.insert(entityGrants).values({ entityId: row.id, userId: input.ownerId, role: 'owner' }).run();
@@ -394,31 +373,29 @@ export class EntitiesService implements OnApplicationBootstrap {
   }
 
   /**
-   * Version-checked save (ADR-0018, ADR-0004). Concurrent edit is a conflict, not silent
-   * overwrite — the base version rides the atomic WHERE. Write-gated through {@link access}
-   * (ADR-0037): an Owner or the World Owner of a `shared` Entity may edit its substance; an
-   * unreachable Entity is a 404 (`not-found`), a reachable one the caller can't write a 403.
+   * Version-checked save: a concurrent edit is a conflict, not a silent overwrite —
+   * the base version rides the atomic WHERE. Write-gated: an unreachable Entity is
+   * `not-found` (404), a reachable one the caller can't edit a 403.
    */
   save(userId: string, id: string, req: SaveEntityRequest): SaveResult {
     // Read first for not-found and to preserve untouched columns in response.
     const access = entityAccess(this.db, userId);
     const decision = access.decide(id);
     if (!decision?.canRead) return { status: 'not-found' };
-    // Substance edit (ADR-0037, #161): an entity-level Editor may save Content/Tags too.
+    // An entity-level Editor may save Content/Tags too.
     if (!decision.canEditSubstance) throw new ForbiddenException();
     const row = decision.row;
 
     // Set only columns a save owns so concurrent renames aren't clobbered.
-    // Tags always fully replace (save carries full set, #72).
+    // Tags always fully replace (save carries the full set).
     const document = serialize(req.document);
     const contentText = extractText(req.document.content);
-    // Descriptors are derived from the saved Content, not sent by the client (#96,
-    // ADR-0023/0035): harvest the links' relationship labels, normalized like tags.
+    // Descriptors are derived from the saved Content, not sent by the client.
     const descriptors = descriptorsSchema.parse(harvestDescriptors(req.document.content));
     const version = req.version + 1;
     const updatedAt = Date.now();
-    // Body write and descriptor-index replace in one transaction (ADR-0023) so
-    // index always reflects last-successful-save state, never rejected saves.
+    // Body write and descriptor-index replace in one transaction so the index
+    // always reflects the last successful save, never a rejected one.
     const saved = this.db.transaction(() => {
       const res = this.db
         .update(entities)
@@ -442,11 +419,8 @@ export class EntitiesService implements OnApplicationBootstrap {
         ? { status: 'conflict', current: toDetail(current.row) }
         : { status: 'not-found' };
     }
-    // The single emit point (ADR-0044): after the atomic write lands, nudge every follower
-    // that this Entity is now at `version`. In the service layer — the one choke point — not
-    // the controller.
+    // Nudge followers only after the atomic write lands.
     this.bus.emitEntityChange(id, version, updatedAt);
-    // Return validated body we just wrote directly.
     return {
       status: 'saved',
       entity: detailOf(
@@ -457,10 +431,9 @@ export class EntitiesService implements OnApplicationBootstrap {
   }
 
   /**
-   * A metadata patch (ADR-0037): the `name` and/or the Visibility, no version bump — it
-   * leaves the body and version untouched so it never invalidates an in-progress edit.
-   * Write-gated through {@link access}: an unreachable Entity is a 404 (null), a reachable
-   * one the caller can't write a 403.
+   * Metadata patch (`name` and/or Visibility): no version bump, so it never
+   * invalidates an in-progress edit. Write-gated: unreachable → null (404),
+   * reachable but not writable → 403.
    */
   patch(
     userId: string,
@@ -470,18 +443,17 @@ export class EntitiesService implements OnApplicationBootstrap {
     const access = entityAccess(this.db, userId);
     const decision = access.decide(id);
     if (!decision?.canRead) return null;
-    // Visibility is exposure — never a grant power (ADR-0037, #161), so a visibility
-    // change needs full management rights; a name-only patch is substance, which an
-    // entity-level Editor may make. The WHERE below mirrors whichever gate applies.
+    // Visibility is exposure, never a grant power: changing it needs full write
+    // rights, while a name-only patch is substance an entity-level Editor may make.
+    // The WHERE below mirrors whichever gate applies.
     const changesVisibility = changes.visibility !== undefined;
     const permitted = changesVisibility ? decision.canWrite : decision.canEditSubstance;
     if (!permitted) throw new ForbiddenException();
     const updatedAt = Date.now();
     const res = this.db
       .update(entities)
-      // The gate predicate in the WHERE (not ownsEntity) so a World Owner's — or an
-      // Editor's name — write actually lands; evaluated pre-SET, so a shared→private
-      // re-hide still matches.
+      // The gate predicate in the WHERE (not ownsEntity) so a World Owner's or an
+      // Editor's write lands; evaluated pre-SET, so a shared→private re-hide still matches.
       .set({ ...changes, updatedAt })
       .where(
         and(
@@ -490,20 +462,16 @@ export class EntitiesService implements OnApplicationBootstrap {
         ),
       )
       .run();
-    // 0 rows means the write predicate no longer matched between the access read and this
-    // UPDATE (e.g. the row was concurrently flipped `private`): the write never landed, so
-    // don't fake a 200. Mirror save()'s lost-write arm — an unreachable row is `null` (404).
+    // 0 rows means the write predicate no longer matched between the access read and
+    // this UPDATE (e.g. concurrently flipped `private`): the write never landed, so
+    // return null (404), not a fake 200.
     if (res.changes === 0) return null;
-    // Emit from the write path (ADR-0044): rename and visibility flip nudge followers. A
-    // patch never bumps version — the fresh `updatedAt` is what marks the nudge newer than
-    // what a follower holds.
+    // A patch never bumps version — the fresh `updatedAt` marks the nudge newer
+    // than what a follower holds.
     this.bus.emitEntityChange(id, decision.row.version, updatedAt);
-    // A visibility flip changes the *caller's own* standing (a World Owner loses write, hence
-    // read+edit, when a shared Entity goes private — ADR-0037): the one metadata patch where the
-    // load-time Rights the client carries forward go stale. Recompute post-update and ship them
-    // so the editor reflects the caller's real standing instead of a stale writable state (a
-    // name-only patch leaves standing untouched, so this is a no-op there). Cold path — a
-    // rename/visibility toggle, never the autosave hot path — so the extra access read is fine.
+    // A visibility flip can change the caller's own standing (a World Owner loses
+    // write when a shared Entity goes private), so recompute Rights post-update.
+    // Cold path — never the autosave hot path.
     const after = access.decide(id);
     return {
       ...toDetail({ ...decision.row, ...changes, updatedAt }),
@@ -512,16 +480,15 @@ export class EntitiesService implements OnApplicationBootstrap {
   }
 
   /**
-   * Owner's `::` suggestion vocabulary (#96, ADR-0023): DISTINCT Link Descriptors
-   * across their entities. Reflects last-saved state (reads the index, not edits).
+   * Owner's `::` suggestion vocabulary: DISTINCT Link Descriptors across their
+   * entities. Reflects last-saved state (reads the index, not edits).
    */
   listDescriptors(ownerId: string): string[] {
     return this.db
       .selectDistinct({ descriptor: entityDescriptors.descriptor })
       .from(entityDescriptors)
       .innerJoin(entities, eq(entities.id, entityDescriptors.entityId))
-      // A personal suggestion vocabulary — the caller's *own* descriptors, so no
-      // Superadmin bypass (repair reaches content, not another user's autocomplete).
+      // Personal suggestion vocabulary — the caller's own descriptors; no Superadmin bypass.
       .where(ownsEntity(ownerId, false))
       .orderBy(asc(entityDescriptors.descriptor))
       .all()
@@ -529,17 +496,15 @@ export class EntitiesService implements OnApplicationBootstrap {
   }
 
   /**
-   * Owner's tag suggestion vocabulary: DISTINCT Tags across their entities,
-   * sorted. Tags live in the JSON `tags` column, so `json_each` unrolls each array
-   * before DISTINCT (the shape countTags uses). No index table — unlike descriptors,
-   * tags are already a first-class column, so this reads live rather than harvested.
+   * Owner's tag suggestion vocabulary: DISTINCT Tags across their entities.
+   * `json_each` unrolls the JSON `tags` column before DISTINCT.
    */
   listTags(ownerId: string): string[] {
     return this.db
       .selectDistinct({ value: sql<string>`tag.value` })
       .from(entities)
       .innerJoin(sql`json_each(${entities.tags}) as tag`, sql`1 = 1`)
-      // Personal suggestion vocabulary — the caller's own tags; no Superadmin bypass.
+      // Personal suggestion vocabulary — the caller's own tags only; no Superadmin bypass.
       .where(ownsEntity(ownerId, false))
       .orderBy(sql`tag.value`)
       .all()
@@ -547,8 +512,8 @@ export class EntitiesService implements OnApplicationBootstrap {
   }
 
   /**
-   * Replace entity's descriptor rows with harvested set (#96). Self-pruning:
-   * dropped descriptors lose rows. Runs in save's transaction on success.
+   * Replace the entity's descriptor rows with the harvested set (self-pruning).
+   * Runs inside save's transaction.
    */
   private replaceDescriptors(id: string, descriptors: readonly string[]): void {
     this.db.delete(entityDescriptors).where(eq(entityDescriptors.entityId, id)).run();
@@ -560,9 +525,8 @@ export class EntitiesService implements OnApplicationBootstrap {
   }
 
   /**
-   * Delete an Entity (ADR-0037): an Owner, or the World Owner of a `shared` one (the
-   * nuclear revoke) — write-gated through {@link access}. false → unreachable (404); a
-   * reachable Entity the caller can't write is a 403.
+   * Delete an Entity: an Owner, or the World Owner of a `shared` one. false →
+   * unreachable (404); reachable but not writable → 403.
    */
   delete(userId: string, id: string): boolean {
     const access = entityAccess(this.db, userId).decide(id);
@@ -570,34 +534,26 @@ export class EntitiesService implements OnApplicationBootstrap {
     if (!access.canWrite) throw new ForbiddenException();
     // entity_grants (owner + grant rows) cascades with the row.
     this.db.delete(entities).where(eq(entities.id, id)).run();
-    // Emit from the write path (ADR-0044): the row is gone, so the per-recipient shaping in
-    // the bus resolves every follower to `unavailable` — deletion *is* eviction. The version
-    // and timestamp passed are never delivered (nobody can read a deleted row).
+    // Deletion is eviction: the bus resolves every follower to `unavailable`.
     this.bus.emitEntityChange(id, access.row.version, access.row.updatedAt);
     return true;
   }
 
   /**
-   * Gate the owner-set endpoints (ADR-0037): grant/owner management belongs to the Entity's
-   * Owners *alone* — not the World Owner, even over a `shared` Entity (grants pierce `private`
-   * and outlive visibility flips, so they stay with the accountable party). Returns the failing
-   * outcome — `not-found` when the Entity is unreachable (404), `forbidden` when it is reachable
-   * but the caller isn't an Owner (403) — or undefined when the caller is an Owner and may proceed.
+   * Gate the owner-set endpoints: grant/owner management belongs to the Entity's
+   * Owners *alone* — not the World Owner, even over a `shared` Entity. Returns the
+   * failing outcome (`not-found` → 404, `forbidden` → 403) or undefined to proceed.
    */
   private gateOwnerManagement(
     userId: string,
     id: string,
   ): Extract<OwnerSetResult, { status: 'not-found' | 'forbidden' }> | undefined {
-    // Only needs reachability + ownership, so it uses the blob-free decideMeta (no document),
-    // then the shared gate maps it to the not-found/forbidden/proceed split (ADR-0037).
+    // Only needs reachability + ownership, so it uses the blob-free decideMeta.
     const meta = entityAccess(this.db, userId).decideMeta(id);
     return gate({ reachable: !!meta?.canRead, isOwner: !!meta?.isOwner });
   }
 
-  /**
-   * The Entity's ownership set, for an Owner (ADR-0037). Unreachable → 404; reachable but
-   * not an Owner → 403 (the controller maps the outcome via {@link gateOwnerManagement}).
-   */
+  /** The Entity's ownership set, for an Owner. Unreachable → 404; not an Owner → 403. */
   listOwners(userId: string, id: string): OwnerSetResult {
     const gate = this.gateOwnerManagement(userId, id);
     if (gate) return gate;
@@ -605,15 +561,14 @@ export class EntitiesService implements OnApplicationBootstrap {
   }
 
   /**
-   * Add a co-Owner to an Entity (ADR-0037): Owner-only, the target must be an existing
-   * Instance user. Idempotent — re-adding an existing Owner is a no-op returning the set.
+   * Add a co-Owner: Owner-only, the target must be an existing Instance user.
+   * Idempotent — re-adding an existing Owner is a no-op returning the set.
    */
   addOwner(userId: string, id: string, targetUserId: string): OwnerSetResult {
     const gate = this.gateOwnerManagement(userId, id);
     if (gate) return gate;
     if (!userExists(this.db, targetUserId)) return { status: 'no-such-user' };
-    // Owner wins (ADR-0037, migration 0007): promoting a user who already holds an
-    // editor/viewer grant overwrites it to owner; re-adding an existing Owner is a no-op.
+    // Owner wins: promoting a user who holds an editor/viewer grant overwrites it to owner.
     this.db
       .insert(entityGrants)
       .values({ entityId: id, userId: targetUserId, role: 'owner' })
@@ -626,16 +581,16 @@ export class EntitiesService implements OnApplicationBootstrap {
   }
 
   /**
-   * Remove an Owner from an Entity, or resign your own ownership (ADR-0037): Owner-only.
-   * The ≥1-Owner invariant refuses removing the last Owner (`last-owner` → 409). A
-   * co-Owner may evict any other Owner, including the creator.
+   * Remove an Owner (or resign your own ownership): Owner-only. The ≥1-Owner
+   * invariant refuses removing the last Owner (`last-owner` → 409). A co-Owner may
+   * evict any other Owner, including the creator.
    */
   removeOwner(userId: string, id: string, targetUserId: string): OwnerSetResult {
     const gate = this.gateOwnerManagement(userId, id);
     if (gate) return gate;
     const outcome = removeOwnerOutcome(this.entityOwnersOf(id), targetUserId);
     if (outcome.status !== 'ok') return outcome;
-    // Delete the owner-role row (their access ends; they hold no other row post-fold).
+    // Delete the owner-role row — their access ends; they hold no other grant row.
     this.db
       .delete(entityGrants)
       .where(
@@ -649,20 +604,15 @@ export class EntitiesService implements OnApplicationBootstrap {
     return outcome;
   }
 
-  /**
-   * The Entity's grant set, for an Owner (ADR-0037, #161). Grant management belongs to
-   * the Owners alone (same gate as the owner set) — unreachable → 404, reachable but not
-   * an Owner → 403 (the controller maps the outcome).
-   */
+  /** The Entity's grant set, for an Owner — same Owner-only gate as the owner set. */
   listGrants(userId: string, id: string): AclSetResult<EntityGrant[]> {
     const gate = this.gateOwnerManagement(userId, id);
     return gate ?? { status: 'ok', value: this.entityGrantsOf(id) };
   }
 
   /**
-   * Grant an Instance user Editor or Viewer on an Entity (ADR-0037, #161): Owner-only,
-   * the target must be an existing Instance user (World membership is *not* required —
-   * an outsider can be handed one note). Upsert — re-granting a different role updates it.
+   * Grant an Instance user Editor or Viewer: Owner-only; World membership is *not*
+   * required. Upsert — re-granting a different role updates it.
    */
   addGrant(
     userId: string,
@@ -673,10 +623,9 @@ export class EntitiesService implements OnApplicationBootstrap {
     const gate = this.gateOwnerManagement(userId, id);
     if (gate) return gate;
     if (!userExists(this.db, targetUserId)) return { status: 'no-such-user' };
-    // A grant is editor/viewer only — the `setWhere` guard makes an existing `owner` row win,
-    // so granting a current Owner viewer/editor never demotes them (that would silently strip
-    // ownership through the wrong endpoint, past the ≥1-Owner invariant). Owners are managed
-    // via addOwner/removeOwner; the grant surface (entityGrantsOf) excludes them.
+    // The `setWhere` guard makes an existing `owner` row win, so granting a current
+    // Owner viewer/editor never demotes them past the ≥1-Owner invariant. Owners are
+    // managed via addOwner/removeOwner only.
     this.db
       .insert(entityGrants)
       .values({ entityId: id, userId: targetUserId, role })
@@ -690,9 +639,8 @@ export class EntitiesService implements OnApplicationBootstrap {
   }
 
   /**
-   * Revoke a grant (ADR-0037, #161): Owner-only. Revocation is how entity-level access
-   * ends — a plain row delete, after which the read/write predicates simply recompute.
-   * Revoking a non-existent grant is a no-op that still returns the (unchanged) set.
+   * Revoke a grant: Owner-only. Revoking a non-existent grant is a no-op that
+   * still returns the (unchanged) set.
    */
   removeGrant(
     userId: string,
@@ -701,8 +649,8 @@ export class EntitiesService implements OnApplicationBootstrap {
   ): AclSetResult<EntityGrant[]> {
     const gate = this.gateOwnerManagement(userId, id);
     if (gate) return gate;
-    // Editor/viewer rows only — an `owner` row is removed via removeOwner (which enforces the
-    // ≥1-Owner invariant), never silently deleted here through the grant-revoke endpoint.
+    // Editor/viewer rows only — an `owner` row is removed via removeOwner (which
+    // enforces the ≥1-Owner invariant), never silently deleted here.
     this.db
       .delete(entityGrants)
       .where(
@@ -716,11 +664,7 @@ export class EntitiesService implements OnApplicationBootstrap {
     return { status: 'ok', value: this.entityGrantsOf(id) };
   }
 
-  /**
-   * The Entity's per-entity Public Link, for an Owner (ADR-0037, #162): the active token or
-   * null. Link administration belongs to the Entity's Owners alone (same gate as grants) —
-   * unreachable → 404, reachable but not an Owner → 403 (the controller maps the outcome).
-   */
+  /** The Entity's Public Link (active token or null), for an Owner — same Owner-only gate as grants. */
   getLink(userId: string, id: string): AclSetResult<PublicLink | null> {
     const gate = this.gateOwnerManagement(userId, id);
     if (gate) return gate;
@@ -728,10 +672,9 @@ export class EntitiesService implements OnApplicationBootstrap {
   }
 
   /**
-   * Mint (or return the existing) per-entity Public Link (ADR-0037, #162): Owner-only. One
-   * active link per Entity — a re-mint returns the current token rather than rotating it, so
-   * the shared URL stays stable (rotate = revoke + re-mint). The token is an anonymous Viewer
-   * grant that pierces `private`; revoking it is the kill-switch (ADR-0004).
+   * Mint (or return the existing) Public Link: Owner-only, one active link per
+   * Entity — a re-mint returns the current token (rotate = revoke + re-mint). The
+   * token is an anonymous Viewer grant that pierces `private`.
    */
   mintLink(userId: string, id: string): AclSetResult<PublicLink> {
     const gate = this.gateOwnerManagement(userId, id);
@@ -740,18 +683,16 @@ export class EntitiesService implements OnApplicationBootstrap {
   }
 
   /**
-   * Revoke the per-entity Public Link (ADR-0037, #162): Owner-only, the kill-switch. A plain
-   * row delete after which the token route stops resolving immediately. Idempotent — revoking
-   * an absent link is a no-op that still succeeds.
+   * Revoke the Public Link: Owner-only kill-switch — the token stops resolving
+   * immediately. Idempotent.
    */
   revokeLink(userId: string, id: string): AclSetResult<null> {
     const gate = this.gateOwnerManagement(userId, id);
     if (gate) return gate;
     revokePublicLink(this.db, ENTITY_LINK, id);
-    // Revoke *is* eviction (ADR-0044, #175): emit a change so the bus re-shapes per recipient — an
-    // anonymous token follower now resolves to `{ id, unavailable }` and blanks the open screen. The
-    // row itself is unchanged, so ship its real version/updatedAt: a still-authorized cookie follower
-    // (a World-share viewer, a grant holder) computes newer-than-held false and no-ops it.
+    // Revoke is eviction: emit with the row's real version/updatedAt so an anonymous
+    // token follower resolves to `unavailable` while a still-authorized follower
+    // computes newer-than-held false and no-ops.
     const row = this.db
       .select({ version: entities.version, updatedAt: entities.updatedAt })
       .from(entities)
@@ -762,10 +703,9 @@ export class EntitiesService implements OnApplicationBootstrap {
   }
 
   /**
-   * Resolve a per-entity Public Link token to its Entity, read-only (ADR-0037, #162). The
-   * token *is* an anonymous Viewer grant, so it pierces `private` — no visibility check. null
-   * when the token doesn't resolve (revoked or never minted). `canWrite: false` so the reader
-   * renders read-only.
+   * Resolve a Public Link token to its Entity, read-only. The token *is* an
+   * anonymous Viewer grant, so it pierces `private` — no visibility check. null
+   * when the token doesn't resolve (revoked or never minted).
    */
   loadByEntityLink(token: string): EntityDetail | null {
     const link = this.db
@@ -779,10 +719,9 @@ export class EntitiesService implements OnApplicationBootstrap {
   }
 
   /**
-   * The `shared` Entity in World `worldId` with this id, read-only (ADR-0037, #162) — the
-   * per-entity read behind a World Public Link. Scoped to the token's World *and* `shared`,
-   * so the World link reaches that World's shared surface and nothing else; a `private` or
-   * out-of-World id is null (→ 404, a non-navigable dangling label for the reader).
+   * The `shared` Entity in World `worldId` with this id, read-only — the per-entity
+   * read behind a World Public Link. Scoped to the token's World *and* `shared`, so
+   * the link reaches that World's shared surface and nothing else; anything else is null (404).
    */
   loadSharedInWorld(worldId: string, id: string): EntityDetail | null {
     const row = this.db
@@ -793,7 +732,7 @@ export class EntitiesService implements OnApplicationBootstrap {
     return row ? { ...toDetail(row), rights: [...READ_ONLY_RIGHTS] } : null;
   }
 
-  /** Summaries of a World's `shared` Entities (ADR-0037, #162), ordered like {@link list}. */
+  /** Summaries of a World's `shared` Entities, ordered like {@link list}. */
   listSharedByWorld(worldId: string): EntitySummary[] {
     return this.db
       .select()
@@ -805,9 +744,8 @@ export class EntitiesService implements OnApplicationBootstrap {
   }
 
   /**
-   * The Entity's grants (ADR-0037, #161), ordered stably by user id. Owner rows share the
-   * table post-fold (migration 0007) but aren't grants — the grant surface is editor/viewer
-   * only, so they're filtered out here (owners are the {@link entityOwnersOf} surface).
+   * The Entity's grants, ordered by user id. Owner rows share the table but aren't
+   * grants — the grant surface is editor/viewer only ({@link entityOwnersOf} covers owners).
    */
   private entityGrantsOf(id: string): EntityGrant[] {
     return this.db
@@ -819,7 +757,7 @@ export class EntitiesService implements OnApplicationBootstrap {
       .map((r) => ({ userId: r.userId, role: r.role as GrantRole }));
   }
 
-  /** The Entity's Owner user ids (ADR-0037) — the `owner`-role rows, ordered stably. */
+  /** The Entity's Owner user ids — the `owner`-role rows, ordered stably. */
   private entityOwnersOf(id: string): string[] {
     return this.db
       .select({ userId: entityGrants.userId })
@@ -831,14 +769,10 @@ export class EntitiesService implements OnApplicationBootstrap {
   }
 
   /**
-   * Resolve target World for new Entity (ADR-0024). The two branches carry *different* rules, so
-   * the predicates differ (both homed in `acl/world-access.ts`, not re-derived here):
-   *
-   * - A **supplied** worldId may be any World the caller can author in — a World Owner or
-   *   Contributor (CONTEXT.md → Contributor), or a Superadmin (repair). The caller named it.
-   * - An **absent** worldId defaults to the caller's *own* oldest World (owner role only). It must
-   *   never silently land in a World the caller merely contributes to, nor — for a Superadmin —
-   *   the globally-oldest World; `worldOwnerFilter` has no match-all bypass for exactly this reason.
+   * Resolve the target World for a new Entity. A supplied worldId may be any World
+   * the caller can author in (Owner, Contributor, or Superadmin). An absent one
+   * defaults to the caller's own oldest *owned* World — never a World they merely
+   * contribute to, nor (for a Superadmin) the globally-oldest World.
    */
   private resolveWorldId(ownerId: string, requestedId?: string): string {
     const predicate = requestedId
@@ -855,26 +789,21 @@ export class EntitiesService implements OnApplicationBootstrap {
     return world.id;
   }
 
-  /**
-   * Whether `userId` is a Superadmin (ADR-0037, #163) — the repair bypass, for the
-   * ownership-only scans ({@link listByWorld}) that don't route through an access context.
-   */
+  /** The Superadmin repair bypass, for ownership-only scans that don't route through an access context. */
   private isSuperadmin(userId: string): boolean {
     return isSuperadmin(this.db, userId);
   }
 }
 
 /**
- * Composable list predicates (ADR-0025). Owner-scoping applied by caller. The
- * text query `q` is handled by {@link list} (an FTS5 MATCH, ADR-0035), not here.
- * type/worldId: exact match; ids: explicit set.
+ * Composable list predicates. Owner-scoping and the FTS text query are applied by
+ * the caller.
  */
 function filters(opts: FilterOptions) {
   const predicates = [];
   // Empty id set selects nothing (inArray([]) is always-false).
   if (opts.ids) predicates.push(inArray(entities.id, [...opts.ids]));
-  // Facets (#155): OR within a category (inArray / json_each IN), AND across them
-  // (separate predicates the caller ANDs). Empty arrays are skipped, not applied.
+  // Facets: OR within a category, AND across them; empty arrays are skipped.
   if (opts.type?.length) predicates.push(inArray(entities.type, [...opts.type]));
   if (opts.visibility?.length)
     predicates.push(inArray(entities.visibility, [...opts.visibility]));
@@ -884,9 +813,8 @@ function filters(opts: FilterOptions) {
 }
 
 /**
- * The shared owner + World + query + facet conjunction for a facet-count read
- * (#155). Same predicates {@link EntitiesService.list} applies, minus paging, so a
- * count and the page it annotates always agree on what's in the filtered set.
+ * The same predicates {@link EntitiesService.list} applies, minus paging, so a
+ * facet count and the page it annotates always agree on the filtered set.
  */
 function facetWhere(opts: FacetOptions, match: string | null, filter: SQL) {
   return and(
@@ -897,9 +825,8 @@ function facetWhere(opts: FacetOptions, match: string | null, filter: SQL) {
 }
 
 /**
- * A row matches the Tag facet if its JSON `tags` array contains any of `tags`
- * (OR within the category, #155). `json_each` unrolls the stored array so a plain
- * `value IN (...)` can test membership; EXISTS keeps it a per-row predicate.
+ * A row matches if its JSON `tags` array contains any of `tags`: `json_each`
+ * unrolls the stored array so `value IN (...)` can test membership.
  */
 function hasAnyTag(tags: readonly string[]) {
   const list = sql.join(
@@ -910,11 +837,10 @@ function hasAnyTag(tags: readonly string[]) {
 }
 
 /**
- * Turn a user's raw query into a safe FTS5 MATCH string (ADR-0035): split on
- * non-alphanumeric so the user can never inject FTS operators, quote each token
- * as a string literal, and append `*` for prefix matching ("cita" → "citadel").
- * Tokens combine with implicit AND. All-punctuation input yields `''`, which the
- * caller reads as "no query" (an empty MATCH string is an FTS5 error).
+ * Turn a raw query into a safe FTS5 MATCH string: split on non-alphanumeric (so
+ * FTS operators can't be injected), quote each token, append `*` for prefix match.
+ * All-punctuation input yields `''`, which the caller reads as "no query" (an
+ * empty MATCH string is an FTS5 error).
  */
 function toFtsMatch(q: string): string {
   const tokens = q.match(/[\p{L}\p{N}]+/gu) ?? [];
@@ -935,7 +861,6 @@ function toSummary(row: SummaryColumns): EntitySummary {
     id: row.id,
     worldId: row.worldId,
     name: row.name,
-    // Validate against schema, not bare cast (ADR-0001).
     type: entityTypeSchema.parse(row.type),
     tags: tagsSchema.parse(row.tags),
     visibility: visibilitySchema.parse(row.visibility),
@@ -955,8 +880,8 @@ function detailOf(row: SummaryRow, document: EntityBody): EntityDetail {
 }
 
 /**
- * Parse and validate stored body (ADR-0001). Failure is corruption/migration
- * error, so throw descriptive Error naming the row (clear 500).
+ * Parse and validate the stored body. Failure is corruption — throw a descriptive
+ * Error naming the row (clear 500).
  */
 function parseDocument(id: string, document: string): EntityBody {
   let parsed: unknown;

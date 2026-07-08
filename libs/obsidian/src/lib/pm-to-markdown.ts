@@ -12,7 +12,7 @@ const stringifier = unified()
   .use(remarkFrontmatter, ['yaml']);
 
 /**
- * Export: ProseMirror `tiptap-v3` JSON → Obsidian markdown (#145). The inverse of
+ * Export: ProseMirror `tiptap-v3` JSON → Obsidian markdown. The inverse of
  * {@link markdownToProseMirror}: faithful constructs round-trip; already-degraded
  * ones re-emit in their degraded form (e.g. an `entityLink` back to `[[wikilink]]`).
  * Optional `metadata` is re-emitted as YAML frontmatter.
@@ -124,7 +124,7 @@ function listItems(node: PMNode): ListItem[] {
 }
 
 /**
- * mdast list looseness (#150). PM has no tight/loose flag, so we derive one: an item is "spread"
+ * mdast list looseness. PM has no tight/loose flag, so we derive one: an item is "spread"
  * (rendered with blank lines around its later blocks) only when two of its paragraphs are adjacent
  * and would otherwise merge into one on reparse — a paragraph followed by a nested list stays tight.
  * A list is loose iff any item is, matching CommonMark. Without this, remark defaults every list to

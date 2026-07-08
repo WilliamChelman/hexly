@@ -9,20 +9,17 @@ import {
 } from '@hexly/domain';
 
 /**
- * The client half of the live-follow nudge bus (ADR-0044, #173). Opens one multiplexed SSE
- * stream (`GET /api/events`) for the whole tab, captures the `connectionId` its first frame
+ * The client half of the live-follow nudge bus. Opens one multiplexed SSE stream
+ * (`GET /api/events`) for the whole tab, captures the `connectionId` its first frame
  * mints, and declares the *whole* interest set via `PUT /api/events/:connectionId/interest`.
  *
  * Interest is subscription-scoped: {@link follow} returns the nudge stream for one ref, and
- * *subscribing* is what declares interest — unsubscribing withdraws it. A ref is reference-counted,
- * so N followers of the same resource share one server-side subscription and only the last to
- * leave withdraws it; a caller never manages unfollow by hand (its teardown does).
- *
- * The stream opens lazily on the first follower — a tab watching nothing holds no connection.
- *
- * An entry is either a `{ id, version }` delta or an opaque `{ id, unavailable }` eviction
- * (#174) — the bus relays both; what eviction means is the follower's business. Reconnect
- * re-sync, heartbeat, and World refs are additive later slices (#171).
+ * *subscribing* is what declares interest — unsubscribing withdraws it. A ref is
+ * reference-counted, so N followers share one server-side subscription and only the last to
+ * leave withdraws it. The stream opens lazily on the first follower — a tab watching nothing
+ * holds no connection. An entry is either a `{ id, version }` delta or an opaque
+ * `{ id, unavailable }` eviction — the bus relays both; what eviction means is the
+ * follower's business.
  */
 @Injectable({ providedIn: 'root' })
 export class NudgeBusClient {
@@ -31,9 +28,9 @@ export class NudgeBusClient {
   private source: EventSource | null = null;
   private connectionId: string | null = null;
   /**
-   * The anonymous Public Link token this tab connects as, or null for a cookie principal (#175).
-   * When set it rides the `EventSource` URL and the interest `PUT` as `?token=`, so a viewer with
-   * no account still opens the stream and declares interest — the token *is* the grant.
+   * The anonymous Public Link token this tab connects as, or null for a cookie principal.
+   * When set it rides the `EventSource` URL and the interest `PUT` as `?token=` — the
+   * token *is* the grant.
    */
   private token: string | null = null;
   /** Live interest, reference-counted per ref key, so shared follows don't clobber each other. */
@@ -44,15 +41,9 @@ export class NudgeBusClient {
   private readonly nudges = new Subject<NudgeEntry>();
 
   /**
-   * The stream of nudges for one resource. Subscribing declares interest in it (and opens the
-   * connection if this is the first follower); unsubscribing withdraws it once the last follower
-   * leaves. So a follower is `bus.follow(ref).pipe(...)` under a `switchMap`/`takeUntilDestroyed`
-   * — teardown handles withdrawal.
-   */
-  /**
-   * Connect as an anonymous Public Link token principal instead of a session cookie (#175). A
-   * Public Link page calls this before following its Entity; passing `null` reverts to the cookie
-   * principal. Changing the token reopens the stream so the new principal takes effect.
+   * Connect as an anonymous Public Link token principal instead of a session cookie;
+   * `null` reverts to the cookie principal. Changing the token reopens the stream so
+   * the new principal takes effect.
    */
   useToken(token: string | null): void {
     if (token === this.token) return;
@@ -67,6 +58,11 @@ export class NudgeBusClient {
     }
   }
 
+  /**
+   * The stream of nudges for one resource. Subscribing declares interest (and opens the
+   * connection if this is the first follower); unsubscribing withdraws it once the last
+   * follower leaves — teardown handles withdrawal.
+   */
   follow(ref: InterestRef): Observable<NudgeEntry> {
     return new Observable<NudgeEntry>((subscriber) => {
       this.acquire(ref);
@@ -106,8 +102,8 @@ export class NudgeBusClient {
     // jsdom (unit tests) has no EventSource — stay inert rather than throw. The mock stands in
     // for the connection there; this guard keeps the real client harmless when injected.
     if (typeof EventSource === 'undefined') return;
-    // Relative URL → same origin, so the session cookie rides automatically (ADR-0008). An
-    // anonymous Public Link viewer has no cookie, so its token rides the URL instead (#175).
+    // Relative URL → same origin, so the session cookie rides automatically. An
+    // anonymous Public Link viewer has no cookie, so its token rides the URL instead.
     this.source = new EventSource('/api/events' + this.tokenQuery());
     this.source.addEventListener('ready', (e) => {
       this.connectionId = (JSON.parse((e as MessageEvent).data) as ConnectionReady).connectionId;

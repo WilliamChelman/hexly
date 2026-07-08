@@ -20,12 +20,9 @@ function newToken(): string {
 }
 
 /**
- * argon2's memory-hard defaults are the production security cost (~20ms/hash).
- * The test suite runs hundreds of hashes; under parallel workers that cost
- * oversubscribes the cores and pushes auth-heavy specs past the 5s timeout —
- * flaky, unrelated failures. Under NODE_ENV=test (set by vitest) drop to a
- * throwaway cost: still a real `$argon2` hash, just cheap. Never hit in
- * production (NODE_ENV=production).
+ * Under NODE_ENV=test (set by vitest), drop argon2 to a throwaway cost — still a
+ * real `$argon2` hash, just cheap — so parallel auth-heavy specs don't blow their
+ * timeouts. Production keeps the memory-hard defaults.
  */
 const HASH_OPTIONS: Parameters<typeof hash>[1] | undefined =
   process.env.NODE_ENV === 'test'
@@ -50,12 +47,10 @@ export class AuthService {
   constructor(@Inject(DB) private readonly db: Db) {}
 
   /**
-   * Provision a user out-of-band (ADR-0004 — no public signup): the seed CLI, the
+   * Provision a user out-of-band (no public signup): the seed CLI, the
    * `--superadmin` setup path, and the Instance Admin's create-user endpoint all
-   * route through here. The password is hashed with argon2; the plaintext is never
-   * stored. `roles` seeds the admin tiers (ADR-0037, #163) and the World Creation
-   * capability (ADR-0040) — all default off, so a plain gated member is the common
-   * case; callers that want a bootstrap-ready account opt in explicitly.
+   * route through here. The password is hashed with argon2; the plaintext is
+   * never stored. All `roles` default off.
    */
   async seedUser(
     email: string,
@@ -78,9 +73,6 @@ export class AuthService {
         passwordHash,
         isAdmin: roles.isAdmin ?? false,
         isSuperadmin: roles.isSuperadmin ?? false,
-        // World Creation is off-by-default (ADR-0040), matching the DB column
-        // default — a caller that omits the flag provisions a gated user. The
-        // seed CLI opts in explicitly for its bootstrap account.
         canCreateWorlds: roles.canCreateWorlds ?? false,
         createdAt: Date.now(),
       })
@@ -105,8 +97,8 @@ export class AuthService {
       .where(eq(users.email, normalizeEmail(email)))
       .get();
 
-    // Verify against the real hash or dummy to equalize timing and prevent enumeration.
-    // A throw is treated as auth failure, not a 500.
+    // Verify against the real hash or the dummy to equalize timing (no email
+    // enumeration). A throw is treated as auth failure, not a 500.
     let passwordOk = false;
     try {
       const targetHash = user ? user.passwordHash : await DUMMY_PASSWORD_HASH;
@@ -115,11 +107,11 @@ export class AuthService {
       return null;
     }
     if (!user || !passwordOk) return null;
-    // A disabled account cannot open a session (ADR-0037, #163) — the login lock.
-    // Checked after the password verify so timing doesn't reveal disabled accounts.
+    // A disabled account cannot open a session; checked after the password verify
+    // so timing doesn't reveal disabled accounts.
     if (user.disabledAt !== null) return null;
 
-    // Opportunistic sweep on login to prevent unbounded table growth (ADR-0002).
+    // Opportunistic sweep on login to prevent unbounded table growth.
     this.purgeExpiredSessions();
 
     const token = newToken();
@@ -152,16 +144,15 @@ export class AuthService {
       .where(eq(users.id, session.userId))
       .get();
     if (!user) return null;
-    // A disabled account's live sessions stop resolving immediately (ADR-0037,
-    // #163) — disable is the immediate lever, not just a future-login block.
+    // A disabled account's live sessions stop resolving immediately — disable is
+    // the immediate lever, not just a future-login block.
     if (user.disabledAt !== null) return null;
     return toAuthUser(user);
   }
 
   /**
    * Merge a Preferences patch into the user's stored bag and return the merged
-   * result (ADR-0038). PATCH semantics: absent fields keep their stored value
-   * (so the theme and locale writers never clobber each other), an explicit
+   * result. PATCH semantics: absent fields keep their stored value, an explicit
    * `null` clears a field back to "no choice".
    */
   async updatePreferences(
@@ -205,11 +196,9 @@ export class AuthService {
   }
 
   /**
-   * Change the user's password (ADR-0038): verify the current one against the
-   * stored hash, then re-hash and store the new one. Returns `false` — with
-   * nothing written — when the current password does not verify. Length rules
-   * live in the request schema at the edge; invalidating the user's other
-   * sessions is deferred (ADR-0038).
+   * Change the user's password: verify the current one, then re-hash and store
+   * the new one. Returns `false` — with nothing written — when the current
+   * password does not verify. The user's other sessions stay valid.
    */
   async changePassword(
     userId: string,
@@ -241,10 +230,8 @@ export class AuthService {
   }
 
   /**
-   * Set a user's password unconditionally — the Instance Admin reset path (ADR-0037,
-   * #163), which carries no current-password check because the Admin acts on the
-   * user's behalf. Same argon2 hashing as {@link changePassword}; length rules live
-   * in the request schema at the edge.
+   * Set a user's password unconditionally — the Instance Admin reset path, which
+   * carries no current-password check because the Admin acts on the user's behalf.
    */
   async setPassword(userId: string, newPassword: string): Promise<void> {
     const passwordHash = await hash(newPassword, HASH_OPTIONS);

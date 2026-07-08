@@ -14,11 +14,10 @@ import { ToasterService } from './toaster.service';
 import { healWorldSegment, idFromSegment } from '../utils/pretty-id';
 
 /**
- * The active World (ADR-0028): which World the shell and routed pages act within,
- * plus its loaded {@link WorldDetail}. Which World is active is a URL fact — the
+ * The active World: which World the shell and routed pages act within, plus its
+ * loaded {@link WorldDetail}. Which World is active is a URL fact — the
  * `:worldId` path segment is the source of truth — but the detail is fetched and
- * pinned here by {@link activeWorldGuard} on the `w/:worldId` route, so the switcher,
- * nav rail, and world pages can read one loaded value (name, owners, rights)
+ * pinned here by {@link activeWorldGuard} so consumers read one loaded value
  * instead of each re-fetching. Both are `null` on the World Index (`/`).
  */
 @Injectable({ providedIn: 'root' })
@@ -49,10 +48,9 @@ export class ActiveWorld {
   }
 
   /**
-   * Persist the active World's pin set wholesale (ADR-0043, #168/#169) and re-pin from the
-   * returned Detail so the pins re-resolve. Owner-only server-side; a failure toasts and
-   * leaves the World's pins as they were. The single home for both the Dashboard's curation
-   * controls and the Entity actions menu's Pin toggle, so both share the same error UX.
+   * Persist the active World's pin set wholesale and re-pin from the returned
+   * Detail. Owner-only server-side; a failure toasts and leaves the pins as they
+   * were. The single home for every pin-mutating surface, so all share one error UX.
    */
   commitPins(pinnedEntityIds: string[]): void {
     const worldId = this._worldId();
@@ -69,8 +67,8 @@ export class ActiveWorld {
 }
 
 /**
- * Pins {@link ActiveWorld} from the `:worldId` segment (ADR-0028) and self-heals its
- * decorative slug (ADR-0042). It decodes the id, fetches the World detail (reusing an
+ * Pins {@link ActiveWorld} from the `:worldId` segment and self-heals its
+ * decorative slug. It decodes the id, fetches the World detail (reusing an
  * already-pinned one so the heal redirect never re-fetches), and pins it. With the
  * name in hand it rewrites a bare, stale, or legacy World segment to the canonical
  * `slug-base62` form via a `replaceUrl` redirect that preserves the child path and
@@ -110,17 +108,12 @@ function targetWorldId(state: RouterStateSnapshot): string | null {
 }
 
 /**
- * Clears {@link ActiveWorld} when leaving the World scope (ADR-0028). On the
- * `w/:worldId` parent's `canDeactivate`, so stepping out to the Index (or login)
- * drops the scope.
- *
- * Only clears when the destination truly leaves this World — the Index, login, or a
- * *different* World. A within-World URL change keeps the same World active, so it must
- * not clear: notably the slug self-heal (bare/legacy id → slug-base62, ADR-0042) bounces
- * through a `replaceUrl` redirect that re-segments — and so deactivates — this parent.
- * Clearing on that redirect would blank the World-scoped rail for the frame between the
- * clear and the guard's re-pin (the flicker). The decoded id is the identity, not the
- * segment string, so a uuid↔slug hop reads as "same World" and the scope stays pinned.
+ * Clears {@link ActiveWorld} when leaving the World scope, on the `w/:worldId`
+ * parent's `canDeactivate`. Only clears when the destination truly leaves this
+ * World: the slug self-heal bounces through a `replaceUrl` redirect that
+ * deactivates this parent, and clearing on it would blank the World-scoped rail
+ * for a frame. The decoded id is the identity, not the segment string, so a
+ * uuid↔slug hop reads as "same World" and the scope stays pinned.
  */
 export const clearActiveWorld: CanDeactivateFn<unknown> = (_c, _r, _s, nextState) => {
   const active = inject(ActiveWorld);

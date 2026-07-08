@@ -1,11 +1,8 @@
 /**
- * Harvest the Link Descriptors (#96, ADR-0023) an Entity's Content sets on its
- * `entityLink` nodes — the relationship labels ("spouse", "capital of") that feed
- * the owner's `::` vocabulary. Like {@link extractText} this reads inside Content
- * behind the format tag (ADR-0019/0035), but it is deliberately node-*specific*:
- * it knows the `entityLink` node and its `descriptor` attr, where the text extractor
- * stays node-agnostic. Server-derived on save so the vocabulary index tracks the
- * saved links, not a separately-computed client payload.
+ * Harvest the Link Descriptors an Entity's Content sets on its `entityLink`
+ * nodes — the relationship labels ("spouse", "capital of") that feed the
+ * owner's `::` vocabulary. Server-derived on save so the vocabulary index
+ * tracks the saved links, not a separately-computed client payload.
  */
 
 import { Content } from './entity';

@@ -5,7 +5,7 @@ import remarkFrontmatter from 'remark-frontmatter';
 import { parse as parseYaml } from 'yaml';
 import type { Root, RootContent } from 'mdast';
 
-/** A ProseMirror JSON node — the opaque `tiptap-v3` snapshot shape (ADR-0019/0033). */
+/** A ProseMirror JSON node — the opaque `tiptap-v3` snapshot shape. */
 export interface PMNode {
   type: string;
   attrs?: Record<string, unknown>;
@@ -26,7 +26,7 @@ const parser = unified()
   .use(remarkFrontmatter, ['yaml']);
 
 /**
- * Import: Obsidian markdown → ProseMirror `tiptap-v3` JSON (#145). Pure — no HTTP,
+ * Import: Obsidian markdown → ProseMirror `tiptap-v3` JSON. Pure — no HTTP,
  * DB, or entity resolution. Lossy by design: constructs with no native node degrade
  * to the nearest readable form and are tallied in `degraded`, never silently dropped.
  */
@@ -237,8 +237,7 @@ function tableToPM(
  * Maps an mdast list to PM list nodes. GFM lets one list mix plain `-` items and
  * `- [ ]` task items, but PM's bulletList/taskList can't mix, so each consecutive
  * run of the same kind becomes its own sibling list — a plain item next to a task
- * stays a bullet rather than a stray checkbox (#149). A uniform list is one run,
- * so ordinary bullet/ordered/checklist output is unchanged.
+ * stays a bullet rather than a stray checkbox.
  */
 function listToPM(
   node: Extract<RootContent, { type: 'list' }>,
@@ -379,7 +378,7 @@ function splitInlineText(
 }
 
 /**
- * Extensions Obsidian embeds as media rather than as a note transclusion (ADR-0034). An
+ * Extensions Obsidian embeds as media rather than as a note transclusion. An
  * `![[X]]` whose target ends in one of these is an Asset the importer stores; anything else
  * (a bare note name) stays a degraded link. This is the source of truth the API's asset MIME
  * map must cover — a parity test in the API asserts the two lists agree, so drift fails CI.
@@ -399,7 +398,7 @@ function tokenToPM(m: RegExpExecArray, marks: Mark[], degraded: Record<string, n
   if (wikilink !== undefined) {
     if (bang === '!') {
       // `![[media.ext]]` is an embedded Asset — surface it as a block image node (src = the
-      // vault path) so the importer can store it (ADR-0034); the `|size`/alias part is dropped.
+      // vault path) so the importer can store it; the `|size`/alias part is dropped.
       const target = wikilink.split('|', 1)[0].trim();
       if (isAssetEmbed(target)) {
         return [{ type: 'image', attrs: { src: target, alt: null, title: null } }];

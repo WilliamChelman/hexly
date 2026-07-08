@@ -9,29 +9,23 @@ import {
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntityFacets } from '@hexly/domain';
 
-/** The Facet selections the rail reflects and toggles (#155) — one string set per category. */
 export interface ActiveFacets {
   readonly type: readonly string[];
   readonly tag: readonly string[];
   readonly visibility: readonly string[];
 }
 
-/** The category enum shared with the parent, so a toggle can't name a bad category. */
 export type FacetCategory = keyof ActiveFacets;
 
-/** A single value toggled within its category (the parent adds/removes it). */
 export interface FacetToggle {
   readonly category: FacetCategory;
   readonly value: string;
 }
 
 /**
- * The Facet rail beside the Entity Browser grid (#155): Type, Tag, and Visibility,
- * each listing its live values with a count, drilled down server-side (ADR-0035).
- * Controlled — the parent owns the active selections and the count data; the rail
- * only renders them and emits {@link toggled}/{@link clearAll}. Clicking an active
- * value toggles it off (that's how an individual filter is removed); Clear all
- * resets the query and every Facet at once. Categories with no values are omitted.
+ * The Facet rail beside the Entity Browser grid. Controlled — the parent owns
+ * the active selections and count data; the rail renders them and emits
+ * {@link toggled}/{@link clearAll}. Clicking an active value toggles it off.
  */
 @Component({
   selector: 'app-facet-rail',
@@ -92,22 +86,15 @@ export interface FacetToggle {
 export class FacetRail {
   private readonly transloco = inject(TranslocoService);
 
-  /** The live counts to display, drilled down under the active filters (server-computed). */
   readonly facetCounts = input<EntityFacets>({ type: [], tag: [], visibility: [] });
-  /** Which values are currently selected, so the rail can mark them active. */
   readonly active = input<ActiveFacets>({ type: [], tag: [], visibility: [] });
-  /** Whether anything (query or a Facet) is active — gates the Clear all control. */
   readonly canClear = input(false);
 
   readonly toggled = output<FacetToggle>();
   readonly clearAll = output<void>();
 
-  /**
-   * The three categories as render rows, each value marked active and given a
-   * display label. Type/Visibility labels are translated (re-resolved on a language
-   * switch via `activeLang`, like the card's date); a Tag shows its raw text. An
-   * empty category is dropped so the rail never shows a bare heading.
-   */
+  /** Categories as render rows. Type/Visibility labels are translated; a Tag
+   * shows its raw text. Empty categories are dropped — no bare headings. */
   protected readonly groups = computed(() => {
     this.transloco.activeLang(); // reactive dependency: re-translate labels on switch
     const active = this.active();

@@ -27,15 +27,14 @@ import { CreateCommands } from './providers/create-commands';
 import { NavCommands } from './providers/nav-commands';
 
 /**
- * The built-in Command Providers, supplied at bootstrap (ADR-0032) and registered
- * for the app's lifetime by the Palette when it mounts. A DI seam: a test provides
- * its own set instead of reaching into the root {@link CommandRegistry}.
+ * Built-in Command Providers, registered by the Palette on mount. A DI seam:
+ * a test provides its own set instead of reaching into the root registry.
  */
 export const COMMAND_PROVIDERS = new InjectionToken<readonly CommandProvider[]>(
   'COMMAND_PROVIDERS',
 );
 
-/** Register the v1 built-in Providers as the {@link COMMAND_PROVIDERS} set, in listing order. */
+/** Listing order is the palette's section order. */
 export function provideBuiltInCommands(): Provider[] {
   return [
     { provide: COMMAND_PROVIDERS, useExisting: EntityQuickOpen, multi: true },
@@ -46,11 +45,9 @@ export function provideBuiltInCommands(): Provider[] {
 }
 
 /**
- * The Command Palette (CONTEXT.md, ADR-0032): a Cmd/Ctrl+K overlay, reachable
- * from anywhere regardless of route, for finding Entities and Worlds and
- * invoking Commands. Mounted once in {@link App}; it owns no route gating and
- * merges results from every {@link CommandRegistry} Provider bound to the
- * typed prefix into stable, provider-ordered sections.
+ * The Command Palette: a Cmd/Ctrl+K overlay, mounted once in {@link App},
+ * merging results from every Provider bound to the typed prefix into stable,
+ * provider-ordered sections.
  */
 @Component({
   selector: 'app-command-palette',
@@ -80,9 +77,8 @@ export function provideBuiltInCommands(): Provider[] {
         data-testid="command-palette-results"
         [attr.aria-label]="'commandPalette.searchLabel' | transloco"
       >
-        <!-- One flat list: each row is tagged inline with its Provider's label on
-             the right, rather than grouped under section headings. Rows that carry
-             a route render as routerLink anchors so they open in a new tab. -->
+        <!-- One flat list, each row tagged with its Provider's label; rows with a
+             route render as routerLink anchors so they can open in a new tab. -->
         @for (row of rows(); track row.command.id) {
           @if (row.command.route; as route) {
             <a
@@ -149,9 +145,8 @@ export class CommandPalette {
   private readonly router = inject(Router);
   private readonly builtIns =
     inject(COMMAND_PROVIDERS, { optional: true }) ?? [];
-  // read: ElementRef — the #search element also hosts appInput, so a bare
-  // query would resolve to the Input component instance instead of the
-  // native element (see Dialog's #dialog for the same idiom).
+  // read: ElementRef — #search also hosts appInput, so a bare query would
+  // resolve to the Input component instead of the native element.
   private readonly searchInput = viewChild('search', { read: ElementRef });
 
   protected readonly open = signal(false);
@@ -159,9 +154,8 @@ export class CommandPalette {
   private readonly activeIndex = signal(0);
 
   // Gate the search on open() as well as the query: Providers return snapshot
-  // results (e.g. WorldQuickOpen reads the already-loaded World list), so opening
-  // the palette must re-run the search against current state rather than replay a
-  // stale result computed at bootstrap before the Worlds had loaded.
+  // results, so opening must re-run the search against current state rather
+  // than replay a stale bootstrap-time result.
   private readonly parsed = computed(() => ({
     open: this.open(),
     ...parseCommandQuery(this.text()),
@@ -178,7 +172,6 @@ export class CommandPalette {
     { initialValue: [] as readonly CommandSection[] },
   );
 
-  /** The flat list actually rendered: each Command paired with its Provider's label. */
   protected readonly rows = computed(() =>
     this.sections().flatMap((section: CommandSection) =>
       section.commands.map((command) => ({
@@ -188,18 +181,16 @@ export class CommandPalette {
     ),
   );
 
-  // Clamp the highlight to the current rows: an in-flight query can resolve to
-  // fewer rows than the stale-while-revalidate seed the user already arrowed
-  // into, so a raw activeIndex would point past the list and leave Enter and
-  // aria-activedescendant dead until the next keystroke.
+  // Clamp the highlight to the current rows: a query can resolve to fewer rows
+  // than the user already arrowed into, and a raw activeIndex past the list
+  // would leave Enter and aria-activedescendant dead.
   protected readonly activeCommand = computed(() => {
     const rows = this.rows();
     if (!rows.length) return null;
     return rows[Math.min(this.activeIndex(), rows.length - 1)].command;
   });
 
-  // Stable per-option DOM ids so the input's aria-activedescendant can point at
-  // the highlighted row — the same listbox idiom as SuggestionMenu's pickers.
+  // Stable per-option DOM ids for the input's aria-activedescendant.
   protected optionId(id: string): string {
     return 'command-opt-' + id;
   }
@@ -210,20 +201,17 @@ export class CommandPalette {
   });
 
   constructor() {
-    // Built-in Providers register once, for the app's lifetime — the Palette is
-    // mounted a single time (ADR-0032), so there's nothing to unregister.
+    // The Palette mounts once for the app's lifetime, so there's nothing to unregister.
     for (const provider of this.builtIns) this.registry.register(provider);
 
-    // A new query invalidates the previous active pick — always land back on
-    // the top result rather than an index that now points at something else.
+    // A new query invalidates the previous pick — land back on the top result.
     effect(() => {
       this.text();
       untracked(() => this.activeIndex.set(0));
     });
 
-    // Reset to a blank slate whenever the palette closes — by toggle, Escape
-    // (Dialog's native behaviour), or after picking a command — so opening it
-    // again never shows a stale query or selection.
+    // Reset on close (toggle, Escape, or pick) so reopening never shows a
+    // stale query or selection.
     effect(() => {
       if (this.open()) {
         untracked(() => {
@@ -261,8 +249,7 @@ export class CommandPalette {
     if (event.key === 'Enter') {
       const command = this.activeCommand();
       if (!command) return;
-      // Ctrl/Cmd+Enter opens a routable Command in a new tab, mirroring the
-      // native modifier-click affordance the anchor rows already give the mouse.
+      // Ctrl/Cmd+Enter opens a routable Command in a new tab, mirroring modifier-click.
       if ((event.metaKey || event.ctrlKey) && command.route) {
         this.openInNewTab(command.route);
         this.close();
@@ -273,13 +260,9 @@ export class CommandPalette {
     }
     const items = this.rows();
     if (!items.length) return;
-    // Delegate arrow navigation (with wrap) to CDK's ListKeyManager instead of
-    // hand-rolling index math. We render the highlight ourselves from activeIndex
-    // (aria-activedescendant), so a transient manager seeded with the current
-    // index is enough: it computes the next index for this one keystroke. No
-    // withHomeAndEnd — the manager would preventDefault Home/End and steal them
-    // from caret navigation in the search input; those keys fall through instead.
-    // getLabel gives it a ListKeyManagerOption (and leaves typeahead available).
+    // A transient ListKeyManager seeded with the current index computes the next
+    // index (with wrap) for this one keystroke. No withHomeAndEnd — it would
+    // preventDefault Home/End and steal caret navigation in the search input.
     const options = items.map((row) => ({ getLabel: () => row.command.label }));
     const manager = new ListKeyManager(options).withWrap();
     manager.setActiveItem(Math.min(this.activeIndex(), items.length - 1));
@@ -294,11 +277,8 @@ export class CommandPalette {
     this.close();
   }
 
-  /**
-   * A plain left-click on a link row: RouterLink navigates, so just close the
-   * palette. Modified / middle clicks fall through untouched — the browser opens
-   * the anchor in a new tab and the palette stays open.
-   */
+  /** Plain left-click: RouterLink navigates, so just close. Modified/middle
+   * clicks fall through — the browser opens a new tab and the palette stays open. */
   protected onLinkClick(event: MouseEvent): void {
     if (
       event.ctrlKey ||

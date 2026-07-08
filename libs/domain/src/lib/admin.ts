@@ -1,7 +1,6 @@
 /**
- * Instance Admin contracts shared by the API and the web panel (ADR-0037, #163).
- * The Admin surface manages accounts — create/disable/delete users, password
- * resets, the Admin flag itself — so, unlike the public `UserSummary` directory,
+ * Instance Admin contracts shared by the API and the web panel. The Admin
+ * surface manages accounts, so — unlike the public `UserSummary` directory —
  * it *does* carry the email: it is the login identity an Admin administers.
  */
 
@@ -19,18 +18,17 @@ export interface AdminUser {
   readonly displayName: string;
   readonly isAdmin: boolean;
   readonly isSuperadmin: boolean;
-  /** World Creation capability (ADR-0040): whether this user may create Worlds. */
+  /** Whether this user may create Worlds. */
   readonly canCreateWorlds: boolean;
   /** Epoch ms the account was disabled, or null when active. */
   readonly disabledAt: number | null;
 }
 
 /**
- * The stable, structured reasons the Admin surface refuses a mutation (ADR-0037, #163).
- * Returned as `{ code }` in the 4xx body — never prose — so the web maps a code to localized
- * copy rather than string-matching English. The HTTP status still carries the category
- * (409 invariant conflict, 403 tier, 404 unknown). `data` is reserved for codes that later
- * need to name specifics (which resource, which action) without a new code.
+ * The stable, structured reasons the Admin surface refuses a mutation. Returned
+ * as `{ code }` in the 4xx body — never prose — so the web maps a code to
+ * localized copy rather than string-matching English. The HTTP status still
+ * carries the category (409 invariant conflict, 403 tier, 404 unknown).
  */
 export const AdminErrorCode = {
   /** The email is already taken by another account. */
@@ -54,7 +52,7 @@ export const AdminErrorCode = {
 /** One of the {@link AdminErrorCode} values — the wire code in an Admin error body. */
 export type AdminErrorCode = (typeof AdminErrorCode)[keyof typeof AdminErrorCode];
 
-/** The structured body of an Admin 4xx (ADR-0037, #163): a stable code, plus optional data. */
+/** The structured body of an Admin 4xx: a stable code, plus optional data. */
 export interface AdminError {
   readonly code: AdminErrorCode;
   readonly data?: Record<string, unknown>;
@@ -88,7 +86,7 @@ export const setAdminRequestSchema = z.object({ isAdmin: z.boolean() }).strict()
 /** A validated Admin-flag toggle. */
 export type SetAdminRequest = z.infer<typeof setAdminRequestSchema>;
 
-/** The body of `PATCH /admin/users/:id/can-create-worlds` — grant (or revoke) World Creation (ADR-0040). */
+/** The body of `PATCH /admin/users/:id/can-create-worlds` — grant (or revoke) World Creation. */
 export const setCanCreateWorldsRequestSchema = z
   .object({ canCreateWorlds: z.boolean() })
   .strict();

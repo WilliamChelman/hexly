@@ -1,5 +1,5 @@
 /**
- * Hex coordinates for the infinite sparse plane (see CONTEXT.md, ADR-0003).
+ * Hex coordinates for the infinite sparse plane (see CONTEXT.md).
  *
  * Axial `(q, r)` is the storage and addressing coordinate — signed ints, so the
  * plane extends in every direction for free. Cube `(x, y, z)` is the transient
@@ -60,8 +60,7 @@ export function hexRound(fractional: Axial): Axial {
 
 /**
  * The six axial directions, ordered counter-clockwise starting due "east"
- * (`+q`). Shared by `neighbors` and, later, edge/vertex identity so callers can
- * address a hex's sides by a stable direction index 0–5.
+ * (`+q`) — a stable direction index 0–5 for neighbors and edge identity.
  */
 const DIRECTIONS: readonly Axial[] = [
   { q: 1, r: 0 },

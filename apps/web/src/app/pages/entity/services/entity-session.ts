@@ -44,29 +44,28 @@ import { EntityView, HexMapStore } from './hexmap-store';
 
 /**
  * Bridges {@link EntitiesClient} and {@link HexMapStore} for `/entities/:id`:
- * unwraps the stored grid on open, re-wraps it (ADR-0019) on save.
+ * unwraps the stored grid on open, re-wraps it on save.
  *
  * Route-scoped (`providers`), not root: leaving the route destroys it, so
  * open-Entity state resets implicitly.
  */
-/** Trailing-debounce window before an edit is autosaved (ADR-0026). */
+/** Trailing-debounce window before an edit is autosaved. */
 const AUTOSAVE_DELAY_MS = 800;
 
 /**
- * Trailing-debounce window before an incoming nudge is reconciled (ADR-0044): a burst of rapid
- * saves by another user coalesces into a single refetch, so following feels near-live but not
- * janky. Per-resource in the bus; here one Entity is open, so it's one timer.
+ * Trailing-debounce window before an incoming nudge is reconciled: a burst of
+ * rapid saves by another user coalesces into a single refetch.
  */
 export const NUDGE_DEBOUNCE_MS = 150;
 
 /**
- * Ceiling on how long a leave-flush blocks navigation (ADR-0026). Normal saves finish in
- * well under a second; this only bites a hung network, where we stop waiting and let the
- * route change proceed (the edit is best-effort lost, same as the `beforeunload` path).
+ * Ceiling on how long a leave-flush blocks navigation — only bites a hung
+ * network, where we stop waiting and let the route change proceed (the edit is
+ * best-effort lost, same as the `beforeunload` path).
  */
 const FLUSH_TIMEOUT_MS = 10_000;
 
-/** The savable payload references captured at one instant (ADR-0026). */
+/** The savable payload references captured at one instant. */
 interface SaveSnapshot {
   grid: HexMap;
   content: Content;
@@ -100,43 +99,40 @@ export class EntitySession {
   readonly error = this._error.asReadonly();
 
   /**
-   * The followed Entity became unreachable mid-view (ADR-0044, #174): made `private`,
-   * un-shared, or deleted — the nudge said only `unavailable`. Cleared when the next load
-   * starts. Eviction also prunes the ref from the interest set (per the ADR), so a later
-   * re-share is *not* discovered live — the user finds it by navigating to the Entity again.
-   * Distinct from {@link error}: nothing failed, the view was *evicted*, so the page renders
-   * an unavailable state instead of stale content.
+   * The followed Entity became unreachable mid-view (made private, un-shared, or
+   * deleted — the nudge said only `unavailable`). Cleared when the next load
+   * starts. Eviction also prunes the ref from the interest set, so a later
+   * re-share is *not* discovered live. Distinct from {@link error}: nothing
+   * failed, the view was evicted, so the page renders an unavailable state.
    */
   private readonly _evicted = signal(false);
   readonly evicted = this._evicted.asReadonly();
 
   /**
-   * Whether the caller may write the open Entity (ADR-0039): the load-time Rights carry the
-   * `edit` verb (substance — content, name, tags). False → a read-only opener: {@link save}
-   * no-ops so no autosave ever hits a 403 wall.
+   * Whether the load-time Rights carry the `edit` verb. False → a read-only
+   * opener: {@link save} no-ops so no autosave ever hits a 403 wall.
    */
   readonly writable = computed(() => !!this._current()?.rights?.includes('edit'));
 
   /**
-   * Whether the caller may MANAGE this Entity's sharing (ADR-0039): the owner-only surface
-   * behind the Share dialog (owners, grants, Public Link) — the `manage` verb. Absent → Share
-   * stays hidden for a writer who isn't an Owner (an entity-level Editor or a World Owner),
-   * whose Rights carry `edit` but not `manage`.
+   * Whether the caller may manage this Entity's sharing (the `manage` verb) —
+   * gates the owner-only Share surface; a writer who isn't an Owner carries
+   * `edit` but not `manage`.
    */
   readonly manageable = computed(() => !!this._current()?.rights?.includes('manage'));
 
-  /** Live Content envelope (ADR-0019); here not in {@link HexMapStore} since Content spans every Entity type. */
+  /** Live Content envelope; here not in {@link HexMapStore} since Content spans every Entity type. */
   private readonly _content = signal<Content | null>(null);
   /**
    * Live Content for an editor to seed from on (re)mount. Unlike {@link seed} it
-   * carries edits since load, so an editor recreated mid-session (Map↔Note toggle,
-   * #75) restores the latest prose, not the loaded snapshot.
+   * carries edits since load, so an editor recreated mid-session restores the
+   * latest prose, not the loaded snapshot.
    */
   readonly content = this._content.asReadonly();
 
   /**
-   * Live Tags (#72): span every Entity type and ride the version-checked save, so a
-   * body-only save never silently drops them. Survives a clean save.
+   * Live Tags: span every Entity type and ride the version-checked save, so a
+   * body-only save never silently drops them.
    */
   private readonly _tags = signal<readonly string[]>([]);
   readonly tags = this._tags.asReadonly();
@@ -145,12 +141,10 @@ export class EntitySession {
   readonly saving = this._saving.asReadonly();
 
   /**
-   * The last-persisted reference of each savable input (grid, Content, Tags), captured
-   * on load and reset to the *sent* snapshot after a clean save. {@link dirty} is the
-   * single channel: derived by reference equality against these, so a new editing
-   * widget can't forget to flag a change — if it mutates a savable signal, dirty sees
-   * it (ADR-0026). Reference equality is sound because immer's commit/undo/redo and
-   * TipTap-minted Content only yield a new reference on a real edit (ADR-0005).
+   * The last-persisted reference of each savable input, captured on load and
+   * reset to the *sent* snapshot after a clean save. {@link dirty} derives by
+   * reference equality against these — sound because immer and TipTap-minted
+   * Content only yield a new reference on a real edit.
    */
   private readonly _baseGrid = signal<HexMap | null>(null);
   private readonly _baseContent = signal<Content | null>(null);
@@ -166,9 +160,9 @@ export class EntitySession {
   );
 
   /**
-   * The open Entity's id, or `null` with none open / a public reader (whose stream is
-   * externally driven, #162). Drives live-follow: the reconciler switches its server subscription
-   * to this id, so a swap unfollows the old and follows the new without any manual bookkeeping.
+   * The open Entity's id, or `null` with none open / a public reader. Drives
+   * live-follow: the reconciler switches its server subscription to this id, so a
+   * swap unfollows the old and follows the new without manual bookkeeping.
    */
   private readonly _followedId = computed(() =>
     this.externallyDriven ? null : this._current()?.id ?? null,
@@ -182,10 +176,10 @@ export class EntitySession {
   private readonly _loading = signal(false);
 
   /**
-   * Payload of the last failed save (ADR-0026). While it stands unchanged, the autosave
-   * scheduler is paused — a fresh edit (new reference) or manual Retry clears it, so a
-   * failing PUT can't self-retry every 800ms. Plain fields, not signals: the live editor
-   * references (already scheduler deps) decide when the pause lifts.
+   * Payload of the last failed save. While it stands unchanged, the autosave
+   * scheduler is paused — a fresh edit (new reference) or manual Retry clears it,
+   * so a failing PUT can't self-retry every 800ms. Plain fields, not signals: the
+   * live editor references (already scheduler deps) decide when the pause lifts.
    */
   private failed: SaveSnapshot | null = null;
 
@@ -194,14 +188,13 @@ export class EntitySession {
     effect(() => this.title.setDocumentName(this._current()?.name ?? null));
     this.destroyRef.onDestroy(() => this.title.setDocumentName(null));
 
-    // Route-leave flush is awaited by the CanDeactivate guard (ADR-0026), not fired here —
+    // Route-leave flush is awaited by the CanDeactivate guard, not fired here —
     // onDestroy runs too late to block navigation, so the guard calls flush() up front.
 
-    // Tab close / refresh / external nav tears the page down before any async save can
-    // land (ADR-0026): warn the browser so the user can stay and let autosave finish.
+    // Tab close / refresh / external nav tears the page down before any async save
+    // can land: warn the browser so the user can stay and let autosave finish.
     const beforeUnload = (event: BeforeUnloadEvent) => {
-      // preventDefault() is the modern trigger for the unsaved-changes prompt; the old
-      // event.returnValue is deprecated and every current browser honours this alone.
+      // preventDefault() triggers the unsaved-changes prompt in every current browser.
       if (this.dirty()) event.preventDefault();
     };
     // Cmd/Ctrl+S flushes now instead of waiting out the debounce, and suppresses the
@@ -220,14 +213,12 @@ export class EntitySession {
       window.removeEventListener('keydown', keydown);
     });
 
-    // Autosave scheduler (ADR-0026). Reading the live edit signals — not just dirty() —
-    // re-arms the trailing debounce on every keystroke (dirty() stays true, so it alone
-    // wouldn't re-fire the effect). dirty() then decides whether to actually save.
-    // Single-flight: saving() gates a save out while one is in flight; when it clears,
-    // a still-dirty Entity re-arms here, coalescing mid-flight edits into one follow-up.
-    // Paused on conflict (a stale base version would just loop), during route load, and
-    // after a failed save until the payload changes (unsavedFailure) — else _saving
-    // flipping false would retry the same failing PUT every 800ms.
+    // Autosave scheduler. Reading the live edit signals — not just dirty() —
+    // re-arms the trailing debounce on every keystroke (dirty() stays true, so it
+    // alone wouldn't re-fire the effect). Single-flight: saving() gates while one
+    // is in flight; when it clears, a still-dirty Entity re-arms here. Paused on
+    // conflict, during route load, and after a failed save until the payload
+    // changes — else _saving flipping false would retry the same failing PUT.
     effect((onCleanup) => {
       this.editor.document();
       this._content();
@@ -243,10 +234,10 @@ export class EntitySession {
       onCleanup(() => clearTimeout(timer));
     });
 
-    // Live-follow reconciler (ADR-0044). Follow the open Entity and, on a nudge newer than the
-    // held version, silently refetch-and-replace. `switchMap` off the followed id makes the whole
-    // thing subscription-scoped: swapping Entity tears down the old follow (withdrawing interest)
-    // and follows the new; `takeUntilDestroyed` withdraws on route leave — no manual unfollow.
+    // Live-follow reconciler: follow the open Entity and, on a nudge newer than
+    // the held version, silently refetch-and-replace. `switchMap` off the followed
+    // id makes it subscription-scoped: swapping Entity tears down the old follow;
+    // `takeUntilDestroyed` withdraws on route leave — no manual unfollow.
     toObservable(this._followedId)
       .pipe(
         // A computed already dedupes on ===, so toObservable only emits on a real id change.
@@ -254,31 +245,29 @@ export class EntitySession {
           id === null
             ? EMPTY
             : this.bus.follow({ kind: 'entity', id }).pipe(
-                // Live eviction (#174): our own access ended (private flip, revoked grant,
-                // delete) — blank the view rather than leave it stale. Nulling `current` also
-                // nulls `_followedId`, so this switchMap tears the follow down and its teardown
-                // prunes the ref from the interest set — no manual bookkeeping. The dirty guard
-                // holds here too (ADR-0044): blanking over unsaved edits would destroy them, so
-                // a dirty editor keeps its buffer and meets the access loss at save time (403 →
-                // read-only) instead.
+                // Live eviction: our own access ended — blank the view rather than
+                // leave it stale. Nulling `current` also nulls `_followedId`, so
+                // this switchMap tears the follow down. Never blank over unsaved
+                // edits: a dirty editor keeps its buffer and meets the access loss
+                // at save time (403 → read-only) instead.
                 tap((n) => {
                   if ('unavailable' in n && !this.dirty()) this.evict();
                 }),
                 filter((n): n is EntityNudge => !('unavailable' in n)),
-                // Echo dedupe up front (a tab already holding this state ignores it), then
-                // debounce so a burst of the GM's saves coalesces into one refetch.
+                // Echo dedupe up front, then debounce so a burst of another
+                // user's saves coalesces into one refetch.
                 filter((n) => this.newerThanHeld(n)),
                 debounceTime(NUDGE_DEBOUNCE_MS),
-                // Re-check at fire time: the clobber guard (never refetch over unsaved edits — the
-                // editor still finds concurrent edits at save time via the 409 path), skip during a
-                // route load so a late nudge can't snap the view back, and re-check freshness
-                // since our own save may have advanced it during the debounce window.
+                // Re-check at fire time: never refetch over unsaved edits (the 409
+                // path finds concurrent edits at save time), skip during a route
+                // load, and re-check freshness since our own save may have
+                // advanced it during the debounce window.
                 filter(
                   (n) => !this.dirty() && !this._loading() && this.newerThanHeld(n),
                 ),
-                // A nudge is an idempotent invalidation (ADR-0044): swallow a transient refetch
-                // failure rather than let it kill the subscription — the next nudge or a reconnect
-                // heals the staleness. Without this, one 5xx ends live-follow for the session.
+                // A nudge is an idempotent invalidation: swallow a transient
+                // refetch failure rather than let one 5xx end live-follow for the
+                // session — the next nudge or a reconnect heals the staleness.
                 switchMap(() => this.open(id).pipe(catchError(() => EMPTY))),
               ),
         ),
@@ -288,17 +277,15 @@ export class EntitySession {
   }
 
   /**
-   * Caller passes its ActivatedRoute in — a route-scoped service would get the root
-   * injector's route. switchMap keeps a stale A response off B's canvas; 404 →
-   * the World's library (ADR-0028) via ActiveWorld; other load errors set the
-   * reload-error state so the user sees feedback without a silent redirect.
+   * Caller passes its ActivatedRoute in — a route-scoped service would get the
+   * root injector's route. switchMap keeps a stale A response off B's canvas;
+   * 404 → the World's library; other load errors set the reload-error state.
    */
   /**
-   * A Public Link page fetches its Entity through the token-scoped public read surface and
-   * {@link adopt}s it directly (ADR-0037, #162). Marking the session externally driven makes
-   * {@link watchRoute} a no-op, so the reused {@link EntityPage} can't *also* fire an
-   * authenticated `/api/entities/:id` load — an explicit read-only mode, not a reliance on the
-   * public route merely naming its param `entityId` instead of `id`.
+   * A Public Link page fetches its Entity through the token-scoped public read
+   * surface and {@link adopt}s it directly. Marking the session externally driven
+   * makes {@link watchRoute} a no-op, so the reused {@link EntityPage} can't
+   * *also* fire an authenticated `/api/entities/:id` load.
    */
   private externallyDriven = false;
   markExternallyDriven(): void {
@@ -306,8 +293,7 @@ export class EntitySession {
   }
 
   watchRoute(route: ActivatedRoute): void {
-    // A public reader already has its Entity (adopted from the public surface, #162) — never
-    // fire an authenticated load over it, regardless of how the route params are named.
+    // A public reader already has its Entity — never fire an authenticated load over it.
     if (this.externallyDriven) return;
     route.paramMap
       .pipe(
@@ -331,7 +317,7 @@ export class EntitySession {
       )
       .subscribe();
 
-    // Editor surface lives in the URL (#75): refresh/shared link restores the view,
+    // Editor surface lives in the URL: refresh/shared link restores the view,
     // opening another Entity (no `view` param) resets to the grid.
     route.queryParamMap
       .pipe(

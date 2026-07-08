@@ -20,10 +20,9 @@ import { PublicEntityNameResolver } from './public-entity-name-resolver';
 import { OutlineStore } from '../entity/services/outline-store';
 import { EntityPage } from '../entity/entity.page';
 
-/** Trailing-debounce before an anonymous follower refetches (ADR-0044): coalesce a save burst. */
+// Coalesces a save burst into one refetch.
 const NUDGE_DEBOUNCE_MS = 150;
 
-/** What the public reader currently follows: the token, its mode, and the resolved Entity id. */
 interface Followed {
   token: string;
   mode: 'entity' | 'worldEntity';
@@ -31,20 +30,12 @@ interface Followed {
 }
 
 /**
- * A Public Link Entity page (ADR-0037, #162): reuses the real {@link EntityPage} in its
- * read-only mode rather than a bespoke renderer, so a public reader gets full-fidelity
- * Content and hex maps for free. The entity comes from the token route (not the
- * authenticated load), so this fetches via {@link PublicClient} and hands it to
- * {@link EntitySession.adopt}; the server ships it with `rights: ['read']` (no `edit`), which
- * drives the whole editor read-only (no autosave, no edit chrome).
- *
- * It provides the same route-scoped stores as `/entities/:id` so the reused EntityPage and
- * its content editor resolve one shared session — but marks that session externally driven
- * (constructor) so EntityPage's `watchRoute` never fires an authenticated load; this component
- * is the sole data source. The {@link EntityNameResolver} is swapped for the
- * {@link PublicEntityNameResolver}, which resolves no in-content Entity Links at all — a Public
- * Link grants only its own scope, so cross-references render as their frozen label (dangling)
- * rather than doing a scope-widening lookup or hitting the session-guarded `/api/entities`.
+ * A Public Link Entity page: reuses {@link EntityPage}, driven read-only by the
+ * server shipping `rights: ['read']`. Fetches via {@link PublicClient} and adopts
+ * into the session, marked externally driven so EntityPage's `watchRoute` never
+ * fires an authenticated load. {@link PublicEntityNameResolver} resolves no
+ * in-content Entity Links — a Public Link grants only its own scope, so
+ * cross-references render as their frozen label.
  */
 @Component({
   selector: 'app-public-entity-page',
@@ -100,25 +91,24 @@ export class PublicEntityPage {
   private readonly shell = inject(AppShellStore);
   private readonly bus = inject(NudgeBusClient);
 
-  /** True once a token failed to resolve (revoked/bad) — shows the calm dead-link panel. */
+  /** True once a token failed to resolve (revoked/bad) — shows the dead-link panel. */
   readonly notFound = signal(false);
-  /** The World token to offer a back link to, for a world-scoped page; null for a bare link. */
+  /** World token for the back link on a world-scoped page; null for a bare link. */
   readonly backToken = signal<string | null>(null);
-  /** The resource this anonymous reader live-follows (ADR-0044, #175); null while none is open. */
+  /** The resource this anonymous reader live-follows; null while none is open. */
   private readonly followed = signal<Followed | null>(null);
 
   constructor() {
-    // Sole data source (#162): mark the shared session external before the reused EntityPage
-    // mounts, so its watchRoute never fires an authenticated load over the adopted Entity.
+    // Must happen before the reused EntityPage mounts, so its watchRoute never
+    // fires an authenticated load over the adopted Entity.
     this.session.markExternallyDriven();
 
     this.shell.standalone.set(true);
     inject(DestroyRef).onDestroy(() => {
       this.shell.standalone.set(false);
-      // Unpin the token from the root-singleton bus (#175): the same NudgeBusClient serves the
-      // authenticated app, so leaving it set would make a signed-in user who opened their own
-      // public link keep connecting as that token afterwards — every other Entity would then
-      // resolve to `unavailable` until a full reload.
+      // Unpin the token from the root-singleton bus: otherwise a signed-in user
+      // who opened their own public link would keep connecting as that token,
+      // and every other Entity would resolve to `unavailable` until a reload.
       this.bus.useToken(null);
     });
 
@@ -130,8 +120,7 @@ export class PublicEntityPage {
           const worldScoped = data['mode'] === 'worldEntity';
           const mode: Followed['mode'] = worldScoped ? 'worldEntity' : 'entity';
           this.backToken.set(worldScoped ? token : null);
-          // Connect the nudge bus as this token principal (#175) so an anonymous viewer can
-          // live-follow. The stream reopens under the new token when it changes.
+          // Connect the bus as this token principal; the stream reopens when it changes.
           this.bus.useToken(token);
           const read$ = worldScoped
             ? this.client.worldEntity(token, params.get('entityId') ?? '')
@@ -153,12 +142,10 @@ export class PublicEntityPage {
         }
       });
 
-    // Live-follow reconciler (ADR-0044, #175). Follow the open Entity over the token-scoped bus:
-    // a version nudge newer than held → silent refetch-and-replace through the public read surface;
-    // an `unavailable` (the Owner revoked the link) → blank to the dead-link panel, i.e. access
-    // withdrawal takes effect on the open screen without a reload. `switchMap` off `followed` makes
-    // it subscription-scoped, so swapping Entity tears down the old follow and `takeUntilDestroyed`
-    // withdraws on leave — no manual bookkeeping. A public reader never edits, so no dirty guard.
+    // Live-follow the open Entity: a nudge newer than held → silent refetch-and-
+    // replace; `unavailable` (link revoked) → the dead-link panel without a
+    // reload. switchMap off `followed` tears down the old follow when the Entity
+    // swaps. A public reader never edits, so no dirty guard.
     toObservable(this.followed)
       .pipe(
         switchMap((f) =>
@@ -195,7 +182,7 @@ export class PublicEntityPage {
       .subscribe((entity) => this.session.adopt(entity));
   }
 
-  /** Whether a nudge is newer than the held Entity (ADR-0044) — version, then updatedAt tiebreak. */
+  /** Version, then updatedAt tiebreak. */
   private newerThanHeld(n: EntityNudge): boolean {
     const held = this.session.current();
     if (!held) return false;

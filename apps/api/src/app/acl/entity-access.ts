@@ -5,35 +5,28 @@ import { entities, entityGrants, entityLinks, worldLinks, worldMembers } from '.
 import { isSuperadmin } from './owner-set';
 
 /**
- * The Entity authorization rule (ADR-0037), in one home. The SQL predicates below are the
- * single source of truth; {@link entityRightsOf} is the only JS *projector* off them. A read
- * path composes {@link EntityAccess.filter} into its WHERE, a write path rides the matching
- * bound predicate on the atomic UPDATE WHERE, and a single-row endpoint calls {@link
- * EntityAccess.decide}. Superadmin is resolved once per context (see {@link entityAccess}) and
- * closed over by every predicate, so no caller ever re-threads the flag — the "forgot to thread
- * superadmin" leak can't reopen.
+ * The Entity authorization rule, in one home. The SQL predicates below are the
+ * single source of truth; {@link entityRightsOf} is the only JS *projector* off them.
+ * Superadmin is resolved once per context ({@link entityAccess}) and closed over by
+ * every predicate, so no caller ever re-threads the flag.
  */
 
 /**
- * The Superadmin bypass (ADR-0037, #163): a Superadmin short-circuits each predicate to
- * match-all (`sql`1``), so a repair read/write reaches anything and the set-based `list`/`facets`
- * reads return everything, without a per-row `users` subquery bolted onto every predicate.
+ * The Superadmin bypass: a Superadmin short-circuits each predicate to match-all,
+ * so repair reads/writes reach everything without a per-row `users` subquery.
  * `superadmin === false` emits the exact collaboration-model SQL, unchanged.
  */
 const MATCH_ALL = sql`1`;
 
 /**
- * The stored `entity_grants.role` vocabulary (ADR-0037): the API-facing {@link GrantRole}
- * (`editor`/`viewer`) plus `owner`, the top role folded in from the retired `entity_owners`
- * (migration 0007). Owner is a *stored* role only — it never appears in a grant request body.
+ * The stored `entity_grants.role` vocabulary: the API-facing {@link GrantRole} plus
+ * `owner`. Owner is a *stored* role only — it never appears in a grant request body.
  */
 type StoredEntityRole = 'owner' | GrantRole;
 
 /**
- * The caller holds a row in the entity ACE set (ADR-0037) whose role is one of `roles`. A
- * per-row EXISTS that composes into any WHERE. `roles` spans the *stored* vocabulary — `owner`
- * (folded in, migration 0007) plus the `editor`/`viewer` grant roles — broader than the
- * API-facing {@link GrantRole}, so it takes {@link StoredEntityRole}.
+ * The caller holds an entity ACE row whose role is one of `roles` — a per-row
+ * EXISTS that composes into any WHERE.
  */
 function hasGrant(userId: string, roles: readonly StoredEntityRole[]) {
   const list = sql.join(
@@ -44,9 +37,8 @@ function hasGrant(userId: string, roles: readonly StoredEntityRole[]) {
 }
 
 /**
- * Ownership predicate (ADR-0037): the caller is one of the Entity's Owners — an `owner`-role
- * grant row (folded from `entity_owners`, migration 0007). A Superadmin short-circuits to
- * match-all (repair). The top-role case of {@link hasGrant}.
+ * Ownership predicate: the caller is one of the Entity's Owners (an `owner`-role
+ * grant row). A Superadmin short-circuits to match-all (repair).
  */
 export function ownsEntity(userId: string, superadmin: boolean) {
   return superadmin ? MATCH_ALL : hasGrant(userId, ['owner']);
@@ -63,10 +55,10 @@ function isWorldOwner(userId: string) {
 }
 
 /**
- * The read predicate (ADR-0037): `owner ∨ grant(editor|viewer) ∨ (member ∧ shared)`. The
- * choke point every read path shares — an Entity the caller can't read is indistinguishable
- * from a missing one (ADR-0004), so `private` things don't even leak their existence. An
- * entity-level grant pierces `private`: it reveals the Entity to exactly that user (#161).
+ * The read predicate: `owner ∨ grant(editor|viewer) ∨ (member ∧ shared)` — the
+ * choke point every read path shares. An Entity the caller can't read is
+ * indistinguishable from a missing one, so `private` never leaks existence. An
+ * entity-level grant pierces `private` for exactly that user.
  */
 function canReadEntity(userId: string, superadmin: boolean) {
   if (superadmin) return MATCH_ALL;
@@ -74,10 +66,9 @@ function canReadEntity(userId: string, superadmin: boolean) {
 }
 
 /**
- * The management predicate (ADR-0037): `owner ∨ (world-owner ∧ shared)`. Governs the powers a
- * grant never confers — delete, visibility change, grant management. An Owner mutates their
- * Entity at any visibility; a World Owner curates only the *shared* surface and this power stops
- * dead at `private`. Rides the atomic UPDATE WHERE so a World Owner's write actually lands.
+ * The management predicate: `owner ∨ (world-owner ∧ shared)`. Governs the powers a
+ * grant never confers — delete, visibility change, grant management. A World Owner
+ * curates only the *shared* surface; this power stops dead at `private`.
  */
 function canWriteEntity(userId: string, superadmin: boolean) {
   if (superadmin) return MATCH_ALL;
@@ -85,22 +76,21 @@ function canWriteEntity(userId: string, superadmin: boolean) {
 }
 
 /**
- * The substance predicate (ADR-0037, #161): `canWrite ∨ grant(editor)`. Governs the autosave
- * surface — Content, name, Tags, Metadata — so an entity-level Editor edits substance without
- * gaining the lifecycle/exposure powers {@link canWriteEntity} keeps.
+ * The substance predicate: `canWrite ∨ grant(editor)`. Governs the autosave
+ * surface (Content, name, Tags, Metadata) — an entity-level Editor edits substance
+ * without the lifecycle/exposure powers {@link canWriteEntity} keeps.
  */
 function canEditSubstanceEntity(userId: string, superadmin: boolean) {
   if (superadmin) return MATCH_ALL;
-  // canWrite is `owner ∨ (shared ∧ world-owner)`; folding the extra `∨ grant(editor)` in as a
-  // single `grant(owner|editor)` scan keeps one EXISTS on entity_grants, not two.
+  // Folding `∨ grant(editor)` into one `grant(owner|editor)` scan keeps a single
+  // EXISTS on entity_grants, not two.
   return sql`(${hasGrant(userId, ['owner', 'editor'])} OR (${entities.visibility} = 'shared' AND ${isWorldOwner(userId)}))`;
 }
 
 /**
- * The caller's Entity Rights from a resolved access decision (ADR-0039) — the single place the
- * verb↔predicate correspondence lives. Each ADR-0037 predicate projects to its verb(s):
- * `set-visibility` and `delete` share `canWrite` (the lifecycle gate), two UI affordances over
- * one rule. Order is stable for assertions.
+ * The caller's Entity Rights from a resolved access decision — the single home of
+ * the verb↔predicate correspondence. `set-visibility` and `delete` both project
+ * from `canWrite`. Order is stable for assertions.
  */
 export function entityRightsOf(a: {
   canRead: boolean;
@@ -117,31 +107,23 @@ export function entityRightsOf(a: {
 }
 
 /**
- * The `shared` Entity-visibility predicate (ADR-0037, #162) — the surface a World or Entity
- * Public Link exposes. A named export so the token-scoped read paths (which are an honest
- * `(token) → resource` path with no caller, not a `decide(caller, resource)`) stop hardcoding
- * the string. Composes into any WHERE over `entities`.
+ * The `shared` visibility predicate — the surface a Public Link exposes. Named so
+ * the token-scoped read paths don't hardcode the string.
  */
 export const sharedVisibility = eq(entities.visibility, 'shared');
 
 /**
- * An anonymous Public Link's Rights (ADR-0037, #162): read-only. The token *is* the grant —
- * there's no caller to derive Rights from — so a link read always ships exactly `['read']`,
- * named here so the link paths stop repeating the literal.
+ * An anonymous Public Link's Rights: read-only. The token *is* the grant — there
+ * is no caller to derive Rights from.
  */
 export const READ_ONLY_RIGHTS: readonly EntityVerb[] = ['read'];
 
 /**
- * Whether a Public Link *token* currently grants read of Entity `id` (ADR-0037/0044, #175). The
- * token *is* the anonymous grant — there is no caller to derive Rights from — so this is the
- * boolean reachability seam the nudge bus checks for a token principal, mirroring what the
- * unguarded `GET /public/…` routes resolve. A token reaches an Entity two ways:
- *
- * - a per-entity link (`entity_links.id = token`) pointing straight at it (pierces `private`), or
- * - a World link (`world_links.id = token`) whose World holds it *and* it is `shared`.
- *
- * A revoked (deleted-row) token reaches nothing → live eviction rides the same shaping event.
- * Blob-free (no `document`), one cheap query, so it is fine on the per-emit path.
+ * Whether a Public Link *token* currently grants read of Entity `id` — the
+ * reachability seam the nudge bus checks for a token principal. A token reaches an
+ * Entity via a per-entity link pointing at it (pierces `private`), or via a World
+ * link whose World holds it *and* it is `shared`. A revoked token reaches nothing.
+ * Blob-free and cheap, so fine on the per-emit path.
  */
 export function tokenReachesEntity(db: Db, token: string, id: string): boolean {
   const direct = db
@@ -162,7 +144,7 @@ export function tokenReachesEntity(db: Db, token: string, id: string): boolean {
   return !!viaWorld;
 }
 
-/** A resolved single-row Entity decision (ADR-0039): the full row plus the caller's standing. */
+/** A resolved single-row Entity decision: the full row plus the caller's standing. */
 export interface EntityDecision {
   row: typeof entities.$inferSelect;
   canRead: boolean;
@@ -172,11 +154,10 @@ export interface EntityDecision {
 }
 
 /**
- * A per-request Entity access context (ADR-0037/0039): resolves the Superadmin bypass **once**
- * and hands back the ADR-0037 rule pre-bound to `userId`. Read paths compose {@link filter}
- * (and select {@link rightsColumns} for per-row Rights); write paths ride {@link writeFilter} /
- * {@link editFilter} on the atomic UPDATE WHERE; single-row endpoints call {@link decide} (full
- * row) or {@link decideMeta} (blob-free — no `document` — for the owner/grant/link gates).
+ * A per-request Entity access context: resolves the Superadmin bypass **once** and
+ * hands back the authorization rule pre-bound to `userId`. Read paths compose
+ * {@link filter}; write paths ride {@link writeFilter}/{@link editFilter} on the
+ * atomic UPDATE WHERE; single-row endpoints call {@link decide} or {@link decideMeta}.
  */
 export interface EntityAccess {
   /** Read predicate for a list/get WHERE (`owner ∨ grant ∨ (shared ∧ member)`). */
@@ -238,8 +219,7 @@ export function entityAccess(db: Db, userId: string): EntityAccess {
       };
     },
     decideMeta(id) {
-      // Only reachability + ownership, so it skips the document blob (the whole point of
-      // keeping it separate from decide) — the owner/grant/link gates never need the body.
+      // Reachability + ownership only, skipping the document blob.
       const row = db
         .select({
           canRead: canReadEntity(userId, superadmin),

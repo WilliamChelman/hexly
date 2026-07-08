@@ -21,14 +21,14 @@ import {
 
 export type EntityListParams = Partial<EntityListQuery>;
 
-/** The subset of list params the Facet-count read narrows against (#155) — no paging. */
+/** The subset of list params the Facet-count read narrows against — no paging. */
 export type EntityFacetParams = Pick<
   EntityListParams,
   'q' | 'type' | 'tag' | 'visibility' | 'worldId'
 >;
 
 /**
- * HTTP client for the entities API (ADR-0018, ADR-0005).
+ * HTTP client for the entities API.
  * Stateless: every call is a round trip; open-entity/conflict state lives in EntitySession.
  */
 @Injectable({ providedIn: 'root' })
@@ -45,13 +45,13 @@ export class EntitiesClient {
     // default page size isn't silently truncated. An explicit limit still wins.
     const limit = opts.limit ?? (opts.ids?.length || undefined);
     if (limit !== undefined) params = params.set('limit', limit);
-    // Opt-in per-row Rights (ADR-0039): the Entity Browser sets it to gate per-card actions;
-    // other list callers omit it so the server stays a pure read-filter (no per-row EXISTS).
+    // Opt-in per-row Rights; callers that omit it keep the server a pure read-filter
+    // (no per-row EXISTS).
     if (opts.rights) params = params.set('rights', '1');
     return this.http.get<EntityPage>('/api/entities', { params });
   }
 
-  /** Facet-rail counts under the active filters (#155), drilled down server-side (ADR-0035). */
+  /** Facet-rail counts under the active filters, drilled down server-side. */
   facets(opts: EntityFacetParams = {}): Observable<EntityFacets> {
     return this.http.get<EntityFacets>('/api/entities/facets', {
       params: facetParams(opts),
@@ -59,8 +59,8 @@ export class EntitiesClient {
   }
 
   /**
-   * Patch an Entity's metadata — name and/or Visibility (ADR-0037, #160). One PATCH for
-   * both: metadata never conflicts with an in-progress save. Owner-gated server-side.
+   * Patch an Entity's metadata — name and/or Visibility. One PATCH for both:
+   * metadata never conflicts with an in-progress save. Owner-gated server-side.
    */
   patch(
     id: string,
@@ -73,7 +73,7 @@ export class EntitiesClient {
     return this.http.delete<void>(`/api/entities/${id}`);
   }
 
-  /** The Entity's ownership set — Owner user ids (ADR-0037, #158). Owner-only server-side. */
+  /** The Entity's ownership set — Owner user ids. Owner-only server-side. */
   owners(id: string): Observable<string[]> {
     return this.http.get<string[]>(`/api/entities/${id}/owners`);
   }
@@ -83,12 +83,12 @@ export class EntitiesClient {
     return this.http.post<string[]>(`/api/entities/${id}/owners`, { userId });
   }
 
-  /** Remove an Owner or resign your own ownership; returns the updated set (ADR-0037). */
+  /** Remove an Owner or resign your own ownership; returns the updated set. */
   removeOwner(id: string, userId: string): Observable<string[]> {
     return this.http.delete<string[]>(`/api/entities/${id}/owners/${userId}`);
   }
 
-  /** The Entity's grant set — named Editor/Viewer grants (ADR-0037, #161). Owner-only server-side. */
+  /** The Entity's grant set — named Editor/Viewer grants. Owner-only server-side. */
   grants(id: string): Observable<EntityGrant[]> {
     return this.http.get<EntityGrant[]>(`/api/entities/${id}/grants`);
   }
@@ -98,12 +98,12 @@ export class EntitiesClient {
     return this.http.post<EntityGrant[]>(`/api/entities/${id}/grants`, { userId, role });
   }
 
-  /** Revoke a grant; returns the updated set (ADR-0037, #161). */
+  /** Revoke a grant; returns the updated set. */
   removeGrant(id: string, userId: string): Observable<EntityGrant[]> {
     return this.http.delete<EntityGrant[]>(`/api/entities/${id}/grants/${userId}`);
   }
 
-  /** The Entity's per-entity Public Link — the active token or null (ADR-0037, #162). Owner-only server-side. */
+  /** The Entity's per-entity Public Link — the active token or null. Owner-only server-side. */
   link(id: string): Observable<PublicLink | null> {
     return this.http.get<PublicLink | null>(`/api/entities/${id}/link`);
   }
@@ -113,12 +113,12 @@ export class EntitiesClient {
     return this.http.post<PublicLink>(`/api/entities/${id}/link`, {});
   }
 
-  /** Revoke the per-entity Public Link — the kill-switch (ADR-0037, #162). */
+  /** Revoke the per-entity Public Link — the kill-switch. */
   revokeLink(id: string): Observable<void> {
     return this.http.delete<void>(`/api/entities/${id}/link`);
   }
 
-  // worldId scopes to a World (ADR-0024); omitted, server defaults to caller's first.
+  // worldId omitted, the server defaults to the caller's first World.
   create(
     name: string,
     type: EntityType,
@@ -135,7 +135,7 @@ export class EntitiesClient {
     return this.http.get<EntityDetail>(`/api/entities/${id}`);
   }
 
-  // Owner's Link Descriptor vocabulary — DISTINCT, last-saved state (#96, ADR-0023).
+  // Owner's Link Descriptor vocabulary — DISTINCT, last-saved state.
   listDescriptors(): Observable<string[]> {
     return this.http.get<string[]>('/api/entities/descriptors');
   }
@@ -145,7 +145,7 @@ export class EntitiesClient {
     return this.http.get<string[]>('/api/entities/tags');
   }
 
-  /** Stale base → `conflict` outcome (ADR-0018), not a thrown error; caller branches, not catches. */
+  /** Stale base → `conflict` outcome, not a thrown error; caller branches, not catches. */
   save(
     id: string,
     body: EntityBody,
@@ -180,8 +180,8 @@ export class EntitiesClient {
 }
 
 /**
- * Serialize the shared query + Facet filters (#155) — the params both the paged
- * list and the Facet-count read carry. `type`/`tag`/`visibility` each repeat in the
+ * Serialize the shared query + Facet filters — the params both the paged list
+ * and the Facet-count read carry. `type`/`tag`/`visibility` each repeat in the
  * query string (`?tag=a&tag=b`, OR within category); `q`/`worldId` are single-valued.
  */
 function facetParams(opts: EntityFacetParams): HttpParams {

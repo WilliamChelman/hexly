@@ -4,8 +4,7 @@ import { Observable } from 'rxjs';
 import { ImportSummary, MemberRole, PublicLink, WorldDetail, WorldMember, WorldSummary } from '@hexly/domain';
 
 /**
- * HTTP client for the worlds API (ADR-0024). Stateless: every call is a round
- * trip. The active-World selection lives in {@link WorldStore}, not here.
+ * HTTP client for the worlds API. Stateless: every call is a round trip.
  */
 @Injectable({ providedIn: 'root' })
 export class WorldsClient {
@@ -15,15 +14,14 @@ export class WorldsClient {
     return this.http.get<WorldSummary[]>('/api/worlds');
   }
 
-  // Server mints an empty World (ADR-0043).
+  // Server mints an empty World.
   create(name: string): Observable<WorldDetail> {
     return this.http.post<WorldDetail>('/api/worlds', { name });
   }
 
   /**
-   * Import an Obsidian vault `.zip` into a fresh World (ADR-0033). Multipart under
-   * the `file` field the server expects; the browser sets the multipart boundary,
-   * so we deliberately don't touch Content-Type. Returns the {@link ImportSummary}.
+   * Import an Obsidian vault `.zip` into a fresh World. The browser sets the
+   * multipart boundary, so we deliberately don't touch Content-Type.
    */
   importVault(file: File): Observable<ImportSummary> {
     const form = new FormData();
@@ -36,9 +34,8 @@ export class WorldsClient {
   }
 
   /**
-   * Export a World to a `.zip` of markdown + assets (ADR-0033, #150). The response is
-   * a binary blob (`responseType: 'blob'`), which the caller saves as a download; the
-   * filename is derived from the World's name rather than parsed from a header.
+   * Export a World to a `.zip` of markdown + assets. The caller saves the blob as
+   * a download; the filename is derived from the World's name, not a header.
    */
   exportVault(id: string): Observable<Blob> {
     return this.http.get(`/api/worlds/${id}/export`, { responseType: 'blob' });
@@ -49,9 +46,8 @@ export class WorldsClient {
   }
 
   /**
-   * Replace the World's Owner-curated Pinned Entities wholesale (ADR-0043, #168):
-   * add, remove, and reorder all collapse to "send the new ordered array". Owner-gated
-   * server-side; returns the updated Detail so the caller can re-pin the active World.
+   * Replace the World's Pinned Entities wholesale: add, remove, and reorder all
+   * collapse to "send the new ordered array". Owner-gated server-side.
    */
   setPins(id: string, pinnedEntityIds: string[]): Observable<WorldDetail> {
     return this.http.patch<WorldDetail>(`/api/worlds/${id}`, { pinnedEntityIds });
@@ -61,7 +57,7 @@ export class WorldsClient {
     return this.http.delete<void>(`/api/worlds/${id}`);
   }
 
-  /** The World's ownership set — Owner user ids (ADR-0037, #158). Owner-only server-side. */
+  /** The World's ownership set — Owner user ids. Owner-only server-side. */
   owners(id: string): Observable<string[]> {
     return this.http.get<string[]>(`/api/worlds/${id}/owners`);
   }
@@ -71,12 +67,12 @@ export class WorldsClient {
     return this.http.post<string[]>(`/api/worlds/${id}/owners`, { userId });
   }
 
-  /** Remove an Owner or resign your own ownership; returns the updated set (ADR-0037). */
+  /** Remove an Owner or resign your own ownership; returns the updated set. */
   removeOwner(id: string, userId: string): Observable<string[]> {
     return this.http.delete<string[]>(`/api/worlds/${id}/owners/${userId}`);
   }
 
-  /** The World's non-owner members — Contributors and Viewers (ADR-0037, #159). Owner-only server-side. */
+  /** The World's non-owner members — Contributors and Viewers. Owner-only server-side. */
   members(id: string): Observable<WorldMember[]> {
     return this.http.get<WorldMember[]>(`/api/worlds/${id}/members`);
   }
@@ -96,7 +92,7 @@ export class WorldsClient {
     return this.http.delete<WorldMember[]>(`/api/worlds/${id}/members/${userId}`);
   }
 
-  /** The World's Public Link — the active token or null (ADR-0037, #162). Owner-only server-side. */
+  /** The World's Public Link — the active token or null. Owner-only server-side. */
   link(id: string): Observable<PublicLink | null> {
     return this.http.get<PublicLink | null>(`/api/worlds/${id}/link`);
   }
@@ -106,7 +102,7 @@ export class WorldsClient {
     return this.http.post<PublicLink>(`/api/worlds/${id}/link`, {});
   }
 
-  /** Revoke the World Public Link — the kill-switch (ADR-0037, #162). */
+  /** Revoke the World Public Link — the kill-switch. */
   revokeLink(id: string): Observable<void> {
     return this.http.delete<void>(`/api/worlds/${id}/link`);
   }

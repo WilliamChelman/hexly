@@ -3,11 +3,8 @@ import { coordKey, Hex, HexMap, parseCoordKey, regionById } from './hex-map';
 
 /**
  * The Map elements a move picks up and translates together (CONTEXT.md →
- * Selection). Domain-level, so the planner owns no store types: a move is
- * described by the coordinates and region ids it carries. Labels are deliberately
- * absent — they are free-positioned pixels, never collide, and so have no part in
- * the coordinate-space collision logic this planner owns; the *caller* translates
- * them by the equivalent pixels.
+ * Selection). Labels are deliberately absent — they are free-positioned pixels
+ * that never collide; the *caller* translates them by the equivalent pixels.
  */
 export interface MoveSelection {
   readonly hexes: Axial[];
@@ -30,9 +27,8 @@ export interface HexWrite {
 
 /**
  * One region's translated membership footprint: the new `(q,r) → true` set after
- * shifting every member by the move's offset (CONTEXT.md → "each selected Region's
- * membership footprint shifts by the offset"). Replaces the region's whole `hexes`
- * map, so the caller writes it wholesale rather than diffing.
+ * shifting every member by the move's offset. Replaces the region's whole
+ * `hexes` map, so the caller writes it wholesale rather than diffing.
  */
 export interface RegionWrite {
   readonly id: string;
@@ -40,11 +36,8 @@ export interface RegionWrite {
 }
 
 /**
- * A resolved move (CONTEXT.md → "a move never silently destroys content"): the
- * hex writes/clears and region-footprint shifts that, applied together in one
- * step, carry the selection by the offset. `regions` is empty when no region is
- * selected (the single-hex and hexes-only group cases). Labels are not here — the
- * caller translates them by the equivalent pixels, since they never collide.
+ * A resolved move: the hex writes/clears and region-footprint shifts that,
+ * applied together in one step, carry the selection by the offset.
  */
 export interface ResolvedMovePlan {
   readonly blocked: false;
@@ -54,12 +47,8 @@ export interface ResolvedMovePlan {
 
 /**
  * A move the planner refuses: the destination `cells` that can't take their
- * content, so the caller leaves the document untouched. A cell blocks when the
- * non-selected hex sitting on it cannot be displaced by the inverse offset:
- * `d − offset` is always a source the group is vacating, so it blocks precisely
- * when another moving member is also landing there (a self-overlapping nudge).
- * Single-hex moves never block (a drop onto an occupant swaps); blocking arrives
- * with the group slice.
+ * content, so the caller leaves the document untouched. Single-hex moves never
+ * block (a drop onto an occupant swaps).
  */
 export interface BlockedMovePlan {
   readonly blocked: true;
@@ -70,41 +59,22 @@ export interface BlockedMovePlan {
 export type MovePlan = ResolvedMovePlan | BlockedMovePlan;
 
 /**
- * Plan a move of `selection` by `offset` over `document` (CONTEXT.md, ADR-0017):
- * the pure seam every move routes through — single hex or whole group. Returns a
- * resolved plan of writes to apply in one step, or a refusal naming the blocked
- * cells.
- *
- * **Rigid translation.** Each selected, painted source is snapshotted, its origin
- * cleared, and its whole record written at `source + offset`. The cluster keeps
- * its internal shape, and intra-group overlap just works: a source that is also
- * another member's destination is written, not cleared, so shifting a blob by one
- * cell never fights itself.
- *
- * **Group collision.** A destination occupied by a hex *outside* the selection
- * displaces that occupant by the inverse offset, to `d − offset`. That target is
- * always the source the moving member is vacating, so it is free — except when
- * another moving member is *also* landing there (a self-overlapping nudge), in
- * which case the destination is **blocked**. The clean single-hex swap is exactly
- * this displacement with one member. Any blocked cell blocks the whole move,
- * returning `{ blocked, cells }` so the caller is a no-op.
- *
- * **Regions.** Each selected region's footprint translates by the offset (every
- * member key `(q,r) → (q+dq, r+dr)`); region membership is otherwise untouched, so
- * "regions stay put" falls out of no region being selected. Region footprints
- * never collide — regions overlap freely — so they never block.
- *
- * A move that carries nothing — no painted source and no selected region — resolves
- * to an empty (no-op) plan rather than emitting clears that would destroy
- * untouched destinations: the seam owns its own preconditions so every caller is
- * safe.
+ * Plan a move of `selection` by `offset` over `document` — the pure seam every
+ * move routes through, single hex or whole group. Rigid translation: each
+ * painted source is snapshotted, cleared, and rewritten at `source + offset`;
+ * intra-group overlap writes rather than clears, so a cluster keeps its shape.
+ * A destination occupied by a non-selected hex displaces that occupant to
+ * `d − offset` (the single-hex swap is this with one member); the cell blocks
+ * when another moving member is also landing there, and any blocked cell
+ * refuses the whole move. Selected region footprints translate by the offset
+ * and never block. A move carrying nothing resolves to an empty plan rather
+ * than emitting destructive clears.
  */
 export function planMove({ document, selection, offset }: MoveRequest): MovePlan {
   const sourceKeys = new Set(selection.hexes.map(coordKey));
 
-  // Snapshot the painted sources in selection order: an unpainted (Void) source
-  // carries nothing, so it is skipped — it neither writes a destination nor clears
-  // an origin (the single-hex "origin is Void" no-op generalises to the group).
+  // Snapshot the painted sources in selection order; an unpainted (Void) source
+  // carries nothing — it neither writes a destination nor clears an origin.
   const moves = selection.hexes.flatMap((source) => {
     const hex = document.hexes[coordKey(source)];
     if (!hex) return [];
@@ -141,8 +111,7 @@ export function planMove({ document, selection, offset }: MoveRequest): MovePlan
     }
   }
 
-  // Any blocked cell refuses the whole move: the caller leaves the document
-  // untouched (CONTEXT.md → "any blocked cell blocks the whole move").
+  // Any blocked cell refuses the whole move: the caller leaves the document untouched.
   if (blocked.length > 0) return { blocked: true, cells: blocked };
 
   // Clear every source nothing reclaimed (not a group destination, not where a

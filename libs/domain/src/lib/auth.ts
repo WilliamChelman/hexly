@@ -1,25 +1,14 @@
 /**
- * Auth contracts shared by the API and the web client (ADR-0001). The closed
- * user set logs in with email + password; the session itself rides in an
- * HttpOnly cookie, so it never appears in these payloads (ADR-0004).
+ * Auth contracts shared by the API and the web client. The session itself rides
+ * in an HttpOnly cookie, so it never appears in these payloads.
  */
 
 import { z } from 'zod';
 
 /**
- * A user's roaming Preferences (ADR-0038): the JSON bag stored on the user row
- * and carried on the auth payload. Every field is optional — an absent field
- * means "no expressed choice", and the client falls back to its own detection
- * (browser language, OS theme, Format Locale following the UI Locale). New
- * prefs are a code-only change here; the storage is one JSON column.
- */
-/**
- * The Format Locale choices as BCP-47 tags (ADR-0038). `Intl` can't enumerate
- * locales, so the list stays curated. Shared here — not just in the web picker —
- * so the server validates against the exact set the picker offers: a stored tag
- * the picker can't represent is rejected, never silently kept. The web side adds
- * the `''` "Same as language" sentinel and derives every label from
- * `Intl.DisplayNames`, so growing this is one entry with no copy to translate.
+ * The Format Locale choices as BCP-47 tags. `Intl` can't enumerate locales, so
+ * the list stays curated. Shared so the server validates against the exact set
+ * the web picker offers.
  */
 export const FORMAT_LOCALE_TAGS = [
   'en-US', 'en-GB', 'en-IE', 'en-CA', 'en-AU', 'en-NZ', 'en-IN',
@@ -32,10 +21,10 @@ const localeField = z.enum(['en', 'fr']);
 const formatLocaleField = z.enum(FORMAT_LOCALE_TAGS);
 const themeField = z.enum(['light', 'dark']);
 
-// Read path is lenient (`.strip()`): an unknown key — a hand-edited row, or a
-// bag written by a newer deploy that added a pref — drops that key instead of
-// failing the whole parse and resetting the user's other prefs to defaults. The
-// PATCH boundary below stays `.strict()`, so requests can't smuggle junk in.
+// The roaming Preferences bag stored on the user row; an absent field means "no
+// expressed choice" and the client falls back to its own detection. Read path is
+// lenient (`.strip()`): an unknown key drops instead of failing the whole parse
+// and resetting the other prefs. The PATCH boundary below stays `.strict()`.
 export const preferencesSchema = z
   .object({
     /** UI language (the Locale). */
@@ -72,30 +61,20 @@ export interface AuthUser {
   readonly email: string;
   readonly displayName: string;
   readonly preferences: Preferences;
-  /**
-   * Instance Admin (ADR-0037, #163): account management, zero content powers.
-   * Surfaced so the web nav/route guard can offer the admin panel, and so the
-   * server guard reads it off the session.
-   */
+  /** Instance Admin: account management, zero content powers. */
   readonly isAdmin: boolean;
-  /**
-   * Superadmin (ADR-0037, #163): the operator's in-app self, outside the
-   * collaboration model. Implies Admin's account powers (Superadmin ⊇ Admin).
-   */
+  /** Superadmin: the operator's in-app self. Implies Admin's account powers (Superadmin ⊇ Admin). */
   readonly isSuperadmin: boolean;
   /**
-   * World Creation (ADR-0040): a per-user Instance capability, orthogonal to
-   * Instance Admin, gating whether this user may create a World. Surfaced so the
-   * web nav gates the "New World" affordance on exactly what the server enforces.
-   * A Superadmin always may create (repair), regardless of this flag.
+   * World Creation: a per-user Instance capability, orthogonal to Instance
+   * Admin. A Superadmin always may create, regardless of this flag.
    */
   readonly canCreateWorlds: boolean;
 }
 
 /**
- * A single Instance user in the directory `GET /users` (#158): just enough for
- * the owner-set UI to name an owner and pick a co-Owner. Deliberately omits the
- * email — that is private (ADR-0004), so it never enters the directory.
+ * A single Instance user in the directory `GET /users`. Deliberately omits the
+ * email — that is private, so it never enters the directory.
  */
 export interface UserSummary {
   readonly id: string;
@@ -103,9 +82,8 @@ export interface UserSummary {
 }
 
 /**
- * The body of `PATCH /auth/me/profile` (ADR-0038): the self-editable identity
- * fields — the display name only. Email is deliberately absent: it is the
- * login identity and stays read-only (an Instance Admin concern).
+ * The body of `PATCH /auth/me/profile` — the display name only. Email is
+ * deliberately absent: it is the login identity and stays read-only.
  */
 export const updateProfileRequestSchema = z
   .object({
@@ -116,13 +94,13 @@ export const updateProfileRequestSchema = z
 /** A validated profile update. */
 export type UpdateProfileRequest = z.infer<typeof updateProfileRequestSchema>;
 
-/** The shortest password `POST /auth/me/password` accepts (ADR-0038). */
+/** The shortest password `POST /auth/me/password` accepts. */
 export const MIN_PASSWORD_LENGTH = 8;
 
 /**
- * The body of `POST /auth/me/password` (ADR-0038): the current password is
- * re-verified against the stored hash before the new one is accepted, so a
- * hijacked session cannot silently take over the account.
+ * The body of `POST /auth/me/password`: the current password is re-verified
+ * against the stored hash first, so a hijacked session cannot silently take
+ * over the account.
  */
 export const changePasswordRequestSchema = z
   .object({
@@ -135,9 +113,8 @@ export const changePasswordRequestSchema = z
 export type ChangePasswordRequest = z.infer<typeof changePasswordRequestSchema>;
 
 /**
- * The body of `POST /auth/login`. Both fields must be present and non-empty;
- * the email is otherwise unconstrained — a malformed address simply matches no
- * user rather than being a distinct error (ADR-0004 — credentials are opaque).
+ * The body of `POST /auth/login`. The email is otherwise unconstrained — a
+ * malformed address simply matches no user rather than being a distinct error.
  */
 export const loginRequestSchema = z.object({
   email: z.string().min(1),

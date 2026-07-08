@@ -13,12 +13,9 @@ import { WorldsClient } from './worlds.client';
 import { Logger } from './logger';
 
 /**
- * The caller's loaded Worlds (ADR-0028). Which World is *active* is a URL fact now
- * ({@link ActiveWorld}), not a remembered selection — so this store no longer holds
- * an active id or persists anything to localStorage. It is just the loaded list plus
- * the create plumbing: the World Index and the switcher read {@link worlds}/{@link
- * loaded}, and {@link create} mints an empty World (ADR-0043); the caller navigates
- * into it by URL.
+ * The caller's loaded Worlds. Which World is *active* is a URL fact
+ * ({@link ActiveWorld}), not held here — this is just the loaded list plus the
+ * create plumbing; the caller navigates into a created World by URL.
  */
 @Injectable({ providedIn: 'root' })
 export class WorldStore {
@@ -75,14 +72,14 @@ export class WorldStore {
     });
   }
 
-  // Server mints an empty World (ADR-0043); append the result to the list.
+  // Server mints an empty World; append the result to the list.
   create(name: string): Observable<WorldDetail> {
     return this.client.create(name).pipe(
       tap((world) => this._worlds.update((ws) => [...ws, world])),
     );
   }
 
-  // Owner-only server-side (ADR-0024); update in place after save.
+  // Owner-only server-side; update in place after save.
   rename(id: string, name: string): Observable<WorldDetail> {
     return this.client.rename(id, name).pipe(
       tap((world) =>
@@ -101,10 +98,10 @@ export class WorldStore {
   }
 
   /**
-   * Leave a World (ADR-0037, #159): drop the caller's own membership row, then re-fetch
-   * the authoritative list. Not an optimistic remove — reachability is derived, so a
-   * member who still owns an Entity in the World keeps it, and only the server can say
-   * which Worlds survive leaving. The re-fetch reconciles both cases.
+   * Leave a World: drop the caller's own membership row, then re-fetch the
+   * authoritative list. Not an optimistic remove — reachability is derived, so a
+   * member who still owns an Entity in the World keeps it, and only the server
+   * can say which Worlds survive leaving.
    */
   leave(id: string): Observable<WorldMember[]> {
     return this.client.removeMember(id, this.userId() ?? '').pipe(
@@ -112,10 +109,9 @@ export class WorldStore {
     );
   }
 
-  // Re-fetch the reachable Worlds after an out-of-band change — e.g. leaving one, or
-  // the World Index returning to focus (ADR-0044: the durable directory refetches on
-  // focus, off the nudge bus). Unconditional, unlike load(): it bypasses the once-only
-  // guard so a re-focus reflects a World created/renamed/deleted elsewhere.
+  // Re-fetch the reachable Worlds after an out-of-band change (leaving one, the
+  // World Index returning to focus). Unconditional, unlike load(): it bypasses the
+  // once-only guard so a re-focus reflects a World created/renamed/deleted elsewhere.
   refresh(): void {
     this.client.list().subscribe({
       next: (worlds) => this._worlds.set(worlds),

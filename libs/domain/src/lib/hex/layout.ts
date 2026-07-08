@@ -11,7 +11,7 @@ export function addPoint(point: Point, delta: Point): Point {
   return { x: point.x + delta.x, y: point.y + delta.y };
 }
 
-/** Per-map hex orientation; pointy-top is the default (ADR-0003). */
+/** Per-map hex orientation; pointy-top is the default. */
 export type Orientation = 'pointy' | 'flat';
 
 /**

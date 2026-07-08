@@ -1,15 +1,12 @@
 import { z } from 'zod';
 
 /**
- * The live-follow nudge bus (ADR-0044). A single server→client SSE stream carries *nudges* —
- * "resource X is now at version N, refetch it" — never resource data. This module holds the
- * wire vocabulary shared by the API and the web client.
- *
- * Entity refs only for now; World refs and reconnect replay are additive later slices (#171) —
- * the array shape below is what makes them additive.
+ * The live-follow nudge bus. A single server→client SSE stream carries *nudges* —
+ * "resource X is now at version N, refetch it" — never resource data. This module
+ * holds the wire vocabulary shared by the API and the web client.
  */
 
-/** A resource a connection is watching. A World is just another ref (ADR-0044) — one channel. */
+/** A resource a connection is watching. A World is just another ref — one channel. */
 export const interestRefSchema = z.object({
   kind: z.enum(['entity', 'world']),
   id: z.string(),
@@ -17,8 +14,8 @@ export const interestRefSchema = z.object({
 export type InterestRef = z.infer<typeof interestRefSchema>;
 
 /**
- * The *whole* interest set a client declares via `PUT /events/:connectionId/interest`
- * (ADR-0044): idempotent, client-owned, no add/remove bookkeeping.
+ * The *whole* interest set a client declares via `PUT /events/:connectionId/interest`:
+ * idempotent, client-owned, no add/remove bookkeeping.
  */
 export const interestSetSchema = z.object({
   refs: z.array(interestRefSchema),
@@ -27,17 +24,17 @@ export type InterestSet = z.infer<typeof interestSetSchema>;
 
 /**
  * The handshake: the SSE stream's first event names this connection with an unguessable
- * `connectionId`, which the client then addresses its interest `PUT` to (ADR-0044).
+ * `connectionId`, which the client then addresses its interest `PUT` to.
  */
 export interface ConnectionReady {
   connectionId: string;
 }
 
 /**
- * One changed resource in a nudge. `version` + `updatedAt` dedupe self/cross-tab echo
- * (ADR-0044): a holder refetches only on something newer than it has. A metadata patch
- * (rename, visibility) touches `updatedAt` *without* bumping `version` — carrying both is
- * what lets a follower see a same-version rename as new.
+ * One changed resource in a nudge. `version` + `updatedAt` dedupe self/cross-tab echo:
+ * a holder refetches only on something newer than it has. A metadata patch (rename,
+ * visibility) touches `updatedAt` *without* bumping `version` — carrying both is what
+ * lets a follower see a same-version rename as new.
  */
 export interface EntityNudge {
   id: string;
@@ -46,8 +43,8 @@ export interface EntityNudge {
 }
 
 /**
- * The eviction entry (ADR-0044, #174): the recipient's own access to a followed resource has
- * ended. Opaque and version-free — unauthorized, deleted, and never-existed are byte-identical,
+ * The eviction entry: the recipient's own access to a followed resource has ended.
+ * Opaque and version-free — unauthorized, deleted, and never-existed are byte-identical,
  * so the status can't leak "it still exists, you just can't see it."
  */
 export interface UnavailableNudge {
@@ -59,7 +56,7 @@ export interface UnavailableNudge {
 export type NudgeEntry = EntityNudge | UnavailableNudge;
 
 /**
- * A nudge is a *delta* array holding only the resource(s) whose event fired (ADR-0044) — not a
+ * A nudge is a *delta* array holding only the resource(s) whose event fired — not a
  * full-set reconciliation. Reconnect → refetch-the-interest-set heals any missed event.
  */
 export type NudgeDelta = NudgeEntry[];

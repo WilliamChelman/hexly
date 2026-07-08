@@ -11,16 +11,13 @@ import { MIN_PASSWORD_LENGTH } from '@hexly/domain';
 import { FormatLocale, Locale, LocaleService, AuthClient, ThemeService, Theme, ToasterService } from '@hexly/web-core';
 import { Eyebrow, Field, Input, Panel, Select, Button } from '@hexly/web-ui';
 
-/** What went wrong with the password form, keyed into `settings.password.*`. */
+/** Keyed into `settings.password.*`. */
 type PasswordError = '' | 'tooShort' | 'wrongCurrent' | 'error';
 
 /**
- * The User Settings page (ADR-0038): Preferences — theme, Locale, Format
- * Locale — applied and persisted instantly through the very signals the user
- * menu writes (one source of truth, two entry points; PreferencesSync pushes
- * them to the account), plus the self-service profile: display name and
- * password behind explicit forms. Email is the login identity and stays
- * read-only.
+ * User Settings: Preferences applied instantly through the same signals the
+ * user menu writes (one source of truth, two entry points), plus the
+ * self-service profile forms. Email is the login identity and stays read-only.
  */
 @Component({
   selector: 'app-user-settings',
@@ -212,13 +209,9 @@ export class UserSettings {
   protected readonly theme = this.themeService.theme;
   protected readonly lang = this.locale.lang;
 
-  /**
-   * The Format Locale picker options, labelled in the active UI language
-   * ("English (United Kingdom) — 7/5/2026", "anglais (Royaume-Uni) — 05/07/2026")
-   * with a live preview of today's date — no per-tag copy to translate. Built
-   * once per language change instead of re-deriving ~28 `Intl.DisplayNames`
-   * lookups and date formats on every change detection.
-   */
+  /** Format Locale options labelled via Intl in the active UI language, with a
+   * date preview — no per-tag copy to translate. Computed so the ~28 Intl
+   * lookups run once per language change, not per change detection. */
   protected readonly formatOptions = computed(() => {
     const names = new Intl.DisplayNames([this.transloco.activeLang()], {
       type: 'language',

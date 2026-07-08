@@ -20,7 +20,6 @@ import { NavEntry, NavRailStore } from './nav-rail.store';
 
 const STATIC_ENTRIES: readonly NavEntry[] = [
   {
-    // Back to the World Index (ADR-0028) — the chooser at the root.
     link: '/',
     testid: 'nav-worlds',
     icon: 'globe',
@@ -36,9 +35,9 @@ const STATIC_ENTRIES: readonly NavEntry[] = [
 ];
 
 /**
- * The persistent global nav rail (ADR-0022). Expands to reveal labels on wide
- * viewports (docked, persisted); overlays transiently on narrow viewports
- * (focus-trapped, dismissed on click-away / Escape / destination chosen).
+ * The persistent global nav rail. Expands to reveal labels on wide viewports
+ * (docked, persisted); overlays transiently on narrow viewports (focus-trapped,
+ * dismissed on click-away / Escape / destination chosen).
  *
  * ponytail: appearance/account stay in {@link UserMenu}'s popover at both widths.
  * Build the inline section if expanded-rail affordances grow.
@@ -121,12 +120,8 @@ const STATIC_ENTRIES: readonly NavEntry[] = [
         >
       </a>
 
-      <!-- The World crest sits at the masthead under the brand (#121, redesign):
-           the active World stays legible at both widths and no longer twins the
-           foot avatar — a square gilt tile against the round personal avatar. -->
       @if (isAuthenticated()) {
-        <!-- The Switcher is a World-scoped control, so it shows only inside a
-             World (ADR-0041); on the Index the Index itself is the chooser. -->
+        <!-- The Switcher is World-scoped: on the Index, the Index itself is the chooser. -->
         @if (activeWorldId()) {
           <app-world-switcher [expanded]="expanded" />
         }
@@ -157,10 +152,6 @@ const STATIC_ENTRIES: readonly NavEntry[] = [
 
       <div class="flex-1"></div>
 
-      <!--
-        Avatar and collapse toggle sit together at the foot: stacked when
-        collapsed, side-by-side when expanded. Chevron points the way it moves.
-      -->
       <div class="flex items-center gap-1" [class.flex-col]="!expanded">
         <app-user-menu [expanded]="expanded" [class.flex-1]="expanded" />
         <button
@@ -196,18 +187,17 @@ export class NavRail {
   protected readonly isAuthenticated = this.auth.isAuthenticated;
   protected readonly loading = inject(AppShellStore).loading;
   protected readonly activeWorldId = this.activeWorld.worldId;
-  // The rail renders destinations, it no longer builds them (ADR-0041): inside a World
-  // the World layout fills the slot; elsewhere the rail's own instance-scoped links show.
+  // The rail renders destinations, it doesn't build them: inside a World the
+  // World layout fills the slot; elsewhere the rail's own instance-scoped links show.
   protected readonly entries = computed<readonly NavEntry[]>(() => {
     const injected = this.rail.entries();
     if (injected.length) return injected;
-    // In a World but its layout hasn't filled the slot yet — show nothing rather than
-    // flash the instance nav for a frame on every World entry.
+    // In a World before its layout fills the slot: show nothing rather than
+    // flash the instance nav for a frame.
     if (this.activeWorldId()) return [];
     return [
       ...STATIC_ENTRIES,
-      // The Instance Admin panel link (ADR-0037, #163) shows only for an Admin or
-      // Superadmin — the same gate the route enforces server-side.
+      // Admin/Superadmin only — the same gate the route enforces server-side.
       ...(this.auth.canAdminister()
         ? [{ link: '/admin', testid: 'nav-admin', icon: 'user' as const, labelKey: 'nav.admin' }]
         : []),
@@ -235,15 +225,13 @@ export class NavRail {
   );
 
   constructor() {
-    // The rail is the always-present authenticated chrome, so it owns loading the
-    // World list (ADR-0024) — the switcher only shows on the expanded rail, but the
-    // active World must be known even when collapsed so the browser can scope to it.
+    // The rail is the always-present authenticated chrome, so it owns loading
+    // the World list — the active World must be known even while collapsed.
     effect(() => {
       if (this.isAuthenticated()) this.worlds.load();
     });
 
-    // BreakpointObserver cleans up via takeUntilDestroyed so no listener fires
-    // on a dead instance (rail is destroyed/recreated across login).
+    // takeUntilDestroyed: the rail is destroyed/recreated across login.
     inject(BreakpointObserver)
       .observe('(min-width: 768px)')
       .pipe(takeUntilDestroyed())

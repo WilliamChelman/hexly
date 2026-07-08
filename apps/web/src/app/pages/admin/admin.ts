@@ -13,12 +13,10 @@ import { AdminClient, AuthClient, ToasterService } from '@hexly/web-core';
 import { Eyebrow, Field, Input, Panel, Button } from '@hexly/web-ui';
 
 /**
- * The Instance Admin panel (ADR-0037, #163): account management with zero content powers.
- * An Admin creates users, disables/enables and deletes them, resets passwords, and toggles
- * the Admin flag; a Superadmin additionally sees the Superadmin toggle. Every action is a
- * thin call to {@link AdminClient} followed by a reload — the server is the source of truth,
- * so a refusal (e.g. deleting a sole Owner, or demoting the last Superadmin) surfaces as an
- * error toast and leaves the list unchanged. Reached only via the admin-guarded route.
+ * The Instance Admin panel: account management with zero content powers. Every
+ * action is a thin {@link AdminClient} call followed by a reload — the server
+ * is the source of truth, so a refusal surfaces as an error toast and leaves
+ * the list unchanged.
  */
 @Component({
   selector: 'app-admin',
@@ -166,7 +164,6 @@ export class Admin {
 
   protected readonly users = signal<readonly AdminUser[]>([]);
 
-  /** Case-insensitive filter over display name + email (#163). */
   protected readonly query = signal('');
   protected readonly filtered = computed(() => {
     const q = this.query().trim().toLowerCase();
@@ -182,7 +179,6 @@ export class Admin {
   protected readonly newEmail = signal('');
   protected readonly newPassword = signal('');
 
-  /** The user whose password is being reset inline, or null. */
   protected readonly resettingId = signal<string | null>(null);
   protected readonly resetDraft = signal('');
 
@@ -251,7 +247,6 @@ export class Admin {
     this.run(this.admin.deleteUser(u.id), 'admin.toast.deleted');
   }
 
-  /** Run a mutation, then reload + toast on success or surface the server's refusal. */
   private run(op: Observable<unknown>, successKey: string, onOk?: () => void): void {
     op.subscribe({
       next: () => {
@@ -265,11 +260,8 @@ export class Admin {
     });
   }
 
-  /**
-   * Resolve a failed mutation to a localized message from the server's structured error
-   * code (ADR-0037, #163) — `admin.error.<code>` when the body carries a known {@link
-   * AdminErrorCode}, else a generic fallback. No English is matched off the wire.
-   */
+  /** Localize the server's structured error code (`admin.error.<code>`); no
+   * English is matched off the wire. */
   private errorMessage(err: unknown): string {
     const code = err instanceof HttpErrorResponse ? (err.error as AdminError | null)?.code : undefined;
     const key = code ? `admin.error.${code}` : 'admin.toast.error';
