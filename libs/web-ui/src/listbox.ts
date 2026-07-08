@@ -1,14 +1,12 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 
 /**
- * The positioned `<ul role="listbox">` box every suggestion picker shares — the `/`
- * slash menu, the `@` entity picker, the `::` descriptor picker and the `|`/`#` link-text
- * pickers (ADR-0019/0023/0033). Extracted when the third picker landed (the
- * DescriptorPicker `ponytail:` note asked for it): each picker projects only its own row
- * template, this owns the chrome (fixed position, size, border, aria wiring).
+ * The positioned `<ul role="listbox">` box a picker projects its rows into: it owns the
+ * chrome (fixed position, size, border, aria wiring) so each caller supplies only its own
+ * `<li>` option template. Pairs with {@link ListboxController} for keyboard behaviour.
  */
 @Component({
-  selector: 'app-suggestion-menu-shell',
+  selector: 'app-listbox',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <ul
@@ -24,7 +22,7 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
     </ul>
   `,
 })
-export class SuggestionMenuShell {
+export class Listbox {
   readonly testid = input.required<string>();
   readonly ariaLabel = input.required<string | null>();
   readonly activeItemId = input.required<string | null>();

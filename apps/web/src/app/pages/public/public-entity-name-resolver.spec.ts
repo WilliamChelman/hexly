@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { EntitiesClient } from '@hexly/web-core';
-import { EntityNameResolver } from '../entity/services/entity-name-resolver';
+import { EntityNameResolver } from '@hexly/content-editor';
 import { PublicEntityNameResolver } from './public-entity-name-resolver';
 
 const tick = () => new Promise((r) => queueMicrotask(r as () => void));

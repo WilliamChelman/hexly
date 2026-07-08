@@ -1,26 +1,25 @@
 import { signal } from '@angular/core';
 
-/** What a `@tiptap/suggestion` render cycle hands the menu on open/update. */
-export interface SuggestionMenuProps<T> {
+/** What each open/update cycle hands the listbox: current items, a pick callback, and where to anchor. */
+export interface ListboxProps<T> {
   items: T[];
   command: (item: T) => void;
   clientRect?: (() => DOMRect | null) | null;
   /**
-   * True on the interim render `@tiptap/suggestion` emits with empty `items`
-   * while an async `items()` search is in flight, before the resolved render.
+   * True on an interim open/update with empty `items` while an async search is in
+   * flight — the controller keeps the previous results rather than blanking the list.
    */
   loading?: boolean;
 }
 
 /**
- * Shared keyboard-driven popup behind the `/` slash menu and the `@` entity picker
- * (ADR-0019, ADR-0023). The `@tiptap/suggestion` plugin drives both identically —
- * open/update/close/onKeyDown — and a pick just calls back the plugin's `command`;
- * the menu never touches the editor. Subclasses differ only in how each item
- * renders and the DOM-id prefix for its options, so all the state and key handling
- * live here and the two components are thin templates over it.
+ * Keyboard-driven listbox behaviour (ARIA active-descendant): open/update/close plus
+ * ArrowUp/Down/Enter/Tab/Escape over a signal-backed item list, calling back `command` on
+ * pick. Driver-agnostic — a `@tiptap/suggestion` plugin or a plain text input feeds it the
+ * same {@link ListboxProps}. Subclasses supply only how each row renders and the option-id
+ * prefix; all state and key handling live here.
  */
-export abstract class SuggestionMenu<T extends { id: string }> {
+export abstract class ListboxController<T extends { id: string }> {
   protected readonly visible = signal(false);
   protected readonly items = signal<T[]>([]);
   protected readonly activeIndex = signal(0);
@@ -30,7 +29,7 @@ export abstract class SuggestionMenu<T extends { id: string }> {
   /** Prefix for each option's stable DOM id (the aria-activedescendant target). */
   protected abstract readonly optionIdPrefix: string;
 
-  open(props: SuggestionMenuProps<T>): void {
+  open(props: ListboxProps<T>): void {
     this.command = props.command;
     this.items.set(props.items);
     this.activeIndex.set(0);
@@ -40,7 +39,7 @@ export abstract class SuggestionMenu<T extends { id: string }> {
     this.visible.set(true);
   }
 
-  update(props: SuggestionMenuProps<T>): void {
+  update(props: ListboxProps<T>): void {
     this.command = props.command;
     // While an async search is in flight tiptap sends an interim update with
     // empty items (loading); keep the previous results until the resolved ones

@@ -19,8 +19,8 @@ import { Editor, JSONContent } from '@tiptap/core';
 import { catchError, firstValueFrom, of } from 'rxjs';
 import { EntitiesClient } from '@hexly/web-core';
 import { TiptapDirective } from './tiptap.directive';
-import { EntitySession } from '../../services/entity-session';
-import { EntityNameResolver } from '../../services/entity-name-resolver';
+import { CONTENT_EDITOR_SESSION } from './content-editor-session';
+import { EntityNameResolver } from './entity-name-resolver';
 import { CONTENT_EXTENSIONS } from './content-extensions';
 import { entityLinkNode } from './entity-link-node';
 import { calloutNode } from './callout-node';
@@ -244,7 +244,7 @@ import { BubbleMenuDirective } from './bubble-menu.directive';
   `,
 })
 export class ContentEditor {
-  private readonly session = inject(EntitySession);
+  private readonly session = inject(CONTENT_EDITOR_SESSION);
   private readonly destroyRef = inject(DestroyRef);
   // The shared id→name resolver backs both the `@` picker (its entity list) and
   // every entityLink node view; provided at the entities/:id route so navigating

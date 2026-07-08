@@ -1,0 +1,19 @@
+{
+  "name": "content-editor",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/content-editor/src",
+  "prefix": "app",
+  "projectType": "library",
+  "tags": ["scope:web", "type:feature"],
+  "targets": {
+    "test": {
+      "executor": "@angular/build:unit-test",
+      "options": {
+        "watch": false,
+        "buildTarget": "web:build:development",
+        "tsConfig": "libs/content-editor/tsconfig.spec.json",
+        "setupFiles": ["libs/content-editor/src/test-setup.ts"]
+      }
+    }
+  }
+}

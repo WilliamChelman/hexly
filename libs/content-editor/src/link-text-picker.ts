@@ -1,8 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { SuggestionMenu } from './suggestion-menu';
-import { SuggestionMenuShell } from './suggestion-menu-shell';
-import { SuggestionEmpty, SuggestionOption } from './suggestion-option';
+import { ListboxController, Listbox, ListboxEmpty, ListboxOption } from '@hexly/web-ui';
 import { VocabItem } from './vocab-items';
 
 /** Which wikilink attr this picker edits — drives its testid and i18n only. */
@@ -19,10 +17,10 @@ export type LinkTextKind = 'display' | 'heading';
 @Component({
   selector: 'app-link-text-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, SuggestionMenuShell, SuggestionOption, SuggestionEmpty],
+  imports: [TranslocoPipe, Listbox, ListboxOption, ListboxEmpty],
   template: `
     @if (visible()) {
-      <app-suggestion-menu-shell
+      <app-listbox
         [testid]="kind() + '-picker'"
         [ariaLabel]="labelKey() | transloco"
         [activeItemId]="activeItemId()"
@@ -31,7 +29,7 @@ export type LinkTextKind = 'display' | 'heading';
       >
         @for (item of items(); track item.id; let i = $index) {
           <li
-            appSuggestionOption
+            appListboxOption
             [optionId]="optionId(item.id)"
             [testid]="kind() + '-picker-option'"
             [selected]="i === activeIndex()"
@@ -44,13 +42,13 @@ export type LinkTextKind = 'display' | 'heading';
             }
           </li>
         } @empty {
-          <li appSuggestionEmpty>{{ emptyKey() | transloco }}</li>
+          <li appListboxEmpty>{{ emptyKey() | transloco }}</li>
         }
-      </app-suggestion-menu-shell>
+      </app-listbox>
     }
   `,
 })
-export class LinkTextPicker extends SuggestionMenu<VocabItem> {
+export class LinkTextPicker extends ListboxController<VocabItem> {
   readonly kind = input.required<LinkTextKind>();
   protected readonly optionIdPrefix = 'link-text-opt-';
 

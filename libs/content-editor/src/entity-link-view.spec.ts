@@ -6,7 +6,7 @@ import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import {
   EntityNameResolver,
   EntityResolution,
-} from '../../services/entity-name-resolver';
+} from './entity-name-resolver';
 import { EntityLinkView } from './entity-link-view';
 
 /** A resolver stub that reports a fixed live name for every id (no HTTP). */

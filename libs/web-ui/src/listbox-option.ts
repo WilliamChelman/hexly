@@ -10,15 +10,14 @@ import {
 } from '@angular/core';
 
 /**
- * One selectable row in a suggestion picker — the `<li><button role="option">` every
- * picker repeats (slash / entity / descriptor / display / heading). Attribute selector on
- * the `<li>` itself so the `<ul>` (in {@link SuggestionMenuShell}) keeps a valid, a11y-clean
+ * One selectable row — the `<li><button role="option">` a listbox repeats. Attribute
+ * selector on the `<li>` itself so the `<ul>` (in {@link Listbox}) keeps a valid, a11y-clean
  * `ul > li` structure; the button and its projected label live in the template. `mousedown`
- * is swallowed so the click doesn't first blur the editor (losing the selection the pick
- * acts on); the caller wires `(pick)` to its own `select(item)`.
+ * is swallowed so the click doesn't first blur whatever holds focus (losing the selection the
+ * pick acts on); the caller wires `(pick)` to its own `select(item)`.
  */
 @Component({
-  selector: 'li[appSuggestionOption]',
+  selector: 'li[appListboxOption]',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { role: 'presentation' },
   template: `
@@ -37,7 +36,7 @@ import {
     </button>
   `,
 })
-export class SuggestionOption {
+export class ListboxOption {
   readonly optionId = input.required<string>();
   readonly testid = input.required<string>();
   readonly selected = input.required<boolean>();
@@ -56,7 +55,7 @@ export class SuggestionOption {
 
 /** The muted `<li>` a picker shows when a query matches nothing — the `@empty` row's styling, once. */
 @Directive({
-  selector: 'li[appSuggestionEmpty]',
+  selector: 'li[appListboxEmpty]',
   host: { class: 'px-3 py-1 text-sm text-ink-muted' },
 })
-export class SuggestionEmpty {}
+export class ListboxEmpty {}

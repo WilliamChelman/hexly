@@ -1,4 +1,4 @@
-import { vocabItems } from './content-editor/vocab-items';
+import { vocabItems } from '@hexly/content-editor';
 
 /** One row in the Tag entry picker: an owner-vocabulary tag, or the typed free text. */
 export interface TagItem {

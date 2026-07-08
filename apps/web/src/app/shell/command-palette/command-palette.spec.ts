@@ -168,7 +168,7 @@ describe('CommandPalette', () => {
       '[data-testid="command-palette-option-c1"]',
     );
     expect(option).not.toBeNull();
-    // The result list is a proper listbox for AT, following the SuggestionMenu
+    // The result list is a proper listbox for AT, following the ListboxController
     // idiom: role=option rows + the input's aria-activedescendant naming the
     // highlighted one (so arrowing is announced with focus still in the input).
     expect(option.getAttribute('role')).toBe('option');

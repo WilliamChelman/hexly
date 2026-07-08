@@ -15,6 +15,7 @@
     "skipDefaultLibCheck": true,
     "baseUrl": ".",
     "paths": {
+      "@hexly/content-editor": ["./libs/content-editor/src/index.ts"],
       "@hexly/domain": ["./libs/domain/src/index.ts"],
       "@hexly/immer": ["./libs/immer/src/index.ts"],
       "@hexly/obsidian": ["./libs/obsidian/src/index.ts"],

@@ -41,6 +41,7 @@ import {
 } from '@hexly/domain';
 import { EntitiesClient, NudgeBusClient, ActiveWorld, idFromSegment, worldRoute, TitleService, AppShellStore } from '@hexly/web-core';
 import { EntityView, HexMapStore } from '@hexly/web-map';
+import type { ContentEditorSession } from '@hexly/content-editor';
 
 /**
  * Bridges {@link EntitiesClient} and {@link HexMapStore} for `/entities/:id`:
@@ -73,7 +74,7 @@ interface SaveSnapshot {
 }
 
 @Injectable()
-export class EntitySession {
+export class EntitySession implements ContentEditorSession {
   private readonly entities = inject(EntitiesClient);
   private readonly bus = inject(NudgeBusClient);
   private readonly editor = inject(HexMapStore);

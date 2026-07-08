@@ -1,16 +1,49 @@
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { ComponentRef } from '@angular/core';
+import { ComponentRef, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
-import { CONTENT_FORMAT, EntityDetail } from '@hexly/domain';
+import { CONTENT_FORMAT, Content, EntityDetail, tiptapContent } from '@hexly/domain';
 import { Editor } from '@tiptap/core';
-import { EntitySession } from '../../services/entity-session';
-import { EntityNameResolver } from '../../services/entity-name-resolver';
+import { EntityNameResolver } from './entity-name-resolver';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { ContentEditor } from './content-editor';
-import { noteDetail } from '../entity-detail.fixtures';
+import { CONTENT_EDITOR_SESSION, ContentEditorSession } from './content-editor-session';
+
+// A minimal note EntityDetail — the lib owns its own fixture rather than the entity
+// page's (owner Rights keep the editor writable, ADR-0039).
+const noteDetail = (name: string): EntityDetail => ({
+  id: 'n1',
+  worldId: 'w1',
+  name,
+  type: 'note',
+  tags: [],
+  visibility: 'private',
+  version: 1,
+  createdAt: 1,
+  updatedAt: 1,
+  rights: ['read', 'edit', 'delete', 'set-visibility', 'manage'],
+  document: { type: 'note', content: { format: CONTENT_FORMAT, snapshot: {} } },
+});
+
+// Drives ContentEditor via the token, standing in for the page's EntitySession:
+// adopt seeds, setContent streams edits back — the 4 members the editor reads.
+class FakeEditorSession implements ContentEditorSession {
+  private readonly _content = signal<Content | null>(null);
+  private readonly _seed = signal<EntityDetail | null>(null);
+  readonly content = this._content.asReadonly();
+  readonly seed = this._seed.asReadonly();
+  readonly writable = signal(true);
+
+  setContent(snapshot: unknown): void {
+    this._content.set(tiptapContent(snapshot));
+  }
+  adopt(detail: EntityDetail): void {
+    this._content.set(detail.document.content);
+    this._seed.set(detail);
+  }
+}
 
 describe('ContentEditor', () => {
   const note = noteDetail;
@@ -61,7 +94,7 @@ describe('ContentEditor', () => {
     await TestBed.configureTestingModule({
       imports: [ContentEditor, provideTranslocoTesting()],
       providers: [
-        EntitySession,
+        { provide: CONTENT_EDITOR_SESSION, useClass: FakeEditorSession },
         EntityNameResolver,
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -72,7 +105,7 @@ describe('ContentEditor', () => {
   });
 
   it('seeds the editor with the open Entity’s stored Content', () => {
-    TestBed.inject(EntitySession).adopt(
+    (TestBed.inject(CONTENT_EDITOR_SESSION) as FakeEditorSession).adopt(
       noteWithProse('Lady Mara rules the north.'),
     );
 
@@ -85,7 +118,7 @@ describe('ContentEditor', () => {
   });
 
   it('renders a callout’s node view — its type/title chrome around live body content', () => {
-    TestBed.inject(EntitySession).adopt({
+    (TestBed.inject(CONTENT_EDITOR_SESSION) as FakeEditorSession).adopt({
       ...note('Lady Mara'),
       document: {
         type: 'note',
@@ -122,7 +155,7 @@ describe('ContentEditor', () => {
       .spyOn(HTMLElement.prototype, 'scrollIntoView')
       .mockImplementation(() => undefined);
 
-    TestBed.inject(EntitySession).adopt({
+    (TestBed.inject(CONTENT_EDITOR_SESSION) as FakeEditorSession).adopt({
       ...note('Lady Mara'),
       document: {
         type: 'note',
@@ -156,7 +189,7 @@ describe('ContentEditor', () => {
       .spyOn(HTMLElement.prototype, 'scrollIntoView')
       .mockImplementation(() => undefined);
 
-    TestBed.inject(EntitySession).adopt(noteWithProse('Just a paragraph.'));
+    (TestBed.inject(CONTENT_EDITOR_SESSION) as FakeEditorSession).adopt(noteWithProse('Just a paragraph.'));
     const fixture = create();
     fragment$.next('Nowhere');
     fixture.detectChanges();
@@ -166,7 +199,7 @@ describe('ContentEditor', () => {
   });
 
   it('labels the editable surface with the supplied aria-label', () => {
-    TestBed.inject(EntitySession).adopt(note('Lady Mara'));
+    (TestBed.inject(CONTENT_EDITOR_SESSION) as FakeEditorSession).adopt(note('Lady Mara'));
 
     const fixture = create();
 
@@ -176,7 +209,7 @@ describe('ContentEditor', () => {
   });
 
   it('opens the slash menu of insertable blocks when “/” is typed', async () => {
-    TestBed.inject(EntitySession).adopt(note('Lady Mara'));
+    (TestBed.inject(CONTENT_EDITOR_SESSION) as FakeEditorSession).adopt(note('Lady Mara'));
 
     const fixture = create();
 
@@ -191,7 +224,7 @@ describe('ContentEditor', () => {
   });
 
   it('mounts the formatting bubble menu', () => {
-    TestBed.inject(EntitySession).adopt(note('Lady Mara'));
+    (TestBed.inject(CONTENT_EDITOR_SESSION) as FakeEditorSession).adopt(note('Lady Mara'));
 
     const fixture = create();
 
@@ -199,7 +232,7 @@ describe('ContentEditor', () => {
   });
 
   it('rebuilds the editor on re-seed and destroys the previous instance', async () => {
-    const session = TestBed.inject(EntitySession);
+    const session = (TestBed.inject(CONTENT_EDITOR_SESSION) as FakeEditorSession);
     session.adopt(noteWithProse('Original prose.'));
 
     const fixture = create();
@@ -229,7 +262,7 @@ describe('ContentEditor', () => {
     // Repro of the Map↔Note toggle bug (#75): the editor is destroyed/recreated
     // across views. A clean save advances the session's live Content but not its
     // seed, so a remount must re-seed from the live edits, not the load snapshot.
-    const session = TestBed.inject(EntitySession);
+    const session = (TestBed.inject(CONTENT_EDITOR_SESSION) as FakeEditorSession);
     session.adopt(noteWithProse('Original prose.'));
 
     const first = create();
@@ -258,7 +291,7 @@ describe('ContentEditor', () => {
   });
 
   it('streams edits to the session after a re-seed', () => {
-    const session = TestBed.inject(EntitySession);
+    const session = (TestBed.inject(CONTENT_EDITOR_SESSION) as FakeEditorSession);
     session.adopt(noteWithProse('Original prose.'));
 
     const fixture = create();

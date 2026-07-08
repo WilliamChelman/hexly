@@ -19,7 +19,7 @@ import {
   EditorRail,
   StatusBar,
 } from '@hexly/web-map';
-import { ContentEditor } from './components/content-editor/content-editor';
+import { ContentEditor } from '@hexly/content-editor';
 import { EntityMetadata } from './components/entity-metadata';
 import { OutlinePanel } from './components/outline-panel';
 import { OutlineSource } from './components/outline-source';

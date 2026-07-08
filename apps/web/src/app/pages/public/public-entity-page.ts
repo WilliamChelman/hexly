@@ -15,7 +15,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { EntityNudge } from '@hexly/domain';
 import { PublicClient, NudgeBusClient, AppShellStore } from '@hexly/web-core';
 import { EntitySession } from '../entity/services/entity-session';
-import { EntityNameResolver } from '../entity/services/entity-name-resolver';
+import { EntityNameResolver, CONTENT_EDITOR_SESSION } from '@hexly/content-editor';
 import { PublicEntityNameResolver } from './public-entity-name-resolver';
 import { OutlineStore } from '../entity/services/outline-store';
 import { EntityPage } from '../entity/entity.page';
@@ -43,6 +43,7 @@ interface Followed {
   host: { class: 'flex h-full flex-col' },
   providers: [
     EntitySession,
+    { provide: CONTENT_EDITOR_SESSION, useExisting: EntitySession },
     { provide: EntityNameResolver, useClass: PublicEntityNameResolver },
     OutlineStore,
   ],

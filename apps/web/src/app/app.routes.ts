@@ -1,9 +1,5 @@
 import { Route } from '@angular/router';
 import { adminGuard, authGuard, loginGuard, entityWorldRedirect, reconcileWorldSegment, activeWorldGuard, clearActiveWorld } from '@hexly/web-core';
-import { flushOnLeave } from './pages/entity/flush-on-leave.guard';
-import { EntitySession } from './pages/entity/services/entity-session';
-import { EntityNameResolver } from './pages/entity/services/entity-name-resolver';
-import { OutlineStore } from './pages/entity/services/outline-store';
 
 // `title` values are transloco keys, resolved by TranslationTitleStrategy.
 export const appRoutes: Route[] = [
@@ -76,19 +72,14 @@ export const appRoutes: Route[] = [
       {
         path: 'entities/:id',
         // Reconcile a stale/hand-edited World segment against the Entity's real
-        // world_id, redirecting to the correct World on mismatch.
+        // world_id, redirecting to the correct World on mismatch. Stays here (not
+        // in the lazy child) so its parent is still `w/:worldId` — where the guard
+        // reads the worldId segment from.
         canActivate: [reconcileWorldSegment],
-        // Await a pending autosave so in-app navigation never drops a debounced edit.
-        canDeactivate: [flushOnLeave],
-        // Route-scoped: one EntitySession per open Entity, destroyed on leave;
-        // EntityNameResolver's id→name cache resets with it.
-        providers: [EntitySession, EntityNameResolver, OutlineStore],
-        // documentTitleKey composes the Entity name with the brand; `title` is
-        // the pre-load fallback.
-        title: 'editorShell.tabTitle',
-        data: { documentTitleKey: 'editorShell.tabTitleNamed' },
-        loadComponent: () =>
-          import('./pages/entity/entity.page').then((m) => m.EntityPage),
+        // The editor's providers + component live in a lazy child config so the
+        // ContentEditor barrel (TipTap) never lands in the initial bundle.
+        loadChildren: () =>
+          import('./pages/entity/entity.routes').then((m) => m.ENTITY_ROUTES),
       },
     ],
   },

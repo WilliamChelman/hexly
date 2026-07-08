@@ -1,22 +1,21 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { SlashItem } from './slash-menu-items';
-import { SuggestionMenu, SuggestionMenuProps } from './suggestion-menu';
-import { SuggestionEmpty, SuggestionOption } from './suggestion-option';
+import { ListboxController, ListboxProps, ListboxEmpty, ListboxOption } from '@hexly/web-ui';
 
 /** What the slash suggestion plugin hands the menu on open/update. */
-export type SlashMenuProps = SuggestionMenuProps<SlashItem>;
+export type SlashMenuProps = ListboxProps<SlashItem>;
 
 /**
  * The keyboard-driven block picker that opens on `/` in the Content editor (#73).
  * Headless TipTap owns no chrome, so this is ours (ADR-0019). All the open/update/
- * close/keyboard state lives in {@link SuggestionMenu}; this is just the slash-item
+ * close/keyboard state lives in {@link ListboxController}; this is just the slash-item
  * template over it.
  */
 @Component({
   selector: 'app-slash-menu',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, SuggestionOption, SuggestionEmpty],
+  imports: [TranslocoPipe, ListboxOption, ListboxEmpty],
   template: `
     @if (visible()) {
       <ul
@@ -30,7 +29,7 @@ export type SlashMenuProps = SuggestionMenuProps<SlashItem>;
       >
         @for (item of items(); track item.id; let i = $index) {
           <li
-            appSuggestionOption
+            appListboxOption
             [optionId]="optionId(item.id)"
             [testid]="'slash-item-' + item.id"
             [selected]="i === activeIndex()"
@@ -39,12 +38,12 @@ export type SlashMenuProps = SuggestionMenuProps<SlashItem>;
             {{ item.labelKey | transloco }}
           </li>
         } @empty {
-          <li appSuggestionEmpty>{{ 'noteView.slashMenu.empty' | transloco }}</li>
+          <li appListboxEmpty>{{ 'noteView.slashMenu.empty' | transloco }}</li>
         }
       </ul>
     }
   `,
 })
-export class SlashMenu extends SuggestionMenu<SlashItem> {
+export class SlashMenu extends ListboxController<SlashItem> {
   protected readonly optionIdPrefix = 'slash-opt-';
 }
