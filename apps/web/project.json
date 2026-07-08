@@ -84,10 +84,10 @@
       "executor": "nx:run-commands",
       "cache": true,
       "inputs": [
-        "{projectRoot}/public/assets/i18n/**/*.json",
+        "{workspaceRoot}/libs/web-core/src/i18n/catalogs/**/*.json",
         "{projectRoot}/tools/check-locale-sync.ts",
         "{projectRoot}/tools/tsconfig.json",
-        "{projectRoot}/src/app/core/i18n/locale-key-sync.ts"
+        "{workspaceRoot}/libs/web-core/src/i18n/locale-key-sync.ts"
       ],
       "options": {
         "commands": [

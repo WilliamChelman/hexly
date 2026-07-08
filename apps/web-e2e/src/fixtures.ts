@@ -2,7 +2,8 @@ import { test as base, expect, type Page, type Response } from '@playwright/test
 // Reuse the app's own pretty-URL codec (ADR-0042): URL segments are `slug-base62(id)`,
 // so specs decode a segment back to the canonical id and build loose matchers from it.
 // A direct file import (not the @hexly/web-core barrel) keeps the Playwright process off the
-// Angular services layer the barrel re-exports — pretty-id is a pure util.
+// Angular services layer the barrel re-exports — pretty-id is a pure util. The nx
+// module-boundary rule is waived for these two pure utils via eslint.config.mjs `allow`.
 import { idFromSegment, segment } from '../../../libs/web-core/src/utils/pretty-id';
 
 /**

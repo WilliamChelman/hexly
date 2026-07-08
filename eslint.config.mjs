@@ -17,9 +17,15 @@ export default [
           // web-core exposes its test doubles via a secondary entry point that
           // is deliberately kept out of the production barrel (the mocks lean on
           // the ambient `vi` global); allow specs to reach it.
+          // The two pure utils below (pretty-id, locale-key-sync) are reached by
+          // direct file path from non-Angular runtimes (Playwright fixtures, the
+          // jiti-run i18n-sync tool) that must not drag in the barrel's Angular
+          // services layer; neither runtime resolves the tsconfig `paths` alias,
+          // so a relative import is used and waived here.
           allow: [
             '^.*/eslint(\\.base)?\\.config\\.[cm]?[jt]s$',
             '@hexly/web-core/testing',
+            '^.*/libs/web-core/src/(utils/pretty-id|i18n/locale-key-sync)$',
           ],
           // ponytail: layering (core←ui←app) holds by construction and review;
           // left permissive because a type:* matrix would need every existing

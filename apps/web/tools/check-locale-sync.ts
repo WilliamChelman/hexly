@@ -15,17 +15,26 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { findKeyDrift } from '../src/app/core/i18n/locale-key-sync';
+// Direct file import (not the @hexly/web-core barrel) keeps this jiti-run CI tool
+// off the Angular services layer the barrel re-exports — findKeyDrift is a pure util.
+// The nx module-boundary rule is waived for these two pure utils via eslint.config.mjs `allow`.
+import { findKeyDrift } from '../../../libs/web-core/src/i18n/locale-key-sync';
 
 /** English is the source of truth and fallback (ADR-0014). */
 const REFERENCE_LOCALE = 'en';
 
+// Catalogs live in web-core (ADR-0014); the web build copies them to
+// assets/i18n at bundle time. Scan them at their source of truth here.
 const I18N_DIR = join(
   dirname(fileURLToPath(import.meta.url)),
   '..',
-  'public',
-  'assets',
+  '..',
+  '..',
+  'libs',
+  'web-core',
+  'src',
   'i18n',
+  'catalogs',
 );
 
 function load(locale: string): Record<string, unknown> {
