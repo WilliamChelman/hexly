@@ -2,14 +2,16 @@ import { basename, posix } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import {
+  ContentNode,
   EntityBody,
   HEXLY_METADATA_PREFIX,
   ImportSummary,
   nameSchema,
   tagsSchema,
   tiptapContent,
+  visit,
 } from '@hexly/domain';
-import { markdownToProseMirror, type PMNode } from '@hexly/obsidian';
+import { markdownToProseMirror } from '@hexly/obsidian';
 import { AssetsService } from '../assets/assets.service';
 import { DB, type Db } from '../db/db';
 import { EntitiesService } from '../entities/entities.service';
@@ -128,28 +130,26 @@ export class VaultImportService {
    * (dedup makes a repeat reference cost nothing), so the summary counts unique stored assets.
    */
   private storeImages(
-    doc: PMNode,
+    doc: ContentNode,
     noteDir: string,
     index: AssetIndex,
     assetFiles: Record<string, Uint8Array>,
     worldId: string,
   ): number {
     let stored = 0;
-    const walk = (n: PMNode) => {
+    visit(doc, (n) => {
       if (n.type === 'image' && n.attrs) {
-        const src = String(n.attrs.src ?? '');
+        const src = String(n.attrs['src'] ?? '');
         if (src && !isExternalUrl(src)) {
           const path = index.resolve(src, noteDir);
           if (path) {
             const result = this.assets.store(worldId, path, assetFiles[path]);
-            n.attrs.src = result.url;
+            n.attrs['src'] = result.url;
             if (!result.deduped) stored++;
           }
         }
       }
-      n.content?.forEach(walk);
-    };
-    walk(doc);
+    });
     return stored;
   }
 }
@@ -159,7 +159,7 @@ interface ImportNote {
   readonly id: string;
   readonly path: string;
   readonly name: string;
-  readonly doc: PMNode;
+  readonly doc: ContentNode;
   readonly metadata: Record<string, unknown>;
 }
 
@@ -256,27 +256,23 @@ function isExternalUrl(src: string): boolean {
  * so its intent survives as a dangling link (#147). Only `entityLink` nodes count — a `![[X]]`
  * embed is already a plain link, so it never reaches here.
  */
-function resolveLinks(node: PMNode, index: NoteIndex): { resolved: number; dangling: number } {
+function resolveLinks(node: ContentNode, index: NoteIndex): { resolved: number; dangling: number } {
   let resolved = 0;
   let dangling = 0;
-  const walk = (n: PMNode) => {
-    if (n.type === 'entityLink' && n.attrs) {
-      const label = String(n.attrs.label ?? '');
-      // An empty label is a same-note anchor (`[[#heading]]`) — it names no note, so it is
-      // neither resolved nor dangling.
-      if (label !== '') {
-        const id = index.resolve(label);
-        if (id) {
-          n.attrs.entityId = id;
-          resolved++;
-        } else {
-          dangling++;
-        }
-      }
+  visit(node, (n) => {
+    if (n.type !== 'entityLink' || !n.attrs) return;
+    const label = String(n.attrs['label'] ?? '');
+    // An empty label is a same-note anchor (`[[#heading]]`) — it names no note, so it is
+    // neither resolved nor dangling.
+    if (label === '') return;
+    const id = index.resolve(label);
+    if (id) {
+      n.attrs['entityId'] = id;
+      resolved++;
+    } else {
+      dangling++;
     }
-    n.content?.forEach(walk);
-  };
-  walk(node);
+  });
   return { resolved, dangling };
 }
 

@@ -14,6 +14,7 @@ The editor is **TipTap v3** (MIT), integrated into the Angular app (ADR-0007/000
 
 - **ProseMirror JSON is schema-coupled: content for a node type not in the registered extension set is silently dropped on load.** So the registered extension set is part of the `format` contract — a schema change is a format change (bump the `format` tag and migrate), not a transparent edit. This is the main sharp edge of the choice and the reason the format tag exists.
 - We own UI chrome (slash menu, toolbar) and a thin dependency on `ngx-tiptap`; both are deliberate, bounded costs.
+- **Content-aware derivation is sanctioned, and confined to one seam.** Deriving *from* Content — FTS plain-text (ADR-0035), the Outline, descriptor harvest, vault import/export rewrites — is not a violation of the opacity above: that opacity is about the Entity **model, storage, and save/version** path never parsing Content, not a ban on reading it. All such derivation goes through the domain `content/` seam (`ContentNode` + `visit`), the single place that knows the snapshot shape. A format bump still touches only that seam and the registered extension set, never the Entity model.
 
 ## Registered extension set for `tiptap-v1`
 

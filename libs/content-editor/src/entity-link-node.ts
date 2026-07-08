@@ -1,22 +1,5 @@
 import { Node, mergeAttributes } from '@tiptap/core';
-
-/**
- * A Content Entity Link (CONTEXT.md, ADR-0023): an inline reference to another
- * Entity by id, living in prose. `entityId` is the reference; `label` is a
- * snapshot of the target's name at insert time (the dangling fallback); the
- * optional `descriptor` characterises the relationship ("spouse", "capital of").
- *
- * Two optional Obsidian-wikilink attrs (ADR-0033): `display` is `[[Target|text]]`
- * custom text that renders **statically** in place of the live target name; `heading`
- * is a `[[Target#Heading]]` anchor navigation scrolls to (round-trips verbatim).
- */
-export interface EntityLinkAttrs {
-  entityId: string;
-  label: string;
-  descriptor?: string | null;
-  display?: string | null;
-  heading?: string | null;
-}
+import { EntityLinkAttrs, entityLinkText } from '@hexly/domain';
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -87,7 +70,7 @@ export const entityLinkNode = Node.create({
         'data-entity-link': '',
         href: `/entities/${node.attrs['entityId'] ?? ''}`,
       }),
-      node.attrs['display'] ?? node.attrs['label'] ?? '',
+      entityLinkText(node.attrs),
     ];
   },
 

@@ -13,7 +13,7 @@ A closed, code-known enum that decides an Entity's shape: `note` (Content only) 
 _Avoid_: Kind, category, class
 
 **Content**:
-The rich-text body every Entity carries — the result of block-based editing (TipTap; see ADR-0019). Stored as an opaque, format-tagged snapshot the domain never parses, so the editor can change without touching the Entity model. Replaces the old per-element "Note".
+The rich-text body every Entity carries — the result of block-based editing (TipTap; see ADR-0019). Replaces the old per-element "Note".
 _Avoid_: Body, rich text, document, prose
 
 **Metadata**:

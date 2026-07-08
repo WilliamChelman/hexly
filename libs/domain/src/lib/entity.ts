@@ -21,7 +21,7 @@ export const READABLE_CONTENT_FORMATS = [
   'tiptap-v3',
 ] as const;
 
-/** Opaque, format-tagged Content. `snapshot` is `z.unknown()` — the domain never parses it. */
+/** Format-tagged Content; `snapshot` is `z.unknown()` so persistence stays format-agnostic — see ADR-0019. */
 export const contentSchema = z.object({
   format: z.enum(READABLE_CONTENT_FORMATS),
   snapshot: z.unknown(),

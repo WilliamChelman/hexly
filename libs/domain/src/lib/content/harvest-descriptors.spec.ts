@@ -1,4 +1,4 @@
-import { tiptapContent } from './entity';
+import { tiptapContent } from '../entity';
 import { harvestDescriptors } from './harvest-descriptors';
 
 /** A doc holding the given entityLink attrs, wrapped in a paragraph. */

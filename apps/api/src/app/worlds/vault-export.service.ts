@@ -1,7 +1,7 @@
 import { posix } from 'node:path';
 import { Injectable } from '@nestjs/common';
-import { EntityDetail, HEXLY_METADATA_PREFIX } from '@hexly/domain';
-import { proseMirrorToMarkdown, type PMNode } from '@hexly/obsidian';
+import { ContentNode, EntityDetail, HEXLY_METADATA_PREFIX, visit } from '@hexly/domain';
+import { proseMirrorToMarkdown } from '@hexly/obsidian';
 import { strToU8, zipSync, type Zippable } from 'fflate';
 import { AssetsService } from '../assets/assets.service';
 import { EntitiesService } from '../entities/entities.service';
@@ -57,7 +57,8 @@ export class VaultExportService {
 
   /** Serialize one Entity's Content body to Obsidian markdown (ProseMirror JSON → mdast → markdown). */
   private toMarkdown(entity: EntityDetail, srcMap: Map<string, string>, nameById: Map<string, string>): string {
-    const doc = entity.document.content.snapshot as PMNode;
+    // One boundary narrow for the serializer, which needs a typed doc root.
+    const doc = entity.document.content.snapshot as ContentNode;
     // In-place on the throwaway parsed snapshot: repoint asset srcs, and refresh each wikilink's
     // label to its target's CURRENT name so a post-import rename still round-trips.
     rewriteAssetSrcs(doc, srcMap);
@@ -85,21 +86,23 @@ function uniquePath(files: Zippable, path: string): string {
  * import still exports a `[[name]]` that resolves to the right file on re-import (#150). A link whose
  * target isn't in this World (deleted/cross-World) keeps its stored label.
  */
-function rewriteEntityLinks(node: PMNode, nameById: Map<string, string>): void {
-  if (node.type === 'entityLink' && node.attrs) {
-    const current = nameById.get(String(node.attrs['entityId'] ?? ''));
-    if (current) node.attrs['label'] = current;
-  }
-  node.content?.forEach((child) => rewriteEntityLinks(child, nameById));
+function rewriteEntityLinks(snapshot: unknown, nameById: Map<string, string>): void {
+  visit(snapshot, (node) => {
+    if (node.type === 'entityLink' && node.attrs) {
+      const current = nameById.get(String(node.attrs['entityId'] ?? ''));
+      if (current) node.attrs['label'] = current;
+    }
+  });
 }
 
 /** Rewrite each `image` node's capability-URL src to its exported `assets/<name>` path; external srcs are absent from the map and pass through untouched. */
-function rewriteAssetSrcs(node: PMNode, srcMap: Map<string, string>): void {
-  if (node.type === 'image' && node.attrs) {
-    const mapped = srcMap.get(String(node.attrs['src'] ?? ''));
-    if (mapped) node.attrs['src'] = mapped;
-  }
-  node.content?.forEach((child) => rewriteAssetSrcs(child, srcMap));
+function rewriteAssetSrcs(snapshot: unknown, srcMap: Map<string, string>): void {
+  visit(snapshot, (node) => {
+    if (node.type === 'image' && node.attrs) {
+      const mapped = srcMap.get(String(node.attrs['src'] ?? ''));
+      if (mapped) node.attrs['src'] = mapped;
+    }
+  });
 }
 
 /**

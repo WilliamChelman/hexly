@@ -5,28 +5,17 @@
  * tracks the saved links, not a separately-computed client payload.
  */
 
-import { Content } from './entity';
+import { Content } from '../entity';
+import { visit } from './content-node';
 
 /** Distinct raw descriptors on every `entityLink` in the doc; `[]` for a non-tiptap format. Normalize (trim/lower/dedupe) with {@link descriptorsSchema} at the call site. */
 export function harvestDescriptors(content: Content): string[] {
   if (!content.format.startsWith('tiptap-')) return [];
   const found = new Set<string>();
-  collect(content.snapshot, found);
+  visit(content.snapshot, (node) => {
+    if (node.type !== 'entityLink') return;
+    const descriptor = node.attrs?.['descriptor'];
+    if (typeof descriptor === 'string' && descriptor.trim()) found.add(descriptor);
+  });
   return [...found];
-}
-
-function collect(node: unknown, found: Set<string>): void {
-  if (Array.isArray(node)) {
-    for (const child of node) collect(child, found);
-    return;
-  }
-  if (node && typeof node === 'object') {
-    const record = node as Record<string, unknown>;
-    if (record['type'] === 'entityLink') {
-      const attrs = record['attrs'] as Record<string, unknown> | undefined;
-      const descriptor = attrs?.['descriptor'];
-      if (typeof descriptor === 'string' && descriptor.trim()) found.add(descriptor);
-    }
-    collect(record['content'], found);
-  }
 }

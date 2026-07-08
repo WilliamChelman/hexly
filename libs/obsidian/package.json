@@ -13,6 +13,7 @@
     "remark-stringify": "^11.0.0",
     "tslib": "^2.3.0",
     "unified": "^11.0.5",
-    "yaml": "^2.9.0"
+    "yaml": "^2.9.0",
+    "@hexly/domain": "*"
   }
 }

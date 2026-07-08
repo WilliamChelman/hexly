@@ -4,15 +4,10 @@ import remarkGfm from 'remark-gfm';
 import remarkFrontmatter from 'remark-frontmatter';
 import { parse as parseYaml } from 'yaml';
 import type { Root, RootContent } from 'mdast';
+import type { ContentNode } from '@hexly/domain';
 
-/** A ProseMirror JSON node — the opaque `tiptap-v3` snapshot shape. */
-export interface PMNode {
-  type: string;
-  attrs?: Record<string, unknown>;
-  content?: PMNode[];
-  marks?: { type: string; attrs?: Record<string, unknown> }[];
-  text?: string;
-}
+/** The `tiptap-v3` snapshot node shape — owned by @hexly/domain (ADR-0019); aliased here for the converters' internal use. */
+export type PMNode = ContentNode;
 
 export interface MarkdownToProseMirror {
   doc: PMNode;
