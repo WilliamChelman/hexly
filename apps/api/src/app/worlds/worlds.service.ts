@@ -176,6 +176,8 @@ export class WorldsService {
       .set({ name: next.name, pinnedEntityIds: next.pinnedEntityIds, updatedAt })
       .where(eq(worlds.id, id))
       .run();
+    // Nudge followers: rename and pin reorder both ride this one world-detail nudge.
+    this.bus.emitWorldChange(id);
     // Only an Owner reaches update (checked above), so full Rights.
     return this.toDetail(next, userId);
   }
@@ -195,6 +197,12 @@ export class WorldsService {
       this.db.delete(entities).where(eq(entities.worldId, id)).run();
       this.db.delete(worlds).where(eq(worlds.id, id)).run();
     });
+    // Deletion is eviction: the World row is gone, so the bus shapes every follower to
+    // `unavailable`. Emit *before* the best-effort filesystem cleanup below — a throwing rmSync
+    // (EACCES/EBUSY) must not strand followers on a ghost World whose row is already gone.
+    // ponytail: its Entities' own followers heal on reconnect/focus — re-emitting each cascaded
+    // Entity is the open-Dashboard/Entity slice's job (#171), not this one.
+    this.bus.emitWorldChange(id);
     // Rows (incl. `assets`) cascade with the World; the on-disk Asset bytes don't,
     // so drop the World's Asset folder here. Best-effort, after the commit.
     this.assets.deleteWorld(id);
@@ -221,6 +229,9 @@ export class WorldsService {
          ON CONFLICT(world_id, user_id) DO UPDATE SET role = 'owner'`,
       )
       .run(id, targetUserId);
+    // Promotion grants `manage`: a follower already holding this World must see the change (their
+    // owner/manage actions light up), so nudge the additive path too, not just removals.
+    this.touchAndNudge(id);
     return { status: 'ok', value: this.worldOwners(id) };
   }
 
@@ -250,6 +261,9 @@ export class WorldsService {
         ),
       )
       .run();
+    // Removing an Owner deletes their membership row — eviction for them if it ends their
+    // reachability, a detail nudge for everyone else. Same shaping path as removeMember.
+    this.touchAndNudge(id);
     return outcome;
   }
 
@@ -283,6 +297,9 @@ export class WorldsService {
          WHERE world_members.role != 'owner'`,
       )
       .run(id, targetUserId, role);
+    // Membership is the single choke point (ADR-0044): additive changes nudge too, so a follower
+    // gaining/regaining reach reconciles rather than waiting for a focus-refetch.
+    this.touchAndNudge(id);
     return { status: 'ok', value: this.worldMembers(id) };
   }
 
@@ -311,6 +328,7 @@ export class WorldsService {
       )
       .run();
     if (updated.changes === 0) return { status: 'not-found' };
+    this.touchAndNudge(id);
     return { status: 'ok', value: this.worldMembers(id) };
   }
 
@@ -352,6 +370,9 @@ export class WorldsService {
       .run();
     // No row matched: the target isn't a (removable) member — an Owner or unknown user.
     if (deleted.changes === 0) return { status: 'not-found' };
+    // Membership removal is eviction for the removed principal (world-share loss rides the same
+    // shaping path): they resolve to `unavailable` while remaining members get a detail nudge.
+    this.touchAndNudge(id);
     return { status: 'ok', value: this.worldMembers(id) };
   }
 
@@ -407,6 +428,18 @@ export class WorldsService {
   ): Extract<OwnerSetResult, { status: 'not-found' | 'forbidden' }> | undefined {
     const meta = worldAccess(this.db, userId).decideMeta(id);
     return gate({ reachable: !!meta?.reachable, isOwner: !!meta?.isOwner });
+  }
+
+  /**
+   * A membership change touched the World's access surface: bump `updatedAt` and nudge followers
+   * (ADR-0044, #176). The bump keeps the world nudge's `updatedAt` honest as the freshness key —
+   * a membership mutation doesn't touch `name`/pins, so without this the nudge would carry a stale
+   * `updatedAt` and a newer-than-held consumer would drop it. Shaping is per recipient: a principal
+   * whose access ended resolves to `unavailable`, everyone still-reachable to a detail nudge.
+   */
+  private touchAndNudge(id: string): void {
+    this.db.update(worlds).set({ updatedAt: Date.now() }).where(eq(worlds.id, id)).run();
+    this.bus.emitWorldChange(id);
   }
 
   // Attach the World's Entity count, ownership set, and the caller's Rights.

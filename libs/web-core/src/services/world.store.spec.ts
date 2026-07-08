@@ -5,8 +5,10 @@ import { AuthClient } from './auth.client';
 import { MockAuthClient } from '../testing/auth-client.mock';
 import { WorldsClient } from './worlds.client';
 import { MockWorldsClient } from '../testing/worlds-client.mock';
+import { NudgeBusClient } from './nudge-bus.client';
+import { MockNudgeBusClient } from '../testing/nudge-bus.mock';
 import { Logger } from './logger';
-import { WorldStore } from './world.store';
+import { WorldStore, WORLD_NUDGE_DEBOUNCE_MS } from './world.store';
 
 function world(id: string, name = id): WorldSummary {
   return { id, name, owners: ['u1'], rights: ['read', 'manage'], createdAt: 1, updatedAt: 1 };
@@ -16,16 +18,19 @@ describe('WorldStore', () => {
   let store: WorldStore;
   let worldsClient: MockWorldsClient;
   let auth: MockAuthClient;
+  let bus: MockNudgeBusClient;
   let logger: { error: ReturnType<typeof vi.fn>; warn: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     worldsClient = new MockWorldsClient();
     auth = new MockAuthClient();
+    bus = new MockNudgeBusClient();
     logger = { error: vi.fn(), warn: vi.fn() };
     TestBed.configureTestingModule({
       providers: [
         { provide: WorldsClient, useValue: worldsClient },
         { provide: AuthClient, useValue: auth },
+        { provide: NudgeBusClient, useValue: bus },
         { provide: Logger, useValue: logger },
       ],
     });
@@ -79,7 +84,7 @@ describe('WorldStore', () => {
     expect(logger.error).toHaveBeenCalled();
   });
 
-  it('creating a World appends it and returns its detail', () => {
+  it('creating a World appends the authoritative response and returns its detail', () => {
     flushList([world('w1')]);
     store.load();
 
@@ -93,8 +98,31 @@ describe('WorldStore', () => {
     let created: WorldDetail | undefined;
     store.create('New Realm').subscribe((w) => (created = w));
 
+    // The acting tab reflects its own confirmed create at once — no dependence on a refetch.
     expect(created).toEqual(detail);
     expect(store.worlds().map((w) => w.id)).toEqual(['w1', 'w2']);
+  });
+
+  it('renaming a World reflects the acting tab’s own change in place at once', () => {
+    flushList([world('w1', 'Aldermoor')]);
+    store.load();
+    worldsClient.rename.mockReturnValue(
+      of({ ...world('w1', 'Aldermoor Reborn'), entityCount: 0, pinnedEntityIds: [] }),
+    );
+
+    store.rename('w1', 'Aldermoor Reborn').subscribe();
+
+    expect(store.worlds().map((w) => w.name)).toEqual(['Aldermoor Reborn']);
+  });
+
+  it('deleting a World removes it from the list on the acting tab at once', () => {
+    flushList([world('w1'), world('w2')]);
+    store.load();
+    worldsClient.delete.mockReturnValue(of(undefined));
+
+    store.delete('w1').subscribe();
+
+    expect(store.worlds().map((w) => w.id)).toEqual(['w2']);
   });
 
   it('forgets the loaded Worlds when the authenticated user changes', () => {
@@ -123,5 +151,55 @@ describe('WorldStore', () => {
 
     expect(store.worlds()).toHaveLength(1);
     expect(store.loaded()).toBe(true);
+  });
+
+  /**
+   * Live-follow reconciliation (ADR-0044, #176): the store follows the Worlds it holds and
+   * reconciles from world nudges instead of hand-written optimistic in-place mutation.
+   */
+  describe('nudge reconciler', () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    /** Load a list and settle the follow effect (`toObservable` subscribes async off the signal). */
+    function loadAndFollow(worlds: WorldSummary[]): void {
+      // Settle the user-change reset effect on the empty state *before* loading, else its first
+      // flush would wipe the freshly-loaded list; then load and let the follow effect pick it up.
+      TestBed.flushEffects();
+      flushList(worlds);
+      store.load();
+      TestBed.flushEffects();
+    }
+
+    it('follows each held World so the server can nudge it', () => {
+      loadAndFollow([world('w1'), world('w2')]);
+      expect(bus.follow).toHaveBeenCalledWith({ kind: 'world', id: 'w1' });
+      expect(bus.follow).toHaveBeenCalledWith({ kind: 'world', id: 'w2' });
+    });
+
+    it('refetches the list once after the debounce on a readable World nudge (rename elsewhere)', () => {
+      loadAndFollow([world('w1', 'Aldermoor')]);
+      // The refetch pulls the authoritative renamed list.
+      flushList([world('w1', 'Aldermoor Reborn')]);
+      worldsClient.list.mockClear();
+
+      bus.emit({ id: 'w1', updatedAt: 2 });
+      expect(worldsClient.list).not.toHaveBeenCalled(); // debounced, not yet
+
+      vi.advanceTimersByTime(WORLD_NUDGE_DEBOUNCE_MS);
+      expect(worldsClient.list).toHaveBeenCalledTimes(1);
+      expect(store.worlds().map((w) => w.name)).toEqual(['Aldermoor Reborn']);
+    });
+
+    it('drops a World from the list on an unavailable nudge (membership loss / delete), no refetch', () => {
+      loadAndFollow([world('w1'), world('w2')]);
+      worldsClient.list.mockClear();
+
+      bus.emit({ id: 'w2', unavailable: true });
+
+      expect(store.worlds().map((w) => w.id)).toEqual(['w1']);
+      vi.advanceTimersByTime(WORLD_NUDGE_DEBOUNCE_MS);
+      expect(worldsClient.list).not.toHaveBeenCalled();
+    });
   });
 });

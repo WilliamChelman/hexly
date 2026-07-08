@@ -1,8 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable, MessageEvent } from '@nestjs/common';
 import { Subject } from 'rxjs';
+import { eq } from 'drizzle-orm';
 import { InterestRef, NudgeDelta, NudgeEntry } from '@hexly/domain';
 import { entityAccess, tokenReachesEntity } from '../acl/entity-access';
+import { worldAccess } from '../acl/world-access';
+import { worlds } from '../db/schema';
 import { DB, Db } from '../db/db';
 
 /**
@@ -72,6 +75,26 @@ export class NudgeBus {
       : tokenReachesEntity(this.db, principal.token, id);
   }
 
+  /**
+   * Whether a principal can currently reach World `id` — the World peer of {@link canRead},
+   * resolving the same `reachableBy` rule the worlds-list read uses (member row OR any Entity
+   * grant inside the World). An anonymous token grants no World-detail reachability in this slice
+   * (the open World Dashboard is the next surface, #171), so it reaches no World ref.
+   */
+  private canReadWorld(principal: Principal, id: string): boolean {
+    return (
+      principal.kind === 'user' &&
+      !!worldAccess(this.db, principal.userId).decideMeta(id)?.reachable
+    );
+  }
+
+  /** Reachability for either ref kind — the shared seam for subscribe-time filtering and shaping. */
+  private canReach(principal: Principal, ref: InterestRef): boolean {
+    return ref.kind === 'entity'
+      ? this.canRead(principal, ref.id)
+      : this.canReadWorld(principal, ref.id);
+  }
+
   /** Drop a connection (client closed the stream). Completes the stream so nothing leaks. */
   disconnect(connectionId: string): void {
     const conn = this.connections.get(connectionId);
@@ -93,38 +116,78 @@ export class NudgeBus {
     const conn = this.connections.get(connectionId);
     if (!conn) return 'not-found';
     if (!principalsEqual(conn.principal, principal)) return 'forbidden';
-    // World refs pass through unfiltered: nothing emits for Worlds yet (#171 later slice).
-    conn.interest = refs.filter(
-      (ref) => ref.kind !== 'entity' || this.canRead(principal, ref.id),
-    );
+    // A forbidden or nonexistent ref of either kind is silently not-subscribed, so existence
+    // can't be probed by guessing ids — a recipient only hears about what it could reach.
+    conn.interest = refs.filter((ref) => this.canReach(principal, ref));
     return 'ok';
   }
 
   /**
-   * Emit a change for an Entity to every connection subscribed to it. The nudge is a delta
-   * carrying only the changed resource (ADR-0044); `version` lets a tab already at that version
-   * ignore the echo.
-   *
-   * Each recipient's entry is shaped against their own *current* rights — the cheap boolean
-   * reachability check on the single access seam (ADR-0044). Still-readable →
-   * `{ id, version, updatedAt }`; access ended (private flip, revoked grant, deleted row) →
-   * opaque `{ id, unavailable }`. The entry is memoized per principal, so N tabs of one user
-   * cost one access resolution per emit, not N.
+   * The shared fan-out (ADR-0044): to every connection whose interest matches `matches`, push a
+   * per-recipient-shaped delta. The shaping invariant — *shape the payload per recipient, never
+   * filter recipients* — lives here once so Entity and World emits can't drift apart. `shape` is
+   * memoized per principal, so N tabs of one user cost one access resolution per emit, not N.
    */
-  emitEntityChange(id: string, version: number, updatedAt: number): void {
+  private fanOut(
+    matches: (ref: InterestRef) => boolean,
+    shape: (principal: Principal) => NudgeEntry,
+  ): void {
     const byPrincipal = new Map<string, NudgeEntry>();
     for (const conn of this.connections.values()) {
-      if (!conn.interest.some((ref) => ref.kind === 'entity' && ref.id === id)) continue;
+      if (!conn.interest.some(matches)) continue;
       const key = principalKey(conn.principal);
       let entry = byPrincipal.get(key);
       if (!entry) {
-        entry = this.canRead(conn.principal, id)
-          ? { id, version, updatedAt }
-          : { id, unavailable: true };
+        entry = shape(conn.principal);
         byPrincipal.set(key, entry);
       }
       const delta: NudgeDelta = [entry];
       conn.stream.next({ type: 'nudge', data: delta });
     }
+  }
+
+  /** Whether any live connection is watching `ref` — lets an emit skip all work when nobody follows. */
+  private anyFollower(matches: (ref: InterestRef) => boolean): boolean {
+    for (const conn of this.connections.values()) {
+      if (conn.interest.some(matches)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Emit a change for an Entity to every subscriber (ADR-0044). Still-readable →
+   * `{ id, version, updatedAt }`; access ended (private flip, revoked grant, deleted row) → opaque
+   * `{ id, unavailable }`. `version`/`updatedAt` let a tab already at that state ignore the echo.
+   */
+  emitEntityChange(id: string, version: number, updatedAt: number): void {
+    this.fanOut(
+      (ref) => ref.kind === 'entity' && ref.id === id,
+      (principal) =>
+        this.canRead(principal, id)
+          ? { id, version, updatedAt }
+          : { id, unavailable: true },
+    );
+  }
+
+  /**
+   * Emit a change for a World to every subscriber (ADR-0044, #176) — the World peer of
+   * {@link emitEntityChange}. Still-reachable → `{ id, updatedAt }`; access ended (member removed,
+   * World deleted) → opaque `{ id, unavailable }`. The `updatedAt` read is guarded behind a
+   * follower check, so the common no-followers emit costs one interest scan and no query; a deleted
+   * World simply has no row and shapes everyone to `unavailable`.
+   */
+  emitWorldChange(id: string): void {
+    const matches = (ref: InterestRef) => ref.kind === 'world' && ref.id === id;
+    if (!this.anyFollower(matches)) return;
+    const row = this.db
+      .select({ updatedAt: worlds.updatedAt })
+      .from(worlds)
+      .where(eq(worlds.id, id))
+      .get();
+    this.fanOut(matches, (principal) =>
+      row && this.canReadWorld(principal, id)
+        ? { id, updatedAt: row.updatedAt }
+        : { id, unavailable: true },
+    );
   }
 }

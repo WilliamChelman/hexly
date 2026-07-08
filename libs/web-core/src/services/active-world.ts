@@ -1,4 +1,11 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import {
+  DestroyRef,
+  Injectable,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import {
   ActivatedRouteSnapshot,
   CanActivateFn,
@@ -6,10 +13,11 @@ import {
   Router,
   RouterStateSnapshot,
 } from '@angular/router';
-import { catchError, map, of } from 'rxjs';
+import { EMPTY, catchError, map, of, switchMap } from 'rxjs';
 import { TranslocoService } from '@jsverse/transloco';
 import { WorldDetail } from '@hexly/domain';
 import { WorldsClient } from './worlds.client';
+import { NudgeBusClient } from './nudge-bus.client';
 import { ToasterService } from './toaster.service';
 import { healWorldSegment, idFromSegment } from '../utils/pretty-id';
 
@@ -23,8 +31,11 @@ import { healWorldSegment, idFromSegment } from '../utils/pretty-id';
 @Injectable({ providedIn: 'root' })
 export class ActiveWorld {
   private readonly worlds = inject(WorldsClient);
+  private readonly bus = inject(NudgeBusClient);
+  private readonly router = inject(Router);
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly _world = signal<WorldDetail | null>(null);
   private readonly _worldId = signal<string | null>(null);
 
@@ -32,6 +43,30 @@ export class ActiveWorld {
   /** The active World id — pinned even when the detail failed to load. */
   readonly worldId = this._worldId.asReadonly();
   readonly name = computed(() => this._world()?.name ?? null);
+
+  constructor() {
+    // Live-follow the active World for *eviction* (ADR-0044, #176): if access ends (removed from
+    // membership, World deleted) the follow delivers `unavailable`, so blank the World and send
+    // the viewer to the Index rather than leave an open Dashboard they can't enter. A *readable*
+    // nudge (rename, pin reorder) is ignored here — that positive live-follow is a later surface.
+    toObservable(this._worldId)
+      .pipe(
+        switchMap((id) =>
+          id === null ? EMPTY : this.bus.follow({ kind: 'world', id }),
+        ),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((n) => {
+        if ('unavailable' in n) this.evict();
+      });
+  }
+
+  /** Blank the active World and return to the World Index — the eviction landing. */
+  private evict(): void {
+    this._world.set(null);
+    this._worldId.set(null);
+    this.router.navigate(['/']);
+  }
 
   /**
    * Pin the active World. Pass the loaded {@link WorldDetail}, an id string to pin

@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import {
   ActivatedRouteSnapshot,
   convertToParamMap,
+  Router,
   RouterStateSnapshot,
   UrlTree,
 } from '@angular/router';
@@ -9,6 +10,8 @@ import { firstValueFrom, isObservable, Observable, of, throwError } from 'rxjs';
 import { WorldDetail } from '@hexly/domain';
 import { TranslocoService } from '@jsverse/transloco';
 import { WorldsClient } from './worlds.client';
+import { NudgeBusClient } from './nudge-bus.client';
+import { MockNudgeBusClient } from '../testing/nudge-bus.mock';
 import { ToasterService } from './toaster.service';
 import { MockWorldsClient } from '../testing/worlds-client.mock';
 import { segment } from '../utils/pretty-id';
@@ -26,19 +29,25 @@ function settle(result: unknown): Promise<boolean | UrlTree> {
 describe('ActiveWorld', () => {
   let active: ActiveWorld;
   let worlds: MockWorldsClient;
+  let bus: MockNudgeBusClient;
+  let navigate: ReturnType<typeof vi.spyOn>;
   let toaster: { show: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     worlds = new MockWorldsClient();
+    bus = new MockNudgeBusClient();
     toaster = { show: vi.fn() };
     TestBed.configureTestingModule({
       providers: [
         { provide: WorldsClient, useValue: worlds },
+        { provide: NudgeBusClient, useValue: bus },
         { provide: ToasterService, useValue: toaster },
         { provide: TranslocoService, useValue: { translate: (k: string) => k } },
       ],
     });
     active = TestBed.inject(ActiveWorld);
+    // Spy on the real Router (the guard relies on parseUrl) rather than replacing it.
+    navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
   });
 
   function run(worldSeg: string, url = `/w/${worldSeg}`) {
@@ -169,5 +178,30 @@ describe('ActiveWorld', () => {
 
     expect(active.worldId()).toBe(WORLD_ID);
     expect(active.world()).toBe(detail);
+  });
+
+  // Live-follow eviction (ADR-0044, #176): losing access to the open World blanks it and sends the
+  // viewer to the World Index, rather than leaving an open Dashboard for a World they can't enter.
+  describe('live eviction', () => {
+    it('evicts the active World to the Index when it becomes unavailable (membership loss / delete)', () => {
+      active.set(detail, WORLD_ID);
+      TestBed.flushEffects(); // settle the follow subscription
+
+      bus.emit({ id: WORLD_ID, unavailable: true });
+
+      expect(active.worldId()).toBeNull();
+      expect(active.world()).toBeNull();
+      expect(navigate).toHaveBeenCalledWith(['/']);
+    });
+
+    it('does not evict on a readable World nudge — open-Dashboard live-follow is a later surface', () => {
+      active.set(detail, WORLD_ID);
+      TestBed.flushEffects();
+
+      bus.emit({ id: WORLD_ID, updatedAt: 2 });
+
+      expect(active.worldId()).toBe(WORLD_ID);
+      expect(navigate).not.toHaveBeenCalled();
+    });
   });
 });

@@ -43,6 +43,16 @@ export interface EntityNudge {
 }
 
 /**
+ * A changed World. A World has no `version` column (only `updatedAt`), so its readable
+ * nudge carries `updatedAt` alone — the client reconciles by refetching, keyed on it.
+ * A World is just another `ref`: rename, pin reorder, and metadata changes all flow here.
+ */
+export interface WorldNudge {
+  id: string;
+  updatedAt: number;
+}
+
+/**
  * The eviction entry: the recipient's own access to a followed resource has ended.
  * Opaque and version-free — unauthorized, deleted, and never-existed are byte-identical,
  * so the status can't leak "it still exists, you just can't see it."
@@ -52,8 +62,8 @@ export interface UnavailableNudge {
   unavailable: true;
 }
 
-/** One per-recipient entry: still-readable → version, access ended → unavailable. */
-export type NudgeEntry = EntityNudge | UnavailableNudge;
+/** One per-recipient entry: still-readable → version/updatedAt, access ended → unavailable. */
+export type NudgeEntry = EntityNudge | WorldNudge | UnavailableNudge;
 
 /**
  * A nudge is a *delta* array holding only the resource(s) whose event fired — not a

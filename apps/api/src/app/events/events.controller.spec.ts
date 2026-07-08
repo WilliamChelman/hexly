@@ -628,4 +628,188 @@ describe('Events (SSE nudge bus) endpoints', () => {
 
     await bob.sse.close();
   });
+
+  /** Ada's sole World (minted in beforeEach), via her authorized list read. */
+  async function adaWorldId(cookie: string): Promise<string> {
+    const res = await request(app.getHttpServer())
+      .get('/worlds')
+      .set('Cookie', cookie)
+      .expect(200);
+    return res.body[0].id as string;
+  }
+
+  it('delivers { id, updatedAt } to a follower when a World is renamed (a World is just another ref)', async () => {
+    const adaCookie = await sessionCookie('ada@hexly.test', 'correct horse');
+    const worldId = await adaWorldId(adaCookie);
+
+    const { sse, connectionId } = await connect(adaCookie);
+    await request(app.getHttpServer())
+      .put(`/events/${connectionId}/interest`)
+      .set('Cookie', adaCookie)
+      .send({ refs: [{ kind: 'world', id: worldId }] })
+      .expect(204);
+
+    await request(app.getHttpServer())
+      .patch(`/worlds/${worldId}`)
+      .set('Cookie', adaCookie)
+      .send({ name: 'Aldermoor Reborn' })
+      .expect(200);
+
+    // A World has no version column; the readable world nudge carries updatedAt only.
+    const nudge = await sse.next();
+    expect(nudge.event).toBe('nudge');
+    expect(nudge.data).toEqual([{ id: worldId, updatedAt: expect.any(Number) }]);
+
+    await sse.close();
+  });
+
+  it('evicts a World follower to opaque, version-free { id, unavailable } when the World is deleted', async () => {
+    const adaCookie = await sessionCookie('ada@hexly.test', 'correct horse');
+    const worldId = await adaWorldId(adaCookie);
+
+    const { sse, connectionId } = await connect(adaCookie);
+    await request(app.getHttpServer())
+      .put(`/events/${connectionId}/interest`)
+      .set('Cookie', adaCookie)
+      .send({ refs: [{ kind: 'world', id: worldId }] })
+      .expect(204);
+
+    await request(app.getHttpServer())
+      .delete(`/worlds/${worldId}`)
+      .set('Cookie', adaCookie)
+      .expect(204);
+
+    // Deleted rides the same shaping path as unauthorized — byte-identical, version-free.
+    const nudge = await sse.next();
+    expect(nudge.event).toBe('nudge');
+    expect(nudge.data).toEqual([{ id: worldId, unavailable: true }]);
+
+    await sse.close();
+  });
+
+  it('shapes one member-removal event per recipient: removed member evicted, remaining Owner kept (ADR-0044)', async () => {
+    // Bob follows via a World Viewer membership; Ada owns it. Removing Bob is one mutation event,
+    // correct per person — Bob loses reachability (opaque eviction), Ada keeps it (version-free
+    // detail nudge). This is the worlds-list disappearance from user story 16.
+    const bobId = await app
+      .get(AuthService)
+      .seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob');
+    const adaCookie = await sessionCookie('ada@hexly.test', 'correct horse');
+    const bobCookie = await sessionCookie('bob@hexly.test', 'hunter2 stationery');
+    const worldId = await adaWorldId(adaCookie);
+    db.insert(worldMembers).values({ worldId, userId: bobId, role: 'viewer' }).run();
+
+    const bob = await connect(bobCookie);
+    await request(app.getHttpServer())
+      .put(`/events/${bob.connectionId}/interest`)
+      .set('Cookie', bobCookie)
+      .send({ refs: [{ kind: 'world', id: worldId }] })
+      .expect(204);
+    const ada = await connect(adaCookie);
+    await request(app.getHttpServer())
+      .put(`/events/${ada.connectionId}/interest`)
+      .set('Cookie', adaCookie)
+      .send({ refs: [{ kind: 'world', id: worldId }] })
+      .expect(204);
+
+    await request(app.getHttpServer())
+      .delete(`/worlds/${worldId}/members/${bobId}`)
+      .set('Cookie', adaCookie)
+      .expect(200);
+
+    const bobNudge = await bob.sse.next();
+    expect(bobNudge.data).toEqual([{ id: worldId, unavailable: true }]);
+    const adaNudge = await ada.sse.next();
+    expect(adaNudge.data).toEqual([{ id: worldId, updatedAt: expect.any(Number) }]);
+
+    await bob.sse.close();
+    await ada.sse.close();
+  });
+
+  it('nudges an existing follower on an additive membership change (promotion), with a freshened updatedAt', async () => {
+    // A World Viewer already follows the World; promoting them to Owner grants `manage`, so the
+    // additive membership path must nudge too (not only removals) or their UI stays stale until a
+    // focus-refetch. The nudge's updatedAt is bumped, so a newer-than-held consumer can't drop it.
+    const bobId = await app
+      .get(AuthService)
+      .seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob');
+    const adaCookie = await sessionCookie('ada@hexly.test', 'correct horse');
+    const bobCookie = await sessionCookie('bob@hexly.test', 'hunter2 stationery');
+    const worldId = await adaWorldId(adaCookie);
+    db.insert(worldMembers).values({ worldId, userId: bobId, role: 'viewer' }).run();
+    const before = (await request(app.getHttpServer()).get('/worlds').set('Cookie', bobCookie))
+      .body[0].updatedAt as number;
+
+    const bob = await connect(bobCookie);
+    await request(app.getHttpServer())
+      .put(`/events/${bob.connectionId}/interest`)
+      .set('Cookie', bobCookie)
+      .send({ refs: [{ kind: 'world', id: worldId }] })
+      .expect(204);
+
+    await request(app.getHttpServer())
+      .post(`/worlds/${worldId}/owners`)
+      .set('Cookie', adaCookie)
+      .send({ userId: bobId })
+      .expect(200);
+
+    const nudge = await bob.sse.next();
+    expect(nudge.data).toEqual([{ id: worldId, updatedAt: expect.any(Number) }]);
+    // The membership change bumped updatedAt, so the nudge carries the current (fresh) value.
+    const after = (await request(app.getHttpServer()).get('/worlds').set('Cookie', bobCookie))
+      .body[0].updatedAt as number;
+    expect((nudge.data as { updatedAt: number }[])[0].updatedAt).toBe(after);
+    expect(after).toBeGreaterThanOrEqual(before);
+
+    await bob.sse.close();
+  });
+
+  it('never delivers a World nudge to a principal with no access to it — silently not-subscribed', async () => {
+    // Bob can't reach Ada's World, so subscribing to it is silently dropped (existence/activity
+    // must not leak, user story 18). His own note is the tell-tale: mutating the forbidden World
+    // first, then his note, his first frame being the note proves the World ref delivered nothing.
+    const bobId = await app
+      .get(AuthService)
+      .seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob', { canCreateWorlds: true });
+    app.get(WorldsService).mintWorld(bobId, 'Bobland');
+    const adaCookie = await sessionCookie('ada@hexly.test', 'correct horse');
+    const bobCookie = await sessionCookie('bob@hexly.test', 'hunter2 stationery');
+    const adaWorld = await adaWorldId(adaCookie);
+
+    const bobNote = await request(app.getHttpServer())
+      .post('/entities')
+      .set('Cookie', bobCookie)
+      .send({ name: 'Bob’s Ledger', type: 'note' })
+      .expect(201);
+    const bobEntityId = bobNote.body.id as string;
+
+    const bob = await connect(bobCookie);
+    await request(app.getHttpServer())
+      .put(`/events/${bob.connectionId}/interest`)
+      .set('Cookie', bobCookie)
+      .send({
+        refs: [
+          { kind: 'world', id: adaWorld },
+          { kind: 'entity', id: bobEntityId },
+        ],
+      })
+      .expect(204);
+
+    // Rename Ada's World first (Bob can't reach it), then Bob's note.
+    await request(app.getHttpServer())
+      .patch(`/worlds/${adaWorld}`)
+      .set('Cookie', adaCookie)
+      .send({ name: 'Sealed Realm' })
+      .expect(200);
+    await request(app.getHttpServer())
+      .patch(`/entities/${bobEntityId}`)
+      .set('Cookie', bobCookie)
+      .send({ name: 'Bob’s Amended Ledger' })
+      .expect(200);
+
+    const nudge = await bob.sse.next();
+    expect(nudge.data).toEqual([{ id: bobEntityId, version: 1, updatedAt: expect.any(Number) }]);
+
+    await bob.sse.close();
+  });
 });
