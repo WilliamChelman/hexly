@@ -663,6 +663,106 @@ describe('Events (SSE nudge bus) endpoints', () => {
     await sse.close();
   });
 
+  /** Mint a World Public Link on `worldId`, returning its token. */
+  async function mintWorldLink(worldId: string, cookie: string): Promise<string> {
+    const link = await request(app.getHttpServer())
+      .post(`/worlds/${worldId}/link`)
+      .set('Cookie', cookie)
+      .expect(200);
+    return link.body.token as string;
+  }
+
+  // Open-Dashboard live-follow for anonymous World Public Link viewers (ADR-0044, #178): a
+  // world-link token is a first-class World-ref follower — the deferred `canReadWorld` token branch
+  // from #176 now resolves the world-link grant, so an anonymous Dashboard follows rename/pin live.
+  it('resolves a World-link token following the World ref and delivers { id, updatedAt } on rename (#178)', async () => {
+    const adaCookie = await sessionCookie('ada@hexly.test', 'correct horse');
+    const worldId = await adaWorldId(adaCookie);
+    const token = await mintWorldLink(worldId, adaCookie);
+
+    const { sse, connectionId } = await connectToken(token);
+    await request(app.getHttpServer())
+      .put(`/events/${connectionId}/interest?token=${token}`)
+      .send({ refs: [{ kind: 'world', id: worldId }] })
+      .expect(204);
+
+    await request(app.getHttpServer())
+      .patch(`/worlds/${worldId}`)
+      .set('Cookie', adaCookie)
+      .send({ name: 'Aldermoor Reborn' })
+      .expect(200);
+
+    const nudge = await sse.next();
+    expect(nudge.event).toBe('nudge');
+    expect(nudge.data).toEqual([{ id: worldId, updatedAt: expect.any(Number) }]);
+
+    await sse.close();
+  });
+
+  it('evicts a World-link token following the World ref to { id, unavailable } when the link is revoked (#178)', async () => {
+    const adaCookie = await sessionCookie('ada@hexly.test', 'correct horse');
+    const worldId = await adaWorldId(adaCookie);
+    const token = await mintWorldLink(worldId, adaCookie);
+
+    const { sse, connectionId } = await connectToken(token);
+    await request(app.getHttpServer())
+      .put(`/events/${connectionId}/interest?token=${token}`)
+      .send({ refs: [{ kind: 'world', id: worldId }] })
+      .expect(204);
+
+    await request(app.getHttpServer())
+      .delete(`/worlds/${worldId}/link`)
+      .set('Cookie', adaCookie)
+      .expect(204);
+
+    // Revoke rides the world-detail shaping event: the token now reaches no World, so it evicts.
+    const nudge = await sse.next();
+    expect(nudge.data).toEqual([{ id: worldId, unavailable: true }]);
+
+    await sse.close();
+  });
+
+  it('confines a World-link token to its own World — a sibling World it does not grant is silently not-subscribed (#178)', async () => {
+    const bobId = await app
+      .get(AuthService)
+      .seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob', { canCreateWorlds: true });
+    const otherWorldId = app.get(WorldsService).mintWorld(bobId, 'Bobland');
+    const adaCookie = await sessionCookie('ada@hexly.test', 'correct horse');
+    const bobCookie = await sessionCookie('bob@hexly.test', 'hunter2 stationery');
+    const adaWorld = await adaWorldId(adaCookie);
+    const token = await mintWorldLink(adaWorld, adaCookie);
+
+    // Subscribe the Ada-World token to *both* Worlds; only its own is honoured.
+    const { sse, connectionId } = await connectToken(token);
+    await request(app.getHttpServer())
+      .put(`/events/${connectionId}/interest?token=${token}`)
+      .send({
+        refs: [
+          { kind: 'world', id: otherWorldId },
+          { kind: 'world', id: adaWorld },
+        ],
+      })
+      .expect(204);
+
+    // Rename Bob's World first (the token can't reach it), then Ada's; the first frame being
+    // Ada's proves the sibling World ref delivered nothing.
+    await request(app.getHttpServer())
+      .patch(`/worlds/${otherWorldId}`)
+      .set('Cookie', bobCookie)
+      .send({ name: 'Bobland Renamed' })
+      .expect(200);
+    await request(app.getHttpServer())
+      .patch(`/worlds/${adaWorld}`)
+      .set('Cookie', adaCookie)
+      .send({ name: 'Aldermoor Renamed' })
+      .expect(200);
+
+    const nudge = await sse.next();
+    expect(nudge.data).toEqual([{ id: adaWorld, updatedAt: expect.any(Number) }]);
+
+    await sse.close();
+  });
+
   it('evicts a World follower to opaque, version-free { id, unavailable } when the World is deleted', async () => {
     const adaCookie = await sessionCookie('ada@hexly.test', 'correct horse');
     const worldId = await adaWorldId(adaCookie);

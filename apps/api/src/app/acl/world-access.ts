@@ -1,7 +1,7 @@
 import { WorldVerb } from '@hexly/domain';
 import { and, eq, sql, SQLWrapper } from 'drizzle-orm';
 import { Db } from '../db/db';
-import { entities, entityGrants, worldMembers, worlds } from '../db/schema';
+import { entities, entityGrants, worldLinks, worldMembers, worlds } from '../db/schema';
 import { isSuperadmin } from './owner-set';
 
 /**
@@ -77,6 +77,22 @@ export function canCreateEntityFilter(userId: string, superadmin: boolean) {
  */
 export function worldOwnerFilter(userId: string) {
   return ownedBy(userId, worlds.id);
+}
+
+/**
+ * Whether a World Public Link *token* currently reaches World `id` — the reachability seam the
+ * nudge bus checks for a token principal (ADR-0044, #178), the World peer of `tokenReachesEntity`.
+ * The token *is* the grant: a live `world_links` row pointing at the World grants anonymous
+ * Dashboard reach, so rename/pin/metadata nudges flow and a revoked token (row gone) reaches
+ * nothing (→ eviction). Blob-free and index-backed, so fine on the per-emit path.
+ */
+export function tokenReachesWorld(db: Db, token: string, id: string): boolean {
+  const row = db
+    .select({ id: worldLinks.id })
+    .from(worldLinks)
+    .where(and(eq(worldLinks.id, token), eq(worldLinks.worldId, id)))
+    .get();
+  return !!row;
 }
 
 /**

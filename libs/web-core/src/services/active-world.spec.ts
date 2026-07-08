@@ -6,7 +6,7 @@ import {
   RouterStateSnapshot,
   UrlTree,
 } from '@angular/router';
-import { firstValueFrom, isObservable, Observable, of, throwError } from 'rxjs';
+import { firstValueFrom, isObservable, Observable, of, Subject, throwError } from 'rxjs';
 import { WorldDetail } from '@hexly/domain';
 import { TranslocoService } from '@jsverse/transloco';
 import { WorldsClient } from './worlds.client';
@@ -16,9 +16,10 @@ import { ToasterService } from './toaster.service';
 import { MockWorldsClient } from '../testing/worlds-client.mock';
 import { segment } from '../utils/pretty-id';
 import { ActiveWorld, activeWorldGuard, clearActiveWorld } from './active-world';
+import { WORLD_NUDGE_DEBOUNCE_MS } from './world.store';
 
 const WORLD_ID = '11111111-1111-4111-8111-111111111111';
-const detail = { id: WORLD_ID, name: 'Aldermoor' } as WorldDetail;
+const detail = { id: WORLD_ID, name: 'Aldermoor', updatedAt: 1 } as WorldDetail;
 
 function settle(result: unknown): Promise<boolean | UrlTree> {
   return isObservable(result)
@@ -194,7 +195,7 @@ describe('ActiveWorld', () => {
       expect(navigate).toHaveBeenCalledWith(['/']);
     });
 
-    it('does not evict on a readable World nudge — open-Dashboard live-follow is a later surface', () => {
+    it('does not navigate away on a readable World nudge — a rename/pin change is live-follow, not eviction', () => {
       active.set(detail, WORLD_ID);
       TestBed.flushEffects();
 
@@ -202,6 +203,62 @@ describe('ActiveWorld', () => {
 
       expect(active.worldId()).toBe(WORLD_ID);
       expect(navigate).not.toHaveBeenCalled();
+    });
+  });
+
+  // Open-Dashboard live-follow (ADR-0044, #178): a readable World nudge (rename / pin reorder /
+  // metadata) refetches the authoritative detail and re-pins it, so an open Dashboard — which
+  // derives its name and pins from active.world() — reflects the change without a reload.
+  describe('live-follow refetch', () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    it('refetches and re-pins the World detail once after the debounce on a readable nudge', () => {
+      active.set(detail, WORLD_ID);
+      TestBed.flushEffects(); // settle the follow subscription
+      const renamed = { id: WORLD_ID, name: 'Aldermoor Reborn', updatedAt: 2 } as WorldDetail;
+      worlds.get.mockReturnValue(of(renamed));
+
+      bus.emit({ id: WORLD_ID, updatedAt: 2 });
+      expect(worlds.get).not.toHaveBeenCalled(); // debounced, not yet
+
+      vi.advanceTimersByTime(WORLD_NUDGE_DEBOUNCE_MS);
+
+      expect(worlds.get).toHaveBeenCalledWith(WORLD_ID);
+      expect(active.world()).toBe(renamed);
+      expect(active.name()).toBe('Aldermoor Reborn');
+    });
+
+    it('ignores a self-echo nudge no newer than the held detail — no redundant refetch', () => {
+      active.set(detail, WORLD_ID); // held updatedAt = 1
+      TestBed.flushEffects();
+
+      bus.emit({ id: WORLD_ID, updatedAt: 1 });
+      vi.advanceTimersByTime(WORLD_NUDGE_DEBOUNCE_MS);
+
+      expect(worlds.get).not.toHaveBeenCalled();
+    });
+
+    // The nudge-driven GET and this tab's own commitPins are independent subscriptions with no
+    // response ordering. A GET issued while the held detail was old must not, on resolving late,
+    // revert a newer local write (e.g. a pin reorder committed in the meantime) back to stale state.
+    it('drops a stale in-flight refetch that resolves after a newer local write', () => {
+      active.set(detail, WORLD_ID); // held updatedAt = 1
+      TestBed.flushEffects();
+      const inflight = new Subject<WorldDetail>();
+      worlds.get.mockReturnValue(inflight);
+
+      bus.emit({ id: WORLD_ID, updatedAt: 2 });
+      vi.advanceTimersByTime(WORLD_NUDGE_DEBOUNCE_MS); // GET issued (in flight), held still updatedAt 1
+
+      // This tab's own commitPins lands with a newer detail while the GET is still in flight.
+      const local = { id: WORLD_ID, name: 'Local Reorder', updatedAt: 5 } as WorldDetail;
+      active.set(local, WORLD_ID);
+      // The stale GET (read before commitPins committed) now resolves late.
+      inflight.next({ id: WORLD_ID, name: 'Stale', updatedAt: 2 } as WorldDetail);
+
+      expect(active.world()).toBe(local); // not clobbered back to the stale read
+      expect(active.name()).toBe('Local Reorder');
     });
   });
 });

@@ -13,11 +13,22 @@ import {
   Router,
   RouterStateSnapshot,
 } from '@angular/router';
-import { EMPTY, catchError, map, of, switchMap } from 'rxjs';
+import {
+  EMPTY,
+  catchError,
+  debounceTime,
+  filter,
+  map,
+  of,
+  switchMap,
+  tap,
+} from 'rxjs';
 import { TranslocoService } from '@jsverse/transloco';
-import { WorldDetail } from '@hexly/domain';
+import { WorldDetail, WorldNudge } from '@hexly/domain';
 import { WorldsClient } from './worlds.client';
 import { NudgeBusClient } from './nudge-bus.client';
+import { WORLD_NUDGE_DEBOUNCE_MS } from './world.store';
+import { Logger } from './logger';
 import { ToasterService } from './toaster.service';
 import { healWorldSegment, idFromSegment } from '../utils/pretty-id';
 
@@ -35,6 +46,7 @@ export class ActiveWorld {
   private readonly router = inject(Router);
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
+  private readonly logger = inject(Logger);
   private readonly destroyRef = inject(DestroyRef);
   private readonly _world = signal<WorldDetail | null>(null);
   private readonly _worldId = signal<string | null>(null);
@@ -45,20 +57,62 @@ export class ActiveWorld {
   readonly name = computed(() => this._world()?.name ?? null);
 
   constructor() {
-    // Live-follow the active World for *eviction* (ADR-0044, #176): if access ends (removed from
-    // membership, World deleted) the follow delivers `unavailable`, so blank the World and send
-    // the viewer to the Index rather than leave an open Dashboard they can't enter. A *readable*
-    // nudge (rename, pin reorder) is ignored here — that positive live-follow is a later surface.
+    // Live-follow the active World (ADR-0044, #176/#178). Two outcomes ride the one follow:
+    // - `unavailable` (membership loss, World deleted) → *evict*: blank the World and send the
+    //   viewer to the Index rather than leave an open Dashboard they can't enter.
+    // - a readable nudge (rename, pin reorder, metadata) → *refetch* the authoritative detail and
+    //   re-pin it, so an open Dashboard — which derives its name and pins from world() — reflects
+    //   the change without a reload. Debounced to coalesce a burst; `newerThanHeld` drops a
+    //   self-echo (this tab's own commitPins already re-pinned) so it doesn't refetch its own write.
     toObservable(this._worldId)
       .pipe(
         switchMap((id) =>
-          id === null ? EMPTY : this.bus.follow({ kind: 'world', id }),
+          id === null
+            ? EMPTY
+            : this.bus.follow({ kind: 'world', id }).pipe(
+                tap((n) => {
+                  if ('unavailable' in n) this.evict();
+                }),
+                filter((n): n is WorldNudge => !('unavailable' in n)),
+                filter((n) => this.newerThanHeld(n)),
+                debounceTime(WORLD_NUDGE_DEBOUNCE_MS),
+                // Re-check after the debounce: this tab's own commitPins may have landed during the
+                // window, advancing the held detail past the nudge — then there's nothing to refetch.
+                filter((n) => this.newerThanHeld(n)),
+                switchMap(() =>
+                  this.worlds.get(id).pipe(
+                    catchError((err) => {
+                      // A transient failure leaves the held detail as-is (self-heals on the next
+                      // nudge/reconnect); log it — mirroring WorldStore's reconciler — so a stale
+                      // Dashboard isn't silently unexplained.
+                      this.logger.error('Failed to refetch the active World from a nudge', err);
+                      return EMPTY;
+                    }),
+                  ),
+                ),
+              ),
         ),
         takeUntilDestroyed(this.destroyRef),
       )
-      .subscribe((n) => {
-        if ('unavailable' in n) this.evict();
+      // Only apply a refetch at least as fresh as the held detail. The nudge-driven GET and this
+      // tab's own commitPins are independent subscriptions with no response ordering: a stale GET
+      // (one that read server state before commitPins committed) resolving late must not revert a
+      // newer local write back to old pins. A null resolve (World just went unreachable) leaves
+      // the held detail alone — the `unavailable` path owns eviction.
+      .subscribe((detail) => {
+        const held = this._world();
+        if (detail && (!held || detail.updatedAt >= held.updatedAt)) this.set(detail);
       });
+  }
+
+  /**
+   * Whether a readable World nudge is newer than the loaded detail — the self-echo guard. A World
+   * has no `version`, so `updatedAt` is the sole freshness key (a rename/pin/metadata patch bumps
+   * it). No held detail (an id-only pin from a failed fetch) → always refetch, to recover it.
+   */
+  private newerThanHeld(n: WorldNudge): boolean {
+    const held = this._world();
+    return !held || n.updatedAt > held.updatedAt;
   }
 
   /** Blank the active World and return to the World Index — the eviction landing. */

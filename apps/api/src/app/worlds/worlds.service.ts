@@ -402,6 +402,10 @@ export class WorldsService {
     const gate = this.gateOwnerManagement(userId, id);
     if (gate) return gate;
     revokePublicLink(this.db, WORLD_LINK, id);
+    // Revoke is eviction for a World-ref follower too (#178): the token now reaches no World, so
+    // emit the world-detail event to evict an anonymous open-Dashboard viewer to `unavailable`.
+    // An authorized cookie follower re-derives reachable and gets a harmless refresh nudge.
+    this.bus.emitWorldChange(id);
     // Revoke is eviction: re-emit each of the World's `shared` Entities so the bus
     // shapes every world-link follower to `unavailable`; a still-authorized follower
     // computes newer-than-held false and no-ops it.

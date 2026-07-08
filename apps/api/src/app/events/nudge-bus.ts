@@ -4,7 +4,7 @@ import { Subject } from 'rxjs';
 import { eq } from 'drizzle-orm';
 import { InterestRef, NudgeDelta, NudgeEntry } from '@hexly/domain';
 import { entityAccess, tokenReachesEntity } from '../acl/entity-access';
-import { worldAccess } from '../acl/world-access';
+import { worldAccess, tokenReachesWorld } from '../acl/world-access';
 import { worlds } from '../db/schema';
 import { DB, Db } from '../db/db';
 
@@ -76,16 +76,16 @@ export class NudgeBus {
   }
 
   /**
-   * Whether a principal can currently reach World `id` — the World peer of {@link canRead},
-   * resolving the same `reachableBy` rule the worlds-list read uses (member row OR any Entity
-   * grant inside the World). An anonymous token grants no World-detail reachability in this slice
-   * (the open World Dashboard is the next surface, #171), so it reaches no World ref.
+   * Whether a principal can currently reach World `id` — the World peer of {@link canRead}. A
+   * cookie principal resolves the same `reachableBy` rule the worlds-list read uses (member row OR
+   * any Entity grant inside the World); a token principal resolves its World Public Link grant
+   * (ADR-0044, #178), so an anonymous World-link viewer follows the open Dashboard live and a
+   * revoked link reaches nothing.
    */
   private canReadWorld(principal: Principal, id: string): boolean {
-    return (
-      principal.kind === 'user' &&
-      !!worldAccess(this.db, principal.userId).decideMeta(id)?.reachable
-    );
+    return principal.kind === 'user'
+      ? !!worldAccess(this.db, principal.userId).decideMeta(id)?.reachable
+      : tokenReachesWorld(this.db, principal.token, id);
   }
 
   /** Reachability for either ref kind — the shared seam for subscribe-time filtering and shaping. */

@@ -14,6 +14,9 @@ export class MockNudgeBusClient {
       this.nudges.pipe(filter((n) => n.id === ref.id)),
   );
 
+  /** Spy for the anonymous-principal switch — asserts a page connects/clears its token. */
+  readonly useToken = vi.fn((_token: string | null): void => undefined);
+
   /** Test helper: deliver a nudge (a version delta or an `unavailable` eviction) to followers. */
   emit(nudge: NudgeEntry): void {
     this.nudges.next(nudge);
