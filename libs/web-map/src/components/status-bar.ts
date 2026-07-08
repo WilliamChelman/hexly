@@ -10,7 +10,7 @@ import { HttpClient } from '@angular/common/http';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { HealthStatus, isHealthy } from '@hexly/domain';
 import { Cartouche, Coord, Dot } from '@hexly/web-ui';
-import { HexMapStore } from '../../services/hexmap-store';
+import { HexMapStore } from '../services/hexmap-store';
 
 /**
  * The bottom rail. It owns the API health probe it displays — the only piece of

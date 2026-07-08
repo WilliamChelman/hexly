@@ -6,7 +6,7 @@ import {
 import { TestBed } from '@angular/core/testing';
 import { TranslocoService } from '@jsverse/transloco';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
-import { HexMapStore } from '../../services/hexmap-store';
+import { HexMapStore } from '../services/hexmap-store';
 import { StatusBar } from './status-bar';
 
 describe('StatusBar', () => {

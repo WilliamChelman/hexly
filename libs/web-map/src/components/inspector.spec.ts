@@ -5,7 +5,7 @@ import { of } from 'rxjs';
 import { EntityDetail, EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient } from '@hexly/web-core';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
-import { HexMapStore } from '../../services/hexmap-store';
+import { HexMapStore } from '../services/hexmap-store';
 import { Inspector } from './inspector';
 
 /** A minimal EntitySummary the Entity Link picker can list (issue #76). */

@@ -13,7 +13,7 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient, ActiveWorld } from '@hexly/web-core';
 import { Button, Field, Icon, EntitySearchPicker } from '@hexly/web-ui';
-import { HexMapStore } from '../../services/hexmap-store';
+import { HexMapStore } from '../services/hexmap-store';
 
 /**
  * The Inspector's Entity Link control (issue #76, CONTEXT.md → Entity Link) for the

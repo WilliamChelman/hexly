@@ -40,7 +40,7 @@ import {
   Visibility,
 } from '@hexly/domain';
 import { EntitiesClient, NudgeBusClient, ActiveWorld, idFromSegment, worldRoute, TitleService, AppShellStore } from '@hexly/web-core';
-import { EntityView, HexMapStore } from './hexmap-store';
+import { EntityView, HexMapStore } from '@hexly/web-map';
 
 /**
  * Bridges {@link EntitiesClient} and {@link HexMapStore} for `/entities/:id`:

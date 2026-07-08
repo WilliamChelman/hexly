@@ -2,9 +2,9 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { TranslocoPipe } from '@jsverse/transloco';
 import { coordKey, Label, TerrainId } from '@hexly/domain';
 import { Button, Coord, Eyebrow, Field, Input } from '@hexly/web-ui';
-import { featureKey, terrainKey } from '../../utils/catalog-keys';
-import { inputValue } from '../../utils/dom';
-import { HexMapStore, Selection } from '../../services/hexmap-store';
+import { featureKey, terrainKey } from '../utils/catalog-keys';
+import { inputValue } from '../utils/dom';
+import { HexMapStore, Selection } from '../services/hexmap-store';
 import { EntityLink } from './entity-link';
 import { RegionFields } from './region-fields';
 

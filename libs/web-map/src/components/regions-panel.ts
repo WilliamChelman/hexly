@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Region } from '@hexly/domain';
 import { Button, Eyebrow, Swatch } from '@hexly/web-ui';
-import { HexMapStore } from '../../services/hexmap-store';
+import { HexMapStore } from '../services/hexmap-store';
 
 /**
  * Regions panel sharing the Inspector's column (ADR-0011, issue #39).

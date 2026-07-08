@@ -17,7 +17,7 @@ import { MockEntitiesClient, MockNudgeBusClient, provideTranslocoTesting } from 
 import { EntitySession } from './services/entity-session';
 import { EntityNameResolver } from './services/entity-name-resolver';
 import { OutlineStore } from './services/outline-store';
-import { HexMapStore } from './services/hexmap-store';
+import { HexMapStore } from '@hexly/web-map';
 import { noteDetail } from './components/entity-detail.fixtures';
 import { EntityPage } from './entity.page';
 

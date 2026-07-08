@@ -1,5 +1,5 @@
 import { IconName } from '@hexly/web-ui';
-import { ToolId } from '../../services/hexmap-store';
+import { ToolId } from '../services/hexmap-store';
 
 /** One top-level Tool's identity: its stable id, keyboard hotkey, and palette glyph. */
 export interface ToolDef {

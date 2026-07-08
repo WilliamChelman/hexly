@@ -13,7 +13,7 @@ import {
 import { provideTranslocoTesting, MockEntitiesClient, MockNudgeBusClient } from '@hexly/web-core/testing';
 import { EntitiesClient, NudgeBusClient } from '@hexly/web-core';
 import { EntitySession, NUDGE_DEBOUNCE_MS } from './entity-session';
-import { HexMapStore } from './hexmap-store';
+import { HexMapStore } from '@hexly/web-map';
 
 describe('EntitySession', () => {
   let session: EntitySession;

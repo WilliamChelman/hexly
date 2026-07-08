@@ -11,7 +11,7 @@ import {
 import { provideTranslocoTesting, MockEntitiesClient } from '@hexly/web-core/testing';
 import { EntitiesClient } from '@hexly/web-core';
 import { EntitySession } from '../services/entity-session';
-import { HexMapStore } from '../services/hexmap-store';
+import { HexMapStore } from '@hexly/web-map';
 import { SaveStatus } from './save-status';
 
 // Autosave feedback chip that replaced the Save button (ADR-0026):

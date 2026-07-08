@@ -2,13 +2,13 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { featureLibrary, terrainPalette } from '@hexly/domain';
 import { IconButton, Icon, IconName, IconPath, Panel, Rule, Swatch } from '@hexly/web-ui';
-import { featureKey, terrainKey } from '../../utils/catalog-keys';
+import { featureKey, terrainKey } from '../utils/catalog-keys';
 import {
   HexMapStore,
   featureSubtools,
   SelectSubtool,
   selectSubtools,
-} from '../../services/hexmap-store';
+} from '../services/hexmap-store';
 import { TOOLS } from './tools';
 
 /** The glyph for a Select Subtool: the arrow cursor for Pick, a dashed box for Marquee. */

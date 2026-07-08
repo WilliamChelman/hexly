@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { IconButton, Icon, IconName } from '@hexly/web-ui';
-import { HexMapStore } from '../../services/hexmap-store';
+import { HexMapStore } from '../services/hexmap-store';
 
 /** The right panel's identity a rail entry can open (mirrors {@link HexMapStore.rightPanel}). */
 type RightPanel = 'inspector' | 'regions';

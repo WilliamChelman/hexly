@@ -1,0 +1,19 @@
+{
+  "name": "web-map",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/web-map/src",
+  "prefix": "app",
+  "projectType": "library",
+  "tags": ["scope:web", "type:feature"],
+  "targets": {
+    "test": {
+      "executor": "@angular/build:unit-test",
+      "options": {
+        "watch": false,
+        "buildTarget": "web:build:development",
+        "tsConfig": "libs/web-map/tsconfig.spec.json",
+        "setupFiles": ["libs/web-map/src/test-setup.ts"]
+      }
+    }
+  }
+}

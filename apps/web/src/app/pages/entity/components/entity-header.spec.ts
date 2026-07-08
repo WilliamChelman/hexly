@@ -8,7 +8,7 @@ import { emptyContent, EntityDetail, WorldDetail, WorldVerb } from '@hexly/domai
 import { provideTranslocoTesting, MockEntitiesClient, MockWorldsClient, MockUsersClient, MockAuthClient } from '@hexly/web-core/testing';
 import { EntitiesClient, WorldsClient, ActiveWorld, UsersClient, AuthClient } from '@hexly/web-core';
 import { EntitySession } from '../services/entity-session';
-import { HexMapStore } from '../services/hexmap-store';
+import { HexMapStore } from '@hexly/web-map';
 import { OwnerSet } from '@hexly/web-ui';
 import { EntityHeader } from './entity-header';
 import { noteDetail } from './entity-detail.fixtures';

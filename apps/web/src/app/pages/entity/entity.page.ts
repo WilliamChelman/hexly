@@ -8,15 +8,17 @@ import { ActivatedRoute } from '@angular/router';
 import { TranslocoPipe, translateSignal } from '@jsverse/transloco';
 import { Observable, concat, ignoreElements, of } from 'rxjs';
 import { EntitySession } from './services/entity-session';
-import { HexMapStore } from './services/hexmap-store';
 import { OutlineStore } from './services/outline-store';
 import { EntityHeader } from './components/entity-header';
-import { ToolPalette } from './components/map/tool-palette';
-import { MapCanvas } from './components/map/map-canvas';
-import { Inspector } from './components/map/inspector';
-import { RegionsPanel } from './components/map/regions-panel';
-import { EditorRail } from './components/map/editor-rail';
-import { StatusBar } from './components/map/status-bar';
+import {
+  HexMapStore,
+  ToolPalette,
+  MapCanvas,
+  Inspector,
+  RegionsPanel,
+  EditorRail,
+  StatusBar,
+} from '@hexly/web-map';
 import { ContentEditor } from './components/content-editor/content-editor';
 import { EntityMetadata } from './components/entity-metadata';
 import { OutlinePanel } from './components/outline-panel';

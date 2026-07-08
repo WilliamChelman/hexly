@@ -16,7 +16,7 @@ import { EntityShareDialog } from './entity-share-dialog';
 import { EntityTags } from './entity-tags';
 import { SaveStatus } from './save-status';
 import { EntitySession } from '../services/entity-session';
-import { EntityView, HexMapStore } from '../services/hexmap-store';
+import { EntityView, HexMapStore } from '@hexly/web-map';
 
 /** The view toggle's two segments, in display order; Map (the grid) is the default. */
 const VIEWS: readonly { id: EntityView; labelKey: string; testid: string }[] = [

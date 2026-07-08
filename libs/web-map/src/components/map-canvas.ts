@@ -27,14 +27,14 @@ import {
   regionById,
 } from '@hexly/domain';
 import { ThemeService, ToasterService } from '@hexly/web-core';
-import { terrainKey } from '../../utils/catalog-keys';
-import { HexMapStore, SelectMode } from '../../services/hexmap-store';
+import { terrainKey } from '../utils/catalog-keys';
+import { HexMapStore, SelectMode } from '../services/hexmap-store';
 import { toolForHotkey } from './tools';
 import { CoordReadout } from './coord-readout';
 import { ZoomControl } from './zoom-control';
-import { Camera } from '../../utils/camera';
-import { Canvas2dMapRenderer } from '../../services/map-renderer';
-import { MapRenderer, MarqueeOverride } from '../../models/map-renderer';
+import { Camera } from '../utils/camera';
+import { Canvas2dMapRenderer } from '../services/map-renderer';
+import { MapRenderer, MarqueeOverride } from '../models/map-renderer';
 
 /** Hex radius (centre→corner) in world pixels at zoom 1. */
 const HEX_SIZE = 40;
