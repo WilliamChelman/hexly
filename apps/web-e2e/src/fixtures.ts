@@ -1,8 +1,9 @@
 import { test as base, expect, type Page, type Response } from '@playwright/test';
 // Reuse the app's own pretty-URL codec (ADR-0042): URL segments are `slug-base62(id)`,
 // so specs decode a segment back to the canonical id and build loose matchers from it.
-// The nx boundary rule allows web-e2e → web imports (see eslint.config.mjs).
-import { idFromSegment, segment } from '../../web/src/app/core/utils/pretty-id';
+// A direct file import (not the @hexly/web-core barrel) keeps the Playwright process off the
+// Angular services layer the barrel re-exports — pretty-id is a pure util.
+import { idFromSegment, segment } from '../../../libs/web-core/src/utils/pretty-id';
 
 /**
  * The base test for the authenticated suite. An auto fixture resets the database
