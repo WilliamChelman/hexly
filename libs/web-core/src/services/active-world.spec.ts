@@ -6,6 +6,7 @@ import {
   RouterStateSnapshot,
   UrlTree,
 } from '@angular/router';
+import { HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom, isObservable, Observable, of, Subject, throwError } from 'rxjs';
 import { WorldDetail } from '@hexly/domain';
 import { TranslocoService } from '@jsverse/transloco';
@@ -227,6 +228,35 @@ describe('ActiveWorld', () => {
       expect(worlds.get).toHaveBeenCalledWith(WORLD_ID);
       expect(active.world()).toBe(renamed);
       expect(active.name()).toBe('Aldermoor Reborn');
+    });
+
+    it('refetches and re-pins on a stale reconnect pulse, though it carries no newer updatedAt (#177)', () => {
+      active.set(detail, WORLD_ID); // held updatedAt = 1
+      TestBed.flushEffects();
+      // While disconnected the World was renamed; the reconnect pulse can't know its updatedAt, so
+      // it must refetch unconditionally to reconcile the gap (no server replay).
+      const renamed = { id: WORLD_ID, name: 'Aldermoor Reborn', updatedAt: 2 } as WorldDetail;
+      worlds.get.mockReturnValue(of(renamed));
+
+      bus.emit({ id: WORLD_ID, stale: true });
+      vi.advanceTimersByTime(WORLD_NUDGE_DEBOUNCE_MS);
+
+      expect(worlds.get).toHaveBeenCalledWith(WORLD_ID);
+      expect(active.world()).toBe(renamed);
+    });
+
+    it('evicts the active World to the Index when the reconnect refetch finds it gone (#177)', () => {
+      active.set(detail, WORLD_ID);
+      TestBed.flushEffects();
+      // Access ended while disconnected (removed as member / World deleted): no eviction nudge to
+      // replay, so the refetch's 404 is what surfaces the loss.
+      worlds.get.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
+
+      bus.emit({ id: WORLD_ID, stale: true });
+      vi.advanceTimersByTime(WORLD_NUDGE_DEBOUNCE_MS);
+
+      expect(active.worldId()).toBeNull();
+      expect(navigate).toHaveBeenCalledWith(['/']);
     });
 
     it('ignores a self-echo nudge no newer than the held detail — no redundant refetch', () => {

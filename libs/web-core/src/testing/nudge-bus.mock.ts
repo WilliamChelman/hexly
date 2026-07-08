@@ -1,5 +1,5 @@
 import { Observable, Subject, filter } from 'rxjs';
-import { InterestRef, NudgeEntry } from '@hexly/domain';
+import { FollowSignal, InterestRef } from '@hexly/domain';
 
 /**
  * Spy-backed stand-in for {@link NudgeBusClient} (ADR-0044). `follow` is a spy returning the
@@ -7,18 +7,18 @@ import { InterestRef, NudgeEntry } from '@hexly/domain';
  * server sent one.
  */
 export class MockNudgeBusClient {
-  private readonly nudges = new Subject<NudgeEntry>();
+  private readonly nudges = new Subject<FollowSignal>();
 
   readonly follow = vi.fn(
-    (ref: InterestRef): Observable<NudgeEntry> =>
+    (ref: InterestRef): Observable<FollowSignal> =>
       this.nudges.pipe(filter((n) => n.id === ref.id)),
   );
 
   /** Spy for the anonymous-principal switch — asserts a page connects/clears its token. */
   readonly useToken = vi.fn((_token: string | null): void => undefined);
 
-  /** Test helper: deliver a nudge (a version delta or an `unavailable` eviction) to followers. */
-  emit(nudge: NudgeEntry): void {
+  /** Test helper: deliver a follow signal (version delta, `unavailable` eviction, or `stale` pulse). */
+  emit(nudge: FollowSignal): void {
     this.nudges.next(nudge);
   }
 }

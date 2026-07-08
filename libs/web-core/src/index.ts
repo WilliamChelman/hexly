@@ -24,6 +24,7 @@ export * from './services/toaster.service';
 export * from './services/users.client';
 export * from './services/world.store';
 export * from './services/worlds.client';
+export * from './utils/http-errors';
 export * from './utils/pretty-id';
 export * from './utils/routes';
 export * from './utils/search-entities';

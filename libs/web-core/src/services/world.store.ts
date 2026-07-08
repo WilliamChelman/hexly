@@ -19,7 +19,7 @@ import {
   tap,
 } from 'rxjs';
 import {
-  NudgeEntry,
+  FollowSignal,
   WorldDetail,
   WorldMember,
   WorldSummary,
@@ -130,11 +130,12 @@ export class WorldStore {
    * that World at once — access has ended, no refetch needed. A readable nudge (rename, pin reorder,
    * a still-reachable membership change) → a debounced, `switchMap`-guarded authoritative refetch.
    */
-  private reconcile(n: NudgeEntry): void {
+  private reconcile(n: FollowSignal): void {
     if ('unavailable' in n) {
       this._worlds.update((ws) => ws.filter((w) => w.id !== n.id));
       return;
     }
+    // A readable nudge OR a `stale` reconnect pulse (#177): both refetch the authoritative list.
     this.readableNudges.next();
   }
 

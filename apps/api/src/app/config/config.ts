@@ -77,6 +77,14 @@ const rawConfigSchema = z.object({
         .prefault({}),
     })
     .prefault({}),
+  // Live-follow SSE heartbeat cadence (ADR-0044, #177): how often the server pings each open
+  // stream to keep it alive and surface a dead half-open socket for reaping. 30s suits most
+  // deployments; a proxy with a tighter idle timeout can lower it. Positive seconds only.
+  liveFollow: z
+    .object({
+      heartbeatSeconds: z.number().positive().default(30),
+    })
+    .prefault({}),
 });
 
 /** The validated-but-unprocessed config: what `hexly.yml` literally says (sizes as strings). */
@@ -96,6 +104,10 @@ export interface HexlyConfig {
     /** bm25 per-column multipliers (ADR-0035): higher = that column influences relevance more. */
     weights: { name: number; tags: number; content: number };
   };
+  liveFollow: {
+    /** SSE heartbeat cadence in seconds (ADR-0044, #177) — the keepalive/reap ping interval. */
+    heartbeatSeconds: number;
+  };
 }
 
 /**
@@ -112,6 +124,7 @@ function processConfig(raw: HexlyConfigRaw): HexlyConfig {
       strictZipGuard: raw.import.strictZipGuard,
     },
     search: { weights: { ...raw.search.weights } },
+    liveFollow: { heartbeatSeconds: raw.liveFollow.heartbeatSeconds },
   };
 }
 

@@ -12,8 +12,8 @@ import {
   tap,
 } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { EntityNudge } from '@hexly/domain';
-import { PublicClient, NudgeBusClient, AppShellStore } from '@hexly/web-core';
+import { EntityNudge, StaleNudge } from '@hexly/domain';
+import { PublicClient, NudgeBusClient, AppShellStore, isAccessLoss } from '@hexly/web-core';
 import { EntitySession } from '../entity/services/entity-session';
 import { EntityNameResolver, CONTENT_EDITOR_SESSION } from '@hexly/content-editor';
 import { PublicEntityNameResolver } from './public-entity-name-resolver';
@@ -154,24 +154,23 @@ export class PublicEntityPage {
             ? EMPTY
             : this.bus.follow({ kind: 'entity', id: f.id }).pipe(
                 tap((n) => {
-                  if ('unavailable' in n) {
-                    this.followed.set(null);
-                    this.notFound.set(true);
-                  }
+                  if ('unavailable' in n) this.evict();
                 }),
-                filter((n): n is EntityNudge => !('unavailable' in n)),
-                filter((n) => this.newerThanHeld(n)),
+                filter((n): n is EntityNudge | StaleNudge => !('unavailable' in n)),
+                // Refetch-worthy up front (a `stale` reconnect pulse always is — #177), then debounce.
+                filter((n) => this.wantsRefetch(n)),
                 debounceTime(NUDGE_DEBOUNCE_MS),
-                filter((n) => this.newerThanHeld(n)),
+                filter((n) => this.wantsRefetch(n)),
                 switchMap(() =>
                   (f.mode === 'worldEntity'
                     ? this.client.worldEntity(f.token, f.id)
                     : this.client.entity(f.token)
                   ).pipe(
-                    // A refetch 404 means the resource just went away (revoked/deleted) — evict.
-                    catchError(() => {
-                      this.followed.set(null);
-                      this.notFound.set(true);
+                    // 403/404 means the link/resource went away (revoked, deleted) — evict. A
+                    // transient failure (5xx, a reconnect into a bouncing backend) self-heals on
+                    // the next event, so keep the view rather than blank a valid link (#177).
+                    catchError((err) => {
+                      if (isAccessLoss(err)) this.evict();
                       return EMPTY;
                     }),
                   ),
@@ -191,5 +190,16 @@ export class PublicEntityPage {
       n.version > held.version ||
       (n.version === held.version && n.updatedAt > held.updatedAt)
     );
+  }
+
+  /** A `stale` reconnect pulse always refetches (no version — `||` order matters); else newer-than-held (#177). */
+  private wantsRefetch(n: EntityNudge | StaleNudge): boolean {
+    return 'stale' in n || this.newerThanHeld(n);
+  }
+
+  /** Blank to the dead-link panel: access ended on the open screen (revoked / deleted). */
+  private evict(): void {
+    this.followed.set(null);
+    this.notFound.set(true);
   }
 }

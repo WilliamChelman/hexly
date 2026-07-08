@@ -66,6 +66,21 @@ export interface UnavailableNudge {
 export type NudgeEntry = EntityNudge | WorldNudge | UnavailableNudge;
 
 /**
+ * A client-minted refetch pulse — **never a server frame**, so it is not part of {@link NudgeEntry}
+ * (the wire union parsed from SSE JSON). On reconnect the client can't know what changed during the
+ * gap (there is no server-side event log or `Last-Event-ID` replay), so its bus pulses each watched
+ * ref `stale` and the follower refetches unconditionally, reconciling from the `GET`. Version-free:
+ * it carries no claim about the resource, only "your held state may be stale."
+ */
+export interface StaleNudge {
+  id: string;
+  stale: true;
+}
+
+/** What a live-follow subscriber sees: a server nudge, or the client's local `stale` reconnect pulse. */
+export type FollowSignal = NudgeEntry | StaleNudge;
+
+/**
  * A nudge is a *delta* array holding only the resource(s) whose event fired — not a
  * full-set reconciliation. Reconnect → refetch-the-interest-set heals any missed event.
  */

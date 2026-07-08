@@ -1,5 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { Inject, Injectable, MessageEvent } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  MessageEvent,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { Subject } from 'rxjs';
 import { eq } from 'drizzle-orm';
 import { InterestRef, NudgeDelta, NudgeEntry } from '@hexly/domain';
@@ -7,6 +13,7 @@ import { entityAccess, tokenReachesEntity } from '../acl/entity-access';
 import { worldAccess, tokenReachesWorld } from '../acl/world-access';
 import { worlds } from '../db/schema';
 import { DB, Db } from '../db/db';
+import { HEXLY_CONFIG, HexlyConfig } from '../config/config.module';
 
 /**
  * The principal that opened a connection (ADR-0044, #175). Either a signed-in user (cookie) or
@@ -48,10 +55,50 @@ interface Connection {
 export type InterestOutcome = 'ok' | 'forbidden' | 'not-found';
 
 @Injectable()
-export class NudgeBus {
+export class NudgeBus implements OnModuleInit, OnModuleDestroy {
   private readonly connections = new Map<string, Connection>();
+  private timer: ReturnType<typeof setInterval> | undefined;
+  /** Heartbeat cadence in ms, from the Instance Configuration (`liveFollow.heartbeatSeconds`, #177). */
+  private readonly heartbeatMs: number;
 
-  constructor(@Inject(DB) private readonly db: Db) {}
+  constructor(
+    @Inject(DB) private readonly db: Db,
+    @Inject(HEXLY_CONFIG) config: HexlyConfig,
+  ) {
+    this.heartbeatMs = config.liveFollow.heartbeatSeconds * 1000;
+  }
+
+  /**
+   * Start the shared heartbeat once the app is up (#177). One timer for every connection, not one
+   * per stream. `unref()` so an idle heartbeat can't hold the process open. The timer never runs in
+   * a unit test (it constructs the bus directly, skipping the Nest lifecycle) — {@link heartbeat}
+   * is the seam those tests drive.
+   */
+  onModuleInit(): void {
+    this.timer = setInterval(() => this.heartbeat(), this.heartbeatMs);
+    this.timer.unref?.();
+  }
+
+  onModuleDestroy(): void {
+    if (this.timer) clearInterval(this.timer);
+  }
+
+  /**
+   * Push a heartbeat frame onto every open stream (#177). Its purpose is liveness, not data: a
+   * client ignores the unlistened `heartbeat` event, and a write to a dead half-open socket
+   * surfaces the close so the existing `finalize` reaps it — so the map can't grow unbounded over
+   * uptime without a separate reaper.
+   */
+  heartbeat(): void {
+    for (const conn of this.connections.values()) {
+      conn.stream.next({ type: 'heartbeat', data: {} });
+    }
+  }
+
+  /** Live connection count — the "no unbounded growth" invariant, observable for a reap test (#177). */
+  connectionCount(): number {
+    return this.connections.size;
+  }
 
   /**
    * Register a new connection for `principal`, minting an unguessable `connectionId`. The

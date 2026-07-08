@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
-import { BehaviorSubject, Observable, of } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
+import { BehaviorSubject, Observable, of, throwError } from 'rxjs';
 import { PublicWorldView } from '@hexly/domain';
 import { PublicClient, NudgeBusClient } from '@hexly/web-core';
 import { MockNudgeBusClient, provideTranslocoTesting } from '@hexly/web-core/testing';
@@ -71,6 +72,45 @@ describe('PublicWorldPage', () => {
 
     expect(client.world).toHaveBeenLastCalledWith(TOKEN);
     expect(nameOf(el)).toBe('Aldermoor Reborn');
+  });
+
+  it('refetches on a stale reconnect pulse, reconciling a change missed while disconnected (#177)', () => {
+    const el = render().nativeElement as HTMLElement;
+    client.world.mockReturnValue(of(view('Aldermoor Reborn')));
+
+    // A stale pulse is a readable (non-unavailable) nudge, so the World path refetches — it never
+    // version-gates. Reconciles whatever the anonymous viewer missed during the gap, no reload.
+    bus.emit({ id: WORLD_ID, stale: true });
+    vi.advanceTimersByTime(200);
+    fixture.detectChanges();
+
+    expect(client.world).toHaveBeenLastCalledWith(TOKEN);
+    expect(nameOf(el)).toBe('Aldermoor Reborn');
+  });
+
+  it('keeps the view on a transient refetch failure — a valid link is not blanked on a 5xx (#177)', () => {
+    const el = render().nativeElement as HTMLElement;
+    // A nudge arrives (reconnect or rename), but the refetch hits a bouncing backend.
+    client.world.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 503 })));
+
+    bus.emit({ id: WORLD_ID, stale: true });
+    vi.advanceTimersByTime(200);
+    fixture.detectChanges();
+
+    // Not the dead-link panel — the last-good view stands, healing on the next event.
+    expect(notFound(el)).toBe(false);
+    expect(nameOf(el)).toBe('Aldermoor');
+  });
+
+  it('evicts to the dead-link panel when the refetch finds the World gone (404 across the gap) (#177)', () => {
+    const el = render().nativeElement as HTMLElement;
+    client.world.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
+
+    bus.emit({ id: WORLD_ID, stale: true });
+    vi.advanceTimersByTime(200);
+    fixture.detectChanges();
+
+    expect(notFound(el)).toBe(true);
   });
 
   it('evicts to the dead-link panel on an unavailable nudge (link revoked)', () => {

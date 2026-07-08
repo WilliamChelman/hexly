@@ -3,9 +3,9 @@ import { HttpClient } from '@angular/common/http';
 import { EMPTY, Observable, Subject, catchError, filter } from 'rxjs';
 import {
   ConnectionReady,
+  FollowSignal,
   InterestRef,
   NudgeDelta,
-  NudgeEntry,
 } from '@hexly/domain';
 
 /**
@@ -38,7 +38,8 @@ export class NudgeBusClient {
   /** Coalesce flag: many acquire/release calls in one turn collapse to a single interest flush. */
   private declareScheduled = false;
 
-  private readonly nudges = new Subject<NudgeEntry>();
+  /** Server nudges plus the client's own `stale` reconnect pulses (#177) — the follow stream. */
+  private readonly nudges = new Subject<FollowSignal>();
 
   /**
    * Connect as an anonymous Public Link token principal instead of a session cookie;
@@ -63,8 +64,8 @@ export class NudgeBusClient {
    * connection if this is the first follower); unsubscribing withdraws it once the last
    * follower leaves — teardown handles withdrawal.
    */
-  follow(ref: InterestRef): Observable<NudgeEntry> {
-    return new Observable<NudgeEntry>((subscriber) => {
+  follow(ref: InterestRef): Observable<FollowSignal> {
+    return new Observable<FollowSignal>((subscriber) => {
       this.acquire(ref);
       const inner = this.nudges
         .pipe(filter((n) => n.id === ref.id))
@@ -106,8 +107,16 @@ export class NudgeBusClient {
     // anonymous Public Link viewer has no cookie, so its token rides the URL instead.
     this.source = new EventSource('/api/events' + this.tokenQuery());
     this.source.addEventListener('ready', (e) => {
+      // A `ready` while we already hold a connectionId is a *gap reconnect* on the same
+      // EventSource (native auto-reconnect), not the first handshake — the mint differs each open.
+      const reconnected = this.connectionId !== null;
       this.connectionId = (JSON.parse((e as MessageEvent).data) as ConnectionReady).connectionId;
       this.scheduleDeclare(); // flush interest gathered before the id arrived
+      // Reconcile the gap: no server replay, so pulse each watched ref `stale` and let the follower
+      // refetch. Not on the first connect — the follower already loaded its state on open.
+      if (reconnected) {
+        for (const { ref } of this.interest.values()) this.nudges.next({ id: ref.id, stale: true });
+      }
     });
     this.source.addEventListener('nudge', (e) => {
       const delta = JSON.parse((e as MessageEvent).data) as NudgeDelta;

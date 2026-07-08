@@ -34,12 +34,13 @@ import {
   EntityDetail,
   EntityNudge,
   EntitySaveOutcome,
+  StaleNudge,
   HexMap,
   hexMapSchema,
   tiptapContent,
   Visibility,
 } from '@hexly/domain';
-import { EntitiesClient, NudgeBusClient, ActiveWorld, idFromSegment, worldRoute, TitleService, AppShellStore } from '@hexly/web-core';
+import { EntitiesClient, NudgeBusClient, ActiveWorld, idFromSegment, isAccessLoss, worldRoute, TitleService, AppShellStore } from '@hexly/web-core';
 import { EntityView, HexMapStore } from '@hexly/web-map';
 import type { ContentEditorSession } from '@hexly/content-editor';
 
@@ -254,22 +255,30 @@ export class EntitySession implements ContentEditorSession {
                 tap((n) => {
                   if ('unavailable' in n && !this.dirty()) this.evict();
                 }),
-                filter((n): n is EntityNudge => !('unavailable' in n)),
-                // Echo dedupe up front, then debounce so a burst of another
-                // user's saves coalesces into one refetch.
-                filter((n) => this.newerThanHeld(n)),
+                // This follow is entity-kind, so only entity/stale/unavailable entries
+                // arrive; narrow past the eviction entry (WorldNudge never reaches here).
+                filter((n): n is EntityNudge | StaleNudge => !('unavailable' in n)),
+                // Refetch-worthy up front, then debounce so a burst coalesces into one refetch.
+                filter((n) => this.wantsRefetch(n)),
                 debounceTime(NUDGE_DEBOUNCE_MS),
                 // Re-check at fire time: never refetch over unsaved edits (the 409
                 // path finds concurrent edits at save time), skip during a route
-                // load, and re-check freshness since our own save may have
-                // advanced it during the debounce window.
-                filter(
-                  (n) => !this.dirty() && !this._loading() && this.newerThanHeld(n),
+                // load, and re-check freshness since our own save may have advanced
+                // it during the debounce window.
+                filter((n) => !this.dirty() && !this._loading() && this.wantsRefetch(n)),
+                // A nudge is an idempotent invalidation: swallow a transient refetch
+                // failure rather than let one 5xx end live-follow for the session —
+                // the next nudge or reconnect heals it. But 403/404 is access *gone*
+                // (lost while disconnected, no eviction nudge to replay), so evict —
+                // the reconnect refetch is what surfaces the loss (#177).
+                switchMap(() =>
+                  this.open(id).pipe(
+                    catchError((err) => {
+                      if (isAccessLoss(err) && !this.dirty()) this.evict();
+                      return EMPTY;
+                    }),
+                  ),
                 ),
-                // A nudge is an idempotent invalidation: swallow a transient
-                // refetch failure rather than let one 5xx end live-follow for the
-                // session — the next nudge or a reconnect heals the staleness.
-                switchMap(() => this.open(id).pipe(catchError(() => EMPTY))),
               ),
         ),
         takeUntilDestroyed(this.destroyRef),
@@ -345,6 +354,16 @@ export class EntitySession implements ContentEditorSession {
       n.version > held.version ||
       (n.version === held.version && n.updatedAt > held.updatedAt)
     );
+  }
+
+  /**
+   * Whether a follow signal should drive a refetch: a `stale` reconnect pulse always does (it has
+   * no version to compare — the `||` order matters, so a version-less pulse never reaches
+   * {@link newerThanHeld}), else only a nudge newer than held (#177). One predicate, used at both
+   * the pre- and post-debounce gates so they can't drift.
+   */
+  private wantsRefetch(n: EntityNudge | StaleNudge): boolean {
+    return 'stale' in n || this.newerThanHeld(n);
   }
 
   /** Blank the view on live eviction (#174): the unavailable state, not an error or a redirect. */

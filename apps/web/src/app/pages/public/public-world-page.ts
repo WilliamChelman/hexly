@@ -9,6 +9,7 @@ import {
   NudgeBusClient,
   AppShellStore,
   WORLD_NUDGE_DEBOUNCE_MS,
+  isAccessLoss,
 } from '@hexly/web-core';
 import { Eyebrow } from '@hexly/web-ui';
 
@@ -133,9 +134,11 @@ export class PublicWorldPage {
                 debounceTime(WORLD_NUDGE_DEBOUNCE_MS),
                 switchMap(() =>
                   this.client.world(f.token).pipe(
-                    // A refetch 404 means the World/link just went away — evict.
-                    catchError(() => {
-                      this.evict();
+                    // 403/404 means the World/link went away (revoked, deleted) — evict. A transient
+                    // failure (5xx, a reconnect into a bouncing backend) self-heals on the next
+                    // event, so keep the view rather than blank a valid link (#177).
+                    catchError((err) => {
+                      if (isAccessLoss(err)) this.evict();
                       return EMPTY;
                     }),
                   ),

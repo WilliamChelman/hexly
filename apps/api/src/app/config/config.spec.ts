@@ -39,6 +39,7 @@ describe('loadConfig', () => {
   const DEFAULTS = {
     import: { maxUpload: 500 * MB, maxDecompressed: 5 * 1024 * MB, strictZipGuard: false },
     search: { weights: { name: 10, tags: 5, content: 1 } },
+    liveFollow: { heartbeatSeconds: 30 },
   };
 
   it('falls back to defaults when no file is present', () => {
@@ -79,5 +80,16 @@ describe('loadConfig', () => {
 
   it('rejects a non-positive search weight, naming the key', () => {
     expect(() => loadConfig(dataDir('search:\n  weights:\n    name: 0\n'))).toThrow(/name/);
+  });
+
+  it('overrides the live-follow heartbeat cadence from the file', () => {
+    const cfg = loadConfig(dataDir('liveFollow:\n  heartbeatSeconds: 10\n'));
+    expect(cfg.liveFollow.heartbeatSeconds).toBe(10);
+  });
+
+  it('rejects a non-positive heartbeat cadence, naming the key', () => {
+    expect(() => loadConfig(dataDir('liveFollow:\n  heartbeatSeconds: 0\n'))).toThrow(
+      /heartbeatSeconds/,
+    );
   });
 });

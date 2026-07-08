@@ -24,10 +24,11 @@ import {
   tap,
 } from 'rxjs';
 import { TranslocoService } from '@jsverse/transloco';
-import { WorldDetail, WorldNudge } from '@hexly/domain';
+import { WorldDetail, WorldNudge, StaleNudge } from '@hexly/domain';
 import { WorldsClient } from './worlds.client';
 import { NudgeBusClient } from './nudge-bus.client';
 import { WORLD_NUDGE_DEBOUNCE_MS } from './world.store';
+import { isAccessLoss } from '../utils/http-errors';
 import { Logger } from './logger';
 import { ToasterService } from './toaster.service';
 import { healWorldSegment, idFromSegment } from '../utils/pretty-id';
@@ -73,19 +74,22 @@ export class ActiveWorld {
                 tap((n) => {
                   if ('unavailable' in n) this.evict();
                 }),
-                filter((n): n is WorldNudge => !('unavailable' in n)),
-                filter((n) => this.newerThanHeld(n)),
+                filter((n): n is WorldNudge | StaleNudge => !('unavailable' in n)),
+                // Refetch-worthy up front, then debounce.
+                filter((n) => this.wantsRefetch(n)),
                 debounceTime(WORLD_NUDGE_DEBOUNCE_MS),
                 // Re-check after the debounce: this tab's own commitPins may have landed during the
                 // window, advancing the held detail past the nudge — then there's nothing to refetch.
-                filter((n) => this.newerThanHeld(n)),
+                filter((n) => this.wantsRefetch(n)),
                 switchMap(() =>
                   this.worlds.get(id).pipe(
                     catchError((err) => {
-                      // A transient failure leaves the held detail as-is (self-heals on the next
-                      // nudge/reconnect); log it — mirroring WorldStore's reconciler — so a stale
-                      // Dashboard isn't silently unexplained.
-                      this.logger.error('Failed to refetch the active World from a nudge', err);
+                      // A 403/404 is access *gone* (lost while disconnected, no eviction nudge to
+                      // replay): evict as the reconnect refetch surfaces the loss (#177). A transient
+                      // failure leaves the held detail as-is (self-heals on the next nudge/reconnect);
+                      // log it — mirroring WorldStore — so a stale Dashboard isn't silently unexplained.
+                      if (isAccessLoss(err)) this.evict();
+                      else this.logger.error('Failed to refetch the active World from a nudge', err);
                       return EMPTY;
                     }),
                   ),
@@ -113,6 +117,15 @@ export class ActiveWorld {
   private newerThanHeld(n: WorldNudge): boolean {
     const held = this._world();
     return !held || n.updatedAt > held.updatedAt;
+  }
+
+  /**
+   * Whether a follow signal should drive a refetch: a `stale` reconnect pulse always does (no
+   * updatedAt to compare — the `||` order matters), else only a nudge newer than held (#177). One
+   * predicate for both the pre- and post-debounce gates so they can't drift.
+   */
+  private wantsRefetch(n: WorldNudge | StaleNudge): boolean {
+    return 'stale' in n || this.newerThanHeld(n);
   }
 
   /** Blank the active World and return to the World Index — the eviction landing. */

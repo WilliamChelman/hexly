@@ -962,5 +962,67 @@ describe('EntitySession', () => {
       expect(entities.load).toHaveBeenCalledTimes(2);
       expect(session.current()?.version).toBe(5);
     });
+
+    /**
+     * Reconnect reconciliation (#177): a `stale` pulse carries no version, so the reconciler
+     * cannot version-check it — it must refetch unconditionally to heal whatever changed while
+     * the socket was down. The dirty and gap-eviction guards still apply.
+     */
+    it('refetches on a stale reconnect pulse even though it carries no newer version', () => {
+      openAndFollow(); // version 3
+      entities.load.mockClear();
+      // While disconnected the Entity advanced to version 5; the reconnect pulse can't know that.
+      entities.load.mockReturnValue(of({ ...aldermoor, version: 5 }));
+
+      bus.emit({ id: 'm1', stale: true });
+      vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
+
+      expect(entities.load).toHaveBeenCalledTimes(1);
+      expect(entities.load).toHaveBeenCalledWith('m1');
+      expect(session.current()?.version).toBe(5);
+    });
+
+    it('does NOT refetch on a stale pulse while the buffer is dirty (clobber guard)', () => {
+      openAndFollow();
+      entities.load.mockClear();
+      editor.paintAt({ q: 5, r: 5 }, 'ocean'); // unsaved edit
+      expect(session.dirty()).toBe(true);
+
+      bus.emit({ id: 'm1', stale: true });
+      vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
+
+      expect(entities.load).not.toHaveBeenCalled();
+    });
+
+    it('evicts when the reconnect refetch finds the resource gone (403/404 across the gap)', () => {
+      openAndFollow();
+      entities.load.mockClear();
+      // Access ended while disconnected (made private / deleted). There is no eviction nudge to
+      // replay, so the refetch's 404 is what surfaces the loss — blank to the unavailable state.
+      entities.load.mockReturnValue(
+        throwError(() => new HttpErrorResponse({ status: 404 })),
+      );
+
+      bus.emit({ id: 'm1', stale: true });
+      vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
+
+      expect(session.current()).toBeNull();
+      expect(session.evicted()).toBe(true);
+    });
+
+    it('does NOT evict on a transient 5xx across the gap — live-follow survives to the next event', () => {
+      openAndFollow();
+      entities.load.mockClear();
+      entities.load.mockReturnValueOnce(
+        throwError(() => new HttpErrorResponse({ status: 503 })),
+      );
+
+      bus.emit({ id: 'm1', stale: true });
+      vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
+
+      // A blip is not access loss: keep the view, stay subscribed.
+      expect(session.current()).not.toBeNull();
+      expect(session.evicted()).toBe(false);
+    });
   });
 });

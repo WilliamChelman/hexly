@@ -116,6 +116,47 @@ describe('NudgeBusClient', () => {
     http.expectOne('/api/events/c2/interest').flush(null);
   });
 
+  it('re-declares the full interest set when the stream reconnects (fresh connectionId)', async () => {
+    // The native EventSource auto-reconnects across a gap; the server mints a fresh id on the new
+    // handshake. The client must re-PUT its whole watched set against the new id, or nudges stop.
+    client.follow(entity('X')).subscribe();
+    client.follow(entity('Y')).subscribe();
+    await ready('c1');
+    http.expectOne('/api/events/c1/interest').flush(null);
+
+    // Same EventSource, a second `ready` = a reconnect handshake with a new connectionId.
+    FakeEventSource.instances[0].fire('ready', { connectionId: 'c2' });
+    await Promise.resolve();
+
+    const put = http.expectOne('/api/events/c2/interest');
+    expect(put.request.body).toEqual({ refs: [entity('X'), entity('Y')] });
+    put.flush(null);
+    // Reconnect reused the connection, not churned it.
+    expect(FakeEventSource.instances.length).toBe(1);
+  });
+
+  it('emits a stale pulse for each watched ref on reconnect, so followers reconcile the gap', async () => {
+    // Reconnect-and-refetch is how a gap heals (ADR-0044): no server replay. On the reconnect
+    // handshake the client pulses each watched ref `{ id, stale: true }` so its follower refetches
+    // and picks up whatever changed while the socket was down.
+    const x: unknown[] = [];
+    const y: unknown[] = [];
+    client.follow(entity('X')).subscribe((n) => x.push(n));
+    client.follow(entity('Y')).subscribe((n) => y.push(n));
+    await ready('c1');
+    http.expectOne('/api/events/c1/interest').flush(null);
+    // Nothing fires on the *first* connect — the followers already loaded their state on open.
+    expect(x).toEqual([]);
+    expect(y).toEqual([]);
+
+    FakeEventSource.instances[0].fire('ready', { connectionId: 'c2' });
+    await Promise.resolve();
+    http.expectOne('/api/events/c2/interest').flush(null);
+
+    expect(x).toEqual([{ id: 'X', stale: true }]);
+    expect(y).toEqual([{ id: 'Y', stale: true }]);
+  });
+
   it('delivers nudges only to the matching follower', async () => {
     const seen: unknown[] = [];
     client.follow(entity('X')).subscribe((n) => seen.push(n));
