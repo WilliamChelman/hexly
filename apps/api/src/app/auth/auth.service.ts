@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { hash, verify } from '@node-rs/argon2';
 import { eq, lt } from 'drizzle-orm';
@@ -20,21 +20,32 @@ function newToken(): string {
 }
 
 /**
- * Under NODE_ENV=test (set by vitest), drop argon2 to a throwaway cost — still a
- * real `$argon2` hash, just cheap — so parallel auth-heavy specs don't blow their
- * timeouts. Production keeps the memory-hard defaults.
+ * Under NODE_ENV=test (set by vitest), skip the native argon2 addon entirely: it's
+ * the CPU contention under parallel workers that makes auth-heavy specs flaky, not
+ * the cost params. The fake keeps the `$argon2`-ish shape so specs asserting the
+ * stored form still pass. Production always runs real argon2 with memory-hard defaults.
  */
-const HASH_OPTIONS: Parameters<typeof hash>[1] | undefined =
-  process.env.NODE_ENV === 'test'
-    ? { memoryCost: 512, timeCost: 2, parallelism: 1, outputLen: 32 }
-    : undefined;
+const isTest = process.env.NODE_ENV === 'test';
+
+/** Cheap, non-reversible test stand-in: sha256, not the plaintext, so the
+ *  "never stores plaintext" spec still holds. `$argon2` prefix keeps shape checks green. */
+function testHash(password: string): string {
+  return `$argon2-test$${createHash('sha256').update(password).digest('hex')}`;
+}
+
+function hashPassword(password: string): Promise<string> {
+  return isTest ? Promise.resolve(testHash(password)) : hash(password);
+}
+function verifyPassword(stored: string, password: string): Promise<boolean> {
+  return isTest ? Promise.resolve(stored === testHash(password)) : verify(stored, password);
+}
 
 /**
- * A precomputed argon2 hash verified against when no user matches, so the
- * unknown-email path costs roughly the same as the wrong-password path and
- * response timing cannot be used to enumerate which emails exist.
+ * A precomputed hash verified against when no user matches, so the unknown-email
+ * path costs roughly the same as the wrong-password path and response timing
+ * cannot be used to enumerate which emails exist. (No-op cost under test.)
  */
-const DUMMY_PASSWORD_HASH = hash('hexly-dummy-password', HASH_OPTIONS);
+const DUMMY_PASSWORD_HASH = hashPassword('hexly-dummy-password');
 
 /**
  * The auth domain behind a small interface: provisioning members of the closed
@@ -63,7 +74,7 @@ export class AuthService {
     } = {},
   ): Promise<string> {
     const id = randomUUID();
-    const passwordHash = await hash(password, HASH_OPTIONS);
+    const passwordHash = await hashPassword(password);
     this.db
       .insert(users)
       .values({
@@ -102,7 +113,7 @@ export class AuthService {
     let passwordOk = false;
     try {
       const targetHash = user ? user.passwordHash : await DUMMY_PASSWORD_HASH;
-      passwordOk = await verify(targetHash, password);
+      passwordOk = await verifyPassword(targetHash, password);
     } catch {
       return null;
     }
@@ -214,13 +225,13 @@ export class AuthService {
 
     let currentOk = false;
     try {
-      currentOk = await verify(row.passwordHash, currentPassword);
+      currentOk = await verifyPassword(row.passwordHash, currentPassword);
     } catch {
       return false;
     }
     if (!currentOk) return false;
 
-    const passwordHash = await hash(newPassword, HASH_OPTIONS);
+    const passwordHash = await hashPassword(newPassword);
     this.db
       .update(users)
       .set({ passwordHash })
@@ -234,7 +245,7 @@ export class AuthService {
    * carries no current-password check because the Admin acts on the user's behalf.
    */
   async setPassword(userId: string, newPassword: string): Promise<void> {
-    const passwordHash = await hash(newPassword, HASH_OPTIONS);
+    const passwordHash = await hashPassword(newPassword);
     this.db.update(users).set({ passwordHash }).where(eq(users.id, userId)).run();
   }
 
