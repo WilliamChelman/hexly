@@ -5,23 +5,23 @@ A web application for TTRPG worldbuilding: authoring interlinked **Entities** �
 ## Entities
 
 **Entity**:
-The top-level thing a user creates, owns, and shares. Carries an `id`, a `name`, a `type`, `tags`, created/modified timestamps, an optional **Metadata** map, and a rich-text **Content** body. A **Hex Map** is one kind of Entity. The unit of ownership, sharing, and saving.
+The top-level thing a user creates, owns, and shares. Carries a `name`, a `type`, `tags`, an optional **Metadata** map, and a rich-text **Content** body. A **Hex Map** is one kind of Entity. The unit of ownership, sharing, and saving.
 _Avoid_: Document, page, record, object
 
 **Entity Type**:
-A closed, code-known enum that decides an Entity's shape: `note` (Content only) and `hexmap` (Content plus a hex grid). User- and plugin-defined types are a long-term goal, not a launch concept.
+A closed set that decides an Entity's shape: `note` (Content only) and `hexmap` (Content plus a hex grid).
 _Avoid_: Kind, category, class
 
 **Content**:
-The rich-text body every Entity carries — the result of block-based editing (TipTap; see ADR-0019). Replaces the old per-element "Note".
+The rich-text body every Entity carries — the result of block-based editing. Replaces the old per-element "Note".
 _Avoid_: Body, rich text, document, prose
 
 **Metadata**:
-An arbitrary key→value map on an Entity, mirroring Obsidian frontmatter/properties. Populated from a note's frontmatter on import and re-emitted as YAML frontmatter on export. Keys under the reserved `hexly.` namespace (e.g. `hexly.sourcePath`, the vault-relative path of the source file) carry Hexly's own provenance and are consumed on export rather than written back to frontmatter. Displayed read-only for now; editing is deferred.
+An arbitrary key→value map on an Entity, mirroring Obsidian frontmatter/properties. Populated from a note's frontmatter on import and re-emitted as YAML frontmatter on export. Keys under the reserved `hexly.` namespace carry Hexly's own provenance and are consumed on export rather than written back to frontmatter.
 _Avoid_: Frontmatter, properties, attributes, custom fields
 
 **Asset**:
-A binary file — typically an image, but also a PDF or other media — belonging to a World and referenced from an Entity's Content. Stored per-World and served by an unguessable, unauthenticated link, so possession of the link is the only access control (even for an Asset referenced from a `private` Entity).
+A binary file — typically an image, but also a PDF or other media — belonging to a World and referenced from an Entity's Content. Served by an unguessable, unauthenticated link, so possession of the link is the only access control (even for an Asset referenced from a `private` Entity).
 _Avoid_: Attachment, file, blob, media, upload
 
 **Tag**:
@@ -29,7 +29,7 @@ A free-text label on an Entity, for flavour and informal grouping (e.g. "deity",
 _Avoid_: Keyword, category, label
 
 **Entity Link**:
-An optional reference to an Entity by id, from either a Map element (a Hex, Feature, or Region — not a Label, set via the Inspector) or inline within another Entity's Content (prose, inserted via `@` or the link picker): e.g. a settlement Feature pointing at the town's `note`, or a sentence in one note linking to another `hexmap`. A link to a missing or inaccessible Entity renders non-navigable — a Content link shows its last-known name as a dangling label — rather than erroring; ids are not referentially enforced. A Content link may carry an optional Link Descriptor.
+An optional reference to an Entity by id, from either a Map element (a Hex, Feature, or Region — not a Label) or inline within another Entity's Content (prose): e.g. a settlement Feature pointing at the town's `note`, or a sentence in one note linking to another `hexmap`. A link to a missing or inaccessible Entity renders non-navigable — a Content link shows its last-known name as a dangling label — rather than erroring. A Content link may carry an optional Link Descriptor.
 _Avoid_: Reference, relation, backlink
 
 **Link Descriptor**:
@@ -43,7 +43,7 @@ _Avoid_: Entity, item, object
 ## Language
 
 **Hex Map**:
-An **Entity** of type `hexmap`: its Content (lore) plus a grid of hexes, overlays, regions, and labels. The grid is an infinite sparse plane — a Hex exists only where painted (ADR-0003). Ownership, sharing, and saving are properties of the Entity, not the grid.
+An **Entity** of type `hexmap`: its Content (lore) plus a grid of hexes, overlays, regions, and labels. The grid is an infinite sparse plane — a Hex exists only where painted. Ownership, sharing, and saving are properties of the Entity, not the grid.
 _Avoid_: Map document, board, canvas
 
 **Hex**:
@@ -51,7 +51,7 @@ A cell the user has given content to, stored at its coordinate. The map is an in
 _Avoid_: Cell, tile, square
 
 **Void**:
-A coordinate with no Hex record — untouched space on the infinite plane. Rendered as a neutral background; carries no data and costs no storage.
+A coordinate with no Hex record — untouched space on the infinite plane. Rendered as a neutral background; carries no data.
 _Avoid_: Empty hex, blank, null tile
 
 **Terrain**:
@@ -71,7 +71,7 @@ A named, colored grouping of hex coordinates with optional notes (e.g. "The King
 _Avoid_: Area, zone, territory, group
 
 **Note**:
-An Entity of type `note`: a prose worldbuilding page (a character, a faction, a place, a bit of history) whose substance is its Content. The lore, description, and secrets — now a first-class Entity that Map elements link to, not text attached to a single Map element.
+An Entity of type `note`: a prose worldbuilding page (a character, a faction, a place, a bit of history) whose substance is its Content. The lore, description, and secrets — a first-class Entity that Map elements link to, not text attached to a single Map element.
 _Avoid_: Description, comment, annotation, lore
 
 **Name**:
@@ -85,23 +85,23 @@ _Avoid_: Text, caption, title, annotation
 ## Worlds
 
 **World**:
-A lightweight container record that groups Entities for a single campaign or setting. Not an Entity type — it lives outside the entity model. Every Entity belongs to exactly one World (`world_id NOT NULL`). Carries a `name` and an `owner_id`. Its landing surface is the derived World Dashboard; it holds an ordered `pinned_entity_ids` set surfaced there.
+A lightweight container record that groups Entities for a single campaign or setting. Not an Entity type — it lives outside the entity model. Every Entity belongs to exactly one World. Carries a name and an owner. Its landing surface is the derived World Dashboard; it holds an ordered set of Pinned Entities surfaced there.
 _Avoid_: Space, container, campaign
 
 **World Dashboard**:
-The per-World landing surface at `/w/:worldId` — the front door on entering a World. A read-only *derived* view (recent Entities, Hex Maps, at-a-glance counts) plus the Owners' curated Pinned Entities. It authors nothing of its own — no stored body, only queries over the World's Entities (ADR-0043) — so authored landing prose, if wanted, is just a Note the Owner pins. Distinct from the World Index (lists Worlds, at `/`) and the Entity Browser (lists this World's Entities, at `/entities`).
+The per-World landing surface at `/w/:worldId` — the front door on entering a World. A read-only *derived* view (recent Entities, Hex Maps, at-a-glance counts) plus the Owners' curated Pinned Entities. It authors nothing of its own — so authored landing prose, if wanted, is just a Note the Owner pins. Distinct from the World Index (lists Worlds, at `/`) and the Entity Browser (lists this World's Entities, at `/entities`).
 _Avoid_: Home Entity, world home, landing page, overview
 
 **Pinned Entity**:
-An Entity an Owner has featured on the World Dashboard. The pin set is a World property — one shared, ordered list (`pinned_entity_ids` on the World), the same for everyone, curated only by World Owners. A pin is a reference by id, not an enforced FK: resolved per viewer through the ordinary access filter, so a pinned Entity the caller can't reach (`private` without a grant, or deleted) simply drops off their Dashboard.
+An Entity an Owner has featured on the World Dashboard. The pin set is a World property — one shared, ordered list, the same for everyone, curated only by World Owners. A pin is a reference by id, resolved per viewer through the ordinary access filter: a pinned Entity the caller can't reach (`private` without a grant, or deleted) simply drops off their Dashboard.
 _Avoid_: Bookmark, favourite, featured note
 
 **World Index**:
-The page at `/` listing every World the caller can reach — owned, member, or holding any Entity the caller owns or is granted (reachability is derived, not a stored flag) — and the surface that owns World create, rename, and delete. The durable directory of Worlds — distinct from the World Switcher (a transient quick-hop control) and from a World's own World Dashboard (its in-world landing surface).
+The page at `/` listing every World the caller can reach — owned, member, or holding any Entity the caller owns or is granted — and the surface that owns World create, rename, and delete. The durable directory of Worlds — distinct from the World Switcher (a transient quick-hop control) and from a World's own World Dashboard (its in-world landing surface).
 _Avoid_: World home, world library, world picker
 
 **World Switcher**:
-The compact in-app control at the nav-rail masthead for hopping to another reachable World without returning to the World Index. Pure navigation — it shows the current World and switches the URL scope; it does not manage Worlds. Shown only inside a World (ADR-0041); on the World Index the Index itself is the chooser, so the Switcher is absent.
+The compact in-app control at the nav-rail masthead for hopping to another reachable World without returning to the World Index. Pure navigation — it shows the current World and switches the URL scope; it does not manage Worlds. Shown only inside a World; on the World Index the Index itself is the chooser, so the Switcher is absent.
 _Avoid_: World selector, world dropdown
 
 **World Owner**:
@@ -122,10 +122,8 @@ _Avoid_: Share link, invite link
 
 ## Sharing
 
-Sharing is per **World** (ADR-0024; cemented in ADR-0037). A World's sharing cascades to all `shared` Entities within it. Entity-level Editor/Viewer grants (ADR-0004) provide finer-grained control on top — including per-user visibility, via a grant on a `private` Entity.
-
 **Rights**:
-The closed set of actions a given caller may perform on a specific Entity or World — e.g. reading it, editing its substance, deleting it, changing its visibility, managing its sharing. Derived from the sharing rules (a caller's standing as Owner, grantee, or member) rather than granted directly, and reported *with* the resource when it is fetched, so a surface knows what to offer without re-deriving standing. The vocabulary is per resource kind: a World is not something one "edits the substance" of. Distinct from a role (Owner, Editor, Contributor…), which is *why* a caller holds a Right; the Rights are the resolved *what*. The derivation has a single seam per resource kind — `acl/entity-access.ts` and `acl/world-access.ts` — so the sharing rules live in exactly one place each, projected to Rights on read and applied as SQL predicates on write.
+The closed set of actions a given caller may perform on a specific Entity or World — e.g. reading it, editing its substance, deleting it, changing its visibility, managing its sharing. Derived from the sharing rules (a caller's standing as Owner, grantee, or member) rather than granted directly. The vocabulary is per resource kind: a World is not something one "edits the substance" of. Distinct from a role (Owner, Editor, Contributor…), which is *why* a caller holds a Right; the Rights are the resolved *what*.
 _Avoid_: Permissions, ACL, capabilities, grants (a grant is one input to Rights, not the Rights)
 
 **Entity Visibility**:
@@ -137,7 +135,7 @@ A user holding full control of an Entity — substance, lifecycle (delete), expo
 _Avoid_: Admin, creator, co-owner
 
 **Editor**:
-A named user — any user on the Instance, World membership not required — granted permission to edit a specific Entity's substance: Content, name, Tags, Metadata. Never its lifecycle or exposure: no delete, no visibility change, no grant management. Edits are asynchronous and last-write-wins, guarded by the Entity's version (a stale save is rejected). Real-time co-editing is deferred, not precluded (ADR-0019).
+A named user — any user on the Instance, World membership not required — granted permission to edit a specific Entity's substance: Content, name, Tags, Metadata. Never its lifecycle or exposure: no delete, no visibility change, no grant management.
 _Avoid_: Collaborator, contributor
 
 **Viewer**:
@@ -149,12 +147,8 @@ An unguessable, unlisted URL that grants read-only access to a specific Entity w
 _Avoid_: Share link, public URL, share token
 
 **Live-follow**:
-A viewer in read mode seeing another user's *committed* changes to the Entity or World they are looking at appear on their own screen without a manual refresh — e.g. a player watching a `shared` Hex Map the GM is editing, or a World Dashboard whose pins the Owner is reordering. Applies to committed versions, not keystrokes (real-time co-editing is a separate, deferred concept — ADR-0019). Extends to anonymous World/Entity Public Link viewers. If the followed resource becomes unreachable (made `private`, un-shared, link revoked, or deleted), the follower's view is evicted rather than left stale. Never overwrites the follower's own unsaved edits: an editor with local changes keeps them and resolves the concurrent edit at save time. See ADR-0044.
+A viewer in read mode seeing another user's *committed* changes to the Entity or World they are looking at appear on their own screen without a manual refresh — e.g. a player watching a `shared` Hex Map the GM is editing, or a World Dashboard whose pins the Owner is reordering. Applies to committed versions, not keystrokes. Extends to anonymous World/Entity Public Link viewers. If the followed resource becomes unreachable (made `private`, un-shared, link revoked, or deleted), the follower's view is evicted rather than left stale. Never overwrites the follower's own unsaved edits: an editor with local changes keeps them and resolves the concurrent edit at save time.
 _Avoid_: Real-time sync, live editing, collaboration, streaming
-
-**EntityView**:
-Which editor surface is currently showing for an Entity that has multiple surfaces — the hex `'map'` (grid) or the `'note'` (Content body). Mirrored to the URL `view` param so a refresh or shared link lands on the correct surface. Session-only state, never part of the Entity document. Applies only to `hexmap` Entities; Notes have a single surface.
-_Avoid_: Mode, surface, panel, view mode
 
 ## Placement modes
 
@@ -167,7 +161,7 @@ Every piece of map content sits in exactly one of three placement modes:
 ## Editing tools
 
 **Tool**:
-A top-level editing mode armed in the palette — Select, Terrain, Feature, Label, Erase. Exactly one is armed at a time, and a canvas gesture applies it. A map opens armed with Select (its Pick Subtool). Region is *not* a palette Tool: Regions are created in the Regions panel and their membership is painted via the Inspector's Add/Remove brush (ADR-0012).
+A top-level editing mode armed in the palette — Select, Terrain, Feature, Label, Erase. Exactly one is armed at a time, and a canvas gesture applies it. A map opens armed with Select (its Pick Subtool). Region is *not* a palette Tool: Regions are created in the Regions panel and their membership is painted via the Inspector's Add/Remove brush.
 _Avoid_: Mode, brush, instrument
 
 **Subtool**:
@@ -195,7 +189,7 @@ The Tool that deletes a whole Hex record (its terrain *and* feature), turning th
 _Avoid_: Delete, clear, remove
 
 **Inspector**:
-The surface that shows and edits the currently selected Map element, including its Entity Link. For a Label it edits text/size/rotation/position; for a Region it edits name, color, deletion, and the Add/Remove membership direction — the *only* place Region details are edited. Engaging a Region's Add/Remove here arms the Region membership brush on that Region — the only way to arm it, now that Region is not a palette Tool (ADR-0012).
+The surface that shows and edits the currently selected Map element, including its Entity Link. For a Label it edits text/size/rotation/position; for a Region it edits name, color, deletion, and the Add/Remove membership direction — the *only* place Region details are edited. Engaging a Region's Add/Remove here arms the Region membership brush on that Region — the only way to arm it.
 _Avoid_: Side panel, details pane, properties
 
 **Regions panel**:
@@ -212,32 +206,20 @@ _Avoid_: Quick open, search bar, spotlight
 A single invocable entry in the Command Palette — e.g. creating a Note, or navigating to a matched Entity or World. Distinct from a Tool: invoking a Command may arm a Tool, but a Command is not itself one.
 _Avoid_: Action, shortcut
 
-**Command Provider**:
-A source of Commands for the Command Palette, bound to a prefix (the default empty prefix, or an arbitrary string such as `>`) that decides when it contributes results. Several Providers may share a prefix; each owns its own matching against the typed query, so an Entity-searching Provider and a fixed-Command-listing Provider can behave completely differently.
-_Avoid_: Source, matcher
-
-**Command Registry**:
-Where Command Providers make themselves known to the Command Palette. A Provider may be registered for the app's whole lifetime, or only while the part of the UI it belongs to (e.g. an editor) is present — so Commands become contextual without the Palette itself knowing what a context is.
-_Avoid_: Provider list, command bus
-
 ## Entity Browser
 
 **Entity Browser**:
-The durable, in-World surface (`/w/:worldId/entities`) that lists a single World's Entities as a card grid and lets the user find them by full-text search and Facets. Scoped to one World — distinct from the Command Palette (global, transient, cross-World) and the World Index (lists Worlds, not Entities).
-_Avoid_: Entity list, library, catalog, explorer
+The durable, in-World surface that lists a single World's Entities as a card grid and lets the user find them by Facets and by a full-text query matched against an Entity's name, Tags, and the prose of its Content. Scoped to one World — distinct from the Command Palette (global, transient, cross-World) and the World Index (lists Worlds, not Entities).
+_Avoid_: Entity list, library, catalog, explorer; fuzzy search (the query is full-text, ranked by relevance)
 
 **Facet**:
-A filterable dimension of a World's Entities offered in the Entity Browser with its distinct values and their counts — Type, Tag, and Visibility. Selecting values within one Facet is OR; across Facets is AND; the combined filter is AND-ed with the text query. Faceting on arbitrary Metadata keys is deferred.
+A filterable dimension of a World's Entities offered in the Entity Browser with its distinct values and their counts — Type, Tag, and Visibility. Selecting values within one Facet is OR; across Facets is AND; the combined filter is AND-ed with the text query.
 _Avoid_: Filter, dimension, aspect
-
-**Full-text search**:
-In the Entity Browser, matching a text query against an Entity's name, Tags, and the prose of its Content — ranked by relevance. Backed server-side by a plain-text projection of Content produced by a format-tagged extractor, so the domain still never parses Content (ADR-0019, ADR-0035).
-_Avoid_: Fulltext, keyword search, fuzzy search
 
 ## Outline
 
 **Outline**:
-A navigation view of a Content's headings — a nested, click-to-jump list that also marks the heading currently in view. Derived from the Content, never stored: the domain has no heading model of its own. Available wherever an Entity shows its Content body — a Note, or a Hex Map on its Note view. Sibling to the Inspector and Regions panel.
+A navigation view of a Content's headings — a nested, click-to-jump list that also marks the heading currently in view. Derived from the Content, never stored. Available wherever an Entity shows its Content body — a Note, or a Hex Map on its Note view. Sibling to the Inspector and Regions panel.
 _Avoid_: Table of contents, TOC, minimap, nav panel
 
 ## User preferences
@@ -261,25 +243,21 @@ _Avoid_: Date format, regional settings, locale (bare — that means the UI lang
 ## Self-hosting
 
 **Instance**:
-A single self-hosted deployment of Hexly — one API process over one Instance Directory (ADR-0002, ADR-0036). The unit an operator runs, configures, and backs up.
+A single self-hosted deployment of Hexly, over one Instance Directory. The unit an operator runs, configures, and backs up.
 _Avoid_: Server, deployment, tenant
 
 **Instance Directory**:
-The folder an operator points Hexly at (`HEXLY_DIR`), holding its SQLite database (`hexly.db`) and Instance Configuration (`hexly.yml`) — named for holding both data and config. The boot input — Hexly is given this folder, not a database-file path (ADR-0036).
+The folder an operator points Hexly at, holding its database and Instance Configuration — named for holding both data and config.
 _Avoid_: Data directory, data folder, db path, storage dir
 
 **Instance Admin**:
-A user flag granting account management on an Instance — create, disable, and delete users, reset passwords, grant/revoke the Admin flag, and grant/revoke the World Creation capability — plus future instance-settings surfaces. Carries zero content powers: an Admin reads and edits nothing they aren't otherwise an Owner, member, or grantee of, and does not inherently hold World Creation (granting it to oneself is an explicit, visible act). Deleting a user is refused while that user solely owns any World or Entity; disabling (login locked, data and memberships intact) is the immediate lever.
+A user flag granting account management on an Instance — create, disable, and delete users, reset passwords, grant/revoke the Admin flag, and grant/revoke a user's ability to create Worlds. Carries zero content powers: an Admin reads and edits nothing they aren't otherwise an Owner, member, or grantee of, and cannot create Worlds unless separately granted that ability (granting it to oneself is an explicit, visible act). Deleting a user is refused while that user solely owns any World or Entity; disabling (login locked, data and memberships intact) is the immediate lever.
 _Avoid_: Admin (alone, ambiguous with Superadmin), moderator, staff
-
-**World Creation**:
-A per-user Instance capability deciding whether that user may create a World (from the World Index, the Command Palette, or a vault import). One of a closed, code-known set of **orthogonal** instance capabilities — held independently of Instance Admin, so an account manager need not create Worlds and a creator need not manage accounts, and the "zero content powers" boundary holds (ADR-0040). Off by default: a freshly provisioned user cannot create Worlds until an Instance Admin grants it; a Superadmin always may (repair). Revoking is not retroactive — it gates the create action only, never touching Worlds the user already owns or manages.
-_Avoid_: World Creator, Author (persona), role, permission
 
 **Superadmin**:
 The in-app embodiment of the operator: unrestricted access, sitting outside the collaboration model entirely. Exists for repair — orphaned data, accidental deletions — not for daily administration (that is the Instance Admin's job). At least one per Instance, seeded at setup.
 _Avoid_: Root, god mode, owner
 
 **Instance Configuration**:
-Operator-facing settings for one Instance, in `hexly.yml` beside the database — the vault-import size limits today, feature flags next. The single source for these settings (no env-var override); a missing or partial file falls back to built-in defaults, an invalid one fails boot (ADR-0036). Distinct from per-User or per-World settings, which live in the database.
+Operator-facing settings for one Instance, stored beside the database. Distinct from per-User or per-World settings, which live in the database.
 _Avoid_: Config, settings, preferences, environment
