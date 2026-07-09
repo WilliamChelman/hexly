@@ -57,6 +57,8 @@ describe('Worlds endpoints', () => {
       entityCount: 0,
       // A fresh World carries no Owner-curated pins (ADR-0043, #168).
       pinnedEntityIds: [],
+      // The live-follow freshness key (ADR-0045); a fresh World is at sequence 1.
+      seq: 1,
       createdAt: expect.any(Number),
       updatedAt: expect.any(Number),
     });

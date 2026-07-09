@@ -32,11 +32,9 @@ export class WorldsClient {
   private readonly http = inject(HttpClient);
   private readonly bus = inject(NudgeBusClient);
   private readonly logger = inject(Logger);
-  private readonly store = new FollowStore<WorldDetail, WorldNudge>(this.bus, {
+  private readonly store = new FollowStore<WorldDetail>(this.bus, {
     kind: 'world',
     debounceMs: WORLD_NUDGE_DEBOUNCE_MS,
-    // A World has no version column — updatedAt is the sole freshness key (rename/pin/metadata bump it).
-    isNewer: (a, b) => a.updatedAt > b.updatedAt,
     // A transient refetch failure leaves the Dashboard stale (self-heals on the next nudge/reconnect):
     // log it — as WorldStore does — so it isn't silently unexplained. Restores the log ActiveWorld had.
     onRefetchError: (err) => this.logger.error('Failed to refetch the active World from a nudge', err),

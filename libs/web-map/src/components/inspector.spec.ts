@@ -55,6 +55,7 @@ function inspectorProviders() {
           const detail: EntityDetail = {
             ...summary(nextCreatedId, name),
             type,
+            seq: 1,
             document: { type } as EntityDetail['document'],
           };
           return of(detail);

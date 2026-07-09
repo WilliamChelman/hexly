@@ -85,6 +85,13 @@
       "when": 1783366544377,
       "tag": "0011_remove_home_entity",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1783603384294,
+      "tag": "0012_sequence_keyed_nudges",
+      "breakpoints": true
     }
   ]
 }

@@ -16,7 +16,9 @@ import { asc, count, eq } from 'drizzle-orm';
 import { solelyOwnsAnything } from '../acl/owner-set';
 import { AuthService } from '../auth/auth.service';
 import { DB, Db } from '../db/db';
-import { entityGrants, sessions, users, worldMembers } from '../db/schema';
+import { EntityWrites } from '../entities/entity-writes';
+import { WorldWrites } from '../worlds/world-writes';
+import { sessions, users } from '../db/schema';
 
 /**
  * The Instance Admin domain (ADR-0037, #163): account management with zero content
@@ -29,6 +31,8 @@ export class AdminService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly auth: AuthService,
+    private readonly writes: EntityWrites,
+    private readonly worldWrites: WorldWrites,
   ) {}
 
   /**
@@ -145,11 +149,15 @@ export class AdminService {
     if (user.isSuperadmin && this.isLastSuperadmin())
       throw this.conflict(AdminErrorCode.LastSuperadmin);
     if (solelyOwnsAnything(this.db, id)) throw this.conflict(AdminErrorCode.SoleOwner);
-    this.db.transaction((tx) => {
-      tx.delete(sessions).where(eq(sessions.userId, id)).run();
-      tx.delete(worldMembers).where(eq(worldMembers.userId, id)).run();
-      tx.delete(entityGrants).where(eq(entityGrants.userId, id)).run();
-      tx.delete(users).where(eq(users.id, id)).run();
+    // One outermost transaction (ADR-0045), so the membership and grant purges route through the
+    // write handles that own `world_members` and `entity_grants`. Both bump the touched rows' `seq`
+    // and emit nothing: the deleted user's sessions go with them, so they self-evict, and no
+    // surviving principal's Rights changed.
+    this.writes.transact(() => {
+      this.db.delete(sessions).where(eq(sessions.userId, id)).run();
+      this.worldWrites.purgeMembershipsOf(id);
+      this.writes.purgeGrantsOf(id);
+      this.db.delete(users).where(eq(users.id, id)).run();
     });
   }
 

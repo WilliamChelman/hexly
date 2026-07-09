@@ -21,6 +21,7 @@ const noteDetail = (name: string): EntityDetail => ({
   tags: [],
   visibility: 'private',
   version: 1,
+  seq: 1,
   createdAt: 1,
   updatedAt: 1,
   rights: ['read', 'edit', 'delete', 'set-visibility', 'manage'],

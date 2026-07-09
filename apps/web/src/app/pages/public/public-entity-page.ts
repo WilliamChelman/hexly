@@ -141,17 +141,13 @@ export class PublicEntityPage {
       );
   }
 
-  /** Version, then updatedAt tiebreak. */
+  /** Strictly past the freshness key the open Entity carries (ADR-0045). */
   private newerThanHeld(n: EntityNudge): boolean {
     const held = this.session.current();
-    if (!held) return false;
-    return (
-      n.version > held.version ||
-      (n.version === held.version && n.updatedAt > held.updatedAt)
-    );
+    return !!held && n.seq > held.seq;
   }
 
-  /** A `stale` reconnect pulse always refetches (no version — `||` order matters); else newer-than-held (#177). */
+  /** A `stale` reconnect pulse always refetches (no `seq` — `||` order matters); else newer-than-held (#177). */
   private wantsRefetch(n: EntityNudge | StaleNudge): boolean {
     return 'stale' in n || this.newerThanHeld(n);
   }

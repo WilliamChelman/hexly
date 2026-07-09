@@ -309,18 +309,15 @@ export class EntitySession implements ContentEditorSession {
   }
 
   /**
-   * Whether a freshly-emitted detail is newer than the view holds (ADR-0044) — the adopt gate that
-   * drops the store's echo of our own save (same version). A metadata patch (rename, visibility)
-   * bumps `updatedAt` without `version`, so both are compared — comparing only the version would
-   * drop a same-version rename.
+   * Whether a freshly-emitted detail is newer than the view holds (ADR-0045) — the adopt gate that
+   * drops the store's echo of our own save. `seq` is the freshness key, bumped by *every* committed
+   * change; comparing `(version, updatedAt)` instead would drop the changes that deliberately move
+   * neither — a grant, an ownership change, a visibility flip — so a demoted Editor would keep
+   * rendering a Save button until some unrelated edit finally moved the version.
    */
   private newerThanHeld(d: EntityDetail): boolean {
     const held = this._current();
-    if (!held) return false;
-    return (
-      d.version > held.version ||
-      (d.version === held.version && d.updatedAt > held.updatedAt)
-    );
+    return !!held && d.seq > held.seq;
   }
 
   /** Blank the view on live eviction (#174): the unavailable state, not an error or a redirect. */
@@ -424,14 +421,14 @@ export class EntitySession implements ContentEditorSession {
 
   /**
    * The shared metadata PATCH behind {@link rename} and {@link setVisibility} — both hit
-   * the same endpoint and share the same bookkeeping, so the guard lives in one place.
+   * the same endpoint and share the same bookkeeping, so the guard lives in one place. Exactly one
+   * of the two rides a request (ADR-0045), which is what lets the kind pick the server's gate.
    * None open, or one loading under navigation → no-op (not a throw), so a stale patch
    * can't write to the Entity the user navigated away from (#4).
    */
-  private patch(changes: {
-    name?: string;
-    visibility?: Visibility;
-  }): Observable<EntityDetail> {
+  private patch(
+    changes: { name: string } | { visibility: Visibility },
+  ): Observable<EntityDetail> {
     const open = this._current();
     if (!open || this._loading()) return EMPTY;
     return this.entities.patch(open.id, changes).pipe(

@@ -37,6 +37,7 @@ describe('SaveStatus', () => {
     tags: [],
     visibility: 'private',
     version: 3,
+    seq: 1,
     createdAt: 1,
     updatedAt: 1,
     // Owner opener (ADR-0039): the `edit` Right keeps saves flowing.

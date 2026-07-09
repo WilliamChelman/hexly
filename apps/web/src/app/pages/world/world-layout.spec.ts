@@ -7,7 +7,17 @@ import { NavRailStore } from '../../shell/nav-rail.store';
 import { WorldLayout } from './world-layout';
 
 function world(rights: WorldVerb[]): WorldDetail {
-  return { id: 'w1', name: 'Aldermoor', owners: ['u1'], rights, entityCount: 0, pinnedEntityIds: [], createdAt: 1, updatedAt: 1 };
+  return {
+    id: 'w1',
+    name: 'Aldermoor',
+    owners: ['u1'],
+    rights,
+    entityCount: 0,
+    pinnedEntityIds: [],
+    seq: 1,
+    createdAt: 1,
+    updatedAt: 1,
+  };
 }
 
 describe('WorldLayout', () => {

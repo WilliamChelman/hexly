@@ -1,0 +1,406 @@
+import { randomUUID } from 'node:crypto';
+import { Inject, Injectable } from '@nestjs/common';
+import {
+  Content,
+  EntityBody,
+  GrantRole,
+  Visibility,
+  descriptorsSchema,
+  extractText,
+  harvestDescriptors,
+} from '@hexly/domain';
+import { and, eq, inArray, ne, sql } from 'drizzle-orm';
+import { EntityAccess, entityAccess, sharedVisibility } from '../acl/entity-access';
+import { DB, Db } from '../db/db';
+import { INITIAL_SEQ, entities, entityDescriptors, entityGrants } from '../db/schema';
+import { SyncOnly, WriteOutbox } from '../events/write-outbox';
+
+/** A fresh Entity starts at version 1 — the optimistic-concurrency token's floor. */
+const INITIAL_VERSION = 1;
+
+/** Everything an insert needs. The import path pre-assigns `id` to resolve wikilinks before insert. */
+export interface InsertEntityInput {
+  id?: string;
+  ownerId: string;
+  worldId: string;
+  name: string;
+  tags: readonly string[];
+  body: EntityBody;
+}
+
+/** A stored `entities` row. */
+export type EntityRow = typeof entities.$inferSelect;
+
+/**
+ * The narrow handle a `manage` change writes ACL rows through. It exists so the *invariants*
+ * (≥1-Owner, no-such-user, owner-wins upsert) can stay in the service that reads best with them,
+ * while the `entity_grants` write itself stays inside {@link EntityWrites} — which is what makes
+ * the "no write without a nudge" guard structural rather than a convention. Runs inside the
+ * transaction, before the `seq` bump.
+ */
+export interface AclWriter {
+  /**
+   * Grant Editor or Viewer. An existing `owner` row wins, so granting a current Owner
+   * viewer/editor never demotes them past the ≥1-Owner invariant.
+   */
+  upsertGrant(targetUserId: string, role: GrantRole): void;
+  /** Revoke an editor/viewer grant. An `owner` row is never silently deleted here. */
+  removeGrant(targetUserId: string): void;
+  /** Promote to Owner — deliberately overwrites any editor/viewer grant the target held. */
+  upsertOwner(targetUserId: string): void;
+  /** Drop an Owner row. The ≥1-Owner invariant is the caller's to enforce first. */
+  removeOwner(targetUserId: string): void;
+}
+
+/**
+ * A change to one Entity. The kinds **are** the Rights verbs (ADR-0039, ADR-0045), so the kind
+ * determines the predicate and the caller never picks its own gate:
+ *
+ * | kind             | predicate                 |
+ * |------------------|---------------------------|
+ * | `edit`           | `canEditSubstanceEntity`  |
+ * | `set-visibility` | `canWriteEntity`          |
+ * | `delete`         | `canWriteEntity`          |
+ * | `manage`         | `ownsEntity` (Owner-only) |
+ *
+ * A `version` on an `edit` opts into the optimistic-concurrency check and bumps it; a name-only
+ * patch omits it. `version` and `updatedAt` move on `edit` alone — bumping either on a sharing or
+ * exposure change would 409 an editor's in-flight save, or send a freshly-shared Entity to the top
+ * of "Recently edited". `seq` is what moves on all of them.
+ */
+export type EntityChange =
+  | {
+      kind: 'edit';
+      name?: string;
+      tags?: readonly string[];
+      document?: EntityBody;
+      /** Present → the base version rides the atomic WHERE and is bumped. */
+      version?: number;
+    }
+  | { kind: 'set-visibility'; visibility: Visibility }
+  | { kind: 'manage'; acl?: (w: AclWriter) => void }
+  | { kind: 'delete' };
+
+/**
+ * `not-found` covers both "no such Entity" and "unreachable" — indistinguishable, so `private`
+ * never leaks existence. `conflict` is only reachable from a version-checked `edit`.
+ */
+export type MutateResult =
+  | { status: 'ok'; row: EntityRow }
+  | { status: 'conflict'; row: EntityRow }
+  | { status: 'not-found' }
+  | { status: 'forbidden' };
+
+/**
+ * The single write handle for `entities` and `entity_grants` (ADR-0045). It owns the `seq` bump,
+ * the derived indexes, and the post-commit emit — so a write *cannot* land without nudging its
+ * followers. An ESLint rule bans `update(entities)` and `insert|delete(entityGrants)` everywhere
+ * else.
+ *
+ * The transaction and the nudge buffer live in {@link WriteOutbox}, shared with `WorldWrites`, so
+ * a World membership change can bump the World and its shared Entities under one commit.
+ */
+@Injectable()
+export class EntityWrites {
+  constructor(
+    @Inject(DB) private readonly db: Db,
+    private readonly outbox: WriteOutbox,
+  ) {}
+
+  /**
+   * Run `fn` in the outermost transaction, flushing the nudge outbox on commit — the seam a caller
+   * that spans several write handles (the Admin account purge) reaches for. Delegates to
+   * {@link WriteOutbox.transact}; see there for why an async callback is a type error.
+   */
+  transact<T>(fn: () => SyncOnly<T>): T {
+    return this.outbox.transact(fn);
+  }
+
+  /**
+   * Insert a fully-built Entity — the single trunk behind `create` and the vault import. The row
+   * and its initial Owner land together, so a new Entity is never ownerless. No nudge: nothing can
+   * be following an id that did not exist a moment ago.
+   */
+  insert(input: InsertEntityInput): EntityRow {
+    const now = Date.now();
+    const { contentText, descriptors } = this.derive(input.body.content);
+    const row: EntityRow = {
+      id: input.id ?? randomUUID(),
+      worldId: input.worldId,
+      name: input.name,
+      type: input.body.type,
+      tags: [...input.tags],
+      visibility: 'private',
+      version: INITIAL_VERSION,
+      seq: INITIAL_SEQ,
+      document: JSON.stringify(input.body),
+      contentText,
+      createdAt: now,
+      updatedAt: now,
+    };
+    return this.transact(() => {
+      this.db.insert(entities).values(row).run();
+      this.db
+        .insert(entityGrants)
+        .values({ entityId: row.id, userId: input.ownerId, role: 'owner' })
+        .run();
+      this.replaceDescriptors(row.id, descriptors);
+      return row;
+    });
+  }
+
+  /**
+   * Delete every Entity in a World, nudging each — a **system write**, so it takes no `userId`:
+   * the World's own Owner gate has already run, and no per-Entity Right could refuse it. Each
+   * cascaded Entity's followers evict to `unavailable` on their own ref, which ADR-0044 deferred
+   * and left them stranded on a ghost row.
+   */
+  cascadeDeleteWorld(worldId: string): void {
+    this.transact(() => {
+      const doomed = this.db
+        .select({ id: entities.id })
+        .from(entities)
+        .where(eq(entities.worldId, worldId))
+        .all();
+      // entity_grants, entity_links and entity_descriptors cascade with each row.
+      this.db.delete(entities).where(eq(entities.worldId, worldId)).run();
+      for (const { id } of doomed) this.enqueue(id);
+    });
+  }
+
+  /**
+   * A World's membership moved, so the Rights every `shared` Entity in it confers moved too — a
+   * **system write**, taking no `userId`: the World's own Owner gate has already run, and no
+   * per-Entity Right could refuse it.
+   *
+   * Entity access reads `owner ∨ grant ∨ (shared ∧ world-member)` and Entity write reads
+   * `owner ∨ (shared ∧ world-owner)`, so *every* `world_members` mutation — promotion, demotion,
+   * add, remove — changes some principal's standing on the World's shared Entities. It therefore
+   * bumps each one's `seq` and nudges: a promoted World Owner's open Entity gains its Save button,
+   * and a removed member's follow evicts. Emitting without the bump would be a half-fix — the
+   * follower's freshness gate would drop the nudge and its `rights` array would stay stale
+   * (ADR-0045 rejects exactly that).
+   *
+   * `private` Entities are untouched: World membership confers nothing on them, so nobody's Rights
+   * moved and there is nothing to refetch.
+   *
+   * ponytail: fans out over *all* the World's shared Entities, not just the followed ones — the
+   * bus keeps no per-World interest index, and `emitEntityChange` short-circuits on no followers.
+   * Fine on a small instance; add an index if a huge shared World ever makes this loop hurt.
+   */
+  bumpWorldShared(worldId: string): void {
+    this.transact(() => {
+      const shared = this.db
+        .select({ id: entities.id })
+        .from(entities)
+        .where(and(eq(entities.worldId, worldId), sharedVisibility))
+        .all();
+      if (shared.length === 0) return;
+      const ids = shared.map((e) => e.id);
+      this.db
+        .update(entities)
+        .set({ seq: sql`${entities.seq} + 1` })
+        .where(inArray(entities.id, ids))
+        .run();
+      for (const id of ids) this.enqueue(id);
+    });
+  }
+
+  /**
+   * Drop every grant a departing user holds — a **system write**, called when their account is
+   * deleted. It bumps `seq` on each touched Entity, because the Entity's sharing state moved and a
+   * later nudge must read as newer than a follower's held value, but deliberately **emits
+   * nothing**: the user's own sessions are dropped with the account, so they self-evict, and no
+   * other principal's Rights on those Entities changed.
+   */
+  purgeGrantsOf(userId: string): void {
+    this.transact(() => {
+      const touched = this.db
+        .select({ id: entityGrants.entityId })
+        .from(entityGrants)
+        .where(eq(entityGrants.userId, userId))
+        .all()
+        .map((r) => r.id);
+      if (touched.length === 0) return;
+      this.db.delete(entityGrants).where(eq(entityGrants.userId, userId)).run();
+      this.db
+        .update(entities)
+        .set({ seq: sql`${entities.seq} + 1` })
+        .where(inArray(entities.id, touched))
+        .run();
+    });
+  }
+
+  /**
+   * The one derivation of Content, in one place — {@link EntityWrites} is the only caller of
+   * `extractText` and `harvestDescriptors`. Splitting them is what let an imported vault populate
+   * the search index while contributing nothing to the `::` Link Descriptor vocabulary.
+   */
+  private derive(content: Content): { contentText: string; descriptors: string[] } {
+    return {
+      contentText: extractText(content),
+      descriptors: descriptorsSchema.parse(harvestDescriptors(content)),
+    };
+  }
+
+  /** Replace the Entity's descriptor rows with the harvested set (self-pruning). */
+  private replaceDescriptors(id: string, descriptors: readonly string[]): void {
+    this.db.delete(entityDescriptors).where(eq(entityDescriptors.entityId, id)).run();
+    if (descriptors.length === 0) return;
+    this.db
+      .insert(entityDescriptors)
+      .values(descriptors.map((descriptor) => ({ entityId: id, descriptor })))
+      .run();
+  }
+
+  /**
+   * Apply `change` to Entity `id` on `userId`'s behalf: gate on the kind's predicate, write, bump
+   * `seq`, and nudge followers once the write has committed.
+   */
+  mutate(userId: string, id: string, change: EntityChange): MutateResult {
+    const access = entityAccess(this.db, userId);
+    const decision = access.decide(id);
+    // Unreachable is indistinguishable from nonexistent — ownership never leaks.
+    if (!decision?.canRead) return { status: 'not-found' };
+    const permitted =
+      change.kind === 'edit'
+        ? decision.canEditSubstance
+        : change.kind === 'manage'
+          ? decision.isOwner
+          : decision.canWrite;
+    if (!permitted) return { status: 'forbidden' };
+
+    return this.transact(() => {
+      const result = this.apply(access, decision.row, change);
+      // The choke point: every committed change nudges, whatever its kind.
+      if (result.status === 'ok') this.enqueue(id);
+      return result;
+    });
+  }
+
+  /**
+   * The per-kind write. The gate predicate rides the atomic WHERE (not just the read above), so a
+   * concurrent visibility flip between {@link entityAccess.decide} and the UPDATE means zero rows
+   * matched and the write never lands — never a fake 200.
+   */
+  private apply(access: EntityAccess, row: EntityRow, change: EntityChange): MutateResult {
+    const id = row.id;
+    const seq = row.seq + 1;
+
+    if (change.kind === 'delete') {
+      // entity_grants, entity_links and entity_descriptors cascade with the row.
+      const res = this.db
+        .delete(entities)
+        .where(and(eq(entities.id, id), access.writeFilter))
+        .run();
+      return res.changes === 0 ? { status: 'not-found' } : { status: 'ok', row };
+    }
+
+    if (change.kind === 'manage') {
+      change.acl?.(this.aclWriter(id));
+      // Sharing changed but no `entities` column did: `seq` alone carries the freshness.
+      this.db.update(entities).set({ seq }).where(eq(entities.id, id)).run();
+      return { status: 'ok', row: { ...row, seq } };
+    }
+
+    if (change.kind === 'set-visibility') {
+      // Exposure, not substance: no `version` bump (it would 409 an in-flight save) and no
+      // `updatedAt` bump (it would lie in "edited {date}" and reorder the Entity Browser).
+      const set = { visibility: change.visibility, seq };
+      const res = this.db
+        .update(entities)
+        .set(set)
+        // Evaluated pre-SET, so a shared→private re-hide still matches.
+        .where(and(eq(entities.id, id), access.writeFilter))
+        .run();
+      return res.changes === 0 ? { status: 'not-found' } : { status: 'ok', row: { ...row, ...set } };
+    }
+
+    // `edit`: substance. Set only the columns the caller owns, so a concurrent rename isn't
+    // clobbered by a save that never touched the name.
+    const derived = change.document && this.derive(change.document.content);
+    const set = {
+      ...(change.name !== undefined && { name: change.name }),
+      ...(change.tags !== undefined && { tags: [...change.tags] }),
+      ...(change.document !== undefined && {
+        document: JSON.stringify(change.document),
+        contentText: derived?.contentText,
+      }),
+      ...(change.version !== undefined && { version: change.version + 1 }),
+      updatedAt: Date.now(),
+      seq,
+    };
+    const res = this.db
+      .update(entities)
+      .set(set)
+      .where(
+        and(
+          eq(entities.id, id),
+          access.editFilter,
+          // The optimistic-concurrency token: a concurrent edit is a conflict, not an overwrite.
+          change.version !== undefined ? eq(entities.version, change.version) : undefined,
+        ),
+      )
+      .run();
+    if (res.changes > 0) {
+      // Same transaction as the body write, so the index always reflects the last *successful*
+      // save, never a rejected one.
+      if (derived) this.replaceDescriptors(id, derived.descriptors);
+      return { status: 'ok', row: { ...row, ...set } };
+    }
+    // Zero rows: the version moved, or the predicate stopped matching. Re-read to tell them apart.
+    const current = access.decide(id);
+    if (!current?.canRead) return { status: 'not-found' };
+    return change.version !== undefined
+      ? { status: 'conflict', row: current.row }
+      : { status: 'not-found' };
+  }
+
+  /** The `entity_grants` write handle handed to a `manage` change. */
+  private aclWriter(id: string): AclWriter {
+    const target = (targetUserId: string) =>
+      and(eq(entityGrants.entityId, id), eq(entityGrants.userId, targetUserId));
+    return {
+      upsertGrant: (targetUserId, role) => {
+        this.db
+          .insert(entityGrants)
+          .values({ entityId: id, userId: targetUserId, role })
+          .onConflictDoUpdate({
+            target: [entityGrants.entityId, entityGrants.userId],
+            set: { role },
+            // Owner wins: Owners move only through upsertOwner/removeOwner.
+            setWhere: ne(entityGrants.role, 'owner'),
+          })
+          .run();
+      },
+      removeGrant: (targetUserId) => {
+        this.db
+          .delete(entityGrants)
+          // An `owner` row leaves only through the ≥1-Owner-guarded owner-set path.
+          .where(and(target(targetUserId), inArray(entityGrants.role, ['editor', 'viewer'])))
+          .run();
+      },
+      upsertOwner: (targetUserId) => {
+        this.db
+          .insert(entityGrants)
+          .values({ entityId: id, userId: targetUserId, role: 'owner' })
+          .onConflictDoUpdate({
+            target: [entityGrants.entityId, entityGrants.userId],
+            set: { role: 'owner' },
+          })
+          .run();
+      },
+      removeOwner: (targetUserId) => {
+        this.db
+          .delete(entityGrants)
+          .where(and(target(targetUserId), eq(entityGrants.role, 'owner')))
+          .run();
+      },
+    };
+  }
+
+  /** The only door into the outbox: queue an Entity nudge for the open transaction's commit. */
+  private enqueue(id: string): void {
+    this.outbox.entity(id);
+  }
+}

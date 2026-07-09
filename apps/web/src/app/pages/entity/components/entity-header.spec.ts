@@ -25,6 +25,7 @@ function worldDetail(
     rights,
     entityCount: 1,
     pinnedEntityIds,
+    seq: 1,
     createdAt: 1,
     updatedAt: 1,
   };
@@ -44,6 +45,7 @@ describe('EntityHeader', () => {
     tags: [],
     visibility: 'private',
     version: 3,
+    seq: 1,
     createdAt: 1,
     updatedAt: 1,
     // The default opener is an Owner — full Rights (ADR-0039): writable and can manage sharing.

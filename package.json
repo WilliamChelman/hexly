@@ -12,6 +12,7 @@
     "build": "nx run-many -t build -p api,web",
     "test": "nx run-many -t test",
     "lint": "nx run-many -t lint",
+    "test:eslint-rules": "node --test eslint-rules/*.spec.mjs",
     "e2e": "nx e2e web-e2e"
   },
   "private": true,

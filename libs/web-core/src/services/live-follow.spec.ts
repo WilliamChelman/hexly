@@ -30,7 +30,7 @@ describe('watchResource', () => {
     const fetch = vi.fn(() => of('DETAIL'));
     const { follow, seen } = harness(fetch);
 
-    follow.next({ id: 'x', updatedAt: 2 });
+    follow.next({ id: 'x', seq: 2 });
     expect(fetch).not.toHaveBeenCalled(); // debounced
 
     vi.advanceTimersByTime(DEBOUNCE);
@@ -50,7 +50,7 @@ describe('watchResource', () => {
   it('maps a 403/404 refetch to EVICTED (access gone)', () => {
     for (const status of [403, 404]) {
       const { follow, seen } = harness(() => throwError(() => new HttpErrorResponse({ status })));
-      follow.next({ id: 'x', updatedAt: 2 });
+      follow.next({ id: 'x', seq: 2 });
       vi.advanceTimersByTime(DEBOUNCE);
       expect(seen).toEqual([EVICTED]);
     }
@@ -68,11 +68,11 @@ describe('watchResource', () => {
         .mockReturnValue(of('HEALED'));
       const { follow, seen } = harness(fetch);
 
-      follow.next({ id: 'x', updatedAt: 2 });
+      follow.next({ id: 'x', seq: 2 });
       vi.advanceTimersByTime(DEBOUNCE);
       expect(seen).toEqual([]); // swallowed, not evicted
 
-      follow.next({ id: 'x', updatedAt: 3 });
+      follow.next({ id: 'x', seq: 3 });
       vi.advanceTimersByTime(DEBOUNCE);
       expect(seen).toEqual(['HEALED']); // subscription survived
     }
@@ -87,11 +87,11 @@ describe('watchResource', () => {
       .mockReturnValueOnce(throwError(() => new HttpErrorResponse({ status: 404 })));
     const { follow } = harness(fetch, undefined, onTransientError);
 
-    follow.next({ id: 'x', updatedAt: 2 });
+    follow.next({ id: 'x', seq: 2 });
     vi.advanceTimersByTime(DEBOUNCE);
     expect(onTransientError).toHaveBeenCalledWith(transient);
 
-    follow.next({ id: 'x', updatedAt: 3 });
+    follow.next({ id: 'x', seq: 3 });
     vi.advanceTimersByTime(DEBOUNCE);
     expect(onTransientError).toHaveBeenCalledTimes(1); // 404 evicted, not reported as transient
   });
@@ -100,7 +100,7 @@ describe('watchResource', () => {
     const fetch = vi.fn(() => of('DETAIL'));
     const { follow, seen } = harness(fetch, () => false);
 
-    follow.next({ id: 'x', updatedAt: 2 });
+    follow.next({ id: 'x', seq: 2 });
     vi.advanceTimersByTime(DEBOUNCE);
 
     expect(fetch).not.toHaveBeenCalled();

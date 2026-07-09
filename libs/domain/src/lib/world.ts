@@ -121,6 +121,11 @@ export interface WorldDetail extends WorldSummary {
   /** How many Entities live in this World — the number a delete would destroy. */
   readonly entityCount: number;
   /**
+   * The live-follow freshness key (ADR-0045), the peer of `EntityDetail.seq`. A membership change
+   * bumps it without touching `updatedAt`, so adding a member never reorders the World Index.
+   */
+  readonly seq: number;
+  /**
    * The Owner-curated Pinned Entities (CONTEXT.md → Pinned Entity): one shared,
    * ordered id list, the same for everyone. References, not enforced FKs — a
    * pinned Entity a viewer can't reach simply drops off their Dashboard.

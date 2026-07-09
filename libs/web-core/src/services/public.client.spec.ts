@@ -50,7 +50,7 @@ describe('PublicClient', () => {
       expect(bus.useToken).toHaveBeenCalledWith(TOKEN);
       expect(bus.follow).toHaveBeenCalledWith({ kind: 'world', id: 'w1' });
 
-      bus.emit({ id: 'w1', updatedAt: 2 });
+      bus.emit({ id: 'w1', seq: 2 });
       vi.advanceTimersByTime(WORLD_NUDGE_DEBOUNCE_MS);
       http.expectOne(`/api/public/worlds/${TOKEN}`).flush(worldView);
 
@@ -83,7 +83,7 @@ describe('PublicClient', () => {
       const seen: unknown[] = [];
       const sub = client.watchEntity(TOKEN, 'entity', 'e1').subscribe((r) => seen.push(r));
 
-      bus.emit({ id: 'e1', version: 2, updatedAt: 2 });
+      bus.emit({ id: 'e1', seq: 2 });
       vi.advanceTimersByTime(WORLD_NUDGE_DEBOUNCE_MS);
       http.expectOne(`/api/public/entities/${TOKEN}`).flush(entity);
 
@@ -97,7 +97,7 @@ describe('PublicClient', () => {
         .watchEntity(TOKEN, 'worldEntity', 'e1')
         .subscribe((r) => seen.push(r));
 
-      bus.emit({ id: 'e1', version: 2, updatedAt: 2 });
+      bus.emit({ id: 'e1', seq: 2 });
       vi.advanceTimersByTime(WORLD_NUDGE_DEBOUNCE_MS);
       http.expectOne(`/api/public/worlds/${TOKEN}/entities/e1`).flush(entity);
 

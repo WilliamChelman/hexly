@@ -11,7 +11,7 @@ import { eq } from 'drizzle-orm';
 import { InterestRef, NudgeDelta, NudgeEntry } from '@hexly/domain';
 import { entityAccess, tokenReachesEntity } from '../acl/entity-access';
 import { worldAccess, tokenReachesWorld } from '../acl/world-access';
-import { worlds } from '../db/schema';
+import { entities, worlds } from '../db/schema';
 import { DB, Db } from '../db/db';
 import { HEXLY_CONFIG, HexlyConfig } from '../config/config.module';
 
@@ -202,39 +202,43 @@ export class NudgeBus implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Emit a change for an Entity to every subscriber (ADR-0044). Still-readable →
-   * `{ id, version, updatedAt }`; access ended (private flip, revoked grant, deleted row) → opaque
-   * `{ id, unavailable }`. `version`/`updatedAt` let a tab already at that state ignore the echo.
+   * Emit a change for an Entity to every subscriber (ADR-0044, ADR-0045). Still-readable →
+   * `{ id, seq }`; access ended (private flip, revoked grant, deleted row) → opaque
+   * `{ id, unavailable }`.
+   *
+   * It takes **only an id** and looks up its own freshness, mirroring {@link emitWorldChange}. The
+   * old `(id, version, updatedAt)` signature demanded two facts an ACL mutation does not possess —
+   * a grant change touches neither column — so grant and owner writes simply never called it. The
+   * shallow interface caused the omission (ADR-0045). A missing row is not an error but the
+   * eviction path: a cascade-deleted Entity fans out `unavailable`.
    */
-  emitEntityChange(id: string, version: number, updatedAt: number): void {
-    this.fanOut(
-      (ref) => ref.kind === 'entity' && ref.id === id,
-      (principal) =>
-        this.canRead(principal, id)
-          ? { id, version, updatedAt }
-          : { id, unavailable: true },
+  emitEntityChange(id: string): void {
+    const matches = (ref: InterestRef) => ref.kind === 'entity' && ref.id === id;
+    // The common case is nobody following: one interest scan, no query.
+    if (!this.anyFollower(matches)) return;
+    const row = this.db
+      .select({ seq: entities.seq })
+      .from(entities)
+      .where(eq(entities.id, id))
+      .get();
+    this.fanOut(matches, (principal) =>
+      row && this.canRead(principal, id) ? { id, seq: row.seq } : { id, unavailable: true },
     );
   }
 
   /**
    * Emit a change for a World to every subscriber (ADR-0044, #176) — the World peer of
-   * {@link emitEntityChange}. Still-reachable → `{ id, updatedAt }`; access ended (member removed,
-   * World deleted) → opaque `{ id, unavailable }`. The `updatedAt` read is guarded behind a
-   * follower check, so the common no-followers emit costs one interest scan and no query; a deleted
-   * World simply has no row and shapes everyone to `unavailable`.
+   * {@link emitEntityChange}. Still-reachable → `{ id, seq }`; access ended (member removed,
+   * World deleted) → opaque `{ id, unavailable }`. The `seq` read is guarded behind a follower
+   * check, so the common no-followers emit costs one interest scan and no query; a deleted World
+   * simply has no row and shapes everyone to `unavailable`.
    */
   emitWorldChange(id: string): void {
     const matches = (ref: InterestRef) => ref.kind === 'world' && ref.id === id;
     if (!this.anyFollower(matches)) return;
-    const row = this.db
-      .select({ updatedAt: worlds.updatedAt })
-      .from(worlds)
-      .where(eq(worlds.id, id))
-      .get();
+    const row = this.db.select({ seq: worlds.seq }).from(worlds).where(eq(worlds.id, id)).get();
     this.fanOut(matches, (principal) =>
-      row && this.canReadWorld(principal, id)
-        ? { id, updatedAt: row.updatedAt }
-        : { id, unavailable: true },
+      row && this.canReadWorld(principal, id) ? { id, seq: row.seq } : { id, unavailable: true },
     );
   }
 }

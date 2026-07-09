@@ -97,6 +97,7 @@ describe('WorldStore', () => {
       ...world('w2', 'New Realm'),
       entityCount: 1,
       pinnedEntityIds: [],
+      seq: 1,
     };
     worldsClient.create.mockReturnValue(of(detail));
 
@@ -112,7 +113,7 @@ describe('WorldStore', () => {
     flushList([world('w1', 'Aldermoor')]);
     store.load();
     worldsClient.rename.mockReturnValue(
-      of({ ...world('w1', 'Aldermoor Reborn'), entityCount: 0, pinnedEntityIds: [] }),
+      of({ ...world('w1', 'Aldermoor Reborn'), entityCount: 0, pinnedEntityIds: [], seq: 2 }),
     );
 
     store.rename('w1', 'Aldermoor Reborn').subscribe();
@@ -188,7 +189,7 @@ describe('WorldStore', () => {
       flushList([world('w1', 'Aldermoor Reborn')]);
       worldsClient.list.mockClear();
 
-      bus.emit({ id: 'w1', updatedAt: 2 });
+      bus.emit({ id: 'w1', seq: 2 });
       expect(worldsClient.list).not.toHaveBeenCalled(); // debounced, not yet
 
       vi.advanceTimersByTime(WORLD_NUDGE_DEBOUNCE_MS);

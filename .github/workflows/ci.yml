@@ -48,6 +48,11 @@ jobs:
       # i18n-sync is the key-drift gate (issue #50): it type-checks the tool then
       # diffs every locale catalog against en.json. run-many invokes it for the
       # one project that defines it (web), failing the build on drift.
+      # The custom ESLint rules are the guards for ADR-0020 (design tokens) and ADR-0045
+      # (the EntityWrites and WorldWrites choke points). A rule whose AST selector is typo'd
+      # matches nothing and passes silently, so the rules carry their own RuleTester suites.
+      - run: pnpm test:eslint-rules
+
       - run: pnpm exec nx run-many -t lint test build i18n-sync
 
   e2e:

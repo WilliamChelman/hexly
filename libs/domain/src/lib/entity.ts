@@ -163,17 +163,21 @@ export const entityVerbSchema = z.enum(['read', 'edit', 'delete', 'set-visibilit
 export type EntityVerb = z.infer<typeof entityVerbSchema>;
 
 /**
- * PATCH /entities/:id: a metadata patch — the `name` and/or the Visibility, no
- * `version` (outside the document's concurrency check). At least one field must
- * be present.
+ * PATCH /entities/:id: a metadata patch — the `name` **or** the Visibility, never both, and no
+ * `version` (outside the document's concurrency check).
+ *
+ * The two are different write kinds with different gates: a rename is substance, which an
+ * entity-level Editor may make; a Visibility flip is exposure, which needs full write rights
+ * (ADR-0039, ADR-0045). Accepting both in one request forced the *caller* to decide which rule
+ * judged it. Requiring exactly one lets the kind name the change and the kind pick the gate.
  */
 export const patchEntityRequestSchema = z
   .object({
     name: nameSchema.optional(),
     visibility: visibilitySchema.optional(),
   })
-  .refine((p) => p.name !== undefined || p.visibility !== undefined, {
-    message: 'A patch must change at least one field',
+  .refine((p) => (p.name !== undefined) !== (p.visibility !== undefined), {
+    message: 'A patch must change exactly one of `name` or `visibility`',
   });
 
 export type PatchEntityRequest = z.infer<typeof patchEntityRequestSchema>;
@@ -294,6 +298,12 @@ export interface EntitySummary {
 /** What `GET /entities/:id` and saves return. */
 export interface EntityDetail extends EntitySummary {
   readonly document: EntityBody;
+  /**
+   * The live-follow freshness key (ADR-0045): bumped by every committed change. A follower keeps
+   * the highest `seq` it has seen and refetches only on a nudge that exceeds it. Distinct from
+   * `version`, which the client sends back on save and which never moves on a sharing change.
+   */
+  readonly seq: number;
   /**
    * The caller's Rights, computed on read. Present and non-empty on the
    * single-entity fetch and anonymous link reads; absent on create/save/patch

@@ -212,13 +212,24 @@ describe('visibilitySchema', () => {
 });
 
 describe('patchEntityRequestSchema', () => {
-  it('accepts a name change, a visibility change, or both — and rejects an empty patch', () => {
+  it('accepts a name change or a visibility change — and rejects an empty patch', () => {
     // Metadata-only (no body, no base version) — never races with the save's optimistic-concurrency check.
     expect(patchEntityRequestSchema.parse({ name: 'Aldermoor' }).name).toBe('Aldermoor');
     expect(patchEntityRequestSchema.parse({ visibility: 'shared' }).visibility).toBe('shared');
     expect(() => patchEntityRequestSchema.parse({ name: '   ' })).toThrow();
-    // At least one field must change — an empty body is a no-op, not a valid patch.
+    // Exactly one field must change — an empty body is a no-op, not a valid patch.
     expect(() => patchEntityRequestSchema.parse({})).toThrow();
+  });
+
+  /**
+   * A rename is substance (an entity-level Editor may make it); a Visibility flip is exposure
+   * (full write rights). They are different write kinds with different gates, so one request
+   * cannot carry both without making the caller choose the rule that judges it (ADR-0045).
+   */
+  it('rejects a patch carrying both name and visibility — they are different write kinds', () => {
+    expect(() =>
+      patchEntityRequestSchema.parse({ name: 'Aldermoor', visibility: 'shared' }),
+    ).toThrow();
   });
 });
 

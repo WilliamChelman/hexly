@@ -17,6 +17,7 @@ describe('EntityTags', () => {
     tags,
     visibility: 'private',
     version: 1,
+    seq: 1,
     createdAt: 1,
     updatedAt: 1,
     // Owner by default (ADR-0039): the `edit` Right makes the tag controls editable.

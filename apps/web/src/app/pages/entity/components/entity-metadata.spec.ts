@@ -15,6 +15,7 @@ describe('EntityMetadata', () => {
     tags: [],
     visibility: 'private',
     version: 1,
+    seq: 1,
     createdAt: 1,
     updatedAt: 1,
     document: {

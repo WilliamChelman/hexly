@@ -86,7 +86,7 @@ describe('PublicWorldPage', () => {
     const el = render().nativeElement as HTMLElement;
     client.world.mockReturnValue(of(view('Aldermoor Reborn')));
 
-    bus.emit({ id: WORLD_ID, updatedAt: 2 });
+    bus.emit({ id: WORLD_ID, seq: 2 });
     vi.advanceTimersByTime(200);
     fixture.detectChanges();
 

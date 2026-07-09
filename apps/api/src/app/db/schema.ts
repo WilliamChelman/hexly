@@ -58,6 +58,13 @@ export const sessions = sqliteTable(
 );
 
 /**
+ * The sequence a freshly-inserted Entity or World starts at — no follower can hold anything
+ * older. It is the column default *and* the value the write handles put on the row they return,
+ * so the two cannot drift: a creator's held freshness always equals what the DB stored.
+ */
+export const INITIAL_SEQ = 1;
+
+/**
  * An Entity stored as a single JSON document. The columns are the metadata the
  * list view and access checks need; `document` holds the whole type-discriminated
  * body. `type`/`tags` are denormalized out so a list can group/filter without
@@ -78,12 +85,18 @@ export const entities = sqliteTable(
     // private | shared.
     visibility: text('visibility').notNull().default('private'),
     version: integer('version').notNull(),
+    // The live-follow freshness key (ADR-0045): bumped by *every* committed change —
+    // substance, exposure, sharing, lifecycle — by EntityWrites, the one write handle.
+    // Distinct from `version` (a concurrency token that must not move on a sharing
+    // change) and `updatedAt` (a user-visible timestamp that must not either).
+    seq: integer('seq').notNull().default(INITIAL_SEQ),
     // Serialized Entity body (entityBodySchema), validated at the edge.
     document: text('document').notNull(),
-    // Plain-text prose extracted from Content for full-text search, populated by
-    // extractText on every write. Nullable so rows can migrate in before the boot
-    // backfill fills them; the FTS table and its sync triggers are raw SQL,
-    // outside Drizzle's typed API.
+    // Plain-text prose extracted from Content for full-text search. EntityWrites derives it on
+    // every write (ADR-0045), alongside the Link Descriptor index, so it can no longer be missed;
+    // the boot backfill that once repaired NULL rows is gone with the gap it compensated for.
+    // Still nullable: pre-FTS rows predate the column. The FTS table and its sync triggers are raw
+    // SQL, outside Drizzle's typed API.
     contentText: text('content_text'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
@@ -123,6 +136,10 @@ export const entityGrants = sqliteTable(
 export const worlds = sqliteTable('worlds', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
+  // The live-follow freshness key (ADR-0045), the World peer of `entities.seq`: every
+  // committed change bumps it, including the membership mutations that deliberately
+  // leave `updatedAt` alone so adding a member never reorders the World Index.
+  seq: integer('seq').notNull().default(INITIAL_SEQ),
   // Owner-curated Dashboard pins: an ordered JSON array of Entity ids, one shared
   // set per World. References, not enforced FKs — stale or inaccessible ids are
   // filtered per-viewer on read, never pruned on delete.

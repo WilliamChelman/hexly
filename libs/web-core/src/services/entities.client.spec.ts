@@ -38,6 +38,7 @@ describe('EntitiesClient', () => {
     tags: [],
     visibility: 'private',
     version: 1,
+    seq: 1,
     createdAt: 1,
     updatedAt: 1,
     document: emptyHexmapBody,
@@ -71,7 +72,7 @@ describe('EntitiesClient', () => {
       const sub = client.watch('e1').subscribe((r) => seen.push(r));
       expect(bus.follow).toHaveBeenCalledWith({ kind: 'entity', id: 'e1' });
 
-      bus.emit({ id: 'e1', version: 2, updatedAt: 2 });
+      bus.emit({ id: 'e1', seq: 2 });
       vi.advanceTimersByTime(ENTITY_NUDGE_DEBOUNCE_MS);
       http.expectOne('/api/entities/e1').flush(aldermoor);
 
@@ -83,15 +84,15 @@ describe('EntitiesClient', () => {
       const seen: unknown[] = [];
       const sub = client.watch('e1').subscribe((r) => seen.push(r));
 
-      // A save writes through the store (advancing held to v1).
+      // A save writes through the store (advancing held to seq 1).
       client.save('e1', emptyHexmapBody, 0, []).subscribe();
       http.expectOne('/api/entities/e1').flush(aldermoor); // aldermoor is version 1
       await Promise.resolve(); // flush the deferred fanout
 
-      bus.emit({ id: 'e1', version: 1, updatedAt: 1 }); // the server echoes our own save
+      bus.emit({ id: 'e1', seq: 1 }); // the server echoes our own save
       vi.advanceTimersByTime(ENTITY_NUDGE_DEBOUNCE_MS);
 
-      http.expectNone('/api/entities/e1'); // held already at v1 → no refetch
+      http.expectNone('/api/entities/e1'); // held already at seq 1 → no refetch
       sub.unsubscribe();
     });
 

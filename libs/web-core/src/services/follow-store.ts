@@ -3,23 +3,23 @@ import { FollowSignal, InterestRef } from '@hexly/domain';
 import { NudgeBusClient } from './nudge-bus.client';
 import { Watched, watchResource } from './live-follow';
 
-/** How a {@link FollowStore} follows and orders one kind of resource. */
-export interface FollowStoreConfig<T, N> {
+/** How a {@link FollowStore} follows one kind of resource. */
+export interface FollowStoreConfig {
   /** The interest ref kind (`entity` | `world`) this store follows. */
   kind: InterestRef['kind'];
   /** Trailing-debounce window before a nudge triggers a refetch. */
   debounceMs: number;
   /**
-   * Is `candidate` — an incoming nudge *or* a loaded detail — strictly newer than the `held`
-   * detail? Both a nudge and a detail expose the resource's freshness key (Entities compare
-   * `version` then `updatedAt`; Worlds have no version, so `updatedAt` alone).
-   */
-  isNewer: (candidate: N | T, held: T) => boolean;
-  /**
    * Log a swallowed transient refetch failure (5xx / network blip) — omit to stay silent. Parity
    * with the list stores that log the same class, so a silently-stale follow isn't unexplained.
    */
   onRefetchError?: (err: unknown) => void;
+}
+
+/** Anything carrying the freshness key: a loaded detail, or an incoming nudge. */
+interface Sequenced {
+  id: string;
+  seq: number;
 }
 
 /**
@@ -41,7 +41,7 @@ export interface FollowStoreConfig<T, N> {
  * Not an `@Injectable`: each client news up its own configured instance, so the client stays the
  * only thing that knows the store exists.
  */
-export class FollowStore<T extends { id: string }, N extends { id: string; updatedAt: number }> {
+export class FollowStore<T extends Sequenced> {
   /**
    * Held freshness per id — persistent, so it outlives a watch and a reopened follow still dedups a
    * self-echo. Seeded by every read/write/refetch, monotonically. ponytail: unbounded (one detail
@@ -55,7 +55,7 @@ export class FollowStore<T extends { id: string }, N extends { id: string; updat
 
   constructor(
     private readonly bus: NudgeBusClient,
-    private readonly cfg: FollowStoreConfig<T, N>,
+    private readonly cfg: FollowStoreConfig,
   ) {}
 
   /**
@@ -106,14 +106,21 @@ export class FollowStore<T extends { id: string }, N extends { id: string; updat
   /** Monotonic: advance held only to a strictly newer detail, so a late/stale read can't regress it. */
   private seen(d: T): void {
     const held = this.held.get(d.id);
-    if (!held || this.cfg.isNewer(d, held)) this.held.set(d.id, d);
+    if (!held || d.seq > held.seq) this.held.set(d.id, d);
   }
 
+  /**
+   * The freshness gate. One `seq` on every resource kind, bumped by every committed change, so the
+   * comparison is the same for Entities and Worlds and lives here rather than in a per-kind
+   * adapter (ADR-0045).
+   */
   private isNewer(id: string, n: FollowSignal): boolean {
-    // A `stale` reconnect pulse carries no version to compare — always refetch to reconcile the gap.
-    if ('stale' in n) return true;
+    // A signal carrying no `seq` makes no freshness claim, so it is never gated: a `stale`
+    // reconnect pulse must refetch unconditionally to reconcile the gap. (An `unavailable`
+    // eviction also has no `seq`, but never reaches here — `watchResource` splits it off to
+    // EVICTED upstream of this gate.)
+    if (!('seq' in n)) return true;
     const held = this.held.get(id);
-    if (!held) return true;
-    return this.cfg.isNewer(n as unknown as N, held);
+    return !held || n.seq > held.seq;
   }
 }

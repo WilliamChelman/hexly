@@ -17,7 +17,7 @@ export class MockNudgeBusClient {
   /** Spy for the anonymous-principal switch — asserts a page connects/clears its token. */
   readonly useToken = vi.fn((_token: string | null): void => undefined);
 
-  /** Test helper: deliver a follow signal (version delta, `unavailable` eviction, or `stale` pulse). */
+  /** Test helper: deliver a follow signal (a `seq` delta, `unavailable` eviction, or `stale` pulse). */
   emit(nudge: FollowSignal): void {
     this.nudges.next(nudge);
   }

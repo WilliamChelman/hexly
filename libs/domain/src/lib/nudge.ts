@@ -31,25 +31,28 @@ export interface ConnectionReady {
 }
 
 /**
- * One changed resource in a nudge. `version` + `updatedAt` dedupe self/cross-tab echo:
- * a holder refetches only on something newer than it has. A metadata patch (rename,
- * visibility) touches `updatedAt` *without* bumping `version` — carrying both is what
- * lets a follower see a same-version rename as new.
+ * One changed Entity. `seq` is the sole freshness key (ADR-0045): a monotonic counter the server
+ * bumps on *every* committed change, whatever its kind — substance, exposure, sharing, lifecycle.
+ * A holder refetches exactly when a nudge's `seq` exceeds the one it holds, which dedupes
+ * self/cross-tab echo.
+ *
+ * Neither `version` nor `updatedAt` rides the wire. `version` is an optimistic-concurrency token
+ * that must not move on a sharing change; `updatedAt` is a domain-visible timestamp that must not
+ * either. Comparing the pair also silently dropped a second change landing in the same millisecond.
  */
 export interface EntityNudge {
   id: string;
-  version: number;
-  updatedAt: number;
+  seq: number;
 }
 
 /**
- * A changed World. A World has no `version` column (only `updatedAt`), so its readable
- * nudge carries `updatedAt` alone — the client reconciles by refetching, keyed on it.
- * A World is just another `ref`: rename, pin reorder, and metadata changes all flow here.
+ * A changed World — structurally the peer of {@link EntityNudge}, and keyed the same way. A World
+ * is just another `ref`: rename, pin reorder, and membership changes all flow here. The two stay
+ * distinct types because the names carry domain meaning, not because the shapes differ.
  */
 export interface WorldNudge {
   id: string;
-  updatedAt: number;
+  seq: number;
 }
 
 /**
@@ -62,7 +65,7 @@ export interface UnavailableNudge {
   unavailable: true;
 }
 
-/** One per-recipient entry: still-readable → version/updatedAt, access ended → unavailable. */
+/** One per-recipient entry: still-readable → `seq`, access ended → `unavailable`. */
 export type NudgeEntry = EntityNudge | WorldNudge | UnavailableNudge;
 
 /**

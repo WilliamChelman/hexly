@@ -44,11 +44,9 @@ export type EntityFacetParams = Pick<
 @Injectable({ providedIn: 'root' })
 export class EntitiesClient {
   private readonly http = inject(HttpClient);
-  private readonly store = new FollowStore<EntityDetail, EntityNudge>(inject(NudgeBusClient), {
+  private readonly store = new FollowStore<EntityDetail>(inject(NudgeBusClient), {
     kind: 'entity',
     debounceMs: ENTITY_NUDGE_DEBOUNCE_MS,
-    // Entities carry a version; a metadata patch bumps updatedAt without it, so both are compared.
-    isNewer: (a, b) => a.version > b.version || (a.version === b.version && a.updatedAt > b.updatedAt),
   });
 
   /**
@@ -85,12 +83,16 @@ export class EntitiesClient {
   }
 
   /**
-   * Patch an Entity's metadata — name and/or Visibility. One PATCH for both:
-   * metadata never conflicts with an in-progress save. Owner-gated server-side.
+   * Patch an Entity's metadata — the `name` **or** the Visibility, never both (ADR-0045). The two
+   * are different write kinds with different gates: a rename is substance, which an entity-level
+   * Editor may make; a Visibility flip is exposure, which needs full write rights. The union type
+   * is the client-side half of the server's `exactly one` schema — sending both is a 400, so it is
+   * a compile error here rather than a lost write. Metadata never conflicts with an in-progress
+   * save.
    */
   patch(
     id: string,
-    changes: { name?: string; visibility?: Visibility },
+    changes: { name: string } | { visibility: Visibility },
   ): Observable<EntityDetail> {
     // Write-through: the patched detail feeds the store, so other watchers see the rename/visibility
     // change with no roundtrip and this tab's own echo nudge dedups.

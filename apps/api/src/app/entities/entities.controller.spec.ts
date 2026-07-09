@@ -101,6 +101,8 @@ describe('Entities endpoints', () => {
       tags: [],
       visibility: 'private',
       version: 1,
+      // The live-follow freshness key (ADR-0045); a fresh Entity is at sequence 1.
+      seq: 1,
       createdAt: expect.any(Number),
       updatedAt: expect.any(Number),
       document: emptyHexmapBody,
@@ -927,44 +929,6 @@ describe('Entities endpoints', () => {
 
       expect(seen.slice().sort()).toEqual(['N1', 'N2', 'N3', 'N4', 'N5']);
       expect(pages).toBe(3); // 5 matches at 2/page.
-    });
-
-    it('backfills pre-existing rows at boot so an old vault becomes searchable', async () => {
-      const ada = await signIn('ada@hexly.test', 'correct horse');
-      // Anchor gives us a real owner/World to hang the legacy row off of.
-      const anchor = (await ada.post('/entities').send({ name: 'Anchor', type: 'note' })).body;
-
-      // A row as it looked before this column existed: content_text NULL, so the
-      // INSERT trigger indexed only name/tags — its prose is not yet searchable.
-      const document = JSON.stringify({
-        type: 'note',
-        content: tiptapContent({
-          type: 'doc',
-          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'the buried obelisk' }] }],
-        }),
-      });
-      const now = Date.now();
-      db.$client
-        .prepare(
-          `INSERT INTO entities (id, world_id, name, type, tags, visibility, version, document, content_text, created_at, updated_at)
-           VALUES (?, ?, 'Legacy', 'note', '[]', 'private', 1, ?, NULL, ?, ?)`,
-        )
-        .run('legacy-1', anchor.worldId, document, now, now);
-      // Ownership is a set now (ADR-0037): make the legacy row Ada's by copying the
-      // anchor's owner grant (folded into entity_grants, migration 0007) onto it.
-      db.$client
-        .prepare(
-          `INSERT INTO entity_grants (entity_id, user_id, role)
-           SELECT 'legacy-1', user_id, 'owner' FROM entity_grants WHERE entity_id = ? AND role = 'owner'`,
-        )
-        .run(anchor.id);
-
-      expect(names(await ada.get('/entities').query({ q: 'obelisk' }).expect(200))).toEqual([]);
-
-      // Boot backfill runs the extractor over the NULL row and reindexes it.
-      app.get(EntitiesService).onApplicationBootstrap();
-
-      expect(names(await ada.get('/entities').query({ q: 'obelisk' }).expect(200))).toEqual(['Legacy']);
     });
   });
 

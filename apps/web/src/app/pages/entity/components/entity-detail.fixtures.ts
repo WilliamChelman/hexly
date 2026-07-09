@@ -8,6 +8,7 @@ export const noteDetail = (name: string): EntityDetail => ({
   tags: [],
   visibility: 'private',
   version: 1,
+  seq: 1,
   createdAt: 1,
   updatedAt: 1,
   // Owner opener by default (ADR-0039): the `edit` Right keeps the editor writable.

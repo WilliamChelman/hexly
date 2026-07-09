@@ -23,7 +23,7 @@ describe('WorldsClient', () => {
     createdAt: 1,
     updatedAt: 1,
   };
-  const detail: WorldDetail = { ...summary, entityCount: 1, pinnedEntityIds: [] };
+  const detail: WorldDetail = { ...summary, entityCount: 1, pinnedEntityIds: [], seq: 1 };
 
   beforeEach(() => {
     bus = new MockNudgeBusClient();
@@ -161,7 +161,7 @@ describe('WorldsClient', () => {
       const sub = client.watch('w1').subscribe((r) => seen.push(r));
       expect(bus.follow).toHaveBeenCalledWith({ kind: 'world', id: 'w1' });
 
-      bus.emit({ id: 'w1', updatedAt: 2 });
+      bus.emit({ id: 'w1', seq: 2 });
       vi.advanceTimersByTime(WORLD_NUDGE_DEBOUNCE_MS);
       http.expectOne('/api/worlds/w1').flush(detail);
 

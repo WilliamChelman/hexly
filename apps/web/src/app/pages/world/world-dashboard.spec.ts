@@ -47,6 +47,7 @@ function worldDetail(
     rights,
     entityCount: 0,
     pinnedEntityIds,
+    seq: 1,
     createdAt: 1,
     updatedAt: 1,
   };

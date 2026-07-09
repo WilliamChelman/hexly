@@ -11,6 +11,7 @@ import { VaultImportService } from './vault-import.service';
 import { VaultUnzipper } from './vault-unzipper';
 import { WorldsController } from './worlds.controller';
 import { WorldsService } from './worlds.service';
+import { WorldWrites } from './world-writes';
 
 /**
  * World feature module (ADR-0024). Imports DbModule (shared DB, ADR-0002),
@@ -38,6 +39,9 @@ import { WorldsService } from './worlds.service';
     }),
   ],
   controllers: [WorldsController],
-  providers: [WorldsService, VaultImportService, VaultExportService, VaultUnzipper],
+  providers: [WorldsService, WorldWrites, VaultImportService, VaultExportService, VaultUnzipper],
+  // WorldWrites is exported so the Admin account purge (ADR-0045) routes its `world_members`
+  // deletion through the one handle that bumps `seq` — the World peer of EntityWrites.
+  exports: [WorldWrites],
 })
 export class WorldsModule {}

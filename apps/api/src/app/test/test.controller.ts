@@ -26,6 +26,10 @@ export class TestController {
   @Post('reset')
   @HttpCode(204)
   reset(): void {
+    // Deliberately not routed through EntityWrites (ADR-0045): this is a fixture reset, not a
+    // domain write. There is nothing to nudge — the e2e browser reloads after it — and this
+    // module is physically absent from a real deploy (ADR-0009).
+    // eslint-disable-next-line hexly-writes/no-direct-entity-writes
     this.db.delete(entities).run();
   }
 }

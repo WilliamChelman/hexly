@@ -620,6 +620,7 @@ describe('EntityBrowser', () => {
     client.create.mockReturnValueOnce(
       of({
         ...summary({ id: 'created', name: 'Untitled map' }),
+        seq: 1,
         document: { type: 'hexmap', content: { format: 'tiptap-v1', snapshot: {} }, hexes: {}, regions: [], labels: [] },
       }),
     );
@@ -638,6 +639,7 @@ describe('EntityBrowser', () => {
     client.create.mockReturnValueOnce(
       of({
         ...summary({ id: 'created', name: 'Untitled note', type: 'note' }),
+        seq: 1,
         document: { type: 'note', content: { format: 'tiptap-v1', snapshot: {} } },
       }),
     );
@@ -677,6 +679,8 @@ describe('EntityBrowser', () => {
     client.patch.mockReturnValueOnce(
       of({
         ...summary({ id: 'm1', name: 'Aldermoor Keep', version: 4 }),
+        // The rename bumped `seq`; a patch never bumps `version`.
+        seq: 5,
         document: { type: 'hexmap', content: { format: 'tiptap-v1', snapshot: {} }, hexes: {}, regions: [], labels: [] },
       }),
     );

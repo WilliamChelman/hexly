@@ -43,6 +43,7 @@ describe('EntitySession', () => {
     tags: [],
     visibility: 'private',
     version: 3,
+    seq: 1,
     createdAt: 1,
     updatedAt: 1,
     // The default opener is an Owner — full Rights (ADR-0039), so writable and manageable.
@@ -810,21 +811,42 @@ describe('EntitySession', () => {
     });
 
     it('adopts a fresh detail newer than held', () => {
-      openAndFollow(); // version 3
-      watched.next({ ...aldermoor, version: 4 });
+      openAndFollow(); // seq 1
+      watched.next({ ...aldermoor, seq: 2, version: 4 });
       expect(session.current()?.version).toBe(4);
     });
 
-    it('adopts a same-version detail with a newer updatedAt (a rename never bumps version)', () => {
-      openAndFollow(); // version 3, updatedAt 1
-      watched.next({ ...aldermoor, version: 3, updatedAt: 2, name: 'Aldermoor, Renamed' });
+    /**
+     * `seq` is the freshness key (ADR-0045): a rename bumps neither `version` nor — for a grant or
+     * a visibility flip — `updatedAt`, so gating on those would silently drop the refetched detail
+     * the FollowStore just fetched.
+     */
+    it('adopts a detail whose seq moved though version and updatedAt did not (a rename)', () => {
+      openAndFollow(); // seq 1, version 3, updatedAt 1
+      watched.next({ ...aldermoor, seq: 2, name: 'Aldermoor, Renamed' });
       expect(session.current()?.name).toBe('Aldermoor, Renamed');
     });
 
-    it('ignores a detail no newer than held — the store fans our own save back at its version', () => {
-      openAndFollow(); // version 3, updatedAt 1
+    /**
+     * The bug this gate shipped with: a grant or ownership change bumps `seq` **alone** — the
+     * server deliberately leaves `version` and `updatedAt` where they are, so a sharing change
+     * can't 409 an in-flight save or reorder "Recently edited". A demoted Editor must lose their
+     * Save button on the nudge, not on the next unrelated edit.
+     */
+    it('adopts a seq-only detail whose rights changed, so a demoted Editor loses `edit`', () => {
+      openAndFollow(); // seq 1, full Rights
+      expect(session.writable()).toBe(true);
+
+      watched.next({ ...aldermoor, seq: 2, rights: ['read'] });
+
+      expect(session.writable()).toBe(false);
+      expect(session.manageable()).toBe(false);
+    });
+
+    it('ignores a detail no newer than held — the store fans our own save back at its seq', () => {
+      openAndFollow(); // seq 1
       const before = session.current();
-      watched.next({ ...aldermoor, version: 3, updatedAt: 1 });
+      watched.next({ ...aldermoor, seq: 1, version: 99 });
       expect(session.current()).toBe(before); // not re-adopted, so the editor is not re-seeded
     });
 
@@ -833,7 +855,7 @@ describe('EntitySession', () => {
       editor.paintAt({ q: 5, r: 5 }, 'ocean'); // unsaved edit
       expect(session.dirty()).toBe(true);
 
-      watched.next({ ...aldermoor, version: 4 });
+      watched.next({ ...aldermoor, seq: 2, version: 4 });
       expect(session.current()?.version).toBe(3); // buffer preserved, access loss meets it at save
     });
 
@@ -860,7 +882,7 @@ describe('EntitySession', () => {
       watched.next(EVICTED);
       TestBed.tick(); // nulling current nulls followedId, so switchMap withdraws the follow
 
-      watched.next({ ...aldermoor, version: 99 });
+      watched.next({ ...aldermoor, seq: 99 });
       expect(session.current()).toBeNull();
     });
 

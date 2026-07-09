@@ -1,11 +1,4 @@
-import { randomUUID } from 'node:crypto';
-import {
-  ForbiddenException,
-  Inject,
-  Injectable,
-  NotFoundException,
-  OnApplicationBootstrap,
-} from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
   ApiError,
   CreateEntityRequest,
@@ -20,18 +13,15 @@ import {
   EntityType,
   FacetCount,
   entityTypeSchema,
-  extractText,
   Visibility,
-  descriptorsSchema,
   EntityGrant,
   GrantRole,
-  harvestDescriptors,
   PublicLink,
   SaveEntityRequest,
   tagsSchema,
   visibilitySchema,
 } from '@hexly/domain';
-import { and, asc, desc, eq, inArray, isNull, ne, sql, SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, sql, SQL } from 'drizzle-orm';
 import {
   AclSetResult,
   gate,
@@ -62,7 +52,7 @@ import {
   worlds,
 } from '../db/schema';
 import { HEXLY_CONFIG, HexlyConfig } from '../config/config.module';
-import { NudgeBus } from '../events/nudge-bus';
+import { EntityWrites } from './entity-writes';
 
 /** Per-entity Public Link table for the shared get/mint/revoke helpers. */
 const ENTITY_LINK: PublicLinkTable = {
@@ -71,8 +61,6 @@ const ENTITY_LINK: PublicLinkTable = {
   fk: entityLinks.entityId,
   newRow: (token, entityId) => ({ id: token, entityId, createdAt: Date.now() }),
 };
-
-const INITIAL_VERSION = 1;
 
 /** Reader-scoped paging + filtering options for {@link EntitiesService.list}. */
 export interface ListOptions {
@@ -121,28 +109,12 @@ export type SaveResult = EntitySaveOutcome | { status: 'not-found' };
  * mutations `canWrite` (owner ∨ world-owner-and-shared).
  */
 @Injectable()
-export class EntitiesService implements OnApplicationBootstrap {
+export class EntitiesService {
   constructor(
     @Inject(DB) private readonly db: Db,
     @Inject(HEXLY_CONFIG) private readonly config: HexlyConfig,
-    private readonly bus: NudgeBus,
+    private readonly writes: EntityWrites,
   ) {}
-
-  /**
-   * Boot backfill: populate `content_text` (and, via the FTS triggers, the search
-   * index) for rows where it is still NULL. No-op once every row has a value.
-   */
-  onApplicationBootstrap(): void {
-    const stale = this.db
-      .select({ id: entities.id, document: entities.document })
-      .from(entities)
-      .where(isNull(entities.contentText))
-      .all();
-    for (const row of stale) {
-      const contentText = extractText(parseDocument(row.id, row.document).content);
-      this.db.update(entities).set({ contentText }).where(eq(entities.id, row.id)).run();
-    }
-  }
 
   /**
    * One reader-scoped page of summaries, metadata only. Stable sort (newest first,
@@ -311,7 +283,7 @@ export class EntitiesService implements OnApplicationBootstrap {
 
   create(ownerId: string, req: CreateEntityRequest): EntityDetail {
     const body = emptyEntityBody(req.type);
-    const row = this.insertEntity({
+    const row = this.writes.insert({
       ownerId,
       worldId: this.resolveWorldId(ownerId, req.worldId),
       name: req.name,
@@ -333,43 +305,7 @@ export class EntitiesService implements OnApplicationBootstrap {
     tags: readonly string[],
     body: EntityBody,
   ): void {
-    this.insertEntity({ id, ownerId, worldId, name, tags, body });
-  }
-
-  /**
-   * The single INSERT trunk {@link create} and {@link importNote} share. Returns
-   * the inserted row so callers can build an {@link EntityDetail} without a re-read.
-   */
-  private insertEntity(input: {
-    /** Pre-generated id — the import path assigns ids up front to resolve wikilinks before insert. */
-    id?: string;
-    ownerId: string;
-    worldId: string;
-    name: string;
-    tags: readonly string[];
-    body: EntityBody;
-  }) {
-    const now = Date.now();
-    const row = {
-      id: input.id ?? randomUUID(),
-      worldId: input.worldId,
-      name: input.name,
-      type: input.body.type,
-      tags: [...input.tags],
-      visibility: 'private' as const,
-      version: INITIAL_VERSION,
-      document: serialize(input.body),
-      // Search index text; the FTS triggers pick it up from the column.
-      contentText: extractText(input.body.content),
-      createdAt: now,
-      updatedAt: now,
-    };
-    // Row and its initial Owner land together — a new Entity is never ownerless.
-    this.db.transaction(() => {
-      this.db.insert(entities).values(row).run();
-      this.db.insert(entityGrants).values({ entityId: row.id, userId: input.ownerId, role: 'owner' }).run();
-    });
-    return row;
+    this.writes.insert({ id, ownerId, worldId, name, tags, body });
   }
 
   /**
@@ -378,103 +314,53 @@ export class EntitiesService implements OnApplicationBootstrap {
    * `not-found` (404), a reachable one the caller can't edit a 403.
    */
   save(userId: string, id: string, req: SaveEntityRequest): SaveResult {
-    // Read first for not-found and to preserve untouched columns in response.
-    const access = entityAccess(this.db, userId);
-    const decision = access.decide(id);
-    if (!decision?.canRead) return { status: 'not-found' };
-    // An entity-level Editor may save Content/Tags too.
-    if (!decision.canEditSubstance) throw new ForbiddenException();
-    const row = decision.row;
-
-    // Set only columns a save owns so concurrent renames aren't clobbered.
-    // Tags always fully replace (save carries the full set).
-    const document = serialize(req.document);
-    const contentText = extractText(req.document.content);
-    // Descriptors are derived from the saved Content, not sent by the client.
-    const descriptors = descriptorsSchema.parse(harvestDescriptors(req.document.content));
-    const version = req.version + 1;
-    const updatedAt = Date.now();
-    // Body write and descriptor-index replace in one transaction so the index
-    // always reflects the last successful save, never a rejected one.
-    const saved = this.db.transaction(() => {
-      const res = this.db
-        .update(entities)
-        .set({ document, contentText, version, updatedAt, tags: req.tags })
-        .where(
-          and(
-            eq(entities.id, id),
-            access.editFilter,
-            eq(entities.version, req.version),
-          ),
-        )
-        .run();
-      if (res.changes === 0) return false;
-      this.replaceDescriptors(id, descriptors);
-      return true;
+    const result = this.writes.mutate(userId, id, {
+      kind: 'edit',
+      document: req.document,
+      // Tags always fully replace (a save carries the full set).
+      tags: req.tags,
+      version: req.version,
     });
-    if (!saved) {
-      // Version moved between read and write; re-read to report current state.
-      const current = access.decide(id);
-      return current?.canRead
-        ? { status: 'conflict', current: toDetail(current.row) }
-        : { status: 'not-found' };
+    switch (result.status) {
+      case 'not-found':
+        return { status: 'not-found' };
+      case 'forbidden':
+        throw new ForbiddenException();
+      case 'conflict':
+        return { status: 'conflict', current: toDetail(result.row) };
+      case 'ok':
+        return { status: 'saved', entity: detailOf(result.row, req.document) };
     }
-    // Nudge followers only after the atomic write lands.
-    this.bus.emitEntityChange(id, version, updatedAt);
-    return {
-      status: 'saved',
-      entity: detailOf(
-        { ...row, version, updatedAt, tags: req.tags },
-        req.document,
-      ),
-    };
   }
 
   /**
-   * Metadata patch (`name` and/or Visibility): no version bump, so it never
-   * invalidates an in-progress edit. Write-gated: unreachable → null (404),
-   * reachable but not writable → 403.
+   * Metadata patch: a rename (substance, so an entity-level Editor may make it) or a Visibility
+   * flip (exposure, so it needs full write rights). Exactly one of the two rides a request
+   * ({@link patchEntityRequestSchema}), which is what lets the kind name the change and the kind
+   * pick the gate. Unreachable → null (404); reachable but not permitted → 403.
    */
   patch(
     userId: string,
     id: string,
     changes: { name?: string; visibility?: Visibility },
   ): EntityDetail | null {
+    const result = this.writes.mutate(
+      userId,
+      id,
+      changes.visibility !== undefined
+        ? { kind: 'set-visibility', visibility: changes.visibility }
+        : { kind: 'edit', name: changes.name },
+    );
+    if (result.status === 'forbidden') throw new ForbiddenException();
+    // `conflict` is unreachable — a patch carries no base version — but `not-found` also covers
+    // the write predicate ceasing to match mid-flight, which must 404 rather than fake a 200.
+    if (result.status !== 'ok') return null;
+    // A visibility flip can change the caller's own standing (a World Owner loses write when a
+    // shared Entity goes private), so recompute Rights post-update. Cold path.
     const access = entityAccess(this.db, userId);
-    const decision = access.decide(id);
-    if (!decision?.canRead) return null;
-    // Visibility is exposure, never a grant power: changing it needs full write
-    // rights, while a name-only patch is substance an entity-level Editor may make.
-    // The WHERE below mirrors whichever gate applies.
-    const changesVisibility = changes.visibility !== undefined;
-    const permitted = changesVisibility ? decision.canWrite : decision.canEditSubstance;
-    if (!permitted) throw new ForbiddenException();
-    const updatedAt = Date.now();
-    const res = this.db
-      .update(entities)
-      // The gate predicate in the WHERE (not ownsEntity) so a World Owner's or an
-      // Editor's write lands; evaluated pre-SET, so a shared→private re-hide still matches.
-      .set({ ...changes, updatedAt })
-      .where(
-        and(
-          eq(entities.id, id),
-          changesVisibility ? access.writeFilter : access.editFilter,
-        ),
-      )
-      .run();
-    // 0 rows means the write predicate no longer matched between the access read and
-    // this UPDATE (e.g. concurrently flipped `private`): the write never landed, so
-    // return null (404), not a fake 200.
-    if (res.changes === 0) return null;
-    // A patch never bumps version — the fresh `updatedAt` marks the nudge newer
-    // than what a follower holds.
-    this.bus.emitEntityChange(id, decision.row.version, updatedAt);
-    // A visibility flip can change the caller's own standing (a World Owner loses
-    // write when a shared Entity goes private), so recompute Rights post-update.
-    // Cold path — never the autosave hot path.
     const after = access.decide(id);
     return {
-      ...toDetail({ ...decision.row, ...changes, updatedAt }),
+      ...toDetail(result.row),
       ...(after && { rights: access.rightsOf(after) }),
     };
   }
@@ -512,31 +398,14 @@ export class EntitiesService implements OnApplicationBootstrap {
   }
 
   /**
-   * Replace the entity's descriptor rows with the harvested set (self-pruning).
-   * Runs inside save's transaction.
-   */
-  private replaceDescriptors(id: string, descriptors: readonly string[]): void {
-    this.db.delete(entityDescriptors).where(eq(entityDescriptors.entityId, id)).run();
-    if (descriptors.length === 0) return;
-    this.db
-      .insert(entityDescriptors)
-      .values(descriptors.map((descriptor) => ({ entityId: id, descriptor })))
-      .run();
-  }
-
-  /**
    * Delete an Entity: an Owner, or the World Owner of a `shared` one. false →
    * unreachable (404); reachable but not writable → 403.
    */
   delete(userId: string, id: string): boolean {
-    const access = entityAccess(this.db, userId).decide(id);
-    if (!access?.canRead) return false;
-    if (!access.canWrite) throw new ForbiddenException();
-    // entity_grants (owner + grant rows) cascades with the row.
-    this.db.delete(entities).where(eq(entities.id, id)).run();
-    // Deletion is eviction: the bus resolves every follower to `unavailable`.
-    this.bus.emitEntityChange(id, access.row.version, access.row.updatedAt);
-    return true;
+    // Deletion is eviction: the row is gone, so the bus resolves every follower to `unavailable`.
+    const result = this.writes.mutate(userId, id, { kind: 'delete' });
+    if (result.status === 'forbidden') throw new ForbiddenException();
+    return result.status === 'ok';
   }
 
   /**
@@ -569,14 +438,12 @@ export class EntitiesService implements OnApplicationBootstrap {
     if (gate) return gate;
     if (!userExists(this.db, targetUserId)) return { status: 'no-such-user' };
     // Owner wins: promoting a user who holds an editor/viewer grant overwrites it to owner.
-    this.db
-      .insert(entityGrants)
-      .values({ entityId: id, userId: targetUserId, role: 'owner' })
-      .onConflictDoUpdate({
-        target: [entityGrants.entityId, entityGrants.userId],
-        set: { role: 'owner' },
-      })
-      .run();
+    // Promotion grants `manage`, so a follower already holding this Entity must refetch —
+    // hence the additive path nudges too, not just removals.
+    this.writes.mutate(userId, id, {
+      kind: 'manage',
+      acl: (w) => w.upsertOwner(targetUserId),
+    });
     return { status: 'ok', value: this.entityOwnersOf(id) };
   }
 
@@ -590,17 +457,12 @@ export class EntitiesService implements OnApplicationBootstrap {
     if (gate) return gate;
     const outcome = removeOwnerOutcome(this.entityOwnersOf(id), targetUserId);
     if (outcome.status !== 'ok') return outcome;
-    // Delete the owner-role row — their access ends; they hold no other grant row.
-    this.db
-      .delete(entityGrants)
-      .where(
-        and(
-          eq(entityGrants.entityId, id),
-          eq(entityGrants.userId, targetUserId),
-          eq(entityGrants.role, 'owner'),
-        ),
-      )
-      .run();
+    // Delete the owner-role row — their access ends; they hold no other grant row. The nudge
+    // evicts them live; every remaining Owner refetches their (unchanged) Rights.
+    this.writes.mutate(userId, id, {
+      kind: 'manage',
+      acl: (w) => w.removeOwner(targetUserId),
+    });
     return outcome;
   }
 
@@ -623,18 +485,12 @@ export class EntitiesService implements OnApplicationBootstrap {
     const gate = this.gateOwnerManagement(userId, id);
     if (gate) return gate;
     if (!userExists(this.db, targetUserId)) return { status: 'no-such-user' };
-    // The `setWhere` guard makes an existing `owner` row win, so granting a current
-    // Owner viewer/editor never demotes them past the ≥1-Owner invariant. Owners are
-    // managed via addOwner/removeOwner only.
-    this.db
-      .insert(entityGrants)
-      .values({ entityId: id, userId: targetUserId, role })
-      .onConflictDoUpdate({
-        target: [entityGrants.entityId, entityGrants.userId],
-        set: { role },
-        setWhere: ne(entityGrants.role, 'owner'),
-      })
-      .run();
+    // An Editor demoted to Viewer must see their Save button vanish: `rights` ride the resource
+    // (ADR-0039), so only a nudge-driven refetch refreshes them.
+    this.writes.mutate(userId, id, {
+      kind: 'manage',
+      acl: (w) => w.upsertGrant(targetUserId, role),
+    });
     return { status: 'ok', value: this.entityGrantsOf(id) };
   }
 
@@ -649,18 +505,13 @@ export class EntitiesService implements OnApplicationBootstrap {
   ): AclSetResult<EntityGrant[]> {
     const gate = this.gateOwnerManagement(userId, id);
     if (gate) return gate;
-    // Editor/viewer rows only — an `owner` row is removed via removeOwner (which
-    // enforces the ≥1-Owner invariant), never silently deleted here.
-    this.db
-      .delete(entityGrants)
-      .where(
-        and(
-          eq(entityGrants.entityId, id),
-          eq(entityGrants.userId, targetUserId),
-          inArray(entityGrants.role, ['editor', 'viewer']),
-        ),
-      )
-      .run();
+    // Editor/viewer rows only — an `owner` row is removed via removeOwner (which enforces the
+    // ≥1-Owner invariant), never silently deleted here. Revocation is how entity-level access
+    // ends, so the nudge evicts a live-following grantee rather than leaving them on a stale view.
+    this.writes.mutate(userId, id, {
+      kind: 'manage',
+      acl: (w) => w.removeGrant(targetUserId),
+    });
     return { status: 'ok', value: this.entityGrantsOf(id) };
   }
 
@@ -689,16 +540,13 @@ export class EntitiesService implements OnApplicationBootstrap {
   revokeLink(userId: string, id: string): AclSetResult<null> {
     const gate = this.gateOwnerManagement(userId, id);
     if (gate) return gate;
-    revokePublicLink(this.db, ENTITY_LINK, id);
-    // Revoke is eviction: emit with the row's real version/updatedAt so an anonymous
-    // token follower resolves to `unavailable` while a still-authorized follower
-    // computes newer-than-held false and no-ops.
-    const row = this.db
-      .select({ version: entities.version, updatedAt: entities.updatedAt })
-      .from(entities)
-      .where(eq(entities.id, id))
-      .get();
-    if (row) this.bus.emitEntityChange(id, row.version, row.updatedAt);
+    // Link revocation is sharing, so it is a `manage` write: the token row and the `seq` bump
+    // land in one transaction, and the nudge flushes after it. An anonymous token follower then
+    // resolves to `unavailable`; a still-authorized follower simply refetches.
+    this.writes.transact(() => {
+      revokePublicLink(this.db, ENTITY_LINK, id);
+      return this.writes.mutate(userId, id, { kind: 'manage' });
+    });
     return { status: 'ok', value: null };
   }
 
@@ -847,14 +695,14 @@ function toFtsMatch(q: string): string {
   return tokens.map((t) => `"${t}"*`).join(' ');
 }
 
-function serialize(body: EntityBody): string {
-  return JSON.stringify(body);
-}
-
 type SummaryRow = Omit<typeof entities.$inferSelect, 'document'>;
 
-/** Exactly the columns {@link toSummary} reads — narrower than {@link SummaryRow}, so the `list` projection (which skips `contentText` for weight) satisfies it. */
-type SummaryColumns = Omit<SummaryRow, 'contentText'>;
+/**
+ * Exactly the columns {@link toSummary} reads — narrower than {@link SummaryRow}, so the `list`
+ * projection (which skips `contentText` for weight, and `seq` because a summary carries no
+ * freshness key — only the detail a follower holds does) satisfies it.
+ */
+type SummaryColumns = Omit<SummaryRow, 'contentText' | 'seq'>;
 
 function toSummary(row: SummaryColumns): EntitySummary {
   return {
@@ -876,7 +724,9 @@ function toDetail(row: typeof entities.$inferSelect): EntityDetail {
 
 // Write paths pass valid body; only toDetail re-parses.
 function detailOf(row: SummaryRow, document: EntityBody): EntityDetail {
-  return { ...toSummary(row), document };
+  // `seq` rides the detail, not the summary: it is the freshness key a live-follower holds and
+  // compares each incoming nudge against (ADR-0045).
+  return { ...toSummary(row), seq: row.seq, document };
 }
 
 /**

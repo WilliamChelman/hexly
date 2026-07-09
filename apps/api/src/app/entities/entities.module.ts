@@ -4,6 +4,7 @@ import { DbModule } from '../db/db.module';
 import { EventsModule } from '../events/events.module';
 import { EntitiesController } from './entities.controller';
 import { EntitiesService } from './entities.service';
+import { EntityWrites } from './entity-writes';
 
 /**
  * The Entity feature module (ADR-0018). Imports DbModule for the shared DB token
@@ -13,8 +14,10 @@ import { EntitiesService } from './entities.service';
 @Module({
   imports: [DbModule, AuthModule, EventsModule],
   controllers: [EntitiesController],
-  providers: [EntitiesService],
-  // Exported so the vault import (ADR-0033) can bulk-insert notes through it.
-  exports: [EntitiesService],
+  providers: [EntitiesService, EntityWrites],
+  // EntitiesService is exported so the vault import (ADR-0033) can bulk-insert notes through it;
+  // EntityWrites so the World cascade-delete (ADR-0045) and the Admin grant purge route their
+  // `entities` / `entity_grants` writes through the one handle that nudges.
+  exports: [EntitiesService, EntityWrites],
 })
 export class EntitiesModule {}
