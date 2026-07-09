@@ -1,9 +1,15 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
-import { BehaviorSubject, Observable, of, throwError } from 'rxjs';
+import { BehaviorSubject, Observable, defer, finalize, of, throwError } from 'rxjs';
 import { PublicWorldView } from '@hexly/domain';
-import { PublicClient, NudgeBusClient } from '@hexly/web-core';
+import {
+  PublicClient,
+  NudgeBusClient,
+  WORLD_NUDGE_DEBOUNCE_MS,
+  Watched,
+  watchResource,
+} from '@hexly/web-core';
 import { MockNudgeBusClient, provideTranslocoTesting } from '@hexly/web-core/testing';
 import { PublicWorldPage } from './public-world-page';
 
@@ -17,6 +23,8 @@ function view(worldName: string, entities: PublicWorldView['entities'] = []): Pu
 /** Minimal stand-in for the token-scoped Public read client. */
 class MockPublicClient {
   world = vi.fn<(token: string) => Observable<PublicWorldView>>();
+  watchWorld =
+    vi.fn<(token: string, worldId: string) => Observable<Watched<PublicWorldView>>>();
 }
 
 describe('PublicWorldPage', () => {
@@ -41,6 +49,18 @@ describe('PublicWorldPage', () => {
     client = new MockPublicClient();
     bus = new MockNudgeBusClient();
     client.world.mockReturnValue(of(view('Aldermoor')));
+    // Relay the mock bus through the real live-follow loop, as PublicClient.watchWorld wires in
+    // prod: it pins the token principal for the follow's lifetime, then refetches via client.world.
+    client.watchWorld.mockImplementation((token, worldId) =>
+      defer(() => {
+        bus.useToken(token);
+        return watchResource({
+          follow: bus.follow({ kind: 'world', id: worldId }),
+          fetch: () => client.world(token),
+          debounceMs: WORLD_NUDGE_DEBOUNCE_MS,
+        });
+      }).pipe(finalize(() => bus.useToken(null))),
+    );
     await TestBed.configureTestingModule({
       imports: [PublicWorldPage, provideTranslocoTesting()],
       providers: [

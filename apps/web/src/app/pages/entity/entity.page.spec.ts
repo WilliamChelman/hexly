@@ -10,9 +10,9 @@ import {
   provideRouter,
   Router,
 } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { CONTENT_FORMAT, EntityDetail, EntityType } from '@hexly/domain';
-import { EntitiesClient, NudgeBusClient, ActiveWorld, TitleService } from '@hexly/web-core';
+import { EntitiesClient, NudgeBusClient, ActiveWorld, TitleService, EVICTED, Watched } from '@hexly/web-core';
 import { MockEntitiesClient, MockNudgeBusClient, provideTranslocoTesting } from '@hexly/web-core/testing';
 import { EntitySession } from './services/entity-session';
 import { EntityNameResolver, CONTENT_EDITOR_SESSION } from '@hexly/content-editor';
@@ -66,6 +66,7 @@ describe('EntityPage routing', () => {
   let http: HttpTestingController;
   let entities: MockEntitiesClient;
   let bus: MockNudgeBusClient;
+  let watched: Subject<Watched<EntityDetail>>;
   let navigate: ReturnType<typeof vi.spyOn>;
 
   const detail = (id: string, type: EntityType): EntityDetail =>
@@ -77,6 +78,10 @@ describe('EntityPage routing', () => {
   async function configure(id: string) {
     entities = new MockEntitiesClient();
     bus = new MockNudgeBusClient();
+    // The store's live-follow is tested in its own spec; here the page drives the session off what
+    // EntitiesClient.watch emits, so stub it with a Subject the test pushes into.
+    watched = new Subject<Watched<EntityDetail>>();
+    entities.watch.mockReturnValue(watched);
     await TestBed.configureTestingModule({
       imports: [EntityPage, provideTranslocoTesting()],
       providers: [
@@ -161,7 +166,7 @@ describe('EntityPage routing', () => {
     TestBed.tick(); // settle the reconciler's follow subscription
 
     // The server evicted this follower (private flip, revoked grant, or delete).
-    bus.emit({ id: 'n1', unavailable: true });
+    watched.next(EVICTED);
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;

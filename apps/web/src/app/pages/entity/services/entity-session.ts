@@ -13,7 +13,6 @@ import { HttpErrorResponse } from '@angular/common/http';
 import {
   catchError,
   concat,
-  debounceTime,
   defer,
   distinctUntilChanged,
   EMPTY,
@@ -32,15 +31,13 @@ import {
   emptyHexMap,
   EntityBody,
   EntityDetail,
-  EntityNudge,
   EntitySaveOutcome,
-  StaleNudge,
   HexMap,
   hexMapSchema,
   tiptapContent,
   Visibility,
 } from '@hexly/domain';
-import { EntitiesClient, NudgeBusClient, ActiveWorld, idFromSegment, isAccessLoss, worldRoute, TitleService, AppShellStore } from '@hexly/web-core';
+import { EntitiesClient, ActiveWorld, idFromSegment, worldRoute, TitleService, AppShellStore, EVICTED } from '@hexly/web-core';
 import { EntityView, HexMapStore } from '@hexly/web-map';
 import type { ContentEditorSession } from '@hexly/content-editor';
 
@@ -53,12 +50,6 @@ import type { ContentEditorSession } from '@hexly/content-editor';
  */
 /** Trailing-debounce window before an edit is autosaved. */
 const AUTOSAVE_DELAY_MS = 800;
-
-/**
- * Trailing-debounce window before an incoming nudge is reconciled: a burst of
- * rapid saves by another user coalesces into a single refetch.
- */
-export const NUDGE_DEBOUNCE_MS = 150;
 
 /**
  * Ceiling on how long a leave-flush blocks navigation — only bites a hung
@@ -77,7 +68,6 @@ interface SaveSnapshot {
 @Injectable()
 export class EntitySession implements ContentEditorSession {
   private readonly entities = inject(EntitiesClient);
-  private readonly bus = inject(NudgeBusClient);
   private readonly editor = inject(HexMapStore);
   private readonly title = inject(TitleService);
   private readonly router = inject(Router);
@@ -236,54 +226,30 @@ export class EntitySession implements ContentEditorSession {
       onCleanup(() => clearTimeout(timer));
     });
 
-    // Live-follow reconciler: follow the open Entity and, on a nudge newer than
-    // the held version, silently refetch-and-replace. `switchMap` off the followed
-    // id makes it subscription-scoped: swapping Entity tears down the old follow;
-    // `takeUntilDestroyed` withdraws on route leave — no manual unfollow.
+    // Live-follow reconciler: the client's write-through store owns the source (shared follow +
+    // debounced refetch + freshness dedup, fed by our own saves too); we only decide what to *apply*.
+    // `switchMap` off the followed id makes it subscription-scoped — swapping Entity tears down the
+    // old follow, `takeUntilDestroyed` withdraws on route leave.
     toObservable(this._followedId)
       .pipe(
         // A computed already dedupes on ===, so toObservable only emits on a real id change.
-        switchMap((id) =>
-          id === null
-            ? EMPTY
-            : this.bus.follow({ kind: 'entity', id }).pipe(
-                // Live eviction: our own access ended — blank the view rather than
-                // leave it stale. Nulling `current` also nulls `_followedId`, so
-                // this switchMap tears the follow down. Never blank over unsaved
-                // edits: a dirty editor keeps its buffer and meets the access loss
-                // at save time (403 → read-only) instead.
-                tap((n) => {
-                  if ('unavailable' in n && !this.dirty()) this.evict();
-                }),
-                // This follow is entity-kind, so only entity/stale/unavailable entries
-                // arrive; narrow past the eviction entry (WorldNudge never reaches here).
-                filter((n): n is EntityNudge | StaleNudge => !('unavailable' in n)),
-                // Refetch-worthy up front, then debounce so a burst coalesces into one refetch.
-                filter((n) => this.wantsRefetch(n)),
-                debounceTime(NUDGE_DEBOUNCE_MS),
-                // Re-check at fire time: never refetch over unsaved edits (the 409
-                // path finds concurrent edits at save time), skip during a route
-                // load, and re-check freshness since our own save may have advanced
-                // it during the debounce window.
-                filter((n) => !this.dirty() && !this._loading() && this.wantsRefetch(n)),
-                // A nudge is an idempotent invalidation: swallow a transient refetch
-                // failure rather than let one 5xx end live-follow for the session —
-                // the next nudge or reconnect heals it. But 403/404 is access *gone*
-                // (lost while disconnected, no eviction nudge to replay), so evict —
-                // the reconnect refetch is what surfaces the loss (#177).
-                switchMap(() =>
-                  this.open(id).pipe(
-                    catchError((err) => {
-                      if (isAccessLoss(err) && !this.dirty()) this.evict();
-                      return EMPTY;
-                    }),
-                  ),
-                ),
-              ),
-        ),
+        switchMap((id) => (id === null ? EMPTY : this.entities.watch(id))),
         takeUntilDestroyed(this.destroyRef),
       )
-      .subscribe();
+      .subscribe((result) => {
+        // EVICTED: our access ended (un-shared / deleted / a 403·404 refetch). Blank the view —
+        // but never over unsaved edits: a dirty editor keeps its buffer and meets the access loss
+        // at save time (403 → read-only) instead. Nulling current also nulls _followedId, so the
+        // switchMap tears the follow down.
+        if (result === EVICTED) {
+          if (!this.dirty()) this.evict();
+          return;
+        }
+        // Adopt a fresh detail from another writer — never over unsaved edits or a route load, and
+        // only if newer than held. The store's write-through fans our *own* save back at the same
+        // version; `newerThanHeld` drops that echo so it never re-seeds the editor mid-session.
+        if (!this.dirty() && !this._loading() && this.newerThanHeld(result)) this.adopt(result);
+      });
   }
 
   /**
@@ -343,27 +309,18 @@ export class EntitySession implements ContentEditorSession {
   }
 
   /**
-   * Whether a nudge describes state newer than the view holds (ADR-0044). A metadata patch
-   * (rename, visibility) touches `updatedAt` without bumping `version` — comparing both is what
-   * lets a follower see a same-version rename; comparing only the version would drop it.
+   * Whether a freshly-emitted detail is newer than the view holds (ADR-0044) — the adopt gate that
+   * drops the store's echo of our own save (same version). A metadata patch (rename, visibility)
+   * bumps `updatedAt` without `version`, so both are compared — comparing only the version would
+   * drop a same-version rename.
    */
-  private newerThanHeld(n: EntityNudge): boolean {
+  private newerThanHeld(d: EntityDetail): boolean {
     const held = this._current();
     if (!held) return false;
     return (
-      n.version > held.version ||
-      (n.version === held.version && n.updatedAt > held.updatedAt)
+      d.version > held.version ||
+      (d.version === held.version && d.updatedAt > held.updatedAt)
     );
-  }
-
-  /**
-   * Whether a follow signal should drive a refetch: a `stale` reconnect pulse always does (it has
-   * no version to compare — the `||` order matters, so a version-less pulse never reaches
-   * {@link newerThanHeld}), else only a nudge newer than held (#177). One predicate, used at both
-   * the pre- and post-debounce gates so they can't drift.
-   */
-  private wantsRefetch(n: EntityNudge | StaleNudge): boolean {
-    return 'stale' in n || this.newerThanHeld(n);
   }
 
   /** Blank the view on live eviction (#174): the unavailable state, not an error or a redirect. */

@@ -6,7 +6,6 @@ import {
   RouterStateSnapshot,
   UrlTree,
 } from '@angular/router';
-import { HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom, isObservable, Observable, of, Subject, throwError } from 'rxjs';
 import { WorldDetail } from '@hexly/domain';
 import { TranslocoService } from '@jsverse/transloco';
@@ -15,9 +14,9 @@ import { NudgeBusClient } from './nudge-bus.client';
 import { MockNudgeBusClient } from '../testing/nudge-bus.mock';
 import { ToasterService } from './toaster.service';
 import { MockWorldsClient } from '../testing/worlds-client.mock';
+import { EVICTED, Watched } from './live-follow';
 import { segment } from '../utils/pretty-id';
 import { ActiveWorld, activeWorldGuard, clearActiveWorld } from './active-world';
-import { WORLD_NUDGE_DEBOUNCE_MS } from './world.store';
 
 const WORLD_ID = '11111111-1111-4111-8111-111111111111';
 const detail = { id: WORLD_ID, name: 'Aldermoor', updatedAt: 1 } as WorldDetail;
@@ -32,12 +31,17 @@ describe('ActiveWorld', () => {
   let active: ActiveWorld;
   let worlds: MockWorldsClient;
   let bus: MockNudgeBusClient;
+  let watched: Subject<Watched<WorldDetail>>;
   let navigate: ReturnType<typeof vi.spyOn>;
   let toaster: { show: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     worlds = new MockWorldsClient();
     bus = new MockNudgeBusClient();
+    // The store's live-follow is tested in its own spec; here ActiveWorld reacts to what
+    // WorldsClient.watch emits, so stub it with a Subject the test pushes into.
+    watched = new Subject<Watched<WorldDetail>>();
+    worlds.watch.mockReturnValue(watched);
     toaster = { show: vi.fn() };
     TestBed.configureTestingModule({
       providers: [
@@ -182,113 +186,46 @@ describe('ActiveWorld', () => {
     expect(active.world()).toBe(detail);
   });
 
-  // Live-follow eviction (ADR-0044, #176): losing access to the open World blanks it and sends the
-  // viewer to the World Index, rather than leaving an open Dashboard for a World they can't enter.
-  describe('live eviction', () => {
-    it('evicts the active World to the Index when it becomes unavailable (membership loss / delete)', () => {
+  // Live-follow (ADR-0044, #176/#178): ActiveWorld reacts to what WorldsClient.watch emits — a fresh
+  // detail (re-pin if at least as fresh as held) or EVICTED (blank + return to the Index). The
+  // follow / debounced refetch / freshness dedup all live in FollowStore + watchResource (their specs).
+  describe('live-follow', () => {
+    /** Pin a World (held updatedAt = 1) and settle the reconciler's subscription to worlds.watch. */
+    function follow() {
       active.set(detail, WORLD_ID);
-      TestBed.flushEffects(); // settle the follow subscription
+      TestBed.flushEffects();
+    }
 
-      bus.emit({ id: WORLD_ID, unavailable: true });
+    it('evicts the active World to the Index on EVICTED (membership loss / delete / gone across a gap)', () => {
+      follow();
+      watched.next(EVICTED);
 
       expect(active.worldId()).toBeNull();
       expect(active.world()).toBeNull();
       expect(navigate).toHaveBeenCalledWith(['/']);
     });
 
-    it('does not navigate away on a readable World nudge — a rename/pin change is live-follow, not eviction', () => {
-      active.set(detail, WORLD_ID);
-      TestBed.flushEffects();
-
-      bus.emit({ id: WORLD_ID, updatedAt: 2 });
-
-      expect(active.worldId()).toBe(WORLD_ID);
-      expect(navigate).not.toHaveBeenCalled();
-    });
-  });
-
-  // Open-Dashboard live-follow (ADR-0044, #178): a readable World nudge (rename / pin reorder /
-  // metadata) refetches the authoritative detail and re-pins it, so an open Dashboard — which
-  // derives its name and pins from active.world() — reflects the change without a reload.
-  describe('live-follow refetch', () => {
-    beforeEach(() => vi.useFakeTimers());
-    afterEach(() => vi.useRealTimers());
-
-    it('refetches and re-pins the World detail once after the debounce on a readable nudge', () => {
-      active.set(detail, WORLD_ID);
-      TestBed.flushEffects(); // settle the follow subscription
+    it('re-pins the World on a fresh detail (rename / pin reorder) without navigating away', () => {
+      follow();
       const renamed = { id: WORLD_ID, name: 'Aldermoor Reborn', updatedAt: 2 } as WorldDetail;
-      worlds.get.mockReturnValue(of(renamed));
 
-      bus.emit({ id: WORLD_ID, updatedAt: 2 });
-      expect(worlds.get).not.toHaveBeenCalled(); // debounced, not yet
+      watched.next(renamed);
 
-      vi.advanceTimersByTime(WORLD_NUDGE_DEBOUNCE_MS);
-
-      expect(worlds.get).toHaveBeenCalledWith(WORLD_ID);
       expect(active.world()).toBe(renamed);
       expect(active.name()).toBe('Aldermoor Reborn');
+      expect(navigate).not.toHaveBeenCalled();
     });
 
-    it('refetches and re-pins on a stale reconnect pulse, though it carries no newer updatedAt (#177)', () => {
-      active.set(detail, WORLD_ID); // held updatedAt = 1
-      TestBed.flushEffects();
-      // While disconnected the World was renamed; the reconnect pulse can't know its updatedAt, so
-      // it must refetch unconditionally to reconcile the gap (no server replay).
-      const renamed = { id: WORLD_ID, name: 'Aldermoor Reborn', updatedAt: 2 } as WorldDetail;
-      worlds.get.mockReturnValue(of(renamed));
-
-      bus.emit({ id: WORLD_ID, stale: true });
-      vi.advanceTimersByTime(WORLD_NUDGE_DEBOUNCE_MS);
-
-      expect(worlds.get).toHaveBeenCalledWith(WORLD_ID);
-      expect(active.world()).toBe(renamed);
-    });
-
-    it('evicts the active World to the Index when the reconnect refetch finds it gone (#177)', () => {
-      active.set(detail, WORLD_ID);
-      TestBed.flushEffects();
-      // Access ended while disconnected (removed as member / World deleted): no eviction nudge to
-      // replay, so the refetch's 404 is what surfaces the loss.
-      worlds.get.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
-
-      bus.emit({ id: WORLD_ID, stale: true });
-      vi.advanceTimersByTime(WORLD_NUDGE_DEBOUNCE_MS);
-
-      expect(active.worldId()).toBeNull();
-      expect(navigate).toHaveBeenCalledWith(['/']);
-    });
-
-    it('ignores a self-echo nudge no newer than the held detail — no redundant refetch', () => {
-      active.set(detail, WORLD_ID); // held updatedAt = 1
-      TestBed.flushEffects();
-
-      bus.emit({ id: WORLD_ID, updatedAt: 1 });
-      vi.advanceTimersByTime(WORLD_NUDGE_DEBOUNCE_MS);
-
-      expect(worlds.get).not.toHaveBeenCalled();
-    });
-
-    // The nudge-driven GET and this tab's own commitPins are independent subscriptions with no
-    // response ordering. A GET issued while the held detail was old must not, on resolving late,
-    // revert a newer local write (e.g. a pin reorder committed in the meantime) back to stale state.
-    it('drops a stale in-flight refetch that resolves after a newer local write', () => {
-      active.set(detail, WORLD_ID); // held updatedAt = 1
-      TestBed.flushEffects();
-      const inflight = new Subject<WorldDetail>();
-      worlds.get.mockReturnValue(inflight);
-
-      bus.emit({ id: WORLD_ID, updatedAt: 2 });
-      vi.advanceTimersByTime(WORLD_NUDGE_DEBOUNCE_MS); // GET issued (in flight), held still updatedAt 1
-
-      // This tab's own commitPins lands with a newer detail while the GET is still in flight.
+    // The store's refetch and this tab's own commitPins are independent, with no response ordering:
+    // a stale read resolving late must not revert a newer local write back to old pins.
+    it('drops a detail staler than a newer local write (apply-guard)', () => {
+      follow();
       const local = { id: WORLD_ID, name: 'Local Reorder', updatedAt: 5 } as WorldDetail;
-      active.set(local, WORLD_ID);
-      // The stale GET (read before commitPins committed) now resolves late.
-      inflight.next({ id: WORLD_ID, name: 'Stale', updatedAt: 2 } as WorldDetail);
+      active.set(local, WORLD_ID); // this tab's own commitPins advanced the held detail
+
+      watched.next({ id: WORLD_ID, name: 'Stale', updatedAt: 2 } as WorldDetail);
 
       expect(active.world()).toBe(local); // not clobbered back to the stale read
-      expect(active.name()).toBe('Local Reorder');
     });
   });
 });

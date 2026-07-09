@@ -1,14 +1,14 @@
 import { TestBed } from '@angular/core/testing';
-import { of, throwError } from 'rxjs';
+import { merge, of, throwError } from 'rxjs';
 import { WorldDetail, WorldSummary } from '@hexly/domain';
 import { AuthClient } from './auth.client';
 import { MockAuthClient } from '../testing/auth-client.mock';
-import { WorldsClient } from './worlds.client';
+import { WorldsClient, WORLD_NUDGE_DEBOUNCE_MS } from './worlds.client';
 import { MockWorldsClient } from '../testing/worlds-client.mock';
 import { NudgeBusClient } from './nudge-bus.client';
 import { MockNudgeBusClient } from '../testing/nudge-bus.mock';
 import { Logger } from './logger';
-import { WorldStore, WORLD_NUDGE_DEBOUNCE_MS } from './world.store';
+import { WorldStore } from './world.store';
 
 function world(id: string, name = id): WorldSummary {
   return { id, name, owners: ['u1'], rights: ['read', 'manage'], createdAt: 1, updatedAt: 1 };
@@ -25,6 +25,11 @@ describe('WorldStore', () => {
     worldsClient = new MockWorldsClient();
     auth = new MockAuthClient();
     bus = new MockNudgeBusClient();
+    // Relay the mock bus so the store's reconciler sees raw nudges, as WorldsClient.watchAll wires
+    // in prod: the tests drive them via bus.emit and assert the list-level reconcile.
+    worldsClient.watchAll.mockImplementation((ids) =>
+      merge(...ids.map((id) => bus.follow({ kind: 'world', id }))),
+    );
     logger = { error: vi.fn(), warn: vi.fn() };
     TestBed.configureTestingModule({
       providers: [

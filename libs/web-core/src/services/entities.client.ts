@@ -4,13 +4,14 @@ import {
   HttpParams,
 } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { catchError, map, Observable, of, throwError } from 'rxjs';
+import { catchError, map, Observable, of, tap, throwError } from 'rxjs';
 import {
   EntityBody,
   EntityDetail,
   EntityFacets,
   EntityGrant,
   EntityListQuery,
+  EntityNudge,
   EntityPage,
   EntitySaveOutcome,
   EntityType,
@@ -18,8 +19,17 @@ import {
   PublicLink,
   Visibility,
 } from '@hexly/domain';
+import { NudgeBusClient } from './nudge-bus.client';
+import { FollowStore } from './follow-store';
+import { Watched } from './live-follow';
 
 export type EntityListParams = Partial<EntityListQuery>;
+
+/**
+ * Trailing-debounce window before an incoming nudge is reconciled: a burst of rapid saves by
+ * another user coalesces into a single refetch.
+ */
+export const ENTITY_NUDGE_DEBOUNCE_MS = 150;
 
 /** The subset of list params the Facet-count read narrows against — no paging. */
 export type EntityFacetParams = Pick<
@@ -34,6 +44,22 @@ export type EntityFacetParams = Pick<
 @Injectable({ providedIn: 'root' })
 export class EntitiesClient {
   private readonly http = inject(HttpClient);
+  private readonly store = new FollowStore<EntityDetail, EntityNudge>(inject(NudgeBusClient), {
+    kind: 'entity',
+    debounceMs: ENTITY_NUDGE_DEBOUNCE_MS,
+    // Entities carry a version; a metadata patch bumps updatedAt without it, so both are compared.
+    isNewer: (a, b) => a.version > b.version || (a.version === b.version && a.updatedAt > b.updatedAt),
+  });
+
+  /**
+   * Live-follow one Entity through the write-through store (ADR-0044): a shared, freshness-deduped
+   * stream that also surfaces this tab's own saves/patches with no roundtrip. Emits the fresh detail
+   * or `EVICTED`. A consumer that shouldn't apply a given emission (e.g. an editor mid-edit) ignores
+   * it at subscribe time — refetching is freshness-gated by the store, not by the caller.
+   */
+  watch(id: string): Observable<Watched<EntityDetail>> {
+    return this.store.watch(id, () => this.read(id));
+  }
 
   list(opts: EntityListParams = {}): Observable<EntityPage> {
     let params = facetParams(opts);
@@ -66,7 +92,11 @@ export class EntitiesClient {
     id: string,
     changes: { name?: string; visibility?: Visibility },
   ): Observable<EntityDetail> {
-    return this.http.patch<EntityDetail>(`/api/entities/${id}`, changes);
+    // Write-through: the patched detail feeds the store, so other watchers see the rename/visibility
+    // change with no roundtrip and this tab's own echo nudge dedups.
+    return this.http
+      .patch<EntityDetail>(`/api/entities/${id}`, changes)
+      .pipe(tap((d) => this.store.merge(d)));
   }
 
   delete(id: string): Observable<void> {
@@ -131,8 +161,15 @@ export class EntitiesClient {
     });
   }
 
-  load(id: string): Observable<EntityDetail> {
+  /** Raw read — the store's own refetch source (the store seeds its held from it directly). */
+  private read(id: string): Observable<EntityDetail> {
     return this.http.get<EntityDetail>(`/api/entities/${id}`);
+  }
+
+  // Write-through: a load seeds the store's held version, so the first nudge after opening dedups a
+  // self-echo, and fans the fresh detail to any other watcher.
+  load(id: string): Observable<EntityDetail> {
+    return this.read(id).pipe(tap((d) => this.store.merge(d)));
   }
 
   // Owner's Link Descriptor vocabulary — DISTINCT, last-saved state.
@@ -159,6 +196,9 @@ export class EntitiesClient {
         tags,
       })
       .pipe(
+        // Write-through: a clean save is the freshest state — feed it to the store so other watchers
+        // see it and this tab's echo nudge dedups.
+        tap((saved) => this.store.merge(saved)),
         map((saved): EntitySaveOutcome => ({ status: 'saved', entity: saved })),
         catchError((err: unknown) => {
           // A 409 means the base version moved: report the server's Entity as a
@@ -171,6 +211,8 @@ export class EntitiesClient {
             typeof err.error === 'object'
           ) {
             const current = err.error as EntityDetail;
+            // The server's newer version is authoritative — write it through too, so watchers reconcile.
+            this.store.merge(current);
             return of<EntitySaveOutcome>({ status: 'conflict', current });
           }
           return throwError(() => err);

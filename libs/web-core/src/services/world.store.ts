@@ -14,7 +14,6 @@ import {
   Subject,
   catchError,
   debounceTime,
-  merge,
   switchMap,
   tap,
 } from 'rxjs';
@@ -25,15 +24,8 @@ import {
   WorldSummary,
 } from '@hexly/domain';
 import { AuthClient } from './auth.client';
-import { WorldsClient } from './worlds.client';
-import { NudgeBusClient } from './nudge-bus.client';
+import { WorldsClient, WORLD_NUDGE_DEBOUNCE_MS } from './worlds.client';
 import { Logger } from './logger';
-
-/**
- * Trailing-debounce window before a readable World nudge triggers a list refetch, so a
- * burst of changes (e.g. a pin reorder) coalesces into a single authoritative read.
- */
-export const WORLD_NUDGE_DEBOUNCE_MS = 150;
 
 /**
  * The caller's loaded Worlds. Which World is *active* is a URL fact
@@ -44,7 +36,6 @@ export const WORLD_NUDGE_DEBOUNCE_MS = 150;
 export class WorldStore {
   private readonly client = inject(WorldsClient);
   private readonly auth = inject(AuthClient);
-  private readonly bus = inject(NudgeBusClient);
   private readonly logger = inject(Logger);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -97,9 +88,7 @@ export class WorldStore {
       .pipe(
         switchMap((key) => {
           const ids = key ? key.split('\n') : [];
-          return ids.length === 0
-            ? EMPTY
-            : merge(...ids.map((id) => this.bus.follow({ kind: 'world', id })));
+          return ids.length === 0 ? EMPTY : this.client.watchAll(ids);
         }),
         takeUntilDestroyed(this.destroyRef),
       )

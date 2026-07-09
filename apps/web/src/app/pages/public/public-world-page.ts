@@ -1,16 +1,10 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { EMPTY, catchError, debounceTime, filter, of, switchMap, tap } from 'rxjs';
+import { EMPTY, catchError, of, switchMap } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { PublicWorldView } from '@hexly/domain';
-import {
-  PublicClient,
-  NudgeBusClient,
-  AppShellStore,
-  WORLD_NUDGE_DEBOUNCE_MS,
-  isAccessLoss,
-} from '@hexly/web-core';
+import { PublicClient, AppShellStore, EVICTED } from '@hexly/web-core';
 import { Eyebrow } from '@hexly/web-ui';
 
 /**
@@ -77,7 +71,6 @@ export class PublicWorldPage {
   private readonly route = inject(ActivatedRoute);
   private readonly client = inject(PublicClient);
   private readonly shell = inject(AppShellStore);
-  private readonly bus = inject(NudgeBusClient);
 
   readonly view = signal<PublicWorldView | null>(null);
   readonly notFound = signal(false);
@@ -87,12 +80,7 @@ export class PublicWorldPage {
 
   constructor() {
     this.shell.standalone.set(true);
-    inject(DestroyRef).onDestroy(() => {
-      this.shell.standalone.set(false);
-      // Unpin the token from the root-singleton bus, or a signed-in user who opened their own
-      // World link would keep connecting as that token afterwards (mirrors PublicEntityPage).
-      this.bus.useToken(null);
-    });
+    inject(DestroyRef).onDestroy(() => this.shell.standalone.set(false));
 
     this.route.paramMap
       .pipe(
@@ -102,8 +90,6 @@ export class PublicWorldPage {
           this.view.set(null);
           this.notFound.set(false);
           this.followed.set(null);
-          // Connect the bus as this token principal; the stream reopens when it changes.
-          this.bus.useToken(token);
           return this.client.world(token).pipe(catchError(() => of(null)));
         }),
         takeUntilDestroyed(),
@@ -117,37 +103,17 @@ export class PublicWorldPage {
         }
       });
 
-    // Live-follow the open World (ADR-0044, #178): a readable world nudge (rename / pin / metadata)
-    // → debounced refetch-and-replace; `unavailable` (link revoked, World deleted) → the dead-link
-    // panel without a reload. switchMap off `followed` tears down the old follow on a token swap. A
-    // public reader never curates, so there's no self-echo to dedupe.
+    // Live-follow the open World (ADR-0044, #178): the client's watchWorld() owns the source —
+    // connecting the bus as this token principal, then relaying nudges into a refetch-and-replace;
+    // EVICTED (link revoked, World deleted, a 403/404 refetch) → the dead-link panel without a
+    // reload. switchMap off `followed` tears down the old follow (reverting the token principal) on
+    // a token swap.
     toObservable(this.followed)
       .pipe(
-        switchMap((f) =>
-          f === null
-            ? EMPTY
-            : this.bus.follow({ kind: 'world', id: f.id }).pipe(
-                tap((n) => {
-                  if ('unavailable' in n) this.evict();
-                }),
-                filter((n) => !('unavailable' in n)),
-                debounceTime(WORLD_NUDGE_DEBOUNCE_MS),
-                switchMap(() =>
-                  this.client.world(f.token).pipe(
-                    // 403/404 means the World/link went away (revoked, deleted) — evict. A transient
-                    // failure (5xx, a reconnect into a bouncing backend) self-heals on the next
-                    // event, so keep the view rather than blank a valid link (#177).
-                    catchError((err) => {
-                      if (isAccessLoss(err)) this.evict();
-                      return EMPTY;
-                    }),
-                  ),
-                ),
-              ),
-        ),
+        switchMap((f) => (f === null ? EMPTY : this.client.watchWorld(f.token, f.id))),
         takeUntilDestroyed(),
       )
-      .subscribe((w) => this.view.set(w));
+      .subscribe((result) => (result === EVICTED ? this.evict() : this.view.set(result)));
   }
 
   /** Blank the World and show the dead-link panel — access ended on the open screen. */

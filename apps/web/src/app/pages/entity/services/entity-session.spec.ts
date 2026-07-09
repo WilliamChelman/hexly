@@ -11,8 +11,8 @@ import {
   HexMap,
 } from '@hexly/domain';
 import { provideTranslocoTesting, MockEntitiesClient, MockNudgeBusClient } from '@hexly/web-core/testing';
-import { EntitiesClient, NudgeBusClient } from '@hexly/web-core';
-import { EntitySession, NUDGE_DEBOUNCE_MS } from './entity-session';
+import { EntitiesClient, NudgeBusClient, EVICTED, Watched } from '@hexly/web-core';
+import { EntitySession } from './entity-session';
 import { HexMapStore } from '@hexly/web-map';
 
 describe('EntitySession', () => {
@@ -788,240 +788,92 @@ describe('EntitySession', () => {
   });
 
   /**
-   * Live-follow reconciliation (ADR-0044, #173): an incoming nudge whose version is newer than
-   * the held one triggers a debounced silent refetch — unless the buffer is dirty, in which case
-   * the nudge is ignored so a background event never clobbers unsaved edits.
+   * Live-follow (ADR-0044): the session reacts to what `EntitiesClient.watch` emits — a fresh detail
+   * (adopt if newer and not mid-edit) or `EVICTED` (blank, unless dirty). The follow / debounced
+   * refetch / freshness dedup / write-through fanout all live in EntityStore + watchResource (their
+   * specs) — here we test only the session's reaction, driving the store's stream directly.
    */
-  describe('nudge reconciler', () => {
-    beforeEach(() => vi.useFakeTimers());
-    afterEach(() => vi.useRealTimers());
+  describe('live-follow', () => {
+    let watched: Subject<Watched<EntityDetail>>;
 
-    /**
-     * Open Aldermoor (version 3) and flush effects so the reconciler's `toObservable(followedId)`
-     * subscribes to `bus.follow` — interest is declared async off the signal, so a nudge emitted
-     * before this settles would be missed (as it would be in production, pre-subscription).
-     */
+    /** Open Aldermoor (version 3) and settle the reconciler's subscription to entities.watch. */
     function openAndFollow() {
+      watched = new Subject<Watched<EntityDetail>>();
+      entities.watch.mockReturnValue(watched);
       openAldermoor();
-      TestBed.tick();
+      TestBed.tick(); // toObservable(followedId) subscribes async off the signal
     }
 
-    it('follows the open Entity so the server can nudge it', () => {
+    it('follows the open Entity by id', () => {
       openAndFollow();
-      expect(bus.follow).toHaveBeenCalledWith({ kind: 'entity', id: 'm1' });
+      expect(entities.watch).toHaveBeenCalledWith('m1');
     });
 
-    it('refetches once after the debounce and replaces the view on a newer-version nudge', () => {
+    it('adopts a fresh detail newer than held', () => {
       openAndFollow(); // version 3
-      entities.load.mockClear();
-      // The silent refetch pulls the fresh Entity (version 4).
-      entities.load.mockReturnValue(of({ ...aldermoor, version: 4 }));
-
-      bus.emit({ id: 'm1', version: 4, updatedAt: 2 });
-      expect(entities.load).not.toHaveBeenCalled(); // debounced, not yet
-
-      vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
-      expect(entities.load).toHaveBeenCalledTimes(1);
-      expect(entities.load).toHaveBeenCalledWith('m1');
+      watched.next({ ...aldermoor, version: 4 });
       expect(session.current()?.version).toBe(4);
     });
 
-    it('coalesces a burst of nudges for one resource into a single refetch', () => {
-      openAndFollow();
-      entities.load.mockClear();
-      entities.load.mockReturnValue(of({ ...aldermoor, version: 6 }));
-
-      bus.emit({ id: 'm1', version: 4, updatedAt: 2 });
-      bus.emit({ id: 'm1', version: 5, updatedAt: 3 });
-      bus.emit({ id: 'm1', version: 6, updatedAt: 4 });
-      vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
-
-      expect(entities.load).toHaveBeenCalledTimes(1);
-    });
-
-    it('does NOT refetch on a nudge while the buffer is dirty (clobber guard)', () => {
-      openAndFollow();
-      entities.load.mockClear();
-      editor.paintAt({ q: 5, r: 5 }, 'ocean'); // unsaved edit
-      expect(session.dirty()).toBe(true);
-
-      bus.emit({ id: 'm1', version: 4, updatedAt: 2 });
-      vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
-
-      expect(entities.load).not.toHaveBeenCalled();
-    });
-
-    it('ignores a nudge at the already-held version and timestamp (self / cross-tab echo dedupe)', () => {
+    it('adopts a same-version detail with a newer updatedAt (a rename never bumps version)', () => {
       openAndFollow(); // version 3, updatedAt 1
-      entities.load.mockClear();
-
-      bus.emit({ id: 'm1', version: 3, updatedAt: 1 });
-      vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
-
-      expect(entities.load).not.toHaveBeenCalled();
-    });
-
-    it('refetches on a same-version nudge with a newer updatedAt (a rename patch never bumps version)', () => {
-      openAndFollow(); // version 3, updatedAt 1
-      entities.load.mockClear();
-      entities.load.mockReturnValue(
-        of({ ...aldermoor, name: 'Aldermoor, Renamed', updatedAt: 2 }),
-      );
-
-      bus.emit({ id: 'm1', version: 3, updatedAt: 2 });
-      vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
-
-      expect(entities.load).toHaveBeenCalledTimes(1);
+      watched.next({ ...aldermoor, version: 3, updatedAt: 2, name: 'Aldermoor, Renamed' });
       expect(session.current()?.name).toBe('Aldermoor, Renamed');
     });
 
-    it('ignores a nudge addressed to a different Entity', () => {
-      openAndFollow();
-      entities.load.mockClear();
-
-      bus.emit({ id: 'other', version: 99, updatedAt: 99 });
-      vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
-
-      expect(entities.load).not.toHaveBeenCalled();
+    it('ignores a detail no newer than held — the store fans our own save back at its version', () => {
+      openAndFollow(); // version 3, updatedAt 1
+      const before = session.current();
+      watched.next({ ...aldermoor, version: 3, updatedAt: 1 });
+      expect(session.current()).toBe(before); // not re-adopted, so the editor is not re-seeded
     });
 
-    it('blanks the view to an unavailable state on an { id, unavailable } nudge (live eviction)', () => {
+    it('does NOT adopt a fresh detail over unsaved edits (clobber guard)', () => {
       openAndFollow();
-      entities.load.mockClear();
+      editor.paintAt({ q: 5, r: 5 }, 'ocean'); // unsaved edit
+      expect(session.dirty()).toBe(true);
 
-      // Access ended server-side (private flip, revoked grant, or delete): the entry is
-      // opaque and version-free, and eviction never refetches — there is nothing to fetch.
-      bus.emit({ id: 'm1', unavailable: true });
+      watched.next({ ...aldermoor, version: 4 });
+      expect(session.current()?.version).toBe(3); // buffer preserved, access loss meets it at save
+    });
 
+    it('blanks the view to an unavailable state on EVICTED (live eviction)', () => {
+      openAndFollow();
+      watched.next(EVICTED);
       expect(session.current()).toBeNull();
       expect(session.evicted()).toBe(true);
-      vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
-      expect(entities.load).not.toHaveBeenCalled();
+    });
+
+    it('does NOT evict over unsaved edits — access loss surfaces at save time instead', () => {
+      openAndFollow();
+      editor.paintAt({ q: 5, r: 5 }, 'ocean'); // unsaved edit
+      expect(session.dirty()).toBe(true);
+
+      watched.next(EVICTED);
+
+      expect(session.current()).not.toBeNull();
+      expect(session.evicted()).toBe(false);
+    });
+
+    it('tears the follow down on eviction — a later emission does nothing', () => {
+      openAndFollow();
+      watched.next(EVICTED);
+      TestBed.tick(); // nulling current nulls followedId, so switchMap withdraws the follow
+
+      watched.next({ ...aldermoor, version: 99 });
+      expect(session.current()).toBeNull();
     });
 
     it('clears the evicted state when a new load starts, so it never masks that load’s real error', () => {
       openAndFollow();
-      bus.emit({ id: 'm1', unavailable: true });
+      watched.next(EVICTED);
       expect(session.evicted()).toBe(true);
 
-      // Navigate to another Entity whose load fails (transient 5xx): the page must render
-      // the load error, not last route's "no longer available".
+      // Navigate to another Entity whose load fails: the page must render the load error, not
+      // last route's "no longer available".
       entities.load.mockReturnValue(throwError(() => new Error('boom')));
-      session.openRoute('n2').subscribe({
-        error: () => {
-          // The failed load is the fixture, not the assertion — only evicted() is under test.
-        },
-      });
+      session.openRoute('n2').subscribe({ error: () => undefined });
 
-      expect(session.evicted()).toBe(false);
-    });
-
-    it('does NOT evict over unsaved edits (clobber guard) — access loss surfaces at save time instead', () => {
-      openAndFollow();
-      editor.paintAt({ q: 5, r: 5 }, 'ocean'); // unsaved edit
-      expect(session.dirty()).toBe(true);
-
-      // Blanking now would destroy the user's work (ADR-0044: a background event never
-      // clobbers unsaved edits). The edits stay on screen; the save path's 403 → read-only
-      // state is where the lost access surfaces.
-      bus.emit({ id: 'm1', unavailable: true });
-
-      expect(session.current()).not.toBeNull();
-      expect(session.evicted()).toBe(false);
-    });
-
-    it('prunes the evicted ref from the interest set — a later nudge for it does nothing', () => {
-      openAndFollow();
-      entities.load.mockClear();
-      bus.emit({ id: 'm1', unavailable: true });
-      TestBed.tick(); // let the follow teardown (interest withdrawal) settle
-
-      // Were the ref still followed, a newer version would pass every filter and refetch —
-      // resurrecting a view the server just evicted.
-      bus.emit({ id: 'm1', version: 99, updatedAt: 99 });
-      vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
-
-      expect(entities.load).not.toHaveBeenCalled();
-      expect(session.current()).toBeNull();
-    });
-
-    it('survives a failed refetch and still reconciles the next nudge (idempotent invalidation)', () => {
-      openAndFollow(); // version 3
-      entities.load.mockClear();
-
-      // A transient error on the background refetch must not kill live-follow for the session.
-      entities.load.mockReturnValueOnce(throwError(() => new Error('network blip')));
-      bus.emit({ id: 'm1', version: 4, updatedAt: 2 });
-      vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
-      expect(entities.load).toHaveBeenCalledTimes(1); // attempted, failed, swallowed
-
-      // The next nudge still reconciles — the subscription is alive.
-      entities.load.mockReturnValue(of({ ...aldermoor, version: 5 }));
-      bus.emit({ id: 'm1', version: 5, updatedAt: 3 });
-      vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
-      expect(entities.load).toHaveBeenCalledTimes(2);
-      expect(session.current()?.version).toBe(5);
-    });
-
-    /**
-     * Reconnect reconciliation (#177): a `stale` pulse carries no version, so the reconciler
-     * cannot version-check it — it must refetch unconditionally to heal whatever changed while
-     * the socket was down. The dirty and gap-eviction guards still apply.
-     */
-    it('refetches on a stale reconnect pulse even though it carries no newer version', () => {
-      openAndFollow(); // version 3
-      entities.load.mockClear();
-      // While disconnected the Entity advanced to version 5; the reconnect pulse can't know that.
-      entities.load.mockReturnValue(of({ ...aldermoor, version: 5 }));
-
-      bus.emit({ id: 'm1', stale: true });
-      vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
-
-      expect(entities.load).toHaveBeenCalledTimes(1);
-      expect(entities.load).toHaveBeenCalledWith('m1');
-      expect(session.current()?.version).toBe(5);
-    });
-
-    it('does NOT refetch on a stale pulse while the buffer is dirty (clobber guard)', () => {
-      openAndFollow();
-      entities.load.mockClear();
-      editor.paintAt({ q: 5, r: 5 }, 'ocean'); // unsaved edit
-      expect(session.dirty()).toBe(true);
-
-      bus.emit({ id: 'm1', stale: true });
-      vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
-
-      expect(entities.load).not.toHaveBeenCalled();
-    });
-
-    it('evicts when the reconnect refetch finds the resource gone (403/404 across the gap)', () => {
-      openAndFollow();
-      entities.load.mockClear();
-      // Access ended while disconnected (made private / deleted). There is no eviction nudge to
-      // replay, so the refetch's 404 is what surfaces the loss — blank to the unavailable state.
-      entities.load.mockReturnValue(
-        throwError(() => new HttpErrorResponse({ status: 404 })),
-      );
-
-      bus.emit({ id: 'm1', stale: true });
-      vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
-
-      expect(session.current()).toBeNull();
-      expect(session.evicted()).toBe(true);
-    });
-
-    it('does NOT evict on a transient 5xx across the gap — live-follow survives to the next event', () => {
-      openAndFollow();
-      entities.load.mockClear();
-      entities.load.mockReturnValueOnce(
-        throwError(() => new HttpErrorResponse({ status: 503 })),
-      );
-
-      bus.emit({ id: 'm1', stale: true });
-      vi.advanceTimersByTime(NUDGE_DEBOUNCE_MS);
-
-      // A blip is not access loss: keep the view, stay subscribed.
-      expect(session.current()).not.toBeNull();
       expect(session.evicted()).toBe(false);
     });
   });

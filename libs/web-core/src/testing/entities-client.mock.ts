@@ -1,4 +1,4 @@
-import { Observable, of } from 'rxjs';
+import { NEVER, Observable, of } from 'rxjs';
 import {
   EntityBody,
   EntityDetail,
@@ -11,10 +11,14 @@ import {
   PublicLink,
 } from '@hexly/domain';
 import { EntityFacetParams, EntityListParams } from '../services/entities.client';
+import { Watched } from '../services/live-follow';
 
 /** Spy-backed stand-in for {@link EntitiesClient} — set return values with `mockReturnValue`. */
 export class MockEntitiesClient {
   list = vi.fn<(opts?: EntityListParams) => Observable<EntityPage>>();
+  // Live-follow seam defaults to a silent stream so a consumer that follows on construction doesn't
+  // crash; a spec exercising live-follow overrides the impl to push Watched values (see the specs).
+  watch = vi.fn<(id: string) => Observable<Watched<EntityDetail>>>(() => NEVER);
   // Defaults to empty counts so a spec that doesn't care about the Facet rail
   // (#155) still renders without stubbing it; override per test as needed.
   facets = vi.fn<(opts?: EntityFacetParams) => Observable<EntityFacets>>(() =>

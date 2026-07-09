@@ -11,7 +11,10 @@ import {
   EntityDetail,
   EntitySummary,
 } from '@hexly/domain';
-import { EntitiesClient } from './entities.client';
+import { EntitiesClient, ENTITY_NUDGE_DEBOUNCE_MS } from './entities.client';
+import { NudgeBusClient } from './nudge-bus.client';
+import { MockNudgeBusClient } from '../testing/nudge-bus.mock';
+import { EVICTED } from './live-follow';
 
 /** The shape the editor round-trips through the client. */
 const emptyHexmapBody: EntityBody = {
@@ -25,6 +28,7 @@ const emptyHexmapBody: EntityBody = {
 describe('EntitiesClient', () => {
   let client: EntitiesClient;
   let http: HttpTestingController;
+  let bus: MockNudgeBusClient;
 
   const aldermoor: EntityDetail = {
     id: 'e1',
@@ -40,14 +44,67 @@ describe('EntitiesClient', () => {
   };
 
   beforeEach(() => {
+    bus = new MockNudgeBusClient();
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: NudgeBusClient, useValue: bus },
+      ],
     });
     client = TestBed.inject(EntitiesClient);
     http = TestBed.inject(HttpTestingController);
   });
 
   afterEach(() => http.verify());
+
+  // watch() fronts the write-through store for one Entity (ADR-0044): a nudge newer than held →
+  // debounced refetch, an unavailable eviction → EVICTED, and a save/load write-through dedups the
+  // server's own echo. Locks that watch() wires the store to the right ref and read (store internals
+  // are covered in entity-store.spec).
+  describe('watch (live-follow)', () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    it('follows the Entity ref and refetches on a readable nudge', () => {
+      const seen: unknown[] = [];
+      const sub = client.watch('e1').subscribe((r) => seen.push(r));
+      expect(bus.follow).toHaveBeenCalledWith({ kind: 'entity', id: 'e1' });
+
+      bus.emit({ id: 'e1', version: 2, updatedAt: 2 });
+      vi.advanceTimersByTime(ENTITY_NUDGE_DEBOUNCE_MS);
+      http.expectOne('/api/entities/e1').flush(aldermoor);
+
+      expect(seen).toEqual([aldermoor]);
+      sub.unsubscribe();
+    });
+
+    it('dedups the echo of a write-through save — no refetch, no roundtrip', async () => {
+      const seen: unknown[] = [];
+      const sub = client.watch('e1').subscribe((r) => seen.push(r));
+
+      // A save writes through the store (advancing held to v1).
+      client.save('e1', emptyHexmapBody, 0, []).subscribe();
+      http.expectOne('/api/entities/e1').flush(aldermoor); // aldermoor is version 1
+      await Promise.resolve(); // flush the deferred fanout
+
+      bus.emit({ id: 'e1', version: 1, updatedAt: 1 }); // the server echoes our own save
+      vi.advanceTimersByTime(ENTITY_NUDGE_DEBOUNCE_MS);
+
+      http.expectNone('/api/entities/e1'); // held already at v1 → no refetch
+      sub.unsubscribe();
+    });
+
+    it('emits EVICTED on an unavailable nudge without refetching', () => {
+      const seen: unknown[] = [];
+      const sub = client.watch('e1').subscribe((r) => seen.push(r));
+
+      bus.emit({ id: 'e1', unavailable: true });
+
+      expect(seen).toEqual([EVICTED]);
+      sub.unsubscribe();
+    });
+  });
 
   const summary: EntitySummary = {
     id: 'e1',

@@ -5,11 +5,15 @@ import {
 } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { ImportSummary, WorldDetail, WorldSummary } from '@hexly/domain';
-import { WorldsClient } from './worlds.client';
+import { WorldsClient, WORLD_NUDGE_DEBOUNCE_MS } from './worlds.client';
+import { NudgeBusClient } from './nudge-bus.client';
+import { MockNudgeBusClient } from '../testing/nudge-bus.mock';
+import { EVICTED } from './live-follow';
 
 describe('WorldsClient', () => {
   let client: WorldsClient;
   let http: HttpTestingController;
+  let bus: MockNudgeBusClient;
 
   const summary: WorldSummary = {
     id: 'w1',
@@ -22,8 +26,13 @@ describe('WorldsClient', () => {
   const detail: WorldDetail = { ...summary, entityCount: 1, pinnedEntityIds: [] };
 
   beforeEach(() => {
+    bus = new MockNudgeBusClient();
     TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: NudgeBusClient, useValue: bus },
+      ],
     });
     client = TestBed.inject(WorldsClient);
     http = TestBed.inject(HttpTestingController);
@@ -138,5 +147,36 @@ describe('WorldsClient', () => {
     req.flush(null);
 
     expect(completed).toBe(true);
+  });
+
+  // watch() fronts the live-follow bus for one World (ADR-0044): a nudge → debounced get() refetch,
+  // an unavailable eviction → EVICTED. The reconcile logic lives in watchResource (tested via its
+  // consumers); this locks that watch() wires the right ref, fetch, and debounce.
+  describe('watch (live-follow)', () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    it('follows the World ref and refetches its detail on a readable nudge', () => {
+      const seen: unknown[] = [];
+      const sub = client.watch('w1').subscribe((r) => seen.push(r));
+      expect(bus.follow).toHaveBeenCalledWith({ kind: 'world', id: 'w1' });
+
+      bus.emit({ id: 'w1', updatedAt: 2 });
+      vi.advanceTimersByTime(WORLD_NUDGE_DEBOUNCE_MS);
+      http.expectOne('/api/worlds/w1').flush(detail);
+
+      expect(seen).toEqual([detail]);
+      sub.unsubscribe();
+    });
+
+    it('emits EVICTED on an unavailable nudge without refetching', () => {
+      const seen: unknown[] = [];
+      const sub = client.watch('w1').subscribe((r) => seen.push(r));
+
+      bus.emit({ id: 'w1', unavailable: true });
+
+      expect(seen).toEqual([EVICTED]);
+      sub.unsubscribe();
+    });
   });
 });
