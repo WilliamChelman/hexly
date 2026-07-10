@@ -349,6 +349,7 @@
     "worlds": "Worlds",
     "dashboard": "Dashboard",
     "library": "Library",
+    "graph": "Graph",
     "styleguide": "Styleguide",
     "expand": "Expand navigation",
     "collapse": "Collapse navigation",
@@ -431,6 +432,14 @@
     "browseAll": "Browse all entities",
     "emptyTitle": "Your world is a blank map.",
     "emptyHint": "Create your first note or hex map to begin."
+  },
+  "worldGraph": {
+      "tabTitle": "Hexly — Graph",
+      "eyebrow": "World graph",
+      "counts": "{{nodes}} entities · {{edges}} links",
+      "emptyTitle": "Nothing to draw yet.",
+      "emptyHint": "Create a few entities and link them together to see the shape of your world.",
+      "loadError": "Couldn't load the graph. Try again."
   },
   "entitySearchPicker": {
     "searchPlaceholder": "Search entities…",

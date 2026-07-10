@@ -7,6 +7,7 @@ import {
   MemberRole,
   PublicLink,
   WorldDetail,
+  WorldGraph,
   WorldMember,
   WorldNudge,
   WorldSummary,
@@ -75,6 +76,16 @@ export class WorldsClient {
     const form = new FormData();
     form.append('file', file);
     return this.http.post<ImportSummary>('/api/worlds/import', form);
+  }
+
+  /**
+   * The World Graph (#181): every readable Entity of the World, and the links between them, in one
+   * payload. Deliberately outside the live-follow store — the graph is a derived read of the
+   * *whole* World, and a `world` nudge (a rename, a pin reorder) says nothing about whether its
+   * Entities' links moved. It refreshes when the page is opened.
+   */
+  graph(id: string): Observable<WorldGraph> {
+    return this.http.get<WorldGraph>(`/api/worlds/${id}/graph`);
   }
 
   /** Raw read — the store's own refetch source (the store seeds its held from it directly). */

@@ -14,7 +14,6 @@ import {
   EntityType,
   FacetCount,
   InboundReference,
-  LinkedEntity,
   OutboundReference,
   entityTypeSchema,
   Visibility,
@@ -59,6 +58,7 @@ import {
 } from '../db/schema';
 import { HEXLY_CONFIG, HexlyConfig } from '../config/config.module';
 import { EntityWrites } from './entity-writes';
+import { linkedEntity } from './utils/linked-entity';
 
 /** Per-entity Public Link table for the shared get/mint/revoke helpers. */
 const ENTITY_LINK: PublicLinkTable = {
@@ -321,6 +321,8 @@ export class EntitiesService {
       .map((row) => ({
         targetId: row.targetId,
         descriptor: row.descriptor,
+        // An Entity whose stored type is outside the enum reads as a dangling target, same as an
+        // unreadable or deleted one: the reference is there, the thing at the end of it is not.
         target: row.name === null ? null : linkedEntity(row.targetId, row.name, row.type),
       }));
   }
@@ -343,10 +345,12 @@ export class EntitiesService {
       // `id` is the final tiebreak, for the same reason as {@link outbound}'s `targetId`.
       .orderBy(asc(entities.name), asc(entities.id), asc(entityEdges.descriptor))
       .all()
-      .map((row) => ({
-        descriptor: row.descriptor,
-        source: linkedEntity(row.sourceId, row.name, row.type),
-      }));
+      // A source is the thing doing the linking, so unlike {@link outbound}'s target it cannot
+      // dangle: a row whose source has no drawable type drops out entirely.
+      .flatMap((row) => {
+        const source = linkedEntity(row.sourceId, row.name, row.type);
+        return source ? [{ descriptor: row.descriptor, source }] : [];
+      });
   }
 
   /**
@@ -774,11 +778,6 @@ function hasAnyTag(tags: readonly string[]) {
 function toFtsMatch(q: string): string {
   const tokens = q.match(/[\p{L}\p{N}]+/gu) ?? [];
   return tokens.map((t) => `"${t}"*`).join(' ');
-}
-
-/** One end of a link, resolved live off `entities` — an edge never stores a name. */
-function linkedEntity(id: string, name: string, type: string): LinkedEntity {
-  return { id, name, type: entityTypeSchema.parse(type) };
 }
 
 type SummaryRow = Omit<typeof entities.$inferSelect, 'document'>;

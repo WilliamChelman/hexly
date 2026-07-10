@@ -4,7 +4,7 @@ import {
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { ImportSummary, WorldDetail, WorldSummary } from '@hexly/domain';
+import { ImportSummary, WorldDetail, WorldGraph, WorldSummary } from '@hexly/domain';
 import { WorldsClient, WORLD_NUDGE_DEBOUNCE_MS } from './worlds.client';
 import { NudgeBusClient } from './nudge-bus.client';
 import { MockNudgeBusClient } from '../testing/nudge-bus.mock';
@@ -24,6 +24,13 @@ describe('WorldsClient', () => {
     updatedAt: 1,
   };
   const detail: WorldDetail = { ...summary, entityCount: 1, pinnedEntityIds: [], seq: 1 };
+  const graph: WorldGraph = {
+    nodes: [
+      { id: 'e1', name: 'Ealdred', type: 'note' },
+      { id: 'e2', name: 'Mira', type: 'note' },
+    ],
+    edges: [{ source: 'e1', target: 'e2', descriptor: 'spouse' }],
+  };
 
   beforeEach(() => {
     bus = new MockNudgeBusClient();
@@ -72,6 +79,17 @@ describe('WorldsClient', () => {
     req.flush(detail);
 
     expect(got).toEqual(detail);
+  });
+
+  it('fetches the World Graph as one full-World payload', () => {
+    let got: WorldGraph | undefined;
+    client.graph('w1').subscribe((g) => (got = g));
+
+    const req = http.expectOne('/api/worlds/w1/graph');
+    expect(req.request.method).toBe('GET');
+    req.flush(graph);
+
+    expect(got).toEqual(graph);
   });
 
   it('renames a world', () => {
