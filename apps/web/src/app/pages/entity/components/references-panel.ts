@@ -14,8 +14,8 @@ import { ReferenceRow } from './reference-row';
  * outbound target the viewer cannot read (or that no longer exists) arrives as `target: null`,
  * which {@link ReferenceRow} renders as the usual non-navigable dangling label (#78).
  *
- * Empty states are gated on `loaded()`. "Nothing links here" is a *claim*, and asserting it against
- * an in-flight fetch would be a lie the reader cannot tell from the truth.
+ * Empty states are gated on `loaded()`: asserting "nothing links here" against an in-flight fetch
+ * would show a false empty state indistinguishable from a real one.
  */
 @Component({
   selector: 'app-references-panel',

@@ -27,11 +27,9 @@ export const RIGHT_DOCK_PANELS = new InjectionToken<readonly RightPanel[]>('RIGH
  * Which panel the Content body's right dock is showing (ADR-0013) — the note-view peer of
  * `HexMapStore.rightPanel`, and modelled the same way on purpose.
  *
- * The dock holds **one** panel slot beside a rail of toggles, so "at most one panel is open" is an
- * invariant of the dock, not a rule its callers must remember. Holding a boolean per panel would
- * let a second `toggle()` caller — a panel's own close button, a keyboard shortcut, a pair of
- * restored preference keys — set both true at once, rendering one panel behind the other while both
- * toggle buttons read as active. One discriminant makes that state unrepresentable.
+ * The dock holds **one** panel slot beside a rail of toggles, so "at most one panel is open" is a
+ * dock invariant, not a caller's rule. One discriminant, not a boolean per panel, makes "both open
+ * at once" — one panel hidden behind another while both toggles read active — unrepresentable.
  */
 @Injectable()
 export class RightDock {

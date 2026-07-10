@@ -30,14 +30,12 @@ const yieldToEventLoop = (): Promise<void> => new Promise((resolve) => setImmedi
 
 /**
  * The Superadmin repair domain (ADR-0046, #180): the operator's tier, outside the collaboration
- * model, reaching content that no Instance Admin may. Kept apart from {@link AdminService}, whose
- * every method deliberately stops short of a World or an Entity.
+ * model, reaching content no Instance Admin may. Kept apart from {@link AdminService}, which stops
+ * short of any World or Entity.
  *
- * It owns the instance's one Reindex job. One, because the walk is instance-wide: a second
- * concurrent run would contend with the first for the same rows and discover nothing the first
- * would not. The state is a field on this singleton rather than a table — the *work* is durable
- * (each chunk commits), the bookkeeping need not be, and a restart mid-walk simply forgets a job
- * whose finished chunks are already on disk.
+ * Owns the instance's one Reindex job — one, because the walk is instance-wide. Job state lives on
+ * this singleton, not a table: each chunk commits, so a restart just forgets an unfinished job
+ * whose done chunks are already on disk.
  */
 @Injectable()
 export class SuperadminService {

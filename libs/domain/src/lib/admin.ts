@@ -114,9 +114,7 @@ export type SetSuperadminRequest = z.infer<typeof setSuperadminRequestSchema>;
 
 /**
  * One Entity the Reindex walked but could not derive — a document this build cannot parse. The
- * walk skips it and carries on, so a single unreadable document cannot deny the repair tool to
- * the instance that most needs it. The Superadmin gets the ids back precisely because a skipped
- * Entity is the one thing the operator must go look at by hand.
+ * walk skips it and carries on, returning its id so the Superadmin can inspect it by hand.
  */
 export interface ReindexFailure {
   readonly entityId: string;
@@ -134,18 +132,13 @@ export interface ReindexFailure {
 export type ReindexStatus = 'idle' | 'running' | 'succeeded' | 'failed';
 
 /**
- * The instance's Reindex job (ADR-0046) — the Superadmin repair action that recomputes every
- * Entity's document-derived state. `POST /superadmin/reindex` starts it and returns this
- * immediately; `GET /superadmin/reindex` polls it. There is only ever one: the walk is
- * instance-wide, so a second concurrent run would contend with the first and discover nothing.
+ * The instance's Reindex job (ADR-0046) — the Superadmin repair that recomputes every Entity's
+ * document-derived state. `POST /superadmin/reindex` starts it and returns immediately;
+ * `GET /superadmin/reindex` polls. Only ever one: the walk is instance-wide.
  *
- * `walked` counts Entities read, not Entities changed: the write is a wholesale replace with
- * nothing to diff against, and a re-run reporting the same numbers is the reassurance that it is
- * safe to press twice. `reindexed + failures.length === walked`.
- *
- * Job state lives in the API process, not the database, so a restart forgets it. That is sound
- * because the *work* is committed chunk by chunk and the walk is idempotent: whatever a lost job
- * finished stays finished, and pressing the button again resumes the repair from a clean slate.
+ * `walked` counts Entities read, not changed (the write is a wholesale replace);
+ * `reindexed + failures.length === walked`. Job state lives in the API process, not the DB, so a
+ * restart forgets it — safe because work commits chunk by chunk and the walk is idempotent.
  */
 export interface ReindexJob {
   readonly status: ReindexStatus;

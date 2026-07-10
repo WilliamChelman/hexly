@@ -28,8 +28,8 @@ export const authGuard: CanActivateFn = (_route, state) => {
 /**
  * Like {@link authGuard}, but also requires the caller to reach the Instance Admin
  * surface (ADR-0037, #163) — the Admin flag or Superadmin. A signed-in non-Admin is
- * bounced to the root rather than shown a panel the server would 403 anyway. The
- * server stays the source of truth; this only hides an unusable page.
+ * bounced to the root; the server stays the source of truth (it 403s anyway), so
+ * this only hides an unusable page.
  */
 export const adminGuard: CanActivateFn = (_route, state) => {
   const auth = inject(AuthClient);

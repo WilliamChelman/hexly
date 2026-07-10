@@ -27,8 +27,6 @@ interface RailEntry {
  * Each entry's chrome — its glyph, tooltip, and active state — is data ({@link
  * entries}) rendered by a shared {@link IconButton}, so a second entry brings its
  * own glyph without copied markup, per ADR-0013's "every widget is a primitive."
- * (Its panel-specific toggle is the one piece still wired in the template; only
- * the Regions entry ships, so there is a single handler today.)
  */
 @Component({
   selector: 'app-editor-rail',

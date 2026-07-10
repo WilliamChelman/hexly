@@ -722,12 +722,9 @@ export class HexMapStore {
    * Project the Selection onto the right panel: a non-empty Selection opens the
    * Inspector; emptying it closes the Inspector but never a rail-opened Regions list.
    *
-   * ponytail: a synchronous projection off the select commands, matching the prior
-   * inline behaviour — not a reactive `effect` on {@link selections}. An effect would
-   * also track self-heal (erasing the selected hex would close the Inspector), but it
-   * needs an injection context and doesn't run synchronously under the plain-`new`
-   * store spec. Route a new self-heal-driven panel rule through here or move to an
-   * effect (with a TestBed harness) if that behaviour is ever wanted.
+   * ponytail: a synchronous projection off the select commands, not a reactive `effect` on
+   * {@link selections} — an effect needs an injection context and wouldn't run synchronously
+   * under the plain-`new` store spec. Route a new panel rule through here.
    */
   private projectPanelFromSelection(): void {
     if (this.sel.selections().length > 0) this._rightPanel.set('inspector');

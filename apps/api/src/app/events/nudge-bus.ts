@@ -206,10 +206,8 @@ export class NudgeBus implements OnModuleInit, OnModuleDestroy {
    * `{ id, seq }`; access ended (private flip, revoked grant, deleted row) → opaque
    * `{ id, unavailable }`.
    *
-   * It takes **only an id** and looks up its own freshness, mirroring {@link emitWorldChange}. The
-   * old `(id, version, updatedAt)` signature demanded two facts an ACL mutation does not possess —
-   * a grant change touches neither column — so grant and owner writes simply never called it. The
-   * shallow interface caused the omission (ADR-0045). A missing row is not an error but the
+   * Takes **only an id** and looks up its own freshness, mirroring {@link emitWorldChange} — an ACL
+   * mutation has no version/updatedAt to pass (ADR-0045). A missing row is not an error but the
    * eviction path: a cascade-deleted Entity fans out `unavailable`.
    */
   emitEntityChange(id: string): void {

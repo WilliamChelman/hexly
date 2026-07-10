@@ -104,8 +104,7 @@ const STATIC_ENTRIES: readonly NavEntry[] = [
         [attr.aria-label]="'nav.home' | transloco"
         (click)="choose()"
       >
-        <!-- The brand mark doubles as the subtle loading metaphor: it pulses
-             while in-page work is in flight (a fetch, an entity load, a save). -->
+        <!-- The brand mark pulses while in-page work is in flight (fetch, entity load, save). -->
         <span
           class="grid place-items-center text-gold [filter:drop-shadow(0_0_6px_var(--color-glow))]"
           [class.animate-pulse]="loading() === 'subtle'"
