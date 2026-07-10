@@ -187,7 +187,9 @@ export class GraphCanvas {
    */
   private viewPinned = false;
   /** Restart the parked label loop. Set by {@link paintLabels}; a no-op until the loop is mounted. */
-  private wake: () => void = () => {};
+  private wake: () => void = () => {
+    /* no loop to wake before mount */
+  };
 
   constructor() {
     effect((onCleanup) => {
@@ -439,7 +441,9 @@ export class GraphCanvas {
   private teardown(): void {
     cancelAnimationFrame(this.frame);
     this.frame = 0;
-    this.wake = () => {};
+    this.wake = () => {
+      /* stale handlers must not touch the torn-down loop */
+    };
     this.interacting = false;
     this.viewPinned = false;
     this.labels = [];
