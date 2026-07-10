@@ -1,3 +1,4 @@
+import { EdgeTargetKind } from '@hexly/domain';
 import {
   index,
   integer,
@@ -228,6 +229,44 @@ export const assets = sqliteTable(
     createdAt: integer('created_at').notNull(),
   },
   (table) => [primaryKey({ columns: [table.worldId, table.hash] })]
+);
+
+/**
+ * The derived Entity Link index (ADR-0046): one row per distinct
+ * `(sourceEntityId, targetKind, targetId, descriptor)` an Entity's document expresses.
+ * An **index, never a source of truth** — droppable and recomputable from the documents,
+ * wholesale-replaced by EntityWrites on every save.
+ *
+ * The rows are raw truth (A → B regardless of who may see either); confidentiality lives
+ * entirely in the read, which filters an inbound edge by the viewer's access to its *source*.
+ *
+ * `targetId` deliberately carries **no FK**: a link to a missing or unreadable Entity is a valid
+ * document, so it is unconstrained text resolved opportunistically on read. `worldId` is
+ * denormalized off the source so the World Graph's edge fetch is one indexed lookup.
+ */
+export const entityEdges = sqliteTable(
+  'entity_edges',
+  {
+    sourceEntityId: text('source_entity_id')
+      .notNull()
+      .references(() => entities.id, { onDelete: 'cascade' }),
+    worldId: text('world_id').notNull(),
+    // entity | asset. Asset edges are stored but surface-less — groundwork for Asset GC.
+    targetKind: text('target_kind').$type<EdgeTargetKind>().notNull(),
+    // An `entityId`, or an Asset `hash`. Dangling-allowed, so no FK.
+    targetId: text('target_id').notNull(),
+    // The Link Descriptor, on `content → entity` edges alone. Two descriptors to the same
+    // target are two edges ("spouse" *and* "rival" between one pair).
+    descriptor: text('descriptor'),
+  },
+  (table) => [
+    // Outbound: an Entity's References.
+    index('idx_entity_edges_source').on(table.sourceEntityId),
+    // Inbound: who links here (then filtered by the viewer's access to each source).
+    index('idx_entity_edges_target').on(table.targetKind, table.targetId),
+    // The World Graph's whole-World edge fetch.
+    index('idx_entity_edges_world').on(table.worldId, table.targetKind),
+  ]
 );
 
 /**

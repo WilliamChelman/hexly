@@ -17,6 +17,8 @@ import { MockEntitiesClient, MockNudgeBusClient, provideTranslocoTesting } from 
 import { EntitySession } from './services/entity-session';
 import { EntityNameResolver, CONTENT_EDITOR_SESSION } from '@hexly/content-editor';
 import { OutlineStore } from './services/outline-store';
+import { ReferencesStore } from './services/references-store';
+import { RightDock } from './services/right-dock';
 import { HexMapStore } from '@hexly/web-map';
 import { noteDetail } from './components/entity-detail.fixtures';
 import { EntityPage } from './entity.page';
@@ -89,7 +91,9 @@ describe('EntityPage routing', () => {
         EntitySession,
         { provide: CONTENT_EDITOR_SESSION, useExisting: EntitySession },
         EntityNameResolver,
+        RightDock,
         OutlineStore,
+        ReferencesStore,
         { provide: EntitiesClient, useValue: entities },
         { provide: NudgeBusClient, useValue: bus },
         provideHttpClient(),
@@ -199,7 +203,9 @@ describe('EntityPage layout', () => {
         EntitySession,
         { provide: CONTENT_EDITOR_SESSION, useExisting: EntitySession },
         EntityNameResolver,
+        RightDock,
         OutlineStore,
+        ReferencesStore,
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
@@ -240,6 +246,72 @@ describe('EntityPage layout', () => {
     expect(el.querySelector('app-editor-rail')).not.toBeNull();
     expect(el.querySelector('app-inspector')).toBeNull();
     expect(el.querySelector('app-regions-panel')).toBeNull();
+  });
+
+  /**
+   * The right dock holds one panel and a rail of toggles (ADR-0013). The Outline and References
+   * share the slot, so opening either closes the other — the reading column reflows once, never
+   * twice, and neither panel can be orphaned behind the other.
+   */
+  it('swaps the dock between the Outline and References, never showing both', () => {
+    TestBed.inject(EntitySession).adopt(noteDetail('Lady Mara'));
+    const fixture = TestBed.createComponent(EntityPage);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const click = (testid: string) => {
+      el.querySelector<HTMLButtonElement>(`[data-testid=${testid}]`)?.click();
+      fixture.detectChanges();
+    };
+
+    // Both closed on boot.
+    expect(el.querySelector('app-outline-panel')).toBeNull();
+    expect(el.querySelector('app-references-panel')).toBeNull();
+
+    click('outline-toggle');
+    expect(el.querySelector('app-outline-panel')).not.toBeNull();
+
+    click('references-toggle');
+    expect(el.querySelector('app-outline-panel')).toBeNull();
+    expect(el.querySelector('app-references-panel')).not.toBeNull();
+    // Opening it reads the edge index; the Outline, derived from live Content, reads nothing.
+    http
+      .expectOne('/api/entities/n1/references')
+      .flush({ references: [], referencedBy: [] });
+
+    // A second click on the active toggle closes the dock, as it always did.
+    click('references-toggle');
+    expect(el.querySelector('app-references-panel')).toBeNull();
+  });
+
+  /**
+   * Both panels are the same width and float over the same corner, so the reading column must
+   * reflow for either. Reserving room only for the Outline lets the References panel sit on top
+   * of the last inch of every line of prose.
+   */
+  it('reflows the reading column for whichever panel is open', () => {
+    TestBed.inject(EntitySession).adopt(noteDetail('Lady Mara'));
+    const fixture = TestBed.createComponent(EntityPage);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const column = () => el.querySelector<HTMLElement>('[data-content-scroll]')!;
+    const click = (testid: string) => {
+      el.querySelector<HTMLButtonElement>(`[data-testid=${testid}]`)?.click();
+      fixture.detectChanges();
+    };
+
+    // Closed: room for the floating toggles only.
+    expect(column().style.paddingRight).toBe('3.5rem');
+
+    click('outline-toggle');
+    expect(column().style.paddingRight).toBe('20rem');
+
+    click('references-toggle');
+    http.expectOne('/api/entities/n1/references').flush({ references: [], referencedBy: [] });
+    fixture.detectChanges();
+    expect(column().style.paddingRight).toBe('20rem');
+
+    click('references-toggle');
+    expect(column().style.paddingRight).toBe('3.5rem');
   });
 
   it('reports the API health in the status bar', async () => {

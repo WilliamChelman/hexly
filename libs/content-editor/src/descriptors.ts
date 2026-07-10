@@ -2,10 +2,10 @@ import { Editor } from '@tiptap/core';
 import { EditorState } from '@tiptap/pm/state';
 import { VocabItem, vocabItems } from './vocab-items';
 
-// Link Descriptors are harvested server-side from the saved Content now
-// (harvestDescriptors in @hexly/domain, #96/ADR-0035), so the editor only sets
-// them on links; this module is the `::`/`|`/`#` link-attr picker mechanics (the shared
-// vocabulary rows live in vocab-items.ts).
+// Link Descriptors are harvested server-side from the saved Content now — they fall out of
+// `harvestEdges` in @hexly/domain, which the write path runs on every save (#96/ADR-0035,
+// ADR-0046) — so the editor only sets them on links; this module is the `::`/`|`/`#` link-attr
+// picker mechanics (the shared vocabulary rows live in vocab-items.ts).
 
 /** Sentinel id for the "Remove" row — a `\0` prefix can never appear in typed text. */
 const CLEAR_ID = '\0clear';

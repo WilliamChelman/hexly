@@ -8,7 +8,7 @@ import { ActivatedRoute } from '@angular/router';
 import { TranslocoPipe, translateSignal } from '@jsverse/transloco';
 import { Observable, concat, ignoreElements, of } from 'rxjs';
 import { EntitySession } from './services/entity-session';
-import { OutlineStore } from './services/outline-store';
+import { RightDock } from './services/right-dock';
 import { EntityHeader } from './components/entity-header';
 import {
   HexMapStore,
@@ -23,6 +23,7 @@ import { ContentEditor } from '@hexly/content-editor';
 import { EntityMetadata } from './components/entity-metadata';
 import { OutlinePanel } from './components/outline-panel';
 import { OutlineSource } from './components/outline-source';
+import { ReferencesPanel } from './components/references-panel';
 import { IconButton, Icon } from '@hexly/web-ui';
 
 /**
@@ -57,6 +58,7 @@ import { IconButton, Icon } from '@hexly/web-ui';
     EntityMetadata,
     OutlinePanel,
     OutlineSource,
+    ReferencesPanel,
     IconButton,
     Icon,
     TranslocoPipe,
@@ -101,40 +103,61 @@ import { IconButton, Icon } from '@hexly/web-ui';
             }
           } @else {
             <!-- Content body in a centred reading column: a note, or a hexmap on its Note view (#75).
-                 Opening the Outline reflows this column left (extra right padding) so the panel never
-                 overlaps prose; closed still reserves room for the floating toggle. -->
+                 Opening *either* dock panel reflows this column left (extra right padding) so the
+                 panel never overlaps prose — they share one slot and one width; closed still
+                 reserves room for the floating toggles. -->
             <div
               data-content-scroll
               class="absolute inset-0 overflow-y-auto bg-surface-sunken transition-[padding] duration-200"
-              [style.paddingRight]="outline.isOpen() ? '20rem' : '3.5rem'"
+              [style.paddingRight]="dock.isOpen() ? '20rem' : '3.5rem'"
             >
               <div class="max-w-[60rem] mx-auto py-6 px-6">
                 <app-entity-metadata />
                 <app-content-editor appOutlineSource [ariaLabel]="editorLabel()" />
               </div>
             </div>
-            <!-- Outline dock floating top-right (mirrors the map dock, ADR-0013): panel left of a
-                 single toggle button; pointer-events re-enabled per child. -->
+            <!-- Right dock floating top-right (mirrors the map dock, ADR-0013): one panel slot
+                 left of a rail of toggles; pointer-events re-enabled per child. The Outline and
+                 References share the slot, so dock.panel() is a single discriminant and "both
+                 open at once" is unrepresentable. Ungated by writable(): both are read affordances. -->
             <div
               class="absolute top-3 right-3 bottom-3 flex items-start gap-2 z-[1] pointer-events-none"
             >
-              @if (outline.isOpen()) {
+              @if (dock.panel() === 'outline') {
                 <app-outline-panel
                   class="w-[16rem] max-h-full border border-line rounded-lg shadow-2 pointer-events-auto"
                 />
+              } @else if (dock.panel() === 'references') {
+                <app-references-panel
+                  class="w-[16rem] max-h-full border border-line rounded-lg shadow-2 pointer-events-auto"
+                />
               }
-              <button
-                appIconButton
-                toggle
-                class="pointer-events-auto"
-                [active]="outline.isOpen()"
-                [title]="outlineToggleLabel()"
-                [attr.aria-label]="outlineToggleLabel()"
-                data-testid="outline-toggle"
-                (click)="outline.toggle()"
-              >
-                <app-icon name="outline" [size]="20" />
-              </button>
+              <div class="flex flex-col gap-2">
+                <button
+                  appIconButton
+                  toggle
+                  class="pointer-events-auto"
+                  [active]="dock.panel() === 'outline'"
+                  [title]="outlineToggleLabel()"
+                  [attr.aria-label]="outlineToggleLabel()"
+                  data-testid="outline-toggle"
+                  (click)="dock.toggle('outline')"
+                >
+                  <app-icon name="outline" [size]="20" />
+                </button>
+                <button
+                  appIconButton
+                  toggle
+                  class="pointer-events-auto"
+                  [active]="dock.panel() === 'references'"
+                  [title]="linksToggleLabel()"
+                  [attr.aria-label]="linksToggleLabel()"
+                  data-testid="references-toggle"
+                  (click)="dock.toggle('references')"
+                >
+                  <app-icon name="link" [size]="20" />
+                </button>
+              </div>
             </div>
           }
         </main>
@@ -179,11 +202,12 @@ export class EntityPage {
   protected readonly writable = this.session.writable;
   /** Drives the Map/Note surface swap and which view occupies the right column. */
   protected readonly store = inject(HexMapStore);
-  /** The heading-navigation Outline shown beside the Content body. */
-  protected readonly outline = inject(OutlineStore);
+  /** Which panel the Content body's right dock is showing — one slot, so one discriminant. */
+  protected readonly dock = inject(RightDock);
 
-  /** Accessible name / tooltip for the Outline toggle (ADR-0014). */
+  /** Accessible names / tooltips for the dock's toggles (ADR-0014). */
   protected readonly outlineToggleLabel = translateSignal('noteView.outline.toggle');
+  protected readonly linksToggleLabel = translateSignal('noteView.links.toggle');
 
   /** Only a hexmap carries a grid surface — and so the status bar and Map/Note toggle (#75). */
   protected readonly isHexmap = computed(

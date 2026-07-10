@@ -70,6 +70,14 @@
       "toggle": "Afficher/masquer le plan",
       "empty": "Aucun titre pour l’instant"
     },
+    "links": {
+      "title": "Liens",
+      "toggle": "Afficher/masquer les liens",
+      "references": "Références",
+      "referencedBy": "Référencé par",
+      "referencesEmpty": "Cette entité ne renvoie à rien",
+      "referencedByEmpty": "Rien ne renvoie ici"
+    },
     "slashMenu": {
       "label": "Insérer un bloc",
       "empty": "Aucun bloc correspondant",

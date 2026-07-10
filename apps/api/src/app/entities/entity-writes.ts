@@ -1,22 +1,54 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import {
-  Content,
   EntityBody,
+  EntityEdge,
   GrantRole,
   Visibility,
   descriptorsSchema,
   extractText,
-  harvestDescriptors,
+  harvestEdges,
 } from '@hexly/domain';
 import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 import { EntityAccess, entityAccess, sharedVisibility } from '../acl/entity-access';
 import { DB, Db } from '../db/db';
-import { INITIAL_SEQ, entities, entityDescriptors, entityGrants } from '../db/schema';
+import {
+  INITIAL_SEQ,
+  entities,
+  entityDescriptors,
+  entityEdges,
+  entityGrants,
+} from '../db/schema';
 import { SyncOnly, WriteOutbox } from '../events/write-outbox';
 
 /** A fresh Entity starts at version 1 — the optimistic-concurrency token's floor. */
 const INITIAL_VERSION = 1;
+
+/** Everything one save derives from the Entity's document, in one pass. */
+interface Derived {
+  contentText: string;
+  descriptors: string[];
+  edges: EntityEdge[];
+}
+
+/**
+ * SQLite's `SQLITE_MAX_VARIABLE_NUMBER` — the most bound parameters one statement may carry. A
+ * multi-row `VALUES` list binds `rows × columns` of them, so a derived index rebuilt in one
+ * statement hard-fails past `limit / columns` rows with "too many SQL variables", rolling the
+ * save back and leaving the document unsavable. {@link batched} keeps each statement under it.
+ */
+const MAX_BOUND_PARAMS = 32766;
+
+/** Columns bound per `entity_edges` row: source, world, kind, target, descriptor. */
+const EDGE_COLUMNS = 5;
+/** Columns bound per `entity_descriptors` row: entity, descriptor. */
+const DESCRIPTOR_COLUMNS = 2;
+
+/** Split `rows` into the largest batches a single `INSERT … VALUES` can bind. Empty in, nothing out. */
+function* batched<T>(rows: readonly T[], columns: number): Generator<readonly T[]> {
+  const size = Math.floor(MAX_BOUND_PARAMS / columns);
+  for (let i = 0; i < rows.length; i += size) yield rows.slice(i, i + size);
+}
 
 /** Everything an insert needs. The import path pre-assigns `id` to resolve wikilinks before insert. */
 export interface InsertEntityInput {
@@ -123,7 +155,7 @@ export class EntityWrites {
    */
   insert(input: InsertEntityInput): EntityRow {
     const now = Date.now();
-    const { contentText, descriptors } = this.derive(input.body.content);
+    const derived = this.derive(input.body);
     const row: EntityRow = {
       id: input.id ?? randomUUID(),
       worldId: input.worldId,
@@ -134,7 +166,7 @@ export class EntityWrites {
       version: INITIAL_VERSION,
       seq: INITIAL_SEQ,
       document: JSON.stringify(input.body),
-      contentText,
+      contentText: derived.contentText,
       createdAt: now,
       updatedAt: now,
     };
@@ -144,7 +176,7 @@ export class EntityWrites {
         .insert(entityGrants)
         .values({ entityId: row.id, userId: input.ownerId, role: 'owner' })
         .run();
-      this.replaceDescriptors(row.id, descriptors);
+      this.replaceDerived(row.id, row.worldId, derived);
       return row;
     });
   }
@@ -162,7 +194,7 @@ export class EntityWrites {
         .from(entities)
         .where(eq(entities.worldId, worldId))
         .all();
-      // entity_grants, entity_links and entity_descriptors cascade with each row.
+      // entity_grants, entity_links, entity_descriptors and entity_edges cascade with each row.
       this.db.delete(entities).where(eq(entities.worldId, worldId)).run();
       for (const { id } of doomed) this.enqueue(id);
     });
@@ -232,25 +264,60 @@ export class EntityWrites {
   }
 
   /**
-   * The one derivation of Content, in one place — {@link EntityWrites} is the only caller of
-   * `extractText` and `harvestDescriptors`. Splitting them is what let an imported vault populate
-   * the search index while contributing nothing to the `::` Link Descriptor vocabulary.
+   * The one derivation of the Entity's document, in one place — {@link EntityWrites} is the only
+   * caller of `extractText` and `harvestEdges`. Splitting them is what let an imported vault
+   * populate the search index while contributing nothing to the `::` Link Descriptor vocabulary.
+   *
+   * It takes the whole body, not just the Content: a Hex Map's Entity Links live on its Hexes,
+   * Features, and Regions as well as in its prose (ADR-0046).
+   *
+   * The `::` vocabulary is a *projection* of the edge set, not a second walk: only a
+   * `content → entity` edge carries a descriptor, so the non-null ones are exactly the descriptors
+   * the Content uses. One traversal, and one definition of what a descriptor is.
    */
-  private derive(content: Content): { contentText: string; descriptors: string[] } {
+  private derive(body: EntityBody): Derived {
+    const edges = harvestEdges(body);
     return {
-      contentText: extractText(content),
-      descriptors: descriptorsSchema.parse(harvestDescriptors(content)),
+      contentText: extractText(body.content),
+      descriptors: descriptorsSchema.parse(edges.flatMap((e) => e.descriptor ?? [])),
+      edges,
     };
+  }
+
+  /**
+   * Replace the Entity's derived index rows with the freshly harvested sets — wholesale, no
+   * diffing, so both are self-pruning. Always runs in the same transaction as the body write, so
+   * the indexes reflect the last *successful* save and never a rejected one.
+   */
+  private replaceDerived(id: string, worldId: string, derived: Derived): void {
+    this.replaceDescriptors(id, derived.descriptors);
+    this.replaceEdges(id, worldId, derived.edges);
   }
 
   /** Replace the Entity's descriptor rows with the harvested set (self-pruning). */
   private replaceDescriptors(id: string, descriptors: readonly string[]): void {
     this.db.delete(entityDescriptors).where(eq(entityDescriptors.entityId, id)).run();
-    if (descriptors.length === 0) return;
-    this.db
-      .insert(entityDescriptors)
-      .values(descriptors.map((descriptor) => ({ entityId: id, descriptor })))
-      .run();
+    for (const batch of batched(descriptors, DESCRIPTOR_COLUMNS)) {
+      this.db
+        .insert(entityDescriptors)
+        .values(batch.map((descriptor) => ({ entityId: id, descriptor })))
+        .run();
+    }
+  }
+
+  /**
+   * Replace the Entity's outbound edge rows with the harvested set (self-pruning). `worldId` is
+   * denormalized off the source here — the one place it can be, since an edge has no other
+   * relation to a World.
+   */
+  private replaceEdges(id: string, worldId: string, edges: readonly EntityEdge[]): void {
+    this.db.delete(entityEdges).where(eq(entityEdges.sourceEntityId, id)).run();
+    for (const batch of batched(edges, EDGE_COLUMNS)) {
+      this.db
+        .insert(entityEdges)
+        .values(batch.map((edge) => ({ ...edge, sourceEntityId: id, worldId })))
+        .run();
+    }
   }
 
   /**
@@ -288,7 +355,8 @@ export class EntityWrites {
     const seq = row.seq + 1;
 
     if (change.kind === 'delete') {
-      // entity_grants, entity_links and entity_descriptors cascade with the row.
+      // entity_grants, entity_links, entity_descriptors and entity_edges cascade with the row.
+      // Its *inbound* edges do not: they are keyed by their own source, which still holds the link.
       const res = this.db
         .delete(entities)
         .where(and(eq(entities.id, id), access.writeFilter))
@@ -318,7 +386,7 @@ export class EntityWrites {
 
     // `edit`: substance. Set only the columns the caller owns, so a concurrent rename isn't
     // clobbered by a save that never touched the name.
-    const derived = change.document && this.derive(change.document.content);
+    const derived = change.document && this.derive(change.document);
     const set = {
       ...(change.name !== undefined && { name: change.name }),
       ...(change.tags !== undefined && { tags: [...change.tags] }),
@@ -343,9 +411,9 @@ export class EntityWrites {
       )
       .run();
     if (res.changes > 0) {
-      // Same transaction as the body write, so the index always reflects the last *successful*
+      // Same transaction as the body write, so the indexes always reflect the last *successful*
       // save, never a rejected one.
-      if (derived) this.replaceDescriptors(id, derived.descriptors);
+      if (derived) this.replaceDerived(id, row.worldId, derived);
       return { status: 'ok', row: { ...row, ...set } };
     }
     // Zero rows: the version moved, or the predicate stopped matching. Re-read to tell them apart.

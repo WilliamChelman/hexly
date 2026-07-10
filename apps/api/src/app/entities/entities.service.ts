@@ -8,10 +8,14 @@ import {
   EntityDetail,
   EntityErrorCode,
   EntityFacets,
+  EntityReferences,
   EntitySaveOutcome,
   EntitySummary,
   EntityType,
   FacetCount,
+  InboundReference,
+  LinkedEntity,
+  OutboundReference,
   entityTypeSchema,
   Visibility,
   EntityGrant,
@@ -31,6 +35,7 @@ import {
   userExists,
 } from '../acl/owner-set';
 import {
+  EntityAccess,
   entityAccess,
   ownsEntity,
   READ_ONLY_RIGHTS,
@@ -47,6 +52,7 @@ import { DB, Db } from '../db/db';
 import {
   entities,
   entityDescriptors,
+  entityEdges,
   entityGrants,
   entityLinks,
   worlds,
@@ -266,6 +272,81 @@ export class EntitiesService {
     return decision?.canRead
       ? { ...toDetail(decision.row), rights: access.rightsOf(decision) }
       : null;
+  }
+
+  /**
+   * Both directions of an Entity's links, off the derived edge index (ADR-0046). null when the
+   * Entity itself is unreachable (404) — the same existence-preserving gate as {@link load}.
+   *
+   * The two directions have deliberately different rules. **Outbound** needs no hiding: the caller
+   * already reads this Entity, and a target it may not read (or that no longer exists) resolves to
+   * `null` and renders as a dangling label. **Inbound** is gated on the viewer's access to the
+   * *source*, because an edge names its source — so a `private` Entity linking a `shared` one would
+   * otherwise leak its name and existence to everyone who can reach that `shared` one.
+   */
+  references(userId: string, id: string): EntityReferences | null {
+    const access = entityAccess(this.db, userId);
+    if (!access.decideMeta(id)?.canRead) return null;
+    return { references: this.outbound(access, id), referencedBy: this.inbound(access, id) };
+  }
+
+  /**
+   * This Entity's links. A LEFT JOIN under the read filter resolves each target's *current* name;
+   * a target that is deleted, or that the viewer cannot read, yields NULL columns and so a `null`
+   * target. Asset edges are stored but surface-less, so `entity` targets alone are selected.
+   */
+  private outbound(access: EntityAccess, id: string): OutboundReference[] {
+    return this.db
+      .select({
+        targetId: entityEdges.targetId,
+        descriptor: entityEdges.descriptor,
+        name: entities.name,
+        type: entities.type,
+      })
+      .from(entityEdges)
+      .leftJoin(entities, and(eq(entities.id, entityEdges.targetId), access.filter))
+      .where(
+        and(eq(entityEdges.sourceEntityId, id), eq(entityEdges.targetKind, 'entity')),
+      )
+      // Resolved targets by name; the dangling ones last, where they read as a footnote. `targetId`
+      // is the final tiebreak, so two Entities sharing a name — or two descriptors to one target —
+      // hold a stable order between reads (as `list` does with `asc(entities.id)`).
+      .orderBy(
+        sql`${entities.name} IS NULL`,
+        asc(entities.name),
+        asc(entityEdges.targetId),
+        asc(entityEdges.descriptor),
+      )
+      .all()
+      .map((row) => ({
+        targetId: row.targetId,
+        descriptor: row.descriptor,
+        target: row.name === null ? null : linkedEntity(row.targetId, row.name, row.type),
+      }));
+  }
+
+  /**
+   * Who links here. The INNER JOIN's ON clause carries the ordinary per-viewer read filter over
+   * the *source*, so an unreadable source drops the row entirely — never cached across viewers.
+   */
+  private inbound(access: EntityAccess, id: string): InboundReference[] {
+    return this.db
+      .select({
+        sourceId: entities.id,
+        descriptor: entityEdges.descriptor,
+        name: entities.name,
+        type: entities.type,
+      })
+      .from(entityEdges)
+      .innerJoin(entities, and(eq(entities.id, entityEdges.sourceEntityId), access.filter))
+      .where(and(eq(entityEdges.targetKind, 'entity'), eq(entityEdges.targetId, id)))
+      // `id` is the final tiebreak, for the same reason as {@link outbound}'s `targetId`.
+      .orderBy(asc(entities.name), asc(entities.id), asc(entityEdges.descriptor))
+      .all()
+      .map((row) => ({
+        descriptor: row.descriptor,
+        source: linkedEntity(row.sourceId, row.name, row.type),
+      }));
   }
 
   /**
@@ -693,6 +774,11 @@ function hasAnyTag(tags: readonly string[]) {
 function toFtsMatch(q: string): string {
   const tokens = q.match(/[\p{L}\p{N}]+/gu) ?? [];
   return tokens.map((t) => `"${t}"*`).join(' ');
+}
+
+/** One end of a link, resolved live off `entities` — an edge never stores a name. */
+function linkedEntity(id: string, name: string, type: string): LinkedEntity {
+  return { id, name, type: entityTypeSchema.parse(type) };
 }
 
 type SummaryRow = Omit<typeof entities.$inferSelect, 'document'>;

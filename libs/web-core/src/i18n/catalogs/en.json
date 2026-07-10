@@ -70,6 +70,14 @@
       "toggle": "Toggle outline",
       "empty": "No headings yet"
     },
+    "links": {
+      "title": "Links",
+      "toggle": "Toggle links",
+      "references": "References",
+      "referencedBy": "Referenced by",
+      "referencesEmpty": "This entity links to nothing",
+      "referencedByEmpty": "Nothing links here"
+    },
     "slashMenu": {
       "label": "Insert block",
       "empty": "No matching blocks",

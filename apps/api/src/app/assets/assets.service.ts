@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, extname, join } from 'node:path';
 import { Inject, Injectable } from '@nestjs/common';
+import { assetUrl } from '@hexly/domain';
 import { and, eq } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
 import { assets } from '../db/schema';
@@ -64,7 +65,7 @@ export class AssetsService {
     if (existing) {
       // Match the on-disk name, which was minted from the FIRST store's extension (lower-cased,
       // like the write path below — else the served URL 404s on a case-sensitive filesystem).
-      return { url: this.url(worldId, hash, extname(existing.originalFilename).toLowerCase()), hash, deduped: true };
+      return { url: assetUrl(worldId, hash, extname(existing.originalFilename).toLowerCase()), hash, deduped: true };
     }
 
     const ext = extname(filename).toLowerCase();
@@ -82,7 +83,7 @@ export class AssetsService {
         createdAt: Date.now(),
       })
       .run();
-    return { url: this.url(worldId, hash, ext), hash, deduped: false };
+    return { url: assetUrl(worldId, hash, ext), hash, deduped: false };
   }
 
   /**
@@ -115,7 +116,7 @@ export class AssetsService {
     for (const row of rows) {
       const ext = extname(row.originalFilename).toLowerCase();
       const found = this.read(worldId, row.hash + ext);
-      if (found) out.push({ servedUrl: this.url(worldId, row.hash, ext), originalFilename: row.originalFilename, bytes: found.bytes });
+      if (found) out.push({ servedUrl: assetUrl(worldId, row.hash, ext), originalFilename: row.originalFilename, bytes: found.bytes });
     }
     return out;
   }
@@ -123,9 +124,5 @@ export class AssetsService {
   /** Remove a World's entire Asset folder (its rows cascade away with the World). Best-effort: a missing folder is fine. */
   deleteWorld(worldId: string): void {
     rmSync(join(this.dir, worldId), { recursive: true, force: true });
-  }
-
-  private url(worldId: string, hash: string, ext: string): string {
-    return `/assets/${worldId}/${hash}${ext}`;
   }
 }

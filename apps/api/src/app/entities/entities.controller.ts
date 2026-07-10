@@ -24,6 +24,7 @@ import {
   EntityGrant,
   entityListQuerySchema,
   EntityPage,
+  EntityReferences,
   patchEntityRequestSchema,
   PublicLink,
   saveEntityRequestSchema,
@@ -110,6 +111,18 @@ export class EntitiesController {
     const entity = this.entities.load(user.id, id);
     if (!entity) throw new NotFoundException();
     return entity;
+  }
+
+  /**
+   * Both directions of this Entity's links (ADR-0046, #179), off the derived edge index. The
+   * inbound half is filtered by the caller's access to each *source*, so it is resolved per viewer
+   * and never cached across them.
+   */
+  @Get(':id/references')
+  references(@CurrentUser() user: AuthUser, @Param('id') id: string): EntityReferences {
+    const references = this.entities.references(user.id, id);
+    if (!references) throw new NotFoundException();
+    return references;
   }
 
   @Put(':id')

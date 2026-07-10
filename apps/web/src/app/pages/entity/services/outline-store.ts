@@ -1,10 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { extractOutline, OutlineHeading } from '@hexly/domain';
-import { AuthScopedStorage } from '@hexly/web-core';
 import { EntitySession } from './entity-session';
-
-/** Per-user preference key (auth-scoped), so one user's choice never leaks to the next. */
-const STORAGE_KEY = 'outline.open';
 
 /**
  * Route-scoped UI state for the Outline — the heading-navigation panel beside the
@@ -13,16 +9,13 @@ const STORAGE_KEY = 'outline.open';
  * them without this store ever parsing Content itself; the panel owns the scroll
  * and scrollspy DOM work. Distinct from {@link EntitySession} (the document) and
  * the map's HexMapStore.
+ *
+ * Whether the panel *shows* is not this store's business — the dock holds one panel slot for
+ * the Outline and the References between them, so {@link RightDock} owns that single choice.
  */
 @Injectable()
 export class OutlineStore {
   private readonly session = inject(EntitySession);
-  private readonly storage = inject(AuthScopedStorage);
-
-  // Default closed; the last choice persists app-wide, per user, across reloads.
-  private readonly _open = signal(this.storage.getItem(STORAGE_KEY) === '1');
-  /** Whether the Outline panel is showing. */
-  readonly isOpen = this._open.asReadonly();
 
   private readonly _contentRoot = signal<HTMLElement | null>(null);
   /**
@@ -53,9 +46,4 @@ export class OutlineStore {
         a.every((h, i) => h.text === b[i].text && h.level === b[i].level),
     },
   );
-
-  toggle(): void {
-    this._open.update((open) => !open);
-    this.storage.setItem(STORAGE_KEY, this._open() ? '1' : '0');
-  }
 }

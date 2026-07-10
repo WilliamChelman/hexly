@@ -108,11 +108,25 @@ export const nameSchema = z
  * rejected, duplicates collapsed. Defaults to empty so a tagless Entity still
  * lists with an array.
  */
-const dedupedTags = z
-  .array(z.string().trim().toLowerCase().min(1))
-  .transform((tags) => [...new Set(tags)]);
+/**
+ * One free-text label as a *vocabulary* stores it: trimmed, lower-cased, blanks
+ * rejected. The single definition a Tag and the `::` Link Descriptor vocabulary
+ * fold through, so `"Spouse"` and `" spouse "` are one value in both.
+ */
+const normalizedLabel = z.string().trim().toLowerCase().min(1);
+
+const dedupedTags = z.array(normalizedLabel).transform((tags) => [...new Set(tags)]);
 
 export const tagsSchema = dedupedTags.default([]);
+
+/**
+ * A single Link Descriptor ("spouse", "Capital Of") **as authored**: trimmed, blanks
+ * rejected, case preserved. Deliberately *not* folded — a Content link renders this
+ * exact string in the prose, so the edge index that mirrors it must too, or one link
+ * would show two spellings of its descriptor on one screen. Folding is a property of
+ * the vocabulary ({@link descriptorsSchema}), not of the descriptor itself.
+ */
+export const descriptorSchema = z.string().trim().min(1);
 
 /**
  * Link Descriptors — the distinct relationship labels ("spouse", "capital of")

@@ -6,7 +6,9 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import request from 'supertest';
+import { and, eq } from 'drizzle-orm';
 import { DB, Db, createDb } from '../db/db';
+import { entityEdges } from '../db/schema';
 import { ASSETS_DIR } from '../assets/assets.service';
 import { AuthService } from '../auth/auth.service';
 import { AuthModule } from '../auth/auth.module';
@@ -248,6 +250,13 @@ describe('Vault import endpoint', () => {
     const keep = await linksOf(ada, res.body.worldId, 'Keep');
     expect(keep.links).toHaveLength(1);
     expect(keep.links[0].attrs.entityId).toBe(mara.id);
+
+    // The import goes through EntityWrites.insert, so the edge index is populated with no
+    // re-save (ADR-0046) — the wikilink resolves to an `entityId` *before* the row is written.
+    const { referencedBy } = (await ada.get(`/entities/${mara.id}/references`).expect(200)).body;
+    expect(referencedBy).toEqual([
+      { descriptor: null, source: { id: keep.id, name: 'Keep', type: 'note' } },
+    ]);
   });
 
   it('path-disambiguates [[folder/Note]] and resolves a bare ambiguous basename to a deterministic first match', async () => {
@@ -471,7 +480,26 @@ describe('Vault import endpoint', () => {
     const anon = request(app.getHttpServer());
     const served = await anon.get(heroImages[0]).expect(200);
     expect(new Uint8Array(served.body)).toEqual(png);
+
+    /*
+     * Both notes' asset edges land (ADR-0046) — which is only true because `storeImages` rewrites
+     * the src *before* `importNote` inserts the row and harvests it. Move it after, and every
+     * imported image silently harvests no edge (a vault-relative src names no Asset). The external
+     * URL is no Asset, so it is no edge: Villain has one asset edge, not two.
+     */
+    const hash = heroImages[0].split('/').pop()!.replace('.png', '');
+    expect(assetEdgesIn(worldId)).toEqual([hash, hash]);
   });
+
+  /** The Asset `hash`es every Entity in `worldId` references, via the derived edge index. */
+  function assetEdgesIn(worldId: string): string[] {
+    return db
+      .select({ targetId: entityEdges.targetId })
+      .from(entityEdges)
+      .where(and(eq(entityEdges.worldId, worldId), eq(entityEdges.targetKind, 'asset')))
+      .all()
+      .map((row) => row.targetId);
+  }
 
   it('removes a World\'s asset folder when the World is deleted', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');

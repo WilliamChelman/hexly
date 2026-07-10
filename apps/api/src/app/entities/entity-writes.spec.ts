@@ -4,6 +4,7 @@ import { createDb, Db } from '../db/db';
 import {
   entities,
   entityDescriptors,
+  entityEdges,
   entityGrants,
   users,
   worldMembers,
@@ -158,6 +159,58 @@ describe('EntityWrites', () => {
       expect(contentTextOf('Ealdred')).toBe('Married to');
     });
 
+    /**
+     * The edge index (ADR-0046). `worldId` is denormalized off the source so the World Graph's
+     * edge fetch is one indexed lookup; the target is unconstrained — dangling is valid, and `e2`
+     * here does not exist.
+     */
+    it('an inserted Entity stores the edges its document expresses', () => {
+      writes.insert({
+        ownerId: ADA,
+        worldId: WORLD,
+        name: 'Ealdred',
+        tags: [],
+        body: { type: 'note', content: CONTENT },
+      });
+
+      expect(edgesOf('Ealdred')).toEqual([
+        { worldId: WORLD, targetKind: 'entity', targetId: 'e2', descriptor: 'spouse' },
+      ]);
+    });
+
+    /**
+     * The edge mirrors the Content link, so it keeps the descriptor the author typed — the prose
+     * chip and the References panel must not show two spellings of one descriptor. The `::`
+     * vocabulary is a *vocabulary*, so it folds case, exactly as Tags do.
+     */
+    it('stores the authored descriptor on the edge, and its folded form in the vocabulary', () => {
+      writes.insert({
+        ownerId: ADA,
+        worldId: WORLD,
+        name: 'Aldermoor',
+        tags: [],
+        body: {
+          type: 'note',
+          content: tiptapContent({
+            type: 'doc',
+            content: [
+              {
+                type: 'paragraph',
+                content: [
+                  { type: 'entityLink', attrs: { entityId: 'e2', descriptor: 'Capital Of' } },
+                ],
+              },
+            ],
+          }),
+        },
+      });
+
+      expect(edgesOf('Aldermoor')).toEqual([
+        { worldId: WORLD, targetKind: 'entity', targetId: 'e2', descriptor: 'Capital Of' },
+      ]);
+      expect(descriptorsOf('Aldermoor')).toEqual(['capital of']);
+    });
+
     it('an edit replaces the descriptor set, so it prunes itself', () => {
       const row = writes.insert({
         ownerId: ADA,
@@ -174,6 +227,51 @@ describe('EntityWrites', () => {
       });
 
       expect(descriptorsOf('Ealdred')).toEqual([]);
+    });
+
+    /** Wholesale replace, no diffing — mirroring `replaceDescriptors`. Unlinking prunes the edge. */
+    it('an edit replaces the edge set, so unlinking prunes the edge', () => {
+      const row = writes.insert({
+        ownerId: ADA,
+        worldId: WORLD,
+        name: 'Ealdred',
+        tags: [],
+        body: { type: 'note', content: CONTENT },
+      });
+
+      writes.mutate(ADA, row.id, {
+        kind: 'edit',
+        version: row.version,
+        document: { type: 'note', content: emptyContent() },
+      });
+
+      expect(edgesOf('Ealdred')).toEqual([]);
+    });
+
+    /**
+     * A rejected save must leave the derived indexes untouched: they are a cache of the last
+     * *committed* document, and a stale-version write never became one.
+     */
+    it('a conflicted edit leaves the edge set as the last successful save left it', () => {
+      const row = writes.insert({
+        ownerId: ADA,
+        worldId: WORLD,
+        name: 'Ealdred',
+        tags: [],
+        body: { type: 'note', content: CONTENT },
+      });
+      writes.mutate(ADA, row.id, { kind: 'edit', version: row.version, name: 'Bumped' });
+
+      const result = writes.mutate(ADA, row.id, {
+        kind: 'edit',
+        version: row.version, // stale
+        document: { type: 'note', content: emptyContent() },
+      });
+
+      expect(result.status).toBe('conflict');
+      expect(edgesOf('Bumped')).toEqual([
+        { worldId: WORLD, targetKind: 'entity', targetId: 'e2', descriptor: 'spouse' },
+      ]);
     });
 
     function idOf(name: string): string {
@@ -193,6 +291,89 @@ describe('EntityWrites', () => {
 
     function contentTextOf(name: string): string | null {
       return rowOf(idOf(name)).contentText;
+    }
+
+    /**
+     * `sourceEntityId` FKs `entities.id` with ON DELETE CASCADE, so an Entity's outbound edges die
+     * with it. Its *inbound* rows do not: they are keyed by their own source, which still holds the
+     * link. The read drops them (the target no longer resolves) and the source's next save rewrites
+     * them (ADR-0046).
+     */
+    it('deleting the source cascades its outbound edges, and leaves inbound rows to it standing', () => {
+      const ealdred = writes.insert({
+        ownerId: ADA,
+        worldId: WORLD,
+        name: 'Ealdred',
+        tags: [],
+        body: { type: 'note', content: CONTENT }, // Ealdred → e2
+      });
+      const mira = writes.insert({
+        ownerId: ADA,
+        worldId: WORLD,
+        name: 'Mira',
+        tags: [],
+        body: { type: 'note', content: linkTo(ealdred.id) }, // Mira → Ealdred
+      });
+
+      writes.mutate(ADA, ealdred.id, { kind: 'delete' });
+
+      expect(edgesFrom(ealdred.id)).toEqual([]);
+      expect(edgesFrom(mira.id)).toEqual([
+        { worldId: WORLD, targetKind: 'entity', targetId: ealdred.id, descriptor: null },
+      ]);
+    });
+
+    /**
+     * SQLite binds at most 32766 parameters per statement, and an edge row binds five. A single
+     * `VALUES` list therefore hard-fails past 6553 edges with "too many SQL variables" — rolling
+     * back the save and leaving the document permanently unsavable. A Hex Map naming that many
+     * Entities across its Hexes, Features, and Regions is inside the "low thousands of nodes" a
+     * World is expected to hold, so the insert chunks.
+     */
+    it('stores an edge set far larger than SQLite’s bound-parameter limit', () => {
+      const hexes = Object.fromEntries(
+        Array.from({ length: 7000 }, (_, i) => [
+          `${i},0`,
+          { terrain: 'grass' as const, entityId: `target-${i}` },
+        ]),
+      );
+
+      const row = writes.insert({
+        ownerId: ADA,
+        worldId: WORLD,
+        name: 'The Reach',
+        tags: [],
+        body: { type: 'hexmap', content: emptyContent(), hexes, regions: [], labels: [] },
+      });
+
+      expect(edgesFrom(row.id)).toHaveLength(7000);
+    });
+
+    /** Content holding one bare `entityLink` at `targetId`. */
+    function linkTo(targetId: string) {
+      return tiptapContent({
+        type: 'doc',
+        content: [
+          { type: 'paragraph', content: [{ type: 'entityLink', attrs: { entityId: targetId } }] },
+        ],
+      });
+    }
+
+    function edgesOf(name: string) {
+      return edgesFrom(idOf(name));
+    }
+
+    function edgesFrom(sourceEntityId: string) {
+      return db
+        .select({
+          worldId: entityEdges.worldId,
+          targetKind: entityEdges.targetKind,
+          targetId: entityEdges.targetId,
+          descriptor: entityEdges.descriptor,
+        })
+        .from(entityEdges)
+        .where(eq(entityEdges.sourceEntityId, sourceEntityId))
+        .all();
     }
   });
 

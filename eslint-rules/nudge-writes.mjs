@@ -38,8 +38,8 @@ function staticText(node) {
  *
  * @param tables       drizzle table identifiers whose every change must bump `seq` and nudge.
  *                     Siblings that cascade with the guarded row (`entityDescriptors`,
- *                     `entityLinks`, `worldLinks`) carry no freshness key and are open — a change
- *                     to them rides its owner's `seq` bump.
+ *                     `entityEdges`, `entityLinks`, `worldLinks`) carry no freshness key and are
+ *                     open — a change to them rides its owner's `seq` bump.
  * @param sqlTables    the same tables as raw SQL names. Raw SQL escapes the drizzle selector
  *                     entirely (`db.$client.prepare(...)`), and the codebase reaches for it.
  * @param ownerFile    the module that *is* the write handle, identified by path so the exemption

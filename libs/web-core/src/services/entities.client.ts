@@ -13,6 +13,7 @@ import {
   EntityListQuery,
   EntityNudge,
   EntityPage,
+  EntityReferences,
   EntitySaveOutcome,
   EntityType,
   GrantRole,
@@ -172,6 +173,15 @@ export class EntitiesClient {
   // self-echo, and fans the fresh detail to any other watcher.
   load(id: string): Observable<EntityDetail> {
     return this.read(id).pipe(tap((d) => this.store.merge(d)));
+  }
+
+  /**
+   * Both directions of one Entity's links, off the derived edge index (ADR-0046). Resolved for the
+   * caller: an inbound edge whose source they may not read is already absent, and an outbound
+   * target they may not read arrives with `target: null` — the dangling case.
+   */
+  references(id: string): Observable<EntityReferences> {
+    return this.http.get<EntityReferences>(`/api/entities/${id}/references`);
   }
 
   // Owner's Link Descriptor vocabulary — DISTINCT, last-saved state.
