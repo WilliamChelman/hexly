@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { ActiveWorld } from '@hexly/web-core';
+import { ActiveWorld, worldDashboardRoute } from '@hexly/web-core';
 import { WorldDetail, WorldVerb } from '@hexly/domain';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { NavRailStore } from '../../shell/nav-rail.store';
@@ -35,12 +35,22 @@ describe('WorldLayout', () => {
     return TestBed.inject(NavRailStore).entries();
   }
 
-  it('fills the rail with the Library link from the active World (ADR-0041)', () => {
-    expect(railFor(world(['read'])).map((e) => e.testid)).toEqual(['nav-entities']);
+  it('fills the rail with the Dashboard and Library links from the active World (ADR-0041)', () => {
+    expect(railFor(world(['read'])).map((e) => e.testid)).toEqual([
+      'nav-dashboard',
+      'nav-entities',
+    ]);
+  });
+
+  it('matches the Dashboard link exactly, so it does not stay lit across the World scope', () => {
+    const dashboard = railFor(world(['read']))[0];
+    expect(dashboard.link).toEqual(worldDashboardRoute('w1', 'Aldermoor'));
+    expect(dashboard.exact).toBe(true);
   });
 
   it('adds World Settings only when the caller may manage the World (ADR-0039)', () => {
     expect(railFor(world(['read', 'manage'])).map((e) => e.testid)).toEqual([
+      'nav-dashboard',
       'nav-entities',
       'nav-world-settings',
     ]);

@@ -339,6 +339,7 @@
   "nav": {
     "primary": "Navigation principale",
     "worlds": "Mondes",
+    "dashboard": "Tableau de bord",
     "library": "Bibliothèque",
     "styleguide": "Guide de style",
     "expand": "Déployer la navigation",

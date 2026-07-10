@@ -6,7 +6,12 @@ import {
   inject,
 } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { ActiveWorld, worldRoute, worldSettingsRoute } from '@hexly/web-core';
+import {
+  ActiveWorld,
+  worldDashboardRoute,
+  worldRoute,
+  worldSettingsRoute,
+} from '@hexly/web-core';
 import { NavRailStore } from '../../shell/nav-rail.store';
 
 /**
@@ -35,9 +40,28 @@ export class WorldLayout {
       // World Settings shows only to a caller who may manage the World (ADR-0039).
       const canManage = !!activeWorld.world()?.rights?.includes('manage');
       rail.entries.set([
-        { link: worldRoute(worldId, name), testid: 'nav-entities', icon: 'library', labelKey: 'nav.library' },
+        {
+          link: worldDashboardRoute(worldId, name),
+          testid: 'nav-dashboard',
+          icon: 'dashboard',
+          labelKey: 'nav.dashboard',
+          exact: true,
+        },
+        {
+          link: worldRoute(worldId, name),
+          testid: 'nav-entities',
+          icon: 'library',
+          labelKey: 'nav.library',
+        },
         ...(canManage
-          ? [{ link: worldSettingsRoute(worldId, name), testid: 'nav-world-settings', icon: 'settings' as const, labelKey: 'nav.worldSettings' }]
+          ? [
+              {
+                link: worldSettingsRoute(worldId, name),
+                testid: 'nav-world-settings',
+                icon: 'settings' as const,
+                labelKey: 'nav.worldSettings',
+              },
+            ]
           : []),
       ]);
     });

@@ -9,6 +9,7 @@ import { DomSanitizer } from '@angular/platform-browser';
 import {
   type LucideIconData,
   LucideChevronsRight,
+  LucideLayoutDashboard,
   LucideX,
   LucideEllipsisVertical,
   LucideListTree,
@@ -92,6 +93,7 @@ const CUSTOM = {
 const LUCIDE: Record<string, LucideIconData> = {
   chevrons: LucideChevronsRight.icon,
   close: LucideX.icon,
+  dashboard: LucideLayoutDashboard.icon,
   more: LucideEllipsisVertical.icon,
   outline: LucideListTree.icon,
   erase: LucideEraser.icon,
