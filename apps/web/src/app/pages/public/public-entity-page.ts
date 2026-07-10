@@ -8,7 +8,7 @@ import { PublicClient, PublicEntityMode, AppShellStore, EVICTED } from '@hexly/w
 import { EntitySession } from '../entity/services/entity-session';
 import { EntityNameResolver, CONTENT_EDITOR_SESSION } from '@hexly/content-editor';
 import { PublicEntityNameResolver } from './public-entity-name-resolver';
-import { OutlineStore } from '../entity/services/outline-store';
+import { RIGHT_DOCK_PANELS } from '../entity/services/right-dock';
 import { EntityPage } from '../entity/entity.page';
 
 interface Followed {
@@ -33,7 +33,9 @@ interface Followed {
     EntitySession,
     { provide: CONTENT_EDITOR_SESSION, useExisting: EntitySession },
     { provide: EntityNameResolver, useClass: PublicEntityNameResolver },
-    OutlineStore,
+    // The dock offers the Outline alone: References would need `/entities/:id/references`, which
+    // answers an authenticated user, and this Entity's Public Link grants no scope beyond itself.
+    { provide: RIGHT_DOCK_PANELS, useValue: ['outline'] },
   ],
   imports: [TranslocoPipe, RouterLink, EntityPage],
   template: `

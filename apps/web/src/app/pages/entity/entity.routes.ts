@@ -2,9 +2,6 @@ import { Routes } from '@angular/router';
 import { EntityNameResolver, CONTENT_EDITOR_SESSION } from '@hexly/content-editor';
 import { flushOnLeave } from './flush-on-leave.guard';
 import { EntitySession } from './services/entity-session';
-import { OutlineStore } from './services/outline-store';
-import { ReferencesStore } from './services/references-store';
-import { RightDock } from './services/right-dock';
 
 /**
  * Lazy route config for `/w/:worldId/entities/:id`. Split out of app.routes so the
@@ -19,14 +16,12 @@ export const ENTITY_ROUTES: Routes = [
     // Await a pending autosave so in-app navigation never drops a debounced edit.
     canDeactivate: [flushOnLeave],
     // Route-scoped: one EntitySession per open Entity, destroyed on leave;
-    // EntityNameResolver's id→name cache resets with it.
+    // EntityNameResolver's id→name cache resets with it. The right dock's own stores are
+    // component-scoped on EntityPage, which is the only thing that shows them.
     providers: [
       EntitySession,
       { provide: CONTENT_EDITOR_SESSION, useExisting: EntitySession },
       EntityNameResolver,
-      RightDock,
-      OutlineStore,
-      ReferencesStore,
     ],
     // documentTitleKey composes the Entity name with the brand; `title` is the
     // pre-load fallback.

@@ -16,9 +16,6 @@ import { EntitiesClient, NudgeBusClient, ActiveWorld, TitleService, EVICTED, Wat
 import { MockEntitiesClient, MockNudgeBusClient, provideTranslocoTesting } from '@hexly/web-core/testing';
 import { EntitySession } from './services/entity-session';
 import { EntityNameResolver, CONTENT_EDITOR_SESSION } from '@hexly/content-editor';
-import { OutlineStore } from './services/outline-store';
-import { ReferencesStore } from './services/references-store';
-import { RightDock } from './services/right-dock';
 import { HexMapStore } from '@hexly/web-map';
 import { noteDetail } from './components/entity-detail.fixtures';
 import { EntityPage } from './entity.page';
@@ -91,9 +88,6 @@ describe('EntityPage routing', () => {
         EntitySession,
         { provide: CONTENT_EDITOR_SESSION, useExisting: EntitySession },
         EntityNameResolver,
-        RightDock,
-        OutlineStore,
-        ReferencesStore,
         { provide: EntitiesClient, useValue: entities },
         { provide: NudgeBusClient, useValue: bus },
         provideHttpClient(),
@@ -203,9 +197,6 @@ describe('EntityPage layout', () => {
         EntitySession,
         { provide: CONTENT_EDITOR_SESSION, useExisting: EntitySession },
         EntityNameResolver,
-        RightDock,
-        OutlineStore,
-        ReferencesStore,
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),

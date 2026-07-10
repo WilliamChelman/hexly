@@ -8,6 +8,8 @@ import { ActivatedRoute } from '@angular/router';
 import { TranslocoPipe, translateSignal } from '@jsverse/transloco';
 import { Observable, concat, ignoreElements, of } from 'rxjs';
 import { EntitySession } from './services/entity-session';
+import { OutlineStore } from './services/outline-store';
+import { ReferencesStore } from './services/references-store';
 import { RightDock } from './services/right-dock';
 import { EntityHeader } from './components/entity-header';
 import {
@@ -46,6 +48,12 @@ import { IconButton, Icon } from '@hexly/web-ui';
   selector: 'app-entity-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block h-full overflow-hidden' },
+  // The dock's own state, scoped to the page that shows it. Provided *here* rather than beside
+  // EntitySession on the route, because every context that mounts this component needs them and
+  // none overrides them: a Public Link page reuses EntityPage, and mirroring the route's provider
+  // list by hand is a contract nothing enforces (it silently broke the public page once, #179).
+  // The session-shaped providers stay with the mounting context, which does override them.
+  providers: [RightDock, OutlineStore, ReferencesStore],
   imports: [
     EntityHeader,
     ToolPalette,
@@ -145,18 +153,20 @@ import { IconButton, Icon } from '@hexly/web-ui';
                 >
                   <app-icon name="outline" [size]="20" />
                 </button>
-                <button
-                  appIconButton
-                  toggle
-                  class="pointer-events-auto"
-                  [active]="dock.panel() === 'references'"
-                  [title]="linksToggleLabel()"
-                  [attr.aria-label]="linksToggleLabel()"
-                  data-testid="references-toggle"
-                  (click)="dock.toggle('references')"
-                >
-                  <app-icon name="link" [size]="20" />
-                </button>
+                @if (dock.offers('references')) {
+                  <button
+                    appIconButton
+                    toggle
+                    class="pointer-events-auto"
+                    [active]="dock.panel() === 'references'"
+                    [title]="linksToggleLabel()"
+                    [attr.aria-label]="linksToggleLabel()"
+                    data-testid="references-toggle"
+                    (click)="dock.toggle('references')"
+                  >
+                    <app-icon name="link" [size]="20" />
+                  </button>
+                }
               </div>
             </div>
           }
