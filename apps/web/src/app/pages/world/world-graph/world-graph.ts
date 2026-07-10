@@ -15,7 +15,7 @@ import {
   WorldsClient,
 } from '@hexly/web-core';
 import { Eyebrow, PageHeader, Panel } from '@hexly/web-ui';
-import { GraphCanvas } from './graph-canvas';
+import { GraphCanvas, GraphOpen } from './graph-canvas';
 
 /**
  * The World Graph page at `/w/:worldId/graph` (#181): the World's readable Entities as nodes, their
@@ -88,13 +88,20 @@ export class WorldGraph {
     });
   }
 
-  /** A click on a node opens the Entity it draws — the graph is a way *into* the World. */
-  protected openEntity(entityId: string): void {
+  /**
+   * A click on a node opens the Entity it draws — the graph is a way *into* the World. A Ctrl/Cmd
+   * (or middle) click opens it in a new tab, matching how the same modifier behaves on any link.
+   */
+  protected openEntity({ id, newTab }: GraphOpen): void {
     const worldId = this.activeWorld.worldId();
     if (!worldId) return;
-    const name = this.graph()?.nodes.find((n) => n.id === entityId)?.name;
-    void this.router.navigate(
-      entityRoute(worldId, entityId, this.worldName() ?? undefined, name),
-    );
+    const name = this.graph()?.nodes.find((n) => n.id === id)?.name;
+    const route = entityRoute(worldId, id, this.worldName() ?? undefined, name);
+    if (newTab) {
+      const url = this.router.serializeUrl(this.router.createUrlTree(route));
+      window.open(url, '_blank', 'noopener');
+      return;
+    }
+    void this.router.navigate(route);
   }
 }

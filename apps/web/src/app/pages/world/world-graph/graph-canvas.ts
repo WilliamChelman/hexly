@@ -31,7 +31,11 @@ const SPACE = 4096;
  */
 const LINK_SPRING = 0.3;
 
-/** `onSimulationEnd` never fires with cosmos.gl's default decay, so settle is an alpha threshold. */
+/**
+ * "Readable" is an alpha threshold, crossed long before the simulation truly ends (`onSimulationEnd`
+ * fires at alpha < 1e-3, ~{@link SIMULATION_DECAY} frames further on). The re-fit fires here so the
+ * graph is framed the moment it's legible, not tens of seconds later once the layout has frozen.
+ */
 const SETTLED_ALPHA = 0.05;
 
 /**
@@ -52,6 +56,13 @@ const FIT_VIEW_DELAY_MS = 1200;
 
 /** How long the settle re-fit takes to glide the graph into frame. */
 const FIT_MS = 250;
+
+/**
+ * Reheat energy held on the simulation *throughout* a drag, so the moved Entity's neighbours follow
+ * in real time rather than snapping into place on release. Re-applied each `onDrag` frame — like
+ * d3's `alphaTarget` — then left to cool once the reader lets go.
+ */
+const REHEAT_ALPHA = 0.3;
 
 /** Read a design token, so the canvas follows the theme (ADR-0007's palette, not hardcoded hex). */
 function token(style: CSSStyleDeclaration, name: string, fallback: string): string {
@@ -131,6 +142,13 @@ interface Mounted {
  * The library is dynamically imported: it is ~168 kB gzip of WebGL that renders nothing
  * server-side, and nothing outside this page needs it.
  */
+/** A reader's click on a node: the Entity to open, and whether a modifier asked for a new tab. */
+export interface GraphOpen {
+  readonly id: string;
+  /** Ctrl/Cmd (or a middle-click) was held — open the Entity in a new tab, as a link would. */
+  readonly newTab: boolean;
+}
+
 @Component({
   selector: 'app-graph-canvas',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -149,7 +167,7 @@ interface Mounted {
 export class GraphCanvas {
   readonly graph = input.required<WorldGraph>();
   /** The Entity a reader clicked, for the page to navigate to. */
-  readonly open = output<string>();
+  readonly open = output<GraphOpen>();
 
   private readonly hostEl = viewChild.required<ElementRef<HTMLDivElement>>('host');
   private readonly overlayEl = viewChild.required<ElementRef<HTMLDivElement>>('overlay');
@@ -157,9 +175,19 @@ export class GraphCanvas {
   private readonly logger = inject(Logger);
 
   private mounted: Mounted | null = null;
+  /** The label loop's rAF id; `0` means it has parked itself, waiting on {@link wake} to restart. */
   private frame = 0;
-  /** Reused label spans — a graph at rest still repaints every frame, so never churn the DOM. */
+  /** Reused label spans — the loop repaints in place rather than churning the DOM every frame. */
   private labels: HTMLSpanElement[] = [];
+  /** A drag or pan/zoom is in flight: keep repainting even after the force simulation has cooled. */
+  private interacting = false;
+  /**
+   * The reader has taken the viewport — a user pan, zoom, or node drag. Once set, the settle re-fit
+   * is suppressed, so the camera never jumps out from under a reader already moving the controls.
+   */
+  private viewPinned = false;
+  /** Restart the parked label loop. Set by {@link paintLabels}; a no-op until the loop is mounted. */
+  private wake: () => void = () => {};
 
   constructor() {
     effect((onCleanup) => {
@@ -226,7 +254,8 @@ export class GraphCanvas {
       positions[i * 2] = SPACE / 2 + Math.cos(angle) * 500;
       positions[i * 2 + 1] = SPACE / 2 + Math.sin(angle) * 500;
       // Square-rooted, so a hub reads as bigger without a degree-109 Entity swallowing the view.
-      sizes[i] = 4 + Math.min(9, Math.sqrt(degrees[i]) * 2.2);
+      // The base is the click target: below ~8 units a leaf Entity is a speck that's hard to hit.
+      sizes[i] = 8 + Math.min(9, Math.sqrt(degrees[i]) * 2.2);
     }
 
     const cosmos = new Graph(host, {
@@ -244,7 +273,11 @@ export class GraphCanvas {
       // No `*SamplingDistance` here: cosmos.gl's sampled maps are unused. Their grid is anchored to
       // the *screen*, so a pan slides nodes across cell boundaries and re-elects every cell — the
       // labels flicker. `selectLabels` elects on a grid anchored in graph space instead.
-      onPointClick: (index) => this.open.emit(nodes[index].id),
+      onPointClick: (index, _position, event) =>
+        this.open.emit({
+          id: nodes[index].id,
+          newTab: event.ctrlKey || event.metaKey || event.button === 1,
+        }),
       // Focus mode, built in: everything outside the hovered Entity's neighbourhood greys out.
       onPointMouseOver: (index) =>
         cosmos.setConfigPartial({
@@ -256,16 +289,33 @@ export class GraphCanvas {
           highlightedPointIndices: undefined,
           focusedPointIndex: undefined,
         }),
+      // A pan/zoom shifts the projection and a drag moves the point; both need the label loop awake
+      // even when the force simulation is cold. The gesture holds `interacting`; `wake` restarts the
+      // loop if it had parked. Dragging also reheats the simulation, which re-drives the loop itself.
+      onZoomStart: (_event, userDriven) => {
+        // Only a real gesture pins the view; cosmos's own fit animations report `userDriven: false`.
+        if (userDriven) this.viewPinned = true;
+        this.startInteracting();
+      },
+      onZoomEnd: () => (this.interacting = false),
+      onDragStart: () => {
+        this.viewPinned = true;
+        this.startInteracting();
+      },
+      // Hold the simulation warm for the whole drag, so neighbours ease along with the moved point
+      // instead of jumping when it's released. Cooling resumes on its own once the drag ends.
+      onDrag: () => cosmos.start(REHEAT_ALPHA),
+      onDragEnd: () => (this.interacting = false),
       onSimulationTick: (alpha) => {
-        // Settle is an alpha threshold: `onSimulationEnd` never fires with cosmos.gl's decay
-        // (measured: not within 30 s even at n=100). It marks the layout as *readable*, not as
-        // finished — the points keep drifting, and a drag moves them again, which is why nothing
-        // about the label pass may key off this.
+        // This marks the layout as *readable*, not as finished: the simulation runs on until alpha
+        // crosses 1e-3 (`onSimulationEnd`), so the re-fit fires here, at a legible threshold, rather
+        // than tens of seconds later. The label loop tracks the points until that real end.
         if (alpha > SETTLED_ALPHA || fitted) return;
         fitted = true;
         // `fitViewOnInit` frames the *seed* ring, and the simulation then contracts the graph to a
-        // fraction of it — leaving a speck in the middle of an empty canvas. Re-fit once, on settle.
-        cosmos.fitView(FIT_MS);
+        // fraction of it — leaving a speck in the middle of an empty canvas. Re-fit once, on settle —
+        // but never once the reader has grabbed the viewport, or the camera jumps out from under them.
+        if (!this.viewPinned) cosmos.fitView(FIT_MS);
         host.dataset['settled'] = 'true'; // A hook for tests waiting on the layout.
       },
     });
@@ -281,15 +331,15 @@ export class GraphCanvas {
   }
 
   /**
-   * The label pass, run every frame. `selectLabels` decides *which* Entities and Link Descriptors
-   * are labelled — on a grid anchored in graph space, so panning never changes the set — and this
-   * only projects the winners to the screen and writes the DOM.
+   * The label pass. `selectLabels` decides *which* Entities and Link Descriptors are labelled — on a
+   * grid anchored in graph space, so panning never changes the set — and this only projects the
+   * winners to the screen and writes the DOM.
    *
-   * `positions` is the array the graph was seeded with, re-read from the GPU while the simulation
-   * owns the points. It must not be keyed off "settled": settling only means the layout has cooled
-   * enough to read, not that it has stopped. cosmos.gl's simulation never ends on its own — the
-   * points keep drifting, and dragging one moves it — so a label that stopped re-reading would
-   * silently detach from the node it names.
+   * Render-on-demand: the loop repaints only while something still moves the labels — the force
+   * simulation is running (`cosmos.isSimulationRunning`), or a drag/pan is in flight
+   * ({@link interacting}). When both go quiet it parks itself ({@link frame} = 0), so a settled graph
+   * costs nothing per frame. {@link wake} restarts it when the reader next interacts, and a drag
+   * reheats the simulation — which brings `isSimulationRunning` back true and re-drives the loop.
    *
    * Only ever called on a live mount, past the effect's stale check — the loop it starts owns
    * {@link frame} until {@link teardown} cancels it.
@@ -319,7 +369,6 @@ export class GraphCanvas {
     };
 
     const tick = () => {
-      this.frame = requestAnimationFrame(tick);
       let used = 0;
 
       const place = (text: string, x: number, y: number, angle: number | null) => {
@@ -346,10 +395,10 @@ export class GraphCanvas {
         used++;
       };
 
-      // Unconditional, and it has to be. cosmos.gl owns the points and moves them from two places:
-      // its own forces, and a reader dragging one. No flag it exposes marks them as static —
-      // `isSimulationRunning` goes false while a drag is still moving points — so any attempt to
-      // skip this read leaves labels stranded where their node used to be.
+      // Re-read the GPU's positions while anything still moves them — the simulation's forces, or a
+      // reader dragging a point. `isSimulationRunning` goes false mid-drag, which is why the loop
+      // also stays awake on `interacting`; skipping this read would strand labels where a node used
+      // to be. Once both are quiet the loop parks below and stops reading entirely.
       positions.set(cosmos.getPointPositions());
 
       const selection = selectLabels(payload, positions, currentView(), LABEL_GRID);
@@ -368,13 +417,31 @@ export class GraphCanvas {
       }
 
       for (let i = used; i < this.labels.length; i++) this.labels[i].style.display = 'none';
+
+      // Keep going only while there is motion to track; otherwise park and wait for `wake`.
+      this.frame =
+        cosmos.isSimulationRunning || this.interacting ? requestAnimationFrame(tick) : 0;
+    };
+
+    // Restart the parked loop from an interaction handler, keeping at most one frame in flight.
+    this.wake = () => {
+      if (this.frame === 0) this.frame = requestAnimationFrame(tick);
     };
     this.frame = requestAnimationFrame(tick);
+  }
+
+  /** An interaction began: keep the label loop awake, restarting it if it had parked. */
+  private startInteracting(): void {
+    this.interacting = true;
+    this.wake();
   }
 
   private teardown(): void {
     cancelAnimationFrame(this.frame);
     this.frame = 0;
+    this.wake = () => {};
+    this.interacting = false;
+    this.viewPinned = false;
     this.labels = [];
     const overlay = this.overlayEl?.()?.nativeElement;
     if (overlay) overlay.textContent = '';
