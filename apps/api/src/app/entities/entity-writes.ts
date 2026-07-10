@@ -4,12 +4,13 @@ import {
   EntityBody,
   EntityEdge,
   GrantRole,
+  ReindexFailure,
   Visibility,
   descriptorsSchema,
   extractText,
   harvestEdges,
 } from '@hexly/domain';
-import { and, eq, inArray, ne, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, ne, sql } from 'drizzle-orm';
 import { EntityAccess, entityAccess, sharedVisibility } from '../acl/entity-access';
 import { DB, Db } from '../db/db';
 import {
@@ -48,6 +49,17 @@ const DESCRIPTOR_COLUMNS = 2;
 function* batched<T>(rows: readonly T[], columns: number): Generator<readonly T[]> {
   const size = Math.floor(MAX_BOUND_PARAMS / columns);
   for (let i = 0; i < rows.length; i += size) yield rows.slice(i, i + size);
+}
+
+/**
+ * What one page of {@link EntityWrites.reindexChunk} did. `reindexed + failures.length === walked`.
+ * A `null` cursor means the walk is exhausted — there is no further page to ask for.
+ */
+export interface ReindexChunk {
+  readonly walked: number;
+  readonly reindexed: number;
+  readonly failures: readonly ReindexFailure[];
+  readonly cursor: string | null;
 }
 
 /** Everything an insert needs. The import path pre-assigns `id` to resolve wikilinks before insert. */
@@ -261,6 +273,94 @@ export class EntityWrites {
         .where(inArray(entities.id, touched))
         .run();
     });
+  }
+
+  /**
+   * Recompute one page of Entities' document-derived state — the unit of the Superadmin Reindex
+   * (ADR-0046), driven to exhaustion by the job in `SuperadminService`. A **system write**, taking
+   * no `userId`: the Superadmin sits outside the collaboration model, so there is no per-Entity
+   * Right that could refuse it and no membership to scope the walk by.
+   *
+   * It names none of the derivations it rebuilds, and must not: it re-runs {@link derive} and
+   * {@link replaceDerived}, which is what makes it the general tool for applying *any* future
+   * document-derivation retroactively. A derivation added there is backfilled by this method for
+   * free. Population by recomputation, not by backfill migration — the document is the source of
+   * truth and the derived tables are a cache of it, so this is idempotent by construction: the
+   * writes are wholesale replaces, and running a chunk twice is running it once.
+   *
+   * **A chunk, not the instance.** `better-sqlite3` is synchronous, so a walk of every Entity in
+   * one transaction pins the event loop for its whole duration and no other request is served.
+   * The page is the seam the caller yields on. It also bounds the transaction: the walk commits
+   * as it goes, so a crash leaves the instance *partly* reindexed — harmless, because the next
+   * press starts over and recomputation is idempotent.
+   *
+   * **A bad document skips, it does not abort.** {@link derive} runs *outside* the transaction —
+   * it is pure, and it is the only step that can throw on data (a document this build cannot
+   * parse). Its failures are collected per Entity and only the successes are written, so one
+   * corrupt row cannot deny the repair to every other Entity in the instance. Errors from the
+   * write itself are not caught: those are faults, and they roll the chunk back.
+   *
+   * Ordered by `id` and resumed from `after`, so the page is stable under concurrent inserts. An
+   * Entity created mid-walk is already derived by {@link insert}; reaching it again is a no-op.
+   *
+   * The one write here that lands without a nudge *and* without a `seq` bump. Every column it
+   * touches is derived: `contentText` (whose `entities_fts` mirror follows via sync triggers),
+   * and the two index tables. Clients *do* read all three — `entity_edges` backs
+   * References / Referenced by, the FTS mirror backs search, the descriptors back the `::`
+   * vocabulary — so the exemption rests on *when* this runs, not on the rows being unread.
+   *
+   * Recomputation from an unchanged document is a no-op: on any build whose derivations have not
+   * moved, reindex writes back exactly what it read. It yields new derived state only just after
+   * a deploy adds a derivation, and the stale window then closes on the reader's next navigation
+   * or reload — the same freshness ceiling ADR-0046 already accepts for *Referenced by*, which no
+   * `seq` of this Entity's tracks anyway. Bumping `seq` across the instance to shave that window
+   * would nudge every open document to announce that nothing about it changed.
+   */
+  reindexChunk(after: string | null, limit: number): ReindexChunk {
+    const rows = this.db
+      .select({ id: entities.id, worldId: entities.worldId, document: entities.document })
+      .from(entities)
+      .where(after === null ? undefined : gt(entities.id, after))
+      .orderBy(asc(entities.id))
+      .limit(limit)
+      .all();
+    if (rows.length === 0) return { walked: 0, reindexed: 0, failures: [], cursor: null };
+
+    // Derive first, outside the transaction: pure, and the only step a bad document can throw in.
+    const failures: ReindexFailure[] = [];
+    const derived: { row: (typeof rows)[number]; derived: Derived }[] = [];
+    for (const row of rows) {
+      try {
+        derived.push({ row, derived: this.derive(JSON.parse(row.document) as EntityBody) });
+      } catch (err) {
+        failures.push({
+          entityId: row.id,
+          worldId: row.worldId,
+          reason: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    // A page whose every document was unreadable has nothing to write, and opens no transaction.
+    if (derived.length > 0)
+      this.transact(() => {
+        for (const { row, derived: d } of derived) {
+          this.db
+            .update(entities)
+            .set({ contentText: d.contentText })
+            .where(eq(entities.id, row.id))
+            .run();
+          this.replaceDerived(row.id, row.worldId, d);
+        }
+      });
+
+    return {
+      walked: rows.length,
+      reindexed: derived.length,
+      failures,
+      // A short page is the last page; a full one may not be, so the next call settles it.
+      cursor: rows.length < limit ? null : rows[rows.length - 1].id,
+    };
   }
 
   /**

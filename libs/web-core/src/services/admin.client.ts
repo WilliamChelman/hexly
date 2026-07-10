@@ -1,13 +1,14 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { AdminUser, CreateUserRequest } from '@hexly/domain';
+import { AdminUser, CreateUserRequest, ReindexJob } from '@hexly/domain';
 
 /**
  * HTTP client for the Instance Admin surface (ADR-0037, #163): account management.
  * Stateless — the admin panel reads {@link list} and issues the mutations. Unlike the
  * public {@link UsersClient} directory, these rows carry the email (an Admin concern).
- * The Superadmin-only toggle lives here too; the server refuses it for a plain Admin.
+ * The Superadmin-only calls live here too — one page, one client — even though they hit
+ * a different surface on the server; it refuses them for a plain Admin.
  */
 @Injectable({ providedIn: 'root' })
 export class AdminClient {
@@ -46,5 +47,19 @@ export class AdminClient {
 
   deleteUser(id: string): Observable<void> {
     return this.http.delete<void>(`/api/admin/users/${id}`);
+  }
+
+  /**
+   * Start recomputing every Entity's document-derived state (ADR-0046). A Superadmin repair
+   * action, so it lands on the `superadmin` surface rather than `admin` — the Admin tier reaches
+   * no Entity. Returns at once with the job `running`; follow it with {@link reindexStatus}.
+   */
+  reindex(): Observable<ReindexJob> {
+    return this.http.post<ReindexJob>('/api/superadmin/reindex', {});
+  }
+
+  /** Where the instance's Reindex stands — polled while it runs, readable before it ever ran. */
+  reindexStatus(): Observable<ReindexJob> {
+    return this.http.get<ReindexJob>('/api/superadmin/reindex');
   }
 }

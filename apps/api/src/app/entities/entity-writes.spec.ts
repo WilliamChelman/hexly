@@ -1,4 +1,10 @@
-import { emptyContent, emptyEntityBody, tiptapContent } from '@hexly/domain';
+import {
+  EntityBody,
+  ReindexFailure,
+  emptyContent,
+  emptyEntityBody,
+  tiptapContent,
+} from '@hexly/domain';
 import { eq } from 'drizzle-orm';
 import { createDb, Db } from '../db/db';
 import {
@@ -272,6 +278,184 @@ describe('EntityWrites', () => {
       expect(edgesOf('Bumped')).toEqual([
         { worldId: WORLD, targetKind: 'entity', targetId: 'e2', descriptor: 'spouse' },
       ]);
+    });
+
+    /**
+     * The Superadmin Reindex (ADR-0046, #180). The derived tables are a cache of the document, so
+     * they can always be thrown away and recomputed — which is how the Entities that predate a
+     * derivation gain it, no backfill migration involved.
+     */
+    describe('reindexChunk', () => {
+      /**
+       * Drive the pages to exhaustion, exactly as `SuperadminService`'s job loop does. The unit
+       * under test is one chunk; every assertion below about *the instance* is about this loop
+       * over it, so the loop belongs here rather than being mocked away.
+       */
+      function reindexAll(limit = 100) {
+        let cursor: string | null = null;
+        const walk = { walked: 0, reindexed: 0, failures: [] as ReindexFailure[], chunks: 0 };
+        for (;;) {
+          const chunk = writes.reindexChunk(cursor, limit);
+          walk.walked += chunk.walked;
+          walk.reindexed += chunk.reindexed;
+          walk.failures.push(...chunk.failures);
+          walk.chunks++;
+          if (chunk.cursor === null) return walk;
+          cursor = chunk.cursor;
+        }
+      }
+
+      it('rebuilds an unindexed Entity’s edges, descriptors, and search text from its document', () => {
+        seedUnindexed('ealdred', WORLD, { type: 'note', content: CONTENT });
+
+        reindexAll();
+
+        expect(edgesFrom('ealdred')).toEqual([
+          { worldId: WORLD, targetKind: 'entity', targetId: 'e2', descriptor: 'spouse' },
+        ]);
+        expect(descriptorsOf('ealdred')).toEqual(['spouse']);
+        expect(rowOf('ealdred').contentText).toBe('Married to');
+      });
+
+      /**
+       * The one write in this class that lands without a nudge *and* without a `seq` bump — and
+       * the exemption is earned, not conceded. Clients do read the rows it rewrites; what saves it
+       * is that recomputing from an unchanged document writes back what it read. Reindex yields
+       * new derived state only just after a deploy adds a derivation, and that stale window closes
+       * on the reader's next navigation. Bumping `seq` on every Entity in the instance would fan a
+       * nudge out to every open document to announce that nothing about them changed.
+       */
+      it('rewrites the indexes silently: no seq bump, no nudge', () => {
+        seedUnindexed('ealdred', WORLD, { type: 'note', content: CONTENT });
+
+        reindexAll();
+
+        expect(emitted).toEqual([]);
+        expect(rowOf('ealdred').seq).toBe(1);
+        expect(rowOf(ENTITY).seq).toBe(1);
+      });
+
+      /**
+       * Safe to re-run, because the document is the source of truth and the write is a wholesale
+       * replace. This is what lets the button be the general tool for applying *any* future
+       * document-derivation retroactively: a Superadmin never has to ask whether it already ran.
+       */
+      it('is idempotent: a second run leaves the same rows and reports the same count', () => {
+        seedUnindexed('ealdred', WORLD, { type: 'note', content: CONTENT });
+
+        const first = reindexAll();
+        const afterFirst = { edges: edgesFrom('ealdred'), descriptors: descriptorsOf('ealdred') };
+        const second = reindexAll();
+
+        expect(second.walked).toBe(first.walked);
+        expect(second.reindexed).toBe(first.reindexed);
+        expect(edgesFrom('ealdred')).toEqual(afterFirst.edges);
+        expect(descriptorsOf('ealdred')).toEqual(afterFirst.descriptors);
+      });
+
+      /**
+       * Every Entity in every World, and the count says how many. The Superadmin sits outside the
+       * collaboration model, so there is no World to scope the walk to and no membership to filter
+       * it by — a World nobody has touched since the derivation shipped is exactly the one that
+       * needs it. `WORLD`'s own seeded `ENTITY` is walked too, hence three.
+       */
+      it('walks every Entity in every World, and counts them', () => {
+        const OTHER = 'world-2';
+        seedUser(BOB);
+        seedWorld(OTHER, BOB); // A World the reindex has no membership in, and reaches anyway.
+        seedUnindexed('ealdred', WORLD, { type: 'note', content: CONTENT });
+        seedUnindexed('elsewhere', OTHER, { type: 'note', content: CONTENT });
+
+        expect(reindexAll()).toMatchObject({ walked: 3, reindexed: 3, failures: [] });
+
+        expect(edgesFrom('elsewhere')).toEqual([
+          { worldId: OTHER, targetKind: 'entity', targetId: 'e2', descriptor: 'spouse' },
+        ]);
+      });
+
+      /**
+       * The walk is paged so the event loop can breathe between transactions — an instance-wide
+       * reindex in one synchronous transaction would serve no other request while it ran. A page
+       * of one proves the cursor advances: every Entity is reached, none twice.
+       */
+      it('pages through the instance, reaching every Entity exactly once', () => {
+        seedUnindexed('ealdred', WORLD, { type: 'note', content: CONTENT });
+        seedUnindexed('elsewhere', WORLD, { type: 'note', content: CONTENT });
+
+        // 3 Entities at a page apiece, plus the empty page that settles the exhausted cursor.
+        expect(reindexAll(1)).toMatchObject({ walked: 3, reindexed: 3, chunks: 4 });
+        expect(descriptorsOf('ealdred')).toEqual(['spouse']);
+        expect(descriptorsOf('elsewhere')).toEqual(['spouse']);
+      });
+
+      /** A short page is the last page — the walk ends without asking for one more. */
+      it('ends on a short page without an extra round trip', () => {
+        expect(writes.reindexChunk(null, 100)).toMatchObject({ walked: 1, cursor: null });
+      });
+
+      /** Nothing derived, nothing written — and the walk still advances past the page. */
+      it('walks on when a whole page is unreadable', () => {
+        db.delete(entities).run(); // Only the corrupt row remains.
+        seedCorrupt('broken', WORLD);
+
+        expect(writes.reindexChunk(null, 100)).toMatchObject({ walked: 1, reindexed: 0 });
+      });
+
+      /**
+       * The repair tool has to work on the instance that needs repairing. A document this build
+       * cannot parse is skipped and named, never allowed to roll back the Entities around it —
+       * otherwise one corrupt row denies every other Entity its derivation, and the button that
+       * exists to fix a damaged instance is exactly the button a damaged instance cannot press.
+       */
+      it('skips a document it cannot parse, reports it, and reindexes the rest', () => {
+        seedUnindexed('ealdred', WORLD, { type: 'note', content: CONTENT });
+        seedCorrupt('broken', WORLD);
+
+        const walk = reindexAll();
+
+        expect(walk).toMatchObject({ walked: 3, reindexed: 2 });
+        expect(walk.failures).toEqual([
+          { entityId: 'broken', worldId: WORLD, reason: expect.stringContaining('JSON') },
+        ]);
+        // Its neighbours in the very same chunk are indexed regardless.
+        expect(descriptorsOf('ealdred')).toEqual(['spouse']);
+        expect(rowOf('ealdred').contentText).toBe('Married to');
+      });
+
+      /**
+       * A row exactly as an instance that predates the derivation holds it: an authoritative
+       * document, and not one derived row to its name. Seeded raw, so the walk's behaviour is
+       * observed independently of `insert`'s — which would have derived them on the way in.
+       */
+      function seedUnindexed(id: string, worldId: string, body: EntityBody): void {
+        seedRaw(id, worldId, JSON.stringify(body), body.type);
+      }
+
+      /** An Entity whose stored document this build cannot read at all. */
+      function seedCorrupt(id: string, worldId: string): void {
+        seedRaw(id, worldId, '{ not json', 'note');
+      }
+
+      function seedRaw(id: string, worldId: string, document: string, type: string): void {
+        const now = Date.now();
+        db.insert(entities)
+          .values({
+            id,
+            worldId,
+            name: id,
+            type: type as EntityBody['type'],
+            tags: [],
+            visibility: 'private',
+            version: 1,
+            seq: 1,
+            document,
+            contentText: null,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .run();
+        db.insert(entityGrants).values({ entityId: id, userId: ADA, role: 'owner' }).run();
+      }
     });
 
     function idOf(name: string): string {

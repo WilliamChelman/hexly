@@ -571,6 +571,12 @@
       "heading": "Accounts",
       "empty": "No accounts."
     },
+    "reindex": {
+      "heading": "Repair",
+      "description": "Recompute every Entity's search text, Link Descriptors, and links from its content. Safe to run at any time.",
+      "submit": "Reindex all Entities",
+      "progress": "Reindexing… {{walked}} / {{total}}"
+    },
     "filter": "Filter accounts",
     "col": {
       "account": "Account",
@@ -609,6 +615,9 @@
       "saved": "Saved",
       "reset": "Password reset",
       "deleted": "User deleted",
+      "reindexed": "Reindexed {count, plural, one {# entity} other {# entities}}",
+      "reindexedWithFailures": "Reindexed {count, plural, one {# entity} other {# entities}}. {failed, plural, one {# entity} other {# entities}} could not be read and {failed, plural, one {was} other {were}} skipped.",
+      "reindexAborted": "The reindex stopped before it finished. Nothing was lost — press Reindex again to resume.",
       "error": "Something went wrong."
     },
     "error": {
@@ -619,7 +628,8 @@
       "self-disable": "You cannot disable your own account.",
       "self-admin-revoke": "You cannot remove your own Admin access.",
       "superadmin-managed-by-superadmin": "Only a Superadmin can manage a Superadmin account.",
-      "user-not-found": "That account no longer exists."
+      "user-not-found": "That account no longer exists.",
+      "reindex-running": "A reindex is already running on this instance."
     }
   }
 }

@@ -267,5 +267,5 @@ Operator-facing settings for one Instance, stored beside the database. Distinct 
 _Avoid_: Config, settings, preferences, environment
 
 **Reindex**:
-A Superadmin repair action that recomputes every Entity's document-derived state — its searchable text, Link Descriptor vocabulary, and link edges — from the authoritative Content and map, across all Worlds. Idempotent and safe to run anytime: the Entity's document is the source of truth, and the derived tables are a cache it rebuilds. A repair tool, not part of daily administration — which is why it is Superadmin's, not the Instance Admin's (whose tier reaches no Entity).
+A Superadmin repair action that recomputes every Entity's document-derived state — its searchable text, Link Descriptor vocabulary, and link edges — from the authoritative Content and map, across all Worlds. Idempotent and safe to run anytime: the Entity's document is the source of truth, and the derived tables are a cache it rebuilds. A repair tool, not part of daily administration — which is why it is Superadmin's, not the Instance Admin's (whose tier reaches no Entity). It runs as one instance-wide background job the operator polls, and a document this build cannot parse is skipped and reported rather than allowed to abort the walk.
 _Avoid_: Rebuild, refresh, recompute, sync

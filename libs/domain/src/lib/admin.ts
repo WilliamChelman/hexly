@@ -47,6 +47,8 @@ export const AdminErrorCode = {
   SuperadminManaged: 'superadmin-managed-by-superadmin',
   /** No such account. */
   UserNotFound: 'user-not-found',
+  /** A Reindex is already walking the instance — there is only ever one. */
+  ReindexRunning: 'reindex-running',
 } as const;
 
 /** One of the {@link AdminErrorCode} values — the wire code in an Admin error body. */
@@ -109,3 +111,51 @@ export const setSuperadminRequestSchema = z
 
 /** A validated Superadmin-flag toggle. */
 export type SetSuperadminRequest = z.infer<typeof setSuperadminRequestSchema>;
+
+/**
+ * One Entity the Reindex walked but could not derive — a document this build cannot parse. The
+ * walk skips it and carries on, so a single unreadable document cannot deny the repair tool to
+ * the instance that most needs it. The Superadmin gets the ids back precisely because a skipped
+ * Entity is the one thing the operator must go look at by hand.
+ */
+export interface ReindexFailure {
+  readonly entityId: string;
+  readonly worldId: string;
+  /** The thrown error's message, surfaced verbatim — it names what about the document broke. */
+  readonly reason: string;
+}
+
+/**
+ * Where the instance's one Reindex job stands. `idle` is the state before any run this process
+ * has seen; `succeeded` means the walk finished, even if it skipped documents (see
+ * {@link ReindexJob.failures}). `failed` is reserved for a walk that *aborted* — a database
+ * error, never a bad document.
+ */
+export type ReindexStatus = 'idle' | 'running' | 'succeeded' | 'failed';
+
+/**
+ * The instance's Reindex job (ADR-0046) — the Superadmin repair action that recomputes every
+ * Entity's document-derived state. `POST /superadmin/reindex` starts it and returns this
+ * immediately; `GET /superadmin/reindex` polls it. There is only ever one: the walk is
+ * instance-wide, so a second concurrent run would contend with the first and discover nothing.
+ *
+ * `walked` counts Entities read, not Entities changed: the write is a wholesale replace with
+ * nothing to diff against, and a re-run reporting the same numbers is the reassurance that it is
+ * safe to press twice. `reindexed + failures.length === walked`.
+ *
+ * Job state lives in the API process, not the database, so a restart forgets it. That is sound
+ * because the *work* is committed chunk by chunk and the walk is idempotent: whatever a lost job
+ * finished stays finished, and pressing the button again resumes the repair from a clean slate.
+ */
+export interface ReindexJob {
+  readonly status: ReindexStatus;
+  /** Entities in the instance when the walk started — the denominator for progress. */
+  readonly total: number;
+  readonly walked: number;
+  readonly reindexed: number;
+  readonly failures: readonly ReindexFailure[];
+  readonly startedAt: number | null;
+  readonly finishedAt: number | null;
+  /** Set only when `status === 'failed'`: why the walk aborted. */
+  readonly error: string | null;
+}
