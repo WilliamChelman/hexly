@@ -9,6 +9,7 @@ import { RouterOutlet } from '@angular/router';
 import {
   ActiveWorld,
   worldDashboardRoute,
+  worldGraphRoute,
   worldRoute,
   worldSettingsRoute,
 } from '@hexly/web-core';
@@ -52,6 +53,13 @@ export class WorldLayout {
           testid: 'nav-entities',
           icon: 'library',
           labelKey: 'nav.library',
+        },
+        // The World Graph is a read of the World, so every reader gets it — no rights gate.
+        {
+          link: worldGraphRoute(worldId, name),
+          testid: 'nav-world-graph',
+          icon: 'graph',
+          labelKey: 'nav.graph',
         },
         ...(canManage
           ? [

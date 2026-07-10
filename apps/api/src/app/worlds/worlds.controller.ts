@@ -26,6 +26,7 @@ import {
   setMemberRoleRequestSchema,
   updateWorldRequestSchema,
   WorldDetail,
+  WorldGraph,
   WorldMember,
   WorldSummary,
 } from '@hexly/domain';
@@ -36,6 +37,7 @@ import { CanCreateWorldsGuard } from './can-create-worlds.guard';
 import { aclSetResponse, ownerSetResponse } from '../acl/owner-set';
 import { VaultExportService } from './vault-export.service';
 import { VaultImportService } from './vault-import.service';
+import { WorldGraphService } from './world-graph.service';
 import { WorldsService } from './worlds.service';
 
 /** The subset of multer's uploaded-file shape this controller uses (no @types/multer dep). */
@@ -58,6 +60,7 @@ export class WorldsController {
     private readonly worlds: WorldsService,
     private readonly importer: VaultImportService,
     private readonly exporter: VaultExportService,
+    private readonly graphs: WorldGraphService,
   ) {}
 
   @Get()
@@ -123,6 +126,23 @@ export class WorldsController {
         `filename*=UTF-8''${encodeURIComponent(result.filename)}`,
     );
     res.send(result.zip);
+  }
+
+  /**
+   * The World Graph (ADR-0046, #181): the World's readable Entities as nodes, their Entity Links
+   * as edges. Reachable to anyone who can reach the World — the Entity-level filter inside decides
+   * what they actually see, so a World Viewer gets a graph of the `shared` Entities alone.
+   *
+   * ponytail: one unbounded full-World payload, no windowing — a human-authored World sits in the
+   * low thousands of nodes and a client force-graph handles that. The upgrade path, when one
+   * doesn't: a node cap here, and a single-Entity-neighbourhood mode (`?focus=<entityId>&depth=n`)
+   * that ships the subgraph around one Entity instead of the whole World.
+   */
+  @Get(':id/graph')
+  graph(@CurrentUser() user: AuthUser, @Param('id') id: string): WorldGraph {
+    const graph = this.graphs.graph(user.id, id);
+    if (!graph) throw new NotFoundException();
+    return graph;
   }
 
   // A partial update of the Owner-curated fields: `name` (rename) and/or `pinnedEntityIds`

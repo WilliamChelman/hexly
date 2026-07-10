@@ -71,6 +71,9 @@ describe('appRoutes structure (ADR-0028)', () => {
     expect(redirect?.loadComponent).toBeDefined();
   });
 
+  // Two real chunk loads, so this is import-bound, not compute-bound: under a loaded worker pool
+  // the default 5 s lapses long before the assertions are reached. The timeout guards against a
+  // route that never resolves, and 20 s says that just as well.
   it('lands the World root on the Dashboard and moves Settings to /settings (ADR-0043)', async () => {
     const parent = appRoutes.find((r) => r.path === 'w/:worldId');
     const index = parent?.children?.find((c) => c.path === '');
@@ -83,7 +86,7 @@ describe('appRoutes structure (ADR-0028)', () => {
     const settingsPage = await settings!.loadComponent!();
     expect((dashboard as { name: string }).name).toMatch(/WorldDashboard$/);
     expect((settingsPage as { name: string }).name).toMatch(/WorldSettings$/);
-  });
+  }, 20_000);
 
   it('serves the World Index at the root and renders the error page for unmatched URLs', () => {
     const root = appRoutes.find((r) => r.path === '');

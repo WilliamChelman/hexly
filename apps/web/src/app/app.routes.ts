@@ -70,6 +70,15 @@ export const appRoutes: Route[] = [
         title: 'entityBrowser.tabTitle',
       },
       {
+        // The World Graph (#181). Lazy on its own chunk: cosmos.gl is ~168 kB gzip
+        // of WebGL that nothing outside this page needs.
+        path: 'graph',
+        pathMatch: 'full',
+        loadComponent: () =>
+          import('./pages/world/world-graph/world-graph').then((m) => m.WorldGraph),
+        title: 'worldGraph.tabTitle',
+      },
+      {
         path: 'entities/:id',
         // Reconcile a stale/hand-edited World segment against the Entity's real
         // world_id, redirecting to the correct World on mismatch. Stays here (not

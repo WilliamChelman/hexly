@@ -349,6 +349,7 @@
     "worlds": "Mondes",
     "dashboard": "Tableau de bord",
     "library": "Bibliothèque",
+    "graph": "Graphe",
     "styleguide": "Guide de style",
     "expand": "Déployer la navigation",
     "collapse": "Réduire la navigation",
@@ -431,6 +432,14 @@
     "browseAll": "Parcourir toutes les entités",
     "emptyTitle": "Votre monde est une carte vierge.",
     "emptyHint": "Créez votre première note ou carte hexagonale pour commencer."
+  },
+  "worldGraph": {
+      "tabTitle": "Hexly — Graphe",
+      "eyebrow": "Graphe du monde",
+      "counts": "{{nodes}} entités · {{edges}} liens",
+      "emptyTitle": "Rien à dessiner pour l'instant.",
+      "emptyHint": "Créez quelques entités et reliez-les pour voir la forme de votre monde.",
+      "loadError": "Impossible de charger le graphe. Réessayez."
   },
   "entitySearchPicker": {
     "searchPlaceholder": "Rechercher des entités…",

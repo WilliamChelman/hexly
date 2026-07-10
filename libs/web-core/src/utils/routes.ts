@@ -30,6 +30,14 @@ export function worldSettingsRoute(worldId: string, worldName?: string): string[
   return ['/w', segment(worldId, worldName), 'settings'];
 }
 
+/**
+ * The World Graph `/w/:worldId/graph` (#181) — the node-link view of the World's Entities,
+ * sibling to the Dashboard and the Entity browser. Pretty-segment like the others.
+ */
+export function worldGraphRoute(worldId: string, worldName?: string): string[] {
+  return ['/w', segment(worldId, worldName), 'graph'];
+}
+
 export function entityRoute(
   worldId: string,
   entityId: string,

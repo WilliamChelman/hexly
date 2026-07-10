@@ -34,6 +34,7 @@ import {
   LucideDownload,
   LucideUser,
   LucideGlobe,
+  LucideWaypoints,
 } from '@lucide/angular';
 import { featureLibrary } from '@hexly/domain';
 import { IconHost } from './icon-host';
@@ -100,6 +101,7 @@ const LUCIDE: Record<string, LucideIconData> = {
   link: LucideLink2.icon,
   erase: LucideEraser.icon,
   fit: LucideMaximize.icon,
+  graph: LucideWaypoints.icon,
   label: LucideType.icon,
   library: LucideLibrary.icon,
   palette: LucidePalette.icon,

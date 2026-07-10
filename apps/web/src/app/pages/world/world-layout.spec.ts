@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { ActiveWorld, worldDashboardRoute } from '@hexly/web-core';
+import { ActiveWorld, worldDashboardRoute, worldGraphRoute } from '@hexly/web-core';
 import { WorldDetail, WorldVerb } from '@hexly/domain';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { NavRailStore } from '../../shell/nav-rail.store';
@@ -35,11 +35,18 @@ describe('WorldLayout', () => {
     return TestBed.inject(NavRailStore).entries();
   }
 
-  it('fills the rail with the Dashboard and Library links from the active World (ADR-0041)', () => {
+  it('fills the rail with the Dashboard, Library and Graph links from the active World (ADR-0041)', () => {
     expect(railFor(world(['read'])).map((e) => e.testid)).toEqual([
       'nav-dashboard',
       'nav-entities',
+      'nav-world-graph',
     ]);
+  });
+
+  /** The World Graph is a read of the World, so it shows to anyone who can reach it (#181). */
+  it('links the World Graph with the canonical slug-base62 route (ADR-0042)', () => {
+    const graph = railFor(world(['read']))[2];
+    expect(graph.link).toEqual(worldGraphRoute('w1', 'Aldermoor'));
   });
 
   it('matches the Dashboard link exactly, so it does not stay lit across the World scope', () => {
@@ -52,6 +59,7 @@ describe('WorldLayout', () => {
     expect(railFor(world(['read', 'manage'])).map((e) => e.testid)).toEqual([
       'nav-dashboard',
       'nav-entities',
+      'nav-world-graph',
       'nav-world-settings',
     ]);
   });
