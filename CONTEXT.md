@@ -104,6 +104,10 @@ _Avoid_: World home, world library, world picker
 The compact in-app control at the nav-rail masthead for hopping to another reachable World without returning to the World Index. Pure navigation — it shows the current World and switches the URL scope; it does not manage Worlds. Shown only inside a World; on the World Index the Index itself is the chooser, so the Switcher is absent.
 _Avoid_: World selector, world dropdown
 
+**World Graph**:
+A per-World view of its Entities as nodes and their Entity Links as edges — the node-link picture of how a World's Entities connect. Entity-only (Assets are never nodes) and access-filtered per viewer: an Entity appears only if the viewer can read it, and an edge only when the viewer can read *both* endpoints — so it never reveals a `private` Entity. Orphan Entities (no links) still appear, as isolated nodes. A derived, read-only view — sibling to the World Dashboard and Entity Browser.
+_Avoid_: web, network, mind map, relationship map, world map (collides with Hex Map)
+
 **World Owner**:
 A user holding full control of a World: membership, roles, the public link, World rename/delete, and full control (edit, delete, change visibility) over every `shared` Entity in the World. No special access to others' `private` Entities. Ownership is a symmetric set — one or more Owners, all equal, any Owner may add or remove other Owners; the creator holds no special status after creation. Invariant: at least one Owner (the last cannot be removed or resign).
 _Avoid_: Admin, GM (user vocabulary, not system vocabulary), co-owner (an Owner is an Owner)
@@ -261,3 +265,7 @@ _Avoid_: Root, god mode, owner
 **Instance Configuration**:
 Operator-facing settings for one Instance, stored beside the database. Distinct from per-User or per-World settings, which live in the database.
 _Avoid_: Config, settings, preferences, environment
+
+**Reindex**:
+A Superadmin repair action that recomputes every Entity's document-derived state — its searchable text, Link Descriptor vocabulary, and link edges — from the authoritative Content and map, across all Worlds. Idempotent and safe to run anytime: the Entity's document is the source of truth, and the derived tables are a cache it rebuilds. A repair tool, not part of daily administration — which is why it is Superadmin's, not the Instance Admin's (whose tier reaches no Entity).
+_Avoid_: Rebuild, refresh, recompute, sync
