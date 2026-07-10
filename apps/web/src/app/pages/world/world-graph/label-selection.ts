@@ -40,7 +40,7 @@ export function selectLabels(
   grid: LabelGrid,
 ): LabelSelection {
   const { degrees } = payload;
-  const cell = grid.pointCell / view.scale;
+  const cell = grid.pointCell / quantizeScale(view.scale);
 
   // Elect one winner per space cell, over *every* node — not just the visible ones, so a node
   // scrolling into view arrives already holding (or already having lost) its cell.
@@ -74,7 +74,7 @@ function selectLinks(
   grid: LabelGrid,
 ): number[] {
   const { degrees, links, descriptors } = payload;
-  const cell = grid.linkCell / view.scale;
+  const cell = grid.linkCell / quantizeScale(view.scale);
 
   const winners = new Map<string, number>();
   const weights = new Map<number, number>();
@@ -100,6 +100,25 @@ function selectLinks(
     .filter((link) => visible(...(midpoints.get(link) as [number, number]), view))
     .sort((a, b) => (weights.get(b) as number) - (weights.get(a) as number) || a - b)
     .slice(0, grid.max);
+}
+
+/**
+ * Half-octave steps: the grid's cell size changes only when zoom crosses a factor of √2, so a slow
+ * zoom holds a fixed label set between thresholds instead of restocking on every frame. Fine enough
+ * that a step never doubles the on-screen density, coarse enough to kill the flicker.
+ */
+const ZOOM_STEP = Math.SQRT2;
+
+/**
+ * Snap the live zoom to {@link ZOOM_STEP} before it sizes the grid cells. The cell is `pointCell /
+ * scale`, so a continuously-varying scale continuously reshapes the graph-space grid — every node
+ * drifts across cell boundaries as you zoom, winners flip, and labels blink in and out for no
+ * reason a reader can see. Quantizing pins the grid between thresholds: the elected set changes
+ * only at a deliberate step, never mid-pinch.
+ */
+function quantizeScale(scale: number): number {
+  if (!(scale > 0)) return 1;
+  return ZOOM_STEP ** Math.round(Math.log(scale) / Math.log(ZOOM_STEP));
 }
 
 /** Higher degree wins; an index tiebreak keeps the choice stable across frames. */

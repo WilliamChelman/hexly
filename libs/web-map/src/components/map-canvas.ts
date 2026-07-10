@@ -26,7 +26,12 @@ import {
   rectFromCorners,
   regionById,
 } from '@hexly/domain';
-import { ThemeService, ToasterService } from '@hexly/web-core';
+import {
+  ThemeService,
+  ToasterService,
+  isTrackpadWheel,
+  wheelDeltaPixels,
+} from '@hexly/web-core';
 import { terrainKey } from '../utils/catalog-keys';
 import { HexMapStore, SelectMode } from '../services/hexmap-store';
 import { toolForHotkey } from './tools';
@@ -49,10 +54,6 @@ const ZOOM_STEP = 1.15;
  */
 const ZOOM_SENSITIVITY_TOUCHPAD = 0.006;
 const ZOOM_SENSITIVITY_MOUSE = 0.002;
-/** Above this per-event |deltaY| (px), a wheel looks like a coarse mouse notch. */
-const MOUSE_NOTCH_THRESHOLD = 40;
-/** Pixels assumed per line, to normalise non-pixel wheel deltas. */
-const LINE_HEIGHT = 16;
 /** The placeholder text a freshly-dropped Label carries until it is edited. */
 const NEW_LABEL_TEXT = 'Label';
 /** Screen-pixel travel a press must exceed to count as a drag rather than a click. */
@@ -793,57 +794,23 @@ export class MapCanvas {
     event.preventDefault();
     // A trackpad pinch arrives as a wheel event with ctrlKey set; Ctrl/Cmd+wheel
     // zooms about the cursor, plain scroll pans both axes.
+    const el = event.currentTarget as HTMLElement;
     if (event.ctrlKey || event.metaKey) {
       // A pinch and a Ctrl+wheel mouse both report ctrlKey, so the modifier
       // alone can't tell them apart — the delta shape can.
-      const sensitivity = this.isTouchpadGesture(event)
+      const sensitivity = isTrackpadWheel(event)
         ? ZOOM_SENSITIVITY_TOUCHPAD
         : ZOOM_SENSITIVITY_MOUSE;
       const factor = Math.exp(
-        -this.wheelDeltaPixels(event.deltaY, event, 'y') * sensitivity,
+        -wheelDeltaPixels(event.deltaY, event, el.clientHeight) * sensitivity,
       );
       this.zoomAround(this.localPoint(event), factor);
     } else {
-      const dx = this.wheelDeltaPixels(event.deltaX, event, 'x');
-      const dy = this.wheelDeltaPixels(event.deltaY, event, 'y');
+      const dx = wheelDeltaPixels(event.deltaX, event, el.clientWidth);
+      const dy = wheelDeltaPixels(event.deltaY, event, el.clientHeight);
       // Scrolling down/right moves the content up/left, like scrolling a page.
       this.camera.update((c) => c.panBy(-dx, -dy));
     }
-  }
-
-  /**
-   * Best-effort guess that a wheel event came from a trackpad, used only to
-   * pick the zoom sensitivity: a trackpad streams small, often fractional,
-   * pixel deltas; a mouse wheel arrives in coarse integer notches (and a mac
-   * Cmd+wheel mouse sets metaKey — never a pinch).
-   */
-  private isTouchpadGesture(event: WheelEvent): boolean {
-    if (event.metaKey) return false;
-    if (event.deltaMode !== WheelEvent.DOM_DELTA_PIXEL) return false;
-    return (
-      Math.abs(event.deltaY) < MOUSE_NOTCH_THRESHOLD ||
-      !Number.isInteger(event.deltaY)
-    );
-  }
-
-  /**
-   * A wheel delta on the given `axis` normalised to pixels, whatever the
-   * `deltaMode`. Page-mode deltas scale by the viewport extent *along that axis*
-   * — width for horizontal, height for vertical.
-   */
-  private wheelDeltaPixels(
-    delta: number,
-    event: WheelEvent,
-    axis: 'x' | 'y',
-  ): number {
-    if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) {
-      return delta * LINE_HEIGHT;
-    }
-    if (event.deltaMode === WheelEvent.DOM_DELTA_PAGE) {
-      const el = event.currentTarget as HTMLElement;
-      return delta * (axis === 'x' ? el.clientWidth : el.clientHeight);
-    }
-    return delta;
   }
 
   /** Zoom about the viewport centre by one or more notches (+1 in, -1 out). */

@@ -11,7 +11,7 @@ import {
 } from '@angular/core';
 import type { Graph } from '@cosmos.gl/graph';
 import { LinkedEntity, WorldGraph } from '@hexly/domain';
-import { Logger, ThemeService } from '@hexly/web-core';
+import { Logger, ThemeService, isTrackpadWheel, wheelDeltaPixels } from '@hexly/web-core';
 import { GraphPayload, graphPayload } from './graph-payload';
 import { LabelGrid, selectLabels } from './label-selection';
 
@@ -58,14 +58,42 @@ const FIT_VIEW_DELAY_MS = 1200;
 const FIT_MS = 250;
 
 /**
+ * After the last pan wheel event, how long to keep the label loop awake so it tracks the final
+ * frame in. A trackpad swipe fires a burst of `wheel` events with no "end" signal, so the loop is
+ * held live for a beat past the last one, then parks itself as any settled graph does.
+ */
+const PAN_IDLE_MS = 120;
+
+/**
  * Reheat energy held on the simulation *throughout* a drag, so the moved Entity's neighbours follow
  * in real time rather than snapping into place on release. Re-applied each `onDrag` frame — like
  * d3's `alphaTarget` — then left to cool once the reader lets go.
  */
 const REHEAT_ALPHA = 0.3;
 
+/**
+ * A dark outline stamped around the white Entity labels — four diagonal offsets for the body of the
+ * contour, one soft drop for depth — so a name stays legible over a pale node, a dark one, or the
+ * links crossing behind it, in either theme. Cheaper and crisper at 9px than `-webkit-text-stroke`,
+ * which thins the glyphs.
+ */
+const LABEL_CONTOUR =
+  '-1px -1px 0 #111, 1px -1px 0 #111, -1px 1px 0 #111, 1px 1px 0 #111, 0 1px 2px rgba(0,0,0,0.6)';
+
+/**
+ * How long the pointer must settle before the focus grey-out commits. A sweep across the canvas
+ * fires a burst of over/out events — one per node brushed — and applying each would flash the whole
+ * graph light and dark. Debouncing coalesces the burst into a single commit on the node the pointer
+ * finally rests on, so focus only ever reflects where a reader actually paused.
+ */
+const HOVER_DEBOUNCE_MS = 50;
+
 /** Read a design token, so the canvas follows the theme (ADR-0007's palette, not hardcoded hex). */
-function token(style: CSSStyleDeclaration, name: string, fallback: string): string {
+function token(
+  style: CSSStyleDeclaration,
+  name: string,
+  fallback: string,
+): string {
   return style.getPropertyValue(name).trim() || fallback;
 }
 
@@ -92,10 +120,16 @@ function palette(): Palette {
 }
 
 /** One RGBA quad per point, by point index. */
-function pointColors(nodes: readonly LinkedEntity[], palette: Palette): Float32Array {
+function pointColors(
+  nodes: readonly LinkedEntity[],
+  palette: Palette,
+): Float32Array {
   const colors = new Float32Array(nodes.length * 4);
   for (let i = 0; i < nodes.length; i++) {
-    colors.set(nodes[i].type === 'hexmap' ? palette.hexmap : palette.note, i * 4);
+    colors.set(
+      nodes[i].type === 'hexmap' ? palette.hexmap : palette.note,
+      i * 4,
+    );
   }
   return colors;
 }
@@ -169,8 +203,10 @@ export class GraphCanvas {
   /** The Entity a reader clicked, for the page to navigate to. */
   readonly open = output<GraphOpen>();
 
-  private readonly hostEl = viewChild.required<ElementRef<HTMLDivElement>>('host');
-  private readonly overlayEl = viewChild.required<ElementRef<HTMLDivElement>>('overlay');
+  private readonly hostEl =
+    viewChild.required<ElementRef<HTMLDivElement>>('host');
+  private readonly overlayEl =
+    viewChild.required<ElementRef<HTMLDivElement>>('overlay');
   private readonly theme = inject(ThemeService);
   private readonly logger = inject(Logger);
 
@@ -186,6 +222,10 @@ export class GraphCanvas {
    * is suppressed, so the camera never jumps out from under a reader already moving the controls.
    */
   private viewPinned = false;
+  /** Tears down the two-finger pan wheel listener; aborted by {@link teardown} with the mount. */
+  private panControls: AbortController | null = null;
+  /** Pending {@link HOVER_DEBOUNCE_MS} focus commit; cleared on teardown so it never fires post-destroy. */
+  private hoverTimer = 0;
   /** Restart the parked label loop. Set by {@link paintLabels}; a no-op until the loop is mounted. */
   private wake: () => void = () => {
     /* no loop to wake before mount */
@@ -206,7 +246,10 @@ export class GraphCanvas {
           // outlive it, projecting labels off a destroyed WebGL graph every frame, forever.
           if (stale) return void mounted?.cosmos.destroy();
           this.mounted = mounted;
-          if (mounted) this.paintLabels(mounted, host, overlay);
+          if (mounted) {
+            this.paintLabels(mounted, host, overlay);
+            this.panControls = this.enableTwoFingerPan(mounted.cosmos, host);
+          }
         },
         (err) => this.logger.error('Failed to render the World Graph', err),
       );
@@ -238,7 +281,10 @@ export class GraphCanvas {
     cosmos.render();
   }
 
-  private async mount(graph: WorldGraph, host: HTMLDivElement): Promise<Mounted | null> {
+  private async mount(
+    graph: WorldGraph,
+    host: HTMLDivElement,
+  ): Promise<Mounted | null> {
     const { Graph } = await import('@cosmos.gl/graph');
     if (graph.nodes.length === 0) return null;
 
@@ -259,6 +305,29 @@ export class GraphCanvas {
       // The base is the click target: below ~8 units a leaf Entity is a speck that's hard to hit.
       sizes[i] = 8 + Math.min(9, Math.sqrt(degrees[i]) * 2.2);
     }
+
+    // Commit the focus grey-out only once the pointer settles: each over/out reschedules the same
+    // timer, so a burst of them while sweeping the canvas collapses to a single apply on the target
+    // the pointer finally rests on (or a clear, when that target is the background).
+    const focus = (index: number | undefined) => {
+      clearTimeout(this.hoverTimer);
+      this.hoverTimer = window.setTimeout(() => {
+        cosmos.setConfigPartial(
+          index === undefined
+            ? {
+                highlightedPointIndices: undefined,
+                focusedPointIndex: undefined,
+              }
+            : {
+                highlightedPointIndices: [
+                  index,
+                  ...cosmos.getNeighboringPointIndices(index),
+                ],
+                focusedPointIndex: index,
+              },
+        );
+      }, HOVER_DEBOUNCE_MS);
+    };
 
     const cosmos = new Graph(host, {
       backgroundColor: colors.background,
@@ -281,16 +350,9 @@ export class GraphCanvas {
           newTab: event.ctrlKey || event.metaKey || event.button === 1,
         }),
       // Focus mode, built in: everything outside the hovered Entity's neighbourhood greys out.
-      onPointMouseOver: (index) =>
-        cosmos.setConfigPartial({
-          highlightedPointIndices: [index, ...cosmos.getNeighboringPointIndices(index)],
-          focusedPointIndex: index,
-        }),
-      onPointMouseOut: () =>
-        cosmos.setConfigPartial({
-          highlightedPointIndices: undefined,
-          focusedPointIndex: undefined,
-        }),
+      // Debounced (see {@link focus}) so a sweep across the canvas doesn't strobe the grey-out.
+      onPointMouseOver: (index) => focus(index),
+      onPointMouseOut: () => focus(undefined),
       // A pan/zoom shifts the projection and a drag moves the point; both need the label loop awake
       // even when the force simulation is cold. The gesture holds `interacting`; `wake` restarts the
       // loop if it had parked. Dragging also reheats the simulation, which re-drives the loop itself.
@@ -360,7 +422,10 @@ export class GraphCanvas {
       const [originX] = cosmos.spaceToScreenPosition([0, 0]);
       const [unitX] = cosmos.spaceToScreenPosition([1, 0]);
       const [ax, ay] = cosmos.screenToSpacePosition([0, 0]);
-      const [bx, by] = cosmos.screenToSpacePosition([host.clientWidth, host.clientHeight]);
+      const [bx, by] = cosmos.screenToSpacePosition([
+        host.clientWidth,
+        host.clientHeight,
+      ]);
       return {
         scale: unitX - originX,
         minX: Math.min(ax, bx),
@@ -373,7 +438,12 @@ export class GraphCanvas {
     const tick = () => {
       let used = 0;
 
-      const place = (text: string, x: number, y: number, angle: number | null) => {
+      const place = (
+        text: string,
+        x: number,
+        y: number,
+        angle: number | null,
+      ) => {
         if (!text || used >= LABEL_GRID.max) return;
         let label = this.labels[used];
         if (!label) {
@@ -391,8 +461,18 @@ export class GraphCanvas {
           angle === null
             ? 'translate(-50%, 0)'
             : `translate(-50%, -100%) rotate(${angle}rad)`;
-        label.style.color = angle === null ? 'var(--color-ink-strong)' : 'var(--color-line-strong)';
-        label.style.font = angle === null ? '9px sans-serif' : '8px sans-serif';
+        // Entity names are white-on-contour for readability over any node or the links behind them;
+        // Link Descriptors stay in the muted line colour, riding along the edge they annotate. Spans
+        // are reused across both roles, so each branch sets the shadow the other would otherwise leave.
+        if (angle === null) {
+          label.style.color = '#fff';
+          label.style.textShadow = LABEL_CONTOUR;
+          label.style.font = '9px sans-serif';
+        } else {
+          label.style.color = 'var(--color-line-strong)';
+          label.style.textShadow = 'none';
+          label.style.font = '8px sans-serif';
+        }
         if (label.textContent !== text) label.textContent = text;
         used++;
       };
@@ -403,26 +483,48 @@ export class GraphCanvas {
       // to be. Once both are quiet the loop parks below and stops reading entirely.
       positions.set(cosmos.getPointPositions());
 
-      const selection = selectLabels(payload, positions, currentView(), LABEL_GRID);
+      const selection = selectLabels(
+        payload,
+        positions,
+        currentView(),
+        LABEL_GRID,
+      );
 
       for (const index of selection.points) {
-        const [x, y] = cosmos.spaceToScreenPosition([positions[index * 2], positions[index * 2 + 1]]);
+        const [x, y] = cosmos.spaceToScreenPosition([
+          positions[index * 2],
+          positions[index * 2 + 1],
+        ]);
         place(nodes[index].name, x, y + 6, null);
       }
       for (const index of selection.links) {
         const source = links[index * 2];
         const target = links[index * 2 + 1];
-        const [sx, sy] = cosmos.spaceToScreenPosition([positions[source * 2], positions[source * 2 + 1]]);
-        const [tx, ty] = cosmos.spaceToScreenPosition([positions[target * 2], positions[target * 2 + 1]]);
+        const [sx, sy] = cosmos.spaceToScreenPosition([
+          positions[source * 2],
+          positions[source * 2 + 1],
+        ]);
+        const [tx, ty] = cosmos.spaceToScreenPosition([
+          positions[target * 2],
+          positions[target * 2 + 1],
+        ]);
         // Angle in screen space, so the label lies along the edge as drawn, at any zoom.
-        place(descriptors[index], (sx + tx) / 2, (sy + ty) / 2, upright(Math.atan2(ty - sy, tx - sx)));
+        place(
+          descriptors[index],
+          (sx + tx) / 2,
+          (sy + ty) / 2,
+          upright(Math.atan2(ty - sy, tx - sx)),
+        );
       }
 
-      for (let i = used; i < this.labels.length; i++) this.labels[i].style.display = 'none';
+      for (let i = used; i < this.labels.length; i++)
+        this.labels[i].style.display = 'none';
 
       // Keep going only while there is motion to track; otherwise park and wait for `wake`.
       this.frame =
-        cosmos.isSimulationRunning || this.interacting ? requestAnimationFrame(tick) : 0;
+        cosmos.isSimulationRunning || this.interacting
+          ? requestAnimationFrame(tick)
+          : 0;
     };
 
     // Restart the parked loop from an interaction handler, keeping at most one frame in flight.
@@ -438,6 +540,76 @@ export class GraphCanvas {
     this.wake();
   }
 
+  /**
+   * Two-finger trackpad pan. cosmos.gl's zoom is d3-zoom on the canvas, which reads *every* wheel
+   * event as a zoom — so a two-finger swipe zooms instead of panning, and there is no built-in pan
+   * to swap in. The pan gestures are intercepted in the capture phase, before d3-zoom on the canvas
+   * below can see them, and turned into a pan. What falls through to the built-in zoom: a zoom
+   * modifier (pinch or Ctrl/Cmd+wheel), and a *vertical* mouse-wheel notch — so a mouse still zooms
+   * the graph as it always has.
+   *
+   * A horizontal-dominant wheel is *always* taken as a pan, even when it looks like a mouse notch.
+   * `preventDefault` on it is what stops the browser reading a leftward two-finger swipe as history
+   * back-navigation — and `isTrackpadWheel` keys off `deltaY` alone, so a mostly-sideways swipe can
+   * momentarily read as a mouse and leak the event to the browser. The axis check closes that hole.
+   *
+   * There is no `panBy`, so the pan goes through the one public lever that moves the camera without
+   * animation: refit the current viewport box, shifted by the swipe, with zero duration and zero
+   * padding — same zoom, new centre.
+   */
+  private enableTwoFingerPan(
+    cosmos: Graph,
+    host: HTMLDivElement,
+  ): AbortController {
+    const controls = new AbortController();
+    let idle = 0;
+
+    const onWheel = (event: WheelEvent) => {
+      if (event.ctrlKey || event.metaKey) return; // Pinch or Ctrl/Cmd+wheel — cosmos's built-in zoom.
+      // Horizontal-dominant wheels always pan (and so are always caught, keeping the browser from
+      // swiping back); a vertical mouse-wheel notch is left to cosmos to zoom, only a trackpad pans.
+      const horizontal = Math.abs(event.deltaX) > Math.abs(event.deltaY);
+      if (!horizontal && !isTrackpadWheel(event)) return;
+      event.preventDefault();
+      event.stopPropagation(); // Capture phase: keep it from reaching d3-zoom on the canvas below.
+
+      // Screen pixels per space unit, off the transform — the same reading the label pass elects on.
+      const [originX] = cosmos.spaceToScreenPosition([0, 0]);
+      const [unitX] = cosmos.spaceToScreenPosition([1, 0]);
+      const scale = unitX - originX;
+      if (!scale) return;
+
+      const dx =
+        wheelDeltaPixels(event.deltaX, event, host.clientWidth) / scale;
+      // Space y runs opposite screen y here, so the vertical swipe is negated while the horizontal
+      // one is not — scrolling down still walks the view down the World, as a scrollbar would.
+      const dy =
+        -wheelDeltaPixels(event.deltaY, event, host.clientHeight) / scale;
+      const [ax, ay] = cosmos.screenToSpacePosition([0, 0]);
+      const [bx, by] = cosmos.screenToSpacePosition([
+        host.clientWidth,
+        host.clientHeight,
+      ]);
+      // Shift both corners by the swipe and refit: the box keeps its size (zoom holds) and only its
+      // centre moves.
+      const box = new Float32Array([ax + dx, ay + dy, bx + dx, by + dy]);
+      cosmos.setZoomTransformByPointPositions(box, 0, undefined, 0, false);
+
+      this.viewPinned = true;
+      this.startInteracting();
+      clearTimeout(idle);
+      idle = window.setTimeout(() => (this.interacting = false), PAN_IDLE_MS);
+    };
+
+    host.addEventListener('wheel', onWheel, {
+      passive: false,
+      capture: true,
+      signal: controls.signal,
+    });
+    controls.signal.addEventListener('abort', () => clearTimeout(idle));
+    return controls;
+  }
+
   private teardown(): void {
     cancelAnimationFrame(this.frame);
     this.frame = 0;
@@ -446,6 +618,10 @@ export class GraphCanvas {
     };
     this.interacting = false;
     this.viewPinned = false;
+    this.panControls?.abort();
+    this.panControls = null;
+    clearTimeout(this.hoverTimer);
+    this.hoverTimer = 0;
     this.labels = [];
     const overlay = this.overlayEl?.()?.nativeElement;
     if (overlay) overlay.textContent = '';
