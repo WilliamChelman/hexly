@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
-import { MemberRole } from '@hexly/domain';
+import { MemberRole, UserDefinedType } from '@hexly/domain';
 import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
-import { INITIAL_SEQ, worldMembers, worlds } from '../db/schema';
+import { INITIAL_SEQ, worldMembers, worlds, worldTypes } from '../db/schema';
 import { SyncOnly, WriteOutbox } from '../events/write-outbox';
 import { EntityWrites } from '../entities/entity-writes';
 
@@ -163,6 +163,79 @@ export class WorldWrites {
       this.entities.bumpWorldShared(id);
       return true;
     });
+  }
+
+  /**
+   * Author a new user-defined type in a World (#191): insert the `world_types` row, then bump the
+   * World's `seq` and nudge its followers. A type change touches neither `name` nor pins, so it
+   * bumps **`seq` alone** — like {@link membership} — rather than moving `updatedAt` and reordering
+   * the World Index. The service has already checked the type id is free, so this insert never
+   * conflicts.
+   */
+  createType(worldId: string, type: UserDefinedType, now: number = Date.now()): void {
+    this.transact(() => {
+      this.db
+        .insert(worldTypes)
+        .values({
+          worldId,
+          typeId: type.id,
+          label: type.label,
+          fields: [...type.fields],
+          createdAt: now,
+          updatedAt: now,
+        })
+        .run();
+      this.bumpAndNudge(worldId);
+    });
+  }
+
+  /**
+   * Rename and/or replace the Fields of a World's user-defined type (#191). An absent field is left
+   * untouched; `fields` is sent wholesale. Returns whether a row matched — an unknown type id leaves
+   * the World untouched, so the bump and nudge are skipped and the caller can 404.
+   */
+  updateType(worldId: string, typeId: string, patch: { label?: string; fields?: UserDefinedType['fields'] }): boolean {
+    return this.transact(() => {
+      const updated = this.db
+        .update(worldTypes)
+        .set({
+          ...(patch.label !== undefined ? { label: patch.label } : {}),
+          ...(patch.fields !== undefined ? { fields: [...patch.fields] } : {}),
+          updatedAt: Date.now(),
+        })
+        .where(and(eq(worldTypes.worldId, worldId), eq(worldTypes.typeId, typeId)))
+        .run();
+      if (updated.changes === 0) return false;
+      this.bumpAndNudge(worldId);
+      return true;
+    });
+  }
+
+  /**
+   * Delete a World's user-defined type (#191). Existing entities carrying the type keep their
+   * Metadata as plain values (a Field is a lens, ADR-0048), so the drop de-types them without
+   * touching their bodies. Returns whether a row matched, so an unknown type id 404s.
+   */
+  deleteType(worldId: string, typeId: string): boolean {
+    return this.transact(() => {
+      const deleted = this.db
+        .delete(worldTypes)
+        .where(and(eq(worldTypes.worldId, worldId), eq(worldTypes.typeId, typeId)))
+        .run();
+      if (deleted.changes === 0) return false;
+      this.bumpAndNudge(worldId);
+      return true;
+    });
+  }
+
+  /** Bump the World's `seq` and nudge its followers — the freshness half every type write shares. */
+  private bumpAndNudge(worldId: string): void {
+    this.db
+      .update(worlds)
+      .set({ seq: sql`${worlds.seq} + 1` })
+      .where(eq(worlds.id, worldId))
+      .run();
+    this.outbox.world(worldId);
   }
 
   /**

@@ -18,6 +18,7 @@ export * from './lib/content/entity-link';
 export * from './lib/content/extract-text';
 export * from './lib/content/extract-outline';
 export * from './lib/world';
+export * from './lib/world-type';
 export * from './lib/world-graph';
 export * from './lib/public-link';
 export * from './lib/nudge';

@@ -18,7 +18,7 @@ import { EntityAccess, entityAccess, sharedVisibility } from '../acl/entity-acce
 import { DB, Db } from '../db/db';
 import { INITIAL_SEQ, entities, entityDescriptors, entityEdges, entityFieldFacets, entityGrants } from '../db/schema';
 import { SyncOnly, WriteOutbox } from '../events/write-outbox';
-import { TypeFieldRegistry } from './type-field-registry';
+import { WorldTypeFields } from './world-type-fields';
 
 /** A fresh Entity starts at version 1 — the optimistic-concurrency token's floor. */
 const INITIAL_VERSION = 1;
@@ -155,9 +155,10 @@ export class EntityWrites {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly outbox: WriteOutbox,
-    // Resolves a `types[]` set to its Field schema, so the derive pass can materialise the
-    // facetable Field values (ADR-0048, #188) the same way it harvests edges and descriptors.
-    private readonly typeFields: TypeFieldRegistry,
+    // Resolves a `types[]` set to its Field schema **scoped to the Entity's World**, so the derive
+    // pass materialises the facetable Field values (ADR-0048, #188) — including a World's
+    // user-defined types (#191) — the same way it harvests edges and descriptors.
+    private readonly worldTypeFields: WorldTypeFields,
   ) {}
 
   /**
@@ -176,7 +177,7 @@ export class EntityWrites {
    */
   insert(input: InsertEntityInput): EntityRow {
     const now = Date.now();
-    const derived = this.derive(input.body, input.types);
+    const derived = this.derive(input.body, input.types, input.worldId);
     const row: EntityRow = {
       id: input.id ?? randomUUID(),
       worldId: input.worldId,
@@ -319,7 +320,7 @@ export class EntityWrites {
       try {
         derived.push({
           row,
-          derived: this.derive(JSON.parse(row.document) as EntityBody, row.types),
+          derived: this.derive(JSON.parse(row.document) as EntityBody, row.types, row.worldId),
         });
       } catch (err) {
         failures.push({
@@ -360,10 +361,11 @@ export class EntityWrites {
    * `content → entity` edge carries a descriptor, so the non-null ones are exactly the descriptors
    * the Content uses. One traversal, and one definition of what a descriptor is.
    */
-  private derive(body: EntityBody, types: readonly string[]): Derived {
+  private derive(body: EntityBody, types: readonly string[], worldId: string): Derived {
     // Resolved once, shared by the two derivations that read the type set: the edge harvest's
-    // Entity-Link Fields (#190) and the facet derivation's facetable Fields (#188).
-    const fields = resolveFields(this.typeFields.resolver, types);
+    // Entity-Link Fields (#190) and the facet derivation's facetable Fields (#188). Scoped to the
+    // Entity's World so a user-defined type's Fields resolve too (#191).
+    const fields = resolveFields(this.worldTypeFields.resolverFor(worldId), types);
     const edges = harvestEdges(body, fields);
     return {
       contentText: extractText(body.content),
@@ -500,7 +502,7 @@ export class EntityWrites {
     // `edit`: substance. Set only the columns the caller owns, so a concurrent rename isn't
     // clobbered by a save that never touched the name. Field facets ride the document derivation,
     // resolved against the save's type set when it carries one, else the stored types (ADR-0048).
-    const derived = change.document && this.derive(change.document, change.types ?? row.types);
+    const derived = change.document && this.derive(change.document, change.types ?? row.types, row.worldId);
     const set = {
       ...(change.name !== undefined && { name: change.name }),
       ...(change.tags !== undefined && { tags: [...change.tags] }),

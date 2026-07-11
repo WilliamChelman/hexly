@@ -38,6 +38,13 @@ export interface TypeDefinition {
   readonly icon: IconName;
   readonly labels: TypeLabels;
   /**
+   * A **literal** display label, set only by a **user-defined type** (#191) whose name is authored
+   * data, not a transloco key. Surfaces that show a type's name (the Type facet, the entity card)
+   * prefer this over the `entityBrowser.type.<id>` transloco key — a core/plugin type omits it and
+   * keeps its translated key. It is not itself run through transloco.
+   */
+  readonly labelText?: string;
+  /**
    * The {@link ViewId}s this type contributes, in header display order (ADR-0048,
    * *Views* amendment). A plain note contributes only `core.view.content`; a hexmap
    * also contributes `core.view.map`, so it gets the view toggle and the status bar.

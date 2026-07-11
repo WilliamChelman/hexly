@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject } from '
 import { RouterOutlet } from '@angular/router';
 import { ActiveWorld, worldDashboardRoute, worldGraphRoute, worldRoute, worldSettingsRoute } from '@hexly/web-core';
 import { NavRailStore } from '../../shell/nav-rail.store';
+import { WorldTypesLoader } from '../../entity-types/world-types-loader';
 
 /**
  * The World scope's layout: a thin owner for the `w/:worldId` subtree (previously
@@ -20,6 +21,9 @@ export class WorldLayout {
   constructor() {
     const activeWorld = inject(ActiveWorld);
     const rail = inject(NavRailStore);
+    // Project the active World's user-defined types into the TypeRegistry for as long as a World is
+    // open (#191) — injecting it here is what brings the reactive loader to life.
+    inject(WorldTypesLoader);
 
     effect(() => {
       const worldId = activeWorld.worldId();

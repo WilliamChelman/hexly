@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntityFacets } from '@hexly/domain';
+import { TypeRegistry } from '../../entity-types/type-registry';
 
 /** One type's Field selection (ADR-0048, #188): eq membership for enum/list/string, or a
  * `gte`/`lte` range for number/date. Absent parts mean "unconstrained on that axis". */
@@ -160,6 +161,16 @@ export interface FieldRangeChange {
 })
 export class FacetRail {
   private readonly transloco = inject(TranslocoService);
+  private readonly types = inject(TypeRegistry);
+
+  /**
+   * A Type facet row's label: a user-defined type's authored name (its registered `labelText`), else
+   * the `entityBrowser.type.<id>` transloco key — so a World's own types read by name in the rail
+   * alongside the translated core/plugin types (#191).
+   */
+  private typeLabel(id: string): string {
+    return this.types.get(id)?.labelText ?? this.transloco.translate(`entityBrowser.type.${id}`);
+  }
 
   readonly facetCounts = input<EntityFacets>({
     type: [],
@@ -198,7 +209,7 @@ export class FacetRail {
       {
         category: 'type' as const,
         rows: counts.type,
-        label: (v: string) => this.transloco.translate(`entityBrowser.type.${v}`),
+        label: (v: string) => this.typeLabel(v),
       },
       { category: 'tag' as const, rows: counts.tag, label: (v: string) => v },
       {

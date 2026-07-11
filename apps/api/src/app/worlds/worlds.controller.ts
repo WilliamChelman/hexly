@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Body,
+  ConflictException,
   Controller,
   Delete,
   ForbiddenException,
@@ -20,11 +21,15 @@ import {
   addMemberRequestSchema,
   addOwnerRequestSchema,
   AuthUser,
+  AvailableType,
+  createUserDefinedTypeRequestSchema,
   createWorldRequestSchema,
   ImportSummary,
   PublicLink,
   setMemberRoleRequestSchema,
+  updateUserDefinedTypeRequestSchema,
   updateWorldRequestSchema,
+  UserDefinedType,
   WorldDetail,
   WorldGraph,
   WorldMember,
@@ -39,6 +44,7 @@ import { VaultExportService } from './vault-export.service';
 import { VaultImportService } from './vault-import.service';
 import { WorldGraphService } from './world-graph.service';
 import { WorldsService } from './worlds.service';
+import { TypeResult, WorldTypesService } from './world-types.service';
 
 /** The subset of multer's uploaded-file shape this controller uses (no @types/multer dep). */
 interface UploadedZip {
@@ -57,6 +63,7 @@ interface UploadedZip {
 export class WorldsController {
   constructor(
     private readonly worlds: WorldsService,
+    private readonly types: WorldTypesService,
     private readonly importer: VaultImportService,
     private readonly exporter: VaultExportService,
     private readonly graphs: WorldGraphService,
@@ -155,6 +162,63 @@ export class WorldsController {
     const result = this.worlds.delete(user.id, id);
     if (result === null) throw new NotFoundException();
     if (result === 'forbidden') throw new ForbiddenException();
+  }
+
+  /**
+   * The Entity Types available in a World (ADR-0048, #191): the instance-wide plugin types plus this
+   * World's user-defined types — for the create dialog, facet labels, and view resolution.
+   * Reachable-gated: any World member reads the set (a 404 for an unreachable World).
+   */
+  @Get(':id/types')
+  availableTypes(@CurrentUser() user: AuthUser, @Param('id') id: string): AvailableType[] {
+    const result = this.types.listAvailable(user.id, id);
+    if (result === 'not-found') throw new NotFoundException();
+    return result;
+  }
+
+  // Author a new user-defined type (#191): World-Owner-only, id `world.`-namespaced and unique in
+  // the World (a 409 otherwise). Returns the created type (201).
+  @Post(':id/types')
+  createType(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): UserDefinedType {
+    const parsed = createUserDefinedTypeRequestSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException();
+    return this.typeResult(this.types.create(user.id, id, parsed.data));
+  }
+
+  // Rename / re-Field a user-defined type (#191): World-Owner-only. The id is immutable (entities
+  // key off it), so it is a path param, not in the body.
+  @Patch(':id/types/:typeId')
+  updateType(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Param('typeId') typeId: string,
+    @Body() body: unknown,
+  ): UserDefinedType {
+    const parsed = updateUserDefinedTypeRequestSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException();
+    return this.typeResult(this.types.update(user.id, id, typeId, parsed.data));
+  }
+
+  // Delete a user-defined type (#191): World-Owner-only. Entities carrying it keep their Metadata
+  // as plain values (a Field is a lens) — the drop de-types them, never destroying data.
+  @Delete(':id/types/:typeId')
+  @HttpCode(204)
+  removeType(@CurrentUser() user: AuthUser, @Param('id') id: string, @Param('typeId') typeId: string): void {
+    this.typeResult(this.types.delete(user.id, id, typeId));
+  }
+
+  /** Map a {@link TypeResult} to its HTTP outcome: `ok` unwraps, else the status's exception. */
+  private typeResult<T>(result: TypeResult<T>): T {
+    switch (result.status) {
+      case 'not-found':
+        throw new NotFoundException();
+      case 'forbidden':
+        throw new ForbiddenException();
+      case 'conflict':
+        throw new ConflictException();
+      case 'ok':
+        return result.value;
+    }
   }
 
   // The World's ownership set (ADR-0037), for an Owner.

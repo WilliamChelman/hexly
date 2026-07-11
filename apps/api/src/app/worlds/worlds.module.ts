@@ -12,6 +12,7 @@ import { VaultUnzipper } from './vault-unzipper';
 import { WorldGraphService } from './world-graph.service';
 import { WorldsController } from './worlds.controller';
 import { WorldsService } from './worlds.service';
+import { WorldTypesService } from './world-types.service';
 import { WorldWrites } from './world-writes';
 
 /**
@@ -40,7 +41,15 @@ import { WorldWrites } from './world-writes';
     }),
   ],
   controllers: [WorldsController],
-  providers: [WorldsService, WorldWrites, WorldGraphService, VaultImportService, VaultExportService, VaultUnzipper],
+  providers: [
+    WorldsService,
+    WorldTypesService,
+    WorldWrites,
+    WorldGraphService,
+    VaultImportService,
+    VaultExportService,
+    VaultUnzipper,
+  ],
   // WorldWrites is exported so the Admin account purge (ADR-0045) routes its `world_members`
   // deletion through the one handle that bumps `seq` — the World peer of EntityWrites.
   exports: [WorldWrites],

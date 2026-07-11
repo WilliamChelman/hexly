@@ -30,6 +30,7 @@ import {
   resolveFields,
   SaveEntityRequest,
   tagsSchema,
+  TypeFieldResolver,
   validateFields,
   visibilitySchema,
 } from '@hexly/domain';
@@ -51,6 +52,7 @@ import {
 import { HEXLY_CONFIG, HexlyConfig } from '../config/config.module';
 import { EntityWrites } from './entity-writes';
 import { TypeFieldRegistry } from './type-field-registry';
+import { WorldTypeFields } from './world-type-fields';
 import { linkedEntity } from './utils/linked-entity';
 
 /** Per-entity Public Link table for the shared get/mint/revoke helpers. */
@@ -114,7 +116,17 @@ export class EntitiesService {
     @Inject(HEXLY_CONFIG) private readonly config: HexlyConfig,
     private readonly writes: EntityWrites,
     private readonly typeFields: TypeFieldRegistry,
+    private readonly worldTypeFields: WorldTypeFields,
   ) {}
+
+  /**
+   * The {@link TypeFieldResolver} to resolve a `types[]` set through: scoped to `worldId` when one
+   * is in play (so a World's user-defined types resolve too, #191), else the bare instance-wide
+   * plugin registry.
+   */
+  private typeResolver(worldId: string | undefined): TypeFieldResolver {
+    return worldId ? this.worldTypeFields.resolverFor(worldId) : this.typeFields.resolver;
+  }
 
   /**
    * One reader-scoped page of summaries, metadata only. Stable sort (newest first,
@@ -203,7 +215,7 @@ export class EntitiesService {
    * universal facets — counted against every other constraint but that Field's own filter.
    */
   private countFieldFacets(opts: FacetOptions, filter: SQL): FieldFacet[] {
-    const fields = resolveFields(this.typeFields.resolver, opts.type ?? []).filter((field) => field.facetable);
+    const fields = resolveFields(this.typeResolver(opts.worldId), opts.type ?? []).filter((field) => field.facetable);
     return fields.map((field) => {
       const values = this.countFieldValues(
         // Drill-down: drop this Field's own filters, keep every sibling constraint.
@@ -478,7 +490,7 @@ export class EntitiesService {
    * `not-found` (404), a reachable one the caller can't edit a 403.
    */
   save(userId: string, id: string, req: SaveEntityRequest): SaveResult {
-    this.gateTypedEdit(userId, req);
+    this.gateTypedEdit(userId, id, req);
     const result = this.writes.mutate(userId, id, {
       kind: 'edit',
       document: req.document,
@@ -510,9 +522,17 @@ export class EntitiesService {
    * types. The vault import ({@link importNote}) never routes here, and reads / reindex never
    * validate, so data at rest stays tolerated end to end.
    */
-  private gateTypedEdit(userId: string, req: SaveEntityRequest): void {
+  private gateTypedEdit(userId: string, id: string, req: SaveEntityRequest): void {
     if (req.types === undefined) return;
-    this.assertTypedFieldsValid(userId, req.types, req.document.metadata);
+    // Resolve the Entity's World so its user-defined types' Fields resolve in the gate (#191). A
+    // missing row leaves `worldId` undefined — the gate falls back to the instance registry, and the
+    // save 404s in `mutate` regardless, so the World-less resolution never reaches storage.
+    const worldId = this.db
+      .select({ worldId: entities.worldId })
+      .from(entities)
+      .where(eq(entities.id, id))
+      .get()?.worldId;
+    this.assertTypedFieldsValid(userId, worldId, req.types, req.document.metadata);
   }
 
   /**
@@ -522,8 +542,13 @@ export class EntitiesService {
    * forward-only check {@link gateTypedEdit} runs for a typed save. A missing or inaccessible
    * link target stays inert (never an error), so graceful degradation is preserved end to end.
    */
-  private assertTypedFieldsValid(userId: string, types: readonly EntityType[], metadata: EntityBody['metadata']): void {
-    const fields = resolveFields(this.typeFields.resolver, types);
+  private assertTypedFieldsValid(
+    userId: string,
+    worldId: string | undefined,
+    types: readonly EntityType[],
+    metadata: EntityBody['metadata'],
+  ): void {
+    const fields = resolveFields(this.typeResolver(worldId), types);
     const errors: FieldError[] = [
       ...validateFields(fields, metadata).errors,
       ...this.linkTargetTypeErrors(userId, fields, metadata),

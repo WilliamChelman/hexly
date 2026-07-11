@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntityType, EntityVerb } from '@hexly/domain';
 import { HexlyDatePipe } from '@hexly/web-core';
 import { Autofocus, Button, Panel, Icon, IconName, ACCENT_BAR, ACCENT_SIGIL, accentFor } from '@hexly/web-ui';
@@ -73,7 +73,7 @@ export interface EntityCardVm {
           <hr class="border-0 border-t border-line my-2" />
           <div class="flex items-center gap-2">
             <span class="text-2xs uppercase tracking-wider text-ink-muted" [attr.data-testid]="'type-' + card().id">{{
-              'entityBrowser.type.' + card().type | transloco
+              typeLabel()
             }}</span>
             <span class="text-2xs text-ink-faint">·</span>
             <span class="meta text-2xs text-ink-muted">{{
@@ -143,11 +143,21 @@ export class EntityCard {
   readonly remove = output<void>();
 
   private readonly types = inject(TypeRegistry);
+  private readonly transloco = inject(TranslocoService);
 
   protected readonly bar = computed(() => ACCENT_BAR[accentFor(this.card().id)]);
   protected readonly sigil = computed(() => ACCENT_SIGIL[accentFor(this.card().id)]);
   /** The Entity type's registered icon (a hex map reads as terrain, a note as a label). */
   protected readonly typeIcon = computed<IconName>(() => this.types.resolve(this.card().type).icon);
+  /**
+   * The primary type's label: a user-defined type's authored name (its `labelText`), else the
+   * `entityBrowser.type.<id>` transloco key (#191). Re-translates on a language switch.
+   */
+  protected readonly typeLabel = computed(() => {
+    this.transloco.activeLang(); // reactive dependency: re-translate on switch
+    const def = this.types.get(this.card().type);
+    return def?.labelText ?? this.transloco.translate(`entityBrowser.type.${this.card().type}`);
+  });
   /** Rename is a substance edit; delete the lifecycle verb (ADR-0039). Absent Rights → hidden (fail-closed). */
   protected readonly canRename = computed(() => !!this.card().rights?.includes('edit'));
   protected readonly canDelete = computed(() => !!this.card().rights?.includes('delete'));

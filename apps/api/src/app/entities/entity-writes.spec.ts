@@ -15,6 +15,7 @@ import { NudgeBus } from '../events/nudge-bus';
 import { WriteOutbox } from '../events/write-outbox';
 import { EntityChange, EntityWrites, MutateResult } from './entity-writes';
 import { TypeFieldRegistry } from './type-field-registry';
+import { WorldTypeFields } from './world-type-fields';
 
 /**
  * `EntityWrites` is the single write handle for `entities` and `entity_grants` (ADR-0045), so
@@ -48,7 +49,9 @@ describe('EntityWrites', () => {
     // The real outbox: the transaction and the post-commit flush are part of what this spec
     // asserts, so only the bus at the far end of it is a recorder.
     typeFields = new TypeFieldRegistry();
-    writes = new EntityWrites(db, new WriteOutbox(db, bus), typeFields);
+    // The world-scoped resolver over the same registry — no World-defined types are seeded here, so
+    // it resolves through to the plugin registry (#191).
+    writes = new EntityWrites(db, new WriteOutbox(db, bus), new WorldTypeFields(db, typeFields));
 
     seedUser(ADA);
     seedWorld(WORLD, ADA);

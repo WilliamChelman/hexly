@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ActiveWorld } from '@hexly/web-core';
 import { Eyebrow, Panel, OwnerSet, MemberSet, PublicLinkControl } from '@hexly/web-ui';
+import { WorldTypesPanel } from './world-types-panel';
 
 /**
  * The World settings page (#158, #159): the World's symmetric owner set (view, add,
@@ -15,7 +16,7 @@ import { Eyebrow, Panel, OwnerSet, MemberSet, PublicLinkControl } from '@hexly/w
 @Component({
   selector: 'app-world-settings',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, Eyebrow, Panel, OwnerSet, MemberSet, PublicLinkControl],
+  imports: [TranslocoPipe, Eyebrow, Panel, OwnerSet, MemberSet, PublicLinkControl, WorldTypesPanel],
   template: `
     @if (worldId(); as id) {
       <section class="world-settings">
@@ -38,6 +39,16 @@ import { Eyebrow, Panel, OwnerSet, MemberSet, PublicLinkControl } from '@hexly/w
         </p>
         <div appPanel>
           <app-member-set [id]="id" />
+        </div>
+
+        <h2 class="world-settings-heading">
+          {{ 'worldTypes.heading' | transloco }}
+        </h2>
+        <p class="world-settings-subhead">
+          {{ 'worldTypes.subhead' | transloco }}
+        </p>
+        <div appPanel>
+          <app-world-types [id]="id" />
         </div>
 
         <h2 class="world-settings-heading">

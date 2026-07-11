@@ -1,4 +1,4 @@
-import { EdgeTargetKind } from '@hexly/domain';
+import { EdgeTargetKind, FieldSchema } from '@hexly/domain';
 import { index, integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 // Keep in sync by hand with the `CREATE TABLE` DDL in `./db.ts`; column changes
@@ -159,6 +159,32 @@ export const worldMembers = sqliteTable(
     role: text('role').notNull(),
   },
   (table) => [primaryKey({ columns: [table.worldId, table.userId] })],
+);
+
+/**
+ * A World's **user-defined Type Definitions** (ADR-0048): an Entity Type a World Owner authors as
+ * data, scoped to this one World. The World peer of the instance-wide plugin type registry — the
+ * junction-table storage pattern of {@link worldMembers}, keyed by `(worldId, typeId)`. `label` and
+ * `fields` (a `UserDefinedType`'s JSON Field schema) are the editable surface; `typeId` is the
+ * `world.`-namespaced Entity Type key entities carry and is immutable once authored. Rows cascade
+ * with the World. Written through the World write choke point ({@link WorldWrites}) so a type change
+ * bumps the World's `seq` and nudges its followers, like a rename or a pin reorder.
+ */
+export const worldTypes = sqliteTable(
+  'world_types',
+  {
+    worldId: text('world_id')
+      .notNull()
+      .references(() => worlds.id, { onDelete: 'cascade' }),
+    typeId: text('type_id').notNull(),
+    label: text('label').notNull(),
+    // The type's Field schema (FieldSchema[]), validated at the trust boundary against the shared Zod
+    // schema. A JSON bag, never DB-queried — the write-path resolver loads it whole and unions it.
+    fields: text('fields', { mode: 'json' }).$type<FieldSchema[]>().notNull().default([]),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.worldId, table.typeId] })],
 );
 
 /**

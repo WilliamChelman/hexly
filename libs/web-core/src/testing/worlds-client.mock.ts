@@ -1,9 +1,13 @@
 import { NEVER, Observable, of } from 'rxjs';
 import {
+  AvailableType,
+  CreateUserDefinedTypeRequest,
   FollowSignal,
   ImportSummary,
   MemberRole,
   PublicLink,
+  UpdateUserDefinedTypeRequest,
+  UserDefinedType,
   WorldDetail,
   WorldMember,
   WorldSummary,
@@ -40,4 +44,11 @@ export class MockWorldsClient {
   link = vi.fn<(id: string) => Observable<PublicLink | null>>(() => of<PublicLink | null>(null));
   mintLink = vi.fn<(id: string) => Observable<PublicLink>>();
   revokeLink = vi.fn<(id: string) => Observable<void>>();
+  // Defaults to no available types so a spec mounting the type-authoring panel (#191) without
+  // caring about it still renders; override per test as needed.
+  availableTypes = vi.fn<(id: string) => Observable<AvailableType[]>>(() => of<AvailableType[]>([]));
+  createType = vi.fn<(id: string, req: CreateUserDefinedTypeRequest) => Observable<UserDefinedType>>();
+  updateType =
+    vi.fn<(id: string, typeId: string, patch: UpdateUserDefinedTypeRequest) => Observable<UserDefinedType>>();
+  deleteType = vi.fn<(id: string, typeId: string) => Observable<void>>();
 }
