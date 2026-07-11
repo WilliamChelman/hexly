@@ -19,6 +19,7 @@
       "@hexly/domain": ["./libs/domain/src/index.ts"],
       "@hexly/immer": ["./libs/immer/src/index.ts"],
       "@hexly/obsidian": ["./libs/obsidian/src/index.ts"],
+      "@hexly/plugins": ["./libs/plugins/src/index.ts"],
       "@hexly/web-core": ["./libs/web-core/src/index.ts"],
       "@hexly/web-core/testing": ["./libs/web-core/src/testing/index.ts"],
       "@hexly/web-entity": ["./libs/web-entity/src/index.ts"],

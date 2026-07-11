@@ -24,6 +24,9 @@
       "core": {
         "note": "Note",
         "hexmap": "Carte"
+      },
+      "dnd": {
+        "monster": "Monstre"
       }
     },
     "loadErrorTitle": "Impossible de charger votre bibliothèque.",
@@ -75,6 +78,22 @@
     "requiredHeading": "{{type}} nécessite ces champs avant de pouvoir être ajouté :",
     "confirmAdd": "Ajouter le type",
     "requiredFieldsHeading": "Champs requis"
+  },
+  "plugins": {
+    "dnd": {
+      "monster": {
+        "eyebrow": "Monstre",
+        "titleLabel": "Nom du monstre",
+        "rename": "Renommer le monstre",
+        "editorLabel": "Description du monstre",
+        "create": "Nouveau monstre",
+        "untitled": "Monstre sans titre",
+        "loreHint": "Passez à la vue Note pour la description, les tactiques et le trésor de ce monstre.",
+        "view": {
+          "statBlock": "Bloc de stats"
+        }
+      }
+    }
   },
   "genericFieldView": {
     "plainHeading": "Autres métadonnées",

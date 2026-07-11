@@ -24,6 +24,9 @@
       "core": {
         "note": "Note",
         "hexmap": "Map"
+      },
+      "dnd": {
+        "monster": "Monster"
       }
     },
     "loadErrorTitle": "Couldn't load your library.",
@@ -81,6 +84,22 @@
     "entityLink": {
       "set": "Link an entity…",
       "change": "Change entity…"
+    }
+  },
+  "plugins": {
+    "dnd": {
+      "monster": {
+        "eyebrow": "Monster",
+        "titleLabel": "Monster name",
+        "rename": "Rename monster",
+        "editorLabel": "Monster lore",
+        "create": "New monster",
+        "untitled": "Untitled monster",
+        "loreHint": "Switch to the Note view for this monster's lore, tactics, and treasure.",
+        "view": {
+          "statBlock": "Stat block"
+        }
+      }
     }
   },
   "noteView": {

@@ -41,7 +41,7 @@ describe('EntityTypesEditor', () => {
 
   function render(types: string[], metadata: Record<string, unknown> = {}, writable = true) {
     TestBed.configureTestingModule({ imports: [EntityTypesEditor, provideTranslocoTesting()] });
-    TestBed.inject(TypeRegistry).register(definition('dnd.monster', [lairField]));
+    TestBed.inject(TypeRegistry).register(definition('test.monster', [lairField]));
     const fixture = TestBed.createComponent(EntityTypesEditor);
     ref = fixture.componentRef;
     ref.setInput('types', types);
@@ -104,7 +104,7 @@ describe('EntityTypesEditor', () => {
 
     // Adding a type with an unmet required Field opens the prompt instead of adding straight away.
     const add = q('type-add') as HTMLSelectElement;
-    add.value = 'dnd.monster';
+    add.value = 'test.monster';
     add.dispatchEvent(new Event('change'));
     fixture.detectChanges();
     expect(q('type-add-prompt')).not.toBeNull();
@@ -122,17 +122,17 @@ describe('EntityTypesEditor', () => {
 
     q('type-add-confirm').click();
     expect(emittedMetadata.at(-1)).toEqual({ lair: 'Sunken keep' });
-    expect(emittedTypes.at(-1)).toEqual(['core.note', 'dnd.monster']);
+    expect(emittedTypes.at(-1)).toEqual(['core.note', 'test.monster']);
   });
 
   it('skips the prompt when the required Field is already satisfied by existing Metadata (#189)', () => {
     // A re-added type whose values persist as free Metadata (CONTEXT.md → Field) needs no prompt.
     render(['core.note'], { lair: 'Sunken keep' });
     const add = q('type-add') as HTMLSelectElement;
-    add.value = 'dnd.monster';
+    add.value = 'test.monster';
     add.dispatchEvent(new Event('change'));
     expect(q('type-add-prompt')).toBeNull();
-    expect(emittedTypes.at(-1)).toEqual(['core.note', 'dnd.monster']);
+    expect(emittedTypes.at(-1)).toEqual(['core.note', 'test.monster']);
   });
 
   it('shows no editing affordances for a read-only opener', () => {

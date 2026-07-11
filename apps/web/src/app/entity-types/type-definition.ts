@@ -60,9 +60,10 @@ export interface TypeDefinition {
   /**
    * The type's **Field schema** (ADR-0048, #187): the Metadata keys it types, each
    * with a data-type and required-ness. A typing *lens* over Metadata — values stay
-   * in the one Metadata map. A type that declares Fields additionally affords the
-   * generic Field View (`core.view.fields`); the core types declare none, so it is
-   * optional and defaults to empty.
+   * in the one Metadata map. Which View renders them is the type's own choice, made
+   * in {@link views}: a user-defined type (and any plugin shipping no code) lists
+   * `core.view.fields`; a plugin that ships a bespoke view (`dnd.monster`) lists that
+   * instead. The core types declare no Fields at all, so this is optional.
    */
   readonly fields?: readonly FieldSchema[];
   /**

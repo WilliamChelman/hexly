@@ -12,6 +12,7 @@ import { RightDock } from './services/right-dock';
 import { EntityHeader } from './components/entity-header';
 import { ViewRegistry } from '../../entity-types/view-registry';
 import { CORE_VIEW_DEFINITIONS } from './views/core-views';
+import { PLUGIN_VIEW_DEFINITIONS } from '../../plugins/bundled-views';
 
 /**
  * The open-Entity route (`/entities/:id`, #70): the routed page that loads the
@@ -78,10 +79,11 @@ export class EntityPage {
   protected readonly activeComponent = computed(() => this.views.resolve(this.viewStore.activeView()).component);
 
   constructor() {
-    // Register the core Views from the lazy entity chunk, the same path a bundled
-    // plugin would use, and drop them when the page is torn down (ADR-0048). Kept out
-    // of the root ViewRegistry so the heavy view bodies stay off the initial bundle.
-    const unregister = CORE_VIEW_DEFINITIONS.map((d) => this.views.register(d));
+    // Register the core Views from the lazy entity chunk — and, through the identical call, the
+    // bundled plugins' own (the `dnd.monster` stat block, #192) — dropping them when the page is
+    // torn down (ADR-0048). Kept out of the root ViewRegistry so the heavy view bodies stay off the
+    // initial bundle.
+    const unregister = [...CORE_VIEW_DEFINITIONS, ...PLUGIN_VIEW_DEFINITIONS].map((d) => this.views.register(d));
     inject(DestroyRef).onDestroy(() => unregister.forEach((u) => u()));
 
     const route = inject(ActivatedRoute);

@@ -20,7 +20,9 @@ describe('WorldTypesLoader', () => {
     source: 'user',
     fields: [{ key: 'domain', label: 'Domain', dataType: { kind: 'string' }, required: false, facetable: true }],
   };
-  const monster: AvailableType = { id: 'dnd.monster', label: 'Monster', source: 'plugin', fields: [] };
+  // A plugin-source type as the API reports it. The web already knows its plugin types from code, so
+  // the loader must ignore these rows rather than re-register a view-less copy over the real one.
+  const monster: AvailableType = { id: 'test.monster', label: 'Monster', source: 'plugin', fields: [] };
 
   let worldId: ReturnType<typeof signal<string | null>>;
   let availableTypes: ReturnType<typeof vi.fn>;
@@ -59,7 +61,7 @@ describe('WorldTypesLoader', () => {
     worldId.set('w1');
     TestBed.flushEffects();
 
-    expect(registry.get('dnd.monster')).toBeUndefined();
+    expect(registry.get('test.monster')).toBeUndefined();
   });
 
   it('drops the previous World’s user types on a World change (no cross-World leak)', () => {

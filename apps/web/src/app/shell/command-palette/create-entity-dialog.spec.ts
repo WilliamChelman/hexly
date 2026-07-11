@@ -12,7 +12,7 @@ import { CORE_VIEW_CONTENT } from '../../entity-types/view-definition';
 
 /** A plugin-style type declaring one required Field — to exercise the create-time required-Fields form. */
 const monster: TypeDefinition = {
-  id: 'dnd.monster',
+  id: 'test.monster',
   icon: 'label',
   views: [CORE_VIEW_CONTENT],
   fields: [{ key: 'lair', label: 'Lair', dataType: { kind: 'string' }, required: true, facetable: false }],
@@ -166,7 +166,7 @@ describe('CreateEntityDialog', () => {
         id: 'e1',
         name: 'Balthazar',
         worldId: 'w1',
-        types: ['dnd.monster'],
+        types: ['test.monster'],
         tags: [],
         visibility: 'private',
         version: 1,
@@ -178,7 +178,7 @@ describe('CreateEntityDialog', () => {
     );
 
     // Open seeded with the required-Field type (as a "Create Monster" command would).
-    state.open('dnd.monster');
+    state.open('test.monster');
     fixture.detectChanges();
 
     const nameInput: HTMLInputElement = q(fixture, 'create-entity-name');
@@ -203,7 +203,7 @@ describe('CreateEntityDialog', () => {
     submit.click();
     fixture.detectChanges();
     // The collected value rides the create as initial Metadata.
-    expect(entitiesClient.create).toHaveBeenCalledWith('Balthazar', ['dnd.monster'], 'w1', { lair: 'Sunken keep' });
+    expect(entitiesClient.create).toHaveBeenCalledWith('Balthazar', ['test.monster'], 'w1', { lair: 'Sunken keep' });
   });
 
   it('closes without creating anything on cancel', () => {

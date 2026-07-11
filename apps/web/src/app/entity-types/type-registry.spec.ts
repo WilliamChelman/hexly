@@ -1,8 +1,10 @@
 import { TestBed } from '@angular/core/testing';
 import { FieldSchema } from '@hexly/domain';
+import { DND_MONSTER } from '@hexly/plugins';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { TypeRegistry } from './type-registry';
 import { TypeDefinition } from './type-definition';
+import { DND_VIEW_STAT_BLOCK } from '../plugins/dnd/dnd-types';
 import { CORE_VIEW_CONTENT, CORE_VIEW_FIELDS, CORE_VIEW_MAP } from './view-definition';
 
 function definition(id: string, fields?: readonly FieldSchema[]): TypeDefinition {
@@ -41,8 +43,10 @@ describe('TypeRegistry', () => {
     registry = TestBed.inject(TypeRegistry);
   });
 
-  it('seeds the core note and hexmap types (core dogfoods register())', () => {
-    expect(registry.all().map((d) => d.id)).toEqual(['core.note', 'core.hexmap']);
+  it('seeds the core types, then the bundled plugins — all through one register()', () => {
+    // The core dogfoods the plugin API: `core.note`/`core.hexmap` and `dnd.monster` arrive by the
+    // same call, and the registry cannot tell which is which (ADR-0048, #192).
+    expect(registry.all().map((d) => d.id)).toEqual(['core.note', 'core.hexmap', DND_MONSTER]);
   });
 
   it('resolves a registered definition by its type id', () => {
@@ -51,14 +55,14 @@ describe('TypeRegistry', () => {
   });
 
   it('returns undefined for an unregistered or absent type', () => {
-    expect(registry.get('dnd.monster')).toBeUndefined();
+    expect(registry.get('pathfinder.monster')).toBeUndefined();
     expect(registry.get(null)).toBeUndefined();
     expect(registry.get(undefined)).toBeUndefined();
   });
 
   it('resolves an unregistered or absent type to the core note fallback', () => {
     expect(registry.resolve('core.hexmap').id).toBe('core.hexmap');
-    expect(registry.resolve('dnd.monster').id).toBe('core.note');
+    expect(registry.resolve('pathfinder.monster').id).toBe('core.note');
     expect(registry.resolve(undefined).id).toBe('core.note');
   });
 
@@ -71,23 +75,51 @@ describe('TypeRegistry', () => {
     expect(registry.viewsFor(undefined)).toEqual([]);
   });
 
-  it('affords the generic Field View for a type that declares Fields (ADR-0048)', () => {
-    registry.register(definition('dnd.beast', [crField]));
-    // The declared-Field type unions its own views plus the generic Field View.
-    expect(registry.viewsFor(['dnd.beast'])).toEqual([CORE_VIEW_CONTENT, CORE_VIEW_FIELDS]);
-    // A core type declares no Fields, so it never surfaces the generic View.
+  /** One View per surface the Entity's payloads and types afford — the header's whole rule (#192). */
+  describe('view-per-surface for the bundled dnd.monster plugin', () => {
+    it('offers the stat block and the Note view, defaulting to the plugin’s own', () => {
+      expect(registry.viewsFor([DND_MONSTER])).toEqual([DND_VIEW_STAT_BLOCK, CORE_VIEW_CONTENT]);
+    });
+
+    it('offers the stat block, Note, and Map when the monster also carries core.hexmap', () => {
+      expect(registry.viewsFor([DND_MONSTER, 'core.hexmap'])).toEqual([
+        DND_VIEW_STAT_BLOCK,
+        CORE_VIEW_CONTENT,
+        CORE_VIEW_MAP,
+      ]);
+      // Re-primarying the hexmap re-orders the union, so the Map becomes the default View.
+      expect(registry.viewsFor(['core.hexmap', DND_MONSTER])).toEqual([
+        CORE_VIEW_MAP,
+        CORE_VIEW_CONTENT,
+        DND_VIEW_STAT_BLOCK,
+      ]);
+    });
+
+    it('does not drag in the generic Field View — a bespoke view is what the code bought', () => {
+      expect(registry.viewsFor([DND_MONSTER])).not.toContain(CORE_VIEW_FIELDS);
+    });
+  });
+
+  it('affords exactly the Views a registered type declares', () => {
+    // A fields-only type (every user-defined one) declares the generic Field View outright…
+    registry.register({ ...definition('dnd.beast', [crField]), views: [CORE_VIEW_FIELDS] });
+    expect(registry.viewsFor(['dnd.beast'])).toEqual([CORE_VIEW_FIELDS]);
+    // …and a core type declaring no Fields never surfaces it.
     expect(registry.viewsFor(['core.note'])).toEqual([CORE_VIEW_CONTENT]);
   });
 
   it('falls back to the generic Field View for an unregistered type — the missing-plugin case', () => {
-    // No definition registered for `dnd.monster`: the Entity still affords the generic View, which
-    // renders it as an inert chip over its plain Metadata rather than a blank screen.
-    expect(registry.viewsFor(['dnd.monster'])).toEqual([CORE_VIEW_FIELDS]);
+    // No definition registered for `pathfinder.monster`: the Entity still affords the generic View,
+    // which renders it as an inert chip over its plain Metadata rather than a blank screen.
+    expect(registry.viewsFor(['pathfinder.monster'])).toEqual([CORE_VIEW_FIELDS]);
   });
 
   it('resolves the union of Field schemas a types[] set declares, primary type first', () => {
     registry.register(definition('dnd.beast', [crField]));
     expect(registry.resolveFields(['dnd.beast']).map((f) => f.key)).toEqual(['cr']);
+    // The bundled plugin's schema resolves through the same path — the web twin of what the API's
+    // write gate and facet build read (#192).
+    expect(registry.resolveFields([DND_MONSTER]).map((f) => f.key)).toContain('challenge_rating');
     // A set of types that declare no Fields resolves to none — values stay plain Metadata.
     expect(registry.resolveFields(['core.note'])).toEqual([]);
     expect(registry.resolveFields(undefined)).toEqual([]);
@@ -95,21 +127,21 @@ describe('TypeRegistry', () => {
 
   it('lists the type ids contributing a View — backing the maps filter', () => {
     expect(registry.typeIdsForView(CORE_VIEW_MAP)).toEqual(['core.hexmap']);
-    expect(registry.typeIdsForView(CORE_VIEW_CONTENT)).toEqual(['core.note', 'core.hexmap']);
+    expect(registry.typeIdsForView(CORE_VIEW_CONTENT)).toEqual(['core.note', 'core.hexmap', DND_MONSTER]);
   });
 
   it('registers a new definition and drops it via the returned unregister fn', () => {
-    const def = definition('dnd.monster');
+    const def = definition('pathfinder.monster');
     const unregister = registry.register(def);
 
-    expect(registry.get('dnd.monster')).toBe(def);
+    expect(registry.get('pathfinder.monster')).toBe(def);
     unregister();
-    expect(registry.get('dnd.monster')).toBeUndefined();
+    expect(registry.get('pathfinder.monster')).toBeUndefined();
   });
 
-  it('keeps definitions in registration order (core first)', () => {
-    registry.register(definition('dnd.monster'));
-    expect(registry.all().map((d) => d.id)).toEqual(['core.note', 'core.hexmap', 'dnd.monster']);
+  it('keeps definitions in registration order (core, plugins, then the rest)', () => {
+    registry.register(definition('pathfinder.monster'));
+    expect(registry.all().map((d) => d.id)).toEqual(['core.note', 'core.hexmap', DND_MONSTER, 'pathfinder.monster']);
   });
 
   /**
@@ -137,12 +169,12 @@ describe('TypeRegistry', () => {
     });
 
     it('resolves a code type’s name and chrome through its transloco keys', () => {
-      registry.register(definition('dnd.monster'));
+      registry.register(definition('pathfinder.monster'));
 
       // The testing catalog has no copy for these, so transloco echoes the key — proving the *key*
       // path is taken for a code type (and, by contrast, is never taken for a user-defined one).
-      expect(registry.name('dnd.monster')).toBe('entityBrowser.type.dnd.monster');
-      expect(registry.chromeLabel('dnd.monster', 'create')).toBe('dnd.monster.create');
+      expect(registry.name('pathfinder.monster')).toBe('entityBrowser.type.pathfinder.monster');
+      expect(registry.chromeLabel('pathfinder.monster', 'create')).toBe('pathfinder.monster.create');
     });
   });
 });

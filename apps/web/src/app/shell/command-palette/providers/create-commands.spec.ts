@@ -18,9 +18,11 @@ describe('CreateCommands', () => {
     expect(provider.prefix).toBe('>');
   });
 
-  it('offers Create Note and Create Map regardless of query', async () => {
+  it('offers a create Command per registered type — core first, then the bundled plugins', async () => {
     const commands = await firstValueFrom(provider.search(''));
-    expect(commands.map((c) => c.id)).toEqual(['create-note', 'create-map']);
+    // `create-dnd.monster` is not enumerated anywhere: the bundled plugin registers its type and the
+    // Command falls out of `types.all()`, which is exactly the plugin API doing its job (#192).
+    expect(commands.map((c) => c.id)).toEqual(['create-note', 'create-map', 'create-dnd.monster']);
   });
 
   it('opens the create dialog seeded with the Note type when Create Note runs', async () => {

@@ -3,6 +3,7 @@ import { TranslocoService } from '@jsverse/transloco';
 import { CORE_NOTE, EntityType, FieldSchema, resolveFields } from '@hexly/domain';
 import { TypeDefinition, TypeLabels } from './type-definition';
 import { CORE_TYPE_DEFINITIONS } from './core-types';
+import { PLUGIN_TYPE_DEFINITIONS } from '../plugins/bundled-types';
 import { CORE_VIEW_FIELDS, ViewId } from './view-definition';
 
 /**
@@ -13,20 +14,24 @@ import { CORE_VIEW_FIELDS, ViewId } from './view-definition';
  * per-type icon, labels, and afforded view surfaces, replacing the scattered
  * `type === 'hexmap'` / `type === 'note'` branches (ADR-0048).
  *
- * Core `note`/`hexmap` register through the same path a bundled plugin would, so
- * the type API is exercised by the core. They are seeded here for this prefactor;
- * #184 moves core registration into its own internal lib.
+ * Core `note`/`hexmap` register through the same path a bundled plugin does — the
+ * two seedings below are the same call with different data, which is what keeps the
+ * plugin API from rotting un-exercised (ADR-0048). A World's user-defined types join
+ * the same registry at runtime, projected by {@link WorldTypesLoader} (#191).
  */
 @Injectable({ providedIn: 'root' })
 export class TypeRegistry {
   private readonly transloco = inject(TranslocoService);
   private readonly definitions = signal<readonly TypeDefinition[]>([]);
 
-  /** Every registered definition, in registration order (core first). */
+  /** Every registered definition, in registration order (core, then the bundled plugins). */
   readonly all = this.definitions.asReadonly();
 
   constructor() {
     for (const def of CORE_TYPE_DEFINITIONS) this.register(def);
+    // The bundled plugins (`dnd.monster`, #192) — registered instance-wide at startup, through the
+    // identical `register()` the core just used. The registry knows the list, never a plugin.
+    for (const def of PLUGIN_TYPE_DEFINITIONS) this.register(def);
   }
 
   register(definition: TypeDefinition): () => void {
@@ -57,22 +62,22 @@ export class TypeRegistry {
    * the union of every type's contributed views, in `types` order, primary type
    * first (ADR-0048, *Views* amendment). Drives the header view toggle: a note
    * yields `[core.view.content]` (one view, no toggle); a hexmap yields
-   * `[core.view.map, core.view.content]`; a future `[dnd.monster, core.hexmap]`
-   * composes all three. `types[0]`'s first view is the default.
+   * `[core.view.map, core.view.content]`; a `[dnd.monster, core.hexmap]` composes
+   * all three (stat block, Note, and Map). `types[0]`'s first view is the default.
+   *
+   * A registered type affords exactly the Views it declares — so a plugin shipping a
+   * bespoke view (the stat block) does *not* also drag in the generic Field View,
+   * while a fields-only type (every user-defined one, #191) declares
+   * `core.view.fields` outright. Only an **unregistered** type — a missing plugin —
+   * falls back to it, which is the graceful-absence path: an inert chip over the
+   * values, still plain Metadata (#187).
    */
   viewsFor(types: readonly string[] | null | undefined): ViewId[] {
     const seen = new Set<ViewId>();
     for (const type of types ?? []) {
       const def = this.get(type);
-      if (def) {
-        for (const view of def.views) seen.add(view);
-        // A type that declares Fields additionally affords the generic Field View (ADR-0048, #187).
-        if (def.fields?.length) seen.add(CORE_VIEW_FIELDS);
-      } else {
-        // An absent/unregistered type — a missing plugin, a World-defined type with no code — falls
-        // back to the generic Field View, which shows it as an inert chip over its plain Metadata.
-        seen.add(CORE_VIEW_FIELDS);
-      }
+      if (def) for (const view of def.views) seen.add(view);
+      else seen.add(CORE_VIEW_FIELDS);
     }
     return [...seen];
   }

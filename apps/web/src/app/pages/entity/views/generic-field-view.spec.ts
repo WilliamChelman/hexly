@@ -147,11 +147,12 @@ describe('GenericFieldView', () => {
   });
 
   it('falls back to an inert chip + plain Metadata for a type with no registered view', () => {
-    // No definition registered for `dnd.monster`: the missing-plugin fallback.
-    const { el } = render(detail(['dnd.monster'], { lore: 'ancient', power: 9 }, ['edit']));
+    // No definition registered for `pathfinder.monster` — the graceful-absence path an Entity takes
+    // when the plugin that typed it isn't compiled into *this* instance (#192).
+    const { el } = render(detail(['pathfinder.monster'], { lore: 'ancient', power: 9 }, ['edit']));
 
     const chip = el.querySelector('[data-testid=type-chip]');
-    expect(chip?.textContent).toContain('dnd.monster');
+    expect(chip?.textContent).toContain('pathfinder.monster');
     // Its values fall through to the plain-Metadata display — nothing hidden, nothing editable.
     const plain = el.querySelector('[data-testid=field-plain-metadata]');
     expect(plain?.textContent).toContain('lore');

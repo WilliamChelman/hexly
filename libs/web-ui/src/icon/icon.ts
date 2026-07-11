@@ -23,6 +23,7 @@ import {
   LucideShare2,
   LucideSun,
   LucideHexagon,
+  LucideSkull,
   LucideUndo2,
   LucideUpload,
   LucideDownload,
@@ -103,6 +104,9 @@ const LUCIDE: Record<string, LucideIconData> = {
   select: LucideMousePointer2.icon,
   settings: LucideSettings.icon,
   share: LucideShare2.icon,
+  // The `dnd.monster` plugin type's glyph (#192) — a bundled plugin dresses its type in the
+  // instance's one icon vocabulary rather than smuggling in art of its own.
+  skull: LucideSkull.icon,
   sun: LucideSun.icon,
   terrain: LucideHexagon.icon,
   undo: LucideUndo2.icon,

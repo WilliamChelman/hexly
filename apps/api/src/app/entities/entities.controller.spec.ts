@@ -1654,6 +1654,81 @@ describe('Entities endpoints', () => {
     });
   });
 
+  /**
+   * The bundled `dnd.monster` plugin (#192). Nothing here registers a type: the plugin declared it in
+   * code and {@link TypeFieldRegistry} seeded it at startup — which is what "the plugin's Field schema
+   * is known on the API side" means. The API knows nothing of the plugin's stat-block view; it knows
+   * its Fields, and that is enough to validate and facet a monster.
+   */
+  describe('the bundled dnd.monster plugin type', () => {
+    /** Typed-save a monster with the given Metadata — an active typed edit, so the gate applies. */
+    async function saveMonster(agent: Awaited<ReturnType<typeof signIn>>, metadata: Record<string, unknown>) {
+      const created = await agent
+        .post('/entities')
+        .send({ name: 'Aboleth', types: ['core.note'] })
+        .expect(201);
+      const res = await agent.put(`/entities/${created.body.id}`).send({
+        document: { content: emptyContent(), metadata },
+        version: 1,
+        tags: [],
+        types: ['dnd.monster'],
+      });
+      return { id: created.body.id as string, worldId: created.body.worldId as string, res };
+    }
+
+    it('resolves the plugin’s schema for the forward-only gate — a monster needs its challenge_rating', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+
+      const missing = await saveMonster(ada, { size: 'Huge' });
+      expect(missing.res.status).toBe(400);
+      expect(missing.res.body.code).toBe('invalid-fields');
+      expect(missing.res.body.data.fields).toContainEqual({ key: 'challenge_rating', code: 'required' });
+
+      // A CR is a number; the string a stat block *prints* is not the value it stores.
+      const illTyped = await saveMonster(ada, { challenge_rating: '24' });
+      expect(illTyped.res.status).toBe(400);
+
+      const ok = await saveMonster(ada, { challenge_rating: 24, size: 'Huge', creature_type: 'dragon' });
+      expect(ok.res.status).toBe(200);
+    });
+
+    it('facets a monster on the plugin’s facetable Fields, challenge_rating as a number', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const dragon = await saveMonster(ada, { challenge_rating: 24, size: 'Huge', creature_type: 'dragon' });
+      expect(dragon.res.status).toBe(200);
+
+      const facets = await ada
+        .get('/entities/facets')
+        .query({ worldId: dragon.worldId, type: 'dnd.monster' })
+        .expect(200);
+      const keys = (facets.body.fields as { key: string }[]).map((f) => f.key);
+      expect(keys).toEqual(['size', 'creature_type', 'challenge_rating']);
+
+      // The CR is indexed as a *number*, so a range filter compares it as one (`cr >= 20`).
+      const ranged = await ada
+        .get('/entities')
+        .query({ worldId: dragon.worldId, field: 'challenge_rating:gte:20' })
+        .expect(200);
+      expect(ranged.body.items.map((e: { id: string }) => e.id)).toEqual([dragon.id]);
+
+      const outOfRange = await ada
+        .get('/entities')
+        .query({ worldId: dragon.worldId, field: 'challenge_rating:gte:25' })
+        .expect(200);
+      expect(outOfRange.body.items).toEqual([]);
+    });
+
+    it('lists the plugin type in a World’s available types, alongside its user-defined ones', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const worldId = (await ada.get('/worlds').expect(200)).body[0].id;
+
+      const listed = await ada.get(`/worlds/${worldId}/types`).expect(200);
+      expect(listed.body).toContainEqual(
+        expect.objectContaining({ id: 'dnd.monster', label: 'Monster', source: 'plugin' }),
+      );
+    });
+  });
+
   it('refuses every entity route without a session cookie', async () => {
     const server = app.getHttpServer();
 
