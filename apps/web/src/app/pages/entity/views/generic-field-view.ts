@@ -3,6 +3,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { FieldSchema, Metadata, readField, validateFields, writeField } from '@hexly/domain';
 import { EntitySession } from '../services/entity-session';
 import { TypeRegistry } from '../../../entity-types/type-registry';
+import { FieldControl } from './field-control';
 
 /**
  * The **generic Field View** (`core.view.fields`, ADR-0048, #187): renders an Entity's
@@ -25,7 +26,7 @@ import { TypeRegistry } from '../../../entity-types/type-registry';
   selector: 'app-generic-field-view',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'contents' },
-  imports: [TranslocoPipe],
+  imports: [TranslocoPipe, FieldControl],
   template: `
     <div class="absolute inset-0 overflow-y-auto bg-surface-sunken" data-testid="generic-field-view">
       <div class="max-w-[60rem] mx-auto py-6 px-6 flex flex-col gap-6">
@@ -55,62 +56,13 @@ import { TypeRegistry } from '../../../entity-types/type-registry';
                 }
               </dt>
               <dd class="m-0" [attr.data-testid]="'field-' + field.key">
-                @switch (field.dataType.kind) {
-                  @case ('boolean') {
-                    <input
-                      type="checkbox"
-                      [checked]="boolValue(field)"
-                      [disabled]="!writable()"
-                      (change)="set(field, checkboxChecked($event))"
-                    />
-                  }
-                  @case ('enum') {
-                    <select
-                      class="w-full rounded border border-line bg-surface px-2 py-1 text-sm"
-                      [disabled]="!writable()"
-                      [attr.aria-invalid]="isInvalid(field) || null"
-                      (change)="set(field, selectValue($event))"
-                    >
-                      <option value=""></option>
-                      @for (option of options(field); track option) {
-                        <option [value]="option" [selected]="option === stringValue(field)">
-                          {{ option }}
-                        </option>
-                      }
-                    </select>
-                  }
-                  @case ('date') {
-                    <input
-                      type="date"
-                      class="rounded border border-line bg-surface px-2 py-1 text-sm"
-                      [value]="stringValue(field)"
-                      [disabled]="!writable()"
-                      [attr.aria-invalid]="isInvalid(field) || null"
-                      (change)="set(field, inputValue($event))"
-                    />
-                  }
-                  @case ('number') {
-                    <input
-                      type="number"
-                      class="w-full rounded border border-line bg-surface px-2 py-1 text-sm"
-                      [value]="stringValue(field)"
-                      [disabled]="!writable()"
-                      [attr.aria-invalid]="isInvalid(field) || null"
-                      (input)="set(field, numberValue($event))"
-                    />
-                  }
-                  @default {
-                    <!-- string, and list<scalar> as a comma-separated text field. -->
-                    <input
-                      type="text"
-                      class="w-full rounded border border-line bg-surface px-2 py-1 text-sm"
-                      [value]="stringValue(field)"
-                      [disabled]="!writable()"
-                      [attr.aria-invalid]="isInvalid(field) || null"
-                      (input)="set(field, typedValue(field, inputValue($event)))"
-                    />
-                  }
-                }
+                <app-field-control
+                  [field]="field"
+                  [value]="rawValue(field)"
+                  [disabled]="!writable()"
+                  [invalid]="isInvalid(field)"
+                  (valueChange)="set(field, $event)"
+                />
               </dd>
             }
           </dl>
@@ -144,16 +96,14 @@ export class GenericFieldView {
   /** A read-only opener edits nothing — the controls render disabled (ADR-0037). */
   protected readonly writable = computed(() => this.session.writable());
 
-  /** The union of Field schemas the open Entity's types declare (primary first, deduped by key). */
-  protected readonly fields = computed(() => this.types.resolveFields(this.session.current()?.types));
+  /** The union of Field schemas the open Entity's live types declare (primary first, deduped by key). */
+  protected readonly fields = computed(() => this.types.resolveFields(this.session.types()));
 
   /** The live working Metadata — read off the central store's body, written back through mutate. */
   private readonly metadata = computed<Metadata>(() => this.session.body().metadata ?? {});
 
   /** Types with no registered definition: the missing-plugin fallback, shown as inert chips. */
-  protected readonly unknownTypes = computed(() =>
-    (this.session.current()?.types ?? []).filter((type) => !this.types.get(type)),
-  );
+  protected readonly unknownTypes = computed(() => this.session.types().filter((type) => !this.types.get(type)));
 
   /** Metadata keys the declared Fields don't type — shown read-only as plain Metadata. */
   protected readonly plainEntries = computed(() => {
@@ -172,21 +122,9 @@ export class GenericFieldView {
     return this.invalidKeys().has(field.key);
   }
 
-  /** The options of an `enum` Field, for its `<select>`; empty for any other data-type. */
-  protected options(field: FieldSchema): readonly string[] {
-    return field.dataType.kind === 'enum' ? field.dataType.options : [];
-  }
-
-  protected boolValue(field: FieldSchema): boolean {
-    return readField(this.metadata(), field) === true;
-  }
-
-  /** The Field's value rendered as an input string — a list joins on `, `, a scalar stringifies. */
-  protected stringValue(field: FieldSchema): string {
-    const value = readField(this.metadata(), field);
-    if (value == null) return '';
-    if (Array.isArray(value)) return value.join(', ');
-    return String(value);
+  /** The Field's raw value straight off the live Metadata map — the lens the control reads. */
+  protected rawValue(field: FieldSchema): unknown {
+    return readField(this.metadata(), field);
   }
 
   /**
@@ -199,35 +137,6 @@ export class GenericFieldView {
     this.session.mutate((draft) => {
       draft.metadata = writeField(draft.metadata, field, value);
     });
-  }
-
-  /** Coerce a text input to the Field's data-type: a `list` splits on commas, a scalar passes through. */
-  protected typedValue(field: FieldSchema, raw: string): unknown {
-    if (field.dataType.kind !== 'list') return raw;
-    const itemKind = field.dataType.of.kind;
-    return raw
-      .split(',')
-      .map((part) => part.trim())
-      .filter((part) => part.length > 0)
-      .map((part) => (itemKind === 'number' ? Number(part) : part));
-  }
-
-  /** An empty number input clears the Field; otherwise it becomes a real `number`. */
-  protected numberValue(event: Event): number | undefined {
-    const raw = this.inputValue(event);
-    return raw === '' ? undefined : Number(raw);
-  }
-
-  protected inputValue(event: Event): string {
-    return (event.target as HTMLInputElement).value;
-  }
-
-  protected selectValue(event: Event): string {
-    return (event.target as HTMLSelectElement).value;
-  }
-
-  protected checkboxChecked(event: Event): boolean {
-    return (event.target as HTMLInputElement).checked;
   }
 }
 

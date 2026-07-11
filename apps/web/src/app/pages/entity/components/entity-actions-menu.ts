@@ -36,6 +36,14 @@ import { ActiveWorld } from '@hexly/web-core';
     <ng-template #actionsMenu>
       <div appMenuPanel>
         @if (editable()) {
+          <!-- Edit types (#189): add/remove/reorder the type set — substance, so any writer may. -->
+          <button type="button" appMenuItem data-testid="edit-types" (triggered)="editTypes.emit()">
+            <span class="flex items-center gap-2">
+              <app-icon name="label" [size]="16" />
+              {{ 'entityTypes.editTypes' | transloco }}
+            </span>
+          </button>
+
           <!-- Visibility toggle (ADR-0037, #160): an Owner flips the Entity between
              private and shared. A non-Owner's flip is refused server-side (403). -->
           <button
@@ -89,6 +97,9 @@ export class EntityActionsMenu {
 
   /** Open the owner/grant/link Share dialog — owned by the header, its dialog surface. */
   readonly share = output<void>();
+
+  /** Open the Edit-types dialog (#189) — likewise owned by the header. */
+  readonly editTypes = output<void>();
 
   /** Visibility and rename are gated on write access (ADR-0037): a read-only opener sees neither. */
   protected readonly editable = this.session.writable;

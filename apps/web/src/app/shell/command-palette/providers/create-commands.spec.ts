@@ -23,16 +23,17 @@ describe('CreateCommands', () => {
     expect(commands.map((c) => c.id)).toEqual(['create-note', 'create-map']);
   });
 
-  it('opens the create dialog for a Note when Create Note runs', async () => {
+  it('opens the create dialog seeded with the Note type when Create Note runs', async () => {
     const [createNote] = await firstValueFrom(provider.search(''));
     createNote.run();
-    expect(state.type()).toBe('core.note');
+    // The Command seeds a one-element ordered set; the dialog lets the author add more (#189).
+    expect(state.types()).toEqual(['core.note']);
   });
 
-  it('opens the create dialog for a Map when Create Map runs', async () => {
+  it('opens the create dialog seeded with the Map type when Create Map runs', async () => {
     const [, createMap] = await firstValueFrom(provider.search(''));
     createMap.run();
-    expect(state.type()).toBe('core.hexmap');
+    expect(state.types()).toEqual(['core.hexmap']);
   });
 
   it('narrows to commands whose label matches the typed query, case-insensitively', async () => {

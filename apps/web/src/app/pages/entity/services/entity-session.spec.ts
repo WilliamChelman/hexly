@@ -128,6 +128,57 @@ describe('EntitySession', () => {
     expect(session.current()?.tags).toEqual(['deity', 'ruined']);
   });
 
+  it('seeds the open entity’s types and sends an authored type set with the save (#189)', () => {
+    openAldermoor(); // types: [core.hexmap]
+    expect(session.types()).toEqual([CORE_HEXMAP]);
+    expect(session.dirty()).toBe(false);
+
+    // Reorder to re-primary the note, and add nothing new — a pure type-set edit.
+    session.setTypes([CORE_NOTE, CORE_HEXMAP]);
+    expect(session.types()).toEqual([CORE_NOTE, CORE_HEXMAP]);
+    expect(session.dirty()).toBe(true);
+
+    const saved: EntityDetail = {
+      ...aldermoor,
+      version: 4,
+      types: [CORE_NOTE, CORE_HEXMAP],
+      document: bodyOf(editor.document()),
+    };
+    entities.save.mockReturnValue(of({ status: 'saved', entity: saved }));
+    session.save().subscribe();
+
+    // The type set rides the save as the 5th arg — an active typed edit the server gates.
+    expect(entities.save).toHaveBeenCalledWith('m1', bodyOf(editor.document()), 3, [], [CORE_NOTE, CORE_HEXMAP]);
+    expect(session.current()?.types).toEqual([CORE_NOTE, CORE_HEXMAP]);
+    expect(session.dirty()).toBe(false);
+  });
+
+  it('mints the hex-grid payload when core.hexmap is added to a note (#189)', () => {
+    const noteBody = { content };
+    const note: EntityDetail = { ...aldermoor, id: 'n1', types: [CORE_NOTE], document: noteBody };
+    entities.load.mockReturnValue(of(note));
+    session.open('n1').subscribe();
+    expect(session.body()).toEqual(noteBody);
+
+    session.setTypes([CORE_NOTE, CORE_HEXMAP]);
+
+    // The body gained an empty grid so the map View has a plane to render; Content is preserved.
+    expect(session.body()).toEqual({ ...noteBody, hexes: {}, regions: [], labels: [] });
+    expect(session.dirty()).toBe(true);
+  });
+
+  it('never sends types on a plain body edit — data at rest is not re-typed (#189)', () => {
+    openAldermoor();
+    editor.paintAt({ q: 5, r: 5 }, 'ocean'); // body edit, no type change
+
+    entities.save.mockReturnValue(of({ status: 'saved', entity: { ...aldermoor, version: 4 } }));
+    session.save().subscribe();
+
+    // Four args: the type set is omitted, so the server leaves the stored types untouched.
+    expect(entities.save).toHaveBeenCalledWith('m1', expect.anything(), 3, []);
+    expect(entities.save.mock.calls[0]).toHaveLength(4);
+  });
+
   it('preserves the caller’s load-time Rights across a save (ADR-0039)', () => {
     // Load carries the Owner's Rights; the server's save response omits them. A content
     // save mustn't drop the caller's standing — else Share vanishes after autosave.

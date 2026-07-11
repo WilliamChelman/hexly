@@ -268,7 +268,7 @@ describe('WorldDashboard', () => {
 
     ($(el, '[data-testid=create-note]') as HTMLButtonElement).click();
 
-    expect(entities.create).toHaveBeenCalledWith(expect.any(String), 'core.note', 'w1');
+    expect(entities.create).toHaveBeenCalledWith(expect.any(String), ['core.note'], 'w1');
     expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'new1']);
   });
 });

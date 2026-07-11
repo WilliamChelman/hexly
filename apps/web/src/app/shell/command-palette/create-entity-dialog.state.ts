@@ -10,15 +10,17 @@ import { EntityType } from '@hexly/domain';
  */
 @Injectable({ providedIn: 'root' })
 export class CreateEntityDialogState {
-  private readonly _type = signal<EntityType | null>(null);
+  // The ordered type set the dialog opens seeded with; `types[0]` primary (ADR-0048, #189). A
+  // Command opens it with a single type and the dialog lets the author add more before creating.
+  private readonly _types = signal<readonly EntityType[] | null>(null);
 
-  readonly type = this._type.asReadonly();
+  readonly types = this._types.asReadonly();
 
   open(type: EntityType): void {
-    this._type.set(type);
+    this._types.set([type]);
   }
 
   close(): void {
-    this._type.set(null);
+    this._types.set(null);
   }
 }

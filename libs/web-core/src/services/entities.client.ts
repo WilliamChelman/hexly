@@ -13,6 +13,7 @@ import {
   EntitySaveOutcome,
   EntityType,
   GrantRole,
+  Metadata,
   PublicLink,
   Visibility,
 } from '@hexly/domain';
@@ -142,13 +143,16 @@ export class EntitiesClient {
     return this.http.delete<void>(`/api/entities/${id}/link`);
   }
 
-  // worldId omitted, the server defaults to the caller's first World. A single core type per
-  // creation, sent as the one-element ordered `types` set the server now speaks (ADR-0048).
-  create(name: string, type: EntityType, worldId?: string): Observable<EntityDetail> {
+  /**
+   * Create an Entity with an ordered `types` set, `types[0]` primary (ADR-0048). `metadata` seeds a
+   * picked type's required Fields into the minted body. worldId omitted → the caller's first World.
+   */
+  create(name: string, types: readonly EntityType[], worldId?: string, metadata?: Metadata): Observable<EntityDetail> {
     return this.http.post<EntityDetail>('/api/entities', {
       name,
-      types: [type],
+      types,
       ...(worldId ? { worldId } : {}),
+      ...(metadata ? { metadata } : {}),
     });
   }
 
@@ -182,13 +186,24 @@ export class EntitiesClient {
     return this.http.get<string[]>('/api/entities/tags');
   }
 
-  /** Stale base → `conflict` outcome, not a thrown error; caller branches, not catches. */
-  save(id: string, body: EntityBody, version: number, tags: readonly string[]): Observable<EntitySaveOutcome> {
+  /**
+   * Stale base → `conflict` outcome, not a thrown error; caller branches, not catches. `types` is
+   * sent only when the session authored the type set (an active typed edit the server gates its
+   * Fields forward-only); a plain body edit omits it, so data at rest is never re-typed (ADR-0048).
+   */
+  save(
+    id: string,
+    body: EntityBody,
+    version: number,
+    tags: readonly string[],
+    types?: readonly EntityType[],
+  ): Observable<EntitySaveOutcome> {
     return this.http
       .put<EntityDetail>(`/api/entities/${id}`, {
         document: body,
         version,
         tags,
+        ...(types !== undefined && { types }),
       })
       .pipe(
         // Write-through: a clean save is the freshest state — feed it to the store so other watchers

@@ -193,26 +193,27 @@ describe('EntitiesClient', () => {
     expect(got).toEqual(facets);
   });
 
-  it('creates an entity by name and type', () => {
+  it('creates an entity by name and an ordered type set (#189)', () => {
     let created: EntityDetail | undefined;
-    client.create('Aldermoor', 'hexmap').subscribe((e) => (created = e));
+    client.create('Aldermoor', ['core.hexmap', 'dnd.lair']).subscribe((e) => (created = e));
 
     const req = http.expectOne('/api/entities');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ name: 'Aldermoor', types: ['hexmap'] });
+    expect(req.request.body).toEqual({ name: 'Aldermoor', types: ['core.hexmap', 'dnd.lair'] });
     req.flush(aldermoor);
 
     expect(created).toEqual(aldermoor);
   });
 
-  it('scopes a create to a World when worldId is given', () => {
-    client.create('Aldermoor', 'hexmap', 'w9').subscribe();
+  it('scopes a create to a World and carries initial Metadata when given (#189)', () => {
+    client.create('Aldermoor', ['core.hexmap'], 'w9', { cr: 5 }).subscribe();
 
     const req = http.expectOne('/api/entities');
     expect(req.request.body).toEqual({
       name: 'Aldermoor',
-      types: ['hexmap'],
+      types: ['core.hexmap'],
       worldId: 'w9',
+      metadata: { cr: 5 },
     });
     req.flush(aldermoor);
   });
@@ -289,6 +290,25 @@ describe('EntitiesClient', () => {
     req.flush(saved);
 
     expect(outcome).toEqual({ status: 'saved', entity: saved });
+  });
+
+  it('sends the authored type set only when the save carries one (#189)', () => {
+    // A type-set edit (add/remove/reorder) rides the save as an active typed edit...
+    client.save('e1', emptyHexmapBody, 1, [], ['core.hexmap', 'core.note']).subscribe();
+    const typed = http.expectOne('/api/entities/e1');
+    expect(typed.request.body).toEqual({
+      document: emptyHexmapBody,
+      version: 1,
+      tags: [],
+      types: ['core.hexmap', 'core.note'],
+    });
+    typed.flush(aldermoor);
+
+    // ...a plain body edit omits `types`, so data at rest is never re-typed.
+    client.save('e1', emptyHexmapBody, 2, []).subscribe();
+    const plain = http.expectOne('/api/entities/e1');
+    expect(plain.request.body).not.toHaveProperty('types');
+    plain.flush(aldermoor);
   });
 
   it('reads the owner’s descriptor vocabulary (#96)', () => {

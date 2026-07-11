@@ -13,6 +13,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { Button, ButtonGroup, Eyebrow, PageHeader } from '@hexly/web-ui';
 import { EntityActionsMenu } from './entity-actions-menu';
 import { EntityShareDialog } from './entity-share-dialog';
+import { EntityTypesDialog } from './entity-types-dialog';
 import { EntityTags } from './entity-tags';
 import { SaveStatus } from './save-status';
 import { EntitySession } from '../services/entity-session';
@@ -41,6 +42,7 @@ import { ViewId } from '../../../entity-types/view-definition';
     PageHeader,
     EntityActionsMenu,
     EntityShareDialog,
+    EntityTypesDialog,
     TranslocoPipe,
     EntityTags,
     SaveStatus,
@@ -100,12 +102,14 @@ import { ViewId } from '../../../entity-types/view-definition';
         </div>
       }
 
-      <!-- The Entity's actions — Visibility, Pin, and Share — gathered behind one overflow
-           menu. Share is this header's dialog surface, so the menu emits (share) and we open it. -->
-      <app-entity-actions-menu pageHeaderActions (share)="ownersOpen.set(true)" />
+      <!-- The Entity's actions — Edit types, Visibility, Pin, and Share — gathered behind one
+           overflow menu. Share and Edit types are this header's dialog surfaces, so the menu emits
+           and we open them. -->
+      <app-entity-actions-menu pageHeaderActions (share)="ownersOpen.set(true)" (editTypes)="typesOpen.set(true)" />
     </app-page-header>
 
     <app-entity-share-dialog [open]="ownersOpen()" (closed)="ownersOpen.set(false)" (resigned)="onResigned()" />
+    <app-entity-types-dialog [open]="typesOpen()" (closed)="typesOpen.set(false)" />
   `,
 })
 export class EntityHeader {
@@ -119,6 +123,9 @@ export class EntityHeader {
 
   /** Whether the entity Share dialog (#158) is open — toggled by the actions menu's Share item. */
   protected readonly ownersOpen = signal(false);
+
+  /** Whether the Edit-types dialog (#189) is open — toggled by the actions menu's Edit types item. */
+  protected readonly typesOpen = signal(false);
 
   /** Resigning can cost reach to this Entity, so drop back to the World Index. */
   protected onResigned(): void {
@@ -138,8 +145,8 @@ export class EntityHeader {
   protected readonly activeView = this.viewStore.activeView;
   /** The Views the open Entity affords, resolved to their toggle definitions (label + testid). */
   protected readonly viewToggle = computed(() => this.viewStore.views().map((id) => this.views.resolve(id)));
-  /** Per-type header chrome (eyebrow + title a11y labels), keyed on the primary type, falling back to the note type. */
-  protected readonly labels = computed(() => this.types.resolve(this.session.current()?.types?.[0]).labels);
+  /** Per-type header chrome (eyebrow + title a11y labels), keyed on the live primary type (types[0]), falling back to the note type. */
+  protected readonly labels = computed(() => this.types.resolve(this.session.types()[0]).labels);
   protected readonly title = computed(() => this.session.current()?.name ?? '');
 
   private readonly titleEl = viewChild.required<ElementRef<HTMLElement>>('titleEl');

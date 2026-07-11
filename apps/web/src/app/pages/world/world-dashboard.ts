@@ -355,7 +355,7 @@ export class WorldDashboard {
     this.entitiesClient
       .create(
         this.transloco.translate(this.types.resolve(type).labels.untitled),
-        type,
+        [type],
         this.activeWorld.worldId() ?? undefined,
       )
       .pipe(finalize(() => this.creating.set(false)))

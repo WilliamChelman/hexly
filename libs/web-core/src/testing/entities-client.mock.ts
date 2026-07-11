@@ -8,6 +8,7 @@ import {
   EntitySaveOutcome,
   EntityType,
   GrantRole,
+  Metadata,
   PublicLink,
 } from '@hexly/domain';
 import { EntityFacetParams, EntityListParams } from '../services/entities.client';
@@ -29,14 +30,25 @@ export class MockEntitiesClient {
       (id: string, changes: { name?: string; visibility?: EntityDetail['visibility'] }) => Observable<EntityDetail>
     >();
   delete = vi.fn<(id: string) => Observable<void>>();
-  create = vi.fn<(name: string, type: EntityType, worldId?: string) => Observable<EntityDetail>>();
+  create =
+    vi.fn<
+      (name: string, types: readonly EntityType[], worldId?: string, metadata?: Metadata) => Observable<EntityDetail>
+    >();
   load = vi.fn<(id: string) => Observable<EntityDetail>>();
   listDescriptors = vi.fn<() => Observable<string[]>>();
   // Defaults to an empty vocabulary so a spec that drives the tag input (EntityTags.suggest)
   // doesn't throw on an unstubbed listTags; override per test as needed.
   listTags = vi.fn<() => Observable<string[]>>(() => of<string[]>([]));
   save =
-    vi.fn<(id: string, body: EntityBody, version: number, tags: readonly string[]) => Observable<EntitySaveOutcome>>();
+    vi.fn<
+      (
+        id: string,
+        body: EntityBody,
+        version: number,
+        tags: readonly string[],
+        types?: readonly EntityType[],
+      ) => Observable<EntitySaveOutcome>
+    >();
   // Defaults to an empty set so a spec that mounts the owner-set panel without
   // caring about it still renders; override per test as needed.
   owners = vi.fn<(id: string) => Observable<string[]>>(() => of<string[]>([]));

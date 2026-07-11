@@ -1,12 +1,23 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, signal, untracked } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { EntityType } from '@hexly/domain';
+import { EntityType, FieldSchema, Metadata, validateFields, writeField } from '@hexly/domain';
 import { ActiveWorld, EntitiesClient, WorldStore, entityRoute } from '@hexly/web-core';
 import { Button, Field, Input, Dialog } from '@hexly/web-ui';
 import { CreateEntityDialogState } from './create-entity-dialog.state';
 import { TypeRegistry } from '../../entity-types/type-registry';
+import { EntityTypesEditor } from '../../pages/entity/components/entity-types-editor';
+import { FieldControl } from '../../pages/entity/views/field-control';
 
 /**
  * The create-Entity flow behind the `>`-prefix Create Note / Create Map
@@ -16,14 +27,17 @@ import { TypeRegistry } from '../../entity-types/type-registry';
  * Mounted once alongside {@link CommandPalette}; driven by
  * {@link CreateEntityDialogState} rather than route/component state so a
  * Command's `run()` can open it without a reference to this component.
+ *
+ * The Command seeds one primary type; the embedded {@link EntityTypesEditor} lets the author pick
+ * more (ADR-0048), and required Fields are collected below, gating Create until they validate.
  */
 @Component({
   selector: 'app-create-entity-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Dialog, Field, Input, TranslocoPipe],
+  imports: [Button, Dialog, Field, Input, TranslocoPipe, EntityTypesEditor, FieldControl],
   template: `
-    @if (dialogState.type(); as type) {
-      <app-dialog [open]="true" [heading]="createLabel(type) | transloco" (closed)="cancel()">
+    @if (dialogState.types(); as seeded) {
+      <app-dialog [open]="true" [heading]="createLabel(types()) | transloco" (closed)="cancel()">
         <label appField [label]="'commandPalette.nameLabel' | transloco">
           <input
             appInput
@@ -31,7 +45,7 @@ import { TypeRegistry } from '../../entity-types/type-registry';
             data-testid="create-entity-name"
             [value]="name()"
             (input)="onName($event)"
-            (keydown.enter)="submit(type)"
+            (keydown.enter)="submit()"
           />
         </label>
         <label appField [label]="'commandPalette.worldLabel' | transloco">
@@ -50,6 +64,42 @@ import { TypeRegistry } from '../../entity-types/type-registry';
             }
           </select>
         </label>
+        <div class="flex flex-col gap-1.5">
+          <span class="text-2xs uppercase tracking-wider text-ink-muted">{{ 'entityTypes.heading' | transloco }}</span>
+          <!-- promptOnAdd=false: added types go straight in and all required Fields are collected
+               below, so the seeded primary type the picker prompt never sees is covered too (#189). -->
+          <app-entity-types-editor
+            [types]="types()"
+            [metadata]="metadata()"
+            [promptOnAdd]="false"
+            (typesChange)="types.set($event)"
+            (metadataChange)="metadata.set($event)"
+          />
+        </div>
+
+        <!-- Required Fields for every picked type, gating Create until supplied (forward-only, #189). -->
+        @if (requiredFields().length > 0) {
+          <div class="flex flex-col gap-1.5">
+            <span class="text-2xs uppercase tracking-wider text-ink-muted">{{
+              'entityTypes.requiredFieldsHeading' | transloco
+            }}</span>
+            <dl class="grid grid-cols-[minmax(6rem,10rem)_1fr] items-center gap-x-4 gap-y-2 m-0">
+              @for (field of requiredFields(); track field.key) {
+                <dt class="text-sm text-ink-muted">
+                  {{ field.label }}<span class="text-danger" aria-hidden="true">&nbsp;*</span>
+                </dt>
+                <dd class="m-0" [attr.data-testid]="'create-field-' + field.key">
+                  <app-field-control
+                    [field]="field"
+                    [value]="metadata()[field.key]"
+                    [invalid]="invalidKeys().has(field.key)"
+                    (valueChange)="setField(field, $event)"
+                  />
+                </dd>
+              }
+            </dl>
+          </div>
+        }
         <button dialogFooter type="button" appButton data-testid="create-entity-cancel" (click)="cancel()">
           {{ 'common.cancel' | transloco }}
         </button>
@@ -59,8 +109,8 @@ import { TypeRegistry } from '../../entity-types/type-registry';
           appButton
           variant="primary"
           data-testid="create-entity-submit"
-          [attr.aria-disabled]="!worldId() || null"
-          (click)="submit(type)"
+          [attr.aria-disabled]="!worldId() || !valid() || null"
+          (click)="submit()"
         >
           {{ 'common.create' | transloco }}
         </button>
@@ -70,7 +120,7 @@ import { TypeRegistry } from '../../entity-types/type-registry';
 })
 export class CreateEntityDialog {
   protected readonly dialogState = inject(CreateEntityDialogState);
-  private readonly types = inject(TypeRegistry);
+  private readonly typeRegistry = inject(TypeRegistry);
   private readonly entitiesClient = inject(EntitiesClient);
   private readonly activeWorld = inject(ActiveWorld);
   private readonly worldStore = inject(WorldStore);
@@ -81,22 +131,42 @@ export class CreateEntityDialog {
   protected readonly worlds = this.worldStore.worlds;
   protected readonly name = signal('');
   protected readonly worldId = signal<string | null>(null);
+  /** The working ordered type set the author builds through the embedded editor. */
+  protected readonly types = signal<readonly EntityType[]>([]);
+  /** The Metadata collected for a picked type's required Fields, sent with the create. */
+  protected readonly metadata = signal<Metadata>({});
+
+  /** The union of Field schemas the picked types afford (primary first, deduped) — via the registry. */
+  private readonly fields = computed(() => this.typeRegistry.resolveFields(this.types()));
+
+  /** The required Fields the author must supply before creating — rendered as the gated form (#189). */
+  protected readonly requiredFields = computed(() => this.fields().filter((field) => field.required));
+
+  /** Every picked type's required Fields must validate before the create is allowed (#189). */
+  protected readonly valid = computed(() => validateFields(this.fields(), this.metadata()).ok);
+
+  /** Keys still failing the forward-only gate, so a required control can flag itself invalid. */
+  protected readonly invalidKeys = computed(
+    () => new Set(validateFields(this.fields(), this.metadata()).errors.map((error) => error.key)),
+  );
 
   constructor() {
-    // Reset to a fresh form every time the dialog opens for a type, defaulting
-    // the World to the one already in scope (ADR-0032).
+    // Reset to a fresh form every time the dialog opens, seeding the type set from the Command and
+    // defaulting the World to the one already in scope (ADR-0032).
     effect(() => {
-      const type = this.dialogState.type();
+      const seeded = this.dialogState.types();
       untracked(() => {
         this.name.set('');
-        this.worldId.set(type ? (this.activeWorld.worldId() ?? this.worldStore.worlds()[0]?.id ?? null) : null);
+        this.types.set(seeded ?? []);
+        this.metadata.set({});
+        this.worldId.set(seeded ? (this.activeWorld.worldId() ?? this.worldStore.worlds()[0]?.id ?? null) : null);
       });
     });
   }
 
-  /** The create-dialog heading key for `type`, from the registry (ADR-0048). */
-  protected createLabel(type: EntityType): string {
-    return this.types.resolve(type).labels.create;
+  /** The create-dialog heading key for the primary (first) type, from the registry (ADR-0048). */
+  protected createLabel(types: readonly EntityType[]): string {
+    return this.typeRegistry.resolve(types[0]).labels.create;
   }
 
   protected onName(event: Event): void {
@@ -107,16 +177,23 @@ export class CreateEntityDialog {
     this.worldId.set((event.target as HTMLSelectElement).value);
   }
 
+  /** Collect a required Field's value into the initial Metadata, clearing an emptied key (#189). */
+  protected setField(field: FieldSchema, value: unknown): void {
+    this.metadata.update((meta) => writeField(meta, field, value));
+  }
+
   protected cancel(): void {
     this.dialogState.close();
   }
 
-  protected submit(type: EntityType): void {
+  protected submit(): void {
     const worldId = this.worldId();
-    if (!worldId) return;
-    const name = this.name().trim() || this.transloco.translate(this.types.resolve(type).labels.untitled);
+    const types = this.types();
+    if (!worldId || types.length === 0 || !this.valid()) return;
+    const name = this.name().trim() || this.transloco.translate(this.typeRegistry.resolve(types[0]).labels.untitled);
+    const metadata = this.metadata();
     this.entitiesClient
-      .create(name, type, worldId)
+      .create(name, types, worldId, Object.keys(metadata).length ? metadata : undefined)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((entity) => {
         this.dialogState.close();

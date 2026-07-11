@@ -63,6 +63,19 @@
   "entityMetadata": {
     "heading": "Métadonnées"
   },
+  "entityTypes": {
+    "primary": "Principal",
+    "addLabel": "Ajouter un type…",
+    "removeLabel": "Supprimer le type : {{type}}",
+    "moveUpLabel": "Monter : {{type}}",
+    "moveDownLabel": "Descendre : {{type}}",
+    "editTypes": "Modifier les types",
+    "heading": "Types de l’entité",
+    "hint": "Le premier type est le principal — il détermine l’icône, la vue par défaut et l’en-tête.",
+    "requiredHeading": "{{type}} nécessite ces champs avant de pouvoir être ajouté :",
+    "confirmAdd": "Ajouter le type",
+    "requiredFieldsHeading": "Champs requis"
+  },
   "genericFieldView": {
     "plainHeading": "Autres métadonnées"
   },

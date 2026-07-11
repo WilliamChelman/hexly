@@ -123,6 +123,21 @@ describe('Entities endpoints', () => {
     expect(res.body.document).toEqual({ content: emptyContent() });
   });
 
+  it('seeds a multi-type create’s initial Metadata into the minted body (#189)', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+
+    // Creating with more than one type, carrying the values the create dialog collected for a
+    // picked type's required Fields — seeded straight into the body's Metadata map.
+    const res = await ada
+      .post('/entities')
+      .send({ name: 'Balthazar', types: ['core.note', 'core.hexmap'], metadata: { role: 'lich' } })
+      .expect(201);
+
+    expect(res.body.types).toEqual(['core.note', 'core.hexmap']);
+    // `types` carries the hex-grid payload; the collected Metadata rides the same body.
+    expect(res.body.document).toEqual({ ...emptyHexmapBody, metadata: { role: 'lich' } });
+  });
+
   it('trims surrounding whitespace off a created entity name', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
 

@@ -401,7 +401,10 @@ export class EntitiesService {
   }
 
   create(ownerId: string, req: CreateEntityRequest): EntityDetail {
-    const body = emptyEntityBody(req.types);
+    // Seed the minted body with the create dialog's initial Metadata (a picked type's required Field
+    // values). Not gated: like import, a create establishes at-rest data — the gate is save-only
+    // (#187), and the create dialog runs the forward-only check client-side before it sends.
+    const body = req.metadata ? { ...emptyEntityBody(req.types), metadata: req.metadata } : emptyEntityBody(req.types);
     const row = this.writes.insert({
       ownerId,
       worldId: this.resolveWorldId(ownerId, req.worldId),
@@ -477,8 +480,17 @@ export class EntitiesService {
    */
   private gateTypedEdit(req: SaveEntityRequest): void {
     if (req.types === undefined) return;
-    const fields = resolveFields(this.typeFields.resolver, req.types);
-    const validation = validateFields(fields, req.document.metadata);
+    this.assertTypedFieldsValid(req.types, req.document.metadata);
+  }
+
+  /**
+   * Resolve `types` to their Fields and reject (400 {@link EntityErrorCode.InvalidFields}) when the
+   * Metadata leaves a required Field unmet or ill-types a present one — the forward-only check
+   * {@link gateTypedEdit} runs for a typed save.
+   */
+  private assertTypedFieldsValid(types: readonly EntityType[], metadata: EntityBody['metadata']): void {
+    const fields = resolveFields(this.typeFields.resolver, types);
+    const validation = validateFields(fields, metadata);
     if (!validation.ok)
       throw new BadRequestException({
         code: EntityErrorCode.InvalidFields,

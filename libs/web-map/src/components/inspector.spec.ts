@@ -49,11 +49,12 @@ function inspectorProviders() {
           if (opts.q) items = items.filter((e) => e.name.toLowerCase().includes(opts.q!.toLowerCase()));
           return of({ items, nextCursor: null });
         },
-        create: (name: string, type: EntityType) => {
-          createdCalls.push({ name, type });
+        create: (name: string, types: readonly EntityType[]) => {
+          // The create-and-link flow sends a one-element ordered set now (#189); record its primary.
+          createdCalls.push({ name, type: types[0] });
           const detail: EntityDetail = {
             ...summary(nextCreatedId, name),
-            types: [type],
+            types: [...types],
             seq: 1,
             document: {} as EntityDetail['document'],
           };

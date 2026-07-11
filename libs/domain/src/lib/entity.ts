@@ -146,6 +146,18 @@ export function emptyEntityBody(types: readonly string[]): EntityBody {
   return types.includes(CORE_HEXMAP) ? { ...base, ...emptyHexMap() } : base;
 }
 
+/**
+ * Reconcile a body to the payloads its `types` require (ADR-0048): adding `core.hexmap` to a
+ * grid-less body mints an empty `hex-grid` so a note authored into a map opens on a blank plane.
+ * Additive only — dropping `core.hexmap` never strips the grid (the data outlives the lens, like a
+ * removed type's Metadata). Returns the same reference when nothing is missing, keeping the dirty
+ * check by reference sound.
+ */
+export function withPayloadsFor(body: EntityBody, types: readonly string[]): EntityBody {
+  if (types.includes(CORE_HEXMAP) && !hasHexGrid(body)) return { ...body, ...emptyHexMap() };
+  return body;
+}
+
 /** The reserved Metadata namespace: Hexly provenance keys (`hexly.*`) that drive placement/typing on export and are stripped from author-facing frontmatter. */
 export const HEXLY_METADATA_PREFIX = 'hexly.';
 
@@ -199,9 +211,12 @@ export const descriptorsSchema = dedupedTags.default([]);
 /** POST /entities: body (Content + payload) is minted server-side from `types`. */
 export const createEntityRequestSchema = z.object({
   name: nameSchema,
-  // The ordered type set; `types[0]` is primary. A single core type per creation here (ADR-0048).
+  // The ordered type set; `types[0]` is primary. One or more per creation (ADR-0048).
   types: typesSchema,
   tags: tagsSchema,
+  // Initial Metadata seeded into the minted body — the values the create dialog collected for a
+  // picked type's required Fields. Omitted → a blank map.
+  metadata: metadataSchema,
   // Optional target World; omitted, the server defaults to the owner's World.
   worldId: z.string().optional(),
 });

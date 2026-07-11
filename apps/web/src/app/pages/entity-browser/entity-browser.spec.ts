@@ -616,7 +616,7 @@ describe('EntityBrowser', () => {
     (fixture.nativeElement.querySelector('[data-testid=new-map]') as HTMLButtonElement).click();
 
     // Scoped to the World in the URL (ADR-0028).
-    expect(client.create).toHaveBeenCalledWith('Untitled map', 'core.hexmap', 'w1');
+    expect(client.create).toHaveBeenCalledWith('Untitled map', ['core.hexmap'], 'w1');
     expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'created']);
   });
 
@@ -636,7 +636,7 @@ describe('EntityBrowser', () => {
     );
     (fixture.nativeElement.querySelector('[data-testid=new-note]') as HTMLButtonElement).click();
 
-    expect(client.create).toHaveBeenCalledWith('Untitled note', 'core.note', 'w1');
+    expect(client.create).toHaveBeenCalledWith('Untitled note', ['core.note'], 'w1');
     expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'created']);
   });
 

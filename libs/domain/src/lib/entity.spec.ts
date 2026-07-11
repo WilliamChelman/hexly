@@ -12,6 +12,7 @@ import {
   saveEntityRequestSchema,
   tiptapContent,
   visibilitySchema,
+  withPayloadsFor,
 } from './entity';
 
 const content = {
@@ -135,6 +136,35 @@ describe('emptyEntityBody', () => {
   });
 });
 
+describe('withPayloadsFor (#189)', () => {
+  const note = emptyEntityBody([CORE_NOTE]);
+
+  it('adds the hex-grid payload when core.hexmap is added to a payload-less body', () => {
+    const reconciled = withPayloadsFor(note, [CORE_NOTE, CORE_HEXMAP]);
+
+    expect(hasHexGrid(reconciled)).toBe(true);
+    expect(entityBodySchema.parse(reconciled)).toEqual(reconciled);
+    // The base Content is preserved; only the grid payload is layered on.
+    expect(reconciled.content).toBe(note.content);
+  });
+
+  it('returns the same body reference when the grid payload is already present', () => {
+    const map = emptyEntityBody([CORE_HEXMAP]);
+    expect(withPayloadsFor(map, [CORE_HEXMAP])).toBe(map);
+  });
+
+  it('leaves a body untouched when no type requires a payload', () => {
+    expect(withPayloadsFor(note, [CORE_NOTE])).toBe(note);
+  });
+
+  it('never strips the grid when core.hexmap is dropped — the data outlives the lens', () => {
+    const map = emptyEntityBody([CORE_HEXMAP]);
+    const kept = withPayloadsFor(map, [CORE_NOTE]);
+    expect(kept).toBe(map);
+    expect(hasHexGrid(kept)).toBe(true);
+  });
+});
+
 describe('entityListQuerySchema Facet params (#155)', () => {
   it('normalizes a single Facet value to an array (a lone query param arrives as a string)', () => {
     const parsed = entityListQuerySchema.parse({
@@ -238,6 +268,17 @@ describe('createEntityRequestSchema', () => {
       }).worldId,
     ).toBe('w1');
     expect(createEntityRequestSchema.parse({ name: 'x', types: ['core.note'] }).worldId).toBeUndefined();
+  });
+
+  it('carries an optional initial Metadata map for a picked type’s required Fields (#189)', () => {
+    const parsed = createEntityRequestSchema.parse({
+      name: 'Balthazar',
+      types: ['dnd.monster'],
+      metadata: { cr: 5 },
+    });
+    expect(parsed.metadata).toEqual({ cr: 5 });
+    // Omitted metadata parses to undefined (a blank map, minted server-side).
+    expect(createEntityRequestSchema.parse({ name: 'x', types: ['core.note'] }).metadata).toBeUndefined();
   });
 });
 

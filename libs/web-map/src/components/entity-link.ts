@@ -187,7 +187,7 @@ export class EntityLink {
     this.entitiesClient
       // Scope the create-and-link Entity to the World in the URL (ADR-0028) so it
       // lands in the same World as the map being edited, not the owner's oldest.
-      .create(name, type, this.activeWorld.worldId() ?? undefined)
+      .create(name, [type], this.activeWorld.worldId() ?? undefined)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((entity) => {
         // Remember it locally so its name resolves without a server round trip,

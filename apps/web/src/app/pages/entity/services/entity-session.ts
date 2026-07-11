@@ -23,8 +23,10 @@ import {
   EntityBody,
   EntityDetail,
   EntitySaveOutcome,
+  EntityType,
   tiptapContent,
   Visibility,
+  withPayloadsFor,
 } from '@hexly/domain';
 import {
   EntitiesClient,
@@ -65,6 +67,9 @@ interface SaveSnapshot {
   body: EntityBody;
   content: Content;
   tags: readonly string[];
+  types: readonly EntityType[];
+  /** True when the type set was authored this session — only then does the save carry `types`. */
+  typesChanged: boolean;
 }
 
 @Injectable()
@@ -149,6 +154,13 @@ export class EntitySession implements ContentEditorSession, EntitySessionPort {
   private readonly _tags = signal<readonly string[]>([]);
   readonly tags = this._tags.asReadonly();
 
+  /**
+   * The live, ordered type set every type-driven surface reads, so the header, view toggle, and
+   * Field View re-primary the moment a type is added/removed/reordered, before any save (#189).
+   */
+  private readonly _types = signal<readonly EntityType[]>([]);
+  readonly types = this._types.asReadonly();
+
   private readonly _saving = signal(false);
   readonly saving = this._saving.asReadonly();
 
@@ -161,6 +173,7 @@ export class EntitySession implements ContentEditorSession, EntitySessionPort {
   private readonly _baseBody = signal<EntityBody | null>(null);
   private readonly _baseContent = signal<Content | null>(null);
   private readonly _baseTags = signal<readonly string[]>([]);
+  private readonly _baseTypes = signal<readonly EntityType[]>([]);
 
   /** True when any savable input has moved off its baseline; false with none open. */
   readonly dirty = computed(
@@ -168,7 +181,8 @@ export class EntitySession implements ContentEditorSession, EntitySessionPort {
       this._current() !== null &&
       (this._body() !== this._baseBody() ||
         this._content() !== this._baseContent() ||
-        this._tags() !== this._baseTags()),
+        this._tags() !== this._baseTags() ||
+        this._types() !== this._baseTypes()),
   );
 
   /**
@@ -233,6 +247,7 @@ export class EntitySession implements ContentEditorSession, EntitySessionPort {
       this._body();
       this._content();
       this._tags();
+      this._types();
       const armed = this.dirty() && !this._conflict() && !this._saving() && !this._loading() && !this.unsavedFailure();
       if (!armed) return;
       const timer = setTimeout(() => this.save().subscribe(), AUTOSAVE_DELAY_MS);
@@ -339,10 +354,12 @@ export class EntitySession implements ContentEditorSession, EntitySessionPort {
     this._content.set(detail.document.content); // before seed: seed effect reads content()
     this._seed.set(detail);
     this._tags.set(detail.tags);
+    this._types.set(detail.types);
     // Baseline = exactly the references now live, so a load never reads as dirty.
     this._baseBody.set(this._body());
     this._baseContent.set(this._content());
     this._baseTags.set(this._tags());
+    this._baseTypes.set(this._types());
     // A fresh Entity: reset every View's body-tied transient state (a map's undo/selection).
     this._loadGeneration.update((n) => n + 1);
     // Live-follow tracks the open Entity reactively off _current (see the reconciler), so adopt
@@ -385,6 +402,16 @@ export class EntitySession implements ContentEditorSession, EntitySessionPort {
   }
 
   /**
+   * Replace the live type set, `types[0]` primary (#189). {@link withPayloadsFor} mints the hex-grid
+   * payload when `core.hexmap` is added so the map View has a plane; removing never strips it.
+   */
+  setTypes(types: readonly EntityType[]): void {
+    this._types.set([...types]);
+    const reconciled = withPayloadsFor(this._body(), types);
+    if (reconciled !== this._body()) this._body.set(reconciled);
+  }
+
+  /**
    * Run `recipe` against a draft of the body through Immer, adopting the result and
    * returning the forward/inverse patches (ADR-0048). The universal write-channel every
    * View shares; a View that owns undo/redo (the map editor) keeps the patches to replay.
@@ -415,6 +442,7 @@ export class EntitySession implements ContentEditorSession, EntitySessionPort {
       defer(() => {
         this._body.set(emptyEntityBody([])); // clear the previous canvas during load (#7)
         this._tags.set([]); // and the previous Entity's tags/content, which ride the same load (#88)
+        this._types.set([]); // and its type set, re-baselined below so the blank load isn't dirty
         this._content.set(null);
         // A cleared canvas is a fresh start: reset the Views' body-tied state (#7) — the same
         // bump adopt() makes, so a load that never resolves still leaves no stale map state.
@@ -425,6 +453,7 @@ export class EntitySession implements ContentEditorSession, EntitySessionPort {
         this._baseBody.set(this._body());
         this._baseContent.set(this._content());
         this._baseTags.set(this._tags());
+        this._baseTypes.set(this._types());
         // Eviction belongs to the Entity just left (#174): clear it as the new load starts —
         // waiting for a successful adopt() would let it mask this load's own failure state.
         this._evicted.set(false);
@@ -491,6 +520,8 @@ export class EntitySession implements ContentEditorSession, EntitySessionPort {
         body: this._body(),
         content,
         tags: this._tags(),
+        types: this._types(),
+        typesChanged: this._types() !== this._baseTypes(),
       },
       showLoading,
     );
@@ -501,11 +532,15 @@ export class EntitySession implements ContentEditorSession, EntitySessionPort {
     this._saving.set(true);
     this._error.set(null);
     this.failed = null;
-    const { body, content, tags } = snapshot;
+    const { body, content, tags, types, typesChanged } = snapshot;
     // The working body already carries every grid/metadata edit (mutate wrote them in
     // place); fold in only the live Content, which TipTap tracks separately (ADR-0019).
     const saved = withContent(body, content);
-    const save$ = this.entities.save(open.id, saved, open.version, tags).pipe(
+    // Send `types` only when this edit authored them, so a plain body save never re-types data at rest.
+    const request$ = typesChanged
+      ? this.entities.save(open.id, saved, open.version, tags, types)
+      : this.entities.save(open.id, saved, open.version, tags);
+    const save$ = request$.pipe(
       tap((outcome) => {
         // Drop a late response if the user has since navigated to another Entity — it
         // must not write its result over the Entity now open (generalises #4/#70).
@@ -520,6 +555,7 @@ export class EntitySession implements ContentEditorSession, EntitySessionPort {
           this._baseBody.set(body);
           this._baseContent.set(content);
           this._baseTags.set(tags);
+          this._baseTypes.set(types);
         }
       }),
       catchError((err: unknown) => {
@@ -568,7 +604,8 @@ export class EntitySession implements ContentEditorSession, EntitySessionPort {
       failed !== null &&
       this._body() === failed.body &&
       this._content() === failed.content &&
-      this._tags() === failed.tags
+      this._tags() === failed.tags &&
+      this._types() === failed.types
     );
   }
 
