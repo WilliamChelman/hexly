@@ -14,6 +14,7 @@ import { EntityFacets, EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient, ActiveWorld, ToasterService, HexlyDatePipe, entityRoute, worldRoute } from '@hexly/web-core';
 import { Button, Eyebrow, Panel, PageHeader, Icon, IconName, EntitySearchPicker, ACCENT_BAR, accentFor } from '@hexly/web-ui';
 import { TypeRegistry } from '../../entity-types/type-registry';
+import { CORE_VIEW_MAP } from '../../entity-types/view-definition';
 
 const RECENTS_LIMIT = 8;
 const MAPS_LIMIT = 8;
@@ -332,7 +333,7 @@ export class WorldDashboard {
         this.loaded.set(true);
       });
     this.entitiesClient
-      .list({ worldId, type: this.types.mapTypeIds(), limit: MAPS_LIMIT })
+      .list({ worldId, type: this.types.typeIdsForView(CORE_VIEW_MAP), limit: MAPS_LIMIT })
       .subscribe((page) => this.maps.set(page.items));
     this.entitiesClient
       .facets({ worldId })

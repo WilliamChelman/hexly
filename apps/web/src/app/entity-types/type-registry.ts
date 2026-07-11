@@ -2,6 +2,7 @@ import { Injectable, signal } from '@angular/core';
 import { CORE_NOTE, EntityType } from '@hexly/domain';
 import { TypeDefinition } from './type-definition';
 import { CORE_TYPE_DEFINITIONS } from './core-types';
+import { ViewId } from './view-definition';
 
 /**
  * Root registry where Entity Types make themselves known to the type-specific UI
@@ -51,19 +52,27 @@ export class TypeRegistry {
   }
 
   /**
-   * Whether an Entity carrying `types` affords the hex-grid map surface — drives the
-   * Map/Note toggle, the grid layout + status bar, and the split-on-save. Reads the
-   * whole ordered set: *any* type contributing the hex-grid payload affords the map,
-   * so a future multi-type Entity (e.g. `[dnd.monster, core.hexmap]`) still gets it.
+   * The ordered, de-duplicated {@link ViewId}s an Entity carrying `types` affords —
+   * the union of every type's contributed views, in `types` order, primary type
+   * first (ADR-0048, *Views* amendment). Drives the header view toggle: a note
+   * yields `[core.view.content]` (one view, no toggle); a hexmap yields
+   * `[core.view.map, core.view.content]`; a future `[dnd.monster, core.hexmap]`
+   * composes all three. `types[0]`'s first view is the default.
    */
-  affordsMap(types: readonly string[] | null | undefined): boolean {
-    return (types ?? []).some((type) => this.get(type)?.surfaces.includes('map'));
+  viewsFor(types: readonly string[] | null | undefined): ViewId[] {
+    const seen = new Set<ViewId>();
+    for (const type of types ?? [])
+      for (const view of this.get(type)?.views ?? []) seen.add(view);
+    return [...seen];
   }
 
-  /** The type ids that afford a map surface — the dashboard/list "maps" filter. */
-  mapTypeIds(): EntityType[] {
+  /**
+   * The type ids that contribute `view` — e.g. `typeIdsForView('core.view.map')`
+   * backs the dashboard/list "maps" filter (the types that afford the map view).
+   */
+  typeIdsForView(view: ViewId): EntityType[] {
     return this.definitions()
-      .filter((d) => d.surfaces.includes('map'))
+      .filter((d) => d.views.includes(view))
       .map((d) => d.id);
   }
 }

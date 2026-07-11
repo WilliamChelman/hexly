@@ -15,15 +15,13 @@ import { CONTENT_FORMAT, CORE_HEXMAP, EntityDetail, EntityType } from '@hexly/do
 import { EntitiesClient, NudgeBusClient, ActiveWorld, TitleService, EVICTED, Watched } from '@hexly/web-core';
 import { MockEntitiesClient, MockNudgeBusClient, provideTranslocoTesting } from '@hexly/web-core/testing';
 import { EntitySession } from './services/entity-session';
-import { EntityNameResolver, CONTENT_EDITOR_SESSION } from '@hexly/content-editor';
+import { GRID_STORE } from './services/grid-store.port';
 import { HexMapStore } from '@hexly/web-map';
+import { EntityNameResolver, CONTENT_EDITOR_SESSION } from '@hexly/content-editor';
 import { noteDetail } from './components/entity-detail.fixtures';
 import { EntityPage } from './entity.page';
-
-/** Flush the status bar's health probe so afterEach's verify() is satisfied (hexmap only). */
-function flushHealth(http: HttpTestingController) {
-  http.expectOne('/api/health').flush({ status: 'ok', service: 'api' });
-}
+import { EntityViewStore } from './services/entity-view-store';
+import { CORE_VIEW_CONTENT } from '../../entity-types/view-definition';
 
 /** Resolve AuthClient's boot `/auth/me` as anonymous so `whenStable()` settles. */
 function flushAuth(http: HttpTestingController) {
@@ -74,7 +72,7 @@ describe('EntityPage routing', () => {
       : { ...hexmapWithContent('The reach lies north.'), id, name: 'Aldermoor' };
 
   /** Configure the TestBed for `:id` without mounting yet, so a test can arm `entities` first. */
-  async function configure(id: string) {
+  async function configure(id: string, query: Record<string, string> = {}) {
     entities = new MockEntitiesClient();
     bus = new MockNudgeBusClient();
     // The store's live-follow is tested in its own spec; here the page drives the session off what
@@ -86,6 +84,7 @@ describe('EntityPage routing', () => {
       providers: [
         EntitySession,
         { provide: CONTENT_EDITOR_SESSION, useExisting: EntitySession },
+        { provide: GRID_STORE, useExisting: HexMapStore },
         EntityNameResolver,
         { provide: EntitiesClient, useValue: entities },
         { provide: NudgeBusClient, useValue: bus },
@@ -95,7 +94,7 @@ describe('EntityPage routing', () => {
           provide: ActivatedRoute,
           useValue: {
             paramMap: of(convertToParamMap({ id })),
-            queryParamMap: of(convertToParamMap({})),
+            queryParamMap: of(convertToParamMap(query)),
             // ContentEditor reads the fragment for `[[Target#Heading]]` anchor scroll (ADR-0033).
             fragment: of(null),
           },
@@ -137,10 +136,21 @@ describe('EntityPage routing', () => {
     entities.load.mockReturnValue(of(detail('m1', 'hexmap')));
     const fixture = mount();
     fixture.detectChanges();
-    flushHealth(http);
 
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelector('app-map-canvas')).not.toBeNull();
+  });
+
+  it('restores the active View from the ?view query param (#75, ADR-0048)', async () => {
+    // A shared link with the full View id lands the hexmap on its Content view.
+    await configure('m1', { view: CORE_VIEW_CONTENT });
+    entities.load.mockReturnValue(of(detail('m1', 'hexmap')));
+    const fixture = mount();
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('app-content-editor')).not.toBeNull();
+    expect(el.querySelector('app-map-canvas')).toBeNull();
   });
 
   it('titles the tab with the open Entity name (owned by the session, not the view)', async () => {
@@ -148,7 +158,6 @@ describe('EntityPage routing', () => {
     entities.load.mockReturnValue(of(detail('m1', 'hexmap')));
     const fixture = mount();
     fixture.detectChanges();
-    flushHealth(http);
     flushAuth(http);
     await fixture.whenStable();
     fixture.detectChanges();
@@ -195,6 +204,7 @@ describe('EntityPage layout', () => {
       providers: [
         EntitySession,
         { provide: CONTENT_EDITOR_SESSION, useExisting: EntitySession },
+        { provide: GRID_STORE, useExisting: HexMapStore },
         EntityNameResolver,
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -214,7 +224,6 @@ describe('EntityPage layout', () => {
     TestBed.inject(EntitySession).adopt(hexmapWithContent('The reach lies north.'));
     const fixture = TestBed.createComponent(EntityPage);
     fixture.detectChanges();
-    flushHealth(http);
 
     // Maps open armed with Select so a stray first click never paints (#27).
     const select = (fixture.nativeElement as HTMLElement).querySelector(
@@ -227,7 +236,6 @@ describe('EntityPage layout', () => {
     TestBed.inject(EntitySession).adopt(hexmapWithContent('The reach lies north.'));
     const fixture = TestBed.createComponent(EntityPage);
     fixture.detectChanges();
-    flushHealth(http);
 
     const el = fixture.nativeElement as HTMLElement;
     // Canvas, strip, and rail present; right panel closed by default (ADR-0013, story 20).
@@ -304,27 +312,10 @@ describe('EntityPage layout', () => {
     expect(column().style.paddingRight).toBe('3.5rem');
   });
 
-  it('reports the API health in the status bar', async () => {
-    TestBed.inject(EntitySession).adopt(hexmapWithContent('The reach lies north.'));
-    const fixture = TestBed.createComponent(EntityPage);
-    fixture.detectChanges(); // status bar -> GET /health
-    http.expectOne('/api/health').flush({ status: 'ok', service: 'api' });
-    flushAuth(http);
-    await fixture.whenStable();
-    fixture.detectChanges();
-
-    const health = (fixture.nativeElement as HTMLElement).querySelector(
-      '[data-testid="health"]',
-    );
-    expect(health?.textContent).toContain('ok');
-    expect(health?.textContent).toContain('api');
-  });
-
   it('shows the hex canvas in the Map view, not the Content editor', () => {
     TestBed.inject(EntitySession).adopt(hexmapWithContent('The reach lies north.'));
     const fixture = TestBed.createComponent(EntityPage);
     fixture.detectChanges();
-    flushHealth(http);
 
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelector('app-map-canvas')).not.toBeNull();
@@ -334,14 +325,13 @@ describe('EntityPage layout', () => {
   it('swaps the canvas for the Content editor in the Note view, seeded with the map’s Content', () => {
     TestBed.inject(EntitySession).adopt(hexmapWithContent('The reach lies north.'));
     const fixture = TestBed.createComponent(EntityPage);
-    fixture.detectChanges(); // mounts on the grid (watchRoute seeds view=map from the empty route)
-    flushHealth(http);
-    // Flip to the Note view after mount, as the header's toggle would.
-    TestBed.inject(HexMapStore).setView('note');
+    fixture.detectChanges(); // mounts on the grid (the empty route leaves the default map view)
+    // Flip to the Content view after mount, as the header's toggle would.
+    fixture.debugElement.injector.get(EntityViewStore).setView(CORE_VIEW_CONTENT);
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
-    // Note view: Content editor takes the body, canvas gone — but the status bar stays.
+    // Content view: the editor takes the body, canvas gone.
     expect(el.querySelector('app-content-editor')).not.toBeNull();
     expect(el.querySelector('app-map-canvas')).toBeNull();
     const surface = el.querySelector('[data-testid=note-content]') as HTMLElement;
@@ -352,7 +342,6 @@ describe('EntityPage layout', () => {
     TestBed.inject(EntitySession).adopt(hexmapWithContent('The reach lies north.'));
     const fixture = TestBed.createComponent(EntityPage);
     fixture.detectChanges();
-    flushHealth(http);
 
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelector('app-regions-panel')).toBeNull();
@@ -365,16 +354,15 @@ describe('EntityPage layout', () => {
     expect(el.querySelector('app-inspector')).toBeNull();
   });
 
-  it('shows the open note’s name, with no status bar or canvas', () => {
+  it('shows the open note’s name, with no map canvas', () => {
     TestBed.inject(EntitySession).adopt(noteDetail('Lady Mara'));
     const fixture = TestBed.createComponent(EntityPage);
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
     expect(el.textContent).toContain('Lady Mara');
-    // A note has no grid: no map canvas, no status bar (and no /api/health probe).
+    // A note has no grid: the content view renders, never the map canvas.
     expect(el.querySelector('app-map-canvas')).toBeNull();
-    expect(el.querySelector('app-status-bar')).toBeNull();
   });
 
   it('mounts the shared Content editor for a note, seeded with its stored Content', () => {

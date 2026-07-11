@@ -12,6 +12,7 @@ import {
 import { provideTranslocoTesting, MockEntitiesClient } from '@hexly/web-core/testing';
 import { EntitiesClient } from '@hexly/web-core';
 import { EntitySession } from '../services/entity-session';
+import { GRID_STORE } from '../services/grid-store.port';
 import { HexMapStore } from '@hexly/web-map';
 import { SaveStatus } from './save-status';
 
@@ -52,6 +53,7 @@ describe('SaveStatus', () => {
       imports: [SaveStatus, provideTranslocoTesting()],
       providers: [
         EntitySession,
+        { provide: GRID_STORE, useExisting: HexMapStore },
         { provide: EntitiesClient, useValue: entities },
         provideRouter([]),
       ],

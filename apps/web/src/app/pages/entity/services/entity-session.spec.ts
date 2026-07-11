@@ -1,6 +1,5 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
-import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 import {
   CONTENT_FORMAT,
@@ -15,6 +14,7 @@ import {
 import { provideTranslocoTesting, MockEntitiesClient, MockNudgeBusClient } from '@hexly/web-core/testing';
 import { EntitiesClient, NudgeBusClient, EVICTED, Watched } from '@hexly/web-core';
 import { EntitySession } from './entity-session';
+import { GRID_STORE } from './grid-store.port';
 import { HexMapStore } from '@hexly/web-map';
 
 describe('EntitySession', () => {
@@ -63,6 +63,9 @@ describe('EntitySession', () => {
       imports: [provideTranslocoTesting()],
       providers: [
         EntitySession,
+        // The session depends on the grid-store port (ADR-0048); bind it to HexMapStore
+        // as the app's composition root does.
+        { provide: GRID_STORE, useExisting: HexMapStore },
         { provide: EntitiesClient, useValue: entities },
         { provide: NudgeBusClient, useValue: bus },
       ],
@@ -720,26 +723,8 @@ describe('EntitySession', () => {
     load$.complete();
   });
 
-  it('restores the editor view from the ?view query param on load (#75)', () => {
-    // A shared link with ?view=note lands on the Note view. No id param → no fetch.
-    session.watchRoute({
-      paramMap: of(convertToParamMap({})),
-      queryParamMap: of(convertToParamMap({ view: 'note' })),
-    } as unknown as ActivatedRoute);
-
-    expect(editor.view()).toBe('note');
-  });
-
-  it('opens on the Map view when the URL carries no view param (#75)', () => {
-    editor.setView('note'); // a stale view from a previously open Entity
-
-    session.watchRoute({
-      paramMap: of(convertToParamMap({})),
-      queryParamMap: of(convertToParamMap({})),
-    } as unknown as ActivatedRoute);
-
-    expect(editor.view()).toBe('map');
-  });
+  // The `?view=` → active-View sync moved to EntityPage (ADR-0048, Views amendment);
+  // its coverage lives in entity.page.spec.ts, driven off the outletted view.
 
   it('warns on tab close (beforeunload) only when there are unsaved edits', () => {
     openAldermoor();

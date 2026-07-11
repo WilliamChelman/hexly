@@ -14,7 +14,6 @@ import {
   catchError,
   concat,
   defer,
-  distinctUntilChanged,
   EMPTY,
   filter,
   finalize,
@@ -39,12 +38,14 @@ import {
   Visibility,
 } from '@hexly/domain';
 import { EntitiesClient, ActiveWorld, idFromSegment, worldRoute, TitleService, AppShellStore, EVICTED } from '@hexly/web-core';
-import { EntityView, HexMapStore } from '@hexly/web-map';
+import { GRID_STORE } from './grid-store.port';
 import type { ContentEditorSession } from '@hexly/content-editor';
 
 /**
- * Bridges {@link EntitiesClient} and {@link HexMapStore} for `/entities/:id`:
- * unwraps the stored grid on open, re-wraps it on save.
+ * Bridges {@link EntitiesClient} and the hex-grid editor (the {@link GRID_STORE}
+ * port, implemented by `HexMapStore`) for `/entities/:id`: unwraps the stored grid
+ * on open, re-wraps it on save. Depends on the port, not `@hexly/web-map`, so the
+ * map lib plugs into the session rather than the session reaching into it (ADR-0048).
  *
  * Route-scoped (`providers`), not root: leaving the route destroys it, so
  * open-Entity state resets implicitly.
@@ -69,7 +70,7 @@ interface SaveSnapshot {
 @Injectable()
 export class EntitySession implements ContentEditorSession {
   private readonly entities = inject(EntitiesClient);
-  private readonly editor = inject(HexMapStore);
+  private readonly editor = inject(GRID_STORE);
   private readonly title = inject(TitleService);
   private readonly router = inject(Router);
   private readonly activeWorld = inject(ActiveWorld);
@@ -180,6 +181,11 @@ export class EntitySession implements ContentEditorSession {
     // One owner for the tab title across every view this route dispatches to.
     effect(() => this.title.setDocumentName(this._current()?.name ?? null));
     this.destroyRef.onDestroy(() => this.title.setDocumentName(null));
+
+    // The grid editor's edit-ability tracks the load-time Rights (ADR-0037), so the
+    // map view gates its tools without reaching back to the session (a visibility flip
+    // that revokes write updates it live).
+    effect(() => this.editor.setEditable(this.writable()));
 
     // Route-leave flush is awaited by the CanDeactivate guard, not fired here —
     // onDestroy runs too late to block navigation, so the guard calls flush() up front.
@@ -293,16 +299,6 @@ export class EntitySession implements ContentEditorSession {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe();
-
-    // Editor surface lives in the URL: refresh/shared link restores the view,
-    // opening another Entity (no `view` param) resets to the grid.
-    route.queryParamMap
-      .pipe(
-        map((q): EntityView => (q.get('view') === 'note' ? 'note' : 'map')),
-        distinctUntilChanged(),
-        takeUntilDestroyed(this.destroyRef),
-      )
-      .subscribe((view) => this.editor.setView(view));
   }
 
   open(id: string): Observable<EntityDetail> {

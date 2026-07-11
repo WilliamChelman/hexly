@@ -5,6 +5,8 @@ import { provideRouter } from '@angular/router';
 import { CORE_HEXMAP, CORE_NOTE, EntityReferences } from '@hexly/domain';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { EntitySession } from '../services/entity-session';
+import { GRID_STORE } from '../services/grid-store.port';
+import { HexMapStore } from '@hexly/web-map';
 import { ReferencesStore } from '../services/references-store';
 import { RightDock } from '../services/right-dock';
 import { noteDetail } from './entity-detail.fixtures';
@@ -29,6 +31,7 @@ describe('ReferencesPanel', () => {
         // The store is route-scoped and reads the open Entity off the session; no Entity is
         // adopted here, so its fetch effect never fires and `adopt` is the only source.
         EntitySession,
+        { provide: GRID_STORE, useExisting: HexMapStore },
         RightDock,
         ReferencesStore,
         provideRouter([]),

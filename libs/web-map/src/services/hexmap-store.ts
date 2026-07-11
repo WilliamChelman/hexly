@@ -48,9 +48,6 @@ export type FeatureSubtool = FeatureId | 'clear';
  */
 export type SelectSubtool = 'pick' | 'marquee';
 
-/** Which surface the editor shows: the hex grid (`'map'`) or the Content body (`'note'`). */
-export type EntityView = 'map' | 'note';
-
 /** The Select tool's Subtools in palette/keyboard order — Pick first (the default). */
 export const selectSubtools: readonly SelectSubtool[] = ['pick', 'marquee'];
 
@@ -174,12 +171,13 @@ export class HexMapStore {
   readonly rightPanel = this._rightPanel.asReadonly();
 
   /**
-   * Which surface the editor shows: hex `'map'` grid or `'note'` Content body.
-   * Mirrored to the URL `view` param — the session drives it from the route, so
-   * {@link load} does not reset it.
+   * Whether the caller may edit the grid (ADR-0037, #162). Fed by the owning session
+   * through the grid-store port; the {@link MapView} gates its tool palette and dock
+   * on it, so a read-only opener sees the canvas as pan/zoom-only. Defaults read-only
+   * until the session says otherwise.
    */
-  private readonly _view = signal<EntityView>('map');
-  readonly view = this._view.asReadonly();
+  private readonly _editable = signal(false);
+  readonly editable = this._editable.asReadonly();
 
   /** The remembered Select Subtool; the canvas reads this to choose its Select gesture. */
   readonly selectSubtool = this._selectSubtool.asReadonly();
@@ -339,13 +337,11 @@ export class HexMapStore {
     this.resetSubtoolMemory();
     this.deselect();
     this._rightPanel.set(null);
-    // The Map/Note surface is NOT reset: it lives in the URL `view` param, which the
-    // session restores on every (re)load.
   }
 
-  /** Switch the editor surface between the hex grid and the Content body. */
-  setView(view: EntityView): void {
-    this._view.set(view);
+  /** Set whether the grid is editable (ADR-0037) — the grid-store port the session drives. */
+  setEditable(editable: boolean): void {
+    this._editable.set(editable);
   }
 
   /** Restore the cold-start Subtool memory shared by a fresh store and a reload. */

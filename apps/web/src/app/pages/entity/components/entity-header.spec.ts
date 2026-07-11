@@ -8,7 +8,12 @@ import { CORE_HEXMAP, emptyContent, EntityDetail, WorldDetail, WorldVerb } from 
 import { provideTranslocoTesting, MockEntitiesClient, MockWorldsClient, MockUserDirectoryClient, MockAuthClient } from '@hexly/web-core/testing';
 import { EntitiesClient, WorldsClient, ActiveWorld, UserDirectoryClient, AuthClient } from '@hexly/web-core';
 import { EntitySession } from '../services/entity-session';
+import { GRID_STORE } from '../services/grid-store.port';
 import { HexMapStore } from '@hexly/web-map';
+import { EntityViewStore } from '../services/entity-view-store';
+import { ViewRegistry } from '../../../entity-types/view-registry';
+import { CORE_VIEW_CONTENT } from '../../../entity-types/view-definition';
+import { CORE_VIEW_DEFINITIONS } from '../views/core-views';
 import { OwnerSet } from '@hexly/web-ui';
 import { EntityHeader } from './entity-header';
 import { noteDetail } from './entity-detail.fixtures';
@@ -68,6 +73,10 @@ describe('EntityHeader', () => {
       imports: [EntityHeader, provideTranslocoTesting()],
       providers: [
         EntitySession,
+        { provide: GRID_STORE, useExisting: HexMapStore },
+        // Page-scoped in the app (provided on EntityPage); provided here since this spec
+        // mounts the header alone, and it reads the active View off this store.
+        EntityViewStore,
         { provide: EntitiesClient, useValue: entities },
         { provide: WorldsClient, useValue: worlds },
         {
@@ -91,6 +100,10 @@ describe('EntityHeader', () => {
         provideRouter([]),
       ],
     }).compileComponents();
+    // EntityPage registers the core Views in the running app; the header spec mounts the
+    // header alone, so seed the registry here for the toggle to resolve labels + testids.
+    const views = TestBed.inject(ViewRegistry);
+    for (const def of CORE_VIEW_DEFINITIONS) views.register(def);
   });
 
   // The actions live in a CDK menu overlay (attached to the document body); tear it
@@ -339,10 +352,10 @@ describe('EntityHeader', () => {
     fixture.detectChanges();
 
     const map = fixture.nativeElement.querySelector(
-      '[data-testid=view-map]',
+      '[data-testid="core.view.map"]',
     ) as HTMLButtonElement;
     const noteBtn = fixture.nativeElement.querySelector(
-      '[data-testid=view-note]',
+      '[data-testid="core.view.content"]',
     ) as HTMLButtonElement;
     expect(map).not.toBeNull();
     expect(noteBtn).not.toBeNull();
@@ -356,27 +369,27 @@ describe('EntityHeader', () => {
     const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('[data-testid=view-map]')).toBeNull();
-    expect(fixture.nativeElement.querySelector('[data-testid=view-note]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="core.view.map"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid="core.view.content"]')).toBeNull();
     // The title is still editable — a note can be renamed too.
     expect(fixture.nativeElement.textContent).toContain('Lady Mara');
   });
 
-  it('switches the editor surface to the Note view when Note is clicked', () => {
+  it('switches to the Content view when Note is clicked', () => {
     open(aldermoor);
     const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 
     (
-      fixture.nativeElement.querySelector('[data-testid=view-note]') as HTMLButtonElement
+      fixture.nativeElement.querySelector('[data-testid="core.view.content"]') as HTMLButtonElement
     ).click();
     fixture.detectChanges();
 
-    // The store is the single owner of the surface choice (shared with the shell).
-    expect(TestBed.inject(HexMapStore).view()).toBe('note');
+    // The store is the single owner of the active-View choice (shared with the page body).
+    expect(TestBed.inject(EntityViewStore).activeView()).toBe(CORE_VIEW_CONTENT);
     expect(
       (
-        fixture.nativeElement.querySelector('[data-testid=view-note]') as HTMLButtonElement
+        fixture.nativeElement.querySelector('[data-testid="core.view.content"]') as HTMLButtonElement
       ).getAttribute('aria-pressed'),
     ).toBe('true');
   });
@@ -458,16 +471,16 @@ describe('EntityHeader', () => {
       .mockResolvedValue(true);
 
     (
-      fixture.nativeElement.querySelector('[data-testid=view-note]') as HTMLButtonElement
+      fixture.nativeElement.querySelector('[data-testid="core.view.content"]') as HTMLButtonElement
     ).click();
-    // Persisted as ?view=note (replaceUrl — a view flip is not a navigation).
+    // Persisted as the full View id (replaceUrl — a view flip is not a navigation).
     expect(nav).toHaveBeenCalledWith(
       [],
-      expect.objectContaining({ queryParams: { view: 'note' }, replaceUrl: true }),
+      expect.objectContaining({ queryParams: { view: CORE_VIEW_CONTENT }, replaceUrl: true }),
     );
 
     (
-      fixture.nativeElement.querySelector('[data-testid=view-map]') as HTMLButtonElement
+      fixture.nativeElement.querySelector('[data-testid="core.view.map"]') as HTMLButtonElement
     ).click();
     // The default Map view drops the param to keep the URL clean.
     expect(nav).toHaveBeenCalledWith(

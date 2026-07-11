@@ -16,14 +16,10 @@ import { EntityShareDialog } from './entity-share-dialog';
 import { EntityTags } from './entity-tags';
 import { SaveStatus } from './save-status';
 import { EntitySession } from '../services/entity-session';
-import { EntityView, HexMapStore } from '@hexly/web-map';
 import { TypeRegistry } from '../../../entity-types/type-registry';
-
-/** The view toggle's two segments, in display order; Map (the grid) is the default. */
-const VIEWS: readonly { id: EntityView; labelKey: string; testid: string }[] = [
-  { id: 'map', labelKey: 'editorShell.view.map', testid: 'view-map' },
-  { id: 'note', labelKey: 'editorShell.view.note', testid: 'view-note' },
-];
+import { ViewRegistry } from '../../../entity-types/view-registry';
+import { EntityViewStore } from '../services/entity-view-store';
+import { ViewId } from '../../../entity-types/view-definition';
 
 /**
  * The open Entity's page-owned header (ADR-0022), rendered by {@link EntityPage}
@@ -31,7 +27,8 @@ const VIEWS: readonly { id: EntityView; labelKey: string; testid: string }[] = [
  * ({@link SaveStatus}, ADR-0026), Tags and Share. App navigation lives in the NavRail.
  *
  * Fully driven by {@link EntitySession.current} — the eyebrow/title labels switch on
- * the Entity's `type`, and the Map/Note view toggle (#75) shows only for a `hexmap`.
+ * the primary type, and the view toggle (#75) offers one button per View the Entity's
+ * types afford (ADR-0048, *Views* amendment), shown only when there is more than one.
  */
 @Component({
   selector: 'app-entity-header',
@@ -82,24 +79,23 @@ const VIEWS: readonly { id: EntityView; labelKey: string; testid: string }[] = [
         <app-entity-tags class="min-w-0 flex-1" />
       </div>
 
-      @if (isHexmap()) {
-        <!-- Map/Note view toggle (#75): a hexmap carries both a grid and a Content
-             body; this flips the editor surface between them, driven off the store's
-             view() so the shell renders whichever is pressed. -->
+      @if (viewToggle().length > 1) {
+        <!-- View toggle (#75, ADR-0048): one button per View the Entity's types afford
+             (a hexmap: Map + Note), flipping the outletted body via the active View. -->
         <div
           pageHeaderActions
           appButtonGroup
           [attr.aria-label]="'editorShell.view.switchLabel' | transloco"
         >
-          @for (v of views; track v.id) {
+          @for (v of viewToggle(); track v.id) {
             <button
               type="button"
               appButton
               variant="ghost"
               size="sm"
-              [active]="store.view() === v.id"
-              [attr.aria-pressed]="store.view() === v.id"
-              [attr.data-testid]="v.testid"
+              [active]="activeView() === v.id"
+              [attr.aria-pressed]="activeView() === v.id"
+              [attr.data-testid]="v.id"
               (click)="selectView(v.id)"
             >
               {{ v.labelKey | transloco }}
@@ -127,10 +123,10 @@ export class EntityHeader {
   private readonly session = inject(EntitySession);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-  /** Owns the Map/Note surface choice, shared with the {@link EntityPage} body (#75). */
-  protected readonly store = inject(HexMapStore);
+  /** Owns the active-View choice, shared with the {@link EntityPage} body (#75). */
+  private readonly viewStore = inject(EntityViewStore);
+  private readonly views = inject(ViewRegistry);
   private readonly types = inject(TypeRegistry);
-  protected readonly views = VIEWS;
 
   /** Whether the entity Share dialog (#158) is open — toggled by the actions menu's Share item. */
   protected readonly ownersOpen = signal(false);
@@ -151,9 +147,11 @@ export class EntityHeader {
   );
   /** Tooltip key: the in-place rename affordance. */
   protected readonly titleHint = computed(() => this.labels().rename);
-  /** Only a hexmap affords both surfaces, so only it gets the view toggle (#75). */
-  protected readonly isHexmap = computed(() =>
-    this.types.affordsMap(this.session.current()?.types),
+  /** The active View id, driving which toggle button reads as pressed. */
+  protected readonly activeView = this.viewStore.activeView;
+  /** The Views the open Entity affords, resolved to their toggle definitions (label + testid). */
+  protected readonly viewToggle = computed(() =>
+    this.viewStore.views().map((id) => this.views.resolve(id)),
   );
   /** Per-type header chrome (eyebrow + title a11y labels), keyed on the primary type, falling back to the note type. */
   protected readonly labels = computed(
@@ -219,22 +217,24 @@ export class EntityHeader {
   }
 
   /**
-   * Switch the editor surface (#75). Updates the store for instant feedback, then
-   * mirrors the choice to the URL `view` param (`replaceUrl`, Map drops the param)
-   * so a refresh restores it. Reverts the store if the navigation is cancelled.
+   * Switch the active View (#75, ADR-0048). Updates the store for instant feedback,
+   * then mirrors the choice to the URL `view` param (`replaceUrl`) so a refresh
+   * restores it — the default View (the primary type's first) drops the param, others
+   * carry the full View id. Reverts the store if the navigation is cancelled.
    */
-  protected selectView(view: EntityView): void {
-    const previous = this.store.view();
-    this.store.setView(view);
+  protected selectView(view: ViewId): void {
+    const previous = this.viewStore.activeView();
+    this.viewStore.setView(view);
+    const isDefault = this.viewStore.views()[0] === view;
     this.router
       .navigate([], {
         relativeTo: this.route,
-        queryParams: { view: view === 'map' ? null : view },
+        queryParams: { view: isDefault ? null : view },
         queryParamsHandling: 'merge',
         replaceUrl: true,
       })
       .then((navigated) => {
-        if (!navigated) this.store.setView(previous);
+        if (!navigated) this.viewStore.setView(previous);
       });
   }
 }

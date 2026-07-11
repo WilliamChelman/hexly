@@ -2268,33 +2268,9 @@ describe('HexMapStore shared right column', () => {
     expect(store.rightPanel()).toBe('regions');
   });
 
-  // The Map/Note view toggle (#75): a hexmap carries both a grid and a Content body.
-  // Session-only view state like rightPanel — never part of the document.
-  it('opens to the Map view', () => {
-    const store = new HexMapStore();
-    expect(store.view()).toBe('map');
-  });
-
-  it('flips to the Note view and back via setView', () => {
-    const store = new HexMapStore();
-
-    store.setView('note');
-    expect(store.view()).toBe('note');
-
-    store.setView('map');
-    expect(store.view()).toBe('map');
-  });
-
-  it('does not reset the view when a map opens — the URL governs it (#75)', () => {
-    const store = new HexMapStore();
-    store.setView('note');
-
-    // load() is the document seam; the open view lives in the URL `view` param, which
-    // the session restores on (re)load, so opening a map must not clobber it here.
-    store.load(emptyHexMap());
-
-    expect(store.view()).toBe('note');
-  });
+  // The active-View state (the former Map/Note toggle) left HexMapStore for the
+  // app-level EntityViewStore (ADR-0048, Views amendment); its coverage lives with
+  // the entity page and header, driven off the outletted View.
 });
 
 describe('HexMapStore Entity Link', () => {

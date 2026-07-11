@@ -4,4 +4,4 @@ export * from './components/map-canvas';
 export * from './components/inspector';
 export * from './components/regions-panel';
 export * from './components/editor-rail';
-export * from './components/status-bar';
+export * from './components/map-view';

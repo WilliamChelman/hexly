@@ -16,6 +16,10 @@ _Avoid_: Kind, category, class
 The body shape and editing surface an **Entity Type** maps to — a **closed, code-known** set: `rich-content` (the base every Entity has: Content + Metadata — formerly the `note` payload) and `hex-grid` (an *additive addon* over that base). Payloads compose rather than rival: a Hex Map is `rich-content` + `hex-grid`. What actually discriminates the stored document — distinct from the open, user-facing Entity Type.
 _Avoid_: Body type, document type, schema, variant
 
+**View**:
+A distinct togglable renderer + editor an Entity affords — today's Note/Map toggle, generalized. The header offers one View per View an Entity's **Payload Kinds** afford (`rich-content` → the Content view, `hex-grid` → the map view), plus any View a **Type** contributes (a plugin's stat-block, or the generic Field view that renders user-defined and absent-plugin types). An **open**, `namespace.id`-keyed set, sub-namespaced `core.view.*` to stay distinct from **Entity Type** ids and **Payload Kind** names. The primary type's first View is the default; a single-View Entity shows no toggle.
+_Avoid_: Surface (kept only for informal prose like "landing surface"), tab, mode, panel
+
 **Field**:
 A structured, typed slot an **Entity Type** gives to a specific **Metadata** key — a name, a data-type (scalar, enum, date, list, or a typed **Entity Link**), and whether it is facetable. A typing *lens* over Metadata, not a separate store: values live in the one Metadata map, so a missing plugin leaves them as plain Metadata. Validated *forward-only* — enforced on active typed edits, tolerated on imported or at-rest data.
 _Avoid_: Property, attribute, column, custom field

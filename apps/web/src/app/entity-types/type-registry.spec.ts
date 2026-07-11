@@ -1,12 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 import { TypeRegistry } from './type-registry';
 import { TypeDefinition } from './type-definition';
+import { CORE_VIEW_CONTENT, CORE_VIEW_MAP } from './view-definition';
 
 function definition(id: string): TypeDefinition {
   return {
     id: id as TypeDefinition['id'],
     icon: 'label',
-    surfaces: ['note'],
+    views: [CORE_VIEW_CONTENT],
     graphColorToken: '--color-ink-muted',
     labels: {
       eyebrow: `${id}.eyebrow`,
@@ -48,17 +49,21 @@ describe('TypeRegistry', () => {
     expect(registry.resolve(undefined).id).toBe('core.note');
   });
 
-  it('reports whether a type set affords the map surface — any member with the payload counts', () => {
-    expect(registry.affordsMap(['core.hexmap'])).toBe(true);
-    expect(registry.affordsMap(['core.note'])).toBe(false);
-    // A multi-type set affords the map if any member does (a future `[dnd.monster, core.hexmap]`).
-    expect(registry.affordsMap(['dnd.monster', 'core.hexmap'])).toBe(true);
-    expect(registry.affordsMap([])).toBe(false);
-    expect(registry.affordsMap(undefined)).toBe(false);
+  it('unions the ordered Views a type set affords — primary first, deduped', () => {
+    expect(registry.viewsFor(['core.hexmap'])).toEqual([CORE_VIEW_MAP, CORE_VIEW_CONTENT]);
+    expect(registry.viewsFor(['core.note'])).toEqual([CORE_VIEW_CONTENT]);
+    // A multi-type set unions in `types` order, deduping the shared content view.
+    expect(registry.viewsFor(['core.hexmap', 'core.note'])).toEqual([
+      CORE_VIEW_MAP,
+      CORE_VIEW_CONTENT,
+    ]);
+    expect(registry.viewsFor([])).toEqual([]);
+    expect(registry.viewsFor(undefined)).toEqual([]);
   });
 
-  it('lists the map-affording type ids for the maps filter', () => {
-    expect(registry.mapTypeIds()).toEqual(['core.hexmap']);
+  it('lists the type ids contributing a View — backing the maps filter', () => {
+    expect(registry.typeIdsForView(CORE_VIEW_MAP)).toEqual(['core.hexmap']);
+    expect(registry.typeIdsForView(CORE_VIEW_CONTENT)).toEqual(['core.note', 'core.hexmap']);
   });
 
   it('registers a new definition and drops it via the returned unregister fn', () => {

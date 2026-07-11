@@ -1,7 +1,9 @@
 import { Routes } from '@angular/router';
 import { EntityNameResolver, CONTENT_EDITOR_SESSION } from '@hexly/content-editor';
+import { HexMapStore } from '@hexly/web-map';
 import { flushOnLeave } from './flush-on-leave.guard';
 import { EntitySession } from './services/entity-session';
+import { GRID_STORE } from './services/grid-store.port';
 
 /**
  * Lazy route config for `/w/:worldId/entities/:id`. Split out of app.routes so the
@@ -21,6 +23,9 @@ export const ENTITY_ROUTES: Routes = [
     providers: [
       EntitySession,
       { provide: CONTENT_EDITOR_SESSION, useExisting: EntitySession },
+      // Bind the hex-grid editor to the port the session depends on (ADR-0048); kept
+      // in the lazy entity chunk so web-map never reaches the initial bundle.
+      { provide: GRID_STORE, useExisting: HexMapStore },
       EntityNameResolver,
     ],
     // documentTitleKey composes the Entity name with the brand; `title` is the
