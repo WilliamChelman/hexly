@@ -20,6 +20,8 @@ import {
   EntitySummary,
   EntityType,
   FacetCount,
+  FieldFacet,
+  FieldFilter,
   InboundReference,
   OutboundReference,
   typesSchema,
@@ -61,6 +63,7 @@ import {
   entities,
   entityDescriptors,
   entityEdges,
+  entityFieldFacets,
   entityGrants,
   entityLinks,
   worlds,
@@ -92,6 +95,9 @@ export interface ListOptions {
   readonly tags?: readonly string[];
   /** Facet: restrict to any of these Visibilities (OR within category). */
   readonly visibility?: readonly Visibility[];
+  /** Filter-by-Field (ADR-0048, #188): each constraint matches a facetable Field value — eq
+   * membership (enum/list/string) or a gte/lte range (number/date). Same key OR / range, diff key AND. */
+  readonly fields?: readonly FieldFilter[];
   /** Restrict to one World. */
   readonly worldId?: string;
   /** Attach the caller's Rights to each summary — opt-in, the Entity Browser sets it. */
@@ -101,7 +107,7 @@ export interface ListOptions {
 /** The filter state a facet-count read narrows against — the list filters minus paging/ids. */
 export type FacetOptions = Pick<
   ListOptions,
-  'worldId' | 'q' | 'type' | 'tags' | 'visibility'
+  'worldId' | 'q' | 'type' | 'tags' | 'visibility' | 'fields'
 >;
 
 /** Everything {@link filters} reads — shared by the paged list and the facet-count reads. */
@@ -160,7 +166,10 @@ export class EntitiesService {
       .from(entities)
       .$dynamic();
     if (match) {
-      query.innerJoin(sql`entities_fts`, sql`entities_fts.rowid = entities.rowid`);
+      query.innerJoin(
+        sql`entities_fts`,
+        sql`entities_fts.rowid = entities.rowid`,
+      );
     }
     const rows = query
       .where(
@@ -189,7 +198,11 @@ export class EntitiesService {
       const summary = toSummary(row);
       if (!opts.withRights) return summary;
       // The predicate columns arrive as SQLite 0/1; rightsOf reads them truthily.
-      const r = row as typeof row & Record<'canRead' | 'canEditSubstance' | 'canWrite' | 'isOwner', unknown>;
+      const r = row as typeof row &
+        Record<
+          'canRead' | 'canEditSubstance' | 'canWrite' | 'isOwner',
+          unknown
+        >;
       return {
         ...summary,
         rights: access.rightsOf({
@@ -224,8 +237,81 @@ export class EntitiesService {
         entities.visibility,
         filter,
       ),
-      tag: this.countJsonArray({ ...opts, tags: undefined }, entities.tags, filter),
+      tag: this.countJsonArray(
+        { ...opts, tags: undefined },
+        entities.tags,
+        filter,
+      ),
+      // A type's Field facets, contextually — only the active types' facetable Fields (ADR-0048, #188).
+      fields: this.countFieldFacets(opts, filter),
     };
+  }
+
+  /**
+   * A type's facetable Field facets, surfaced **contextually** (ADR-0048, #188): resolved across the
+   * *active* Type filter (`opts.type`), so a Field facet is absent until its type is the active
+   * filter, and the universal facets are unaffected. Each Field's values drill down like the
+   * universal facets — counted against every other constraint but that Field's own filter.
+   */
+  private countFieldFacets(opts: FacetOptions, filter: SQL): FieldFacet[] {
+    const fields = resolveFields(
+      this.typeFields.resolver,
+      opts.type ?? [],
+    ).filter((field) => field.facetable);
+    return fields.map((field) => ({
+      key: field.key,
+      label: field.label,
+      dataType: field.dataType,
+      values: this.countFieldValues(
+        // Drill-down: drop this Field's own filters, keep every sibling constraint.
+        {
+          ...opts,
+          fields: (opts.fields ?? []).filter((ff) => ff.key !== field.key),
+        },
+        field.key,
+        filter,
+      ),
+    }));
+  }
+
+  /**
+   * Count one facetable Field's distinct values under `opts`, off the denormalised
+   * `entity_field_facets` index. `(entityId, key, value)` is unique, so `count(*)` per value is the
+   * number of Entities carrying it; `GROUP BY` omits zero-count values, exactly like the universal
+   * facets.
+   */
+  private countFieldValues(
+    opts: FacetOptions,
+    key: string,
+    filter: SQL,
+  ): FacetCount[] {
+    const match = opts.q ? toFtsMatch(opts.q) : null;
+    const query = this.db
+      .select({
+        value: entityFieldFacets.value,
+        count: sql<number>`count(*)`.as('count'),
+      })
+      .from(entities)
+      .innerJoin(
+        entityFieldFacets,
+        and(
+          eq(entityFieldFacets.entityId, entities.id),
+          eq(entityFieldFacets.key, key),
+        ),
+      )
+      .$dynamic();
+    if (match) {
+      query.innerJoin(
+        sql`entities_fts`,
+        sql`entities_fts.rowid = entities.rowid`,
+      );
+    }
+    return query
+      .where(facetWhere(opts, match, filter))
+      .groupBy(entityFieldFacets.value)
+      .orderBy(asc(entityFieldFacets.value))
+      .all()
+      .map((r) => ({ value: r.value, count: r.count }));
   }
 
   /** Count a denormalized scalar column's values (visibility) under `opts`. */
@@ -240,7 +326,10 @@ export class EntitiesService {
       .from(entities)
       .$dynamic();
     if (match) {
-      query.innerJoin(sql`entities_fts`, sql`entities_fts.rowid = entities.rowid`);
+      query.innerJoin(
+        sql`entities_fts`,
+        sql`entities_fts.rowid = entities.rowid`,
+      );
     }
     return query
       .where(facetWhere(opts, match, filter))
@@ -270,7 +359,10 @@ export class EntitiesService {
       .innerJoin(sql`json_each(${column}) as each`, sql`1 = 1`)
       .$dynamic();
     if (match) {
-      query.innerJoin(sql`entities_fts`, sql`entities_fts.rowid = entities.rowid`);
+      query.innerJoin(
+        sql`entities_fts`,
+        sql`entities_fts.rowid = entities.rowid`,
+      );
     }
     return query
       .where(facetWhere(opts, match, filter))
@@ -307,7 +399,10 @@ export class EntitiesService {
   references(userId: string, id: string): EntityReferences | null {
     const access = entityAccess(this.db, userId);
     if (!access.decideMeta(id)?.canRead) return null;
-    return { references: this.outbound(access, id), referencedBy: this.inbound(access, id) };
+    return {
+      references: this.outbound(access, id),
+      referencedBy: this.inbound(access, id),
+    };
   }
 
   /**
@@ -316,35 +411,46 @@ export class EntitiesService {
    * target. Asset edges are stored but surface-less, so `entity` targets alone are selected.
    */
   private outbound(access: EntityAccess, id: string): OutboundReference[] {
-    return this.db
-      .select({
-        targetId: entityEdges.targetId,
-        descriptor: entityEdges.descriptor,
-        name: entities.name,
-        types: entities.types,
-      })
-      .from(entityEdges)
-      .leftJoin(entities, and(eq(entities.id, entityEdges.targetId), access.filter))
-      .where(
-        and(eq(entityEdges.sourceEntityId, id), eq(entityEdges.targetKind, 'entity')),
-      )
-      // Resolved targets by name; the dangling ones last, where they read as a footnote. `targetId`
-      // is the final tiebreak, so two Entities sharing a name — or two descriptors to one target —
-      // hold a stable order between reads (as `list` does with `asc(entities.id)`).
-      .orderBy(
-        sql`${entities.name} IS NULL`,
-        asc(entities.name),
-        asc(entityEdges.targetId),
-        asc(entityEdges.descriptor),
-      )
-      .all()
-      .map((row) => ({
-        targetId: row.targetId,
-        descriptor: row.descriptor,
-        // An Entity whose stored types can't be read reads as a dangling target, same as an
-        // unreadable or deleted one: the reference is there, the thing at the end of it is not.
-        target: row.name === null ? null : linkedEntity(row.targetId, row.name, row.types),
-      }));
+    return (
+      this.db
+        .select({
+          targetId: entityEdges.targetId,
+          descriptor: entityEdges.descriptor,
+          name: entities.name,
+          types: entities.types,
+        })
+        .from(entityEdges)
+        .leftJoin(
+          entities,
+          and(eq(entities.id, entityEdges.targetId), access.filter),
+        )
+        .where(
+          and(
+            eq(entityEdges.sourceEntityId, id),
+            eq(entityEdges.targetKind, 'entity'),
+          ),
+        )
+        // Resolved targets by name; the dangling ones last, where they read as a footnote. `targetId`
+        // is the final tiebreak, so two Entities sharing a name — or two descriptors to one target —
+        // hold a stable order between reads (as `list` does with `asc(entities.id)`).
+        .orderBy(
+          sql`${entities.name} IS NULL`,
+          asc(entities.name),
+          asc(entityEdges.targetId),
+          asc(entityEdges.descriptor),
+        )
+        .all()
+        .map((row) => ({
+          targetId: row.targetId,
+          descriptor: row.descriptor,
+          // An Entity whose stored types can't be read reads as a dangling target, same as an
+          // unreadable or deleted one: the reference is there, the thing at the end of it is not.
+          target:
+            row.name === null
+              ? null
+              : linkedEntity(row.targetId, row.name, row.types),
+        }))
+    );
   }
 
   /**
@@ -352,25 +458,39 @@ export class EntitiesService {
    * the *source*, so an unreadable source drops the row entirely — never cached across viewers.
    */
   private inbound(access: EntityAccess, id: string): InboundReference[] {
-    return this.db
-      .select({
-        sourceId: entities.id,
-        descriptor: entityEdges.descriptor,
-        name: entities.name,
-        types: entities.types,
-      })
-      .from(entityEdges)
-      .innerJoin(entities, and(eq(entities.id, entityEdges.sourceEntityId), access.filter))
-      .where(and(eq(entityEdges.targetKind, 'entity'), eq(entityEdges.targetId, id)))
-      // `id` is the final tiebreak, for the same reason as {@link outbound}'s `targetId`.
-      .orderBy(asc(entities.name), asc(entities.id), asc(entityEdges.descriptor))
-      .all()
-      // A source is the thing doing the linking, so unlike {@link outbound}'s target it cannot
-      // dangle: a row whose source has no drawable type drops out entirely.
-      .flatMap((row) => {
-        const source = linkedEntity(row.sourceId, row.name, row.types);
-        return source ? [{ descriptor: row.descriptor, source }] : [];
-      });
+    return (
+      this.db
+        .select({
+          sourceId: entities.id,
+          descriptor: entityEdges.descriptor,
+          name: entities.name,
+          types: entities.types,
+        })
+        .from(entityEdges)
+        .innerJoin(
+          entities,
+          and(eq(entities.id, entityEdges.sourceEntityId), access.filter),
+        )
+        .where(
+          and(
+            eq(entityEdges.targetKind, 'entity'),
+            eq(entityEdges.targetId, id),
+          ),
+        )
+        // `id` is the final tiebreak, for the same reason as {@link outbound}'s `targetId`.
+        .orderBy(
+          asc(entities.name),
+          asc(entities.id),
+          asc(entityEdges.descriptor),
+        )
+        .all()
+        // A source is the thing doing the linking, so unlike {@link outbound}'s target it cannot
+        // dangle: a row whose source has no drawable type drops out entirely.
+        .flatMap((row) => {
+          const source = linkedEntity(row.sourceId, row.name, row.types);
+          return source ? [{ descriptor: row.descriptor, source }] : [];
+        })
+    );
   }
 
   /**
@@ -381,7 +501,12 @@ export class EntitiesService {
     return this.db
       .select()
       .from(entities)
-      .where(and(ownsEntity(userId, this.isSuperadmin(userId)), eq(entities.worldId, worldId)))
+      .where(
+        and(
+          ownsEntity(userId, this.isSuperadmin(userId)),
+          eq(entities.worldId, worldId),
+        ),
+      )
       .all()
       .map(toDetail);
   }
@@ -412,7 +537,15 @@ export class EntitiesService {
     body: EntityBody,
   ): void {
     // An imported note is always a single `core.note` — multi-type authoring is not an import path.
-    this.writes.insert({ id, ownerId, worldId, name, tags, types: [CORE_NOTE], body });
+    this.writes.insert({
+      id,
+      ownerId,
+      worldId,
+      name,
+      tags,
+      types: [CORE_NOTE],
+      body,
+    });
   }
 
   /**
@@ -501,15 +634,17 @@ export class EntitiesService {
    * entities. Reflects last-saved state (reads the index, not edits).
    */
   listDescriptors(ownerId: string): string[] {
-    return this.db
-      .selectDistinct({ descriptor: entityDescriptors.descriptor })
-      .from(entityDescriptors)
-      .innerJoin(entities, eq(entities.id, entityDescriptors.entityId))
-      // Personal suggestion vocabulary — the caller's own descriptors; no Superadmin bypass.
-      .where(ownsEntity(ownerId, false))
-      .orderBy(asc(entityDescriptors.descriptor))
-      .all()
-      .map((row) => row.descriptor);
+    return (
+      this.db
+        .selectDistinct({ descriptor: entityDescriptors.descriptor })
+        .from(entityDescriptors)
+        .innerJoin(entities, eq(entities.id, entityDescriptors.entityId))
+        // Personal suggestion vocabulary — the caller's own descriptors; no Superadmin bypass.
+        .where(ownsEntity(ownerId, false))
+        .orderBy(asc(entityDescriptors.descriptor))
+        .all()
+        .map((row) => row.descriptor)
+    );
   }
 
   /**
@@ -517,15 +652,17 @@ export class EntitiesService {
    * `json_each` unrolls the JSON `tags` column before DISTINCT.
    */
   listTags(ownerId: string): string[] {
-    return this.db
-      .selectDistinct({ value: sql<string>`tag.value` })
-      .from(entities)
-      .innerJoin(sql`json_each(${entities.tags}) as tag`, sql`1 = 1`)
-      // Personal suggestion vocabulary — the caller's own tags only; no Superadmin bypass.
-      .where(ownsEntity(ownerId, false))
-      .orderBy(sql`tag.value`)
-      .all()
-      .map((row) => row.value);
+    return (
+      this.db
+        .selectDistinct({ value: sql<string>`tag.value` })
+        .from(entities)
+        .innerJoin(sql`json_each(${entities.tags}) as tag`, sql`1 = 1`)
+        // Personal suggestion vocabulary — the caller's own tags only; no Superadmin bypass.
+        .where(ownsEntity(ownerId, false))
+        .orderBy(sql`tag.value`)
+        .all()
+        .map((row) => row.value)
+    );
   }
 
   /**
@@ -547,7 +684,9 @@ export class EntitiesService {
   private gateOwnerManagement(
     userId: string,
     id: string,
-  ): Extract<OwnerSetResult, { status: 'not-found' | 'forbidden' }> | undefined {
+  ):
+    | Extract<OwnerSetResult, { status: 'not-found' | 'forbidden' }>
+    | undefined {
     // Only needs reachability + ownership, so it uses the blob-free decideMeta.
     const meta = entityAccess(this.db, userId).decideMeta(id);
     return gate({ reachable: !!meta?.canRead, isOwner: !!meta?.isOwner });
@@ -583,7 +722,11 @@ export class EntitiesService {
    * invariant refuses removing the last Owner (`last-owner` → 409). A co-Owner may
    * evict any other Owner, including the creator.
    */
-  removeOwner(userId: string, id: string, targetUserId: string): OwnerSetResult {
+  removeOwner(
+    userId: string,
+    id: string,
+    targetUserId: string,
+  ): OwnerSetResult {
     const gate = this.gateOwnerManagement(userId, id);
     if (gate) return gate;
     const outcome = removeOwnerOutcome(this.entityOwnersOf(id), targetUserId);
@@ -693,7 +836,11 @@ export class EntitiesService {
       .where(eq(entityLinks.id, token))
       .get();
     if (!link) return null;
-    const row = this.db.select().from(entities).where(eq(entities.id, link.entityId)).get();
+    const row = this.db
+      .select()
+      .from(entities)
+      .where(eq(entities.id, link.entityId))
+      .get();
     return row ? { ...toDetail(row), rights: [...READ_ONLY_RIGHTS] } : null;
   }
 
@@ -706,7 +853,13 @@ export class EntitiesService {
     const row = this.db
       .select()
       .from(entities)
-      .where(and(eq(entities.id, id), eq(entities.worldId, worldId), sharedVisibility))
+      .where(
+        and(
+          eq(entities.id, id),
+          eq(entities.worldId, worldId),
+          sharedVisibility,
+        ),
+      )
       .get();
     return row ? { ...toDetail(row), rights: [...READ_ONLY_RIGHTS] } : null;
   }
@@ -730,7 +883,12 @@ export class EntitiesService {
     return this.db
       .select({ userId: entityGrants.userId, role: entityGrants.role })
       .from(entityGrants)
-      .where(and(eq(entityGrants.entityId, id), inArray(entityGrants.role, ['editor', 'viewer'])))
+      .where(
+        and(
+          eq(entityGrants.entityId, id),
+          inArray(entityGrants.role, ['editor', 'viewer']),
+        ),
+      )
       .orderBy(asc(entityGrants.userId))
       .all()
       .map((r) => ({ userId: r.userId, role: r.role as GrantRole }));
@@ -755,7 +913,10 @@ export class EntitiesService {
    */
   private resolveWorldId(ownerId: string, requestedId?: string): string {
     const predicate = requestedId
-      ? and(eq(worlds.id, requestedId), canCreateEntityFilter(ownerId, this.isSuperadmin(ownerId)))
+      ? and(
+          eq(worlds.id, requestedId),
+          canCreateEntityFilter(ownerId, this.isSuperadmin(ownerId)),
+        )
       : worldOwnerFilter(ownerId);
     const world = this.db
       .select({ id: worlds.id })
@@ -764,7 +925,9 @@ export class EntitiesService {
       .orderBy(asc(worlds.createdAt), asc(worlds.id))
       .get();
     if (!world)
-      throw new NotFoundException({ code: EntityErrorCode.NoWritableWorld } satisfies ApiError);
+      throw new NotFoundException({
+        code: EntityErrorCode.NoWritableWorld,
+      } satisfies ApiError);
     return world.id;
   }
 
@@ -787,8 +950,60 @@ function filters(opts: FilterOptions) {
   if (opts.visibility?.length)
     predicates.push(inArray(entities.visibility, [...opts.visibility]));
   if (opts.tags?.length) predicates.push(hasAny(entities.tags, opts.tags));
+  if (opts.fields?.length) predicates.push(...fieldFilters(opts.fields));
   if (opts.worldId) predicates.push(eq(entities.worldId, opts.worldId));
   return predicates;
+}
+
+/**
+ * Filter-by-Field predicates (ADR-0048, #188), grouped by Metadata key: `eq` values OR (enum/list
+ * membership), `gte`/`lte` bounds AND (a range), and one `EXISTS` over the denormalised
+ * `entity_field_facets` index per key — so different keys AND, matching the universal facets. A
+ * range on a `number` Field compares the numeric `num` column; a date/string compares `value`
+ * lexically (ISO dates sort correctly as text).
+ */
+function fieldFilters(fields: readonly FieldFilter[]): SQL[] {
+  const byKey = new Map<string, FieldFilter[]>();
+  for (const f of fields) {
+    const group = byKey.get(f.key);
+    if (group) group.push(f);
+    else byKey.set(f.key, [f]);
+  }
+  const predicates: SQL[] = [];
+  for (const [key, group] of byKey) {
+    const conds: SQL[] = [];
+    const eqValues = group.filter((f) => f.op === 'eq').map((f) => f.value);
+    if (eqValues.length) {
+      const list = sql.join(
+        eqValues.map((v) => sql`${v}`),
+        sql`, `,
+      );
+      conds.push(sql`f.value IN (${list})`);
+    }
+    for (const f of group) {
+      if (f.op === 'gte') conds.push(rangeBound(f.value, '>='));
+      if (f.op === 'lte') conds.push(rangeBound(f.value, '<='));
+    }
+    if (conds.length === 0) continue;
+    predicates.push(
+      sql`EXISTS (SELECT 1 FROM ${entityFieldFacets} f WHERE f.entity_id = ${entities.id} AND f.key = ${key} AND ${and(...conds)})`,
+    );
+  }
+  return predicates;
+}
+
+/**
+ * One `gte`/`lte` range bound. The materialised `num` column *is* the numeric-ness signal (set only
+ * for a `number` Field), so a row with `num` compares numerically and one without compares its
+ * `value` lexically (ISO dates sort correctly as text) — no need to know the Field's data-type at
+ * filter time, so a stale URL that omits the active type still compares a number as a number. A
+ * non-finite numeric bound (a hand-edited URL) matches no numeric row rather than binding NaN.
+ */
+function rangeBound(value: string, op: '>=' | '<='): SQL {
+  const n = Number(value);
+  const numeric = Number.isFinite(n) ? sql`f.num ${sql.raw(op)} ${n}` : sql`0`;
+  const lexical = sql`f.value ${sql.raw(op)} ${value}`;
+  return sql`(CASE WHEN f.num IS NOT NULL THEN ${numeric} ELSE ${lexical} END)`;
 }
 
 /**

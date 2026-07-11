@@ -785,6 +785,7 @@ describe('EntityBrowser', () => {
           ],
           tag: [{ value: 'deity', count: 2 }],
           visibility: [{ value: 'private', count: 4 }],
+          fields: [],
         }),
       );
       const el = renderWith([summary({ id: 'm1' })]).nativeElement as HTMLElement;
@@ -798,7 +799,7 @@ describe('EntityBrowser', () => {
 
     it('toggles a Type Facet: filters the list and mirrors it to the URL', () => {
       client.facets.mockReturnValue(
-        of({ type: [{ value: 'core.note', count: 1 }], tag: [], visibility: [] }),
+        of({ type: [{ value: 'core.note', count: 1 }], tag: [], visibility: [], fields: [] }),
       );
       const fixture = renderWith([summary({ id: 'm1' })]);
       const el = fixture.nativeElement as HTMLElement;
@@ -827,7 +828,7 @@ describe('EntityBrowser', () => {
 
     it('removes an individual active Facet by toggling it off', () => {
       client.facets.mockReturnValue(
-        of({ type: [{ value: 'core.note', count: 1 }], tag: [], visibility: [] }),
+        of({ type: [{ value: 'core.note', count: 1 }], tag: [], visibility: [], fields: [] }),
       );
       const fixture = renderWith([summary({ id: 'm1' })]);
       const el = fixture.nativeElement as HTMLElement;
@@ -850,7 +851,7 @@ describe('EntityBrowser', () => {
 
     it('Clear all resets the query and every Facet, dropping their URL params', () => {
       client.facets.mockReturnValue(
-        of({ type: [{ value: 'core.note', count: 1 }], tag: [], visibility: [] }),
+        of({ type: [{ value: 'core.note', count: 1 }], tag: [], visibility: [], fields: [] }),
       );
       const fixture = renderWith([summary({ id: 'm1' })]);
       const el = fixture.nativeElement as HTMLElement;
@@ -867,7 +868,7 @@ describe('EntityBrowser', () => {
       expect(navigate).toHaveBeenLastCalledWith(
         [],
         expect.objectContaining({
-          queryParams: { q: null, type: null, tag: null, visibility: null },
+          queryParams: { q: null, type: null, tag: null, visibility: null, field: null },
         }),
       );
       expect(client.list).toHaveBeenLastCalledWith({ limit: 50, worldId: 'w1', rights: true });
@@ -900,6 +901,118 @@ describe('EntityBrowser', () => {
 
       expect(client.facets.mock.calls.length).toBeGreaterThan(before);
       expect(client.facets).toHaveBeenLastCalledWith({ worldId: 'w1', q: 'temple' });
+    });
+
+    describe('contextual Field facets (#188)', () => {
+      // A facets response carrying one enum Field facet — the contextual dimension the server
+      // returns only when a type is the active filter.
+      const withEnumField = () =>
+        client.facets.mockReturnValue(
+          of({
+            type: [{ value: 'test.beast', count: 2 }],
+            tag: [],
+            visibility: [],
+            fields: [
+              {
+                key: 'alignment',
+                label: 'Alignment',
+                dataType: { kind: 'enum', options: ['lawful-good', 'chaotic-evil'] },
+                values: [
+                  { value: 'lawful-good', count: 1 },
+                  { value: 'chaotic-evil', count: 1 },
+                ],
+              },
+            ],
+          }),
+        );
+
+      it('renders a type’s Field facet with its values and counts', () => {
+        withEnumField();
+        const el = renderWith([summary({ id: 'm1' })]).nativeElement as HTMLElement;
+
+        expect(el.querySelector('[data-testid="facet-field-alignment"]')).not.toBeNull();
+        const row = facet(el, 'facet-field-alignment-lawful-good');
+        expect(row?.textContent).toContain('lawful-good');
+        expect(row?.textContent).toContain('1');
+      });
+
+      it('toggling a Field-facet value filters the list and mirrors a `field` token to the URL', () => {
+        withEnumField();
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        const el = fixture.nativeElement as HTMLElement;
+
+        client.list.mockReturnValueOnce(of({ items: [], nextCursor: null }));
+        facet(el, 'facet-field-alignment-lawful-good')?.click();
+        fixture.detectChanges();
+
+        expect(client.list).toHaveBeenLastCalledWith({
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          field: ['alignment:eq:lawful-good'],
+        });
+        expect(navigate).toHaveBeenLastCalledWith(
+          [],
+          expect.objectContaining({
+            queryParams: expect.objectContaining({ field: ['alignment:eq:lawful-good'] }),
+          }),
+        );
+      });
+
+      it('a number Field facet renders a range whose bound becomes a `gte` token', () => {
+        client.facets.mockReturnValue(
+          of({
+            type: [{ value: 'test.beast', count: 2 }],
+            tag: [],
+            visibility: [],
+            fields: [
+              {
+                key: 'cr',
+                label: 'Challenge Rating',
+                dataType: { kind: 'number' },
+                values: [
+                  { value: '1', count: 1 },
+                  { value: '10', count: 1 },
+                ],
+              },
+            ],
+          }),
+        );
+        const fixture = renderWith([summary({ id: 'm1' })]);
+        const el = fixture.nativeElement as HTMLElement;
+
+        const min = el.querySelector('[data-testid="facet-field-cr-gte"]') as HTMLInputElement;
+        expect(min).not.toBeNull();
+        client.list.mockReturnValueOnce(of({ items: [], nextCursor: null }));
+        min.value = '5';
+        min.dispatchEvent(new Event('change'));
+        fixture.detectChanges();
+
+        expect(client.list).toHaveBeenLastCalledWith({
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          field: ['cr:gte:5'],
+        });
+      });
+
+      it('seeds Field filters from a `field` URL param into the first fetch', () => {
+        queryParams$.next(
+          convertToParamMap({ type: 'test.beast', field: 'alignment:eq:lawful-good' }),
+        );
+        client.list.mockReturnValueOnce(of({ items: [], nextCursor: null }));
+        const fixture = TestBed.createComponent(EntityBrowser);
+        fixture.detectChanges();
+        fixture.detectChanges();
+
+        expect(client.list).toHaveBeenCalledWith({
+          limit: 50,
+          worldId: 'w1',
+          rights: true,
+          type: ['test.beast'],
+          field: ['alignment:eq:lawful-good'],
+        });
+      });
     });
   });
 

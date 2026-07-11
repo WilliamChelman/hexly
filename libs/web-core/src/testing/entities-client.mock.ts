@@ -22,7 +22,7 @@ export class MockEntitiesClient {
   // Defaults to empty counts so a spec that doesn't care about the Facet rail
   // (#155) still renders without stubbing it; override per test as needed.
   facets = vi.fn<(opts?: EntityFacetParams) => Observable<EntityFacets>>(() =>
-    of({ type: [], tag: [], visibility: [] }),
+    of({ type: [], tag: [], visibility: [], fields: [] }),
   );
   patch =
     vi.fn<

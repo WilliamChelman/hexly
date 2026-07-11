@@ -25,6 +25,7 @@ import {
   entityListQuerySchema,
   EntityPage,
   EntityReferences,
+  parseFieldFilters,
   patchEntityRequestSchema,
   PublicLink,
   saveEntityRequestSchema,
@@ -51,7 +52,7 @@ export class EntitiesController {
   list(@CurrentUser() user: AuthUser, @Query() query: unknown): EntityPage {
     const parsed = entityListQuerySchema.safeParse(query);
     if (!parsed.success) throw new BadRequestException();
-    const { cursor, limit, ids, q, type, tag, visibility, worldId, rights } = parsed.data;
+    const { cursor, limit, ids, q, type, tag, visibility, field, worldId, rights } = parsed.data;
 
     // Absent cursor is page one; undecodable is a 400 (ADR-0001).
     const offset = cursor === undefined ? 0 : decodeCursor(cursor);
@@ -65,6 +66,8 @@ export class EntitiesController {
       type,
       tags: tag,
       visibility,
+      // A malformed `field` token is dropped, not 400'd, so a stale URL degrades to no-filter.
+      fields: parseFieldFilters(field),
       worldId,
       withRights: rights,
     });
@@ -96,12 +99,13 @@ export class EntitiesController {
   facets(@CurrentUser() user: AuthUser, @Query() query: unknown): EntityFacets {
     const parsed = entityListQuerySchema.safeParse(query);
     if (!parsed.success) throw new BadRequestException();
-    const { q, type, tag, visibility, worldId } = parsed.data;
+    const { q, type, tag, visibility, field, worldId } = parsed.data;
     return this.entities.facets(user.id, {
       q,
       type,
       tags: tag,
       visibility,
+      fields: parseFieldFilters(field),
       worldId,
     });
   }

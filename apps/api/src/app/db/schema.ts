@@ -3,6 +3,7 @@ import {
   index,
   integer,
   primaryKey,
+  real,
   sqliteTable,
   text,
 } from 'drizzle-orm/sqlite-core';
@@ -267,6 +268,41 @@ export const entityEdges = sqliteTable(
     index('idx_entity_edges_target').on(table.targetKind, table.targetId),
     // The World Graph's whole-World edge fetch.
     index('idx_entity_edges_world').on(table.worldId, table.targetKind),
+  ]
+);
+
+/**
+ * The denormalised **Field-facet** index (ADR-0048, #188): one row per distinct facetable Field
+ * value an Entity's Metadata carries — the Field peer of the `types`/`tags` columns, pulled out so a
+ * Field facet can be counted and filtered without loading each body. Like {@link entityEdges} it is
+ * an **index, never a source of truth**: `EntityWrites` derives it from `document.metadata` on every
+ * save and Reindex rebuilds it, wholesale-replacing an Entity's rows (self-pruning). Deleting the
+ * Entity cascades them away.
+ *
+ * `value` is the canonical string form; `num` is set only for a `number` Field, so a range filter
+ * compares it numerically while an enum/date/string compares `value` lexically. `worldId` is
+ * denormalised off the source, mirroring {@link entityEdges}, so a World-scoped facet read is one
+ * indexed lookup. A `list` Field explodes to one row per item, so the composite PK is
+ * `(entityId, key, value)`.
+ */
+export const entityFieldFacets = sqliteTable(
+  'entity_field_facets',
+  {
+    entityId: text('entity_id')
+      .notNull()
+      .references(() => entities.id, { onDelete: 'cascade' }),
+    worldId: text('world_id').notNull(),
+    // The Metadata key the Field types.
+    key: text('key').notNull(),
+    // The canonical string form of the value; the facet value the rail lists and eq/date filters match.
+    value: text('value').notNull(),
+    // The numeric form of a `number` Field (else null), so a range filter compares as a number.
+    num: real('num'),
+  },
+  (table) => [
+    primaryKey({ columns: [table.entityId, table.key, table.value] }),
+    // The World-scoped facet count and filter: group/match by (world, key, value).
+    index('idx_entity_field_facets_key').on(table.worldId, table.key, table.value),
   ]
 );
 

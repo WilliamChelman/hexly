@@ -141,6 +141,105 @@ export function validateFields(
   return { ok: errors.length === 0, errors };
 }
 
+/**
+ * One denormalised **facetable** Field value (ADR-0048, #188), the Field peer of the `types`/`tags`
+ * denormalisation: the Metadata `key` it types, its canonical string `value`, and a `num` — the
+ * numeric form of a `number` Field, else `null`. `num` is what lets a range filter compare a number
+ * *as a number* (`cr >= 5`), while an enum/date/string compares its `value` lexically (ISO dates sort
+ * correctly as text). Materialised on write and rebuilt by Reindex, so a Field facet is queryable
+ * without loading each body.
+ */
+export interface FieldFacetValue {
+  readonly key: string;
+  readonly value: string;
+  readonly num: number | null;
+}
+
+/**
+ * The pure Field-facet derivation (ADR-0048, #188): a resolved Field set + an Entity's Metadata →
+ * the denormalised facet values to materialise. Only **facetable** Fields contribute, only a
+ * *present, well-typed* value is indexed (an ill-typed value at rest is tolerated, never faceted),
+ * a `list` explodes to one value per item, and values repeated within one Entity collapse so a facet
+ * count is per-Entity rather than per-occurrence. Side-effect-free — the write path feeds the result
+ * to the denormalised table, and Reindex re-runs it from the stored document for free.
+ */
+export function deriveFieldFacets(
+  fields: readonly FieldSchema[],
+  metadata: Metadata | undefined,
+): FieldFacetValue[] {
+  const seen = new Set<string>();
+  const out: FieldFacetValue[] = [];
+  for (const field of fields) {
+    if (!field.facetable) continue;
+    const raw = readField(metadata, field);
+    if (raw === undefined || raw === null) continue;
+    for (const item of facetItems(field.dataType, raw)) {
+      // Dedup on the (key, value) pair so a value repeated within one Entity (a list with dupes)
+      // counts once — JSON.stringify keeps the two parts unambiguous whatever they contain.
+      const dedupKey = JSON.stringify([field.key, item.value]);
+      if (seen.has(dedupKey)) continue;
+      seen.add(dedupKey);
+      out.push({ key: field.key, value: item.value, num: item.num });
+    }
+  }
+  return out;
+}
+
+/** A Field's facet rows: a `list` maps each well-typed item, a scalar its one well-typed value. */
+function facetItems(dataType: FieldDataType, raw: unknown): { value: string; num: number | null }[] {
+  if (dataType.kind === 'list')
+    return Array.isArray(raw) ? raw.flatMap((item) => scalarFacet(dataType.of, item)) : [];
+  return scalarFacet(dataType, raw);
+}
+
+/** A scalar's facet row, or nothing if it doesn't inhabit the data-type (forward-only tolerance). */
+function scalarFacet(dataType: ScalarDataType, raw: unknown): { value: string; num: number | null }[] {
+  if (!matchesDataType(dataType, raw)) return [];
+  return dataType.kind === 'number'
+    ? [{ value: String(raw), num: raw as number }]
+    : [{ value: String(raw), num: null }];
+}
+
+/** The comparison a {@link FieldFilter} applies: `eq` membership, or a `gte`/`lte` range bound. */
+export type FieldFilterOp = 'eq' | 'gte' | 'lte';
+
+const FIELD_FILTER_OPS: ReadonlySet<string> = new Set<FieldFilterOp>(['eq', 'gte', 'lte']);
+
+/**
+ * One filter-by-Field constraint (ADR-0048, #188): the Metadata `key`, an `op`, and the compared
+ * `value`. `eq` on the same key OR together (enum/list membership); `gte`/`lte` on the same key form
+ * a range; different keys AND — mirroring the universal facets. Wire form is `key:op:value`.
+ */
+export interface FieldFilter {
+  readonly key: string;
+  readonly op: FieldFilterOp;
+  readonly value: string;
+}
+
+/**
+ * Parse one `key:op:value` token, splitting on the **first two** colons so a value carrying its own
+ * (an ISO datetime) survives intact. `null` for a malformed token — the caller drops it rather than
+ * 400ing, so a stale or hand-edited URL degrades to no-filter instead of breaking the browse.
+ */
+export function parseFieldFilter(raw: string): FieldFilter | null {
+  const first = raw.indexOf(':');
+  if (first <= 0) return null;
+  const second = raw.indexOf(':', first + 1);
+  if (second < 0) return null;
+  const op = raw.slice(first + 1, second);
+  const value = raw.slice(second + 1);
+  if (!FIELD_FILTER_OPS.has(op) || value === '') return null;
+  return { key: raw.slice(0, first), op: op as FieldFilterOp, value };
+}
+
+/** Parse the repeated `field` query params, keeping the valid tokens and dropping the rest. */
+export function parseFieldFilters(raw: readonly string[] | undefined): FieldFilter[] {
+  return (raw ?? []).flatMap((token) => {
+    const parsed = parseFieldFilter(token);
+    return parsed ? [parsed] : [];
+  });
+}
+
 /** Read a Field's value straight off the Metadata map — the lens, so it never copies or coerces. */
 export function readField(metadata: Metadata | undefined, field: FieldSchema): unknown {
   return metadata?.[field.key];

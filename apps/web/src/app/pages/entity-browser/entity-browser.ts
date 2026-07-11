@@ -22,6 +22,7 @@ import {
   EntityPage,
   EntitySummary,
   EntityType,
+  parseFieldFilters,
   Visibility,
 } from '@hexly/domain';
 import { EntitiesClient, EntityFacetParams, ActiveWorld, ToasterService, entityRoute, AppShellStore } from '@hexly/web-core';
@@ -30,9 +31,47 @@ import { TypeRegistry } from '../../entity-types/type-registry';
 import { EntityCard } from './entity-card';
 import { EntitySearch } from './entity-search';
 import { EmptyState } from './empty-state';
-import { ActiveFacets, FacetRail, FacetToggle } from './facet-rail';
+import {
+  ActiveFacets,
+  FacetRail,
+  FacetToggle,
+  FieldRangeChange,
+  FieldSelection,
+  FieldValueToggle,
+  isFieldSelectionEmpty,
+} from './facet-rail';
 
-const NO_FACETS: ActiveFacets = { type: [], tag: [], visibility: [] };
+const NO_FACETS: ActiveFacets = { type: [], tag: [], visibility: [], fields: {} };
+
+const NO_FACET_COUNTS: EntityFacets = { type: [], tag: [], visibility: [], fields: [] };
+
+/** Serialize the active Field selections to the repeated `key:op:value` tokens the API + URL speak. */
+function fieldTokens(fields: Readonly<Record<string, FieldSelection>>): string[] {
+  const tokens: string[] = [];
+  for (const [key, sel] of Object.entries(fields)) {
+    for (const v of sel.values ?? []) tokens.push(`${key}:eq:${v}`);
+    if (sel.gte) tokens.push(`${key}:gte:${sel.gte}`);
+    if (sel.lte) tokens.push(`${key}:lte:${sel.lte}`);
+  }
+  return tokens;
+}
+
+/** Fold the repeated `field` params back into the per-key {@link FieldSelection} record. */
+function fieldsFromTokens(tokens: readonly string[]): Record<string, FieldSelection> {
+  const out: Record<string, { values: string[]; gte?: string; lte?: string }> = {};
+  for (const f of parseFieldFilters(tokens)) {
+    const sel = (out[f.key] ??= { values: [] });
+    if (f.op === 'eq') sel.values.push(f.value);
+    else if (f.op === 'gte') sel.gte = f.value;
+    else sel.lte = f.value;
+  }
+  return out;
+}
+
+/** Drop a Field key once its selection is empty, so `hasFilters`/the URL never carry a dead entry. */
+function pruneField(sel: FieldSelection): FieldSelection | undefined {
+  return isFieldSelectionEmpty(sel) ? undefined : sel;
+}
 
 // ponytail: bounded first page so a large vault loads fast; bump or make
 // configurable only if a real page size proves wrong in use.
@@ -115,6 +154,8 @@ const FIRST_PAGE_CACHE_LIMIT = 50;
           [active]="activeFacets()"
           [canClear]="hasFilters()"
           (toggled)="toggleFacet($event)"
+          (fieldValueToggled)="toggleFieldValue($event)"
+          (fieldRangeChanged)="changeFieldRange($event)"
           (clearAll)="clearAll()"
         />
         <div>
@@ -223,18 +264,15 @@ export class EntityBrowser {
   protected readonly activeFacets = signal<ActiveFacets>(NO_FACETS, {
     equal: (a, b) => JSON.stringify(a) === JSON.stringify(b),
   });
-  protected readonly facetCounts = signal<EntityFacets>({
-    type: [],
-    tag: [],
-    visibility: [],
-  });
+  protected readonly facetCounts = signal<EntityFacets>(NO_FACET_COUNTS);
   protected readonly hasFilters = computed(() => {
     const f = this.activeFacets();
     return (
       this.query() !== '' ||
       f.type.length > 0 ||
       f.tag.length > 0 ||
-      f.visibility.length > 0
+      f.visibility.length > 0 ||
+      Object.keys(f.fields).length > 0
     );
   });
 
@@ -268,6 +306,7 @@ export class EntityBrowser {
           type: params.getAll('type'),
           tag: params.getAll('tag'),
           visibility: params.getAll('visibility'),
+          field: params.getAll('field'),
         })),
         distinctUntilChanged((a, b) => JSON.stringify(a) === JSON.stringify(b)),
         takeUntilDestroyed(),
@@ -278,6 +317,7 @@ export class EntityBrowser {
           type: f.type,
           tag: f.tag,
           visibility: f.visibility,
+          fields: fieldsFromTokens(f.field),
         });
       });
 
@@ -315,13 +355,40 @@ export class EntityBrowser {
     const next = values.includes(value)
       ? values.filter((v) => v !== value)
       : [...values, value];
-    const updated = { ...current, [category]: next };
+    this.applyFacets({ ...current, [category]: next });
+  }
+
+  /** Toggle one enum/list/string Field-facet value (eq membership, OR within the Field). */
+  protected toggleFieldValue({ key, value }: FieldValueToggle): void {
+    const current = this.activeFacets();
+    const sel = current.fields[key] ?? {};
+    const values = sel.values ?? [];
+    const nextValues = values.includes(value)
+      ? values.filter((v) => v !== value)
+      : [...values, value];
+    this.setFieldSelection(current, key, { ...sel, values: nextValues });
+  }
+
+  /** Set (or clear) one bound of a number/date Field range. */
+  protected changeFieldRange({ key, bound, value }: FieldRangeChange): void {
+    const current = this.activeFacets();
+    const sel = current.fields[key] ?? {};
+    this.setFieldSelection(current, key, { ...sel, [bound]: value || undefined });
+  }
+
+  /** Fold a Field selection back into the active facets, pruning it away once empty. */
+  private setFieldSelection(current: ActiveFacets, key: string, sel: FieldSelection): void {
+    const fields = { ...current.fields };
+    const pruned = pruneField(sel);
+    if (pruned) fields[key] = pruned;
+    else delete fields[key];
+    this.applyFacets({ ...current, fields });
+  }
+
+  /** Commit a new active-facet set: update the signal and mirror it to the URL. */
+  private applyFacets(updated: ActiveFacets): void {
     this.activeFacets.set(updated);
-    this.mirrorToUrl({
-      type: updated.type,
-      tag: updated.tag,
-      visibility: updated.visibility,
-    });
+    this.mirrorToUrl(updated);
   }
 
   protected clearAll(): void {
@@ -329,19 +396,21 @@ export class EntityBrowser {
     this.activeFacets.set(NO_FACETS);
     this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { q: null, type: null, tag: null, visibility: null },
+      queryParams: { q: null, type: null, tag: null, visibility: null, field: null },
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });
   }
 
   private mirrorToUrl(facets: ActiveFacets): void {
+    const field = fieldTokens(facets.fields);
     this.router.navigate([], {
       relativeTo: this.route,
       queryParams: {
         type: facets.type.length ? [...facets.type] : null,
         tag: facets.tag.length ? [...facets.tag] : null,
         visibility: facets.visibility.length ? [...facets.visibility] : null,
+        field: field.length ? field : null,
       },
       queryParamsHandling: 'merge',
       replaceUrl: true,
@@ -408,6 +477,7 @@ export class EntityBrowser {
   private activeFilterParams(): EntityFacetParams {
     const q = this.query();
     const f = this.activeFacets();
+    const field = fieldTokens(f.fields);
     return {
       ...(q ? { q } : {}),
       ...(f.type.length ? { type: [...f.type] as EntityType[] } : {}),
@@ -415,6 +485,7 @@ export class EntityBrowser {
       ...(f.visibility.length
         ? { visibility: [...f.visibility] as Visibility[] }
         : {}),
+      ...(field.length ? { field } : {}),
     };
   }
 

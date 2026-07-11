@@ -1,6 +1,9 @@
 import {
+  deriveFieldFacets,
   FieldSchema,
   fieldSchemaSchema,
+  parseFieldFilter,
+  parseFieldFilters,
   readField,
   resolveFields,
   validateFields,
@@ -156,6 +159,80 @@ describe('validateFields (forward-only)', () => {
     const numberField = [field({ key: 'cr', dataType: { kind: 'number' } })];
     expect(validateFields(numberField, { cr: Number.NaN }).ok).toBe(false);
     expect(validateFields(numberField, { cr: Infinity }).ok).toBe(false);
+  });
+});
+
+describe('deriveFieldFacets (the write-time denormalisation, a lens over Metadata)', () => {
+  const fields: FieldSchema[] = [
+    field({ key: 'cr', dataType: { kind: 'number' }, facetable: true }),
+    field({ key: 'size', dataType: { kind: 'enum', options: ['small', 'large'] }, facetable: true }),
+    field({ key: 'born', dataType: { kind: 'date' }, facetable: true }),
+    field({ key: 'senses', dataType: { kind: 'list', of: { kind: 'string' } }, facetable: true }),
+    // Declared but NOT facetable — never materialised.
+    field({ key: 'name', dataType: { kind: 'string' }, facetable: false }),
+  ];
+
+  it('materialises each facetable Field value, tagging a number with its numeric form', () => {
+    const facets = deriveFieldFacets(fields, {
+      cr: 10,
+      size: 'large',
+      born: '2026-07-11',
+      senses: ['darkvision', 'truesight'],
+      name: 'Aboleth',
+    });
+    expect(facets).toContainEqual({ key: 'cr', value: '10', num: 10 });
+    expect(facets).toContainEqual({ key: 'size', value: 'large', num: null });
+    expect(facets).toContainEqual({ key: 'born', value: '2026-07-11', num: null });
+    // A list explodes to one row per item.
+    expect(facets).toContainEqual({ key: 'senses', value: 'darkvision', num: null });
+    expect(facets).toContainEqual({ key: 'senses', value: 'truesight', num: null });
+    // A non-facetable Field is never materialised.
+    expect(facets.some((f) => f.key === 'name')).toBe(false);
+  });
+
+  it('skips absent values and ill-typed values — data at rest is tolerated, not indexed', () => {
+    // `cr` is present but the wrong type, `size` absent: neither reaches the facet index.
+    expect(deriveFieldFacets(fields, { cr: 'huge' })).toEqual([]);
+    expect(deriveFieldFacets(fields, undefined)).toEqual([]);
+    // A list drops only the ill-typed items, keeping the good ones.
+    expect(deriveFieldFacets(fields, { senses: ['darkvision', 7] })).toEqual([
+      { key: 'senses', value: 'darkvision', num: null },
+    ]);
+  });
+
+  it('dedupes repeated values within one Entity so a count is per-Entity, not per-occurrence', () => {
+    expect(deriveFieldFacets(fields, { senses: ['darkvision', 'darkvision'] })).toEqual([
+      { key: 'senses', value: 'darkvision', num: null },
+    ]);
+  });
+});
+
+describe('parseFieldFilter (`key:op:value`)', () => {
+  it('parses each op, splitting on the first two colons so a value keeps its own', () => {
+    expect(parseFieldFilter('cr:gte:5')).toEqual({ key: 'cr', op: 'gte', value: '5' });
+    expect(parseFieldFilter('size:eq:large')).toEqual({ key: 'size', op: 'eq', value: 'large' });
+    // An ISO datetime value carries colons — they belong to the value, not the delimiter.
+    expect(parseFieldFilter('born:lte:2026-07-11T09:30:00Z')).toEqual({
+      key: 'born',
+      op: 'lte',
+      value: '2026-07-11T09:30:00Z',
+    });
+  });
+
+  it('returns null for a malformed token so a stale URL is dropped, never a 400', () => {
+    expect(parseFieldFilter('cr:5')).toBeNull(); // no op
+    expect(parseFieldFilter('cr:between:5')).toBeNull(); // unknown op
+    expect(parseFieldFilter('cr:eq:')).toBeNull(); // empty value
+    expect(parseFieldFilter(':eq:5')).toBeNull(); // empty key
+    expect(parseFieldFilter('nonsense')).toBeNull();
+  });
+
+  it('parseFieldFilters keeps the valid tokens and drops the rest', () => {
+    expect(parseFieldFilters(['cr:gte:5', 'garbage', 'size:eq:large'])).toEqual([
+      { key: 'cr', op: 'gte', value: '5' },
+      { key: 'size', op: 'eq', value: 'large' },
+    ]);
+    expect(parseFieldFilters(undefined)).toEqual([]);
   });
 });
 

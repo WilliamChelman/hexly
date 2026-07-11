@@ -45,7 +45,9 @@
       "visibility": "Visibilité",
       "clearAll": "Tout effacer",
       "private": "Privé",
-      "shared": "Partagé"
+      "shared": "Partagé",
+      "rangeMin": "{{field}} minimum",
+      "rangeMax": "{{field}} maximum"
     }
   },
   "entityTags": {

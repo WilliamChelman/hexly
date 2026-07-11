@@ -35,7 +35,7 @@ export const ENTITY_NUDGE_DEBOUNCE_MS = 150;
 /** The subset of list params the Facet-count read narrows against — no paging. */
 export type EntityFacetParams = Pick<
   EntityListParams,
-  'q' | 'type' | 'tag' | 'visibility' | 'worldId'
+  'q' | 'type' | 'tag' | 'visibility' | 'field' | 'worldId'
 >;
 
 /**
@@ -245,6 +245,8 @@ function facetParams(opts: EntityFacetParams): HttpParams {
   for (const t of opts.type ?? []) params = params.append('type', t);
   for (const t of opts.tag ?? []) params = params.append('tag', t);
   for (const v of opts.visibility ?? []) params = params.append('visibility', v);
+  // Filter-by-Field (#188): each `key:op:value` token repeats, like the other facet params.
+  for (const f of opts.field ?? []) params = params.append('field', f);
   if (opts.worldId) params = params.set('worldId', opts.worldId);
   return params;
 }

@@ -109,7 +109,7 @@ describe('WorldDashboard', () => {
       return of(page(o?.type?.includes('core.hexmap') ? (opts.maps ?? []) : (opts.recents ?? [])));
     });
     entities.facets.mockReturnValue(
-      of(opts.facets ?? { type: [], tag: [], visibility: [] }),
+      of(opts.facets ?? { type: [], tag: [], visibility: [], fields: [] }),
     );
     fixture = TestBed.createComponent(WorldDashboard);
     fixture.detectChanges();
@@ -250,6 +250,7 @@ describe('WorldDashboard', () => {
         ],
         tag: [],
         visibility: [],
+        fields: [],
       },
     });
 

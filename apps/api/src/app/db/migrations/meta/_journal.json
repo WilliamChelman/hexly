@@ -120,6 +120,13 @@
       "when": 1783750035063,
       "tag": "0016_core_types_flip",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1783793291603,
+      "tag": "0017_field_facets",
+      "breakpoints": true
     }
   ]
 }

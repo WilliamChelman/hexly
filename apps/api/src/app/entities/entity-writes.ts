@@ -3,12 +3,15 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   EntityBody,
   EntityEdge,
+  FieldFacetValue,
   GrantRole,
   ReindexFailure,
   Visibility,
   descriptorsSchema,
+  deriveFieldFacets,
   extractText,
   harvestEdges,
+  resolveFields,
 } from '@hexly/domain';
 import { and, asc, eq, gt, inArray, ne, sql } from 'drizzle-orm';
 import { EntityAccess, entityAccess, sharedVisibility } from '../acl/entity-access';
@@ -18,18 +21,22 @@ import {
   entities,
   entityDescriptors,
   entityEdges,
+  entityFieldFacets,
   entityGrants,
 } from '../db/schema';
 import { SyncOnly, WriteOutbox } from '../events/write-outbox';
+import { TypeFieldRegistry } from './type-field-registry';
 
 /** A fresh Entity starts at version 1 — the optimistic-concurrency token's floor. */
 const INITIAL_VERSION = 1;
 
-/** Everything one save derives from the Entity's document, in one pass. */
+/** Everything one save derives from the Entity's document (and its types), in one pass. */
 interface Derived {
   contentText: string;
   descriptors: string[];
   edges: EntityEdge[];
+  /** The denormalised facetable Field values (ADR-0048, #188) — depends on `types` *and* Metadata. */
+  fieldFacets: FieldFacetValue[];
 }
 
 /**
@@ -44,6 +51,8 @@ const MAX_BOUND_PARAMS = 32766;
 const EDGE_COLUMNS = 5;
 /** Columns bound per `entity_descriptors` row: entity, descriptor. */
 const DESCRIPTOR_COLUMNS = 2;
+/** Columns bound per `entity_field_facets` row: entity, world, key, value, num. */
+const FIELD_FACET_COLUMNS = 5;
 
 /** Split `rows` into the largest batches a single `INSERT … VALUES` can bind. Empty in, nothing out. */
 function* batched<T>(rows: readonly T[], columns: number): Generator<readonly T[]> {
@@ -153,6 +162,9 @@ export class EntityWrites {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly outbox: WriteOutbox,
+    // Resolves a `types[]` set to its Field schema, so the derive pass can materialise the
+    // facetable Field values (ADR-0048, #188) the same way it harvests edges and descriptors.
+    private readonly typeFields: TypeFieldRegistry,
   ) {}
 
   /**
@@ -171,7 +183,7 @@ export class EntityWrites {
    */
   insert(input: InsertEntityInput): EntityRow {
     const now = Date.now();
-    const derived = this.derive(input.body);
+    const derived = this.derive(input.body, input.types);
     const row: EntityRow = {
       id: input.id ?? randomUUID(),
       worldId: input.worldId,
@@ -299,7 +311,14 @@ export class EntityWrites {
    */
   reindexChunk(after: string | null, limit: number): ReindexChunk {
     const rows = this.db
-      .select({ id: entities.id, worldId: entities.worldId, document: entities.document })
+      .select({
+        id: entities.id,
+        worldId: entities.worldId,
+        // Field facets derive from the type set as well as the document (ADR-0048, #188), so the
+        // reindex projection carries `types` — the one derivation that reads a column beyond `document`.
+        types: entities.types,
+        document: entities.document,
+      })
       .from(entities)
       .where(after === null ? undefined : gt(entities.id, after))
       .orderBy(asc(entities.id))
@@ -312,7 +331,7 @@ export class EntityWrites {
     const derived: { row: (typeof rows)[number]; derived: Derived }[] = [];
     for (const row of rows) {
       try {
-        derived.push({ row, derived: this.derive(JSON.parse(row.document) as EntityBody) });
+        derived.push({ row, derived: this.derive(JSON.parse(row.document) as EntityBody, row.types) });
       } catch (err) {
         failures.push({
           entityId: row.id,
@@ -356,12 +375,15 @@ export class EntityWrites {
    * `content → entity` edge carries a descriptor, so the non-null ones are exactly the descriptors
    * the Content uses. One traversal, and one definition of what a descriptor is.
    */
-  private derive(body: EntityBody): Derived {
+  private derive(body: EntityBody, types: readonly string[]): Derived {
     const edges = harvestEdges(body);
     return {
       contentText: extractText(body.content),
       descriptors: descriptorsSchema.parse(edges.flatMap((e) => e.descriptor ?? [])),
       edges,
+      // Field facets need the type set (which Fields are facetable) *and* the document's Metadata
+      // (their values) — the one derivation that reads a column beyond the body (ADR-0048, #188).
+      fieldFacets: deriveFieldFacets(resolveFields(this.typeFields.resolver, types), body.metadata),
     };
   }
 
@@ -373,6 +395,22 @@ export class EntityWrites {
   private replaceDerived(id: string, worldId: string, derived: Derived): void {
     this.replaceDescriptors(id, derived.descriptors);
     this.replaceEdges(id, worldId, derived.edges);
+    this.replaceFieldFacets(id, worldId, derived.fieldFacets);
+  }
+
+  /**
+   * Replace the Entity's Field-facet rows with the freshly derived set (self-pruning, ADR-0048,
+   * #188). `worldId` is denormalised off the source, mirroring {@link replaceEdges}, so a
+   * World-scoped facet read is one indexed lookup.
+   */
+  private replaceFieldFacets(id: string, worldId: string, facets: readonly FieldFacetValue[]): void {
+    this.db.delete(entityFieldFacets).where(eq(entityFieldFacets.entityId, id)).run();
+    for (const batch of batched(facets, FIELD_FACET_COLUMNS)) {
+      this.db
+        .insert(entityFieldFacets)
+        .values(batch.map((f) => ({ entityId: id, worldId, key: f.key, value: f.value, num: f.num })))
+        .run();
+    }
   }
 
   /** Replace the Entity's descriptor rows with the harvested set (self-pruning). */
@@ -466,8 +504,9 @@ export class EntityWrites {
     }
 
     // `edit`: substance. Set only the columns the caller owns, so a concurrent rename isn't
-    // clobbered by a save that never touched the name.
-    const derived = change.document && this.derive(change.document);
+    // clobbered by a save that never touched the name. Field facets ride the document derivation,
+    // resolved against the save's type set when it carries one, else the stored types (ADR-0048).
+    const derived = change.document && this.derive(change.document, change.types ?? row.types);
     const set = {
       ...(change.name !== undefined && { name: change.name }),
       ...(change.tags !== undefined && { tags: [...change.tags] }),

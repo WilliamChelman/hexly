@@ -19,6 +19,7 @@ import {
 import { NudgeBus } from '../events/nudge-bus';
 import { WriteOutbox } from '../events/write-outbox';
 import { EntityChange, EntityWrites, MutateResult } from './entity-writes';
+import { TypeFieldRegistry } from './type-field-registry';
 
 /**
  * `EntityWrites` is the single write handle for `entities` and `entity_grants` (ADR-0045), so
@@ -39,6 +40,7 @@ describe('EntityWrites', () => {
   let db: Db;
   let emitted: string[];
   let writes: EntityWrites;
+  let typeFields: TypeFieldRegistry;
 
   beforeEach(() => {
     db = createDb(':memory:'); // Isolated per-test (ADR-0002).
@@ -50,7 +52,8 @@ describe('EntityWrites', () => {
     } as unknown as NudgeBus;
     // The real outbox: the transaction and the post-commit flush are part of what this spec
     // asserts, so only the bus at the far end of it is a recorder.
-    writes = new EntityWrites(db, new WriteOutbox(db, bus));
+    typeFields = new TypeFieldRegistry();
+    writes = new EntityWrites(db, new WriteOutbox(db, bus), typeFields);
 
     seedUser(ADA);
     seedWorld(WORLD, ADA);

@@ -6,6 +6,7 @@
 
 import { z } from 'zod';
 import { emptyHexMap, HexMap, hexMapSchema } from './hex/hex-map';
+import { FieldDataType } from './field';
 
 /** The format tag new saves write; a schema-affecting extension change is a bump + migration. */
 export const CONTENT_FORMAT = 'tiptap-v3';
@@ -323,6 +324,13 @@ export const entityListQuerySchema = z.object({
     .union([visibilitySchema, z.array(visibilitySchema)])
     .transform((v) => (Array.isArray(v) ? v : [v]))
     .optional(),
+  // Filter-by-Field (ADR-0048, #188): each repeated `field` param is a `key:op:value` token
+  // (`challenge_rating:gte:5`, `alignment:eq:lawful-good`). Only shape-normalised to an array here;
+  // the domain `parseFieldFilters` decodes the tokens (a malformed one is dropped, never a 400).
+  field: z
+    .union([z.string(), z.array(z.string())])
+    .transform((v) => (Array.isArray(v) ? v : [v]))
+    .optional(),
   worldId: z.string().min(1).optional(),
   cursor: z.string().optional(),
   // Opt-in per-row Rights; paths that omit it keep `list` a pure read-filter.
@@ -347,15 +355,31 @@ export interface FacetCount {
 }
 
 /**
+ * One type's facetable **Field** as a facet (ADR-0048, #188): the Metadata `key` it types, its
+ * human `label` and `dataType` (so the rail picks a data-type-appropriate control — value toggles
+ * for enum/list/string, a range for number/date), and its live `values` with counts. Surfaced
+ * **contextually** — a Field facet appears only once its type is in the active Type filter.
+ */
+export interface FieldFacet {
+  readonly key: string;
+  readonly label: string;
+  readonly dataType: FieldDataType;
+  readonly values: readonly FacetCount[];
+}
+
+/**
  * `GET /entities/facets`: each Facet category's live values with counts. Counts
  * drill down — every category is computed against all *other* active constraints
  * but not its own, so a category still lists the sibling values you could add.
- * Zero-count values are omitted.
+ * Zero-count values are omitted. The universal facets (`type`/`tag`/`visibility`)
+ * are always present; `fields` carries a type's Field facets only while that type
+ * is the active filter, so the rail stays clean (ADR-0048, #188).
  */
 export interface EntityFacets {
   readonly type: readonly FacetCount[];
   readonly tag: readonly FacetCount[];
   readonly visibility: readonly FacetCount[];
+  readonly fields: readonly FieldFacet[];
 }
 
 /** What `GET /entities` lists; body fetched only on open. */
