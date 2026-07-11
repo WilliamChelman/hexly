@@ -37,7 +37,7 @@ import { FieldControl } from '../../pages/entity/views/field-control';
   imports: [Button, Dialog, Field, Input, TranslocoPipe, EntityTypesEditor, FieldControl],
   template: `
     @if (dialogState.types(); as seeded) {
-      <app-dialog [open]="true" [heading]="createLabel(types()) | transloco" (closed)="cancel()">
+      <app-dialog [open]="true" [heading]="createLabel(types())" (closed)="cancel()">
         <label appField [label]="'commandPalette.nameLabel' | transloco">
           <input
             appInput
@@ -164,9 +164,12 @@ export class CreateEntityDialog {
     });
   }
 
-  /** The create-dialog heading key for the primary (first) type, from the registry (ADR-0048). */
+  /**
+   * The create-dialog heading for the primary (first) type — already resolved, not a transloco key:
+   * a user-defined type's heading is its authored name, which must never be translated (#191).
+   */
   protected createLabel(types: readonly EntityType[]): string {
-    return this.typeRegistry.resolve(types[0]).labels.create;
+    return this.typeRegistry.chromeLabel(types[0], 'create');
   }
 
   protected onName(event: Event): void {
@@ -190,7 +193,7 @@ export class CreateEntityDialog {
     const worldId = this.worldId();
     const types = this.types();
     if (!worldId || types.length === 0 || !this.valid()) return;
-    const name = this.name().trim() || this.transloco.translate(this.typeRegistry.resolve(types[0]).labels.untitled);
+    const name = this.name().trim() || this.typeRegistry.chromeLabel(types[0], 'untitled');
     const metadata = this.metadata();
     this.entitiesClient
       .create(name, types, worldId, Object.keys(metadata).length ? metadata : undefined)

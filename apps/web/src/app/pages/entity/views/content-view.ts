@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
-import { TranslocoPipe, translateSignal } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService, translateSignal } from '@jsverse/transloco';
 import { ContentEditor } from '@hexly/content-editor';
 import { Icon, IconButton } from '@hexly/web-ui';
 import { EntitySession } from '../services/entity-session';
@@ -46,7 +46,7 @@ import { ReferencesPanel } from '../components/references-panel';
     >
       <div class="max-w-[60rem] mx-auto py-6 px-6">
         <app-entity-metadata />
-        <app-content-editor appOutlineSource [ariaLabel]="editorLabelKey() | transloco" />
+        <app-content-editor appOutlineSource [ariaLabel]="editorLabel()" />
       </div>
     </div>
     <!-- Right dock floating top-right (mirrors the map dock, ADR-0013): one panel slot
@@ -93,6 +93,7 @@ import { ReferencesPanel } from '../components/references-panel';
 export class ContentView {
   private readonly session = inject(EntitySession);
   private readonly types = inject(TypeRegistry);
+  private readonly transloco = inject(TranslocoService);
   /** Which panel the Content body's right dock is showing — one slot, so one discriminant. */
   protected readonly dock = inject(RightDock);
 
@@ -100,8 +101,12 @@ export class ContentView {
   protected readonly outlineToggleLabel = translateSignal('noteView.outline.toggle');
   protected readonly linksToggleLabel = translateSignal('noteView.links.toggle');
 
-  /** The Content editor's accessible-name transloco key, from the primary type (ADR-0014, #75). */
-  protected readonly editorLabelKey = computed(
-    () => this.types.resolve(this.session.current()?.types?.[0]).labels.editorLabel,
-  );
+  /**
+   * The Content editor's accessible name, from the primary type (ADR-0014, #75) — already resolved,
+   * so a user-defined type contributes its authored name rather than a translated key (#191).
+   */
+  protected readonly editorLabel = computed(() => {
+    this.transloco.activeLang(); // reactive dependency: re-resolve on a language switch
+    return this.types.chromeLabel(this.session.current()?.types?.[0], 'editorLabel');
+  });
 }

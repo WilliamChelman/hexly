@@ -165,10 +165,9 @@ export class EntityTypesEditor {
     () => new Set(validateFields(this.pendingFields(), this.pendingMetadata()).errors.map((e) => e.key)),
   );
 
-  /** A friendly label: a registered type's eyebrow copy, else the raw `namespace.id` for an unknown type. */
+  /** A friendly label: a registered type's name (authored, for a user-defined one), else the raw id. */
   protected typeLabel(type: string): string {
-    const def = this.registry.get(type);
-    return def ? this.transloco.translate(def.labels.eyebrow) : type;
+    return this.registry.get(type) ? this.registry.chromeLabel(type, 'eyebrow') : type;
   }
 
   /** Swap a type up one place; reaching index 0 re-primaries it. */

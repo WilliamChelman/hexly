@@ -149,14 +149,10 @@ export class EntityCard {
   protected readonly sigil = computed(() => ACCENT_SIGIL[accentFor(this.card().id)]);
   /** The Entity type's registered icon (a hex map reads as terrain, a note as a label). */
   protected readonly typeIcon = computed<IconName>(() => this.types.resolve(this.card().type).icon);
-  /**
-   * The primary type's label: a user-defined type's authored name (its `labelText`), else the
-   * `entityBrowser.type.<id>` transloco key (#191). Re-translates on a language switch.
-   */
+  /** The primary type's display name, resolved by the registry (a user-defined name is never translated). */
   protected readonly typeLabel = computed(() => {
-    this.transloco.activeLang(); // reactive dependency: re-translate on switch
-    const def = this.types.get(this.card().type);
-    return def?.labelText ?? this.transloco.translate(`entityBrowser.type.${this.card().type}`);
+    this.transloco.activeLang(); // reactive dependency: re-resolve on a language switch
+    return this.types.name(this.card().type);
   });
   /** Rename is a substance edit; delete the lifecycle verb (ADR-0039). Absent Rights → hidden (fail-closed). */
   protected readonly canRename = computed(() => !!this.card().rights?.includes('edit'));

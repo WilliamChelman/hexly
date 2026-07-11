@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { FieldSchema } from '@hexly/domain';
+import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { TypeRegistry } from './type-registry';
 import { TypeDefinition } from './type-definition';
 import { CORE_VIEW_CONTENT, CORE_VIEW_FIELDS, CORE_VIEW_MAP } from './view-definition';
@@ -34,7 +35,9 @@ describe('TypeRegistry', () => {
   let registry: TypeRegistry;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({});
+    // The registry resolves a code type's name/chrome through Transloco (a user-defined type's
+    // authored name never goes near it), so the spec needs the testing catalog.
+    TestBed.configureTestingModule({ imports: [provideTranslocoTesting()] });
     registry = TestBed.inject(TypeRegistry);
   });
 
@@ -107,5 +110,39 @@ describe('TypeRegistry', () => {
   it('keeps definitions in registration order (core first)', () => {
     registry.register(definition('dnd.monster'));
     expect(registry.all().map((d) => d.id)).toEqual(['core.note', 'core.hexmap', 'dnd.monster']);
+  });
+
+  /**
+   * A user-defined type's name is authored data, so it must be shown verbatim — never looked up as a
+   * transloco key, which is what leaked the raw `entityBrowser.type.world.deity` onto the Dashboard.
+   */
+  describe('label resolution', () => {
+    /** A World-defined type: an authored `labelText`, and no transloco copy at all. */
+    const userType: TypeDefinition = {
+      id: 'world.deity' as TypeDefinition['id'],
+      icon: 'label',
+      labelText: 'Deity',
+      views: [CORE_VIEW_FIELDS],
+      graphColorToken: '--color-ink-muted',
+    };
+
+    it('shows a user-defined type’s authored name verbatim, never as a transloco key', () => {
+      registry.register(userType);
+
+      expect(registry.name('world.deity')).toBe('Deity');
+      // Every chrome slot resolves to the authored name too — it ships no copy to translate.
+      expect(registry.chromeLabel('world.deity', 'create')).toBe('Deity');
+      expect(registry.chromeLabel('world.deity', 'untitled')).toBe('Deity');
+      expect(registry.chromeLabel('world.deity', 'eyebrow')).toBe('Deity');
+    });
+
+    it('resolves a code type’s name and chrome through its transloco keys', () => {
+      registry.register(definition('dnd.monster'));
+
+      // The testing catalog has no copy for these, so transloco echoes the key — proving the *key*
+      // path is taken for a code type (and, by contrast, is never taken for a user-defined one).
+      expect(registry.name('dnd.monster')).toBe('entityBrowser.type.dnd.monster');
+      expect(registry.chromeLabel('dnd.monster', 'create')).toBe('dnd.monster.create');
+    });
   });
 });

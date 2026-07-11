@@ -2,6 +2,7 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { ActiveWorld, WorldsClient } from '@hexly/web-core';
+import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { AvailableType } from '@hexly/domain';
 import { WorldTypesLoader } from './world-types-loader';
 import { TypeRegistry } from './type-registry';
@@ -29,6 +30,7 @@ describe('WorldTypesLoader', () => {
     worldId = signal<string | null>(null);
     availableTypes = vi.fn(() => of<AvailableType[]>([]));
     TestBed.configureTestingModule({
+      imports: [provideTranslocoTesting()],
       providers: [
         { provide: ActiveWorld, useValue: { worldId } },
         { provide: WorldsClient, useValue: { availableTypes } },

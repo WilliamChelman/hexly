@@ -17,6 +17,7 @@ import {
   accentFor,
 } from '@hexly/web-ui';
 import { TypeRegistry } from '../../entity-types/type-registry';
+import { TypeNamePipe } from '../../entity-types/type-name.pipe';
 import { CORE_VIEW_MAP } from '../../entity-types/view-definition';
 
 const RECENTS_LIMIT = 8;
@@ -36,6 +37,7 @@ const MAPS_LIMIT = 8;
     RouterLink,
     TranslocoPipe,
     HexlyDatePipe,
+    TypeNamePipe,
     Button,
     Eyebrow,
     Panel,
@@ -68,7 +70,7 @@ const MAPS_LIMIT = 8;
             >
           </a>
           <span class="mt-1 block text-2xs text-ink-muted">
-            {{ 'entityBrowser.type.' + e.types[0] | transloco }}
+            {{ e.types[0] | typeName }}
             <span class="text-ink-faint">·</span>
             {{ 'entityBrowser.edited' | transloco: { date: (e.updatedAt | hexlyDate) } }}
           </span>
@@ -143,7 +145,7 @@ const MAPS_LIMIT = 8;
                   [attr.data-testid]="'count-type-' + c.value"
                 >
                   <span class="font-display text-2xl text-ink-strong">{{ c.count }}</span>
-                  <span class="text-sm text-ink-muted">{{ 'entityBrowser.type.' + c.value | transloco }}</span>
+                  <span class="text-sm text-ink-muted">{{ c.value | typeName }}</span>
                 </li>
               }
             </ul>
@@ -353,11 +355,7 @@ export class WorldDashboard {
     if (this.creating()) return;
     this.creating.set(true);
     this.entitiesClient
-      .create(
-        this.transloco.translate(this.types.resolve(type).labels.untitled),
-        [type],
-        this.activeWorld.worldId() ?? undefined,
-      )
+      .create(this.types.chromeLabel(type, 'untitled'), [type], this.activeWorld.worldId() ?? undefined)
       .pipe(finalize(() => this.creating.set(false)))
       .subscribe({
         next: (entity) =>

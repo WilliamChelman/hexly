@@ -504,11 +504,7 @@ export class EntityBrowser {
     if (this.creating()) return;
     this.creating.set(true);
     this.entitiesClient
-      .create(
-        this.transloco.translate(this.types.resolve(type).labels.untitled),
-        [type],
-        this.activeWorld.worldId() ?? undefined,
-      )
+      .create(this.types.chromeLabel(type, 'untitled'), [type], this.activeWorld.worldId() ?? undefined)
       .pipe(finalize(() => this.creating.set(false)))
       .subscribe({
         // EntitySession loads on open; no pre-adopt from here (it would outlive this page).

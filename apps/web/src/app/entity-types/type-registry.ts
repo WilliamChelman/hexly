@@ -1,6 +1,7 @@
-import { Injectable, signal } from '@angular/core';
+import { inject, Injectable, signal } from '@angular/core';
+import { TranslocoService } from '@jsverse/transloco';
 import { CORE_NOTE, EntityType, FieldSchema, resolveFields } from '@hexly/domain';
-import { TypeDefinition } from './type-definition';
+import { TypeDefinition, TypeLabels } from './type-definition';
 import { CORE_TYPE_DEFINITIONS } from './core-types';
 import { CORE_VIEW_FIELDS, ViewId } from './view-definition';
 
@@ -18,6 +19,7 @@ import { CORE_VIEW_FIELDS, ViewId } from './view-definition';
  */
 @Injectable({ providedIn: 'root' })
 export class TypeRegistry {
+  private readonly transloco = inject(TranslocoService);
   private readonly definitions = signal<readonly TypeDefinition[]>([]);
 
   /** Every registered definition, in registration order (core first). */
@@ -83,6 +85,33 @@ export class TypeRegistry {
    */
   resolveFields(types: readonly string[] | null | undefined): FieldSchema[] {
     return resolveFields((type) => this.get(type)?.fields, types ?? []);
+  }
+
+  /**
+   * A type's **display name** — the noun every surface shows for it ("Note", "Hex Map", "Deity").
+   * The single home of the rule that a **user-defined type's name is authored data, never a
+   * transloco key** (#191): its `labelText` is returned verbatim, and only a code-registered type's
+   * name is looked up as `entityBrowser.type.<id>` copy. An unregistered id falls back to the raw
+   * key lookup, as it did before.
+   *
+   * Read it through the `typeName` pipe in a template; call it directly from a `computed` that also
+   * tracks `transloco.activeLang()`, so the name re-resolves on a language switch.
+   */
+  name(type: string | null | undefined): string {
+    const def = this.get(type);
+    return def?.labelText ?? this.transloco.translate(`entityBrowser.type.${type}`);
+  }
+
+  /**
+   * One of a type's **chrome** labels — the create heading, the untitled default, the header eyebrow,
+   * the editor's accessible name. A code-registered type declares these as transloco keys; a
+   * user-defined type has no copy at all, so every one of its chrome labels resolves to its authored
+   * name (again, never translated).
+   */
+  chromeLabel(type: string | null | undefined, key: keyof TypeLabels): string {
+    const def = this.resolve(type);
+    if (def.labelText) return def.labelText;
+    return def.labels ? this.transloco.translate(def.labels[key]) : this.name(type);
   }
 
   /**

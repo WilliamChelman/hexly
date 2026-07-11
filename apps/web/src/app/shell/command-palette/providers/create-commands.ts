@@ -32,7 +32,7 @@ export class CreateCommands implements CommandProvider {
     const q = query.trim().toLowerCase();
     const commands: Command[] = this.types.all().map((def) => ({
       id: CreateCommands.COMMAND_ID[def.id] ?? `create-${def.id}`,
-      label: this.transloco.translate(def.labels.create),
+      label: this.types.chromeLabel(def.id, 'create'),
       run: () => this.dialogState.open(def.id),
     }));
     return of(commands.filter((c) => c.label.toLowerCase().includes(q)));

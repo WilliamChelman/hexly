@@ -64,9 +64,9 @@ export class WorldTypesLoader {
 
 /**
  * Project a user-defined {@link AvailableType} onto a {@link TypeDefinition}: the generic Field View
- * as its only View (so an Entity carrying it always renders), its authored name as `labelText`, and
- * its Field schema. The transloco-key `labels` are literal names — they degrade to themselves via the
- * missing-key fallback.
+ * as its only View (so an Entity carrying it always renders), its Field schema, and its authored name
+ * as `labelText`. It declares **no** transloco `labels` — a user-defined type ships no copy, so every
+ * label it shows is that authored name, resolved through {@link TypeRegistry.name}/`chromeLabel`.
  */
 function toDefinition(type: AvailableType): TypeDefinition {
   return {
@@ -76,13 +76,5 @@ function toDefinition(type: AvailableType): TypeDefinition {
     views: [CORE_VIEW_FIELDS],
     fields: type.fields,
     graphColorToken: '--color-ink-muted',
-    labels: {
-      eyebrow: type.label,
-      titleLabel: type.label,
-      rename: type.label,
-      editorLabel: type.label,
-      create: type.label,
-      untitled: type.label,
-    },
   };
 }

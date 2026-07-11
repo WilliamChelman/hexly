@@ -36,12 +36,17 @@ export interface TypeDefinition {
   readonly id: EntityType;
   /** The card and dashboard-tile icon. */
   readonly icon: IconName;
-  readonly labels: TypeLabels;
   /**
-   * A **literal** display label, set only by a **user-defined type** (#191) whose name is authored
-   * data, not a transloco key. Surfaces that show a type's name (the Type facet, the entity card)
-   * prefer this over the `entityBrowser.type.<id>` transloco key — a core/plugin type omits it and
-   * keeps its translated key. It is not itself run through transloco.
+   * The transloco keys for this type's page chrome — declared by a **code-registered** type (core or
+   * plugin), which is the only kind that ships translated copy. Absent on a user-defined type, whose
+   * every label is its authored {@link labelText}.
+   */
+  readonly labels?: TypeLabels;
+  /**
+   * The **authored** display name of a **user-defined type** (#191) — data, not a transloco key, so
+   * it is never translated. Read every type's name through {@link TypeRegistry.name} (or the
+   * `typeName` pipe), which returns this verbatim when present and falls back to a code type's
+   * translated copy otherwise. A core/plugin type omits it.
    */
   readonly labelText?: string;
   /**

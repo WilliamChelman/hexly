@@ -163,15 +163,6 @@ export class FacetRail {
   private readonly transloco = inject(TranslocoService);
   private readonly types = inject(TypeRegistry);
 
-  /**
-   * A Type facet row's label: a user-defined type's authored name (its registered `labelText`), else
-   * the `entityBrowser.type.<id>` transloco key — so a World's own types read by name in the rail
-   * alongside the translated core/plugin types (#191).
-   */
-  private typeLabel(id: string): string {
-    return this.types.get(id)?.labelText ?? this.transloco.translate(`entityBrowser.type.${id}`);
-  }
-
   readonly facetCounts = input<EntityFacets>({
     type: [],
     tag: [],
@@ -209,7 +200,8 @@ export class FacetRail {
       {
         category: 'type' as const,
         rows: counts.type,
-        label: (v: string) => this.typeLabel(v),
+        // A user-defined type's authored name; a code type's translated copy (#191).
+        label: (v: string) => this.types.name(v),
       },
       { category: 'tag' as const, rows: counts.tag, label: (v: string) => v },
       {

@@ -9,7 +9,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { Button, ButtonGroup, Eyebrow, PageHeader } from '@hexly/web-ui';
 import { EntityActionsMenu } from './entity-actions-menu';
 import { EntityShareDialog } from './entity-share-dialog';
@@ -18,6 +18,7 @@ import { EntityTags } from './entity-tags';
 import { SaveStatus } from './save-status';
 import { EntitySession } from '../services/entity-session';
 import { TypeRegistry } from '../../../entity-types/type-registry';
+import { TypeLabels } from '../../../entity-types/type-definition';
 import { ViewRegistry } from '../../../entity-types/view-registry';
 import { EntityViewStore } from '../services/entity-view-store';
 import { ViewId } from '../../../entity-types/view-definition';
@@ -51,9 +52,7 @@ import { ViewId } from '../../../entity-types/view-definition';
     <app-page-header>
       <div pageHeaderTitle class="flex items-center gap-3 min-w-0 flex-1">
         <div class="flex items-center gap-3 shrink-0">
-          <span appEyebrow class="text-gold! tracking-[0.28em] whitespace-nowrap">{{
-            labels().eyebrow | transloco
-          }}</span>
+          <span appEyebrow class="text-gold! tracking-[0.28em] whitespace-nowrap">{{ eyebrow() }}</span>
           <!--
             Text is driven imperatively (effect, never while focused) rather than
             interpolated, so re-renders can't move the caret mid-edit.
@@ -68,8 +67,8 @@ import { ViewId } from '../../../entity-types/view-definition';
             spellcheck="false"
             [attr.tabindex]="editable() ? 0 : null"
             [attr.contenteditable]="editable() ? 'plaintext-only' : null"
-            [attr.aria-label]="labels().titleLabel | transloco"
-            [title]="titleHint() | transloco"
+            [attr.aria-label]="titleLabel()"
+            [title]="titleHint()"
             (focus)="onFocus()"
             (keydown.enter)="onEnter($event)"
             (keydown.escape)="onEscape($event)"
@@ -120,6 +119,19 @@ export class EntityHeader {
   private readonly viewStore = inject(EntityViewStore);
   private readonly views = inject(ViewRegistry);
   private readonly types = inject(TypeRegistry);
+  private readonly transloco = inject(TranslocoService);
+
+  /**
+   * One of the primary type's chrome labels, already resolved — re-derived when the primary type or
+   * the language changes. A user-defined type has no transloco copy, so it resolves to its authored
+   * name rather than being run through translate (#191).
+   */
+  private chromeLabel(key: keyof TypeLabels) {
+    return computed(() => {
+      this.transloco.activeLang(); // reactive dependency: re-resolve on a language switch
+      return this.types.chromeLabel(this.session.types()[0], key);
+    });
+  }
 
   /** Whether the entity Share dialog (#158) is open — toggled by the actions menu's Share item. */
   protected readonly ownersOpen = signal(false);
@@ -139,14 +151,15 @@ export class EntityHeader {
    * `@if (editable())`).
    */
   protected readonly editable = computed(() => this.session.current() !== null && this.session.writable());
-  /** Tooltip key: the in-place rename affordance. */
-  protected readonly titleHint = computed(() => this.labels().rename);
+  /** Tooltip: the in-place rename affordance. */
+  protected readonly titleHint = this.chromeLabel('rename');
   /** The active View id, driving which toggle button reads as pressed. */
   protected readonly activeView = this.viewStore.activeView;
   /** The Views the open Entity affords, resolved to their toggle definitions (label + testid). */
   protected readonly viewToggle = computed(() => this.viewStore.views().map((id) => this.views.resolve(id)));
-  /** Per-type header chrome (eyebrow + title a11y labels), keyed on the live primary type (types[0]), falling back to the note type. */
-  protected readonly labels = computed(() => this.types.resolve(this.session.types()[0]).labels);
+  /** The header eyebrow tag and the title's accessible name, from the live primary type (`types[0]`). */
+  protected readonly eyebrow = this.chromeLabel('eyebrow');
+  protected readonly titleLabel = this.chromeLabel('titleLabel');
   protected readonly title = computed(() => this.session.current()?.name ?? '');
 
   private readonly titleEl = viewChild.required<ElementRef<HTMLElement>>('titleEl');
