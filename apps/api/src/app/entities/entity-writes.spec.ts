@@ -1,7 +1,16 @@
 import { EntityBody, ReindexFailure, emptyContent, emptyEntityBody, tiptapContent } from '@hexly/domain';
 import { eq } from 'drizzle-orm';
 import { createDb, Db } from '../db/db';
-import { entities, entityDescriptors, entityEdges, entityGrants, users, worldMembers, worlds } from '../db/schema';
+import {
+  entities,
+  entityDescriptors,
+  entityEdges,
+  entityFieldFacets,
+  entityGrants,
+  users,
+  worldMembers,
+  worlds,
+} from '../db/schema';
 import { NudgeBus } from '../events/nudge-bus';
 import { WriteOutbox } from '../events/write-outbox';
 import { EntityChange, EntityWrites, MutateResult } from './entity-writes';
@@ -514,6 +523,67 @@ describe('EntityWrites', () => {
           })
           .run();
         db.insert(entityGrants).values({ entityId: id, userId: ADA, role: 'owner' }).run();
+      }
+    });
+
+    /**
+     * A typed Entity-Link Field (#190) feeds both derived indexes through the one derive pass: its
+     * value materialises an edge (so a Field relation reaches the World Graph) and, when facetable,
+     * a Field-facet row keyed by the *target id* (so filter-by-link is a stable lookup). Both are
+     * resolved against the Entity's registered Fields, then wholesale-replaced like every derivation.
+     */
+    describe('Entity-Link Field edges + facets (#190)', () => {
+      beforeEach(() => {
+        typeFields.register('test.monster', [
+          { key: 'lair', label: 'Lair', dataType: { kind: 'entityLink' }, facetable: true },
+        ]);
+      });
+
+      it('materialises an edge and a target-id facet from an Entity-Link Field value', () => {
+        writes.insert({
+          ownerId: ADA,
+          worldId: WORLD,
+          name: 'Aboleth',
+          types: ['test.monster'],
+          tags: [],
+          body: { content: emptyContent(), metadata: { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } } },
+        });
+
+        expect(edgesOf('Aboleth')).toEqual([
+          { worldId: WORLD, targetKind: 'entity', targetId: 'whisperwood', descriptor: null },
+        ]);
+        expect(facetsOf('Aboleth')).toEqual([{ key: 'lair', value: 'whisperwood', num: null }]);
+      });
+
+      it('re-pointing the link replaces both the edge and the facet (self-pruning)', () => {
+        const row = writes.insert({
+          ownerId: ADA,
+          worldId: WORLD,
+          name: 'Aboleth',
+          types: ['test.monster'],
+          tags: [],
+          body: { content: emptyContent(), metadata: { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } } },
+        });
+
+        writes.mutate(ADA, row.id, {
+          kind: 'edit',
+          version: row.version,
+          types: ['test.monster'],
+          document: { content: emptyContent(), metadata: { lair: { entityId: 'sunken-keep', label: 'Sunken Keep' } } },
+        });
+
+        expect(edgesOf('Aboleth')).toEqual([
+          { worldId: WORLD, targetKind: 'entity', targetId: 'sunken-keep', descriptor: null },
+        ]);
+        expect(facetsOf('Aboleth')).toEqual([{ key: 'lair', value: 'sunken-keep', num: null }]);
+      });
+
+      function facetsOf(name: string) {
+        return db
+          .select({ key: entityFieldFacets.key, value: entityFieldFacets.value, num: entityFieldFacets.num })
+          .from(entityFieldFacets)
+          .where(eq(entityFieldFacets.entityId, idOf(name)))
+          .all();
       }
     });
 

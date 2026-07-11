@@ -1,4 +1,5 @@
 import { emptyContent, EntityBody, tiptapContent } from './entity';
+import { fieldSchemaSchema } from './field';
 import { emptyHexMap } from './hex/hex-map';
 import { harvestEdges } from './entity-edges';
 
@@ -208,6 +209,45 @@ describe('harvestEdges (#179, ADR-0046)', () => {
       expect(harvestEdges(note({ entityId: 'mira', descriptor: '  Capital Of  ' }))).toEqual([
         { targetKind: 'entity', targetId: 'mira', descriptor: 'Capital Of' },
       ]);
+    });
+  });
+
+  /**
+   * A typed Entity-Link Field value (#190) is an edge to its target, descriptor-less like a map
+   * placement — harvested against the Entity's resolved `fields`, from the Metadata map rather than
+   * the Content snapshot. Feeds the same materialised index, so a Field relation appears in the
+   * World Graph.
+   */
+  describe('Entity-Link Field edges (#190)', () => {
+    const lair = fieldSchemaSchema.parse({ key: 'lair', label: 'Lair', dataType: { kind: 'entityLink' } });
+
+    it('emits an edge per Entity-Link Field value, resolved against the Entity fields', () => {
+      const body: EntityBody = {
+        content: emptyContent(),
+        metadata: { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } },
+      };
+      expect(harvestEdges(body, [lair])).toEqual([{ targetKind: 'entity', targetId: 'whisperwood', descriptor: null }]);
+    });
+
+    it('reads no Field edge without the resolved fields (the default), so Content/map edges are unchanged', () => {
+      const body: EntityBody = {
+        content: prose({ entityId: 'mira', label: 'Mira' }),
+        metadata: { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } },
+      };
+      expect(harvestEdges(body)).toEqual([{ targetKind: 'entity', targetId: 'mira', descriptor: null }]);
+    });
+
+    it('collapses a Field link and a content link to the same target into one edge', () => {
+      const body: EntityBody = {
+        content: prose({ entityId: 'whisperwood', label: 'The Whisperwood' }),
+        metadata: { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } },
+      };
+      expect(harvestEdges(body, [lair])).toEqual([{ targetKind: 'entity', targetId: 'whisperwood', descriptor: null }]);
+    });
+
+    it('ignores a blank or ill-typed Field value — inert, never an edge', () => {
+      const body: EntityBody = { content: emptyContent(), metadata: { lair: { label: 'Ghost' } } };
+      expect(harvestEdges(body, [lair])).toEqual([]);
     });
   });
 });

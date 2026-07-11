@@ -77,7 +77,11 @@
     "requiredFieldsHeading": "Required fields"
   },
   "genericFieldView": {
-    "plainHeading": "Other metadata"
+    "plainHeading": "Other metadata",
+    "entityLink": {
+      "set": "Link an entity…",
+      "change": "Change entity…"
+    }
   },
   "noteView": {
     "eyebrow": "Note",

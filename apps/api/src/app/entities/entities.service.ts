@@ -14,15 +14,19 @@ import {
   EntitySummary,
   EntityType,
   FacetCount,
+  FieldError,
   FieldFacet,
   FieldFilter,
+  FieldSchema,
   InboundReference,
   OutboundReference,
   typesSchema,
   Visibility,
   EntityGrant,
   GrantRole,
+  isEntityLinkDataType,
   PublicLink,
+  entityLinkConstraints,
   resolveFields,
   SaveEntityRequest,
   tagsSchema,
@@ -200,20 +204,48 @@ export class EntitiesService {
    */
   private countFieldFacets(opts: FacetOptions, filter: SQL): FieldFacet[] {
     const fields = resolveFields(this.typeFields.resolver, opts.type ?? []).filter((field) => field.facetable);
-    return fields.map((field) => ({
-      key: field.key,
-      label: field.label,
-      dataType: field.dataType,
-      values: this.countFieldValues(
+    return fields.map((field) => {
+      const values = this.countFieldValues(
         // Drill-down: drop this Field's own filters, keep every sibling constraint.
-        {
-          ...opts,
-          fields: (opts.fields ?? []).filter((ff) => ff.key !== field.key),
-        },
+        { ...opts, fields: (opts.fields ?? []).filter((ff) => ff.key !== field.key) },
         field.key,
         filter,
-      ),
-    }));
+      );
+      return {
+        key: field.key,
+        label: field.label,
+        dataType: field.dataType,
+        // An Entity-Link facet's values are target ids; resolve each to its name for the rail (#190).
+        values: isEntityLinkDataType(field.dataType) ? this.labelLinkValues(values, filter) : values,
+      };
+    });
+  }
+
+  /**
+   * Attach each Entity-Link facet value's target name as its `label` (#190). Filtered by the reader's
+   * access to the *target* — the facet count filters on the readable source, so the target may be one
+   * the reader cannot see, and an unguarded name lookup would leak a `private` Entity (ADR-0046). An
+   * unreadable or deleted target keeps no label, so the rail falls back to the dangling id.
+   */
+  private labelLinkValues(values: readonly FacetCount[], filter: SQL): FacetCount[] {
+    if (values.length === 0) return [];
+    const names = new Map(
+      this.db
+        .select({ id: entities.id, name: entities.name })
+        .from(entities)
+        .where(
+          and(
+            filter,
+            inArray(
+              entities.id,
+              values.map((v) => v.value),
+            ),
+          ),
+        )
+        .all()
+        .map((row) => [row.id, row.name]),
+    );
+    return values.map((v) => (names.has(v.value) ? { ...v, label: names.get(v.value) } : v));
   }
 
   /**
@@ -446,7 +478,7 @@ export class EntitiesService {
    * `not-found` (404), a reachable one the caller can't edit a 403.
    */
   save(userId: string, id: string, req: SaveEntityRequest): SaveResult {
-    this.gateTypedEdit(req);
+    this.gateTypedEdit(userId, req);
     const result = this.writes.mutate(userId, id, {
       kind: 'edit',
       document: req.document,
@@ -478,24 +510,58 @@ export class EntitiesService {
    * types. The vault import ({@link importNote}) never routes here, and reads / reindex never
    * validate, so data at rest stays tolerated end to end.
    */
-  private gateTypedEdit(req: SaveEntityRequest): void {
+  private gateTypedEdit(userId: string, req: SaveEntityRequest): void {
     if (req.types === undefined) return;
-    this.assertTypedFieldsValid(req.types, req.document.metadata);
+    this.assertTypedFieldsValid(userId, req.types, req.document.metadata);
   }
 
   /**
    * Resolve `types` to their Fields and reject (400 {@link EntityErrorCode.InvalidFields}) when the
-   * Metadata leaves a required Field unmet or ill-types a present one — the forward-only check
-   * {@link gateTypedEdit} runs for a typed save.
+   * Metadata leaves a required Field unmet, ill-types a present value, or an Entity-Link Field
+   * points at a *resolvable* Entity whose types miss its target-type constraint (#190) — the
+   * forward-only check {@link gateTypedEdit} runs for a typed save. A missing or inaccessible
+   * link target stays inert (never an error), so graceful degradation is preserved end to end.
    */
-  private assertTypedFieldsValid(types: readonly EntityType[], metadata: EntityBody['metadata']): void {
+  private assertTypedFieldsValid(userId: string, types: readonly EntityType[], metadata: EntityBody['metadata']): void {
     const fields = resolveFields(this.typeFields.resolver, types);
-    const validation = validateFields(fields, metadata);
-    if (!validation.ok)
+    const errors: FieldError[] = [
+      ...validateFields(fields, metadata).errors,
+      ...this.linkTargetTypeErrors(userId, fields, metadata),
+    ];
+    if (errors.length > 0)
       throw new BadRequestException({
         code: EntityErrorCode.InvalidFields,
-        data: { fields: validation.errors },
+        data: { fields: errors },
       } satisfies ApiError);
+  }
+
+  /**
+   * The Entity-Link Field target-type check (#190): flag a `type` error when a constrained link
+   * points at a *resolvable* Entity whose types miss the constraint. Resolution runs through the
+   * caller's read filter, so a deleted or inaccessible target resolves to no row and stays inert.
+   */
+  private linkTargetTypeErrors(
+    userId: string,
+    fields: readonly FieldSchema[],
+    metadata: EntityBody['metadata'],
+  ): FieldError[] {
+    const constraints = entityLinkConstraints(fields, metadata);
+    if (constraints.length === 0) return [];
+    const { filter } = entityAccess(this.db, userId);
+    const targetTypes = new Map(
+      this.db
+        .select({ id: entities.id, types: entities.types })
+        .from(entities)
+        .where(and(filter, inArray(entities.id, [...new Set(constraints.map((c) => c.entityId))])))
+        .all()
+        .map((row) => [row.id, row.types]),
+    );
+    return constraints.flatMap((c) => {
+      const actual = targetTypes.get(c.entityId);
+      // Unresolved target → inert. Resolved but off-type → a `type` error on the Field's key.
+      if (!actual || actual.some((t) => c.targetTypes.includes(t))) return [];
+      return [{ key: c.key, code: 'type' as const }];
+    });
   }
 
   /**

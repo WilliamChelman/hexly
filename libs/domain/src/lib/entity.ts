@@ -360,10 +360,16 @@ export const entityListQuerySchema = z.object({
 
 export type EntityListQuery = z.infer<typeof entityListQuerySchema>;
 
-/** One Facet value and how many entities carry it under the active filters. */
+/**
+ * One Facet value and how many entities carry it under the active filters. `label` is a display
+ * rendering shown in place of the raw `value` — set for an Entity-Link Field facet, whose `value`
+ * is a target id and `label` its current name (absent when the target dangles); unset elsewhere,
+ * where the value is already human-readable (#188, #190).
+ */
 export interface FacetCount {
   readonly value: string;
   readonly count: number;
+  readonly label?: string;
 }
 
 /**

@@ -10,6 +10,7 @@ import { ConfigModule } from '../config/config.module';
 import { DB, Db, createDb } from '../db/db';
 import { entities, entityEdges } from '../db/schema';
 import { EntitiesModule } from '../entities/entities.module';
+import { TypeFieldRegistry } from '../entities/type-field-registry';
 import { WorldsModule } from './worlds.module';
 
 /**
@@ -60,6 +61,35 @@ describe('World Graph', () => {
       { id: mira, name: 'Mira', types: ['core.note'] },
     ]);
     expect(edges).toEqual([{ source: ealdred, target: mira, descriptor: 'spouse' }]);
+  });
+
+  /**
+   * A typed Entity-Link Field relation feeds the same edge index as a Content or map link (#190),
+   * so it appears in the graph and rides the identical both-endpoints access sieve — an edge only
+   * when the viewer can read source *and* target.
+   */
+  it('renders an Entity-Link Field relation as a graph edge, hidden when an endpoint is private', async () => {
+    app
+      .get(TypeFieldRegistry)
+      .register('test.monster', [{ key: 'lair', label: 'Lair', dataType: { kind: 'entityLink' }, facetable: false }]);
+    const ada = await signIn('ada@hexly.test');
+    const bob = await signIn('bob@hexly.test');
+    const world = await makeWorld(ada);
+    await addMember(ada, world, bobId);
+
+    const aboleth = await makeEntity(ada, world, 'Aboleth');
+    await share(ada, aboleth);
+    const lair = await makeEntity(ada, world, 'The Whisperwood'); // private by default
+    await linkField(ada, aboleth, { entityId: lair, label: 'The Whisperwood' });
+
+    // Ada owns both, so the Field relation draws as an edge.
+    const asAda = await graphOf(ada, world);
+    expect(asAda.edges).toEqual([{ source: aboleth, target: lair, descriptor: null }]);
+
+    // Bob cannot read the private lair, so the edge (and its endpoint) drop — nothing dangles.
+    const asBob = await graphOf(bob, world);
+    expect(names(asBob.nodes)).toEqual(['Aboleth']);
+    expect(asBob.edges).toEqual([]);
   });
 
   /** Nodes are sourced from the accessible-entities query, not the edge table, so orphans appear. */
@@ -253,6 +283,20 @@ describe('World Graph', () => {
   /** Save `id`'s Content as prose holding one `image` — which harvests as an Asset edge. */
   async function illustrate(owner: Agent, id: string, src: string): Promise<void> {
     await save(owner, id, [{ type: 'image', attrs: { src } }]);
+  }
+
+  /** Typed-save `id` as a `test.monster` whose `lair` Entity-Link Field points at `link` (#190). */
+  async function linkField(owner: Agent, id: string, link: { entityId: string; label: string }): Promise<void> {
+    const current = (await owner.get(`/entities/${id}`).expect(200)).body;
+    await owner
+      .put(`/entities/${id}`)
+      .send({
+        document: { content: tiptapContent({ type: 'doc', content: [] }), metadata: { lair: link } },
+        version: current.version,
+        tags: [],
+        types: ['test.monster'],
+      })
+      .expect(200);
   }
 
   async function save(owner: Agent, id: string, inline: unknown[]): Promise<void> {

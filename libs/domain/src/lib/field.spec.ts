@@ -1,5 +1,7 @@
 import {
   deriveFieldFacets,
+  entityLinkConstraints,
+  entityLinkFieldValues,
   FieldSchema,
   fieldSchemaSchema,
   parseFieldFilter,
@@ -54,7 +56,7 @@ describe('fieldSchemaSchema', () => {
       fieldSchemaSchema.safeParse({
         key: 'k',
         label: 'K',
-        dataType: { kind: 'entityLink' },
+        dataType: { kind: 'geo' },
       }).success,
     ).toBe(false);
     expect(
@@ -72,6 +74,29 @@ describe('fieldSchemaSchema', () => {
           kind: 'list',
           of: { kind: 'list', of: { kind: 'string' } },
         },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('accepts an entityLink, with or without a target-type constraint (#190)', () => {
+    expect(fieldSchemaSchema.parse({ key: 'lair', label: 'Lair', dataType: { kind: 'entityLink' } }).dataType).toEqual({
+      kind: 'entityLink',
+    });
+    expect(
+      fieldSchemaSchema.parse({
+        key: 'lair',
+        label: 'Lair',
+        dataType: { kind: 'entityLink', targetTypes: ['world.place'] },
+      }).dataType,
+    ).toEqual({ kind: 'entityLink', targetTypes: ['world.place'] });
+  });
+
+  it('rejects an entityLink whose target-type constraint is not a `namespace.id` key', () => {
+    expect(
+      fieldSchemaSchema.safeParse({
+        key: 'lair',
+        label: 'Lair',
+        dataType: { kind: 'entityLink', targetTypes: ['place'] },
       }).success,
     ).toBe(false);
   });
@@ -233,6 +258,55 @@ describe('deriveFieldFacets (the write-time denormalisation, a lens over Metadat
     expect(deriveFieldFacets(fields, { senses: ['darkvision', 'darkvision'] })).toEqual([
       { key: 'senses', value: 'darkvision', num: null },
     ]);
+  });
+
+  it('materialises an entityLink Field as its target id (a stable filter key, not the mutable name)', () => {
+    const lairFields = [field({ key: 'lair', dataType: { kind: 'entityLink' }, facetable: true })];
+    expect(deriveFieldFacets(lairFields, { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } })).toEqual([
+      { key: 'lair', value: 'whisperwood', num: null },
+    ]);
+    // A malformed link (no entityId) is tolerated at rest, never indexed.
+    expect(deriveFieldFacets(lairFields, { lair: { label: 'Ghost' } })).toEqual([]);
+  });
+});
+
+describe('entityLink Fields (#190)', () => {
+  const lair = field({ key: 'lair', dataType: { kind: 'entityLink', targetTypes: ['world.place'] } });
+  const ally = field({ key: 'ally', dataType: { kind: 'entityLink' } });
+
+  it('validates the value shape forward-only — an object with a non-blank entityId', () => {
+    expect(validateFields([lair], { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } }).ok).toBe(true);
+    // Bare id, a string, and a blank-id object all fail the shape gate.
+    expect(validateFields([lair], { lair: 'whisperwood' }).ok).toBe(false);
+    expect(validateFields([lair], { lair: { entityId: '  ' } }).ok).toBe(false);
+    // Absent is fine for an optional Field.
+    expect(validateFields([lair], {}).ok).toBe(true);
+  });
+
+  it('reads each present, shape-valid Entity-Link Field value as an edge target', () => {
+    expect(
+      entityLinkFieldValues([lair, ally], {
+        lair: { entityId: 'whisperwood', label: 'The Whisperwood' },
+        ally: { entityId: 'mira' },
+      }),
+    ).toEqual([
+      { key: 'lair', value: { entityId: 'whisperwood', label: 'The Whisperwood' } },
+      { key: 'ally', value: { entityId: 'mira', label: '' } },
+    ]);
+    // A blank / ill-typed value contributes no edge.
+    expect(entityLinkFieldValues([lair], { lair: { label: 'Ghost' } })).toEqual([]);
+  });
+
+  it('surfaces only *constrained*, present links for the write-gate target-type check', () => {
+    expect(
+      entityLinkConstraints([lair, ally], {
+        lair: { entityId: 'whisperwood', label: 'The Whisperwood' },
+        // `ally` has no targetTypes → nothing to enforce, even when set.
+        ally: { entityId: 'mira' },
+      }),
+    ).toEqual([{ key: 'lair', entityId: 'whisperwood', targetTypes: ['world.place'] }]);
+    // An absent constrained link has no target to check.
+    expect(entityLinkConstraints([lair], {})).toEqual([]);
   });
 });
 

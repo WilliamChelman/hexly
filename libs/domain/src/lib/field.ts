@@ -10,11 +10,13 @@
  * This module is the pure heart of the feature, shared by the API write-path gate
  * and the web generic Field view: the Field vocabulary, the `types[] → union of
  * Field schemas` resolution, the **forward-only** value validation, and the
- * value reader/writer over the Metadata map. A typed **Entity Link** field
- * (ADR-0023) is a later ticket — the data-types here are scalar / enum / date / list.
+ * value reader/writer over the Metadata map. A typed **Entity Link** field (ADR-0046, #190) joins
+ * the scalar / enum / date / list data-types here: a Field pointing at another Entity, harvested
+ * into the World Graph edge index and degrading gracefully when the target is gone.
  */
 
 import { z } from 'zod';
+import { entityTypeSchema } from './entity';
 
 /** The Metadata map a Field reads from and writes to — the one store, never forked (CONTEXT.md → Metadata). */
 export type Metadata = Record<string, unknown>;
@@ -51,9 +53,20 @@ const listType = z.object({
 });
 
 /**
+ * A typed **Entity Link** Field (CONTEXT.md → Entity Link, ADR-0046, #190): a Field pointing at
+ * another Entity. `targetTypes` is the optional target-type constraint (a `lair` must point at a
+ * place); omitted or empty means any Entity is valid. Not a scalar — so no `list` of links, which
+ * would need a multi-picker the ticket doesn't build.
+ */
+const entityLinkType = z.object({
+  kind: z.literal('entityLink'),
+  targetTypes: z.array(entityTypeSchema).optional(),
+});
+
+/**
  * The Field data-type: a scalar (`string`/`number`/`boolean`/`date`), an `enum`
- * over a closed option set, or a `list` of any of those. The open, code-known set
- * a Field declares; a typed `entityLink` joins it in its own ticket (ADR-0048).
+ * over a closed option set, a `list` of any of those, or a typed `entityLink`
+ * pointing at another Entity. The open, code-known set a Field declares (ADR-0048).
  */
 export const fieldDataTypeSchema = z.discriminatedUnion('kind', [
   stringType,
@@ -62,9 +75,28 @@ export const fieldDataTypeSchema = z.discriminatedUnion('kind', [
   dateType,
   enumType,
   listType,
+  entityLinkType,
 ]);
 
 export type FieldDataType = z.infer<typeof fieldDataTypeSchema>;
+
+/**
+ * The stored value of an `entityLink` Field: the target's `entityId` plus a `label` snapshot of its
+ * name at pick time — the last-known name a deleted/inaccessible target degrades to instead of
+ * erroring (CONTEXT.md → Entity Link), mirroring the Content link's `{ entityId, label }`. Non-strict,
+ * so a hand-authored value carrying only `entityId` (label defaults to blank) is tolerated.
+ */
+export const entityLinkValueSchema = z.object({
+  entityId: z.string().trim().min(1),
+  label: z.string().default(''),
+});
+
+export type EntityLinkValue = z.infer<typeof entityLinkValueSchema>;
+
+/** Whether a data-type is a typed Entity Link. For callers that need only the yes/no, not narrowing. */
+export function isEntityLinkDataType(dataType: FieldDataType): boolean {
+  return dataType.kind === 'entityLink';
+}
 
 /**
  * One Field's declaration in a Type Definition's schema: the Metadata `key` it
@@ -182,9 +214,17 @@ export function deriveFieldFacets(fields: readonly FieldSchema[], metadata: Meta
   return out;
 }
 
-/** A Field's facet rows: a `list` maps each well-typed item, a scalar its one well-typed value. */
+/**
+ * A Field's facet rows: a `list` maps each well-typed item, an `entityLink` yields its target id
+ * (so the facet filters "lair = <place>" by a stable id, not the mutable name), a scalar its one
+ * well-typed value.
+ */
 function facetItems(dataType: FieldDataType, raw: unknown): { value: string; num: number | null }[] {
   if (dataType.kind === 'list') return Array.isArray(raw) ? raw.flatMap((item) => scalarFacet(dataType.of, item)) : [];
+  if (dataType.kind === 'entityLink') {
+    const parsed = entityLinkValueSchema.safeParse(raw);
+    return parsed.success ? [{ value: parsed.data.entityId, num: null }] : [];
+  }
   return scalarFacet(dataType, raw);
 }
 
@@ -194,6 +234,51 @@ function scalarFacet(dataType: ScalarDataType, raw: unknown): { value: string; n
   return dataType.kind === 'number'
     ? [{ value: String(raw), num: raw as number }]
     : [{ value: String(raw), num: null }];
+}
+
+/**
+ * Every Entity-Link Field value an Entity's Metadata carries (#190), keyed by the Field. Only an
+ * `entityLink` Field with a present, shape-valid value contributes (a blank or ill-typed one is
+ * skipped, forward-only). Feeds {@link harvestEdges}.
+ */
+export function entityLinkFieldValues(
+  fields: readonly FieldSchema[],
+  metadata: Metadata | undefined,
+): { key: string; value: EntityLinkValue }[] {
+  const out: { key: string; value: EntityLinkValue }[] = [];
+  for (const field of fields) {
+    if (field.dataType.kind !== 'entityLink') continue;
+    const parsed = entityLinkValueSchema.safeParse(readField(metadata, field));
+    if (parsed.success) out.push({ key: field.key, value: parsed.data });
+  }
+  return out;
+}
+
+/**
+ * One Entity-Link Field whose target-type constraint the write gate must check (#190): the Field
+ * `key`, the linked `entityId`, and the non-empty `targetTypes` the target's types must intersect.
+ * Only a constrained Field (`targetTypes` non-empty) with a present value yields one. The caller
+ * resolves each `entityId`'s actual types from the DB — a missing target has nothing to check.
+ */
+export interface EntityLinkConstraint {
+  readonly key: string;
+  readonly entityId: string;
+  readonly targetTypes: readonly string[];
+}
+
+export function entityLinkConstraints(
+  fields: readonly FieldSchema[],
+  metadata: Metadata | undefined,
+): EntityLinkConstraint[] {
+  const out: EntityLinkConstraint[] = [];
+  for (const field of fields) {
+    if (field.dataType.kind !== 'entityLink') continue;
+    const targetTypes = field.dataType.targetTypes ?? [];
+    if (targetTypes.length === 0) continue;
+    const parsed = entityLinkValueSchema.safeParse(readField(metadata, field));
+    if (parsed.success) out.push({ key: field.key, entityId: parsed.data.entityId, targetTypes });
+  }
+  return out;
 }
 
 /** The comparison a {@link FieldFilter} applies: `eq` membership, or a `gte`/`lte` range bound. */
@@ -281,6 +366,10 @@ function matchesDataType(dataType: FieldDataType, value: unknown): boolean {
       return typeof value === 'string' && dataType.options.includes(value);
     case 'list':
       return Array.isArray(value) && value.every((item) => matchesDataType(dataType.of, item));
+    case 'entityLink':
+      // Shape only — the *target-type* constraint needs the target's own types, so it is enforced
+      // by the API write gate (a DB read the pure gate can't make), not here (#190).
+      return entityLinkValueSchema.safeParse(value).success;
   }
 }
 

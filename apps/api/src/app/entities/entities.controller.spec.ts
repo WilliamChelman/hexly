@@ -1523,6 +1523,137 @@ describe('Entities endpoints', () => {
     });
   });
 
+  describe('Entity-Link Fields (#190)', () => {
+    // A monster type whose `lair` is a facetable, target-type-constrained Entity Link at a place.
+    beforeEach(() => {
+      app.get(TypeFieldRegistry).register('test.monster', [
+        {
+          key: 'lair',
+          label: 'Lair',
+          dataType: { kind: 'entityLink', targetTypes: ['world.place'] },
+          facetable: true,
+        },
+      ]);
+    });
+
+    const names = (res: { body: { items: { name: string }[] } }) => res.body.items.map((e) => e.name).sort();
+
+    /** Create a place (the link target) carrying the constrained type, in the caller's default World. */
+    async function place(agent: Awaited<ReturnType<typeof signIn>>, name: string) {
+      const created = await agent
+        .post('/entities')
+        .send({ name, types: ['world.place'] })
+        .expect(201);
+      return created.body.id as string;
+    }
+
+    /** Typed-save a monster whose `lair` points at `link` (an `{ entityId, label }` or nothing). */
+    async function monster(
+      agent: Awaited<ReturnType<typeof signIn>>,
+      name: string,
+      link: { entityId: string; label: string } | undefined,
+    ) {
+      const created = await agent
+        .post('/entities')
+        .send({ name, types: ['core.note'] })
+        .expect(201);
+      const res = await agent.put(`/entities/${created.body.id}`).send({
+        document: { content: emptyContent(), metadata: link ? { lair: link } : {} },
+        version: 1,
+        tags: [],
+        types: ['test.monster'],
+      });
+      return { id: created.body.id as string, res };
+    }
+
+    it('materialises the link as an edge, and filters the list by the Entity-Link Field', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const whisperwood = await place(ada, 'The Whisperwood');
+      const other = await place(ada, 'The Sunken Keep');
+      await monster(ada, 'Aboleth', { entityId: whisperwood, label: 'The Whisperwood' }).then((m) =>
+        expect(m.res.status).toBe(200),
+      );
+      await monster(ada, 'Kraken', { entityId: other, label: 'The Sunken Keep' });
+
+      // "all monsters whose lair is in the Whisperwood" — an eq filter on the target id.
+      const res = await ada
+        .get('/entities')
+        .query({ type: 'test.monster', field: `lair:eq:${whisperwood}` })
+        .expect(200);
+      expect(names(res)).toEqual(['Aboleth']);
+    });
+
+    it('surfaces the link facet contextually, resolving each target id to its current name', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const whisperwood = await place(ada, 'The Whisperwood');
+      const { id } = await monster(ada, 'Aboleth', { entityId: whisperwood, label: 'The Whisperwood' });
+      const worldId = (await ada.get(`/entities/${id}`)).body.worldId;
+
+      const res = await ada.get('/entities/facets').query({ worldId, type: 'test.monster' }).expect(200);
+      const lair = (
+        res.body.fields as {
+          key: string;
+          dataType: { kind: string };
+          values: { value: string; label?: string; count: number }[];
+        }[]
+      ).find((f) => f.key === 'lair')!;
+      expect(lair.dataType.kind).toBe('entityLink');
+      // The facet value is the stable target id; the label is the target's live name for the rail.
+      expect(lair.values).toEqual([{ value: whisperwood, label: 'The Whisperwood', count: 1 }]);
+    });
+
+    it('degrades gracefully: a link to a missing Entity saves inert and never errors the read', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      // A constrained link at an id that does not resolve — inert, so the typed save still succeeds.
+      const { id, res } = await monster(ada, 'Aboleth', { entityId: 'ghost-place', label: 'A Forgotten Vale' });
+      expect(res.status).toBe(200);
+      await ada.get(`/entities/${id}`).expect(200);
+
+      // The dangling facet value keeps no label (the target resolves to no row).
+      const worldId = (await ada.get(`/entities/${id}`)).body.worldId;
+      const facets = await ada.get('/entities/facets').query({ worldId, type: 'test.monster' }).expect(200);
+      const lair = (facets.body.fields as { key: string; values: { value: string; label?: string }[] }[]).find(
+        (f) => f.key === 'lair',
+      )!;
+      expect(lair.values).toEqual([{ value: 'ghost-place', count: 1 }]);
+    });
+
+    it('enforces the target-type constraint on an active typed edit — a resolvable off-type target is rejected', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      // A note is a real, readable Entity, but not a `world.place`.
+      const note = await ada
+        .post('/entities')
+        .send({ name: 'Just a Note', types: ['core.note'] })
+        .expect(201);
+      const { res } = await monster(ada, 'Aboleth', { entityId: note.body.id, label: 'Just a Note' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.code).toBe('invalid-fields');
+      expect(res.body.data.fields).toContainEqual({ key: 'lair', code: 'type' });
+    });
+
+    it('never leaks a private target’s name through the link facet label (ADR-0046)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      // Ada links a shared monster at a lair she keeps private.
+      const whisperwood = await place(ada, 'The Whisperwood'); // private by default
+      const { id: monsterId } = await monster(ada, 'Aboleth', { entityId: whisperwood, label: 'The Whisperwood' });
+      setVisibility(monsterId, 'shared');
+      const worldId = (await ada.get(`/entities/${monsterId}`)).body.worldId;
+
+      // Bob, a World member, can read the shared monster but not its private lair.
+      const bobId = await seedUser('bob@hexly.test', 'battery staple', 'Bob');
+      app.get(WorldsService).addMember(adaId, worldId, bobId, 'contributor');
+      const bob = await signIn('bob@hexly.test', 'battery staple');
+
+      const res = await bob.get('/entities/facets').query({ worldId, type: 'test.monster' }).expect(200);
+      const lair = (
+        res.body.fields as { key: string; values: { value: string; label?: string; count: number }[] }[]
+      ).find((f) => f.key === 'lair')!;
+      // Bob sees a link exists (the readable monster), but the private target's name never resolves.
+      expect(lair.values).toEqual([{ value: whisperwood, count: 1 }]);
+    });
+  });
+
   it('refuses every entity route without a session cookie', async () => {
     const server = app.getHttpServer();
 

@@ -73,6 +73,8 @@ export class EntitySearchPicker {
    * pin can only be a same-World Entity, never one from another of the Owner's Worlds.
    */
   readonly worldId = input<string | undefined>(undefined);
+  /** Constrain results to these Entity Types — an Entity-Link Field's target-type constraint (#190). */
+  readonly types = input<readonly string[] | undefined>(undefined);
 
   /** Every raw keystroke; the consumer commits it back to {@link query}. */
   readonly queryChange = output<string>();
@@ -85,10 +87,13 @@ export class EntitySearchPicker {
     // Search server-side as the query changes (ADR-0025). onCleanup cancels a superseded
     // request; a failed search empties the list so the picker never breaks.
     effect((onCleanup) => {
-      const sub = this.entitiesClient.list({ q: this.query().trim(), worldId: this.worldId() }).subscribe({
-        next: (page) => this.options.set(page.items),
-        error: () => this.options.set([]),
-      });
+      const types = this.types();
+      const sub = this.entitiesClient
+        .list({ q: this.query().trim(), worldId: this.worldId(), type: types?.length ? [...types] : undefined })
+        .subscribe({
+          next: (page) => this.options.set(page.items),
+          error: () => this.options.set([]),
+        });
       onCleanup(() => sub.unsubscribe());
     });
   }

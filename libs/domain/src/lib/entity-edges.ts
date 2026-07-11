@@ -8,6 +8,7 @@
 import { assetHashFromUrl } from './asset';
 import { visit } from './content/content-node';
 import { descriptorSchema, EntityBody, EntityType, hasHexGrid } from './entity';
+import { entityLinkFieldValues, FieldSchema } from './field';
 
 /** What an edge points at: another Entity, or an Asset (CONTEXT.md → Asset). */
 export type EdgeTargetKind = 'entity' | 'asset';
@@ -63,12 +64,16 @@ export interface EntityReferences {
 }
 
 /**
- * Every edge the body's Content and (for a Hex Map) map payload expresses, deduplicated on
- * `(targetKind, targetId, descriptor)`. Nothing records *where* a link was expressed, so a
- * prose mention and a map placement of the same target collapse to one edge, while two
- * descriptors to that target stay two.
+ * Every edge the body expresses, deduplicated on `(targetKind, targetId, descriptor)`: the
+ * Content's inline links, a Hex Map's placements, and — resolved against the Entity's `fields` —
+ * each typed **Entity-Link Field** value (#190). Nothing records *where* a link was expressed, so
+ * a prose mention, a map placement, and a Field link to the same target collapse to one edge, while
+ * two descriptors to that target stay two.
+ *
+ * `fields` is the Entity's resolved Field schema set ({@link resolveFields}); it defaults to none,
+ * so a caller with no type context still harvests Content/map edges unchanged.
  */
-export function harvestEdges(body: EntityBody): EntityEdge[] {
+export function harvestEdges(body: EntityBody, fields: readonly FieldSchema[] = []): EntityEdge[] {
   const edges = new Map<string, EntityEdge>();
   const add = (edge: EntityEdge) => {
     // `\0` cannot occur in an id or a descriptor, so the key is unambiguous. The descriptor folds
@@ -109,5 +114,10 @@ export function harvestEdges(body: EntityBody): EntityEdge[] {
     }
     for (const region of body.regions) entityEdge(region.entityId, null);
   }
+
+  // A typed Entity-Link Field value is a descriptor-less edge to its target (#190), read off the
+  // Metadata map rather than the Content snapshot — so it is format-independent, like the map above.
+  for (const { value } of entityLinkFieldValues(fields, body.metadata)) entityEdge(value.entityId, null);
+
   return [...edges.values()];
 }

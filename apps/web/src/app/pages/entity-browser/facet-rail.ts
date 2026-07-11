@@ -146,7 +146,7 @@ export interface FieldRangeChange {
                       })
                     "
                   >
-                    <span class="truncate">{{ row.value }}</span>
+                    <span class="truncate">{{ row.label }}</span>
                     <span class="ml-2 text-ink-faint tabular-nums">{{ row.count }}</span>
                   </button>
                 </li>
@@ -237,6 +237,8 @@ export class FacetRail {
         const rows = field.values.map((v) => ({
           value: v.value,
           count: v.count,
+          // An Entity-Link facet's value is a target id; the server sends its name as `label` (#190).
+          label: v.label ?? v.value,
           active: (selection.values ?? []).includes(v.value),
         }));
         return {

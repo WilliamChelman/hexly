@@ -108,6 +108,44 @@ describe('GenericFieldView', () => {
     expect((el.querySelector('[data-testid=field-name] input') as HTMLInputElement).disabled).toBe(true);
   });
 
+  it('renders an Entity-Link Field by its last-known name, with a picker toggle when editable (#190)', () => {
+    const lair: FieldSchema = {
+      key: 'lair',
+      label: 'Lair',
+      dataType: { kind: 'entityLink', targetTypes: ['world.place'] },
+      required: false,
+      facetable: false,
+    };
+    registry.register(definitionWithFields('test.monster', [lair]));
+    const value = { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } };
+
+    // Editable: the link shows its last-known name and offers a "change entity" toggle + a clear.
+    const editable = render(detail(['test.monster'], value, ['edit']));
+    expect(editable.el.querySelector('[data-testid=entity-link-value]')?.textContent).toContain('The Whisperwood');
+    expect(editable.el.querySelector('[data-testid=entity-link-open]')).not.toBeNull();
+    expect(editable.el.querySelector('[data-testid=entity-link-clear]')).not.toBeNull();
+    // The picker is closed until the toggle is clicked, so no premature search fires.
+    expect(editable.el.querySelector('[data-testid=entity-link-picker-menu]')).toBeNull();
+  });
+
+  it('renders an Entity-Link Field inert (name only, no controls) for a read-only opener (#190)', () => {
+    const lair: FieldSchema = {
+      key: 'lair',
+      label: 'Lair',
+      dataType: { kind: 'entityLink' },
+      required: false,
+      facetable: false,
+    };
+    registry.register(definitionWithFields('test.monster', [lair]));
+    const { el } = render(
+      detail(['test.monster'], { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } }, ['read']),
+    );
+
+    expect(el.querySelector('[data-testid=entity-link-value]')?.textContent).toContain('The Whisperwood');
+    expect(el.querySelector('[data-testid=entity-link-open]')).toBeNull();
+    expect(el.querySelector('[data-testid=entity-link-clear]')).toBeNull();
+  });
+
   it('falls back to an inert chip + plain Metadata for a type with no registered view', () => {
     // No definition registered for `dnd.monster`: the missing-plugin fallback.
     const { el } = render(detail(['dnd.monster'], { lore: 'ancient', power: 9 }, ['edit']));

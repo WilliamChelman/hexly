@@ -61,6 +61,7 @@ import { FieldControl } from './field-control';
                   [value]="rawValue(field)"
                   [disabled]="!writable()"
                   [invalid]="isInvalid(field)"
+                  [worldId]="worldId()"
                   (valueChange)="set(field, $event)"
                 />
               </dd>
@@ -95,6 +96,9 @@ export class GenericFieldView {
 
   /** A read-only opener edits nothing — the controls render disabled (ADR-0037). */
   protected readonly writable = computed(() => this.session.writable());
+
+  /** The open Entity's World, scoping an Entity-Link Field picker to same-World targets (#190). */
+  protected readonly worldId = computed(() => this.session.current()?.worldId);
 
   /** The union of Field schemas the open Entity's live types declare (primary first, deduped by key). */
   protected readonly fields = computed(() => this.types.resolveFields(this.session.types()));

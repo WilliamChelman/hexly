@@ -361,14 +361,15 @@ export class EntityWrites {
    * the Content uses. One traversal, and one definition of what a descriptor is.
    */
   private derive(body: EntityBody, types: readonly string[]): Derived {
-    const edges = harvestEdges(body);
+    // Resolved once, shared by the two derivations that read the type set: the edge harvest's
+    // Entity-Link Fields (#190) and the facet derivation's facetable Fields (#188).
+    const fields = resolveFields(this.typeFields.resolver, types);
+    const edges = harvestEdges(body, fields);
     return {
       contentText: extractText(body.content),
       descriptors: descriptorsSchema.parse(edges.flatMap((e) => e.descriptor ?? [])),
       edges,
-      // Field facets need the type set (which Fields are facetable) *and* the document's Metadata
-      // (their values) — the one derivation that reads a column beyond the body (ADR-0048, #188).
-      fieldFacets: deriveFieldFacets(resolveFields(this.typeFields.resolver, types), body.metadata),
+      fieldFacets: deriveFieldFacets(fields, body.metadata),
     };
   }
 
