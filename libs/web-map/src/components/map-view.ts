@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { ENTITY_SESSION } from '@hexly/web-entity';
 import { HexMapStore } from '../services/hexmap-store';
 import { MapCanvas } from './map-canvas';
@@ -28,10 +29,21 @@ import { EditorRail } from './editor-rail';
   // route-scoped ENTITY_SESSION from an ancestor, and lives and dies with the Map View:
   // its children (canvas, palette, docks) resolve this one instance.
   providers: [HexMapStore],
-  imports: [MapCanvas, ToolPalette, Inspector, RegionsPanel, EditorRail],
+  imports: [MapCanvas, ToolPalette, Inspector, RegionsPanel, EditorRail, TranslocoPipe],
   template: `
     <!-- Full-bleed canvas; all side chrome floats over it (ADR-0013). -->
     <app-map-canvas class="absolute inset-0" />
+    <!--
+      The model-derived hex count, kept as a screen-reader-only live region rather
+      than visible chrome (the status bar was retired with the Views refactor). The
+      map is Canvas pixels (ADR-0003), so this is the one accessible read-out of how
+      many hexes the live document holds — a11y for non-sighted users and the sole
+      observable the e2e suite polls to prove a canvas gesture reached the document.
+      Outside the writable gate: a read-only opener's map still has a hex count.
+    -->
+    <span class="sr-only" aria-live="polite" data-testid="hex-count">{{
+      'editorShell.statusBar.hexCount' | transloco: { count: hexCount() }
+    }}</span>
     @if (session.writable()) {
       <app-tool-palette class="absolute top-3 left-3 z-[1]" />
       <!--
@@ -69,4 +81,7 @@ export class MapView {
   protected readonly store = inject(HexMapStore);
   /** The central store; `writable()` gates the editing chrome (ADR-0037/0048). */
   protected readonly session = inject(ENTITY_SESSION);
+
+  /** Hexes in the live document — the value the sr-only read-out and the e2e suite observe. */
+  protected readonly hexCount = computed(() => Object.keys(this.store.document().hexes).length);
 }

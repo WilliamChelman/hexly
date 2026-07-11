@@ -28,7 +28,10 @@ test('types into a note, saves, and the Content survives a reload', async ({ pag
   const res = await request.get(`/api/entities/${noteId}`);
   expect(res.ok()).toBeTruthy();
   const detail = await res.json();
-  expect(detail.document.type).toBe('note');
+  // A note's Entity Type lives in the entity-level `types` set now, not a `document.type`
+  // field — the body is discriminated by Payload Kind composition (rich-content, no
+  // hex-grid), so `core.note` is the primary type (ADR-0048).
+  expect(detail.types).toContain('core.note');
   expect(detail.document.content.format).toBe('tiptap-v3'); // mirrors CONTENT_FORMAT
   expect(JSON.stringify(detail.document.content.snapshot)).toContain(content);
 });
