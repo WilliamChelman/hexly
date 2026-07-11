@@ -17,7 +17,7 @@ const noteDetail = (name: string): EntityDetail => ({
   id: 'n1',
   worldId: 'w1',
   name,
-  type: 'note',
+  types: ['core.note'],
   tags: [],
   visibility: 'private',
   version: 1,
@@ -25,7 +25,7 @@ const noteDetail = (name: string): EntityDetail => ({
   createdAt: 1,
   updatedAt: 1,
   rights: ['read', 'edit', 'delete', 'set-visibility', 'manage'],
-  document: { type: 'note', content: { format: CONTENT_FORMAT, snapshot: {} } },
+  document: { content: { format: CONTENT_FORMAT, snapshot: {} } },
 });
 
 // Drives ContentEditor via the token, standing in for the page's EntitySession:
@@ -56,7 +56,6 @@ describe('ContentEditor', () => {
   const noteWithProse = (text: string): EntityDetail => ({
     ...note('Lady Mara'),
     document: {
-      type: 'note',
       content: {
         format: CONTENT_FORMAT,
         snapshot: {
@@ -122,7 +121,6 @@ describe('ContentEditor', () => {
     (TestBed.inject(CONTENT_EDITOR_SESSION) as FakeEditorSession).adopt({
       ...note('Lady Mara'),
       document: {
-        type: 'note',
         content: {
           format: CONTENT_FORMAT,
           snapshot: {
@@ -159,7 +157,6 @@ describe('ContentEditor', () => {
     (TestBed.inject(CONTENT_EDITOR_SESSION) as FakeEditorSession).adopt({
       ...note('Lady Mara'),
       document: {
-        type: 'note',
         content: {
           format: CONTENT_FORMAT,
           snapshot: {

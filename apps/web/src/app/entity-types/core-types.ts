@@ -1,10 +1,11 @@
+import { CORE_HEXMAP, CORE_NOTE } from '@hexly/domain';
 import { TypeDefinition } from './type-definition';
 
 /**
  * The two core Entity Types, registered with the {@link TypeRegistry} the same
  * way a bundled plugin would (`register()`), so the core dogfoods the type API
- * (ADR-0048). `note` adds no payload beyond the Content base; `hexmap` adds the
- * hex grid and so affords the `map` surface.
+ * (ADR-0048). `core.note` adds no payload beyond the `rich-content` base;
+ * `core.hexmap` adds the `hex-grid` payload and so affords the `map` surface.
  *
  * The label values are transloco keys (see `libs/web-core/src/i18n/catalogs`),
  * carried verbatim from the branches this registry replaced so the app reads
@@ -12,7 +13,7 @@ import { TypeDefinition } from './type-definition';
  */
 export const CORE_TYPE_DEFINITIONS: readonly TypeDefinition[] = [
   {
-    id: 'note',
+    id: CORE_NOTE,
     icon: 'label',
     surfaces: ['note'],
     graphColorToken: '--color-ink-muted',
@@ -26,7 +27,7 @@ export const CORE_TYPE_DEFINITIONS: readonly TypeDefinition[] = [
     },
   },
   {
-    id: 'hexmap',
+    id: CORE_HEXMAP,
     icon: 'terrain',
     surfaces: ['map', 'note'],
     graphColorToken: '--color-gold',

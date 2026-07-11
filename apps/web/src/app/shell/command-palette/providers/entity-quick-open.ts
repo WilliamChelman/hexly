@@ -51,7 +51,8 @@ export class EntityQuickOpen implements CommandProvider {
     return {
       id: entity.id,
       label: entity.name,
-      hint: entity.type,
+      // The primary type (CONTEXT.md → Entity Type) as the quick-open hint.
+      hint: entity.types[0],
       route,
       run: () => void this.router.navigate(route),
     };

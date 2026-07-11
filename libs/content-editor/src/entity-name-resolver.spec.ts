@@ -9,7 +9,7 @@ function summary(id: string, name: string): EntitySummary {
     id,
     worldId: 'w1',
     name,
-    type: 'note',
+    types: ['core.note'],
     tags: [],
     visibility: 'private',
     version: 1,

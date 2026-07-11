@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { EntityDetail } from '@hexly/domain';
+import { CORE_NOTE, EntityDetail } from '@hexly/domain';
 import { EntitySession } from '../services/entity-session';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { EntityMetadata } from './entity-metadata';
@@ -11,7 +11,7 @@ describe('EntityMetadata', () => {
     id: 'n1',
     worldId: 'w1',
     name: 'Lady Mara',
-    type: 'note',
+    types: [CORE_NOTE],
     tags: [],
     visibility: 'private',
     version: 1,
@@ -19,7 +19,6 @@ describe('EntityMetadata', () => {
     createdAt: 1,
     updatedAt: 1,
     document: {
-      type: 'note',
       content: { format: 'tiptap-v1', snapshot: {} },
       metadata,
     },

@@ -5,6 +5,8 @@ import { of, Subject, throwError } from 'rxjs';
 import {
   CONTENT_FORMAT,
   coordKey,
+  CORE_HEXMAP,
+  CORE_NOTE,
   emptyContent,
   EntityDetail,
   EntitySaveOutcome,
@@ -23,7 +25,7 @@ describe('EntitySession', () => {
 
   const content = emptyContent();
   /** Wrap a hex grid into the hexmap body the store carries end to end. */
-  const bodyOf = (grid: HexMap) => ({ type: 'hexmap' as const, content, ...grid });
+  const bodyOf = (grid: HexMap) => ({ content, ...grid });
 
   const forestAt00: HexMap = {
     hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' } },
@@ -39,7 +41,7 @@ describe('EntitySession', () => {
     id: 'm1',
     worldId: 'w1',
     name: 'Aldermoor',
-    type: 'hexmap',
+    types: [CORE_HEXMAP],
     tags: [],
     visibility: 'private',
     version: 3,
@@ -606,11 +608,11 @@ describe('EntitySession', () => {
   it('saves a non-hexmap entity without coercing it into a hexmap (no data loss)', () => {
     // A note must save back as a note; the editor's empty grid must not
     // overwrite it with a blank hexmap body.
-    const noteBody = { type: 'note' as const, content };
+    const noteBody = { content };
     const note: EntityDetail = {
       ...aldermoor,
       id: 'n1',
-      type: 'note',
+      types: [CORE_NOTE],
       document: noteBody,
     };
     entities.load.mockReturnValue(of(note));
@@ -625,11 +627,11 @@ describe('EntitySession', () => {
   });
 
   it('saves a note’s edited Content opaquely, round-tripping the snapshot untouched', () => {
-    const noteBody = { type: 'note' as const, content };
+    const noteBody = { content };
     const note: EntityDetail = {
       ...aldermoor,
       id: 'n1',
-      type: 'note',
+      types: [CORE_NOTE],
       document: noteBody,
     };
     entities.load.mockReturnValue(of(note));
@@ -654,7 +656,7 @@ describe('EntitySession', () => {
     // Snapshot wrapped in format envelope, never parsed (ADR-0019).
     expect(entities.save).toHaveBeenCalledWith(
       'n1',
-      { type: 'note', content: { format: CONTENT_FORMAT, snapshot } },
+      { content: { format: CONTENT_FORMAT, snapshot } },
       3,
       [],
     );
@@ -684,7 +686,6 @@ describe('EntitySession', () => {
     expect(entities.save).toHaveBeenCalledWith(
       'm1',
       {
-        type: 'hexmap',
         content: { format: CONTENT_FORMAT, snapshot },
         ...editor.document(),
       },

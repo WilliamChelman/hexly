@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { EntityDetail } from '@hexly/domain';
+import { CORE_NOTE, EntityDetail } from '@hexly/domain';
 import { of } from 'rxjs';
 import { EntitySession } from '../services/entity-session';
 import { EntitiesClient } from '@hexly/web-core';
@@ -13,7 +13,7 @@ describe('EntityTags', () => {
     id: 'n1',
     worldId: 'w1',
     name: 'Lady Mara',
-    type: 'note',
+    types: [CORE_NOTE],
     tags,
     visibility: 'private',
     version: 1,
@@ -22,7 +22,7 @@ describe('EntityTags', () => {
     updatedAt: 1,
     // Owner by default (ADR-0039): the `edit` Right makes the tag controls editable.
     rights: ['read', 'edit', 'delete', 'set-visibility', 'manage'],
-    document: { type: 'note', content: { format: 'tiptap-v1', snapshot: {} } },
+    document: { content: { format: 'tiptap-v1', snapshot: {} } },
   });
 
   let session: EntitySession;

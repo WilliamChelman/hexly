@@ -1,11 +1,11 @@
 /**
  * The Entity domain: the top-level thing a user owns. The single Zod source of
- * truth for the Entity model and its REST payloads. A Hex Map is an Entity of
- * `type: 'hexmap'`.
+ * truth for the Entity model and its REST payloads. A Hex Map is an Entity that
+ * carries the `core.hexmap` type — the type that adds the `hex-grid` Payload Kind.
  */
 
 import { z } from 'zod';
-import { emptyHexMap, hexMapSchema } from './hex/hex-map';
+import { emptyHexMap, HexMap, hexMapSchema } from './hex/hex-map';
 
 /** The format tag new saves write; a schema-affecting extension change is a bump + migration. */
 export const CONTENT_FORMAT = 'tiptap-v3';
@@ -35,14 +35,44 @@ export function tiptapContent(snapshot: unknown): Content {
 }
 
 /**
- * The closed, code-known set of Entity shapes: `note` is Content only; `hexmap`
- * adds the hex grid. Only a *typed payload* (like the grid) justifies a new
- * type — mere flavour is a `tag`.
+ * A single Entity Type identity (CONTEXT.md → Entity Type): an **open**,
+ * `namespace.id`-keyed string (`core.note`, `core.hexmap`, `dnd.monster`). Unlike
+ * the closed Payload Kind it maps to, the set is open — plugins and Worlds extend
+ * it — so this validates only the *shape* of an id, never an enumerated value.
  */
-export const entityTypeSchema = z.enum(['note', 'hexmap']);
+export const entityTypeSchema = z
+  .string()
+  .trim()
+  .regex(/^[a-z0-9_-]+(\.[a-z0-9_-]+)+$/, 'An Entity Type must be a `namespace.id` key');
 
-/** CONTEXT.md → Entity Type. */
+/** CONTEXT.md → Entity Type. Open set, so widened to `string`. */
 export type EntityType = z.infer<typeof entityTypeSchema>;
+
+/** The two core Entity Types, registered by the core the same way a plugin would (ADR-0048). */
+export const CORE_NOTE = 'core.note';
+export const CORE_HEXMAP = 'core.hexmap';
+
+/**
+ * The ordered, deduped set of Entity Types an Entity carries (CONTEXT.md → Entity
+ * Type): `types[0]` is *primary* (drives icon, default view, headline). At least
+ * one — every Entity has a primary type. `Set` insertion order preserves the
+ * authored order while collapsing duplicates.
+ */
+export const typesSchema = z
+  .array(entityTypeSchema)
+  .min(1)
+  .transform((types) => [...new Set(types)]);
+
+/**
+ * The closed, code-known set of Payload Kinds (CONTEXT.md → Payload Kind): the body
+ * shape an Entity Type maps to. `rich-content` is the base every Entity has (Content
+ * + Metadata); `hex-grid` is an *additive addon* over it. What actually discriminates
+ * the stored document — distinct from the open, user-facing Entity Type.
+ */
+export const PAYLOAD_KINDS = ['rich-content', 'hex-grid'] as const;
+
+/** CONTEXT.md → Payload Kind. */
+export type PayloadKind = (typeof PAYLOAD_KINDS)[number];
 
 /**
  * The Entity's Metadata map (CONTEXT.md → Metadata), stored inside the document
@@ -52,35 +82,53 @@ export type EntityType = z.infer<typeof entityTypeSchema>;
  */
 export const metadataSchema = z.record(z.string(), z.unknown()).optional();
 
+/** The `rich-content` base payload every Entity carries: Content + Metadata (formerly the `note` payload). */
+const richContentPayload = {
+  content: contentSchema,
+  metadata: metadataSchema,
+};
+
 /**
- * The type-discriminated Entity body — what the `document` column holds:
- * `{ type, content, ...typedPayload }`.
+ * The Entity body — what the `document` column holds — discriminated by **Payload
+ * Kind composition**, not by a `type` field (ADR-0048): the `rich-content` base
+ * (Content + Metadata) that every Entity has, optionally extended by the additive
+ * `hex-grid` payload (the Hex Map grid). The hex-grid branch comes first so a body
+ * that carries a grid matches it; a body without one falls through to the base.
+ *
+ * The base branch is `.strict()` so a body carrying grid keys that *fail* the grid
+ * shape can't quietly fall through and be stripped to rich-content — a malformed
+ * Hex Map is a hard parse error (a 400 / a corrupt-document 500 on read), never a
+ * silent downgrade to a note. A well-formed body of either kind carries no keys the
+ * base doesn't know, so strictness only bites the malformed-grid case.
  */
-export const entityBodySchema = z.discriminatedUnion('type', [
-  z.object({
-    type: z.literal('note'),
-    content: contentSchema,
-    metadata: metadataSchema,
-  }),
-  z.object({
-    type: z.literal('hexmap'),
-    content: contentSchema,
-    metadata: metadataSchema,
-    ...hexMapSchema.shape,
-  }),
+export const entityBodySchema = z.union([
+  z.object({ ...richContentPayload, ...hexMapSchema.shape }),
+  z.object(richContentPayload).strict(),
 ]);
 
 export type EntityBody = z.infer<typeof entityBodySchema>;
+
+/**
+ * Whether a body carries the `hex-grid` payload — the presence of the grid, which
+ * re-discriminates a Hex Map now that the body holds no `type` field. Narrows the
+ * body so its grid fields (`hexes`/`regions`/`labels`) read without a cast.
+ */
+export function hasHexGrid(body: EntityBody): body is EntityBody & HexMap {
+  return 'hexes' in body;
+}
 
 export function emptyContent(): Content {
   return tiptapContent({ type: 'doc', content: [] });
 }
 
-/** The one place that knows the per-type empty payload. */
-export function emptyEntityBody(type: EntityType): EntityBody {
-  return type === 'hexmap'
-    ? { type, content: emptyContent(), ...emptyHexMap() }
-    : { type, content: emptyContent() };
+/**
+ * The one place that mints an empty body for a fresh Entity as a payload composition:
+ * the `rich-content` base always, plus the `hex-grid` addon when a type in the set
+ * contributes it (the `core.hexmap` type — the only core type that adds a payload).
+ */
+export function emptyEntityBody(types: readonly string[]): EntityBody {
+  const base = { content: emptyContent() };
+  return types.includes(CORE_HEXMAP) ? { ...base, ...emptyHexMap() } : base;
 }
 
 /** The reserved Metadata namespace: Hexly provenance keys (`hexly.*`) that drive placement/typing on export and are stripped from author-facing frontmatter. */
@@ -136,10 +184,11 @@ export const descriptorSchema = z.string().trim().min(1);
  */
 export const descriptorsSchema = dedupedTags.default([]);
 
-/** POST /entities: body (Content + payload) is minted server-side. */
+/** POST /entities: body (Content + payload) is minted server-side from `types`. */
 export const createEntityRequestSchema = z.object({
   name: nameSchema,
-  type: entityTypeSchema,
+  // The ordered type set; `types[0]` is primary. A single core type per creation here (ADR-0048).
+  types: typesSchema,
   tags: tagsSchema,
   // Optional target World; omitted, the server defaults to the owner's World.
   worldId: z.string().optional(),
@@ -153,6 +202,9 @@ export const saveEntityRequestSchema = z.object({
   version: z.number().int().nonnegative(),
   // Always the full current set — a save replaces the stored tags; an empty array clears them.
   tags: dedupedTags,
+  // Optional: a save replaces the type set when present, and leaves it untouched when omitted.
+  // Multi-type authoring is not surfaced yet, so the current client omits it (ADR-0048).
+  types: typesSchema.optional(),
 });
 
 export type SaveEntityRequest = z.infer<typeof saveEntityRequestSchema>;
@@ -298,7 +350,8 @@ export interface EntitySummary {
   /** Every Entity belongs to exactly one World. */
   readonly worldId: string;
   readonly name: string;
-  readonly type: EntityType;
+  /** The ordered Entity Type set; `types[0]` is primary (CONTEXT.md → Entity Type). */
+  readonly types: readonly EntityType[];
   readonly tags: readonly string[];
   readonly visibility: Visibility;
   /** The optimistic-concurrency counter; a save must carry this base value. */

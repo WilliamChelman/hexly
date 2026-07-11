@@ -12,14 +12,14 @@ function prose(...links: Record<string, unknown>[]) {
   });
 }
 
-/** A `note` body whose Content holds the given `entityLink` attrs. */
+/** A rich-content body whose Content holds the given `entityLink` attrs. */
 function note(...links: Record<string, unknown>[]): EntityBody {
-  return { type: 'note', content: prose(...links) };
+  return { content: prose(...links) };
 }
 
-/** A `hexmap` body: an empty plane plus whatever map payload the test overrides. */
+/** A hex-grid body: an empty plane plus whatever map payload the test overrides. */
 function hexmap(map: Partial<ReturnType<typeof emptyHexMap>> = {}): EntityBody {
-  return { type: 'hexmap', content: emptyContent(), ...emptyHexMap(), ...map };
+  return { content: emptyContent(), ...emptyHexMap(), ...map };
 }
 
 describe('harvestEdges (#179, ADR-0046)', () => {
@@ -64,7 +64,6 @@ describe('harvestEdges (#179, ADR-0046)', () => {
   it('reads an image at an Asset URL as an asset edge, and an external image as none', () => {
     const hash = 'a'.repeat(64);
     const body: EntityBody = {
-      type: 'note',
       content: tiptapContent({
         type: 'doc',
         content: [
@@ -93,7 +92,6 @@ describe('harvestEdges (#179, ADR-0046)', () => {
 
   it('finds links nested deep in the Content tree', () => {
     const body: EntityBody = {
-      type: 'note',
       content: tiptapContent({
         type: 'doc',
         content: [
@@ -128,7 +126,6 @@ describe('harvestEdges (#179, ADR-0046)', () => {
   it('reads no Content edges under an unknown format tag, but still reads the map', () => {
     const alien = { format: 'prosemirror-v9', snapshot: { type: 'entityLink', attrs: { entityId: 'e1' } } };
     const body = {
-      type: 'hexmap',
       content: alien,
       ...emptyHexMap(),
       hexes: { '0,0': { terrain: 'grass', entityId: 'harbour' } },
@@ -148,7 +145,6 @@ describe('harvestEdges (#179, ADR-0046)', () => {
   describe('the grain is (target, descriptor)', () => {
     it('collapses a descriptor-less content link and a map placement of the same target', () => {
       const body: EntityBody = {
-        type: 'hexmap',
         content: prose({ entityId: 'riverbend', label: 'Riverbend' }),
         ...emptyHexMap(),
         hexes: { '0,0': { terrain: 'grass', entityId: 'riverbend' } },

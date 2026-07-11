@@ -51,7 +51,7 @@ describe('CreateEntityDialog', () => {
       'w2',
     );
 
-    state.open('note');
+    state.open('core.note');
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('dialog')?.open).toBe(true);
@@ -65,7 +65,7 @@ describe('CreateEntityDialog', () => {
       null,
     );
 
-    state.open('hexmap');
+    state.open('core.hexmap');
     fixture.detectChanges();
 
     const select: HTMLSelectElement = q(fixture, 'create-entity-world');
@@ -78,18 +78,18 @@ describe('CreateEntityDialog', () => {
       id: 'e1',
       name: 'The Reach',
       worldId: 'w1',
-      type: 'note',
+      types: ['core.note'],
       tags: [],
       visibility: 'private',
       version: 1,
       seq: 1,
       createdAt: 1,
       updatedAt: 1,
-      document: { type: 'note', content: emptyContent() },
+      document: { content: emptyContent() },
     };
     entitiesClient.create.mockReturnValue(of(created));
 
-    state.open('note');
+    state.open('core.note');
     fixture.detectChanges();
 
     const nameInput: HTMLInputElement = q(fixture, 'create-entity-name');
@@ -102,7 +102,7 @@ describe('CreateEntityDialog', () => {
 
     expect(entitiesClient.create).toHaveBeenCalledWith(
       'The Reach',
-      'note',
+      'core.note',
       'w1',
     );
     expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'e1']);
@@ -111,7 +111,7 @@ describe('CreateEntityDialog', () => {
 
   it('closes without creating anything on cancel', () => {
     const fixture = render([world('w1', 'Aldermoor')], 'w1');
-    state.open('note');
+    state.open('core.note');
     fixture.detectChanges();
 
     (q(fixture, 'create-entity-cancel') as HTMLButtonElement).click();

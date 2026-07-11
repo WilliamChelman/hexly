@@ -66,7 +66,7 @@ describe('Public links', () => {
 
   async function makeEntity(owner: Agent, worldId: string, name = 'Lady Mara'): Promise<string> {
     return (
-      await owner.post('/entities').send({ name, type: 'note', worldId }).expect(201)
+      await owner.post('/entities').send({ name, types: ['core.note'], worldId }).expect(201)
     ).body.id;
   }
 

@@ -82,7 +82,7 @@ const FIRST_PAGE_CACHE_LIMIT = 50;
         variant="default"
         data-testid="new-note"
         [disabled]="creating()"
-        (click)="create('note')"
+        (click)="create('core.note')"
       >
         <app-icon name="plus" [size]="16" />
         {{
@@ -97,7 +97,7 @@ const FIRST_PAGE_CACHE_LIMIT = 50;
         variant="primary"
         data-testid="new-map"
         [disabled]="creating()"
-        (click)="create('hexmap')"
+        (click)="create('core.hexmap')"
       >
         <app-icon name="plus" [size]="16" />
         {{
@@ -198,7 +198,8 @@ export class EntityBrowser {
     this._entities().map((entity) => ({
       id: entity.id,
       title: entity.name,
-      type: entity.type,
+      // The card renders the primary type's icon and label (CONTEXT.md → Entity Type).
+      type: entity.types[0],
       tags: entity.tags,
       updatedAt: entity.updatedAt,
       // The card gates rename/delete on rights.

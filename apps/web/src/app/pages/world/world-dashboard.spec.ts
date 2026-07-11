@@ -18,14 +18,14 @@ import { WorldDashboard } from './world-dashboard';
 function summary(
   id: string,
   name = id,
-  type: EntityType = 'note',
+  type: EntityType = 'core.note',
   updatedAt = 1,
 ): EntitySummary {
   return {
     id,
     worldId: 'w1',
     name,
-    type,
+    types: [type],
     tags: [],
     visibility: 'private',
     version: 1,
@@ -106,7 +106,7 @@ describe('WorldDashboard', () => {
   } = {}) {
     entities.list.mockImplementation((o) => {
       if (o?.ids) return of(page(opts.pinResolve ?? []));
-      return of(page(o?.type?.includes('hexmap') ? (opts.maps ?? []) : (opts.recents ?? [])));
+      return of(page(o?.type?.includes('core.hexmap') ? (opts.maps ?? []) : (opts.recents ?? [])));
     });
     entities.facets.mockReturnValue(
       of(opts.facets ?? { type: [], tag: [], visibility: [] }),
@@ -230,12 +230,12 @@ describe('WorldDashboard', () => {
   it('renders the World’s Hex Maps, fetched with a type=hexmap filter', () => {
     const el = render({
       recents: [summary('n1', 'A note')],
-      maps: [summary('m1', 'The Reach', 'hexmap')],
+      maps: [summary('m1', 'The Reach', 'core.hexmap')],
     });
 
     // The maps list is a distinct, filtered read.
     expect(entities.list).toHaveBeenCalledWith(
-      expect.objectContaining({ worldId: 'w1', type: ['hexmap'] }),
+      expect.objectContaining({ worldId: 'w1', type: ['core.hexmap'] }),
     );
     expect($(el, '[data-testid=map-m1]')?.textContent).toContain('The Reach');
   });
@@ -245,8 +245,8 @@ describe('WorldDashboard', () => {
       recents: [summary('e1')],
       facets: {
         type: [
-          { value: 'note', count: 3 },
-          { value: 'hexmap', count: 1 },
+          { value: 'core.note', count: 3 },
+          { value: 'core.hexmap', count: 1 },
         ],
         tag: [],
         visibility: [],
@@ -256,8 +256,8 @@ describe('WorldDashboard', () => {
     expect(entities.facets).toHaveBeenCalledWith(
       expect.objectContaining({ worldId: 'w1' }),
     );
-    expect($(el, '[data-testid=count-type-note]')?.textContent).toContain('3');
-    expect($(el, '[data-testid=count-type-hexmap]')?.textContent).toContain('1');
+    expect($(el, '[data-testid="count-type-core.note"]')?.textContent).toContain('3');
+    expect($(el, '[data-testid="count-type-core.hexmap"]')?.textContent).toContain('1');
   });
 
   it('links to the full Entity Browser', () => {
@@ -291,7 +291,7 @@ describe('WorldDashboard', () => {
 
     expect(entities.create).toHaveBeenCalledWith(
       expect.any(String),
-      'note',
+      'core.note',
       'w1',
     );
     expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'new1']);

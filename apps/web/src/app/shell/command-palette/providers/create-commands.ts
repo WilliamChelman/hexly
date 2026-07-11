@@ -24,8 +24,8 @@ export class CreateCommands implements CommandProvider {
   // The command id is the palette's stable handle; the type id drives the dialog
   // and the create label comes from the registry (ADR-0048).
   private static readonly COMMAND_ID: Record<string, string> = {
-    note: 'create-note',
-    hexmap: 'create-map',
+    'core.note': 'create-note',
+    'core.hexmap': 'create-map',
   };
 
   search(query: string): Observable<readonly Command[]> {

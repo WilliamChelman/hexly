@@ -168,19 +168,18 @@ describe('Vault export endpoint', () => {
     expect(hero).not.toContain(`/assets/${worldId}`);
   });
 
-  it('exports a hexmap as lore-only markdown, grid dropped and flagged hexly.type: hexmap', async () => {
+  it('exports a hexmap as lore-only markdown, grid dropped and flagged hexly.type: core.hexmap', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const worldId = await importVault(ada, { 'Note.md': '# Note' });
 
     // Arrange a hexmap with lore Content AND a painted, named hex.
     const entities = app.get(EntitiesService);
-    const created = entities.create(adaId, { type: 'hexmap', name: 'Aldermoor Map', worldId, tags: [] });
+    const created = entities.create(adaId, { types: ['core.hexmap'], name: 'Aldermoor Map', worldId, tags: [] });
     entities.save(adaId, created.id, {
       version: created.version,
       tags: [],
       descriptors: [],
       document: {
-        type: 'hexmap',
         content: tiptapContent({
           type: 'doc',
           content: [
@@ -199,7 +198,7 @@ describe('Vault export endpoint', () => {
     const fm = frontmatter(md);
 
     // Lore round-trips; the map's type is flagged so the dropped grid is a visible loss (ADR-0033).
-    expect(fm['hexly.type']).toBe('hexmap');
+    expect(fm['hexly.type']).toBe('core.hexmap');
     expect(md).toContain('The Aldermoor');
     expect(md).toContain('A wild frontier.');
     // The grid itself is never serialized — no hex terrain/name leaks into the markdown.
@@ -293,7 +292,7 @@ describe('Vault export endpoint', () => {
     db.insert(worldMembers).values({ worldId, userId: bobId, role: 'contributor' }).run();
     const entities = app.get(EntitiesService);
     const bobNoteId = 'bob-shared-note';
-    entities.importNote(bobId, worldId, bobNoteId, 'Bob Secret', [], emptyEntityBody('note'));
+    entities.importNote(bobId, worldId, bobNoteId, 'Bob Secret', [], emptyEntityBody(['core.note']));
     entities.patch(bobId, bobNoteId, { visibility: 'shared' });
 
     const { files } = await exportZip(ada, worldId);

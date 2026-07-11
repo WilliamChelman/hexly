@@ -185,7 +185,7 @@ describe('entityAccess', () => {
         id,
         worldId,
         name: `e-${visibility}`,
-        type: 'note',
+        types: ['core.note'],
         tags: [],
         visibility,
         version: 1,

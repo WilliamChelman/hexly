@@ -55,7 +55,7 @@ import { Input } from './input';
             (click)="pick.emit(e)"
           >
             {{ e.name }}
-            <span class="font-mono text-2xs text-ink-muted">({{ e.type }})</span>
+            <span class="font-mono text-2xs text-ink-muted">({{ e.types[0] }})</span>
           </button>
         } @empty {
           <p class="px-2 py-1 text-sm text-ink-muted">

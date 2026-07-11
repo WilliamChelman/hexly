@@ -21,8 +21,10 @@
     "creating": "Création…",
     "edited": "Modifié le {{date}}",
     "type": {
-      "note": "Note",
-      "hexmap": "Carte"
+      "core": {
+        "note": "Note",
+        "hexmap": "Carte"
+      }
     },
     "loadErrorTitle": "Impossible de charger votre bibliothèque.",
     "loadErrorHint": "Une erreur est survenue. Veuillez réessayer dans un instant.",

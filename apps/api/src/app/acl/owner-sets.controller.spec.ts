@@ -64,7 +64,7 @@ describe('Owner sets', () => {
     return (
       await owner
         .post('/entities')
-        .send({ name: 'Lady Mara', type: 'note', worldId })
+        .send({ name: 'Lady Mara', types: ['core.note'], worldId })
         .expect(201)
     ).body.id;
   }

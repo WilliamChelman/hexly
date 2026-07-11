@@ -151,7 +151,7 @@ describe('Vault import endpoint', () => {
       .expect(200);
     const mara = list.body.items.find((e: { name: string }) => e.name === 'Lady Mara');
     expect(mara).toBeDefined();
-    expect(mara.type).toBe('note');
+    expect(mara.types).toEqual(['core.note']);
   });
 
   it('makes an imported note findable by its Content prose with no re-save (ADR-0035)', async () => {
@@ -255,7 +255,7 @@ describe('Vault import endpoint', () => {
     // re-save (ADR-0046) — the wikilink resolves to an `entityId` *before* the row is written.
     const { referencedBy } = (await ada.get(`/entities/${mara.id}/references`).expect(200)).body;
     expect(referencedBy).toEqual([
-      { descriptor: null, source: { id: keep.id, name: 'Keep', type: 'note' } },
+      { descriptor: null, source: { id: keep.id, name: 'Keep', types: ['core.note'] } },
     ]);
   });
 

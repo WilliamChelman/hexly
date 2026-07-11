@@ -26,13 +26,13 @@ describe('CreateCommands', () => {
   it('opens the create dialog for a Note when Create Note runs', async () => {
     const [createNote] = await firstValueFrom(provider.search(''));
     createNote.run();
-    expect(state.type()).toBe('note');
+    expect(state.type()).toBe('core.note');
   });
 
   it('opens the create dialog for a Map when Create Map runs', async () => {
     const [, createMap] = await firstValueFrom(provider.search(''));
     createMap.run();
-    expect(state.type()).toBe('hexmap');
+    expect(state.type()).toBe('core.hexmap');
   });
 
   it('narrows to commands whose label matches the typed query, case-insensitively', async () => {

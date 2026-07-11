@@ -11,7 +11,7 @@ import {
   Router,
 } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
-import { CONTENT_FORMAT, EntityDetail, EntityType } from '@hexly/domain';
+import { CONTENT_FORMAT, CORE_HEXMAP, EntityDetail, EntityType } from '@hexly/domain';
 import { EntitiesClient, NudgeBusClient, ActiveWorld, TitleService, EVICTED, Watched } from '@hexly/web-core';
 import { MockEntitiesClient, MockNudgeBusClient, provideTranslocoTesting } from '@hexly/web-core/testing';
 import { EntitySession } from './services/entity-session';
@@ -37,7 +37,7 @@ const hexmapWithContent = (text: string): EntityDetail => ({
   id: 'm1',
   worldId: 'w1',
   name: 'The Reach of Aldermoor',
-  type: 'hexmap',
+  types: [CORE_HEXMAP],
   tags: [],
   visibility: 'private',
   version: 1,
@@ -47,7 +47,6 @@ const hexmapWithContent = (text: string): EntityDetail => ({
   // Owner opener (ADR-0039): the `edit` Right keeps the map/editor writable.
   rights: ['read', 'edit', 'delete', 'set-visibility', 'manage'],
   document: {
-    type: 'hexmap',
     content: {
       format: CONTENT_FORMAT,
       snapshot: {
@@ -382,7 +381,6 @@ describe('EntityPage layout', () => {
     TestBed.inject(EntitySession).adopt({
       ...noteDetail('Lady Mara'),
       document: {
-        type: 'note',
         content: {
           format: 'tiptap-v1',
           snapshot: {

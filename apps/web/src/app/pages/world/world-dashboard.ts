@@ -51,7 +51,7 @@ const MAPS_LIMIT = 8;
       >
         <span class="absolute left-0 top-0 bottom-0 w-1.5 {{ bar(e.id) }}"></span>
         <app-icon
-          [name]="typeIcon(e.type)"
+          [name]="typeIcon(e.types[0])"
           [size]="18"
           class="shrink-0 mt-0.5 text-ink-muted"
         />
@@ -68,7 +68,7 @@ const MAPS_LIMIT = 8;
             >
           </a>
           <span class="mt-1 block text-2xs text-ink-muted">
-            {{ 'entityBrowser.type.' + e.type | transloco }}
+            {{ 'entityBrowser.type.' + e.types[0] | transloco }}
             <span class="text-ink-faint">·</span>
             {{ 'entityBrowser.edited' | transloco: { date: (e.updatedAt | hexlyDate) } }}
           </span>
@@ -117,7 +117,7 @@ const MAPS_LIMIT = 8;
               variant="default"
               data-testid="create-note"
               [disabled]="creating()"
-              (click)="create('note')"
+              (click)="create('core.note')"
             >
               <app-icon name="plus" [size]="16" />
               {{ (creating() ? 'entityBrowser.creating' : 'entityBrowser.newNote') | transloco }}
@@ -128,7 +128,7 @@ const MAPS_LIMIT = 8;
               variant="primary"
               data-testid="create-map"
               [disabled]="creating()"
-              (click)="create('hexmap')"
+              (click)="create('core.hexmap')"
             >
               <app-icon name="plus" [size]="16" />
               {{ (creating() ? 'entityBrowser.creating' : 'entityBrowser.newMap') | transloco }}

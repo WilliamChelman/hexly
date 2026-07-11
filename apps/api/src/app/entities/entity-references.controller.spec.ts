@@ -58,7 +58,7 @@ describe('Entity references', () => {
         {
           targetId: mira,
           descriptor: 'spouse',
-          target: { id: mira, name: 'Mira', type: 'note' },
+          target: { id: mira, name: 'Mira', types: ['core.note'] },
         },
       ]);
     });
@@ -96,7 +96,7 @@ describe('Entity references', () => {
 
       const asAda = await referencesOf(ada, town);
       expect(asAda.references).toEqual([
-        { targetId: secret, descriptor: null, target: { id: secret, name: 'The Cabal', type: 'note' } },
+        { targetId: secret, descriptor: null, target: { id: secret, name: 'The Cabal', types: ['core.note'] } },
       ]);
 
       const asBob = await referencesOf(bob, town);
@@ -115,7 +115,7 @@ describe('Entity references', () => {
       const { referencedBy } = await referencesOf(ada, mira);
 
       expect(referencedBy).toEqual([
-        { descriptor: 'spouse', source: { id: ealdred, name: 'Ealdred', type: 'note' } },
+        { descriptor: 'spouse', source: { id: ealdred, name: 'Ealdred', types: ['core.note'] } },
       ]);
     });
 
@@ -144,7 +144,7 @@ describe('Entity references', () => {
       // Ada, who owns the source, sees it. The rows are the same; only the viewer differs.
       const asAda = await referencesOf(ada, town);
       expect(asAda.referencedBy).toEqual([
-        { descriptor: null, source: { id: cabal, name: 'Secret Cabal Roster', type: 'note' } },
+        { descriptor: null, source: { id: cabal, name: 'Secret Cabal Roster', types: ['core.note'] } },
       ]);
     });
 
@@ -164,7 +164,7 @@ describe('Entity references', () => {
 
       const { referencedBy } = await referencesOf(bob, town);
       expect(referencedBy).toEqual([
-        { descriptor: null, source: { id: cabal, name: 'Secret Cabal Roster', type: 'note' } },
+        { descriptor: null, source: { id: cabal, name: 'Secret Cabal Roster', types: ['core.note'] } },
       ]);
     });
   });
@@ -222,7 +222,7 @@ describe('Entity references', () => {
   }
 
   async function makeEntity(owner: Agent, worldId: string, name: string): Promise<string> {
-    return (await owner.post('/entities').send({ name, type: 'note', worldId }).expect(201)).body.id;
+    return (await owner.post('/entities').send({ name, types: ['core.note'], worldId }).expect(201)).body.id;
   }
 
   async function addMember(owner: Agent, worldId: string, userId: string): Promise<void> {
@@ -237,7 +237,6 @@ describe('Entity references', () => {
   async function link(owner: Agent, id: string, links: Record<string, unknown>[]): Promise<void> {
     const current = (await owner.get(`/entities/${id}`).expect(200)).body;
     const document: EntityBody = {
-      type: 'note',
       content: tiptapContent({
         type: 'doc',
         content: [

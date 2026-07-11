@@ -21,8 +21,10 @@
     "creating": "Creating…",
     "edited": "Edited {{date}}",
     "type": {
-      "note": "Note",
-      "hexmap": "Map"
+      "core": {
+        "note": "Note",
+        "hexmap": "Map"
+      }
     },
     "loadErrorTitle": "Couldn't load your library.",
     "loadErrorHint": "Something went wrong. Please try again in a moment.",

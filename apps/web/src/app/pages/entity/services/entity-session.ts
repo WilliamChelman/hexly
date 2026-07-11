@@ -32,6 +32,7 @@ import {
   EntityBody,
   EntityDetail,
   EntitySaveOutcome,
+  hasHexGrid,
   HexMap,
   hexMapSchema,
   tiptapContent,
@@ -40,7 +41,6 @@ import {
 import { EntitiesClient, ActiveWorld, idFromSegment, worldRoute, TitleService, AppShellStore, EVICTED } from '@hexly/web-core';
 import { EntityView, HexMapStore } from '@hexly/web-map';
 import type { ContentEditorSession } from '@hexly/content-editor';
-import { TypeRegistry } from '../../../entity-types/type-registry';
 
 /**
  * Bridges {@link EntitiesClient} and {@link HexMapStore} for `/entities/:id`:
@@ -76,7 +76,6 @@ export class EntitySession implements ContentEditorSession {
   private readonly shell = inject(AppShellStore);
   private readonly destroyRef = inject(DestroyRef);
   private readonly injector = inject(Injector);
-  private readonly types = inject(TypeRegistry);
 
   private readonly _current = signal<EntityDetail | null>(null);
   readonly current = this._current.asReadonly();
@@ -337,7 +336,7 @@ export class EntitySession implements ContentEditorSession {
     this._content.set(detail.document.content); // before seed: seed effect reads content()
     this._seed.set(detail);
     this._tags.set(detail.tags);
-    this.editor.load(gridOf(detail.document, this.types.affordsMap(detail.document.type)));
+    this.editor.load(gridOf(detail.document));
     // Baseline = exactly the references now live, so a load never reads as dirty.
     this._baseGrid.set(this.editor.document());
     this._baseContent.set(this._content());
@@ -482,10 +481,7 @@ export class EntitySession implements ContentEditorSession {
     this._error.set(null);
     this.failed = null;
     const { grid, content, tags } = snapshot;
-    const body = withContent(
-      withGrid(open.document, grid, this.types.affordsMap(open.document.type)),
-      content,
-    );
+    const body = withContent(withGrid(open.document, grid), content);
     const save$ = this.entities
       .save(open.id, body, open.version, tags)
       .pipe(
@@ -575,23 +571,23 @@ export class EntitySession implements ContentEditorSession {
 }
 
 /**
- * Parse through {@link hexMapSchema} so the schema drops `type`/`content`, not a hand-listed
- * field set; empty when the type affords no map surface. `affordsMap` comes from the
- * {@link TypeRegistry} so the grid seam converges with the rest of the type-specific UI (ADR-0048).
+ * The body's hex-grid payload, parsed through {@link hexMapSchema} so the schema picks out the grid
+ * fields rather than a hand-listed set; an empty plane when the body carries no hex-grid. Keys off
+ * the payload composition ({@link hasHexGrid}) — the body holds no `type` field now (ADR-0048).
  */
-function gridOf(body: EntityBody, affordsMap: boolean): HexMap {
-  return affordsMap ? hexMapSchema.parse(body) : emptyHexMap();
+function gridOf(body: EntityBody): HexMap {
+  return hasHexGrid(body) ? hexMapSchema.parse(body) : emptyHexMap();
 }
 
 /**
- * Re-wrap an edited grid into the body, carrying Content and type through (ADR-0019).
- * A type that affords no map surface passes through as-is, so the hex seam can't coerce a note on save.
+ * Re-wrap an edited grid into the body on save (ADR-0019). A body with no hex-grid payload passes
+ * through as-is, so the hex seam can't graft a grid onto a note.
  */
-function withGrid(body: EntityBody, grid: HexMap, affordsMap: boolean): EntityBody {
-  return affordsMap ? { ...body, ...grid } : body;
+function withGrid(body: EntityBody, grid: HexMap): EntityBody {
+  return hasHexGrid(body) ? { ...body, ...grid } : body;
 }
 
-/** Fold the live Content into the body on save (ADR-0019); spread preserves the type discriminant. */
+/** Fold the live Content into the body on save (ADR-0019); the spread preserves the payload composition. */
 function withContent(body: EntityBody, content: Content): EntityBody {
   return { ...body, content };
 }

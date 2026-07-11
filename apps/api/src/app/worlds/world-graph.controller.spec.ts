@@ -56,8 +56,8 @@ describe('World Graph', () => {
     const { nodes, edges } = await graphOf(ada, world);
 
     expect(nodes).toEqual([
-      { id: ealdred, name: 'Ealdred', type: 'note' },
-      { id: mira, name: 'Mira', type: 'note' },
+      { id: ealdred, name: 'Ealdred', types: ['core.note'] },
+      { id: mira, name: 'Mira', types: ['core.note'] },
     ]);
     expect(edges).toEqual([{ source: ealdred, target: mira, descriptor: 'spouse' }]);
   });
@@ -93,7 +93,7 @@ describe('World Graph', () => {
     await link(ada, town, [{ entityId: cabal }]); // shared → private
 
     const asBob = await graphOf(bob, world);
-    expect(asBob.nodes).toEqual([{ id: town, name: 'Riverbend', type: 'note' }]);
+    expect(asBob.nodes).toEqual([{ id: town, name: 'Riverbend', types: ['core.note'] }]);
     expect(asBob.edges).toEqual([]);
 
     // The rows are the same; only the viewer differs. Ada, who owns both, sees the whole picture.
@@ -191,7 +191,7 @@ describe('World Graph', () => {
     await link(ada, ealdred, [{ entityId: mira, descriptor: 'spouse' }]);
 
     // Written past the API, which would never accept it.
-    db.update(entities).set({ type: 'grimoire' }).where(eq(entities.id, mira)).run();
+    db.update(entities).set({ types: ['grimoire'] }).where(eq(entities.id, mira)).run();
 
     const { nodes, edges } = await graphOf(ada, world);
     expect(names(nodes)).toEqual(['Ealdred']);
@@ -225,7 +225,7 @@ describe('World Graph', () => {
   }
 
   async function makeEntity(owner: Agent, worldId: string, name: string): Promise<string> {
-    return (await owner.post('/entities').send({ name, type: 'note', worldId }).expect(201)).body.id;
+    return (await owner.post('/entities').send({ name, types: ['core.note'], worldId }).expect(201)).body.id;
   }
 
   async function addMember(owner: Agent, worldId: string, userId: string): Promise<void> {
@@ -249,7 +249,6 @@ describe('World Graph', () => {
   async function save(owner: Agent, id: string, inline: unknown[]): Promise<void> {
     const current = (await owner.get(`/entities/${id}`).expect(200)).body;
     const document: EntityBody = {
-      type: 'note',
       content: tiptapContent({
         type: 'doc',
         content: [{ type: 'paragraph', content: inline }],

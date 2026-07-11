@@ -4,7 +4,7 @@ import { By } from '@angular/platform-browser';
 import { provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { of, throwError } from 'rxjs';
-import { emptyContent, EntityDetail, WorldDetail, WorldVerb } from '@hexly/domain';
+import { CORE_HEXMAP, emptyContent, EntityDetail, WorldDetail, WorldVerb } from '@hexly/domain';
 import { provideTranslocoTesting, MockEntitiesClient, MockWorldsClient, MockUserDirectoryClient, MockAuthClient } from '@hexly/web-core/testing';
 import { EntitiesClient, WorldsClient, ActiveWorld, UserDirectoryClient, AuthClient } from '@hexly/web-core';
 import { EntitySession } from '../services/entity-session';
@@ -41,7 +41,7 @@ describe('EntityHeader', () => {
     id: 'm1',
     worldId: 'w1',
     name: 'The Reach of Aldermoor',
-    type: 'hexmap',
+    types: [CORE_HEXMAP],
     tags: [],
     visibility: 'private',
     version: 3,
@@ -50,7 +50,7 @@ describe('EntityHeader', () => {
     updatedAt: 1,
     // The default opener is an Owner — full Rights (ADR-0039): writable and can manage sharing.
     rights: ['read', 'edit', 'delete', 'set-visibility', 'manage'],
-    document: { type: 'hexmap', content: emptyContent(), hexes: {}, regions: [], labels: [] },
+    document: { content: emptyContent(), hexes: {}, regions: [], labels: [] },
   };
 
   /** Open an entity through the real session so the header has one to show/save. */

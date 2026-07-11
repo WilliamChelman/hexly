@@ -206,7 +206,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     const created = await request(app.getHttpServer())
       .post('/entities')
       .set('Cookie', adaCookie)
-      .send({ name: 'The Chronicle', type: 'note' })
+      .send({ name: 'The Chronicle', types: ['core.note'] })
       .expect(201);
     const entityId = created.body.id as string;
     const document = created.body.document;
@@ -242,7 +242,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     const created = await request(app.getHttpServer())
       .post('/entities')
       .set('Cookie', adaCookie)
-      .send({ name: 'The Chronicle', type: 'note' })
+      .send({ name: 'The Chronicle', types: ['core.note'] })
       .expect(201);
     const entityId = created.body.id as string;
 
@@ -286,7 +286,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     const created = await request(app.getHttpServer())
       .post('/entities')
       .set('Cookie', adaCookie)
-      .send({ name: 'The Chronicle', type: 'note' })
+      .send({ name: 'The Chronicle', types: ['core.note'] })
       .expect(201);
     const entityId = created.body.id as string;
     const worldId = created.body.worldId as string;
@@ -350,7 +350,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     const created = await request(app.getHttpServer())
       .post('/entities')
       .set('Cookie', adaCookie)
-      .send({ name: 'The Chronicle', type: 'note' })
+      .send({ name: 'The Chronicle', types: ['core.note'] })
       .expect(201);
     const entityId = created.body.id as string;
     await request(app.getHttpServer())
@@ -383,7 +383,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     const created = await request(app.getHttpServer())
       .post('/entities')
       .set('Cookie', adaCookie)
-      .send({ name: 'The Chronicle', type: 'note' })
+      .send({ name: 'The Chronicle', types: ['core.note'] })
       .expect(201);
     const entityId = created.body.id as string;
 
@@ -418,7 +418,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     const created = await request(app.getHttpServer())
       .post('/entities')
       .set('Cookie', cookie)
-      .send({ name: 'The Chronicle', type: 'note' })
+      .send({ name: 'The Chronicle', types: ['core.note'] })
       .expect(201);
     const entityId = created.body.id as string;
     const link = await request(app.getHttpServer())
@@ -499,7 +499,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     const created = await request(app.getHttpServer())
       .post('/entities')
       .set('Cookie', adaCookie)
-      .send({ name: 'The Chronicle', type: 'note' })
+      .send({ name: 'The Chronicle', types: ['core.note'] })
       .expect(201);
     const entityId = created.body.id as string;
     const worldId = created.body.worldId as string;
@@ -579,7 +579,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     const other = await request(app.getHttpServer())
       .post('/entities')
       .set('Cookie', cookie)
-      .send({ name: 'Sealed Archive', type: 'note' })
+      .send({ name: 'Sealed Archive', types: ['core.note'] })
       .expect(201);
     const forbiddenId = other.body.id as string;
 
@@ -629,7 +629,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
       const res = await request(app.getHttpServer())
         .post('/entities')
         .set('Cookie', adaCookie)
-        .send({ name, type: 'note' })
+        .send({ name, types: ['core.note'] })
         .expect(201);
       return res.body.id as string;
     };
@@ -843,7 +843,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     const created = await request(app.getHttpServer())
       .post('/entities')
       .set('Cookie', adaCookie)
-      .send({ name: 'The Chronicle', type: 'note' })
+      .send({ name: 'The Chronicle', types: ['core.note'] })
       .expect(201);
     const entityId = created.body.id as string;
     const worldId = created.body.worldId as string;
@@ -966,7 +966,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     const created = await request(app.getHttpServer())
       .post('/entities')
       .set('Cookie', adaCookie)
-      .send({ name: 'The Chronicle', type: 'note' })
+      .send({ name: 'The Chronicle', types: ['core.note'] })
       .expect(201);
     const entityId = created.body.id as string;
     const worldId = created.body.worldId as string;
@@ -1025,7 +1025,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     const created = await request(app.getHttpServer())
       .post('/entities')
       .set('Cookie', adaCookie)
-      .send({ name: 'The Chronicle', type: 'note' })
+      .send({ name: 'The Chronicle', types: ['core.note'] })
       .expect(201);
     const entityId = created.body.id as string;
     const worldId = created.body.worldId as string;
@@ -1069,7 +1069,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     const bobNote = await request(app.getHttpServer())
       .post('/entities')
       .set('Cookie', bobCookie)
-      .send({ name: 'Bob’s Ledger', type: 'note' })
+      .send({ name: 'Bob’s Ledger', types: ['core.note'] })
       .expect(201);
     const bobEntityId = bobNote.body.id as string;
 

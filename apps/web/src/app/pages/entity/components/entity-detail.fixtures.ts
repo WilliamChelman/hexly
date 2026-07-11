@@ -1,10 +1,10 @@
-import { CONTENT_FORMAT, EntityDetail } from '@hexly/domain';
+import { CONTENT_FORMAT, CORE_NOTE, EntityDetail } from '@hexly/domain';
 
 export const noteDetail = (name: string): EntityDetail => ({
   id: 'n1',
   worldId: 'w1',
   name,
-  type: 'note',
+  types: [CORE_NOTE],
   tags: [],
   visibility: 'private',
   version: 1,
@@ -13,5 +13,5 @@ export const noteDetail = (name: string): EntityDetail => ({
   updatedAt: 1,
   // Owner opener by default (ADR-0039): the `edit` Right keeps the editor writable.
   rights: ['read', 'edit', 'delete', 'set-visibility', 'manage'],
-  document: { type: 'note', content: { format: CONTENT_FORMAT, snapshot: {} } },
+  document: { content: { format: CONTENT_FORMAT, snapshot: {} } },
 });

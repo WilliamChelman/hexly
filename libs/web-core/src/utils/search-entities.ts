@@ -80,7 +80,7 @@ function sameResults(a: EntitySummary[], b: EntitySummary[]): boolean {
       return (
         e.id === o.id &&
         e.name === o.name &&
-        e.type === o.type &&
+        e.types[0] === o.types[0] &&
         e.worldId === o.worldId
       );
     })

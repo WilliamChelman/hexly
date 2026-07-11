@@ -153,11 +153,11 @@ export class EntityHeader {
   protected readonly titleHint = computed(() => this.labels().rename);
   /** Only a hexmap affords both surfaces, so only it gets the view toggle (#75). */
   protected readonly isHexmap = computed(() =>
-    this.types.affordsMap(this.session.current()?.document.type),
+    this.types.affordsMap(this.session.current()?.types),
   );
-  /** Per-type header chrome (eyebrow + title a11y labels), falling back to the note type. */
+  /** Per-type header chrome (eyebrow + title a11y labels), keyed on the primary type, falling back to the note type. */
   protected readonly labels = computed(
-    () => this.types.resolve(this.session.current()?.document.type).labels,
+    () => this.types.resolve(this.session.current()?.types?.[0]).labels,
   );
   protected readonly title = computed(
     () => this.session.current()?.name ?? '',

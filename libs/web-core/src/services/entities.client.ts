@@ -151,7 +151,8 @@ export class EntitiesClient {
     return this.http.delete<void>(`/api/entities/${id}/link`);
   }
 
-  // worldId omitted, the server defaults to the caller's first World.
+  // worldId omitted, the server defaults to the caller's first World. A single core type per
+  // creation, sent as the one-element ordered `types` set the server now speaks (ADR-0048).
   create(
     name: string,
     type: EntityType,
@@ -159,7 +160,7 @@ export class EntitiesClient {
   ): Observable<EntityDetail> {
     return this.http.post<EntityDetail>('/api/entities', {
       name,
-      type,
+      types: [type],
       ...(worldId ? { worldId } : {}),
     });
   }

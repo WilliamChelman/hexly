@@ -1,10 +1,13 @@
 import { emptyHexMap } from './hex/hex-map';
 import {
   contentSchema,
+  CORE_HEXMAP,
+  CORE_NOTE,
   createEntityRequestSchema,
   emptyEntityBody,
   entityBodySchema,
   entityListQuerySchema,
+  hasHexGrid,
   patchEntityRequestSchema,
   saveEntityRequestSchema,
   tiptapContent,
@@ -65,75 +68,81 @@ describe('contentSchema', () => {
 });
 
 describe('entityBodySchema', () => {
-  it('accepts a note body — Content only, no typed payload', () => {
-    const body = { type: 'note' as const, content };
+  it('accepts a rich-content body — Content only, the base every Entity carries', () => {
+    const body = { content };
 
     expect(entityBodySchema.parse(body)).toEqual(body);
   });
 
-  it('accepts a hexmap body — Content plus the hex grid alongside it', () => {
-    const body = { type: 'hexmap' as const, content, ...emptyHexMap() };
+  it('accepts a body carrying the hex-grid payload alongside its Content', () => {
+    const body = { content, ...emptyHexMap() };
 
     const parsed = entityBodySchema.parse(body);
 
-    expect(parsed.type).toBe('hexmap');
+    expect(hasHexGrid(parsed)).toBe(true);
     expect(parsed).toMatchObject({ hexes: {}, regions: [], labels: [] });
   });
 
-  it('rejects a hexmap body missing its hex grid', () => {
-    expect(() =>
-      entityBodySchema.parse({ type: 'hexmap', content }),
-    ).toThrow();
+  it('reads a body with no grid fields as rich-content, not hex-grid', () => {
+    // Discrimination is by payload composition (ADR-0048): no grid → the base kind, not a hex map.
+    expect(hasHexGrid(entityBodySchema.parse({ content }))).toBe(false);
   });
 
-  it('rejects an unknown entity type', () => {
+  it('rejects a body missing its Content — every payload composes over the rich-content base', () => {
+    expect(() => entityBodySchema.parse({ metadata: { note: 'orphan' } })).toThrow();
+  });
+
+  it('rejects a body whose hex-grid payload is malformed rather than stripping it to rich-content', () => {
+    // A grid that fails the hex-grid shape must be a hard error, not a silent downgrade to a note:
+    // the base branch is strict, so the stray `hexes` key can't fall through and be dropped.
     expect(() =>
-      entityBodySchema.parse({ type: 'spreadsheet', content }),
+      entityBodySchema.parse({ content, hexes: 'not-a-record', regions: [], labels: [] }),
     ).toThrow();
   });
 });
 
 describe('emptyEntityBody', () => {
-  it('mints a note body with an empty Content envelope and no payload', () => {
-    const body = emptyEntityBody('note');
+  it('mints a rich-content body with an empty Content envelope and no payload', () => {
+    const body = emptyEntityBody([CORE_NOTE]);
 
     expect(entityBodySchema.parse(body)).toEqual(body);
     expect(body).toEqual({
-      type: 'note',
       content: { format: 'tiptap-v3', snapshot: { type: 'doc', content: [] } },
     });
   });
 
-  it('mints a hexmap body with an empty Content envelope and an empty grid', () => {
-    const body = emptyEntityBody('hexmap');
+  it('mints a hex-grid body when a type in the set adds the hex-grid payload', () => {
+    const body = emptyEntityBody([CORE_HEXMAP]);
 
     expect(entityBodySchema.parse(body)).toEqual(body);
-    expect(body).toMatchObject({ type: 'hexmap', hexes: {}, regions: [], labels: [] });
+    expect(hasHexGrid(body)).toBe(true);
+    expect(body).toMatchObject({ hexes: {}, regions: [], labels: [] });
   });
 });
 
 describe('entityListQuerySchema Facet params (#155)', () => {
   it('normalizes a single Facet value to an array (a lone query param arrives as a string)', () => {
     const parsed = entityListQuerySchema.parse({
-      type: 'note',
+      type: 'core.note',
       tag: 'deity',
       visibility: 'shared',
     });
-    expect(parsed.type).toEqual(['note']);
+    expect(parsed.type).toEqual(['core.note']);
     expect(parsed.tag).toEqual(['deity']);
     expect(parsed.visibility).toEqual(['shared']);
   });
 
   it('keeps repeated Facet values as an array (OR within a category)', () => {
     const parsed = entityListQuerySchema.parse({
-      type: ['note', 'hexmap'],
+      type: ['core.note', 'core.hexmap'],
       tag: ['deity', 'ruined'],
     });
-    expect(parsed.type).toEqual(['note', 'hexmap']);
+    expect(parsed.type).toEqual(['core.note', 'core.hexmap']);
     expect(parsed.tag).toEqual(['deity', 'ruined']);
   });
 
-  it('rejects an unknown type or visibility value at the boundary (ADR-0001)', () => {
+  it('rejects a malformed type or visibility value at the boundary (ADR-0001)', () => {
+    // The type set is open, but a filter value must still be a `namespace.id` key, not bare flavour.
     expect(() => entityListQuerySchema.parse({ type: 'spreadsheet' })).toThrow();
     expect(() => entityListQuerySchema.parse({ visibility: 'public' })).toThrow();
   });
@@ -150,16 +159,31 @@ describe('createEntityRequestSchema', () => {
   it('accepts a request that names and types the entity', () => {
     const parsed = createEntityRequestSchema.parse({
       name: 'The Reach of Aldermoor',
-      type: 'hexmap',
+      types: ['core.hexmap'],
     });
 
     expect(parsed.name).toBe('The Reach of Aldermoor');
-    expect(parsed.type).toBe('hexmap');
+    expect(parsed.types).toEqual(['core.hexmap']);
+  });
+
+  it('de-duplicates the ordered type set, keeping the primary first', () => {
+    expect(
+      createEntityRequestSchema.parse({
+        name: 'Aldermoor',
+        types: ['core.hexmap', 'core.note', 'core.hexmap'],
+      }).types,
+    ).toEqual(['core.hexmap', 'core.note']);
+  });
+
+  it('rejects a create with no types — every Entity has a primary type', () => {
+    expect(() =>
+      createEntityRequestSchema.parse({ name: 'x', types: [] }),
+    ).toThrow();
   });
 
   it('defaults tags to empty when none are given', () => {
     expect(
-      createEntityRequestSchema.parse({ name: 'Aldermoor', type: 'note' }).tags,
+      createEntityRequestSchema.parse({ name: 'Aldermoor', types: ['core.note'] }).tags,
     ).toEqual([]);
   });
 
@@ -167,7 +191,7 @@ describe('createEntityRequestSchema', () => {
     expect(
       createEntityRequestSchema.parse({
         name: 'Aldermoor',
-        type: 'note',
+        types: ['core.note'],
         tags: ['kingdom', 'kingdom', 'coast'],
       }).tags,
     ).toEqual(['kingdom', 'coast']);
@@ -176,28 +200,28 @@ describe('createEntityRequestSchema', () => {
   it('trims the name and rejects an empty or whitespace-only one', () => {
     // Reuses the same trimmed, non-empty rule the Hex Map title used (#12/#15).
     expect(
-      createEntityRequestSchema.parse({ name: '  Aldermoor  ', type: 'note' })
+      createEntityRequestSchema.parse({ name: '  Aldermoor  ', types: ['core.note'] })
         .name,
     ).toBe('Aldermoor');
     expect(() =>
-      createEntityRequestSchema.parse({ name: '   ', type: 'note' }),
+      createEntityRequestSchema.parse({ name: '   ', types: ['core.note'] }),
     ).toThrow();
   });
 
-  it('rejects an unknown entity type', () => {
+  it('rejects a malformed type id — a type is a `namespace.id` key, not bare flavour', () => {
     expect(() =>
-      createEntityRequestSchema.parse({ name: 'x', type: 'spreadsheet' }),
+      createEntityRequestSchema.parse({ name: 'x', types: ['spreadsheet'] }),
     ).toThrow();
   });
 
   it('accepts an optional worldId, and omits it when absent (server defaults to the owner World)', () => {
     // A client may target a specific World; when omitted the server resolves the owner's World (#101).
     expect(
-      createEntityRequestSchema.parse({ name: 'x', type: 'note', worldId: 'w1' })
+      createEntityRequestSchema.parse({ name: 'x', types: ['core.note'], worldId: 'w1' })
         .worldId,
     ).toBe('w1');
     expect(
-      createEntityRequestSchema.parse({ name: 'x', type: 'note' }).worldId,
+      createEntityRequestSchema.parse({ name: 'x', types: ['core.note'] }).worldId,
     ).toBeUndefined();
   });
 });
@@ -235,15 +259,31 @@ describe('patchEntityRequestSchema', () => {
 
 describe('saveEntityRequestSchema', () => {
   it('carries the whole body, the base version, and the tags the save replaces', () => {
-    const body = { type: 'hexmap' as const, content, ...emptyHexMap() };
+    const body = { content, ...emptyHexMap() };
 
     expect(
       saveEntityRequestSchema.parse({ document: body, version: 3, tags: [] }),
     ).toEqual({ document: body, version: 3, tags: [] });
   });
 
+  it('accepts an optional type set the save replaces, and omits it when absent', () => {
+    const body = { content };
+
+    expect(
+      saveEntityRequestSchema.parse({
+        document: body,
+        version: 1,
+        tags: [],
+        types: ['core.note'],
+      }).types,
+    ).toEqual(['core.note']);
+    expect(
+      saveEntityRequestSchema.parse({ document: body, version: 1, tags: [] }),
+    ).not.toHaveProperty('types');
+  });
+
   it('ignores a descriptors field a stale client still sends (server harvests them now, #96)', () => {
-    const body = { type: 'note' as const, content };
+    const body = { content };
 
     // The wire no longer carries descriptors — the server derives them from the
     // saved Content — so an old client's field is a stripped unknown key.
@@ -257,7 +297,7 @@ describe('saveEntityRequestSchema', () => {
   });
 
   it('requires tags on save — the save always carries the full current set', () => {
-    const body = { type: 'note' as const, content };
+    const body = { content };
 
     expect(() =>
       saveEntityRequestSchema.parse({ document: body, version: 3 }),
@@ -265,7 +305,7 @@ describe('saveEntityRequestSchema', () => {
   });
 
   it('normalizes tags on save: trims, lower-cases, dedupes, rejects blanks (#88)', () => {
-    const body = { type: 'note' as const, content };
+    const body = { content };
 
     expect(
       saveEntityRequestSchema.parse({
@@ -280,7 +320,7 @@ describe('saveEntityRequestSchema', () => {
   });
 
   it('rejects a save that omits the base version', () => {
-    const body = { type: 'note' as const, content };
+    const body = { content };
 
     expect(() => saveEntityRequestSchema.parse({ document: body })).toThrow();
   });
@@ -288,7 +328,7 @@ describe('saveEntityRequestSchema', () => {
   it('rejects a save whose body fails the Entity schema', () => {
     expect(() =>
       saveEntityRequestSchema.parse({
-        document: { type: 'hexmap', content },
+        document: { metadata: { orphan: true } },
         version: 1,
       }),
     ).toThrow();

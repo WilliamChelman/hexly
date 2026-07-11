@@ -68,6 +68,8 @@ export interface InsertEntityInput {
   ownerId: string;
   worldId: string;
   name: string;
+  /** The ordered Entity Type set; `types[0]` is primary. Carried alongside `tags`, not in the body. */
+  types: readonly string[];
   tags: readonly string[];
   body: EntityBody;
 }
@@ -117,6 +119,8 @@ export type EntityChange =
       kind: 'edit';
       name?: string;
       tags?: readonly string[];
+      /** Present → the type set fully replaces the stored one; omitted → left untouched (ADR-0048). */
+      types?: readonly string[];
       document?: EntityBody;
       /** Present → the base version rides the atomic WHERE and is bumped. */
       version?: number;
@@ -172,7 +176,7 @@ export class EntityWrites {
       id: input.id ?? randomUUID(),
       worldId: input.worldId,
       name: input.name,
-      type: input.body.type,
+      types: [...input.types],
       tags: [...input.tags],
       visibility: 'private',
       version: INITIAL_VERSION,
@@ -467,6 +471,7 @@ export class EntityWrites {
     const set = {
       ...(change.name !== undefined && { name: change.name }),
       ...(change.tags !== undefined && { tags: [...change.tags] }),
+      ...(change.types !== undefined && { types: [...change.types] }),
       ...(change.document !== undefined && {
         document: JSON.stringify(change.document),
         contentText: derived?.contentText,

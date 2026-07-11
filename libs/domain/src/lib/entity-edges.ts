@@ -7,7 +7,7 @@
 
 import { assetHashFromUrl } from './asset';
 import { visit } from './content/content-node';
-import { descriptorSchema, EntityBody, EntityType } from './entity';
+import { descriptorSchema, EntityBody, EntityType, hasHexGrid } from './entity';
 
 /** What an edge points at: another Entity, or an Asset (CONTEXT.md → Asset). */
 export type EdgeTargetKind = 'entity' | 'asset';
@@ -32,7 +32,8 @@ export interface EntityEdge {
 export interface LinkedEntity {
   readonly id: string;
   readonly name: string;
-  readonly type: EntityType;
+  /** The ordered Entity Type set; `types[0]` is primary and drives the icon/colour a surface draws. */
+  readonly types: readonly EntityType[];
 }
 
 /**
@@ -99,8 +100,9 @@ export function harvestEdges(body: EntityBody): EntityEdge[] {
     });
   }
 
-  // A map placement expresses no relationship, so it carries no Link Descriptor.
-  if (body.type === 'hexmap') {
+  // A map placement expresses no relationship, so it carries no Link Descriptor. The presence of
+  // the hex-grid payload — not a `type` field — is what marks a body as carrying map placements.
+  if (hasHexGrid(body)) {
     for (const hex of Object.values(body.hexes)) {
       entityEdge(hex.entityId, null);
       entityEdge(hex.feature?.entityId, null);

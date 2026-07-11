@@ -26,8 +26,8 @@ describe('WorldsClient', () => {
   const detail: WorldDetail = { ...summary, entityCount: 1, pinnedEntityIds: [], seq: 1 };
   const graph: WorldGraph = {
     nodes: [
-      { id: 'e1', name: 'Ealdred', type: 'note' },
-      { id: 'e2', name: 'Mira', type: 'note' },
+      { id: 'e1', name: 'Ealdred', types: ['core.note'] },
+      { id: 'e2', name: 'Mira', types: ['core.note'] },
     ],
     edges: [{ source: 'e1', target: 'e2', descriptor: 'spouse' }],
   };

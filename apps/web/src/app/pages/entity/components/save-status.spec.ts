@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 import {
+  CORE_HEXMAP,
   EntityDetail,
   EntitySaveOutcome,
   HexMap,
@@ -23,7 +24,7 @@ describe('SaveStatus', () => {
   let fixture: ComponentFixture<SaveStatus>;
 
   const content = emptyContent();
-  const bodyOf = (grid: HexMap) => ({ type: 'hexmap' as const, content, ...grid });
+  const bodyOf = (grid: HexMap) => ({ content, ...grid });
   const forestAt00: HexMap = {
     hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' } },
     regions: [],
@@ -33,7 +34,7 @@ describe('SaveStatus', () => {
     id: 'm1',
     worldId: 'w1',
     name: 'Aldermoor',
-    type: 'hexmap',
+    types: [CORE_HEXMAP],
     tags: [],
     visibility: 'private',
     version: 3,

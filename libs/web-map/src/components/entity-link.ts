@@ -10,7 +10,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { EntitySummary, EntityType } from '@hexly/domain';
+import { CORE_HEXMAP, EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient, ActiveWorld } from '@hexly/web-core';
 import { Button, Field, Icon, EntitySearchPicker } from '@hexly/web-ui';
 import { HexMapStore } from '../services/hexmap-store';
@@ -39,7 +39,7 @@ import { HexMapStore } from '../services/hexmap-store';
               [routerLink]="['/entities', id]"
             >
               <span aria-hidden="true">→ </span>{{ e.name }}
-              <span class="font-mono text-2xs text-ink-muted">({{ e.type }})</span>
+              <span class="font-mono text-2xs text-ink-muted">({{ e.types[0] }})</span>
             </a>
           } @else if (resolved()) {
             <!-- Target deleted/inaccessible: visible but non-navigable (issue #78). -->
@@ -105,7 +105,7 @@ import { HexMapStore } from '../services/hexmap-store';
               size="sm"
               class="flex-1"
               data-testid="entity-link-create-note"
-              (click)="create('note')"
+              (click)="create('core.note')"
             >
               + {{ 'editorShell.inspector.newNote' | transloco }}
             </button>
@@ -116,7 +116,7 @@ import { HexMapStore } from '../services/hexmap-store';
               size="sm"
               class="flex-1"
               data-testid="entity-link-create-map"
-              (click)="create('hexmap')"
+              (click)="create('core.hexmap')"
             >
               + {{ 'editorShell.inspector.newMap' | transloco }}
             </button>
@@ -199,7 +199,7 @@ export class EntityLink {
   protected create(type: EntityType): void {
     const name =
       this.query().trim() ||
-      this.transloco.translate(type === 'hexmap' ? 'domain.untitledMap' : 'domain.untitledNote');
+      this.transloco.translate(type === CORE_HEXMAP ? 'domain.untitledMap' : 'domain.untitledNote');
     this.entitiesClient
       // Scope the create-and-link Entity to the World in the URL (ADR-0028) so it
       // lands in the same World as the map being edited, not the owner's oldest.

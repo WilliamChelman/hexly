@@ -1,6 +1,6 @@
 import { posix } from 'node:path';
 import { Injectable } from '@nestjs/common';
-import { ContentNode, EntityDetail, HEXLY_METADATA_PREFIX, visit } from '@hexly/domain';
+import { ContentNode, CORE_HEXMAP, EntityDetail, HEXLY_METADATA_PREFIX, visit } from '@hexly/domain';
 import { proseMirrorToMarkdown } from '@hexly/obsidian';
 import { strToU8, zipSync, type Zippable } from 'fflate';
 import { AssetsService } from '../assets/assets.service';
@@ -118,7 +118,7 @@ function frontmatter(entity: EntityDetail): Record<string, unknown> | undefined 
   }
   if (entity.tags.length) meta['tags'] = [...entity.tags];
   // A hexmap exports lore only (grid dropped); flag the type so the loss is visible (ADR-0033).
-  if (entity.type === 'hexmap') meta['hexly.type'] = 'hexmap';
+  if (entity.types.includes(CORE_HEXMAP)) meta['hexly.type'] = CORE_HEXMAP;
   return Object.keys(meta).length ? meta : undefined;
 }
 

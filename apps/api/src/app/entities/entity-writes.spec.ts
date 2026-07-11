@@ -157,8 +157,9 @@ describe('EntityWrites', () => {
         ownerId: ADA,
         worldId: WORLD,
         name: 'Ealdred',
+        types: ['core.note'],
         tags: [],
-        body: { type: 'note', content: CONTENT },
+        body: { content: CONTENT },
       });
 
       expect(descriptorsOf('Ealdred')).toEqual(['spouse']);
@@ -175,8 +176,9 @@ describe('EntityWrites', () => {
         ownerId: ADA,
         worldId: WORLD,
         name: 'Ealdred',
+        types: ['core.note'],
         tags: [],
-        body: { type: 'note', content: CONTENT },
+        body: { content: CONTENT },
       });
 
       expect(edgesOf('Ealdred')).toEqual([
@@ -194,9 +196,9 @@ describe('EntityWrites', () => {
         ownerId: ADA,
         worldId: WORLD,
         name: 'Aldermoor',
+        types: ['core.note'],
         tags: [],
         body: {
-          type: 'note',
           content: tiptapContent({
             type: 'doc',
             content: [
@@ -222,14 +224,15 @@ describe('EntityWrites', () => {
         ownerId: ADA,
         worldId: WORLD,
         name: 'Ealdred',
+        types: ['core.note'],
         tags: [],
-        body: { type: 'note', content: CONTENT },
+        body: { content: CONTENT },
       });
 
       writes.mutate(ADA, row.id, {
         kind: 'edit',
         version: row.version,
-        document: { type: 'note', content: emptyContent() },
+        document: { content: emptyContent() },
       });
 
       expect(descriptorsOf('Ealdred')).toEqual([]);
@@ -241,14 +244,15 @@ describe('EntityWrites', () => {
         ownerId: ADA,
         worldId: WORLD,
         name: 'Ealdred',
+        types: ['core.note'],
         tags: [],
-        body: { type: 'note', content: CONTENT },
+        body: { content: CONTENT },
       });
 
       writes.mutate(ADA, row.id, {
         kind: 'edit',
         version: row.version,
-        document: { type: 'note', content: emptyContent() },
+        document: { content: emptyContent() },
       });
 
       expect(edgesOf('Ealdred')).toEqual([]);
@@ -263,15 +267,16 @@ describe('EntityWrites', () => {
         ownerId: ADA,
         worldId: WORLD,
         name: 'Ealdred',
+        types: ['core.note'],
         tags: [],
-        body: { type: 'note', content: CONTENT },
+        body: { content: CONTENT },
       });
       writes.mutate(ADA, row.id, { kind: 'edit', version: row.version, name: 'Bumped' });
 
       const result = writes.mutate(ADA, row.id, {
         kind: 'edit',
         version: row.version, // stale
-        document: { type: 'note', content: emptyContent() },
+        document: { content: emptyContent() },
       });
 
       expect(result.status).toBe('conflict');
@@ -306,7 +311,7 @@ describe('EntityWrites', () => {
       }
 
       it('rebuilds an unindexed Entity’s edges, descriptors, and search text from its document', () => {
-        seedUnindexed('ealdred', WORLD, { type: 'note', content: CONTENT });
+        seedUnindexed('ealdred', WORLD, { content: CONTENT });
 
         reindexAll();
 
@@ -326,7 +331,7 @@ describe('EntityWrites', () => {
        * nudge out to every open document to announce that nothing about them changed.
        */
       it('rewrites the indexes silently: no seq bump, no nudge', () => {
-        seedUnindexed('ealdred', WORLD, { type: 'note', content: CONTENT });
+        seedUnindexed('ealdred', WORLD, { content: CONTENT });
 
         reindexAll();
 
@@ -341,7 +346,7 @@ describe('EntityWrites', () => {
        * document-derivation retroactively: a Superadmin never has to ask whether it already ran.
        */
       it('is idempotent: a second run leaves the same rows and reports the same count', () => {
-        seedUnindexed('ealdred', WORLD, { type: 'note', content: CONTENT });
+        seedUnindexed('ealdred', WORLD, { content: CONTENT });
 
         const first = reindexAll();
         const afterFirst = { edges: edgesFrom('ealdred'), descriptors: descriptorsOf('ealdred') };
@@ -363,8 +368,8 @@ describe('EntityWrites', () => {
         const OTHER = 'world-2';
         seedUser(BOB);
         seedWorld(OTHER, BOB); // A World the reindex has no membership in, and reaches anyway.
-        seedUnindexed('ealdred', WORLD, { type: 'note', content: CONTENT });
-        seedUnindexed('elsewhere', OTHER, { type: 'note', content: CONTENT });
+        seedUnindexed('ealdred', WORLD, { content: CONTENT });
+        seedUnindexed('elsewhere', OTHER, { content: CONTENT });
 
         expect(reindexAll()).toMatchObject({ walked: 3, reindexed: 3, failures: [] });
 
@@ -379,8 +384,8 @@ describe('EntityWrites', () => {
        * of one proves the cursor advances: every Entity is reached, none twice.
        */
       it('pages through the instance, reaching every Entity exactly once', () => {
-        seedUnindexed('ealdred', WORLD, { type: 'note', content: CONTENT });
-        seedUnindexed('elsewhere', WORLD, { type: 'note', content: CONTENT });
+        seedUnindexed('ealdred', WORLD, { content: CONTENT });
+        seedUnindexed('elsewhere', WORLD, { content: CONTENT });
 
         // 3 Entities at a page apiece, plus the empty page that settles the exhausted cursor.
         expect(reindexAll(1)).toMatchObject({ walked: 3, reindexed: 3, chunks: 4 });
@@ -408,7 +413,7 @@ describe('EntityWrites', () => {
        * exists to fix a damaged instance is exactly the button a damaged instance cannot press.
        */
       it('skips a document it cannot parse, reports it, and reindexes the rest', () => {
-        seedUnindexed('ealdred', WORLD, { type: 'note', content: CONTENT });
+        seedUnindexed('ealdred', WORLD, { content: CONTENT });
         seedCorrupt('broken', WORLD);
 
         const walk = reindexAll();
@@ -428,7 +433,7 @@ describe('EntityWrites', () => {
        * observed independently of `insert`'s — which would have derived them on the way in.
        */
       function seedUnindexed(id: string, worldId: string, body: EntityBody): void {
-        seedRaw(id, worldId, JSON.stringify(body), body.type);
+        seedRaw(id, worldId, JSON.stringify(body), 'note');
       }
 
       /** An Entity whose stored document this build cannot read at all. */
@@ -443,7 +448,7 @@ describe('EntityWrites', () => {
             id,
             worldId,
             name: id,
-            type: type as EntityBody['type'],
+            types: ['core.' + type],
             tags: [],
             visibility: 'private',
             version: 1,
@@ -488,15 +493,17 @@ describe('EntityWrites', () => {
         ownerId: ADA,
         worldId: WORLD,
         name: 'Ealdred',
+        types: ['core.note'],
         tags: [],
-        body: { type: 'note', content: CONTENT }, // Ealdred → e2
+        body: { content: CONTENT }, // Ealdred → e2
       });
       const mira = writes.insert({
         ownerId: ADA,
         worldId: WORLD,
         name: 'Mira',
+        types: ['core.note'],
         tags: [],
-        body: { type: 'note', content: linkTo(ealdred.id) }, // Mira → Ealdred
+        body: { content: linkTo(ealdred.id) }, // Mira → Ealdred
       });
 
       writes.mutate(ADA, ealdred.id, { kind: 'delete' });
@@ -526,8 +533,9 @@ describe('EntityWrites', () => {
         ownerId: ADA,
         worldId: WORLD,
         name: 'The Reach',
+        types: ['core.hexmap'],
         tags: [],
-        body: { type: 'hexmap', content: emptyContent(), hexes, regions: [], labels: [] },
+        body: { content: emptyContent(), hexes, regions: [], labels: [] },
       });
 
       expect(edgesFrom(row.id)).toHaveLength(7000);
@@ -819,12 +827,12 @@ describe('EntityWrites', () => {
         id,
         worldId,
         name: id,
-        type: 'note',
+        types: ['core.note'],
         tags: [],
         visibility,
         version: 1,
         seq: 1,
-        document: JSON.stringify(emptyEntityBody('note')),
+        document: JSON.stringify(emptyEntityBody(['core.note'])),
         contentText: '',
         createdAt: now,
         updatedAt: now,

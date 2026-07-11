@@ -1,5 +1,5 @@
 import { Injectable, signal } from '@angular/core';
-import { EntityType } from '@hexly/domain';
+import { CORE_NOTE, EntityType } from '@hexly/domain';
 import { TypeDefinition } from './type-definition';
 import { CORE_TYPE_DEFINITIONS } from './core-types';
 
@@ -39,22 +39,25 @@ export class TypeRegistry {
   }
 
   /**
-   * The definition for `type`, falling back to the core `note` for an absent or
-   * unregistered id — for the chrome (icon, labels) that must always resolve to
+   * The definition for `type`, falling back to the core `core.note` for an absent
+   * or unregistered id — for the chrome (icon, labels) that must always resolve to
    * *something*, mirroring the old `?? TYPE_LABELS['note']` default. Non-optional:
-   * `note` is always registered.
+   * `core.note` is always registered. Callers pass an Entity's *primary* type
+   * (`types[0]`) here, which drives its icon, headline, and default view.
    */
   resolve(type: string | null | undefined): TypeDefinition {
-    // `note` is seeded in the constructor, so the fallback is always present.
-    return this.get(type) ?? this.get('note')!;
+    // `core.note` is seeded in the constructor, so the fallback is always present.
+    return this.get(type) ?? this.get(CORE_NOTE)!;
   }
 
   /**
-   * Whether `type`'s payload affords the hex-grid map surface — drives the
-   * Map/Note toggle, the grid layout + status bar, and the split-on-save.
+   * Whether an Entity carrying `types` affords the hex-grid map surface — drives the
+   * Map/Note toggle, the grid layout + status bar, and the split-on-save. Reads the
+   * whole ordered set: *any* type contributing the hex-grid payload affords the map,
+   * so a future multi-type Entity (e.g. `[dnd.monster, core.hexmap]`) still gets it.
    */
-  affordsMap(type: string | null | undefined): boolean {
-    return this.get(type)?.surfaces.includes('map') ?? false;
+  affordsMap(types: readonly string[] | null | undefined): boolean {
+    return (types ?? []).some((type) => this.get(type)?.surfaces.includes('map'));
   }
 
   /** The type ids that afford a map surface — the dashboard/list "maps" filter. */

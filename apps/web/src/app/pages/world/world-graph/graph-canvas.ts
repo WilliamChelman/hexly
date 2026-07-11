@@ -10,7 +10,7 @@ import {
   viewChild,
 } from '@angular/core';
 import type { Graph } from '@cosmos.gl/graph';
-import { LinkedEntity, WorldGraph } from '@hexly/domain';
+import { CORE_NOTE, LinkedEntity, WorldGraph } from '@hexly/domain';
 import { Logger, ThemeService, isTrackpadWheel, wheelDeltaPixels } from '@hexly/web-core';
 import { GraphPayload, graphPayload } from './graph-payload';
 import { LabelGrid, selectLabels } from './label-selection';
@@ -130,7 +130,7 @@ function palette(defs: readonly TypeDefinition[]): Palette {
     byType,
     // An unregistered type reads as a note, exactly as the old note/hexmap ternary did.
     node:
-      byType.get('note') ??
+      byType.get(CORE_NOTE) ??
       toRgba(token(style, '--color-ink-muted', FALLBACK_NODE_COLOR)),
     link: toRgba(token(style, '--color-line-strong', '#b89a62')),
   };
@@ -143,7 +143,8 @@ function pointColors(
 ): Float32Array {
   const colors = new Float32Array(nodes.length * 4);
   for (let i = 0; i < nodes.length; i++) {
-    colors.set(palette.byType.get(nodes[i].type) ?? palette.node, i * 4);
+    // Colour by the node's primary type (`types[0]`); an unregistered or absent one takes the fallback.
+    colors.set(palette.byType.get(nodes[i].types[0]) ?? palette.node, i * 4);
   }
   return colors;
 }

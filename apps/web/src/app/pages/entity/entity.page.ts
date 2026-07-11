@@ -223,7 +223,7 @@ export class EntityPage {
 
   /** Only a hexmap affords a grid surface — and so the status bar and Map/Note toggle (#75). */
   protected readonly isHexmap = computed(() =>
-    this.types.affordsMap(this.session.current()?.document.type),
+    this.types.affordsMap(this.session.current()?.types),
   );
 
   /** Show the hex grid only for a hexmap on its Map view; everything else shows the Content body (#75). */
@@ -234,7 +234,7 @@ export class EntityPage {
   /** The Content editor's accessible-name transloco key, from the open Entity's type (ADR-0014, #75). */
   protected readonly editorLabelKey = computed(
     () =>
-      this.types.resolve(this.session.current()?.document.type).labels
+      this.types.resolve(this.session.current()?.types?.[0]).labels
         .editorLabel,
   );
 

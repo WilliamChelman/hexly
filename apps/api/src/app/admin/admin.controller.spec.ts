@@ -133,14 +133,13 @@ describe('Superadmin repair surface', () => {
   }
 
   async function makeEntity(owner: Agent, worldId: string, name: string): Promise<string> {
-    return (await owner.post('/entities').send({ name, type: 'note', worldId }).expect(201)).body.id;
+    return (await owner.post('/entities').send({ name, types: ['core.note'], worldId }).expect(201)).body.id;
   }
 
   /** Save `id`'s Content as prose holding one `entityLink` to `targetId`. */
   async function link(owner: Agent, id: string, targetId: string): Promise<void> {
     const current = (await owner.get(`/entities/${id}`).expect(200)).body;
     const document: EntityBody = {
-      type: 'note',
       content: tiptapContent({
         type: 'doc',
         content: [

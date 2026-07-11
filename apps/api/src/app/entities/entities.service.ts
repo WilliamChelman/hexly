@@ -1,6 +1,7 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
   ApiError,
+  CORE_NOTE,
   CreateEntityRequest,
   emptyEntityBody,
   EntityBody,
@@ -15,7 +16,7 @@ import {
   FacetCount,
   InboundReference,
   OutboundReference,
-  entityTypeSchema,
+  typesSchema,
   Visibility,
   EntityGrant,
   GrantRole,
@@ -137,7 +138,7 @@ export class EntitiesService {
         id: entities.id,
         worldId: entities.worldId,
         name: entities.name,
-        type: entities.type,
+        types: entities.types,
         tags: entities.tags,
         visibility: entities.visibility,
         version: entities.version,
@@ -203,20 +204,24 @@ export class EntitiesService {
     const { filter } = entityAccess(this.db, readerId);
     return {
       // Drop a category's own selection before counting it (drill-down).
-      type: this.countColumn({ ...opts, type: undefined }, entities.type, filter),
+      type: this.countJsonArray(
+        { ...opts, type: undefined },
+        entities.types,
+        filter,
+      ),
       visibility: this.countColumn(
         { ...opts, visibility: undefined },
         entities.visibility,
         filter,
       ),
-      tag: this.countTags({ ...opts, tags: undefined }, filter),
+      tag: this.countJsonArray({ ...opts, tags: undefined }, entities.tags, filter),
     };
   }
 
-  /** Count a denormalized column's values (type/visibility) under `opts`. */
+  /** Count a denormalized scalar column's values (visibility) under `opts`. */
   private countColumn(
     opts: FacetOptions,
-    column: typeof entities.type | typeof entities.visibility,
+    column: typeof entities.visibility,
     filter: SQL,
   ): FacetCount[] {
     const match = opts.q ? toFtsMatch(opts.q) : null;
@@ -235,26 +240,31 @@ export class EntitiesService {
   }
 
   /**
-   * Count Tag-facet values under `opts`. Tags live in the JSON `tags` column, so
-   * `json_each` unrolls each array before grouping — an entity with two tags
-   * counts toward both values.
+   * Count a multi-valued JSON-array column's values (`types`/`tags`) under `opts`. The array lives
+   * in one JSON column, so `json_each` unrolls each entity's array before grouping — an entity with
+   * two types (or two tags) counts toward both values. This is the multi-valued path the Type facet
+   * moved onto when `type` became the `types` set (ADR-0048), shared with the Tag facet it mirrors.
    */
-  private countTags(opts: FacetOptions, filter: SQL): FacetCount[] {
+  private countJsonArray(
+    opts: FacetOptions,
+    column: typeof entities.types | typeof entities.tags,
+    filter: SQL,
+  ): FacetCount[] {
     const match = opts.q ? toFtsMatch(opts.q) : null;
     const query = this.db
       .select({
-        value: sql<string>`tag.value`.as('value'),
+        value: sql<string>`each.value`.as('value'),
         count: sql<number>`count(*)`.as('count'),
       })
       .from(entities)
-      .innerJoin(sql`json_each(${entities.tags}) as tag`, sql`1 = 1`)
+      .innerJoin(sql`json_each(${column}) as each`, sql`1 = 1`)
       .$dynamic();
     if (match) {
       query.innerJoin(sql`entities_fts`, sql`entities_fts.rowid = entities.rowid`);
     }
     return query
       .where(facetWhere(opts, match, filter))
-      .groupBy(sql`tag.value`)
+      .groupBy(sql`each.value`)
       .all()
       .map((r) => ({ value: r.value, count: r.count }));
   }
@@ -301,7 +311,7 @@ export class EntitiesService {
         targetId: entityEdges.targetId,
         descriptor: entityEdges.descriptor,
         name: entities.name,
-        type: entities.type,
+        types: entities.types,
       })
       .from(entityEdges)
       .leftJoin(entities, and(eq(entities.id, entityEdges.targetId), access.filter))
@@ -321,9 +331,9 @@ export class EntitiesService {
       .map((row) => ({
         targetId: row.targetId,
         descriptor: row.descriptor,
-        // An Entity whose stored type is outside the enum reads as a dangling target, same as an
+        // An Entity whose stored types can't be read reads as a dangling target, same as an
         // unreadable or deleted one: the reference is there, the thing at the end of it is not.
-        target: row.name === null ? null : linkedEntity(row.targetId, row.name, row.type),
+        target: row.name === null ? null : linkedEntity(row.targetId, row.name, row.types),
       }));
   }
 
@@ -337,7 +347,7 @@ export class EntitiesService {
         sourceId: entities.id,
         descriptor: entityEdges.descriptor,
         name: entities.name,
-        type: entities.type,
+        types: entities.types,
       })
       .from(entityEdges)
       .innerJoin(entities, and(eq(entities.id, entityEdges.sourceEntityId), access.filter))
@@ -348,7 +358,7 @@ export class EntitiesService {
       // A source is the thing doing the linking, so unlike {@link outbound}'s target it cannot
       // dangle: a row whose source has no drawable type drops out entirely.
       .flatMap((row) => {
-        const source = linkedEntity(row.sourceId, row.name, row.type);
+        const source = linkedEntity(row.sourceId, row.name, row.types);
         return source ? [{ descriptor: row.descriptor, source }] : [];
       });
   }
@@ -367,11 +377,12 @@ export class EntitiesService {
   }
 
   create(ownerId: string, req: CreateEntityRequest): EntityDetail {
-    const body = emptyEntityBody(req.type);
+    const body = emptyEntityBody(req.types);
     const row = this.writes.insert({
       ownerId,
       worldId: this.resolveWorldId(ownerId, req.worldId),
       name: req.name,
+      types: req.types,
       tags: req.tags,
       body,
     });
@@ -390,7 +401,8 @@ export class EntitiesService {
     tags: readonly string[],
     body: EntityBody,
   ): void {
-    this.writes.insert({ id, ownerId, worldId, name, tags, body });
+    // An imported note is always a single `core.note` — multi-type authoring is not an import path.
+    this.writes.insert({ id, ownerId, worldId, name, tags, types: [CORE_NOTE], body });
   }
 
   /**
@@ -404,6 +416,8 @@ export class EntitiesService {
       document: req.document,
       // Tags always fully replace (a save carries the full set).
       tags: req.tags,
+      // Types replace only when the save carries them; the current client omits them (ADR-0048).
+      types: req.types,
       version: req.version,
     });
     switch (result.status) {
@@ -737,10 +751,10 @@ function filters(opts: FilterOptions) {
   // Empty id set selects nothing (inArray([]) is always-false).
   if (opts.ids) predicates.push(inArray(entities.id, [...opts.ids]));
   // Facets: OR within a category, AND across them; empty arrays are skipped.
-  if (opts.type?.length) predicates.push(inArray(entities.type, [...opts.type]));
+  if (opts.type?.length) predicates.push(hasAny(entities.types, opts.type));
   if (opts.visibility?.length)
     predicates.push(inArray(entities.visibility, [...opts.visibility]));
-  if (opts.tags?.length) predicates.push(hasAnyTag(opts.tags));
+  if (opts.tags?.length) predicates.push(hasAny(entities.tags, opts.tags));
   if (opts.worldId) predicates.push(eq(entities.worldId, opts.worldId));
   return predicates;
 }
@@ -758,15 +772,19 @@ function facetWhere(opts: FacetOptions, match: string | null, filter: SQL) {
 }
 
 /**
- * A row matches if its JSON `tags` array contains any of `tags`: `json_each`
- * unrolls the stored array so `value IN (...)` can test membership.
+ * A row matches if its JSON-array `column` (`types` or `tags`) contains any of `values`:
+ * `json_each` unrolls the stored array so `value IN (...)` tests array membership. Shared by the
+ * Type and Tag filters, both multi-valued since the `type` → `types` flip (ADR-0048).
  */
-function hasAnyTag(tags: readonly string[]) {
+function hasAny(
+  column: typeof entities.types | typeof entities.tags,
+  values: readonly string[],
+) {
   const list = sql.join(
-    tags.map((t) => sql`${t}`),
+    values.map((v) => sql`${v}`),
     sql`, `,
   );
-  return sql`EXISTS (SELECT 1 FROM json_each(${entities.tags}) WHERE value IN (${list}))`;
+  return sql`EXISTS (SELECT 1 FROM json_each(${column}) WHERE value IN (${list}))`;
 }
 
 /**
@@ -794,7 +812,7 @@ function toSummary(row: SummaryColumns): EntitySummary {
     id: row.id,
     worldId: row.worldId,
     name: row.name,
-    type: entityTypeSchema.parse(row.type),
+    types: typesSchema.parse(row.types),
     tags: tagsSchema.parse(row.tags),
     visibility: visibilitySchema.parse(row.visibility),
     version: row.version,

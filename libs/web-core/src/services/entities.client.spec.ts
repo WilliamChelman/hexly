@@ -18,7 +18,6 @@ import { EVICTED } from './live-follow';
 
 /** The shape the editor round-trips through the client. */
 const emptyHexmapBody: EntityBody = {
-  type: 'hexmap',
   content: emptyContent(),
   hexes: {},
   regions: [],
@@ -34,7 +33,7 @@ describe('EntitiesClient', () => {
     id: 'e1',
     worldId: 'w1',
     name: 'Aldermoor',
-    type: 'hexmap',
+    types: ['core.hexmap'],
     tags: [],
     visibility: 'private',
     version: 1,
@@ -111,7 +110,7 @@ describe('EntitiesClient', () => {
     id: 'e1',
     worldId: 'w1',
     name: 'Aldermoor',
-    type: 'hexmap',
+    types: ['core.hexmap'],
     tags: [],
     visibility: 'private',
     version: 1,
@@ -205,7 +204,7 @@ describe('EntitiesClient', () => {
 
     const req = http.expectOne('/api/entities');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ name: 'Aldermoor', type: 'hexmap' });
+    expect(req.request.body).toEqual({ name: 'Aldermoor', types: ['hexmap'] });
     req.flush(aldermoor);
 
     expect(created).toEqual(aldermoor);
@@ -217,7 +216,7 @@ describe('EntitiesClient', () => {
     const req = http.expectOne('/api/entities');
     expect(req.request.body).toEqual({
       name: 'Aldermoor',
-      type: 'hexmap',
+      types: ['hexmap'],
       worldId: 'w9',
     });
     req.flush(aldermoor);

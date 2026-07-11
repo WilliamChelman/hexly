@@ -14,7 +14,7 @@ function summary(id: string, name: string): EntitySummary {
     id,
     worldId: 'w1',
     name,
-    type: 'note',
+    types: ['core.note'],
     tags: [],
     visibility: 'private',
     version: 1,
@@ -54,9 +54,9 @@ function inspectorProviders() {
           createdCalls.push({ name, type });
           const detail: EntityDetail = {
             ...summary(nextCreatedId, name),
-            type,
+            types: [type],
             seq: 1,
-            document: { type } as EntityDetail['document'],
+            document: {} as EntityDetail['document'],
           };
           return of(detail);
         },
@@ -734,7 +734,7 @@ describe('Inspector Entity Link control', () => {
     fixture.detectChanges();
 
     // A note was created and the Hex now links to it; its name resolves locally.
-    expect(createdCalls).toEqual([{ name: 'Untitled note', type: 'note' }]);
+    expect(createdCalls).toEqual([{ name: 'Untitled note', type: 'core.note' }]);
     expect(store.document().hexes['0,0'].entityId).toBe('n-new');
     expect(byId(el, 'entity-link-name')?.textContent).toContain('Untitled note');
   });
@@ -758,7 +758,7 @@ describe('Inspector Entity Link control', () => {
     (byId(el, 'entity-link-create-note') as HTMLButtonElement).click();
     fixture.detectChanges();
 
-    expect(createdCalls).toEqual([{ name: 'Ironhold', type: 'note' }]);
+    expect(createdCalls).toEqual([{ name: 'Ironhold', type: 'core.note' }]);
     expect(byId(el, 'entity-link-name')?.textContent).toContain('Ironhold');
   });
 
@@ -778,7 +778,7 @@ describe('Inspector Entity Link control', () => {
     fixture.detectChanges();
 
     // The Feature's own link points at the new hexmap — independent of the Hex.
-    expect(createdCalls).toEqual([{ name: 'Untitled map', type: 'hexmap' }]);
+    expect(createdCalls).toEqual([{ name: 'Untitled map', type: 'core.hexmap' }]);
     expect(store.document().hexes['0,0'].feature).toEqual({
       ref: 'settlement',
       entityId: 'city-map',

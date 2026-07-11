@@ -108,7 +108,7 @@ describe('worldAccess', () => {
           id: entityId,
           worldId,
           name: 'Relic',
-          type: 'note',
+          types: ['core.note'],
           tags: [],
           visibility: 'private',
           version: 1,

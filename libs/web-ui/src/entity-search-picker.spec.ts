@@ -6,12 +6,12 @@ import { EntitiesClient } from '@hexly/web-core';
 import { MockEntitiesClient, provideTranslocoTesting } from '@hexly/web-core/testing';
 import { EntitySearchPicker } from './entity-search-picker';
 
-function summary(id: string, name = id, type: EntityType = 'note'): EntitySummary {
+function summary(id: string, name = id, type: EntityType = 'core.note'): EntitySummary {
   return {
     id,
     worldId: 'w1',
     name,
-    type,
+    types: [type],
     tags: [],
     visibility: 'private',
     version: 1,

@@ -24,7 +24,7 @@ describe('EntityBrowser', () => {
     id: 'x',
     worldId: 'w1',
     name: 'A map',
-    type: 'hexmap',
+    types: ['core.hexmap'],
     tags: [],
     visibility: 'private',
     version: 1,
@@ -306,8 +306,8 @@ describe('EntityBrowser', () => {
 
   it('shows each entity’s type', () => {
     const fixture = renderWith([
-      summary({ id: 'm1', name: 'Aldermoor', type: 'hexmap' }),
-      summary({ id: 'n1', name: 'Lady Mara', type: 'note' }),
+      summary({ id: 'm1', name: 'Aldermoor', types: ['core.hexmap'] }),
+      summary({ id: 'n1', name: 'Lady Mara', types: ['core.note'] }),
     ]);
     const typeOf = (id: string) =>
       (
@@ -342,8 +342,8 @@ describe('EntityBrowser', () => {
 
   it('renders the new-note action and type labels in French when French is active', () => {
     const fixture = renderWith([
-      summary({ id: 'm1', name: 'Aldermoor', type: 'hexmap' }),
-      summary({ id: 'n1', name: 'Lady Mara', type: 'note' }),
+      summary({ id: 'm1', name: 'Aldermoor', types: ['core.hexmap'] }),
+      summary({ id: 'n1', name: 'Lady Mara', types: ['core.note'] }),
     ]);
     const el = fixture.nativeElement as HTMLElement;
 
@@ -621,7 +621,7 @@ describe('EntityBrowser', () => {
       of({
         ...summary({ id: 'created', name: 'Untitled map' }),
         seq: 1,
-        document: { type: 'hexmap', content: { format: 'tiptap-v1', snapshot: {} }, hexes: {}, regions: [], labels: [] },
+        document: { content: { format: 'tiptap-v1', snapshot: {} }, hexes: {}, regions: [], labels: [] },
       }),
     );
     (
@@ -629,7 +629,7 @@ describe('EntityBrowser', () => {
     ).click();
 
     // Scoped to the World in the URL (ADR-0028).
-    expect(client.create).toHaveBeenCalledWith('Untitled map', 'hexmap', 'w1');
+    expect(client.create).toHaveBeenCalledWith('Untitled map', 'core.hexmap', 'w1');
     expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'created']);
   });
 
@@ -638,16 +638,16 @@ describe('EntityBrowser', () => {
 
     client.create.mockReturnValueOnce(
       of({
-        ...summary({ id: 'created', name: 'Untitled note', type: 'note' }),
+        ...summary({ id: 'created', name: 'Untitled note', types: ['core.note'] }),
         seq: 1,
-        document: { type: 'note', content: { format: 'tiptap-v1', snapshot: {} } },
+        document: { content: { format: 'tiptap-v1', snapshot: {} } },
       }),
     );
     (
       fixture.nativeElement.querySelector('[data-testid=new-note]') as HTMLButtonElement
     ).click();
 
-    expect(client.create).toHaveBeenCalledWith('Untitled note', 'note', 'w1');
+    expect(client.create).toHaveBeenCalledWith('Untitled note', 'core.note', 'w1');
     expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'created']);
   });
 
@@ -681,7 +681,7 @@ describe('EntityBrowser', () => {
         ...summary({ id: 'm1', name: 'Aldermoor Keep', version: 4 }),
         // The rename bumped `seq`; a patch never bumps `version`.
         seq: 5,
-        document: { type: 'hexmap', content: { format: 'tiptap-v1', snapshot: {} }, hexes: {}, regions: [], labels: [] },
+        document: { content: { format: 'tiptap-v1', snapshot: {} }, hexes: {}, regions: [], labels: [] },
       }),
     );
     // After the rename the browser refreshes from page one: it re-fetches and
@@ -772,14 +772,16 @@ describe('EntityBrowser', () => {
 
   describe('Facet rail (#155)', () => {
     const facet = (el: HTMLElement, tid: string) =>
-      el.querySelector(`[data-testid=${tid}]`) as HTMLButtonElement | null;
+      // Quote the value: a `namespace.id` type testid (e.g. `facet-type-core.note`) carries a dot,
+      // which an unquoted attribute selector rejects.
+      el.querySelector(`[data-testid="${tid}"]`) as HTMLButtonElement | null;
 
     it('renders each Facet category’s values with server counts', () => {
       client.facets.mockReturnValue(
         of({
           type: [
-            { value: 'note', count: 3 },
-            { value: 'hexmap', count: 1 },
+            { value: 'core.note', count: 3 },
+            { value: 'core.hexmap', count: 1 },
           ],
           tag: [{ value: 'deity', count: 2 }],
           visibility: [{ value: 'private', count: 4 }],
@@ -787,8 +789,8 @@ describe('EntityBrowser', () => {
       );
       const el = renderWith([summary({ id: 'm1' })]).nativeElement as HTMLElement;
 
-      expect(facet(el, 'facet-type-note')?.textContent).toContain('Note');
-      expect(facet(el, 'facet-type-note')?.textContent).toContain('3');
+      expect(facet(el, 'facet-type-core.note')?.textContent).toContain('Note');
+      expect(facet(el, 'facet-type-core.note')?.textContent).toContain('3');
       expect(facet(el, 'facet-tag-deity')?.textContent).toContain('deity');
       expect(facet(el, 'facet-tag-deity')?.textContent).toContain('2');
       expect(facet(el, 'facet-visibility-private')).not.toBeNull();
@@ -796,27 +798,27 @@ describe('EntityBrowser', () => {
 
     it('toggles a Type Facet: filters the list and mirrors it to the URL', () => {
       client.facets.mockReturnValue(
-        of({ type: [{ value: 'note', count: 1 }], tag: [], visibility: [] }),
+        of({ type: [{ value: 'core.note', count: 1 }], tag: [], visibility: [] }),
       );
       const fixture = renderWith([summary({ id: 'm1' })]);
       const el = fixture.nativeElement as HTMLElement;
 
       client.list.mockReturnValueOnce(
-        of({ items: [summary({ id: 'n1', type: 'note' })], nextCursor: null }),
+        of({ items: [summary({ id: 'n1', types: ['core.note'] })], nextCursor: null }),
       );
-      facet(el, 'facet-type-note')?.click();
+      facet(el, 'facet-type-core.note')?.click();
       fixture.detectChanges();
 
       expect(client.list).toHaveBeenLastCalledWith({
         limit: 50,
         worldId: 'w1',
         rights: true,
-        type: ['note'],
+        type: ['core.note'],
       });
       expect(navigate).toHaveBeenCalledWith(
         [],
         expect.objectContaining({
-          queryParams: expect.objectContaining({ type: ['note'] }),
+          queryParams: expect.objectContaining({ type: ['core.note'] }),
           queryParamsHandling: 'merge',
           replaceUrl: true,
         }),
@@ -825,19 +827,19 @@ describe('EntityBrowser', () => {
 
     it('removes an individual active Facet by toggling it off', () => {
       client.facets.mockReturnValue(
-        of({ type: [{ value: 'note', count: 1 }], tag: [], visibility: [] }),
+        of({ type: [{ value: 'core.note', count: 1 }], tag: [], visibility: [] }),
       );
       const fixture = renderWith([summary({ id: 'm1' })]);
       const el = fixture.nativeElement as HTMLElement;
 
       client.list.mockReturnValue(of({ items: [], nextCursor: null }));
-      facet(el, 'facet-type-note')?.click();
+      facet(el, 'facet-type-core.note')?.click();
       fixture.detectChanges();
       // The value now reads as active.
-      expect(facet(el, 'facet-type-note')?.getAttribute('aria-pressed')).toBe('true');
+      expect(facet(el, 'facet-type-core.note')?.getAttribute('aria-pressed')).toBe('true');
 
       // Toggling the same value off drops the whole category from the request/URL.
-      facet(el, 'facet-type-note')?.click();
+      facet(el, 'facet-type-core.note')?.click();
       fixture.detectChanges();
       expect(client.list).toHaveBeenLastCalledWith({ limit: 50, worldId: 'w1', rights: true });
       expect(navigate).toHaveBeenLastCalledWith(
@@ -848,13 +850,13 @@ describe('EntityBrowser', () => {
 
     it('Clear all resets the query and every Facet, dropping their URL params', () => {
       client.facets.mockReturnValue(
-        of({ type: [{ value: 'note', count: 1 }], tag: [], visibility: [] }),
+        of({ type: [{ value: 'core.note', count: 1 }], tag: [], visibility: [] }),
       );
       const fixture = renderWith([summary({ id: 'm1' })]);
       const el = fixture.nativeElement as HTMLElement;
 
       client.list.mockReturnValue(of({ items: [], nextCursor: null }));
-      facet(el, 'facet-type-note')?.click();
+      facet(el, 'facet-type-core.note')?.click();
       fixture.detectChanges();
       // Clear all only appears once something is active.
       expect(facet(el, 'facet-clear')).not.toBeNull();
@@ -872,7 +874,7 @@ describe('EntityBrowser', () => {
     });
 
     it('seeds active Facets from the URL and carries them into the first fetch', () => {
-      queryParams$.next(convertToParamMap({ type: 'note', tag: ['deity', 'ruined'] }));
+      queryParams$.next(convertToParamMap({ type: 'core.note', tag: ['deity', 'ruined'] }));
       client.list.mockReturnValueOnce(of({ items: [], nextCursor: null }));
       const fixture = TestBed.createComponent(EntityBrowser);
       fixture.detectChanges();
@@ -883,7 +885,7 @@ describe('EntityBrowser', () => {
         limit: 50,
         worldId: 'w1',
         rights: true,
-        type: ['note'],
+        type: ['core.note'],
         tag: ['deity', 'ruined'],
       });
       expect(client.list).toHaveBeenCalledTimes(1);

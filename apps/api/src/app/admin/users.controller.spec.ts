@@ -144,7 +144,7 @@ describe('Account management (/users)', () => {
     const bob = await signIn('bob@hexly.test');
     const worldId = (await bob.post('/worlds').send({ name: 'Bobland' }).expect(201)).body.id;
     const entityId = (
-      await bob.post('/entities').send({ name: 'Secret', type: 'note', worldId }).expect(201)
+      await bob.post('/entities').send({ name: 'Secret', types: ['core.note'], worldId }).expect(201)
     ).body.id;
 
     await seedManager('ada@hexly.test', 'Ada');
@@ -271,7 +271,7 @@ describe('Account management (/users)', () => {
     const carol = await signIn('carol@hexly.test');
     const worldId = (await carol.post('/worlds').send({ name: 'Carolina' }).expect(201)).body.id;
     const noteId = (
-      await carol.post('/entities').send({ name: 'Ledger', type: 'note', worldId }).expect(201)
+      await carol.post('/entities').send({ name: 'Ledger', types: ['core.note'], worldId }).expect(201)
     ).body.id;
     // Reassign sole ownership of the note to Bob (ownership is an `owner`-role grant row).
     db.delete(entityGrants).where(and(eq(entityGrants.entityId, noteId), eq(entityGrants.role, 'owner'))).run();
@@ -313,7 +313,7 @@ describe('Account management (/users)', () => {
     const bob = await signIn((await seedUser('bob@hexly.test', 'Bob')) && 'bob@hexly.test');
     const worldId = (await bob.post('/worlds').send({ name: 'Bobland' }).expect(201)).body.id;
     const entityId = (
-      await bob.post('/entities').send({ name: 'Secret', type: 'note', worldId }).expect(201)
+      await bob.post('/entities').send({ name: 'Secret', types: ['core.note'], worldId }).expect(201)
     ).body.id; // private by default
 
     await seedSuperadmin('root@hexly.test', 'Root');
@@ -333,7 +333,7 @@ describe('Account management (/users)', () => {
     const bob = await signIn('bob@hexly.test');
     const worldId = (await bob.post('/worlds').send({ name: 'Bobland' }).expect(201)).body.id;
     const entityId = (
-      await bob.post('/entities').send({ name: 'Stuck', type: 'note', worldId }).expect(201)
+      await bob.post('/entities').send({ name: 'Stuck', types: ['core.note'], worldId }).expect(201)
     ).body.id;
 
     await seedSuperadmin('root@hexly.test', 'Root');
