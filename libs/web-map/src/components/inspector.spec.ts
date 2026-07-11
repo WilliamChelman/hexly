@@ -6,6 +6,7 @@ import { EntityDetail, EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient } from '@hexly/web-core';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { HexMapStore } from '../services/hexmap-store';
+import { provideHexMapStoreTesting } from '../testing/entity-session.fake';
 import { Inspector } from './inspector';
 
 /** A minimal EntitySummary the Entity Link picker can list (issue #76). */
@@ -35,6 +36,7 @@ let nextCreatedId = 'created-1';
 /** Providers every Inspector spec needs now that it embeds the Entity Link control. */
 function inspectorProviders() {
   return [
+    ...provideHexMapStoreTesting(),
     provideRouter([]),
     {
       provide: EntitiesClient,

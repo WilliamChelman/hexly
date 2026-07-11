@@ -1,11 +1,13 @@
-import { computed, Injectable, signal } from '@angular/core';
+import { computed, effect, inject, Injectable, signal } from '@angular/core';
 import {
   addPoint,
   Axial,
   coordKey,
-  emptyHexMap,
+  EntityBody,
   FeatureId,
   featureLibrary,
+  gridOf,
+  hasHexGrid,
   HexMap,
   Label,
   MovePlan,
@@ -16,7 +18,8 @@ import {
   TerrainId,
   terrainPalette,
 } from '@hexly/domain';
-import { applyPatches, Patch, produceWithPatches } from '@hexly/immer';
+import { Patch } from '@hexly/immer';
+import { ENTITY_SESSION } from '@hexly/web-entity';
 import { MapSelection } from './map-selection';
 import type { Selection, SelectMode, SelectionRef } from './map-selection';
 
@@ -127,16 +130,25 @@ export const DEFAULT_LABEL_SIZE = 28;
 export type MoveOutcome = 'moved' | 'blocked' | 'noop';
 
 /**
- * The editor's command/undo stack. Holds the {@link HexMap} as immutable signal
- * state; every mutation runs through Immer's `produceWithPatches`, inverse patches
- * onto an undo stack. Nothing mutates the document directly — that discipline is
- * what makes undo correct.
+ * The Hex Map editor: tools, selection, and undo/redo over the grid — but no longer the
+ * owner of the grid. The document is the hex-grid slice of the central
+ * {@link EntitySession}'s body (ADR-0048, *Central store* amendment): reads project off
+ * `session.body`, edits go through `session.mutate` (Immer, patches captured), and undo
+ * pushes those inverse patches back through `session.applyPatches`. Nothing mutates the
+ * document directly — that discipline is what keeps undo correct.
+ *
+ * Route-scoped, bound beside the session it drives (not `providedIn: 'root'`): it injects
+ * the route-scoped {@link ENTITY_SESSION}, so it lives and dies with the open Entity.
  */
-@Injectable({ providedIn: 'root' })
+@Injectable()
 export class HexMapStore {
-  private readonly _document = signal<HexMap>(emptyHexMap());
-  /** The live document. Read-only to everyone but this store. */
-  readonly document = this._document.asReadonly();
+  private readonly session = inject(ENTITY_SESSION);
+
+  /**
+   * The live document — the hex-grid slice of the session's body, recomputed once per
+   * grid edit. Read-only to everyone (the store writes through {@link commit}, never here).
+   */
+  readonly document = computed<HexMap>(() => gridOf(this.session.body()));
 
   /**
    * The transient Selection: owns the reference set and click-cycle anchor,
@@ -165,19 +177,10 @@ export class HexMapStore {
    * What floats in the dismissible right panel: the {@link Inspector}, the Regions
    * list, or `null` when closed (the default). Selecting an entity or Region opens
    * the Inspector; the right-edge rail toggles `regions` ⇄ closed. Session-only;
-   * {@link load} resets it closed.
+   * a fresh load ({@link resetForLoad}) resets it closed.
    */
   private readonly _rightPanel = signal<'inspector' | 'regions' | null>(null);
   readonly rightPanel = this._rightPanel.asReadonly();
-
-  /**
-   * Whether the caller may edit the grid (ADR-0037, #162). Fed by the owning session
-   * through the grid-store port; the {@link MapView} gates its tool palette and dock
-   * on it, so a read-only opener sees the canvas as pan/zoom-only. Defaults read-only
-   * until the session says otherwise.
-   */
-  private readonly _editable = signal(false);
-  readonly editable = this._editable.asReadonly();
 
   /** The remembered Select Subtool; the canvas reads this to choose its Select gesture. */
   readonly selectSubtool = this._selectSubtool.asReadonly();
@@ -229,7 +232,7 @@ export class HexMapStore {
   readonly selectedRegion = this.sel.selectedRegion;
 
   /** The document's Regions — a narrow view so consumers needn't subscribe to the whole document. */
-  readonly regions = computed<Region[]>(() => this._document().regions);
+  readonly regions = computed<Region[]>(() => this.document().regions);
 
   /** The Entity Link id on the single selected Map element; the Inspector's Entity Link control binds to this. */
   readonly selectedEntityLink = this.sel.selectedEntityLink;
@@ -243,6 +246,29 @@ export class HexMapStore {
   /** Whether there is an edit to undo / redo — drives the toolbar buttons. */
   readonly canUndo = this._canUndo.asReadonly();
   readonly canRedo = this._canRedo.asReadonly();
+
+  constructor() {
+    // Reset on a *fresh* load, not on our own edits (ADR-0048, *Central store*): the
+    // session bumps loadGeneration only when a new Entity is adopted or the canvas is
+    // cleared for a route swap. The undo patches and selection refs are tied to the old
+    // body — undoing after a load would corrupt the new grid — so both are cleared here,
+    // while an edit (which never bumps the counter) leaves history intact. The document
+    // itself needs no reset: it is derived from the session's body, so it already tracks
+    // the load.
+    //
+    // Reset on a *change* in the counter, compared against the value observed so far —
+    // not merely on the effect running — so the reset is tied to a real load and not to
+    // when effects happen to flush. The store is born clean, so its construction-time
+    // generation needs no reset; only a later bump (or a bump between construction and
+    // the first flush) triggers one.
+    let seenGeneration = this.session.loadGeneration();
+    effect(() => {
+      const generation = this.session.loadGeneration();
+      if (generation === seenGeneration) return;
+      seenGeneration = generation;
+      this.resetForLoad();
+    });
+  }
 
   /**
    * Arm the Tool `id`; Subtool memory is held separately, so switching Tools never
@@ -324,11 +350,13 @@ export class HexMapStore {
   }
 
   /**
-   * Adopt `document` as the map being edited. A fresh start, not an edit, so
-   * undo/redo history is cleared — you can't undo back into the previous map.
+   * Reset the transient editor state a fresh load invalidates: undo/redo history (its
+   * patches target the old body), the selection and its brush, the armed Tool, and the
+   * dock. Driven by the session's {@link ENTITY_SESSION.loadGeneration} bump, not a
+   * direct call — the document is derived from the session's body, so a load is a fresh
+   * start with no map to set here (ADR-0048).
    */
-  load(document: HexMap): void {
-    this._document.set(document);
+  private resetForLoad(): void {
     this.undoStack.length = 0;
     this.redoStack.length = 0;
     this.syncHistory();
@@ -337,11 +365,6 @@ export class HexMapStore {
     this.resetSubtoolMemory();
     this.deselect();
     this._rightPanel.set(null);
-  }
-
-  /** Set whether the grid is editable (ADR-0037) — the grid-store port the session drives. */
-  setEditable(editable: boolean): void {
-    this._editable.set(editable);
   }
 
   /** Restore the cold-start Subtool memory shared by a fresh store and a reload. */
@@ -474,7 +497,7 @@ export class HexMapStore {
   ): ReadonlyMap<string, Point> {
     const moved = new Map<string, Point>();
     if (delta.x === 0 && delta.y === 0) return moved;
-    const byId = new Map(this._document().labels.map((l) => [l.id, l]));
+    const byId = new Map(this.document().labels.map((l) => [l.id, l]));
     for (const id of labelIds) {
       const label = byId.get(id);
       if (label) moved.set(id, addPoint(label.position, delta));
@@ -494,7 +517,7 @@ export class HexMapStore {
   ): { plan: MovePlan; labelPositions: ReadonlyMap<string, Point> } {
     const { hexes, labels, regions } = this.sel.partitionForMove();
     const plan = planMove({
-      document: this._document(),
+      document: this.document(),
       selection: { hexes, regions },
       offset,
     });
@@ -576,7 +599,7 @@ export class HexMapStore {
    * existing "Region N" + 1, so a freed name/colour isn't immediately reused.
    */
   private nextRegionIdentity(): { name: string; color: string } {
-    const used = this._document().regions.flatMap((r) => {
+    const used = this.document().regions.flatMap((r) => {
       const match = /^Region (\d+)$/.exec(r.name);
       return match ? [Number(match[1])] : [];
     });
@@ -832,7 +855,9 @@ export class HexMapStore {
   undo(): void {
     const edit = this.undoStack.pop();
     if (!edit) return;
-    this._document.set(applyPatches(this._document(), edit.undo));
+    // Replay the inverse patches through the session — it owns the body, so the grid
+    // slice this store reads updates in lockstep (ADR-0048).
+    this.session.applyPatches(edit.undo);
     this.sel.restore(edit.selectionBefore);
     this.redoStack.push(edit);
     this.syncHistory();
@@ -842,24 +867,27 @@ export class HexMapStore {
   redo(): void {
     const edit = this.redoStack.pop();
     if (!edit) return;
-    this._document.set(applyPatches(this._document(), edit.redo));
+    this.session.applyPatches(edit.redo);
     this.sel.restore(edit.selectionAfter);
     this.undoStack.push(edit);
     this.syncHistory();
   }
 
   /**
-   * Run `recipe` through Immer, adopting the result and recording the patches for
-   * undo/redo. Returns whether a step was recorded — callers that re-point the
-   * selection use it to know an edit exists to {@link trackSelectionOnLastEdit stamp}.
+   * Run `recipe` through the session's {@link ENTITY_SESSION.mutate}, recording the
+   * returned patches for undo/redo. Returns whether a step was recorded — callers that
+   * re-point the selection use it to know an edit exists to
+   * {@link trackSelectionOnLastEdit stamp}. The recipe touches only the hex-grid slice,
+   * present iff the body carries a grid, so a note's body passes through untouched.
    */
   private commit(recipe: (draft: HexMap) => void): boolean {
     const selectionBefore = this.sel.snapshot();
-    const [next, redo, undo] = produceWithPatches(this._document(), recipe);
+    const { redo, undo } = this.session.mutate((body: EntityBody) => {
+      if (hasHexGrid(body)) recipe(body);
+    });
     // No patches → the recipe changed nothing; recording it would leave empty undo
     // steps and discard the redo branch.
     if (redo.length === 0) return false;
-    this._document.set(next);
     // selectionAfter defaults to before; re-pointing edits update it via trackSelectionOnLastEdit.
     this.undoStack.push({ redo, undo, selectionBefore, selectionAfter: selectionBefore });
     // A fresh edit forks history: the old redo branch is unreachable.

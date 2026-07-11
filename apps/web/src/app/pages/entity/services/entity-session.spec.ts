@@ -14,7 +14,7 @@ import {
 import { provideTranslocoTesting, MockEntitiesClient, MockNudgeBusClient } from '@hexly/web-core/testing';
 import { EntitiesClient, NudgeBusClient, EVICTED, Watched } from '@hexly/web-core';
 import { EntitySession } from './entity-session';
-import { GRID_STORE } from './grid-store.port';
+import { ENTITY_SESSION } from '@hexly/web-entity';
 import { HexMapStore } from '@hexly/web-map';
 
 describe('EntitySession', () => {
@@ -63,9 +63,10 @@ describe('EntitySession', () => {
       imports: [provideTranslocoTesting()],
       providers: [
         EntitySession,
-        // The session depends on the grid-store port (ADR-0048); bind it to HexMapStore
-        // as the app's composition root does.
-        { provide: GRID_STORE, useExisting: HexMapStore },
+        // The session is the central store; HexMapStore edits it through the ENTITY_SESSION
+        // token, as the app's composition root wires it (ADR-0048).
+        { provide: ENTITY_SESSION, useExisting: EntitySession },
+        HexMapStore,
         { provide: EntitiesClient, useValue: entities },
         { provide: NudgeBusClient, useValue: bus },
       ],

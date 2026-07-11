@@ -1,9 +1,8 @@
 import { Routes } from '@angular/router';
 import { EntityNameResolver, CONTENT_EDITOR_SESSION } from '@hexly/content-editor';
-import { HexMapStore } from '@hexly/web-map';
+import { ENTITY_SESSION } from '@hexly/web-entity';
 import { flushOnLeave } from './flush-on-leave.guard';
 import { EntitySession } from './services/entity-session';
-import { GRID_STORE } from './services/grid-store.port';
 
 /**
  * Lazy route config for `/w/:worldId/entities/:id`. Split out of app.routes so the
@@ -22,10 +21,12 @@ export const ENTITY_ROUTES: Routes = [
     // component-scoped on EntityPage, which is the only thing that shows them.
     providers: [
       EntitySession,
+      // The session is the central store every View edits; bind the token to it so the
+      // map lib (and future Views) reach it without importing the app (ADR-0048). Each
+      // View owns its own store — MapView provides HexMapStore itself — so the route
+      // composition root stays out of View internals.
+      { provide: ENTITY_SESSION, useExisting: EntitySession },
       { provide: CONTENT_EDITOR_SESSION, useExisting: EntitySession },
-      // Bind the hex-grid editor to the port the session depends on (ADR-0048); kept
-      // in the lazy entity chunk so web-map never reaches the initial bundle.
-      { provide: GRID_STORE, useExisting: HexMapStore },
       EntityNameResolver,
     ],
     // documentTitleKey composes the Entity name with the brand; `title` is the

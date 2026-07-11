@@ -12,8 +12,8 @@ import {
 import { provideTranslocoTesting, MockEntitiesClient } from '@hexly/web-core/testing';
 import { EntitiesClient } from '@hexly/web-core';
 import { EntitySession } from '../services/entity-session';
-import { GRID_STORE } from '../services/grid-store.port';
 import { HexMapStore } from '@hexly/web-map';
+import { ENTITY_SESSION } from '@hexly/web-entity';
 import { SaveStatus } from './save-status';
 
 // Autosave feedback chip that replaced the Save button (ADR-0026):
@@ -53,7 +53,8 @@ describe('SaveStatus', () => {
       imports: [SaveStatus, provideTranslocoTesting()],
       providers: [
         EntitySession,
-        { provide: GRID_STORE, useExisting: HexMapStore },
+        HexMapStore,
+        { provide: ENTITY_SESSION, useExisting: EntitySession },
         { provide: EntitiesClient, useValue: entities },
         provideRouter([]),
       ],

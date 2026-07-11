@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { TranslocoService } from '@jsverse/transloco';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
+import { provideHexMapStoreTesting } from '../testing/entity-session.fake';
 import { HexMapStore } from '../services/hexmap-store';
 import { ToolPalette } from './tool-palette';
 
@@ -35,7 +36,7 @@ function has(
 
 describe('ToolPalette primary Tool row', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [ToolPalette, provideTranslocoTesting()] }).compileComponents();
+    await TestBed.configureTestingModule({ imports: [ToolPalette, provideTranslocoTesting()], providers: provideHexMapStoreTesting() }).compileComponents();
   });
 
   it('arms each top-level Tool from the primary row', () => {
@@ -69,7 +70,7 @@ describe('ToolPalette primary Tool row', () => {
 
 describe('ToolPalette contextual Subtool panel', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [ToolPalette, provideTranslocoTesting()] }).compileComponents();
+    await TestBed.configureTestingModule({ imports: [ToolPalette, provideTranslocoTesting()], providers: provideHexMapStoreTesting() }).compileComponents();
   });
 
   it('shows the Select Subtools Pick and Marquee, with Pick active at cold-start', () => {
@@ -131,7 +132,7 @@ describe('ToolPalette contextual Subtool panel', () => {
 
 describe('ToolPalette history', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [ToolPalette, provideTranslocoTesting()] }).compileComponents();
+    await TestBed.configureTestingModule({ imports: [ToolPalette, provideTranslocoTesting()], providers: provideHexMapStoreTesting() }).compileComponents();
   });
 
   it('renders Undo and Redo, disabled when there is nothing to undo or redo', () => {
@@ -171,7 +172,7 @@ describe('ToolPalette history', () => {
 
 describe('ToolPalette regions', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [ToolPalette, provideTranslocoTesting()] }).compileComponents();
+    await TestBed.configureTestingModule({ imports: [ToolPalette, provideTranslocoTesting()], providers: provideHexMapStoreTesting() }).compileComponents();
   });
 
   it('shows no Region Subtool legend while the Region brush is armed', () => {
@@ -207,7 +208,7 @@ describe('ToolPalette regions', () => {
 
 describe('ToolPalette flyout binding', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [ToolPalette, provideTranslocoTesting()] }).compileComponents();
+    await TestBed.configureTestingModule({ imports: [ToolPalette, provideTranslocoTesting()], providers: provideHexMapStoreTesting() }).compileComponents();
   });
 
   it('opens no flyout for Label or Erase (no Subtools)', () => {
@@ -241,6 +242,7 @@ describe('ToolPalette localization', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [ToolPalette, provideTranslocoTesting()],
+      providers: provideHexMapStoreTesting(),
     }).compileComponents();
   });
 

@@ -15,8 +15,7 @@ import { CONTENT_FORMAT, CORE_HEXMAP, EntityDetail, EntityType } from '@hexly/do
 import { EntitiesClient, NudgeBusClient, ActiveWorld, TitleService, EVICTED, Watched } from '@hexly/web-core';
 import { MockEntitiesClient, MockNudgeBusClient, provideTranslocoTesting } from '@hexly/web-core/testing';
 import { EntitySession } from './services/entity-session';
-import { GRID_STORE } from './services/grid-store.port';
-import { HexMapStore } from '@hexly/web-map';
+import { ENTITY_SESSION } from '@hexly/web-entity';
 import { EntityNameResolver, CONTENT_EDITOR_SESSION } from '@hexly/content-editor';
 import { noteDetail } from './components/entity-detail.fixtures';
 import { EntityPage } from './entity.page';
@@ -84,7 +83,7 @@ describe('EntityPage routing', () => {
       providers: [
         EntitySession,
         { provide: CONTENT_EDITOR_SESSION, useExisting: EntitySession },
-        { provide: GRID_STORE, useExisting: HexMapStore },
+        { provide: ENTITY_SESSION, useExisting: EntitySession },
         EntityNameResolver,
         { provide: EntitiesClient, useValue: entities },
         { provide: NudgeBusClient, useValue: bus },
@@ -204,7 +203,7 @@ describe('EntityPage layout', () => {
       providers: [
         EntitySession,
         { provide: CONTENT_EDITOR_SESSION, useExisting: EntitySession },
-        { provide: GRID_STORE, useExisting: HexMapStore },
+        { provide: ENTITY_SESSION, useExisting: EntitySession },
         EntityNameResolver,
         provideHttpClient(),
         provideHttpClientTesting(),

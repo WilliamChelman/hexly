@@ -117,6 +117,20 @@ export function hasHexGrid(body: EntityBody): body is EntityBody & HexMap {
   return 'hexes' in body;
 }
 
+/**
+ * The body's hex-grid slice as a standalone {@link HexMap}, or an empty plane when the
+ * body carries no grid. A cheap projection off the already-validated body (not a
+ * re-parse) — it sits on the map editor's hot read path, one recompute per grid edit, so
+ * it hand-picks the grid fields rather than re-running {@link hexMapSchema} (ADR-0048).
+ * `regions`/`labels` still fall back to empty (the defaults the schema mints) so a body
+ * predating those fields never surfaces `undefined` on the read path.
+ */
+export function gridOf(body: EntityBody): HexMap {
+  return hasHexGrid(body)
+    ? { hexes: body.hexes, regions: body.regions ?? [], labels: body.labels ?? [] }
+    : emptyHexMap();
+}
+
 export function emptyContent(): Content {
   return tiptapContent({ type: 'doc', content: [] });
 }

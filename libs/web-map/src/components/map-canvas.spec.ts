@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { TranslocoService } from '@jsverse/transloco';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
+import { provideHexMapStoreTesting } from '../testing/entity-session.fake';
 import { HexMapStore } from '../services/hexmap-store';
 import { MapCanvas } from './map-canvas';
 
@@ -17,6 +18,7 @@ describe('MapCanvas keyboard', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [MapCanvas, provideTranslocoTesting()],
+      providers: provideHexMapStoreTesting(),
     }).compileComponents();
     const fixture = TestBed.createComponent(MapCanvas);
     fixture.detectChanges();
@@ -169,6 +171,7 @@ describe('MapCanvas localization', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [MapCanvas, provideTranslocoTesting()],
+      providers: provideHexMapStoreTesting(),
     }).compileComponents();
   });
 

@@ -3,8 +3,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { CORE_NOTE, EntityDetail } from '@hexly/domain';
 import { EntitySession } from '../services/entity-session';
-import { GRID_STORE } from '../services/grid-store.port';
-import { HexMapStore } from '@hexly/web-map';
+import { ENTITY_SESSION } from '@hexly/web-entity';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { EntityMetadata } from './entity-metadata';
 
@@ -33,7 +32,7 @@ describe('EntityMetadata', () => {
       imports: [EntityMetadata, provideTranslocoTesting()],
       providers: [
         EntitySession,
-        { provide: GRID_STORE, useExisting: HexMapStore },
+        { provide: ENTITY_SESSION, useExisting: EntitySession },
         provideHttpClient(),
         provideHttpClientTesting(),
       ],

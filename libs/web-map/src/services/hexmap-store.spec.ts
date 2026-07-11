@@ -1,9 +1,39 @@
+import { TestBed } from '@angular/core/testing';
 import { emptyHexMap, HexMap } from '@hexly/domain';
 import { HexMapStore } from './hexmap-store';
+import {
+  FakeEntitySession,
+  provideFakeEntitySession,
+} from '../testing/entity-session.fake';
+
+/**
+ * The store is now route-scoped and injects the central {@link ENTITY_SESSION} (ADR-0048),
+ * so it needs an injection context and a session to edit through — a fresh TestBed per test
+ * provides both. `makeStore()` returns the store; `reload()` stands in for the old
+ * `reload(grid)`, driving the session's load (which bumps loadGeneration) and flushing
+ * the store's reset effect so the reset is observable synchronously.
+ */
+let session: FakeEntitySession;
+
+beforeEach(() => {
+  TestBed.configureTestingModule({
+    providers: [HexMapStore, provideFakeEntitySession()],
+  });
+  session = TestBed.inject(FakeEntitySession);
+});
+
+function makeStore(): HexMapStore {
+  return TestBed.inject(HexMapStore);
+}
+
+function reload(grid: HexMap): void {
+  session.load(grid);
+  TestBed.flushEffects();
+}
 
 describe('HexMapStore', () => {
   it('paints a Hex with the given terrain at the given coordinate', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
 
     store.paintAt({ q: 1, r: -2 }, 'ocean');
 
@@ -11,7 +41,7 @@ describe('HexMapStore', () => {
   });
 
   it('replaces the terrain when painting an already-painted hex', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
 
     store.paintAt({ q: 0, r: 0 }, 'desert');
@@ -20,7 +50,7 @@ describe('HexMapStore', () => {
   });
 
   it('does not mutate the previous document when painting (goes through Immer)', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const before = store.document();
 
     store.paintAt({ q: 0, r: 0 }, 'grass');
@@ -30,7 +60,7 @@ describe('HexMapStore', () => {
   });
 
   it('erases a hex by deleting its record entirely, not blanking it', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 2, r: 2 }, 'grass');
 
     store.eraseAt({ q: 2, r: 2 });
@@ -39,7 +69,7 @@ describe('HexMapStore', () => {
   });
 
   it('undo removes a painted hex', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'grass');
 
     store.undo();
@@ -48,7 +78,7 @@ describe('HexMapStore', () => {
   });
 
   it('redo re-applies an undone paint', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'mountain');
     store.undo();
 
@@ -58,7 +88,7 @@ describe('HexMapStore', () => {
   });
 
   it('undo restores a hex that was erased', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'grass');
     store.eraseAt({ q: 0, r: 0 });
 
@@ -68,7 +98,7 @@ describe('HexMapStore', () => {
   });
 
   it('drops the redo stack once a new edit is made', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'grass');
     store.undo();
 
@@ -80,7 +110,7 @@ describe('HexMapStore', () => {
   });
 
   it('reports nothing to undo or redo on a fresh map, and ignores both', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
 
     expect(store.canUndo()).toBe(false);
     expect(store.canRedo()).toBe(false);
@@ -92,7 +122,7 @@ describe('HexMapStore', () => {
   });
 
   it('tracks whether undo and redo are available as edits flow', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'grass');
 
     expect(store.canUndo()).toBe(true);
@@ -105,7 +135,7 @@ describe('HexMapStore', () => {
   });
 
   it('treats erasing a Void hex as a no-op with no undo step', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
 
     store.eraseAt({ q: 5, r: 5 });
 
@@ -113,7 +143,7 @@ describe('HexMapStore', () => {
   });
 
   it('keeps the redo branch when an edit changes nothing', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'grass');
     store.undo();
 
@@ -123,7 +153,7 @@ describe('HexMapStore', () => {
   });
 
   it('applyAt does nothing when the Select tool is armed', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
 
     // A fresh map boots armed with Select; a click must paint nothing (issue #27).
     store.applyAt({ q: 0, r: 0 });
@@ -133,7 +163,7 @@ describe('HexMapStore', () => {
   });
 
   it('applyAt paints the armed terrain', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.armTerrain('ocean');
 
     store.applyAt({ q: 0, r: 0 });
@@ -142,7 +172,7 @@ describe('HexMapStore', () => {
   });
 
   it('applyAt erases once the eraser is armed', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'ocean');
 
     store.armTool('erase');
@@ -152,7 +182,7 @@ describe('HexMapStore', () => {
   });
 
   it('applyAt places the armed feature on the hex', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'grass');
 
     store.armFeature('ruin');
@@ -162,7 +192,7 @@ describe('HexMapStore', () => {
   });
 
   it('applyAt clears the feature once the Clear feature Subtool is armed', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'grass');
     store.placeFeatureAt({ q: 0, r: 0 }, 'ruin');
 
@@ -173,7 +203,7 @@ describe('HexMapStore', () => {
   });
 
   it('places a feature on an already-painted hex, keeping its terrain', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 1, r: 1 }, 'forest');
 
     store.placeFeatureAt({ q: 1, r: 1 }, 'settlement');
@@ -185,7 +215,7 @@ describe('HexMapStore', () => {
   });
 
   it('replaces the feature when placing on a hex that already has one', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'grass');
     store.placeFeatureAt({ q: 0, r: 0 }, 'settlement');
 
@@ -195,7 +225,7 @@ describe('HexMapStore', () => {
   });
 
   it('ignores placing a feature on Void — a feature rides on an existing hex', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
 
     store.placeFeatureAt({ q: 4, r: 4 }, 'settlement');
 
@@ -204,7 +234,7 @@ describe('HexMapStore', () => {
   });
 
   it('keeps an existing feature when its hex is repainted with new terrain', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.placeFeatureAt({ q: 0, r: 0 }, 'settlement');
 
@@ -217,7 +247,7 @@ describe('HexMapStore', () => {
   });
 
   it('clears a hex feature without disturbing its terrain', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.placeFeatureAt({ q: 0, r: 0 }, 'settlement');
 
@@ -227,7 +257,7 @@ describe('HexMapStore', () => {
   });
 
   it('undo reverses placing a feature, leaving the bare terrain', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
 
     store.placeFeatureAt({ q: 0, r: 0 }, 'settlement');
@@ -237,7 +267,7 @@ describe('HexMapStore', () => {
   });
 
   it('undo restores a feature that was cleared', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.placeFeatureAt({ q: 0, r: 0 }, 'settlement');
 
@@ -248,7 +278,7 @@ describe('HexMapStore', () => {
   });
 
   it('creates a region with the given name and color, returning its id', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
 
     const id = store.createRegion('Avalon', '#b08a4e');
 
@@ -258,7 +288,7 @@ describe('HexMapStore', () => {
   });
 
   it('adds a hex coordinate to a region', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.createRegion('Avalon', '#b08a4e');
 
     store.addHexToRegion(id, { q: 2, r: -1 });
@@ -267,7 +297,7 @@ describe('HexMapStore', () => {
   });
 
   it('lets a single coordinate belong to two regions at once (overlap)', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const a = store.createRegion('Avalon', '#b08a4e');
     const b = store.createRegion('Whisperwood', '#7c9b86');
 
@@ -280,7 +310,7 @@ describe('HexMapStore', () => {
   });
 
   it('removes a hex coordinate from a region', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.createRegion('Avalon', '#b08a4e');
     store.addHexToRegion(id, { q: 0, r: 0 });
 
@@ -290,7 +320,7 @@ describe('HexMapStore', () => {
   });
 
   it('treats adding a coordinate already in the region as a no-op', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.createRegion('Avalon', '#b08a4e');
     store.addHexToRegion(id, { q: 0, r: 0 });
 
@@ -302,7 +332,7 @@ describe('HexMapStore', () => {
   });
 
   it('treats removing a coordinate not in the region as a no-op with no undo step', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.createRegion('Avalon', '#b08a4e');
 
     store.removeHexFromRegion(id, { q: 5, r: 5 }); // not a member → records nothing
@@ -313,7 +343,7 @@ describe('HexMapStore', () => {
   });
 
   it('undo reverses creating a region', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.createRegion('Avalon', '#b08a4e');
 
     store.undo();
@@ -322,7 +352,7 @@ describe('HexMapStore', () => {
   });
 
   it('undo reverses adding a hex to a region', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.createRegion('Avalon', '#b08a4e');
     store.addHexToRegion(id, { q: 0, r: 0 });
 
@@ -332,7 +362,7 @@ describe('HexMapStore', () => {
   });
 
   it('renames a region', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.createRegion('Avalon', '#b08a4e');
 
     store.renameRegion(id, 'The Kingdom of Avalon');
@@ -341,7 +371,7 @@ describe('HexMapStore', () => {
   });
 
   it('recolors a region', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.createRegion('Avalon', '#b08a4e');
 
     store.recolorRegion(id, '#6f7fae');
@@ -350,7 +380,7 @@ describe('HexMapStore', () => {
   });
 
   it('deletes a region', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.createRegion('Avalon', '#b08a4e');
 
     store.deleteRegion(id);
@@ -359,7 +389,7 @@ describe('HexMapStore', () => {
   });
 
   it('falls back to Select and forgets the Region Subtool when its region is deleted', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.createRegion('Avalon', '#b08a4e');
     store.armRegion(id, 'add');
 
@@ -370,7 +400,7 @@ describe('HexMapStore', () => {
   });
 
   it('undo restores a deleted region with its membership', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.createRegion('Avalon', '#b08a4e');
     store.addHexToRegion(id, { q: 1, r: 1 });
 
@@ -381,11 +411,11 @@ describe('HexMapStore', () => {
   });
 
   it('deleteSelected destroys a selected Region as one undoable step, restoring its membership and selection on undo', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = 'reg-avalon';
     // `load` clears history, so the deletion is the only edit on the stack —
     // a single undo that restores the Region proves it is one step.
-    store.load({
+    reload({
       hexes: {},
       regions: [{ id, name: 'Avalon', color: '#b08a4e', hexes: { '1,1': true } }],
       labels: [],
@@ -403,9 +433,9 @@ describe('HexMapStore', () => {
   });
 
   it('disarms the Region tool when its armed Region is deleted, and undo does not re-arm it', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = 'reg-avalon';
-    store.load({
+    reload({
       hexes: {},
       regions: [{ id, name: 'Avalon', color: '#b08a4e', hexes: { '1,1': true } }],
       labels: [],
@@ -429,7 +459,7 @@ describe('HexMapStore', () => {
   });
 
   it('keeps region membership when the underlying terrain is erased', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.createRegion('Avalon', '#b08a4e');
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.addHexToRegion(id, { q: 0, r: 0 });
@@ -440,7 +470,7 @@ describe('HexMapStore', () => {
   });
 
   it('adds a free-positioned label with text at a world point, returning its id', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
 
     const id = store.addLabel('The Whisperwood', { x: 120, y: -40 });
 
@@ -450,7 +480,7 @@ describe('HexMapStore', () => {
   });
 
   it('undo removes an added label', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.addLabel('Open Sea', { x: 0, y: 0 });
 
     store.undo();
@@ -459,7 +489,7 @@ describe('HexMapStore', () => {
   });
 
   it('edits the text of a label', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.addLabel('Draft', { x: 10, y: 10 });
 
     store.editLabelText(id, 'The Drowned Coast');
@@ -468,7 +498,7 @@ describe('HexMapStore', () => {
   });
 
   it('moves a label to a new world position', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.addLabel('Here', { x: 0, y: 0 });
 
     store.moveLabel(id, { x: 200, y: -75 });
@@ -477,7 +507,7 @@ describe('HexMapStore', () => {
   });
 
   it('resizes a label', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.addLabel('Big', { x: 0, y: 0 });
 
     store.resizeLabel(id, 64);
@@ -486,7 +516,7 @@ describe('HexMapStore', () => {
   });
 
   it('ignores a non-positive resize, leaving the size unchanged and adding no undo step', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.addLabel('Big', { x: 0, y: 0 });
     store.resizeLabel(id, 64);
 
@@ -504,7 +534,7 @@ describe('HexMapStore', () => {
   });
 
   it('rotates a label', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.addLabel('Tilted', { x: 0, y: 0 });
 
     store.rotateLabel(id, 30);
@@ -513,7 +543,7 @@ describe('HexMapStore', () => {
   });
 
   it('deletes a label', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.addLabel('Doomed', { x: 0, y: 0 });
 
     store.deleteLabel(id);
@@ -522,7 +552,7 @@ describe('HexMapStore', () => {
   });
 
   it('undo restores a deleted label with its text and position', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.addLabel('The Whisperwood', { x: 80, y: -20 });
 
     store.deleteLabel(id);
@@ -536,7 +566,7 @@ describe('HexMapStore', () => {
   });
 
   it('selects a label for editing, and clears the selection', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.addLabel('Pick me', { x: 0, y: 0 });
 
     store.selectLabel(id);
@@ -547,7 +577,7 @@ describe('HexMapStore', () => {
   });
 
   it('clears the selection when the selected label is deleted', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.addLabel('Gone', { x: 0, y: 0 });
     store.selectLabel(id);
 
@@ -557,7 +587,7 @@ describe('HexMapStore', () => {
   });
 
   it('treats editing a label that does not exist as a no-op with no undo step', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
 
     store.editLabelText('no-such-label', 'ignored');
 
@@ -565,20 +595,20 @@ describe('HexMapStore', () => {
   });
 
   it('loads a document, replacing whatever was being edited', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'grass');
 
-    store.load({ hexes: { '2,3': { terrain: 'ocean' } }, regions: [], labels: [] });
+    reload({ hexes: { '2,3': { terrain: 'ocean' } }, regions: [], labels: [] });
 
     expect(store.document()).toEqual({ hexes: { '2,3': { terrain: 'ocean' } }, regions: [], labels: [] });
   });
 
   it('clears undo/redo history when a document is loaded', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'grass');
     store.undo(); // there is now a redo to make
 
-    store.load(emptyHexMap());
+    reload(emptyHexMap());
 
     // A loaded map is a fresh starting point — you cannot undo into the old one.
     expect(store.canUndo()).toBe(false);
@@ -588,7 +618,7 @@ describe('HexMapStore', () => {
 
 describe('HexMapStore two-level armed state', () => {
   it('cold-starts armed with Select and the default Subtools', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
 
     // Select armed; Terrain → forest, Feature → first library feature, Region → none.
     expect(store.tool()).toBe('select');
@@ -598,7 +628,7 @@ describe('HexMapStore two-level armed state', () => {
   });
 
   it('arms a Tool and sets its Subtool together when a Subtool is picked', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
 
     store.armTerrain('ocean');
     expect(store.tool()).toBe('terrain');
@@ -610,7 +640,7 @@ describe('HexMapStore two-level armed state', () => {
   });
 
   it('remembers each Tool’s last Subtool and restores it on re-arm', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.armTerrain('ocean'); // remember a non-default terrain
     store.armFeature('ruin'); // switch Tools — terrain memory must survive
 
@@ -624,7 +654,7 @@ describe('HexMapStore two-level armed state', () => {
   });
 
   it('keeps Subtool memory out of the document, the undo stack, and reloads', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
 
     store.armTerrain('ocean');
     store.armFeature('clear');
@@ -637,7 +667,7 @@ describe('HexMapStore two-level armed state', () => {
   });
 
   it('picks the nth Terrain Subtool by index when Terrain is armed', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.armTool('terrain');
 
     store.armSubtoolByIndex(3); // 3rd terrain in the palette is Ocean
@@ -646,7 +676,7 @@ describe('HexMapStore two-level armed state', () => {
   });
 
   it('picks the nth Feature Subtool by index, with Clear in the last slot', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.armTool('feature');
 
     store.armSubtoolByIndex(1);
@@ -657,7 +687,7 @@ describe('HexMapStore two-level armed state', () => {
   });
 
   it('ignores a Subtool index while the Region tool is armed (no Subtools)', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const a = store.createRegion('Avalon', '#b08a4e');
     store.createRegion('Whisperwood', '#7c9b86');
     store.armRegion(a, 'remove'); // armed on Avalon
@@ -669,7 +699,7 @@ describe('HexMapStore two-level armed state', () => {
   });
 
   it('treats an out-of-range Subtool index as a no-op', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.armTerrain('ocean');
 
     store.armSubtoolByIndex(99);
@@ -678,7 +708,7 @@ describe('HexMapStore two-level armed state', () => {
   });
 
   it('ignores a Subtool index for a Tool that has no Subtools', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.armTool('label'); // Label has no Subtools (nor does Erase)
 
     store.armSubtoolByIndex(1);
@@ -688,7 +718,7 @@ describe('HexMapStore two-level armed state', () => {
   });
 
   it('arms Select and resets Subtool memory when a document is loaded', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.armTerrain('ocean');
     store.armSelectSubtool('marquee'); // move the Select Subtool off its boot default
     const id = store.createRegion('Avalon', '#b08a4e');
@@ -697,7 +727,7 @@ describe('HexMapStore two-level armed state', () => {
     store.select({ q: 0, r: 0 }, null); // select the Region so the toggle can engage
     store.armRegionDirection('remove'); // move the membership direction off cold-start
 
-    store.load(emptyHexMap());
+    reload(emptyHexMap());
 
     expect(store.tool()).toBe('select');
     expect(store.selectSubtool()).toBe('pick');
@@ -709,7 +739,7 @@ describe('HexMapStore two-level armed state', () => {
   });
 
   it('does not auto-arm a region when Region is armed with none remembered', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.createRegion('Avalon', '#b08a4e');
     store.createRegion('Whisperwood', '#7c9b86');
 
@@ -722,7 +752,7 @@ describe('HexMapStore two-level armed state', () => {
   });
 
   it('arms no region Subtool when Region is armed on a region-less map', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
 
     store.armTool('region');
 
@@ -731,7 +761,7 @@ describe('HexMapStore two-level armed state', () => {
   });
 
   it('restores the remembered region Subtool on re-arm rather than auto-picking', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.createRegion('Avalon', '#b08a4e');
     const b = store.createRegion('Whisperwood', '#7c9b86');
     store.armRegion(b, 'remove'); // remember a non-first region in 'remove'
@@ -743,12 +773,12 @@ describe('HexMapStore two-level armed state', () => {
   });
 
   it('clears the selected label when a document is loaded', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const first: HexMap = {
       ...emptyHexMap(),
       labels: [{ id: 'L1', text: 'A', position: { x: 0, y: 0 }, size: 28 }],
     };
-    store.load(first);
+    reload(first);
     store.selectLabel('L1');
     expect(store.selectedLabel()?.id).toBe('L1');
 
@@ -758,20 +788,20 @@ describe('HexMapStore two-level armed state', () => {
       ...emptyHexMap(),
       labels: [{ id: 'L1', text: 'B', position: { x: 5, y: 5 }, size: 28 }],
     };
-    store.load(second);
+    reload(second);
     expect(store.selectedLabel()).toBeNull();
   });
 });
 
 describe('HexMapStore Select Subtools (Pick/Marquee)', () => {
   it('cold-starts the Select Subtool at Pick so boot behaviour is unchanged', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
 
     expect(store.selectSubtool()).toBe('pick');
   });
 
   it('arms Select and sets its Subtool together when one is picked', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.armTool('terrain'); // start on another Tool
 
     store.armSelectSubtool('marquee');
@@ -781,7 +811,7 @@ describe('HexMapStore Select Subtools (Pick/Marquee)', () => {
   });
 
   it('remembers the Select Subtool across a Tool switch and restores it on re-arm', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.armSelectSubtool('marquee');
 
     store.armTool('terrain'); // leave Select — its Subtool memory must survive
@@ -791,7 +821,7 @@ describe('HexMapStore Select Subtools (Pick/Marquee)', () => {
   });
 
   it('picks Pick and Marquee by Subtool index 1 and 2 while Select is armed', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.armTool('select');
 
     store.armSubtoolByIndex(2);
@@ -802,7 +832,7 @@ describe('HexMapStore Select Subtools (Pick/Marquee)', () => {
   });
 
   it('treats an out-of-range Select Subtool index as a no-op', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.armSelectSubtool('marquee');
 
     store.armSubtoolByIndex(3); // Select has only two Subtools
@@ -813,51 +843,51 @@ describe('HexMapStore Select Subtools (Pick/Marquee)', () => {
 
 describe('HexMapStore continuous', () => {
   it('treats Terrain as a continuous brush', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.armTerrain('forest');
     expect(store.continuous()).toBe(true);
   });
 
   it('treats Erase as a continuous brush', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.armTool('erase');
     expect(store.continuous()).toBe(true);
   });
 
   it('treats the Clear feature Subtool as a continuous brush', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.armFeature('clear');
     expect(store.continuous()).toBe(true);
   });
 
   it('treats placing a Feature as a discrete stamp, not continuous', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.armFeature('settlement');
     expect(store.continuous()).toBe(false);
   });
 
   it('treats painting a Region as a continuous brush', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.createRegion('Avalon', '#b08a4e');
     store.armRegion(id, 'add');
     expect(store.continuous()).toBe(true);
   });
 
   it('treats placing a Label as a discrete stamp, not continuous', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.armTool('label');
     expect(store.continuous()).toBe(false);
   });
 
   it('treats Select as non-continuous', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     expect(store.continuous()).toBe(false);
   });
 });
 
 describe('HexMapStore selection precedence', () => {
   it('selects the Label under the cursor over the hex beneath it (Label wins)', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     const id = store.addLabel('Open Sea', { x: 5, y: 5 });
 
@@ -867,7 +897,7 @@ describe('HexMapStore selection precedence', () => {
   });
 
   it('selects the Feature on a hex that carries one, not the Hex beneath it', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 1, r: 2 }, 'forest');
     store.placeFeatureAt({ q: 1, r: 2 }, 'settlement');
 
@@ -877,7 +907,7 @@ describe('HexMapStore selection precedence', () => {
   });
 
   it('selects a painted Hex that carries no Feature', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: -3, r: 4 }, 'ocean');
 
     store.select({ q: -3, r: 4 }, null);
@@ -886,7 +916,7 @@ describe('HexMapStore selection precedence', () => {
   });
 
   it('clears the selection on a Void coordinate with no label hit', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'grass');
     store.select({ q: 0, r: 0 }, null); // something selected first
 
@@ -896,7 +926,7 @@ describe('HexMapStore selection precedence', () => {
   });
 
   it('does not resolve a selected Hex as a Label (selectedLabel stays null)', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'grass');
 
     store.select({ q: 0, r: 0 }, null);
@@ -905,7 +935,7 @@ describe('HexMapStore selection precedence', () => {
   });
 
   it('deselect clears the current selection', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'grass');
     store.select({ q: 0, r: 0 }, null);
     expect(store.selection()).not.toBeNull();
@@ -918,7 +948,7 @@ describe('HexMapStore selection precedence', () => {
 
 describe('HexMapStore Region selection cycle', () => {
   it('cycles from the Hex to the Region containing it on a repeated click', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     const id = store.createRegion('Avalon', '#b08a4e');
     store.addHexToRegion(id, { q: 0, r: 0 });
@@ -931,7 +961,7 @@ describe('HexMapStore Region selection cycle', () => {
   });
 
   it('cycles Label → Feature → Region → wrap at a coordinate carrying all three', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.placeFeatureAt({ q: 0, r: 0 }, 'settlement'); // a Feature rides the hex
     const id = store.createRegion('Avalon', '#b08a4e');
@@ -947,7 +977,7 @@ describe('HexMapStore Region selection cycle', () => {
   });
 
   it('resets to the top of the stack when the next click lands on a different coordinate', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.createRegion('Avalon', '#b08a4e');
     store.addHexToRegion(id, { q: 0, r: 0 }); // a Void member coordinate
     store.paintAt({ q: 1, r: 0 }, 'forest');
@@ -963,7 +993,7 @@ describe('HexMapStore Region selection cycle', () => {
   });
 
   it('resets the cycle when the next click at the same coordinate hits a different label', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     const first = store.addLabel('First', { x: 1, y: 1 });
     const second = store.addLabel('Second', { x: 2, y: 2 });
@@ -978,7 +1008,7 @@ describe('HexMapStore Region selection cycle', () => {
   });
 
   it('selects the first containing Region (document order) on a Void coordinate, cycling through the rest', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const a = store.createRegion('Avalon', '#b08a4e');
     const b = store.createRegion('Whisperwood', '#7c9b86');
     store.addHexToRegion(a, { q: 4, r: 4 }); // a is added first → first in document order
@@ -997,7 +1027,7 @@ describe('HexMapStore Region selection cycle', () => {
   });
 
   it('deselects on a Void coordinate that no Region contains', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.createRegion('Avalon', '#b08a4e');
     store.addHexToRegion(id, { q: 0, r: 0 });
     store.select({ q: 0, r: 0 }, null); // something selected first
@@ -1008,7 +1038,7 @@ describe('HexMapStore Region selection cycle', () => {
   });
 
   it('clears a Region selection when that Region is deleted', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.createRegion('Avalon', '#b08a4e');
     store.addHexToRegion(id, { q: 0, r: 0 });
     store.select({ q: 0, r: 0 }, null); // the Region (its only candidate)
@@ -1021,7 +1051,7 @@ describe('HexMapStore Region selection cycle', () => {
   });
 
   it('destroys a selected Region on deleteSelected, clearing the selection (issue #36)', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.createRegion('Avalon', '#b08a4e');
     store.addHexToRegion(id, { q: 0, r: 0 });
     store.select({ q: 0, r: 0 }, null);
@@ -1034,7 +1064,7 @@ describe('HexMapStore Region selection cycle', () => {
   });
 
   it('restarts the cycle at the top after a non-click path changed the selection', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     const id = store.createRegion('Avalon', '#b08a4e');
     store.addHexToRegion(id, { q: 0, r: 0 });
@@ -1056,7 +1086,7 @@ describe('HexMapStore Region selection cycle', () => {
   });
 
   it('re-derives the descent from the live selection when the stack changes under the anchor', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.createRegion('Avalon', '#b08a4e');
     store.addHexToRegion(id, { q: 0, r: 0 }); // a Void member: the stack is [Region]
 
@@ -1074,7 +1104,7 @@ describe('HexMapStore Region selection cycle', () => {
 
 describe('HexMapStore marqueeSelect', () => {
   it('replaces the selection with the marquee’s hexes and labels on a plain marquee', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.paintAt({ q: 1, r: 0 }, 'ocean');
     const labelId = store.addLabel('Avalon', { x: 5, y: 5 });
@@ -1092,7 +1122,7 @@ describe('HexMapStore marqueeSelect', () => {
   });
 
   it('accumulates across boxes on an additive marquee, never dropping a member', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.paintAt({ q: 1, r: 0 }, 'ocean');
     store.paintAt({ q: 2, r: 0 }, 'grass');
@@ -1108,7 +1138,7 @@ describe('HexMapStore marqueeSelect', () => {
   });
 
   it('does not re-add a hex an additive marquee already holds', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.paintAt({ q: 1, r: 0 }, 'ocean');
 
@@ -1122,7 +1152,7 @@ describe('HexMapStore marqueeSelect', () => {
   });
 
   it('clears the set when a plain marquee hits nothing, but an additive one leaves it', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.marqueeSelect([{ q: 0, r: 0 }], [], false);
 
@@ -1134,7 +1164,7 @@ describe('HexMapStore marqueeSelect', () => {
   });
 
   it('opens the Inspector on a marquee that selects something', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
 
     store.marqueeSelect([{ q: 0, r: 0 }], [], false);
@@ -1145,7 +1175,7 @@ describe('HexMapStore marqueeSelect', () => {
 
 describe('HexMapStore marqueePreview', () => {
   it('previews the box’s hexes and labels without committing them (plain)', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.paintAt({ q: 1, r: 0 }, 'ocean');
     const labelId = store.addLabel('Avalon', { x: 5, y: 5 });
@@ -1169,7 +1199,7 @@ describe('HexMapStore marqueePreview', () => {
   });
 
   it('previews a featured cell as a Feature, matching what release would select', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.placeFeatureAt({ q: 0, r: 0 }, 'settlement');
 
@@ -1179,7 +1209,7 @@ describe('HexMapStore marqueePreview', () => {
   });
 
   it('unions the committed selection with the box on an additive preview', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.paintAt({ q: 1, r: 0 }, 'ocean');
     store.marqueeSelect([{ q: 0, r: 0 }], [], false); // committed: hex 0,0
@@ -1195,7 +1225,7 @@ describe('HexMapStore marqueePreview', () => {
   });
 
   it('does not duplicate an already-selected hex in an additive preview', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.marqueeSelect([{ q: 0, r: 0 }], [], false);
 
@@ -1207,7 +1237,7 @@ describe('HexMapStore marqueePreview', () => {
 
 describe('HexMapStore multi-selection set', () => {
   it('builds a set when Cmd/Ctrl-click toggles a second topmost entity in', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.paintAt({ q: 1, r: 0 }, 'ocean');
 
@@ -1224,7 +1254,7 @@ describe('HexMapStore multi-selection set', () => {
   });
 
   it('toggles the topmost entity back out on a second Cmd/Ctrl-click', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.paintAt({ q: 1, r: 0 }, 'ocean');
     store.select({ q: 0, r: 0 }, null);
@@ -1237,7 +1267,7 @@ describe('HexMapStore multi-selection set', () => {
   });
 
   it('Shift-click toggles the whole stack at a coordinate into the set', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest'); // a bare Hex…
     const region = store.createRegion('Avalon', '#b08a4e');
     store.addHexToRegion(region, { q: 0, r: 0 }); // …inside a Region
@@ -1254,7 +1284,7 @@ describe('HexMapStore multi-selection set', () => {
   });
 
   it('Shift-click on an already-fully-selected stack removes all of it', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     const region = store.createRegion('Avalon', '#b08a4e');
     store.addHexToRegion(region, { q: 0, r: 0 });
@@ -1267,7 +1297,7 @@ describe('HexMapStore multi-selection set', () => {
   });
 
   it('Shift-click adds only the missing members of a partly-selected stack', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     const region = store.createRegion('Avalon', '#b08a4e');
     store.addHexToRegion(region, { q: 0, r: 0 });
@@ -1282,7 +1312,7 @@ describe('HexMapStore multi-selection set', () => {
   });
 
   it('a plain click replaces the whole set with the single topmost entity', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.paintAt({ q: 1, r: 0 }, 'ocean');
     store.select({ q: 0, r: 0 }, null);
@@ -1295,7 +1325,7 @@ describe('HexMapStore multi-selection set', () => {
   });
 
   it('drops a stale member when its entity is deleted, keeping the rest', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     const labelId = store.addLabel('Doomed', { x: 5, y: 5 });
     store.select({ q: 0, r: 0 }, null);
@@ -1309,7 +1339,7 @@ describe('HexMapStore multi-selection set', () => {
   });
 
   it('clears the whole set on a plain click in empty space', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.paintAt({ q: 1, r: 0 }, 'ocean');
     store.select({ q: 0, r: 0 }, null);
@@ -1322,7 +1352,7 @@ describe('HexMapStore multi-selection set', () => {
   });
 
   it('add-top adds the topmost entity without removing existing members, idempotently', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.paintAt({ q: 1, r: 0 }, 'ocean');
     store.select({ q: 0, r: 0 }, null); // [hex 0,0]
@@ -1343,7 +1373,7 @@ describe('HexMapStore multi-selection set', () => {
   });
 
   it('add-stack adds the whole stack at a coordinate, never removing it on re-entry', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     const region = store.createRegion('Avalon', '#b08a4e');
     store.addHexToRegion(region, { q: 0, r: 0 });
@@ -1363,7 +1393,7 @@ describe('HexMapStore multi-selection set', () => {
   });
 
   it('add-* over empty space leaves the set unchanged', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.select({ q: 0, r: 0 }, null);
 
@@ -1373,10 +1403,10 @@ describe('HexMapStore multi-selection set', () => {
   });
 
   it('deletes a heterogeneous set per kind in a single undo step, restoring all on undo', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     // `load` clears history, so the multi-delete is the only edit on the stack —
     // a single undo that restores everything proves it is one step.
-    store.load({
+    reload({
       hexes: {
         '0,0': { terrain: 'forest' },
         '1,0': { terrain: 'grass', feature: { ref: 'settlement' } },
@@ -1417,7 +1447,7 @@ describe('HexMapStore multi-selection set', () => {
 
 describe('HexMapStore deleteSelected', () => {
   it('deletes the selected Label and clears the selection', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.addLabel('Doomed', { x: 0, y: 0 });
     store.selectLabel(id);
 
@@ -1428,7 +1458,7 @@ describe('HexMapStore deleteSelected', () => {
   });
 
   it('deletes a selected Feature by clearing only the feature, leaving the terrain', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 1, r: 1 }, 'forest');
     store.placeFeatureAt({ q: 1, r: 1 }, 'settlement');
     store.select({ q: 1, r: 1 }, null); // selects the Feature (precedence)
@@ -1440,7 +1470,7 @@ describe('HexMapStore deleteSelected', () => {
   });
 
   it('deletes a selected Hex by erasing its whole record, back to Void', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: -3, r: 4 }, 'ocean');
     store.placeFeatureAt({ q: -3, r: 4 }, 'ruin');
     // A featured hex selects the Feature (precedence), so clear it first to get
@@ -1455,7 +1485,7 @@ describe('HexMapStore deleteSelected', () => {
   });
 
   it('treats deleteSelected with nothing selected as a no-op with no undo step', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
 
     store.deleteSelected();
 
@@ -1463,7 +1493,7 @@ describe('HexMapStore deleteSelected', () => {
   });
 
   it('records a single undoable step for a delete', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.placeFeatureAt({ q: 0, r: 0 }, 'settlement');
     store.select({ q: 0, r: 0 }, null); // the Feature
@@ -1483,7 +1513,7 @@ describe('HexMapStore moveSelection', () => {
   const ZERO = { x: 0, y: 0 };
 
   it('translates a whole multi-hex selection by one offset, keeping its shape', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.placeFeatureAt({ q: 0, r: 0 }, 'settlement');
     store.paintAt({ q: 1, r: 0 }, 'ocean');
@@ -1511,7 +1541,7 @@ describe('HexMapStore moveSelection', () => {
   });
 
   it('shifts a contiguous blob by one cell without fighting itself (intra-group overlap)', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.paintAt({ q: 1, r: 0 }, 'ocean');
     store.marqueeSelect([{ q: 0, r: 0 }, { q: 1, r: 0 }], [], false);
@@ -1526,7 +1556,7 @@ describe('HexMapStore moveSelection', () => {
   });
 
   it('swaps a non-selected occupant back to d − offset when that cell is free', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.paintAt({ q: 0, r: 1 }, 'grass');
     store.paintAt({ q: 3, r: 0 }, 'ocean'); // a non-selected occupant at one destination
@@ -1542,7 +1572,7 @@ describe('HexMapStore moveSelection', () => {
   });
 
   it('refuses a blocked move entirely: no document change, no undo step, selection intact', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.paintAt({ q: 1, r: 0 }, 'ocean');
     store.paintAt({ q: 2, r: 0 }, 'mountain'); // X: pushing it back lands where A is going
@@ -1561,7 +1591,7 @@ describe('HexMapStore moveSelection', () => {
   });
 
   it('translates a selected region\'s footprint by the offset, keeping it selected', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.createRegion('Avalon', '#b08a4e');
     store.addHexToRegion(id, { q: 0, r: 0 });
     store.addHexToRegion(id, { q: 1, r: 0 });
@@ -1574,7 +1604,7 @@ describe('HexMapStore moveSelection', () => {
   });
 
   it('moves a labels-only selection by free pixels, keeping the label selected', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.addLabel('Whisperwood', { x: 10, y: 10 });
     store.selectLabel(id);
 
@@ -1587,7 +1617,7 @@ describe('HexMapStore moveSelection', () => {
   });
 
   it('applies a mixed hex + region + label move as one undo step', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     const regionId = store.createRegion('Avalon', '#b08a4e');
     store.addHexToRegion(regionId, { q: 0, r: 0 });
@@ -1612,7 +1642,7 @@ describe('HexMapStore moveSelection', () => {
   });
 
   it('moves a single selected hex onto Void, re-pointing the selection', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.placeFeatureAt({ q: 0, r: 0 }, 'settlement');
     store.select({ q: 0, r: 0 }, null);
@@ -1628,7 +1658,7 @@ describe('HexMapStore moveSelection', () => {
   });
 
   it('swaps a single selected hex onto an occupant, selecting only the moved record', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.editHexName({ q: 0, r: 0 }, 'Riverbend');
     store.paintAt({ q: 1, r: 0 }, 'ocean');
@@ -1644,7 +1674,7 @@ describe('HexMapStore moveSelection', () => {
   });
 
   it('restores the whole group with a single undo and re-applies it on redo', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.paintAt({ q: 1, r: 0 }, 'ocean');
     store.marqueeSelect([{ q: 0, r: 0 }, { q: 1, r: 0 }], [], false);
@@ -1675,7 +1705,7 @@ describe('HexMapStore moveSelection', () => {
   });
 
   it('treats a drag that never moved (zero offset and pixels) as a no-op', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.select({ q: 0, r: 0 }, null);
 
@@ -1688,7 +1718,7 @@ describe('HexMapStore moveSelection', () => {
   });
 
   it('reports a resolved move as moved and a drag that never moved as noop', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.select({ q: 0, r: 0 }, null);
 
@@ -1698,7 +1728,7 @@ describe('HexMapStore moveSelection', () => {
   });
 
   it('reports a blocked group move as blocked, so the caller can warn the user', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.paintAt({ q: 1, r: 0 }, 'ocean');
     store.paintAt({ q: 2, r: 0 }, 'grass'); // a non-selected occupant on B's destination
@@ -1711,7 +1741,7 @@ describe('HexMapStore moveSelection', () => {
   });
 
   it('leaves an unselected region\'s membership untouched at both the origin and destination', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.createRegion('Avalon', '#b08a4e');
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.addHexToRegion(id, { q: 0, r: 0 }); // the origin is a region member
@@ -1730,7 +1760,7 @@ describe('HexMapStore moveSelection', () => {
 
 describe('HexMapStore hex name', () => {
   it('names a painted hex', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
 
     store.editHexName({ q: 0, r: 0 }, 'Riverbend');
@@ -1742,7 +1772,7 @@ describe('HexMapStore hex name', () => {
   });
 
   it('undo reverses a rename', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.editHexName({ q: 0, r: 0 }, 'Riverbend');
 
@@ -1752,7 +1782,7 @@ describe('HexMapStore hex name', () => {
   });
 
   it('naming a Void coordinate is a no-op that paints no hex and records no undo step', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
 
     store.editHexName({ q: 0, r: 0 }, 'Riverbend');
 
@@ -1761,7 +1791,7 @@ describe('HexMapStore hex name', () => {
   });
 
   it('clearing the name to blank removes the field rather than leaving an empty string', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.editHexName({ q: 0, r: 0 }, 'Riverbend');
 
@@ -1771,7 +1801,7 @@ describe('HexMapStore hex name', () => {
   });
 
   it('clearing the feature leaves the name intact', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.placeFeatureAt({ q: 0, r: 0 }, 'settlement');
     store.editHexName({ q: 0, r: 0 }, 'Riverbend');
@@ -1785,7 +1815,7 @@ describe('HexMapStore hex name', () => {
   });
 
   it('erasing the hex removes the name with the rest of the record', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.editHexName({ q: 0, r: 0 }, 'Riverbend');
 
@@ -1795,7 +1825,7 @@ describe('HexMapStore hex name', () => {
   });
 
   it('carries the name with the hex on a single-hex move', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.editHexName({ q: 0, r: 0 }, 'Riverbend');
     store.select({ q: 0, r: 0 }, null);
@@ -1813,7 +1843,7 @@ describe('HexMapStore hex name', () => {
 describe('HexMapStore region direction', () => {
   /** Select a fresh Region (sole member at a Void coordinate, so it's the only candidate). */
   function withSelectedRegion() {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.createRegion('Avalon', '#b08a4e');
     store.addHexToRegion(id, { q: 0, r: 0 });
     store.select({ q: 0, r: 0 }, null);
@@ -1841,13 +1871,13 @@ describe('HexMapStore region direction', () => {
   });
 
   it('cold-starts the membership direction at Add', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
 
     expect(store.regionDirection()).toBe('add');
   });
 
   it('does not arm the Region tool, or move the direction, when no Region is selected', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.createRegion('Avalon', '#b08a4e'); // exists, but is not selected
 
     // Engage the *non-default* direction: were the guard not honoured, the armed
@@ -1875,7 +1905,7 @@ describe('HexMapStore region direction', () => {
   });
 
   it('does not inherit a stale Region\'s direction when a different Region is selected', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const a = store.createRegion('Avalon', '#b08a4e');
     const b = store.createRegion('Brevoy', '#7c9b86');
     store.addHexToRegion(a, { q: 0, r: 0 });
@@ -1898,7 +1928,7 @@ describe('HexMapStore region direction', () => {
   });
 
   it('arms and paints the selected Region — not merely the first — when several exist', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const first = store.createRegion('First', '#7c9b86');
     const second = store.createRegion('Second', '#b08a4e');
     store.addHexToRegion(second, { q: 0, r: 0 }); // the only candidate at 0,0
@@ -1974,7 +2004,7 @@ describe('HexMapStore region direction', () => {
 
 describe('HexMapStore Region tool (membership brush only)', () => {
   it('does not mint a Region on a stroke when armed with none selected', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.armTool('region'); // armed, but nothing is selected
 
     store.applyAt({ q: 2, r: 3 });
@@ -1986,7 +2016,7 @@ describe('HexMapStore Region tool (membership brush only)', () => {
   });
 
   it('paints the selected Region\'s membership on a stroke (the only remaining job)', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.createRegion('Avalon', '#b08a4e');
     store.selectRegion(id);
     store.armRegion(id, 'add'); // the Inspector's Add/Remove path arms the brush
@@ -1999,7 +2029,7 @@ describe('HexMapStore Region tool (membership brush only)', () => {
 
 describe('HexMapStore New Region (from the Regions panel)', () => {
   it('creates an empty "Region 1" with the first palette colour, without painting', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
 
     const id = store.newRegion();
 
@@ -2013,7 +2043,7 @@ describe('HexMapStore New Region (from the Regions panel)', () => {
   });
 
   it('selects the new Region and opens it in the Inspector, even from the list', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.showRegionsPanel(); // the user is on the Regions list when they click New
 
     const id = store.newRegion();
@@ -2025,7 +2055,7 @@ describe('HexMapStore New Region (from the Regions panel)', () => {
   });
 
   it('arms the Region tool on the new Region in Add, so the next stroke paints into it', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
 
     const id = store.newRegion();
 
@@ -2038,7 +2068,7 @@ describe('HexMapStore New Region (from the Regions panel)', () => {
   });
 
   it('creates as one undoable step that restores name, selection on redo', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
 
     const id = store.newRegion();
 
@@ -2052,7 +2082,7 @@ describe('HexMapStore New Region (from the Regions panel)', () => {
   });
 
   it('numbers and colours successive New Regions through the palette in order', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
 
     store.newRegion(); // Region 1
     store.newRegion(); // Region 2
@@ -2063,7 +2093,7 @@ describe('HexMapStore New Region (from the Regions panel)', () => {
   });
 
   it('numbers a New Region by the next unused "Region N", not the region count', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
 
     store.newRegion(); // Region 1
     store.newRegion(); // Region 2
@@ -2081,7 +2111,7 @@ describe('HexMapStore New Region (from the Regions panel)', () => {
 
 describe('HexMapStore shared right column', () => {
   it('is closed by default and opens the Regions list on demand', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
 
     // The right panel is closed by default (ADR-0013): nothing covers the map until
     // there is something to show — a selection (Inspector) or Regions toggled on.
@@ -2093,7 +2123,7 @@ describe('HexMapStore shared right column', () => {
   });
 
   it('selects a Region by id — even an empty one — and flips back to the Inspector', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     // An empty Region has no member hex, so select(coord) can't reach it — the list
     // selects by id. "Emptied Regions stay reachable" (ADR-0011).
     const id = store.createRegion('The Whisperwood', '#6f7fae');
@@ -2107,19 +2137,19 @@ describe('HexMapStore shared right column', () => {
   });
 
   it('resets the right panel closed when a map is opened', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.showRegionsPanel();
 
     // Opening a map is a fresh start (like the tool/selection reset in load): the
     // right side reopens closed, not the prior list view or an empty Inspector
     // (ADR-0013, story 20).
-    store.load(emptyHexMap());
+    reload(emptyHexMap());
 
     expect(store.rightPanel()).toBeNull();
   });
 
   it('flips the shared column back to the Inspector when a canvas selection is made', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.createRegion('Avalon', '#b08a4e');
     store.addHexToRegion(id, { q: 0, r: 0 }); // a member coordinate to click
     store.showRegionsPanel(); // the user is on the Regions list
@@ -2134,7 +2164,7 @@ describe('HexMapStore shared right column', () => {
   });
 
   it('leaves a rail-opened Regions list alone on a modifier-click that hits empty Void', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.marqueeSelect([{ q: 0, r: 0 }], [], false); // a selection exists
     store.showRegionsPanel(); // the user flips to the Regions list
@@ -2149,7 +2179,7 @@ describe('HexMapStore shared right column', () => {
   });
 
   it('flips the shared column back to the Inspector when a Label is selected', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.addLabel('Pick me', { x: 0, y: 0 });
     store.showRegionsPanel();
     expect(store.rightPanel()).toBe('regions');
@@ -2161,7 +2191,7 @@ describe('HexMapStore shared right column', () => {
   });
 
   it('disarms a membership brush armed on a different Region when one is selected from the list', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const a = store.createRegion('Avalon', '#b08a4e');
     const b = store.createRegion('Brevoy', '#7c9b86');
     store.armRegion(a, 'add'); // the brush is armed on A
@@ -2181,7 +2211,7 @@ describe('HexMapStore shared right column', () => {
   });
 
   it('leaves the brush armed when the Region it targets is the one selected', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const a = store.createRegion('Avalon', '#b08a4e');
     store.armRegion(a, 'remove'); // armed on A…
 
@@ -2192,7 +2222,7 @@ describe('HexMapStore shared right column', () => {
   });
 
   it('toggles the right panel between the Regions list and closed', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
 
     // The panel is closed by default; the rail entry's click opens the Regions list.
     expect(store.rightPanel()).toBeNull();
@@ -2207,7 +2237,7 @@ describe('HexMapStore shared right column', () => {
   });
 
   it('opens the Inspector from the closed default when an entity is selected', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     expect(store.rightPanel()).toBeNull(); // closed boot state
 
@@ -2219,7 +2249,7 @@ describe('HexMapStore shared right column', () => {
   });
 
   it('opens the Regions list from the Inspector when the rail entry is toggled', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.addLabel('Pick me', { x: 0, y: 0 });
     store.selectLabel(id); // a selection opens the Inspector
     expect(store.rightPanel()).toBe('inspector');
@@ -2231,7 +2261,7 @@ describe('HexMapStore shared right column', () => {
   });
 
   it('closes the Inspector when the selection that opened it is cleared', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.addLabel('Pick me', { x: 0, y: 0 });
     store.selectLabel(id); // a selection opens the Inspector
     expect(store.rightPanel()).toBe('inspector');
@@ -2244,7 +2274,7 @@ describe('HexMapStore shared right column', () => {
   });
 
   it('closes the Inspector when the inspected entity is deleted', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.addLabel('Doomed', { x: 0, y: 0 });
     store.selectLabel(id);
     expect(store.rightPanel()).toBe('inspector');
@@ -2257,7 +2287,7 @@ describe('HexMapStore shared right column', () => {
   });
 
   it('leaves the Regions list open when a canvas click deselects', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.showRegionsPanel();
     expect(store.rightPanel()).toBe('regions');
 
@@ -2275,7 +2305,7 @@ describe('HexMapStore shared right column', () => {
 
 describe('HexMapStore Entity Link', () => {
   it('links the selected Hex to an Entity, surfacing it through selectedEntityLink', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.select({ q: 0, r: 0 }, null);
 
@@ -2286,7 +2316,7 @@ describe('HexMapStore Entity Link', () => {
   });
 
   it('unlinks the selected Hex, dropping the field rather than blanking it', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.select({ q: 0, r: 0 }, null);
     store.linkEntity('ent-1');
@@ -2298,7 +2328,7 @@ describe('HexMapStore Entity Link', () => {
   });
 
   it('links a selected Feature on its own ref, leaving the host Hex unlinked', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.placeFeatureAt({ q: 0, r: 0 }, 'settlement');
     store.select({ q: 0, r: 0 }, null); // resolves to the Feature
@@ -2312,7 +2342,7 @@ describe('HexMapStore Entity Link', () => {
   });
 
   it('links a selected Region to an Entity, surfacing it through selectedEntityLink', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.createRegion('Avalon', '#b08a4e');
     store.addHexToRegion(id, { q: 0, r: 0 });
     store.select({ q: 0, r: 0 }, null); // a Void member resolves to the Region
@@ -2327,7 +2357,7 @@ describe('HexMapStore Entity Link', () => {
   });
 
   it('exposes no Entity Link for a selected Label (Labels carry none)', () => {
-    const store = new HexMapStore();
+    const store = makeStore();
     const id = store.addLabel('Open Sea', { x: 0, y: 0 });
     store.selectLabel(id);
 
@@ -2335,5 +2365,63 @@ describe('HexMapStore Entity Link', () => {
     // Linking a Label is a no-op — nothing to carry the id.
     store.linkEntity('ent-6');
     expect(store.selectedEntityLink()).toBeNull();
+  });
+});
+
+describe('HexMapStore central-store seam (ADR-0048)', () => {
+  it('reads the grid document off the session body without a store-level load', () => {
+    const store = makeStore();
+
+    // The session is the source of the grid: writing its body surfaces on document().
+    session.load({ hexes: { '2,3': { terrain: 'ocean' } }, regions: [], labels: [] });
+
+    expect(store.document()).toEqual({
+      hexes: { '2,3': { terrain: 'ocean' } },
+      regions: [],
+      labels: [],
+    });
+  });
+
+  it('reflects a mutate driven straight through the session (a peer View editing the body)', () => {
+    const store = makeStore();
+
+    // A different View edits the shared body directly; the map's document tracks it live.
+    session.mutate((body) => {
+      if ('hexes' in body) body.hexes['0,0'] = { terrain: 'grass' };
+    });
+
+    expect(store.document().hexes['0,0']).toEqual({ terrain: 'grass' });
+  });
+
+  it('does not reset undo history on an edit — a mutate never bumps the load generation', () => {
+    const store = makeStore();
+    TestBed.flushEffects(); // settle the store's initial reset, as its first render cycle does
+
+    store.paintAt({ q: 0, r: 0 }, 'grass');
+    store.paintAt({ q: 1, r: 1 }, 'ocean');
+    // A later flush must not re-run the reset: an edit leaves loadGeneration untouched,
+    // so the effect has no reason to fire and the live history survives.
+    TestBed.flushEffects();
+
+    expect(store.canUndo()).toBe(true);
+    store.undo();
+    expect('1,1' in store.document().hexes).toBe(false);
+    expect(store.document().hexes['0,0']).toEqual({ terrain: 'grass' });
+  });
+
+  it('clears undo history on a fresh load so an undo cannot corrupt the new grid', () => {
+    const store = makeStore();
+    store.paintAt({ q: 0, r: 0 }, 'grass');
+
+    // A new Entity loads: its body replaces the grid and the stale undo patch is dropped.
+    reload({ hexes: { '9,9': { terrain: 'desert' } }, regions: [], labels: [] });
+
+    expect(store.canUndo()).toBe(false);
+    store.undo(); // a no-op — the pre-load patch is gone, so the new grid is untouched
+    expect(store.document()).toEqual({
+      hexes: { '9,9': { terrain: 'desert' } },
+      regions: [],
+      labels: [],
+    });
   });
 });

@@ -5,9 +5,8 @@ import { EMPTY, catchError, combineLatest, of, switchMap, tap } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { EntityNudge, StaleNudge } from '@hexly/domain';
 import { PublicClient, PublicEntityMode, AppShellStore, EVICTED } from '@hexly/web-core';
-import { HexMapStore } from '@hexly/web-map';
+import { ENTITY_SESSION } from '@hexly/web-entity';
 import { EntitySession } from '../entity/services/entity-session';
-import { GRID_STORE } from '../entity/services/grid-store.port';
 import { EntityNameResolver, CONTENT_EDITOR_SESSION } from '@hexly/content-editor';
 import { PublicEntityNameResolver } from './public-entity-name-resolver';
 import { RIGHT_DOCK_PANELS } from '../entity/services/right-dock';
@@ -33,8 +32,8 @@ interface Followed {
   host: { class: 'flex h-full flex-col' },
   providers: [
     EntitySession,
+    { provide: ENTITY_SESSION, useExisting: EntitySession },
     { provide: CONTENT_EDITOR_SESSION, useExisting: EntitySession },
-    { provide: GRID_STORE, useExisting: HexMapStore },
     { provide: EntityNameResolver, useClass: PublicEntityNameResolver },
     // The dock offers the Outline alone: References would need `/entities/:id/references`, which
     // answers an authenticated user, and this Entity's Public Link grants no scope beyond itself.

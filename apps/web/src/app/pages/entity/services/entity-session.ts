@@ -27,25 +27,30 @@ import {
 } from 'rxjs';
 import {
   Content,
-  emptyHexMap,
+  emptyEntityBody,
   EntityBody,
   EntityDetail,
   EntitySaveOutcome,
-  hasHexGrid,
-  HexMap,
-  hexMapSchema,
   tiptapContent,
   Visibility,
 } from '@hexly/domain';
 import { EntitiesClient, ActiveWorld, idFromSegment, worldRoute, TitleService, AppShellStore, EVICTED } from '@hexly/web-core';
-import { GRID_STORE } from './grid-store.port';
+import {
+  applyPatches as immerApplyPatches,
+  Draft,
+  Patch,
+  produceWithPatches,
+} from '@hexly/immer';
+import type { EntitySession as EntitySessionPort } from '@hexly/web-entity';
 import type { ContentEditorSession } from '@hexly/content-editor';
 
 /**
- * Bridges {@link EntitiesClient} and the hex-grid editor (the {@link GRID_STORE}
- * port, implemented by `HexMapStore`) for `/entities/:id`: unwraps the stored grid
- * on open, re-wraps it on save. Depends on the port, not `@hexly/web-map`, so the
- * map lib plugs into the session rather than the session reaching into it (ADR-0048).
+ * The central mutable store for the open Entity (ADR-0048, *Central store* amendment):
+ * the concrete {@link EntitySessionPort}. Owns the working body every View edits through
+ * {@link mutate}, and bridges it to {@link EntitiesClient} for `/entities/:id` — load,
+ * autosave, conflict, live-follow. `HexMapStore` and the other Views bind to it through
+ * the {@link ENTITY_SESSION} token, so the map lib plugs into the session rather than the
+ * session reaching into it (the inversion this ADR set up).
  *
  * Route-scoped (`providers`), not root: leaving the route destroys it, so
  * open-Entity state resets implicitly.
@@ -62,15 +67,14 @@ const FLUSH_TIMEOUT_MS = 10_000;
 
 /** The savable payload references captured at one instant. */
 interface SaveSnapshot {
-  grid: HexMap;
+  body: EntityBody;
   content: Content;
   tags: readonly string[];
 }
 
 @Injectable()
-export class EntitySession implements ContentEditorSession {
+export class EntitySession implements ContentEditorSession, EntitySessionPort {
   private readonly entities = inject(EntitiesClient);
-  private readonly editor = inject(GRID_STORE);
   private readonly title = inject(TitleService);
   private readonly router = inject(Router);
   private readonly activeWorld = inject(ActiveWorld);
@@ -80,6 +84,23 @@ export class EntitySession implements ContentEditorSession {
 
   private readonly _current = signal<EntityDetail | null>(null);
   readonly current = this._current.asReadonly();
+
+  /**
+   * The working Entity body — the source every View edits (grid now, Fields/Metadata
+   * later). Owned here (ADR-0048): a View reads its slice off {@link body} and writes it
+   * through {@link mutate}. Content is the one exception, still tracked in {@link _content}
+   * (TipTap owns its own live doc) and folded back in at save; `mutate` covers the rest.
+   */
+  private readonly _body = signal<EntityBody>(emptyEntityBody([]));
+  readonly body = this._body.asReadonly();
+
+  /**
+   * Bumped on a *fresh* load — a new Entity adopted, or the canvas cleared for a route
+   * swap — never on a {@link mutate}. A View watches it to reset the transient state tied
+   * to the old body (a map editor's undo history and selection); an edit leaves it be.
+   */
+  private readonly _loadGeneration = signal(0);
+  readonly loadGeneration = this._loadGeneration.asReadonly();
 
   private readonly _conflict = signal<EntityDetail | null>(null);
   /** The server's current Entity when a save was rejected as stale, else `null`. */
@@ -103,8 +124,10 @@ export class EntitySession implements ContentEditorSession {
   readonly evicted = this._evicted.asReadonly();
 
   /**
-   * Whether the load-time Rights carry the `edit` verb. False → a read-only
-   * opener: {@link save} no-ops so no autosave ever hits a 403 wall.
+   * Whether the load-time Rights carry the `edit` verb (ADR-0037). False → a read-only
+   * opener: {@link save} no-ops so no autosave ever hits a 403 wall. Exposed straight off
+   * the `ENTITY_SESSION` token so a View gates its own tools without the session pushing
+   * edit-ability into it — a visibility flip that revokes write updates it live.
    */
   readonly writable = computed(() => !!this._current()?.rights?.includes('edit'));
 
@@ -140,7 +163,7 @@ export class EntitySession implements ContentEditorSession {
    * reference equality against these — sound because immer and TipTap-minted
    * Content only yield a new reference on a real edit.
    */
-  private readonly _baseGrid = signal<HexMap | null>(null);
+  private readonly _baseBody = signal<EntityBody | null>(null);
   private readonly _baseContent = signal<Content | null>(null);
   private readonly _baseTags = signal<readonly string[]>([]);
 
@@ -148,7 +171,7 @@ export class EntitySession implements ContentEditorSession {
   readonly dirty = computed(
     () =>
       this._current() !== null &&
-      (this.editor.document() !== this._baseGrid() ||
+      (this._body() !== this._baseBody() ||
         this._content() !== this._baseContent() ||
         this._tags() !== this._baseTags()),
   );
@@ -182,11 +205,6 @@ export class EntitySession implements ContentEditorSession {
     effect(() => this.title.setDocumentName(this._current()?.name ?? null));
     this.destroyRef.onDestroy(() => this.title.setDocumentName(null));
 
-    // The grid editor's edit-ability tracks the load-time Rights (ADR-0037), so the
-    // map view gates its tools without reaching back to the session (a visibility flip
-    // that revokes write updates it live).
-    effect(() => this.editor.setEditable(this.writable()));
-
     // Route-leave flush is awaited by the CanDeactivate guard, not fired here —
     // onDestroy runs too late to block navigation, so the guard calls flush() up front.
 
@@ -219,7 +237,7 @@ export class EntitySession implements ContentEditorSession {
     // conflict, during route load, and after a failed save until the payload
     // changes — else _saving flipping false would retry the same failing PUT.
     effect((onCleanup) => {
-      this.editor.document();
+      this._body();
       this._content();
       this._tags();
       const armed =
@@ -329,14 +347,16 @@ export class EntitySession implements ContentEditorSession {
     this._evicted.set(false);
     this.failed = null;
     this._current.set(detail);
+    this._body.set(detail.document); // the working body — grid and all — is the loaded body
     this._content.set(detail.document.content); // before seed: seed effect reads content()
     this._seed.set(detail);
     this._tags.set(detail.tags);
-    this.editor.load(gridOf(detail.document));
     // Baseline = exactly the references now live, so a load never reads as dirty.
-    this._baseGrid.set(this.editor.document());
+    this._baseBody.set(this._body());
     this._baseContent.set(this._content());
     this._baseTags.set(this._tags());
+    // A fresh Entity: reset every View's body-tied transient state (a map's undo/selection).
+    this._loadGeneration.update((n) => n + 1);
     // Live-follow tracks the open Entity reactively off _current (see the reconciler), so adopt
     // needs no follow bookkeeping — swapping id re-points the subscription on its own.
   }
@@ -376,6 +396,26 @@ export class EntitySession implements ContentEditorSession {
     this._tags.set(tags);
   }
 
+  /**
+   * Run `recipe` against a draft of the body through Immer, adopting the result and
+   * returning the forward/inverse patches (ADR-0048). The universal write-channel every
+   * View shares; a View that owns undo/redo (the map editor) keeps the patches to replay.
+   * Bumps no load generation — an edit must not reset a View's history.
+   */
+  mutate(recipe: (draft: EntityBody) => void): { redo: Patch[]; undo: Patch[] } {
+    const [next, redo, undo] = produceWithPatches(
+      this._body(),
+      recipe as (draft: Draft<EntityBody>) => void,
+    );
+    this._body.set(next as EntityBody);
+    return { redo, undo };
+  }
+
+  /** Apply raw patches to the body — the undo/redo channel a View replays its own stack through. */
+  applyPatches(patches: Patch[]): void {
+    this._body.set(immerApplyPatches(this._body(), patches));
+  }
+
   /** Always a fresh fetch: the session outlives library trips, so a cached `current` can be stale (#70). */
   openRoute(id: string): Observable<EntityDetail> {
     // Flush the previous Entity AND WAIT before clearing its canvas (ADR-0026): an in-app
@@ -385,13 +425,16 @@ export class EntitySession implements ContentEditorSession {
     return concat(
       this.flush().pipe(ignoreElements()),
       defer(() => {
-        this.editor.load(emptyHexMap()); // clear the previous canvas during load (#7)
+        this._body.set(emptyEntityBody([])); // clear the previous canvas during load (#7)
         this._tags.set([]); // and the previous Entity's tags/content, which ride the same load (#88)
         this._content.set(null);
+        // A cleared canvas is a fresh start: reset the Views' body-tied state (#7) — the same
+        // bump adopt() makes, so a load that never resolves still leaves no stale map state.
+        this._loadGeneration.update((n) => n + 1);
         // Re-baseline onto the cleared placeholder so the load window isn't dirty — else a
         //404 redirect (which clears then leaves) would flush this empty state over the
         // Entity the user just left (ADR-0026).
-        this._baseGrid.set(this.editor.document());
+        this._baseBody.set(this._body());
         this._baseContent.set(this._content());
         this._baseTags.set(this._tags());
         // Eviction belongs to the Entity just left (#174): clear it as the new load starts —
@@ -459,7 +502,7 @@ export class EntitySession implements ContentEditorSession {
     return this.runSave(
       open,
       {
-        grid: this.editor.document(),
+        body: this._body(),
         content,
         tags: this._tags(),
       },
@@ -476,10 +519,12 @@ export class EntitySession implements ContentEditorSession {
     this._saving.set(true);
     this._error.set(null);
     this.failed = null;
-    const { grid, content, tags } = snapshot;
-    const body = withContent(withGrid(open.document, grid), content);
+    const { body, content, tags } = snapshot;
+    // The working body already carries every grid/metadata edit (mutate wrote them in
+    // place); fold in only the live Content, which TipTap tracks separately (ADR-0019).
+    const saved = withContent(body, content);
     const save$ = this.entities
-      .save(open.id, body, open.version, tags)
+      .save(open.id, saved, open.version, tags)
       .pipe(
       tap((outcome) => {
         // Drop a late response if the user has since navigated to another Entity — it
@@ -492,7 +537,7 @@ export class EntitySession implements ContentEditorSession {
         } else {
           this._conflict.set(null);
           this._current.set(this.withPermissions(outcome.entity, open));
-          this._baseGrid.set(grid);
+          this._baseBody.set(body);
           this._baseContent.set(content);
           this._baseTags.set(tags);
         }
@@ -545,7 +590,7 @@ export class EntitySession implements ContentEditorSession {
     const failed = this.failed;
     return (
       failed !== null &&
-      this.editor.document() === failed.grid &&
+      this._body() === failed.body &&
       this._content() === failed.content &&
       this._tags() === failed.tags
     );
@@ -564,23 +609,6 @@ export class EntitySession implements ContentEditorSession {
       }),
     );
   }
-}
-
-/**
- * The body's hex-grid payload, parsed through {@link hexMapSchema} so the schema picks out the grid
- * fields rather than a hand-listed set; an empty plane when the body carries no hex-grid. Keys off
- * the payload composition ({@link hasHexGrid}) — the body holds no `type` field now (ADR-0048).
- */
-function gridOf(body: EntityBody): HexMap {
-  return hasHexGrid(body) ? hexMapSchema.parse(body) : emptyHexMap();
-}
-
-/**
- * Re-wrap an edited grid into the body on save (ADR-0019). A body with no hex-grid payload passes
- * through as-is, so the hex seam can't graft a grid onto a note.
- */
-function withGrid(body: EntityBody, grid: HexMap): EntityBody {
-  return hasHexGrid(body) ? { ...body, ...grid } : body;
 }
 
 /** Fold the live Content into the body on save (ADR-0019); the spread preserves the payload composition. */

@@ -8,8 +8,7 @@ import { CORE_HEXMAP, emptyContent, EntityDetail, WorldDetail, WorldVerb } from 
 import { provideTranslocoTesting, MockEntitiesClient, MockWorldsClient, MockUserDirectoryClient, MockAuthClient } from '@hexly/web-core/testing';
 import { EntitiesClient, WorldsClient, ActiveWorld, UserDirectoryClient, AuthClient } from '@hexly/web-core';
 import { EntitySession } from '../services/entity-session';
-import { GRID_STORE } from '../services/grid-store.port';
-import { HexMapStore } from '@hexly/web-map';
+import { ENTITY_SESSION } from '@hexly/web-entity';
 import { EntityViewStore } from '../services/entity-view-store';
 import { ViewRegistry } from '../../../entity-types/view-registry';
 import { CORE_VIEW_CONTENT } from '../../../entity-types/view-definition';
@@ -73,7 +72,7 @@ describe('EntityHeader', () => {
       imports: [EntityHeader, provideTranslocoTesting()],
       providers: [
         EntitySession,
-        { provide: GRID_STORE, useExisting: HexMapStore },
+        { provide: ENTITY_SESSION, useExisting: EntitySession },
         // Page-scoped in the app (provided on EntityPage); provided here since this spec
         // mounts the header alone, and it reads the active View off this store.
         EntityViewStore,

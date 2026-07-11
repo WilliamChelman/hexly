@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { TranslocoService } from '@jsverse/transloco';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
+import { provideHexMapStoreTesting } from '../testing/entity-session.fake';
 import { HexMapStore } from '../services/hexmap-store';
 import { EditorRail } from './editor-rail';
 
@@ -17,7 +18,7 @@ function setup() {
 
 describe('EditorRail', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [EditorRail, provideTranslocoTesting()] }).compileComponents();
+    await TestBed.configureTestingModule({ imports: [EditorRail, provideTranslocoTesting()], providers: provideHexMapStoreTesting() }).compileComponents();
   });
 
   it('renders the Regions entry inactive while the panel is closed', () => {
