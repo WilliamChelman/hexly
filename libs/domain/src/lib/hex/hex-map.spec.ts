@@ -69,7 +69,12 @@ describe('labelSchema', () => {
   });
 
   it('accepts a label with no rotation (an unrotated label)', () => {
-    const label = { id: 'l2', text: 'Open Sea', position: { x: 0, y: 0 }, size: 32 };
+    const label = {
+      id: 'l2',
+      text: 'Open Sea',
+      position: { x: 0, y: 0 },
+      size: 32,
+    };
 
     expect(labelSchema.parse(label)).toEqual(label);
   });
@@ -104,7 +109,11 @@ describe('hexMapSchema', () => {
       },
     };
 
-    expect(hexMapSchema.parse(doc)).toEqual({ ...doc, regions: [], labels: [] });
+    expect(hexMapSchema.parse(doc)).toEqual({
+      ...doc,
+      regions: [],
+      labels: [],
+    });
   });
 
   it('defaults regions to empty for a document saved before regions existed', () => {
@@ -118,7 +127,12 @@ describe('hexMapSchema', () => {
       hexes: {},
       regions: [
         { id: 'a', name: 'Avalon', color: '#b08a4e', hexes: { '0,0': true } },
-        { id: 'b', name: 'Whisperwood', color: '#7c9b86', hexes: { '0,0': true } },
+        {
+          id: 'b',
+          name: 'Whisperwood',
+          color: '#7c9b86',
+          hexes: { '0,0': true },
+        },
       ],
     };
 
@@ -145,7 +159,11 @@ describe('hexMapSchema', () => {
       hexes: { '0,0': { terrain: 'forest', feature: { ref: 'settlement' } } },
     };
 
-    expect(hexMapSchema.parse(doc)).toEqual({ ...doc, regions: [], labels: [] });
+    expect(hexMapSchema.parse(doc)).toEqual({
+      ...doc,
+      regions: [],
+      labels: [],
+    });
   });
 
   it('round-trips a hex that carries a name', () => {
@@ -153,7 +171,11 @@ describe('hexMapSchema', () => {
       hexes: { '0,0': { terrain: 'forest', name: 'Riverbend' } },
     };
 
-    expect(hexMapSchema.parse(doc)).toEqual({ ...doc, regions: [], labels: [] });
+    expect(hexMapSchema.parse(doc)).toEqual({
+      ...doc,
+      regions: [],
+      labels: [],
+    });
   });
 
   it('round-trips a hex that carries an Entity Link by id', () => {
@@ -161,17 +183,28 @@ describe('hexMapSchema', () => {
       hexes: { '0,0': { terrain: 'forest', entityId: 'ent-7' } },
     };
 
-    expect(hexMapSchema.parse(doc)).toEqual({ ...doc, regions: [], labels: [] });
+    expect(hexMapSchema.parse(doc)).toEqual({
+      ...doc,
+      regions: [],
+      labels: [],
+    });
   });
 
   it('round-trips a feature that carries its own Entity Link, distinct from the hex', () => {
     const doc = {
       hexes: {
-        '0,0': { terrain: 'forest', feature: { ref: 'settlement', entityId: 'ent-9' } },
+        '0,0': {
+          terrain: 'forest',
+          feature: { ref: 'settlement', entityId: 'ent-9' },
+        },
       },
     };
 
-    expect(hexMapSchema.parse(doc)).toEqual({ ...doc, regions: [], labels: [] });
+    expect(hexMapSchema.parse(doc)).toEqual({
+      ...doc,
+      regions: [],
+      labels: [],
+    });
   });
 
   it('starts a fresh map with no regions', () => {
@@ -192,7 +225,14 @@ describe('hexMapSchema', () => {
     const doc = {
       hexes: {},
       regions: [],
-      labels: [{ id: 'l1', text: 'The Whisperwood', position: { x: 80, y: -20 }, size: 28 }],
+      labels: [
+        {
+          id: 'l1',
+          text: 'The Whisperwood',
+          position: { x: 80, y: -20 },
+          size: 28,
+        },
+      ],
     };
 
     expect(hexMapSchema.parse(doc)).toEqual(doc);

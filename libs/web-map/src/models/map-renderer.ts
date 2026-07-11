@@ -73,12 +73,7 @@ export interface MapRenderer {
    * label/hex/marquee previews) — each previewed without the caller rebuilding
    * the document each frame (issues #6, #30, ADR-0017).
    */
-  render(
-    camera: Camera,
-    doc: HexMap,
-    hover: Axial | null,
-    overrides?: RenderOverrides,
-  ): void;
+  render(camera: Camera, doc: HexMap, hover: Axial | null, overrides?: RenderOverrides): void;
   /**
    * The id of the Label drawn under screen `point` (topmost wins), or `null`.
    * Reflects the most recent {@link render}, so the canvas can hit-test clicks

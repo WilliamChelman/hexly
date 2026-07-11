@@ -1,12 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { EMPTY, Observable, Subject, catchError, filter } from 'rxjs';
-import {
-  ConnectionReady,
-  FollowSignal,
-  InterestRef,
-  NudgeDelta,
-} from '@hexly/domain';
+import { ConnectionReady, FollowSignal, InterestRef, NudgeDelta } from '@hexly/domain';
 
 /**
  * The client half of the live-follow nudge bus. Opens one multiplexed SSE stream
@@ -67,9 +62,7 @@ export class NudgeBusClient {
   follow(ref: InterestRef): Observable<FollowSignal> {
     return new Observable<FollowSignal>((subscriber) => {
       this.acquire(ref);
-      const inner = this.nudges
-        .pipe(filter((n) => n.id === ref.id))
-        .subscribe(subscriber);
+      const inner = this.nudges.pipe(filter((n) => n.id === ref.id)).subscribe(subscriber);
       return () => {
         inner.unsubscribe();
         this.release(ref);

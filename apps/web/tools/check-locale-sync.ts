@@ -42,9 +42,7 @@ function load(locale: string): Record<string, unknown> {
   try {
     return JSON.parse(readFileSync(file, 'utf8'));
   } catch (error) {
-    console.error(
-      `✘ Could not read ${locale}.json: ${(error as Error).message}`,
-    );
+    console.error(`✘ Could not read ${locale}.json: ${(error as Error).message}`);
     process.exit(1);
   }
 }
@@ -56,14 +54,10 @@ function discoverLocales(): string[] {
     .map((name) => name.slice(0, -'.json'.length));
 }
 
-const targets = discoverLocales().filter(
-  (locale) => locale !== REFERENCE_LOCALE,
-);
+const targets = discoverLocales().filter((locale) => locale !== REFERENCE_LOCALE);
 
 if (targets.length === 0) {
-  console.warn(
-    `⚠ No catalogs besides ${REFERENCE_LOCALE}.json found in ${I18N_DIR}; nothing to compare.`,
-  );
+  console.warn(`⚠ No catalogs besides ${REFERENCE_LOCALE}.json found in ${I18N_DIR}; nothing to compare.`);
   process.exit(0);
 }
 
@@ -74,35 +68,25 @@ for (const locale of targets) {
   const drift = findKeyDrift(reference, load(locale));
 
   if (drift.inSync) {
-    console.log(
-      `✔ i18n key sync: ${locale}.json matches ${REFERENCE_LOCALE}.json.`,
-    );
+    console.log(`✔ i18n key sync: ${locale}.json matches ${REFERENCE_LOCALE}.json.`);
     continue;
   }
 
   drifted = true;
-  console.error(
-    `✘ i18n key drift between ${REFERENCE_LOCALE}.json and ${locale}.json:\n`,
-  );
+  console.error(`✘ i18n key drift between ${REFERENCE_LOCALE}.json and ${locale}.json:\n`);
   if (drift.missing.length) {
-    console.error(
-      `  Missing in ${locale}.json (present in ${REFERENCE_LOCALE}.json):`,
-    );
+    console.error(`  Missing in ${locale}.json (present in ${REFERENCE_LOCALE}.json):`);
     for (const key of drift.missing) console.error(`    - ${key}`);
   }
   if (drift.orphaned.length) {
-    console.error(
-      `  Orphaned in ${locale}.json (absent from ${REFERENCE_LOCALE}.json):`,
-    );
+    console.error(`  Orphaned in ${locale}.json (absent from ${REFERENCE_LOCALE}.json):`);
     for (const key of drift.orphaned) console.error(`    - ${key}`);
   }
   console.error('');
 }
 
 if (drifted) {
-  console.error(
-    `Add or remove the keys above so every catalog matches ${REFERENCE_LOCALE}.json.`,
-  );
+  console.error(`Add or remove the keys above so every catalog matches ${REFERENCE_LOCALE}.json.`);
   process.exit(1);
 }
 

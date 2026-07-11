@@ -23,7 +23,9 @@ import { Eyebrow } from '@hexly/web-ui';
         {{ 'publicView.banner' | transloco }}
       </p>
       @if (view(); as w) {
-        <h1 class="public-title" data-testid="public-world-name">{{ w.worldName }}</h1>
+        <h1 class="public-title" data-testid="public-world-name">
+          {{ w.worldName }}
+        </h1>
         <span appEyebrow>{{ 'publicView.worldEntities' | transloco }}</span>
         <ul class="public-list">
           @for (e of w.entities; track e.id) {
@@ -40,7 +42,9 @@ import { Eyebrow } from '@hexly/web-ui';
       } @else if (notFound()) {
         <div data-testid="public-notfound">
           <h1 class="public-title">{{ 'publicView.notFound' | transloco }}</h1>
-          <p class="public-muted">{{ 'publicView.notFoundBody' | transloco }}</p>
+          <p class="public-muted">
+            {{ 'publicView.notFoundBody' | transloco }}
+          </p>
         </div>
       }
     </main>

@@ -94,9 +94,7 @@ export class WorldWrites {
     const next: WorldRow = {
       ...row,
       ...(patch.name !== undefined ? { name: patch.name } : {}),
-      ...(patch.pinnedEntityIds !== undefined
-        ? { pinnedEntityIds: patch.pinnedEntityIds }
-        : {}),
+      ...(patch.pinnedEntityIds !== undefined ? { pinnedEntityIds: patch.pinnedEntityIds } : {}),
       updatedAt: Date.now(),
       seq: row.seq + 1,
     };
@@ -203,8 +201,7 @@ export class WorldWrites {
   } {
     const db = this.db;
     let changed = false;
-    const target = (targetUserId: string) =>
-      and(eq(worldMembers.worldId, id), eq(worldMembers.userId, targetUserId));
+    const target = (targetUserId: string) => and(eq(worldMembers.worldId, id), eq(worldMembers.userId, targetUserId));
     return {
       changed: () => changed,
       writer: {
@@ -241,9 +238,7 @@ export class WorldWrites {
         removeMember: (targetUserId, allowOwner) => {
           const deleted = db
             .delete(worldMembers)
-            .where(
-              and(target(targetUserId), ...(allowOwner ? [] : [ne(worldMembers.role, 'owner')])),
-            )
+            .where(and(target(targetUserId), ...(allowOwner ? [] : [ne(worldMembers.role, 'owner')])))
             .run();
           changed ||= deleted.changes > 0;
         },

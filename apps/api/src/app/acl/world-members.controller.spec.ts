@@ -77,10 +77,7 @@ describe('World members', () => {
 
     await bob.get(`/worlds/${id}`).expect(404);
 
-    const members = await ada
-      .post(`/worlds/${id}/members`)
-      .send({ userId: bobId, role: 'contributor' })
-      .expect(200);
+    const members = await ada.post(`/worlds/${id}/members`).send({ userId: bobId, role: 'contributor' }).expect(200);
     expect(members.body).toEqual([{ userId: bobId, role: 'contributor' }]);
 
     // The World now appears in Bob's reachable World list and reads as a Detail.

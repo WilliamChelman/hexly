@@ -1,21 +1,7 @@
-import {
-  EntityBody,
-  ReindexFailure,
-  emptyContent,
-  emptyEntityBody,
-  tiptapContent,
-} from '@hexly/domain';
+import { EntityBody, ReindexFailure, emptyContent, emptyEntityBody, tiptapContent } from '@hexly/domain';
 import { eq } from 'drizzle-orm';
 import { createDb, Db } from '../db/db';
-import {
-  entities,
-  entityDescriptors,
-  entityEdges,
-  entityGrants,
-  users,
-  worldMembers,
-  worlds,
-} from '../db/schema';
+import { entities, entityDescriptors, entityEdges, entityGrants, users, worldMembers, worlds } from '../db/schema';
 import { NudgeBus } from '../events/nudge-bus';
 import { WriteOutbox } from '../events/write-outbox';
 import { EntityChange, EntityWrites, MutateResult } from './entity-writes';
@@ -131,7 +117,11 @@ describe('EntityWrites', () => {
     expect(renamed.version).toBe(before.version);
     expect(renamed.updatedAt).toBeGreaterThanOrEqual(before.updatedAt);
 
-    writes.mutate(ADA, ENTITY, { kind: 'edit', version: before.version, name: 'Again' });
+    writes.mutate(ADA, ENTITY, {
+      kind: 'edit',
+      version: before.version,
+      name: 'Again',
+    });
 
     expect(rowOf(ENTITY).version).toBe(before.version + 1);
   });
@@ -149,7 +139,10 @@ describe('EntityWrites', () => {
           type: 'paragraph',
           content: [
             { type: 'text', text: 'Married to ' },
-            { type: 'entityLink', attrs: { entityId: 'e2', descriptor: 'spouse' } },
+            {
+              type: 'entityLink',
+              attrs: { entityId: 'e2', descriptor: 'spouse' },
+            },
           ],
         },
       ],
@@ -185,7 +178,12 @@ describe('EntityWrites', () => {
       });
 
       expect(edgesOf('Ealdred')).toEqual([
-        { worldId: WORLD, targetKind: 'entity', targetId: 'e2', descriptor: 'spouse' },
+        {
+          worldId: WORLD,
+          targetKind: 'entity',
+          targetId: 'e2',
+          descriptor: 'spouse',
+        },
       ]);
     });
 
@@ -208,7 +206,10 @@ describe('EntityWrites', () => {
               {
                 type: 'paragraph',
                 content: [
-                  { type: 'entityLink', attrs: { entityId: 'e2', descriptor: 'Capital Of' } },
+                  {
+                    type: 'entityLink',
+                    attrs: { entityId: 'e2', descriptor: 'Capital Of' },
+                  },
                 ],
               },
             ],
@@ -217,7 +218,12 @@ describe('EntityWrites', () => {
       });
 
       expect(edgesOf('Aldermoor')).toEqual([
-        { worldId: WORLD, targetKind: 'entity', targetId: 'e2', descriptor: 'Capital Of' },
+        {
+          worldId: WORLD,
+          targetKind: 'entity',
+          targetId: 'e2',
+          descriptor: 'Capital Of',
+        },
       ]);
       expect(descriptorsOf('Aldermoor')).toEqual(['capital of']);
     });
@@ -274,7 +280,11 @@ describe('EntityWrites', () => {
         tags: [],
         body: { content: CONTENT },
       });
-      writes.mutate(ADA, row.id, { kind: 'edit', version: row.version, name: 'Bumped' });
+      writes.mutate(ADA, row.id, {
+        kind: 'edit',
+        version: row.version,
+        name: 'Bumped',
+      });
 
       const result = writes.mutate(ADA, row.id, {
         kind: 'edit',
@@ -284,7 +294,12 @@ describe('EntityWrites', () => {
 
       expect(result.status).toBe('conflict');
       expect(edgesOf('Bumped')).toEqual([
-        { worldId: WORLD, targetKind: 'entity', targetId: 'e2', descriptor: 'spouse' },
+        {
+          worldId: WORLD,
+          targetKind: 'entity',
+          targetId: 'e2',
+          descriptor: 'spouse',
+        },
       ]);
     });
 
@@ -301,7 +316,12 @@ describe('EntityWrites', () => {
        */
       function reindexAll(limit = 100) {
         let cursor: string | null = null;
-        const walk = { walked: 0, reindexed: 0, failures: [] as ReindexFailure[], chunks: 0 };
+        const walk = {
+          walked: 0,
+          reindexed: 0,
+          failures: [] as ReindexFailure[],
+          chunks: 0,
+        };
         for (;;) {
           const chunk = writes.reindexChunk(cursor, limit);
           walk.walked += chunk.walked;
@@ -319,7 +339,12 @@ describe('EntityWrites', () => {
         reindexAll();
 
         expect(edgesFrom('ealdred')).toEqual([
-          { worldId: WORLD, targetKind: 'entity', targetId: 'e2', descriptor: 'spouse' },
+          {
+            worldId: WORLD,
+            targetKind: 'entity',
+            targetId: 'e2',
+            descriptor: 'spouse',
+          },
         ]);
         expect(descriptorsOf('ealdred')).toEqual(['spouse']);
         expect(rowOf('ealdred').contentText).toBe('Married to');
@@ -352,7 +377,10 @@ describe('EntityWrites', () => {
         seedUnindexed('ealdred', WORLD, { content: CONTENT });
 
         const first = reindexAll();
-        const afterFirst = { edges: edgesFrom('ealdred'), descriptors: descriptorsOf('ealdred') };
+        const afterFirst = {
+          edges: edgesFrom('ealdred'),
+          descriptors: descriptorsOf('ealdred'),
+        };
         const second = reindexAll();
 
         expect(second.walked).toBe(first.walked);
@@ -374,10 +402,19 @@ describe('EntityWrites', () => {
         seedUnindexed('ealdred', WORLD, { content: CONTENT });
         seedUnindexed('elsewhere', OTHER, { content: CONTENT });
 
-        expect(reindexAll()).toMatchObject({ walked: 3, reindexed: 3, failures: [] });
+        expect(reindexAll()).toMatchObject({
+          walked: 3,
+          reindexed: 3,
+          failures: [],
+        });
 
         expect(edgesFrom('elsewhere')).toEqual([
-          { worldId: OTHER, targetKind: 'entity', targetId: 'e2', descriptor: 'spouse' },
+          {
+            worldId: OTHER,
+            targetKind: 'entity',
+            targetId: 'e2',
+            descriptor: 'spouse',
+          },
         ]);
       });
 
@@ -391,14 +428,21 @@ describe('EntityWrites', () => {
         seedUnindexed('elsewhere', WORLD, { content: CONTENT });
 
         // 3 Entities at a page apiece, plus the empty page that settles the exhausted cursor.
-        expect(reindexAll(1)).toMatchObject({ walked: 3, reindexed: 3, chunks: 4 });
+        expect(reindexAll(1)).toMatchObject({
+          walked: 3,
+          reindexed: 3,
+          chunks: 4,
+        });
         expect(descriptorsOf('ealdred')).toEqual(['spouse']);
         expect(descriptorsOf('elsewhere')).toEqual(['spouse']);
       });
 
       /** A short page is the last page — the walk ends without asking for one more. */
       it('ends on a short page without an extra round trip', () => {
-        expect(writes.reindexChunk(null, 100)).toMatchObject({ walked: 1, cursor: null });
+        expect(writes.reindexChunk(null, 100)).toMatchObject({
+          walked: 1,
+          cursor: null,
+        });
       });
 
       /** Nothing derived, nothing written — and the walk still advances past the page. */
@@ -406,7 +450,10 @@ describe('EntityWrites', () => {
         db.delete(entities).run(); // Only the corrupt row remains.
         seedCorrupt('broken', WORLD);
 
-        expect(writes.reindexChunk(null, 100)).toMatchObject({ walked: 1, reindexed: 0 });
+        expect(writes.reindexChunk(null, 100)).toMatchObject({
+          walked: 1,
+          reindexed: 0,
+        });
       });
 
       /**
@@ -423,7 +470,11 @@ describe('EntityWrites', () => {
 
         expect(walk).toMatchObject({ walked: 3, reindexed: 2 });
         expect(walk.failures).toEqual([
-          { entityId: 'broken', worldId: WORLD, reason: expect.stringContaining('JSON') },
+          {
+            entityId: 'broken',
+            worldId: WORLD,
+            reason: expect.stringContaining('JSON'),
+          },
         ]);
         // Its neighbours in the very same chunk are indexed regardless.
         expect(descriptorsOf('ealdred')).toEqual(['spouse']);
@@ -513,7 +564,12 @@ describe('EntityWrites', () => {
 
       expect(edgesFrom(ealdred.id)).toEqual([]);
       expect(edgesFrom(mira.id)).toEqual([
-        { worldId: WORLD, targetKind: 'entity', targetId: ealdred.id, descriptor: null },
+        {
+          worldId: WORLD,
+          targetKind: 'entity',
+          targetId: ealdred.id,
+          descriptor: null,
+        },
       ]);
     });
 
@@ -526,10 +582,7 @@ describe('EntityWrites', () => {
      */
     it('stores an edge set far larger than SQLite’s bound-parameter limit', () => {
       const hexes = Object.fromEntries(
-        Array.from({ length: 7000 }, (_, i) => [
-          `${i},0`,
-          { terrain: 'grass' as const, entityId: `target-${i}` },
-        ]),
+        Array.from({ length: 7000 }, (_, i) => [`${i},0`, { terrain: 'grass' as const, entityId: `target-${i}` }]),
       );
 
       const row = writes.insert({
@@ -549,7 +602,10 @@ describe('EntityWrites', () => {
       return tiptapContent({
         type: 'doc',
         content: [
-          { type: 'paragraph', content: [{ type: 'entityLink', attrs: { entityId: targetId } }] },
+          {
+            type: 'paragraph',
+            content: [{ type: 'entityLink', attrs: { entityId: targetId } }],
+          },
         ],
       });
     }
@@ -672,7 +728,10 @@ describe('EntityWrites', () => {
     it('a nested mutate joins the open transaction rather than flushing early', () => {
       writes.transact(() => {
         writes.mutate(ADA, ENTITY, { kind: 'edit', name: 'A' });
-        writes.mutate(ADA, ENTITY, { kind: 'set-visibility', visibility: 'shared' });
+        writes.mutate(ADA, ENTITY, {
+          kind: 'set-visibility',
+          visibility: 'shared',
+        });
         expect(emitted).toEqual([]);
       });
 
@@ -694,7 +753,11 @@ describe('EntityWrites', () => {
     emitted.length = 0;
     const afterFirst = rowOf(ENTITY);
 
-    const result = writes.mutate(ADA, ENTITY, { kind: 'edit', version: 1, name: 'Stale' });
+    const result = writes.mutate(ADA, ENTITY, {
+      kind: 'edit',
+      version: 1,
+      name: 'Stale',
+    });
 
     expect(result.status).toBe('conflict');
     const now = rowOf(ENTITY);

@@ -32,8 +32,16 @@ const SELECTION_KINDS: readonly {
  * legend is gone (issue #38).
  */
 const DIRECTIONS = [
-  { direction: 'add', labelKey: 'editorShell.inspector.add', testid: 'region-add' },
-  { direction: 'remove', labelKey: 'editorShell.inspector.remove', testid: 'region-remove' },
+  {
+    direction: 'add',
+    labelKey: 'editorShell.inspector.add',
+    testid: 'region-add',
+  },
+  {
+    direction: 'remove',
+    labelKey: 'editorShell.inspector.remove',
+    testid: 'region-remove',
+  },
 ] as const;
 
 /** A selected Hex or Feature resolved for display: its coordinate and identity. */
@@ -84,57 +92,51 @@ interface SelectedEntity {
       </header>
 
       <div class="leaf">
-      <div appField [label]="'editorShell.inspector.text' | transloco">
-        <input
-          appInput
-          data-testid="label-text"
-          [value]="label.text"
-          (change)="onText(label.id, $event)"
-        />
-      </div>
+        <div appField [label]="'editorShell.inspector.text' | transloco">
+          <input appInput data-testid="label-text" [value]="label.text" (change)="onText(label.id, $event)" />
+        </div>
 
-      <div appField [label]="'editorShell.inspector.size' | transloco">
-        <input
-          appInput
-          type="number"
-          min="1"
-          data-testid="label-size"
-          [value]="label.size"
-          (change)="onSize(label.id, $event)"
-        />
-      </div>
-
-      <div appField [label]="'editorShell.inspector.rotation' | transloco">
-        <input
-          appInput
-          type="number"
-          data-testid="label-rotation"
-          [value]="label.rotation ?? 0"
-          (change)="onRotation(label.id, $event)"
-        />
-      </div>
-
-      <div class="flex gap-3">
-        <div appField class="flex-1 min-w-0" [label]="'editorShell.inspector.x' | transloco">
+        <div appField [label]="'editorShell.inspector.size' | transloco">
           <input
             appInput
             type="number"
-            data-testid="label-x"
-            [value]="label.position.x"
-            (change)="onX(label, $event)"
+            min="1"
+            data-testid="label-size"
+            [value]="label.size"
+            (change)="onSize(label.id, $event)"
           />
         </div>
-        <div appField class="flex-1 min-w-0" [label]="'editorShell.inspector.y' | transloco">
+
+        <div appField [label]="'editorShell.inspector.rotation' | transloco">
           <input
             appInput
             type="number"
-            data-testid="label-y"
-            [value]="label.position.y"
-            (change)="onY(label, $event)"
+            data-testid="label-rotation"
+            [value]="label.rotation ?? 0"
+            (change)="onRotation(label.id, $event)"
           />
         </div>
-      </div>
 
+        <div class="flex gap-3">
+          <div appField class="flex-1 min-w-0" [label]="'editorShell.inspector.x' | transloco">
+            <input
+              appInput
+              type="number"
+              data-testid="label-x"
+              [value]="label.position.x"
+              (change)="onX(label, $event)"
+            />
+          </div>
+          <div appField class="flex-1 min-w-0" [label]="'editorShell.inspector.y' | transloco">
+            <input
+              appInput
+              type="number"
+              data-testid="label-y"
+              [value]="label.position.y"
+              (change)="onY(label, $event)"
+            />
+          </div>
+        </div>
       </div>
 
       <div class="flex gap-2 mt-auto pt-2">
@@ -156,9 +158,9 @@ interface SelectedEntity {
       </header>
 
       <div class="leaf">
-      <app-region-fields [region]="region" />
+        <app-region-fields [region]="region" />
 
-      <!--
+        <!--
         Engaging either button auto-arms the Region tool on this Region with the
         chosen membership direction (issue #37) — the only control outside the
         palette permitted to arm a Tool. The active button (styled off its own
@@ -166,28 +168,27 @@ interface SelectedEntity {
         same store.regionDirection() the brush paints by, so the active one reads
         as set and can never disagree with the stroke.
       -->
-      <div appField [label]="'editorShell.inspector.membership' | transloco">
-        <div
-          class="flex gap-2"
-          role="group"
-          [attr.aria-label]="'editorShell.inspector.membershipDirection' | transloco"
-        >
-          @for (d of directions; track d.direction) {
-            <button
-              type="button"
-              class="flex-1 bg-transparent text-ink-muted border border-line rounded-sm py-1 px-3 text-xs font-semibold cursor-pointer aria-[pressed=true]:text-ink aria-[pressed=true]:border-gold aria-[pressed=true]:bg-gold-soft"
-              [attr.aria-pressed]="store.regionDirection() === d.direction"
-              [attr.data-testid]="d.testid"
-              (click)="store.armRegionDirection(d.direction)"
-            >
-              {{ d.labelKey | transloco }}
-            </button>
-          }
+        <div appField [label]="'editorShell.inspector.membership' | transloco">
+          <div
+            class="flex gap-2"
+            role="group"
+            [attr.aria-label]="'editorShell.inspector.membershipDirection' | transloco"
+          >
+            @for (d of directions; track d.direction) {
+              <button
+                type="button"
+                class="flex-1 bg-transparent text-ink-muted border border-line rounded-sm py-1 px-3 text-xs font-semibold cursor-pointer aria-[pressed=true]:text-ink aria-[pressed=true]:border-gold aria-[pressed=true]:bg-gold-soft"
+                [attr.aria-pressed]="store.regionDirection() === d.direction"
+                [attr.data-testid]="d.testid"
+                (click)="store.armRegionDirection(d.direction)"
+              >
+                {{ d.labelKey | transloco }}
+              </button>
+            }
+          </div>
         </div>
-      </div>
 
-      <app-entity-link />
-
+        <app-entity-link />
       </div>
 
       <div class="flex gap-2 mt-auto pt-2">
@@ -206,20 +207,18 @@ interface SelectedEntity {
     } @else if (entity) {
       <header class="flex items-center justify-between">
         <span appEyebrow mark>{{
-          (entity.kind === 'feature'
-            ? 'editorShell.inspector.selectedFeature'
-            : 'editorShell.inspector.selectedHex') | transloco
+          (entity.kind === 'feature' ? 'editorShell.inspector.selectedFeature' : 'editorShell.inspector.selectedHex')
+            | transloco
         }}</span>
       </header>
 
       <div class="leaf">
         <div class="ident">
-          <span
-            class="ident-swatch"
-            [style.background]="'var(--color-terrain-' + entity.terrain + ')'"
-          ></span>
+          <span class="ident-swatch" [style.background]="'var(--color-terrain-' + entity.terrain + ')'"></span>
           <div class="min-w-0">
-            <div class="ident-name">{{ entity.name || (entity.detailKey | transloco) }}</div>
+            <div class="ident-name">
+              {{ entity.name || (entity.detailKey | transloco) }}
+            </div>
             <div class="ident-sub">
               <span data-testid="entity-detail">{{ entity.detailKey | transloco }}</span>
               <span class="opacity-50">·</span>
@@ -229,12 +228,7 @@ interface SelectedEntity {
         </div>
 
         <div appField [label]="'editorShell.inspector.name' | transloco">
-          <input
-            appInput
-            data-testid="entity-name"
-            [value]="entity.name"
-            (change)="onName(entity, $event)"
-          />
+          <input appInput data-testid="entity-name" [value]="entity.name" (change)="onName(entity, $event)" />
         </div>
 
         <!--
@@ -260,9 +254,8 @@ interface SelectedEntity {
           (click)="store.deleteSelected()"
         >
           {{
-            (entity.kind === 'feature'
-              ? 'editorShell.inspector.deleteFeature'
-              : 'editorShell.inspector.deleteHex') | transloco
+            (entity.kind === 'feature' ? 'editorShell.inspector.deleteFeature' : 'editorShell.inspector.deleteHex')
+              | transloco
           }}
         </button>
       </div>
@@ -278,7 +271,8 @@ interface SelectedEntity {
       </header>
 
       <p class="text-sm font-semibold text-ink" data-testid="selection-count">
-        {{ multi.count }} {{ 'editorShell.inspector.selectedCount' | transloco }}
+        {{ multi.count }}
+        {{ 'editorShell.inspector.selectedCount' | transloco }}
       </p>
 
       <ul class="m-0 pl-4 flex flex-col gap-1 text-sm text-ink-muted" data-testid="selection-breakdown">
@@ -306,7 +300,9 @@ interface SelectedEntity {
       <header class="flex items-center justify-between">
         <span appEyebrow mark>{{ 'editorShell.inspector.title' | transloco }}</span>
       </header>
-      <p class="muted text-sm leading-normal text-ink-muted">{{ 'editorShell.inspector.emptyHint' | transloco }}</p>
+      <p class="muted text-sm leading-normal text-ink-muted">
+        {{ 'editorShell.inspector.emptyHint' | transloco }}
+      </p>
     }
   `,
   // Scoped chrome (ADR-0007): a framed "leaf" — gold corner brackets on lifted
@@ -335,7 +331,9 @@ interface SelectedEntity {
     .ident-swatch {
       @apply w-[38px] h-[38px] flex-none rounded-md border border-line-strong;
       /* multi-shadow list: named token + literal geometry — stays raw (ADR-0031). */
-      box-shadow: var(--shadow-inset), 0 0 0 1px var(--color-gold-soft);
+      box-shadow:
+        var(--shadow-inset),
+        0 0 0 1px var(--color-gold-soft);
     }
     .ident-name {
       @apply font-display text-lg leading-[1.15] text-ink-strong overflow-hidden text-ellipsis whitespace-nowrap;
@@ -382,9 +380,7 @@ export class Inspector {
     // (ADR-0014). A Feature selection shows the feature's label, else the hex's
     // terrain; the ids are schema-constrained to the built-ins, so the key
     // always resolves.
-    const detailKey = hex.feature
-      ? featureKey(hex.feature.ref)
-      : terrainKey(hex.terrain);
+    const detailKey = hex.feature ? featureKey(hex.feature.ref) : terrainKey(hex.terrain);
     return {
       kind: sel.kind,
       q: sel.coord.q,
@@ -430,10 +426,16 @@ export class Inspector {
   }
 
   protected onX(label: Label, event: Event): void {
-    this.store.moveLabel(label.id, { x: Number(inputValue(event)), y: label.position.y });
+    this.store.moveLabel(label.id, {
+      x: Number(inputValue(event)),
+      y: label.position.y,
+    });
   }
 
   protected onY(label: Label, event: Event): void {
-    this.store.moveLabel(label.id, { x: label.position.x, y: Number(inputValue(event)) });
+    this.store.moveLabel(label.id, {
+      x: label.position.x,
+      y: Number(inputValue(event)),
+    });
   }
 }

@@ -12,10 +12,7 @@ import { entityIdFromUrl, expect, segRe, test, type Page } from './fixtures';
 async function createWorldFromIndex(page: Page): Promise<{ id: string }> {
   await page.goto('/');
   const created = page.waitForResponse(
-    (r) =>
-      r.url().endsWith('/api/worlds') &&
-      r.request().method() === 'POST' &&
-      r.ok(),
+    (r) => r.url().endsWith('/api/worlds') && r.request().method() === 'POST' && r.ok(),
   );
   await page.getByTestId('create-world').click();
   const world = await (await created).json();
@@ -38,9 +35,7 @@ async function switchToWorld(page: Page, worldId: string): Promise<void> {
   await page.getByTestId(`switcher-option-${worldId}`).click();
 }
 
-test('the World Index lists reachable Worlds; creating one lands on its root', async ({
-  page,
-}) => {
+test('the World Index lists reachable Worlds; creating one lands on its root', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { name: /Welcome back/ })).toBeVisible();
 
@@ -65,9 +60,7 @@ test('type-to-confirm delete shows the entity count, enables on match, and remov
   await page.goto('/');
   await expect(page.getByTestId(`world-${world.id}`)).toBeVisible();
 
-  const counted = page.waitForResponse(
-    (r) => r.url().endsWith(`/api/worlds/${world.id}`) && r.ok(),
-  );
+  const counted = page.waitForResponse((r) => r.url().endsWith(`/api/worlds/${world.id}`) && r.ok());
   await page.getByTestId(`delete-world-${world.id}`).click();
   await counted;
   // A fresh World holds no Entities (ADR-0043).
@@ -83,9 +76,7 @@ test('type-to-confirm delete shows the entity count, enables on match, and remov
   await expect(page.getByTestId(`world-${world.id}`)).toHaveCount(0);
 });
 
-test('a stale World segment reconciles to the Entity’s real World (ADR-0028, #119)', async ({
-  page,
-}) => {
+test('a stale World segment reconciles to the Entity’s real World (ADR-0028, #119)', async ({ page }) => {
   const worldA = await createWorldFromIndex(page);
   const noteA = await createNote(page, worldA.id);
   const worldB = await createWorldFromIndex(page);
@@ -95,21 +86,15 @@ test('a stale World segment reconciles to the Entity’s real World (ADR-0028, #
   await page.goto(`/w/${worldB.id}/entities/${noteA}`);
 
   // Reconcile guard lands on the Entity under its correct World segment.
-  await expect(page).toHaveURL(
-    new RegExp(`/w/${segRe(worldA.id)}/entities/${segRe(noteA)}$`),
-  );
+  await expect(page).toHaveURL(new RegExp(`/w/${segRe(worldA.id)}/entities/${segRe(noteA)}$`));
 });
 
-test('the entity browser is scoped by the URL World; switching Worlds filters it', async ({
-  page,
-}) => {
+test('the entity browser is scoped by the URL World; switching Worlds filters it', async ({ page }) => {
   const worldA = await createWorldFromIndex(page);
   await page.getByRole('link', { name: 'Library' }).click();
   await expect(page).toHaveURL(new RegExp(`/w/${segRe(worldA.id)}/entities$`));
   await page.getByTestId('new-note').click();
-  await expect(page).toHaveURL(
-    new RegExp(`/w/${segRe(worldA.id)}/entities/[\\w-]+$`),
-  );
+  await expect(page).toHaveURL(new RegExp(`/w/${segRe(worldA.id)}/entities/[\\w-]+$`));
   const noteId = entityIdFromUrl(page);
   await page.getByRole('link', { name: 'Library' }).click();
   await page.getByTestId(`rename-${noteId}`).click();
@@ -134,9 +119,7 @@ test('the entity browser is scoped by the URL World; switching Worlds filters it
   await expect(page.getByText('Alpha in A')).toBeVisible();
 });
 
-test('the masthead switcher shows the current World and hops to another (#121)', async ({
-  page,
-}) => {
+test('the masthead switcher shows the current World and hops to another (#121)', async ({ page }) => {
   const worldA = await createWorldFromIndex(page);
   await page.request.patch(`/api/worlds/${worldA.id}`, {
     data: { name: 'Aldermoor' },

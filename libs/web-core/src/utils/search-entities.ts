@@ -35,10 +35,7 @@ const CACHE_LIMIT = 50;
  * Take-first consumers (a `firstValueFrom` picker) get the cached paint and skip
  * revalidation — fine for a short-lived per-surface stream.
  */
-export function searchEntities(
-  client: EntitiesClient,
-  query$: Observable<string>,
-): Observable<EntitySummary[]> {
+export function searchEntities(client: EntitiesClient, query$: Observable<string>): Observable<EntitySummary[]> {
   // Per call, so it lives with the stream (a per-surface resolver's cache dies with
   // the surface; the app-lifetime palette's persists but self-heals via revalidation).
   const cache = new Map<string, EntitySummary[]>();
@@ -55,8 +52,7 @@ export function searchEntities(
         // refresh insertion order and evict the oldest past the cap.
         tap((items) => {
           cache.set(q, items);
-          if (cache.size > CACHE_LIMIT)
-            cache.delete(cache.keys().next().value as string);
+          if (cache.size > CACHE_LIMIT) cache.delete(cache.keys().next().value as string);
         }),
       );
       if (!cached) return fresh$.pipe(catchError(() => of<EntitySummary[]>([])));
@@ -77,12 +73,7 @@ function sameResults(a: EntitySummary[], b: EntitySummary[]): boolean {
     a.length === b.length &&
     a.every((e, i) => {
       const o = b[i];
-      return (
-        e.id === o.id &&
-        e.name === o.name &&
-        e.types[0] === o.types[0] &&
-        e.worldId === o.worldId
-      );
+      return e.id === o.id && e.name === o.name && e.types[0] === o.types[0] && e.worldId === o.worldId;
     })
   );
 }

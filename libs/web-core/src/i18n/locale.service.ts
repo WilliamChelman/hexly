@@ -1,9 +1,4 @@
-import {
-  EnvironmentProviders,
-  inject,
-  Injectable,
-  provideAppInitializer,
-} from '@angular/core';
+import { EnvironmentProviders, inject, Injectable, provideAppInitializer } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { TranslocoService } from '@jsverse/transloco';
 import { FORMAT_LOCALE_TAGS } from '@hexly/domain';
@@ -84,9 +79,7 @@ export class LocaleService {
   formatDate(timestamp: number): string {
     const date = new Date(timestamp);
     try {
-      return date.toLocaleDateString(
-        this.formatLocale() || this.transloco.activeLang(),
-      );
+      return date.toLocaleDateString(this.formatLocale() || this.transloco.activeLang());
     } catch {
       return date.toLocaleDateString();
     }

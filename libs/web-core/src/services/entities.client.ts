@@ -1,8 +1,4 @@
-import {
-  HttpClient,
-  HttpErrorResponse,
-  HttpParams,
-} from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { catchError, map, Observable, of, tap, throwError } from 'rxjs';
 import {
@@ -33,10 +29,7 @@ export type EntityListParams = Partial<EntityListQuery>;
 export const ENTITY_NUDGE_DEBOUNCE_MS = 150;
 
 /** The subset of list params the Facet-count read narrows against — no paging. */
-export type EntityFacetParams = Pick<
-  EntityListParams,
-  'q' | 'type' | 'tag' | 'visibility' | 'field' | 'worldId'
->;
+export type EntityFacetParams = Pick<EntityListParams, 'q' | 'type' | 'tag' | 'visibility' | 'field' | 'worldId'>;
 
 /**
  * HTTP client for the entities API.
@@ -91,15 +84,10 @@ export class EntitiesClient {
    * a compile error here rather than a lost write. Metadata never conflicts with an in-progress
    * save.
    */
-  patch(
-    id: string,
-    changes: { name: string } | { visibility: Visibility },
-  ): Observable<EntityDetail> {
+  patch(id: string, changes: { name: string } | { visibility: Visibility }): Observable<EntityDetail> {
     // Write-through: the patched detail feeds the store, so other watchers see the rename/visibility
     // change with no roundtrip and this tab's own echo nudge dedups.
-    return this.http
-      .patch<EntityDetail>(`/api/entities/${id}`, changes)
-      .pipe(tap((d) => this.store.merge(d)));
+    return this.http.patch<EntityDetail>(`/api/entities/${id}`, changes).pipe(tap((d) => this.store.merge(d)));
   }
 
   delete(id: string): Observable<void> {
@@ -128,7 +116,10 @@ export class EntitiesClient {
 
   /** Grant an Instance user Editor or Viewer; returns the updated set. Upsert (200), not a create. */
   addGrant(id: string, userId: string, role: GrantRole): Observable<EntityGrant[]> {
-    return this.http.post<EntityGrant[]>(`/api/entities/${id}/grants`, { userId, role });
+    return this.http.post<EntityGrant[]>(`/api/entities/${id}/grants`, {
+      userId,
+      role,
+    });
   }
 
   /** Revoke a grant; returns the updated set. */
@@ -153,11 +144,7 @@ export class EntitiesClient {
 
   // worldId omitted, the server defaults to the caller's first World. A single core type per
   // creation, sent as the one-element ordered `types` set the server now speaks (ADR-0048).
-  create(
-    name: string,
-    type: EntityType,
-    worldId?: string,
-  ): Observable<EntityDetail> {
+  create(name: string, type: EntityType, worldId?: string): Observable<EntityDetail> {
     return this.http.post<EntityDetail>('/api/entities', {
       name,
       types: [type],
@@ -196,12 +183,7 @@ export class EntitiesClient {
   }
 
   /** Stale base → `conflict` outcome, not a thrown error; caller branches, not catches. */
-  save(
-    id: string,
-    body: EntityBody,
-    version: number,
-    tags: readonly string[],
-  ): Observable<EntitySaveOutcome> {
+  save(id: string, body: EntityBody, version: number, tags: readonly string[]): Observable<EntitySaveOutcome> {
     return this.http
       .put<EntityDetail>(`/api/entities/${id}`, {
         document: body,

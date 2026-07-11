@@ -14,11 +14,7 @@ export class AssetsController {
   constructor(private readonly assets: AssetsService) {}
 
   @Get(':worldId/:file')
-  serve(
-    @Param('worldId') worldId: string,
-    @Param('file') file: string,
-    @Res() res: Response,
-  ): void {
+  serve(@Param('worldId') worldId: string, @Param('file') file: string, @Res() res: Response): void {
     const found = this.assets.read(worldId, file);
     if (!found) throw new NotFoundException();
     res.type(found.mime).send(found.bytes);

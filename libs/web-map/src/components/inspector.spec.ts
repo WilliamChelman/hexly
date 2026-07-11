@@ -46,10 +46,7 @@ function inspectorProviders() {
         list: (opts: { ids?: string[]; q?: string } = {}) => {
           let items = stubEntities;
           if (opts.ids) items = items.filter((e) => opts.ids!.includes(e.id));
-          if (opts.q)
-            items = items.filter((e) =>
-              e.name.toLowerCase().includes(opts.q!.toLowerCase()),
-            );
+          if (opts.q) items = items.filter((e) => e.name.toLowerCase().includes(opts.q!.toLowerCase()));
           return of({ items, nextCursor: null });
         },
         create: (name: string, type: EntityType) => {
@@ -90,7 +87,7 @@ describe('Inspector label editing', () => {
     return fixture.nativeElement.querySelector(`[data-testid=${testid}]`) as HTMLInputElement;
   }
 
-  it('shows the selected label\'s text', () => {
+  it("shows the selected label's text", () => {
     const { fixture } = withSelectedLabel('Open Sea');
 
     expect(field(fixture, 'label-text').value).toBe('Open Sea');
@@ -105,9 +102,7 @@ describe('Inspector label editing', () => {
     expect(el.querySelector('header')?.textContent).toContain('Étiquette sélectionnée');
     expect(el.textContent).toContain('Texte');
     expect(el.textContent).toContain('Taille');
-    expect(el.querySelector('[data-testid=label-delete]')?.textContent).toContain(
-      'Supprimer l’étiquette',
-    );
+    expect(el.querySelector('[data-testid=label-delete]')?.textContent).toContain('Supprimer l’étiquette');
     // The user's label text is content — left exactly as typed.
     expect(field(fixture, 'label-text').value).toBe('Open Sea');
   });
@@ -166,9 +161,7 @@ describe('Inspector label editing', () => {
   it('deletes the selected label when Delete is clicked', () => {
     const { store, id, fixture } = withSelectedLabel();
 
-    (
-      fixture.nativeElement.querySelector('[data-testid=label-delete]') as HTMLButtonElement
-    ).click();
+    (fixture.nativeElement.querySelector('[data-testid=label-delete]') as HTMLButtonElement).click();
 
     expect(store.document().labels.find((l) => l.id === id)).toBeUndefined();
   });
@@ -196,7 +189,7 @@ describe('Inspector hex and feature selection', () => {
     return fixture;
   }
 
-  it('shows a selected Hex\'s coordinate and terrain, with no label editor', () => {
+  it("shows a selected Hex's coordinate and terrain, with no label editor", () => {
     const store = TestBed.inject(HexMapStore);
     store.paintAt({ q: 2, r: -1 }, 'ocean');
     store.select({ q: 2, r: -1 }, null);
@@ -216,9 +209,7 @@ describe('Inspector hex and feature selection', () => {
     store.paintAt({ q: 0, r: 0 }, 'grass');
     store.select({ q: 0, r: 0 }, null);
 
-    const del = render().nativeElement.querySelector(
-      '[data-testid=entity-delete]',
-    ) as HTMLButtonElement;
+    const del = render().nativeElement.querySelector('[data-testid=entity-delete]') as HTMLButtonElement;
     // The affordance must be live, not the disabled placeholder it used to render
     // — a programmatic click fires even on a disabled button, so assert it first.
     expect(del.disabled).toBe(false);
@@ -234,17 +225,13 @@ describe('Inspector hex and feature selection', () => {
     store.placeFeatureAt({ q: 1, r: 1 }, 'settlement');
     store.select({ q: 1, r: 1 }, null); // the Feature
 
-    (
-      render().nativeElement.querySelector(
-        '[data-testid=entity-delete]',
-      ) as HTMLButtonElement
-    ).click();
+    (render().nativeElement.querySelector('[data-testid=entity-delete]') as HTMLButtonElement).click();
 
     expect(store.document().hexes['1,1']).toEqual({ terrain: 'forest' });
     expect(store.selection()).toBeNull();
   });
 
-  it('shows a selected Feature\'s identity, labelled as a feature', () => {
+  it("shows a selected Feature's identity, labelled as a feature", () => {
     const store = TestBed.inject(HexMapStore);
     store.paintAt({ q: 1, r: 1 }, 'grass');
     store.placeFeatureAt({ q: 1, r: 1 }, 'settlement');
@@ -253,12 +240,8 @@ describe('Inspector hex and feature selection', () => {
     const el = render().nativeElement;
 
     expect(el.querySelector('header').textContent).toContain('feature');
-    expect(el.querySelector('[data-testid=entity-detail]').textContent).toContain(
-      'Settlement',
-    );
-    expect(el.querySelector('[data-testid=entity-delete]').textContent).toContain(
-      'feature',
-    );
+    expect(el.querySelector('[data-testid=entity-detail]').textContent).toContain('Settlement');
+    expect(el.querySelector('[data-testid=entity-delete]').textContent).toContain('feature');
   });
 
   it('renders a selected Feature in French — built-in label keyed by id, chrome translated', () => {
@@ -274,19 +257,11 @@ describe('Inspector hex and feature selection', () => {
 
     // The built-in Feature label renders via domain.feature.settlement → Colonie,
     // not the English domain label.
-    expect(el.querySelector('[data-testid=entity-detail]')?.textContent).toContain(
-      'Colonie',
-    );
-    expect(el.querySelector('[data-testid=entity-detail]')?.textContent).not.toContain(
-      'Settlement',
-    );
+    expect(el.querySelector('[data-testid=entity-detail]')?.textContent).toContain('Colonie');
+    expect(el.querySelector('[data-testid=entity-detail]')?.textContent).not.toContain('Settlement');
     // The selected-kind eyebrow and the Delete action translate too.
-    expect(el.querySelector('header')?.textContent).toContain(
-      'Caractéristique sélectionnée',
-    );
-    expect(el.querySelector('[data-testid=entity-delete]')?.textContent).toContain(
-      'Supprimer la caractéristique',
-    );
+    expect(el.querySelector('header')?.textContent).toContain('Caractéristique sélectionnée');
+    expect(el.querySelector('[data-testid=entity-delete]')?.textContent).toContain('Supprimer la caractéristique');
   });
 
   it('renders a selected Hex’s terrain in French, keyed by its id', () => {
@@ -298,9 +273,7 @@ describe('Inspector hex and feature selection', () => {
     TestBed.inject(TranslocoService).setActiveLang('fr');
     fixture.detectChanges();
 
-    expect(
-      fixture.nativeElement.querySelector('[data-testid=entity-detail]')?.textContent,
-    ).toContain('Océan');
+    expect(fixture.nativeElement.querySelector('[data-testid=entity-detail]')?.textContent).toContain('Océan');
   });
 
   it('shows no membership direction toggle for a Hex selection', () => {
@@ -316,15 +289,13 @@ describe('Inspector hex and feature selection', () => {
     expect(el.querySelector('[data-testid=region-remove]')).toBeNull();
   });
 
-  it('prefills the name field with a selected Hex\'s current name', () => {
+  it("prefills the name field with a selected Hex's current name", () => {
     const store = TestBed.inject(HexMapStore);
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.editHexName({ q: 0, r: 0 }, 'Riverbend');
     store.select({ q: 0, r: 0 }, null);
 
-    const input = render().nativeElement.querySelector(
-      '[data-testid=entity-name]',
-    ) as HTMLInputElement;
+    const input = render().nativeElement.querySelector('[data-testid=entity-name]') as HTMLInputElement;
 
     expect(input.value).toBe('Riverbend');
   });
@@ -334,13 +305,14 @@ describe('Inspector hex and feature selection', () => {
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.select({ q: 0, r: 0 }, null);
 
-    const input = render().nativeElement.querySelector(
-      '[data-testid=entity-name]',
-    ) as HTMLInputElement;
+    const input = render().nativeElement.querySelector('[data-testid=entity-name]') as HTMLInputElement;
     input.value = 'Riverbend';
     input.dispatchEvent(new Event('change'));
 
-    expect(store.document().hexes['0,0']).toEqual({ terrain: 'forest', name: 'Riverbend' });
+    expect(store.document().hexes['0,0']).toEqual({
+      terrain: 'forest',
+      name: 'Riverbend',
+    });
   });
 
   it('offers the name field for a selected Feature too', () => {
@@ -349,9 +321,7 @@ describe('Inspector hex and feature selection', () => {
     store.placeFeatureAt({ q: 1, r: 1 }, 'settlement');
     store.select({ q: 1, r: 1 }, null);
 
-    const input = render().nativeElement.querySelector(
-      '[data-testid=entity-name]',
-    ) as HTMLInputElement;
+    const input = render().nativeElement.querySelector('[data-testid=entity-name]') as HTMLInputElement;
     input.value = 'Riverbend';
     input.dispatchEvent(new Event('change'));
 
@@ -400,9 +370,11 @@ describe('Inspector multi-selection', () => {
     const { fixture } = withThreeSelected();
     // Collapse the inter-token whitespace the multi-line template leaves between
     // the count and its word, so the kind-bound substrings match.
-    const breakdown = ((fixture.nativeElement as HTMLElement).querySelector(
-      '[data-testid=selection-breakdown]',
-    )?.textContent ?? '').replace(/\s+/g, ' ').trim();
+    const breakdown = (
+      (fixture.nativeElement as HTMLElement).querySelector('[data-testid=selection-breakdown]')?.textContent ?? ''
+    )
+      .replace(/\s+/g, ' ')
+      .trim();
 
     // Two hexes and one label, each count bound to its kind — and the count-1 row
     // reads the singular "label", not "1 labels" (the \b stops "1 label" matching
@@ -431,9 +403,7 @@ describe('Inspector multi-selection', () => {
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
 
-    expect(el.querySelector('[data-testid=selection-delete-all]')?.textContent).toContain(
-      'Tout supprimer',
-    );
+    expect(el.querySelector('[data-testid=selection-delete-all]')?.textContent).toContain('Tout supprimer');
   });
 });
 
@@ -483,15 +453,9 @@ describe('Inspector region editing', () => {
     expect(el.textContent).toContain('Nom');
     expect(el.textContent).toContain('Couleur');
     expect(el.textContent).toContain('Appartenance');
-    expect(
-      (el.querySelector('[data-testid=region-add]') as HTMLElement).textContent,
-    ).toContain('Ajouter');
-    expect(
-      (el.querySelector('[data-testid=region-remove]') as HTMLElement).textContent,
-    ).toContain('Retirer');
-    expect(el.querySelector('[data-testid=region-delete]')?.textContent).toContain(
-      'Supprimer la région',
-    );
+    expect((el.querySelector('[data-testid=region-add]') as HTMLElement).textContent).toContain('Ajouter');
+    expect((el.querySelector('[data-testid=region-remove]') as HTMLElement).textContent).toContain('Retirer');
+    expect(el.querySelector('[data-testid=region-delete]')?.textContent).toContain('Supprimer la région');
     // The user's Region name stays their word, not swapped for the French "Ajouter".
     expect(field(fixture, 'region-name').value).toBe('Add');
   });
@@ -795,9 +759,7 @@ describe('Inspector Entity Link control', () => {
     TestBed.inject(TranslocoService).setActiveLang('fr');
     fixture.detectChanges();
 
-    expect(byId(fixture.nativeElement, 'entity-link-pick')?.textContent).toContain(
-      'Lier une entité',
-    );
+    expect(byId(fixture.nativeElement, 'entity-link-pick')?.textContent).toContain('Lier une entité');
   });
 
   it('renders the create-and-link row in French', () => {

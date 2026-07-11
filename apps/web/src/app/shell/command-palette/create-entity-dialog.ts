@@ -1,12 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  DestroyRef,
-  effect,
-  inject,
-  signal,
-  untracked,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
@@ -31,11 +23,7 @@ import { TypeRegistry } from '../../entity-types/type-registry';
   imports: [Button, Dialog, Field, Input, TranslocoPipe],
   template: `
     @if (dialogState.type(); as type) {
-      <app-dialog
-        [open]="true"
-        [heading]="createLabel(type) | transloco"
-        (closed)="cancel()"
-      >
+      <app-dialog [open]="true" [heading]="createLabel(type) | transloco" (closed)="cancel()">
         <label appField [label]="'commandPalette.nameLabel' | transloco">
           <input
             appInput
@@ -62,13 +50,7 @@ import { TypeRegistry } from '../../entity-types/type-registry';
             }
           </select>
         </label>
-        <button
-          dialogFooter
-          type="button"
-          appButton
-          data-testid="create-entity-cancel"
-          (click)="cancel()"
-        >
+        <button dialogFooter type="button" appButton data-testid="create-entity-cancel" (click)="cancel()">
           {{ 'common.cancel' | transloco }}
         </button>
         <button
@@ -107,11 +89,7 @@ export class CreateEntityDialog {
       const type = this.dialogState.type();
       untracked(() => {
         this.name.set('');
-        this.worldId.set(
-          type
-            ? (this.activeWorld.worldId() ?? this.worldStore.worlds()[0]?.id ?? null)
-            : null,
-        );
+        this.worldId.set(type ? (this.activeWorld.worldId() ?? this.worldStore.worlds()[0]?.id ?? null) : null);
       });
     });
   }
@@ -136,9 +114,7 @@ export class CreateEntityDialog {
   protected submit(type: EntityType): void {
     const worldId = this.worldId();
     if (!worldId) return;
-    const name =
-      this.name().trim() ||
-      this.transloco.translate(this.types.resolve(type).labels.untitled);
+    const name = this.name().trim() || this.transloco.translate(this.types.resolve(type).labels.untitled);
     this.entitiesClient
       .create(name, type, worldId)
       .pipe(takeUntilDestroyed(this.destroyRef))

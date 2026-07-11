@@ -38,9 +38,7 @@ export function graphPayload(graph: WorldGraph): GraphPayload {
     degreeOf.set(edge.target, (degreeOf.get(edge.target) ?? 0) + 1);
   }
   // A stable sort, so nodes of equal degree keep the server's name order.
-  const nodes = [...graph.nodes].sort(
-    (a, b) => (degreeOf.get(a.id) ?? 0) - (degreeOf.get(b.id) ?? 0),
-  );
+  const nodes = [...graph.nodes].sort((a, b) => (degreeOf.get(a.id) ?? 0) - (degreeOf.get(b.id) ?? 0));
   const indexOf = new Map(nodes.map((n, i) => [n.id, i]));
   // Read off the map the order itself came from, so what sizes a node and what ordered it are the
   // same number by construction — they cannot drift into disagreeing about one dropped edge.

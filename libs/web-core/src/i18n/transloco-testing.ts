@@ -1,9 +1,5 @@
 import { ModuleWithProviders } from '@angular/core';
-import {
-  Translation,
-  TranslocoTestingModule,
-  TranslocoTestingOptions,
-} from '@jsverse/transloco';
+import { Translation, TranslocoTestingModule, TranslocoTestingOptions } from '@jsverse/transloco';
 import { provideTranslocoMessageformat } from '@jsverse/transloco-messageformat';
 import en from './catalogs/en.json';
 import fr from './catalogs/fr.json';
@@ -20,10 +16,7 @@ import { translocoAppConfig } from './transloco.config';
  * French tree with a key removed, to prove that fallback.
  */
 export function provideTranslocoTesting(
-  langs: TranslocoTestingOptions['langs'] = { en, fr } as Record<
-    string,
-    Translation
-  >,
+  langs: TranslocoTestingOptions['langs'] = { en, fr } as Record<string, Translation>,
 ): ModuleWithProviders<TranslocoTestingModule> {
   const mod = TranslocoTestingModule.forRoot({
     langs,

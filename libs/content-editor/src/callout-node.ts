@@ -27,8 +27,7 @@ export const calloutNode = Node.create({
       title: {
         default: null,
         parseHTML: (el) => el.getAttribute('data-title'),
-        renderHTML: (attrs) =>
-          attrs['title'] ? { 'data-title': attrs['title'] } : {},
+        renderHTML: (attrs) => (attrs['title'] ? { 'data-title': attrs['title'] } : {}),
       },
     };
   },

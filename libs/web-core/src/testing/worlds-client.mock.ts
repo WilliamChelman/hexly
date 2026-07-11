@@ -32,10 +32,8 @@ export class MockWorldsClient {
   // Defaults to an empty set so a spec mounting the member panel without caring
   // about it still renders; override per test as needed.
   members = vi.fn<(id: string) => Observable<WorldMember[]>>(() => of<WorldMember[]>([]));
-  addMember =
-    vi.fn<(id: string, userId: string, role: MemberRole) => Observable<WorldMember[]>>();
-  setMemberRole =
-    vi.fn<(id: string, userId: string, role: MemberRole) => Observable<WorldMember[]>>();
+  addMember = vi.fn<(id: string, userId: string, role: MemberRole) => Observable<WorldMember[]>>();
+  setMemberRole = vi.fn<(id: string, userId: string, role: MemberRole) => Observable<WorldMember[]>>();
   removeMember = vi.fn<(id: string, userId: string) => Observable<WorldMember[]>>();
   // Defaults to no active link so a spec mounting the Public Link control (#162) without
   // caring about it still renders; override per test as needed.

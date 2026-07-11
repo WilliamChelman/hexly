@@ -16,11 +16,7 @@ export const CONTENT_FORMAT = 'tiptap-v3';
  * version's docs round-trip untouched with no transform. Saves always write
  * CONTENT_FORMAT.
  */
-export const READABLE_CONTENT_FORMATS = [
-  'tiptap-v1',
-  'tiptap-v2',
-  'tiptap-v3',
-] as const;
+export const READABLE_CONTENT_FORMATS = ['tiptap-v1', 'tiptap-v2', 'tiptap-v3'] as const;
 
 /** Format-tagged Content; `snapshot` is `z.unknown()` so persistence stays format-agnostic — see ADR-0019. */
 export const contentSchema = z.object({
@@ -128,7 +124,11 @@ export function hasHexGrid(body: EntityBody): body is EntityBody & HexMap {
  */
 export function gridOf(body: EntityBody): HexMap {
   return hasHexGrid(body)
-    ? { hexes: body.hexes, regions: body.regions ?? [], labels: body.labels ?? [] }
+    ? {
+        hexes: body.hexes,
+        regions: body.regions ?? [],
+        labels: body.labels ?? [],
+      }
     : emptyHexMap();
 }
 
@@ -160,10 +160,7 @@ export const nameSchema = z
   .trim()
   .min(1)
   .max(255)
-  .refine(
-    (s) => !/[\p{Cc}/\\]/u.test(s),
-    'Name cannot contain control characters or slashes',
-  );
+  .refine((s) => !/[\p{Cc}/\\]/u.test(s), 'Name cannot contain control characters or slashes');
 
 /**
  * Free-text Tags on an Entity (CONTEXT.md → Tag), normalized on parse so the

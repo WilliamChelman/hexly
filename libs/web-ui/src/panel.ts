@@ -1,9 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  booleanAttribute,
-  input,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, booleanAttribute, input } from '@angular/core';
 
 /**
  * Turns a semantic container (`<section>`, `<figure>`, `<aside>`…) into a Hexly

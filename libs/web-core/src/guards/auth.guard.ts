@@ -15,8 +15,7 @@ export const authGuard: CanActivateFn = (_route, state) => {
   const auth = inject(AuthClient);
   const router = inject(Router);
   const injector = inject(Injector);
-  const toLogin = () =>
-    router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
+  const toLogin = () => router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
 
   return toObservable(auth.sessionLoading, { injector }).pipe(
     filter((loading) => !loading),
@@ -35,8 +34,7 @@ export const manageUsersGuard: CanActivateFn = (_route, state) => {
   const auth = inject(AuthClient);
   const router = inject(Router);
   const injector = inject(Injector);
-  const toLogin = () =>
-    router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
+  const toLogin = () => router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
 
   return toObservable(auth.sessionLoading, { injector }).pipe(
     filter((loading) => !loading),
@@ -57,8 +55,7 @@ export const superadminGuard: CanActivateFn = (_route, state) => {
   const auth = inject(AuthClient);
   const router = inject(Router);
   const injector = inject(Injector);
-  const toLogin = () =>
-    router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
+  const toLogin = () => router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
 
   return toObservable(auth.sessionLoading, { injector }).pipe(
     filter((loading) => !loading),
@@ -79,8 +76,7 @@ export const loginGuard: CanActivateFn = (route) => {
   const auth = inject(AuthClient);
   const router = inject(Router);
   const injector = inject(Injector);
-  const home = () =>
-    router.parseUrl(route.queryParamMap.get('returnUrl') ?? '/');
+  const home = () => router.parseUrl(route.queryParamMap.get('returnUrl') ?? '/');
 
   return toObservable(auth.sessionLoading, { injector }).pipe(
     filter((loading) => !loading),

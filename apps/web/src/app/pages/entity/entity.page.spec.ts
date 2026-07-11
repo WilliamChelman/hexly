@@ -1,15 +1,7 @@
 import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import {
-  ActivatedRoute,
-  convertToParamMap,
-  provideRouter,
-  Router,
-} from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 import { CONTENT_FORMAT, CORE_HEXMAP, EntityDetail, EntityType } from '@hexly/domain';
 import { EntitiesClient, NudgeBusClient, ActiveWorld, TitleService, EVICTED, Watched } from '@hexly/web-core';
@@ -24,9 +16,7 @@ import { CORE_VIEW_CONTENT } from '../../entity-types/view-definition';
 
 /** Resolve AuthClient's boot `/auth/me` as anonymous so `whenStable()` settles. */
 function flushAuth(http: HttpTestingController) {
-  http
-    .match('/api/auth/me')
-    .forEach((req) => req.flush(null, { status: 401, statusText: 'Unauthorized' }));
+  http.match('/api/auth/me').forEach((req) => req.flush(null, { status: 401, statusText: 'Unauthorized' }));
 }
 
 // Hexmap with a populated Content body, to prove the Note view seeds it (#75).
@@ -68,7 +58,11 @@ describe('EntityPage routing', () => {
   const detail = (id: string, type: EntityType): EntityDetail =>
     type === 'note'
       ? noteDetail('Lady Mara')
-      : { ...hexmapWithContent('The reach lies north.'), id, name: 'Aldermoor' };
+      : {
+          ...hexmapWithContent('The reach lies north.'),
+          id,
+          name: 'Aldermoor',
+        };
 
   /** Configure the TestBed for `:id` without mounting yet, so a test can arm `entities` first. */
   async function configure(id: string, query: Record<string, string> = {}) {
@@ -102,9 +96,7 @@ describe('EntityPage routing', () => {
     }).compileComponents();
     TestBed.inject(ActiveWorld).set('w1');
     http = TestBed.inject(HttpTestingController);
-    navigate = vi
-      .spyOn(TestBed.inject(Router), 'navigate')
-      .mockResolvedValue(true);
+    navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
   }
 
   function mount() {
@@ -182,9 +174,7 @@ describe('EntityPage routing', () => {
 
   it('returns to the World’s library when the Entity fails to load', async () => {
     await configure('gone');
-    entities.load.mockReturnValue(
-      throwError(() => new HttpErrorResponse({ status: 404 })),
-    );
+    entities.load.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
     const fixture = mount();
     fixture.detectChanges();
 
@@ -225,9 +215,7 @@ describe('EntityPage layout', () => {
     fixture.detectChanges();
 
     // Maps open armed with Select so a stray first click never paints (#27).
-    const select = (fixture.nativeElement as HTMLElement).querySelector(
-      '[data-testid=tool-select]',
-    );
+    const select = (fixture.nativeElement as HTMLElement).querySelector('[data-testid=tool-select]');
     expect(select?.getAttribute('aria-pressed')).toBe('true');
   });
 
@@ -271,9 +259,7 @@ describe('EntityPage layout', () => {
     expect(el.querySelector('app-outline-panel')).toBeNull();
     expect(el.querySelector('app-references-panel')).not.toBeNull();
     // Opening it reads the edge index; the Outline, derived from live Content, reads nothing.
-    http
-      .expectOne('/api/entities/n1/references')
-      .flush({ references: [], referencedBy: [] });
+    http.expectOne('/api/entities/n1/references').flush({ references: [], referencedBy: [] });
 
     // A second click on the active toggle closes the dock, as it always did.
     click('references-toggle');
@@ -396,10 +382,6 @@ describe('EntityPage layout', () => {
     const fixture = TestBed.createComponent(EntityPage);
     fixture.detectChanges();
 
-    expect(
-      (fixture.nativeElement as HTMLElement).querySelector(
-        '[data-testid=entity-tags]',
-      ),
-    ).not.toBeNull();
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid=entity-tags]')).not.toBeNull();
   });
 });

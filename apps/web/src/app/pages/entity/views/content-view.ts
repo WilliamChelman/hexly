@@ -1,9 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { TranslocoPipe, translateSignal } from '@jsverse/transloco';
 import { ContentEditor } from '@hexly/content-editor';
 import { Icon, IconButton } from '@hexly/web-ui';
@@ -58,17 +53,11 @@ import { ReferencesPanel } from '../components/references-panel';
          left of a rail of toggles; pointer-events re-enabled per child. The Outline and
          References share the slot, so dock.panel() is a single discriminant and "both
          open at once" is unrepresentable. Ungated by writable(): both are read affordances. -->
-    <div
-      class="absolute top-3 right-3 bottom-3 flex items-start gap-2 z-[1] pointer-events-none"
-    >
+    <div class="absolute top-3 right-3 bottom-3 flex items-start gap-2 z-[1] pointer-events-none">
       @if (dock.panel() === 'outline') {
-        <app-outline-panel
-          class="w-[16rem] max-h-full border border-line rounded-lg shadow-2 pointer-events-auto"
-        />
+        <app-outline-panel class="w-[16rem] max-h-full border border-line rounded-lg shadow-2 pointer-events-auto" />
       } @else if (dock.panel() === 'references') {
-        <app-references-panel
-          class="w-[16rem] max-h-full border border-line rounded-lg shadow-2 pointer-events-auto"
-        />
+        <app-references-panel class="w-[16rem] max-h-full border border-line rounded-lg shadow-2 pointer-events-auto" />
       }
       <div class="flex flex-col gap-2">
         <button

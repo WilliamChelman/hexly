@@ -1,11 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  input,
-  output,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntityFacets } from '@hexly/domain';
 
@@ -63,15 +56,11 @@ export interface FieldRangeChange {
   imports: [TranslocoPipe],
   host: { class: 'block' },
   template: `
-    <div
-      data-testid="facet-rail"
-      class="rounded-sm border border-line bg-surface p-4"
-    >
+    <div data-testid="facet-rail" class="rounded-sm border border-line bg-surface p-4">
       <div class="flex items-center justify-between mb-3">
-        <span
-          class="font-sans text-xs uppercase tracking-[0.18em] text-ink-faint"
-          >{{ 'entityBrowser.facets.heading' | transloco }}</span
-        >
+        <span class="font-sans text-xs uppercase tracking-[0.18em] text-ink-faint">{{
+          'entityBrowser.facets.heading' | transloco
+        }}</span>
         @if (canClear()) {
           <button
             type="button"
@@ -150,7 +139,12 @@ export interface FieldRangeChange {
                     [attr.data-testid]="'facet-field-' + field.key + '-' + row.value"
                     [attr.aria-pressed]="row.active"
                     class="w-full flex items-center justify-between px-2 py-1 rounded-sm font-sans text-sm text-left text-ink-strong hover:bg-surface-sunken aria-pressed:bg-gold/15 aria-pressed:text-gold"
-                    (click)="fieldValueToggled.emit({ key: field.key, value: row.value })"
+                    (click)="
+                      fieldValueToggled.emit({
+                        key: field.key,
+                        value: row.value,
+                      })
+                    "
                   >
                     <span class="truncate">{{ row.value }}</span>
                     <span class="ml-2 text-ink-faint tabular-nums">{{ row.count }}</span>
@@ -167,8 +161,18 @@ export interface FieldRangeChange {
 export class FacetRail {
   private readonly transloco = inject(TranslocoService);
 
-  readonly facetCounts = input<EntityFacets>({ type: [], tag: [], visibility: [], fields: [] });
-  readonly active = input<ActiveFacets>({ type: [], tag: [], visibility: [], fields: {} });
+  readonly facetCounts = input<EntityFacets>({
+    type: [],
+    tag: [],
+    visibility: [],
+    fields: [],
+  });
+  readonly active = input<ActiveFacets>({
+    type: [],
+    tag: [],
+    visibility: [],
+    fields: {},
+  });
   readonly canClear = input(false);
 
   readonly toggled = output<FacetToggle>();
@@ -177,7 +181,11 @@ export class FacetRail {
   readonly clearAll = output<void>();
 
   protected emitRange(key: string, bound: 'gte' | 'lte', event: Event): void {
-    this.fieldRangeChanged.emit({ key, bound, value: (event.target as HTMLInputElement).value });
+    this.fieldRangeChanged.emit({
+      key,
+      bound,
+      value: (event.target as HTMLInputElement).value,
+    });
   }
 
   /** Categories as render rows. Type/Visibility labels are translated; a Tag
@@ -237,8 +245,12 @@ export class FacetRail {
           kind: range ? ('range' as const) : ('values' as const),
           // A date range wants a date picker; every other range is numeric.
           inputType: field.dataType.kind === 'date' ? 'date' : 'number',
-          minLabel: this.transloco.translate('entityBrowser.facets.rangeMin', { field: field.label }),
-          maxLabel: this.transloco.translate('entityBrowser.facets.rangeMax', { field: field.label }),
+          minLabel: this.transloco.translate('entityBrowser.facets.rangeMin', {
+            field: field.label,
+          }),
+          maxLabel: this.transloco.translate('entityBrowser.facets.rangeMax', {
+            field: field.label,
+          }),
           gte: selection.gte ?? '',
           lte: selection.lte ?? '',
           // Placeholder bounds hint the available span. A number range compares numerically, so its

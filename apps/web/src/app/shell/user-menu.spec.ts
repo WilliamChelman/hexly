@@ -13,31 +13,31 @@ describe('UserMenu', () => {
     auth = new MockAuthClient();
     await TestBed.configureTestingModule({
       imports: [UserMenu, provideTranslocoTesting()],
-      providers: [
-        provideRouter([]),
-        { provide: AuthClient, useValue: auth },
-      ],
+      providers: [provideRouter([]), { provide: AuthClient, useValue: auth }],
     }).compileComponents();
   });
 
   afterEach(() => localStorage.clear());
   afterEach(() => {
-    document
-      .querySelectorAll('.cdk-overlay-container')
-      .forEach((el) => el.remove());
+    document.querySelectorAll('.cdk-overlay-container').forEach((el) => el.remove());
   });
 
   function signIn(displayName = 'Ada Lovelace'): void {
-    auth.setUser({ id: 'u1', email: 'ada@hexly.test', displayName, preferences: {}, roles: ['create-worlds'], isSuperadmin: false });
+    auth.setUser({
+      id: 'u1',
+      email: 'ada@hexly.test',
+      displayName,
+      preferences: {},
+      roles: ['create-worlds'],
+      isSuperadmin: false,
+    });
   }
 
   type Fixture = ReturnType<typeof TestBed.createComponent>;
 
   /** The trigger, found by its accessible name rather than a test hook. */
   function trigger(fixture: Fixture): HTMLButtonElement {
-    return fixture.nativeElement.querySelector(
-      'button[aria-label="Open user menu"]',
-    ) as HTMLButtonElement;
+    return fixture.nativeElement.querySelector('button[aria-label="Open user menu"]') as HTMLButtonElement;
   }
 
   function openMenu(fixture: Fixture): HTMLElement {
@@ -48,12 +48,8 @@ describe('UserMenu', () => {
 
   /** A menu command (menuitem / menuitemradio) addressed by its accessible name. */
   function item(menu: HTMLElement, name: RegExp): HTMLElement {
-    const items = Array.from(
-      menu.querySelectorAll('[role=menuitem],[role=menuitemradio]'),
-    ) as HTMLElement[];
-    const match = items.find((el) =>
-      name.test(el.getAttribute('aria-label') ?? el.textContent ?? ''),
-    );
+    const items = Array.from(menu.querySelectorAll('[role=menuitem],[role=menuitemradio]')) as HTMLElement[];
+    const match = items.find((el) => name.test(el.getAttribute('aria-label') ?? el.textContent ?? ''));
     if (!match) throw new Error(`No menu item matching ${name}`);
     return match;
   }

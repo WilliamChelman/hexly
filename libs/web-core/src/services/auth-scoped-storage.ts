@@ -52,7 +52,9 @@ export class AuthScopedStorage {
             }
           }
           localStorage.setItem(SCOPE_KEY, newHash);
-        } catch { /* private mode */ }
+        } catch {
+          /* private mode */
+        }
       });
     });
   }
@@ -68,13 +70,17 @@ export class AuthScopedStorage {
   setItem(key: string, value: string): void {
     try {
       localStorage.setItem(PREFIX + key, value);
-    } catch { /* private mode */ }
+    } catch {
+      /* private mode */
+    }
   }
 
   removeItem(key: string): void {
     try {
       localStorage.removeItem(PREFIX + key);
-    } catch { /* private mode */ }
+    } catch {
+      /* private mode */
+    }
   }
 
   /**

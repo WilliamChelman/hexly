@@ -15,12 +15,7 @@ import { EntitiesClient, WorldsClient, ActiveWorld } from '@hexly/web-core';
 import { MockEntitiesClient, MockWorldsClient, provideTranslocoTesting } from '@hexly/web-core/testing';
 import { WorldDashboard } from './world-dashboard';
 
-function summary(
-  id: string,
-  name = id,
-  type: EntityType = 'core.note',
-  updatedAt = 1,
-): EntitySummary {
+function summary(id: string, name = id, type: EntityType = 'core.note', updatedAt = 1): EntitySummary {
   return {
     id,
     worldId: 'w1',
@@ -34,12 +29,12 @@ function summary(
   };
 }
 
-const page = (items: EntitySummary[]): EntityPage => ({ items, nextCursor: null });
+const page = (items: EntitySummary[]): EntityPage => ({
+  items,
+  nextCursor: null,
+});
 
-function worldDetail(
-  pinnedEntityIds: string[] = [],
-  rights: WorldVerb[] = ['read', 'manage'],
-): WorldDetail {
+function worldDetail(pinnedEntityIds: string[] = [], rights: WorldVerb[] = ['read', 'manage']): WorldDetail {
   return {
     id: 'w1',
     name: 'Aldermoor',
@@ -97,20 +92,20 @@ describe('WorldDashboard', () => {
    * Render the Dashboard. `recents` is the unfiltered (updatedAt desc) list;
    * `maps` is the `type=hexmap` list; `facets` the at-a-glance counts.
    */
-  function render(opts: {
-    recents?: EntitySummary[];
-    maps?: EntitySummary[];
-    facets?: EntityFacets;
-    /** Access-filtered summaries the `list({ ids })` pin-resolve returns (any order). */
-    pinResolve?: EntitySummary[];
-  } = {}) {
+  function render(
+    opts: {
+      recents?: EntitySummary[];
+      maps?: EntitySummary[];
+      facets?: EntityFacets;
+      /** Access-filtered summaries the `list({ ids })` pin-resolve returns (any order). */
+      pinResolve?: EntitySummary[];
+    } = {},
+  ) {
     entities.list.mockImplementation((o) => {
       if (o?.ids) return of(page(opts.pinResolve ?? []));
       return of(page(o?.type?.includes('core.hexmap') ? (opts.maps ?? []) : (opts.recents ?? [])));
     });
-    entities.facets.mockReturnValue(
-      of(opts.facets ?? { type: [], tag: [], visibility: [], fields: [] }),
-    );
+    entities.facets.mockReturnValue(of(opts.facets ?? { type: [], tag: [], visibility: [], fields: [] }));
     fixture = TestBed.createComponent(WorldDashboard);
     fixture.detectChanges();
     return fixture.nativeElement as HTMLElement;
@@ -127,15 +122,10 @@ describe('WorldDashboard', () => {
 
     // Resolved through the entity read path with the pin id set (the client sizes the
     // page to the id count — covered in entities.client.spec).
-    expect(entities.list).toHaveBeenCalledWith(
-      expect.objectContaining({ ids: ['p2', 'gone', 'p1'] }),
-    );
+    expect(entities.list).toHaveBeenCalledWith(expect.objectContaining({ ids: ['p2', 'gone', 'p1'] }));
     // Rendered in pinnedEntityIds order (p2 before p1), with 'gone' absent.
     const pins = Array.from(el.querySelectorAll('[data-testid^=pin-]'));
-    expect(pins.map((p) => p.getAttribute('data-testid'))).toEqual([
-      'pin-p2',
-      'pin-p1',
-    ]);
+    expect(pins.map((p) => p.getAttribute('data-testid'))).toEqual(['pin-p2', 'pin-p1']);
     expect($(el, '[data-testid=pin-p2]')?.textContent).toContain('North Reach');
   });
 
@@ -168,9 +158,7 @@ describe('WorldDashboard', () => {
     ($(el, '[data-testid=pin-picker-option-e1]') as HTMLButtonElement).click();
 
     // The picker is scoped to the active World so a pin can't be a foreign-World Entity.
-    expect(entities.list).toHaveBeenCalledWith(
-      expect.objectContaining({ q: '', worldId: 'w1' }),
-    );
+    expect(entities.list).toHaveBeenCalledWith(expect.objectContaining({ q: '', worldId: 'w1' }));
     // Appended to the existing set, sent wholesale.
     expect(worlds.setPins).toHaveBeenCalledWith('w1', ['p1', 'e1']);
     // The returned Detail re-pins the active World so the pins re-resolve.
@@ -234,9 +222,7 @@ describe('WorldDashboard', () => {
     });
 
     // The maps list is a distinct, filtered read.
-    expect(entities.list).toHaveBeenCalledWith(
-      expect.objectContaining({ worldId: 'w1', type: ['core.hexmap'] }),
-    );
+    expect(entities.list).toHaveBeenCalledWith(expect.objectContaining({ worldId: 'w1', type: ['core.hexmap'] }));
     expect($(el, '[data-testid=map-m1]')?.textContent).toContain('The Reach');
   });
 
@@ -254,9 +240,7 @@ describe('WorldDashboard', () => {
       },
     });
 
-    expect(entities.facets).toHaveBeenCalledWith(
-      expect.objectContaining({ worldId: 'w1' }),
-    );
+    expect(entities.facets).toHaveBeenCalledWith(expect.objectContaining({ worldId: 'w1' }));
     expect($(el, '[data-testid="count-type-core.note"]')?.textContent).toContain('3');
     expect($(el, '[data-testid="count-type-core.hexmap"]')?.textContent).toContain('1');
   });
@@ -264,9 +248,7 @@ describe('WorldDashboard', () => {
   it('links to the full Entity Browser', () => {
     const el = render({ recents: [summary('e1')] });
 
-    expect(
-      ($(el, '[data-testid=browse-all]') as HTMLAnchorElement).getAttribute('href'),
-    ).toBe('/w/w1/entities');
+    expect(($(el, '[data-testid=browse-all]') as HTMLAnchorElement).getAttribute('href')).toBe('/w/w1/entities');
   });
 
   it('shows an empty state prompting Note or Map creation for an empty World', () => {
@@ -281,20 +263,12 @@ describe('WorldDashboard', () => {
 
   it('creates the first Note from the empty state and opens it', () => {
     const el = render({ recents: [], maps: [] });
-    const navigate = vi
-      .spyOn(TestBed.inject(Router), 'navigate')
-      .mockResolvedValue(true);
-    entities.create.mockReturnValue(
-      of(summary('new1', 'Untitled note') as unknown as EntityDetail),
-    );
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+    entities.create.mockReturnValue(of(summary('new1', 'Untitled note') as unknown as EntityDetail));
 
     ($(el, '[data-testid=create-note]') as HTMLButtonElement).click();
 
-    expect(entities.create).toHaveBeenCalledWith(
-      expect.any(String),
-      'core.note',
-      'w1',
-    );
+    expect(entities.create).toHaveBeenCalledWith(expect.any(String), 'core.note', 'w1');
     expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'new1']);
   });
 });

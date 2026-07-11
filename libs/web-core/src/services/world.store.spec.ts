@@ -11,7 +11,14 @@ import { Logger } from './logger';
 import { WorldStore } from './world.store';
 
 function world(id: string, name = id): WorldSummary {
-  return { id, name, owners: ['u1'], rights: ['read', 'manage'], createdAt: 1, updatedAt: 1 };
+  return {
+    id,
+    name,
+    owners: ['u1'],
+    rights: ['read', 'manage'],
+    createdAt: 1,
+    updatedAt: 1,
+  };
 }
 
 describe('WorldStore', () => {
@@ -19,7 +26,10 @@ describe('WorldStore', () => {
   let worldsClient: MockWorldsClient;
   let auth: MockAuthClient;
   let bus: MockNudgeBusClient;
-  let logger: { error: ReturnType<typeof vi.fn>; warn: ReturnType<typeof vi.fn> };
+  let logger: {
+    error: ReturnType<typeof vi.fn>;
+    warn: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     worldsClient = new MockWorldsClient();
@@ -27,9 +37,7 @@ describe('WorldStore', () => {
     bus = new MockNudgeBusClient();
     // Relay the mock bus so the store's reconciler sees raw nudges, as WorldsClient.watchAll wires
     // in prod: the tests drive them via bus.emit and assert the list-level reconcile.
-    worldsClient.watchAll.mockImplementation((ids) =>
-      merge(...ids.map((id) => bus.follow({ kind: 'world', id }))),
-    );
+    worldsClient.watchAll.mockImplementation((ids) => merge(...ids.map((id) => bus.follow({ kind: 'world', id }))));
     logger = { error: vi.fn(), warn: vi.fn() };
     TestBed.configureTestingModule({
       providers: [
@@ -47,7 +55,14 @@ describe('WorldStore', () => {
   }
 
   function login(id = 'u1'): void {
-    auth.setUser({ id, email: 'ada@hexly.test', displayName: 'Ada', preferences: {}, roles: ['create-worlds'], isSuperadmin: false });
+    auth.setUser({
+      id,
+      email: 'ada@hexly.test',
+      displayName: 'Ada',
+      preferences: {},
+      roles: ['create-worlds'],
+      isSuperadmin: false,
+    });
   }
 
   it('loads the caller’s Worlds and marks loaded', () => {
@@ -113,7 +128,12 @@ describe('WorldStore', () => {
     flushList([world('w1', 'Aldermoor')]);
     store.load();
     worldsClient.rename.mockReturnValue(
-      of({ ...world('w1', 'Aldermoor Reborn'), entityCount: 0, pinnedEntityIds: [], seq: 2 }),
+      of({
+        ...world('w1', 'Aldermoor Reborn'),
+        entityCount: 0,
+        pinnedEntityIds: [],
+        seq: 2,
+      }),
     );
 
     store.rename('w1', 'Aldermoor Reborn').subscribe();

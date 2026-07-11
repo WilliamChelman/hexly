@@ -9,15 +9,21 @@ import { gate, removeOwnerOutcome } from './owner-set';
  */
 describe('gate', () => {
   it('is not-found when the resource is unreachable', () => {
-    expect(gate({ reachable: false, isOwner: false })).toEqual({ status: 'not-found' });
+    expect(gate({ reachable: false, isOwner: false })).toEqual({
+      status: 'not-found',
+    });
   });
 
   it('hides ownership behind reachability — unreachable owner is still not-found', () => {
-    expect(gate({ reachable: false, isOwner: true })).toEqual({ status: 'not-found' });
+    expect(gate({ reachable: false, isOwner: true })).toEqual({
+      status: 'not-found',
+    });
   });
 
   it('is forbidden when reachable but not an Owner', () => {
-    expect(gate({ reachable: true, isOwner: false })).toEqual({ status: 'forbidden' });
+    expect(gate({ reachable: true, isOwner: false })).toEqual({
+      status: 'forbidden',
+    });
   });
 
   it('proceeds (undefined) when reachable and an Owner', () => {
@@ -32,14 +38,21 @@ describe('gate', () => {
  */
 describe('removeOwnerOutcome', () => {
   it('is not-found when the target is not an Owner', () => {
-    expect(removeOwnerOutcome(['ada', 'bob'], 'carol')).toEqual({ status: 'not-found' });
+    expect(removeOwnerOutcome(['ada', 'bob'], 'carol')).toEqual({
+      status: 'not-found',
+    });
   });
 
   it('refuses to empty the set — the sole Owner is last-owner', () => {
-    expect(removeOwnerOutcome(['ada'], 'ada')).toEqual({ status: 'last-owner' });
+    expect(removeOwnerOutcome(['ada'], 'ada')).toEqual({
+      status: 'last-owner',
+    });
   });
 
   it('removes the target and returns the post-removal set when others remain', () => {
-    expect(removeOwnerOutcome(['ada', 'bob'], 'ada')).toEqual({ status: 'ok', value: ['bob'] });
+    expect(removeOwnerOutcome(['ada', 'bob'], 'ada')).toEqual({
+      status: 'ok',
+      value: ['bob'],
+    });
   });
 });

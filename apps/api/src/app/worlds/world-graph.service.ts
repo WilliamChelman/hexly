@@ -24,7 +24,10 @@ export class WorldGraphService {
     if (!worldAccess(this.db, userId).decideMeta(worldId)?.reachable) return null;
     const access = entityAccess(this.db, userId);
     const nodes = this.nodes(access, worldId);
-    return { nodes, edges: this.edges(worldId, new Set(nodes.map((n) => n.id))) };
+    return {
+      nodes,
+      edges: this.edges(worldId, new Set(nodes.map((n) => n.id))),
+    };
   }
 
   /**

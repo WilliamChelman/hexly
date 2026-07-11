@@ -24,8 +24,7 @@
   font-style: normal;
   font-weight: 200 900;
   font-display: optional;
-  src: url('/fonts/source-serif-4-latin-wght-normal.woff2')
-    format('woff2-variations');
+  src: url('/fonts/source-serif-4-latin-wght-normal.woff2') format('woff2-variations');
 }
 
 @import '@fontsource/marcellus/latin-400.css';

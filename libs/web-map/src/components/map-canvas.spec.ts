@@ -121,9 +121,7 @@ describe('MapCanvas keyboard', () => {
     input.focus();
 
     // Backspace in a label/rename field must edit the text, never delete the hex.
-    input.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true }),
-    );
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true }));
 
     const survived = '0,0' in store.document().hexes;
     input.remove();
@@ -139,9 +137,7 @@ describe('MapCanvas keyboard', () => {
 
     // Delete right after clicking, say, a tool button must not erase the selection
     // behind the focused control — only the canvas owns the destructive shortcut.
-    button.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }),
-    );
+    button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }));
 
     const survived = '0,0' in store.document().hexes;
     button.remove();
@@ -184,12 +180,8 @@ describe('MapCanvas localization', () => {
 
     // With no hovered coordinate the readout reads the "no hex" fallback, and the
     // canvas/zoom chrome carries translated aria-labels.
-    expect(el.querySelector('app-coord-readout')?.textContent).toContain(
-      'Aucun hex',
-    );
-    expect(el.querySelector('canvas')?.getAttribute('aria-label')).toBe(
-      'Carte hexagonale',
-    );
+    expect(el.querySelector('app-coord-readout')?.textContent).toContain('Aucun hex');
+    expect(el.querySelector('canvas')?.getAttribute('aria-label')).toBe('Carte hexagonale');
     expect(el.querySelector('[aria-label="Zoom avant"]')).not.toBeNull();
   });
 });

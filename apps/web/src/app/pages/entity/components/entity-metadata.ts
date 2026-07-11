@@ -15,18 +15,11 @@ import { EntitySession } from '../services/entity-session';
   imports: [TranslocoPipe],
   template: `
     @if (entries().length > 0) {
-      <details
-        class="mb-4 rounded-md border border-line bg-surface-sunken"
-        data-testid="entity-metadata"
-      >
-        <summary
-          class="cursor-pointer select-none px-3 py-2 text-2xs uppercase tracking-wider text-ink-muted"
-        >
+      <details class="mb-4 rounded-md border border-line bg-surface-sunken" data-testid="entity-metadata">
+        <summary class="cursor-pointer select-none px-3 py-2 text-2xs uppercase tracking-wider text-ink-muted">
           {{ 'entityMetadata.heading' | transloco }} ({{ entries().length }})
         </summary>
-        <dl
-          class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 border-t border-line px-3 py-2 m-0 text-sm"
-        >
+        <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 border-t border-line px-3 py-2 m-0 text-sm">
           @for (entry of entries(); track entry.key) {
             <dt class="font-mono text-xs text-ink-muted break-all">
               {{ entry.key }}

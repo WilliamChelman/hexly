@@ -41,9 +41,7 @@ export class OutlineStore {
       // content() is a fresh object every keystroke, so re-emit only when the heading
       // set truly changes — otherwise the panel rebuilds its scrollspy and flashes the
       // active highlight back to the top on every key pressed anywhere in the document.
-      equal: (a, b) =>
-        a.length === b.length &&
-        a.every((h, i) => h.text === b[i].text && h.level === b[i].level),
+      equal: (a, b) => a.length === b.length && a.every((h, i) => h.text === b[i].text && h.level === b[i].level),
     },
   );
 }

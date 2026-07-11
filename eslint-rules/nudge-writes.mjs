@@ -49,10 +49,7 @@ function staticText(node) {
  */
 function chokePoint({ tables, sqlTables, ownerFile, handle, entryPoints }) {
   const guarded = new Set(tables);
-  const rawWrite = new RegExp(
-    `\\b(INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\s+["\`']?(${sqlTables.join('|')})\\b`,
-    'i',
-  );
+  const rawWrite = new RegExp(`\\b(INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\s+["\`']?(${sqlTables.join('|')})\\b`, 'i');
   const messages = {
     direct: `Route this through ${handle}: it owns the \`seq\` bump and the post-commit nudge, so a write to \`{{table}}\` cannot land without refreshing or evicting its live-followers (ADR-0045).`,
     rawSql: `Raw SQL writing \`{{table}}\` bypasses ${handle}, which owns the \`seq\` bump and the post-commit nudge (ADR-0045). Use ${entryPoints}.`,
@@ -61,7 +58,9 @@ function chokePoint({ tables, sqlTables, ownerFile, handle, entryPoints }) {
   return {
     meta: {
       type: 'problem',
-      docs: { description: `Only ${handle} may write ${tables.join(' and ')} (ADR-0045).` },
+      docs: {
+        description: `Only ${handle} may write ${tables.join(' and ')} (ADR-0045).`,
+      },
       schema: [],
       messages,
     },
@@ -81,7 +80,11 @@ function chokePoint({ tables, sqlTables, ownerFile, handle, entryPoints }) {
           ) {
             const [table] = node.arguments;
             if (table?.type === 'Identifier' && guarded.has(table.name)) {
-              context.report({ node, messageId: 'direct', data: { table: table.name } });
+              context.report({
+                node,
+                messageId: 'direct',
+                data: { table: table.name },
+              });
               return;
             }
           }
@@ -90,7 +93,11 @@ function chokePoint({ tables, sqlTables, ownerFile, handle, entryPoints }) {
             const text = staticText(arg);
             const match = text && rawWrite.exec(text);
             if (match) {
-              context.report({ node: arg, messageId: 'rawSql', data: { table: match[2] } });
+              context.report({
+                node: arg,
+                messageId: 'rawSql',
+                data: { table: match[2] },
+              });
               return;
             }
           }

@@ -5,7 +5,13 @@ import { provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { of, throwError } from 'rxjs';
 import { CORE_HEXMAP, emptyContent, EntityDetail, WorldDetail, WorldVerb } from '@hexly/domain';
-import { provideTranslocoTesting, MockEntitiesClient, MockWorldsClient, MockUserDirectoryClient, MockAuthClient } from '@hexly/web-core/testing';
+import {
+  provideTranslocoTesting,
+  MockEntitiesClient,
+  MockWorldsClient,
+  MockUserDirectoryClient,
+  MockAuthClient,
+} from '@hexly/web-core/testing';
 import { EntitiesClient, WorldsClient, ActiveWorld, UserDirectoryClient, AuthClient } from '@hexly/web-core';
 import { EntitySession } from '../services/entity-session';
 import { ENTITY_SESSION } from '@hexly/web-entity';
@@ -18,10 +24,7 @@ import { EntityHeader } from './entity-header';
 import { noteDetail } from './entity-detail.fixtures';
 
 /** The active World the header reads for pin state — 'm1' is the opened entity's id. */
-function worldDetail(
-  pinnedEntityIds: string[] = [],
-  rights: WorldVerb[] = ['read', 'manage'],
-): WorldDetail {
+function worldDetail(pinnedEntityIds: string[] = [], rights: WorldVerb[] = ['read', 'manage']): WorldDetail {
   return {
     id: 'w1',
     name: 'Aldermoor',
@@ -94,7 +97,10 @@ describe('EntityHeader', () => {
             ),
           },
         },
-        { provide: UserDirectoryClient, useValue: new MockUserDirectoryClient() },
+        {
+          provide: UserDirectoryClient,
+          useValue: new MockUserDirectoryClient(),
+        },
         { provide: AuthClient, useValue: new MockAuthClient() },
         provideRouter([]),
       ],
@@ -108,18 +114,12 @@ describe('EntityHeader', () => {
   // The actions live in a CDK menu overlay (attached to the document body); tear it
   // down between specs so a lingering menu never leaks into the next.
   afterEach(() => {
-    document
-      .querySelectorAll('.cdk-overlay-container')
-      .forEach((el) => el.remove());
+    document.querySelectorAll('.cdk-overlay-container').forEach((el) => el.remove());
   });
 
   /** Open the entity actions overflow menu; its items render into the overlay. */
   function openActions(fixture: ComponentFixture<EntityHeader>): void {
-    (
-      fixture.nativeElement.querySelector(
-        '[data-testid=entity-actions]',
-      ) as HTMLButtonElement
-    ).click();
+    (fixture.nativeElement.querySelector('[data-testid=entity-actions]') as HTMLButtonElement).click();
     fixture.detectChanges();
   }
 
@@ -139,8 +139,7 @@ describe('EntityHeader', () => {
     menuItem('manage-owners')!.click();
     fixture.detectChanges();
 
-    const set = fixture.debugElement.query(By.directive(OwnerSet))
-      ?.componentInstance as OwnerSet;
+    const set = fixture.debugElement.query(By.directive(OwnerSet))?.componentInstance as OwnerSet;
     expect(set.kind()).toBe('entity');
     expect(set.id()).toBe('m1');
   });
@@ -196,9 +195,7 @@ describe('EntityHeader', () => {
     const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 
-    expect(
-      fixture.nativeElement.querySelector('[data-testid=entity-tags]'),
-    ).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid=entity-tags]')).not.toBeNull();
   });
 
   it('renames the open entity when the title is edited', () => {
@@ -208,13 +205,13 @@ describe('EntityHeader', () => {
 
     // Edit in place (contenteditable), commit on blur.
     entities.patch.mockReturnValue(of({ ...aldermoor, name: 'The Whisperwood' }));
-    const title = fixture.nativeElement.querySelector(
-      '[data-testid=title]',
-    ) as HTMLElement;
+    const title = fixture.nativeElement.querySelector('[data-testid=title]') as HTMLElement;
     title.textContent = 'The Whisperwood';
     title.dispatchEvent(new Event('blur'));
 
-    expect(entities.patch).toHaveBeenCalledWith('m1', { name: 'The Whisperwood' });
+    expect(entities.patch).toHaveBeenCalledWith('m1', {
+      name: 'The Whisperwood',
+    });
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('The Whisperwood');
@@ -225,9 +222,7 @@ describe('EntityHeader', () => {
     const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 
-    (
-      fixture.nativeElement.querySelector('[data-testid=title]') as HTMLElement
-    ).dispatchEvent(new Event('blur'));
+    (fixture.nativeElement.querySelector('[data-testid=title]') as HTMLElement).dispatchEvent(new Event('blur'));
 
     expect(entities.patch).not.toHaveBeenCalled();
   });
@@ -285,9 +280,7 @@ describe('EntityHeader', () => {
     const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 
-    const title = fixture.nativeElement.querySelector(
-      '[data-testid=title]',
-    ) as HTMLElement;
+    const title = fixture.nativeElement.querySelector('[data-testid=title]') as HTMLElement;
     expect(title.getAttribute('contenteditable')).toBeNull();
     expect(title.getAttribute('tabindex')).toBeNull();
     openActions(fixture);
@@ -304,9 +297,7 @@ describe('EntityHeader', () => {
     expect(text).not.toContain('All maps');
     expect(text).not.toContain('Design system');
     expect(fixture.nativeElement.querySelector('a[href="/entities"]')).toBeNull();
-    expect(
-      fixture.nativeElement.querySelector('a[href="/styleguide"]'),
-    ).toBeNull();
+    expect(fixture.nativeElement.querySelector('a[href="/styleguide"]')).toBeNull();
   });
 
   it('renders its chrome and actions in French when French is the active language', () => {
@@ -321,9 +312,7 @@ describe('EntityHeader', () => {
     const el = fixture.nativeElement as HTMLElement;
     // The Share action now lives in the overflow menu; open it to see its label.
     openActions(fixture);
-    expect((document.querySelector('[role=menu]') as HTMLElement).textContent).toContain(
-      'Partager',
-    );
+    expect((document.querySelector('[role=menu]') as HTMLElement).textContent).toContain('Partager');
     // The autosave status chip (no Save button anymore, ADR-0026): clean → "Enregistré".
     expect(el.textContent).toContain('Enregistré');
     expect(el.textContent).not.toContain('Saved');
@@ -337,9 +326,7 @@ describe('EntityHeader', () => {
     TestBed.inject(TranslocoService).setActiveLang('fr');
     fixture.detectChanges();
 
-    const title = fixture.nativeElement.querySelector(
-      '[data-testid=title]',
-    ) as HTMLButtonElement;
+    const title = fixture.nativeElement.querySelector('[data-testid=title]') as HTMLButtonElement;
     expect(title.textContent?.trim()).toBe('Save');
   });
 
@@ -350,12 +337,8 @@ describe('EntityHeader', () => {
     const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 
-    const map = fixture.nativeElement.querySelector(
-      '[data-testid="core.view.map"]',
-    ) as HTMLButtonElement;
-    const noteBtn = fixture.nativeElement.querySelector(
-      '[data-testid="core.view.content"]',
-    ) as HTMLButtonElement;
+    const map = fixture.nativeElement.querySelector('[data-testid="core.view.map"]') as HTMLButtonElement;
+    const noteBtn = fixture.nativeElement.querySelector('[data-testid="core.view.content"]') as HTMLButtonElement;
     expect(map).not.toBeNull();
     expect(noteBtn).not.toBeNull();
     // Default is the grid: Map pressed, Note not.
@@ -379,17 +362,15 @@ describe('EntityHeader', () => {
     const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 
-    (
-      fixture.nativeElement.querySelector('[data-testid="core.view.content"]') as HTMLButtonElement
-    ).click();
+    (fixture.nativeElement.querySelector('[data-testid="core.view.content"]') as HTMLButtonElement).click();
     fixture.detectChanges();
 
     // The store is the single owner of the active-View choice (shared with the page body).
     expect(TestBed.inject(EntityViewStore).activeView()).toBe(CORE_VIEW_CONTENT);
     expect(
-      (
-        fixture.nativeElement.querySelector('[data-testid="core.view.content"]') as HTMLButtonElement
-      ).getAttribute('aria-pressed'),
+      (fixture.nativeElement.querySelector('[data-testid="core.view.content"]') as HTMLButtonElement).getAttribute(
+        'aria-pressed',
+      ),
     ).toBe('true');
   });
 
@@ -465,26 +446,26 @@ describe('EntityHeader', () => {
     const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 
-    const nav = vi
-      .spyOn(TestBed.inject(Router), 'navigate')
-      .mockResolvedValue(true);
+    const nav = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
 
-    (
-      fixture.nativeElement.querySelector('[data-testid="core.view.content"]') as HTMLButtonElement
-    ).click();
+    (fixture.nativeElement.querySelector('[data-testid="core.view.content"]') as HTMLButtonElement).click();
     // Persisted as the full View id (replaceUrl — a view flip is not a navigation).
     expect(nav).toHaveBeenCalledWith(
       [],
-      expect.objectContaining({ queryParams: { view: CORE_VIEW_CONTENT }, replaceUrl: true }),
+      expect.objectContaining({
+        queryParams: { view: CORE_VIEW_CONTENT },
+        replaceUrl: true,
+      }),
     );
 
-    (
-      fixture.nativeElement.querySelector('[data-testid="core.view.map"]') as HTMLButtonElement
-    ).click();
+    (fixture.nativeElement.querySelector('[data-testid="core.view.map"]') as HTMLButtonElement).click();
     // The default Map view drops the param to keep the URL clean.
     expect(nav).toHaveBeenCalledWith(
       [],
-      expect.objectContaining({ queryParams: { view: null }, replaceUrl: true }),
+      expect.objectContaining({
+        queryParams: { view: null },
+        replaceUrl: true,
+      }),
     );
   });
 });

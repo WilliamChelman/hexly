@@ -7,10 +7,7 @@ import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtur
  * round trip by reloading; a direct API read confirms the persisted document
  * (ADR-0009).
  */
-test('paints a hex, saves, and the hex survives a reload', async ({
-  page,
-  request,
-}) => {
+test('paints a hex, saves, and the hex survives a reload', async ({ page, request }) => {
   await enterLibrary(page);
   await page.getByTestId('new-map').click();
 
@@ -23,10 +20,7 @@ test('paints a hex, saves, and the hex survives a reload', async ({
 
   // Pick a non-default terrain so the saved document proves our selection.
   await page.getByTestId('tool-terrain').click();
-  await page
-    .getByRole('group', { name: 'Terrain' })
-    .getByRole('button', { name: 'Ocean' })
-    .click();
+  await page.getByRole('group', { name: 'Terrain' }).getByRole('button', { name: 'Ocean' }).click();
 
   await expect(page.getByTestId('hex-count')).toHaveText('0 hexes');
 

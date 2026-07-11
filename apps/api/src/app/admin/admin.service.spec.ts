@@ -56,7 +56,11 @@ describe('AdminService — the Reindex job', () => {
   }
 
   it('is idle before anything has run', () => {
-    expect(service.status()).toMatchObject({ status: 'idle', walked: 0, startedAt: null });
+    expect(service.status()).toMatchObject({
+      status: 'idle',
+      walked: 0,
+      startedAt: null,
+    });
   });
 
   /**
@@ -84,7 +88,11 @@ describe('AdminService — the Reindex job', () => {
     await settle();
 
     expect(asked).toEqual([null, 'e2', 'e4']);
-    expect(service.status()).toMatchObject({ status: 'succeeded', walked: 5, reindexed: 5 });
+    expect(service.status()).toMatchObject({
+      status: 'succeeded',
+      walked: 5,
+      reindexed: 5,
+    });
     expect(service.status().finishedAt).not.toBeNull();
   });
 
@@ -93,11 +101,12 @@ describe('AdminService — the Reindex job', () => {
    * finishes, and the Superadmin gets the ids of what it could not read.
    */
   it('succeeds with failures collected across chunks, never aborting on a bad document', async () => {
-    const bad = { entityId: 'broken', worldId: 'w1', reason: 'Unexpected token' };
-    chunks = [
-      chunk({ walked: 2, reindexed: 1, failures: [bad], cursor: 'e2' }),
-      chunk({ walked: 1, reindexed: 1 }),
-    ];
+    const bad = {
+      entityId: 'broken',
+      worldId: 'w1',
+      reason: 'Unexpected token',
+    };
+    chunks = [chunk({ walked: 2, reindexed: 1, failures: [bad], cursor: 'e2' }), chunk({ walked: 1, reindexed: 1 })];
 
     service.start();
     await settle();
@@ -123,7 +132,10 @@ describe('AdminService — the Reindex job', () => {
     service.start();
     await settle();
 
-    expect(service.status()).toMatchObject({ status: 'failed', error: 'database is locked' });
+    expect(service.status()).toMatchObject({
+      status: 'failed',
+      error: 'database is locked',
+    });
     expect(service.status().finishedAt).not.toBeNull();
   });
 

@@ -27,10 +27,7 @@ test('links a Hex to an Entity in the Inspector; the link survives a reload and 
   const canvas = page.getByRole('img', { name: 'Hex map' });
 
   await page.getByTestId('tool-terrain').click();
-  await page
-    .getByRole('group', { name: 'Terrain' })
-    .getByRole('button', { name: 'Ocean' })
-    .click();
+  await page.getByRole('group', { name: 'Terrain' }).getByRole('button', { name: 'Ocean' }).click();
   await canvas.click();
   await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
 

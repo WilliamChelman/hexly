@@ -9,7 +9,13 @@ import { TypeRegistry } from '../../../entity-types/type-registry';
 import { GenericFieldView } from './generic-field-view';
 
 const beastFields: FieldSchema[] = [
-  { key: 'name', label: 'Name', dataType: { kind: 'string' }, required: true, facetable: false },
+  {
+    key: 'name',
+    label: 'Name',
+    dataType: { kind: 'string' },
+    required: true,
+    facetable: false,
+  },
   {
     key: 'size',
     label: 'Size',
@@ -17,7 +23,13 @@ const beastFields: FieldSchema[] = [
     required: false,
     facetable: false,
   },
-  { key: 'cr', label: 'CR', dataType: { kind: 'number' }, required: false, facetable: false },
+  {
+    key: 'cr',
+    label: 'CR',
+    dataType: { kind: 'number' },
+    required: false,
+    facetable: false,
+  },
 ];
 
 describe('GenericFieldView', () => {

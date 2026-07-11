@@ -7,10 +7,7 @@ import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtur
  * (ADR-0003), so we assert on the model-derived hex count and prove the round
  * trip with a direct API read of the persisted document (ADR-0009).
  */
-test('places a feature on a hex, saves, and the feature survives a reload', async ({
-  page,
-  request,
-}) => {
+test('places a feature on a hex, saves, and the feature survives a reload', async ({ page, request }) => {
   await enterLibrary(page);
   await page.getByTestId('new-map').click();
 
@@ -25,10 +22,7 @@ test('places a feature on a hex, saves, and the feature survives a reload', asyn
   await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
 
   await page.getByTestId('tool-feature').click();
-  await page
-    .getByRole('group', { name: 'Features' })
-    .getByRole('button', { name: 'Settlement' })
-    .click();
+  await page.getByRole('group', { name: 'Features' }).getByRole('button', { name: 'Settlement' }).click();
   await canvas.click();
 
   await flushSave(page);

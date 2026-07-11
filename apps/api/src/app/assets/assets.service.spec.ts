@@ -63,7 +63,9 @@ describe('AssetsService', () => {
     expect(again.hash).toBe(first.hash);
     expect(again.deduped).toBe(true);
     expect(readdirSync(join(dir, 'world-1'))).toHaveLength(1);
-    expect(db.$client.prepare('SELECT count(*) c FROM assets WHERE world_id = ?').get('world-1')).toMatchObject({ c: 1 });
+    expect(db.$client.prepare('SELECT count(*) c FROM assets WHERE world_id = ?').get('world-1')).toMatchObject({
+      c: 1,
+    });
 
     // Different bytes hash differently and store separately.
     const other = assets.store('world-1', 'Map.png', PNG_B);

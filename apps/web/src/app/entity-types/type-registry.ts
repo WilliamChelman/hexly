@@ -29,8 +29,7 @@ export class TypeRegistry {
 
   register(definition: TypeDefinition): () => void {
     this.definitions.update((list) => [...list, definition]);
-    return () =>
-      this.definitions.update((list) => list.filter((d) => d !== definition));
+    return () => this.definitions.update((list) => list.filter((d) => d !== definition));
   }
 
   /** The definition registered for `type`, or `undefined` for an absent/unregistered id. */

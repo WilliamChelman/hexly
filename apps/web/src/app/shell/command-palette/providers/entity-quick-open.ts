@@ -24,10 +24,7 @@ export class EntityQuickOpen implements CommandProvider {
   // the palette re-subscribing per keystroke.
   // ponytail: no unsubscribe — app-lifetime root singleton, nothing to leak.
   private readonly query$ = new Subject<string>();
-  private readonly commands$ = searchEntities(
-    this.entitiesClient,
-    this.query$,
-  ).pipe(
+  private readonly commands$ = searchEntities(this.entitiesClient, this.query$).pipe(
     map((items) => items.map((entity) => this.toCommand(entity))),
     // Replay the last results so a re-subscribing keystroke shows them until the
     // next search lands (stale-while-revalidate); refCount:false keeps the

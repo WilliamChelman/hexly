@@ -1,8 +1,5 @@
 import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideTransloco, TranslocoService } from '@jsverse/transloco';
 import { provideTranslocoTesting } from './transloco-testing';
@@ -97,9 +94,7 @@ describe('LocaleService', () => {
 
       locale.setFormatLocale('en-GB');
 
-      expect(locale.formatDate(ts)).toBe(
-        new Date(ts).toLocaleDateString('en-GB'),
-      );
+      expect(locale.formatDate(ts)).toBe(new Date(ts).toLocaleDateString('en-GB'));
       // The UI language is a separate axis: still English.
       expect(locale.lang()).toBe('en');
       expect(transloco.getActiveLang()).toBe('en');
@@ -151,12 +146,8 @@ describe('LocaleService', () => {
       // Loading French also pulls the English fallback (forkJoin), so both
       // catalogs are requested; flush both to let init() resolve.
       const ready = locale.init();
-      http
-        .expectOne('assets/i18n/fr.json')
-        .flush({ auth: { signIn: 'Se connecter' } });
-      http
-        .expectOne('assets/i18n/en.json')
-        .flush({ auth: { signIn: 'Sign in' } });
+      http.expectOne('assets/i18n/fr.json').flush({ auth: { signIn: 'Se connecter' } });
+      http.expectOne('assets/i18n/en.json').flush({ auth: { signIn: 'Sign in' } });
       await ready;
 
       expect(transloco.translate('auth.signIn')).toBe('Se connecter');

@@ -1,10 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  DestroyRef,
-  inject,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { translateSignal, TranslocoPipe } from '@jsverse/transloco';
@@ -47,12 +41,7 @@ import { Button, Field, Input, Panel } from '@hexly/web-ui';
             </p>
           }
 
-          <button
-            appButton
-            variant="primary"
-            type="submit"
-            [disabled]="pending()"
-          >
+          <button appButton variant="primary" type="submit" [disabled]="pending()">
             {{ (pending() ? 'auth.signingIn' : 'auth.signIn') | transloco }}
           </button>
         </form>
@@ -97,8 +86,7 @@ export class Login {
       .pipe(finalize(() => this.pending.set(false)))
       .subscribe({
         next: () => {
-          const returnUrl =
-            this.route.snapshot.queryParamMap.get('returnUrl') ?? '/';
+          const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl') ?? '/';
           this.router.navigateByUrl(returnUrl);
         },
         error: () => this.error.set('auth.invalidCredentials'),

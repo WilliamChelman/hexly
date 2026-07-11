@@ -1,11 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import {
-  Inject,
-  Injectable,
-  MessageEvent,
-  OnModuleDestroy,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Inject, Injectable, MessageEvent, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Subject } from 'rxjs';
 import { eq } from 'drizzle-orm';
 import { InterestRef, NudgeDelta, NudgeEntry } from '@hexly/domain';
@@ -21,9 +15,7 @@ import { HEXLY_CONFIG, HexlyConfig } from '../config/config.module';
  * object. Reachability resolves the same single access seam for both ({@link canRead}), which is
  * what makes an anonymous Public Link viewer a first-class live-follow participant.
  */
-export type Principal =
-  | { kind: 'user'; userId: string }
-  | { kind: 'token'; token: string };
+export type Principal = { kind: 'user'; userId: string } | { kind: 'token'; token: string };
 
 /** A stable key identifying a principal, so per-emit shaping can memoize one entry per recipient. */
 function principalKey(p: Principal): string {
@@ -104,7 +96,10 @@ export class NudgeBus implements OnModuleInit, OnModuleDestroy {
    * Register a new connection for `principal`, minting an unguessable `connectionId`. The
    * returned `stream` is what the SSE handler pipes to the client; nudges are pushed onto it.
    */
-  connect(principal: Principal): { connectionId: string; stream: Subject<MessageEvent> } {
+  connect(principal: Principal): {
+    connectionId: string;
+    stream: Subject<MessageEvent>;
+  } {
     const connectionId = randomUUID();
     const stream = new Subject<MessageEvent>();
     this.connections.set(connectionId, { principal, interest: [], stream });
@@ -137,9 +132,7 @@ export class NudgeBus implements OnModuleInit, OnModuleDestroy {
 
   /** Reachability for either ref kind — the shared seam for subscribe-time filtering and shaping. */
   private canReach(principal: Principal, ref: InterestRef): boolean {
-    return ref.kind === 'entity'
-      ? this.canRead(principal, ref.id)
-      : this.canReadWorld(principal, ref.id);
+    return ref.kind === 'entity' ? this.canRead(principal, ref.id) : this.canReadWorld(principal, ref.id);
   }
 
   /** Drop a connection (client closed the stream). Completes the stream so nothing leaks. */
@@ -175,10 +168,7 @@ export class NudgeBus implements OnModuleInit, OnModuleDestroy {
    * filter recipients* — lives here once so Entity and World emits can't drift apart. `shape` is
    * memoized per principal, so N tabs of one user cost one access resolution per emit, not N.
    */
-  private fanOut(
-    matches: (ref: InterestRef) => boolean,
-    shape: (principal: Principal) => NudgeEntry,
-  ): void {
+  private fanOut(matches: (ref: InterestRef) => boolean, shape: (principal: Principal) => NudgeEntry): void {
     const byPrincipal = new Map<string, NudgeEntry>();
     for (const conn of this.connections.values()) {
       if (!conn.interest.some(matches)) continue;
@@ -214,11 +204,7 @@ export class NudgeBus implements OnModuleInit, OnModuleDestroy {
     const matches = (ref: InterestRef) => ref.kind === 'entity' && ref.id === id;
     // The common case is nobody following: one interest scan, no query.
     if (!this.anyFollower(matches)) return;
-    const row = this.db
-      .select({ seq: entities.seq })
-      .from(entities)
-      .where(eq(entities.id, id))
-      .get();
+    const row = this.db.select({ seq: entities.seq }).from(entities).where(eq(entities.id, id)).get();
     this.fanOut(matches, (principal) =>
       row && this.canRead(principal, id) ? { id, seq: row.seq } : { id, unavailable: true },
     );

@@ -31,13 +31,7 @@ export type { Selection, SelectMode, SelectionRef } from './map-selection';
  * applies it. Variant Tools track a Subtool separately ({@link FeatureSubtool},
  * {@link RegionSubtool}, the terrain id).
  */
-export type ToolId =
-  | 'select'
-  | 'terrain'
-  | 'feature'
-  | 'region'
-  | 'label'
-  | 'erase';
+export type ToolId = 'select' | 'terrain' | 'feature' | 'region' | 'label' | 'erase';
 
 /**
  * The Feature tool's Subtool: a library feature to place, or `'clear'` to remove
@@ -91,10 +85,7 @@ function eraseHexFrom(draft: HexMap, coord: Axial): void {
  * Set `target.entityId`, or delete it when `entityId` is undefined — a cleared
  * link is absent, not blank. A missing target (stale coordinate) is left untouched.
  */
-function setOrClearLink(
-  target: { entityId?: string } | undefined,
-  entityId: string | undefined,
-): void {
+function setOrClearLink(target: { entityId?: string } | undefined, entityId: string | undefined): void {
   if (!target) return;
   if (entityId !== undefined) target.entityId = entityId;
   else delete target.entityId;
@@ -105,10 +96,7 @@ function setOrClearLink(
  * then Clear last. Single source of the index→Subtool mapping shared by the
  * keyboard and the palette keycaps.
  */
-export const featureSubtools: readonly FeatureSubtool[] = [
-  ...featureLibrary.map((f) => f.id),
-  'clear',
-];
+export const featureSubtools: readonly FeatureSubtool[] = [...featureLibrary.map((f) => f.id), 'clear'];
 
 /**
  * Colours a fresh Region cycles through, so two new Regions look distinct.
@@ -491,10 +479,7 @@ export class HexMapStore {
    * shared by the preview and the {@link moveSelection commit} so they can't
    * drift. Empty for a zero `delta`, so no spurious label write.
    */
-  private movedLabelPositions(
-    labelIds: readonly string[],
-    delta: Point,
-  ): ReadonlyMap<string, Point> {
+  private movedLabelPositions(labelIds: readonly string[], delta: Point): ReadonlyMap<string, Point> {
     const moved = new Map<string, Point>();
     if (delta.x === 0 && delta.y === 0) return moved;
     const byId = new Map(this.document().labels.map((l) => [l.id, l]));
@@ -521,7 +506,10 @@ export class HexMapStore {
       selection: { hexes, regions },
       offset,
     });
-    return { plan, labelPositions: this.movedLabelPositions(labels, labelDelta) };
+    return {
+      plan,
+      labelPositions: this.movedLabelPositions(labels, labelDelta),
+    };
   }
 
   /**
@@ -532,12 +520,7 @@ export class HexMapStore {
    * re-points to the moved entities so the group stays selected.
    */
   moveSelection(offset: Axial, labelDelta: Point): MoveOutcome {
-    if (
-      offset.q === 0 &&
-      offset.r === 0 &&
-      labelDelta.x === 0 &&
-      labelDelta.y === 0
-    ) {
+    if (offset.q === 0 && offset.r === 0 && labelDelta.x === 0 && labelDelta.y === 0) {
       return 'noop';
     }
     const { plan, labelPositions } = this.previewSelectionMove(offset, labelDelta);
@@ -604,7 +587,10 @@ export class HexMapStore {
       return match ? [Number(match[1])] : [];
     });
     const n = used.length ? Math.max(...used) + 1 : 1;
-    return { name: `Region ${n}`, color: NEW_REGION_COLORS[(n - 1) % NEW_REGION_COLORS.length] };
+    return {
+      name: `Region ${n}`,
+      color: NEW_REGION_COLORS[(n - 1) % NEW_REGION_COLORS.length],
+    };
   }
 
   /** Rename the region `id`; a no-op (no undo step) if there is no such region. */
@@ -671,11 +657,7 @@ export class HexMapStore {
    * clears) and the click-cycle. Returns the resolved {@link Selection} so the
    * caller can branch, then projects it onto the Inspector.
    */
-  select(
-    coord: Axial,
-    labelHit: string | null,
-    mode: SelectMode = 'replace',
-  ): Selection | null {
+  select(coord: Axial, labelHit: string | null, mode: SelectMode = 'replace'): Selection | null {
     // A modifier click that changes nothing (empty Void) must not project the
     // panel either, leaving a rail-opened Regions list alone; `replace` always projects.
     const before = this.sel.snapshot();
@@ -713,11 +695,7 @@ export class HexMapStore {
    * The Selection a marquee commit *would* produce, without mutating — a pure
    * query the canvas reads each drag frame to preview the box.
    */
-  marqueePreview(
-    hexes: Axial[],
-    labelIds: string[],
-    additive: boolean,
-  ): Selection[] {
+  marqueePreview(hexes: Axial[], labelIds: string[], additive: boolean): Selection[] {
     return this.sel.marqueePreview(hexes, labelIds, additive);
   }
 
@@ -757,7 +735,12 @@ export class HexMapStore {
   addLabel(text: string, position: Point): string {
     const id = mintId();
     this.commit((draft) => {
-      draft.labels.push({ id, text, position: { x: position.x, y: position.y }, size: DEFAULT_LABEL_SIZE });
+      draft.labels.push({
+        id,
+        text,
+        position: { x: position.x, y: position.y },
+        size: DEFAULT_LABEL_SIZE,
+      });
     });
     return id;
   }
@@ -889,7 +872,12 @@ export class HexMapStore {
     // steps and discard the redo branch.
     if (redo.length === 0) return false;
     // selectionAfter defaults to before; re-pointing edits update it via trackSelectionOnLastEdit.
-    this.undoStack.push({ redo, undo, selectionBefore, selectionAfter: selectionBefore });
+    this.undoStack.push({
+      redo,
+      undo,
+      selectionBefore,
+      selectionAfter: selectionBefore,
+    });
     // A fresh edit forks history: the old redo branch is unreachable.
     this.redoStack.length = 0;
     this.syncHistory();
@@ -919,8 +907,7 @@ export class HexMapStore {
  * ponytail: keep the fallback — it's a real calibration knob, not dead code.
  */
 function mintId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
-    return crypto.randomUUID();
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
   return 'r-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 }
 

@@ -1,18 +1,6 @@
-import {
-  DestroyRef,
-  Injectable,
-  computed,
-  inject,
-  signal,
-} from '@angular/core';
+import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
-import {
-  ActivatedRouteSnapshot,
-  CanActivateFn,
-  CanDeactivateFn,
-  Router,
-  RouterStateSnapshot,
-} from '@angular/router';
+import { ActivatedRouteSnapshot, CanActivateFn, CanDeactivateFn, Router, RouterStateSnapshot } from '@angular/router';
 import { EMPTY, catchError, map, of, switchMap } from 'rxjs';
 import { TranslocoService } from '@jsverse/transloco';
 import { WorldDetail } from '@hexly/domain';
@@ -83,8 +71,7 @@ export class ActiveWorld {
   set(world: WorldDetail | string | null, worldId?: string | null): void {
     const detail = typeof world === 'string' ? null : world;
     this._world.set(detail);
-    const _worldId =
-      worldId ?? (typeof world === 'string' ? world : (detail?.id ?? null));
+    const _worldId = worldId ?? (typeof world === 'string' ? world : (detail?.id ?? null));
     if (_worldId !== this._worldId()) {
       this._worldId.set(_worldId);
     }
@@ -100,11 +87,7 @@ export class ActiveWorld {
     if (!worldId) return;
     this.worlds.setPins(worldId, pinnedEntityIds).subscribe({
       next: (detail) => this.set(detail),
-      error: () =>
-        this.toaster.show(
-          this.transloco.translate('worldDashboard.pinError'),
-          'error',
-        ),
+      error: () => this.toaster.show(this.transloco.translate('worldDashboard.pinError'), 'error'),
     });
   }
 }

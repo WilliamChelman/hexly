@@ -34,13 +34,13 @@ import { VocabItem } from './vocab-items';
           >
             {{ item.value }}
             @if (item.isNew) {
-              <span class="text-2xs text-ink-muted">
-                {{ 'noteView.descriptorPicker.create' | transloco }}</span
-              >
+              <span class="text-2xs text-ink-muted"> {{ 'noteView.descriptorPicker.create' | transloco }}</span>
             }
           </li>
         } @empty {
-          <li appListboxEmpty>{{ 'noteView.descriptorPicker.empty' | transloco }}</li>
+          <li appListboxEmpty>
+            {{ 'noteView.descriptorPicker.empty' | transloco }}
+          </li>
         }
       </app-listbox>
     }

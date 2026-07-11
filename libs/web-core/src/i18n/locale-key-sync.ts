@@ -23,21 +23,14 @@ export interface KeyDrift {
  * `target` is reported as `missing`; a key present only in `target` is reported
  * as `orphaned`.
  */
-export function findKeyDrift(
-  reference: Record<string, unknown>,
-  target: Record<string, unknown>,
-): KeyDrift {
+export function findKeyDrift(reference: Record<string, unknown>, target: Record<string, unknown>): KeyDrift {
   const referencePaths = flattenPaths(reference);
   const targetPaths = flattenPaths(target);
   const referenceKeys = new Set(referencePaths.map(serialize));
   const targetKeys = new Set(targetPaths.map(serialize));
 
-  const missing = referencePaths
-    .filter((path) => !targetKeys.has(serialize(path)))
-    .map(toDotPath);
-  const orphaned = targetPaths
-    .filter((path) => !referenceKeys.has(serialize(path)))
-    .map(toDotPath);
+  const missing = referencePaths.filter((path) => !targetKeys.has(serialize(path))).map(toDotPath);
+  const orphaned = targetPaths.filter((path) => !referenceKeys.has(serialize(path))).map(toDotPath);
 
   return {
     missing,
@@ -61,10 +54,7 @@ export function flattenKeys(catalog: Record<string, unknown>): string[] {
  * itself contains a `.` (e.g. `{ 'a.b': 1 }`) can never alias a nested path
  * (`{ a: { b: 1 } }`) when key sets are compared.
  */
-function flattenPaths(
-  catalog: Record<string, unknown>,
-  prefix: readonly string[] = [],
-): string[][] {
+function flattenPaths(catalog: Record<string, unknown>, prefix: readonly string[] = []): string[][] {
   return Object.entries(catalog).flatMap(([key, value]) => {
     const path = [...prefix, key];
     if (!isCatalog(value)) return [path];

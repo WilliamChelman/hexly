@@ -18,6 +18,4 @@ export interface ContentEditorSession {
   setContent(snapshot: unknown): void;
 }
 
-export const CONTENT_EDITOR_SESSION = new InjectionToken<ContentEditorSession>(
-  'CONTENT_EDITOR_SESSION',
-);
+export const CONTENT_EDITOR_SESSION = new InjectionToken<ContentEditorSession>('CONTENT_EDITOR_SESSION');

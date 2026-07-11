@@ -1,10 +1,4 @@
-import {
-  ConflictException,
-  ForbiddenException,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
   AuthUser,
   CreateUserRequest,
@@ -71,8 +65,7 @@ export class UsersService {
     const target = this.loadTarget(id);
     this.assertCanManage(actor, target);
     if (disabled && actor.id === id) throw this.conflict(UsersErrorCode.SelfDisable);
-    if (disabled && target.isSuperadmin && this.isLastSuperadmin())
-      throw this.conflict(UsersErrorCode.LastSuperadmin);
+    if (disabled && target.isSuperadmin && this.isLastSuperadmin()) throw this.conflict(UsersErrorCode.LastSuperadmin);
     this.db
       .update(users)
       .set({ disabledAt: disabled ? Date.now() : null })
@@ -123,8 +116,7 @@ export class UsersService {
    */
   setRoles(actor: AuthUser, id: string, roles: readonly InstanceRole[]): void {
     this.assertCanManage(actor, this.loadTarget(id));
-    if (actor.id === id && !roles.includes('manage-users'))
-      throw this.conflict(UsersErrorCode.SelfManageUsersRevoke);
+    if (actor.id === id && !roles.includes('manage-users')) throw this.conflict(UsersErrorCode.SelfManageUsersRevoke);
     this.db
       .update(users)
       .set({ roles: JSON.stringify([...roles]) })
@@ -146,8 +138,7 @@ export class UsersService {
     if (actor.id === id) throw this.conflict(UsersErrorCode.SelfDelete);
     // The last Superadmin is irremovable (ADR-0037, ADR-0047) — deletion must not lose the
     // repair capability, the same guard the demote path raises.
-    if (user.isSuperadmin && this.isLastSuperadmin())
-      throw this.conflict(UsersErrorCode.LastSuperadmin);
+    if (user.isSuperadmin && this.isLastSuperadmin()) throw this.conflict(UsersErrorCode.LastSuperadmin);
     if (solelyOwnsAnything(this.db, id)) throw this.conflict(UsersErrorCode.SoleOwner);
     // One outermost transaction (ADR-0045), so the membership and grant purges route through the
     // write handles that own `world_members` and `entity_grants`. Both bump the touched rows' `seq`
@@ -168,11 +159,7 @@ export class UsersService {
    * repair capability can't be dropped to zero. Idempotent on promotion; an unknown id is a 404.
    */
   setSuperadmin(id: string, isSuperadmin: boolean): void {
-    const user = this.db
-      .select({ isSuperadmin: users.isSuperadmin })
-      .from(users)
-      .where(eq(users.id, id))
-      .get();
+    const user = this.db.select({ isSuperadmin: users.isSuperadmin }).from(users).where(eq(users.id, id)).get();
     if (!user) throw this.notFound();
     if (!isSuperadmin && user.isSuperadmin && this.isLastSuperadmin())
       throw this.conflict(UsersErrorCode.LastSuperadmin);
@@ -181,11 +168,7 @@ export class UsersService {
 
   /** Whether exactly one Superadmin remains — the ≥1-Superadmin invariant's live count. */
   private isLastSuperadmin(): boolean {
-    const [{ n }] = this.db
-      .select({ n: count() })
-      .from(users)
-      .where(eq(users.isSuperadmin, true))
-      .all();
+    const [{ n }] = this.db.select({ n: count() }).from(users).where(eq(users.isSuperadmin, true)).all();
     return n === 1;
   }
 
@@ -207,7 +190,9 @@ export class UsersService {
 
   /** A structured 404 for an unknown account — the id-scoped mutations' existence guard. */
   private notFound(): NotFoundException {
-    return new NotFoundException({ code: UsersErrorCode.UserNotFound } satisfies UsersError);
+    return new NotFoundException({
+      code: UsersErrorCode.UserNotFound,
+    } satisfies UsersError);
   }
 
   /**
@@ -218,7 +203,9 @@ export class UsersService {
    */
   private assertCanManage(actor: AuthUser, target: { isSuperadmin: boolean }): void {
     if (target.isSuperadmin && !actor.isSuperadmin)
-      throw new ForbiddenException({ code: UsersErrorCode.SuperadminManaged } satisfies UsersError);
+      throw new ForbiddenException({
+        code: UsersErrorCode.SuperadminManaged,
+      } satisfies UsersError);
   }
 }
 

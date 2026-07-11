@@ -282,11 +282,7 @@ function resolveLinks(node: ContentNode, index: NoteIndex): { resolved: number; 
  * Anything else (or absent) yields no tags.
  */
 function toTags(raw: unknown): readonly string[] {
-  const list = Array.isArray(raw)
-    ? raw
-    : typeof raw === 'string'
-      ? raw.split(/[,\s]+/)
-      : [];
+  const list = Array.isArray(raw) ? raw : typeof raw === 'string' ? raw.split(/[,\s]+/) : [];
   return tagsSchema.parse(list.filter((t) => typeof t === 'string' && t.trim() !== ''));
 }
 

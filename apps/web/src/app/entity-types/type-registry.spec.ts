@@ -63,10 +63,7 @@ describe('TypeRegistry', () => {
     expect(registry.viewsFor(['core.hexmap'])).toEqual([CORE_VIEW_MAP, CORE_VIEW_CONTENT]);
     expect(registry.viewsFor(['core.note'])).toEqual([CORE_VIEW_CONTENT]);
     // A multi-type set unions in `types` order, deduping the shared content view.
-    expect(registry.viewsFor(['core.hexmap', 'core.note'])).toEqual([
-      CORE_VIEW_MAP,
-      CORE_VIEW_CONTENT,
-    ]);
+    expect(registry.viewsFor(['core.hexmap', 'core.note'])).toEqual([CORE_VIEW_MAP, CORE_VIEW_CONTENT]);
     expect(registry.viewsFor([])).toEqual([]);
     expect(registry.viewsFor(undefined)).toEqual([]);
   });

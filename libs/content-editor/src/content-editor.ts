@@ -269,8 +269,12 @@ export class ContentEditor {
   private readonly entityPicker = viewChild(EntityPicker);
   private readonly descriptorPicker = viewChild(DescriptorPicker);
   // Two instances of the one free-text picker, keyed by template ref (ADR-0033).
-  private readonly displayPicker = viewChild('displayPicker', { read: LinkTextPicker });
-  private readonly headingPicker = viewChild('headingPicker', { read: LinkTextPicker });
+  private readonly displayPicker = viewChild('displayPicker', {
+    read: LinkTextPicker,
+  });
+  private readonly headingPicker = viewChild('headingPicker', {
+    read: LinkTextPicker,
+  });
 
   // Recreated on every seed rather than reset: a fresh Editor gets empty undo
   // history for free (Ctrl-Z can't reach past the seed), and the directives re-bind
@@ -281,8 +285,7 @@ export class ContentEditor {
     effect((onCleanup) => {
       const editor = this.editor();
       if (!editor) return;
-      const push = ({ editor }: { editor: Editor }) =>
-        this.session.setContent(editor.getJSON());
+      const push = ({ editor }: { editor: Editor }) => this.session.setContent(editor.getJSON());
       editor.on('update', push);
       onCleanup(() => editor.off('update', push));
     });
@@ -357,8 +360,7 @@ export class ContentEditor {
     const appRef = this.appRef;
     const entityLinkWithView = entityLinkNode.extend({
       addNodeView() {
-        return ({ node }) =>
-          createEntityLinkNodeView(node, environmentInjector, elementInjector, appRef);
+        return ({ node }) => createEntityLinkNodeView(node, environmentInjector, elementInjector, appRef);
       },
     });
 
@@ -367,8 +369,7 @@ export class ContentEditor {
     // callout chrome has no routerLink to resolve.
     const calloutWithView = calloutNode.extend({
       addNodeView() {
-        return ({ node, editor, getPos }) =>
-          createCalloutNodeView(node, editor, getPos, environmentInjector, appRef);
+        return ({ node, editor, getPos }) => createCalloutNodeView(node, editor, getPos, environmentInjector, appRef);
       },
       // ArrowUp from the top line of a callout body focuses its type input (arrow-key
       // navigation into the chrome); elsewhere it returns false and cursor motion is normal.
@@ -388,10 +389,7 @@ export class ContentEditor {
     let vocab: Promise<string[]> | undefined;
     const descriptor = descriptorSuggestion(
       () => this.descriptorPicker(),
-      () =>
-        (vocab ??= firstValueFrom(
-          this.entities.listDescriptors().pipe(catchError(() => of<string[]>([]))),
-        )),
+      () => (vocab ??= firstValueFrom(this.entities.listDescriptors().pipe(catchError(() => of<string[]>([]))))),
     );
 
     // The `|` display and `#` heading triggers (ADR-0033): free-text siblings of `::`,
@@ -471,9 +469,5 @@ function decodeFragment(fragment: string): string {
 
 /** A malformed/placeholder snapshot (e.g. `{}`) leaves the editor on its empty doc rather than throwing. */
 function isDocSnapshot(snapshot: unknown): snapshot is JSONContent {
-  return (
-    typeof snapshot === 'object' &&
-    snapshot !== null &&
-    (snapshot as { type?: unknown }).type === 'doc'
-  );
+  return typeof snapshot === 'object' && snapshot !== null && (snapshot as { type?: unknown }).type === 'doc';
 }

@@ -11,10 +11,33 @@ import { z } from 'zod';
  * the web picker offers.
  */
 export const FORMAT_LOCALE_TAGS = [
-  'en-US', 'en-GB', 'en-IE', 'en-CA', 'en-AU', 'en-NZ', 'en-IN',
-  'fr-FR', 'fr-CA', 'fr-BE', 'fr-CH', 'de-DE', 'de-AT', 'de-CH',
-  'es-ES', 'es-MX', 'it-IT', 'nl-NL', 'nl-BE', 'pt-PT', 'pt-BR',
-  'sv-SE', 'da-DK', 'nb-NO', 'fi-FI', 'pl-PL', 'ja-JP',
+  'en-US',
+  'en-GB',
+  'en-IE',
+  'en-CA',
+  'en-AU',
+  'en-NZ',
+  'en-IN',
+  'fr-FR',
+  'fr-CA',
+  'fr-BE',
+  'fr-CH',
+  'de-DE',
+  'de-AT',
+  'de-CH',
+  'es-ES',
+  'es-MX',
+  'it-IT',
+  'nl-NL',
+  'nl-BE',
+  'pt-PT',
+  'pt-BR',
+  'sv-SE',
+  'da-DK',
+  'nb-NO',
+  'fi-FI',
+  'pl-PL',
+  'ja-JP',
 ] as const;
 
 const localeField = z.enum(['en', 'fr']);

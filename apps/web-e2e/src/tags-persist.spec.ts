@@ -1,10 +1,7 @@
 import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtures';
 
 /** #72 — tags share the version-checked save path and are stored as Entity metadata (ADR-0018). */
-test('adds tags on a note, saves, and they survive reload and show in the library', async ({
-  page,
-  request,
-}) => {
+test('adds tags on a note, saves, and they survive reload and show in the library', async ({ page, request }) => {
   await enterLibrary(page);
   await page.getByTestId('new-note').click();
 

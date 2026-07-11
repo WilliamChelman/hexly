@@ -1,13 +1,5 @@
 import { computed, signal, Signal } from '@angular/core';
-import {
-  addAxial,
-  Axial,
-  coordKey,
-  HexMap,
-  Label,
-  Region,
-  regionById,
-} from '@hexly/domain';
+import { addAxial, Axial, coordKey, HexMap, Label, Region, regionById } from '@hexly/domain';
 
 /**
  * One selected entity (CONTEXT.md → Selection, ADR-0010/0011/0017): a Label or
@@ -47,12 +39,7 @@ export type SelectionRef =
  * - `add-top` / `add-stack` — modifier-held *drag*: add-only counterparts of the
  *   toggles, so sweeping accumulates and re-entering a hex never removes it.
  */
-export type SelectMode =
-  | 'replace'
-  | 'toggle-top'
-  | 'toggle-stack'
-  | 'add-top'
-  | 'add-stack';
+export type SelectMode = 'replace' | 'toggle-top' | 'toggle-stack' | 'add-top' | 'add-stack';
 
 /**
  * The transient Selection — a set of {@link SelectionRef}s over the live document
@@ -195,10 +182,8 @@ export class MapSelection {
    */
   repointByOffset(offset: Axial): void {
     this._selections.set(
-      this._selections().map((ref): SelectionRef =>
-        ref.kind === 'cell'
-          ? { kind: 'cell', coord: addAxial(ref.coord, offset) }
-          : ref,
+      this._selections().map(
+        (ref): SelectionRef => (ref.kind === 'cell' ? { kind: 'cell', coord: addAxial(ref.coord, offset) } : ref),
       ),
     );
   }
@@ -210,11 +195,7 @@ export class MapSelection {
    * a Void with no hit clears (CONTEXT.md → Select, ADR-0010). Returns the resolved
    * {@link Selection} so the caller can branch (e.g. start a label drag).
    */
-  select(
-    coord: Axial,
-    labelHit: string | null,
-    mode: SelectMode = 'replace',
-  ): Selection | null {
+  select(coord: Axial, labelHit: string | null, mode: SelectMode = 'replace'): Selection | null {
     const stack = this.candidatesAt(coord, labelHit);
     if (mode === 'replace') return this.selectReplace(coord, labelHit, stack);
 
@@ -247,11 +228,7 @@ export class MapSelection {
    * stack — never a stored index — so a label drop, Hex move, undo, or added/removed
    * candidate can't leave it stale (issue #35).
    */
-  private selectReplace(
-    coord: Axial,
-    labelHit: string | null,
-    stack: SelectionRef[],
-  ): Selection | null {
+  private selectReplace(coord: Axial, labelHit: string | null, stack: SelectionRef[]): Selection | null {
     if (stack.length === 0) {
       this.deselect();
       return null;
@@ -261,9 +238,7 @@ export class MapSelection {
     if (anchor === this.cycleAnchor) {
       // The cycle runs only on a single-entity selection; a larger set restarts at top.
       const current = this.singleRef();
-      const at = current
-        ? stack.findIndex((ref) => sameSelectionRef(ref, current))
-        : -1;
+      const at = current ? stack.findIndex((ref) => sameSelectionRef(ref, current)) : -1;
       if (at !== -1) index = (at + 1) % stack.length;
     }
     this.cycleAnchor = anchor;
@@ -369,11 +344,7 @@ export class MapSelection {
    * previews its own contents; an additive box previews the committed set unioned with
    * it. Pure query — no edit, no signal.
    */
-  marqueePreview(
-    hexes: Axial[],
-    labelIds: string[],
-    additive: boolean,
-  ): Selection[] {
+  marqueePreview(hexes: Axial[], labelIds: string[], additive: boolean): Selection[] {
     const refs = marqueeRefs(hexes, labelIds);
     // Additive builds on the committed set (deduped via the same {@link mergeRefs} as
     // the commit); plain shows only the box, since release replaces the set.
@@ -425,18 +396,14 @@ export class MapSelection {
  */
 function resolveRef(doc: HexMap, ref: SelectionRef): Selection | null {
   if (ref.kind === 'label') {
-    return doc.labels.some((l) => l.id === ref.id)
-      ? { kind: 'label', id: ref.id }
-      : null;
+    return doc.labels.some((l) => l.id === ref.id) ? { kind: 'label', id: ref.id } : null;
   }
   if (ref.kind === 'region') {
     return regionById(doc, ref.id) ? { kind: 'region', id: ref.id } : null;
   }
   const hex = doc.hexes[coordKey(ref.coord)];
   if (!hex) return null;
-  return hex.feature
-    ? { kind: 'feature', coord: ref.coord }
-    : { kind: 'hex', coord: ref.coord };
+  return hex.feature ? { kind: 'feature', coord: ref.coord } : { kind: 'hex', coord: ref.coord };
 }
 
 /**
@@ -475,10 +442,7 @@ function marqueeRefs(hexes: Axial[], labelIds: string[]): SelectionRef[] {
  * {@link MapSelection.marqueePreview} so the preview can't disagree with the commit.
  * Returns a fresh array; `base` is unmutated, order preserved, new members appended.
  */
-function mergeRefs(
-  base: readonly SelectionRef[],
-  refs: readonly SelectionRef[],
-): SelectionRef[] {
+function mergeRefs(base: readonly SelectionRef[], refs: readonly SelectionRef[]): SelectionRef[] {
   const present = new Set(base.map(refKey));
   const merged = [...base];
   for (const ref of refs) {

@@ -1,10 +1,4 @@
-import {
-  EnvironmentProviders,
-  inject,
-  Injectable,
-  provideAppInitializer,
-  signal,
-} from '@angular/core';
+import { EnvironmentProviders, inject, Injectable, provideAppInitializer, signal } from '@angular/core';
 
 export type Theme = 'light' | 'dark';
 
@@ -12,8 +6,7 @@ const STORAGE_KEY = 'hexly-theme';
 
 /** The app-default Theme: follow the OS preference. */
 export function detectTheme(): Theme {
-  return typeof window !== 'undefined' &&
-    window.matchMedia?.('(prefers-color-scheme: dark)').matches
+  return typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches
     ? 'dark'
     : 'light';
 }
@@ -38,7 +31,9 @@ export class ThemeService {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored === 'light' || stored === 'dark') return stored;
-    } catch { /* private mode */ }
+    } catch {
+      /* private mode */
+    }
     return detectTheme();
   }
 
@@ -60,7 +55,9 @@ export class ThemeService {
     document.documentElement.dataset['theme'] = theme;
     try {
       localStorage.setItem(STORAGE_KEY, theme);
-    } catch { /* private mode */ }
+    } catch {
+      /* private mode */
+    }
   }
 }
 

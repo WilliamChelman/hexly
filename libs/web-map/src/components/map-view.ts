@@ -39,9 +39,7 @@ import { EditorRail } from './editor-rail';
         hand-computed offsets (ADR-0013). pointer-events-none so the canvas stays
         interactive below a short panel; each child re-enables it.
       -->
-      <div
-        class="absolute top-3 right-3 bottom-3 flex items-start gap-2 z-[1] pointer-events-none"
-      >
+      <div class="absolute top-3 right-3 bottom-3 flex items-start gap-2 z-[1] pointer-events-none">
         @if (store.rightPanel() === 'regions') {
           <app-regions-panel
             class="w-[var(--rail-inspector)] max-h-full border border-line rounded-lg shadow-2 pointer-events-auto"

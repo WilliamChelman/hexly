@@ -40,9 +40,7 @@ const FULL_CURTAIN_DELAY_MS = 150;
         role="status"
         aria-busy="true"
       >
-        <span
-          class="text-gold animate-pulse [filter:drop-shadow(0_0_12px_var(--color-glow))]"
-        >
+        <span class="text-gold animate-pulse [filter:drop-shadow(0_0_12px_var(--color-glow))]">
           <app-icon name="logo" [size]="64" />
         </span>
       </div>
@@ -75,18 +73,12 @@ export class App {
   // switchMap cancels the pending timer if loading resolves early.
   protected readonly showFull = toSignal(
     toObservable(this.shell.loading).pipe(
-      switchMap((level) =>
-        level === 'full'
-          ? timer(FULL_CURTAIN_DELAY_MS).pipe(map(() => true))
-          : of(false),
-      ),
+      switchMap((level) => (level === 'full' ? timer(FULL_CURTAIN_DELAY_MS).pipe(map(() => true)) : of(false))),
     ),
     { initialValue: false },
   );
 
-  protected readonly showSubtleFallback = computed(
-    () => this.shell.loading() === 'subtle' && this.shell.standalone(),
-  );
+  protected readonly showSubtleFallback = computed(() => this.shell.loading() === 'subtle' && this.shell.standalone());
 
   // Wait for first navigation so the landing page's `standalone` flag is set,
   // preventing the rail flash on cold /login loads.

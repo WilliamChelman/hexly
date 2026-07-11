@@ -42,9 +42,7 @@ describe('EntityTags', () => {
     }).compileComponents();
     session = TestBed.inject(EntitySession);
     // The picker's vocabulary comes from the owner's DISTINCT tags; stub it.
-    vi.spyOn(TestBed.inject(EntitiesClient), 'listTags').mockImplementation(() =>
-      of(vocab),
-    );
+    vi.spyOn(TestBed.inject(EntitiesClient), 'listTags').mockImplementation(() => of(vocab));
   });
 
   function render(tags: string[]) {
@@ -69,11 +67,7 @@ describe('EntityTags', () => {
   it('renders the open entity’s tags as chips', () => {
     const fixture = render(['deity', 'ruined']);
 
-    const text = (
-      fixture.nativeElement.querySelector(
-        '[data-testid=entity-tags]',
-      ) as HTMLElement
-    ).textContent;
+    const text = (fixture.nativeElement.querySelector('[data-testid=entity-tags]') as HTMLElement).textContent;
     expect(text).toContain('deity');
     expect(text).toContain('ruined');
   });
@@ -81,19 +75,13 @@ describe('EntityTags', () => {
   it('removes a tag when its remove control is clicked', () => {
     const fixture = render(['deity', 'ruined']);
 
-    (
-      fixture.nativeElement.querySelector(
-        '[data-testid=tag-remove-deity]',
-      ) as HTMLButtonElement
-    ).click();
+    (fixture.nativeElement.querySelector('[data-testid=tag-remove-deity]') as HTMLButtonElement).click();
 
     expect(session.tags()).toEqual(['ruined']);
   });
 
   function typeTag(fixture: ReturnType<typeof render>, value: string) {
-    const input = fixture.nativeElement.querySelector(
-      '[data-testid=tag-input]',
-    ) as HTMLInputElement;
+    const input = fixture.nativeElement.querySelector('[data-testid=tag-input]') as HTMLInputElement;
     input.value = value;
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
     fixture.detectChanges();
@@ -126,13 +114,8 @@ describe('EntityTags', () => {
     expect(session.tags()).toEqual(['deity']);
   });
 
-  async function queryInput(
-    fixture: ReturnType<typeof render>,
-    value: string,
-  ): Promise<HTMLInputElement> {
-    const input = fixture.nativeElement.querySelector(
-      '[data-testid=tag-input]',
-    ) as HTMLInputElement;
+  async function queryInput(fixture: ReturnType<typeof render>, value: string): Promise<HTMLInputElement> {
+    const input = fixture.nativeElement.querySelector('[data-testid=tag-input]') as HTMLInputElement;
     input.value = value;
     input.dispatchEvent(new Event('input'));
     await fixture.whenStable();

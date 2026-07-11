@@ -12,17 +12,18 @@ import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtur
  */
 
 /** Read the saved document for `mapId` after a committed PUT. */
-async function savedDocument(page: import('@playwright/test').Page, request: import('@playwright/test').APIRequestContext, mapId: string) {
+async function savedDocument(
+  page: import('@playwright/test').Page,
+  request: import('@playwright/test').APIRequestContext,
+  mapId: string,
+) {
   await flushSave(page);
   const res = await request.get(`/api/entities/${mapId}`);
   expect(res.ok()).toBeTruthy();
   return (await res.json()).document;
 }
 
-test('drags one label of a multi-label selection and the whole group moves', async ({
-  page,
-  request,
-}) => {
+test('drags one label of a multi-label selection and the whole group moves', async ({ page, request }) => {
   await enterLibrary(page);
   await page.getByTestId('new-map').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
@@ -37,7 +38,9 @@ test('drags one label of a multi-label selection and the whole group moves', asy
 
   await page.getByTestId('tool-label').click();
   await canvas.click({ position: { x: box.width / 2, y: box.height / 2 } });
-  await canvas.click({ position: { x: box.width / 2 + gap, y: box.height / 2 } });
+  await canvas.click({
+    position: { x: box.width / 2 + gap, y: box.height / 2 },
+  });
 
   // Select both: click the first, Shift-click the second.
   await page.getByTestId('tool-select').click();
@@ -78,10 +81,7 @@ test('drags one label of a multi-label selection and the whole group moves', asy
   }
 });
 
-test('drags a region on its own and its whole footprint moves', async ({
-  page,
-  request,
-}) => {
+test('drags a region on its own and its whole footprint moves', async ({ page, request }) => {
   await enterLibrary(page);
   await page.getByTestId('new-map').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);

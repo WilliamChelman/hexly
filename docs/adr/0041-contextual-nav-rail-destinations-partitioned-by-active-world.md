@@ -3,7 +3,7 @@
 The nav rail shows **World-scoped destinations only inside a World and instance-scoped destinations only outside one**. The pivot is the active World (ADR-0028) — a URL fact, `null` on the World Index (`/`) and set under `/w/:worldId` — so the partition is a read of one existing signal, not new state:
 
 - **Inside a World** (`activeWorld.worldId()` set): the **World Switcher** at the masthead, **Library** (`/w/:worldId/entities`), and **World Settings** (`/w/:worldId`, the owners page). World Settings is gated on the World's `manage` right — the same `rights` the World Index reads to gate its own settings entry (ADR-0039), not a separate lookup.
-- **Outside a World** (the Index): **Styleguide**, and **Admin** when the caller holds it (`canAdminister()`, ADR-0037). No Switcher — the Index *is* the World chooser, so a quick-hop control there is redundant.
+- **Outside a World** (the Index): **Styleguide**, and **Admin** when the caller holds it (`canAdminister()`, ADR-0037). No Switcher — the Index _is_ the World chooser, so a quick-hop control there is redundant.
 
 This replaces a flat rail that showed every destination at every location: Library (pointing back at the Index when no World was open), Styleguide, and Admin, with the Switcher above them. That mixed altitudes — a World-scoped rail carried instance links, and the Index's rail carried World links that pointed nowhere useful — so the rail never read as "about the thing you're in." Partitioning makes each context's rail name only what that context can act on.
 

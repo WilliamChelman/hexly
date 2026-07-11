@@ -28,11 +28,7 @@ import { ReferenceRow } from './reference-row';
     <!-- Tracked positionally: the list is replaced wholesale on each fetch and no row holds
          state, so identity buys nothing (as in the Outline). -->
     @for (ref of store.references(); track $index) {
-      <app-reference-row
-        data-testid="reference-out"
-        [entity]="ref.target"
-        [descriptor]="ref.descriptor"
-      />
+      <app-reference-row data-testid="reference-out" [entity]="ref.target" [descriptor]="ref.descriptor" />
     } @empty {
       @if (store.loaded()) {
         <p class="text-sm leading-normal text-ink-muted" data-testid="references-out-empty">
@@ -41,16 +37,10 @@ import { ReferenceRow } from './reference-row';
       }
     }
 
-    <span appEyebrow mark class="mt-3 mb-1">{{
-      'noteView.links.referencedBy' | transloco
-    }}</span>
+    <span appEyebrow mark class="mt-3 mb-1">{{ 'noteView.links.referencedBy' | transloco }}</span>
 
     @for (ref of store.referencedBy(); track $index) {
-      <app-reference-row
-        data-testid="reference-in"
-        [entity]="ref.source"
-        [descriptor]="ref.descriptor"
-      />
+      <app-reference-row data-testid="reference-in" [entity]="ref.source" [descriptor]="ref.descriptor" />
     } @empty {
       @if (store.loaded()) {
         <p class="text-sm leading-normal text-ink-muted" data-testid="references-in-empty">

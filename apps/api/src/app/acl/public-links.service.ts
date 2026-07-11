@@ -58,11 +58,7 @@ export class PublicLinksService {
 
   /** A World Public Link token → its World id, or null if the token doesn't resolve. */
   private resolveWorldToken(token: string): string | null {
-    const link = this.db
-      .select({ worldId: worldLinks.worldId })
-      .from(worldLinks)
-      .where(eq(worldLinks.id, token))
-      .get();
+    const link = this.db.select({ worldId: worldLinks.worldId }).from(worldLinks).where(eq(worldLinks.id, token)).get();
     return link?.worldId ?? null;
   }
 }

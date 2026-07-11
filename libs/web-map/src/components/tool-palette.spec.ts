@@ -13,30 +13,25 @@ function setup() {
 }
 
 /** Click the element with `data-testid`, re-rendering first so it is in the DOM. */
-function click(
-  fixture: ReturnType<typeof TestBed.createComponent>,
-  testid: string,
-): void {
+function click(fixture: ReturnType<typeof TestBed.createComponent>, testid: string): void {
   fixture.detectChanges();
-  const el = fixture.nativeElement.querySelector(
-    `[data-testid=${testid}]`,
-  ) as HTMLButtonElement | null;
+  const el = fixture.nativeElement.querySelector(`[data-testid=${testid}]`) as HTMLButtonElement | null;
   if (!el) throw new Error(`no element with data-testid="${testid}"`);
   el.click();
   fixture.detectChanges();
 }
 
-function has(
-  fixture: ReturnType<typeof TestBed.createComponent>,
-  testid: string,
-): boolean {
+function has(fixture: ReturnType<typeof TestBed.createComponent>, testid: string): boolean {
   fixture.detectChanges();
   return !!fixture.nativeElement.querySelector(`[data-testid=${testid}]`);
 }
 
 describe('ToolPalette primary Tool row', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [ToolPalette, provideTranslocoTesting()], providers: provideHexMapStoreTesting() }).compileComponents();
+    await TestBed.configureTestingModule({
+      imports: [ToolPalette, provideTranslocoTesting()],
+      providers: provideHexMapStoreTesting(),
+    }).compileComponents();
   });
 
   it('arms each top-level Tool from the primary row', () => {
@@ -70,7 +65,10 @@ describe('ToolPalette primary Tool row', () => {
 
 describe('ToolPalette contextual Subtool panel', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [ToolPalette, provideTranslocoTesting()], providers: provideHexMapStoreTesting() }).compileComponents();
+    await TestBed.configureTestingModule({
+      imports: [ToolPalette, provideTranslocoTesting()],
+      providers: provideHexMapStoreTesting(),
+    }).compileComponents();
   });
 
   it('shows the Select Subtools Pick and Marquee, with Pick active at cold-start', () => {
@@ -78,9 +76,7 @@ describe('ToolPalette contextual Subtool panel', () => {
 
     expect(has(fixture, 'select-pick')).toBe(true);
     expect(has(fixture, 'select-marquee')).toBe(true);
-    const pick = fixture.nativeElement.querySelector(
-      '[data-testid=select-pick]',
-    ) as HTMLButtonElement;
+    const pick = fixture.nativeElement.querySelector('[data-testid=select-pick]') as HTMLButtonElement;
     expect(pick.classList.contains('is-active')).toBe(true);
     expect(has(fixture, 'feature-settlement')).toBe(false);
     expect(fixture.nativeElement.querySelector('[aria-label=Ocean]')).toBeNull();
@@ -102,9 +98,7 @@ describe('ToolPalette contextual Subtool panel', () => {
     store.armTool('terrain');
 
     fixture.detectChanges();
-    const ocean = fixture.nativeElement.querySelector(
-      '[aria-label=Ocean]',
-    ) as HTMLButtonElement;
+    const ocean = fixture.nativeElement.querySelector('[aria-label=Ocean]') as HTMLButtonElement;
     ocean.click();
 
     expect(store.tool()).toBe('terrain');
@@ -132,15 +126,16 @@ describe('ToolPalette contextual Subtool panel', () => {
 
 describe('ToolPalette history', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [ToolPalette, provideTranslocoTesting()], providers: provideHexMapStoreTesting() }).compileComponents();
+    await TestBed.configureTestingModule({
+      imports: [ToolPalette, provideTranslocoTesting()],
+      providers: provideHexMapStoreTesting(),
+    }).compileComponents();
   });
 
   it('renders Undo and Redo, disabled when there is nothing to undo or redo', () => {
     const { fixture, store } = setup();
-    const undo = () =>
-      fixture.nativeElement.querySelector('[data-testid=undo]') as HTMLButtonElement;
-    const redo = () =>
-      fixture.nativeElement.querySelector('[data-testid=redo]') as HTMLButtonElement;
+    const undo = () => fixture.nativeElement.querySelector('[data-testid=undo]') as HTMLButtonElement;
+    const redo = () => fixture.nativeElement.querySelector('[data-testid=redo]') as HTMLButtonElement;
 
     // The history controls live at the bottom of the strip (story 13).
     expect(undo()).not.toBeNull();
@@ -172,7 +167,10 @@ describe('ToolPalette history', () => {
 
 describe('ToolPalette regions', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [ToolPalette, provideTranslocoTesting()], providers: provideHexMapStoreTesting() }).compileComponents();
+    await TestBed.configureTestingModule({
+      imports: [ToolPalette, provideTranslocoTesting()],
+      providers: provideHexMapStoreTesting(),
+    }).compileComponents();
   });
 
   it('shows no Region Subtool legend while the Region brush is armed', () => {
@@ -208,7 +206,10 @@ describe('ToolPalette regions', () => {
 
 describe('ToolPalette flyout binding', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [ToolPalette, provideTranslocoTesting()], providers: provideHexMapStoreTesting() }).compileComponents();
+    await TestBed.configureTestingModule({
+      imports: [ToolPalette, provideTranslocoTesting()],
+      providers: provideHexMapStoreTesting(),
+    }).compileComponents();
   });
 
   it('opens no flyout for Label or Erase (no Subtools)', () => {
@@ -254,11 +255,7 @@ describe('ToolPalette localization', () => {
     // Each Tool button carries its name on aria-label; the built-in catalog and
     // tool names reflow live on a switch (ADR-0014).
     const labelOf = (testid: string) =>
-      (
-        fixture.nativeElement.querySelector(
-          `[data-testid=${testid}]`,
-        ) as HTMLElement
-      ).getAttribute('aria-label');
+      (fixture.nativeElement.querySelector(`[data-testid=${testid}]`) as HTMLElement).getAttribute('aria-label');
     expect(labelOf('tool-select')).toBe('Sélection');
     expect(labelOf('tool-feature')).toBe('Caractéristique');
     expect(labelOf('tool-erase')).toBe('Effacer');
@@ -275,9 +272,7 @@ describe('ToolPalette localization', () => {
 
     store.armTool('feature');
     fixture.detectChanges();
-    const settlement = fixture.nativeElement.querySelector(
-      '[data-testid=feature-settlement]',
-    ) as HTMLElement;
+    const settlement = fixture.nativeElement.querySelector('[data-testid=feature-settlement]') as HTMLElement;
     expect(settlement.getAttribute('aria-label')).toBe('Colonie');
   });
 });

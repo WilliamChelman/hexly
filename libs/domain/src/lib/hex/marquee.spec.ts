@@ -16,7 +16,10 @@ function rectAround(hex: { q: number; r: number }) {
 
 describe('marqueeHits', () => {
   it('returns a painted hex whose centre falls inside the rect', () => {
-    const doc: HexMap = { ...emptyHexMap(), hexes: { '2,1': { terrain: 'forest' } } };
+    const doc: HexMap = {
+      ...emptyHexMap(),
+      hexes: { '2,1': { terrain: 'forest' } },
+    };
 
     const hits = marqueeHits(layout, doc, rectAround({ q: 2, r: 1 }));
 
@@ -44,7 +47,12 @@ describe('marqueeHits', () => {
       ],
     };
 
-    const hits = marqueeHits(layout, doc, { minX: 0, minY: 0, maxX: 10, maxY: 10 });
+    const hits = marqueeHits(layout, doc, {
+      minX: 0,
+      minY: 0,
+      maxX: 10,
+      maxY: 10,
+    });
 
     expect(hits.labels).toEqual(['in']);
   });
@@ -54,9 +62,7 @@ describe('marqueeHits', () => {
     // marquee keys off painted hexes, never region membership, so it finds nothing.
     const doc: HexMap = {
       ...emptyHexMap(),
-      regions: [
-        { id: 'kingdom', name: 'K', color: '#7c9b86', hexes: { '2,1': true } },
-      ],
+      regions: [{ id: 'kingdom', name: 'K', color: '#7c9b86', hexes: { '2,1': true } }],
     };
 
     const hits = marqueeHits(layout, doc, rectAround({ q: 2, r: 1 }));

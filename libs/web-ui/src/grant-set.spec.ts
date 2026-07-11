@@ -52,9 +52,9 @@ describe('GrantSet', () => {
   it('excludes both existing grantees and the Entity’s Owners from the add candidates', () => {
     // u1 is an Owner, u2 is already a grantee — only Carol (u3) remains addable.
     const { nativeElement: el } = render('e1', [{ userId: 'u2', role: 'editor' }], ['u1']);
-    const options = Array.from(
-      ($(el, '[data-testid="grant-add-select"]') as HTMLSelectElement).options,
-    ).map((o) => o.value);
+    const options = Array.from(($(el, '[data-testid="grant-add-select"]') as HTMLSelectElement).options).map(
+      (o) => o.value,
+    );
 
     expect(options).toEqual(['', 'u3']);
   });

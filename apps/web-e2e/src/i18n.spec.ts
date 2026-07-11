@@ -9,9 +9,7 @@ import { expect, test } from './fixtures';
  */
 test.use({ storageState: { cookies: [], origins: [] } });
 
-test('defaults to English, flips to French via the rail, and remembers it on reload', async ({
-  page,
-}) => {
+test('defaults to English, flips to French via the rail, and remembers it on reload', async ({ page }) => {
   // The login screen renders in English on a first visit with an English browser.
   await page.goto('/login');
   await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible();
@@ -24,9 +22,7 @@ test('defaults to English, flips to French via the rail, and remembers it on rel
 
   // The switch takes effect live, in place — no reload, no navigation: the rail's
   // own avatar control is already relabelled in French on this same page.
-  await expect(
-    page.getByRole('button', { name: 'Ouvrir le menu utilisateur' }),
-  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Ouvrir le menu utilisateur' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Open user menu' })).toHaveCount(0);
 
   // The choice carries to the standalone login screen and persists on reload.
@@ -46,8 +42,6 @@ test.describe('with a French browser', () => {
   test('picks French on the first visit', async ({ page }) => {
     await page.goto('/login');
 
-    await expect(
-      page.getByRole('button', { name: 'Se connecter' }),
-    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Se connecter' })).toBeVisible();
   });
 });

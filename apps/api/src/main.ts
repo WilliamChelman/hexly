@@ -63,12 +63,7 @@ function serveWebApp(app: NestExpressApplication): void {
     // `/api-docs`, …). `extname` lets a missing asset 404 rather than return
     // HTML — known limit: a client route whose last segment has a dot is treated
     // as an asset and 404s, acceptable since map ids/routes are `[\w-]+` (no dots).
-    if (
-      req.method !== 'GET' ||
-      req.path === '/api' ||
-      req.path.startsWith('/api/') ||
-      extname(req.path)
-    ) {
+    if (req.method !== 'GET' || req.path === '/api' || req.path.startsWith('/api/') || extname(req.path)) {
       return next();
     }
     res.sendFile(indexHtml);

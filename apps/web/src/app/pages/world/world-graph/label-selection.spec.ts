@@ -33,7 +33,11 @@ describe('selectLabels', () => {
   it('labels the higher-degree node when two would collide in one cell', () => {
     const payload = graphPayload(world(['Hub', 'Orphan', 'Far'], ['Hub>Far']));
     // Hub and Orphan sit 10 units apart — well inside one 100px cell.
-    const positions = positionsOf(payload, { Hub: [500, 500], Orphan: [510, 500], Far: [900, 900] });
+    const positions = positionsOf(payload, {
+      Hub: [500, 500],
+      Orphan: [510, 500],
+      Far: [900, 900],
+    });
 
     const { points } = selectLabels(payload, positions, VIEW, GRID);
 
@@ -49,25 +53,40 @@ describe('selectLabels', () => {
    */
   it('chooses the same labels no matter where the viewport is panned', () => {
     const payload = graphPayload(
-      world(
-        ['Hub', 'Spoke', 'Neighbour', 'Orphan'],
-        ['Hub>Spoke', 'Hub>Neighbour', 'Spoke>Neighbour'],
-      ),
+      world(['Hub', 'Spoke', 'Neighbour', 'Orphan'], ['Hub>Spoke', 'Hub>Neighbour', 'Spoke>Neighbour']),
     );
     const positions = positionsOf(payload, {
-      Hub: [140, 140], Spoke: [160, 150], Neighbour: [420, 380], Orphan: [700, 640],
+      Hub: [140, 140],
+      Spoke: [160, 150],
+      Neighbour: [420, 380],
+      Orphan: [700, 640],
     });
     const chosen = (view: typeof VIEW) =>
-      selectLabels(payload, positions, view, GRID).points.map((i) => payload.nodes[i].name).sort();
+      selectLabels(payload, positions, view, GRID)
+        .points.map((i) => payload.nodes[i].name)
+        .sort();
 
     const origin = chosen(VIEW);
     expect(origin).toEqual(['Hub', 'Neighbour', 'Orphan']); // Spoke loses Hub's cell
 
     // Every pan keeps all four nodes (x,y ∈ 140..700) inside the viewport, so any change in the
     // result would be the grid re-electing, not a node scrolling out of frame.
-    for (const [dx, dy] of [[50, 0], [0, 50], [50, 50], [100, 100], [-63, 120]]) {
-      expect(chosen({ ...VIEW, minX: VIEW.minX + dx, maxX: VIEW.maxX + dx, minY: VIEW.minY + dy, maxY: VIEW.maxY + dy }))
-        .toEqual(origin);
+    for (const [dx, dy] of [
+      [50, 0],
+      [0, 50],
+      [50, 50],
+      [100, 100],
+      [-63, 120],
+    ]) {
+      expect(
+        chosen({
+          ...VIEW,
+          minX: VIEW.minX + dx,
+          maxX: VIEW.maxX + dx,
+          minY: VIEW.minY + dy,
+          maxY: VIEW.maxY + dy,
+        }),
+      ).toEqual(origin);
     }
   });
 
@@ -78,7 +97,11 @@ describe('selectLabels', () => {
    */
   it('drops labels that pan off screen without promoting the node that lost their cell', () => {
     const payload = graphPayload(world(['Hub', 'Spoke', 'Far'], ['Hub>Far', 'Hub>Spoke']));
-    const positions = positionsOf(payload, { Hub: [140, 140], Spoke: [160, 150], Far: [800, 800] });
+    const positions = positionsOf(payload, {
+      Hub: [140, 140],
+      Spoke: [160, 150],
+      Far: [800, 800],
+    });
 
     const panned = selectLabels(payload, positions, { ...VIEW, minX: 400, minY: 400 }, GRID);
 
@@ -88,7 +111,10 @@ describe('selectLabels', () => {
   describe('Link Descriptors', () => {
     it('labels a link at its midpoint, on the same space-anchored grid', () => {
       const payload = graphPayload(world(['Ealdred', 'Mira'], ['Ealdred-spouse>Mira']));
-      const positions = positionsOf(payload, { Ealdred: [400, 400], Mira: [600, 400] });
+      const positions = positionsOf(payload, {
+        Ealdred: [400, 400],
+        Mira: [600, 400],
+      });
 
       const { links } = selectLabels(payload, positions, VIEW, GRID);
 
@@ -105,7 +131,11 @@ describe('selectLabels', () => {
         world(['Hub', 'A', 'B'], ['Hub>A', 'Hub-rules>B']), // Hub>A is bare, and Hub is the heavier end
       );
       // Both midpoints land in the same cell, so exactly one link may be labelled.
-      const positions = positionsOf(payload, { Hub: [500, 500], A: [520, 500], B: [500, 520] });
+      const positions = positionsOf(payload, {
+        Hub: [500, 500],
+        A: [520, 500],
+        B: [500, 520],
+      });
 
       const { links } = selectLabels(payload, positions, VIEW, GRID);
 
@@ -116,7 +146,10 @@ describe('selectLabels', () => {
   /** Zoom *should* change it: a cell covers less World, so labels that lost a collision now fit. */
   it('reveals more labels as the view zooms in', () => {
     const payload = graphPayload(world(['Hub', 'Spoke'], ['Hub>Spoke']));
-    const positions = positionsOf(payload, { Hub: [500, 500], Spoke: [530, 500] });
+    const positions = positionsOf(payload, {
+      Hub: [500, 500],
+      Spoke: [530, 500],
+    });
 
     // At 1 px/unit the two sit in one 100px cell; at 8 px/unit the cell covers 12.5 units.
     expect(selectLabels(payload, positions, VIEW, GRID).points).toHaveLength(1);

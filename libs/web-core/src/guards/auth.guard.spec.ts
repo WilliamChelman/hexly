@@ -1,17 +1,19 @@
 import { TestBed } from '@angular/core/testing';
-import {
-  ActivatedRouteSnapshot,
-  convertToParamMap,
-  RouterStateSnapshot,
-  UrlTree,
-} from '@angular/router';
+import { ActivatedRouteSnapshot, convertToParamMap, RouterStateSnapshot, UrlTree } from '@angular/router';
 import { firstValueFrom, isObservable, Observable } from 'rxjs';
 import { AuthUser } from '@hexly/domain';
 import { authGuard, loginGuard, manageUsersGuard, superadminGuard } from './auth.guard';
 import { AuthClient } from '../services/auth.client';
 import { MockAuthClient } from '../testing/auth-client.mock';
 
-const ada: AuthUser = { id: 'u1', email: 'ada@hexly.test', displayName: 'Ada', preferences: {}, roles: ['create-worlds'], isSuperadmin: false };
+const ada: AuthUser = {
+  id: 'u1',
+  email: 'ada@hexly.test',
+  displayName: 'Ada',
+  preferences: {},
+  roles: ['create-worlds'],
+  isSuperadmin: false,
+};
 const userManager: AuthUser = { ...ada, roles: ['manage-users'] };
 const superadmin: AuthUser = { ...ada, roles: [], isSuperadmin: true };
 
@@ -33,12 +35,7 @@ describe('authGuard', () => {
   });
 
   function run(url = '/atlas/42') {
-    return TestBed.runInInjectionContext(() =>
-      authGuard(
-        {} as ActivatedRouteSnapshot,
-        { url } as RouterStateSnapshot,
-      ),
-    );
+    return TestBed.runInInjectionContext(() => authGuard({} as ActivatedRouteSnapshot, { url } as RouterStateSnapshot));
   }
 
   it('redirects to /login preserving the intended destination when there is no session', async () => {
@@ -88,10 +85,7 @@ describe('manageUsersGuard', () => {
 
   function run(url = '/users') {
     return TestBed.runInInjectionContext(() =>
-      manageUsersGuard(
-        {} as ActivatedRouteSnapshot,
-        { url } as RouterStateSnapshot,
-      ),
+      manageUsersGuard({} as ActivatedRouteSnapshot, { url } as RouterStateSnapshot),
     );
   }
 
@@ -131,10 +125,7 @@ describe('superadminGuard', () => {
 
   function run(url = '/admin') {
     return TestBed.runInInjectionContext(() =>
-      superadminGuard(
-        {} as ActivatedRouteSnapshot,
-        { url } as RouterStateSnapshot,
-      ),
+      superadminGuard({} as ActivatedRouteSnapshot, { url } as RouterStateSnapshot),
     );
   }
 
@@ -171,9 +162,7 @@ describe('loginGuard', () => {
     const route = {
       queryParamMap: convertToParamMap(returnUrl ? { returnUrl } : {}),
     } as unknown as ActivatedRouteSnapshot;
-    return TestBed.runInInjectionContext(() =>
-      loginGuard(route, {} as RouterStateSnapshot),
-    );
+    return TestBed.runInInjectionContext(() => loginGuard(route, {} as RouterStateSnapshot));
   }
 
   it('lets an unauthenticated user reach /login', async () => {

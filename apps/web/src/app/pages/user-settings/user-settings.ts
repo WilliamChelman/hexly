@@ -1,11 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  linkedSignal,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, linkedSignal, signal } from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { MIN_PASSWORD_LENGTH } from '@hexly/domain';
 import { FormatLocale, Locale, LocaleService, AuthClient, ThemeService, Theme, ToasterService } from '@hexly/web-core';
@@ -59,12 +52,7 @@ type PasswordError = '' | 'tooShort' | 'wrongCurrent' | 'error';
         </div>
 
         <label appField [label]="'settings.preferences.language' | transloco">
-          <select
-            appSelect
-            data-testid="language"
-            [value]="lang()"
-            (change)="setLang($any($event.target).value)"
-          >
+          <select appSelect data-testid="language" [value]="lang()" (change)="setLang($any($event.target).value)">
             @for (l of locale.locales; track l) {
               <option [value]="l">
                 {{ 'common.locale.' + l | transloco }}
@@ -73,10 +61,7 @@ type PasswordError = '' | 'tooShort' | 'wrongCurrent' | 'error';
           </select>
         </label>
 
-        <label
-          appField
-          [label]="'settings.preferences.formatLocale' | transloco"
-        >
+        <label appField [label]="'settings.preferences.formatLocale' | transloco">
           <select
             appSelect
             data-testid="format-locale"
@@ -87,9 +72,7 @@ type PasswordError = '' | 'tooShort' | 'wrongCurrent' | 'error';
               <option [value]="opt.tag">{{ opt.label }}</option>
             }
           </select>
-          <span class="settings-hint">{{
-            'settings.preferences.formatLocaleHint' | transloco
-          }}</span>
+          <span class="settings-hint">{{ 'settings.preferences.formatLocaleHint' | transloco }}</span>
         </label>
       </div>
 
@@ -98,12 +81,8 @@ type PasswordError = '' | 'tooShort' | 'wrongCurrent' | 'error';
       </h2>
       <div appPanel class="settings-panel">
         <div appField [label]="'settings.profile.email' | transloco">
-          <span class="text-sm text-ink" data-testid="email">{{
-            user()?.email
-          }}</span>
-          <span class="settings-hint">{{
-            'settings.profile.emailHint' | transloco
-          }}</span>
+          <span class="text-sm text-ink" data-testid="email">{{ user()?.email }}</span>
+          <span class="settings-hint">{{ 'settings.profile.emailHint' | transloco }}</span>
         </div>
         <form (submit)="saveProfile($event)">
           <label appField [label]="'settings.profile.displayName' | transloco">
@@ -155,11 +134,7 @@ type PasswordError = '' | 'tooShort' | 'wrongCurrent' | 'error';
             />
           </label>
           @if (passwordError(); as error) {
-            <p
-              class="text-sm text-danger"
-              role="alert"
-              data-testid="password-error"
-            >
+            <p class="text-sm text-danger" role="alert" data-testid="password-error">
               {{ 'settings.password.' + error | transloco }}
             </p>
           }
@@ -168,9 +143,7 @@ type PasswordError = '' | 'tooShort' | 'wrongCurrent' | 'error';
               type="submit"
               appButton
               data-testid="change-password"
-              [disabled]="
-                changingPassword() || !currentPassword() || !newPassword()
-              "
+              [disabled]="changingPassword() || !currentPassword() || !newPassword()"
             >
               {{ 'settings.password.submit' | transloco }}
             </button>
@@ -221,16 +194,12 @@ export class UserSettings {
     const same = this.transloco.translate('settings.preferences.format.same');
     return this.locale.formatLocales.map((tag) => ({
       tag,
-      label: tag
-        ? `${names.of(tag) ?? tag} — ${today.toLocaleDateString(tag)}`
-        : same,
+      label: tag ? `${names.of(tag) ?? tag} — ${today.toLocaleDateString(tag)}` : same,
     }));
   });
 
   /** Follows the account name until the user starts typing their own value. */
-  protected readonly displayName = linkedSignal(
-    () => this.user()?.displayName ?? '',
-  );
+  protected readonly displayName = linkedSignal(() => this.user()?.displayName ?? '');
   protected readonly savingProfile = signal(false);
 
   protected readonly currentPassword = signal('');
@@ -258,17 +227,11 @@ export class UserSettings {
     this.auth.updateProfile(name).subscribe({
       next: () => {
         this.savingProfile.set(false);
-        this.toaster.show(
-          this.transloco.translate('settings.profile.saved'),
-          'success',
-        );
+        this.toaster.show(this.transloco.translate('settings.profile.saved'), 'success');
       },
       error: () => {
         this.savingProfile.set(false);
-        this.toaster.show(
-          this.transloco.translate('settings.profile.saveError'),
-          'error',
-        );
+        this.toaster.show(this.transloco.translate('settings.profile.saveError'), 'error');
       },
     });
   }
@@ -282,26 +245,19 @@ export class UserSettings {
       return;
     }
     this.changingPassword.set(true);
-    this.auth
-      .changePassword(this.currentPassword(), this.newPassword())
-      .subscribe({
-        next: () => {
-          this.changingPassword.set(false);
-          this.currentPassword.set('');
-          this.newPassword.set('');
-          this.toaster.show(
-            this.transloco.translate('settings.password.changed'),
-            'success',
-          );
-        },
-        error: (err: unknown) => {
-          this.changingPassword.set(false);
-          this.passwordError.set(
-            err instanceof Object && 'status' in err && err.status === 401
-              ? 'wrongCurrent'
-              : 'error',
-          );
-        },
-      });
+    this.auth.changePassword(this.currentPassword(), this.newPassword()).subscribe({
+      next: () => {
+        this.changingPassword.set(false);
+        this.currentPassword.set('');
+        this.newPassword.set('');
+        this.toaster.show(this.transloco.translate('settings.password.changed'), 'success');
+      },
+      error: (err: unknown) => {
+        this.changingPassword.set(false);
+        this.passwordError.set(
+          err instanceof Object && 'status' in err && err.status === 401 ? 'wrongCurrent' : 'error',
+        );
+      },
+    });
   }
 }

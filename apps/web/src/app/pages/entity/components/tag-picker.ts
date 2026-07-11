@@ -1,11 +1,6 @@
 import { ChangeDetectionStrategy, Component, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import {
-  ListboxController,
-  Listbox,
-  ListboxEmpty,
-  ListboxOption,
-} from '@hexly/web-ui';
+import { ListboxController, Listbox, ListboxEmpty, ListboxOption } from '@hexly/web-ui';
 import { TagItem } from './tag-suggestions';
 
 /**
@@ -38,9 +33,7 @@ import { TagItem } from './tag-suggestions';
           >
             {{ item.tag }}
             @if (item.isNew) {
-              <span class="text-2xs text-ink-muted">
-                {{ 'entityTags.picker.create' | transloco }}</span
-              >
+              <span class="text-2xs text-ink-muted"> {{ 'entityTags.picker.create' | transloco }}</span>
             }
           </li>
         } @empty {

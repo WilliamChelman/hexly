@@ -1,12 +1,5 @@
 import { EdgeTargetKind } from '@hexly/domain';
-import {
-  index,
-  integer,
-  primaryKey,
-  real,
-  sqliteTable,
-  text,
-} from 'drizzle-orm/sqlite-core';
+import { index, integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 // Keep in sync by hand with the `CREATE TABLE` DDL in `./db.ts`; column changes
 // need a drizzle-kit migration to reach an existing database.
@@ -54,7 +47,7 @@ export const sessions = sqliteTable(
   (table) => [
     // Speeds up expired-session sweep (runs on every login).
     index('idx_sessions_expires_at').on(table.expiresAt),
-  ]
+  ],
 );
 
 /**
@@ -104,9 +97,7 @@ export const entities = sqliteTable(
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
-  (table) => [
-    index('idx_entities_world_id').on(table.worldId),
-  ]
+  (table) => [index('idx_entities_world_id').on(table.worldId)],
 );
 
 /**
@@ -128,7 +119,7 @@ export const entityGrants = sqliteTable(
       .references(() => users.id),
     role: text('role').notNull(),
   },
-  (table) => [primaryKey({ columns: [table.entityId, table.userId] })]
+  (table) => [primaryKey({ columns: [table.entityId, table.userId] })],
 );
 
 /**
@@ -146,10 +137,7 @@ export const worlds = sqliteTable('worlds', {
   // Owner-curated Dashboard pins: an ordered JSON array of Entity ids, one shared
   // set per World. References, not enforced FKs — stale or inaccessible ids are
   // filtered per-viewer on read, never pruned on delete.
-  pinnedEntityIds: text('pinned_entity_ids', { mode: 'json' })
-    .$type<string[]>()
-    .notNull()
-    .default([]),
+  pinnedEntityIds: text('pinned_entity_ids', { mode: 'json' }).$type<string[]>().notNull().default([]),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 });
@@ -170,9 +158,7 @@ export const worldMembers = sqliteTable(
       .references(() => users.id),
     role: text('role').notNull(),
   },
-  (table) => [
-    primaryKey({ columns: [table.worldId, table.userId] }),
-  ]
+  (table) => [primaryKey({ columns: [table.worldId, table.userId] })],
 );
 
 /**
@@ -188,9 +174,7 @@ export const worldLinks = sqliteTable(
       .references(() => worlds.id, { onDelete: 'cascade' }),
     createdAt: integer('created_at').notNull(),
   },
-  (table) => [
-    index('idx_world_links_world_id').on(table.worldId),
-  ]
+  (table) => [index('idx_world_links_world_id').on(table.worldId)],
 );
 
 /**
@@ -208,7 +192,7 @@ export const entityLinks = sqliteTable(
       .references(() => entities.id, { onDelete: 'cascade' }),
     createdAt: integer('created_at').notNull(),
   },
-  (table) => [index('idx_entity_links_entity_id').on(table.entityId)]
+  (table) => [index('idx_entity_links_entity_id').on(table.entityId)],
 );
 
 /**
@@ -230,7 +214,7 @@ export const assets = sqliteTable(
     size: integer('size').notNull(),
     createdAt: integer('created_at').notNull(),
   },
-  (table) => [primaryKey({ columns: [table.worldId, table.hash] })]
+  (table) => [primaryKey({ columns: [table.worldId, table.hash] })],
 );
 
 /**
@@ -268,7 +252,7 @@ export const entityEdges = sqliteTable(
     index('idx_entity_edges_target').on(table.targetKind, table.targetId),
     // The World Graph's whole-World edge fetch.
     index('idx_entity_edges_world').on(table.worldId, table.targetKind),
-  ]
+  ],
 );
 
 /**
@@ -303,7 +287,7 @@ export const entityFieldFacets = sqliteTable(
     primaryKey({ columns: [table.entityId, table.key, table.value] }),
     // The World-scoped facet count and filter: group/match by (world, key, value).
     index('idx_entity_field_facets_key').on(table.worldId, table.key, table.value),
-  ]
+  ],
 );
 
 /**
@@ -319,7 +303,5 @@ export const entityDescriptors = sqliteTable(
       .references(() => entities.id, { onDelete: 'cascade' }),
     descriptor: text('descriptor').notNull(),
   },
-  (table) => [
-    primaryKey({ columns: [table.entityId, table.descriptor] }),
-  ]
+  (table) => [primaryKey({ columns: [table.entityId, table.descriptor] })],
 );

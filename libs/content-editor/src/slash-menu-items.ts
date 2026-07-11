@@ -15,8 +15,7 @@ export interface SlashItem {
   apply: (editor: Editor, range: Range) => void;
 }
 
-const chainFrom = (editor: Editor, range: Range) =>
-  editor.chain().focus().deleteRange(range);
+const chainFrom = (editor: Editor, range: Range) => editor.chain().focus().deleteRange(range);
 
 export const SLASH_ITEMS: SlashItem[] = [
   {
@@ -29,43 +28,37 @@ export const SLASH_ITEMS: SlashItem[] = [
     id: 'heading1',
     labelKey: 'noteView.slashMenu.heading1',
     keywords: ['heading', 'title', 'h1'],
-    apply: (editor, range) =>
-      chainFrom(editor, range).setNode('heading', { level: 1 }).run(),
+    apply: (editor, range) => chainFrom(editor, range).setNode('heading', { level: 1 }).run(),
   },
   {
     id: 'heading2',
     labelKey: 'noteView.slashMenu.heading2',
     keywords: ['heading', 'title', 'h2', 'subtitle'],
-    apply: (editor, range) =>
-      chainFrom(editor, range).setNode('heading', { level: 2 }).run(),
+    apply: (editor, range) => chainFrom(editor, range).setNode('heading', { level: 2 }).run(),
   },
   {
     id: 'heading3',
     labelKey: 'noteView.slashMenu.heading3',
     keywords: ['heading', 'title', 'h3'],
-    apply: (editor, range) =>
-      chainFrom(editor, range).setNode('heading', { level: 3 }).run(),
+    apply: (editor, range) => chainFrom(editor, range).setNode('heading', { level: 3 }).run(),
   },
   {
     id: 'heading4',
     labelKey: 'noteView.slashMenu.heading4',
     keywords: ['heading', 'h4'],
-    apply: (editor, range) =>
-      chainFrom(editor, range).setNode('heading', { level: 4 }).run(),
+    apply: (editor, range) => chainFrom(editor, range).setNode('heading', { level: 4 }).run(),
   },
   {
     id: 'heading5',
     labelKey: 'noteView.slashMenu.heading5',
     keywords: ['heading', 'h5'],
-    apply: (editor, range) =>
-      chainFrom(editor, range).setNode('heading', { level: 5 }).run(),
+    apply: (editor, range) => chainFrom(editor, range).setNode('heading', { level: 5 }).run(),
   },
   {
     id: 'heading6',
     labelKey: 'noteView.slashMenu.heading6',
     keywords: ['heading', 'h6'],
-    apply: (editor, range) =>
-      chainFrom(editor, range).setNode('heading', { level: 6 }).run(),
+    apply: (editor, range) => chainFrom(editor, range).setNode('heading', { level: 6 }).run(),
   },
   {
     id: 'bulletList',
@@ -116,15 +109,18 @@ export const SLASH_ITEMS: SlashItem[] = [
     keywords: ['callout', 'admonition', 'note', 'warning', 'aside', 'box'],
     apply: (editor, range) =>
       chainFrom(editor, range)
-        .insertContent({ type: 'callout', attrs: { type: 'note' }, content: [{ type: 'paragraph' }] })
+        .insertContent({
+          type: 'callout',
+          attrs: { type: 'note' },
+          content: [{ type: 'paragraph' }],
+        })
         .run(),
   },
   {
     id: 'table',
     labelKey: 'noteView.slashMenu.table',
     keywords: ['table', 'grid', 'rows', 'columns'],
-    apply: (editor, range) =>
-      chainFrom(editor, range).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+    apply: (editor, range) => chainFrom(editor, range).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
   },
   {
     id: 'taskList',
@@ -163,8 +159,6 @@ export function filterSlashItems(items: SlashItem[], query: string): SlashItem[]
   const q = query.trim().toLowerCase();
   if (!q) return items;
   return items.filter(
-    (item) =>
-      item.id.toLowerCase().includes(q) ||
-      item.keywords.some((keyword) => keyword.toLowerCase().includes(q)),
+    (item) => item.id.toLowerCase().includes(q) || item.keywords.some((keyword) => keyword.toLowerCase().includes(q)),
   );
 }

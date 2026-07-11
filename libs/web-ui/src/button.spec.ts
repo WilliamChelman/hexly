@@ -5,17 +5,7 @@ import { Button, ButtonSize, ButtonVariant } from './button';
 /** A host that drives the attribute-selector primitive from typed inputs. */
 @Component({
   imports: [Button],
-  template: `
-    <button
-      appButton
-      [variant]="variant"
-      [size]="size"
-      [icon]="icon"
-      [danger]="danger"
-    >
-      Label
-    </button>
-  `,
+  template: ` <button appButton [variant]="variant" [size]="size" [icon]="icon" [danger]="danger">Label</button> `,
 })
 class Host {
   variant: ButtonVariant = 'default';

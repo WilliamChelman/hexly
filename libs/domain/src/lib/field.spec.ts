@@ -50,15 +50,28 @@ describe('fieldSchemaSchema', () => {
   });
 
   it('rejects an unknown data-type kind, an empty enum, and a list of a list', () => {
-    expect(fieldSchemaSchema.safeParse({ key: 'k', label: 'K', dataType: { kind: 'entityLink' } }).success).toBe(false);
     expect(
-      fieldSchemaSchema.safeParse({ key: 'k', label: 'K', dataType: { kind: 'enum', options: [] } }).success,
+      fieldSchemaSchema.safeParse({
+        key: 'k',
+        label: 'K',
+        dataType: { kind: 'entityLink' },
+      }).success,
     ).toBe(false);
     expect(
       fieldSchemaSchema.safeParse({
         key: 'k',
         label: 'K',
-        dataType: { kind: 'list', of: { kind: 'list', of: { kind: 'string' } } },
+        dataType: { kind: 'enum', options: [] },
+      }).success,
+    ).toBe(false);
+    expect(
+      fieldSchemaSchema.safeParse({
+        key: 'k',
+        label: 'K',
+        dataType: {
+          kind: 'list',
+          of: { kind: 'list', of: { kind: 'string' } },
+        },
       }).success,
     ).toBe(false);
   });
@@ -68,19 +81,16 @@ describe('resolveFields', () => {
   const beast = [field({ key: 'cr', dataType: { kind: 'number' } })];
   const place = [field({ key: 'region', dataType: { kind: 'string' } })];
   const resolver = (type: string) =>
-    ({ 'dnd.beast': beast, 'world.place': place } as Record<string, FieldSchema[]>)[type];
+    (({ 'dnd.beast': beast, 'world.place': place }) as Record<string, FieldSchema[]>)[type];
 
   it('unions the resolved Field schemas of a types[] set, primary type first', () => {
-    expect(resolveFields(resolver, ['dnd.beast', 'world.place']).map((f) => f.key)).toEqual([
-      'cr',
-      'region',
-    ]);
+    expect(resolveFields(resolver, ['dnd.beast', 'world.place']).map((f) => f.key)).toEqual(['cr', 'region']);
   });
 
   it('dedupes by key, keeping the primary type’s declaration when two types share a key', () => {
     const a = [field({ key: 'name', dataType: { kind: 'string' }, label: 'A name' })];
     const b = [field({ key: 'name', dataType: { kind: 'number' }, label: 'B name' })];
-    const both = (t: string) => ({ 'a.type': a, 'b.type': b } as Record<string, FieldSchema[]>)[t];
+    const both = (t: string) => (({ 'a.type': a, 'b.type': b }) as Record<string, FieldSchema[]>)[t];
     const resolved = resolveFields(both, ['a.type', 'b.type']);
     expect(resolved).toHaveLength(1);
     expect(resolved[0].label).toBe('A name');
@@ -99,8 +109,14 @@ describe('validateFields (forward-only)', () => {
     field({ key: 'cr', dataType: { kind: 'number' } }),
     field({ key: 'legendary', dataType: { kind: 'boolean' } }),
     field({ key: 'born', dataType: { kind: 'date' } }),
-    field({ key: 'size', dataType: { kind: 'enum', options: ['small', 'large'] } }),
-    field({ key: 'senses', dataType: { kind: 'list', of: { kind: 'string' } } }),
+    field({
+      key: 'size',
+      dataType: { kind: 'enum', options: ['small', 'large'] },
+    }),
+    field({
+      key: 'senses',
+      dataType: { kind: 'list', of: { kind: 'string' } },
+    }),
   ];
 
   it('passes well-typed data with the required Field present', () => {
@@ -138,14 +154,7 @@ describe('validateFields (forward-only)', () => {
       senses: ['darkvision', 7],
     });
     expect(wrong.ok).toBe(false);
-    expect(wrong.errors.map((e) => e.key).sort()).toEqual([
-      'born',
-      'cr',
-      'legendary',
-      'name',
-      'senses',
-      'size',
-    ]);
+    expect(wrong.errors.map((e) => e.key).sort()).toEqual(['born', 'cr', 'legendary', 'name', 'senses', 'size']);
     expect(wrong.errors.every((e) => e.code === 'type')).toBe(true);
   });
 
@@ -165,9 +174,17 @@ describe('validateFields (forward-only)', () => {
 describe('deriveFieldFacets (the write-time denormalisation, a lens over Metadata)', () => {
   const fields: FieldSchema[] = [
     field({ key: 'cr', dataType: { kind: 'number' }, facetable: true }),
-    field({ key: 'size', dataType: { kind: 'enum', options: ['small', 'large'] }, facetable: true }),
+    field({
+      key: 'size',
+      dataType: { kind: 'enum', options: ['small', 'large'] },
+      facetable: true,
+    }),
     field({ key: 'born', dataType: { kind: 'date' }, facetable: true }),
-    field({ key: 'senses', dataType: { kind: 'list', of: { kind: 'string' } }, facetable: true }),
+    field({
+      key: 'senses',
+      dataType: { kind: 'list', of: { kind: 'string' } },
+      facetable: true,
+    }),
     // Declared but NOT facetable — never materialised.
     field({ key: 'name', dataType: { kind: 'string' }, facetable: false }),
   ];
@@ -182,10 +199,22 @@ describe('deriveFieldFacets (the write-time denormalisation, a lens over Metadat
     });
     expect(facets).toContainEqual({ key: 'cr', value: '10', num: 10 });
     expect(facets).toContainEqual({ key: 'size', value: 'large', num: null });
-    expect(facets).toContainEqual({ key: 'born', value: '2026-07-11', num: null });
+    expect(facets).toContainEqual({
+      key: 'born',
+      value: '2026-07-11',
+      num: null,
+    });
     // A list explodes to one row per item.
-    expect(facets).toContainEqual({ key: 'senses', value: 'darkvision', num: null });
-    expect(facets).toContainEqual({ key: 'senses', value: 'truesight', num: null });
+    expect(facets).toContainEqual({
+      key: 'senses',
+      value: 'darkvision',
+      num: null,
+    });
+    expect(facets).toContainEqual({
+      key: 'senses',
+      value: 'truesight',
+      num: null,
+    });
     // A non-facetable Field is never materialised.
     expect(facets.some((f) => f.key === 'name')).toBe(false);
   });
@@ -209,8 +238,16 @@ describe('deriveFieldFacets (the write-time denormalisation, a lens over Metadat
 
 describe('parseFieldFilter (`key:op:value`)', () => {
   it('parses each op, splitting on the first two colons so a value keeps its own', () => {
-    expect(parseFieldFilter('cr:gte:5')).toEqual({ key: 'cr', op: 'gte', value: '5' });
-    expect(parseFieldFilter('size:eq:large')).toEqual({ key: 'size', op: 'eq', value: 'large' });
+    expect(parseFieldFilter('cr:gte:5')).toEqual({
+      key: 'cr',
+      op: 'gte',
+      value: '5',
+    });
+    expect(parseFieldFilter('size:eq:large')).toEqual({
+      key: 'size',
+      op: 'eq',
+      value: 'large',
+    });
     // An ISO datetime value carries colons — they belong to the value, not the delimiter.
     expect(parseFieldFilter('born:lte:2026-07-11T09:30:00Z')).toEqual({
       key: 'born',
@@ -257,10 +294,19 @@ describe('readField / writeField (a lens over the one Metadata map)', () => {
   });
 
   it('clears the key when the value is emptied, leaving other Metadata untouched', () => {
-    expect(writeField({ cr: 1, other: 'x' }, cr, undefined)).toEqual({ other: 'x' });
+    expect(writeField({ cr: 1, other: 'x' }, cr, undefined)).toEqual({
+      other: 'x',
+    });
     expect(writeField({ cr: 1 }, cr, '')).toEqual({});
     expect(
-      writeField({ senses: ['a'] }, field({ key: 'senses', dataType: { kind: 'list', of: { kind: 'string' } } }), []),
+      writeField(
+        { senses: ['a'] },
+        field({
+          key: 'senses',
+          dataType: { kind: 'list', of: { kind: 'string' } },
+        }),
+        [],
+      ),
     ).toEqual({});
   });
 });

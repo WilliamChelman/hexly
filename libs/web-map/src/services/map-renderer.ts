@@ -20,11 +20,7 @@ import {
 } from '@hexly/domain';
 import { Camera } from '../utils/camera';
 import type { Selection } from './hexmap-store';
-import type {
-  MapRenderer,
-  MarqueeOverride,
-  RenderOverrides,
-} from '../models/map-renderer';
+import type { MapRenderer, MarqueeOverride, RenderOverrides } from '../models/map-renderer';
 
 /** The built-in features keyed by id, for a marker's path lookup. */
 const FEATURE_BY_ID = new Map(featureLibrary.map((f) => [f.id, f]));
@@ -146,8 +142,7 @@ interface Palette {
 export class Canvas2dMapRenderer implements MapRenderer {
   private width = 0;
   private height = 0;
-  private readonly dpr =
-    typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
+  private readonly dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
   /** The 2D context, fetched once — re-fetching it per frame is wasteful. */
   private readonly ctx: CanvasRenderingContext2D | null;
   /** Cached themed colours; refreshed only on a theme switch, not per frame. */
@@ -230,11 +225,11 @@ export class Canvas2dMapRenderer implements MapRenderer {
   /** Resolve the themed colours from CSS in a single style read. */
   private readPalette(): Palette {
     const style = getComputedStyle(this.canvas);
-    const read = (name: string, fallback: string): string =>
-      style.getPropertyValue(name).trim() || fallback;
-    const terrain = Object.fromEntries(
-      terrainPalette.map((t) => [t.id, read(t.fill, '#888')]),
-    ) as Record<TerrainId, string>;
+    const read = (name: string, fallback: string): string => style.getPropertyValue(name).trim() || fallback;
+    const terrain = Object.fromEntries(terrainPalette.map((t) => [t.id, read(t.fill, '#888')])) as Record<
+      TerrainId,
+      string
+    >;
     return {
       hover: read('--color-gold-soft', 'rgba(212,175,55,.3)'),
       line: read('--color-hex-line', '#888'),
@@ -258,12 +253,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
     this.canvas.style.height = `${height}px`;
   }
 
-  render(
-    camera: Camera,
-    doc: HexMap,
-    hover: Axial | null,
-    overrides: RenderOverrides = {},
-  ): void {
+  render(camera: Camera, doc: HexMap, hover: Axial | null, overrides: RenderOverrides = {}): void {
     const {
       labelPositions = null,
       selections = [],
@@ -291,8 +281,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
     // leaves it Void; an undefined lookup means "not previewed — draw as stored".
     const preview = new Map<string, Hex | null>();
     if (movePreview) {
-      for (const { coord, hex } of movePreview)
-        preview.set(coordKey(coord), hex);
+      for (const { coord, hex } of movePreview) preview.set(coordKey(coord), hex);
     }
 
     // Painted terrain, under the grid lines. The document is sparse, so this never
@@ -308,8 +297,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
       this.tracePath(ctx, camera, hex);
       ctx.fill();
       if (painted.feature) featured.push({ hex, ref: painted.feature.ref });
-      if (painted.name)
-        named.push({ hex, name: painted.name, hasFeature: !!painted.feature });
+      if (painted.name) named.push({ hex, name: painted.name, hasFeature: !!painted.feature });
     }
 
     // Hover highlight next, so the grid lines draw crisply on top of it.
@@ -379,13 +367,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
       ctx.strokeStyle = this.palette.inkStroke;
       ctx.fillStyle = this.palette.nameInk;
       for (const { hex, name, hasFeature } of named) {
-        this.drawHexName(
-          ctx,
-          camera,
-          hex,
-          name,
-          hasFeature ? radius * NAME_FEATURE_OFFSET : 0,
-        );
+        this.drawHexName(ctx, camera, hex, name, hasFeature ? radius * NAME_FEATURE_OFFSET : 0);
       }
       ctx.restore();
     }
@@ -430,20 +412,10 @@ export class Canvas2dMapRenderer implements MapRenderer {
       if (regionById_.has(region.id)) continue;
       // The selection tint follows a dragged region's previewed footprint too.
       const previewFootprint = regionPreview?.get(region.id);
-      regionById_.set(
-        region.id,
-        previewFootprint ? { ...region, hexes: previewFootprint } : region,
-      );
+      regionById_.set(region.id, previewFootprint ? { ...region, hexes: previewFootprint } : region);
     }
     for (const selection of selections) {
-      this.drawSelection(
-        ctx,
-        camera,
-        regionById_,
-        labelBoxById,
-        visibleKeys,
-        selection,
-      );
+      this.drawSelection(ctx, camera, regionById_, labelBoxById, visibleKeys, selection);
     }
 
     // The live marquee rectangle rides on top of everything.
@@ -456,11 +428,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
    * canvas's hit-test box whichever way the drag runs; save/restore keeps the
    * dash from leaking into the next frame's grid stroke.
    */
-  private drawMarquee(
-    ctx: CanvasRenderingContext2D,
-    camera: Camera,
-    marquee: MarqueeOverride,
-  ): void {
+  private drawMarquee(ctx: CanvasRenderingContext2D, camera: Camera, marquee: MarqueeOverride): void {
     const { minX, minY, maxX, maxY } = rectFromCorners(
       camera.worldToScreen(marquee.a),
       camera.worldToScreen(marquee.b),
@@ -484,12 +452,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
     // Topmost (last drawn) wins, so iterate the recorded boxes in reverse.
     for (let i = this.labelBoxes.length - 1; i >= 0; i--) {
       const box = this.labelBoxes[i];
-      if (
-        point.x >= box.minX &&
-        point.x <= box.maxX &&
-        point.y >= box.minY &&
-        point.y <= box.maxY
-      ) {
+      if (point.x >= box.minX && point.x <= box.maxX && point.y >= box.minY && point.y <= box.maxY) {
         return box.id;
       }
     }
@@ -512,13 +475,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
     // A Region is highlighted by tinting its member hexes — its boundary stroke
     // already comes from the regions pass.
     if (selection.kind === 'region') {
-      this.fillRegionMembers(
-        ctx,
-        camera,
-        regionById,
-        visibleKeys,
-        selection.id,
-      );
+      this.fillRegionMembers(ctx, camera, regionById, visibleKeys, selection.id);
       return;
     }
     ctx.save();
@@ -576,12 +533,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
    * screen box for hit-testing; the box ignores rotation (a close-enough bound
    * that keeps click-to-select cheap).
    */
-  private drawLabel(
-    ctx: CanvasRenderingContext2D,
-    camera: Camera,
-    label: Label,
-    position: Point,
-  ): void {
+  private drawLabel(ctx: CanvasRenderingContext2D, camera: Camera, label: Label, position: Point): void {
     const centre = camera.worldToScreen(position);
     const fontPx = label.size * camera.zoom;
     // Blit the cached bitmap; falls back to drawing inline only when no offscreen
@@ -592,13 +544,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
     if (label.rotation) ctx.rotate((label.rotation * Math.PI) / 180);
     let textW: number;
     if (glyph) {
-      ctx.drawImage(
-        glyph.canvas,
-        -glyph.cssW / 2,
-        -glyph.cssH / 2,
-        glyph.cssW,
-        glyph.cssH,
-      );
+      ctx.drawImage(glyph.canvas, -glyph.cssW / 2, -glyph.cssH / 2, glyph.cssW, glyph.cssH);
       textW = glyph.textW;
     } else {
       textW = this.paintLabel(ctx, label.text, fontPx);
@@ -663,11 +609,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
    * legibility halo), then the gilded fill on top. Used both to rasterize the
    * cache tile and as the fallback when no offscreen context exists.
    */
-  private paintLabel(
-    ctx: CanvasRenderingContext2D,
-    text: string,
-    fontPx: number,
-  ): number {
+  private paintLabel(ctx: CanvasRenderingContext2D, text: string, fontPx: number): number {
     ctx.font = `italic ${fontPx}px ${MAP_FONT}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -688,13 +630,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
    * Draw a Hex's `name` dropped `offsetY` screen pixels below the centre (to
    * clear a feature marker). Font, fill, and alignment are set by the caller's pass.
    */
-  private drawHexName(
-    ctx: CanvasRenderingContext2D,
-    camera: Camera,
-    hex: Axial,
-    name: string,
-    offsetY: number,
-  ): void {
+  private drawHexName(ctx: CanvasRenderingContext2D, camera: Camera, hex: Axial, name: string, offsetY: number): void {
     const centre = camera.worldToScreen(hexToPixel(this.layout, hex));
     ctx.strokeText(name, centre.x, centre.y + offsetY);
     ctx.fillText(name, centre.x, centre.y + offsetY);
@@ -705,13 +641,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
    * 24×24 box; this scales it to a fraction of the on-screen hex and keeps the
    * stroke a constant screen weight whatever the zoom.
    */
-  private strokeMarker(
-    ctx: CanvasRenderingContext2D,
-    camera: Camera,
-    hex: Axial,
-    id: FeatureId,
-    scale: number,
-  ): void {
+  private strokeMarker(ctx: CanvasRenderingContext2D, camera: Camera, hex: Axial, id: FeatureId, scale: number): void {
     const path = this.markerPath(id);
     if (!path) return;
     const centre = camera.worldToScreen(hexToPixel(this.layout, hex));
@@ -780,16 +710,10 @@ export class Canvas2dMapRenderer implements MapRenderer {
   }
 
   /** Lay down the screen-space polygon path for one hex (no fill/stroke). */
-  private tracePath(
-    ctx: CanvasRenderingContext2D,
-    camera: Camera,
-    hex: Axial,
-  ): void {
+  private tracePath(ctx: CanvasRenderingContext2D, camera: Camera, hex: Axial): void {
     const corners = this.screenCorners(camera, hex);
     ctx.beginPath();
-    corners.forEach((p, i) =>
-      i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y),
-    );
+    corners.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
     ctx.closePath();
   }
 }

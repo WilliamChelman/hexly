@@ -22,7 +22,14 @@ describe('MapSelection', () => {
     it('a Label hit wins over the cell and regions beneath it', () => {
       const doc = makeDoc({
         hexes: { [coordKey(at(0, 0))]: { terrain: 'forest' } },
-        regions: [{ id: 'reg', name: 'R', color: '#fff', hexes: { [coordKey(at(0, 0))]: true } }],
+        regions: [
+          {
+            id: 'reg',
+            name: 'R',
+            color: '#fff',
+            hexes: { [coordKey(at(0, 0))]: true },
+          },
+        ],
         labels: [{ id: 'lbl', text: 'x', position: { x: 0, y: 0 }, size: 10 }],
       });
       const sel = new MapSelection(doc.asReadonly());
@@ -33,7 +40,9 @@ describe('MapSelection', () => {
     });
 
     it('selects the painted cell when there is no label hit', () => {
-      const doc = makeDoc({ hexes: { [coordKey(at(1, 1))]: { terrain: 'ocean' } } });
+      const doc = makeDoc({
+        hexes: { [coordKey(at(1, 1))]: { terrain: 'ocean' } },
+      });
       const sel = new MapSelection(doc.asReadonly());
 
       sel.select(at(1, 1), null);
@@ -43,7 +52,12 @@ describe('MapSelection', () => {
 
     it('reads a cell carrying a feature as a feature selection', () => {
       const doc = makeDoc({
-        hexes: { [coordKey(at(0, 0))]: { terrain: 'forest', feature: { ref: 'settlement' } } },
+        hexes: {
+          [coordKey(at(0, 0))]: {
+            terrain: 'forest',
+            feature: { ref: 'settlement' },
+          },
+        },
       });
       const sel = new MapSelection(doc.asReadonly());
 
@@ -53,7 +67,9 @@ describe('MapSelection', () => {
     });
 
     it('a plain click on Void with no label hit clears the selection', () => {
-      const doc = makeDoc({ hexes: { [coordKey(at(0, 0))]: { terrain: 'forest' } } });
+      const doc = makeDoc({
+        hexes: { [coordKey(at(0, 0))]: { terrain: 'forest' } },
+      });
       const sel = new MapSelection(doc.asReadonly());
       sel.select(at(0, 0), null);
 
@@ -67,10 +83,25 @@ describe('MapSelection', () => {
   describe('click-cycle', () => {
     it('descends Label → Feature → Region(s) → wrap on repeated clicks at one anchor', () => {
       const doc = makeDoc({
-        hexes: { [coordKey(at(0, 0))]: { terrain: 'forest', feature: { ref: 'settlement' } } },
+        hexes: {
+          [coordKey(at(0, 0))]: {
+            terrain: 'forest',
+            feature: { ref: 'settlement' },
+          },
+        },
         regions: [
-          { id: 'r1', name: 'R1', color: '#111', hexes: { [coordKey(at(0, 0))]: true } },
-          { id: 'r2', name: 'R2', color: '#222', hexes: { [coordKey(at(0, 0))]: true } },
+          {
+            id: 'r1',
+            name: 'R1',
+            color: '#111',
+            hexes: { [coordKey(at(0, 0))]: true },
+          },
+          {
+            id: 'r2',
+            name: 'R2',
+            color: '#222',
+            hexes: { [coordKey(at(0, 0))]: true },
+          },
         ],
         labels: [{ id: 'lbl', text: 'x', position: { x: 0, y: 0 }, size: 10 }],
       });
@@ -89,7 +120,10 @@ describe('MapSelection', () => {
     it('a click at a different anchor restarts at the top of the new stack', () => {
       const doc = makeDoc({
         hexes: {
-          [coordKey(at(0, 0))]: { terrain: 'forest', feature: { ref: 'settlement' } },
+          [coordKey(at(0, 0))]: {
+            terrain: 'forest',
+            feature: { ref: 'settlement' },
+          },
           [coordKey(at(5, 5))]: { terrain: 'ocean' },
         },
       });
@@ -123,7 +157,14 @@ describe('MapSelection', () => {
     it('toggle-stack removes the whole pile when it is already fully selected', () => {
       const doc = makeDoc({
         hexes: { [coordKey(at(0, 0))]: { terrain: 'forest' } },
-        regions: [{ id: 'r1', name: 'R1', color: '#111', hexes: { [coordKey(at(0, 0))]: true } }],
+        regions: [
+          {
+            id: 'r1',
+            name: 'R1',
+            color: '#111',
+            hexes: { [coordKey(at(0, 0))]: true },
+          },
+        ],
       });
       const sel = new MapSelection(doc.asReadonly());
 
@@ -137,7 +178,14 @@ describe('MapSelection', () => {
     it('add-stack (modifier-held sweep) never removes a re-entered member', () => {
       const doc = makeDoc({
         hexes: { [coordKey(at(0, 0))]: { terrain: 'forest' } },
-        regions: [{ id: 'r1', name: 'R1', color: '#111', hexes: { [coordKey(at(0, 0))]: true } }],
+        regions: [
+          {
+            id: 'r1',
+            name: 'R1',
+            color: '#111',
+            hexes: { [coordKey(at(0, 0))]: true },
+          },
+        ],
       });
       const sel = new MapSelection(doc.asReadonly());
 
@@ -149,7 +197,9 @@ describe('MapSelection', () => {
     });
 
     it('a modifier click on empty space leaves the existing set untouched', () => {
-      const doc = makeDoc({ hexes: { [coordKey(at(0, 0))]: { terrain: 'forest' } } });
+      const doc = makeDoc({
+        hexes: { [coordKey(at(0, 0))]: { terrain: 'forest' } },
+      });
       const sel = new MapSelection(doc.asReadonly());
       sel.select(at(0, 0), null);
 
@@ -201,7 +251,9 @@ describe('MapSelection', () => {
 
   describe('self-heal against the live document', () => {
     it('drops a selected hex from selections() when its record is erased', () => {
-      const doc = makeDoc({ hexes: { [coordKey(at(0, 0))]: { terrain: 'forest' } } });
+      const doc = makeDoc({
+        hexes: { [coordKey(at(0, 0))]: { terrain: 'forest' } },
+      });
       const sel = new MapSelection(doc.asReadonly());
       sel.select(at(0, 0), null);
 
@@ -228,13 +280,22 @@ describe('MapSelection', () => {
 
   describe('selectedEntityLink', () => {
     it('reads the link off a hex, a feature, and a region', () => {
-      const linkHex = makeDoc({ hexes: { [coordKey(at(0, 0))]: { terrain: 'forest', entityId: 'e-hex' } } });
+      const linkHex = makeDoc({
+        hexes: {
+          [coordKey(at(0, 0))]: { terrain: 'forest', entityId: 'e-hex' },
+        },
+      });
       const sHex = new MapSelection(linkHex.asReadonly());
       sHex.select(at(0, 0), null);
       expect(sHex.selectedEntityLink()).toBe('e-hex');
 
       const linkFeat = makeDoc({
-        hexes: { [coordKey(at(0, 0))]: { terrain: 'forest', feature: { ref: 'settlement', entityId: 'e-feat' } } },
+        hexes: {
+          [coordKey(at(0, 0))]: {
+            terrain: 'forest',
+            feature: { ref: 'settlement', entityId: 'e-feat' },
+          },
+        },
       });
       const sFeat = new MapSelection(linkFeat.asReadonly());
       sFeat.select(at(0, 0), null);
@@ -268,8 +329,20 @@ describe('MapSelection', () => {
 
     it('restore resets the cycle anchor so the next click starts at the top', () => {
       const doc = makeDoc({
-        hexes: { [coordKey(at(0, 0))]: { terrain: 'forest', feature: { ref: 'settlement' } } },
-        regions: [{ id: 'r1', name: 'R1', color: '#111', hexes: { [coordKey(at(0, 0))]: true } }],
+        hexes: {
+          [coordKey(at(0, 0))]: {
+            terrain: 'forest',
+            feature: { ref: 'settlement' },
+          },
+        },
+        regions: [
+          {
+            id: 'r1',
+            name: 'R1',
+            color: '#111',
+            hexes: { [coordKey(at(0, 0))]: true },
+          },
+        ],
       });
       const sel = new MapSelection(doc.asReadonly());
 
@@ -288,7 +361,14 @@ describe('MapSelection', () => {
     it('partitionForMove splits the set into hexes, labels, regions', () => {
       const doc = makeDoc({
         hexes: { [coordKey(at(0, 0))]: { terrain: 'forest' } },
-        regions: [{ id: 'r1', name: 'R', color: '#111', hexes: { [coordKey(at(0, 0))]: true } }],
+        regions: [
+          {
+            id: 'r1',
+            name: 'R',
+            color: '#111',
+            hexes: { [coordKey(at(0, 0))]: true },
+          },
+        ],
         labels: [{ id: 'l1', text: 'x', position: { x: 0, y: 0 }, size: 10 }],
       });
       const sel = new MapSelection(doc.asReadonly());
@@ -304,7 +384,10 @@ describe('MapSelection', () => {
 
     it('repointByOffset rides cell refs by the offset and leaves label/region refs put', () => {
       const doc = makeDoc({
-        hexes: { [coordKey(at(0, 0))]: { terrain: 'forest' }, [coordKey(at(1, 1))]: { terrain: 'ocean' } },
+        hexes: {
+          [coordKey(at(0, 0))]: { terrain: 'forest' },
+          [coordKey(at(1, 1))]: { terrain: 'ocean' },
+        },
         labels: [{ id: 'l1', text: 'x', position: { x: 0, y: 0 }, size: 10 }],
       });
       const sel = new MapSelection(doc.asReadonly());
@@ -333,7 +416,9 @@ describe('MapSelection', () => {
     });
 
     it('emptying the set clears it entirely', () => {
-      const doc = makeDoc({ labels: [{ id: 'l1', text: 'x', position: { x: 0, y: 0 }, size: 10 }] });
+      const doc = makeDoc({
+        labels: [{ id: 'l1', text: 'x', position: { x: 0, y: 0 }, size: 10 }],
+      });
       const sel = new MapSelection(doc.asReadonly());
       sel.selectLabel('l1');
 

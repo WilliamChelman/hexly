@@ -38,7 +38,9 @@ export type EntityPickerProps = ListboxProps<EntitySummary>;
             <span class="font-mono text-2xs text-ink-muted">({{ item.types[0] }})</span>
           </li>
         } @empty {
-          <li appListboxEmpty>{{ 'noteView.entityPicker.empty' | transloco }}</li>
+          <li appListboxEmpty>
+            {{ 'noteView.entityPicker.empty' | transloco }}
+          </li>
         }
       </app-listbox>
     }

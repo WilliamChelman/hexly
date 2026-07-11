@@ -45,7 +45,10 @@ export const scalarDataTypeSchema = z.discriminatedUnion('kind', [
 export type ScalarDataType = z.infer<typeof scalarDataTypeSchema>;
 
 /** A `list` of a scalar item type — homogeneous, one level deep. */
-const listType = z.object({ kind: z.literal('list'), of: scalarDataTypeSchema });
+const listType = z.object({
+  kind: z.literal('list'),
+  of: scalarDataTypeSchema,
+});
 
 /**
  * The Field data-type: a scalar (`string`/`number`/`boolean`/`date`), an `enum`
@@ -125,10 +128,7 @@ export interface FieldValidation {
  * enforce it — active typed edits only, never on import or data at rest — so already
  * stored or imported Metadata is never retroactively invalidated.
  */
-export function validateFields(
-  fields: readonly FieldSchema[],
-  metadata: Metadata | undefined,
-): FieldValidation {
+export function validateFields(fields: readonly FieldSchema[], metadata: Metadata | undefined): FieldValidation {
   const errors: FieldError[] = [];
   for (const field of fields) {
     const value = metadata?.[field.key];
@@ -163,10 +163,7 @@ export interface FieldFacetValue {
  * count is per-Entity rather than per-occurrence. Side-effect-free — the write path feeds the result
  * to the denormalised table, and Reindex re-runs it from the stored document for free.
  */
-export function deriveFieldFacets(
-  fields: readonly FieldSchema[],
-  metadata: Metadata | undefined,
-): FieldFacetValue[] {
+export function deriveFieldFacets(fields: readonly FieldSchema[], metadata: Metadata | undefined): FieldFacetValue[] {
   const seen = new Set<string>();
   const out: FieldFacetValue[] = [];
   for (const field of fields) {
@@ -187,8 +184,7 @@ export function deriveFieldFacets(
 
 /** A Field's facet rows: a `list` maps each well-typed item, a scalar its one well-typed value. */
 function facetItems(dataType: FieldDataType, raw: unknown): { value: string; num: number | null }[] {
-  if (dataType.kind === 'list')
-    return Array.isArray(raw) ? raw.flatMap((item) => scalarFacet(dataType.of, item)) : [];
+  if (dataType.kind === 'list') return Array.isArray(raw) ? raw.flatMap((item) => scalarFacet(dataType.of, item)) : [];
   return scalarFacet(dataType, raw);
 }
 
@@ -295,8 +291,7 @@ function matchesDataType(dataType: FieldDataType, value: unknown): boolean {
  * the parse rejects an impossible calendar date the shape alone would admit.
  */
 function isIsoDateString(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:\d{2})?)?$/.test(value))
-    return false;
+  if (!/^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:\d{2})?)?$/.test(value)) return false;
   const [y, m, d] = value.slice(0, 10).split('-').map(Number);
   // Round-trip the date part through UTC: a rolled-over day (e.g. 02-30 → 03-02) proves it was invalid.
   const date = new Date(Date.UTC(y, m - 1, d));

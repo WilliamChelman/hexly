@@ -1,14 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
-import {
-  CORE_HEXMAP,
-  EntityDetail,
-  EntitySaveOutcome,
-  HexMap,
-  coordKey,
-  emptyContent,
-} from '@hexly/domain';
+import { CORE_HEXMAP, EntityDetail, EntitySaveOutcome, HexMap, coordKey, emptyContent } from '@hexly/domain';
 import { provideTranslocoTesting, MockEntitiesClient } from '@hexly/web-core/testing';
 import { EntitiesClient } from '@hexly/web-core';
 import { EntitySession } from '../services/entity-session';
@@ -111,11 +104,7 @@ describe('SaveStatus', () => {
     expect(text()).toContain('Newer version on server');
 
     entities.load.mockReturnValue(of(aldermoor));
-    (
-      fixture.nativeElement.querySelector(
-        '[data-testid=conflict-reload]',
-      ) as HTMLButtonElement
-    ).click();
+    (fixture.nativeElement.querySelector('[data-testid=conflict-reload]') as HTMLButtonElement).click();
     fixture.detectChanges();
     expect(session.conflict()).toBeNull();
   });
@@ -130,21 +119,13 @@ describe('SaveStatus', () => {
     // Re-pull fails: the conflict stands, but the user must be told Reload failed
     // else the chip looks unchanged and Reload appears to do nothing (ADR-0026).
     entities.load.mockReturnValue(throwError(() => new Error('network')));
-    (
-      fixture.nativeElement.querySelector(
-        '[data-testid=conflict-reload]',
-      ) as HTMLButtonElement
-    ).click();
+    (fixture.nativeElement.querySelector('[data-testid=conflict-reload]') as HTMLButtonElement).click();
     fixture.detectChanges();
 
     expect(session.conflict()).not.toBeNull();
     expect(session.error()).toBe('reload');
-    expect(
-      fixture.nativeElement.querySelector('[data-testid=reload-error]'),
-    ).not.toBeNull();
-    expect(
-      fixture.nativeElement.querySelector('[data-testid=conflict-reload]'),
-    ).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid=reload-error]')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid=conflict-reload]')).not.toBeNull();
   });
 
   it('shows a save error with a Retry that re-saves', () => {
@@ -158,14 +139,14 @@ describe('SaveStatus', () => {
     entities.save.mockReturnValue(
       of({
         status: 'saved',
-        entity: { ...aldermoor, version: 4, document: bodyOf(editor.document()) },
+        entity: {
+          ...aldermoor,
+          version: 4,
+          document: bodyOf(editor.document()),
+        },
       }),
     );
-    (
-      fixture.nativeElement.querySelector(
-        '[data-testid=save-retry]',
-      ) as HTMLButtonElement
-    ).click();
+    (fixture.nativeElement.querySelector('[data-testid=save-retry]') as HTMLButtonElement).click();
     expect(entities.save).toHaveBeenCalledTimes(2);
   });
 

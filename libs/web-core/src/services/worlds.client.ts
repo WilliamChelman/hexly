@@ -119,9 +119,7 @@ export class WorldsClient {
    */
   setPins(id: string, pinnedEntityIds: string[]): Observable<WorldDetail> {
     // Write-through, as {@link rename} — a pin reorder fans out and its echo dedups.
-    return this.http
-      .patch<WorldDetail>(`/api/worlds/${id}`, { pinnedEntityIds })
-      .pipe(tap((d) => this.store.merge(d)));
+    return this.http.patch<WorldDetail>(`/api/worlds/${id}`, { pinnedEntityIds }).pipe(tap((d) => this.store.merge(d)));
   }
 
   delete(id: string): Observable<void> {
@@ -150,7 +148,10 @@ export class WorldsClient {
 
   /** Add a Contributor or World Viewer; returns the updated member set. Upsert (200), not a create. */
   addMember(id: string, userId: string, role: MemberRole): Observable<WorldMember[]> {
-    return this.http.post<WorldMember[]>(`/api/worlds/${id}/members`, { userId, role });
+    return this.http.post<WorldMember[]>(`/api/worlds/${id}/members`, {
+      userId,
+      role,
+    });
   }
 
   /** Change a member's role between Contributor and Viewer; returns the updated member set. */

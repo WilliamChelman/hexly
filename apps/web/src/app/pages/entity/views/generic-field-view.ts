@@ -49,7 +49,8 @@ import { TypeRegistry } from '../../../entity-types/type-registry';
           <dl class="grid grid-cols-[minmax(8rem,12rem)_1fr] items-center gap-x-6 gap-y-3 m-0">
             @for (field of fields(); track field.key) {
               <dt class="text-sm text-ink-muted">
-                {{ field.label }}@if (field.required) {
+                {{ field.label }}
+                @if (field.required) {
                   <span class="text-danger" aria-hidden="true">&nbsp;*</span>
                 }
               </dt>
@@ -122,12 +123,11 @@ import { TypeRegistry } from '../../../entity-types/type-registry';
             <h2 class="mb-2 text-2xs uppercase tracking-wider text-ink-muted">
               {{ 'genericFieldView.plainHeading' | transloco }}
             </h2>
-            <dl
-              class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 m-0 text-sm"
-              data-testid="field-plain-metadata"
-            >
+            <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 m-0 text-sm" data-testid="field-plain-metadata">
               @for (entry of plainEntries(); track entry.key) {
-                <dt class="font-mono text-xs text-ink-muted break-all">{{ entry.key }}</dt>
+                <dt class="font-mono text-xs text-ink-muted break-all">
+                  {{ entry.key }}
+                </dt>
                 <dd class="m-0 text-ink break-words">{{ entry.value }}</dd>
               }
             </dl>
@@ -145,9 +145,7 @@ export class GenericFieldView {
   protected readonly writable = computed(() => this.session.writable());
 
   /** The union of Field schemas the open Entity's types declare (primary first, deduped by key). */
-  protected readonly fields = computed(() =>
-    this.types.resolveFields(this.session.current()?.types),
-  );
+  protected readonly fields = computed(() => this.types.resolveFields(this.session.current()?.types));
 
   /** The live working Metadata — read off the central store's body, written back through mutate. */
   private readonly metadata = computed<Metadata>(() => this.session.body().metadata ?? {});

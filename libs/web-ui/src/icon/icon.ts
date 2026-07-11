@@ -1,10 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  input,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { DomSanitizer } from '@angular/platform-browser';
 import {
   type LucideIconData,
@@ -40,12 +34,10 @@ import { featureLibrary } from '@hexly/domain';
 import { IconHost } from './icon-host';
 
 /** The settlement marker art, shared with the canvas via `featureLibrary` (ADR-0006). */
-const SETTLEMENT_PATH =
-  featureLibrary.find((f) => f.id === 'settlement')?.path ?? '';
+const SETTLEMENT_PATH = featureLibrary.find((f) => f.id === 'settlement')?.path ?? '';
 
 /** The `<svg>` root attrs Lucide glyphs are drawn with (its house stroke, lightened to 1.6). */
-const LUCIDE_ATTRS =
-  'stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"';
+const LUCIDE_ATTRS = 'stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"';
 
 /**
  * Serialize a Lucide icon's node list (`[tag, attrs]` pairs) to SVG inner markup.
@@ -75,13 +67,11 @@ const CUSTOM = {
     body: '<path d="M12 2.2 20.5 7v10L12 21.8 3.5 17V7z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" /><path d="M12 7.4 16.2 9.9v4.2L12 16.6 7.8 14.1V9.9z" fill="currentColor" opacity=".5" />',
   },
   region: {
-    attrs:
-      'stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-dasharray="3 2.5"',
+    attrs: 'stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-dasharray="3 2.5"',
     body: '<path d="M5 7c4-3 9-2 12 1s2 8-2 10-11 1-12-4 2-4 2-7z" />',
   },
   settlement: {
-    attrs:
-      'stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"',
+    attrs: 'stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"',
     body: `<path d="${SETTLEMENT_PATH}" />`,
   },
 } as const;
@@ -146,9 +136,7 @@ export class Icon {
 
   protected readonly svg = computed(() => {
     const name = this.name();
-    const custom = (CUSTOM as Record<string, { attrs: string; body: string }>)[
-      name
-    ];
+    const custom = (CUSTOM as Record<string, { attrs: string; body: string }>)[name];
     const { attrs, body } = custom ?? {
       attrs: LUCIDE_ATTRS,
       body: lucideBody(LUCIDE[name]),

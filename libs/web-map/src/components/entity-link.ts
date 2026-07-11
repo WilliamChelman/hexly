@@ -1,12 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  DestroyRef,
-  effect,
-  inject,
-  signal,
-  untracked,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
@@ -48,8 +40,7 @@ import { HexMapStore } from '../services/hexmap-store';
               data-testid="entity-link-dangling"
               [attr.title]="'editorShell.inspector.linkUnavailable' | transloco"
             >
-              <span aria-hidden="true">→ </span
-              >{{ 'editorShell.inspector.linkUnavailable' | transloco }}
+              <span aria-hidden="true">→ </span>{{ 'editorShell.inspector.linkUnavailable' | transloco }}
             </span>
           } @else {
             <!-- List still loading: neutral placeholder, never a clickable dead link. -->
@@ -73,14 +64,7 @@ import { HexMapStore } from '../services/hexmap-store';
           </button>
         </div>
       } @else {
-        <button
-          type="button"
-          appButton
-          variant="ghost"
-          size="sm"
-          data-testid="entity-link-pick"
-          (click)="toggle()"
-        >
+        <button type="button" appButton variant="ghost" size="sm" data-testid="entity-link-pick" (click)="toggle()">
           {{ 'editorShell.inspector.pickLink' | transloco }}
         </button>
       }

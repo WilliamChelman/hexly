@@ -9,5 +9,5 @@ The reflexive choice would be Postgres with a normalized schema (`hexes`, `regio
 ## Consequences
 
 - Saves write the whole document; concurrency is whole-document granularity, resolved by an optimistic **`version`** field (a save whose base version has moved is rejected — surfaced as HTTP 409).
-- No server-side partial updates or querying *into* a map.
+- No server-side partial updates or querying _into_ a map.
 - If a single map ever outgrows one document, it can be chunked by coordinate region later — the document shape does not preclude that. If the user base grows beyond a handful, this decision (DB + storage shape) is the one to revisit first.

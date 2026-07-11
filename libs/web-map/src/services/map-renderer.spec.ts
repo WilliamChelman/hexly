@@ -101,11 +101,12 @@ class FakeContext {
     this.pathFillAlphas.push(this.globalAlpha);
     const n = this.currentPath.length;
     if (n > 0) {
-      const sum = this.currentPath.reduce(
-        (acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }),
-        { x: 0, y: 0 },
-      );
-      this.pathDraws.push({ fill: this.fillStyle, cx: sum.x / n, cy: sum.y / n });
+      const sum = this.currentPath.reduce((acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }), { x: 0, y: 0 });
+      this.pathDraws.push({
+        fill: this.fillStyle,
+        cx: sum.x / n,
+        cy: sum.y / n,
+      });
     }
   }
   /** Each dash pattern set, in order — the marquee is the only dashed stroke. */
@@ -181,7 +182,11 @@ describe('Canvas2dMapRenderer painted terrain', () => {
     const renderer = makeRenderer(ctx);
     // Centre hex (0,0) under the camera so it is on screen.
     const camera = Camera.initial().panBy(60, 60);
-    const doc: HexMap = { hexes: { '0,0': { terrain: 'forest' } }, regions: [], labels: [] };
+    const doc: HexMap = {
+      hexes: { '0,0': { terrain: 'forest' } },
+      regions: [],
+      labels: [],
+    };
 
     renderer.render(camera, doc, null);
 
@@ -210,9 +215,7 @@ describe('Canvas2dMapRenderer region borders', () => {
     const camera = Camera.initial().panBy(60, 60);
     const doc: HexMap = {
       hexes: {},
-      regions: [
-        { id: 'a', name: 'Avalon', color: '#b08a4e', hexes: { '0,0': true } },
-      ],
+      regions: [{ id: 'a', name: 'Avalon', color: '#b08a4e', hexes: { '0,0': true } }],
       labels: [],
     };
 
@@ -233,7 +236,12 @@ describe('Canvas2dMapRenderer region borders', () => {
       hexes: {},
       regions: [
         { id: 'a', name: 'Avalon', color: '#b08a4e', hexes: { '0,0': true } },
-        { id: 'b', name: 'Whisperwood', color: '#7c9b86', hexes: { '0,0': true } },
+        {
+          id: 'b',
+          name: 'Whisperwood',
+          color: '#7c9b86',
+          hexes: { '0,0': true },
+        },
       ],
       labels: [],
     };
@@ -253,9 +261,7 @@ describe('Canvas2dMapRenderer region borders', () => {
     const camera = Camera.initial().panBy(60, 60);
     const doc: HexMap = {
       hexes: { '0,0': { terrain: 'forest' } },
-      regions: [
-        { id: 'a', name: 'Avalon', color: '#b08a4e', hexes: { '5,5': true } },
-      ],
+      regions: [{ id: 'a', name: 'Avalon', color: '#b08a4e', hexes: { '5,5': true } }],
       labels: [],
     };
 
@@ -274,7 +280,12 @@ describe('Canvas2dMapRenderer region borders', () => {
     const doc: HexMap = {
       hexes: {},
       regions: [
-        { id: 'a', name: 'Avalon', color: '#b08a4e', hexes: { '0,0': true, '1,0': true } },
+        {
+          id: 'a',
+          name: 'Avalon',
+          color: '#b08a4e',
+          hexes: { '0,0': true, '1,0': true },
+        },
       ],
       labels: [],
     };
@@ -288,7 +299,7 @@ describe('Canvas2dMapRenderer region borders', () => {
     restore();
   });
 
-  it('previews a dragged region\'s border at its translated footprint', () => {
+  it("previews a dragged region's border at its translated footprint", () => {
     const restore = stubTheme();
     const ctx = new FakeContext();
     const renderer = makeRenderer(ctx);
@@ -320,7 +331,8 @@ describe('Canvas2dMapRenderer feature markers', () => {
     const camera = Camera.initial().panBy(60, 60);
     const doc: HexMap = {
       hexes: { '0,0': { terrain: 'forest', feature: { ref: 'settlement' } } },
-      regions: [], labels: [],
+      regions: [],
+      labels: [],
     };
 
     renderer.render(camera, doc, null);
@@ -336,7 +348,11 @@ describe('Canvas2dMapRenderer feature markers', () => {
     const ctx = new FakeContext();
     const renderer = makeRenderer(ctx);
     const camera = Camera.initial().panBy(60, 60);
-    const doc: HexMap = { hexes: { '0,0': { terrain: 'forest' } }, regions: [], labels: [] };
+    const doc: HexMap = {
+      hexes: { '0,0': { terrain: 'forest' } },
+      regions: [],
+      labels: [],
+    };
 
     renderer.render(camera, doc, null);
 
@@ -353,7 +369,8 @@ describe('Canvas2dMapRenderer feature markers', () => {
     const camera = Camera.initial().panBy(60, 60);
     const doc: HexMap = {
       hexes: { '0,0': { terrain: 'forest', feature: { ref: 'settlement' } } },
-      regions: [], labels: [],
+      regions: [],
+      labels: [],
     };
 
     renderer.render(camera, doc, null);
@@ -390,7 +407,11 @@ describe('Canvas2dMapRenderer hex names', () => {
     const ctx = new FakeContext();
     const renderer = makeRenderer(ctx);
     const camera = Camera.initial().panBy(60, 60);
-    const doc: HexMap = { hexes: { '0,0': { terrain: 'forest' } }, regions: [], labels: [] };
+    const doc: HexMap = {
+      hexes: { '0,0': { terrain: 'forest' } },
+      regions: [],
+      labels: [],
+    };
 
     renderer.render(camera, doc, null);
 
@@ -438,7 +459,10 @@ describe('Canvas2dMapRenderer swap drag preview', () => {
     // they are spelled out so the renderer draws exactly what it is told.
     renderer.render(camera, doc, null, {
       movePreview: [
-        { coord: { q: 1, r: 0 }, hex: { terrain: 'forest', name: 'Riverbend' } },
+        {
+          coord: { q: 1, r: 0 },
+          hex: { terrain: 'forest', name: 'Riverbend' },
+        },
         { coord: { q: 0, r: 0 }, hex: { terrain: 'ocean', name: 'The Deep' } },
       ],
     });
@@ -450,19 +474,19 @@ describe('Canvas2dMapRenderer swap drag preview', () => {
     const origin = centre({ q: 0, r: 0 });
     const dest = centre({ q: 1, r: 0 });
     const filledAt = (fill: string, c: { x: number; y: number }) =>
-      ctx.pathDraws.some(
-        (d) => d.fill === fill && Math.abs(d.cx - c.x) < 0.5 && Math.abs(d.cy - c.y) < 0.5,
-      );
+      ctx.pathDraws.some((d) => d.fill === fill && Math.abs(d.cx - c.x) < 0.5 && Math.abs(d.cy - c.y) < 0.5);
 
     // Forest (dragged) at the destination; ocean (occupant) slid back to the origin.
     expect(filledAt(FOREST, dest)).toBe(true);
     expect(filledAt(OCEAN, origin)).toBe(true);
     // And the carried names land with their records — not the other way round.
+    expect(ctx.textDraws).toContainEqual(expect.objectContaining({ text: 'Riverbend', fill: NAME_INK, x: dest.x }));
     expect(ctx.textDraws).toContainEqual(
-      expect.objectContaining({ text: 'Riverbend', fill: NAME_INK, x: dest.x }),
-    );
-    expect(ctx.textDraws).toContainEqual(
-      expect.objectContaining({ text: 'The Deep', fill: NAME_INK, x: origin.x }),
+      expect.objectContaining({
+        text: 'The Deep',
+        fill: NAME_INK,
+        x: origin.x,
+      }),
     );
     restore();
   });
@@ -474,15 +498,17 @@ describe('Canvas2dMapRenderer swap drag preview', () => {
     const camera = Camera.initial().panBy(60, 60);
     // A non-selected occupant sits at the contested destination; a blocked plan
     // names that cell, and the renderer marks it red so the drag reads as refused.
-    const doc: HexMap = { hexes: { '2,0': { terrain: 'ocean' } }, regions: [], labels: [] };
+    const doc: HexMap = {
+      hexes: { '2,0': { terrain: 'ocean' } },
+      regions: [],
+      labels: [],
+    };
 
     renderer.render(camera, doc, null, { blockedCells: [{ q: 2, r: 0 }] });
 
     const centre = camera.worldToScreen(hexToPixel(LAYOUT, { q: 2, r: 0 }));
     const filledAt = (fill: string, c: { x: number; y: number }) =>
-      ctx.pathDraws.some(
-        (d) => d.fill === fill && Math.abs(d.cx - c.x) < 0.5 && Math.abs(d.cy - c.y) < 0.5,
-      );
+      ctx.pathDraws.some((d) => d.fill === fill && Math.abs(d.cx - c.x) < 0.5 && Math.abs(d.cy - c.y) < 0.5);
 
     // The blocked cell is washed in the danger ink — a preview overlay only, so the
     // document is never mutated to draw it.
@@ -518,9 +544,7 @@ describe('Canvas2dMapRenderer swap drag preview', () => {
 
     const centre = (hex: Axial) => camera.worldToScreen(hexToPixel(LAYOUT, hex));
     const filledAt = (fill: string, c: { x: number; y: number }) =>
-      ctx.pathDraws.some(
-        (d) => d.fill === fill && Math.abs(d.cx - c.x) < 0.5 && Math.abs(d.cy - c.y) < 0.5,
-      );
+      ctx.pathDraws.some((d) => d.fill === fill && Math.abs(d.cx - c.x) < 0.5 && Math.abs(d.cy - c.y) < 0.5);
 
     // Each member draws at its destination — the group reads as moved, not duplicated.
     expect(filledAt(FOREST, centre({ q: 0, r: 0 }))).toBe(true);
@@ -532,7 +556,7 @@ describe('Canvas2dMapRenderer swap drag preview', () => {
 });
 
 describe('Canvas2dMapRenderer labels', () => {
-  it('draws a label\'s text in the label ink at its world position', () => {
+  it("draws a label's text in the label ink at its world position", () => {
     const restore = stubTheme();
     const ctx = new FakeContext();
     const renderer = makeRenderer(ctx);
@@ -540,12 +564,22 @@ describe('Canvas2dMapRenderer labels', () => {
     const doc: HexMap = {
       hexes: {},
       regions: [],
-      labels: [{ id: 'l1', text: 'The Whisperwood', position: { x: 0, y: 0 }, size: 28 }],
+      labels: [
+        {
+          id: 'l1',
+          text: 'The Whisperwood',
+          position: { x: 0, y: 0 },
+          size: 28,
+        },
+      ],
     };
 
     renderer.render(camera, doc, null);
 
-    expect(ctx.textFills).toContainEqual({ text: 'The Whisperwood', fill: LABEL_INK });
+    expect(ctx.textFills).toContainEqual({
+      text: 'The Whisperwood',
+      fill: LABEL_INK,
+    });
     restore();
   });
 
@@ -653,7 +687,15 @@ describe('Canvas2dMapRenderer labels', () => {
     const doc: HexMap = {
       hexes: {},
       regions: [],
-      labels: [{ id: 'l1', text: 'Tilted', position: { x: 0, y: 0 }, size: 28, rotation: 30 }],
+      labels: [
+        {
+          id: 'l1',
+          text: 'Tilted',
+          position: { x: 0, y: 0 },
+          size: 28,
+          rotation: 30,
+        },
+      ],
     };
 
     renderer.render(camera, doc, null);
@@ -669,7 +711,11 @@ describe('Canvas2dMapRenderer selection highlight', () => {
     const ctx = new FakeContext();
     const renderer = makeRenderer(ctx);
     const camera = Camera.initial().panBy(60, 60);
-    const doc: HexMap = { hexes: { '0,0': { terrain: 'forest' } }, regions: [], labels: [] };
+    const doc: HexMap = {
+      hexes: { '0,0': { terrain: 'forest' } },
+      regions: [],
+      labels: [],
+    };
 
     renderer.render(camera, doc, null, {
       selections: [{ kind: 'hex', coord: { q: 0, r: 0 } }],
@@ -730,7 +776,11 @@ describe('Canvas2dMapRenderer selection highlight', () => {
     const ctx = new FakeContext();
     const renderer = makeRenderer(ctx);
     const camera = Camera.initial().panBy(60, 60);
-    const doc: HexMap = { hexes: { '0,0': { terrain: 'forest' } }, regions: [], labels: [] };
+    const doc: HexMap = {
+      hexes: { '0,0': { terrain: 'forest' } },
+      regions: [],
+      labels: [],
+    };
 
     renderer.render(camera, doc, null, { selections: [] });
 
@@ -740,16 +790,14 @@ describe('Canvas2dMapRenderer selection highlight', () => {
 });
 
 describe('Canvas2dMapRenderer region selection highlight', () => {
-  it('fills a selected region\'s member hex translucently in the region colour', () => {
+  it("fills a selected region's member hex translucently in the region colour", () => {
     const restore = stubTheme();
     const ctx = new FakeContext();
     const renderer = makeRenderer(ctx);
     const camera = Camera.initial().panBy(60, 60);
     const doc: HexMap = {
       hexes: {},
-      regions: [
-        { id: 'a', name: 'Avalon', color: '#b08a4e', hexes: { '0,0': true } },
-      ],
+      regions: [{ id: 'a', name: 'Avalon', color: '#b08a4e', hexes: { '0,0': true } }],
       labels: [],
     };
 
@@ -775,7 +823,12 @@ describe('Canvas2dMapRenderer region selection highlight', () => {
       hexes: {},
       regions: [
         { id: 'a', name: 'Avalon', color: '#b08a4e', hexes: { '0,0': true } },
-        { id: 'b', name: 'Whisperwood', color: '#7c9b86', hexes: { '0,0': true } },
+        {
+          id: 'b',
+          name: 'Whisperwood',
+          color: '#7c9b86',
+          hexes: { '0,0': true },
+        },
       ],
       labels: [],
     };
@@ -815,7 +868,11 @@ describe('Canvas2dMapRenderer marquee rectangle', () => {
     const ctx = new FakeContext();
     const renderer = makeRenderer(ctx);
     const camera = Camera.initial().panBy(60, 60);
-    const doc: HexMap = { hexes: { '0,0': { terrain: 'forest' } }, regions: [], labels: [] };
+    const doc: HexMap = {
+      hexes: { '0,0': { terrain: 'forest' } },
+      regions: [],
+      labels: [],
+    };
 
     renderer.render(camera, doc, null);
 

@@ -30,16 +30,12 @@ describe('appRoutes titles', () => {
     TestBed.configureTestingModule({ imports: [provideTranslocoTesting()] });
     const transloco = TestBed.inject(TranslocoService);
 
-    expect(transloco.translate('styleguide.tabTitle')).toBe(
-      'Hexly — Design system',
-    );
+    expect(transloco.translate('styleguide.tabTitle')).toBe('Hexly — Design system');
     expect(transloco.translate('editorShell.tabTitle')).toBe('Hexly');
 
     transloco.setActiveLang('fr');
 
-    expect(transloco.translate('styleguide.tabTitle')).toBe(
-      'Hexly — Système de design',
-    );
+    expect(transloco.translate('styleguide.tabTitle')).toBe('Hexly — Système de design');
     expect(transloco.translate('editorShell.tabTitle')).toBe('Hexly');
   });
 });
@@ -97,5 +93,4 @@ describe('appRoutes structure (ADR-0028)', () => {
     expect(wildcard?.redirectTo).toBeUndefined();
     expect(wildcard?.loadComponent).toBeDefined();
   });
-
 });

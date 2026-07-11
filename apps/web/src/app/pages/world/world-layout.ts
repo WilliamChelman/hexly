@@ -1,18 +1,6 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  DestroyRef,
-  effect,
-  inject,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import {
-  ActiveWorld,
-  worldDashboardRoute,
-  worldGraphRoute,
-  worldRoute,
-  worldSettingsRoute,
-} from '@hexly/web-core';
+import { ActiveWorld, worldDashboardRoute, worldGraphRoute, worldRoute, worldSettingsRoute } from '@hexly/web-core';
 import { NavRailStore } from '../../shell/nav-rail.store';
 
 /**

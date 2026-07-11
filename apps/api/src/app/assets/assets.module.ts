@@ -13,10 +13,7 @@ import { ASSETS_DIR, AssetsService } from './assets.service';
 @Module({
   imports: [DbModule],
   controllers: [AssetsController],
-  providers: [
-    AssetsService,
-    { provide: ASSETS_DIR, useFactory: () => resolveAssetsDir() },
-  ],
+  providers: [AssetsService, { provide: ASSETS_DIR, useFactory: () => resolveAssetsDir() }],
   exports: [AssetsService],
 })
 export class AssetsModule {}

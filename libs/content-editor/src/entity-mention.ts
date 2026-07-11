@@ -1,9 +1,6 @@
 import { Extension } from '@tiptap/core';
 import { PluginKey } from '@tiptap/pm/state';
-import Suggestion, {
-  SuggestionKeyDownProps,
-  SuggestionProps,
-} from '@tiptap/suggestion';
+import Suggestion, { SuggestionKeyDownProps, SuggestionProps } from '@tiptap/suggestion';
 import { EntitySummary } from '@hexly/domain';
 import { EntityPicker } from './entity-picker';
 
@@ -45,10 +42,7 @@ export function entityMention(
             allowSpaces: true,
             allow: ({ state }) => {
               const { $from } = state.selection;
-              return (
-                !$from.parent.type.spec.code &&
-                !$from.marks().some((m) => m.type.name === 'code')
-              );
+              return !$from.parent.type.spec.code && !$from.marks().some((m) => m.type.name === 'code');
             },
             items: ({ query }) => search(query),
             command: ({ editor, range, props }) => {
@@ -61,12 +55,9 @@ export function entityMention(
                 .run();
             },
             render: () => ({
-              onStart: (props: SuggestionProps<EntitySummary, EntitySummary>) =>
-                getPicker()?.open(props),
-              onUpdate: (props: SuggestionProps<EntitySummary, EntitySummary>) =>
-                getPicker()?.update(props),
-              onKeyDown: (props: SuggestionKeyDownProps) =>
-                getPicker()?.onKeyDown(props.event) ?? false,
+              onStart: (props: SuggestionProps<EntitySummary, EntitySummary>) => getPicker()?.open(props),
+              onUpdate: (props: SuggestionProps<EntitySummary, EntitySummary>) => getPicker()?.update(props),
+              onKeyDown: (props: SuggestionKeyDownProps) => getPicker()?.onKeyDown(props.event) ?? false,
               onExit: (props: SuggestionProps<EntitySummary, EntitySummary>) => {
                 // If /link triggered this session and the user escaped (no pick),
                 // remove the programmatically-inserted @ so it doesn't litter the doc.

@@ -1,11 +1,6 @@
 import { Provider, signal } from '@angular/core';
 import { emptyContent, emptyHexMap, EntityBody, HexMap } from '@hexly/domain';
-import {
-  applyPatches as immerApplyPatches,
-  Draft,
-  Patch,
-  produceWithPatches,
-} from '@hexly/immer';
+import { applyPatches as immerApplyPatches, Draft, Patch, produceWithPatches } from '@hexly/immer';
 import { ENTITY_SESSION, EntitySession } from '@hexly/web-entity';
 import { HexMapStore } from '../services/hexmap-store';
 
@@ -31,11 +26,11 @@ export class FakeEntitySession implements EntitySession {
   private readonly _loadGeneration = signal(0);
   readonly loadGeneration = this._loadGeneration.asReadonly();
 
-  mutate(recipe: (draft: EntityBody) => void): { redo: Patch[]; undo: Patch[] } {
-    const [next, redo, undo] = produceWithPatches(
-      this._body(),
-      recipe as (draft: Draft<EntityBody>) => void,
-    );
+  mutate(recipe: (draft: EntityBody) => void): {
+    redo: Patch[];
+    undo: Patch[];
+  } {
+    const [next, redo, undo] = produceWithPatches(this._body(), recipe as (draft: Draft<EntityBody>) => void);
     this._body.set(next as EntityBody);
     return { redo, undo };
   }
@@ -62,10 +57,7 @@ export class FakeEntitySession implements EntitySession {
  * the test-only helpers and the store resolves the same instance through the token.
  */
 export function provideFakeEntitySession(): Provider[] {
-  return [
-    FakeEntitySession,
-    { provide: ENTITY_SESSION, useExisting: FakeEntitySession },
-  ];
+  return [FakeEntitySession, { provide: ENTITY_SESSION, useExisting: FakeEntitySession }];
 }
 
 /**

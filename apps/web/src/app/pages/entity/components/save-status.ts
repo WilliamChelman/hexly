@@ -26,15 +26,11 @@ import { EntitySession } from '../services/entity-session';
             {{ 'editorShell.reload' | transloco }}
           </button>
           @if (error() === 'reload') {
-            <span data-testid="reload-error" class="ml-2">{{
-              'editorShell.save.reloadFailed' | transloco
-            }}</span>
+            <span data-testid="reload-error" class="ml-2">{{ 'editorShell.save.reloadFailed' | transloco }}</span>
           }
         </app-chip>
       } @else if (error() === 'readonly') {
-        <app-chip data-testid="readonly">{{
-          'editorShell.save.readonly' | transloco
-        }}</app-chip>
+        <app-chip data-testid="readonly">{{ 'editorShell.save.readonly' | transloco }}</app-chip>
       } @else if (error() === 'save') {
         <app-chip tone="gold" data-testid="save-error">
           {{ 'editorShell.save.failed' | transloco }}
@@ -48,17 +44,11 @@ import { EntitySession } from '../services/entity-session';
           </button>
         </app-chip>
       } @else if (saving()) {
-        <app-chip tone="gold" data-testid="save-status">{{
-          'editorShell.saving' | transloco
-        }}</app-chip>
+        <app-chip tone="gold" data-testid="save-status">{{ 'editorShell.saving' | transloco }}</app-chip>
       } @else if (dirty()) {
-        <app-chip data-testid="save-status">{{
-          'editorShell.save.unsaved' | transloco
-        }}</app-chip>
+        <app-chip data-testid="save-status">{{ 'editorShell.save.unsaved' | transloco }}</app-chip>
       } @else {
-        <app-chip data-testid="save-status">{{
-          'editorShell.save.saved' | transloco
-        }}</app-chip>
+        <app-chip data-testid="save-status">{{ 'editorShell.save.saved' | transloco }}</app-chip>
       }
     </span>
   `,

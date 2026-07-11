@@ -1,11 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  DestroyRef,
-  computed,
-  inject,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
@@ -36,9 +29,13 @@ const REINDEX_POLL_MS = 1000;
       <span appEyebrow>{{ 'admin.heading' | transloco }}</span>
       <h1 class="admin-heading">{{ 'admin.heading' | transloco }}</h1>
 
-      <h2 class="admin-heading text-xl">{{ 'admin.reindex.heading' | transloco }}</h2>
+      <h2 class="admin-heading text-xl">
+        {{ 'admin.reindex.heading' | transloco }}
+      </h2>
       <div appPanel class="admin-panel">
-        <p class="admin-subhead">{{ 'admin.reindex.description' | transloco }}</p>
+        <p class="admin-subhead">
+          {{ 'admin.reindex.description' | transloco }}
+        </p>
         <div>
           <button appButton data-testid="reindex" [disabled]="reindexing()" (click)="reindex()">
             @if (reindexing()) {
@@ -53,10 +50,18 @@ const REINDEX_POLL_MS = 1000;
   `,
   styles: `
     @reference '#app-styles.css';
-    .admin { @apply mx-auto flex w-full max-w-5xl flex-col gap-3 p-6; }
-    .admin-heading { @apply font-display text-2xl text-ink-strong; }
-    .admin-subhead { @apply text-sm text-ink-muted; }
-    .admin-panel { @apply flex flex-col gap-3 p-4; }
+    .admin {
+      @apply mx-auto flex w-full max-w-5xl flex-col gap-3 p-6;
+    }
+    .admin-heading {
+      @apply font-display text-2xl text-ink-strong;
+    }
+    .admin-subhead {
+      @apply text-sm text-ink-muted;
+    }
+    .admin-panel {
+      @apply flex flex-col gap-3 p-4;
+    }
   `,
 })
 export class Admin {
@@ -146,7 +151,9 @@ export class Admin {
       return;
     }
     this.toaster.show(
-      this.transloco.translate('admin.toast.reindexed', { count: job.reindexed }),
+      this.transloco.translate('admin.toast.reindexed', {
+        count: job.reindexed,
+      }),
       'success',
     );
   }
@@ -154,8 +161,7 @@ export class Admin {
   /** Localize the server's structured error code (`admin.error.<code>`); no
    * English is matched off the wire. */
   private errorMessage(err: unknown): string {
-    const code =
-      err instanceof HttpErrorResponse ? (err.error as { code?: string } | null)?.code : undefined;
+    const code = err instanceof HttpErrorResponse ? (err.error as { code?: string } | null)?.code : undefined;
     const key = code ? `admin.error.${code}` : 'admin.toast.error';
     const message = this.transloco.translate(key);
     // Transloco echoes the key back on a miss — fall back to the generic message.

@@ -104,12 +104,7 @@ describe('EntitySession', () => {
     session.save().subscribe((o) => (outcome = o));
 
     // Content preserved untouched.
-    expect(entities.save).toHaveBeenCalledWith(
-      'm1',
-      bodyOf(editor.document()),
-      3,
-      [],
-    );
+    expect(entities.save).toHaveBeenCalledWith('m1', bodyOf(editor.document()), 3, []);
     expect(outcome).toEqual({ status: 'saved', entity: saved });
   });
 
@@ -129,12 +124,7 @@ describe('EntitySession', () => {
     entities.save.mockReturnValue(of({ status: 'saved', entity: saved }));
     session.save().subscribe();
 
-    expect(entities.save).toHaveBeenCalledWith(
-      'm1',
-      bodyOf(editor.document()),
-      3,
-      ['deity', 'ruined'],
-    );
+    expect(entities.save).toHaveBeenCalledWith('m1', bodyOf(editor.document()), 3, ['deity', 'ruined']);
     expect(session.current()?.tags).toEqual(['deity', 'ruined']);
   });
 
@@ -145,7 +135,11 @@ describe('EntitySession', () => {
     session.open('m1').subscribe();
     editor.paintAt({ q: 5, r: 5 }, 'ocean');
 
-    const saved = stripRights({ ...aldermoor, version: 4, document: bodyOf(editor.document()) });
+    const saved = stripRights({
+      ...aldermoor,
+      version: 4,
+      document: bodyOf(editor.document()),
+    });
     entities.save.mockReturnValue(of({ status: 'saved', entity: saved }));
     session.save().subscribe();
 
@@ -223,7 +217,11 @@ describe('EntitySession', () => {
     entities.save.mockReturnValue(
       of({
         status: 'saved',
-        entity: { ...aldermoor, version: 4, document: bodyOf(editor.document()) },
+        entity: {
+          ...aldermoor,
+          version: 4,
+          document: bodyOf(editor.document()),
+        },
       }),
     );
     session.save().subscribe();
@@ -287,7 +285,11 @@ describe('EntitySession', () => {
       entities.save.mockReturnValue(
         of({
           status: 'saved',
-          entity: { ...aldermoor, version: 4, document: bodyOf(editor.document()) },
+          entity: {
+            ...aldermoor,
+            version: 4,
+            document: bodyOf(editor.document()),
+          },
         }),
       );
 
@@ -319,9 +321,7 @@ describe('EntitySession', () => {
       editor.paintAt({ q: 5, r: 5 }, 'ocean'); // dirty, debounce not yet elapsed
       expect(session.dirty()).toBe(true);
 
-      entities.save.mockReturnValue(
-        of({ status: 'saved', entity: { ...aldermoor, version: 4 } }),
-      );
+      entities.save.mockReturnValue(of({ status: 'saved', entity: { ...aldermoor, version: 4 } }));
       let done = false;
       session.flush().subscribe({ complete: () => (done = true) });
 
@@ -357,7 +357,11 @@ describe('EntitySession', () => {
       entities.save.mockReturnValueOnce(second$);
       first$.next({
         status: 'saved',
-        entity: { ...aldermoor, version: 4, document: bodyOf(editor.document()) },
+        entity: {
+          ...aldermoor,
+          version: 4,
+          document: bodyOf(editor.document()),
+        },
       });
       first$.complete();
 
@@ -368,7 +372,11 @@ describe('EntitySession', () => {
 
       second$.next({
         status: 'saved',
-        entity: { ...aldermoor, version: 5, document: bodyOf(editor.document()) },
+        entity: {
+          ...aldermoor,
+          version: 5,
+          document: bodyOf(editor.document()),
+        },
       });
       second$.complete();
 
@@ -390,7 +398,11 @@ describe('EntitySession', () => {
       entities.save.mockReturnValue(
         of({
           status: 'saved',
-          entity: { ...aldermoor, version: 4, document: bodyOf(editor.document()) },
+          entity: {
+            ...aldermoor,
+            version: 4,
+            document: bodyOf(editor.document()),
+          },
         }),
       );
       vi.advanceTimersByTime(300); // 800ms since the last edit
@@ -435,7 +447,11 @@ describe('EntitySession', () => {
       entities.save.mockReturnValue(
         of({
           status: 'saved',
-          entity: { ...aldermoor, version: 8, document: bodyOf(editor.document()) },
+          entity: {
+            ...aldermoor,
+            version: 8,
+            document: bodyOf(editor.document()),
+          },
         }),
       );
       editor.paintAt({ q: 1, r: 1 }, 'ocean');
@@ -462,7 +478,11 @@ describe('EntitySession', () => {
       entities.save.mockReturnValue(
         of({
           status: 'saved',
-          entity: { ...aldermoor, version: 4, document: bodyOf(editor.document()) },
+          entity: {
+            ...aldermoor,
+            version: 4,
+            document: bodyOf(editor.document()),
+          },
         }),
       );
       editor.paintAt({ q: 6, r: 6 }, 'forest');
@@ -527,7 +547,9 @@ describe('EntitySession', () => {
     entities.patch.mockReturnValue(of({ ...aldermoor, name: 'The Whisperwood' }));
     session.rename('The Whisperwood').subscribe();
 
-    expect(entities.patch).toHaveBeenCalledWith('m1', { name: 'The Whisperwood' });
+    expect(entities.patch).toHaveBeenCalledWith('m1', {
+      name: 'The Whisperwood',
+    });
     expect(session.current()?.name).toBe('The Whisperwood');
   });
 
@@ -557,9 +579,7 @@ describe('EntitySession', () => {
   it('surfaces a 403 save as a terminal read-only state, not the retryable save error', () => {
     openAldermoor(); // Owner Rights → writable, so the save is actually attempted
     editor.paintAt({ q: 5, r: 5 }, 'ocean');
-    entities.save.mockReturnValue(
-      throwError(() => new HttpErrorResponse({ status: 403 })),
-    );
+    entities.save.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 403 })));
 
     session.save().subscribe();
 
@@ -586,9 +606,7 @@ describe('EntitySession', () => {
     openAldermoor();
     editor.paintAt({ q: 5, r: 5 }, 'ocean'); // m1 now dirty
 
-    entities.save.mockReturnValue(
-      of({ status: 'saved', entity: { ...aldermoor, version: 4 } }),
-    );
+    entities.save.mockReturnValue(of({ status: 'saved', entity: { ...aldermoor, version: 4 } }));
     const load$ = new Subject<EntityDetail>();
     entities.load.mockReturnValue(load$);
 
@@ -603,7 +621,11 @@ describe('EntitySession', () => {
     expect(editor.document()).toEqual({ hexes: {}, regions: [], labels: [] });
     expect(session.dirty()).toBe(false);
 
-    const other: EntityDetail = { ...aldermoor, id: 'm2', document: bodyOf(forestAt00) };
+    const other: EntityDetail = {
+      ...aldermoor,
+      id: 'm2',
+      document: bodyOf(forestAt00),
+    };
     load$.next(other);
     load$.complete();
     expect(editor.document()).toEqual(forestAt00);
@@ -622,9 +644,7 @@ describe('EntitySession', () => {
     entities.load.mockReturnValue(of(note));
     session.open('n1').subscribe();
 
-    entities.save.mockReturnValue(
-      of({ status: 'saved', entity: { ...note, version: 4 } }),
-    );
+    entities.save.mockReturnValue(of({ status: 'saved', entity: { ...note, version: 4 } }));
     session.save().subscribe();
 
     expect(entities.save).toHaveBeenCalledWith('n1', noteBody, 3, []);
@@ -652,18 +672,11 @@ describe('EntitySession', () => {
     };
     session.setContent(snapshot);
 
-    entities.save.mockReturnValue(
-      of({ status: 'saved', entity: { ...note, version: 4 } }),
-    );
+    entities.save.mockReturnValue(of({ status: 'saved', entity: { ...note, version: 4 } }));
     session.save().subscribe();
 
     // Snapshot wrapped in format envelope, never parsed (ADR-0019).
-    expect(entities.save).toHaveBeenCalledWith(
-      'n1',
-      { content: { format: CONTENT_FORMAT, snapshot } },
-      3,
-      [],
-    );
+    expect(entities.save).toHaveBeenCalledWith('n1', { content: { format: CONTENT_FORMAT, snapshot } }, 3, []);
   });
 
   it('rides a hexmap’s edited Content alongside its grid on save (#75)', () => {
@@ -681,9 +694,7 @@ describe('EntitySession', () => {
     };
     session.setContent(snapshot);
 
-    entities.save.mockReturnValue(
-      of({ status: 'saved', entity: { ...aldermoor, version: 4 } }),
-    );
+    entities.save.mockReturnValue(of({ status: 'saved', entity: { ...aldermoor, version: 4 } }));
     session.save().subscribe();
 
     // Body carries both edits; neither surface drops the other's (ADR-0019).
@@ -703,9 +714,7 @@ describe('EntitySession', () => {
     editor.paintAt({ q: 5, r: 5 }, 'ocean');
 
     // Navigating away first flushes m1's pending edit (ADR-0026), then loads m2.
-    entities.save.mockReturnValue(
-      of({ status: 'saved', entity: { ...aldermoor, version: 4 } }),
-    );
+    entities.save.mockReturnValue(of({ status: 'saved', entity: { ...aldermoor, version: 4 } }));
     const load$ = new Subject<EntityDetail>();
     entities.load.mockReturnValue(load$);
 
@@ -747,7 +756,11 @@ describe('EntitySession', () => {
     entities.save.mockReturnValue(
       of({
         status: 'saved',
-        entity: { ...aldermoor, version: 4, document: bodyOf(editor.document()) },
+        entity: {
+          ...aldermoor,
+          version: 4,
+          document: bodyOf(editor.document()),
+        },
       }),
     );
     const event = new KeyboardEvent('keydown', {

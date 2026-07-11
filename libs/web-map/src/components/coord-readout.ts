@@ -16,9 +16,9 @@ import { Axial } from '@hexly/domain';
   },
   imports: [TranslocoPipe],
   template: `
-    q <b class="font-semibold text-gold-strong">{{ coord()?.q ?? 0 }}</b>
-    · r <b class="font-semibold text-gold-strong">{{ coord()?.r ?? 0 }}</b>
-    · <b class="font-semibold text-gold-strong">{{ terrainKey() | transloco }}</b>
+    q <b class="font-semibold text-gold-strong">{{ coord()?.q ?? 0 }}</b> · r
+    <b class="font-semibold text-gold-strong">{{ coord()?.r ?? 0 }}</b> ·
+    <b class="font-semibold text-gold-strong">{{ terrainKey() | transloco }}</b>
   `,
   styles: `
     :host {

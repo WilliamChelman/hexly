@@ -1,12 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  input,
-  OnInit,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, OnInit, signal } from '@angular/core';
 import { Observable } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { PublicLink } from '@hexly/domain';
@@ -41,21 +33,10 @@ export type PublicLinkKind = 'world' | 'entity';
           [value]="url()"
           (focus)="$any($event.target).select()"
         />
-        <button
-          appButton
-          size="sm"
-          data-testid="public-link-copy"
-          (click)="copy()"
-        >
+        <button appButton size="sm" data-testid="public-link-copy" (click)="copy()">
           {{ 'publicLink.copy' | transloco }}
         </button>
-        <button
-          appButton
-          size="sm"
-          danger
-          data-testid="public-link-revoke"
-          (click)="revoke()"
-        >
+        <button appButton size="sm" danger data-testid="public-link-revoke" (click)="revoke()">
           {{ 'publicLink.revoke' | transloco }}
         </button>
       </div>

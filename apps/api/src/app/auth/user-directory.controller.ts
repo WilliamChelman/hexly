@@ -20,9 +20,6 @@ export class UserDirectoryController {
 
   @Get()
   list(): UserSummary[] {
-    return this.db
-      .select({ id: users.id, displayName: users.displayName })
-      .from(users)
-      .all();
+    return this.db.select({ id: users.id, displayName: users.displayName }).from(users).all();
   }
 }

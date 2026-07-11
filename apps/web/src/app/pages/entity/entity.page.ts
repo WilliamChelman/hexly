@@ -1,10 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  DestroyRef,
-  computed,
-  inject,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject } from '@angular/core';
 import { NgComponentOutlet } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
@@ -81,9 +75,7 @@ export class EntityPage {
   private readonly views = inject(ViewRegistry);
 
   /** The component to outlet for the active View — always resolves (content fallback). */
-  protected readonly activeComponent = computed(
-    () => this.views.resolve(this.viewStore.activeView()).component,
-  );
+  protected readonly activeComponent = computed(() => this.views.resolve(this.viewStore.activeView()).component);
 
   constructor() {
     // Register the core Views from the lazy entity chunk, the same path a bundled

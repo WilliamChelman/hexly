@@ -33,11 +33,7 @@ test('lists the note’s headings, in order, once opened', async ({ page }) => {
 
   await page.getByTestId('outline-toggle').click();
 
-  await expect(page.getByTestId('outline-item')).toHaveText([
-    'The Reach',
-    'History',
-    'Geography',
-  ]);
+  await expect(page.getByTestId('outline-item')).toHaveText(['The Reach', 'History', 'Geography']);
 });
 
 test('shows an empty state for a note with no headings', async ({ page }) => {
@@ -63,9 +59,7 @@ test('clicking an item scrolls that heading into view', async ({ page }) => {
   const alpha = surface.getByRole('heading', { name: 'Alpha', exact: true });
 
   // Force the scroll port to the bottom so Alpha is definitively off-screen first.
-  await page.evaluate(() =>
-    document.querySelector('[data-content-scroll]')?.scrollTo(0, 1e6),
-  );
+  await page.evaluate(() => document.querySelector('[data-content-scroll]')?.scrollTo(0, 1e6));
   await expect(alpha).not.toBeInViewport();
 
   await page.getByTestId('outline-toggle').click();

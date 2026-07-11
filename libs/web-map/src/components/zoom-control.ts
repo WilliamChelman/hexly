@@ -1,10 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  inject,
-  input,
-  output,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, input, output } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { Icon } from '@hexly/web-ui';
@@ -19,8 +13,7 @@ import { Icon } from '@hexly/web-ui';
   host: {
     role: 'group',
     '[attr.aria-label]': 'groupLabel()',
-    class:
-      'flex items-center gap-[2px] p-[3px] border border-line rounded-lg shadow-2 backdrop-blur-[4px]',
+    class: 'flex items-center gap-[2px] p-[3px] border border-line rounded-lg shadow-2 backdrop-blur-[4px]',
   },
   imports: [Icon, TranslocoPipe],
   template: `
@@ -42,12 +35,7 @@ import { Icon } from '@hexly/web-ui';
       <app-icon name="plus" [size]="16" />
     </button>
     <span class="div"></span>
-    <button
-      type="button"
-      class="zbtn"
-      [attr.aria-label]="'editorShell.canvas.fit' | transloco"
-      (click)="fit.emit()"
-    >
+    <button type="button" class="zbtn" [attr.aria-label]="'editorShell.canvas.fit' | transloco" (click)="fit.emit()">
       <app-icon name="fit" [size]="16" />
     </button>
   `,
@@ -86,8 +74,7 @@ export class ZoomControl {
   readonly zoomOut = output<void>();
   readonly fit = output<void>();
 
-  protected readonly groupLabel = toSignal(
-    this.transloco.selectTranslate('editorShell.canvas.zoom'),
-    { initialValue: '' },
-  );
+  protected readonly groupLabel = toSignal(this.transloco.selectTranslate('editorShell.canvas.zoom'), {
+    initialValue: '',
+  });
 }

@@ -1,16 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import {
-  EMPTY,
-  Observable,
-  catchError,
-  debounceTime,
-  filter,
-  map,
-  merge,
-  of,
-  share,
-  switchMap,
-} from 'rxjs';
+import { EMPTY, Observable, catchError, debounceTime, filter, map, merge, of, share, switchMap } from 'rxjs';
 import { FollowSignal, UnavailableNudge } from '@hexly/domain';
 
 /**

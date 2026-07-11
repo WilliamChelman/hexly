@@ -9,8 +9,8 @@ Today there is no app-level header: `App` is a bare `<router-outlet />`, and eac
 - **One header, owned by the root shell.** `App` renders a single always-present `AppHeader` above the routed `<router-outlet />`. The header owns the global chrome that every page shares: brand/logo, the **theme toggle** (relocated out of `app-editor-header`), and the new **language switcher**. Per-feature headers are dissolved.
 
 - **Pages inject content two ways, by complexity.**
-  - **Stateful `HeaderService` (signals)** for *simple declarative* content a page sets on activation — eyebrow/title/breadcrumb text, a primary action label. The page writes to the service; the header reads the signals.
-  - **Named `<router-outlet name="header">`** for *rich interactive* content that is really a component — the editor's map-title input and Share control. The route declares a header component for the named outlet.
+  - **Stateful `HeaderService` (signals)** for _simple declarative_ content a page sets on activation — eyebrow/title/breadcrumb text, a primary action label. The page writes to the service; the header reads the signals.
+  - **Named `<router-outlet name="header">`** for _rich interactive_ content that is really a component — the editor's map-title input and Share control. The route declares a header component for the named outlet.
   - **Heuristic:** plain text/state → service; interactive component → named outlet.
 
 ## Considered options

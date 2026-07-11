@@ -16,14 +16,7 @@ import {
 import { and, asc, eq, gt, inArray, ne, sql } from 'drizzle-orm';
 import { EntityAccess, entityAccess, sharedVisibility } from '../acl/entity-access';
 import { DB, Db } from '../db/db';
-import {
-  INITIAL_SEQ,
-  entities,
-  entityDescriptors,
-  entityEdges,
-  entityFieldFacets,
-  entityGrants,
-} from '../db/schema';
+import { INITIAL_SEQ, entities, entityDescriptors, entityEdges, entityFieldFacets, entityGrants } from '../db/schema';
 import { SyncOnly, WriteOutbox } from '../events/write-outbox';
 import { TypeFieldRegistry } from './type-field-registry';
 
@@ -200,10 +193,7 @@ export class EntityWrites {
     };
     return this.transact(() => {
       this.db.insert(entities).values(row).run();
-      this.db
-        .insert(entityGrants)
-        .values({ entityId: row.id, userId: input.ownerId, role: 'owner' })
-        .run();
+      this.db.insert(entityGrants).values({ entityId: row.id, userId: input.ownerId, role: 'owner' }).run();
       this.replaceDerived(row.id, row.worldId, derived);
       return row;
     });
@@ -217,11 +207,7 @@ export class EntityWrites {
    */
   cascadeDeleteWorld(worldId: string): void {
     this.transact(() => {
-      const doomed = this.db
-        .select({ id: entities.id })
-        .from(entities)
-        .where(eq(entities.worldId, worldId))
-        .all();
+      const doomed = this.db.select({ id: entities.id }).from(entities).where(eq(entities.worldId, worldId)).all();
       // entity_grants, entity_links, entity_descriptors and entity_edges cascade with each row.
       this.db.delete(entities).where(eq(entities.worldId, worldId)).run();
       for (const { id } of doomed) this.enqueue(id);
@@ -331,7 +317,10 @@ export class EntityWrites {
     const derived: { row: (typeof rows)[number]; derived: Derived }[] = [];
     for (const row of rows) {
       try {
-        derived.push({ row, derived: this.derive(JSON.parse(row.document) as EntityBody, row.types) });
+        derived.push({
+          row,
+          derived: this.derive(JSON.parse(row.document) as EntityBody, row.types),
+        });
       } catch (err) {
         failures.push({
           entityId: row.id,
@@ -345,11 +334,7 @@ export class EntityWrites {
     if (derived.length > 0)
       this.transact(() => {
         for (const { row, derived: d } of derived) {
-          this.db
-            .update(entities)
-            .set({ contentText: d.contentText })
-            .where(eq(entities.id, row.id))
-            .run();
+          this.db.update(entities).set({ contentText: d.contentText }).where(eq(entities.id, row.id)).run();
           this.replaceDerived(row.id, row.worldId, d);
         }
       });
@@ -408,7 +393,15 @@ export class EntityWrites {
     for (const batch of batched(facets, FIELD_FACET_COLUMNS)) {
       this.db
         .insert(entityFieldFacets)
-        .values(batch.map((f) => ({ entityId: id, worldId, key: f.key, value: f.value, num: f.num })))
+        .values(
+          batch.map((f) => ({
+            entityId: id,
+            worldId,
+            key: f.key,
+            value: f.value,
+            num: f.num,
+          })),
+        )
         .run();
     }
   }
@@ -540,15 +533,12 @@ export class EntityWrites {
     // Zero rows: the version moved, or the predicate stopped matching. Re-read to tell them apart.
     const current = access.decide(id);
     if (!current?.canRead) return { status: 'not-found' };
-    return change.version !== undefined
-      ? { status: 'conflict', row: current.row }
-      : { status: 'not-found' };
+    return change.version !== undefined ? { status: 'conflict', row: current.row } : { status: 'not-found' };
   }
 
   /** The `entity_grants` write handle handed to a `manage` change. */
   private aclWriter(id: string): AclWriter {
-    const target = (targetUserId: string) =>
-      and(eq(entityGrants.entityId, id), eq(entityGrants.userId, targetUserId));
+    const target = (targetUserId: string) => and(eq(entityGrants.entityId, id), eq(entityGrants.userId, targetUserId));
     return {
       upsertGrant: (targetUserId, role) => {
         this.db

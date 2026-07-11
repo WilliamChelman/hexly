@@ -18,7 +18,7 @@ Hexly imports mostly-vanilla Obsidian vaults (a `.zip` of `.md` files, folders, 
 
 ## Considered Options
 
-- **Markdown as the stored source of truth** (parse-on-edit) — rejected: overturns ADR-0019, breaks the `entityLink` model (raw markdown can't carry `entityId`/`descriptor`), and makes round-trip lossless *by construction*, defeating the loss-measurement goal.
+- **Markdown as the stored source of truth** (parse-on-edit) — rejected: overturns ADR-0019, breaks the `entityLink` model (raw markdown can't carry `entityId`/`descriptor`), and makes round-trip lossless _by construction_, defeating the loss-measurement goal.
 - **A dedicated raw-passthrough node** (`rawBlock`) carrying unsupported markdown verbatim for byte-faithful re-export — considered and **cut**: its value collapses because the original vaults stay authoritative on disk (improve by re-importing, not by upgrading stored blocks), loss is measured at import, and edit-in-Hexly-then-faithful-export is not a target flow. Revisit only if that flow becomes real. Degrade-to-nearest-node is the lazier choice.
 - **prosemirror-markdown / tiptap-markdown** — rejected: weaker source positions and single-maintainer risk (the trap ADR-0019 already named), respectively; remark also has the richer ecosystem for the Obsidian-specific syntaxes.
 - **Folders as Tags, or as a new Folder concept** — rejected for `hexly.sourcePath` Metadata: no tag pollution, no new domain primitive, and export can still rebuild the tree.

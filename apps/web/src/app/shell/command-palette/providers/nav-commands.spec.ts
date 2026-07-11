@@ -21,8 +21,12 @@ describe('NavCommands', () => {
 
   function signIn(roles: InstanceRole[], isSuperadmin = false): void {
     auth.setUser({
-      id: 'u1', email: 'a@hexly.test', displayName: 'Ada', preferences: {},
-      roles, isSuperadmin,
+      id: 'u1',
+      email: 'a@hexly.test',
+      displayName: 'Ada',
+      preferences: {},
+      roles,
+      isSuperadmin,
     });
   }
 

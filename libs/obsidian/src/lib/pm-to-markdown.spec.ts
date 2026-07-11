@@ -6,29 +6,40 @@ const doc = (...content: PMNode[]): PMNode => ({ type: 'doc', content });
 describe('proseMirrorToMarkdown', () => {
   it('emits a paragraph as its text', () => {
     const md = proseMirrorToMarkdown(
-      doc({ type: 'paragraph', content: [{ type: 'text', text: 'Hello world' }] })
+      doc({
+        type: 'paragraph',
+        content: [{ type: 'text', text: 'Hello world' }],
+      }),
     );
 
     expect(md.trim()).toBe('Hello world');
   });
 
   it('re-emits metadata as YAML frontmatter', () => {
-    const md = proseMirrorToMarkdown(
-      doc({ type: 'paragraph', content: [{ type: 'text', text: 'Body' }] }),
-      { title: 'Hello', tags: ['a', 'b'] }
-    );
+    const md = proseMirrorToMarkdown(doc({ type: 'paragraph', content: [{ type: 'text', text: 'Body' }] }), {
+      title: 'Hello',
+      tags: ['a', 'b'],
+    });
 
     expect(md).toMatch(/^---\ntitle: Hello\ntags:\n {2}- a\n {2}- b\n---/);
     // and it round-trips back through the importer
-    expect(markdownToProseMirror(md).metadata).toEqual({ title: 'Hello', tags: ['a', 'b'] });
+    expect(markdownToProseMirror(md).metadata).toEqual({
+      title: 'Hello',
+      tags: ['a', 'b'],
+    });
   });
 
   it('keeps literal bracket text escaped instead of reviving it as a wikilink/callout/footnote', () => {
     const md = proseMirrorToMarkdown(
       doc({
         type: 'paragraph',
-        content: [{ type: 'text', text: '[[not a link]] and [!not a callout] and [^not a footnote]' }],
-      })
+        content: [
+          {
+            type: 'text',
+            text: '[[not a link]] and [!not a callout] and [^not a footnote]',
+          },
+        ],
+      }),
     );
 
     expect(md.trim()).toBe('\\[\\[not a link]] and \\[!not a callout] and \\[^not a footnote]');
@@ -39,9 +50,17 @@ describe('proseMirrorToMarkdown', () => {
       doc({
         type: 'paragraph',
         content: [
-          { type: 'entityLink', attrs: { entityId: 'x', label: 'Alice', display: 'Al', heading: 'Bio' } },
+          {
+            type: 'entityLink',
+            attrs: {
+              entityId: 'x',
+              label: 'Alice',
+              display: 'Al',
+              heading: 'Bio',
+            },
+          },
         ],
-      })
+      }),
     );
 
     expect(md.trim()).toBe('[[Alice#Bio|Al]]');
@@ -56,7 +75,7 @@ describe('proseMirrorToMarkdown', () => {
           { type: 'text', text: 'const x = 1;' },
           { type: 'text', text: '\nconst y = 2;' },
         ],
-      })
+      }),
     );
 
     expect(md).toContain('const x = 1;\nconst y = 2;');
@@ -73,14 +92,20 @@ describe('proseMirrorToMarkdown', () => {
               {
                 type: 'tableCell',
                 content: [
-                  { type: 'paragraph', content: [{ type: 'text', text: 'first' }] },
-                  { type: 'paragraph', content: [{ type: 'text', text: 'second' }] },
+                  {
+                    type: 'paragraph',
+                    content: [{ type: 'text', text: 'first' }],
+                  },
+                  {
+                    type: 'paragraph',
+                    content: [{ type: 'text', text: 'second' }],
+                  },
                 ],
               },
             ],
           },
         ],
-      })
+      }),
     );
 
     expect(md).toContain('first');
@@ -93,7 +118,7 @@ describe('proseMirrorToMarkdown', () => {
         type: 'callout',
         attrs: { type: 'tip', title: 'Heads up' },
         content: [{ type: 'paragraph', content: [{ type: 'text', text: 'body' }] }],
-      })
+      }),
     );
 
     expect(md).toContain('> [!tip] Heads up');

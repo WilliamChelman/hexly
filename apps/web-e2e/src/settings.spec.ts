@@ -11,26 +11,18 @@ import { expect, test, type Page } from './fixtures';
 /** Pick a Format Locale on /settings and wait for the roaming PATCH to land. */
 async function chooseFormatLocale(page: Page, tag: string): Promise<void> {
   const patched = page.waitForResponse(
-    (r) =>
-      r.url().endsWith('/api/auth/me/preferences') &&
-      r.request().method() === 'PATCH' &&
-      r.ok(),
+    (r) => r.url().endsWith('/api/auth/me/preferences') && r.request().method() === 'PATCH' && r.ok(),
   );
   await page.getByTestId('format-locale').selectOption(tag);
   await patched;
 }
 
-test('Format Locale roams via the account and reflows the entity browser date', async ({
-  page,
-}) => {
+test('Format Locale roams via the account and reflows the entity browser date', async ({ page }) => {
   // A fresh World is empty (ADR-0043), so seed one note to give the browser a card
   // with an "Edited" date.
   await page.goto('/');
   const created = page.waitForResponse(
-    (r) =>
-      r.url().endsWith('/api/worlds') &&
-      r.request().method() === 'POST' &&
-      r.ok(),
+    (r) => r.url().endsWith('/api/worlds') && r.request().method() === 'POST' && r.ok(),
   );
   await page.getByTestId('create-world').click();
   const world = await (await created).json();

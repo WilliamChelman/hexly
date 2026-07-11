@@ -82,7 +82,10 @@ describe('ReferencesPanel', () => {
   it('lists each inbound source as a link back to it', () => {
     const el = render({
       referencedBy: [
-        { descriptor: 'capital of', source: { id: 'avalon', name: 'Avalon', types: [CORE_HEXMAP] } },
+        {
+          descriptor: 'capital of',
+          source: { id: 'avalon', name: 'Avalon', types: [CORE_HEXMAP] },
+        },
       ],
     });
 
@@ -127,7 +130,11 @@ describe('ReferencesPanel', () => {
   it('drops a held list when a different Entity is opened', () => {
     const el = render({
       references: [
-        { targetId: 'mira', descriptor: null, target: { id: 'mira', name: 'Mira', types: [CORE_NOTE] } },
+        {
+          targetId: 'mira',
+          descriptor: null,
+          target: { id: 'mira', name: 'Mira', types: [CORE_NOTE] },
+        },
       ],
     });
     expect(el.querySelector('[data-testid=reference-out]')).not.toBeNull();

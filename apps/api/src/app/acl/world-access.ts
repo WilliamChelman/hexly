@@ -142,7 +142,11 @@ export function worldAccess(db: Db, userId: string): WorldAccess {
       return superadmin || owners.includes(userId);
     },
     decide(id) {
-      return db.select().from(worlds).where(and(eq(worlds.id, id), reachFilter)).get();
+      return db
+        .select()
+        .from(worlds)
+        .where(and(eq(worlds.id, id), reachFilter))
+        .get();
     },
     decideMeta(id) {
       // The predicates ride a top-level SELECT projection here, so the World id must be a bound

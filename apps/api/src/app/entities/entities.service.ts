@@ -1,10 +1,4 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
   ApiError,
   CORE_NOTE,
@@ -36,28 +30,10 @@ import {
   visibilitySchema,
 } from '@hexly/domain';
 import { and, asc, desc, eq, inArray, sql, SQL } from 'drizzle-orm';
-import {
-  AclSetResult,
-  gate,
-  isSuperadmin,
-  OwnerSetResult,
-  removeOwnerOutcome,
-  userExists,
-} from '../acl/owner-set';
-import {
-  EntityAccess,
-  entityAccess,
-  ownsEntity,
-  READ_ONLY_RIGHTS,
-  sharedVisibility,
-} from '../acl/entity-access';
+import { AclSetResult, gate, isSuperadmin, OwnerSetResult, removeOwnerOutcome, userExists } from '../acl/owner-set';
+import { EntityAccess, entityAccess, ownsEntity, READ_ONLY_RIGHTS, sharedVisibility } from '../acl/entity-access';
 import { canCreateEntityFilter, worldOwnerFilter } from '../acl/world-access';
-import {
-  mintPublicLink,
-  PublicLinkTable,
-  readPublicLink,
-  revokePublicLink,
-} from '../acl/public-link-store';
+import { mintPublicLink, PublicLinkTable, readPublicLink, revokePublicLink } from '../acl/public-link-store';
 import { DB, Db } from '../db/db';
 import {
   entities,
@@ -105,10 +81,7 @@ export interface ListOptions {
 }
 
 /** The filter state a facet-count read narrows against — the list filters minus paging/ids. */
-export type FacetOptions = Pick<
-  ListOptions,
-  'worldId' | 'q' | 'type' | 'tags' | 'visibility' | 'fields'
->;
+export type FacetOptions = Pick<ListOptions, 'worldId' | 'q' | 'type' | 'tags' | 'visibility' | 'fields'>;
 
 /** Everything {@link filters} reads — shared by the paged list and the facet-count reads. */
 type FilterOptions = FacetOptions & Pick<ListOptions, 'ids'>;
@@ -166,27 +139,15 @@ export class EntitiesService {
       .from(entities)
       .$dynamic();
     if (match) {
-      query.innerJoin(
-        sql`entities_fts`,
-        sql`entities_fts.rowid = entities.rowid`,
-      );
+      query.innerJoin(sql`entities_fts`, sql`entities_fts.rowid = entities.rowid`);
     }
     const rows = query
-      .where(
-        and(
-          access.filter,
-          ...filters(opts),
-          match ? sql`entities_fts MATCH ${match}` : undefined,
-        ),
-      )
+      .where(and(access.filter, ...filters(opts), match ? sql`entities_fts MATCH ${match}` : undefined))
       // With a query: best match first (bm25 ascending), id for a stable page boundary;
       // otherwise newest first. Weight order must match the FTS DDL: name, tags, content_text.
       .orderBy(
         ...(match
-          ? [
-              sql`bm25(entities_fts, ${w.name}, ${w.tags}, ${w.content})`,
-              asc(entities.id),
-            ]
+          ? [sql`bm25(entities_fts, ${w.name}, ${w.tags}, ${w.content})`, asc(entities.id)]
           : [desc(entities.updatedAt), asc(entities.id)]),
       )
       .limit(opts.limit + 1)
@@ -198,11 +159,7 @@ export class EntitiesService {
       const summary = toSummary(row);
       if (!opts.withRights) return summary;
       // The predicate columns arrive as SQLite 0/1; rightsOf reads them truthily.
-      const r = row as typeof row &
-        Record<
-          'canRead' | 'canEditSubstance' | 'canWrite' | 'isOwner',
-          unknown
-        >;
+      const r = row as typeof row & Record<'canRead' | 'canEditSubstance' | 'canWrite' | 'isOwner', unknown>;
       return {
         ...summary,
         rights: access.rightsOf({
@@ -227,21 +184,9 @@ export class EntitiesService {
     const { filter } = entityAccess(this.db, readerId);
     return {
       // Drop a category's own selection before counting it (drill-down).
-      type: this.countJsonArray(
-        { ...opts, type: undefined },
-        entities.types,
-        filter,
-      ),
-      visibility: this.countColumn(
-        { ...opts, visibility: undefined },
-        entities.visibility,
-        filter,
-      ),
-      tag: this.countJsonArray(
-        { ...opts, tags: undefined },
-        entities.tags,
-        filter,
-      ),
+      type: this.countJsonArray({ ...opts, type: undefined }, entities.types, filter),
+      visibility: this.countColumn({ ...opts, visibility: undefined }, entities.visibility, filter),
+      tag: this.countJsonArray({ ...opts, tags: undefined }, entities.tags, filter),
       // A type's Field facets, contextually — only the active types' facetable Fields (ADR-0048, #188).
       fields: this.countFieldFacets(opts, filter),
     };
@@ -254,10 +199,7 @@ export class EntitiesService {
    * universal facets — counted against every other constraint but that Field's own filter.
    */
   private countFieldFacets(opts: FacetOptions, filter: SQL): FieldFacet[] {
-    const fields = resolveFields(
-      this.typeFields.resolver,
-      opts.type ?? [],
-    ).filter((field) => field.facetable);
+    const fields = resolveFields(this.typeFields.resolver, opts.type ?? []).filter((field) => field.facetable);
     return fields.map((field) => ({
       key: field.key,
       label: field.label,
@@ -280,11 +222,7 @@ export class EntitiesService {
    * number of Entities carrying it; `GROUP BY` omits zero-count values, exactly like the universal
    * facets.
    */
-  private countFieldValues(
-    opts: FacetOptions,
-    key: string,
-    filter: SQL,
-  ): FacetCount[] {
+  private countFieldValues(opts: FacetOptions, key: string, filter: SQL): FacetCount[] {
     const match = opts.q ? toFtsMatch(opts.q) : null;
     const query = this.db
       .select({
@@ -292,19 +230,10 @@ export class EntitiesService {
         count: sql<number>`count(*)`.as('count'),
       })
       .from(entities)
-      .innerJoin(
-        entityFieldFacets,
-        and(
-          eq(entityFieldFacets.entityId, entities.id),
-          eq(entityFieldFacets.key, key),
-        ),
-      )
+      .innerJoin(entityFieldFacets, and(eq(entityFieldFacets.entityId, entities.id), eq(entityFieldFacets.key, key)))
       .$dynamic();
     if (match) {
-      query.innerJoin(
-        sql`entities_fts`,
-        sql`entities_fts.rowid = entities.rowid`,
-      );
+      query.innerJoin(sql`entities_fts`, sql`entities_fts.rowid = entities.rowid`);
     }
     return query
       .where(facetWhere(opts, match, filter))
@@ -315,21 +244,14 @@ export class EntitiesService {
   }
 
   /** Count a denormalized scalar column's values (visibility) under `opts`. */
-  private countColumn(
-    opts: FacetOptions,
-    column: typeof entities.visibility,
-    filter: SQL,
-  ): FacetCount[] {
+  private countColumn(opts: FacetOptions, column: typeof entities.visibility, filter: SQL): FacetCount[] {
     const match = opts.q ? toFtsMatch(opts.q) : null;
     const query = this.db
       .select({ value: column, count: sql<number>`count(*)`.as('count') })
       .from(entities)
       .$dynamic();
     if (match) {
-      query.innerJoin(
-        sql`entities_fts`,
-        sql`entities_fts.rowid = entities.rowid`,
-      );
+      query.innerJoin(sql`entities_fts`, sql`entities_fts.rowid = entities.rowid`);
     }
     return query
       .where(facetWhere(opts, match, filter))
@@ -359,10 +281,7 @@ export class EntitiesService {
       .innerJoin(sql`json_each(${column}) as each`, sql`1 = 1`)
       .$dynamic();
     if (match) {
-      query.innerJoin(
-        sql`entities_fts`,
-        sql`entities_fts.rowid = entities.rowid`,
-      );
+      query.innerJoin(sql`entities_fts`, sql`entities_fts.rowid = entities.rowid`);
     }
     return query
       .where(facetWhere(opts, match, filter))
@@ -381,9 +300,7 @@ export class EntitiesService {
     // Rights let the editor gate itself: a Viewer opens read-only, an entity-level
     // Editor (canWrite false, canEditSubstance true) opens writable. canManage rides
     // the owner-only gate so the Share dialog is only offered to actual Owners.
-    return decision?.canRead
-      ? { ...toDetail(decision.row), rights: access.rightsOf(decision) }
-      : null;
+    return decision?.canRead ? { ...toDetail(decision.row), rights: access.rightsOf(decision) } : null;
   }
 
   /**
@@ -420,16 +337,8 @@ export class EntitiesService {
           types: entities.types,
         })
         .from(entityEdges)
-        .leftJoin(
-          entities,
-          and(eq(entities.id, entityEdges.targetId), access.filter),
-        )
-        .where(
-          and(
-            eq(entityEdges.sourceEntityId, id),
-            eq(entityEdges.targetKind, 'entity'),
-          ),
-        )
+        .leftJoin(entities, and(eq(entities.id, entityEdges.targetId), access.filter))
+        .where(and(eq(entityEdges.sourceEntityId, id), eq(entityEdges.targetKind, 'entity')))
         // Resolved targets by name; the dangling ones last, where they read as a footnote. `targetId`
         // is the final tiebreak, so two Entities sharing a name — or two descriptors to one target —
         // hold a stable order between reads (as `list` does with `asc(entities.id)`).
@@ -445,10 +354,7 @@ export class EntitiesService {
           descriptor: row.descriptor,
           // An Entity whose stored types can't be read reads as a dangling target, same as an
           // unreadable or deleted one: the reference is there, the thing at the end of it is not.
-          target:
-            row.name === null
-              ? null
-              : linkedEntity(row.targetId, row.name, row.types),
+          target: row.name === null ? null : linkedEntity(row.targetId, row.name, row.types),
         }))
     );
   }
@@ -467,22 +373,10 @@ export class EntitiesService {
           types: entities.types,
         })
         .from(entityEdges)
-        .innerJoin(
-          entities,
-          and(eq(entities.id, entityEdges.sourceEntityId), access.filter),
-        )
-        .where(
-          and(
-            eq(entityEdges.targetKind, 'entity'),
-            eq(entityEdges.targetId, id),
-          ),
-        )
+        .innerJoin(entities, and(eq(entities.id, entityEdges.sourceEntityId), access.filter))
+        .where(and(eq(entityEdges.targetKind, 'entity'), eq(entityEdges.targetId, id)))
         // `id` is the final tiebreak, for the same reason as {@link outbound}'s `targetId`.
-        .orderBy(
-          asc(entities.name),
-          asc(entities.id),
-          asc(entityEdges.descriptor),
-        )
+        .orderBy(asc(entities.name), asc(entities.id), asc(entityEdges.descriptor))
         .all()
         // A source is the thing doing the linking, so unlike {@link outbound}'s target it cannot
         // dangle: a row whose source has no drawable type drops out entirely.
@@ -501,12 +395,7 @@ export class EntitiesService {
     return this.db
       .select()
       .from(entities)
-      .where(
-        and(
-          ownsEntity(userId, this.isSuperadmin(userId)),
-          eq(entities.worldId, worldId),
-        ),
-      )
+      .where(and(ownsEntity(userId, this.isSuperadmin(userId)), eq(entities.worldId, worldId)))
       .all()
       .map(toDetail);
   }
@@ -603,11 +492,7 @@ export class EntitiesService {
    * ({@link patchEntityRequestSchema}), which is what lets the kind name the change and the kind
    * pick the gate. Unreachable → null (404); reachable but not permitted → 403.
    */
-  patch(
-    userId: string,
-    id: string,
-    changes: { name?: string; visibility?: Visibility },
-  ): EntityDetail | null {
+  patch(userId: string, id: string, changes: { name?: string; visibility?: Visibility }): EntityDetail | null {
     const result = this.writes.mutate(
       userId,
       id,
@@ -684,9 +569,7 @@ export class EntitiesService {
   private gateOwnerManagement(
     userId: string,
     id: string,
-  ):
-    | Extract<OwnerSetResult, { status: 'not-found' | 'forbidden' }>
-    | undefined {
+  ): Extract<OwnerSetResult, { status: 'not-found' | 'forbidden' }> | undefined {
     // Only needs reachability + ownership, so it uses the blob-free decideMeta.
     const meta = entityAccess(this.db, userId).decideMeta(id);
     return gate({ reachable: !!meta?.canRead, isOwner: !!meta?.isOwner });
@@ -722,11 +605,7 @@ export class EntitiesService {
    * invariant refuses removing the last Owner (`last-owner` → 409). A co-Owner may
    * evict any other Owner, including the creator.
    */
-  removeOwner(
-    userId: string,
-    id: string,
-    targetUserId: string,
-  ): OwnerSetResult {
+  removeOwner(userId: string, id: string, targetUserId: string): OwnerSetResult {
     const gate = this.gateOwnerManagement(userId, id);
     if (gate) return gate;
     const outcome = removeOwnerOutcome(this.entityOwnersOf(id), targetUserId);
@@ -750,12 +629,7 @@ export class EntitiesService {
    * Grant an Instance user Editor or Viewer: Owner-only; World membership is *not*
    * required. Upsert — re-granting a different role updates it.
    */
-  addGrant(
-    userId: string,
-    id: string,
-    targetUserId: string,
-    role: GrantRole,
-  ): AclSetResult<EntityGrant[]> {
+  addGrant(userId: string, id: string, targetUserId: string, role: GrantRole): AclSetResult<EntityGrant[]> {
     const gate = this.gateOwnerManagement(userId, id);
     if (gate) return gate;
     if (!userExists(this.db, targetUserId)) return { status: 'no-such-user' };
@@ -772,11 +646,7 @@ export class EntitiesService {
    * Revoke a grant: Owner-only. Revoking a non-existent grant is a no-op that
    * still returns the (unchanged) set.
    */
-  removeGrant(
-    userId: string,
-    id: string,
-    targetUserId: string,
-  ): AclSetResult<EntityGrant[]> {
+  removeGrant(userId: string, id: string, targetUserId: string): AclSetResult<EntityGrant[]> {
     const gate = this.gateOwnerManagement(userId, id);
     if (gate) return gate;
     // Editor/viewer rows only — an `owner` row is removed via removeOwner (which enforces the
@@ -836,11 +706,7 @@ export class EntitiesService {
       .where(eq(entityLinks.id, token))
       .get();
     if (!link) return null;
-    const row = this.db
-      .select()
-      .from(entities)
-      .where(eq(entities.id, link.entityId))
-      .get();
+    const row = this.db.select().from(entities).where(eq(entities.id, link.entityId)).get();
     return row ? { ...toDetail(row), rights: [...READ_ONLY_RIGHTS] } : null;
   }
 
@@ -853,13 +719,7 @@ export class EntitiesService {
     const row = this.db
       .select()
       .from(entities)
-      .where(
-        and(
-          eq(entities.id, id),
-          eq(entities.worldId, worldId),
-          sharedVisibility,
-        ),
-      )
+      .where(and(eq(entities.id, id), eq(entities.worldId, worldId), sharedVisibility))
       .get();
     return row ? { ...toDetail(row), rights: [...READ_ONLY_RIGHTS] } : null;
   }
@@ -883,12 +743,7 @@ export class EntitiesService {
     return this.db
       .select({ userId: entityGrants.userId, role: entityGrants.role })
       .from(entityGrants)
-      .where(
-        and(
-          eq(entityGrants.entityId, id),
-          inArray(entityGrants.role, ['editor', 'viewer']),
-        ),
-      )
+      .where(and(eq(entityGrants.entityId, id), inArray(entityGrants.role, ['editor', 'viewer'])))
       .orderBy(asc(entityGrants.userId))
       .all()
       .map((r) => ({ userId: r.userId, role: r.role as GrantRole }));
@@ -913,10 +768,7 @@ export class EntitiesService {
    */
   private resolveWorldId(ownerId: string, requestedId?: string): string {
     const predicate = requestedId
-      ? and(
-          eq(worlds.id, requestedId),
-          canCreateEntityFilter(ownerId, this.isSuperadmin(ownerId)),
-        )
+      ? and(eq(worlds.id, requestedId), canCreateEntityFilter(ownerId, this.isSuperadmin(ownerId)))
       : worldOwnerFilter(ownerId);
     const world = this.db
       .select({ id: worlds.id })
@@ -947,8 +799,7 @@ function filters(opts: FilterOptions) {
   if (opts.ids) predicates.push(inArray(entities.id, [...opts.ids]));
   // Facets: OR within a category, AND across them; empty arrays are skipped.
   if (opts.type?.length) predicates.push(hasAny(entities.types, opts.type));
-  if (opts.visibility?.length)
-    predicates.push(inArray(entities.visibility, [...opts.visibility]));
+  if (opts.visibility?.length) predicates.push(inArray(entities.visibility, [...opts.visibility]));
   if (opts.tags?.length) predicates.push(hasAny(entities.tags, opts.tags));
   if (opts.fields?.length) predicates.push(...fieldFilters(opts.fields));
   if (opts.worldId) predicates.push(eq(entities.worldId, opts.worldId));
@@ -1011,11 +862,7 @@ function rangeBound(value: string, op: '>=' | '<='): SQL {
  * facet count and the page it annotates always agree on the filtered set.
  */
 function facetWhere(opts: FacetOptions, match: string | null, filter: SQL) {
-  return and(
-    filter,
-    ...filters(opts),
-    match ? sql`entities_fts MATCH ${match}` : undefined,
-  );
+  return and(filter, ...filters(opts), match ? sql`entities_fts MATCH ${match}` : undefined);
 }
 
 /**
@@ -1023,10 +870,7 @@ function facetWhere(opts: FacetOptions, match: string | null, filter: SQL) {
  * `json_each` unrolls the stored array so `value IN (...)` tests array membership. Shared by the
  * Type and Tag filters, both multi-valued since the `type` → `types` flip (ADR-0048).
  */
-function hasAny(
-  column: typeof entities.types | typeof entities.tags,
-  values: readonly string[],
-) {
+function hasAny(column: typeof entities.types | typeof entities.tags, values: readonly string[]) {
   const list = sql.join(
     values.map((v) => sql`${v}`),
     sql`, `,
@@ -1088,17 +932,11 @@ function parseDocument(id: string, document: string): EntityBody {
   try {
     parsed = JSON.parse(document);
   } catch (cause) {
-    throw new Error(
-      `Stored entity ${id} has a document that is not valid JSON`,
-      { cause },
-    );
+    throw new Error(`Stored entity ${id} has a document that is not valid JSON`, { cause });
   }
   const result = entityBodySchema.safeParse(parsed);
   if (!result.success) {
-    throw new Error(
-      `Stored entity ${id} has a document that fails the Entity schema`,
-      { cause: result.error },
-    );
+    throw new Error(`Stored entity ${id} has a document that fails the Entity schema`, { cause: result.error });
   }
   return result.data;
 }

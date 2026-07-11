@@ -99,10 +99,7 @@ describe('World Graph', () => {
     // The rows are the same; only the viewer differs. Ada, who owns both, sees the whole picture.
     const asAda = await graphOf(ada, world);
     expect(names(asAda.nodes)).toEqual(['Riverbend', 'Secret Cabal Roster']);
-    expect(drawn(asAda)).toEqual([
-      'Riverbend → Secret Cabal Roster',
-      'Secret Cabal Roster —meets in→ Riverbend',
-    ]);
+    expect(drawn(asAda)).toEqual(['Riverbend → Secret Cabal Roster', 'Secret Cabal Roster —meets in→ Riverbend']);
   });
 
   /** An entity-level Viewer grant pierces `private`, restoring the node *and* the lines into it. */
@@ -191,7 +188,10 @@ describe('World Graph', () => {
     await link(ada, ealdred, [{ entityId: mira, descriptor: 'spouse' }]);
 
     // Written past the API, which would never accept it.
-    db.update(entities).set({ types: ['grimoire'] }).where(eq(entities.id, mira)).run();
+    db.update(entities)
+      .set({ types: ['grimoire'] })
+      .where(eq(entities.id, mira))
+      .run();
 
     const { nodes, edges } = await graphOf(ada, world);
     expect(names(nodes)).toEqual(['Ealdred']);
@@ -225,7 +225,12 @@ describe('World Graph', () => {
   }
 
   async function makeEntity(owner: Agent, worldId: string, name: string): Promise<string> {
-    return (await owner.post('/entities').send({ name, types: ['core.note'], worldId }).expect(201)).body.id;
+    return (
+      await owner
+        .post('/entities')
+        .send({ name, types: ['core.note'], worldId })
+        .expect(201)
+    ).body.id;
   }
 
   async function addMember(owner: Agent, worldId: string, userId: string): Promise<void> {
@@ -238,7 +243,11 @@ describe('World Graph', () => {
 
   /** Save `id`'s Content as prose holding one `entityLink` per entry. */
   async function link(owner: Agent, id: string, links: Record<string, unknown>[]): Promise<void> {
-    await save(owner, id, links.map((attrs) => ({ type: 'entityLink', attrs })));
+    await save(
+      owner,
+      id,
+      links.map((attrs) => ({ type: 'entityLink', attrs })),
+    );
   }
 
   /** Save `id`'s Content as prose holding one `image` — which harvests as an Asset edge. */
@@ -254,10 +263,7 @@ describe('World Graph', () => {
         content: [{ type: 'paragraph', content: inline }],
       }),
     };
-    await owner
-      .put(`/entities/${id}`)
-      .send({ document, version: current.version, tags: [] })
-      .expect(200);
+    await owner.put(`/entities/${id}`).send({ document, version: current.version, tags: [] }).expect(200);
   }
 
   /** The raw index rows, unfiltered by any viewer — the truth the read is supposed to hide. */

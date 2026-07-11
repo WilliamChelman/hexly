@@ -36,10 +36,7 @@ type Matrix = readonly [number, number, number, number];
  * (pointy corners at 30° + 60°·i, flat at 0° + 60°·i — what makes a pointy hex
  * point up and a flat hex point sideways). Red Blob Games convention.
  */
-const ORIENTATIONS: Record<
-  Orientation,
-  { forward: Matrix; inverse: Matrix; startAngle: number }
-> = {
+const ORIENTATIONS: Record<Orientation, { forward: Matrix; inverse: Matrix; startAngle: number }> = {
   pointy: {
     forward: [SQRT3, SQRT3 / 2, 0, 3 / 2],
     inverse: [SQRT3 / 3, -1 / 3, 0, 2 / 3],

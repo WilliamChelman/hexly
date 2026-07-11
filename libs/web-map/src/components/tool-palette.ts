@@ -3,12 +3,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { featureLibrary, terrainPalette } from '@hexly/domain';
 import { IconButton, Icon, IconName, IconPath, Panel, Rule, Swatch } from '@hexly/web-ui';
 import { featureKey, terrainKey } from '../utils/catalog-keys';
-import {
-  HexMapStore,
-  featureSubtools,
-  SelectSubtool,
-  selectSubtools,
-} from '../services/hexmap-store';
+import { HexMapStore, featureSubtools, SelectSubtool, selectSubtools } from '../services/hexmap-store';
 import { TOOLS } from './tools';
 
 /** The glyph for a Select Subtool: the arrow cursor for Pick, a dashed box for Marquee. */
@@ -75,12 +70,7 @@ function glyphFor(subtool: SelectSubtool): IconName {
 
     @switch (store.tool()) {
       @case ('select') {
-        <div
-          class="flyout"
-          appPanel
-          role="group"
-          [attr.aria-label]="'editorShell.toolPalette.selectGroup' | transloco"
-        >
+        <div class="flyout" appPanel role="group" [attr.aria-label]="'editorShell.toolPalette.selectGroup' | transloco">
           @for (s of selectTools; track s.id) {
             @let subName = s.nameKey | transloco;
             <button
@@ -144,10 +134,7 @@ function glyphFor(subtool: SelectSubtool): IconName {
             appIconButton
             toggle
             [active]="store.feature() === 'clear'"
-            [title]="
-              ('editorShell.toolPalette.clearFeature' | transloco) +
-              ' (' + clearKey + ')'
-            "
+            [title]="('editorShell.toolPalette.clearFeature' | transloco) + ' (' + clearKey + ')'"
             [attr.aria-label]="'editorShell.toolPalette.clearFeature' | transloco"
             data-testid="clear-feature"
             (click)="store.armFeature('clear')"

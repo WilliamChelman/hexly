@@ -96,7 +96,11 @@ describe('Entity references', () => {
 
       const asAda = await referencesOf(ada, town);
       expect(asAda.references).toEqual([
-        { targetId: secret, descriptor: null, target: { id: secret, name: 'The Cabal', types: ['core.note'] } },
+        {
+          targetId: secret,
+          descriptor: null,
+          target: { id: secret, name: 'The Cabal', types: ['core.note'] },
+        },
       ]);
 
       const asBob = await referencesOf(bob, town);
@@ -115,7 +119,10 @@ describe('Entity references', () => {
       const { referencedBy } = await referencesOf(ada, mira);
 
       expect(referencedBy).toEqual([
-        { descriptor: 'spouse', source: { id: ealdred, name: 'Ealdred', types: ['core.note'] } },
+        {
+          descriptor: 'spouse',
+          source: { id: ealdred, name: 'Ealdred', types: ['core.note'] },
+        },
       ]);
     });
 
@@ -144,7 +151,14 @@ describe('Entity references', () => {
       // Ada, who owns the source, sees it. The rows are the same; only the viewer differs.
       const asAda = await referencesOf(ada, town);
       expect(asAda.referencedBy).toEqual([
-        { descriptor: null, source: { id: cabal, name: 'Secret Cabal Roster', types: ['core.note'] } },
+        {
+          descriptor: null,
+          source: {
+            id: cabal,
+            name: 'Secret Cabal Roster',
+            types: ['core.note'],
+          },
+        },
       ]);
     });
 
@@ -164,7 +178,14 @@ describe('Entity references', () => {
 
       const { referencedBy } = await referencesOf(bob, town);
       expect(referencedBy).toEqual([
-        { descriptor: null, source: { id: cabal, name: 'Secret Cabal Roster', types: ['core.note'] } },
+        {
+          descriptor: null,
+          source: {
+            id: cabal,
+            name: 'Secret Cabal Roster',
+            types: ['core.note'],
+          },
+        },
       ]);
     });
   });
@@ -189,9 +210,11 @@ describe('Entity references', () => {
 
     const { references } = await referencesOf(ada, ealdred);
 
-    expect(references.map((r: { target: { name: string } | null; descriptor: string | null }) =>
-      r.target ? `${r.target.name}:${r.descriptor ?? ''}` : 'dangling',
-    )).toEqual(['Avalon:', 'Mira:rival', 'Mira:spouse', 'dangling']);
+    expect(
+      references.map((r: { target: { name: string } | null; descriptor: string | null }) =>
+        r.target ? `${r.target.name}:${r.descriptor ?? ''}` : 'dangling',
+      ),
+    ).toEqual(['Avalon:', 'Mira:rival', 'Mira:spouse', 'dangling']);
   });
 
   it('404s for an Entity the caller cannot reach', async () => {
@@ -222,7 +245,12 @@ describe('Entity references', () => {
   }
 
   async function makeEntity(owner: Agent, worldId: string, name: string): Promise<string> {
-    return (await owner.post('/entities').send({ name, types: ['core.note'], worldId }).expect(201)).body.id;
+    return (
+      await owner
+        .post('/entities')
+        .send({ name, types: ['core.note'], worldId })
+        .expect(201)
+    ).body.id;
   }
 
   async function addMember(owner: Agent, worldId: string, userId: string): Promise<void> {
@@ -240,14 +268,14 @@ describe('Entity references', () => {
       content: tiptapContent({
         type: 'doc',
         content: [
-          { type: 'paragraph', content: links.map((attrs) => ({ type: 'entityLink', attrs })) },
+          {
+            type: 'paragraph',
+            content: links.map((attrs) => ({ type: 'entityLink', attrs })),
+          },
         ],
       }),
     };
-    await owner
-      .put(`/entities/${id}`)
-      .send({ document, version: current.version, tags: [] })
-      .expect(200);
+    await owner.put(`/entities/${id}`).send({ document, version: current.version, tags: [] }).expect(200);
   }
 
   async function referencesOf(viewer: Agent, id: string) {

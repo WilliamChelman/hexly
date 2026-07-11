@@ -24,10 +24,9 @@ export const entityWorldRedirect: CanActivateFn = (route) => {
         if (!target) return true;
         // Bare World segment; the parent activeWorldGuard heals its slug once the
         // redirect lands under `/w/:worldId`. Entity slug is canonical from here.
-        return router.createUrlTree(
-          entityRoute(target.worldId, id, undefined, target.name),
-          { queryParams: route.queryParams },
-        );
+        return router.createUrlTree(entityRoute(target.worldId, id, undefined, target.name), {
+          queryParams: route.queryParams,
+        });
       }),
       catchError(() => of(true)),
     );

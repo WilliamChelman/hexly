@@ -6,9 +6,7 @@ describe('markdownToProseMirror', () => {
     const { doc, metadata } = markdownToProseMirror(md);
 
     expect(metadata).toEqual({ title: 'Hello', tags: ['a', 'b'] });
-    expect(doc.content).toEqual([
-      { type: 'paragraph', content: [{ type: 'text', text: 'Body text' }] },
-    ]);
+    expect(doc.content).toEqual([{ type: 'paragraph', content: [{ type: 'text', text: 'Body text' }] }]);
   });
 
   it('degrades non-object frontmatter (a top-level list) to empty metadata, not index-keyed junk', () => {
@@ -25,9 +23,7 @@ describe('markdownToProseMirror', () => {
 
     expect(metadata).toEqual({});
     expect(degraded).toEqual({ frontmatter: 1 });
-    expect(doc.content).toEqual([
-      { type: 'paragraph', content: [{ type: 'text', text: 'Body text' }] },
-    ]);
+    expect(doc.content).toEqual([{ type: 'paragraph', content: [{ type: 'text', text: 'Body text' }] }]);
   });
 
   it('converts a paragraph of plain text into a doc with a paragraph node', () => {
@@ -35,9 +31,7 @@ describe('markdownToProseMirror', () => {
 
     expect(doc).toEqual({
       type: 'doc',
-      content: [
-        { type: 'paragraph', content: [{ type: 'text', text: 'Hello world' }] },
-      ],
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Hello world' }] }],
     });
   });
 
@@ -45,7 +39,11 @@ describe('markdownToProseMirror', () => {
     const { doc } = markdownToProseMirror('**_a_**_**b**_');
 
     expect(doc.content?.[0].content).toEqual([
-      { type: 'text', text: 'ab', marks: expect.arrayContaining([{ type: 'bold' }, { type: 'italic' }]) },
+      {
+        type: 'text',
+        text: 'ab',
+        marks: expect.arrayContaining([{ type: 'bold' }, { type: 'italic' }]),
+      },
     ]);
   });
 
@@ -69,7 +67,10 @@ describe('markdownToProseMirror', () => {
 
     expect(doc.content?.[0].content).toEqual([{ type: 'text', text: 'Cite this[^1].' }]);
     // The definition survives as readable prose.
-    expect(doc.content?.[1]).toEqual({ type: 'paragraph', content: [{ type: 'text', text: 'A source.' }] });
+    expect(doc.content?.[1]).toEqual({
+      type: 'paragraph',
+      content: [{ type: 'text', text: 'A source.' }],
+    });
     expect(degraded).toEqual({ footnote: 1 });
   });
 
@@ -113,30 +114,58 @@ describe('markdownToProseMirror', () => {
 
     expect(link('[[Alice]]')).toEqual({
       type: 'entityLink',
-      attrs: { entityId: null, label: 'Alice', descriptor: null, display: null, heading: null },
+      attrs: {
+        entityId: null,
+        label: 'Alice',
+        descriptor: null,
+        display: null,
+        heading: null,
+      },
     });
-    expect(link('[[Alice|Al]]')?.attrs).toMatchObject({ label: 'Alice', display: 'Al', heading: null });
-    expect(link('[[Alice#Bio]]')?.attrs).toMatchObject({ label: 'Alice', display: null, heading: 'Bio' });
-    expect(link('[[Alice#Bio|Al]]')?.attrs).toMatchObject({ label: 'Alice', display: 'Al', heading: 'Bio' });
+    expect(link('[[Alice|Al]]')?.attrs).toMatchObject({
+      label: 'Alice',
+      display: 'Al',
+      heading: null,
+    });
+    expect(link('[[Alice#Bio]]')?.attrs).toMatchObject({
+      label: 'Alice',
+      display: null,
+      heading: 'Bio',
+    });
+    expect(link('[[Alice#Bio|Al]]')?.attrs).toMatchObject({
+      label: 'Alice',
+      display: 'Al',
+      heading: 'Bio',
+    });
   });
 
   it('keeps a display alias intact even if it contains a literal "|"', () => {
     const link = (md: string) => markdownToProseMirror(md).doc.content?.[0].content?.[0];
 
-    expect(link('[[Alice|A|B]]')?.attrs).toMatchObject({ label: 'Alice', display: 'A|B' });
+    expect(link('[[Alice|A|B]]')?.attrs).toMatchObject({
+      label: 'Alice',
+      display: 'A|B',
+    });
   });
 
   it('keeps the full heading anchor even if it contains a literal "#"', () => {
     const link = (md: string) => markdownToProseMirror(md).doc.content?.[0].content?.[0];
 
-    expect(link('[[Alice#Head#ing]]')?.attrs).toMatchObject({ label: 'Alice', heading: 'Head#ing' });
+    expect(link('[[Alice#Head#ing]]')?.attrs).toMatchObject({
+      label: 'Alice',
+      heading: 'Head#ing',
+    });
   });
 
   it('degrades an ![[embed]] to a plain link and counts it', () => {
     const { doc, degraded } = markdownToProseMirror('![[Some Note]]');
 
     expect(doc.content?.[0].content).toEqual([
-      { type: 'text', text: 'Some Note', marks: [{ type: 'link', attrs: { href: 'Some Note' } }] },
+      {
+        type: 'text',
+        text: 'Some Note',
+        marks: [{ type: 'link', attrs: { href: 'Some Note' } }],
+      },
     ]);
     expect(degraded).toEqual({ embed: 1 });
   });
@@ -145,9 +174,7 @@ describe('markdownToProseMirror', () => {
     const { doc, degraded } = markdownToProseMirror('![[portrait.png]]');
 
     // A media embed is a faithful image, so it is NOT a degraded construct.
-    expect(doc.content).toEqual([
-      { type: 'image', attrs: { src: 'portrait.png', alt: null, title: null } },
-    ]);
+    expect(doc.content).toEqual([{ type: 'image', attrs: { src: 'portrait.png', alt: null, title: null } }]);
     expect(degraded).toEqual({});
   });
 
@@ -155,7 +182,10 @@ describe('markdownToProseMirror', () => {
     const { doc } = markdownToProseMirror('![[folder/Map.jpg|300]]');
 
     expect(doc.content).toEqual([
-      { type: 'image', attrs: { src: 'folder/Map.jpg', alt: null, title: null } },
+      {
+        type: 'image',
+        attrs: { src: 'folder/Map.jpg', alt: null, title: null },
+      },
     ]);
   });
 
@@ -180,7 +210,11 @@ describe('markdownToProseMirror', () => {
         attrs: { level: 1 },
         content: [
           { type: 'text', text: 'Cover ' },
-          { type: 'text', text: 'cover.png', marks: [{ type: 'link', attrs: { href: 'cover.png' } }] },
+          {
+            type: 'text',
+            text: 'cover.png',
+            marks: [{ type: 'link', attrs: { href: 'cover.png' } }],
+          },
         ],
       },
     ]);
@@ -197,7 +231,11 @@ describe('markdownToProseMirror', () => {
     const { doc } = markdownToProseMirror('## Chapter One');
 
     expect(doc.content).toEqual([
-      { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Chapter One' }] },
+      {
+        type: 'heading',
+        attrs: { level: 2 },
+        content: [{ type: 'text', text: 'Chapter One' }],
+      },
     ]);
   });
 
@@ -206,8 +244,14 @@ describe('markdownToProseMirror', () => {
     expect(bullet).toEqual({
       type: 'bulletList',
       content: [
-        { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'one' }] }] },
-        { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'two' }] }] },
+        {
+          type: 'listItem',
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'one' }] }],
+        },
+        {
+          type: 'listItem',
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'two' }] }],
+        },
       ],
     });
 
@@ -221,7 +265,11 @@ describe('markdownToProseMirror', () => {
 
     expect(doc.content?.[0].content).toEqual([
       { type: 'text', text: 'see ' },
-      { type: 'text', text: 'the docs', marks: [{ type: 'link', attrs: { href: 'https://x/docs' } }] },
+      {
+        type: 'text',
+        text: 'the docs',
+        marks: [{ type: 'link', attrs: { href: 'https://x/docs' } }],
+      },
     ]);
   });
 
@@ -229,7 +277,10 @@ describe('markdownToProseMirror', () => {
     const { doc } = markdownToProseMirror('![a cat](https://x/cat.png "Tabby")');
 
     expect(doc.content).toEqual([
-      { type: 'image', attrs: { src: 'https://x/cat.png', alt: 'a cat', title: 'Tabby' } },
+      {
+        type: 'image',
+        attrs: { src: 'https://x/cat.png', alt: 'a cat', title: 'Tabby' },
+      },
     ]);
   });
 
@@ -253,15 +304,27 @@ describe('markdownToProseMirror', () => {
         {
           type: 'tableRow',
           content: [
-            { type: 'tableHeader', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'A' }] }] },
-            { type: 'tableHeader', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'B' }] }] },
+            {
+              type: 'tableHeader',
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'A' }] }],
+            },
+            {
+              type: 'tableHeader',
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'B' }] }],
+            },
           ],
         },
         {
           type: 'tableRow',
           content: [
-            { type: 'tableCell', content: [{ type: 'paragraph', content: [{ type: 'text', text: '1' }] }] },
-            { type: 'tableCell', content: [{ type: 'paragraph', content: [{ type: 'text', text: '2' }] }] },
+            {
+              type: 'tableCell',
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: '1' }] }],
+            },
+            {
+              type: 'tableCell',
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: '2' }] }],
+            },
           ],
         },
       ],
@@ -283,7 +346,11 @@ describe('markdownToProseMirror', () => {
     const { doc } = markdownToProseMirror('```ts\nconst x = 1;\n```');
 
     expect(doc.content).toEqual([
-      { type: 'codeBlock', attrs: { language: 'ts' }, content: [{ type: 'text', text: 'const x = 1;' }] },
+      {
+        type: 'codeBlock',
+        attrs: { language: 'ts' },
+        content: [{ type: 'text', text: 'const x = 1;' }],
+      },
     ]);
   });
 
@@ -299,7 +366,16 @@ describe('markdownToProseMirror', () => {
           type: 'paragraph',
           content: [
             { type: 'text', text: 'Body with ' },
-            { type: 'entityLink', attrs: { entityId: null, label: 'Alice', descriptor: null, display: null, heading: null } },
+            {
+              type: 'entityLink',
+              attrs: {
+                entityId: null,
+                label: 'Alice',
+                descriptor: null,
+                display: null,
+                heading: null,
+              },
+            },
             { type: 'text', text: '.' },
           ],
         },
@@ -315,7 +391,10 @@ describe('markdownToProseMirror', () => {
   it('keeps a bolded callout title as plain text instead of dropping it into the body', () => {
     const { doc } = markdownToProseMirror('> [!warning] **Be careful**\n> rest of body');
 
-    expect(doc.content?.[0].attrs).toEqual({ type: 'warning', title: 'Be careful' });
+    expect(doc.content?.[0].attrs).toEqual({
+      type: 'warning',
+      title: 'Be careful',
+    });
     expect(doc.content?.[0].content).toEqual([
       { type: 'paragraph', content: [{ type: 'text', text: 'rest of body' }] },
     ]);
@@ -338,8 +417,16 @@ describe('markdownToProseMirror', () => {
     expect(doc.content?.[0]).toEqual({
       type: 'taskList',
       content: [
-        { type: 'taskItem', attrs: { checked: true }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'done' }] }] },
-        { type: 'taskItem', attrs: { checked: false }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'todo' }] }] },
+        {
+          type: 'taskItem',
+          attrs: { checked: true },
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'done' }] }],
+        },
+        {
+          type: 'taskItem',
+          attrs: { checked: false },
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'todo' }] }],
+        },
       ],
     });
   });
@@ -353,8 +440,24 @@ describe('markdownToProseMirror', () => {
     expect(doc.content?.[0]).toEqual({
       type: 'bulletList',
       content: [
-        { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'plain one' }] }] },
-        { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'plain two' }] }] },
+        {
+          type: 'listItem',
+          content: [
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'plain one' }],
+            },
+          ],
+        },
+        {
+          type: 'listItem',
+          content: [
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'plain two' }],
+            },
+          ],
+        },
       ],
     });
     expect(doc.content?.[1].content?.map((i) => i.attrs?.['checked'])).toEqual([false, true]);

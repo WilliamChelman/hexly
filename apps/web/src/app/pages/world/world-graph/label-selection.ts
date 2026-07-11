@@ -67,12 +67,7 @@ export function selectLabels(
  * A link's weight is the degree of its busier end, so the lines into a hub — the ones a reader is
  * following — keep their descriptors when the graph is dense.
  */
-function selectLinks(
-  payload: GraphPayload,
-  positions: Float32Array,
-  view: LabelView,
-  grid: LabelGrid,
-): number[] {
+function selectLinks(payload: GraphPayload, positions: Float32Array, view: LabelView, grid: LabelGrid): number[] {
   const { degrees, links, descriptors } = payload;
   const cell = grid.linkCell / quantizeScale(view.scale);
 

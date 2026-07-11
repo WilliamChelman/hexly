@@ -16,12 +16,7 @@ export interface MarqueeHits {
 
 /** Whether `point` lies within the (already-normalised) world rectangle. */
 function inRect(rect: Rect, point: Point): boolean {
-  return (
-    point.x >= rect.minX &&
-    point.x <= rect.maxX &&
-    point.y >= rect.minY &&
-    point.y <= rect.maxY
-  );
+  return point.x >= rect.minX && point.x <= rect.maxX && point.y >= rect.minY && point.y <= rect.maxY;
 }
 
 /**
@@ -37,8 +32,6 @@ export function marqueeHits(layout: Layout, doc: HexMap, rect: Rect): MarqueeHit
     if (!doc.hexes[coordKey(coord)]) continue; // skip Void — only painted hexes select
     if (inRect(rect, hexToPixel(layout, coord))) hexes.push(coord);
   }
-  const labels = doc.labels
-    .filter((label) => inRect(rect, label.position))
-    .map((label) => label.id);
+  const labels = doc.labels.filter((label) => inRect(rect, label.position)).map((label) => label.id);
   return { hexes, labels };
 }

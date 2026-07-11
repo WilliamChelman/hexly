@@ -12,9 +12,7 @@ describe('ToasterService', () => {
 
     const toasts = toaster.toasts();
     expect(toasts).toHaveLength(1);
-    expect(toasts[0]).toEqual(
-      expect.objectContaining({ message: 'Move blocked', tone: 'error' }),
-    );
+    expect(toasts[0]).toEqual(expect.objectContaining({ message: 'Move blocked', tone: 'error' }));
   });
 
   it('defaults a toast to the info tone', () => {

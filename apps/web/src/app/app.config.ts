@@ -1,22 +1,25 @@
-import {
-  ApplicationConfig,
-  provideBrowserGlobalErrorListeners,
-} from '@angular/core';
+import { ApplicationConfig, provideBrowserGlobalErrorListeners } from '@angular/core';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideRouter, TitleStrategy } from '@angular/router';
 import { provideTransloco } from '@jsverse/transloco';
 import { provideTranslocoMessageformat } from '@jsverse/transloco-messageformat';
 import { appRoutes } from './app.routes';
-import { withCredentialsInterceptor, translocoAppConfig, TranslocoHttpLoader, TranslationTitleStrategy, provideLocale, provideTheme, providePreferencesSync } from '@hexly/web-core';
+import {
+  withCredentialsInterceptor,
+  translocoAppConfig,
+  TranslocoHttpLoader,
+  TranslationTitleStrategy,
+  provideLocale,
+  provideTheme,
+  providePreferencesSync,
+} from '@hexly/web-core';
 import { provideBuiltInCommands } from './shell/command-palette/command-palette';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideRouter(appRoutes),
-    provideHttpClient(
-      withInterceptors([withCredentialsInterceptor]),
-    ),
+    provideHttpClient(withInterceptors([withCredentialsInterceptor])),
     // Runtime i18n (ADR-0014): one bundle ships every language; LocaleService
     // picks the active one on boot and the switcher flips it live.
     provideTransloco({

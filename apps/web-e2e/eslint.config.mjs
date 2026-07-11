@@ -12,10 +12,7 @@ export default [
         'error',
         {
           enforceBuildableLibDependency: true,
-          allow: [
-            '^.*/eslint(\\.base)?\\.config\\.[cm]?[jt]s$',
-            '^.*/libs/web-core/src/utils/pretty-id$',
-          ],
+          allow: ['^.*/eslint(\\.base)?\\.config\\.[cm]?[jt]s$', '^.*/libs/web-core/src/utils/pretty-id$'],
           depConstraints: [
             {
               sourceTag: '*',

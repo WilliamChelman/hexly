@@ -23,10 +23,7 @@ export interface VocabItem {
  * vocabulary (the `::` descriptor picker and the Tag picker); the `|`/`#` link-text pickers
  * call it with an empty vocab for their single typed row.
  */
-export function vocabItems(
-  query: string,
-  vocab: readonly string[],
-): VocabItem[] {
+export function vocabItems(query: string, vocab: readonly string[]): VocabItem[] {
   const trimmed = query.trim();
   const lower = trimmed.toLowerCase();
   const items: VocabItem[] = vocab

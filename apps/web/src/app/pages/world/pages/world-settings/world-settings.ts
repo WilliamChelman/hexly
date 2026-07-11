@@ -15,14 +15,7 @@ import { Eyebrow, Panel, OwnerSet, MemberSet, PublicLinkControl } from '@hexly/w
 @Component({
   selector: 'app-world-settings',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    TranslocoPipe,
-    Eyebrow,
-    Panel,
-    OwnerSet,
-    MemberSet,
-    PublicLinkControl,
-  ],
+  imports: [TranslocoPipe, Eyebrow, Panel, OwnerSet, MemberSet, PublicLinkControl],
   template: `
     @if (worldId(); as id) {
       <section class="world-settings">
@@ -31,9 +24,7 @@ import { Eyebrow, Panel, OwnerSet, MemberSet, PublicLinkControl } from '@hexly/w
           {{ 'owners.heading' | transloco }}
         </h1>
         <p class="world-settings-subhead">
-          {{
-            'owners.subhead' | transloco: { kind: 'owners.world' | transloco }
-          }}
+          {{ 'owners.subhead' | transloco: { kind: 'owners.world' | transloco } }}
         </p>
         <div appPanel>
           <app-owner-set kind="world" [id]="id" (resigned)="leave()" />

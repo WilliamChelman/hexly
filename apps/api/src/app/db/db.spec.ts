@@ -18,9 +18,7 @@ describe('createDb boot migration (ADR-0027)', () => {
   it('builds the full schema on a fresh in-memory DB', () => {
     const db = createDb(':memory:');
     const tables = (
-      db.$client
-        .prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`)
-        .all() as { name: string }[]
+      db.$client.prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`).all() as { name: string }[]
     ).map((r) => r.name);
 
     expect(tables).toEqual(
@@ -36,7 +34,7 @@ describe('createDb boot migration (ADR-0027)', () => {
         'entity_grants',
         // The full-text search virtual table (ADR-0035).
         'entities_fts',
-      ])
+      ]),
     );
     db.$client.close();
   });
@@ -44,28 +42,20 @@ describe('createDb boot migration (ADR-0027)', () => {
   it('builds the FTS index and its three sync triggers (ADR-0035)', () => {
     const db = createDb(':memory:');
     const triggers = (
-      db.$client
-        .prepare(`SELECT name FROM sqlite_master WHERE type = 'trigger'`)
-        .all() as { name: string }[]
+      db.$client.prepare(`SELECT name FROM sqlite_master WHERE type = 'trigger'`).all() as { name: string }[]
     ).map((r) => r.name);
 
     // INSERT/UPDATE/DELETE triggers keep entities_fts in sync with entities.
-    expect(triggers).toEqual(
-      expect.arrayContaining(['entities_fts_ai', 'entities_fts_au', 'entities_fts_ad']),
-    );
+    expect(triggers).toEqual(expect.arrayContaining(['entities_fts_ai', 'entities_fts_au', 'entities_fts_ad']));
     db.$client.close();
   });
 
   it('carries the roles set, the Superadmin flag, and the disable stamp on users (ADR-0037, ADR-0047)', () => {
     const db = createDb(':memory:');
-    const columns = (
-      db.$client.prepare(`PRAGMA table_info(users)`).all() as { name: string }[]
-    ).map((c) => c.name);
+    const columns = (db.$client.prepare(`PRAGMA table_info(users)`).all() as { name: string }[]).map((c) => c.name);
     // Migration 0009 added the tier flags; 0014/0015 replaced `is_admin`/`can_create_worlds`
     // with the `roles` JSON set, leaving the Superadmin flag and disable stamp.
-    expect(columns).toEqual(
-      expect.arrayContaining(['roles', 'is_superadmin', 'disabled_at']),
-    );
+    expect(columns).toEqual(expect.arrayContaining(['roles', 'is_superadmin', 'disabled_at']));
     expect(columns).not.toContain('is_admin');
     expect(columns).not.toContain('can_create_worlds');
     db.$client.close();
@@ -74,9 +64,7 @@ describe('createDb boot migration (ADR-0027)', () => {
   it('is safe to run twice — the migration ledger skips applied files', () => {
     // Re-running migrate() skips already-applied files (not CREATE TABLE again).
     const db = createDb(':memory:');
-    expect(() =>
-      migrate(db, { migrationsFolder: resolve(__dirname, 'migrations') }),
-    ).not.toThrow();
+    expect(() => migrate(db, { migrationsFolder: resolve(__dirname, 'migrations') })).not.toThrow();
     db.$client.close();
   });
 });
@@ -93,11 +81,7 @@ describe('symmetric-owners migration round-trip (0003)', () => {
     // Rebuild is a table drop+recreate; FK cascades would wipe the backfill mid-run
     // (createDb disables enforcement for the same reason).
     sqlite.pragma('foreign_keys = OFF');
-    for (const file of [
-      '0000_amused_nomad.sql',
-      '0001_supreme_sersi.sql',
-      '0002_past_randall_flagg.sql',
-    ]) {
+    for (const file of ['0000_amused_nomad.sql', '0001_supreme_sersi.sql', '0002_past_randall_flagg.sql']) {
       applyMigration(sqlite, file);
     }
     // A user who solely owns a World and an Entity, as the old schema stored it.
@@ -121,9 +105,9 @@ describe('symmetric-owners migration round-trip (0003)', () => {
     applyMigration(sqlite, '0003_symmetric_owner_sets.sql');
 
     // The World Owner is now a `world_members` row with role 'owner'.
-    expect(
-      sqlite.prepare(`SELECT user_id FROM world_members WHERE world_id = 'w1' AND role = 'owner'`).all(),
-    ).toEqual([{ user_id: 'u1' }]);
+    expect(sqlite.prepare(`SELECT user_id FROM world_members WHERE world_id = 'w1' AND role = 'owner'`).all()).toEqual([
+      { user_id: 'u1' },
+    ]);
     // The Entity Owner is now an `entity_owners` row (folded into entity_grants by 0007,
     // which this test predates — it applies only 0003, so the standalone table still exists here).
     expect(sqlite.prepare(`SELECT user_id FROM entity_owners WHERE entity_id = 'e1'`).all()).toEqual([
@@ -142,13 +126,16 @@ describe('symmetric-owners migration round-trip (0003)', () => {
     applyMigration(sqlite, '0003_symmetric_owner_sets.sql');
 
     // The row survives intact.
-    expect(
-      sqlite.prepare(`SELECT name, document FROM entities WHERE id = 'e1'`).get(),
-    ).toEqual({ name: 'Lady Mara', document: '{"type":"note"}' });
+    expect(sqlite.prepare(`SELECT name, document FROM entities WHERE id = 'e1'`).get()).toEqual({
+      name: 'Lady Mara',
+      document: '{"type":"note"}',
+    });
     // The FTS index still matches by prose — rowid carried forward, triggers recreated.
     expect(
       sqlite
-        .prepare(`SELECT e.id FROM entities_fts f JOIN entities e ON e.rowid = f.rowid WHERE entities_fts MATCH 'obelisk'`)
+        .prepare(
+          `SELECT e.id FROM entities_fts f JOIN entities e ON e.rowid = f.rowid WHERE entities_fts MATCH 'obelisk'`,
+        )
         .all(),
     ).toEqual([{ id: 'e1' }]);
     sqlite.close();
@@ -238,9 +225,9 @@ describe('Home-visibility backfill migration (0005)', () => {
 
     applyMigration(sqlite, '0005_open_hearth.sql');
 
-    expect(
-      sqlite.prepare(`SELECT visibility FROM entities WHERE id = 'home1'`).get(),
-    ).toEqual({ visibility: 'shared' });
+    expect(sqlite.prepare(`SELECT visibility FROM entities WHERE id = 'home1'`).get()).toEqual({
+      visibility: 'shared',
+    });
     sqlite.close();
   });
 });
@@ -272,9 +259,7 @@ describe('Home-Entity removal migration (0011)', () => {
     ]) {
       applyMigration(sqlite, file);
     }
-    sqlite
-      .prepare(`INSERT INTO worlds (id, name, created_at, updated_at) VALUES ('w1', 'Aldermoor', 0, 0)`)
-      .run();
+    sqlite.prepare(`INSERT INTO worlds (id, name, created_at, updated_at) VALUES ('w1', 'Aldermoor', 0, 0)`).run();
     // A home note stored the old way — flagged is_home, locked shared.
     sqlite
       .prepare(
@@ -289,9 +274,7 @@ describe('Home-Entity removal migration (0011)', () => {
     const sqlite = seededPre0011();
     applyMigration(sqlite, '0011_remove_home_entity.sql');
 
-    const entityCols = (
-      sqlite.prepare(`PRAGMA table_info(entities)`).all() as { name: string }[]
-    ).map((c) => c.name);
+    const entityCols = (sqlite.prepare(`PRAGMA table_info(entities)`).all() as { name: string }[]).map((c) => c.name);
     expect(entityCols).not.toContain('is_home');
 
     const indexes = (
@@ -299,9 +282,7 @@ describe('Home-Entity removal migration (0011)', () => {
     ).map((r) => r.name);
     expect(indexes).not.toContain('idx_world_home');
 
-    const worldCols = (
-      sqlite.prepare(`PRAGMA table_info(worlds)`).all() as { name: string }[]
-    ).map((c) => c.name);
+    const worldCols = (sqlite.prepare(`PRAGMA table_info(worlds)`).all() as { name: string }[]).map((c) => c.name);
     expect(worldCols).toContain('pinned_entity_ids');
     // The pre-existing World backfills to an empty pin set.
     expect(sqlite.prepare(`SELECT pinned_entity_ids FROM worlds WHERE id = 'w1'`).get()).toEqual({
@@ -322,7 +303,9 @@ describe('Home-Entity removal migration (0011)', () => {
 
     expect(
       sqlite
-        .prepare(`SELECT e.id FROM entities_fts f JOIN entities e ON e.rowid = f.rowid WHERE entities_fts MATCH 'obelisk'`)
+        .prepare(
+          `SELECT e.id FROM entities_fts f JOIN entities e ON e.rowid = f.rowid WHERE entities_fts MATCH 'obelisk'`,
+        )
         .all(),
     ).toEqual([{ id: 'home1' }]);
     sqlite.close();

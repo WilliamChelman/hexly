@@ -38,7 +38,9 @@ test('an anonymous Public Link viewer live-follows a GM edit, then evicts on rev
   // A visitor with NO account opens the link. An explicitly empty storageState overrides the
   // project's authenticated default (`storageState: authFile`) — a genuinely cookie-less context,
   // so the SSE stream opens on the token principal, not an inherited session.
-  const anonContext = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const anonContext = await browser.newContext({
+    storageState: { cookies: [], origins: [] },
+  });
   const visitor = await anonContext.newPage();
   await visitor.goto(url);
   await expect(visitor.getByTestId('public-banner')).toBeVisible();
@@ -47,10 +49,7 @@ test('an anonymous Public Link viewer live-follows a GM edit, then evicts on rev
   // The GM edits the Entity. The save nudges the anonymous follower, whose page refetches the
   // token surface (a real GET) and re-renders — arm the wait BEFORE the edit so we catch it.
   const followRefetch = visitor.waitForResponse(
-    (r) =>
-      /\/api\/public\/entities\/[\w-]+$/.test(r.url()) &&
-      r.request().method() === 'GET' &&
-      r.ok(),
+    (r) => /\/api\/public\/entities\/[\w-]+$/.test(r.url()) && r.request().method() === 'GET' && r.ok(),
   );
   await surface.click();
   await page.keyboard.press('End');

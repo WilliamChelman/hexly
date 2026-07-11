@@ -30,9 +30,7 @@ import { NavCommands } from './providers/nav-commands';
  * Built-in Command Providers, registered by the Palette on mount. A DI seam:
  * a test provides its own set instead of reaching into the root registry.
  */
-export const COMMAND_PROVIDERS = new InjectionToken<readonly CommandProvider[]>(
-  'COMMAND_PROVIDERS',
-);
+export const COMMAND_PROVIDERS = new InjectionToken<readonly CommandProvider[]>('COMMAND_PROVIDERS');
 
 /** Listing order is the palette's section order. */
 export function provideBuiltInCommands(): Provider[] {
@@ -94,10 +92,7 @@ export function provideBuiltInCommands(): Provider[] {
               [routerLink]="route"
               (click)="onLinkClick($event)"
             >
-              <ng-container
-                [ngTemplateOutlet]="rowBody"
-                [ngTemplateOutletContext]="{ $implicit: row }"
-              />
+              <ng-container [ngTemplateOutlet]="rowBody" [ngTemplateOutletContext]="{ $implicit: row }" />
             </a>
           } @else {
             <button
@@ -113,10 +108,7 @@ export function provideBuiltInCommands(): Provider[] {
               [attr.data-testid]="'command-palette-option-' + row.command.id"
               (click)="pick(row.command)"
             >
-              <ng-container
-                [ngTemplateOutlet]="rowBody"
-                [ngTemplateOutletContext]="{ $implicit: row }"
-              />
+              <ng-container [ngTemplateOutlet]="rowBody" [ngTemplateOutletContext]="{ $implicit: row }" />
             </button>
           }
         } @empty {
@@ -143,8 +135,7 @@ export function provideBuiltInCommands(): Provider[] {
 export class CommandPalette {
   private readonly registry = inject(CommandRegistry);
   private readonly router = inject(Router);
-  private readonly builtIns =
-    inject(COMMAND_PROVIDERS, { optional: true }) ?? [];
+  private readonly builtIns = inject(COMMAND_PROVIDERS, { optional: true }) ?? [];
   // read: ElementRef — #search also hosts appInput, so a bare query would
   // resolve to the Input component instead of the native element.
   private readonly searchInput = viewChild('search', { read: ElementRef });
@@ -164,9 +155,7 @@ export class CommandPalette {
   protected readonly sections = toSignal(
     toObservable(this.parsed).pipe(
       switchMap(({ open, prefix, query }) =>
-        open
-          ? this.registry.search(prefix, query)
-          : of<readonly CommandSection[]>([]),
+        open ? this.registry.search(prefix, query) : of<readonly CommandSection[]>([]),
       ),
     ),
     { initialValue: [] as readonly CommandSection[] },
@@ -215,9 +204,7 @@ export class CommandPalette {
     effect(() => {
       if (this.open()) {
         untracked(() => {
-          const el = this.searchInput()?.nativeElement as
-            | HTMLInputElement
-            | undefined;
+          const el = this.searchInput()?.nativeElement as HTMLInputElement | undefined;
           el?.focus();
         });
       } else {
@@ -280,12 +267,7 @@ export class CommandPalette {
   /** Plain left-click: RouterLink navigates, so just close. Modified/middle
    * clicks fall through — the browser opens a new tab and the palette stays open. */
   protected onLinkClick(event: MouseEvent): void {
-    if (
-      event.ctrlKey ||
-      event.metaKey ||
-      event.shiftKey ||
-      event.button !== 0
-    ) {
+    if (event.ctrlKey || event.metaKey || event.shiftKey || event.button !== 0) {
       return;
     }
     this.close();

@@ -11,13 +11,7 @@ import {
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Editor } from '@tiptap/core';
 import { Button } from '@hexly/web-ui';
-import {
-  FORMAT_ITEMS,
-  FormatItem,
-  applyLink,
-  clearLink,
-  isLinkActive,
-} from './formatting-items';
+import { FORMAT_ITEMS, FormatItem, applyLink, clearLink, isLinkActive } from './formatting-items';
 
 /**
  * The formatting toolbar that floats over a text selection in the Content editor (#74).
@@ -94,8 +88,7 @@ export class FormattingMenu {
 
   protected readonly items = FORMAT_ITEMS;
   protected readonly linkEditing = signal(false);
-  private readonly urlInput =
-    viewChild<ElementRef<HTMLInputElement>>('urlInput');
+  private readonly urlInput = viewChild<ElementRef<HTMLInputElement>>('urlInput');
 
   // The editor mutates outside Angular; `tick` bumps on every transaction so the
   // active-state computed re-reads the selection and the toolbar highlights track it.
@@ -106,9 +99,7 @@ export class FormattingMenu {
     this.tick();
     const editor = this.editor();
     return {
-      ids: new Set(
-        FORMAT_ITEMS.filter((i) => i.isActive(editor)).map((i) => i.id),
-      ),
+      ids: new Set(FORMAT_ITEMS.filter((i) => i.isActive(editor)).map((i) => i.id)),
       link: isLinkActive(editor),
     };
   });

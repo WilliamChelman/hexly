@@ -1,9 +1,4 @@
-import {
-  Global,
-  Inject,
-  Module,
-  OnApplicationShutdown,
-} from '@nestjs/common';
+import { Global, Inject, Module, OnApplicationShutdown } from '@nestjs/common';
 import { DB, Db, createDb, resolveDbPath } from './db';
 
 /**

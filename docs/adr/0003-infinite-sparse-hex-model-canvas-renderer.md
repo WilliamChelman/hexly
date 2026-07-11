@@ -1,6 +1,6 @@
 # Infinite sparse hex plane, Canvas 2D renderer, axial coordinates
 
-A Hex Map is an **infinite plane**, not a bounded grid. A Hex exists *only* where the user has painted content; untouched coordinates are void with no record (see CONTEXT.md → Hex, Void). Storage is therefore a sparse map keyed by coordinate, not a dense array. Hexes are identified by **axial coordinates `(q, r)`** (signed ints, so the plane extends in every direction for free), with cube coordinates used transiently for distance/range/line algorithms. Orientation (pointy-top vs flat-top) is a per-map property, defaulting to pointy-top; the renderer is parameterized by it.
+A Hex Map is an **infinite plane**, not a bounded grid. A Hex exists _only_ where the user has painted content; untouched coordinates are void with no record (see CONTEXT.md → Hex, Void). Storage is therefore a sparse map keyed by coordinate, not a dense array. Hexes are identified by **axial coordinates `(q, r)`** (signed ints, so the plane extends in every direction for free), with cube coordinates used transiently for distance/range/line algorithms. Orientation (pointy-top vs flat-top) is a per-map property, defaulting to pointy-top; the renderer is parameterized by it.
 
 ## Considered Options
 
@@ -11,4 +11,4 @@ For rendering, SVG is ruled out by the infinite/virtualized requirement (a DOM n
 ## Consequences
 
 - Everything downstream must assume sparsity: no dense iteration over "the grid", erasing a hex deletes its record, rendering paints a neutral void for absent coordinates.
-- Premature WebGL is avoided, but very large *dense* maps with buttery zoom are not a v1 guarantee.
+- Premature WebGL is avoided, but very large _dense_ maps with buttery zoom are not a v1 guarantee.

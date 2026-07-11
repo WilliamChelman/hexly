@@ -1,13 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  input,
-  OnInit,
-  output,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, OnInit, output, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
@@ -35,27 +26,17 @@ import { Select } from './select';
       @for (o of rows(); track o.id) {
         <li class="owner-row" [attr.data-testid]="'owner-' + o.id">
           <span class="owner-name"
-            >{{ o.name }}@if (o.isSelf) {
+            >{{ o.name }}
+            @if (o.isSelf) {
               <span class="owner-you"> ({{ 'owners.you' | transloco }})</span>
-            }</span
-          >
+            }
+          </span>
           @if (o.isSelf) {
-            <button
-              appButton
-              size="sm"
-              [attr.data-testid]="'resign-' + o.id"
-              (click)="resign()"
-            >
+            <button appButton size="sm" [attr.data-testid]="'resign-' + o.id" (click)="resign()">
               {{ 'owners.resign' | transloco }}
             </button>
           } @else {
-            <button
-              appButton
-              size="sm"
-              danger
-              [attr.data-testid]="'remove-' + o.id"
-              (click)="remove(o.id)"
-            >
+            <button appButton size="sm" danger [attr.data-testid]="'remove-' + o.id" (click)="remove(o.id)">
               {{ 'owners.remove' | transloco }}
             </button>
           }
@@ -64,9 +45,7 @@ import { Select } from './select';
     </ul>
 
     <div class="owner-add">
-      <label class="owner-add-label" for="owner-add-select">{{
-        'owners.addLabel' | transloco
-      }}</label>
+      <label class="owner-add-label" for="owner-add-select">{{ 'owners.addLabel' | transloco }}</label>
       <div class="owner-add-row">
         <select
           appSelect
@@ -81,13 +60,7 @@ import { Select } from './select';
             <option [value]="c.id">{{ c.displayName }}</option>
           }
         </select>
-        <button
-          appButton
-          variant="primary"
-          data-testid="add"
-          [disabled]="!selected()"
-          (click)="add()"
-        >
+        <button appButton variant="primary" data-testid="add" [disabled]="!selected()" (click)="add()">
           {{ 'owners.add' | transloco }}
         </button>
       </div>
@@ -145,9 +118,7 @@ export class OwnerSet implements OnInit {
   readonly selected = signal<string>('');
 
   /** Directory users who aren't already Owners — the add control's options. */
-  readonly candidates = computed(() =>
-    this.directory().filter((u) => !this.owners().includes(u.id)),
-  );
+  readonly candidates = computed(() => this.directory().filter((u) => !this.owners().includes(u.id)));
 
   /** The current user's id — the one whose row offers "resign" instead of "remove". */
   private readonly me = computed(() => this.auth.currentUser()?.id ?? null);
@@ -187,9 +158,7 @@ export class OwnerSet implements OnInit {
   resign(): void {
     const me = this.me();
     if (!me) return;
-    this.mutate(this.client().removeOwner(this.id(), me), 'owners.removeError', () =>
-      this.resigned.emit(),
-    );
+    this.mutate(this.client().removeOwner(this.id(), me), 'owners.removeError', () => this.resigned.emit());
   }
 
   /**
@@ -199,18 +168,16 @@ export class OwnerSet implements OnInit {
    * other failure falls back to the operation's generic message. The set is only
    * ever mutated inside `onOk`, so a refusal leaves it exactly as it was.
    */
-  private mutate(
-    op$: Observable<string[]>,
-    genericKey: string,
-    onOk: (owners: string[]) => void,
-  ): void {
+  private mutate(op$: Observable<string[]>, genericKey: string, onOk: (owners: string[]) => void): void {
     op$.subscribe({
       next: onOk,
       error: (err: unknown) => {
         const lastOwner = err instanceof HttpErrorResponse && err.status === 409;
         const key = lastOwner ? 'owners.lastOwner' : genericKey;
         this.toaster.show(
-          this.transloco.translate(key, { kind: this.transloco.translate(`owners.${this.kind()}`) }),
+          this.transloco.translate(key, {
+            kind: this.transloco.translate(`owners.${this.kind()}`),
+          }),
           'error',
         );
       },

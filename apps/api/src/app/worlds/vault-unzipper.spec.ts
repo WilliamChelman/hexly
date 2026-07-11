@@ -13,7 +13,9 @@ function zip(files: Record<string, string | Uint8Array>): Buffer {
 
 /** A VaultUnzipper wired to a decompressed ceiling and guard mode (airtight streaming by default). */
 function unzipperWith(maxDecompressed: number, strictZipGuard = true): VaultUnzipper {
-  return new VaultUnzipper({ import: { maxUpload: 0, maxDecompressed, strictZipGuard } });
+  return new VaultUnzipper({
+    import: { maxUpload: 0, maxDecompressed, strictZipGuard },
+  });
 }
 
 describe('VaultUnzipper', () => {
@@ -63,9 +65,7 @@ describe('VaultUnzipper', () => {
   });
 
   it('rejects a non-zip / corrupt archive with 400, not a 500', () => {
-    expect(() => unzipper.unzip(Buffer.from([0x00, 0x01, 0x02, 0x03]))).toThrow(
-      BadRequestException,
-    );
+    expect(() => unzipper.unzip(Buffer.from([0x00, 0x01, 0x02, 0x03]))).toThrow(BadRequestException);
   });
 
   it('rejects an empty upload with 400', () => {

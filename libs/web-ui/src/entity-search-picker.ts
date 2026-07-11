@@ -1,12 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  effect,
-  inject,
-  input,
-  output,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, inject, input, output, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { EntitySummary } from '@hexly/domain';
 import { EntitiesClient } from '@hexly/web-core';
@@ -30,10 +22,7 @@ import { Input } from './input';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [Button, Input, TranslocoPipe],
   template: `
-    <div
-      class="rounded-md border border-line bg-surface p-1 shadow-2"
-      [attr.data-testid]="testid() + '-menu'"
-    >
+    <div class="rounded-md border border-line bg-surface p-1 shadow-2" [attr.data-testid]="testid() + '-menu'">
       <input
         appInput
         class="mb-1"
@@ -96,12 +85,10 @@ export class EntitySearchPicker {
     // Search server-side as the query changes (ADR-0025). onCleanup cancels a superseded
     // request; a failed search empties the list so the picker never breaks.
     effect((onCleanup) => {
-      const sub = this.entitiesClient
-        .list({ q: this.query().trim(), worldId: this.worldId() })
-        .subscribe({
-          next: (page) => this.options.set(page.items),
-          error: () => this.options.set([]),
-        });
+      const sub = this.entitiesClient.list({ q: this.query().trim(), worldId: this.worldId() }).subscribe({
+        next: (page) => this.options.set(page.items),
+        error: () => this.options.set([]),
+      });
       onCleanup(() => sub.unsubscribe());
     });
   }

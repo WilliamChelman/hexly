@@ -98,10 +98,7 @@ export class AuthService {
    * runs an argon2 verify against a dummy hash, so the caller cannot tell which
    * failed (nor enumerate emails) by response timing.
    */
-  async login(
-    email: string,
-    password: string,
-  ): Promise<{ token: string; user: AuthUser } | null> {
+  async login(email: string, password: string): Promise<{ token: string; user: AuthUser } | null> {
     const user = this.db
       .select()
       .from(users)
@@ -142,18 +139,10 @@ export class AuthService {
   /** Resolve a session token to its user, or `null` if missing/expired. */
   async authenticate(token: string | undefined): Promise<AuthUser | null> {
     if (!token) return null;
-    const session = this.db
-      .select()
-      .from(sessions)
-      .where(eq(sessions.id, token))
-      .get();
+    const session = this.db.select().from(sessions).where(eq(sessions.id, token)).get();
     if (!session || session.expiresAt < Date.now()) return null;
 
-    const user = this.db
-      .select()
-      .from(users)
-      .where(eq(users.id, session.userId))
-      .get();
+    const user = this.db.select().from(users).where(eq(users.id, session.userId)).get();
     if (!user) return null;
     // A disabled account's live sessions stop resolving immediately — disable is
     // the immediate lever, not just a future-login block.
@@ -166,15 +155,8 @@ export class AuthService {
    * result. PATCH semantics: absent fields keep their stored value, an explicit
    * `null` clears a field back to "no choice".
    */
-  async updatePreferences(
-    userId: string,
-    patch: PreferencesPatch,
-  ): Promise<Preferences> {
-    const row = this.db
-      .select()
-      .from(users)
-      .where(eq(users.id, userId))
-      .get();
+  async updatePreferences(userId: string, patch: PreferencesPatch): Promise<Preferences> {
+    const row = this.db.select().from(users).where(eq(users.id, userId)).get();
     const merged: Record<string, unknown> = {
       ...parsePreferences(row?.preferences ?? '{}'),
     };
@@ -192,16 +174,8 @@ export class AuthService {
 
   /** Update the user's display name and return their fresh {@link AuthUser}. */
   async updateProfile(userId: string, displayName: string): Promise<AuthUser> {
-    this.db
-      .update(users)
-      .set({ displayName })
-      .where(eq(users.id, userId))
-      .run();
-    const row = this.db
-      .select()
-      .from(users)
-      .where(eq(users.id, userId))
-      .get();
+    this.db.update(users).set({ displayName }).where(eq(users.id, userId)).run();
+    const row = this.db.select().from(users).where(eq(users.id, userId)).get();
     if (!row) throw new Error(`user ${userId} vanished mid-session`);
     return toAuthUser(row);
   }
@@ -211,16 +185,8 @@ export class AuthService {
    * the new one. Returns `false` — with nothing written — when the current
    * password does not verify. The user's other sessions stay valid.
    */
-  async changePassword(
-    userId: string,
-    currentPassword: string,
-    newPassword: string,
-  ): Promise<boolean> {
-    const row = this.db
-      .select()
-      .from(users)
-      .where(eq(users.id, userId))
-      .get();
+  async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<boolean> {
+    const row = this.db.select().from(users).where(eq(users.id, userId)).get();
     if (!row) return false;
 
     let currentOk = false;
@@ -232,11 +198,7 @@ export class AuthService {
     if (!currentOk) return false;
 
     const passwordHash = await hashPassword(newPassword);
-    this.db
-      .update(users)
-      .set({ passwordHash })
-      .where(eq(users.id, userId))
-      .run();
+    this.db.update(users).set({ passwordHash }).where(eq(users.id, userId)).run();
     return true;
   }
 

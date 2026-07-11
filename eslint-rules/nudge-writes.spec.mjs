@@ -9,7 +9,9 @@ import { RuleTester } from 'eslint';
 import { describe, it } from 'node:test';
 import nudgeWrites from './nudge-writes.mjs';
 
-const tester = new RuleTester({ languageOptions: { ecmaVersion: 2022, sourceType: 'module' } });
+const tester = new RuleTester({
+  languageOptions: { ecmaVersion: 2022, sourceType: 'module' },
+});
 
 /** Any file that is neither write handle. */
 const CALLER = '/repo/apps/api/src/app/entities/entities.service.ts';
@@ -24,17 +26,32 @@ describe('no-direct-entity-writes', () => {
       valid: [
         // Reads are untouched — the choke point is on writes, not the access seam.
         { code: 'db.select().from(entities).where(x).get()', filename: CALLER },
-        { code: 'db.selectDistinct({ d }).from(entityGrants).all()', filename: CALLER },
+        {
+          code: 'db.selectDistinct({ d }).from(entityGrants).all()',
+          filename: CALLER,
+        },
         // Sibling tables are not guarded: they carry no `seq` and nudge nobody.
-        { code: 'db.delete(entityDescriptors).where(x).run()', filename: CALLER },
+        {
+          code: 'db.delete(entityDescriptors).where(x).run()',
+          filename: CALLER,
+        },
         { code: 'db.insert(entityLinks).values(row).run()', filename: CALLER },
         // The World tables are the *other* rule's business.
         { code: 'db.update(worlds).set(x).where(y).run()', filename: CALLER },
         { code: 'db.delete(worldMembers).where(x).run()', filename: CALLER },
         // EntityWrites *is* the write handle, so it may write them.
-        { code: 'this.db.update(entities).set({ seq }).where(x).run()', filename: ENTITY_OWNER },
-        { code: 'this.db.insert(entityGrants).values(row).run()', filename: ENTITY_OWNER },
-        { code: 'this.db.delete(entityGrants).where(x).run()', filename: ENTITY_OWNER },
+        {
+          code: 'this.db.update(entities).set({ seq }).where(x).run()',
+          filename: ENTITY_OWNER,
+        },
+        {
+          code: 'this.db.insert(entityGrants).values(row).run()',
+          filename: ENTITY_OWNER,
+        },
+        {
+          code: 'this.db.delete(entityGrants).where(x).run()',
+          filename: ENTITY_OWNER,
+        },
         // WorldWrites is not exempt from *this* rule — it must not reach into `entities` itself,
         // which is why its shared-Entity fan-out delegates to EntityWrites.bumpWorldShared.
       ],
@@ -96,8 +113,14 @@ describe('no-direct-entity-writes', () => {
   it('bans raw SQL that writes the guarded tables, which the drizzle selector cannot see', () => {
     tester.run('no-direct-entity-writes', rule, {
       valid: [
-        { code: "sqlite.prepare(`INSERT INTO worlds (id) VALUES (?)`).run(id)", filename: CALLER },
-        { code: "db.$client.prepare('SELECT * FROM entities WHERE id = ?').get(id)", filename: CALLER },
+        {
+          code: 'sqlite.prepare(`INSERT INTO worlds (id) VALUES (?)`).run(id)',
+          filename: CALLER,
+        },
+        {
+          code: "db.$client.prepare('SELECT * FROM entities WHERE id = ?').get(id)",
+          filename: CALLER,
+        },
       ],
       invalid: [
         {
@@ -122,16 +145,25 @@ describe('no-direct-world-writes', () => {
     tester.run('no-direct-world-writes', rule, {
       valid: [
         { code: 'db.select().from(worlds).where(x).get()', filename: CALLER },
-        { code: 'db.select({ userId }).from(worldMembers).all()', filename: CALLER },
+        {
+          code: 'db.select({ userId }).from(worldMembers).all()',
+          filename: CALLER,
+        },
         // `world_links` carries no `seq`: a link revoke emits directly, it does not bump a World.
         { code: 'db.delete(worldLinks).where(x).run()', filename: CALLER },
         // The Entity tables are the *other* rule's business.
         { code: 'db.update(entities).set(x).where(y).run()', filename: CALLER },
         // WorldWrites *is* the write handle, so it may write them — including its raw upserts.
-        { code: 'this.db.update(worlds).set({ seq }).where(x).run()', filename: WORLD_OWNER },
-        { code: 'this.db.delete(worldMembers).where(x).run()', filename: WORLD_OWNER },
         {
-          code: "db.$client.prepare(`INSERT INTO world_members (world_id) VALUES (?)`).run(id)",
+          code: 'this.db.update(worlds).set({ seq }).where(x).run()',
+          filename: WORLD_OWNER,
+        },
+        {
+          code: 'this.db.delete(worldMembers).where(x).run()',
+          filename: WORLD_OWNER,
+        },
+        {
+          code: 'db.$client.prepare(`INSERT INTO world_members (world_id) VALUES (?)`).run(id)',
           filename: WORLD_OWNER,
         },
       ],
@@ -160,7 +192,7 @@ describe('no-direct-world-writes', () => {
         },
         // `mintWorld`'s old raw insert — the drizzle selector could never have seen it.
         {
-          code: "sqlite.prepare(`INSERT INTO worlds (id, name) VALUES (?,?)`).run(id, name)",
+          code: 'sqlite.prepare(`INSERT INTO worlds (id, name) VALUES (?,?)`).run(id, name)',
           filename: CALLER,
           errors: [{ messageId: 'rawSql' }],
         },

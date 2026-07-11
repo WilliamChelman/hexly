@@ -1,12 +1,4 @@
-import {
-  computed,
-  DestroyRef,
-  Injectable,
-  Injector,
-  effect,
-  inject,
-  signal,
-} from '@angular/core';
+import { computed, DestroyRef, Injectable, Injector, effect, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -34,13 +26,16 @@ import {
   tiptapContent,
   Visibility,
 } from '@hexly/domain';
-import { EntitiesClient, ActiveWorld, idFromSegment, worldRoute, TitleService, AppShellStore, EVICTED } from '@hexly/web-core';
 import {
-  applyPatches as immerApplyPatches,
-  Draft,
-  Patch,
-  produceWithPatches,
-} from '@hexly/immer';
+  EntitiesClient,
+  ActiveWorld,
+  idFromSegment,
+  worldRoute,
+  TitleService,
+  AppShellStore,
+  EVICTED,
+} from '@hexly/web-core';
+import { applyPatches as immerApplyPatches, Draft, Patch, produceWithPatches } from '@hexly/immer';
 import type { EntitySession as EntitySessionPort } from '@hexly/web-entity';
 import type { ContentEditorSession } from '@hexly/content-editor';
 
@@ -181,9 +176,7 @@ export class EntitySession implements ContentEditorSession, EntitySessionPort {
    * live-follow: the reconciler switches its server subscription to this id, so a
    * swap unfollows the old and follows the new without manual bookkeeping.
    */
-  private readonly _followedId = computed(() =>
-    this.externallyDriven ? null : this._current()?.id ?? null,
-  );
+  private readonly _followedId = computed(() => (this.externallyDriven ? null : (this._current()?.id ?? null)));
 
   /**
    * Route load in flight. `current` still holds the previous Entity until the new
@@ -240,12 +233,7 @@ export class EntitySession implements ContentEditorSession, EntitySessionPort {
       this._body();
       this._content();
       this._tags();
-      const armed =
-        this.dirty() &&
-        !this._conflict() &&
-        !this._saving() &&
-        !this._loading() &&
-        !this.unsavedFailure();
+      const armed = this.dirty() && !this._conflict() && !this._saving() && !this._loading() && !this.unsavedFailure();
       if (!armed) return;
       const timer = setTimeout(() => this.save().subscribe(), AUTOSAVE_DELAY_MS);
       onCleanup(() => clearTimeout(timer));
@@ -402,11 +390,11 @@ export class EntitySession implements ContentEditorSession, EntitySessionPort {
    * View shares; a View that owns undo/redo (the map editor) keeps the patches to replay.
    * Bumps no load generation — an edit must not reset a View's history.
    */
-  mutate(recipe: (draft: EntityBody) => void): { redo: Patch[]; undo: Patch[] } {
-    const [next, redo, undo] = produceWithPatches(
-      this._body(),
-      recipe as (draft: Draft<EntityBody>) => void,
-    );
+  mutate(recipe: (draft: EntityBody) => void): {
+    redo: Patch[];
+    undo: Patch[];
+  } {
+    const [next, redo, undo] = produceWithPatches(this._body(), recipe as (draft: Draft<EntityBody>) => void);
     this._body.set(next as EntityBody);
     return { redo, undo };
   }
@@ -466,9 +454,7 @@ export class EntitySession implements ContentEditorSession, EntitySessionPort {
    * None open, or one loading under navigation → no-op (not a throw), so a stale patch
    * can't write to the Entity the user navigated away from (#4).
    */
-  private patch(
-    changes: { name: string } | { visibility: Visibility },
-  ): Observable<EntityDetail> {
+  private patch(changes: { name: string } | { visibility: Visibility }): Observable<EntityDetail> {
     const open = this._current();
     if (!open || this._loading()) return EMPTY;
     return this.entities.patch(open.id, changes).pipe(
@@ -511,11 +497,7 @@ export class EntitySession implements ContentEditorSession, EntitySessionPort {
   }
 
   /** The version-checked PUT for a captured snapshot; callers own the gating. */
-  private runSave(
-    open: EntityDetail,
-    snapshot: SaveSnapshot,
-    showLoading: boolean,
-  ): Observable<EntitySaveOutcome> {
+  private runSave(open: EntityDetail, snapshot: SaveSnapshot, showLoading: boolean): Observable<EntitySaveOutcome> {
     this._saving.set(true);
     this._error.set(null);
     this.failed = null;
@@ -523,9 +505,7 @@ export class EntitySession implements ContentEditorSession, EntitySessionPort {
     // The working body already carries every grid/metadata edit (mutate wrote them in
     // place); fold in only the live Content, which TipTap tracks separately (ADR-0019).
     const saved = withContent(body, content);
-    const save$ = this.entities
-      .save(open.id, saved, open.version, tags)
-      .pipe(
+    const save$ = this.entities.save(open.id, saved, open.version, tags).pipe(
       tap((outcome) => {
         // Drop a late response if the user has since navigated to another Entity — it
         // must not write its result over the Entity now open (generalises #4/#70).
@@ -547,9 +527,7 @@ export class EntitySession implements ContentEditorSession, EntitySessionPort {
         // a role revoked mid-session): a terminal read-only state, not a retryable blip —
         // the chip offers no Retry. `failed` still pauses the scheduler so it can't loop
         // the same rejected PUT every 800ms (it only re-attempts once per fresh edit).
-        this._error.set(
-          err instanceof HttpErrorResponse && err.status === 403 ? 'readonly' : 'save',
-        );
+        this._error.set(err instanceof HttpErrorResponse && err.status === 403 ? 'readonly' : 'save');
         this.failed = snapshot;
         return EMPTY;
       }),
@@ -567,9 +545,7 @@ export class EntitySession implements ContentEditorSession, EntitySessionPort {
    * a hung network can't trap the user on the page.
    */
   flush(): Observable<unknown> {
-    return this.pendingSave().pipe(
-      timeout({ first: FLUSH_TIMEOUT_MS, with: () => EMPTY }),
-    );
+    return this.pendingSave().pipe(timeout({ first: FLUSH_TIMEOUT_MS, with: () => EMPTY }));
   }
 
   private pendingSave(): Observable<unknown> {

@@ -1,10 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  ElementRef,
-  inject,
-  viewChild,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, inject, viewChild } from '@angular/core';
 import { translateSignal, TranslocoPipe } from '@jsverse/transloco';
 import { catchError, firstValueFrom, of } from 'rxjs';
 import { Chip } from '@hexly/web-ui';
@@ -67,8 +61,7 @@ export class EntityTags {
   protected readonly writable = this.session.writable;
   protected readonly addLabel = translateSignal('entityTags.addLabel');
   protected readonly addPlaceholder = translateSignal('entityTags.addPlaceholder');
-  private readonly input =
-    viewChild.required<ElementRef<HTMLInputElement>>('tagInput');
+  private readonly input = viewChild.required<ElementRef<HTMLInputElement>>('tagInput');
   private readonly picker = viewChild.required(TagPicker);
 
   // Fetched lazily on first keystroke and memoized for the component's lifetime —
@@ -82,9 +75,7 @@ export class EntityTags {
   protected async suggest(): Promise<void> {
     const el = this.input().nativeElement;
     const query = el.value;
-    this.vocab ??= firstValueFrom(
-      this.entities.listTags().pipe(catchError(() => of<string[]>([]))),
-    );
+    this.vocab ??= firstValueFrom(this.entities.listTags().pipe(catchError(() => of<string[]>([]))));
     const items = tagItems(query, await this.vocab, this.tags());
     // No trigger char, so a non-empty query with matches is the analog gate (ADR-0023).
     if (!query.trim() || !items.length) {

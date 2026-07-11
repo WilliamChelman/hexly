@@ -16,7 +16,12 @@ describe('filterSlashItems', () => {
   });
 
   it('normalizes keyword case when matching (keyword side)', () => {
-    const item: SlashItem = { id: 'x', labelKey: 'x', keywords: ['MyKeyword'], apply: () => void 0 };
+    const item: SlashItem = {
+      id: 'x',
+      labelKey: 'x',
+      keywords: ['MyKeyword'],
+      apply: () => void 0,
+    };
     expect(filterSlashItems([item], 'mykeyword')).toHaveLength(1);
   });
 
@@ -94,8 +99,7 @@ describe('SlashItem.apply', () => {
       return json;
     };
 
-    const image = (json: ReturnType<typeof withUrl>) =>
-      (json.content ?? []).find((n) => n.type === 'image');
+    const image = (json: ReturnType<typeof withUrl>) => (json.content ?? []).find((n) => n.type === 'image');
 
     // Prompted src is trimmed before insertion.
     expect(image(withUrl())?.attrs?.['src']).toBe('/assets/w1/abc.png');

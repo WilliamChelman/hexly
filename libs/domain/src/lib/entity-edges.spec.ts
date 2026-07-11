@@ -7,7 +7,10 @@ function prose(...links: Record<string, unknown>[]) {
   return tiptapContent({
     type: 'doc',
     content: [
-      { type: 'paragraph', content: links.map((attrs) => ({ type: 'entityLink', attrs })) },
+      {
+        type: 'paragraph',
+        content: links.map((attrs) => ({ type: 'entityLink', attrs })),
+      },
     ],
   });
 }
@@ -24,11 +27,13 @@ function hexmap(map: Partial<ReturnType<typeof emptyHexMap>> = {}): EntityBody {
 
 describe('harvestEdges (#179, ADR-0046)', () => {
   it('reads a content entityLink as an edge to that Entity, carrying its Link Descriptor', () => {
-    const body = note({ entityId: 'mira', label: 'Mira', descriptor: 'spouse' });
+    const body = note({
+      entityId: 'mira',
+      label: 'Mira',
+      descriptor: 'spouse',
+    });
 
-    expect(harvestEdges(body)).toEqual([
-      { targetKind: 'entity', targetId: 'mira', descriptor: 'spouse' },
-    ]);
+    expect(harvestEdges(body)).toEqual([{ targetKind: 'entity', targetId: 'mira', descriptor: 'spouse' }]);
   });
 
   /**
@@ -39,10 +44,19 @@ describe('harvestEdges (#179, ADR-0046)', () => {
     const body = hexmap({
       hexes: {
         '0,0': { terrain: 'grass', entityId: 'harbour' },
-        '1,0': { terrain: 'grass', feature: { ref: 'settlement', entityId: 'riverbend' } },
+        '1,0': {
+          terrain: 'grass',
+          feature: { ref: 'settlement', entityId: 'riverbend' },
+        },
       },
       regions: [
-        { id: 'r1', name: 'Avalon', color: '#aabbcc', hexes: {}, entityId: 'kingdom-of-avalon' },
+        {
+          id: 'r1',
+          name: 'Avalon',
+          color: '#aabbcc',
+          hexes: {},
+          entityId: 'kingdom-of-avalon',
+        },
       ],
     });
 
@@ -50,7 +64,11 @@ describe('harvestEdges (#179, ADR-0046)', () => {
       expect.arrayContaining([
         { targetKind: 'entity', targetId: 'harbour', descriptor: null },
         { targetKind: 'entity', targetId: 'riverbend', descriptor: null },
-        { targetKind: 'entity', targetId: 'kingdom-of-avalon', descriptor: null },
+        {
+          targetKind: 'entity',
+          targetId: 'kingdom-of-avalon',
+          descriptor: null,
+        },
       ]),
     );
     expect(harvestEdges(body)).toHaveLength(3);
@@ -73,9 +91,7 @@ describe('harvestEdges (#179, ADR-0046)', () => {
       }),
     };
 
-    expect(harvestEdges(body)).toEqual([
-      { targetKind: 'asset', targetId: hash, descriptor: null },
-    ]);
+    expect(harvestEdges(body)).toEqual([{ targetKind: 'asset', targetId: hash, descriptor: null }]);
   });
 
   /**
@@ -103,7 +119,12 @@ describe('harvestEdges (#179, ADR-0046)', () => {
                 content: [
                   {
                     type: 'paragraph',
-                    content: [{ type: 'entityLink', attrs: { entityId: 'e1', descriptor: 'liege' } }],
+                    content: [
+                      {
+                        type: 'entityLink',
+                        attrs: { entityId: 'e1', descriptor: 'liege' },
+                      },
+                    ],
                   },
                 ],
               },
@@ -113,9 +134,7 @@ describe('harvestEdges (#179, ADR-0046)', () => {
       }),
     };
 
-    expect(harvestEdges(body)).toEqual([
-      { targetKind: 'entity', targetId: 'e1', descriptor: 'liege' },
-    ]);
+    expect(harvestEdges(body)).toEqual([{ targetKind: 'entity', targetId: 'e1', descriptor: 'liege' }]);
   });
 
   /**
@@ -124,16 +143,17 @@ describe('harvestEdges (#179, ADR-0046)', () => {
    * survive a Content format this build cannot read.
    */
   it('reads no Content edges under an unknown format tag, but still reads the map', () => {
-    const alien = { format: 'prosemirror-v9', snapshot: { type: 'entityLink', attrs: { entityId: 'e1' } } };
+    const alien = {
+      format: 'prosemirror-v9',
+      snapshot: { type: 'entityLink', attrs: { entityId: 'e1' } },
+    };
     const body = {
       content: alien,
       ...emptyHexMap(),
       hexes: { '0,0': { terrain: 'grass', entityId: 'harbour' } },
     } as unknown as EntityBody;
 
-    expect(harvestEdges(body)).toEqual([
-      { targetKind: 'entity', targetId: 'harbour', descriptor: null },
-    ]);
+    expect(harvestEdges(body)).toEqual([{ targetKind: 'entity', targetId: 'harbour', descriptor: null }]);
   });
 
   /**
@@ -150,16 +170,11 @@ describe('harvestEdges (#179, ADR-0046)', () => {
         hexes: { '0,0': { terrain: 'grass', entityId: 'riverbend' } },
       };
 
-      expect(harvestEdges(body)).toEqual([
-        { targetKind: 'entity', targetId: 'riverbend', descriptor: null },
-      ]);
+      expect(harvestEdges(body)).toEqual([{ targetKind: 'entity', targetId: 'riverbend', descriptor: null }]);
     });
 
     it('keeps two descriptors to the same target as two edges', () => {
-      const body = note(
-        { entityId: 'mira', descriptor: 'spouse' },
-        { entityId: 'mira', descriptor: 'rival' },
-      );
+      const body = note({ entityId: 'mira', descriptor: 'spouse' }, { entityId: 'mira', descriptor: 'rival' });
 
       expect(harvestEdges(body)).toEqual([
         { targetKind: 'entity', targetId: 'mira', descriptor: 'spouse' },

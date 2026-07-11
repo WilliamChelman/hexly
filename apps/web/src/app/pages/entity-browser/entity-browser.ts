@@ -1,31 +1,17 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  inject,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import {
-  Subject,
-  Subscription,
-  debounceTime,
-  distinctUntilChanged,
-  finalize,
-  map,
-} from 'rxjs';
+import { Subject, Subscription, debounceTime, distinctUntilChanged, finalize, map } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+import { EntityFacets, EntityPage, EntitySummary, EntityType, parseFieldFilters, Visibility } from '@hexly/domain';
 import {
-  EntityFacets,
-  EntityPage,
-  EntitySummary,
-  EntityType,
-  parseFieldFilters,
-  Visibility,
-} from '@hexly/domain';
-import { EntitiesClient, EntityFacetParams, ActiveWorld, ToasterService, entityRoute, AppShellStore } from '@hexly/web-core';
+  EntitiesClient,
+  EntityFacetParams,
+  ActiveWorld,
+  ToasterService,
+  entityRoute,
+  AppShellStore,
+} from '@hexly/web-core';
 import { Button, Eyebrow, PageHeader, Icon } from '@hexly/web-ui';
 import { TypeRegistry } from '../../entity-types/type-registry';
 import { EntityCard } from './entity-card';
@@ -41,9 +27,19 @@ import {
   isFieldSelectionEmpty,
 } from './facet-rail';
 
-const NO_FACETS: ActiveFacets = { type: [], tag: [], visibility: [], fields: {} };
+const NO_FACETS: ActiveFacets = {
+  type: [],
+  tag: [],
+  visibility: [],
+  fields: {},
+};
 
-const NO_FACET_COUNTS: EntityFacets = { type: [], tag: [], visibility: [], fields: [] };
+const NO_FACET_COUNTS: EntityFacets = {
+  type: [],
+  tag: [],
+  visibility: [],
+  fields: [],
+};
 
 /** Serialize the active Field selections to the repeated `key:op:value` tokens the API + URL speak. */
 function fieldTokens(fields: Readonly<Record<string, FieldSelection>>): string[] {
@@ -92,24 +88,12 @@ const FIRST_PAGE_CACHE_LIMIT = 50;
 @Component({
   selector: 'app-entity-browser',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    Button,
-    Eyebrow,
-    PageHeader,
-    Icon,
-    TranslocoPipe,
-    EntityCard,
-    EntitySearch,
-    EmptyState,
-    FacetRail,
-  ],
+  imports: [Button, Eyebrow, PageHeader, Icon, TranslocoPipe, EntityCard, EntitySearch, EmptyState, FacetRail],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
     <app-page-header sticky>
       <div pageHeaderTitle class="flex flex-col">
-        <span appEyebrow class="text-gold! tracking-[0.28em]">{{
-          'entityBrowser.eyebrow' | transloco
-        }}</span>
+        <span appEyebrow class="text-gold! tracking-[0.28em]">{{ 'entityBrowser.eyebrow' | transloco }}</span>
         <h1 class="font-display text-[22px] text-ink-strong m-0 leading-tight">
           {{ 'entityBrowser.heading' | transloco }}
         </h1>
@@ -124,10 +108,7 @@ const FIRST_PAGE_CACHE_LIMIT = 50;
         (click)="create('core.note')"
       >
         <app-icon name="plus" [size]="16" />
-        {{
-          (creating() ? 'entityBrowser.creating' : 'entityBrowser.newNote')
-            | transloco
-        }}
+        {{ (creating() ? 'entityBrowser.creating' : 'entityBrowser.newNote') | transloco }}
       </button>
       <button
         type="button"
@@ -139,10 +120,7 @@ const FIRST_PAGE_CACHE_LIMIT = 50;
         (click)="create('core.hexmap')"
       >
         <app-icon name="plus" [size]="16" />
-        {{
-          (creating() ? 'entityBrowser.creating' : 'entityBrowser.newMap')
-            | transloco
-        }}
+        {{ (creating() ? 'entityBrowser.creating' : 'entityBrowser.newMap') | transloco }}
       </button>
     </app-page-header>
 
@@ -159,62 +137,55 @@ const FIRST_PAGE_CACHE_LIMIT = 50;
           (clearAll)="clearAll()"
         />
         <div>
-      @if (cards().length > 0) {
-        <ul
-          class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 m-0 p-0 list-none"
-        >
-          @for (card of cards(); track card.id) {
-            <li>
-              <app-entity-card
-                [card]="card"
-                [worldId]="worldId()"
-                [renaming]="renamingId() === card.id"
-                (startRename)="startRename(card.id)"
-                (commitRename)="commitRename(card.id, $event)"
-                (cancelRename)="cancelRename()"
-                (remove)="remove(card.id)"
-              />
-            </li>
+          @if (cards().length > 0) {
+            <ul class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 m-0 p-0 list-none">
+              @for (card of cards(); track card.id) {
+                <li>
+                  <app-entity-card
+                    [card]="card"
+                    [worldId]="worldId()"
+                    [renaming]="renamingId() === card.id"
+                    (startRename)="startRename(card.id)"
+                    (commitRename)="commitRename(card.id, $event)"
+                    (cancelRename)="cancelRename()"
+                    (remove)="remove(card.id)"
+                  />
+                </li>
+              }
+            </ul>
+            @if (nextCursor() !== null) {
+              <div class="mt-8 flex justify-center">
+                <button
+                  type="button"
+                  appButton
+                  variant="default"
+                  data-testid="load-more"
+                  [disabled]="loadingMore()"
+                  (click)="loadMore()"
+                >
+                  {{ (loadingMore() ? 'entityBrowser.loadingMore' : 'entityBrowser.loadMore') | transloco }}
+                </button>
+              </div>
+            }
+          } @else if (loadError()) {
+            <app-empty-state
+              testid="load-error"
+              [title]="'entityBrowser.loadErrorTitle' | transloco"
+              [hint]="'entityBrowser.loadErrorHint' | transloco"
+            />
+          } @else if (loaded() && query()) {
+            <app-empty-state
+              testid="no-matches"
+              [title]="'entityBrowser.noMatchTitle' | transloco"
+              [hint]="'entityBrowser.noMatchHint' | transloco"
+            />
+          } @else if (loaded()) {
+            <app-empty-state
+              testid="empty"
+              [title]="'entityBrowser.emptyTitle' | transloco"
+              [hint]="'entityBrowser.emptyHint' | transloco"
+            />
           }
-        </ul>
-        @if (nextCursor() !== null) {
-          <div class="mt-8 flex justify-center">
-            <button
-              type="button"
-              appButton
-              variant="default"
-              data-testid="load-more"
-              [disabled]="loadingMore()"
-              (click)="loadMore()"
-            >
-              {{
-                (loadingMore()
-                  ? 'entityBrowser.loadingMore'
-                  : 'entityBrowser.loadMore'
-                ) | transloco
-              }}
-            </button>
-          </div>
-        }
-      } @else if (loadError()) {
-        <app-empty-state
-          testid="load-error"
-          [title]="'entityBrowser.loadErrorTitle' | transloco"
-          [hint]="'entityBrowser.loadErrorHint' | transloco"
-        />
-      } @else if (loaded() && query()) {
-        <app-empty-state
-          testid="no-matches"
-          [title]="'entityBrowser.noMatchTitle' | transloco"
-          [hint]="'entityBrowser.noMatchHint' | transloco"
-        />
-      } @else if (loaded()) {
-        <app-empty-state
-          testid="empty"
-          [title]="'entityBrowser.emptyTitle' | transloco"
-          [hint]="'entityBrowser.emptyHint' | transloco"
-        />
-      }
         </div>
       </div>
     </main>
@@ -289,10 +260,7 @@ export class EntityBrowser {
 
   /** First-page cache keyed by World + filters, so returning to a prior query
    * paints instantly (stale-while-revalidate). Bounded, oldest-out. */
-  private readonly firstPageCache = new Map<
-    string,
-    { items: EntitySummary[]; nextCursor: string | null }
-  >();
+  private readonly firstPageCache = new Map<string, { items: EntitySummary[]; nextCursor: string | null }>();
 
   constructor() {
     // Seed query + Facets from the URL and follow back/forward. Subscribed before
@@ -321,20 +289,18 @@ export class EntityBrowser {
         });
       });
 
-    this.typed
-      .pipe(debounceTime(SEARCH_DEBOUNCE_MS), takeUntilDestroyed())
-      .subscribe((raw) => {
-        const q = raw.trim();
-        this.query.set(q);
-        // Mirror to the URL: merge keeps the World scope, replaceUrl avoids a
-        // history entry per keystroke.
-        this.router.navigate([], {
-          relativeTo: this.route,
-          queryParams: { q: q || null },
-          queryParamsHandling: 'merge',
-          replaceUrl: true,
-        });
+    this.typed.pipe(debounceTime(SEARCH_DEBOUNCE_MS), takeUntilDestroyed()).subscribe((raw) => {
+      const q = raw.trim();
+      this.query.set(q);
+      // Mirror to the URL: merge keeps the World scope, replaceUrl avoids a
+      // history entry per keystroke.
+      this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { q: q || null },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
       });
+    });
 
     // Refetch page one whenever the World, query, or Facets change — covers a
     // param-only switch between Worlds (same component instance).
@@ -352,9 +318,7 @@ export class EntityBrowser {
   protected toggleFacet({ category, value }: FacetToggle): void {
     const current = this.activeFacets();
     const values = current[category];
-    const next = values.includes(value)
-      ? values.filter((v) => v !== value)
-      : [...values, value];
+    const next = values.includes(value) ? values.filter((v) => v !== value) : [...values, value];
     this.applyFacets({ ...current, [category]: next });
   }
 
@@ -363,9 +327,7 @@ export class EntityBrowser {
     const current = this.activeFacets();
     const sel = current.fields[key] ?? {};
     const values = sel.values ?? [];
-    const nextValues = values.includes(value)
-      ? values.filter((v) => v !== value)
-      : [...values, value];
+    const nextValues = values.includes(value) ? values.filter((v) => v !== value) : [...values, value];
     this.setFieldSelection(current, key, { ...sel, values: nextValues });
   }
 
@@ -373,7 +335,10 @@ export class EntityBrowser {
   protected changeFieldRange({ key, bound, value }: FieldRangeChange): void {
     const current = this.activeFacets();
     const sel = current.fields[key] ?? {};
-    this.setFieldSelection(current, key, { ...sel, [bound]: value || undefined });
+    this.setFieldSelection(current, key, {
+      ...sel,
+      [bound]: value || undefined,
+    });
   }
 
   /** Fold a Field selection back into the active facets, pruning it away once empty. */
@@ -396,7 +361,13 @@ export class EntityBrowser {
     this.activeFacets.set(NO_FACETS);
     this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { q: null, type: null, tag: null, visibility: null, field: null },
+      queryParams: {
+        q: null,
+        type: null,
+        tag: null,
+        visibility: null,
+        field: null,
+      },
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });
@@ -482,9 +453,7 @@ export class EntityBrowser {
       ...(q ? { q } : {}),
       ...(f.type.length ? { type: [...f.type] as EntityType[] } : {}),
       ...(f.tag.length ? { tag: [...f.tag] } : {}),
-      ...(f.visibility.length
-        ? { visibility: [...f.visibility] as Visibility[] }
-        : {}),
+      ...(f.visibility.length ? { visibility: [...f.visibility] as Visibility[] } : {}),
       ...(field.length ? { field } : {}),
     };
   }
@@ -504,9 +473,7 @@ export class EntityBrowser {
       nextCursor: page.nextCursor,
     });
     if (this.firstPageCache.size > FIRST_PAGE_CACHE_LIMIT)
-      this.firstPageCache.delete(
-        this.firstPageCache.keys().next().value as string,
-      );
+      this.firstPageCache.delete(this.firstPageCache.keys().next().value as string);
   }
 
   /** The `loadingMore` guard makes a double-click a no-op so a page can't append twice. */
@@ -529,11 +496,7 @@ export class EntityBrowser {
           this._entities.update((entities) => [...entities, ...page.items]);
           this.nextCursor.set(page.nextCursor);
         },
-        error: () =>
-          this.toaster.show(
-            this.transloco.translate('entityBrowser.loadMoreError'),
-            'error',
-          ),
+        error: () => this.toaster.show(this.transloco.translate('entityBrowser.loadMoreError'), 'error'),
       });
   }
 
@@ -550,19 +513,13 @@ export class EntityBrowser {
       .subscribe({
         // EntitySession loads on open; no pre-adopt from here (it would outlive this page).
         next: (entity) => this.open(entity.id),
-        error: () =>
-          this.toaster.show(
-            this.transloco.translate('entityBrowser.createError'),
-            'error',
-          ),
+        error: () => this.toaster.show(this.transloco.translate('entityBrowser.createError'), 'error'),
       });
   }
 
   protected open(id: string): void {
     // Pretty World slug from the loaded detail; the Entity slug self-heals on load.
-    this.router.navigate(
-      entityRoute(this.activeWorld.worldId()!, id, this.activeWorld.name() ?? undefined),
-    );
+    this.router.navigate(entityRoute(this.activeWorld.worldId()!, id, this.activeWorld.name() ?? undefined));
   }
 
   protected startRename(id: string): void {
@@ -590,10 +547,7 @@ export class EntityBrowser {
       },
       error: () => {
         this.cancelRename();
-        this.toaster.show(
-          this.transloco.translate('entityBrowser.renameError'),
-          'error',
-        );
+        this.toaster.show(this.transloco.translate('entityBrowser.renameError'), 'error');
       },
     });
   }
@@ -608,11 +562,7 @@ export class EntityBrowser {
         this.invalidateCache();
         this.fetchFirstPage();
       },
-      error: () =>
-        this.toaster.show(
-          this.transloco.translate('entityBrowser.deleteError'),
-          'error',
-        ),
+      error: () => this.toaster.show(this.transloco.translate('entityBrowser.deleteError'), 'error'),
     });
   }
 }

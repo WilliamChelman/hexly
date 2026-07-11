@@ -1,18 +1,30 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  DestroyRef,
-  computed,
-  inject,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { AuthClient, WorldStore, WorldsClient, ToasterService, worldDashboardRoute, worldRoute, worldSettingsRoute } from '@hexly/web-core';
+import {
+  AuthClient,
+  WorldStore,
+  WorldsClient,
+  ToasterService,
+  worldDashboardRoute,
+  worldRoute,
+  worldSettingsRoute,
+} from '@hexly/web-core';
 import { ImportSummary } from '@hexly/domain';
-import { Button, Eyebrow, Panel, Icon, Autofocus, Input, Dialog, ACCENT_SIGIL, accentFor, monogram } from '@hexly/web-ui';
+import {
+  Button,
+  Eyebrow,
+  Panel,
+  Icon,
+  Autofocus,
+  Input,
+  Dialog,
+  ACCENT_SIGIL,
+  accentFor,
+  monogram,
+} from '@hexly/web-ui';
 
 /**
  * The World Index (`/`): lists every World the caller can reach — owned and
@@ -22,18 +34,7 @@ import { Button, Eyebrow, Panel, Icon, Autofocus, Input, Dialog, ACCENT_SIGIL, a
 @Component({
   selector: 'app-world-index',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    Button,
-    Eyebrow,
-    Panel,
-    Icon,
-    TranslocoPipe,
-    Autofocus,
-    Input,
-    Dialog,
-    RouterLink,
-    NgTemplateOutlet,
-  ],
+  imports: [Button, Eyebrow, Panel, Icon, TranslocoPipe, Autofocus, Input, Dialog, RouterLink, NgTemplateOutlet],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
     <!-- One hidden picker, shared by every Import affordance. -->
@@ -74,16 +75,10 @@ import { Button, Eyebrow, Panel, Icon, Autofocus, Input, Dialog, ACCENT_SIGIL, a
       </button>
     </ng-template>
     @if (cards().length > 0) {
-      <header
-        class="bg-linear-[180deg] from-surface to-bg-deep border-b border-line"
-      >
-        <div
-          class="max-w-[64rem] mx-auto px-8 py-16 flex items-end justify-between gap-8"
-        >
+      <header class="bg-linear-[180deg] from-surface to-bg-deep border-b border-line">
+        <div class="max-w-[64rem] mx-auto px-8 py-16 flex items-end justify-between gap-8">
           <div>
-            <span appEyebrow class="text-gold! tracking-[0.28em]">{{
-              'worldIndex.eyebrow' | transloco
-            }}</span>
+            <span appEyebrow class="text-gold! tracking-[0.28em]">{{ 'worldIndex.eyebrow' | transloco }}</span>
             <h1 class="font-display text-3xl text-ink-strong m-0 leading-tight">
               {{ 'worldIndex.greeting' | transloco: { name: who() } }}
             </h1>
@@ -110,14 +105,8 @@ import { Button, Eyebrow, Panel, Icon, Autofocus, Input, Dialog, ACCENT_SIGIL, a
               <div
                 class="group relative h-44 rounded-lg border border-line bg-surface shadow-1 overflow-hidden flex flex-col transition-shadow hover:shadow-2 has-[a:focus-visible]:[outline:2px_solid_var(--color-gold)] has-[a:focus-visible]:[outline-offset:-2px]"
               >
-                <div
-                  class="h-20 flex items-center justify-center {{
-                    sigil(card.id)
-                  }}"
-                >
-                  <span class="font-cartouche text-2xl">{{
-                    mono(card.name)
-                  }}</span>
+                <div class="h-20 flex items-center justify-center {{ sigil(card.id) }}">
+                  <span class="font-cartouche text-2xl">{{ mono(card.name) }}</span>
                 </div>
                 @if (renamingId() === card.id) {
                   <input
@@ -127,9 +116,7 @@ import { Button, Eyebrow, Panel, Icon, Autofocus, Input, Dialog, ACCENT_SIGIL, a
                     [value]="card.name"
                     [attr.data-testid]="'rename-world-input-' + card.id"
                     [attr.aria-label]="'worldIndex.renameLabel' | transloco"
-                    (keydown.enter)="
-                      commitRename(card.id, $any($event.target).value)
-                    "
+                    (keydown.enter)="commitRename(card.id, $any($event.target).value)"
                     (keydown.escape)="cancelRename()"
                   />
                 } @else {
@@ -142,10 +129,7 @@ import { Button, Eyebrow, Panel, Icon, Autofocus, Input, Dialog, ACCENT_SIGIL, a
                     [attr.data-testid]="'world-' + card.id"
                     [attr.aria-label]="card.name"
                   >
-                    <span
-                      class="font-display text-md text-ink-strong line-clamp-2"
-                      >{{ card.name }}</span
-                    >
+                    <span class="font-display text-md text-ink-strong line-clamp-2">{{ card.name }}</span>
                   </a>
                 }
                 <div class="flex items-center gap-1 px-3 pb-2">
@@ -153,13 +137,8 @@ import { Button, Eyebrow, Panel, Icon, Autofocus, Input, Dialog, ACCENT_SIGIL, a
                     class="text-2xs uppercase tracking-wider"
                     [class.text-gold]="card.owned"
                     [class.text-ink-faint]="!card.owned"
-                    [attr.data-testid]="
-                      (card.owned ? 'owned-' : 'member-') + card.id
-                    "
-                    >{{
-                      (card.owned ? 'worldIndex.owned' : 'worldIndex.member')
-                        | transloco
-                    }}</span
+                    [attr.data-testid]="(card.owned ? 'owned-' : 'member-') + card.id"
+                    >{{ (card.owned ? 'worldIndex.owned' : 'worldIndex.member') | transloco }}</span
                   >
                   @if (card.owned) {
                     <span
@@ -250,9 +229,7 @@ import { Button, Eyebrow, Panel, Icon, Autofocus, Input, Dialog, ACCENT_SIGIL, a
                 (click)="create()"
               >
                 <app-icon name="plus" [size]="24" />
-                <span class="font-display text-md">{{
-                  'worlds.new' | transloco
-                }}</span>
+                <span class="font-display text-md">{{ 'worlds.new' | transloco }}</span>
               </button>
             </li>
           }
@@ -260,11 +237,7 @@ import { Button, Eyebrow, Panel, Icon, Autofocus, Input, Dialog, ACCENT_SIGIL, a
       </main>
     } @else if (loadError()) {
       <main class="max-w-[60rem] mx-auto py-8 px-6">
-        <section
-          class="p-8 text-center text-ink-muted"
-          data-testid="load-error"
-          appPanel
-        >
+        <section class="p-8 text-center text-ink-muted" data-testid="load-error" appPanel>
           <p>{{ 'worldIndex.loadErrorTitle' | transloco }}</p>
           <p class="text-sm">{{ 'worldIndex.loadErrorHint' | transloco }}</p>
         </section>
@@ -303,9 +276,7 @@ import { Button, Eyebrow, Panel, Icon, Autofocus, Input, Dialog, ACCENT_SIGIL, a
           }
         </p>
         <label class="flex flex-col gap-1 text-sm text-ink-muted">
-          {{
-            'worldIndex.deleteConfirmPrompt' | transloco: { name: target.name }
-          }}
+          {{ 'worldIndex.deleteConfirmPrompt' | transloco: { name: target.name } }}
           <input
             type="text"
             appAutofocus
@@ -351,9 +322,7 @@ import { Button, Eyebrow, Panel, Icon, Autofocus, Input, Dialog, ACCENT_SIGIL, a
         (closed)="dismissImport()"
         data-testid="import-summary"
       >
-        <dl
-          class="grid grid-cols-[1fr_auto] gap-x-8 gap-y-1 text-sm text-ink-muted m-0"
-        >
+        <dl class="grid grid-cols-[1fr_auto] gap-x-8 gap-y-1 text-sm text-ink-muted m-0">
           <dt>{{ 'worlds.importNotes' | transloco }}</dt>
           <dd class="m-0 text-ink text-right">{{ summary.notesImported }}</dd>
           <dt>{{ 'worlds.importLinksResolved' | transloco }}</dt>
@@ -396,9 +365,7 @@ export class WorldIndex {
   protected readonly cards = computed(() =>
     this.store.worlds().map((w) => ({ ...w, owned: !!w.rights?.includes('manage') })),
   );
-  protected readonly sorted = computed(() =>
-    [...this.cards()].sort((a, b) => b.updatedAt - a.updatedAt),
-  );
+  protected readonly sorted = computed(() => [...this.cards()].sort((a, b) => b.updatedAt - a.updatedAt));
 
   /** Display name derived from the signed-in user's email local part. */
   protected who(): string {
@@ -420,14 +387,13 @@ export class WorldIndex {
   protected readonly exportingId = signal<string | null>(null);
   protected readonly importSummary = signal<ImportSummary | null>(null);
   protected readonly renamingId = signal<string | null>(null);
-  protected readonly pendingDelete = signal<{ id: string; name: string } | null>(
-    null,
-  );
+  protected readonly pendingDelete = signal<{
+    id: string;
+    name: string;
+  } | null>(null);
   protected readonly deleteCount = signal<number | null>(null);
   protected readonly confirmText = signal('');
-  protected readonly canConfirmDelete = computed(
-    () => this.confirmText() === this.pendingDelete()?.name,
-  );
+  protected readonly canConfirmDelete = computed(() => this.confirmText() === this.pendingDelete()?.name);
 
   constructor() {
     this.store.load();
@@ -439,9 +405,7 @@ export class WorldIndex {
       if (document.visibilityState === 'visible') this.store.refresh();
     };
     document.addEventListener('visibilitychange', onVisible);
-    inject(DestroyRef).onDestroy(() =>
-      document.removeEventListener('visibilitychange', onVisible),
-    );
+    inject(DestroyRef).onDestroy(() => document.removeEventListener('visibilitychange', onVisible));
   }
 
   protected startRename(id: string): void {
@@ -464,10 +428,7 @@ export class WorldIndex {
       next: () => this.renamingId.set(null),
       error: () => {
         this.cancelRename();
-        this.toaster.show(
-          this.transloco.translate('worldIndex.renameError'),
-          'error',
-        );
+        this.toaster.show(this.transloco.translate('worldIndex.renameError'), 'error');
       },
     });
   }
@@ -482,10 +443,7 @@ export class WorldIndex {
       next: (world) => this.deleteCount.set(world.entityCount),
       error: () => {
         this.cancelDelete();
-        this.toaster.show(
-          this.transloco.translate('worldIndex.deleteError'),
-          'error',
-        );
+        this.toaster.show(this.transloco.translate('worldIndex.deleteError'), 'error');
       },
     });
   }
@@ -496,8 +454,7 @@ export class WorldIndex {
 
   protected leaveWorld(id: string): void {
     this.store.leave(id).subscribe({
-      error: () =>
-        this.toaster.show(this.transloco.translate('members.leaveError'), 'error'),
+      error: () => this.toaster.show(this.transloco.translate('members.leaveError'), 'error'),
     });
   }
 
@@ -509,10 +466,7 @@ export class WorldIndex {
       next: () => this.cancelDelete(),
       error: () => {
         this.cancelDelete();
-        this.toaster.show(
-          this.transloco.translate('worldIndex.deleteError'),
-          'error',
-        );
+        this.toaster.show(this.transloco.translate('worldIndex.deleteError'), 'error');
       },
     });
   }
@@ -524,13 +478,8 @@ export class WorldIndex {
       .create(this.transloco.translate('worlds.untitled'))
       .pipe(finalize(() => this.creating.set(false)))
       .subscribe({
-        next: (world) =>
-          this.router.navigate(worldDashboardRoute(world.id, world.name)),
-        error: () =>
-          this.toaster.show(
-            this.transloco.translate('worlds.createError'),
-            'error',
-          ),
+        next: (world) => this.router.navigate(worldDashboardRoute(world.id, world.name)),
+        error: () => this.toaster.show(this.transloco.translate('worlds.createError'), 'error'),
       });
   }
 
@@ -547,11 +496,7 @@ export class WorldIndex {
       .pipe(finalize(() => this.importing.set(false)))
       .subscribe({
         next: (summary) => this.importSummary.set(summary),
-        error: () =>
-          this.toaster.show(
-            this.transloco.translate('worlds.importError'),
-            'error',
-          ),
+        error: () => this.toaster.show(this.transloco.translate('worlds.importError'), 'error'),
       });
   }
 
@@ -565,11 +510,7 @@ export class WorldIndex {
       .pipe(finalize(() => this.exportingId.set(null)))
       .subscribe({
         next: (blob) => saveBlob(blob, `${name}.zip`),
-        error: () =>
-          this.toaster.show(
-            this.transloco.translate('worlds.exportError'),
-            'error',
-          ),
+        error: () => this.toaster.show(this.transloco.translate('worlds.exportError'), 'error'),
       });
   }
 

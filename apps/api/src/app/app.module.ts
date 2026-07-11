@@ -24,8 +24,7 @@ import { TestModule } from './test/test.module';
  * harness launches the server with NODE_ENV=test, so the route still mounts there.
  */
 const e2eTestingEnabled =
-  process.env.HEXLY_E2E === '1' &&
-  (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development');
+  process.env.HEXLY_E2E === '1' && (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development');
 
 @Module({
   imports: [

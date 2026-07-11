@@ -52,9 +52,7 @@ describe('MemberSet', () => {
   it('excludes both existing members and Owners from the add candidates', () => {
     // u1 is an Owner, u2 is already a member — only Carol (u3) remains addable.
     const { nativeElement: el } = render('w1', [{ userId: 'u2', role: 'viewer' }], ['u1']);
-    const options = Array.from(
-      ($(el, '[data-testid="add-select"]') as HTMLSelectElement).options,
-    ).map((o) => o.value);
+    const options = Array.from(($(el, '[data-testid="add-select"]') as HTMLSelectElement).options).map((o) => o.value);
 
     expect(options).toEqual(['', 'u3']);
   });

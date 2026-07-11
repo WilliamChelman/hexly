@@ -10,9 +10,7 @@ import { NudgeBus } from './nudge-bus';
  */
 export type SyncOnly<T> = T extends Promise<unknown> ? never : T;
 
-type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2
-  ? true
-  : false;
+type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
 
 /** Fails to compile unless `T` is exactly `true`. */
 type Assert<T extends true> = T;

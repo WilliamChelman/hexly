@@ -1,10 +1,4 @@
-import {
-  axialToCube,
-  cubeToAxial,
-  distance,
-  hexRound,
-  neighbors,
-} from './coordinates';
+import { axialToCube, cubeToAxial, distance, hexRound, neighbors } from './coordinates';
 
 describe('axialToCube', () => {
   it('maps axial (q,r) onto a cube whose components sum to zero', () => {

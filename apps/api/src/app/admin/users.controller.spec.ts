@@ -70,10 +70,7 @@ describe('Account management (/users)', () => {
     await seedManager('ada@hexly.test', 'Ada');
     const ada = await signIn('ada@hexly.test');
 
-    await ada
-      .post('/users')
-      .send({ email: 'bob@hexly.test', password: PASSWORD, displayName: 'Bob' })
-      .expect(201);
+    await ada.post('/users').send({ email: 'bob@hexly.test', password: PASSWORD, displayName: 'Bob' }).expect(201);
 
     // The freshly provisioned account is a real, usable login.
     await request(app.getHttpServer())
@@ -86,10 +83,7 @@ describe('Account management (/users)', () => {
     await seedManager('ada@hexly.test', 'Ada');
     const ada = await signIn('ada@hexly.test');
 
-    await ada
-      .post('/users')
-      .send({ email: 'bob@hexly.test', password: PASSWORD, displayName: 'Bob' })
-      .expect(201);
+    await ada.post('/users').send({ email: 'bob@hexly.test', password: PASSWORD, displayName: 'Bob' }).expect(201);
     // In-app provisioned accounts start with the empty role set (unlike seeded bootstrap users).
     const listed = (await ada.get('/users').expect(200)).body as {
       id: string;
@@ -125,10 +119,7 @@ describe('Account management (/users)', () => {
     await seedUser('mallory@hexly.test', 'Mallory');
     const mallory = await signIn('mallory@hexly.test');
 
-    await mallory
-      .post('/users')
-      .send({ email: 'x@hexly.test', password: PASSWORD, displayName: 'X' })
-      .expect(403);
+    await mallory.post('/users').send({ email: 'x@hexly.test', password: PASSWORD, displayName: 'X' }).expect(403);
   });
 
   it('refuses the users surface to an anonymous caller (401)', async () => {
@@ -144,7 +135,10 @@ describe('Account management (/users)', () => {
     const bob = await signIn('bob@hexly.test');
     const worldId = (await bob.post('/worlds').send({ name: 'Bobland' }).expect(201)).body.id;
     const entityId = (
-      await bob.post('/entities').send({ name: 'Secret', types: ['core.note'], worldId }).expect(201)
+      await bob
+        .post('/entities')
+        .send({ name: 'Secret', types: ['core.note'], worldId })
+        .expect(201)
     ).body.id;
 
     await seedManager('ada@hexly.test', 'Ada');
@@ -181,9 +175,7 @@ describe('Account management (/users)', () => {
     await ada.patch(`/users/${bobId}/disabled`).send({ disabled: false }).expect(200);
     const bobAgain = await signIn('bob@hexly.test');
     await bobAgain.get(`/worlds/${worldId}`).expect(200);
-    expect((await bobAgain.get('/worlds').expect(200)).body.map((w: { id: string }) => w.id)).toContain(
-      worldId,
-    );
+    expect((await bobAgain.get('/worlds').expect(200)).body.map((w: { id: string }) => w.id)).toContain(worldId);
   });
 
   it('lists accounts with email, roles, and disabled state for the panel', async () => {
@@ -233,7 +225,10 @@ describe('Account management (/users)', () => {
     let bob = await signIn('bob@hexly.test');
     await bob.get('/users').expect(403);
 
-    await ada.patch(`/users/${bobId}/roles`).send({ roles: ['manage-users'] }).expect(200);
+    await ada
+      .patch(`/users/${bobId}/roles`)
+      .send({ roles: ['manage-users'] })
+      .expect(200);
     // A fresh session reads the new role set off the row.
     bob = await signIn('bob@hexly.test');
     await bob.get('/users').expect(200);
@@ -256,9 +251,7 @@ describe('Account management (/users)', () => {
     });
 
     // The account is untouched — still listed, still able to log in.
-    expect(
-      (await ada.get('/users').expect(200)).body.map((r: { id: string }) => r.id),
-    ).toContain(bobId);
+    expect((await ada.get('/users').expect(200)).body.map((r: { id: string }) => r.id)).toContain(bobId);
     await signIn('bob@hexly.test');
   });
 
@@ -271,10 +264,15 @@ describe('Account management (/users)', () => {
     const carol = await signIn('carol@hexly.test');
     const worldId = (await carol.post('/worlds').send({ name: 'Carolina' }).expect(201)).body.id;
     const noteId = (
-      await carol.post('/entities').send({ name: 'Ledger', types: ['core.note'], worldId }).expect(201)
+      await carol
+        .post('/entities')
+        .send({ name: 'Ledger', types: ['core.note'], worldId })
+        .expect(201)
     ).body.id;
     // Reassign sole ownership of the note to Bob (ownership is an `owner`-role grant row).
-    db.delete(entityGrants).where(and(eq(entityGrants.entityId, noteId), eq(entityGrants.role, 'owner'))).run();
+    db.delete(entityGrants)
+      .where(and(eq(entityGrants.entityId, noteId), eq(entityGrants.role, 'owner')))
+      .run();
     db.insert(entityGrants).values({ entityId: noteId, userId: bobId, role: 'owner' }).run();
 
     await seedManager('ada@hexly.test', 'Ada');
@@ -295,9 +293,7 @@ describe('Account management (/users)', () => {
     await ada.delete(`/users/${bobId}`).expect(200);
 
     // Gone from the directory and can no longer log in; Carol's World is intact.
-    expect(
-      (await ada.get('/users').expect(200)).body.map((r: { id: string }) => r.id),
-    ).not.toContain(bobId);
+    expect((await ada.get('/users').expect(200)).body.map((r: { id: string }) => r.id)).not.toContain(bobId);
     await request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: 'bob@hexly.test', password: PASSWORD })
@@ -313,7 +309,10 @@ describe('Account management (/users)', () => {
     const bob = await signIn((await seedUser('bob@hexly.test', 'Bob')) && 'bob@hexly.test');
     const worldId = (await bob.post('/worlds').send({ name: 'Bobland' }).expect(201)).body.id;
     const entityId = (
-      await bob.post('/entities').send({ name: 'Secret', types: ['core.note'], worldId }).expect(201)
+      await bob
+        .post('/entities')
+        .send({ name: 'Secret', types: ['core.note'], worldId })
+        .expect(201)
     ).body.id; // private by default
 
     await seedSuperadmin('root@hexly.test', 'Root');
@@ -322,9 +321,7 @@ describe('Account management (/users)', () => {
     // The repair tier reaches anything (ADR-0037) — the bypass lives inside canRead/reachability.
     await root.get(`/entities/${entityId}`).expect(200);
     await root.get(`/worlds/${worldId}`).expect(200);
-    expect((await root.get('/worlds').expect(200)).body.map((w: { id: string }) => w.id)).toContain(
-      worldId,
-    );
+    expect((await root.get('/worlds').expect(200)).body.map((w: { id: string }) => w.id)).toContain(worldId);
   });
 
   it('Superadmin can repair: reassign an Entity owner and delete stuck data', async () => {
@@ -333,16 +330,17 @@ describe('Account management (/users)', () => {
     const bob = await signIn('bob@hexly.test');
     const worldId = (await bob.post('/worlds').send({ name: 'Bobland' }).expect(201)).body.id;
     const entityId = (
-      await bob.post('/entities').send({ name: 'Stuck', types: ['core.note'], worldId }).expect(201)
+      await bob
+        .post('/entities')
+        .send({ name: 'Stuck', types: ['core.note'], worldId })
+        .expect(201)
     ).body.id;
 
     await seedSuperadmin('root@hexly.test', 'Root');
     const root = await signIn('root@hexly.test');
 
     // Reassign owners (owner-management is normally Owner-only) — add Carol as a co-Owner.
-    const owners = (
-      await root.post(`/entities/${entityId}/owners`).send({ userId: carolId }).expect(200)
-    ).body;
+    const owners = (await root.post(`/entities/${entityId}/owners`).send({ userId: carolId }).expect(200)).body;
     expect(owners).toEqual(expect.arrayContaining([bobId, carolId]));
 
     // Delete stuck data — a World the Superadmin doesn't own.
@@ -384,9 +382,9 @@ describe('Account management (/users)', () => {
     const ada = await signIn('ada@hexly.test');
 
     await ada.patch(`/users/${adaId}/disabled`).send({ disabled: true }).expect(409);
-    expect(
-      (await ada.patch(`/users/${adaId}/roles`).send({ roles: [] }).expect(409)).body,
-    ).toEqual({ code: 'self-manage-users-revoke' });
+    expect((await ada.patch(`/users/${adaId}/roles`).send({ roles: [] }).expect(409)).body).toEqual({
+      code: 'self-manage-users-revoke',
+    });
     await ada.delete(`/users/${adaId}`).expect(409);
 
     // Resetting one's own password is fine (not a lockout) — the guard is scoped to lockouts.
@@ -403,9 +401,9 @@ describe('Account management (/users)', () => {
     // and un-demotable (toggle), so the repair capability can't be lost. The demote refusal
     // carries the structured code, not prose (ADR-0037, ADR-0047).
     await root.delete(`/users/${rootId}`).expect(409);
-    expect(
-      (await root.patch(`/users/${rootId}/superadmin`).send({ isSuperadmin: false }).expect(409)).body,
-    ).toEqual({ code: 'last-superadmin' });
+    expect((await root.patch(`/users/${rootId}/superadmin`).send({ isSuperadmin: false }).expect(409)).body).toEqual({
+      code: 'last-superadmin',
+    });
 
     // Promote a second Superadmin; now the first may step down.
     await root.patch(`/users/${bobId}/superadmin`).send({ isSuperadmin: true }).expect(200);

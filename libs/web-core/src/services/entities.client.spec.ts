@@ -1,16 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import {
-  coordKey,
-  emptyContent,
-  EntityBody,
-  EntityDetail,
-  EntitySummary,
-} from '@hexly/domain';
+import { coordKey, emptyContent, EntityBody, EntityDetail, EntitySummary } from '@hexly/domain';
 import { EntitiesClient, ENTITY_NUDGE_DEBOUNCE_MS } from './entities.client';
 import { NudgeBusClient } from './nudge-bus.client';
 import { MockNudgeBusClient } from '../testing/nudge-bus.mock';
@@ -46,11 +37,7 @@ describe('EntitiesClient', () => {
   beforeEach(() => {
     bus = new MockNudgeBusClient();
     TestBed.configureTestingModule({
-      providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        { provide: NudgeBusClient, useValue: bus },
-      ],
+      providers: [provideHttpClient(), provideHttpClientTesting(), { provide: NudgeBusClient, useValue: bus }],
     });
     client = TestBed.inject(EntitiesClient);
     http = TestBed.inject(HttpTestingController);
@@ -134,7 +121,13 @@ describe('EntitiesClient', () => {
 
   it('serializes ids/q/type/cursor/limit into the query string', () => {
     client
-      .list({ ids: ['a', 'b'], q: 'river', type: ['note'], cursor: 'CUR', limit: 25 })
+      .list({
+        ids: ['a', 'b'],
+        q: 'river',
+        type: ['note'],
+        cursor: 'CUR',
+        limit: 25,
+      })
       .subscribe();
 
     const req = http.expectOne((r) => r.url === '/api/entities');
@@ -166,7 +159,11 @@ describe('EntitiesClient', () => {
 
   it('serializes multi-valued Facet params as repeats (OR within category, #155)', () => {
     client
-      .list({ type: ['note', 'hexmap'], tag: ['deity', 'ruined'], visibility: ['shared'] })
+      .list({
+        type: ['note', 'hexmap'],
+        tag: ['deity', 'ruined'],
+        visibility: ['shared'],
+      })
       .subscribe();
 
     const req = http.expectOne((r) => r.url === '/api/entities');
@@ -184,9 +181,7 @@ describe('EntitiesClient', () => {
     };
 
     let got: unknown;
-    client
-      .facets({ q: 'temple', tag: ['deity'], worldId: 'w1' })
-      .subscribe((f) => (got = f));
+    client.facets({ q: 'temple', tag: ['deity'], worldId: 'w1' }).subscribe((f) => (got = f));
 
     const req = http.expectOne((r) => r.url === '/api/entities/facets');
     expect(req.request.method).toBe('GET');
@@ -279,9 +274,7 @@ describe('EntitiesClient', () => {
     };
 
     let outcome: unknown;
-    client
-      .save('e1', painted, 1, ['deity', 'ruined'])
-      .subscribe((o) => (outcome = o));
+    client.save('e1', painted, 1, ['deity', 'ruined']).subscribe((o) => (outcome = o));
 
     const req = http.expectOne('/api/entities/e1');
     expect(req.request.method).toBe('PUT');
@@ -315,9 +308,7 @@ describe('EntitiesClient', () => {
     let outcome: unknown;
     client.save('e1', emptyHexmapBody, 1, []).subscribe((o) => (outcome = o));
 
-    http
-      .expectOne('/api/entities/e1')
-      .flush(serverCurrent, { status: 409, statusText: 'Conflict' });
+    http.expectOne('/api/entities/e1').flush(serverCurrent, { status: 409, statusText: 'Conflict' });
 
     expect(outcome).toEqual({ status: 'conflict', current: serverCurrent });
   });
@@ -329,9 +320,7 @@ describe('EntitiesClient', () => {
     client.save('e1', emptyHexmapBody, 1, []).subscribe({
       error: () => (errored = true),
     });
-    http
-      .expectOne('/api/entities/e1')
-      .flush('<html>Conflict</html>', { status: 409, statusText: 'Conflict' });
+    http.expectOne('/api/entities/e1').flush('<html>Conflict</html>', { status: 409, statusText: 'Conflict' });
 
     expect(errored).toBe(true);
   });

@@ -11,10 +11,7 @@ import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtur
  * drawing of the name is covered by the FakeContext unit tests; canvas pixels are
  * opaque to Playwright (ADR-0003), so this spec proves persistence and re-editing.
  */
-test('names a painted hex in the Inspector, and the name survives a reload', async ({
-  page,
-  request,
-}) => {
+test('names a painted hex in the Inspector, and the name survives a reload', async ({ page, request }) => {
   await enterLibrary(page);
   await page.getByTestId('new-map').click();
 
@@ -25,10 +22,7 @@ test('names a painted hex in the Inspector, and the name survives a reload', asy
 
   // Paint a non-default terrain so the saved document is unambiguous.
   await page.getByTestId('tool-terrain').click();
-  await page
-    .getByRole('group', { name: 'Terrain' })
-    .getByRole('button', { name: 'Ocean' })
-    .click();
+  await page.getByRole('group', { name: 'Terrain' }).getByRole('button', { name: 'Ocean' }).click();
   await canvas.click();
   await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
 
@@ -47,7 +41,10 @@ test('names a painted hex in the Inspector, and the name survives a reload', asy
   const res = await request.get(`/api/entities/${mapId}`);
   expect(res.ok()).toBeTruthy();
   const detail = await res.json();
-  expect(detail.document.hexes['0,0']).toEqual({ terrain: 'ocean', name: 'Riverbend' });
+  expect(detail.document.hexes['0,0']).toEqual({
+    terrain: 'ocean',
+    name: 'Riverbend',
+  });
 
   // The reloaded map boots in Select (issue #27). Clicking the centre re-selects the hex.
   await canvas.click();

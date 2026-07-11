@@ -110,9 +110,7 @@ export class PublicEntityPage {
             ? this.client.worldEntity(token, params.get('entityId') ?? '')
             : this.client.entity(token);
           return read$.pipe(
-            tap((entity) =>
-              this.followed.set({ token, mode, id: entity.id }),
-            ),
+            tap((entity) => this.followed.set({ token, mode, id: entity.id })),
             catchError(() => of(null)),
           );
         }),
@@ -134,15 +132,11 @@ export class PublicEntityPage {
     toObservable(this.followed)
       .pipe(
         switchMap((f) =>
-          f === null
-            ? EMPTY
-            : this.client.watchEntity(f.token, f.mode, f.id, (n) => this.wantsRefetch(n)),
+          f === null ? EMPTY : this.client.watchEntity(f.token, f.mode, f.id, (n) => this.wantsRefetch(n)),
         ),
         takeUntilDestroyed(),
       )
-      .subscribe((result) =>
-        result === EVICTED ? this.evict() : this.session.adopt(result),
-      );
+      .subscribe((result) => (result === EVICTED ? this.evict() : this.session.adopt(result)));
   }
 
   /** Strictly past the freshness key the open Entity carries (ADR-0045). */

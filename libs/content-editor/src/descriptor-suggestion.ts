@@ -1,9 +1,6 @@
 import { Extension } from '@tiptap/core';
 import { PluginKey } from '@tiptap/pm/state';
-import Suggestion, {
-  SuggestionKeyDownProps,
-  SuggestionProps,
-} from '@tiptap/suggestion';
+import Suggestion, { SuggestionKeyDownProps, SuggestionProps } from '@tiptap/suggestion';
 import { DescriptorPicker } from './descriptor-picker';
 import { entityLinkPosBefore, setLinkAttr } from './descriptors';
 import { VocabItem, vocabItems } from './vocab-items';
@@ -38,8 +35,7 @@ export function descriptorSuggestion(
           // The single rule: a link must sit immediately before the `::` (and not in code),
           // so `::` is plain text in ordinary prose.
           allow: ({ state, range }) =>
-            !state.selection.$from.parent.type.spec.code &&
-            entityLinkPosBefore(state, range.from) !== null,
+            !state.selection.$from.parent.type.spec.code && entityLinkPosBefore(state, range.from) !== null,
           items: async ({ query }) => vocabItems(query, await loadVocab()),
           command: ({ editor, range, props }) => {
             // Recompute against the live state: the link sits just before the `::query`.
@@ -48,12 +44,9 @@ export function descriptorSuggestion(
             setLinkAttr(editor, linkPos, 'descriptor', props.value, range);
           },
           render: () => ({
-            onStart: (props: SuggestionProps<VocabItem, VocabItem>) =>
-              getPicker()?.open(props),
-            onUpdate: (props: SuggestionProps<VocabItem, VocabItem>) =>
-              getPicker()?.update(props),
-            onKeyDown: (props: SuggestionKeyDownProps) =>
-              getPicker()?.onKeyDown(props.event) ?? false,
+            onStart: (props: SuggestionProps<VocabItem, VocabItem>) => getPicker()?.open(props),
+            onUpdate: (props: SuggestionProps<VocabItem, VocabItem>) => getPicker()?.update(props),
+            onKeyDown: (props: SuggestionKeyDownProps) => getPicker()?.onKeyDown(props.event) ?? false,
             onExit: () => getPicker()?.close(),
           }),
         }),

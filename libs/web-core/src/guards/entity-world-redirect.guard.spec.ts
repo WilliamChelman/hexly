@@ -1,10 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import {
-  ActivatedRouteSnapshot,
-  convertToParamMap,
-  RouterStateSnapshot,
-  UrlTree,
-} from '@angular/router';
+import { ActivatedRouteSnapshot, convertToParamMap, RouterStateSnapshot, UrlTree } from '@angular/router';
 import { firstValueFrom, isObservable, Observable, of, throwError } from 'rxjs';
 import { EntitySummary } from '@hexly/domain';
 import { EntitiesClient } from '../services/entities.client';
@@ -65,9 +60,7 @@ describe('entityWorldRedirect', () => {
     expect(entities.list).toHaveBeenCalledWith({ ids: [E1] });
     expect(value).toBeInstanceOf(UrlTree);
     // Bare World segment — the parent activeWorldGuard heals its slug on landing.
-    expect((value as UrlTree).toString()).toBe(
-      `/w/${segment(W9)}/entities/${segment(E1, 'Aldermoor')}?view=note`,
-    );
+    expect((value as UrlTree).toString()).toBe(`/w/${segment(W9)}/entities/${segment(E1, 'Aldermoor')}?view=note`);
   });
 
   it('decodes a base62 segment before looking the Entity up', async () => {

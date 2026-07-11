@@ -2,7 +2,7 @@
 
 > **Superseded by ADR-0043.** The Home Entity is removed entirely — a World's landing is now the derived World Dashboard — so there is no title to keep in sync. This ADR is retained for history.
 
-A World's name and its Home Entity's title are one name, not two kept in step. The **World name is the source of truth**; the Home Entity's title is derived and read-only, displayed on the landing page with a hint to rename via the World. Renaming a World (`PATCH /worlds/:id`) writes `worlds.name` *and* the Home Entity's `name` in the same transaction.
+A World's name and its Home Entity's title are one name, not two kept in step. The **World name is the source of truth**; the Home Entity's title is derived and read-only, displayed on the landing page with a hint to rename via the World. Renaming a World (`PATCH /worlds/:id`) writes `worlds.name` _and_ the Home Entity's `name` in the same transaction.
 
 This supersedes the launch behaviour, where `mintWorldWithHome` seeded the two equal but `rename` left "the Home Entity untouched" and the Home note's title was independently editable — so they diverged on the first rename or edit. Collapsing them to one name with one write path makes divergence impossible.
 

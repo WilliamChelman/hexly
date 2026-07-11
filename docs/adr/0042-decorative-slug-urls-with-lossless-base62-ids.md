@@ -4,7 +4,7 @@
 
 Private routes keyed World and Entity segments by raw UUID —
 `/w/c6b611f6-…/entities/274900e5-…` — which is unwelcoming and gives no sense
-of *where you are*. We want orientation (read the URL, know the World and
+of _where you are_. We want orientation (read the URL, know the World and
 Entity) without the machinery of true slugs.
 
 ## Decision
@@ -35,7 +35,7 @@ Supporting rules:
   including cold direct loads. The child `reconcileWorldSegment` heals the
   **entity** segment (name from the fetched entity) and, on a wrong-World link,
   redirects with a bare World segment the parent then heals. A stale or wrong
-  slug is only ever *cosmetically* wrong — it never gates a 404; the suffix is
+  slug is only ever _cosmetically_ wrong — it never gates a 404; the suffix is
   the sole authority.
 - **Slugify is total and dependency-free.** Lowercase, accent-fold via
   `normalize('NFD')` (covers EN/FR), non-`[a-z0-9]` → `-`, cap ~60 chars; an

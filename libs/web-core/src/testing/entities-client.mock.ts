@@ -26,28 +26,17 @@ export class MockEntitiesClient {
   );
   patch =
     vi.fn<
-      (
-        id: string,
-        changes: { name?: string; visibility?: EntityDetail['visibility'] },
-      ) => Observable<EntityDetail>
+      (id: string, changes: { name?: string; visibility?: EntityDetail['visibility'] }) => Observable<EntityDetail>
     >();
   delete = vi.fn<(id: string) => Observable<void>>();
-  create = vi.fn<
-    (name: string, type: EntityType, worldId?: string) => Observable<EntityDetail>
-  >();
+  create = vi.fn<(name: string, type: EntityType, worldId?: string) => Observable<EntityDetail>>();
   load = vi.fn<(id: string) => Observable<EntityDetail>>();
   listDescriptors = vi.fn<() => Observable<string[]>>();
   // Defaults to an empty vocabulary so a spec that drives the tag input (EntityTags.suggest)
   // doesn't throw on an unstubbed listTags; override per test as needed.
   listTags = vi.fn<() => Observable<string[]>>(() => of<string[]>([]));
-  save = vi.fn<
-    (
-      id: string,
-      body: EntityBody,
-      version: number,
-      tags: readonly string[],
-    ) => Observable<EntitySaveOutcome>
-  >();
+  save =
+    vi.fn<(id: string, body: EntityBody, version: number, tags: readonly string[]) => Observable<EntitySaveOutcome>>();
   // Defaults to an empty set so a spec that mounts the owner-set panel without
   // caring about it still renders; override per test as needed.
   owners = vi.fn<(id: string) => Observable<string[]>>(() => of<string[]>([]));
@@ -56,8 +45,7 @@ export class MockEntitiesClient {
   // Defaults to an empty set so a spec that mounts the grant-set panel (#161) without
   // caring about it still renders; override per test as needed.
   grants = vi.fn<(id: string) => Observable<EntityGrant[]>>(() => of<EntityGrant[]>([]));
-  addGrant =
-    vi.fn<(id: string, userId: string, role: GrantRole) => Observable<EntityGrant[]>>();
+  addGrant = vi.fn<(id: string, userId: string, role: GrantRole) => Observable<EntityGrant[]>>();
   removeGrant = vi.fn<(id: string, userId: string) => Observable<EntityGrant[]>>();
   // Defaults to no active link so a spec mounting the Public Link control (#162) without
   // caring about it still renders; override per test as needed.

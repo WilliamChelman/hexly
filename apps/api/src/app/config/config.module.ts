@@ -14,7 +14,12 @@ export const HEXLY_CONFIG = Symbol('HEXLY_CONFIG');
  */
 @Global()
 @Module({
-  providers: [{ provide: HEXLY_CONFIG, useFactory: () => loadConfig(resolveInstanceDir()) }],
+  providers: [
+    {
+      provide: HEXLY_CONFIG,
+      useFactory: () => loadConfig(resolveInstanceDir()),
+    },
+  ],
   exports: [HEXLY_CONFIG],
 })
 export class ConfigModule {}

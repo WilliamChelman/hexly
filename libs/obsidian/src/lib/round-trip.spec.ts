@@ -18,9 +18,10 @@ function sortMarks(node: unknown): unknown {
     const n = node as Record<string, unknown>;
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(n)) {
-      out[k] = k === 'marks' && Array.isArray(v)
-        ? [...v].sort((a, b) => (a.type as string).localeCompare(b.type))
-        : sortMarks(v);
+      out[k] =
+        k === 'marks' && Array.isArray(v)
+          ? [...v].sort((a, b) => (a.type as string).localeCompare(b.type))
+          : sortMarks(v);
     }
     return out;
   }

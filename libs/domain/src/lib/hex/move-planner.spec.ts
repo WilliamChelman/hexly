@@ -71,7 +71,11 @@ describe('planMove — single hex onto Void carries the whole record', () => {
     });
     const before = structuredClone(doc);
 
-    planMove({ document: doc, selection: pickHex(from), offset: { q: 1, r: 0 } });
+    planMove({
+      document: doc,
+      selection: pickHex(from),
+      offset: { q: 1, r: 0 },
+    });
 
     expect(doc).toEqual(before);
   });
@@ -140,9 +144,7 @@ describe('planMove — regions stay put', () => {
     const from = { q: 0, r: 0 };
     const doc: HexMap = {
       hexes: { [coordKey(from)]: { terrain: 'forest' } },
-      regions: [
-        { id: 'r1', name: 'Avalon', color: '#b08a4e', hexes: { '0,0': true } },
-      ],
+      regions: [{ id: 'r1', name: 'Avalon', color: '#b08a4e', hexes: { '0,0': true } }],
       labels: [],
     };
 

@@ -1,8 +1,4 @@
-import {
-  createWorldRequestSchema,
-  worldRoleSchema,
-  worldSchema,
-} from './world';
+import { createWorldRequestSchema, worldRoleSchema, worldSchema } from './world';
 
 describe('worldSchema', () => {
   it('describes a World container: id, name, owners set (ADR-0037)', () => {
@@ -15,12 +11,8 @@ describe('worldSchema', () => {
 
   it('trims the name and rejects an empty or whitespace-only one', () => {
     // Reuses the same trimmed, non-empty rule Entity names use.
-    expect(
-      worldSchema.parse({ name: '  Aldermoor  ', id: 'w1', owners: ['u1'] }).name,
-    ).toBe('Aldermoor');
-    expect(() =>
-      worldSchema.parse({ name: '   ', id: 'w1', owners: ['u1'] }),
-    ).toThrow();
+    expect(worldSchema.parse({ name: '  Aldermoor  ', id: 'w1', owners: ['u1'] }).name).toBe('Aldermoor');
+    expect(() => worldSchema.parse({ name: '   ', id: 'w1', owners: ['u1'] })).toThrow();
   });
 });
 
@@ -37,9 +29,7 @@ describe('worldRoleSchema', () => {
 
 describe('createWorldRequestSchema', () => {
   it('accepts a request that names the World, trimming and rejecting blanks', () => {
-    expect(createWorldRequestSchema.parse({ name: '  Avalon  ' }).name).toBe(
-      'Avalon',
-    );
+    expect(createWorldRequestSchema.parse({ name: '  Avalon  ' }).name).toBe('Avalon');
     expect(() => createWorldRequestSchema.parse({ name: '   ' })).toThrow();
   });
 });

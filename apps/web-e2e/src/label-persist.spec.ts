@@ -8,10 +8,7 @@ import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtur
  * so we prove the round trip with a direct API read of the persisted document
  * (ADR-0009) and confirm it re-renders by re-selecting it on the canvas.
  */
-test('places a label, edits its text, saves, and it survives a reload', async ({
-  page,
-  request,
-}) => {
+test('places a label, edits its text, saves, and it survives a reload', async ({ page, request }) => {
   await enterLibrary(page);
   await page.getByTestId('new-map').click();
 

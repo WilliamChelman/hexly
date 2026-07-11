@@ -90,10 +90,7 @@
         "{workspaceRoot}/libs/web-core/src/i18n/locale-key-sync.ts"
       ],
       "options": {
-        "commands": [
-          "tsc -p apps/web/tools/tsconfig.json --noEmit",
-          "jiti apps/web/tools/check-locale-sync.ts"
-        ],
+        "commands": ["tsc -p apps/web/tools/tsconfig.json --noEmit", "jiti apps/web/tools/check-locale-sync.ts"],
         "cwd": "{workspaceRoot}",
         "parallel": false
       }

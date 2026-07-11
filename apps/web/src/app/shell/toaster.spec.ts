@@ -69,9 +69,7 @@ describe('Toaster', () => {
     toaster.show('Move blocked', 'error', 0);
     const fixture = render();
 
-    fixture.nativeElement
-      .querySelector('[data-testid="toast-dismiss"]')
-      .click();
+    fixture.nativeElement.querySelector('[data-testid="toast-dismiss"]').click();
     fixture.detectChanges();
 
     expect(toaster.toasts()).toHaveLength(0);

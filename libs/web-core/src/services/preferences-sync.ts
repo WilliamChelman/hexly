@@ -9,11 +9,7 @@ import {
 } from '@angular/core';
 import { catchError, of } from 'rxjs';
 import { AuthUser, PreferencesPatch } from '@hexly/domain';
-import {
-  FormatLocale,
-  Locale,
-  LocaleService,
-} from '../i18n/locale.service';
+import { FormatLocale, Locale, LocaleService } from '../i18n/locale.service';
 import { Theme, ThemeService } from './theme.service';
 import { AuthClient } from './auth.client';
 
@@ -82,7 +78,7 @@ export class PreferencesSync {
       // reset every account bag to '{}'.
       const target: Snapshot = {
         locale: user.preferences.locale ?? current.locale,
-        formatLocale: (user.preferences.formatLocale ?? current.formatLocale),
+        formatLocale: user.preferences.formatLocale ?? current.formatLocale,
         theme: user.preferences.theme ?? current.theme,
       };
       this.synced = { userId: user.id, prefs: target };

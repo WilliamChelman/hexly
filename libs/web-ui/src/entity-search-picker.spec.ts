@@ -20,7 +20,10 @@ function summary(id: string, name = id, type: EntityType = 'core.note'): EntityS
   };
 }
 
-const page = (items: EntitySummary[]): EntityPage => ({ items, nextCursor: null });
+const page = (items: EntitySummary[]): EntityPage => ({
+  items,
+  nextCursor: null,
+});
 
 /** A host that owns the controlled query, mirroring how a page embeds the picker. */
 @Component({
@@ -60,8 +63,7 @@ describe('EntitySearchPicker', () => {
     }).compileComponents();
   });
 
-  const byId = (el: HTMLElement, testid: string) =>
-    el.querySelector(`[data-testid=${testid}]`) as HTMLElement | null;
+  const byId = (el: HTMLElement, testid: string) => el.querySelector(`[data-testid=${testid}]`) as HTMLElement | null;
 
   it('lists entities and emits the chosen one on pick', () => {
     const fixture = TestBed.createComponent(Host);
@@ -80,9 +82,7 @@ describe('EntitySearchPicker', () => {
     fixture.componentInstance.worldId = 'w1';
     fixture.detectChanges();
 
-    expect(entities.list).toHaveBeenCalledWith(
-      expect.objectContaining({ worldId: 'w1' }),
-    );
+    expect(entities.list).toHaveBeenCalledWith(expect.objectContaining({ worldId: 'w1' }));
   });
 
   it('re-searches as the query changes and narrows the options', () => {

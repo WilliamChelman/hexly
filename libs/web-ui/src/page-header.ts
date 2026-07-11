@@ -1,9 +1,4 @@
-import {
-  booleanAttribute,
-  ChangeDetectionStrategy,
-  Component,
-  input,
-} from '@angular/core';
+import { booleanAttribute, ChangeDetectionStrategy, Component, input } from '@angular/core';
 
 /**
  *   <app-page-header>

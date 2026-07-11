@@ -60,7 +60,9 @@ describe('Vault export endpoint', () => {
     app.use(cookieParser());
     await app.init();
 
-    adaId = await app.get(AuthService).seedUser('ada@hexly.test', 'correct horse', 'Ada', { roles: ['create-worlds'] });
+    adaId = await app.get(AuthService).seedUser('ada@hexly.test', 'correct horse', 'Ada', {
+      roles: ['create-worlds'],
+    });
   });
 
   afterEach(async () => {
@@ -80,19 +82,13 @@ describe('Vault export endpoint', () => {
     files: Record<string, string | Uint8Array>,
     filename = 'Aldermoor.zip',
   ): Promise<string> {
-    const res = await agent
-      .post('/worlds/import')
-      .attach('file', vaultZip(files), filename)
-      .expect(201);
+    const res = await agent.post('/worlds/import').attach('file', vaultZip(files), filename).expect(201);
     return res.body.worldId;
   }
 
   /** Export a World and return the raw response plus its unzipped entries. */
   async function exportZip(agent: request.Agent, worldId: string) {
-    const res = await agent
-      .get(`/worlds/${worldId}/export`)
-      .responseType('blob')
-      .expect(200);
+    const res = await agent.get(`/worlds/${worldId}/export`).responseType('blob').expect(200);
     return { res, files: unzipSync(new Uint8Array(res.body)) };
   }
 
@@ -174,7 +170,12 @@ describe('Vault export endpoint', () => {
 
     // Arrange a hexmap with lore Content AND a painted, named hex.
     const entities = app.get(EntitiesService);
-    const created = entities.create(adaId, { types: ['core.hexmap'], name: 'Aldermoor Map', worldId, tags: [] });
+    const created = entities.create(adaId, {
+      types: ['core.hexmap'],
+      name: 'Aldermoor Map',
+      worldId,
+      tags: [],
+    });
     entities.save(adaId, created.id, {
       version: created.version,
       tags: [],
@@ -183,8 +184,15 @@ describe('Vault export endpoint', () => {
         content: tiptapContent({
           type: 'doc',
           content: [
-            { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'The Aldermoor' }] },
-            { type: 'paragraph', content: [{ type: 'text', text: 'A wild frontier.' }] },
+            {
+              type: 'heading',
+              attrs: { level: 1 },
+              content: [{ type: 'text', text: 'The Aldermoor' }],
+            },
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'A wild frontier.' }],
+            },
           ],
         }),
         hexes: { '0,0': { terrain: 'forest', name: 'Rivertown' } },
@@ -226,18 +234,17 @@ describe('Vault export endpoint', () => {
     const { res, files } = await exportZip(ada, worldId);
 
     // Exact zip layout: notes under their original folders, assets/ folder — no Home note (ADR-0043).
-    expect(Object.keys(files).sort()).toEqual([
-      'Characters/Lady Mara.md',
-      'Places/Keep.md',
-      'assets/portrait.png',
-    ]);
+    expect(Object.keys(files).sort()).toEqual(['Characters/Lady Mara.md', 'Places/Keep.md', 'assets/portrait.png']);
 
     // Assets kept byte-for-byte under their human-readable name.
     expect(files['assets/portrait.png']).toEqual(png);
 
     // Metadata + tags round-trip; the image src points back at the exported asset.
     const mara = text(files, 'Characters/Lady Mara.md');
-    expect(frontmatter(mara)).toMatchObject({ tags: ['deity'], status: 'alive' });
+    expect(frontmatter(mara)).toMatchObject({
+      tags: ['deity'],
+      status: 'alive',
+    });
     expect(mara).toContain('assets/portrait.png');
     // The resolved entityLink re-emits as an Obsidian wikilink.
     expect(text(files, 'Places/Keep.md')).toContain('[[Lady Mara]]');

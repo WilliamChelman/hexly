@@ -26,12 +26,7 @@ import {
   rectFromCorners,
   regionById,
 } from '@hexly/domain';
-import {
-  ThemeService,
-  ToasterService,
-  isTrackpadWheel,
-  wheelDeltaPixels,
-} from '@hexly/web-core';
+import { ThemeService, ToasterService, isTrackpadWheel, wheelDeltaPixels } from '@hexly/web-core';
 import { terrainKey } from '../utils/catalog-keys';
 import { HexMapStore, SelectMode } from '../services/hexmap-store';
 import { toolForHotkey } from './tools';
@@ -90,11 +85,7 @@ const HEX_DRAG_THRESHOLD = 4;
     <div class="field-vignette" aria-hidden="true"></div>
 
     <!-- Hover-coordinate readout, bottom-left. -->
-    <app-coord-readout
-      class="absolute bottom-4 left-4"
-      [coord]="hover()"
-      [terrainKey]="readoutKey()"
-    />
+    <app-coord-readout class="absolute bottom-4 left-4" [coord]="hover()" [terrainKey]="readoutKey()" />
 
     <!-- Zoom/fit controls, bottom-right. -->
     <app-zoom-control
@@ -117,11 +108,7 @@ const HEX_DRAG_THRESHOLD = 4;
     :host {
       @apply overflow-hidden isolate;
       background:
-        radial-gradient(
-          110% 85% at 50% -6%,
-          var(--color-canvas-glow),
-          transparent 60%
-        ),
+        radial-gradient(110% 85% at 50% -6%, var(--color-canvas-glow), transparent 60%),
         linear-gradient(165deg, var(--color-canvas-bg), var(--color-canvas-mat));
     }
     /*
@@ -139,17 +126,12 @@ const HEX_DRAG_THRESHOLD = 4;
     /* Soft edge vignette: clear centre, sinking to the themed edge ink at the corners. */
     .field-vignette {
       @apply absolute inset-0 pointer-events-none;
-      background: radial-gradient(
-        120% 90% at 50% 42%,
-        transparent 56%,
-        var(--color-canvas-edge) 100%
-      );
+      background: radial-gradient(120% 90% at 50% 42%, transparent 56%, var(--color-canvas-edge) 100%);
     }
   `,
 })
 export class MapCanvas {
-  private readonly canvasRef =
-    viewChild<ElementRef<HTMLCanvasElement>>('canvas');
+  private readonly canvasRef = viewChild<ElementRef<HTMLCanvasElement>>('canvas');
 
   /** Pointy-top hexes, origin at world 0. */
   private readonly layout: Layout = {
@@ -164,9 +146,7 @@ export class MapCanvas {
   protected readonly hover = signal<Axial | null>(null);
   protected readonly dragging = signal(false);
 
-  protected readonly zoomPercent = computed(() =>
-    Math.round(this.camera().zoom * 100),
-  );
+  protected readonly zoomPercent = computed(() => Math.round(this.camera().zoom * 100));
 
   /**
    * The live Selection drag: `offset` in axial hex steps, `labelDelta` in world
@@ -305,26 +285,19 @@ export class MapCanvas {
       marquee = { a: marqueeState.a, b: marqueeState.b };
       const rect = rectFromCorners(marqueeState.a, marqueeState.b);
       const hits = marqueeHits(this.layout, doc, rect);
-      selections = this.store.marqueePreview(
-        hits.hexes,
-        hits.labels,
-        marqueeState.additive,
-      );
+      selections = this.store.marqueePreview(hits.hexes, hits.labels, marqueeState.additive);
     } else if (drag) {
       // A live drag previews exactly what releasing would commit, from the same
       // query the store commits from. A blocked plan washes the contested cells
       // red and leaves the group in place, since releasing would snap back.
-      const { plan, labelPositions: previewLabels } =
-        this.store.previewSelectionMove(drag.offset, drag.labelDelta);
+      const { plan, labelPositions: previewLabels } = this.store.previewSelectionMove(drag.offset, drag.labelDelta);
       if (plan.blocked) {
         blockedCells = plan.cells;
       } else {
         movePreview = plan.hexes;
         const { offset } = drag;
         selections = selections.map((s) =>
-          s.kind === 'hex' || s.kind === 'feature'
-            ? { ...s, coord: addAxial(s.coord, offset) }
-            : s,
+          s.kind === 'hex' || s.kind === 'feature' ? { ...s, coord: addAxial(s.coord, offset) } : s,
         );
         labelPositions = previewLabels;
         // An empty plan yields an empty map the renderer treats as "no override".
@@ -492,11 +465,7 @@ export class MapCanvas {
     // recomputes the offset and the render effect previews it until release.
     const press = this.dragPress;
     if (press) {
-      const moved =
-        Math.hypot(
-          event.clientX - press.clientX,
-          event.clientY - press.clientY,
-        ) >= HEX_DRAG_THRESHOLD;
+      const moved = Math.hypot(event.clientX - press.clientX, event.clientY - press.clientY) >= HEX_DRAG_THRESHOLD;
       if (this.drag() || moved) {
         if (press.snapped) {
           const a = hexToPixel(this.layout, press.hexStart);
@@ -539,8 +508,7 @@ export class MapCanvas {
     if (this.foreignPointer(event)) return;
     // A mouse reuses one pointerId across buttons, so a right/middle release
     // during a left-button gesture mustn't end it — only the owning button does.
-    if (this.gestureButton !== null && event.button !== this.gestureButton)
-      return;
+    if (this.gestureButton !== null && event.button !== this.gestureButton) return;
     (event.target as Element).releasePointerCapture?.(event.pointerId);
     this.endGesture(event);
   }
@@ -586,10 +554,7 @@ export class MapCanvas {
     if (drag) {
       const outcome = this.store.moveSelection(drag.offset, drag.labelDelta);
       if (outcome === 'blocked') {
-        this.toaster.show(
-          this.transloco.translate('editorShell.moveBlocked'),
-          'error',
-        );
+        this.toaster.show(this.transloco.translate('editorShell.moveBlocked'), 'error');
       } else if (outcome === 'noop') {
         // A drag that resolved to no movement (jiggled within the origin hex, or
         // dragged back to the press point) is still a plain pick.
@@ -640,9 +605,7 @@ export class MapCanvas {
    * second pointer can never disturb the gesture in flight.
    */
   private foreignPointer(event: PointerEvent): boolean {
-    return (
-      this.activePointerId !== null && event.pointerId !== this.activePointerId
-    );
+    return this.activePointerId !== null && event.pointerId !== this.activePointerId;
   }
 
   /**
@@ -651,11 +614,7 @@ export class MapCanvas {
    */
   private collapseGroupPress(): void {
     if (this.dragPress?.group) {
-      this.store.select(
-        this.dragPress.hexStart,
-        this.dragPress.labelHit,
-        'replace',
-      );
+      this.store.select(this.dragPress.hexStart, this.dragPress.labelHit, 'replace');
     }
   }
 
@@ -695,10 +654,7 @@ export class MapCanvas {
    */
   private cancelDrag(): boolean {
     const pending =
-      this.drag() !== null ||
-      this.dragPress !== null ||
-      this.selectSweep !== null ||
-      this.marquee() !== null;
+      this.drag() !== null || this.dragPress !== null || this.selectSweep !== null || this.marquee() !== null;
     this.drag.set(null);
     this.dragPress = null;
     this.marquee.set(null);
@@ -798,12 +754,8 @@ export class MapCanvas {
     if (event.ctrlKey || event.metaKey) {
       // A pinch and a Ctrl+wheel mouse both report ctrlKey, so the modifier
       // alone can't tell them apart — the delta shape can.
-      const sensitivity = isTrackpadWheel(event)
-        ? ZOOM_SENSITIVITY_TOUCHPAD
-        : ZOOM_SENSITIVITY_MOUSE;
-      const factor = Math.exp(
-        -wheelDeltaPixels(event.deltaY, event, el.clientHeight) * sensitivity,
-      );
+      const sensitivity = isTrackpadWheel(event) ? ZOOM_SENSITIVITY_TOUCHPAD : ZOOM_SENSITIVITY_MOUSE;
+      const factor = Math.exp(-wheelDeltaPixels(event.deltaY, event, el.clientHeight) * sensitivity);
       this.zoomAround(this.localPoint(event), factor);
     } else {
       const dx = wheelDeltaPixels(event.deltaX, event, el.clientWidth);
@@ -828,9 +780,7 @@ export class MapCanvas {
   protected recenter(): void {
     const canvas = this.canvasRef()?.nativeElement;
     if (!canvas) return;
-    this.camera.set(
-      Camera.initial().panBy(canvas.clientWidth / 2, canvas.clientHeight / 2),
-    );
+    this.camera.set(Camera.initial().panBy(canvas.clientWidth / 2, canvas.clientHeight / 2));
   }
 
   private zoomAround(anchor: { x: number; y: number }, factor: number): void {

@@ -1,7 +1,22 @@
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { Button, Cartouche, Chip, Coord, Eyebrow, Field, IconButton, Icon, Input, Kbd, Panel, Select, Swatch, Textarea } from '@hexly/web-ui';
+import {
+  Button,
+  Cartouche,
+  Chip,
+  Coord,
+  Eyebrow,
+  Field,
+  IconButton,
+  Icon,
+  Input,
+  Kbd,
+  Panel,
+  Select,
+  Swatch,
+  Textarea,
+} from '@hexly/web-ui';
 
 interface SwatchRow {
   readonly token: string;
@@ -44,31 +59,17 @@ interface TypeRow {
   template: `
     <main class="max-w-[1080px] mx-auto pt-6 px-6 pb-24 flex flex-col gap-16">
       <header class="guide-top flex justify-between items-center">
-        <a appButton variant="ghost" size="sm" routerLink="/"
-          >← {{ 'styleguide.backToMap' | transloco }}</a
-        >
+        <a appButton variant="ghost" size="sm" routerLink="/">← {{ 'styleguide.backToMap' | transloco }}</a>
       </header>
 
       <section class="hero flex flex-col gap-4 pt-12 pb-6 border-b border-line">
         <span appEyebrow>{{ 'styleguide.eyebrow' | transloco }}</span>
-        <h1
-          class="text-3xl leading-[1.06]"
-          [innerHTML]="'styleguide.heroTitle' | transloco"
-        ></h1>
-        <p
-          class="hero-lede"
-          [innerHTML]="'styleguide.heroLede' | transloco"
-        ></p>
+        <h1 class="text-3xl leading-[1.06]" [innerHTML]="'styleguide.heroTitle' | transloco"></h1>
+        <p class="hero-lede" [innerHTML]="'styleguide.heroLede' | transloco"></p>
         <div class="flex flex-wrap gap-2 mt-2">
-          <app-chip tone="gold">{{
-            'styleguide.fontDisplay' | transloco
-          }}</app-chip>
-          <app-chip tone="sea">{{
-            'styleguide.fontBody' | transloco
-          }}</app-chip>
-          <app-chip tone="astra">{{
-            'styleguide.fontCoord' | transloco
-          }}</app-chip>
+          <app-chip tone="gold">{{ 'styleguide.fontDisplay' | transloco }}</app-chip>
+          <app-chip tone="sea">{{ 'styleguide.fontBody' | transloco }}</app-chip>
+          <app-chip tone="astra">{{ 'styleguide.fontCoord' | transloco }}</app-chip>
         </div>
       </section>
 
@@ -80,10 +81,7 @@ interface TypeRow {
         <div class="swatches">
           @for (s of semantic; track s.token) {
             <figure class="swatchcard">
-              <span
-                class="swatchcard-chip"
-                [style.background]="'var(' + s.token + ')'"
-              ></span>
+              <span class="swatchcard-chip" [style.background]="'var(' + s.token + ')'"></span>
               <figcaption>
                 <strong>{{ s.nameKey | transloco }}</strong>
                 <code>{{ s.token }}</code>
@@ -98,10 +96,7 @@ interface TypeRow {
         <div class="swatches">
           @for (s of terrain; track s.token) {
             <figure class="swatchcard">
-              <span
-                class="swatchcard-chip"
-                [style.background]="'var(' + s.token + ')'"
-              ></span>
+              <span class="swatchcard-chip" [style.background]="'var(' + s.token + ')'"></span>
               <figcaption>
                 <strong>{{ s.nameKey | transloco }}</strong>
                 <code>{{ s.token }}</code>
@@ -116,11 +111,7 @@ interface TypeRow {
         <div class="typelist" appPanel>
           @for (t of typeScale; track t.token) {
             <div class="typerow">
-              <span
-                class="typerow-sample"
-                [style.font-size]="'var(' + t.token + ')'"
-                >{{ t.sample }}</span
-              >
+              <span class="typerow-sample" [style.font-size]="'var(' + t.token + ')'">{{ t.sample }}</span>
               <span class="typerow-meta"
                 ><code>{{ t.token }}</code
                 ><span>{{ t.size }}</span></span
@@ -147,10 +138,7 @@ interface TypeRow {
           <div class="radii">
             @for (r of radii; track r) {
               <figure class="radiicard">
-                <span
-                  class="radiicard-box"
-                  [style.border-radius]="'var(' + r + ')'"
-                ></span>
+                <span class="radiicard-box" [style.border-radius]="'var(' + r + ')'"></span>
                 <code>{{ r }}</code>
               </figure>
             }
@@ -212,10 +200,7 @@ interface TypeRow {
                 [title]="'styleguide.iconForestTitle' | transloco"
                 [attr.aria-label]="'styleguide.iconForestLabel' | transloco"
               >
-                <span
-                  appSwatch
-                  [style.background]="'var(--color-terrain-forest)'"
-                ></span>
+                <span appSwatch [style.background]="'var(--color-terrain-forest)'"></span>
               </button>
               <button
                 appIconButton
@@ -233,15 +218,9 @@ interface TypeRow {
             </figcaption>
             <div class="specimen-row">
               <app-chip>{{ 'styleguide.chipDefault' | transloco }}</app-chip>
-              <app-chip tone="gold">{{
-                'styleguide.chipSettlement' | transloco
-              }}</app-chip>
-              <app-chip tone="sea">{{
-                'styleguide.chipEditing' | transloco
-              }}</app-chip>
-              <app-chip tone="astra">{{
-                'styleguide.chipRegion' | transloco
-              }}</app-chip>
+              <app-chip tone="gold">{{ 'styleguide.chipSettlement' | transloco }}</app-chip>
+              <app-chip tone="sea">{{ 'styleguide.chipEditing' | transloco }}</app-chip>
+              <app-chip tone="astra">{{ 'styleguide.chipRegion' | transloco }}</app-chip>
               <app-coord>q 12 · r −4</app-coord>
               <kbd appKbd>⌘ Z</kbd>
             </div>
@@ -256,9 +235,7 @@ interface TypeRow {
                 <input appInput value="The Reach of Aldermoor" />
               </label>
               <label appField [label]="'styleguide.fieldNote' | transloco">
-                <textarea appTextarea>
-A walled town where the forest road meets the river ford.</textarea
-                >
+                <textarea appTextarea>A walled town where the forest road meets the river ford.</textarea>
               </label>
               <label appField [label]="'styleguide.fieldTerrain' | transloco">
                 <select appSelect>
@@ -275,10 +252,7 @@ A walled town where the forest road meets the river ford.</textarea
 
       <footer class="guide-foot">
         <span class="brand" appCartouche>Hexly</span>
-        <span
-          >{{ 'styleguide.footerTokens' | transloco }} ·
-          <code>apps/web/src/styles</code></span
-        >
+        <span>{{ 'styleguide.footerTokens' | transloco }} · <code>apps/web/src/styles</code></span>
       </footer>
     </main>
   `,
@@ -459,10 +433,5 @@ export class Styleguide {
 
   protected readonly spacing = [1, 2, 3, 4, 6, 8, 12];
 
-  protected readonly radii = [
-    '--radius-sm',
-    '--radius-md',
-    '--radius-lg',
-    '--radius-xl',
-  ];
+  protected readonly radii = ['--radius-sm', '--radius-md', '--radius-lg', '--radius-xl'];
 }

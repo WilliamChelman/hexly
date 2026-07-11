@@ -55,9 +55,7 @@ describe('PageHeader', () => {
     const fixture = TestBed.createComponent(Host);
     fixture.detectChanges();
 
-    expect(
-      fixture.nativeElement.querySelector('app-page-header').getAttribute('role'),
-    ).toBe('banner');
+    expect(fixture.nativeElement.querySelector('app-page-header').getAttribute('role')).toBe('banner');
   });
 
   it('reserves no leading gap when a page projects no leading content', () => {
@@ -71,14 +69,10 @@ describe('PageHeader', () => {
   it('pins itself to the top only when sticky is set', () => {
     const plain = TestBed.createComponent(Host);
     plain.detectChanges();
-    expect(
-      plain.nativeElement.querySelector('app-page-header').classList,
-    ).not.toContain('sticky');
+    expect(plain.nativeElement.querySelector('app-page-header').classList).not.toContain('sticky');
 
     const sticky = TestBed.createComponent(StickyHost);
     sticky.detectChanges();
-    expect(
-      sticky.nativeElement.querySelector('app-page-header').classList,
-    ).toContain('sticky');
+    expect(sticky.nativeElement.querySelector('app-page-header').classList).toContain('sticky');
   });
 });

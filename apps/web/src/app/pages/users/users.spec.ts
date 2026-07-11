@@ -3,11 +3,7 @@ import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { UserAccount } from '@hexly/domain';
 import { UsersClient, AuthClient, ToasterService } from '@hexly/web-core';
-import {
-  MockUsersClient,
-  MockAuthClient,
-  provideTranslocoTesting,
-} from '@hexly/web-core/testing';
+import { MockUsersClient, MockAuthClient, provideTranslocoTesting } from '@hexly/web-core/testing';
 import { Users } from './users';
 
 /**
@@ -42,7 +38,14 @@ describe('Users panel', () => {
     }).compileComponents();
     toaster = TestBed.inject(ToasterService);
     // The caller holds manage-users (not Superadmin) unless a test says otherwise.
-    auth.setUser({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada', preferences: {}, roles: ['manage-users'], isSuperadmin: false });
+    auth.setUser({
+      id: 'u1',
+      email: 'ada@hexly.test',
+      displayName: 'Ada',
+      preferences: {},
+      roles: ['manage-users'],
+      isSuperadmin: false,
+    });
   });
 
   function render(accounts: UserAccount[]) {
@@ -56,13 +59,18 @@ describe('Users panel', () => {
 
   /** Re-seat the caller as the operator's in-app self, who alone sees the Superadmin controls. */
   function asSuperadmin() {
-    auth.setUser({ id: 'u1', email: 'root@hexly.test', displayName: 'Root', preferences: {}, roles: [], isSuperadmin: true });
+    auth.setUser({
+      id: 'u1',
+      email: 'root@hexly.test',
+      displayName: 'Root',
+      preferences: {},
+      roles: [],
+      isSuperadmin: true,
+    });
   }
 
   it('lists each account with its email, role state, and status', () => {
-    const { nativeElement: el } = render([
-      { ...bob, roles: ['manage-users', 'create-worlds'], disabledAt: 123 },
-    ]);
+    const { nativeElement: el } = render([{ ...bob, roles: ['manage-users', 'create-worlds'], disabledAt: 123 }]);
     const row = $(el, '[data-testid="user-u2"]');
     expect(row?.textContent).toContain('Bob');
     expect(row?.textContent).toContain('bob@hexly.test');
@@ -72,10 +80,7 @@ describe('Users panel', () => {
   });
 
   it('filters the roster by name or email', () => {
-    const fixture = render([
-      bob,
-      { ...bob, id: 'u3', displayName: 'Carol', email: 'carol@hexly.test' },
-    ]);
+    const fixture = render([bob, { ...bob, id: 'u3', displayName: 'Carol', email: 'carol@hexly.test' }]);
     const el = fixture.nativeElement as HTMLElement;
     const search = $(el, '[data-testid="filter"]') as HTMLInputElement;
     search.value = 'carol';
@@ -145,9 +150,7 @@ describe('Users panel', () => {
 
   it('surfaces a server refusal (409) as an error toast, leaving the list', () => {
     vi.stubGlobal('confirm', () => true);
-    users.deleteUser.mockReturnValue(
-      throwError(() => new HttpErrorResponse({ status: 409 })),
-    );
+    users.deleteUser.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 409 })));
     const { nativeElement: el } = render([bob]);
     ($(el, '[data-testid="delete-u2"]') as HTMLButtonElement).click();
     expect(toaster.toasts().some((t) => t.tone === 'error')).toBe(true);

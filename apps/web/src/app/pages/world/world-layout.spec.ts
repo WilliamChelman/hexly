@@ -36,11 +36,7 @@ describe('WorldLayout', () => {
   }
 
   it('fills the rail with the Dashboard, Library and Graph links from the active World (ADR-0041)', () => {
-    expect(railFor(world(['read'])).map((e) => e.testid)).toEqual([
-      'nav-dashboard',
-      'nav-entities',
-      'nav-world-graph',
-    ]);
+    expect(railFor(world(['read'])).map((e) => e.testid)).toEqual(['nav-dashboard', 'nav-entities', 'nav-world-graph']);
   });
 
   /** The World Graph is a read of the World, so it shows to anyone who can reach it (#181). */

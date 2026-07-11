@@ -7,7 +7,10 @@ import { RegionsPanel } from './regions-panel';
 
 describe('RegionsPanel', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [RegionsPanel, provideTranslocoTesting()], providers: provideHexMapStoreTesting() }).compileComponents();
+    await TestBed.configureTestingModule({
+      imports: [RegionsPanel, provideTranslocoTesting()],
+      providers: provideHexMapStoreTesting(),
+    }).compileComponents();
   });
 
   function render() {
@@ -17,9 +20,7 @@ describe('RegionsPanel', () => {
   }
 
   function items(el: HTMLElement) {
-    return Array.from(
-      el.querySelectorAll('[data-testid=region-item]'),
-    ) as HTMLElement[];
+    return Array.from(el.querySelectorAll('[data-testid=region-item]')) as HTMLElement[];
   }
 
   it('lists every Region with its name and colour swatch, including emptied ones', () => {
@@ -44,9 +45,7 @@ describe('RegionsPanel', () => {
     const store = TestBed.inject(HexMapStore);
     const fixture = render();
 
-    (
-      fixture.nativeElement.querySelector('[data-testid=new-region]') as HTMLButtonElement
-    ).click();
+    (fixture.nativeElement.querySelector('[data-testid=new-region]') as HTMLButtonElement).click();
     fixture.detectChanges();
 
     expect(store.document().regions).toHaveLength(1);
@@ -62,12 +61,8 @@ describe('RegionsPanel', () => {
     const el = fixture.nativeElement as HTMLElement;
 
     expect(el.querySelector('header')?.textContent).toContain('Régions');
-    expect(el.querySelector('[data-testid=new-region]')?.textContent).toContain(
-      'Nouvelle région',
-    );
-    expect(el.querySelector('.muted')?.textContent).toContain(
-      'Aucune région pour le moment.',
-    );
+    expect(el.querySelector('[data-testid=new-region]')?.textContent).toContain('Nouvelle région');
+    expect(el.querySelector('.muted')?.textContent).toContain('Aucune région pour le moment.');
   });
 
   it('never translates a user-typed Region name, even one that collides with UI copy', () => {
@@ -77,11 +72,9 @@ describe('RegionsPanel', () => {
     TestBed.inject(TranslocoService).setActiveLang('fr');
     fixture.detectChanges();
 
-    expect(
-      items(fixture.nativeElement)[0]
-        .querySelector('[data-testid=region-name]')
-        ?.textContent?.trim(),
-    ).toBe('Terrain');
+    expect(items(fixture.nativeElement)[0].querySelector('[data-testid=region-name]')?.textContent?.trim()).toBe(
+      'Terrain',
+    );
   });
 
   it('routes a list selection through the shared store selection, even for an empty Region', () => {

@@ -75,7 +75,11 @@ export interface Feature {
  * {@link FeatureId} is a real union, not `string`.
  */
 export const featureLibrary = [
-  { id: 'settlement', label: 'Settlement', path: 'M5 19v-7l7-5 7 5v7z M10 19v-4h4v4' },
+  {
+    id: 'settlement',
+    label: 'Settlement',
+    path: 'M5 19v-7l7-5 7 5v7z M10 19v-4h4v4',
+  },
   { id: 'ruin', label: 'Ruin', path: 'M5 20V9l3 2V7l3 2V6l3 3 3-3v14z' },
 ] as const satisfies readonly Feature[];
 

@@ -43,10 +43,6 @@ export class CommandRegistry {
           tap((commands) => this.lastResults.set(p, commands)),
         ),
       ),
-    ).pipe(
-      map((results) =>
-        matching.map((provider, i) => ({ provider, commands: results[i] })),
-      ),
-    );
+    ).pipe(map((results) => matching.map((provider, i) => ({ provider, commands: results[i] }))));
   }
 }

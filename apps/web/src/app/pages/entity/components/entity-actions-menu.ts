@@ -1,10 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  output,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Button, Icon, MenuItem, MenuItemCheckbox, MenuPanel, MenuTrigger } from '@hexly/web-ui';
 import { EntitySession } from '../services/entity-session';
@@ -22,15 +16,7 @@ import { ActiveWorld } from '@hexly/web-core';
   selector: 'app-entity-actions-menu',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'contents' },
-  imports: [
-    MenuTrigger,
-    MenuPanel,
-    MenuItem,
-    MenuItemCheckbox,
-    Button,
-    Icon,
-    TranslocoPipe,
-  ],
+  imports: [MenuTrigger, MenuPanel, MenuItem, MenuItemCheckbox, Button, Icon, TranslocoPipe],
   template: `
     @if (editable() || canPin() || manageable()) {
       <button
@@ -49,57 +35,50 @@ import { ActiveWorld } from '@hexly/web-core';
 
     <ng-template #actionsMenu>
       <div appMenuPanel>
-      @if (editable()) {
-        <!-- Visibility toggle (ADR-0037, #160): an Owner flips the Entity between
+        @if (editable()) {
+          <!-- Visibility toggle (ADR-0037, #160): an Owner flips the Entity between
              private and shared. A non-Owner's flip is refused server-side (403). -->
-        <button
-          type="button"
-          appMenuItemCheckbox
-          [checked]="shared()"
-          data-testid="visibility-toggle"
-          [attr.aria-label]="'editorShell.visibility.toggle' | transloco"
-          (triggered)="toggleVisibility()"
-        >
-          <span>{{
-            (shared()
-              ? 'editorShell.visibility.shared'
-              : 'editorShell.visibility.private') | transloco
-          }}</span>
-        </button>
-      }
+          <button
+            type="button"
+            appMenuItemCheckbox
+            [checked]="shared()"
+            data-testid="visibility-toggle"
+            [attr.aria-label]="'editorShell.visibility.toggle' | transloco"
+            (triggered)="toggleVisibility()"
+          >
+            <span>{{
+              (shared() ? 'editorShell.visibility.shared' : 'editorShell.visibility.private') | transloco
+            }}</span>
+          </button>
+        }
 
-      @if (canPin()) {
-        <!-- Pin to Dashboard (ADR-0043, #169): a World Owner features the open Entity on
+        @if (canPin()) {
+          <!-- Pin to Dashboard (ADR-0043, #169): a World Owner features the open Entity on
              the World Dashboard without a trip to the Dashboard picker. Hidden for
              non-Owners; the check reflects the shared pin set, so it reads right on load. -->
-        <button
-          type="button"
-          appMenuItemCheckbox
-          [checked]="pinned()"
-          data-testid="pin-toggle"
-          [attr.aria-label]="'editorShell.pin.toggle' | transloco"
-          (triggered)="togglePin()"
-        >
-          <span>{{ 'editorShell.pin.pin' | transloco }}</span>
-        </button>
-      }
+          <button
+            type="button"
+            appMenuItemCheckbox
+            [checked]="pinned()"
+            data-testid="pin-toggle"
+            [attr.aria-label]="'editorShell.pin.toggle' | transloco"
+            (triggered)="togglePin()"
+          >
+            <span>{{ 'editorShell.pin.pin' | transloco }}</span>
+          </button>
+        }
 
-      @if (manageable()) {
-        <!-- Share (owner/grant/link management) is an owner-only power (ADR-0037) — hidden
+        @if (manageable()) {
+          <!-- Share (owner/grant/link management) is an owner-only power (ADR-0037) — hidden
              for every non-Owner opener, including writers (an entity-level Editor, a World
              Owner) whose write access wouldn't carry the owner-gated dialog endpoints. -->
-        <button
-          type="button"
-          appMenuItem
-          data-testid="manage-owners"
-          (triggered)="share.emit()"
-        >
-          <span class="flex items-center gap-2">
-            <app-icon name="share" [size]="16" />
-            {{ 'editorShell.share' | transloco }}
-          </span>
-        </button>
-      }
+          <button type="button" appMenuItem data-testid="manage-owners" (triggered)="share.emit()">
+            <span class="flex items-center gap-2">
+              <app-icon name="share" [size]="16" />
+              {{ 'editorShell.share' | transloco }}
+            </span>
+          </button>
+        }
       </div>
     </ng-template>
   `,
@@ -122,18 +101,14 @@ export class EntityActionsMenu {
   protected readonly manageable = this.session.manageable;
 
   /** Whether the open Entity is `shared` (drives the toggle's checked state and label). */
-  protected readonly shared = computed(
-    () => this.session.current()?.visibility === 'shared',
-  );
+  protected readonly shared = computed(() => this.session.current()?.visibility === 'shared');
 
   /**
    * Whether the caller is a World Owner (`manage` Right on the active World, ADR-0039) —
    * gates the Pin toggle, matching the World Dashboard's curation controls (#168). A
    * non-Owner's pin would 403 server-side, so the toggle stays hidden entirely.
    */
-  protected readonly canPin = computed(
-    () => this.activeWorld.world()?.rights.includes('manage') ?? false,
-  );
+  protected readonly canPin = computed(() => this.activeWorld.world()?.rights.includes('manage') ?? false);
 
   /** Whether the open Entity sits in the World's shared pin set (drives the checked state). */
   protected readonly pinned = computed(() => {
@@ -162,8 +137,6 @@ export class EntityActionsMenu {
     // Swallow like commit()'s rename: a rejected flip (e.g. a 403 from a writable-then-revoked
     // race) is a graceful no-op — the checked state stays bound to the server's Visibility, so
     // there's nothing to revert — not an unhandled RxJS error.
-    this.session
-      .setVisibility(this.shared() ? 'private' : 'shared')
-      .subscribe({ error: () => undefined });
+    this.session.setVisibility(this.shared() ? 'private' : 'shared').subscribe({ error: () => undefined });
   }
 }

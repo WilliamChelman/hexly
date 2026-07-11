@@ -56,10 +56,7 @@ export function segRe(id: string): string {
  */
 export function waitForSave(page: Page): Promise<Response> {
   return page.waitForResponse(
-    (res) =>
-      res.request().method() === 'PUT' &&
-      /\/api\/entities\/[\w-]+$/.test(res.url()) &&
-      res.ok(),
+    (res) => res.request().method() === 'PUT' && /\/api\/entities\/[\w-]+$/.test(res.url()) && res.ok(),
   );
 }
 
@@ -96,7 +93,10 @@ export async function enterLibrary(page: Page): Promise<string> {
   await page.goto('/');
   // The card lands on the World Dashboard — the World root (ADR-0043); the rail's
   // Library link enters the Entity browser from there.
-  await page.getByTestId(/^world-/).first().click();
+  await page
+    .getByTestId(/^world-/)
+    .first()
+    .click();
   await page.getByRole('link', { name: 'Library' }).click();
   await page.waitForURL(/\/w\/[\w-]+\/entities$/);
   return page.url().match(/\/w\/([\w-]+)\/entities/)![1];

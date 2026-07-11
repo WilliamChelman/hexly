@@ -34,7 +34,7 @@ describe('CommandRegistry', () => {
     expect(sections).toEqual([]);
   });
 
-  it('includes a registered provider\'s commands in its prefix\'s search', async () => {
+  it("includes a registered provider's commands in its prefix's search", async () => {
     const p = provider('', [command('a')]);
     registry.register(p);
 
@@ -73,8 +73,16 @@ describe('CommandRegistry', () => {
   it('keeps sections in registration order as a slower provider resolves later', () => {
     const fastResults = new Subject<Command[]>();
     const slowResults = new Subject<Command[]>();
-    const fast: CommandProvider = { prefix: '', label: 'fast', search: () => fastResults };
-    const slow: CommandProvider = { prefix: '', label: 'slow', search: () => slowResults };
+    const fast: CommandProvider = {
+      prefix: '',
+      label: 'fast',
+      search: () => fastResults,
+    };
+    const slow: CommandProvider = {
+      prefix: '',
+      label: 'slow',
+      search: () => slowResults,
+    };
     // Registered slow-then-fast: the slower provider must stay first even though
     // its own results resolve after the faster one's (ADR-0032).
     registry.register(slow);
@@ -96,10 +104,14 @@ describe('CommandRegistry', () => {
     ]);
   });
 
-  it('seeds a new query with the provider\'s previous results (no blank between queries)', () => {
+  it("seeds a new query with the provider's previous results (no blank between queries)", () => {
     const results = new Subject<Command[]>();
     // One provider whose emissions the test drives; it ignores the query text.
-    const p: CommandProvider = { prefix: '', label: 'p', search: () => results };
+    const p: CommandProvider = {
+      prefix: '',
+      label: 'p',
+      search: () => results,
+    };
     registry.register(p);
 
     // First query resolves to [a].

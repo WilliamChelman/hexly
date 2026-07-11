@@ -1,8 +1,5 @@
 import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { ImportSummary, WorldDetail, WorldGraph, WorldSummary } from '@hexly/domain';
 import { WorldsClient, WORLD_NUDGE_DEBOUNCE_MS } from './worlds.client';
@@ -23,7 +20,12 @@ describe('WorldsClient', () => {
     createdAt: 1,
     updatedAt: 1,
   };
-  const detail: WorldDetail = { ...summary, entityCount: 1, pinnedEntityIds: [], seq: 1 };
+  const detail: WorldDetail = {
+    ...summary,
+    entityCount: 1,
+    pinnedEntityIds: [],
+    seq: 1,
+  };
   const graph: WorldGraph = {
     nodes: [
       { id: 'e1', name: 'Ealdred', types: ['core.note'] },
@@ -35,11 +37,7 @@ describe('WorldsClient', () => {
   beforeEach(() => {
     bus = new MockNudgeBusClient();
     TestBed.configureTestingModule({
-      providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        { provide: NudgeBusClient, useValue: bus },
-      ],
+      providers: [provideHttpClient(), provideHttpClientTesting(), { provide: NudgeBusClient, useValue: bus }],
     });
     client = TestBed.inject(WorldsClient);
     http = TestBed.inject(HttpTestingController);
@@ -150,7 +148,9 @@ describe('WorldsClient', () => {
     const req = http.expectOne('/api/worlds/w1/export');
     expect(req.request.method).toBe('GET');
     expect(req.request.responseType).toBe('blob');
-    const zip = new Blob([new Uint8Array([1, 2, 3])], { type: 'application/zip' });
+    const zip = new Blob([new Uint8Array([1, 2, 3])], {
+      type: 'application/zip',
+    });
     req.flush(zip);
 
     expect(got).toBe(zip);

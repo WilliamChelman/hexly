@@ -117,7 +117,10 @@ export function createEntityLinkNodeView(
   elementInjector: Injector,
   appRef: ApplicationRef,
 ): NodeView {
-  const ref = createComponent(EntityLinkView, { environmentInjector, elementInjector });
+  const ref = createComponent(EntityLinkView, {
+    environmentInjector,
+    elementInjector,
+  });
   const apply = (n: ProseMirrorNode) => {
     ref.setInput('entityId', n.attrs['entityId'] ?? '');
     ref.setInput('label', n.attrs['label'] ?? '');

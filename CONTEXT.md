@@ -9,11 +9,11 @@ The top-level thing a user creates, owns, and shares. Carries a `name`, an order
 _Avoid_: Document, page, record, object
 
 **Entity Type**:
-A user-facing identity an Entity carries — `core.note`, `core.hexmap`, `dnd.monster`, `world.deity`. An **open**, `namespace.id`-keyed set (contrast the closed **Payload Kind** it maps to). Each type declares an optional payload addon, a **Field** schema, a view, and its facetable Fields. An Entity holds an **ordered set** of types; the first is *primary* — driving its icon, default view, and headline. Two flavours: a **Plugin type** (code, instance-wide, bespoke view) and a **User-defined type** (data, World-scoped, generic view).
+A user-facing identity an Entity carries — `core.note`, `core.hexmap`, `dnd.monster`, `world.deity`. An **open**, `namespace.id`-keyed set (contrast the closed **Payload Kind** it maps to). Each type declares an optional payload addon, a **Field** schema, a view, and its facetable Fields. An Entity holds an **ordered set** of types; the first is _primary_ — driving its icon, default view, and headline. Two flavours: a **Plugin type** (code, instance-wide, bespoke view) and a **User-defined type** (data, World-scoped, generic view).
 _Avoid_: Kind, category, class
 
 **Payload Kind**:
-The body shape and editing surface an **Entity Type** maps to — a **closed, code-known** set: `rich-content` (the base every Entity has: Content + Metadata — formerly the `note` payload) and `hex-grid` (an *additive addon* over that base). Payloads compose rather than rival: a Hex Map is `rich-content` + `hex-grid`. What actually discriminates the stored document — distinct from the open, user-facing Entity Type.
+The body shape and editing surface an **Entity Type** maps to — a **closed, code-known** set: `rich-content` (the base every Entity has: Content + Metadata — formerly the `note` payload) and `hex-grid` (an _additive addon_ over that base). Payloads compose rather than rival: a Hex Map is `rich-content` + `hex-grid`. What actually discriminates the stored document — distinct from the open, user-facing Entity Type.
 _Avoid_: Body type, document type, schema, variant
 
 **View**:
@@ -21,7 +21,7 @@ A distinct togglable renderer + editor an Entity affords — today's Note/Map to
 _Avoid_: Surface (kept only for informal prose like "landing surface"), tab, mode, panel
 
 **Field**:
-A structured, typed slot an **Entity Type** gives to a specific **Metadata** key — a name, a data-type (scalar, enum, date, list, or a typed **Entity Link**), and whether it is facetable. A typing *lens* over Metadata, not a separate store: values live in the one Metadata map, so a missing plugin leaves them as plain Metadata. Validated *forward-only* — enforced on active typed edits, tolerated on imported or at-rest data.
+A structured, typed slot an **Entity Type** gives to a specific **Metadata** key — a name, a data-type (scalar, enum, date, list, or a typed **Entity Link**), and whether it is facetable. A typing _lens_ over Metadata, not a separate store: values live in the one Metadata map, so a missing plugin leaves them as plain Metadata. Validated _forward-only_ — enforced on active typed edits, tolerated on imported or at-rest data.
 _Avoid_: Property, attribute, column, custom field
 
 **Type Definition**:
@@ -41,7 +41,7 @@ A binary file — typically an image, but also a PDF or other media — belongin
 _Avoid_: Attachment, file, blob, media, upload
 
 **Tag**:
-A free-text label on an Entity, for flavour and informal grouping (e.g. "ruined", "northern reach") — user-invented on the spot, carrying no behaviour. Both Tags and **Entity Types** are multi-valued labels; the line between them is *registration*: a Type is a registered category (Plugin or World-defined) carrying Fields, a view, and facets, whereas a Tag is not. "Deity" is a Tag until someone defines it as a Type.
+A free-text label on an Entity, for flavour and informal grouping (e.g. "ruined", "northern reach") — user-invented on the spot, carrying no behaviour. Both Tags and **Entity Types** are multi-valued labels; the line between them is _registration_: a Type is a registered category (Plugin or World-defined) carrying Fields, a view, and facets, whereas a Tag is not. "Deity" is a Tag until someone defines it as a Type.
 _Avoid_: Keyword, category, label
 
 **Entity Link**:
@@ -53,7 +53,7 @@ An optional free-text label on a Content Entity Link, characterising the relatio
 _Avoid_: Relationship, relation, role, type
 
 **Map element**:
-A placed thing *within* a Hex Map — a Hex, Feature, Region, or Label — that can be selected and moved, and (except a Label) can carry an Entity Link. The in-map counterpart to a top-level Entity. (Formerly called "entity" informally; renamed to free that word for the top-level type.)
+A placed thing _within_ a Hex Map — a Hex, Feature, Region, or Label — that can be selected and moved, and (except a Label) can carry an Entity Link. The in-map counterpart to a top-level Entity. (Formerly called "entity" informally; renamed to free that word for the top-level type.)
 _Avoid_: Entity, item, object
 
 ## Language
@@ -63,7 +63,7 @@ An **Entity** carrying the `core.hexmap` type — the type that adds the `hex-gr
 _Avoid_: Map document, board, canvas
 
 **Hex**:
-A cell the user has given content to, stored at its coordinate. The map is an infinite plane, so a Hex exists *only* where painted — there is no bounded grid of pre-existing cells. Carries exactly one terrain, plus optional content: at most one feature and an optional name.
+A cell the user has given content to, stored at its coordinate. The map is an infinite plane, so a Hex exists _only_ where painted — there is no bounded grid of pre-existing cells. Carries exactly one terrain, plus optional content: at most one feature and an optional name.
 _Avoid_: Cell, tile, square
 
 **Void**:
@@ -105,7 +105,7 @@ A lightweight container record that groups Entities for a single campaign or set
 _Avoid_: Space, container, campaign
 
 **World Dashboard**:
-The per-World landing surface at `/w/:worldId` — the front door on entering a World. A read-only *derived* view (recent Entities, Hex Maps, at-a-glance counts) plus the Owners' curated Pinned Entities. It authors nothing of its own — so authored landing prose, if wanted, is just a Note the Owner pins. Distinct from the World Index (lists Worlds, at `/`) and the Entity Browser (lists this World's Entities, at `/entities`).
+The per-World landing surface at `/w/:worldId` — the front door on entering a World. A read-only _derived_ view (recent Entities, Hex Maps, at-a-glance counts) plus the Owners' curated Pinned Entities. It authors nothing of its own — so authored landing prose, if wanted, is just a Note the Owner pins. Distinct from the World Index (lists Worlds, at `/`) and the Entity Browser (lists this World's Entities, at `/entities`).
 _Avoid_: Home Entity, world home, landing page, overview
 
 **Pinned Entity**:
@@ -121,7 +121,7 @@ The compact in-app control at the nav-rail masthead for hopping to another reach
 _Avoid_: World selector, world dropdown
 
 **World Graph**:
-A per-World view of its Entities as nodes and their Entity Links as edges — the node-link picture of how a World's Entities connect. Entity-only (Assets are never nodes) and access-filtered per viewer: an Entity appears only if the viewer can read it, and an edge only when the viewer can read *both* endpoints — so it never reveals a `private` Entity. Orphan Entities (no links) still appear, as isolated nodes. A derived, read-only view — sibling to the World Dashboard and Entity Browser.
+A per-World view of its Entities as nodes and their Entity Links as edges — the node-link picture of how a World's Entities connect. Entity-only (Assets are never nodes) and access-filtered per viewer: an Entity appears only if the viewer can read it, and an edge only when the viewer can read _both_ endpoints — so it never reveals a `private` Entity. Orphan Entities (no links) still appear, as isolated nodes. A derived, read-only view — sibling to the World Dashboard and Entity Browser.
 _Avoid_: web, network, mind map, relationship map, world map (collides with Hex Map)
 
 **World Owner**:
@@ -143,7 +143,7 @@ _Avoid_: Share link, invite link
 ## Sharing
 
 **Rights**:
-The closed set of actions a given caller may perform on a specific Entity or World — e.g. reading it, editing its substance, deleting it, changing its visibility, managing its sharing. Derived from the sharing rules (a caller's standing as Owner, grantee, or member) rather than granted directly. The vocabulary is per resource kind: a World is not something one "edits the substance" of. Distinct from a role (Owner, Editor, Contributor… — a collaboration role, not an Instance Role), which is *why* a caller holds a Right; the Rights are the resolved *what*.
+The closed set of actions a given caller may perform on a specific Entity or World — e.g. reading it, editing its substance, deleting it, changing its visibility, managing its sharing. Derived from the sharing rules (a caller's standing as Owner, grantee, or member) rather than granted directly. The vocabulary is per resource kind: a World is not something one "edits the substance" of. Distinct from a role (Owner, Editor, Contributor… — a collaboration role, not an Instance Role), which is _why_ a caller holds a Right; the Rights are the resolved _what_.
 _Avoid_: Permissions, ACL, capabilities, grants (a grant is one input to Rights, not the Rights)
 
 **Entity Visibility**:
@@ -167,7 +167,7 @@ An unguessable, unlisted URL that grants read-only access to a specific Entity w
 _Avoid_: Share link, public URL, share token
 
 **Live-follow**:
-A viewer in read mode seeing another user's *committed* changes to the Entity or World they are looking at appear on their own screen without a manual refresh — e.g. a player watching a `shared` Hex Map the GM is editing, or a World Dashboard whose pins the Owner is reordering. Applies to committed versions, not keystrokes. Extends to anonymous World/Entity Public Link viewers. If the followed resource becomes unreachable (made `private`, un-shared, link revoked, or deleted), the follower's view is evicted rather than left stale. Never overwrites the follower's own unsaved edits: an editor with local changes keeps them and resolves the concurrent edit at save time.
+A viewer in read mode seeing another user's _committed_ changes to the Entity or World they are looking at appear on their own screen without a manual refresh — e.g. a player watching a `shared` Hex Map the GM is editing, or a World Dashboard whose pins the Owner is reordering. Applies to committed versions, not keystrokes. Extends to anonymous World/Entity Public Link viewers. If the followed resource becomes unreachable (made `private`, un-shared, link revoked, or deleted), the follower's view is evicted rather than left stale. Never overwrites the follower's own unsaved edits: an editor with local changes keeps them and resolves the concurrent edit at save time.
 _Avoid_: Real-time sync, live editing, collaboration, streaming
 
 ## Placement modes
@@ -181,11 +181,11 @@ Every piece of map content sits in exactly one of three placement modes:
 ## Editing tools
 
 **Tool**:
-A top-level editing mode armed in the palette — Select, Terrain, Feature, Label, Erase. Exactly one is armed at a time, and a canvas gesture applies it. A map opens armed with Select (its Pick Subtool). Region is *not* a palette Tool: Regions are created in the Regions panel and their membership is painted via the Inspector's Add/Remove brush.
+A top-level editing mode armed in the palette — Select, Terrain, Feature, Label, Erase. Exactly one is armed at a time, and a canvas gesture applies it. A map opens armed with Select (its Pick Subtool). Region is _not_ a palette Tool: Regions are created in the Regions panel and their membership is painted via the Inspector's Add/Remove brush.
 _Avoid_: Mode, brush, instrument
 
 **Subtool**:
-A mutually-exclusive variant *within* a Tool — the Terrain tool's individual terrains, the Feature tool's individual features (and its Clear variant), and the Select tool's **Pick** and **Marquee**. Tools that have Subtools remember the last one used for the session. Label and Erase have no Subtools.
+A mutually-exclusive variant _within_ a Tool — the Terrain tool's individual terrains, the Feature tool's individual features (and its Clear variant), and the Select tool's **Pick** and **Marquee**. Tools that have Subtools remember the last one used for the session. Label and Erase have no Subtools.
 _Avoid_: Sub-mode, option, variant
 
 **Select**:
@@ -197,7 +197,7 @@ The set of Map elements (Hexes, Features, Labels, Regions) currently picked out 
 _Avoid_: Highlight, focus, active item
 
 **Pick**:
-The default Select Subtool: click selects the topmost entity under the cursor and drag moves the whole Selection. Repeated plain clicks at one coordinate cycle *deeper* through the stack — `Label → Feature → Hex → each Region containing that coordinate (document order) → wrap` — so an overlapped or interior Region becomes reachable. A plain click replaces the Selection; Cmd/Ctrl-click toggles the topmost entity in it; Shift-click toggles the whole stack at that coordinate; a click on empty space clears it.
+The default Select Subtool: click selects the topmost entity under the cursor and drag moves the whole Selection. Repeated plain clicks at one coordinate cycle _deeper_ through the stack — `Label → Feature → Hex → each Region containing that coordinate (document order) → wrap` — so an overlapped or interior Region becomes reachable. A plain click replaces the Selection; Cmd/Ctrl-click toggles the topmost entity in it; Shift-click toggles the whole stack at that coordinate; a click on empty space clears it.
 _Avoid_: Move tool, arrow
 
 **Marquee**:
@@ -205,11 +205,11 @@ The Select Subtool that drags a rectangle to select every Hex and Label within i
 _Avoid_: Rubber band, lasso, box select
 
 **Erase**:
-The Tool that deletes a whole Hex record (its terrain *and* feature), turning the coordinate back into Void. Distinct from the Feature tool's Clear Subtool, which removes only the feature and leaves the terrain.
+The Tool that deletes a whole Hex record (its terrain _and_ feature), turning the coordinate back into Void. Distinct from the Feature tool's Clear Subtool, which removes only the feature and leaves the terrain.
 _Avoid_: Delete, clear, remove
 
 **Inspector**:
-The surface that shows and edits the currently selected Map element, including its Entity Link. For a Label it edits text/size/rotation/position; for a Region it edits name, color, deletion, and the Add/Remove membership direction — the *only* place Region details are edited. Engaging a Region's Add/Remove here arms the Region membership brush on that Region — the only way to arm it.
+The surface that shows and edits the currently selected Map element, including its Entity Link. For a Label it edits text/size/rotation/position; for a Region it edits name, color, deletion, and the Add/Remove membership direction — the _only_ place Region details are edited. Engaging a Region's Add/Remove here arms the Region membership brush on that Region — the only way to arm it.
 _Avoid_: Side panel, details pane, properties
 
 **Regions panel**:
@@ -233,7 +233,7 @@ The durable, in-World surface that lists a single World's Entities as a card gri
 _Avoid_: Entity list, library, catalog, explorer; fuzzy search (the query is full-text, ranked by relevance)
 
 **Facet**:
-A filterable dimension of a World's Entities offered in the Entity Browser with its distinct values and their counts — Type, Tag, and Visibility always, plus a Type's facetable **Fields** shown *contextually* (a type's Field Facets unfold only once that type is the active filter). Selecting values within one Facet is OR; across Facets is AND; the combined filter is AND-ed with the text query.
+A filterable dimension of a World's Entities offered in the Entity Browser with its distinct values and their counts — Type, Tag, and Visibility always, plus a Type's facetable **Fields** shown _contextually_ (a type's Field Facets unfold only once that type is the active filter). Selecting values within one Facet is OR; across Facets is AND; the combined filter is AND-ed with the text query.
 _Avoid_: Filter, dimension, aspect
 
 ## Outline

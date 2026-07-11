@@ -20,8 +20,7 @@ export class ViewRegistry {
 
   register(definition: ViewDefinition): () => void {
     this.definitions.update((list) => [...list, definition]);
-    return () =>
-      this.definitions.update((list) => list.filter((d) => d !== definition));
+    return () => this.definitions.update((list) => list.filter((d) => d !== definition));
   }
 
   /** The definition registered for `id`, or `undefined` for an unregistered View. */

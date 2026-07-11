@@ -17,21 +17,11 @@ import { HexMapStore } from '../services/hexmap-store';
   template: `
     @let r = region();
     <div appField [label]="'editorShell.inspector.name' | transloco">
-      <input
-        appInput
-        [value]="r.name"
-        data-testid="region-name"
-        (change)="onName(r.id, $event)"
-      />
+      <input appInput [value]="r.name" data-testid="region-name" (change)="onName(r.id, $event)" />
     </div>
 
     <div appField [label]="'editorShell.inspector.color' | transloco">
-      <input
-        type="color"
-        [value]="r.color"
-        data-testid="region-color"
-        (change)="onColor(r.id, $event)"
-      />
+      <input type="color" [value]="r.color" data-testid="region-color" (change)="onColor(r.id, $event)" />
     </div>
   `,
 })

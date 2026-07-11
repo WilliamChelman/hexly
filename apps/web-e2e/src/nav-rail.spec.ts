@@ -5,9 +5,7 @@ import { enterLibrary, expect, openEntityActions, test } from './fixtures';
  * signed-in user. The rail is the only persistent chrome; each page renders its
  * own header. Responsive push-vs-overlay is exercised by setting the viewport.
  */
-test('the rail navigates, exposes account controls, and pages own their headers', async ({
-  page,
-}) => {
+test('the rail navigates, exposes account controls, and pages own their headers', async ({ page }) => {
   await enterLibrary(page);
 
   await expect(page.getByRole('button', { name: 'Expand navigation' })).toBeVisible();
@@ -15,9 +13,7 @@ test('the rail navigates, exposes account controls, and pages own their headers'
 
   // Account + appearance live behind the avatar.
   await page.getByRole('button', { name: 'Open user menu' }).click();
-  await expect(
-    page.getByRole('menuitem', { name: /Switch to (solar|astral) theme/ }),
-  ).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: /Switch to (solar|astral) theme/ })).toBeVisible();
   await expect(page.getByRole('menuitemradio', { name: 'Français' })).toBeVisible();
   await expect(page.getByRole('menuitem', { name: 'Sign out' })).toBeVisible();
   await page.keyboard.press('Escape');
@@ -38,9 +34,7 @@ test('the rail navigates, exposes account controls, and pages own their headers'
   await expect(page).toHaveURL(/\/entities$/);
 });
 
-test('on a wide viewport the expanded rail pushes the page and is remembered', async ({
-  page,
-}) => {
+test('on a wide viewport the expanded rail pushes the page and is remembered', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await enterLibrary(page);
 
@@ -50,9 +44,7 @@ test('on a wide viewport the expanded rail pushes the page and is remembered', a
   await page.getByRole('button', { name: 'Expand navigation' }).click();
   await expect(page.getByRole('button', { name: 'Collapse navigation' })).toBeVisible();
   // Poll past width transition: docked rail grows in place (pushes).
-  await expect
-    .poll(async () => (await rail.boundingBox())!.width)
-    .toBeGreaterThan(collapsed);
+  await expect.poll(async () => (await rail.boundingBox())!.width).toBeGreaterThan(collapsed);
   // No backdrop: pushes rather than overlays.
   await expect(page.getByTestId('rail-backdrop')).toHaveCount(0);
 
@@ -61,9 +53,7 @@ test('on a wide viewport the expanded rail pushes the page and is remembered', a
   await expect(page.getByRole('button', { name: 'Collapse navigation' })).toBeVisible();
 });
 
-test('on a narrow viewport the expanded rail overlays and dismisses on click-away', async ({
-  page,
-}) => {
+test('on a narrow viewport the expanded rail overlays and dismisses on click-away', async ({ page }) => {
   await page.setViewportSize({ width: 600, height: 800 });
   await enterLibrary(page);
 
@@ -72,9 +62,6 @@ test('on a narrow viewport the expanded rail overlays and dismisses on click-awa
   await expect(page.getByTestId('rail-backdrop')).toBeVisible();
 
   // Choosing a destination collapses the overlay.
-  await page
-    .getByTestId('nav-rail-overlay')
-    .getByRole('link', { name: 'Library' })
-    .click();
+  await page.getByTestId('nav-rail-overlay').getByRole('link', { name: 'Library' }).click();
   await expect(page.getByTestId('rail-backdrop')).toHaveCount(0);
 });

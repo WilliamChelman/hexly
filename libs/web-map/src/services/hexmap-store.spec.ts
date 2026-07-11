@@ -1,10 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { emptyHexMap, HexMap } from '@hexly/domain';
 import { HexMapStore } from './hexmap-store';
-import {
-  FakeEntitySession,
-  provideFakeEntitySession,
-} from '../testing/entity-session.fake';
+import { FakeEntitySession, provideFakeEntitySession } from '../testing/entity-session.fake';
 
 /**
  * The store is now route-scoped and injects the central {@link ENTITY_SESSION} (ADR-0048),
@@ -274,7 +271,9 @@ describe('HexMapStore', () => {
     store.clearFeatureAt({ q: 0, r: 0 });
     store.undo();
 
-    expect(store.document().hexes['0,0'].feature).toEqual({ ref: 'settlement' });
+    expect(store.document().hexes['0,0'].feature).toEqual({
+      ref: 'settlement',
+    });
   });
 
   it('creates a region with the given name and color, returning its id', () => {
@@ -282,9 +281,7 @@ describe('HexMapStore', () => {
 
     const id = store.createRegion('Avalon', '#b08a4e');
 
-    expect(store.document().regions).toEqual([
-      { id, name: 'Avalon', color: '#b08a4e', hexes: {} },
-    ]);
+    expect(store.document().regions).toEqual([{ id, name: 'Avalon', color: '#b08a4e', hexes: {} }]);
   });
 
   it('adds a hex coordinate to a region', () => {
@@ -475,7 +472,12 @@ describe('HexMapStore', () => {
     const id = store.addLabel('The Whisperwood', { x: 120, y: -40 });
 
     expect(store.document().labels).toEqual([
-      { id, text: 'The Whisperwood', position: { x: 120, y: -40 }, size: expect.any(Number) },
+      {
+        id,
+        text: 'The Whisperwood',
+        position: { x: 120, y: -40 },
+        size: expect.any(Number),
+      },
     ]);
   });
 
@@ -600,7 +602,11 @@ describe('HexMapStore', () => {
 
     reload({ hexes: { '2,3': { terrain: 'ocean' } }, regions: [], labels: [] });
 
-    expect(store.document()).toEqual({ hexes: { '2,3': { terrain: 'ocean' } }, regions: [], labels: [] });
+    expect(store.document()).toEqual({
+      hexes: { '2,3': { terrain: 'ocean' } },
+      regions: [],
+      labels: [],
+    });
   });
 
   it('clears undo/redo history when a document is loaded', () => {
@@ -903,7 +909,10 @@ describe('HexMapStore selection precedence', () => {
 
     store.select({ q: 1, r: 2 }, null);
 
-    expect(store.selection()).toEqual({ kind: 'feature', coord: { q: 1, r: 2 } });
+    expect(store.selection()).toEqual({
+      kind: 'feature',
+      coord: { q: 1, r: 2 },
+    });
   });
 
   it('selects a painted Hex that carries no Feature', () => {
@@ -969,11 +978,23 @@ describe('HexMapStore Region selection cycle', () => {
     const labelId = store.addLabel('Avalon', { x: 5, y: 5 }); // a Label hit there too
 
     // The label hit wins first; repeated clicks at the same coordinate descend.
-    expect(store.select({ q: 0, r: 0 }, labelId)).toEqual({ kind: 'label', id: labelId });
-    expect(store.select({ q: 0, r: 0 }, labelId)).toEqual({ kind: 'feature', coord: { q: 0, r: 0 } });
-    expect(store.select({ q: 0, r: 0 }, labelId)).toEqual({ kind: 'region', id });
+    expect(store.select({ q: 0, r: 0 }, labelId)).toEqual({
+      kind: 'label',
+      id: labelId,
+    });
+    expect(store.select({ q: 0, r: 0 }, labelId)).toEqual({
+      kind: 'feature',
+      coord: { q: 0, r: 0 },
+    });
+    expect(store.select({ q: 0, r: 0 }, labelId)).toEqual({
+      kind: 'region',
+      id,
+    });
     // Past the last candidate the cycle wraps back to the top of the stack.
-    expect(store.select({ q: 0, r: 0 }, labelId)).toEqual({ kind: 'label', id: labelId });
+    expect(store.select({ q: 0, r: 0 }, labelId)).toEqual({
+      kind: 'label',
+      id: labelId,
+    });
   });
 
   it('resets to the top of the stack when the next click lands on a different coordinate', () => {
@@ -1112,7 +1133,14 @@ describe('HexMapStore marqueeSelect', () => {
     store.paintAt({ q: 5, r: 5 }, 'grass');
     store.select({ q: 5, r: 5 }, null);
 
-    store.marqueeSelect([{ q: 0, r: 0 }, { q: 1, r: 0 }], [labelId], false);
+    store.marqueeSelect(
+      [
+        { q: 0, r: 0 },
+        { q: 1, r: 0 },
+      ],
+      [labelId],
+      false,
+    );
 
     expect(store.selections()).toEqual([
       { kind: 'hex', coord: { q: 0, r: 0 } },
@@ -1128,7 +1156,14 @@ describe('HexMapStore marqueeSelect', () => {
     store.paintAt({ q: 2, r: 0 }, 'grass');
 
     store.marqueeSelect([{ q: 0, r: 0 }], [], false); // first box
-    store.marqueeSelect([{ q: 1, r: 0 }, { q: 2, r: 0 }], [], true); // add a second box
+    store.marqueeSelect(
+      [
+        { q: 1, r: 0 },
+        { q: 2, r: 0 },
+      ],
+      [],
+      true,
+    ); // add a second box
 
     expect(store.selections()).toEqual([
       { kind: 'hex', coord: { q: 0, r: 0 } },
@@ -1143,7 +1178,14 @@ describe('HexMapStore marqueeSelect', () => {
     store.paintAt({ q: 1, r: 0 }, 'ocean');
 
     store.marqueeSelect([{ q: 0, r: 0 }], [], false);
-    store.marqueeSelect([{ q: 0, r: 0 }, { q: 1, r: 0 }], [], true); // overlaps the first box
+    store.marqueeSelect(
+      [
+        { q: 0, r: 0 },
+        { q: 1, r: 0 },
+      ],
+      [],
+      true,
+    ); // overlaps the first box
 
     expect(store.selections()).toEqual([
       { kind: 'hex', coord: { q: 0, r: 0 } },
@@ -1184,7 +1226,10 @@ describe('HexMapStore marqueePreview', () => {
     store.select({ q: 9, r: 9 }, null);
 
     const preview = store.marqueePreview(
-      [{ q: 0, r: 0 }, { q: 1, r: 0 }],
+      [
+        { q: 0, r: 0 },
+        { q: 1, r: 0 },
+      ],
       [labelId],
       false,
     );
@@ -1517,7 +1562,14 @@ describe('HexMapStore moveSelection', () => {
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.placeFeatureAt({ q: 0, r: 0 }, 'settlement');
     store.paintAt({ q: 1, r: 0 }, 'ocean');
-    store.marqueeSelect([{ q: 0, r: 0 }, { q: 1, r: 0 }], [], false);
+    store.marqueeSelect(
+      [
+        { q: 0, r: 0 },
+        { q: 1, r: 0 },
+      ],
+      [],
+      false,
+    );
 
     store.moveSelection({ q: 0, r: 2 }, ZERO);
 
@@ -1544,7 +1596,14 @@ describe('HexMapStore moveSelection', () => {
     const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.paintAt({ q: 1, r: 0 }, 'ocean');
-    store.marqueeSelect([{ q: 0, r: 0 }, { q: 1, r: 0 }], [], false);
+    store.marqueeSelect(
+      [
+        { q: 0, r: 0 },
+        { q: 1, r: 0 },
+      ],
+      [],
+      false,
+    );
 
     store.moveSelection({ q: 1, r: 0 }, ZERO);
 
@@ -1560,7 +1619,14 @@ describe('HexMapStore moveSelection', () => {
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.paintAt({ q: 0, r: 1 }, 'grass');
     store.paintAt({ q: 3, r: 0 }, 'ocean'); // a non-selected occupant at one destination
-    store.marqueeSelect([{ q: 0, r: 0 }, { q: 0, r: 1 }], [], false);
+    store.marqueeSelect(
+      [
+        { q: 0, r: 0 },
+        { q: 0, r: 1 },
+      ],
+      [],
+      false,
+    );
 
     store.moveSelection({ q: 3, r: 0 }, ZERO);
 
@@ -1576,7 +1642,14 @@ describe('HexMapStore moveSelection', () => {
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.paintAt({ q: 1, r: 0 }, 'ocean');
     store.paintAt({ q: 2, r: 0 }, 'mountain'); // X: pushing it back lands where A is going
-    store.marqueeSelect([{ q: 0, r: 0 }, { q: 1, r: 0 }], [], false);
+    store.marqueeSelect(
+      [
+        { q: 0, r: 0 },
+        { q: 1, r: 0 },
+      ],
+      [],
+      false,
+    );
     const before = structuredClone(store.document());
 
     store.moveSelection({ q: 1, r: 0 }, ZERO);
@@ -1590,7 +1663,7 @@ describe('HexMapStore moveSelection', () => {
     expect(store.canRedo()).toBe(true);
   });
 
-  it('translates a selected region\'s footprint by the offset, keeping it selected', () => {
+  it("translates a selected region's footprint by the offset, keeping it selected", () => {
     const store = makeStore();
     const id = store.createRegion('Avalon', '#b08a4e');
     store.addHexToRegion(id, { q: 0, r: 0 });
@@ -1599,7 +1672,10 @@ describe('HexMapStore moveSelection', () => {
 
     store.moveSelection({ q: 0, r: 3 }, ZERO);
 
-    expect(store.document().regions[0].hexes).toEqual({ '0,3': true, '1,3': true });
+    expect(store.document().regions[0].hexes).toEqual({
+      '0,3': true,
+      '1,3': true,
+    });
     expect(store.selection()).toEqual({ kind: 'region', id });
   });
 
@@ -1654,7 +1730,10 @@ describe('HexMapStore moveSelection', () => {
       feature: { ref: 'settlement' },
     });
     expect('0,0' in store.document().hexes).toBe(false);
-    expect(store.selection()).toEqual({ kind: 'feature', coord: { q: 2, r: -1 } });
+    expect(store.selection()).toEqual({
+      kind: 'feature',
+      coord: { q: 2, r: -1 },
+    });
   });
 
   it('swaps a single selected hex onto an occupant, selecting only the moved record', () => {
@@ -1667,8 +1746,14 @@ describe('HexMapStore moveSelection', () => {
 
     store.moveSelection({ q: 1, r: 0 }, ZERO);
 
-    expect(store.document().hexes['1,0']).toEqual({ terrain: 'forest', name: 'Riverbend' });
-    expect(store.document().hexes['0,0']).toEqual({ terrain: 'ocean', name: 'The Deep' });
+    expect(store.document().hexes['1,0']).toEqual({
+      terrain: 'forest',
+      name: 'Riverbend',
+    });
+    expect(store.document().hexes['0,0']).toEqual({
+      terrain: 'ocean',
+      name: 'The Deep',
+    });
     // Only the moved hex follows; the swapped-back occupant is not in the selection.
     expect(store.selection()).toEqual({ kind: 'hex', coord: { q: 1, r: 0 } });
   });
@@ -1677,7 +1762,14 @@ describe('HexMapStore moveSelection', () => {
     const store = makeStore();
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.paintAt({ q: 1, r: 0 }, 'ocean');
-    store.marqueeSelect([{ q: 0, r: 0 }, { q: 1, r: 0 }], [], false);
+    store.marqueeSelect(
+      [
+        { q: 0, r: 0 },
+        { q: 1, r: 0 },
+      ],
+      [],
+      false,
+    );
 
     store.moveSelection({ q: 0, r: 2 }, ZERO);
     store.undo();
@@ -1732,7 +1824,14 @@ describe('HexMapStore moveSelection', () => {
     store.paintAt({ q: 0, r: 0 }, 'forest');
     store.paintAt({ q: 1, r: 0 }, 'ocean');
     store.paintAt({ q: 2, r: 0 }, 'grass'); // a non-selected occupant on B's destination
-    store.marqueeSelect([{ q: 0, r: 0 }, { q: 1, r: 0 }], [], false);
+    store.marqueeSelect(
+      [
+        { q: 0, r: 0 },
+        { q: 1, r: 0 },
+      ],
+      [],
+      false,
+    );
     const before = structuredClone(store.document());
 
     // Nudging the pair right by one is a self-overlapping move that blocks.
@@ -1740,7 +1839,7 @@ describe('HexMapStore moveSelection', () => {
     expect(store.document()).toEqual(before);
   });
 
-  it('leaves an unselected region\'s membership untouched at both the origin and destination', () => {
+  it("leaves an unselected region's membership untouched at both the origin and destination", () => {
     const store = makeStore();
     const id = store.createRegion('Avalon', '#b08a4e');
     store.paintAt({ q: 0, r: 0 }, 'forest');
@@ -1754,7 +1853,10 @@ describe('HexMapStore moveSelection', () => {
 
     expect(store.document().hexes['1,0']).toEqual({ terrain: 'forest' });
     expect('0,0' in store.document().hexes).toBe(false);
-    expect(store.document().regions[0].hexes).toEqual({ '0,0': true, '1,0': true });
+    expect(store.document().regions[0].hexes).toEqual({
+      '0,0': true,
+      '1,0': true,
+    });
   });
 });
 
@@ -1904,7 +2006,7 @@ describe('HexMapStore region direction', () => {
     expect(store.regionDirection()).toBe('add');
   });
 
-  it('does not inherit a stale Region\'s direction when a different Region is selected', () => {
+  it("does not inherit a stale Region's direction when a different Region is selected", () => {
     const store = makeStore();
     const a = store.createRegion('Avalon', '#b08a4e');
     const b = store.createRegion('Brevoy', '#7c9b86');
@@ -2015,7 +2117,7 @@ describe('HexMapStore Region tool (membership brush only)', () => {
     expect(store.selection()).toBeNull();
   });
 
-  it('paints the selected Region\'s membership on a stroke (the only remaining job)', () => {
+  it("paints the selected Region's membership on a stroke (the only remaining job)", () => {
     const store = makeStore();
     const id = store.createRegion('Avalon', '#b08a4e');
     store.selectRegion(id);
@@ -2102,10 +2204,7 @@ describe('HexMapStore New Region (from the Regions panel)', () => {
 
     // "Region 1" is free again, but the next number is max(existing)+1 = 3 — a
     // name/colour freed by deletion is not immediately reused.
-    expect(store.document().regions.map((r) => r.name)).toEqual([
-      'Region 2',
-      'Region 3',
-    ]);
+    expect(store.document().regions.map((r) => r.name)).toEqual(['Region 2', 'Region 3']);
   });
 });
 
@@ -2373,7 +2472,11 @@ describe('HexMapStore central-store seam (ADR-0048)', () => {
     const store = makeStore();
 
     // The session is the source of the grid: writing its body surfaces on document().
-    session.load({ hexes: { '2,3': { terrain: 'ocean' } }, regions: [], labels: [] });
+    session.load({
+      hexes: { '2,3': { terrain: 'ocean' } },
+      regions: [],
+      labels: [],
+    });
 
     expect(store.document()).toEqual({
       hexes: { '2,3': { terrain: 'ocean' } },
@@ -2414,7 +2517,11 @@ describe('HexMapStore central-store seam (ADR-0048)', () => {
     store.paintAt({ q: 0, r: 0 }, 'grass');
 
     // A new Entity loads: its body replaces the grid and the stale undo patch is dropped.
-    reload({ hexes: { '9,9': { terrain: 'desert' } }, regions: [], labels: [] });
+    reload({
+      hexes: { '9,9': { terrain: 'desert' } },
+      regions: [],
+      labels: [],
+    });
 
     expect(store.canUndo()).toBe(false);
     store.undo(); // a no-op — the pre-load patch is gone, so the new grid is untouched

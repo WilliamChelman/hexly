@@ -14,7 +14,10 @@ import {
   visibilitySchema,
 } from './entity';
 
-const content = { format: 'tiptap-v1' as const, snapshot: { type: 'doc', content: [] } };
+const content = {
+  format: 'tiptap-v1' as const,
+  snapshot: { type: 'doc', content: [] },
+};
 
 describe('contentSchema', () => {
   it('round-trips an arbitrary snapshot untouched — the domain never inspects it', () => {
@@ -35,7 +38,10 @@ describe('contentSchema', () => {
     // v2 is additive over v1; a reader loads either losslessly with no transform.
     const envelope = {
       format: 'tiptap-v2' as const,
-      snapshot: { type: 'doc', content: [{ type: 'entityLink', attrs: { entityId: 'e1' } }] },
+      snapshot: {
+        type: 'doc',
+        content: [{ type: 'entityLink', attrs: { entityId: 'e1' } }],
+      },
     };
 
     const parsed = contentSchema.parse(envelope);
@@ -49,7 +55,13 @@ describe('contentSchema', () => {
       format: 'tiptap-v3' as const,
       snapshot: {
         type: 'doc',
-        content: [{ type: 'callout', attrs: { type: 'note', title: 'Beware' }, content: [] }],
+        content: [
+          {
+            type: 'callout',
+            attrs: { type: 'note', title: 'Beware' },
+            content: [],
+          },
+        ],
       },
     };
 
@@ -61,9 +73,7 @@ describe('contentSchema', () => {
   });
 
   it('rejects a Content envelope tagged with an unknown format', () => {
-    expect(() =>
-      contentSchema.parse({ format: 'markdown-v9', snapshot: {} }),
-    ).toThrow();
+    expect(() => contentSchema.parse({ format: 'markdown-v9', snapshot: {} })).toThrow();
   });
 });
 
@@ -96,7 +106,12 @@ describe('entityBodySchema', () => {
     // A grid that fails the hex-grid shape must be a hard error, not a silent downgrade to a note:
     // the base branch is strict, so the stray `hexes` key can't fall through and be dropped.
     expect(() =>
-      entityBodySchema.parse({ content, hexes: 'not-a-record', regions: [], labels: [] }),
+      entityBodySchema.parse({
+        content,
+        hexes: 'not-a-record',
+        regions: [],
+        labels: [],
+      }),
     ).toThrow();
   });
 });
@@ -176,14 +191,15 @@ describe('createEntityRequestSchema', () => {
   });
 
   it('rejects a create with no types — every Entity has a primary type', () => {
-    expect(() =>
-      createEntityRequestSchema.parse({ name: 'x', types: [] }),
-    ).toThrow();
+    expect(() => createEntityRequestSchema.parse({ name: 'x', types: [] })).toThrow();
   });
 
   it('defaults tags to empty when none are given', () => {
     expect(
-      createEntityRequestSchema.parse({ name: 'Aldermoor', types: ['core.note'] }).tags,
+      createEntityRequestSchema.parse({
+        name: 'Aldermoor',
+        types: ['core.note'],
+      }).tags,
     ).toEqual([]);
   });
 
@@ -200,29 +216,28 @@ describe('createEntityRequestSchema', () => {
   it('trims the name and rejects an empty or whitespace-only one', () => {
     // Reuses the same trimmed, non-empty rule the Hex Map title used (#12/#15).
     expect(
-      createEntityRequestSchema.parse({ name: '  Aldermoor  ', types: ['core.note'] })
-        .name,
+      createEntityRequestSchema.parse({
+        name: '  Aldermoor  ',
+        types: ['core.note'],
+      }).name,
     ).toBe('Aldermoor');
-    expect(() =>
-      createEntityRequestSchema.parse({ name: '   ', types: ['core.note'] }),
-    ).toThrow();
+    expect(() => createEntityRequestSchema.parse({ name: '   ', types: ['core.note'] })).toThrow();
   });
 
   it('rejects a malformed type id — a type is a `namespace.id` key, not bare flavour', () => {
-    expect(() =>
-      createEntityRequestSchema.parse({ name: 'x', types: ['spreadsheet'] }),
-    ).toThrow();
+    expect(() => createEntityRequestSchema.parse({ name: 'x', types: ['spreadsheet'] })).toThrow();
   });
 
   it('accepts an optional worldId, and omits it when absent (server defaults to the owner World)', () => {
     // A client may target a specific World; when omitted the server resolves the owner's World (#101).
     expect(
-      createEntityRequestSchema.parse({ name: 'x', types: ['core.note'], worldId: 'w1' })
-        .worldId,
+      createEntityRequestSchema.parse({
+        name: 'x',
+        types: ['core.note'],
+        worldId: 'w1',
+      }).worldId,
     ).toBe('w1');
-    expect(
-      createEntityRequestSchema.parse({ name: 'x', types: ['core.note'] }).worldId,
-    ).toBeUndefined();
+    expect(createEntityRequestSchema.parse({ name: 'x', types: ['core.note'] }).worldId).toBeUndefined();
   });
 });
 
@@ -252,7 +267,10 @@ describe('patchEntityRequestSchema', () => {
    */
   it('rejects a patch carrying both name and visibility — they are different write kinds', () => {
     expect(() =>
-      patchEntityRequestSchema.parse({ name: 'Aldermoor', visibility: 'shared' }),
+      patchEntityRequestSchema.parse({
+        name: 'Aldermoor',
+        visibility: 'shared',
+      }),
     ).toThrow();
   });
 });
@@ -261,9 +279,11 @@ describe('saveEntityRequestSchema', () => {
   it('carries the whole body, the base version, and the tags the save replaces', () => {
     const body = { content, ...emptyHexMap() };
 
-    expect(
-      saveEntityRequestSchema.parse({ document: body, version: 3, tags: [] }),
-    ).toEqual({ document: body, version: 3, tags: [] });
+    expect(saveEntityRequestSchema.parse({ document: body, version: 3, tags: [] })).toEqual({
+      document: body,
+      version: 3,
+      tags: [],
+    });
   });
 
   it('accepts an optional type set the save replaces, and omits it when absent', () => {
@@ -277,9 +297,7 @@ describe('saveEntityRequestSchema', () => {
         types: ['core.note'],
       }).types,
     ).toEqual(['core.note']);
-    expect(
-      saveEntityRequestSchema.parse({ document: body, version: 1, tags: [] }),
-    ).not.toHaveProperty('types');
+    expect(saveEntityRequestSchema.parse({ document: body, version: 1, tags: [] })).not.toHaveProperty('types');
   });
 
   it('ignores a descriptors field a stale client still sends (server harvests them now, #96)', () => {
@@ -299,9 +317,7 @@ describe('saveEntityRequestSchema', () => {
   it('requires tags on save — the save always carries the full current set', () => {
     const body = { content };
 
-    expect(() =>
-      saveEntityRequestSchema.parse({ document: body, version: 3 }),
-    ).toThrow();
+    expect(() => saveEntityRequestSchema.parse({ document: body, version: 3 })).toThrow();
   });
 
   it('normalizes tags on save: trims, lower-cases, dedupes, rejects blanks (#88)', () => {
@@ -315,7 +331,11 @@ describe('saveEntityRequestSchema', () => {
       }).tags,
     ).toEqual(['deity', 'ruined']);
     expect(() =>
-      saveEntityRequestSchema.parse({ document: body, version: 1, tags: ['  '] }),
+      saveEntityRequestSchema.parse({
+        document: body,
+        version: 1,
+        tags: ['  '],
+      }),
     ).toThrow();
   });
 

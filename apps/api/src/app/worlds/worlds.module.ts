@@ -40,14 +40,7 @@ import { WorldWrites } from './world-writes';
     }),
   ],
   controllers: [WorldsController],
-  providers: [
-    WorldsService,
-    WorldWrites,
-    WorldGraphService,
-    VaultImportService,
-    VaultExportService,
-    VaultUnzipper,
-  ],
+  providers: [WorldsService, WorldWrites, WorldGraphService, VaultImportService, VaultExportService, VaultUnzipper],
   // WorldWrites is exported so the Admin account purge (ADR-0045) routes its `world_members`
   // deletion through the one handle that bumps `seq` — the World peer of EntityWrites.
   exports: [WorldWrites],

@@ -82,11 +82,7 @@ import { ViewId } from '../../../entity-types/view-definition';
       @if (viewToggle().length > 1) {
         <!-- View toggle (#75, ADR-0048): one button per View the Entity's types afford
              (a hexmap: Map + Note), flipping the outletted body via the active View. -->
-        <div
-          pageHeaderActions
-          appButtonGroup
-          [attr.aria-label]="'editorShell.view.switchLabel' | transloco"
-        >
+        <div pageHeaderActions appButtonGroup [attr.aria-label]="'editorShell.view.switchLabel' | transloco">
           @for (v of viewToggle(); track v.id) {
             <button
               type="button"
@@ -106,17 +102,10 @@ import { ViewId } from '../../../entity-types/view-definition';
 
       <!-- The Entity's actions — Visibility, Pin, and Share — gathered behind one overflow
            menu. Share is this header's dialog surface, so the menu emits (share) and we open it. -->
-      <app-entity-actions-menu
-        pageHeaderActions
-        (share)="ownersOpen.set(true)"
-      />
+      <app-entity-actions-menu pageHeaderActions (share)="ownersOpen.set(true)" />
     </app-page-header>
 
-    <app-entity-share-dialog
-      [open]="ownersOpen()"
-      (closed)="ownersOpen.set(false)"
-      (resigned)="onResigned()"
-    />
+    <app-entity-share-dialog [open]="ownersOpen()" (closed)="ownersOpen.set(false)" (resigned)="onResigned()" />
   `,
 })
 export class EntityHeader {
@@ -142,27 +131,18 @@ export class EntityHeader {
    * read-only member sees it, can't rename it, and gets no visibility toggle (also
    * `@if (editable())`).
    */
-  protected readonly editable = computed(
-    () => this.session.current() !== null && this.session.writable(),
-  );
+  protected readonly editable = computed(() => this.session.current() !== null && this.session.writable());
   /** Tooltip key: the in-place rename affordance. */
   protected readonly titleHint = computed(() => this.labels().rename);
   /** The active View id, driving which toggle button reads as pressed. */
   protected readonly activeView = this.viewStore.activeView;
   /** The Views the open Entity affords, resolved to their toggle definitions (label + testid). */
-  protected readonly viewToggle = computed(() =>
-    this.viewStore.views().map((id) => this.views.resolve(id)),
-  );
+  protected readonly viewToggle = computed(() => this.viewStore.views().map((id) => this.views.resolve(id)));
   /** Per-type header chrome (eyebrow + title a11y labels), keyed on the primary type, falling back to the note type. */
-  protected readonly labels = computed(
-    () => this.types.resolve(this.session.current()?.types?.[0]).labels,
-  );
-  protected readonly title = computed(
-    () => this.session.current()?.name ?? '',
-  );
+  protected readonly labels = computed(() => this.types.resolve(this.session.current()?.types?.[0]).labels);
+  protected readonly title = computed(() => this.session.current()?.name ?? '');
 
-  private readonly titleEl =
-    viewChild.required<ElementRef<HTMLElement>>('titleEl');
+  private readonly titleEl = viewChild.required<ElementRef<HTMLElement>>('titleEl');
 
   /**
    * The name at focus time. commit() compares against this, not the live

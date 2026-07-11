@@ -29,17 +29,12 @@ function vaultZip(): Buffer {
   );
 }
 
-test('imports a vault from the World Index, landing in the new World with a resolved link', async ({
-  page,
-}) => {
+test('imports a vault from the World Index, landing in the new World with a resolved link', async ({ page }) => {
   await page.goto('/');
 
   // Upload straight to the hidden picker (setInputFiles bypasses the click).
   const imported = page.waitForResponse(
-    (r) =>
-      r.url().endsWith('/api/worlds/import') &&
-      r.request().method() === 'POST' &&
-      r.ok(),
+    (r) => r.url().endsWith('/api/worlds/import') && r.request().method() === 'POST' && r.ok(),
   );
   await page.getByTestId('import-vault-input').setInputFiles({
     name: 'Aldermoor.zip',

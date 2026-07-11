@@ -82,9 +82,7 @@ describe('FormattingMenu', () => {
     fixture.detectChanges();
 
     const marks = editor.getJSON().content?.[0]?.content?.[0]?.marks ?? [];
-    expect(marks.find((m) => m.type === 'link')?.attrs?.['href']).toBe(
-      'https://example.com',
-    );
+    expect(marks.find((m) => m.type === 'link')?.attrs?.['href']).toBe('https://example.com');
     expect(el.querySelector('input[type=url]')).toBeNull();
     expect(editor.state.selection.empty).toBe(true);
   });
@@ -118,9 +116,7 @@ describe('FormattingMenu', () => {
 
     // Create a backwards selection: anchor=10 (end), head=1 (start).
     // selection.to === 10, selection.head === 1.
-    editor.view.dispatch(
-      editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 10, 1)),
-    );
+    editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 10, 1)));
     fixture.detectChanges();
 
     button(el, 'Bold').click();

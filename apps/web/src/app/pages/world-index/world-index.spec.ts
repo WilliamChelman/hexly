@@ -37,12 +37,17 @@ describe('WorldIndex', () => {
         { provide: WorldsClient, useValue: worldsClient },
       ],
     }).compileComponents();
-    navigate = vi
-      .spyOn(TestBed.inject(Router), 'navigate')
-      .mockResolvedValue(true);
+    navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
 
     // The caller (u1) — used to tell owned Worlds from member Worlds.
-    auth.setUser({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada', preferences: {}, roles: ['create-worlds'], isSuperadmin: false });
+    auth.setUser({
+      id: 'u1',
+      email: 'ada@hexly.test',
+      displayName: 'Ada',
+      preferences: {},
+      roles: ['create-worlds'],
+      isSuperadmin: false,
+    });
   });
 
   /**
@@ -66,14 +71,12 @@ describe('WorldIndex', () => {
   const $ = (el: HTMLElement, sel: string) => el.querySelector(sel);
 
   it('lists every reachable World by name', () => {
-    const el = render([
-      world('w1', 'Aldermoor'),
-      world('w2', 'Whisperwood', 'someone-else'),
-    ]).nativeElement as HTMLElement;
+    const el = render([world('w1', 'Aldermoor'), world('w2', 'Whisperwood', 'someone-else')])
+      .nativeElement as HTMLElement;
 
-    const names = Array.from(
-      el.querySelectorAll('[data-testid^=world-]'),
-    ).map((n) => (n as HTMLElement).textContent ?? '');
+    const names = Array.from(el.querySelectorAll('[data-testid^=world-]')).map(
+      (n) => (n as HTMLElement).textContent ?? '',
+    );
     expect(names.join(' ')).toContain('Aldermoor');
     expect(names.join(' ')).toContain('Whisperwood');
   });
@@ -96,11 +99,7 @@ describe('WorldIndex', () => {
     // The whole card is a routerLink anchor (stretched-link inset), so assert the
     // resolved href rather than a navigate() call. The card's front door is the
     // World Dashboard now, not the Entity Browser.
-    expect(
-      ($(el, '[data-testid=world-w1]') as HTMLAnchorElement).getAttribute(
-        'href',
-      ),
-    ).toBe('/w/w1');
+    expect(($(el, '[data-testid=world-w1]') as HTMLAnchorElement).getAttribute('href')).toBe('/w/w1');
   });
 
   it('shows an empty state with a create affordance when there are no Worlds', () => {
@@ -165,7 +164,10 @@ describe('WorldIndex', () => {
     const file = new File([new Uint8Array([1, 2, 3])], name, {
       type: 'application/zip',
     });
-    Object.defineProperty(input, 'files', { value: [file], configurable: true });
+    Object.defineProperty(input, 'files', {
+      value: [file],
+      configurable: true,
+    });
     input.dispatchEvent(new Event('change'));
     return file;
   }
@@ -210,19 +212,17 @@ describe('WorldIndex', () => {
     const fixture = render([]);
     const el = fixture.nativeElement as HTMLElement;
 
-    worldsClient.importVault.mockReturnValue(
-      throwError(() => new Error('bad zip')),
-    );
+    worldsClient.importVault.mockReturnValue(throwError(() => new Error('bad zip')));
     pickVault(el);
     fixture.detectChanges();
 
-    expect(TestBed.inject(ToasterService).toasts().map((t) => t.tone)).toEqual([
-      'error',
-    ]);
-    expect($(el, '[data-testid=import-summary]')).toBeNull();
     expect(
-      ($(el, '[data-testid=import-vault]') as HTMLButtonElement).disabled,
-    ).toBe(false);
+      TestBed.inject(ToasterService)
+        .toasts()
+        .map((t) => t.tone),
+    ).toEqual(['error']);
+    expect($(el, '[data-testid=import-summary]')).toBeNull();
+    expect(($(el, '[data-testid=import-vault]') as HTMLButtonElement).disabled).toBe(false);
   });
 
   it('offers rename + delete on owned Worlds only, not on member Worlds', () => {
@@ -246,25 +246,21 @@ describe('WorldIndex', () => {
     ]).nativeElement as HTMLElement;
 
     // World Settings moved to /settings when the World root became the Dashboard (ADR-0043).
-    expect(
-      ($(el, '[data-testid=owners-world-w1]') as HTMLAnchorElement).getAttribute(
-        'href',
-      ),
-    ).toBe('/w/w1/settings');
+    expect(($(el, '[data-testid=owners-world-w1]') as HTMLAnchorElement).getAttribute('href')).toBe('/w/w1/settings');
     expect($(el, '[data-testid=owners-world-w2]')).toBeNull();
   });
 
   it('exports an owned World as a named .zip download', () => {
     const el = render([world('w1', 'Aldermoor')]).nativeElement as HTMLElement;
-    const zip = new Blob([new Uint8Array([1, 2, 3])], { type: 'application/zip' });
+    const zip = new Blob([new Uint8Array([1, 2, 3])], {
+      type: 'application/zip',
+    });
     worldsClient.exportVault.mockReturnValue(of(zip));
 
     // happy-dom doesn't implement object URLs or a real anchor click — stub them.
     URL.createObjectURL = vi.fn(() => 'blob:zip');
     URL.revokeObjectURL = vi.fn();
-    const click = vi
-      .spyOn(HTMLAnchorElement.prototype, 'click')
-      .mockImplementation(() => undefined);
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
 
     ($(el, '[data-testid=export-world-w1]') as HTMLButtonElement).click();
 
@@ -281,9 +277,11 @@ describe('WorldIndex', () => {
 
     ($(el, '[data-testid=export-world-w1]') as HTMLButtonElement).click();
 
-    expect(TestBed.inject(ToasterService).toasts().map((t) => t.tone)).toEqual([
-      'error',
-    ]);
+    expect(
+      TestBed.inject(ToasterService)
+        .toasts()
+        .map((t) => t.tone),
+    ).toEqual(['error']);
   });
 
   it('renames an owned World from the Index, updating the list', () => {
@@ -306,13 +304,8 @@ describe('WorldIndex', () => {
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
     fixture.detectChanges();
 
-    expect(worldsClient.rename).toHaveBeenCalledWith(
-      'w1',
-      'The Reach of Aldermoor',
-    );
-    expect($(el, '[data-testid=world-w1]')?.textContent).toContain(
-      'The Reach of Aldermoor',
-    );
+    expect(worldsClient.rename).toHaveBeenCalledWith('w1', 'The Reach of Aldermoor');
+    expect($(el, '[data-testid=world-w1]')?.textContent).toContain('The Reach of Aldermoor');
   });
 
   it('opens a delete modal that shows the count of Entities to be destroyed', () => {
@@ -341,7 +334,12 @@ describe('WorldIndex', () => {
     const fixture = render([world('w1', name)]);
     const el = fixture.nativeElement as HTMLElement;
     worldsClient.get.mockReturnValue(
-      of({ ...world('w1', name), entityCount: count, pinnedEntityIds: [], seq: 1 }),
+      of({
+        ...world('w1', name),
+        entityCount: count,
+        pinnedEntityIds: [],
+        seq: 1,
+      }),
     );
     ($(el, '[data-testid=delete-world-w1]') as HTMLButtonElement).click();
     fixture.detectChanges();
@@ -353,9 +351,7 @@ describe('WorldIndex', () => {
     const el = fixture.nativeElement as HTMLElement;
     // aria-disabled, not the native attribute, so the gated button stays focusable.
     const armed = () =>
-      ($(el, '[data-testid=confirm-delete]') as HTMLButtonElement).getAttribute(
-        'aria-disabled',
-      ) === null;
+      ($(el, '[data-testid=confirm-delete]') as HTMLButtonElement).getAttribute('aria-disabled') === null;
     const input = $(el, '[data-testid=delete-confirm-input]') as HTMLInputElement;
 
     expect(armed()).toBe(false);
@@ -394,9 +390,7 @@ describe('WorldIndex', () => {
     TestBed.inject(TranslocoService).setActiveLang('fr');
     fixture.detectChanges();
 
-    expect(
-      (fixture.nativeElement as HTMLElement).textContent,
-    ).toContain("Aucun monde pour l'instant.");
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain("Aucun monde pour l'instant.");
   });
 
   it('shows an error state (not the empty state) when the World list fails to load', () => {
@@ -418,9 +412,11 @@ describe('WorldIndex', () => {
     worldsClient.create.mockReturnValue(throwError(() => new Error('server error')));
     ($(el, '[data-testid=create-world]') as HTMLButtonElement).click();
 
-    expect(TestBed.inject(ToasterService).toasts().map((t) => t.tone)).toEqual([
-      'error',
-    ]);
+    expect(
+      TestBed.inject(ToasterService)
+        .toasts()
+        .map((t) => t.tone),
+    ).toEqual(['error']);
   });
 
   /**
@@ -442,15 +438,11 @@ describe('WorldIndex', () => {
     expect($(el, '[data-testid=world-w1]')).not.toBeNull();
 
     // While the tab was away, a World was renamed and another created elsewhere.
-    worldsClient.list.mockReturnValue(
-      of([world('w1', 'The Reach of Aldermoor'), world('w2', 'Whisperwood')]),
-    );
+    worldsClient.list.mockReturnValue(of([world('w1', 'The Reach of Aldermoor'), world('w2', 'Whisperwood')]));
     fireVisibility('visible');
     fixture.detectChanges();
 
-    expect($(el, '[data-testid=world-w1]')?.textContent).toContain(
-      'The Reach of Aldermoor',
-    );
+    expect($(el, '[data-testid=world-w1]')?.textContent).toContain('The Reach of Aldermoor');
     expect($(el, '[data-testid=world-w2]')).not.toBeNull();
   });
 

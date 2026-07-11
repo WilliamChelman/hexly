@@ -14,9 +14,7 @@ module.exports = {
       target: 'node',
       compiler: 'tsc',
       main: './src/main.ts',
-      additionalEntryPoints: [
-        { entryName: 'seed', entryPath: './src/seed.ts' },
-      ],
+      additionalEntryPoints: [{ entryName: 'seed', entryPath: './src/seed.ts' }],
       tsConfig: './tsconfig.app.json',
       // Migrations read at boot via resolve(__dirname); map to bundle
       // root to mirror source layout (ADR-0027).

@@ -8,7 +8,14 @@ import { CreateEntityDialogState } from './create-entity-dialog.state';
 import { CreateEntityDialog } from './create-entity-dialog';
 
 function world(id: string, name: string): WorldSummary {
-  return { id, name, owners: ['u1'], rights: ['read', 'manage'], createdAt: 1, updatedAt: 1 };
+  return {
+    id,
+    name,
+    owners: ['u1'],
+    rights: ['read', 'manage'],
+    createdAt: 1,
+    updatedAt: 1,
+  };
 }
 
 describe('CreateEntityDialog', () => {
@@ -26,9 +33,7 @@ describe('CreateEntityDialog', () => {
         { provide: WorldStore, useValue: { worlds: () => worlds } },
       ],
     });
-    navigate = vi
-      .spyOn(TestBed.inject(Router), 'navigate')
-      .mockResolvedValue(true);
+    navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     TestBed.inject(ActiveWorld).set(activeWorldId);
     state = TestBed.inject(CreateEntityDialogState);
     const fixture = TestBed.createComponent(CreateEntityDialog);
@@ -46,10 +51,7 @@ describe('CreateEntityDialog', () => {
   });
 
   it('opens prefilled to the active World when Create Note runs', () => {
-    const fixture = render(
-      [world('w1', 'Aldermoor'), world('w2', 'Whisperwood')],
-      'w2',
-    );
+    const fixture = render([world('w1', 'Aldermoor'), world('w2', 'Whisperwood')], 'w2');
 
     state.open('core.note');
     fixture.detectChanges();
@@ -60,10 +62,7 @@ describe('CreateEntityDialog', () => {
   });
 
   it("falls back to the first loaded World when there's no active World", () => {
-    const fixture = render(
-      [world('w1', 'Aldermoor'), world('w2', 'Whisperwood')],
-      null,
-    );
+    const fixture = render([world('w1', 'Aldermoor'), world('w2', 'Whisperwood')], null);
 
     state.open('core.hexmap');
     fixture.detectChanges();
@@ -100,11 +99,7 @@ describe('CreateEntityDialog', () => {
     (q(fixture, 'create-entity-submit') as HTMLButtonElement).click();
     fixture.detectChanges();
 
-    expect(entitiesClient.create).toHaveBeenCalledWith(
-      'The Reach',
-      'core.note',
-      'w1',
-    );
+    expect(entitiesClient.create).toHaveBeenCalledWith('The Reach', 'core.note', 'w1');
     expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'e1']);
     expect(fixture.nativeElement.querySelector('dialog')?.open).toBeFalsy();
   });

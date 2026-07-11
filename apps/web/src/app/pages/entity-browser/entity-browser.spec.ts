@@ -1,11 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import {
-  ActivatedRoute,
-  convertToParamMap,
-  ParamMap,
-  provideRouter,
-  Router,
-} from '@angular/router';
+import { ActivatedRoute, convertToParamMap, ParamMap, provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 import { EntityPage, EntitySummary } from '@hexly/domain';
@@ -56,9 +50,7 @@ describe('EntityBrowser', () => {
         },
       ],
     }).compileComponents();
-    navigate = vi
-      .spyOn(TestBed.inject(Router), 'navigate')
-      .mockResolvedValue(true);
+    navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
 
     // The browser scopes to the active World (ADR-0028), pinned by the `w/:worldId`
     // route resolver in the app; pin it directly here.
@@ -74,8 +66,7 @@ describe('EntityBrowser', () => {
     return fixture;
   }
 
-  const loadMore = (el: HTMLElement) =>
-    el.querySelector('[data-testid=load-more]') as HTMLButtonElement | null;
+  const loadMore = (el: HTMLElement) => el.querySelector('[data-testid=load-more]') as HTMLButtonElement | null;
 
   it('exposes the banner and main as sibling landmarks, not banner nested in main', () => {
     const el = renderWith([]).nativeElement as HTMLElement;
@@ -100,12 +91,8 @@ describe('EntityBrowser', () => {
     const newMap = el.querySelector('[data-testid=new-map]') as HTMLElement;
     expect(newMap.textContent).toContain('Nouvelle carte');
     expect(newMap.textContent).not.toContain('New map');
-    expect(el.querySelector('[data-testid=empty]')?.textContent).toContain(
-      'Votre bibliothèque est vide.',
-    );
-    expect(el.textContent).toContain(
-      'Créez une note ou une carte pour commencer.',
-    );
+    expect(el.querySelector('[data-testid=empty]')?.textContent).toContain('Votre bibliothèque est vide.');
+    expect(el.textContent).toContain('Créez une note ou une carte pour commencer.');
   });
 
   it('owns its page heading in its page-owned header', () => {
@@ -122,7 +109,11 @@ describe('EntityBrowser', () => {
     const fixture = TestBed.createComponent(EntityBrowser);
     fixture.detectChanges();
 
-    expect(client.list).toHaveBeenCalledWith({ limit: 50, worldId: 'w1', rights: true });
+    expect(client.list).toHaveBeenCalledWith({
+      limit: 50,
+      worldId: 'w1',
+      rights: true,
+    });
   });
 
   it('re-fetches scoped to the new World when the active World changes', () => {
@@ -132,7 +123,11 @@ describe('EntityBrowser', () => {
     TestBed.inject(ActiveWorld).set('w2');
     fixture.detectChanges();
 
-    expect(client.list).toHaveBeenCalledWith({ limit: 50, worldId: 'w2', rights: true });
+    expect(client.list).toHaveBeenCalledWith({
+      limit: 50,
+      worldId: 'w2',
+      rights: true,
+    });
   });
 
   it('renders entities in the server-returned order, never re-sorted client-side (#154)', () => {
@@ -146,14 +141,13 @@ describe('EntityBrowser', () => {
       summary({ id: 'second', name: 'The Whisperwood', updatedAt: 300 }),
     ]);
 
-    const titles = Array.from(
-      fixture.nativeElement.querySelectorAll('[data-testid=entity-title]'),
-    ).map((el) => (el as HTMLElement).textContent?.trim());
+    const titles = Array.from(fixture.nativeElement.querySelectorAll('[data-testid=entity-title]')).map((el) =>
+      (el as HTMLElement).textContent?.trim(),
+    );
     expect(titles).toEqual(['Aldermoor', 'The Whisperwood']);
   });
 
-  const searchBox = (el: HTMLElement) =>
-    el.querySelector('[data-testid=entity-search]') as HTMLInputElement;
+  const searchBox = (el: HTMLElement) => el.querySelector('[data-testid=entity-search]') as HTMLInputElement;
 
   /** Type into the search box and flush the 150ms debounce so the fetch fires. */
   function search(fixture: ReturnType<typeof renderWith>, q: string) {
@@ -171,7 +165,10 @@ describe('EntityBrowser', () => {
 
     // The server returns the query-narrowed, relevance-ordered page.
     client.list.mockReturnValueOnce(
-      of({ items: [summary({ id: 'm2', name: 'Dragonspire' })], nextCursor: null }),
+      of({
+        items: [summary({ id: 'm2', name: 'Dragonspire' })],
+        nextCursor: null,
+      }),
     );
     search(fixture, 'dragon');
 
@@ -182,9 +179,9 @@ describe('EntityBrowser', () => {
       worldId: 'w1',
       rights: true,
     });
-    const titles = Array.from(
-      fixture.nativeElement.querySelectorAll('[data-testid=entity-title]'),
-    ).map((t) => (t as HTMLElement).textContent?.trim());
+    const titles = Array.from(fixture.nativeElement.querySelectorAll('[data-testid=entity-title]')).map((t) =>
+      (t as HTMLElement).textContent?.trim(),
+    );
     expect(titles).toEqual(['Dragonspire']);
   });
 
@@ -206,24 +203,29 @@ describe('EntityBrowser', () => {
 
     search(fixture, '');
     // Clearing the box drops the param entirely rather than leaving `?q=`.
-    expect(navigate).toHaveBeenLastCalledWith(
-      [],
-      expect.objectContaining({ queryParams: { q: null } }),
-    );
+    expect(navigate).toHaveBeenLastCalledWith([], expect.objectContaining({ queryParams: { q: null } }));
   });
 
   it('seeds the search box and the first fetch from the URL ?q= (shareable, survives refresh) (#154)', () => {
     // Arrive on a shared/refreshed link that already carries a query.
     queryParams$.next(convertToParamMap({ q: 'dragon' }));
     client.list.mockReturnValueOnce(
-      of({ items: [summary({ id: 'm2', name: 'Dragonspire' })], nextCursor: null }),
+      of({
+        items: [summary({ id: 'm2', name: 'Dragonspire' })],
+        nextCursor: null,
+      }),
     );
     const fixture = TestBed.createComponent(EntityBrowser);
     fixture.detectChanges();
     fixture.detectChanges();
 
     // The first fetch already carries the query — one request, not empty-then-refetch.
-    expect(client.list).toHaveBeenCalledWith({ q: 'dragon', limit: 50, worldId: 'w1', rights: true });
+    expect(client.list).toHaveBeenCalledWith({
+      q: 'dragon',
+      limit: 50,
+      worldId: 'w1',
+      rights: true,
+    });
     expect(client.list).toHaveBeenCalledTimes(1);
     // The box shows the query it was opened with.
     expect(searchBox(fixture.nativeElement).value).toBe('dragon');
@@ -234,7 +236,10 @@ describe('EntityBrowser', () => {
 
     // The user presses Back/Forward: the URL query changes without a keystroke.
     client.list.mockReturnValueOnce(
-      of({ items: [summary({ id: 'm2', name: 'Dragonspire' })], nextCursor: null }),
+      of({
+        items: [summary({ id: 'm2', name: 'Dragonspire' })],
+        nextCursor: null,
+      }),
     );
     queryParams$.next(convertToParamMap({ q: 'dragon' }));
     fixture.detectChanges();
@@ -249,9 +254,7 @@ describe('EntityBrowser', () => {
   });
 
   const titlesOf = (el: HTMLElement) =>
-    Array.from(el.querySelectorAll('[data-testid=entity-title]')).map((t) =>
-      (t as HTMLElement).textContent?.trim(),
-    );
+    Array.from(el.querySelectorAll('[data-testid=entity-title]')).map((t) => (t as HTMLElement).textContent?.trim());
 
   it('coalesces rapid keystrokes into a single request — the grid doesn’t thrash (#154)', () => {
     const fixture = renderWith([]);
@@ -285,7 +288,10 @@ describe('EntityBrowser', () => {
 
     // First 'dragon' search resolves — its page is cached.
     client.list.mockReturnValueOnce(
-      of({ items: [summary({ id: 'd', name: 'Dragonspire' })], nextCursor: null }),
+      of({
+        items: [summary({ id: 'd', name: 'Dragonspire' })],
+        nextCursor: null,
+      }),
     );
     search(fixture, 'dragon');
     expect(titlesOf(el)).toEqual(['Dragonspire']);
@@ -310,11 +316,7 @@ describe('EntityBrowser', () => {
       summary({ id: 'n1', name: 'Lady Mara', types: ['core.note'] }),
     ]);
     const typeOf = (id: string) =>
-      (
-        fixture.nativeElement.querySelector(
-          `[data-testid=type-${id}]`,
-        ) as HTMLElement
-      )?.textContent?.trim();
+      (fixture.nativeElement.querySelector(`[data-testid=type-${id}]`) as HTMLElement)?.textContent?.trim();
 
     expect(typeOf('m1')).toBe('Map');
     expect(typeOf('n1')).toBe('Note');
@@ -322,12 +324,14 @@ describe('EntityBrowser', () => {
 
   it('shows each entity’s tags', () => {
     const fixture = renderWith([
-      summary({ id: 'm1', name: 'Aldermoor', tags: ['kingdom', 'northern reach'] }),
+      summary({
+        id: 'm1',
+        name: 'Aldermoor',
+        tags: ['kingdom', 'northern reach'],
+      }),
     ]);
 
-    const tags = fixture.nativeElement.querySelector(
-      '[data-testid=tags-m1]',
-    ) as HTMLElement;
+    const tags = fixture.nativeElement.querySelector('[data-testid=tags-m1]') as HTMLElement;
     expect(tags.textContent).toContain('kingdom');
     expect(tags.textContent).toContain('northern reach');
   });
@@ -335,9 +339,7 @@ describe('EntityBrowser', () => {
   it('omits the tag list entirely for an untagged entity', () => {
     const fixture = renderWith([summary({ id: 'm1', tags: [] })]);
 
-    expect(
-      fixture.nativeElement.querySelector('[data-testid=tags-m1]'),
-    ).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid=tags-m1]')).toBeNull();
   });
 
   it('renders the new-note action and type labels in French when French is active', () => {
@@ -350,21 +352,11 @@ describe('EntityBrowser', () => {
     TestBed.inject(TranslocoService).setActiveLang('fr');
     fixture.detectChanges();
 
-    expect(
-      (el.querySelector('[data-testid=new-note]') as HTMLElement).textContent,
-    ).toContain('Nouvelle note');
-    expect(
-      (el.querySelector('[data-testid=type-m1]') as HTMLElement).textContent?.trim(),
-    ).toBe('Carte');
-    expect(
-      (el.querySelector('[data-testid=type-n1]') as HTMLElement).textContent?.trim(),
-    ).toBe('Note');
+    expect((el.querySelector('[data-testid=new-note]') as HTMLElement).textContent).toContain('Nouvelle note');
+    expect((el.querySelector('[data-testid=type-m1]') as HTMLElement).textContent?.trim()).toBe('Carte');
+    expect((el.querySelector('[data-testid=type-n1]') as HTMLElement).textContent?.trim()).toBe('Note');
     // The rename action is an icon button — its label lives in aria-label/title.
-    expect(
-      (el.querySelector('[data-testid=rename-m1]') as HTMLElement).getAttribute(
-        'aria-label',
-      ),
-    ).toBe('Renommer');
+    expect((el.querySelector('[data-testid=rename-m1]') as HTMLElement).getAttribute('aria-label')).toBe('Renommer');
   });
 
   it('renders a card’s Delete action in French when French is the active language', () => {
@@ -373,9 +365,7 @@ describe('EntityBrowser', () => {
     TestBed.inject(TranslocoService).setActiveLang('fr');
     fixture.detectChanges();
 
-    const del = fixture.nativeElement.querySelector(
-      '[data-testid=delete-m1]',
-    ) as HTMLElement;
+    const del = fixture.nativeElement.querySelector('[data-testid=delete-m1]') as HTMLElement;
     // Icon button — assert the localized label on aria-label, not text content.
     expect(del.getAttribute('aria-label')).toBe('Supprimer');
   });
@@ -383,9 +373,7 @@ describe('EntityBrowser', () => {
   it('hides a card’s rename/delete actions when the caller lacks the Rights (ADR-0039)', () => {
     // A reader-only Entity (e.g. a shared one the caller can't edit): the server ships
     // `rights: ['read']`, so the Browser must not offer actions it would then 403.
-    const el = renderWith([
-      summary({ id: 'ro', name: 'Read only', rights: ['read'] }),
-    ]).nativeElement as HTMLElement;
+    const el = renderWith([summary({ id: 'ro', name: 'Read only', rights: ['read'] })]).nativeElement as HTMLElement;
 
     expect(el.querySelector('[data-testid=rename-ro]')).toBeNull();
     expect(el.querySelector('[data-testid=delete-ro]')).toBeNull();
@@ -395,9 +383,7 @@ describe('EntityBrowser', () => {
 
   it('requests per-row Rights on the list so the cards can gate their actions (ADR-0039)', () => {
     renderWith([summary({ id: 'm1' })]);
-    expect(client.list).toHaveBeenCalledWith(
-      expect.objectContaining({ rights: true }),
-    );
+    expect(client.list).toHaveBeenCalledWith(expect.objectContaining({ rights: true }));
   });
 
   it('formats the “Edited” timestamp for the active language, not the browser default', () => {
@@ -414,8 +400,7 @@ describe('EntityBrowser', () => {
     // a mid-view language flip reformats on the next render (ADR-0038).
     localStorage.setItem('hexly-u:hexly-locale', 'fr');
     const fixture = renderWith([summary({ id: 'm1', name: 'Aldermoor', updatedAt })]);
-    const meta =
-      (fixture.nativeElement.querySelector('.meta') as HTMLElement).textContent ?? '';
+    const meta = (fixture.nativeElement.querySelector('.meta') as HTMLElement).textContent ?? '';
 
     expect(meta).toContain(`Modifié le ${frDate}`);
     expect(meta).not.toContain(enDate);
@@ -432,8 +417,7 @@ describe('EntityBrowser', () => {
     TestBed.inject(LocaleService).setFormatLocale('en-GB');
     const fixture = renderWith([summary({ id: 'm1', name: 'Aldermoor', updatedAt })]);
 
-    const meta =
-      (fixture.nativeElement.querySelector('.meta') as HTMLElement).textContent ?? '';
+    const meta = (fixture.nativeElement.querySelector('.meta') as HTMLElement).textContent ?? '';
     // Copy still English, date now day-first.
     expect(meta).toContain(`Edited ${gbDate}`);
   });
@@ -446,9 +430,7 @@ describe('EntityBrowser', () => {
     TestBed.inject(TranslocoService).setActiveLang('fr');
     fixture.detectChanges();
 
-    const title = fixture.nativeElement.querySelector(
-      '[data-testid=entity-title]',
-    ) as HTMLElement;
+    const title = fixture.nativeElement.querySelector('[data-testid=entity-title]') as HTMLElement;
     expect(title.textContent?.trim()).toBe('New map');
     expect(title.textContent).not.toContain('Nouvelle carte');
   });
@@ -464,10 +446,7 @@ describe('EntityBrowser', () => {
   });
 
   it('fetches the next page with the cursor and appends it, then hides load-more on the last page', () => {
-    const fixture = renderWith(
-      [summary({ id: 'm1', name: 'Aldermoor', updatedAt: 300 })],
-      'cursor-2',
-    );
+    const fixture = renderWith([summary({ id: 'm1', name: 'Aldermoor', updatedAt: 300 })], 'cursor-2');
     const el = fixture.nativeElement as HTMLElement;
 
     client.list.mockReturnValueOnce(
@@ -477,12 +456,16 @@ describe('EntityBrowser', () => {
       }),
     );
     loadMore(el)?.click();
-    expect(client.list).toHaveBeenCalledWith({ cursor: 'cursor-2', worldId: 'w1', rights: true });
+    expect(client.list).toHaveBeenCalledWith({
+      cursor: 'cursor-2',
+      worldId: 'w1',
+      rights: true,
+    });
     fixture.detectChanges();
 
     // The next page is appended after the first — no duplicates, no gaps.
-    const titles = Array.from(el.querySelectorAll('[data-testid=entity-title]')).map(
-      (t) => (t as HTMLElement).textContent?.trim(),
+    const titles = Array.from(el.querySelectorAll('[data-testid=entity-title]')).map((t) =>
+      (t as HTMLElement).textContent?.trim(),
     );
     expect(titles).toEqual(['Aldermoor', 'The Whisperwood']);
     // Last page reached: the affordance is gone.
@@ -504,7 +487,10 @@ describe('EntityBrowser', () => {
     const el = fixture.nativeElement as HTMLElement;
 
     client.list.mockReturnValueOnce(
-      of({ items: [summary({ id: 'k2', name: 'Keep of Thorns' })], nextCursor: null }),
+      of({
+        items: [summary({ id: 'k2', name: 'Keep of Thorns' })],
+        nextCursor: null,
+      }),
     );
     loadMore(el)?.click();
 
@@ -533,7 +519,10 @@ describe('EntityBrowser', () => {
     fixture.detectChanges();
 
     expect(client.list).toHaveBeenCalledTimes(2); // initial render + one load-more
-    pending.next({ items: [summary({ id: 'm2', updatedAt: 200 })], nextCursor: null });
+    pending.next({
+      items: [summary({ id: 'm2', updatedAt: 200 })],
+      nextCursor: null,
+    });
     pending.complete();
   });
 
@@ -542,7 +531,10 @@ describe('EntityBrowser', () => {
     const el = fixture.nativeElement as HTMLElement;
 
     client.list.mockReturnValueOnce(
-      of({ items: [summary({ id: 'a1', name: 'Aldermoor' })], nextCursor: null }),
+      of({
+        items: [summary({ id: 'a1', name: 'Aldermoor' })],
+        nextCursor: null,
+      }),
     );
     search(fixture, 'ald');
     expect(titlesOf(el)).toEqual(['Aldermoor']);
@@ -580,9 +572,7 @@ describe('EntityBrowser', () => {
     const fixture = renderWith([]);
 
     expect(fixture.nativeElement.querySelector('[data-testid=empty]')).not.toBeNull();
-    expect(
-      fixture.nativeElement.querySelector('[data-testid=entity-title]'),
-    ).toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid=entity-title]')).toBeNull();
   });
 
   it('renders the load-error state in French when French is the active language', () => {
@@ -592,13 +582,9 @@ describe('EntityBrowser', () => {
     TestBed.inject(TranslocoService).setActiveLang('fr');
     fixture.detectChanges();
 
-    const error = fixture.nativeElement.querySelector(
-      '[data-testid=load-error]',
-    ) as HTMLElement;
+    const error = fixture.nativeElement.querySelector('[data-testid=load-error]') as HTMLElement;
     expect(error.textContent).toContain('Impossible de charger votre bibliothèque.');
-    expect(error.textContent).toContain(
-      'Une erreur est survenue. Veuillez réessayer dans un instant.',
-    );
+    expect(error.textContent).toContain('Une erreur est survenue. Veuillez réessayer dans un instant.');
   });
 
   it('shows an error state when the entity list fails to load', () => {
@@ -608,9 +594,7 @@ describe('EntityBrowser', () => {
     fixture.detectChanges();
 
     // A failed list surfaces an error panel rather than a permanently blank page.
-    expect(
-      fixture.nativeElement.querySelector('[data-testid=load-error]'),
-    ).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid=load-error]')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('[data-testid=empty]')).toBeNull();
   });
 
@@ -621,12 +605,15 @@ describe('EntityBrowser', () => {
       of({
         ...summary({ id: 'created', name: 'Untitled map' }),
         seq: 1,
-        document: { content: { format: 'tiptap-v1', snapshot: {} }, hexes: {}, regions: [], labels: [] },
+        document: {
+          content: { format: 'tiptap-v1', snapshot: {} },
+          hexes: {},
+          regions: [],
+          labels: [],
+        },
       }),
     );
-    (
-      fixture.nativeElement.querySelector('[data-testid=new-map]') as HTMLButtonElement
-    ).click();
+    (fixture.nativeElement.querySelector('[data-testid=new-map]') as HTMLButtonElement).click();
 
     // Scoped to the World in the URL (ADR-0028).
     expect(client.create).toHaveBeenCalledWith('Untitled map', 'core.hexmap', 'w1');
@@ -638,14 +625,16 @@ describe('EntityBrowser', () => {
 
     client.create.mockReturnValueOnce(
       of({
-        ...summary({ id: 'created', name: 'Untitled note', types: ['core.note'] }),
+        ...summary({
+          id: 'created',
+          name: 'Untitled note',
+          types: ['core.note'],
+        }),
         seq: 1,
         document: { content: { format: 'tiptap-v1', snapshot: {} } },
       }),
     );
-    (
-      fixture.nativeElement.querySelector('[data-testid=new-note]') as HTMLButtonElement
-    ).click();
+    (fixture.nativeElement.querySelector('[data-testid=new-note]') as HTMLButtonElement).click();
 
     expect(client.create).toHaveBeenCalledWith('Untitled note', 'core.note', 'w1');
     expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'created']);
@@ -657,11 +646,7 @@ describe('EntityBrowser', () => {
     // The whole tile is a routerLink anchor (stretched-link inset), so assert the
     // resolved href rather than a navigate() call.
     expect(
-      (
-        fixture.nativeElement.querySelector(
-          '[data-testid=open-m1]',
-        ) as HTMLAnchorElement
-      ).getAttribute('href'),
+      (fixture.nativeElement.querySelector('[data-testid=open-m1]') as HTMLAnchorElement).getAttribute('href'),
     ).toBe('/w/w1/entities/m1');
   });
 
@@ -681,7 +666,12 @@ describe('EntityBrowser', () => {
         ...summary({ id: 'm1', name: 'Aldermoor Keep', version: 4 }),
         // The rename bumped `seq`; a patch never bumps `version`.
         seq: 5,
-        document: { content: { format: 'tiptap-v1', snapshot: {} }, hexes: {}, regions: [], labels: [] },
+        document: {
+          content: { format: 'tiptap-v1', snapshot: {} },
+          hexes: {},
+          regions: [],
+          labels: [],
+        },
       }),
     );
     // After the rename the browser refreshes from page one: it re-fetches and
@@ -695,13 +685,15 @@ describe('EntityBrowser', () => {
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     expect(client.patch).toHaveBeenCalledWith('m1', { name: 'Aldermoor Keep' });
-    expect(client.list).toHaveBeenCalledWith({ limit: 50, worldId: 'w1', rights: true });
+    expect(client.list).toHaveBeenCalledWith({
+      limit: 50,
+      worldId: 'w1',
+      rights: true,
+    });
     fixture.detectChanges();
 
     // The card shows the new name and the input is gone (back to read mode).
-    expect(
-      (el.querySelector('[data-testid=entity-title]') as HTMLElement).textContent?.trim(),
-    ).toBe('Aldermoor Keep');
+    expect((el.querySelector('[data-testid=entity-title]') as HTMLElement).textContent?.trim()).toBe('Aldermoor Keep');
     expect(el.querySelector('[data-testid=rename-input-m1]')).toBeNull();
   });
 
@@ -740,9 +732,7 @@ describe('EntityBrowser', () => {
     // No PATCH, and the original name stays put with the editor closed.
     expect(client.patch).not.toHaveBeenCalled();
     expect(el.querySelector('[data-testid=rename-input-m1]')).toBeNull();
-    expect(
-      (el.querySelector('[data-testid=entity-title]') as HTMLElement).textContent?.trim(),
-    ).toBe('Aldermoor');
+    expect((el.querySelector('[data-testid=entity-title]') as HTMLElement).textContent?.trim()).toBe('Aldermoor');
   });
 
   it('deletes a map, then refreshes from page one (ADR-0025)', () => {
@@ -754,19 +744,24 @@ describe('EntityBrowser', () => {
     client.delete.mockReturnValueOnce(of(undefined));
     // The delete is followed by a page-one refresh; the view reflects the server.
     client.list.mockReturnValueOnce(
-      of({ items: [summary({ id: 'm2', name: 'The Whisperwood' })], nextCursor: null }),
+      of({
+        items: [summary({ id: 'm2', name: 'The Whisperwood' })],
+        nextCursor: null,
+      }),
     );
-    (
-      fixture.nativeElement.querySelector('[data-testid=delete-m1]') as HTMLButtonElement
-    ).click();
+    (fixture.nativeElement.querySelector('[data-testid=delete-m1]') as HTMLButtonElement).click();
 
     expect(client.delete).toHaveBeenCalledWith('m1');
-    expect(client.list).toHaveBeenCalledWith({ limit: 50, worldId: 'w1', rights: true });
+    expect(client.list).toHaveBeenCalledWith({
+      limit: 50,
+      worldId: 'w1',
+      rights: true,
+    });
     fixture.detectChanges();
 
-    const titles = Array.from(
-      fixture.nativeElement.querySelectorAll('[data-testid=entity-title]'),
-    ).map((el) => (el as HTMLElement).textContent?.trim());
+    const titles = Array.from(fixture.nativeElement.querySelectorAll('[data-testid=entity-title]')).map((el) =>
+      (el as HTMLElement).textContent?.trim(),
+    );
     expect(titles).toEqual(['The Whisperwood']);
   });
 
@@ -799,13 +794,21 @@ describe('EntityBrowser', () => {
 
     it('toggles a Type Facet: filters the list and mirrors it to the URL', () => {
       client.facets.mockReturnValue(
-        of({ type: [{ value: 'core.note', count: 1 }], tag: [], visibility: [], fields: [] }),
+        of({
+          type: [{ value: 'core.note', count: 1 }],
+          tag: [],
+          visibility: [],
+          fields: [],
+        }),
       );
       const fixture = renderWith([summary({ id: 'm1' })]);
       const el = fixture.nativeElement as HTMLElement;
 
       client.list.mockReturnValueOnce(
-        of({ items: [summary({ id: 'n1', types: ['core.note'] })], nextCursor: null }),
+        of({
+          items: [summary({ id: 'n1', types: ['core.note'] })],
+          nextCursor: null,
+        }),
       );
       facet(el, 'facet-type-core.note')?.click();
       fixture.detectChanges();
@@ -828,7 +831,12 @@ describe('EntityBrowser', () => {
 
     it('removes an individual active Facet by toggling it off', () => {
       client.facets.mockReturnValue(
-        of({ type: [{ value: 'core.note', count: 1 }], tag: [], visibility: [], fields: [] }),
+        of({
+          type: [{ value: 'core.note', count: 1 }],
+          tag: [],
+          visibility: [],
+          fields: [],
+        }),
       );
       const fixture = renderWith([summary({ id: 'm1' })]);
       const el = fixture.nativeElement as HTMLElement;
@@ -842,16 +850,27 @@ describe('EntityBrowser', () => {
       // Toggling the same value off drops the whole category from the request/URL.
       facet(el, 'facet-type-core.note')?.click();
       fixture.detectChanges();
-      expect(client.list).toHaveBeenLastCalledWith({ limit: 50, worldId: 'w1', rights: true });
+      expect(client.list).toHaveBeenLastCalledWith({
+        limit: 50,
+        worldId: 'w1',
+        rights: true,
+      });
       expect(navigate).toHaveBeenLastCalledWith(
         [],
-        expect.objectContaining({ queryParams: expect.objectContaining({ type: null }) }),
+        expect.objectContaining({
+          queryParams: expect.objectContaining({ type: null }),
+        }),
       );
     });
 
     it('Clear all resets the query and every Facet, dropping their URL params', () => {
       client.facets.mockReturnValue(
-        of({ type: [{ value: 'core.note', count: 1 }], tag: [], visibility: [], fields: [] }),
+        of({
+          type: [{ value: 'core.note', count: 1 }],
+          tag: [],
+          visibility: [],
+          fields: [],
+        }),
       );
       const fixture = renderWith([summary({ id: 'm1' })]);
       const el = fixture.nativeElement as HTMLElement;
@@ -868,10 +887,20 @@ describe('EntityBrowser', () => {
       expect(navigate).toHaveBeenLastCalledWith(
         [],
         expect.objectContaining({
-          queryParams: { q: null, type: null, tag: null, visibility: null, field: null },
+          queryParams: {
+            q: null,
+            type: null,
+            tag: null,
+            visibility: null,
+            field: null,
+          },
         }),
       );
-      expect(client.list).toHaveBeenLastCalledWith({ limit: 50, worldId: 'w1', rights: true });
+      expect(client.list).toHaveBeenLastCalledWith({
+        limit: 50,
+        worldId: 'w1',
+        rights: true,
+      });
     });
 
     it('seeds active Facets from the URL and carries them into the first fetch', () => {
@@ -900,7 +929,10 @@ describe('EntityBrowser', () => {
       search(fixture, 'temple');
 
       expect(client.facets.mock.calls.length).toBeGreaterThan(before);
-      expect(client.facets).toHaveBeenLastCalledWith({ worldId: 'w1', q: 'temple' });
+      expect(client.facets).toHaveBeenLastCalledWith({
+        worldId: 'w1',
+        q: 'temple',
+      });
     });
 
     describe('contextual Field facets (#188)', () => {
@@ -916,7 +948,10 @@ describe('EntityBrowser', () => {
               {
                 key: 'alignment',
                 label: 'Alignment',
-                dataType: { kind: 'enum', options: ['lawful-good', 'chaotic-evil'] },
+                dataType: {
+                  kind: 'enum',
+                  options: ['lawful-good', 'chaotic-evil'],
+                },
                 values: [
                   { value: 'lawful-good', count: 1 },
                   { value: 'chaotic-evil', count: 1 },
@@ -954,7 +989,9 @@ describe('EntityBrowser', () => {
         expect(navigate).toHaveBeenLastCalledWith(
           [],
           expect.objectContaining({
-            queryParams: expect.objectContaining({ field: ['alignment:eq:lawful-good'] }),
+            queryParams: expect.objectContaining({
+              field: ['alignment:eq:lawful-good'],
+            }),
           }),
         );
       });
@@ -998,7 +1035,10 @@ describe('EntityBrowser', () => {
 
       it('seeds Field filters from a `field` URL param into the first fetch', () => {
         queryParams$.next(
-          convertToParamMap({ type: 'test.beast', field: 'alignment:eq:lawful-good' }),
+          convertToParamMap({
+            type: 'test.beast',
+            field: 'alignment:eq:lawful-good',
+          }),
         );
         client.list.mockReturnValueOnce(of({ items: [], nextCursor: null }));
         const fixture = TestBed.createComponent(EntityBrowser);
@@ -1020,9 +1060,7 @@ describe('EntityBrowser', () => {
     const fixture = renderWith([summary({ id: 'm1', name: 'Aldermoor' })]);
 
     client.delete.mockReturnValueOnce(throwError(() => new Error('boom')));
-    (
-      fixture.nativeElement.querySelector('[data-testid=delete-m1]') as HTMLButtonElement
-    ).click();
+    (fixture.nativeElement.querySelector('[data-testid=delete-m1]') as HTMLButtonElement).click();
     fixture.detectChanges();
 
     // The card stays (the delete didn't take) and the failure is surfaced.

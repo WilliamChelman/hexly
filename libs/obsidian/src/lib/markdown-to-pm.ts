@@ -15,10 +15,7 @@ export interface MarkdownToProseMirror {
   degraded: Record<string, number>;
 }
 
-const parser = unified()
-  .use(remarkParse)
-  .use(remarkGfm)
-  .use(remarkFrontmatter, ['yaml']);
+const parser = unified().use(remarkParse).use(remarkGfm).use(remarkFrontmatter, ['yaml']);
 
 /**
  * Import: Obsidian markdown → ProseMirror `tiptap-v3` JSON. Pure — no HTTP,
@@ -48,9 +45,7 @@ export function markdownToProseMirror(markdown: string): MarkdownToProseMirror {
     }
   }
 
-  const content = tree.children
-    .filter((node) => node.type !== 'yaml')
-    .flatMap((node) => blockToPM(node, degraded));
+  const content = tree.children.filter((node) => node.type !== 'yaml').flatMap((node) => blockToPM(node, degraded));
 
   return { doc: { type: 'doc', content }, metadata, degraded };
 }
@@ -108,16 +103,22 @@ function blockToPM(node: RootContent, degraded: Record<string, number>): PMNode[
  * tokenizer, {@link tokenToPM}). Text runs become paragraphs; each image becomes its own
  * block, in order.
  */
-function paragraphToPM(
-  node: Extract<RootContent, { type: 'paragraph' }>,
-  degraded: Record<string, number>
-): PMNode[] {
+function paragraphToPM(node: Extract<RootContent, { type: 'paragraph' }>, degraded: Record<string, number>): PMNode[] {
   // Assemble the full inline sequence first (mdast images become image nodes here; embed
   // images come from inlineToPM), then hoist every image node out to block level.
   const seq = node.children.flatMap((child) =>
     child.type === 'image'
-      ? [{ type: 'image', attrs: { src: child.url, alt: child.alt ?? null, title: child.title ?? null } }]
-      : inlineToPM(child, degraded, [])
+      ? [
+          {
+            type: 'image',
+            attrs: {
+              src: child.url,
+              alt: child.alt ?? null,
+              title: child.title ?? null,
+            },
+          },
+        ]
+      : inlineToPM(child, degraded, []),
   );
 
   const blocks: PMNode[] = [];
@@ -149,7 +150,7 @@ function flattenToText(nodes: RootContent[]): string {
         ? n.value
         : 'children' in n
           ? flattenToText(n.children as RootContent[])
-          : ''
+          : '',
     )
     .join('');
 }
@@ -161,7 +162,7 @@ function flattenToText(nodes: RootContent[]): string {
  */
 function calloutFromBlockquote(
   node: Extract<RootContent, { type: 'blockquote' }>,
-  degraded: Record<string, number>
+  degraded: Record<string, number>,
 ): PMNode | null {
   const first = node.children[0];
   if (first?.type !== 'paragraph') return null;
@@ -212,10 +213,7 @@ function calloutFromBlockquote(
 }
 
 /** Maps a GFM table to the PM table node set; the first row becomes header cells. */
-function tableToPM(
-  node: Extract<RootContent, { type: 'table' }>,
-  degraded: Record<string, number>
-): PMNode {
+function tableToPM(node: Extract<RootContent, { type: 'table' }>, degraded: Record<string, number>): PMNode {
   return {
     type: 'table',
     content: node.children.map((row, rowIndex) => ({
@@ -234,10 +232,7 @@ function tableToPM(
  * run of the same kind becomes its own sibling list — a plain item next to a task
  * stays a bullet rather than a stray checkbox.
  */
-function listToPM(
-  node: Extract<RootContent, { type: 'list' }>,
-  degraded: Record<string, number>
-): PMNode[] {
+function listToPM(node: Extract<RootContent, { type: 'list' }>, degraded: Record<string, number>): PMNode[] {
   const out: PMNode[] = [];
   let run: typeof node.children = [];
   let runIsTask = false;
@@ -262,8 +257,12 @@ function listToPM(
       }));
       out.push(
         node.ordered
-          ? { type: 'orderedList', attrs: { start: (node.start ?? 1) + consumed }, content: items }
-          : { type: 'bulletList', content: items }
+          ? {
+              type: 'orderedList',
+              attrs: { start: (node.start ?? 1) + consumed },
+              content: items,
+            }
+          : { type: 'bulletList', content: items },
       );
     }
     consumed += run.length;
@@ -292,7 +291,7 @@ const MARK_FOR_NODE: Record<string, string> = {
 function inlineChildren(
   parent: { children: RootContent[] },
   degraded: Record<string, number>,
-  marks: Mark[] = []
+  marks: Mark[] = [],
 ): PMNode[] {
   const nodes = parent.children.flatMap((child) => inlineToPM(child, degraded, marks));
   return mergeAdjacentText(nodes.flatMap((n) => inlineOnly(n, marks, degraded)));
@@ -348,15 +347,10 @@ function sameMarks(a: Mark[] | undefined, b: Mark[] | undefined): boolean {
  */
 // Inline `$…$` requires non-space at both ends and no trailing digit, per Obsidian —
 // so ordinary prose with two dollar amounts (`$5 and $10`) isn't mistaken for math.
-const INLINE_TOKEN =
-  /(!?)\[\[([^\]\n]+)\]\]|==(.+?)==|%%([\s\S]*?)%%|\$\$([\s\S]+?)\$\$|\$(\S|\S[^$\n]*?\S)\$(?!\d)/;
+const INLINE_TOKEN = /(!?)\[\[([^\]\n]+)\]\]|==(.+?)==|%%([\s\S]*?)%%|\$\$([\s\S]+?)\$\$|\$(\S|\S[^$\n]*?\S)\$(?!\d)/;
 
 /** Splits an mdast text value around Obsidian inline tokens into PM inline nodes. */
-function splitInlineText(
-  value: string,
-  marks: Mark[],
-  degraded: Record<string, number>
-): PMNode[] {
+function splitInlineText(value: string, marks: Mark[], degraded: Record<string, number>): PMNode[] {
   const out: PMNode[] = [];
   let rest = value;
 
@@ -436,7 +430,13 @@ function wikilinkToEntityLink(inner: string): PMNode {
 
   return {
     type: 'entityLink',
-    attrs: { entityId: null, label: label.trim(), descriptor: null, display, heading },
+    attrs: {
+      entityId: null,
+      label: label.trim(),
+      descriptor: null,
+      display,
+      heading,
+    },
   };
 }
 
@@ -451,11 +451,7 @@ function withMarks(node: PMNode, marks: Mark[]): PMNode {
 }
 
 /** Maps an mdast inline node to zero or more PM inline nodes, carrying marks down. */
-function inlineToPM(
-  node: RootContent,
-  degraded: Record<string, number>,
-  marks: Mark[]
-): PMNode[] {
+function inlineToPM(node: RootContent, degraded: Record<string, number>, marks: Mark[]): PMNode[] {
   switch (node.type) {
     case 'text':
       return splitInlineText(node.value, marks, degraded);
@@ -468,10 +464,7 @@ function inlineToPM(
     case 'delete':
       return inlineChildren(node, degraded, [...marks, { type: MARK_FOR_NODE[node.type] }]);
     case 'link':
-      return inlineChildren(node, degraded, [
-        ...marks,
-        { type: 'link', attrs: { href: node.url } },
-      ]);
+      return inlineChildren(node, degraded, [...marks, { type: 'link', attrs: { href: node.url } }]);
     // Footnotes have no native node — degrade the reference to a plain `[^id]` marker.
     case 'footnoteReference':
       count(degraded, 'footnote');

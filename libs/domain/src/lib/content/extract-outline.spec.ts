@@ -6,9 +6,17 @@ describe('extractOutline', () => {
     const content = tiptapContent({
       type: 'doc',
       content: [
-        { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'The Reach' }] },
+        {
+          type: 'heading',
+          attrs: { level: 1 },
+          content: [{ type: 'text', text: 'The Reach' }],
+        },
         { type: 'paragraph', content: [{ type: 'text', text: 'some prose' }] },
-        { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'History' }] },
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'History' }],
+        },
       ],
     });
 
@@ -19,8 +27,16 @@ describe('extractOutline', () => {
     const content = tiptapContent({
       type: 'doc',
       content: [
-        { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'Top' }] },
-        { type: 'heading', attrs: { level: 3 }, content: [{ type: 'text', text: 'Deep' }] },
+        {
+          type: 'heading',
+          attrs: { level: 1 },
+          content: [{ type: 'text', text: 'Top' }],
+        },
+        {
+          type: 'heading',
+          attrs: { level: 3 },
+          content: [{ type: 'text', text: 'Deep' }],
+        },
       ],
     });
 
@@ -57,7 +73,12 @@ describe('extractOutline', () => {
         {
           type: 'heading',
           attrs: { level: 1 },
-          content: [{ type: 'entityLink', attrs: { entityId: 'x', label: 'Lady Mara', display: 'Mara' } }],
+          content: [
+            {
+              type: 'entityLink',
+              attrs: { entityId: 'x', label: 'Lady Mara', display: 'Mara' },
+            },
+          ],
         },
       ],
     });
@@ -69,9 +90,17 @@ describe('extractOutline', () => {
     const content = tiptapContent({
       type: 'doc',
       content: [
-        { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'Real' }] },
+        {
+          type: 'heading',
+          attrs: { level: 1 },
+          content: [{ type: 'text', text: 'Real' }],
+        },
         { type: 'heading', attrs: { level: 2 } }, // empty line the author just made a heading
-        { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: '   ' }] }, // whitespace only
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: '   ' }],
+        }, // whitespace only
       ],
     });
 
@@ -82,7 +111,10 @@ describe('extractOutline', () => {
     // A foreign snapshot may reuse the word "heading" for something else — don't parse it.
     const content = {
       format: 'prosemirror-v9',
-      snapshot: { type: 'heading', content: [{ type: 'text', text: 'ignored' }] },
+      snapshot: {
+        type: 'heading',
+        content: [{ type: 'text', text: 'ignored' }],
+      },
     } as never;
 
     expect(extractOutline(content)).toEqual([]);

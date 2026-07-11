@@ -20,7 +20,11 @@ function hasNode(json: JSONContent, type: string): boolean {
 }
 
 function renderHtml(doc: JSONContent): string {
-  const editor = new Editor({ element: document.createElement('div'), extensions: CONTENT_EXTENSIONS, content: doc });
+  const editor = new Editor({
+    element: document.createElement('div'),
+    extensions: CONTENT_EXTENSIONS,
+    content: doc,
+  });
   const html = editor.getHTML();
   editor.destroy();
   return html;
@@ -67,11 +71,21 @@ describe('CONTENT_EXTENSIONS — tiptap-v3 schema', () => {
               content: [
                 {
                   type: 'tableHeader',
-                  content: [{ type: 'paragraph', content: [{ type: 'text', text: 'H' }] }],
+                  content: [
+                    {
+                      type: 'paragraph',
+                      content: [{ type: 'text', text: 'H' }],
+                    },
+                  ],
                 },
                 {
                   type: 'tableCell',
-                  content: [{ type: 'paragraph', content: [{ type: 'text', text: 'c' }] }],
+                  content: [
+                    {
+                      type: 'paragraph',
+                      content: [{ type: 'text', text: 'c' }],
+                    },
+                  ],
                 },
               ],
             },
@@ -92,7 +106,12 @@ describe('CONTENT_EXTENSIONS — tiptap-v3 schema', () => {
             {
               type: 'taskItem',
               attrs: { checked: true },
-              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'done' }] }],
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'done' }],
+                },
+              ],
             },
           ],
         },
@@ -107,8 +126,15 @@ describe('CONTENT_EXTENSIONS — tiptap-v3 schema', () => {
     // The shape a mixed Obsidian list imports to (ADR-0033): one listItem whose
     // body interleaves plain bullets and task runs. TipTap must keep the plain
     // items as listItems (bullets, no checkbox) and only the tasks as taskItems.
-    const li = (text: string) => ({ type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] });
-    const ti = (text: string) => ({ type: 'taskItem', attrs: { checked: true }, content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] });
+    const li = (text: string) => ({
+      type: 'listItem',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
+    });
+    const ti = (text: string) => ({
+      type: 'taskItem',
+      attrs: { checked: true },
+      content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
+    });
     const doc = {
       type: 'doc',
       content: [
@@ -118,7 +144,10 @@ describe('CONTENT_EXTENSIONS — tiptap-v3 schema', () => {
             {
               type: 'listItem',
               content: [
-                { type: 'paragraph', content: [{ type: 'text', text: 'Chrysee' }] },
+                {
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Chrysee' }],
+                },
                 { type: 'bulletList', content: [li('CA 15-'), li('immunite')] },
                 { type: 'taskList', content: [ti('gwayn')] },
                 { type: 'bulletList', content: [li('biiiim')] },
@@ -151,7 +180,10 @@ describe('CONTENT_EXTENSIONS — tiptap-v3 schema', () => {
               type: 'paragraph',
               content: [
                 { type: 'text', text: 'See ' },
-                { type: 'entityLink', attrs: { entityId: 'e1', label: 'Avalon' } },
+                {
+                  type: 'entityLink',
+                  attrs: { entityId: 'e1', label: 'Avalon' },
+                },
               ],
             },
           ],

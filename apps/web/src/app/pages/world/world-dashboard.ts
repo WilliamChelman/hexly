@@ -1,18 +1,21 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  inject,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntityFacets, EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient, ActiveWorld, ToasterService, HexlyDatePipe, entityRoute, worldRoute } from '@hexly/web-core';
-import { Button, Eyebrow, Panel, PageHeader, Icon, IconName, EntitySearchPicker, ACCENT_BAR, accentFor } from '@hexly/web-ui';
+import {
+  Button,
+  Eyebrow,
+  Panel,
+  PageHeader,
+  Icon,
+  IconName,
+  EntitySearchPicker,
+  ACCENT_BAR,
+  accentFor,
+} from '@hexly/web-ui';
 import { TypeRegistry } from '../../entity-types/type-registry';
 import { CORE_VIEW_MAP } from '../../entity-types/view-definition';
 
@@ -51,11 +54,7 @@ const MAPS_LIMIT = 8;
         raised
       >
         <span class="absolute left-0 top-0 bottom-0 w-1.5 {{ bar(e.id) }}"></span>
-        <app-icon
-          [name]="typeIcon(e.types[0])"
-          [size]="18"
-          class="shrink-0 mt-0.5 text-ink-muted"
-        />
+        <app-icon [name]="typeIcon(e.types[0])" [size]="18" class="shrink-0 mt-0.5 text-ink-muted" />
         <div class="min-w-0 flex-1">
           <a
             class="block no-underline outline-none focus-visible:shadow-none after:content-[''] after:absolute after:inset-0"
@@ -79,21 +78,13 @@ const MAPS_LIMIT = 8;
 
     <app-page-header sticky>
       <div pageHeaderTitle class="flex flex-col">
-        <span appEyebrow class="text-gold! tracking-[0.28em]">{{
-          'worldDashboard.eyebrow' | transloco
-        }}</span>
+        <span appEyebrow class="text-gold! tracking-[0.28em]">{{ 'worldDashboard.eyebrow' | transloco }}</span>
         <h1 class="font-display text-[22px] text-ink-strong m-0 leading-tight">
           {{ worldName() }}
         </h1>
       </div>
       @if (!isEmpty()) {
-        <a
-          pageHeaderActions
-          appButton
-          variant="default"
-          [routerLink]="browseAllLink()"
-          data-testid="browse-all"
-        >
+        <a pageHeaderActions appButton variant="default" [routerLink]="browseAllLink()" data-testid="browse-all">
           <app-icon name="library" [size]="16" />
           {{ 'worldDashboard.browseAll' | transloco }}
         </a>
@@ -110,7 +101,9 @@ const MAPS_LIMIT = 8;
           <p class="m-0 font-display text-lg text-ink-strong">
             {{ 'worldDashboard.emptyTitle' | transloco }}
           </p>
-          <p class="text-sm m-0">{{ 'worldDashboard.emptyHint' | transloco }}</p>
+          <p class="text-sm m-0">
+            {{ 'worldDashboard.emptyHint' | transloco }}
+          </p>
           <div class="flex items-center gap-2 mt-1">
             <button
               type="button"
@@ -150,9 +143,7 @@ const MAPS_LIMIT = 8;
                   [attr.data-testid]="'count-type-' + c.value"
                 >
                   <span class="font-display text-2xl text-ink-strong">{{ c.count }}</span>
-                  <span class="text-sm text-ink-muted">{{
-                    'entityBrowser.type.' + c.value | transloco
-                  }}</span>
+                  <span class="text-sm text-ink-muted">{{ 'entityBrowser.type.' + c.value | transloco }}</span>
                 </li>
               }
             </ul>
@@ -192,15 +183,10 @@ const MAPS_LIMIT = 8;
               </div>
             }
 
-            <ul
-              class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 m-0 p-0 list-none"
-            >
+            <ul class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 m-0 p-0 list-none">
               @for (e of pins(); track e.id; let i = $index) {
                 <li class="relative">
-                  <ng-container
-                    [ngTemplateOutlet]="tile"
-                    [ngTemplateOutletContext]="{ $implicit: e, prefix: 'pin' }"
-                  />
+                  <ng-container [ngTemplateOutlet]="tile" [ngTemplateOutletContext]="{ $implicit: e, prefix: 'pin' }" />
                   @if (canCurate()) {
                     <!-- z-10 lifts the controls above the tile's full-card link overlay. -->
                     <div class="absolute top-2 right-2 z-10 flex gap-0.5">
@@ -258,9 +244,7 @@ const MAPS_LIMIT = 8;
           <h2 appEyebrow mark class="mb-3">
             {{ 'worldDashboard.recentsHeading' | transloco }}
           </h2>
-          <ul
-            class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 m-0 p-0 list-none"
-          >
+          <ul class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 m-0 p-0 list-none">
             @for (e of recents(); track e.id) {
               <li>
                 <ng-container
@@ -277,15 +261,10 @@ const MAPS_LIMIT = 8;
             <h2 appEyebrow mark class="mb-3">
               {{ 'worldDashboard.mapsHeading' | transloco }}
             </h2>
-            <ul
-              class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 m-0 p-0 list-none"
-            >
+            <ul class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 m-0 p-0 list-none">
               @for (e of maps(); track e.id) {
                 <li>
-                  <ng-container
-                    [ngTemplateOutlet]="tile"
-                    [ngTemplateOutletContext]="{ $implicit: e, prefix: 'map' }"
-                  />
+                  <ng-container [ngTemplateOutlet]="tile" [ngTemplateOutletContext]="{ $implicit: e, prefix: 'map' }" />
                 </li>
               }
             </ul>
@@ -310,34 +289,30 @@ export class WorldDashboard {
   protected readonly maps = signal<EntitySummary[]>([]);
   /** The resolved Pinned Entities, in `pinnedEntityIds` order. */
   protected readonly pins = signal<EntitySummary[]>([]);
-  protected readonly canCurate = computed(
-    () => this.activeWorld.world()?.rights.includes('manage') ?? false,
-  );
+  protected readonly canCurate = computed(() => this.activeWorld.world()?.rights.includes('manage') ?? false);
   protected readonly pinPickerOpen = signal(false);
   protected readonly pinQuery = signal('');
   protected readonly typeCounts = signal<EntityFacets['type']>([]);
   /** Set once the recents read resolves — gates the empty state so it never flashes pre-load. */
   protected readonly loaded = signal(false);
   protected readonly creating = signal(false);
-  protected readonly isEmpty = computed(
-    () => this.loaded() && this.recents().length === 0,
-  );
+  protected readonly isEmpty = computed(() => this.loaded() && this.recents().length === 0);
 
   constructor() {
     const worldId = this.activeWorld.worldId();
     if (!worldId) return;
+    this.entitiesClient.list({ worldId, limit: RECENTS_LIMIT }).subscribe((page) => {
+      this.recents.set(page.items);
+      this.loaded.set(true);
+    });
     this.entitiesClient
-      .list({ worldId, limit: RECENTS_LIMIT })
-      .subscribe((page) => {
-        this.recents.set(page.items);
-        this.loaded.set(true);
-      });
-    this.entitiesClient
-      .list({ worldId, type: this.types.typeIdsForView(CORE_VIEW_MAP), limit: MAPS_LIMIT })
+      .list({
+        worldId,
+        type: this.types.typeIdsForView(CORE_VIEW_MAP),
+        limit: MAPS_LIMIT,
+      })
       .subscribe((page) => this.maps.set(page.items));
-    this.entitiesClient
-      .facets({ worldId })
-      .subscribe((facets) => this.typeCounts.set(facets.type));
+    this.entitiesClient.facets({ worldId }).subscribe((facets) => this.typeCounts.set(facets.type));
 
     // Resolve pins through the entity read path so the per-caller access filter
     // applies: an unreachable pinned Entity drops out, and pin order is restored
@@ -352,9 +327,7 @@ export class WorldDashboard {
       // the default page size.
       const sub = this.entitiesClient.list({ ids: [...ids] }).subscribe((page) => {
         const byId = new Map(page.items.map((e) => [e.id, e]));
-        this.pins.set(
-          ids.map((id) => byId.get(id)).filter((e): e is EntitySummary => !!e),
-        );
+        this.pins.set(ids.map((id) => byId.get(id)).filter((e): e is EntitySummary => !!e));
       });
       onCleanup(() => sub.unsubscribe());
     });
@@ -389,17 +362,9 @@ export class WorldDashboard {
       .subscribe({
         next: (entity) =>
           this.router.navigate(
-            entityRoute(
-              this.activeWorld.worldId()!,
-              entity.id,
-              this.activeWorld.name() ?? undefined,
-            ),
+            entityRoute(this.activeWorld.worldId()!, entity.id, this.activeWorld.name() ?? undefined),
           ),
-        error: () =>
-          this.toaster.show(
-            this.transloco.translate('entityBrowser.createError'),
-            'error',
-          ),
+        error: () => this.toaster.show(this.transloco.translate('entityBrowser.createError'), 'error'),
       });
   }
 

@@ -3,11 +3,7 @@ import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ReindexJob } from '@hexly/domain';
 import { AdminClient, ToasterService } from '@hexly/web-core';
-import {
-  MockAdminClient,
-  provideTranslocoTesting,
-  reindexJob,
-} from '@hexly/web-core/testing';
+import { MockAdminClient, provideTranslocoTesting, reindexJob } from '@hexly/web-core/testing';
 import { Admin } from './admin';
 
 /** Matches the panel's own poll interval; one `tick` of it advances the walk by one poll. */
@@ -46,8 +42,7 @@ describe('Admin panel (Reindex)', () => {
   /** Fire the next poll; the mocked response lands synchronously with it. */
   const advance = (ms: number) => vi.advanceTimersByTime(ms);
 
-  const reindexButton = (el: HTMLElement) =>
-    $(el, '[data-testid="reindex"]') as HTMLButtonElement;
+  const reindexButton = (el: HTMLElement) => $(el, '[data-testid="reindex"]') as HTMLButtonElement;
 
   /**
    * Script the job reads for a panel that loads with nothing running: the panel reads the job
@@ -72,7 +67,12 @@ describe('Admin panel (Reindex)', () => {
   it('reindexes through the client and reports how many Entities were walked', () => {
     admin.reindex.mockReturnValue(of(reindexJob({ status: 'running', total: 412 })));
     loadsIdleThenPolls(
-      reindexJob({ status: 'succeeded', total: 412, walked: 412, reindexed: 412 }),
+      reindexJob({
+        status: 'succeeded',
+        total: 412,
+        walked: 412,
+        reindexed: 412,
+      }),
     );
     const { nativeElement: el } = render();
 
@@ -80,9 +80,7 @@ describe('Admin panel (Reindex)', () => {
     advance(POLL_MS);
 
     expect(admin.reindex).toHaveBeenCalled();
-    expect(toaster.toasts().some((t) => t.tone === 'success' && t.message.includes('412'))).toBe(
-      true,
-    );
+    expect(toaster.toasts().some((t) => t.tone === 'success' && t.message.includes('412'))).toBe(true);
   });
 
   /** The button reports the walk's progress, and refuses a second press while it runs. */
@@ -166,11 +164,16 @@ describe('Admin panel (Reindex)', () => {
    * is already running rejoins it — rather than being offered a button that would 409.
    */
   it('rejoins a walk that was already running when the panel loaded', () => {
-    admin.reindexStatus
-      .mockReturnValueOnce(of(reindexJob({ status: 'running', total: 9, walked: 4 })))
-      .mockReturnValue(
-        of(reindexJob({ status: 'succeeded', total: 9, walked: 9, reindexed: 9 })),
-      );
+    admin.reindexStatus.mockReturnValueOnce(of(reindexJob({ status: 'running', total: 9, walked: 4 }))).mockReturnValue(
+      of(
+        reindexJob({
+          status: 'succeeded',
+          total: 9,
+          walked: 9,
+          reindexed: 9,
+        }),
+      ),
+    );
     const fixture = render();
     const el = fixture.nativeElement as HTMLElement;
 
@@ -179,15 +182,19 @@ describe('Admin panel (Reindex)', () => {
     expect(admin.reindex).not.toHaveBeenCalled(); // It rejoined; it did not start one.
 
     advance(POLL_MS);
-    expect(toaster.toasts().some((t) => t.tone === 'success' && t.message.includes('9'))).toBe(
-      true,
-    );
+    expect(toaster.toasts().some((t) => t.tone === 'success' && t.message.includes('9'))).toBe(true);
   });
 
   /** Two operators, one instance: the server refuses the second walk, and the panel says why. */
   it('surfaces the structured refusal when a reindex is already running', () => {
     admin.reindex.mockReturnValue(
-      throwError(() => new HttpErrorResponse({ status: 409, error: { code: 'reindex-running' } })),
+      throwError(
+        () =>
+          new HttpErrorResponse({
+            status: 409,
+            error: { code: 'reindex-running' },
+          }),
+      ),
     );
     const { nativeElement: el } = render();
 

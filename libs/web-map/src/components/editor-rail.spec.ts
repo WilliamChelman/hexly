@@ -9,16 +9,16 @@ function setup() {
   const fixture = TestBed.createComponent(EditorRail);
   const store = TestBed.inject(HexMapStore);
   fixture.detectChanges();
-  const regions = () =>
-    fixture.nativeElement.querySelector(
-      '[data-testid=rail-regions]',
-    ) as HTMLButtonElement;
+  const regions = () => fixture.nativeElement.querySelector('[data-testid=rail-regions]') as HTMLButtonElement;
   return { fixture, store, regions };
 }
 
 describe('EditorRail', () => {
   beforeEach(async () => {
-    await TestBed.configureTestingModule({ imports: [EditorRail, provideTranslocoTesting()], providers: provideHexMapStoreTesting() }).compileComponents();
+    await TestBed.configureTestingModule({
+      imports: [EditorRail, provideTranslocoTesting()],
+      providers: provideHexMapStoreTesting(),
+    }).compileComponents();
   });
 
   it('renders the Regions entry inactive while the panel is closed', () => {
