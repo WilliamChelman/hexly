@@ -1,5 +1,8 @@
 # Instance-level capabilities are orthogonal per-user flags; World creation is gated
 
+> **Superseded in part by [ADR-0047](./0047-instance-roles-as-a-set-operator-surface-is-admin.md):** the storage shape moved from boolean flags to a `roles` set, and the vocabulary from "capability" to "Instance Role". The orthogonality decision below (World creation is not implied by account management) still holds.
+
+
 Until now any authenticated user could create a World (`POST /worlds`, `POST /worlds/import` — guarded only by the session). To let an operator control who spins up Worlds (clutter/structure on the World Index, not resource or monetization), we add a per-user **World Creation** capability. Rather than build a general roles system, instance-level powers are modelled as a **closed, code-known set of orthogonal boolean capabilities on the `users` row** — the same shape `is_admin`/`is_superadmin` already have — of which `manage-users` (Instance Admin) and `can_create_worlds` are the first two members.
 
 ## The decision

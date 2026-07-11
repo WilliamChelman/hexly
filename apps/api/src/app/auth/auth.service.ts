@@ -4,6 +4,8 @@ import { hash, verify } from '@node-rs/argon2';
 import { eq, lt } from 'drizzle-orm';
 import {
   AuthUser,
+  InstanceRole,
+  instanceRolesSchema,
   Preferences,
   PreferencesPatch,
   preferencesSchema,
@@ -59,18 +61,17 @@ export class AuthService {
 
   /**
    * Provision a user out-of-band (no public signup): the seed CLI, the
-   * `--superadmin` setup path, and the Instance Admin's create-user endpoint all
+   * `--superadmin` setup path, and the `manage-users` create-user endpoint all
    * route through here. The password is hashed with argon2; the plaintext is
-   * never stored. All `roles` default off.
+   * never stored. Roles default to the empty set and Superadmin to off.
    */
   async seedUser(
     email: string,
     password: string,
     displayName: string,
-    roles: {
-      isAdmin?: boolean;
+    opts: {
+      roles?: readonly InstanceRole[];
       isSuperadmin?: boolean;
-      canCreateWorlds?: boolean;
     } = {},
   ): Promise<string> {
     const id = randomUUID();
@@ -82,9 +83,8 @@ export class AuthService {
         email: normalizeEmail(email),
         displayName,
         passwordHash,
-        isAdmin: roles.isAdmin ?? false,
-        isSuperadmin: roles.isSuperadmin ?? false,
-        canCreateWorlds: roles.canCreateWorlds ?? false,
+        roles: JSON.stringify(opts.roles ?? []),
+        isSuperadmin: opts.isSuperadmin ?? false,
         createdAt: Date.now(),
       })
       .run();
@@ -277,10 +277,23 @@ function toAuthUser(row: typeof users.$inferSelect): AuthUser {
     email: row.email,
     displayName: row.displayName,
     preferences: parsePreferences(row.preferences),
-    isAdmin: row.isAdmin,
+    roles: parseRoles(row.roles),
     isSuperadmin: row.isSuperadmin,
-    canCreateWorlds: row.canCreateWorlds,
   };
+}
+
+/**
+ * Parse the stored `roles` JSON through the domain schema. A corrupt or
+ * hand-edited set degrades to no roles rather than breaking auth — the
+ * Superadmin flag (a separate column) is unaffected.
+ */
+function parseRoles(raw: string): InstanceRole[] {
+  try {
+    const parsed = instanceRolesSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : [];
+  } catch {
+    return [];
+  }
 }
 
 /**

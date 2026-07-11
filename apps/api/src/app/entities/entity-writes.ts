@@ -277,7 +277,7 @@ export class EntityWrites {
 
   /**
    * Recompute one page of Entities' document-derived state — the unit of the Superadmin Reindex
-   * (ADR-0046), driven to exhaustion by `SuperadminService`. A **system write** (no `userId`): the
+   * (ADR-0046), driven to exhaustion by the reindex `AdminService`. A **system write** (no `userId`): the
    * Superadmin sits outside the collaboration model. Re-runs {@link derive} and
    * {@link replaceDerived}, so any derivation added there is backfilled retroactively for free;
    * idempotent, since the writes are wholesale replaces.

@@ -99,6 +99,20 @@
       "when": 1783635812876,
       "tag": "0013_entity_edge_index",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1783750021044,
+      "tag": "0014_add_user_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1783750034063,
+      "tag": "0015_drop_admin_flags",
+      "breakpoints": true
     }
   ]
 }

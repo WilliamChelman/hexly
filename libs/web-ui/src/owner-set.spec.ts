@@ -1,33 +1,33 @@
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
-import { AuthClient, WorldsClient, EntitiesClient, UsersClient, ToasterService } from '@hexly/web-core';
-import { MockAuthClient, MockWorldsClient, MockEntitiesClient, MockUsersClient, provideTranslocoTesting } from '@hexly/web-core/testing';
+import { AuthClient, WorldsClient, EntitiesClient, UserDirectoryClient, ToasterService } from '@hexly/web-core';
+import { MockAuthClient, MockWorldsClient, MockEntitiesClient, MockUserDirectoryClient, provideTranslocoTesting } from '@hexly/web-core/testing';
 import { OwnerSet } from './owner-set';
 
 describe('OwnerSet', () => {
   let worlds: MockWorldsClient;
   let entities: MockEntitiesClient;
-  let users: MockUsersClient;
+  let users: MockUserDirectoryClient;
   let auth: MockAuthClient;
   let toaster: ToasterService;
 
   beforeEach(async () => {
     worlds = new MockWorldsClient();
     entities = new MockEntitiesClient();
-    users = new MockUsersClient();
+    users = new MockUserDirectoryClient();
     auth = new MockAuthClient();
     await TestBed.configureTestingModule({
       imports: [OwnerSet, provideTranslocoTesting()],
       providers: [
         { provide: WorldsClient, useValue: worlds },
         { provide: EntitiesClient, useValue: entities },
-        { provide: UsersClient, useValue: users },
+        { provide: UserDirectoryClient, useValue: users },
         { provide: AuthClient, useValue: auth },
       ],
     }).compileComponents();
     toaster = TestBed.inject(ToasterService);
-    auth.setUser({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada', preferences: {}, isAdmin: false, isSuperadmin: false, canCreateWorlds: true });
+    auth.setUser({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada', preferences: {}, roles: ['create-worlds'], isSuperadmin: false });
     users.list.mockReturnValue(
       of([
         { id: 'u1', displayName: 'Ada' },

@@ -12,7 +12,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { UserSummary } from '@hexly/domain';
-import { WorldsClient, EntitiesClient, UsersClient, AuthClient, ToasterService } from '@hexly/web-core';
+import { WorldsClient, EntitiesClient, UserDirectoryClient, AuthClient, ToasterService } from '@hexly/web-core';
 import { Button } from './button';
 import { Select } from './select';
 
@@ -23,7 +23,7 @@ import { Select } from './select';
  * guard is the ≥1-Owner invariant the server enforces (a refused last-Owner
  * removal surfaces as an error toast, leaving the set untouched).
  *
- * Ownership is stored as user ids; names come from the {@link UsersClient}
+ * Ownership is stored as user ids; names come from the {@link UserDirectoryClient}
  * directory, which carries no email (ADR-0004).
  */
 @Component({
@@ -133,7 +133,7 @@ export class OwnerSet implements OnInit {
 
   private readonly worlds = inject(WorldsClient);
   private readonly entities = inject(EntitiesClient);
-  private readonly users = inject(UsersClient);
+  private readonly users = inject(UserDirectoryClient);
   private readonly auth = inject(AuthClient);
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);

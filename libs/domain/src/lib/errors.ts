@@ -3,7 +3,7 @@
  * mutation returns `{ code }` — a stable, localizable identifier — never prose,
  * so the web maps a code to its own copy instead of string-matching English.
  * The HTTP status still carries the category. (The Instance Admin surface has
- * its own {@link AdminErrorCode} vocabulary in `./admin`.)
+ * its own {@link UsersErrorCode} vocabulary in `./admin`.)
  */
 export interface ApiError {
   readonly code: string;

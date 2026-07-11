@@ -2,23 +2,23 @@ import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { WorldMember } from '@hexly/domain';
-import { WorldsClient, UsersClient, ToasterService } from '@hexly/web-core';
-import { MockWorldsClient, MockUsersClient, provideTranslocoTesting } from '@hexly/web-core/testing';
+import { WorldsClient, UserDirectoryClient, ToasterService } from '@hexly/web-core';
+import { MockWorldsClient, MockUserDirectoryClient, provideTranslocoTesting } from '@hexly/web-core/testing';
 import { MemberSet } from './member-set';
 
 describe('MemberSet', () => {
   let worlds: MockWorldsClient;
-  let users: MockUsersClient;
+  let users: MockUserDirectoryClient;
   let toaster: ToasterService;
 
   beforeEach(async () => {
     worlds = new MockWorldsClient();
-    users = new MockUsersClient();
+    users = new MockUserDirectoryClient();
     await TestBed.configureTestingModule({
       imports: [MemberSet, provideTranslocoTesting()],
       providers: [
         { provide: WorldsClient, useValue: worlds },
-        { provide: UsersClient, useValue: users },
+        { provide: UserDirectoryClient, useValue: users },
       ],
     }).compileComponents();
     toaster = TestBed.inject(ToasterService);

@@ -22,6 +22,7 @@ export * from './services/preferences-sync';
 export * from './services/public.client';
 export * from './services/theme.service';
 export * from './services/toaster.service';
+export * from './services/user-directory.client';
 export * from './services/users.client';
 export * from './services/world.store';
 export * from './services/worlds.client';

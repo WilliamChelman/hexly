@@ -1,7 +1,7 @@
 import { ConflictException } from '@nestjs/common';
 import { createDb, Db } from '../db/db';
 import { ReindexChunk } from '../entities/entity-writes';
-import { SuperadminService } from './superadmin.service';
+import { AdminService } from './admin.service';
 
 /**
  * The Reindex job (ADR-0046, #180). `EntityWrites.reindexChunk` is a stub here on purpose: what
@@ -9,11 +9,11 @@ import { SuperadminService } from './superadmin.service';
  * chunks, that a bad document is reported rather than fatal, and that only one runs at a time.
  * The walk's own correctness is `EntityWrites`' spec.
  */
-describe('SuperadminService — the Reindex job', () => {
+describe('AdminService — the Reindex job', () => {
   let db: Db;
   let chunks: ReindexChunk[];
   let asked: (string | null)[];
-  let service: SuperadminService;
+  let service: AdminService;
 
   /** A stubbed walk: each call shifts the next scripted chunk off the queue. */
   const writes = {
@@ -37,7 +37,7 @@ describe('SuperadminService — the Reindex job', () => {
     db = createDb(':memory:'); // Isolated per-test (ADR-0002). Only the entity count is read.
     chunks = [];
     asked = [];
-    service = new SuperadminService(db, writes as never);
+    service = new AdminService(db, writes as never);
   });
 
   /**
@@ -118,7 +118,7 @@ describe('SuperadminService — the Reindex job', () => {
         throw new Error('database is locked');
       },
     };
-    service = new SuperadminService(db, boom as never);
+    service = new AdminService(db, boom as never);
 
     service.start();
     await settle();

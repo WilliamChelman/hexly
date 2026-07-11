@@ -5,8 +5,8 @@ import { provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { of, throwError } from 'rxjs';
 import { emptyContent, EntityDetail, WorldDetail, WorldVerb } from '@hexly/domain';
-import { provideTranslocoTesting, MockEntitiesClient, MockWorldsClient, MockUsersClient, MockAuthClient } from '@hexly/web-core/testing';
-import { EntitiesClient, WorldsClient, ActiveWorld, UsersClient, AuthClient } from '@hexly/web-core';
+import { provideTranslocoTesting, MockEntitiesClient, MockWorldsClient, MockUserDirectoryClient, MockAuthClient } from '@hexly/web-core/testing';
+import { EntitiesClient, WorldsClient, ActiveWorld, UserDirectoryClient, AuthClient } from '@hexly/web-core';
 import { EntitySession } from '../services/entity-session';
 import { HexMapStore } from '@hexly/web-map';
 import { OwnerSet } from '@hexly/web-ui';
@@ -86,7 +86,7 @@ describe('EntityHeader', () => {
             ),
           },
         },
-        { provide: UsersClient, useValue: new MockUsersClient() },
+        { provide: UserDirectoryClient, useValue: new MockUserDirectoryClient() },
         { provide: AuthClient, useValue: new MockAuthClient() },
         provideRouter([]),
       ],

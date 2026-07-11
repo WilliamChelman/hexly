@@ -354,6 +354,7 @@
     "expand": "Déployer la navigation",
     "collapse": "Réduire la navigation",
     "home": "Accueil Hexly",
+    "users": "Utilisateurs",
     "admin": "Admin",
     "worldSettings": "Paramètres du monde"
   },
@@ -366,6 +367,7 @@
     "commands": "Commandes",
     "createNote": "Créer une note",
     "createMap": "Créer une carte",
+    "goToUsers": "Aller aux utilisateurs",
     "goToAdmin": "Aller à l'administration",
     "goToStyleguide": "Aller au guide de style",
     "nameLabel": "Nom",
@@ -434,12 +436,12 @@
     "emptyHint": "Créez votre première note ou carte hexagonale pour commencer."
   },
   "worldGraph": {
-      "tabTitle": "Hexly — Graphe",
-      "eyebrow": "Graphe du monde",
-      "counts": "{{nodes}} entités · {{edges}} liens",
-      "emptyTitle": "Rien à dessiner pour l'instant.",
-      "emptyHint": "Créez quelques entités et reliez-les pour voir la forme de votre monde.",
-      "loadError": "Impossible de charger le graphe. Réessayez."
+    "tabTitle": "Hexly — Graphe",
+    "eyebrow": "Graphe du monde",
+    "counts": "{{nodes}} entités · {{edges}} liens",
+    "emptyTitle": "Rien à dessiner pour l'instant.",
+    "emptyHint": "Créez quelques entités et reliez-les pour voir la forme de votre monde.",
+    "loadError": "Impossible de charger le graphe. Réessayez."
   },
   "entitySearchPicker": {
     "searchPlaceholder": "Rechercher des entités…",
@@ -556,10 +558,10 @@
       "error": "Impossible de changer le mot de passe."
     }
   },
-  "admin": {
-    "tabTitle": "Admin — Hexly",
-    "heading": "Administration de l'instance",
-    "subhead": "Gérez les comptes de cette instance. L'administrateur n'a accès à aucun Monde ni aucune Entité — le contenu reste privé au sein du modèle de collaboration.",
+  "users": {
+    "tabTitle": "Utilisateurs — Hexly",
+    "heading": "Gestion des utilisateurs",
+    "subhead": "Gérez les comptes de cette instance. Gérer les utilisateurs ne donne accès à aucun Monde ni aucune Entité — le contenu reste privé au sein du modèle de collaboration.",
     "create": {
       "heading": "Créer un utilisateur",
       "displayName": "Nom affiché",
@@ -571,17 +573,11 @@
       "heading": "Comptes",
       "empty": "Aucun compte."
     },
-    "reindex": {
-      "heading": "Réparation",
-      "description": "Recalcule le texte de recherche, les Descripteurs de lien et les liens de chaque Entité à partir de son contenu. Peut être lancé à tout moment sans risque.",
-      "submit": "Réindexer toutes les Entités",
-      "progress": "Réindexation… {{walked}} / {{total}}"
-    },
     "filter": "Filtrer les comptes",
     "col": {
       "account": "Compte",
-      "admin": "Admin",
-      "worlds": "Mondes",
+      "manageUsers": "Utilisateurs",
+      "createWorlds": "Mondes",
       "superadmin": "Super",
       "status": "Statut",
       "actions": "Actions"
@@ -592,17 +588,17 @@
     },
     "badge": {
       "superadmin": "Superadmin",
-      "admin": "Admin",
-      "worldCreator": "Créateur de mondes",
+      "manageUsers": "Gestionnaire d'utilisateurs",
+      "createWorlds": "Créateur de mondes",
       "disabled": "Désactivé"
     },
     "actions": {
       "disable": "Désactiver",
       "enable": "Activer",
-      "grantAdmin": "Nommer admin",
-      "revokeAdmin": "Retirer admin",
-      "grantWorldCreation": "Autoriser la création de mondes",
-      "revokeWorldCreation": "Interdire la création de mondes",
+      "grantManageUsers": "Autoriser la gestion des utilisateurs",
+      "revokeManageUsers": "Retirer la gestion des utilisateurs",
+      "grantCreateWorlds": "Autoriser la création de mondes",
+      "revokeCreateWorlds": "Interdire la création de mondes",
       "grantSuperadmin": "Nommer superadmin",
       "revokeSuperadmin": "Retirer superadmin",
       "reset": "Réinitialiser le mot de passe",
@@ -615,9 +611,6 @@
       "saved": "Enregistré",
       "reset": "Mot de passe réinitialisé",
       "deleted": "Utilisateur supprimé",
-      "reindexed": "{count, plural, one {# entité réindexée} other {# entités réindexées}}",
-      "reindexedWithFailures": "{count, plural, one {# entité réindexée} other {# entités réindexées}}. {failed, plural, one {# entité illisible a été ignorée} other {# entités illisibles ont été ignorées}}.",
-      "reindexAborted": "La réindexation s'est interrompue avant la fin. Rien n'est perdu — relancez-la pour reprendre.",
       "error": "Une erreur est survenue."
     },
     "error": {
@@ -626,9 +619,27 @@
       "last-superadmin": "C'est le dernier Superadmin — il ne peut être ni supprimé, ni rétrogradé, ni désactivé.",
       "self-delete": "Vous ne pouvez pas supprimer votre propre compte.",
       "self-disable": "Vous ne pouvez pas désactiver votre propre compte.",
-      "self-admin-revoke": "Vous ne pouvez pas retirer votre propre accès Admin.",
+      "self-manage-users-revoke": "Vous ne pouvez pas retirer votre propre accès de gestion des utilisateurs.",
       "superadmin-managed-by-superadmin": "Seul un Superadmin peut gérer un compte Superadmin.",
-      "user-not-found": "Ce compte n'existe plus.",
+      "user-not-found": "Ce compte n'existe plus."
+    }
+  },
+  "admin": {
+    "tabTitle": "Admin — Hexly",
+    "heading": "Réparation de l'instance",
+    "reindex": {
+      "heading": "Réparation",
+      "description": "Recalcule le texte de recherche, les Descripteurs de lien et les liens de chaque Entité à partir de son contenu. Peut être lancé à tout moment sans risque.",
+      "submit": "Réindexer toutes les Entités",
+      "progress": "Réindexation… {{walked}} / {{total}}"
+    },
+    "toast": {
+      "reindexed": "{count, plural, one {# entité réindexée} other {# entités réindexées}}",
+      "reindexedWithFailures": "{count, plural, one {# entité réindexée} other {# entités réindexées}}. {failed, plural, one {# entité illisible a été ignorée} other {# entités illisibles ont été ignorées}}.",
+      "reindexAborted": "La réindexation s'est interrompue avant la fin. Rien n'est perdu — relancez-la pour reprendre.",
+      "error": "Une erreur est survenue."
+    },
+    "error": {
       "reindex-running": "Une réindexation est déjà en cours sur cette instance."
     }
   }

@@ -1,5 +1,5 @@
 import { Route } from '@angular/router';
-import { adminGuard, authGuard, loginGuard, entityWorldRedirect, reconcileWorldSegment, activeWorldGuard, clearActiveWorld } from '@hexly/web-core';
+import { manageUsersGuard, superadminGuard, authGuard, loginGuard, entityWorldRedirect, reconcileWorldSegment, activeWorldGuard, clearActiveWorld } from '@hexly/web-core';
 
 // `title` values are transloco keys, resolved by TranslationTitleStrategy.
 export const appRoutes: Route[] = [
@@ -27,9 +27,17 @@ export const appRoutes: Route[] = [
     title: 'settings.tabTitle',
   },
   {
-    // Account-scoped like Settings. The server re-checks every action.
+    // User management (ADR-0047). Account-scoped like Settings; the server
+    // re-checks every action.
+    path: 'users',
+    canActivate: [manageUsersGuard],
+    loadComponent: () => import('./pages/users/users').then((m) => m.Users),
+    title: 'users.tabTitle',
+  },
+  {
+    // The Superadmin repair surface: the Reindex (ADR-0046). Superadmin-only.
     path: 'admin',
-    canActivate: [adminGuard],
+    canActivate: [superadminGuard],
     loadComponent: () => import('./pages/admin/admin').then((m) => m.Admin),
     title: 'admin.tabTitle',
   },

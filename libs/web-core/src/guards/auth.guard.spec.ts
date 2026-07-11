@@ -6,11 +6,14 @@ import {
   UrlTree,
 } from '@angular/router';
 import { firstValueFrom, isObservable, Observable } from 'rxjs';
-import { authGuard, loginGuard } from './auth.guard';
+import { AuthUser } from '@hexly/domain';
+import { authGuard, loginGuard, manageUsersGuard, superadminGuard } from './auth.guard';
 import { AuthClient } from '../services/auth.client';
 import { MockAuthClient } from '../testing/auth-client.mock';
 
-const ada = { id: 'u1', email: 'ada@hexly.test', displayName: 'Ada', preferences: {}, isAdmin: false, isSuperadmin: false, canCreateWorlds: true };
+const ada: AuthUser = { id: 'u1', email: 'ada@hexly.test', displayName: 'Ada', preferences: {}, roles: ['create-worlds'], isSuperadmin: false };
+const userManager: AuthUser = { ...ada, roles: ['manage-users'] };
+const superadmin: AuthUser = { ...ada, roles: [], isSuperadmin: true };
 
 function settle(result: unknown): Promise<boolean | UrlTree> {
   // Helper to unify Observable and Promise guard results.
@@ -70,6 +73,87 @@ describe('authGuard', () => {
     const value = await resultPromise;
     expect(value).toBeInstanceOf(UrlTree);
     expect((value as UrlTree).toString()).toBe('/login?returnUrl=%2Fatlas%2F42');
+  });
+});
+
+describe('manageUsersGuard', () => {
+  let auth: MockAuthClient;
+
+  beforeEach(() => {
+    auth = new MockAuthClient();
+    TestBed.configureTestingModule({
+      providers: [{ provide: AuthClient, useValue: auth }],
+    });
+  });
+
+  function run(url = '/users') {
+    return TestBed.runInInjectionContext(() =>
+      manageUsersGuard(
+        {} as ActivatedRouteSnapshot,
+        { url } as RouterStateSnapshot,
+      ),
+    );
+  }
+
+  it('redirects to /login when there is no session', async () => {
+    const value = await settle(run());
+    expect(value).toBeInstanceOf(UrlTree);
+    expect((value as UrlTree).toString()).toBe('/login?returnUrl=%2Fusers');
+  });
+
+  it('bounces a signed-in user without the manage-users power to the root', async () => {
+    auth.setUser(ada); // holds create-worlds only
+    const value = await settle(run());
+    expect(value).toBeInstanceOf(UrlTree);
+    expect((value as UrlTree).toString()).toBe('/');
+  });
+
+  it('allows a user holding the manage-users role', async () => {
+    auth.setUser(userManager);
+    expect(await settle(run())).toBe(true);
+  });
+
+  it('allows a Superadmin, who supersedes every role', async () => {
+    auth.setUser(superadmin);
+    expect(await settle(run())).toBe(true);
+  });
+});
+
+describe('superadminGuard', () => {
+  let auth: MockAuthClient;
+
+  beforeEach(() => {
+    auth = new MockAuthClient();
+    TestBed.configureTestingModule({
+      providers: [{ provide: AuthClient, useValue: auth }],
+    });
+  });
+
+  function run(url = '/admin') {
+    return TestBed.runInInjectionContext(() =>
+      superadminGuard(
+        {} as ActivatedRouteSnapshot,
+        { url } as RouterStateSnapshot,
+      ),
+    );
+  }
+
+  it('redirects to /login when there is no session', async () => {
+    const value = await settle(run());
+    expect(value).toBeInstanceOf(UrlTree);
+    expect((value as UrlTree).toString()).toBe('/login?returnUrl=%2Fadmin');
+  });
+
+  it('bounces a mere user manager to the root', async () => {
+    auth.setUser(userManager);
+    const value = await settle(run());
+    expect(value).toBeInstanceOf(UrlTree);
+    expect((value as UrlTree).toString()).toBe('/');
+  });
+
+  it('allows a Superadmin', async () => {
+    auth.setUser(superadmin);
+    expect(await settle(run())).toBe(true);
   });
 });
 

@@ -10,7 +10,7 @@ import {
 import { Observable } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntityGrant, GrantRole, UserSummary } from '@hexly/domain';
-import { EntitiesClient, UsersClient, ToasterService } from '@hexly/web-core';
+import { EntitiesClient, UserDirectoryClient, ToasterService } from '@hexly/web-core';
 import { Button } from './button';
 import { Select } from './select';
 
@@ -21,7 +21,7 @@ import { Select } from './select';
  * per-user visibility. An Owner adds, changes the role of, or revokes a grant. All writes
  * are Owner-only server-side; a refusal surfaces as an error toast, leaving the list intact.
  *
- * Grants are stored as user ids + roles; names come from the {@link UsersClient} directory,
+ * Grants are stored as user ids + roles; names come from the {@link UserDirectoryClient} directory,
  * which carries no email (ADR-0004). The Entity's Owners are excluded from the add
  * candidates — an Owner already has full access, so granting them is meaningless.
  */
@@ -132,7 +132,7 @@ export class GrantSet implements OnInit {
   readonly id = input.required<string>();
 
   private readonly entities = inject(EntitiesClient);
-  private readonly users = inject(UsersClient);
+  private readonly users = inject(UserDirectoryClient);
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
 

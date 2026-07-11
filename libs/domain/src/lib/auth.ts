@@ -55,21 +55,52 @@ export const preferencesPatchSchema = z
 /** A validated Preferences patch (`null` = clear). */
 export type PreferencesPatch = z.infer<typeof preferencesPatchSchema>;
 
+/**
+ * The closed, code-known set of Instance Roles — account-wide powers a user may
+ * hold on their account (ADR-0047). Orthogonal: holding one implies nothing
+ * about the other. `manage-users` was the old `is_admin` flag; `create-worlds`
+ * the old `can_create_worlds`. Superadmin is not a member — it is a separate
+ * flag that supersedes the whole set.
+ */
+export const INSTANCE_ROLES = ['manage-users', 'create-worlds'] as const;
+
+/** One Instance Role. */
+export type InstanceRole = (typeof INSTANCE_ROLES)[number];
+
+/** The stored `roles` set on a user account: a subset of the Instance Roles. */
+export const instanceRolesSchema = z.array(z.enum(INSTANCE_ROLES));
+
+/** The two fields any Instance-Role check reads: the held roles plus the Superadmin flag. */
+export interface InstanceRoleHolder {
+  readonly roles: readonly InstanceRole[];
+  readonly isSuperadmin: boolean;
+}
+
+/**
+ * Holds the `manage-users` role, or is a Superadmin (who supersedes every role).
+ * The single home of the `Superadmin ⊇ everything` implication for account
+ * management — call it rather than checking the array inline, so the rule can't
+ * drift.
+ */
+export function canManageUsers(user: InstanceRoleHolder): boolean {
+  return user.isSuperadmin || user.roles.includes('manage-users');
+}
+
+/** Holds the `create-worlds` role, or is a Superadmin. */
+export function canCreateWorlds(user: InstanceRoleHolder): boolean {
+  return user.isSuperadmin || user.roles.includes('create-worlds');
+}
+
 /** The current user as surfaced by login and `GET /auth/me`. Never the hash. */
 export interface AuthUser {
   readonly id: string;
   readonly email: string;
   readonly displayName: string;
   readonly preferences: Preferences;
-  /** Instance Admin: account management, zero content powers. */
-  readonly isAdmin: boolean;
-  /** Superadmin: the operator's in-app self. Implies Admin's account powers (Superadmin ⊇ Admin). */
+  /** The Instance Roles this user holds — account-wide powers (ADR-0047). */
+  readonly roles: readonly InstanceRole[];
+  /** Superadmin: the operator's in-app self. Supersedes every Instance Role. */
   readonly isSuperadmin: boolean;
-  /**
-   * World Creation: a per-user Instance capability, orthogonal to Instance
-   * Admin. A Superadmin always may create, regardless of this flag.
-   */
-  readonly canCreateWorlds: boolean;
 }
 
 /**

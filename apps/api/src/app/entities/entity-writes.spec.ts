@@ -287,7 +287,7 @@ describe('EntityWrites', () => {
      */
     describe('reindexChunk', () => {
       /**
-       * Drive the pages to exhaustion, exactly as `SuperadminService`'s job loop does. The unit
+       * Drive the pages to exhaustion, exactly as the reindex `AdminService`'s job loop does. The unit
        * under test is one chunk; every assertion below about *the instance* is about this loop
        * over it, so the loop belongs here rather than being mocked away.
        */

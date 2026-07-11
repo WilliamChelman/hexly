@@ -40,7 +40,7 @@ async function seed() {
   try {
     const userId = await app
       .get(AuthService)
-      .seedUser(email, password, displayName, { isSuperadmin, canCreateWorlds: true });
+      .seedUser(email, password, displayName, { isSuperadmin, roles: ['create-worlds'] });
     if (withWorld) {
       app.get(WorldsService).mintWorld(userId, `${displayName}'s World`);
     }

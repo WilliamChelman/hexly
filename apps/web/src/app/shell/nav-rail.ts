@@ -196,9 +196,13 @@ export class NavRail {
     if (this.activeWorldId()) return [];
     return [
       ...STATIC_ENTRIES,
-      // Admin/Superadmin only — the same gate the route enforces server-side.
-      ...(this.auth.canAdminister()
-        ? [{ link: '/admin', testid: 'nav-admin', icon: 'user' as const, labelKey: 'nav.admin' }]
+      // User management: manage-users role or Superadmin — the same gate the route enforces.
+      ...(this.auth.canManageUsers()
+        ? [{ link: '/users', testid: 'nav-users', icon: 'user' as const, labelKey: 'nav.users' }]
+        : []),
+      // The Superadmin repair surface — Superadmin only.
+      ...(this.auth.isSuperadmin()
+        ? [{ link: '/admin', testid: 'nav-admin', icon: 'settings' as const, labelKey: 'nav.admin' }]
         : []),
     ];
   });

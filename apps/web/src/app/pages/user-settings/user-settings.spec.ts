@@ -15,9 +15,8 @@ describe('Settings page (ADR-0038)', () => {
       email: 'ada@hexly.test',
       displayName: 'Ada',
       preferences: {},
-      isAdmin: false,
+      roles: ['create-worlds'],
       isSuperadmin: false,
-      canCreateWorlds: true,
     });
     TestBed.configureTestingModule({
       imports: [provideTranslocoTesting()],
@@ -93,9 +92,8 @@ describe('Settings page (ADR-0038)', () => {
         email: 'ada@hexly.test',
         displayName: 'Ada Lovelace',
         preferences: {},
-        isAdmin: false,
+        roles: ['create-worlds'],
         isSuperadmin: false,
-        canCreateWorlds: true,
       }),
     );
 

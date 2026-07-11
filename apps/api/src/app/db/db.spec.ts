@@ -56,15 +56,18 @@ describe('createDb boot migration (ADR-0027)', () => {
     db.$client.close();
   });
 
-  it('adds the admin-tier columns to users (ADR-0037, #163)', () => {
+  it('carries the roles set, the Superadmin flag, and the disable stamp on users (ADR-0037, ADR-0047)', () => {
     const db = createDb(':memory:');
     const columns = (
       db.$client.prepare(`PRAGMA table_info(users)`).all() as { name: string }[]
     ).map((c) => c.name);
-    // The boot migration (0009) adds the two tier flags and the disable stamp.
+    // Migration 0009 added the tier flags; 0014/0015 replaced `is_admin`/`can_create_worlds`
+    // with the `roles` JSON set, leaving the Superadmin flag and disable stamp.
     expect(columns).toEqual(
-      expect.arrayContaining(['is_admin', 'is_superadmin', 'disabled_at']),
+      expect.arrayContaining(['roles', 'is_superadmin', 'disabled_at']),
     );
+    expect(columns).not.toContain('is_admin');
+    expect(columns).not.toContain('can_create_worlds');
     db.$client.close();
   });
 

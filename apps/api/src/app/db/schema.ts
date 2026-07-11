@@ -22,16 +22,14 @@ export const users = sqliteTable('users', {
   passwordHash: text('password_hash').notNull(),
   // Roaming Preferences as one zod-validated JSON bag; never DB-queried.
   preferences: text('preferences').notNull().default('{}'),
-  // Instance Admin: account management with zero content powers — it pierces no
-  // World or Entity. Toggled in-app by another Admin.
-  isAdmin: integer('is_admin', { mode: 'boolean' }).notNull().default(false),
+  // Instance Roles (ADR-0047): the account-wide powers this user holds, as one
+  // zod-validated JSON set — `manage-users` and/or `create-worlds`. Never
+  // DB-queried; loaded whole with the row and checked in code, like preferences.
+  roles: text('roles').notNull().default('[]'),
   // Superadmin: the operator's repair bypass, OR'd into the read/reachability
   // predicates. Seeded via `--superadmin`; the last one is irremovable so the
-  // repair capability can't be lost.
+  // repair capability can't be lost. Not an Instance Role — a separate flag.
   isSuperadmin: integer('is_superadmin', { mode: 'boolean' }).notNull().default(false),
-  // Per-user capability gating World creation; orthogonal to Instance Admin,
-  // granted by an Instance Admin. Off by default.
-  canCreateWorlds: integer('can_create_worlds', { mode: 'boolean' }).notNull().default(false),
   // Non-null locks login (rejected in `authenticate`, killing live sessions too)
   // while leaving the user's data and memberships intact. Null = active.
   disabledAt: integer('disabled_at'),

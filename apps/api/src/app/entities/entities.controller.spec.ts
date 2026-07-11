@@ -57,7 +57,7 @@ describe('Entities endpoints', () => {
    * derived Dashboard (ADR-0043), so nothing surfaces in the owner's Entity list.
    */
   async function seedUserWithWorld(email: string, password: string, name: string) {
-    const userId = await app.get(AuthService).seedUser(email, password, name, { canCreateWorlds: true });
+    const userId = await app.get(AuthService).seedUser(email, password, name, { roles: ['create-worlds'] });
     app.get(WorldsService).mintWorld(userId, name);
     return userId;
   }

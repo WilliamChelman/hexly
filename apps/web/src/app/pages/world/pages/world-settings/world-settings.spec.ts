@@ -2,8 +2,8 @@ import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideRouter, Router } from '@angular/router';
 import { of } from 'rxjs';
-import { WorldsClient, EntitiesClient, UsersClient, AuthClient, ActiveWorld } from '@hexly/web-core';
-import { MockWorldsClient, MockEntitiesClient, MockUsersClient, MockAuthClient, provideTranslocoTesting } from '@hexly/web-core/testing';
+import { WorldsClient, EntitiesClient, UserDirectoryClient, AuthClient, ActiveWorld } from '@hexly/web-core';
+import { MockWorldsClient, MockEntitiesClient, MockUserDirectoryClient, MockAuthClient, provideTranslocoTesting } from '@hexly/web-core/testing';
 import { OwnerSet } from '@hexly/web-ui';
 import { WorldSettings } from './world-settings';
 
@@ -19,7 +19,7 @@ describe('WorldSettings', () => {
         provideRouter([]),
         { provide: WorldsClient, useValue: worlds },
         { provide: EntitiesClient, useValue: new MockEntitiesClient() },
-        { provide: UsersClient, useValue: new MockUsersClient() },
+        { provide: UserDirectoryClient, useValue: new MockUserDirectoryClient() },
         { provide: AuthClient, useValue: new MockAuthClient() },
       ],
     }).compileComponents();

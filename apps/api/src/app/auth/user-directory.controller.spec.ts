@@ -49,7 +49,7 @@ describe('User directory', () => {
   it('lists every Instance user as id + displayName, without email', async () => {
     const ada = await signIn('ada@hexly.test');
 
-    const res = await ada.get('/users').expect(200);
+    const res = await ada.get('/users/directory').expect(200);
 
     expect(res.body).toEqual(
       expect.arrayContaining([
@@ -61,6 +61,6 @@ describe('User directory', () => {
   });
 
   it('rejects an unauthenticated request', async () => {
-    await request(app.getHttpServer()).get('/users').expect(401);
+    await request(app.getHttpServer()).get('/users/directory').expect(401);
   });
 });

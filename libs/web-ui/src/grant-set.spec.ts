@@ -2,23 +2,23 @@ import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { EntityGrant } from '@hexly/domain';
-import { EntitiesClient, UsersClient, ToasterService } from '@hexly/web-core';
-import { MockEntitiesClient, MockUsersClient, provideTranslocoTesting } from '@hexly/web-core/testing';
+import { EntitiesClient, UserDirectoryClient, ToasterService } from '@hexly/web-core';
+import { MockEntitiesClient, MockUserDirectoryClient, provideTranslocoTesting } from '@hexly/web-core/testing';
 import { GrantSet } from './grant-set';
 
 describe('GrantSet', () => {
   let entities: MockEntitiesClient;
-  let users: MockUsersClient;
+  let users: MockUserDirectoryClient;
   let toaster: ToasterService;
 
   beforeEach(async () => {
     entities = new MockEntitiesClient();
-    users = new MockUsersClient();
+    users = new MockUserDirectoryClient();
     await TestBed.configureTestingModule({
       imports: [GrantSet, provideTranslocoTesting()],
       providers: [
         { provide: EntitiesClient, useValue: entities },
-        { provide: UsersClient, useValue: users },
+        { provide: UserDirectoryClient, useValue: users },
       ],
     }).compileComponents();
     toaster = TestBed.inject(ToasterService);
