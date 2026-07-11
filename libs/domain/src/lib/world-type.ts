@@ -1,16 +1,8 @@
 /**
- * **User-defined Type Definitions** (CONTEXT.md → Type Definition, ADR-0048): an Entity Type a
- * **World Owner** authors as *data*, scoped to one World, fields-only, rendered by the generic
- * Field view. The data twin of a **Plugin type** — a plugin registers its type in code; a World
- * Owner stores one of these in their World. The only thing code ever buys is a bespoke view;
- * everything a user-defined type needs (id, Fields, facets, entity-link Fields, primary, multi-type)
- * works code-lessly off this shape.
- *
- * The Zod source of truth for the model and its REST payloads. A user-defined type carries only an
- * `id`, a display `label`, and a **Field schema** (the same {@link fieldSchemaSchema} a plugin
- * declares, so its Fields — facetable flags, enum options, entity-link target constraints — behave
- * identically to a plugin's). It is stored per-World (cascading on World delete) and merged with the
- * instance-wide plugin types into the {@link AvailableType} set a World exposes.
+ * User-defined Type Definitions (CONTEXT.md → Type Definition, ADR-0048): an Entity Type a World
+ * Owner authors as data, scoped to one World, rendered by the generic Field view — the data twin of
+ * a code-registered Plugin type. The Zod source of truth for the model and its REST payloads; a type
+ * carries an `id`, a `label`, and the same {@link fieldSchemaSchema} a plugin declares.
  */
 
 import { z } from 'zod';
@@ -18,29 +10,19 @@ import { entityTypeSchema, nameSchema } from './entity';
 import { FieldSchema, fieldSchemaSchema } from './field';
 
 /**
- * The namespace a user-defined type id lives under (`world.deity`, `world.faction`). Fixing it to
- * `world.` keeps a World Owner from shadowing a plugin type id (`core.note`, `dnd.monster`): the two
- * keyspaces never collide, so a World's `world.deity` and an instance plugin's `dnd.monster` are
- * always distinguishable. World *scoping* is by storage (the owning `worldId`), not by this
- * namespace — two Worlds may each define their own `world.deity` with different Fields.
+ * The namespace a user-defined type id lives under (`world.deity`). Fixing it to `world.` keeps a
+ * World Owner from shadowing a plugin id (`core.note`, `dnd.monster`), so the keyspaces never
+ * collide. World *scoping* is by storage (`worldId`), not this namespace.
  */
 export const USER_TYPE_NAMESPACE = 'world';
 
-/**
- * A user-defined Entity Type id: a `namespace.id` key (so it inhabits the same open Entity Type set)
- * forced into the reserved `world.` namespace. `world.deity` passes; `dnd.monster` or a bare
- * `deity` does not.
- */
+/** A user-defined type id: a `namespace.id` key forced into the reserved `world.` namespace. */
 export const userDefinedTypeIdSchema = entityTypeSchema.refine(
   (id) => id.startsWith(`${USER_TYPE_NAMESPACE}.`),
   `A user-defined type id must be in the \`${USER_TYPE_NAMESPACE}.\` namespace`,
 );
 
-/**
- * A Field schema list with **distinct keys**: a Field is a lens over one Metadata key, so two Fields
- * typing the same key are a contradiction the author must resolve, not a silent last-wins. Reused by
- * the create and update payloads.
- */
+/** A Field schema list with distinct keys — two Fields typing the same Metadata key are a mistake. */
 export const uniqueFieldsSchema = z
   .array(fieldSchemaSchema)
   .refine(
@@ -48,11 +30,7 @@ export const uniqueFieldsSchema = z
     'Field keys must be unique within a type',
   );
 
-/**
- * A stored user-defined type (CONTEXT.md → Type Definition): its `world.`-namespaced `id`, a
- * display `label`, and its `fields`. This is the shape the CRUD endpoints round-trip and the
- * per-World read merges into {@link AvailableType}.
- */
+/** A stored user-defined type: its `world.`-namespaced `id`, a display `label`, and its `fields`. */
 export const userDefinedTypeSchema = z.object({
   id: userDefinedTypeIdSchema,
   label: nameSchema,
@@ -61,21 +39,14 @@ export const userDefinedTypeSchema = z.object({
 
 export type UserDefinedType = z.infer<typeof userDefinedTypeSchema>;
 
-/**
- * POST /worlds/:id/types — author a new user-defined type. The full type shape *is* the create
- * payload (id + label + fields), so it reuses {@link userDefinedTypeSchema} rather than a byte-identical
- * twin that could drift. The `id` is client-supplied (it becomes the Entity Type key entities carry)
- * and immutable thereafter; `label` and `fields` are the editable surface a later PATCH revises.
- */
+/** POST /worlds/:id/types — the full type shape is the create payload, so it reuses the type schema. */
 export const createUserDefinedTypeRequestSchema = userDefinedTypeSchema;
 
 export type CreateUserDefinedTypeRequest = z.infer<typeof createUserDefinedTypeRequestSchema>;
 
 /**
- * PATCH /worlds/:id/types/:typeId — rename (`label`) and/or replace the `fields` of an existing
- * user-defined type. The id is a path parameter and never changes (entities key off it); both body
- * fields are optional, and an absent one is left untouched. `fields` is sent wholesale — add, edit,
- * remove, and reorder all collapse to "send the new array", mirroring the World's pin set.
+ * PATCH /worlds/:id/types/:typeId — rename and/or replace an existing type's `fields`. The id is a
+ * path param (immutable); both body fields are optional and `fields` is sent wholesale.
  */
 export const updateUserDefinedTypeRequestSchema = z
   .object({
@@ -86,18 +57,12 @@ export const updateUserDefinedTypeRequestSchema = z
 
 export type UpdateUserDefinedTypeRequest = z.infer<typeof updateUserDefinedTypeRequestSchema>;
 
-/**
- * Where an {@link AvailableType} comes from: a `plugin` type (registered in code, instance-wide) or
- * a `user` type (this World's authored data). The Entity Browser lists both under the Type facet;
- * the flavour lets a surface treat them differently (only a `user` type is editable here).
- */
+/** Where an {@link AvailableType} comes from: a code-registered `plugin` or this World's `user` data. */
 export type AvailableTypeSource = 'plugin' | 'user';
 
 /**
- * One Entity Type **available in a World** (ADR-0048): the union a World exposes for its create
- * dialog, facet labels, and view resolution — the instance-wide plugin types plus that World's
- * user-defined types. Carries the `id`, a `label`, its `fields`, and the `source` flavour. A World's
- * user-defined types never appear in another World's set (World scoping).
+ * One Entity Type available in a World (ADR-0048): the plugin types plus that World's user-defined
+ * types, for the create dialog, facet labels, and view resolution.
  */
 export interface AvailableType {
   readonly id: string;

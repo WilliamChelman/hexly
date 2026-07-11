@@ -164,11 +164,7 @@ export class WorldsController {
     if (result === 'forbidden') throw new ForbiddenException();
   }
 
-  /**
-   * The Entity Types available in a World (ADR-0048, #191): the instance-wide plugin types plus this
-   * World's user-defined types — for the create dialog, facet labels, and view resolution.
-   * Reachable-gated: any World member reads the set (a 404 for an unreachable World).
-   */
+  // The Entity Types available in a World (#191): plugin + user-defined. Reachable-gated (any member).
   @Get(':id/types')
   availableTypes(@CurrentUser() user: AuthUser, @Param('id') id: string): AvailableType[] {
     const result = this.types.listAvailable(user.id, id);
@@ -176,8 +172,7 @@ export class WorldsController {
     return result;
   }
 
-  // Author a new user-defined type (#191): World-Owner-only, id `world.`-namespaced and unique in
-  // the World (a 409 otherwise). Returns the created type (201).
+  // Author a new user-defined type (#191): Owner-only, id unique in the World (else 409).
   @Post(':id/types')
   createType(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): UserDefinedType {
     const parsed = createUserDefinedTypeRequestSchema.safeParse(body);
@@ -185,8 +180,7 @@ export class WorldsController {
     return this.typeResult(this.types.create(user.id, id, parsed.data));
   }
 
-  // Rename / re-Field a user-defined type (#191): World-Owner-only. The id is immutable (entities
-  // key off it), so it is a path param, not in the body.
+  // Rename / re-Field a user-defined type (#191): Owner-only. The id is immutable, so it is a path param.
   @Patch(':id/types/:typeId')
   updateType(
     @CurrentUser() user: AuthUser,
@@ -199,8 +193,7 @@ export class WorldsController {
     return this.typeResult(this.types.update(user.id, id, typeId, parsed.data));
   }
 
-  // Delete a user-defined type (#191): World-Owner-only. Entities carrying it keep their Metadata
-  // as plain values (a Field is a lens) — the drop de-types them, never destroying data.
+  // Delete a user-defined type (#191): Owner-only. Entities keep their Metadata (a Field is a lens).
   @Delete(':id/types/:typeId')
   @HttpCode(204)
   removeType(@CurrentUser() user: AuthUser, @Param('id') id: string, @Param('typeId') typeId: string): void {

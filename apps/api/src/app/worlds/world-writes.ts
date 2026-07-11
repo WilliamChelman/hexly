@@ -166,11 +166,9 @@ export class WorldWrites {
   }
 
   /**
-   * Author a new user-defined type in a World (#191): insert the `world_types` row, then bump the
-   * World's `seq` and nudge its followers. A type change touches neither `name` nor pins, so it
-   * bumps **`seq` alone** — like {@link membership} — rather than moving `updatedAt` and reordering
-   * the World Index. The service has already checked the type id is free, so this insert never
-   * conflicts.
+   * Author a new user-defined type (#191): insert the row, then bump `seq` and nudge. It bumps `seq`
+   * alone — like {@link membership} — since a type change touches neither `name` nor pins. The
+   * service has already checked the id is free, so the insert never conflicts.
    */
   createType(worldId: string, type: UserDefinedType, now: number = Date.now()): void {
     this.transact(() => {
@@ -190,9 +188,8 @@ export class WorldWrites {
   }
 
   /**
-   * Rename and/or replace the Fields of a World's user-defined type (#191). An absent field is left
-   * untouched; `fields` is sent wholesale. Returns whether a row matched — an unknown type id leaves
-   * the World untouched, so the bump and nudge are skipped and the caller can 404.
+   * Rename / re-Field a World's user-defined type (#191). Returns whether a row matched — an unknown
+   * type id leaves the World untouched, so the bump and nudge are skipped and the caller can 404.
    */
   updateType(worldId: string, typeId: string, patch: { label?: string; fields?: UserDefinedType['fields'] }): boolean {
     return this.transact(() => {
@@ -211,11 +208,7 @@ export class WorldWrites {
     });
   }
 
-  /**
-   * Delete a World's user-defined type (#191). Existing entities carrying the type keep their
-   * Metadata as plain values (a Field is a lens, ADR-0048), so the drop de-types them without
-   * touching their bodies. Returns whether a row matched, so an unknown type id 404s.
-   */
+  /** Delete a World's user-defined type (#191). Returns whether a row matched, so an unknown id 404s. */
   deleteType(worldId: string, typeId: string): boolean {
     return this.transact(() => {
       const deleted = this.db

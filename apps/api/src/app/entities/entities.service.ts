@@ -524,9 +524,8 @@ export class EntitiesService {
    */
   private gateTypedEdit(userId: string, id: string, req: SaveEntityRequest): void {
     if (req.types === undefined) return;
-    // Resolve the Entity's World so its user-defined types' Fields resolve in the gate (#191). A
-    // missing row leaves `worldId` undefined — the gate falls back to the instance registry, and the
-    // save 404s in `mutate` regardless, so the World-less resolution never reaches storage.
+    // Resolve the Entity's World so its user-defined types' Fields resolve (#191). A missing row
+    // leaves `worldId` undefined — the save 404s in `mutate` regardless.
     const worldId = this.db
       .select({ worldId: entities.worldId })
       .from(entities)

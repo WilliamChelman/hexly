@@ -6,19 +6,10 @@ import { worldTypes } from '../db/schema';
 import { TypeFieldRegistry } from './type-field-registry';
 
 /**
- * The **World-scoped** view of the Entity Type set (ADR-0048): a World's user-defined types (stored
- * in `world_types`) layered over the instance-wide plugin types ({@link TypeFieldRegistry}). It is
- * the read half of user-defined types — the write half lives in {@link WorldTypesService}, and the
- * mutations route through the World write choke point.
- *
- * It lives in the Entity module, not the World module, so the write-path gate ({@link EntitiesService})
- * and the derived-index build ({@link EntityWrites}) can resolve a `types[]` set to Fields that
- * include a World's user-defined types **without** pulling the whole World feature module in (which
- * already depends back on Entities — a cycle). The World feature imports the Entity module and reads
- * the available-types set from here.
- *
- * A World's user-defined types are visible only through *that* World's `worldId`, so one World's
- * `world.deity` never leaks into another's — World scoping falls straight out of the keyed read.
+ * The World-scoped view of the Entity Type set (ADR-0048): a World's user-defined types layered over
+ * the instance-wide plugin types. It lives in the Entity module (not Worlds) so the write-path gate
+ * and derived-index build can resolve a World's Fields without a module cycle — Worlds already
+ * depends on Entities. Reads are keyed by `worldId`, so one World's types never leak into another.
  */
 @Injectable()
 export class WorldTypeFields {
@@ -39,22 +30,16 @@ export class WorldTypeFields {
   }
 
   /**
-   * A {@link TypeFieldResolver} scoped to one World: a type's Fields come from the World's
-   * user-defined types first, else the instance-wide plugin registry. The World's types are loaded
-   * once here and closed over, so unioning a `types[]` set is a map lookup, not a query per type.
-   * A user-defined type shadows a plugin of the same id — impossible today (user ids are `world.`,
-   * plugin ids are not), but the precedence is defined rather than accidental.
+   * A {@link TypeFieldResolver} scoped to one World: user-defined Fields first, else the plugin
+   * registry. The World's types are loaded once and closed over, so unioning a `types[]` set is a
+   * map lookup, not a query per type.
    */
   resolverFor(worldId: string): TypeFieldResolver {
     const userFields = new Map(this.list(worldId).map((type) => [type.id, type.fields]));
     return (typeId) => userFields.get(typeId) ?? this.plugins.resolver(typeId);
   }
 
-  /**
-   * The Entity Types **available in a World** (ADR-0048): the instance-wide plugin types plus this
-   * World's user-defined types — the set the create dialog, facet labels, and view resolution read.
-   * Plugin first, then the World's own, so the list reads instance-vocabulary-then-local.
-   */
+  /** The Entity Types available in a World: the instance-wide plugin types plus this World's own. */
   availableTypes(worldId: string): AvailableType[] {
     return [
       ...this.plugins.plugins(),

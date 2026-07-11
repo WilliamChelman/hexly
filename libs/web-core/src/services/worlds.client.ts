@@ -168,11 +168,7 @@ export class WorldsClient {
     return this.http.delete<WorldMember[]>(`/api/worlds/${id}/members/${userId}`);
   }
 
-  /**
-   * The Entity Types available in a World (ADR-0048, #191): the instance-wide plugin types plus this
-   * World's user-defined types — for the create dialog, facet labels, and the generic Field view.
-   * Reachable-gated server-side (any World member reads it).
-   */
+  /** The Entity Types available in a World (#191): plugin + user-defined. Reachable-gated server-side. */
   availableTypes(id: string): Observable<AvailableType[]> {
     return this.http.get<AvailableType[]>(`/api/worlds/${id}/types`);
   }

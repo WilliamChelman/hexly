@@ -30,14 +30,10 @@ interface Draft {
 }
 
 /**
- * The World-Owner surface for authoring **user-defined types** (ADR-0048, #191): list the World's
- * custom types, create a new one (a `world.`-namespaced id, a name, and typed Fields with
- * required/filterable flags), rename / re-Field an existing one, or delete it. Every write is
- * Owner-gated server-side; a refusal surfaces as an error toast and leaves the list untouched.
- *
- * On a successful mutation it reloads its own list *and* asks {@link WorldTypesLoader} to re-project
- * the World's types into the registry, so the Type facet and the generic Field View reflect the
- * change without a World switch.
+ * The World-Owner surface for authoring user-defined types (ADR-0048, #191): list, create, rename /
+ * re-Field, and delete a World's custom types. Writes are Owner-gated server-side; a refusal toasts
+ * and leaves the list untouched. On success it reloads its list and asks {@link WorldTypesLoader} to
+ * re-project, so the Type facet and generic Field View reflect the change without a World switch.
  */
 @Component({
   selector: 'app-world-types',

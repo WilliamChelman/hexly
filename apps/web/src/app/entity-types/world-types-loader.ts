@@ -8,18 +8,11 @@ import { TypeRegistry } from './type-registry';
 import { CORE_VIEW_FIELDS } from './view-definition';
 
 /**
- * Loads the **active World's user-defined types** into the {@link TypeRegistry} (ADR-0048, #191).
- *
- * A user-defined type is authored data scoped to one World, but every type-aware surface — the
- * create dialog, the Type facet, the generic Field View, the entity header — reads the one root
- * {@link TypeRegistry}. So rather than teach each surface a second, World-scoped source, this loader
- * *projects* the active World's types into that registry: when the active World changes it fetches
- * `GET /worlds/:id/types`, registers each user-defined type as a {@link TypeDefinition}, and
- * unregisters the previous World's set. That keeps World scoping honest — one World's `world.deity`
- * never lingers into another — while every consumer stays oblivious to where a type came from.
- *
- * It is a plain reactive singleton with no template; the World layout injects it so it lives for as
- * long as a World is open.
+ * Projects the active World's user-defined types into the root {@link TypeRegistry} (ADR-0048, #191),
+ * so every type-aware surface (create dialog, Type facet, generic Field View) resolves them without a
+ * second World-scoped source. On a World change it fetches the World's types, registers each, and
+ * unregisters the previous set — so one World's types never linger into another. The World layout
+ * injects it so it lives while a World is open.
  */
 @Injectable({ providedIn: 'root' })
 export class WorldTypesLoader {
@@ -39,12 +32,11 @@ export class WorldTypesLoader {
     // Re-fetch on a World change *or* an explicit reload (a type authored/edited/deleted in settings).
     merge(toObservable(this.active.worldId), this.reload$.pipe(map(() => this.active.worldId())))
       .pipe(
+        // A failed fetch degrades to no user-defined types (core/plugin types still work), logged.
         switchMap((id) =>
           id === null
             ? of<AvailableType[]>([])
-            : // A failed fetch degrades to no user-defined types (the core/plugin types still work),
-              // logged rather than swallowed. It re-runs on the next World change or reload.
-              this.worlds.availableTypes(id).pipe(
+            : this.worlds.availableTypes(id).pipe(
                 catchError((err) => {
                   this.logger.error('Failed to load the World’s user-defined types', err);
                   return of<AvailableType[]>([]);
@@ -71,22 +63,19 @@ export class WorldTypesLoader {
 }
 
 /**
- * Project a user-defined {@link AvailableType} onto a {@link TypeDefinition}: a generic icon, the
- * generic Field View as its only View (so an Entity carrying it always renders its Fields, even
- * when it declares none — the type then shows as an inert chip), its authored `label` as the literal
- * `labelText`, and its Field schema. The transloco-key `labels` all fall back to the literal name.
+ * Project a user-defined {@link AvailableType} onto a {@link TypeDefinition}: the generic Field View
+ * as its only View (so an Entity carrying it always renders), its authored name as `labelText`, and
+ * its Field schema. The transloco-key `labels` are literal names — they degrade to themselves via the
+ * missing-key fallback.
  */
 function toDefinition(type: AvailableType): TypeDefinition {
   return {
     id: type.id,
     icon: 'label',
     labelText: type.label,
-    // A user-defined type has no bespoke code view; the generic Field View is its renderer.
     views: [CORE_VIEW_FIELDS],
     fields: type.fields,
     graphColorToken: '--color-ink-muted',
-    // The name is authored data, not a transloco key — the loose keys degrade to it via the
-    // missing-key fallback, so the header eyebrow / create command read the type's name.
     labels: {
       eyebrow: type.label,
       titleLabel: type.label,
