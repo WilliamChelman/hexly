@@ -14,6 +14,8 @@ import { LinkedEntity, WorldGraph } from '@hexly/domain';
 import { Logger, ThemeService, isTrackpadWheel, wheelDeltaPixels } from '@hexly/web-core';
 import { GraphPayload, graphPayload } from './graph-payload';
 import { LabelGrid, selectLabels } from './label-selection';
+import { TypeRegistry } from '../../../entity-types/type-registry';
+import { TypeDefinition } from '../../../entity-types/type-definition';
 
 /**
  * The declutter: at most one Entity label per {@link LABEL_GRID.pointCell} of screen, and one Link
@@ -102,34 +104,46 @@ function token(
  * That is why {@link GraphCanvas.repaint} exists at all — and why the whole palette is resolved in
  * one computed-style read rather than one per token.
  */
+/** The muted fallback hue if a colour token fails to resolve (jsdom, missing var). */
+const FALLBACK_NODE_COLOR = '#6f5a36';
+
 interface Palette {
   readonly background: string;
-  readonly note: [number, number, number, number];
-  readonly hexmap: [number, number, number, number];
+  /** RGBA node colour per Entity type, keyed by type id — the registry's `graphColorToken` resolved (ADR-0048). */
+  readonly byType: ReadonlyMap<string, [number, number, number, number]>;
+  /** Fallback node colour for an unregistered type — the core note's hue, matching the old non-hexmap default. */
+  readonly node: [number, number, number, number];
   readonly link: [number, number, number, number];
 }
 
-function palette(): Palette {
+function palette(defs: readonly TypeDefinition[]): Palette {
   const style = getComputedStyle(document.documentElement);
+  const byType = new Map<string, [number, number, number, number]>();
+  for (const def of defs) {
+    byType.set(
+      def.id,
+      toRgba(token(style, def.graphColorToken, FALLBACK_NODE_COLOR)),
+    );
+  }
   return {
     background: token(style, '--color-surface-sunken', '#ece0c0'),
-    note: toRgba(token(style, '--color-ink-muted', '#6f5a36')),
-    hexmap: toRgba(token(style, '--color-gold', '#9a6a16')),
+    byType,
+    // An unregistered type reads as a note, exactly as the old note/hexmap ternary did.
+    node:
+      byType.get('note') ??
+      toRgba(token(style, '--color-ink-muted', FALLBACK_NODE_COLOR)),
     link: toRgba(token(style, '--color-line-strong', '#b89a62')),
   };
 }
 
-/** One RGBA quad per point, by point index. */
+/** One RGBA quad per point, by point index; a node's colour is its type's registered hue. */
 function pointColors(
   nodes: readonly LinkedEntity[],
   palette: Palette,
 ): Float32Array {
   const colors = new Float32Array(nodes.length * 4);
   for (let i = 0; i < nodes.length; i++) {
-    colors.set(
-      nodes[i].type === 'hexmap' ? palette.hexmap : palette.note,
-      i * 4,
-    );
+    colors.set(palette.byType.get(nodes[i].type) ?? palette.node, i * 4);
   }
   return colors;
 }
@@ -209,6 +223,7 @@ export class GraphCanvas {
     viewChild.required<ElementRef<HTMLDivElement>>('overlay');
   private readonly theme = inject(ThemeService);
   private readonly logger = inject(Logger);
+  private readonly types = inject(TypeRegistry);
 
   private mounted: Mounted | null = null;
   /** The label loop's rAF id; `0` means it has parked itself, waiting on {@link wake} to restart. */
@@ -274,7 +289,7 @@ export class GraphCanvas {
   private repaint(): void {
     if (!this.mounted) return;
     const { cosmos, payload } = this.mounted;
-    const colors = palette();
+    const colors = palette(this.types.all());
     cosmos.setPointColors(pointColors(payload.nodes, colors));
     cosmos.setLinkColors(linkColors(payload.links.length / 2, colors));
     cosmos.setConfigPartial({ backgroundColor: colors.background });
@@ -292,7 +307,7 @@ export class GraphCanvas {
     const { nodes, degrees, links } = payload;
     /** The settle re-fit happens once, on the first tick that cools past the threshold. */
     let fitted = false;
-    const colors = palette();
+    const colors = palette(this.types.all());
 
     const positions = new Float32Array(nodes.length * 2);
     const sizes = new Float32Array(nodes.length);

@@ -13,6 +13,7 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntityFacets, EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient, ActiveWorld, ToasterService, HexlyDatePipe, entityRoute, worldRoute } from '@hexly/web-core';
 import { Button, Eyebrow, Panel, PageHeader, Icon, IconName, EntitySearchPicker, ACCENT_BAR, accentFor } from '@hexly/web-ui';
+import { TypeRegistry } from '../../entity-types/type-registry';
 
 const RECENTS_LIMIT = 8;
 const MAPS_LIMIT = 8;
@@ -299,6 +300,7 @@ export class WorldDashboard {
   private readonly router = inject(Router);
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
+  private readonly types = inject(TypeRegistry);
 
   protected readonly worldName = this.activeWorld.name;
   /** Scopes the pin picker so pins stay same-World. */
@@ -330,7 +332,7 @@ export class WorldDashboard {
         this.loaded.set(true);
       });
     this.entitiesClient
-      .list({ worldId, type: ['hexmap'], limit: MAPS_LIMIT })
+      .list({ worldId, type: this.types.mapTypeIds(), limit: MAPS_LIMIT })
       .subscribe((page) => this.maps.set(page.items));
     this.entitiesClient
       .facets({ worldId })
@@ -370,7 +372,7 @@ export class WorldDashboard {
   }
 
   protected typeIcon(type: EntityType): IconName {
-    return type === 'hexmap' ? 'terrain' : 'label';
+    return this.types.resolve(type).icon;
   }
 
   protected create(type: EntityType): void {
@@ -378,9 +380,7 @@ export class WorldDashboard {
     this.creating.set(true);
     this.entitiesClient
       .create(
-        this.transloco.translate(
-          type === 'note' ? 'domain.untitledNote' : 'domain.untitledMap',
-        ),
+        this.transloco.translate(this.types.resolve(type).labels.untitled),
         type,
         this.activeWorld.worldId() ?? undefined,
       )

@@ -5,19 +5,31 @@ A web application for TTRPG worldbuilding: authoring interlinked **Entities** �
 ## Entities
 
 **Entity**:
-The top-level thing a user creates, owns, and shares. Carries a `name`, a `type`, `tags`, an optional **Metadata** map, and a rich-text **Content** body. A **Hex Map** is one kind of Entity. The unit of ownership, sharing, and saving.
+The top-level thing a user creates, owns, and shares. Carries a `name`, an ordered set of **Entity Types**, `tags`, an optional **Metadata** map, and a rich-text **Content** body. A **Hex Map** is one kind of Entity. The unit of ownership, sharing, and saving.
 _Avoid_: Document, page, record, object
 
 **Entity Type**:
-A closed set that decides an Entity's shape: `note` (Content only) and `hexmap` (Content plus a hex grid).
+A user-facing identity an Entity carries — `core.note`, `core.hexmap`, `dnd.monster`, `world.deity`. An **open**, `namespace.id`-keyed set (contrast the closed **Payload Kind** it maps to). Each type declares an optional payload addon, a **Field** schema, a view, and its facetable Fields. An Entity holds an **ordered set** of types; the first is *primary* — driving its icon, default view, and headline. Two flavours: a **Plugin type** (code, instance-wide, bespoke view) and a **User-defined type** (data, World-scoped, generic view).
 _Avoid_: Kind, category, class
+
+**Payload Kind**:
+The body shape and editing surface an **Entity Type** maps to — a **closed, code-known** set: `rich-content` (the base every Entity has: Content + Metadata — formerly the `note` payload) and `hex-grid` (an *additive addon* over that base). Payloads compose rather than rival: a Hex Map is `rich-content` + `hex-grid`. What actually discriminates the stored document — distinct from the open, user-facing Entity Type.
+_Avoid_: Body type, document type, schema, variant
+
+**Field**:
+A structured, typed slot an **Entity Type** gives to a specific **Metadata** key — a name, a data-type (scalar, enum, date, list, or a typed **Entity Link**), and whether it is facetable. A typing *lens* over Metadata, not a separate store: values live in the one Metadata map, so a missing plugin leaves them as plain Metadata. Validated *forward-only* — enforced on active typed edits, tolerated on imported or at-rest data.
+_Avoid_: Property, attribute, column, custom field
+
+**Type Definition**:
+The registration that gives an **Entity Type** its Fields, view, and facets. Either a **Plugin type** — declared in code by a bundled plugin at startup, instance-wide, shipping a bespoke view (even `core.note`/`core.hexmap` register this way, so the plugin API is dogfooded) — or a **User-defined type** — authored as data by a **World Owner**, scoped to one World, rendered by the generic Field view. Code buys only the bespoke view; everything else works code-lessly.
+_Avoid_: Schema, template, model, class
 
 **Content**:
 The rich-text body every Entity carries — the result of block-based editing. Replaces the old per-element "Note".
 _Avoid_: Body, rich text, document, prose
 
 **Metadata**:
-An arbitrary key→value map on an Entity, mirroring Obsidian frontmatter/properties. Populated from a note's frontmatter on import and re-emitted as YAML frontmatter on export. Keys under the reserved `hexly.` namespace carry Hexly's own provenance and are consumed on export rather than written back to frontmatter.
+An arbitrary key→value map on an Entity, mirroring Obsidian frontmatter/properties. Populated from a note's frontmatter on import and re-emitted as YAML frontmatter on export. Keys under the reserved `hexly.` namespace carry Hexly's own provenance and are consumed on export rather than written back to frontmatter. A key an **Entity Type** declares a **Field** for is still Metadata — the Field only types and surfaces it.
 _Avoid_: Frontmatter, properties, attributes, custom fields
 
 **Asset**:
@@ -25,11 +37,11 @@ A binary file — typically an image, but also a PDF or other media — belongin
 _Avoid_: Attachment, file, blob, media, upload
 
 **Tag**:
-A free-text label on an Entity, for flavour and informal grouping (e.g. "deity", "ruined", "northern reach"). Carries no behaviour; distinct from the structured Entity Type.
+A free-text label on an Entity, for flavour and informal grouping (e.g. "ruined", "northern reach") — user-invented on the spot, carrying no behaviour. Both Tags and **Entity Types** are multi-valued labels; the line between them is *registration*: a Type is a registered category (Plugin or World-defined) carrying Fields, a view, and facets, whereas a Tag is not. "Deity" is a Tag until someone defines it as a Type.
 _Avoid_: Keyword, category, label
 
 **Entity Link**:
-An optional reference to an Entity by id, from either a Map element (a Hex, Feature, or Region — not a Label) or inline within another Entity's Content (prose): e.g. a settlement Feature pointing at the town's `note`, or a sentence in one note linking to another `hexmap`. A link to a missing or inaccessible Entity renders non-navigable — a Content link shows its last-known name as a dangling label — rather than erroring. A Content link may carry an optional Link Descriptor.
+An optional reference to an Entity by id, from a Map element (a Hex, Feature, or Region — not a Label), inline within another Entity's Content (prose), or a typed **Field** on an Entity: e.g. a settlement Feature pointing at the town's `note`, a sentence in one note linking to another `hexmap`, or a monster's `lair` Field pointing at a place. A link to a missing or inaccessible Entity renders non-navigable — a Content link shows its last-known name as a dangling label — rather than erroring. A Content link may carry an optional Link Descriptor.
 _Avoid_: Reference, relation, backlink
 
 **Link Descriptor**:
@@ -43,7 +55,7 @@ _Avoid_: Entity, item, object
 ## Language
 
 **Hex Map**:
-An **Entity** of type `hexmap`: its Content (lore) plus a grid of hexes, overlays, regions, and labels. The grid is an infinite sparse plane — a Hex exists only where painted. Ownership, sharing, and saving are properties of the Entity, not the grid.
+An **Entity** carrying the `core.hexmap` type — the type that adds the `hex-grid` **Payload Kind**: its Content (lore) plus a grid of hexes, overlays, regions, and labels. The grid is an infinite sparse plane — a Hex exists only where painted. Ownership, sharing, and saving are properties of the Entity, not the grid.
 _Avoid_: Map document, board, canvas
 
 **Hex**:
@@ -71,7 +83,7 @@ A named, colored grouping of hex coordinates with optional notes (e.g. "The King
 _Avoid_: Area, zone, territory, group
 
 **Note**:
-An Entity of type `note`: a prose worldbuilding page (a character, a faction, a place, a bit of history) whose substance is its Content. The lore, description, and secrets — a first-class Entity that Map elements link to, not text attached to a single Map element.
+An Entity carrying the `core.note` type — the type that adds no payload beyond the `rich-content` base: a prose worldbuilding page (a character, a faction, a place, a bit of history) whose substance is its Content. The lore, description, and secrets — a first-class Entity that Map elements link to, not text attached to a single Map element.
 _Avoid_: Description, comment, annotation, lore
 
 **Name**:
@@ -217,7 +229,7 @@ The durable, in-World surface that lists a single World's Entities as a card gri
 _Avoid_: Entity list, library, catalog, explorer; fuzzy search (the query is full-text, ranked by relevance)
 
 **Facet**:
-A filterable dimension of a World's Entities offered in the Entity Browser with its distinct values and their counts — Type, Tag, and Visibility. Selecting values within one Facet is OR; across Facets is AND; the combined filter is AND-ed with the text query.
+A filterable dimension of a World's Entities offered in the Entity Browser with its distinct values and their counts — Type, Tag, and Visibility always, plus a Type's facetable **Fields** shown *contextually* (a type's Field Facets unfold only once that type is the active filter). Selecting values within one Facet is OR; across Facets is AND; the combined filter is AND-ed with the text query.
 _Avoid_: Filter, dimension, aspect
 
 ## Outline
@@ -267,5 +279,5 @@ Operator-facing settings for one Instance, stored beside the database. Distinct 
 _Avoid_: Config, settings, preferences, environment
 
 **Reindex**:
-A Superadmin repair action that recomputes every Entity's document-derived state — its searchable text, Link Descriptor vocabulary, and link edges — from the authoritative Content and map, across all Worlds. Idempotent and safe to run anytime: the Entity's document is the source of truth, and the derived tables are a cache it rebuilds. A repair tool, not part of daily administration — which is why it is the Superadmin's, not the `manage-users` role's (which reaches no Entity). It runs as one instance-wide background job the operator polls, and a document this build cannot parse is skipped and reported rather than allowed to abort the walk.
+A Superadmin repair action that recomputes every Entity's document-derived state — its searchable text, Link Descriptor vocabulary, link edges (Content, map, and **Field** links), and **Field** facets — from the authoritative Content and map, across all Worlds. Idempotent and safe to run anytime: the Entity's document is the source of truth, and the derived tables are a cache it rebuilds. A repair tool, not part of daily administration — which is why it is the Superadmin's, not the `manage-users` role's (which reaches no Entity). It runs as one instance-wide background job the operator polls, and a document this build cannot parse is skipped and reported rather than allowed to abort the walk.
 _Avoid_: Rebuild, refresh, recompute, sync

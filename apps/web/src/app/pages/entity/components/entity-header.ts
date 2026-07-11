@@ -17,29 +17,13 @@ import { EntityTags } from './entity-tags';
 import { SaveStatus } from './save-status';
 import { EntitySession } from '../services/entity-session';
 import { EntityView, HexMapStore } from '@hexly/web-map';
+import { TypeRegistry } from '../../../entity-types/type-registry';
 
 /** The view toggle's two segments, in display order; Map (the grid) is the default. */
 const VIEWS: readonly { id: EntityView; labelKey: string; testid: string }[] = [
   { id: 'map', labelKey: 'editorShell.view.map', testid: 'view-map' },
   { id: 'note', labelKey: 'editorShell.view.note', testid: 'view-note' },
 ];
-
-/** Per-entity-type chrome: the eyebrow tag and the title's a11y labels. */
-const TYPE_LABELS: Record<
-  string,
-  { eyebrow: string; titleLabel: string; rename: string }
-> = {
-  hexmap: {
-    eyebrow: 'editorShell.hexMap',
-    titleLabel: 'editorShell.mapTitleLabel',
-    rename: 'editorShell.renameMap',
-  },
-  note: {
-    eyebrow: 'noteView.eyebrow',
-    titleLabel: 'noteView.titleLabel',
-    rename: 'noteView.renameNote',
-  },
-};
 
 /**
  * The open Entity's page-owned header (ADR-0022), rendered by {@link EntityPage}
@@ -145,6 +129,7 @@ export class EntityHeader {
   private readonly route = inject(ActivatedRoute);
   /** Owns the Map/Note surface choice, shared with the {@link EntityPage} body (#75). */
   protected readonly store = inject(HexMapStore);
+  private readonly types = inject(TypeRegistry);
   protected readonly views = VIEWS;
 
   /** Whether the entity Share dialog (#158) is open — toggled by the actions menu's Share item. */
@@ -166,12 +151,13 @@ export class EntityHeader {
   );
   /** Tooltip key: the in-place rename affordance. */
   protected readonly titleHint = computed(() => this.labels().rename);
-  /** Only a hexmap carries both surfaces, so only it gets the view toggle (#75). */
-  protected readonly isHexmap = computed(
-    () => this.session.current()?.document.type === 'hexmap',
+  /** Only a hexmap affords both surfaces, so only it gets the view toggle (#75). */
+  protected readonly isHexmap = computed(() =>
+    this.types.affordsMap(this.session.current()?.document.type),
   );
+  /** Per-type header chrome (eyebrow + title a11y labels), falling back to the note type. */
   protected readonly labels = computed(
-    () => TYPE_LABELS[this.session.current()?.document.type ?? ''] ?? TYPE_LABELS['note'],
+    () => this.types.resolve(this.session.current()?.document.type).labels,
   );
   protected readonly title = computed(
     () => this.session.current()?.name ?? '',

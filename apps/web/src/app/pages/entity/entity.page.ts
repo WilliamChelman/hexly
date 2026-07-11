@@ -27,6 +27,7 @@ import { OutlinePanel } from './components/outline-panel';
 import { OutlineSource } from './components/outline-source';
 import { ReferencesPanel } from './components/references-panel';
 import { IconButton, Icon } from '@hexly/web-ui';
+import { TypeRegistry } from '../../entity-types/type-registry';
 
 /**
  * The open-Entity route (`/entities/:id`, #70): the routed page that loads the
@@ -121,7 +122,7 @@ import { IconButton, Icon } from '@hexly/web-ui';
             >
               <div class="max-w-[60rem] mx-auto py-6 px-6">
                 <app-entity-metadata />
-                <app-content-editor appOutlineSource [ariaLabel]="editorLabel()" />
+                <app-content-editor appOutlineSource [ariaLabel]="editorLabelKey() | transloco" />
               </div>
             </div>
             <!-- Right dock floating top-right (mirrors the map dock, ADR-0013): one panel slot
@@ -214,14 +215,15 @@ export class EntityPage {
   protected readonly store = inject(HexMapStore);
   /** Which panel the Content body's right dock is showing — one slot, so one discriminant. */
   protected readonly dock = inject(RightDock);
+  private readonly types = inject(TypeRegistry);
 
   /** Accessible names / tooltips for the dock's toggles (ADR-0014). */
   protected readonly outlineToggleLabel = translateSignal('noteView.outline.toggle');
   protected readonly linksToggleLabel = translateSignal('noteView.links.toggle');
 
-  /** Only a hexmap carries a grid surface — and so the status bar and Map/Note toggle (#75). */
-  protected readonly isHexmap = computed(
-    () => this.session.current()?.document.type === 'hexmap',
+  /** Only a hexmap affords a grid surface — and so the status bar and Map/Note toggle (#75). */
+  protected readonly isHexmap = computed(() =>
+    this.types.affordsMap(this.session.current()?.document.type),
   );
 
   /** Show the hex grid only for a hexmap on its Map view; everything else shows the Content body (#75). */
@@ -229,11 +231,11 @@ export class EntityPage {
     () => this.isHexmap() && this.store.view() === 'map',
   );
 
-  private readonly mapEditorLabel = translateSignal('editorShell.view.editorLabel');
-  private readonly noteEditorLabel = translateSignal('noteView.editorLabel');
-  /** The Content editor's accessible name, per Entity type (ADR-0014, #75). */
-  protected readonly editorLabel = computed(() =>
-    this.isHexmap() ? this.mapEditorLabel() : this.noteEditorLabel(),
+  /** The Content editor's accessible-name transloco key, from the open Entity's type (ADR-0014, #75). */
+  protected readonly editorLabelKey = computed(
+    () =>
+      this.types.resolve(this.session.current()?.document.type).labels
+        .editorLabel,
   );
 
   constructor() {

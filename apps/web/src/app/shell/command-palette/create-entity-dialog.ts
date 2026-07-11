@@ -14,6 +14,7 @@ import { EntityType } from '@hexly/domain';
 import { ActiveWorld, EntitiesClient, WorldStore, entityRoute } from '@hexly/web-core';
 import { Button, Field, Input, Dialog } from '@hexly/web-ui';
 import { CreateEntityDialogState } from './create-entity-dialog.state';
+import { TypeRegistry } from '../../entity-types/type-registry';
 
 /**
  * The create-Entity flow behind the `>`-prefix Create Note / Create Map
@@ -32,12 +33,7 @@ import { CreateEntityDialogState } from './create-entity-dialog.state';
     @if (dialogState.type(); as type) {
       <app-dialog
         [open]="true"
-        [heading]="
-          (type === 'hexmap'
-            ? 'commandPalette.createMap'
-            : 'commandPalette.createNote'
-          ) | transloco
-        "
+        [heading]="createLabel(type) | transloco"
         (closed)="cancel()"
       >
         <label appField [label]="'commandPalette.nameLabel' | transloco">
@@ -92,6 +88,7 @@ import { CreateEntityDialogState } from './create-entity-dialog.state';
 })
 export class CreateEntityDialog {
   protected readonly dialogState = inject(CreateEntityDialogState);
+  private readonly types = inject(TypeRegistry);
   private readonly entitiesClient = inject(EntitiesClient);
   private readonly activeWorld = inject(ActiveWorld);
   private readonly worldStore = inject(WorldStore);
@@ -119,6 +116,11 @@ export class CreateEntityDialog {
     });
   }
 
+  /** The create-dialog heading key for `type`, from the registry (ADR-0048). */
+  protected createLabel(type: EntityType): string {
+    return this.types.resolve(type).labels.create;
+  }
+
   protected onName(event: Event): void {
     this.name.set((event.target as HTMLInputElement).value);
   }
@@ -136,9 +138,7 @@ export class CreateEntityDialog {
     if (!worldId) return;
     const name =
       this.name().trim() ||
-      this.transloco.translate(
-        type === 'hexmap' ? 'domain.untitledMap' : 'domain.untitledNote',
-      );
+      this.transloco.translate(this.types.resolve(type).labels.untitled);
     this.entitiesClient
       .create(name, type, worldId)
       .pipe(takeUntilDestroyed(this.destroyRef))

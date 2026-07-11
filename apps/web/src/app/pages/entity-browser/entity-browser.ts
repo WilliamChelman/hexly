@@ -26,6 +26,7 @@ import {
 } from '@hexly/domain';
 import { EntitiesClient, EntityFacetParams, ActiveWorld, ToasterService, entityRoute, AppShellStore } from '@hexly/web-core';
 import { Button, Eyebrow, PageHeader, Icon } from '@hexly/web-ui';
+import { TypeRegistry } from '../../entity-types/type-registry';
 import { EntityCard } from './entity-card';
 import { EntitySearch } from './entity-search';
 import { EmptyState } from './empty-state';
@@ -186,6 +187,7 @@ export class EntityBrowser {
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
   private readonly shell = inject(AppShellStore);
+  private readonly types = inject(TypeRegistry);
 
   protected readonly worldId = this.activeWorld.worldId;
 
@@ -468,7 +470,7 @@ export class EntityBrowser {
     this.creating.set(true);
     this.entitiesClient
       .create(
-        this.transloco.translate(type === 'note' ? 'domain.untitledNote' : 'domain.untitledMap'),
+        this.transloco.translate(this.types.resolve(type).labels.untitled),
         type,
         this.activeWorld.worldId() ?? undefined,
       )

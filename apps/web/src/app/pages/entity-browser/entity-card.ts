@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  inject,
   input,
   output,
 } from '@angular/core';
@@ -10,6 +11,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { EntityType, EntityVerb } from '@hexly/domain';
 import { HexlyDatePipe } from '@hexly/web-core';
 import { Autofocus, Button, Panel, Icon, IconName, ACCENT_BAR, ACCENT_SIGIL, accentFor } from '@hexly/web-ui';
+import { TypeRegistry } from '../../entity-types/type-registry';
 
 /** A row of the Entity browser grid — the parent owns list/order, the card owns
  * the tile. The last-edited instant stays raw; the template formats it via
@@ -159,13 +161,15 @@ export class EntityCard {
   readonly cancelRename = output<void>();
   readonly remove = output<void>();
 
+  private readonly types = inject(TypeRegistry);
+
   protected readonly bar = computed(() => ACCENT_BAR[accentFor(this.card().id)]);
   protected readonly sigil = computed(
     () => ACCENT_SIGIL[accentFor(this.card().id)],
   );
-  /** A hex map reads as terrain, a note as a label. */
-  protected readonly typeIcon = computed<IconName>(() =>
-    this.card().type === 'hexmap' ? 'terrain' : 'label',
+  /** The Entity type's registered icon (a hex map reads as terrain, a note as a label). */
+  protected readonly typeIcon = computed<IconName>(
+    () => this.types.resolve(this.card().type).icon,
   );
   /** Rename is a substance edit; delete the lifecycle verb (ADR-0039). Absent Rights → hidden (fail-closed). */
   protected readonly canRename = computed(() => !!this.card().rights?.includes('edit'));
