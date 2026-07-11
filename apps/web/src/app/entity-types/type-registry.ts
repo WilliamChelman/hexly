@@ -1,8 +1,8 @@
 import { Injectable, signal } from '@angular/core';
-import { CORE_NOTE, EntityType } from '@hexly/domain';
+import { CORE_NOTE, EntityType, FieldSchema, resolveFields } from '@hexly/domain';
 import { TypeDefinition } from './type-definition';
 import { CORE_TYPE_DEFINITIONS } from './core-types';
-import { ViewId } from './view-definition';
+import { CORE_VIEW_FIELDS, ViewId } from './view-definition';
 
 /**
  * Root registry where Entity Types make themselves known to the type-specific UI
@@ -61,9 +61,29 @@ export class TypeRegistry {
    */
   viewsFor(types: readonly string[] | null | undefined): ViewId[] {
     const seen = new Set<ViewId>();
-    for (const type of types ?? [])
-      for (const view of this.get(type)?.views ?? []) seen.add(view);
+    for (const type of types ?? []) {
+      const def = this.get(type);
+      if (def) {
+        for (const view of def.views) seen.add(view);
+        // A type that declares Fields additionally affords the generic Field View (ADR-0048, #187).
+        if (def.fields?.length) seen.add(CORE_VIEW_FIELDS);
+      } else {
+        // An absent/unregistered type — a missing plugin, a World-defined type with no code — falls
+        // back to the generic Field View, which shows it as an inert chip over its plain Metadata.
+        seen.add(CORE_VIEW_FIELDS);
+      }
+    }
     return [...seen];
+  }
+
+  /**
+   * The union of Field schemas an Entity carrying `types` affords (ADR-0048, #187) — every
+   * registered type's declared Fields, primary type first, deduped by Metadata key. Delegates to
+   * the pure domain {@link resolveFields}; the generic Field View reads it to render and edit a
+   * typed Entity's Fields as a lens over its one Metadata map.
+   */
+  resolveFields(types: readonly string[] | null | undefined): FieldSchema[] {
+    return resolveFields((type) => this.get(type)?.fields, types ?? []);
   }
 
   /**

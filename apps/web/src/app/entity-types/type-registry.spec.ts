@@ -1,13 +1,15 @@
 import { TestBed } from '@angular/core/testing';
+import { FieldSchema } from '@hexly/domain';
 import { TypeRegistry } from './type-registry';
 import { TypeDefinition } from './type-definition';
-import { CORE_VIEW_CONTENT, CORE_VIEW_MAP } from './view-definition';
+import { CORE_VIEW_CONTENT, CORE_VIEW_FIELDS, CORE_VIEW_MAP } from './view-definition';
 
-function definition(id: string): TypeDefinition {
+function definition(id: string, fields?: readonly FieldSchema[]): TypeDefinition {
   return {
     id: id as TypeDefinition['id'],
     icon: 'label',
     views: [CORE_VIEW_CONTENT],
+    fields,
     graphColorToken: '--color-ink-muted',
     labels: {
       eyebrow: `${id}.eyebrow`,
@@ -19,6 +21,14 @@ function definition(id: string): TypeDefinition {
     },
   };
 }
+
+const crField: FieldSchema = {
+  key: 'cr',
+  label: 'Challenge Rating',
+  dataType: { kind: 'number' },
+  required: false,
+  facetable: false,
+};
 
 describe('TypeRegistry', () => {
   let registry: TypeRegistry;
@@ -59,6 +69,28 @@ describe('TypeRegistry', () => {
     ]);
     expect(registry.viewsFor([])).toEqual([]);
     expect(registry.viewsFor(undefined)).toEqual([]);
+  });
+
+  it('affords the generic Field View for a type that declares Fields (ADR-0048)', () => {
+    registry.register(definition('dnd.beast', [crField]));
+    // The declared-Field type unions its own views plus the generic Field View.
+    expect(registry.viewsFor(['dnd.beast'])).toEqual([CORE_VIEW_CONTENT, CORE_VIEW_FIELDS]);
+    // A core type declares no Fields, so it never surfaces the generic View.
+    expect(registry.viewsFor(['core.note'])).toEqual([CORE_VIEW_CONTENT]);
+  });
+
+  it('falls back to the generic Field View for an unregistered type — the missing-plugin case', () => {
+    // No definition registered for `dnd.monster`: the Entity still affords the generic View, which
+    // renders it as an inert chip over its plain Metadata rather than a blank screen.
+    expect(registry.viewsFor(['dnd.monster'])).toEqual([CORE_VIEW_FIELDS]);
+  });
+
+  it('resolves the union of Field schemas a types[] set declares, primary type first', () => {
+    registry.register(definition('dnd.beast', [crField]));
+    expect(registry.resolveFields(['dnd.beast']).map((f) => f.key)).toEqual(['cr']);
+    // A set of types that declare no Fields resolves to none — values stay plain Metadata.
+    expect(registry.resolveFields(['core.note'])).toEqual([]);
+    expect(registry.resolveFields(undefined)).toEqual([]);
   });
 
   it('lists the type ids contributing a View — backing the maps filter', () => {

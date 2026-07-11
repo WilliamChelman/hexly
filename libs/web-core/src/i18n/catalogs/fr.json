@@ -61,6 +61,9 @@
   "entityMetadata": {
     "heading": "Métadonnées"
   },
+  "genericFieldView": {
+    "plainHeading": "Autres métadonnées"
+  },
   "noteView": {
     "eyebrow": "Note",
     "titleLabel": "Titre de la note",
@@ -153,6 +156,7 @@
       "switchLabel": "Changer de vue",
       "map": "Carte",
       "note": "Note",
+      "fields": "Champs",
       "editorLabel": "Notes de la carte"
     },
     "save": {

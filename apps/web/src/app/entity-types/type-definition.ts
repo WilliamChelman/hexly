@@ -1,4 +1,4 @@
-import { EntityType } from '@hexly/domain';
+import { EntityType, FieldSchema } from '@hexly/domain';
 import { IconName } from '@hexly/web-ui';
 import { ViewId } from './view-definition';
 
@@ -45,6 +45,14 @@ export interface TypeDefinition {
    * primary type's first View.
    */
   readonly views: readonly ViewId[];
+  /**
+   * The type's **Field schema** (ADR-0048, #187): the Metadata keys it types, each
+   * with a data-type and required-ness. A typing *lens* over Metadata — values stay
+   * in the one Metadata map. A type that declares Fields additionally affords the
+   * generic Field View (`core.view.fields`); the core types declare none, so it is
+   * optional and defaults to empty.
+   */
+  readonly fields?: readonly FieldSchema[];
   /**
    * The CSS custom property the World Graph paints this type's nodes with
    * (resolved to RGBA per theme, ADR-0007). The one type-specific graph knob.

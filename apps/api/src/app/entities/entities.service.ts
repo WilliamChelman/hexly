@@ -1,4 +1,10 @@
-import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   ApiError,
   CORE_NOTE,
@@ -21,8 +27,10 @@ import {
   EntityGrant,
   GrantRole,
   PublicLink,
+  resolveFields,
   SaveEntityRequest,
   tagsSchema,
+  validateFields,
   visibilitySchema,
 } from '@hexly/domain';
 import { and, asc, desc, eq, inArray, sql, SQL } from 'drizzle-orm';
@@ -59,6 +67,7 @@ import {
 } from '../db/schema';
 import { HEXLY_CONFIG, HexlyConfig } from '../config/config.module';
 import { EntityWrites } from './entity-writes';
+import { TypeFieldRegistry } from './type-field-registry';
 import { linkedEntity } from './utils/linked-entity';
 
 /** Per-entity Public Link table for the shared get/mint/revoke helpers. */
@@ -121,6 +130,7 @@ export class EntitiesService {
     @Inject(DB) private readonly db: Db,
     @Inject(HEXLY_CONFIG) private readonly config: HexlyConfig,
     private readonly writes: EntityWrites,
+    private readonly typeFields: TypeFieldRegistry,
   ) {}
 
   /**
@@ -411,6 +421,7 @@ export class EntitiesService {
    * `not-found` (404), a reachable one the caller can't edit a 403.
    */
   save(userId: string, id: string, req: SaveEntityRequest): SaveResult {
+    this.gateTypedEdit(req);
     const result = this.writes.mutate(userId, id, {
       kind: 'edit',
       document: req.document,
@@ -430,6 +441,27 @@ export class EntitiesService {
       case 'ok':
         return { status: 'saved', entity: detailOf(result.row, req.document) };
     }
+  }
+
+  /**
+   * The forward-only Field gate on the write path (ADR-0048). A save that carries an explicit
+   * `types` set is an **active typed edit** — the generic Field view (or a plugin form) asserting
+   * the Entity's type set — so its Metadata must satisfy those types' Fields: every required Field
+   * present, every present value well-typed. A save that omits `types` is a plain body edit and is
+   * left untouched, so an already-stored (or imported) document with malformed Fields is never
+   * *retroactively* invalidated by an unrelated edit — the gate only bites data the caller actively
+   * types. The vault import ({@link importNote}) never routes here, and reads / reindex never
+   * validate, so data at rest stays tolerated end to end.
+   */
+  private gateTypedEdit(req: SaveEntityRequest): void {
+    if (req.types === undefined) return;
+    const fields = resolveFields(this.typeFields.resolver, req.types);
+    const validation = validateFields(fields, req.document.metadata);
+    if (!validation.ok)
+      throw new BadRequestException({
+        code: EntityErrorCode.InvalidFields,
+        data: { fields: validation.errors },
+      } satisfies ApiError);
   }
 
   /**

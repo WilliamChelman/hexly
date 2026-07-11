@@ -16,6 +16,14 @@ export type ViewId = string;
 export const CORE_VIEW_CONTENT = 'core.view.content';
 /** The hex-grid View a `hex-grid`-carrying Entity additionally affords. */
 export const CORE_VIEW_MAP = 'core.view.map';
+/**
+ * The **generic Field View** (ADR-0048, #187): renders a type's declared Fields off
+ * the Entity's Metadata and edits them back into it. Contributed by any type that
+ * declares Fields, and the graceful fallback for an Entity whose type has no
+ * registered view (a missing plugin, a World-defined type) — where it shows the type
+ * as an inert chip and the values as plain Metadata.
+ */
+export const CORE_VIEW_FIELDS = 'core.view.fields';
 
 /**
  * One View's registration in the {@link ViewRegistry}: the id, the transloco key

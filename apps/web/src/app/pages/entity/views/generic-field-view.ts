@@ -1,0 +1,241 @@
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { FieldSchema, Metadata, readField, validateFields, writeField } from '@hexly/domain';
+import { EntitySession } from '../services/entity-session';
+import { TypeRegistry } from '../../../entity-types/type-registry';
+
+/**
+ * The **generic Field View** (`core.view.fields`, ADR-0048, #187): renders an Entity's
+ * declared Fields as a typing lens over its one Metadata map, and edits them straight
+ * back into it. It does double duty (CONTEXT.md → Type Definition, View):
+ *
+ * - the renderer for a type that declares Fields (a World-defined type, or a plugin
+ *   type that ships no bespoke view) — a labelled, data-type-appropriate control per
+ *   Field, writing values into Metadata via {@link EntitySession.mutate}; and
+ * - the graceful fallback for an Entity whose type has **no registered view** (a
+ *   missing plugin): the unknown type shows as an inert chip and its values fall
+ *   through to the plain-Metadata display, nothing lost.
+ *
+ * It never forks storage: a Field value lives in the same Metadata map Obsidian
+ * import/export round-trips (ADR-0033), so removing a type leaves the values intact
+ * as plain Metadata. Editing is gated on {@link EntitySession.writable}; a read-only
+ * opener sees the same values as static text.
+ */
+@Component({
+  selector: 'app-generic-field-view',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'contents' },
+  imports: [TranslocoPipe],
+  template: `
+    <div class="absolute inset-0 overflow-y-auto bg-surface-sunken" data-testid="generic-field-view">
+      <div class="max-w-[60rem] mx-auto py-6 px-6 flex flex-col gap-6">
+        <!-- Inert chips for any type with no registered view — a missing plugin, a World-defined
+             type with no code. Purely informational: they carry no behaviour (CONTEXT.md → Tag). -->
+        @if (unknownTypes().length > 0) {
+          <div class="flex flex-wrap items-center gap-2" data-testid="type-chips">
+            @for (type of unknownTypes(); track type) {
+              <span
+                class="inline-flex items-center rounded-full border border-line bg-surface px-2.5 py-0.5 text-xs text-ink-muted"
+                data-testid="type-chip"
+              >
+                {{ type }}
+              </span>
+            }
+          </div>
+        }
+
+        <!-- The declared Fields: one labelled, typed control each. -->
+        @if (fields().length > 0) {
+          <dl class="grid grid-cols-[minmax(8rem,12rem)_1fr] items-center gap-x-6 gap-y-3 m-0">
+            @for (field of fields(); track field.key) {
+              <dt class="text-sm text-ink-muted">
+                {{ field.label }}@if (field.required) {
+                  <span class="text-danger" aria-hidden="true">&nbsp;*</span>
+                }
+              </dt>
+              <dd class="m-0" [attr.data-testid]="'field-' + field.key">
+                @switch (field.dataType.kind) {
+                  @case ('boolean') {
+                    <input
+                      type="checkbox"
+                      [checked]="boolValue(field)"
+                      [disabled]="!writable()"
+                      (change)="set(field, checkboxChecked($event))"
+                    />
+                  }
+                  @case ('enum') {
+                    <select
+                      class="w-full rounded border border-line bg-surface px-2 py-1 text-sm"
+                      [disabled]="!writable()"
+                      [attr.aria-invalid]="isInvalid(field) || null"
+                      (change)="set(field, selectValue($event))"
+                    >
+                      <option value=""></option>
+                      @for (option of options(field); track option) {
+                        <option [value]="option" [selected]="option === stringValue(field)">
+                          {{ option }}
+                        </option>
+                      }
+                    </select>
+                  }
+                  @case ('date') {
+                    <input
+                      type="date"
+                      class="rounded border border-line bg-surface px-2 py-1 text-sm"
+                      [value]="stringValue(field)"
+                      [disabled]="!writable()"
+                      [attr.aria-invalid]="isInvalid(field) || null"
+                      (change)="set(field, inputValue($event))"
+                    />
+                  }
+                  @case ('number') {
+                    <input
+                      type="number"
+                      class="w-full rounded border border-line bg-surface px-2 py-1 text-sm"
+                      [value]="stringValue(field)"
+                      [disabled]="!writable()"
+                      [attr.aria-invalid]="isInvalid(field) || null"
+                      (input)="set(field, numberValue($event))"
+                    />
+                  }
+                  @default {
+                    <!-- string, and list<scalar> as a comma-separated text field. -->
+                    <input
+                      type="text"
+                      class="w-full rounded border border-line bg-surface px-2 py-1 text-sm"
+                      [value]="stringValue(field)"
+                      [disabled]="!writable()"
+                      [attr.aria-invalid]="isInvalid(field) || null"
+                      (input)="set(field, typedValue(field, inputValue($event)))"
+                    />
+                  }
+                }
+              </dd>
+            }
+          </dl>
+        }
+
+        <!-- Whatever Metadata the declared Fields don't type: the plain-Metadata display, so an
+             absent plugin's values are never hidden — the same read-only rows as EntityMetadata. -->
+        @if (plainEntries().length > 0) {
+          <div>
+            <h2 class="mb-2 text-2xs uppercase tracking-wider text-ink-muted">
+              {{ 'genericFieldView.plainHeading' | transloco }}
+            </h2>
+            <dl
+              class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 m-0 text-sm"
+              data-testid="field-plain-metadata"
+            >
+              @for (entry of plainEntries(); track entry.key) {
+                <dt class="font-mono text-xs text-ink-muted break-all">{{ entry.key }}</dt>
+                <dd class="m-0 text-ink break-words">{{ entry.value }}</dd>
+              }
+            </dl>
+          </div>
+        }
+      </div>
+    </div>
+  `,
+})
+export class GenericFieldView {
+  private readonly session = inject(EntitySession);
+  private readonly types = inject(TypeRegistry);
+
+  /** A read-only opener edits nothing — the controls render disabled (ADR-0037). */
+  protected readonly writable = computed(() => this.session.writable());
+
+  /** The union of Field schemas the open Entity's types declare (primary first, deduped by key). */
+  protected readonly fields = computed(() =>
+    this.types.resolveFields(this.session.current()?.types),
+  );
+
+  /** The live working Metadata — read off the central store's body, written back through mutate. */
+  private readonly metadata = computed<Metadata>(() => this.session.body().metadata ?? {});
+
+  /** Types with no registered definition: the missing-plugin fallback, shown as inert chips. */
+  protected readonly unknownTypes = computed(() =>
+    (this.session.current()?.types ?? []).filter((type) => !this.types.get(type)),
+  );
+
+  /** Metadata keys the declared Fields don't type — shown read-only as plain Metadata. */
+  protected readonly plainEntries = computed(() => {
+    const declared = new Set(this.fields().map((field) => field.key));
+    return Object.entries(this.metadata())
+      .filter(([key]) => !declared.has(key))
+      .map(([key, value]) => ({ key, value: displayPlain(value) }));
+  });
+
+  /** The forward-only validation of the live Metadata, so an invalid control can flag itself. */
+  private readonly invalidKeys = computed(
+    () => new Set(validateFields(this.fields(), this.metadata()).errors.map((error) => error.key)),
+  );
+
+  protected isInvalid(field: FieldSchema): boolean {
+    return this.invalidKeys().has(field.key);
+  }
+
+  /** The options of an `enum` Field, for its `<select>`; empty for any other data-type. */
+  protected options(field: FieldSchema): readonly string[] {
+    return field.dataType.kind === 'enum' ? field.dataType.options : [];
+  }
+
+  protected boolValue(field: FieldSchema): boolean {
+    return readField(this.metadata(), field) === true;
+  }
+
+  /** The Field's value rendered as an input string — a list joins on `, `, a scalar stringifies. */
+  protected stringValue(field: FieldSchema): string {
+    const value = readField(this.metadata(), field);
+    if (value == null) return '';
+    if (Array.isArray(value)) return value.join(', ');
+    return String(value);
+  }
+
+  /**
+   * Write a value into the Metadata map through the central store (ADR-0048): a Field is a lens,
+   * so an edit writes the one map every View shares, and {@link writeField} clears the key when the
+   * value is emptied rather than leaving a blank behind. No-op for a read-only opener.
+   */
+  protected set(field: FieldSchema, value: unknown): void {
+    if (!this.session.writable()) return;
+    this.session.mutate((draft) => {
+      draft.metadata = writeField(draft.metadata, field, value);
+    });
+  }
+
+  /** Coerce a text input to the Field's data-type: a `list` splits on commas, a scalar passes through. */
+  protected typedValue(field: FieldSchema, raw: string): unknown {
+    if (field.dataType.kind !== 'list') return raw;
+    const itemKind = field.dataType.of.kind;
+    return raw
+      .split(',')
+      .map((part) => part.trim())
+      .filter((part) => part.length > 0)
+      .map((part) => (itemKind === 'number' ? Number(part) : part));
+  }
+
+  /** An empty number input clears the Field; otherwise it becomes a real `number`. */
+  protected numberValue(event: Event): number | undefined {
+    const raw = this.inputValue(event);
+    return raw === '' ? undefined : Number(raw);
+  }
+
+  protected inputValue(event: Event): string {
+    return (event.target as HTMLInputElement).value;
+  }
+
+  protected selectValue(event: Event): string {
+    return (event.target as HTMLSelectElement).value;
+  }
+
+  protected checkboxChecked(event: Event): boolean {
+    return (event.target as HTMLInputElement).checked;
+  }
+}
+
+/** Flatten a plain Metadata value to a string for read-only display (the domain never interprets it). */
+function displayPlain(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return value.map(displayPlain).join(', ');
+  return JSON.stringify(value) ?? '';
+}

@@ -10,6 +10,7 @@ import { AuthService } from '../auth/auth.service';
 import { AuthModule } from '../auth/auth.module';
 import { EntitiesModule } from './entities.module';
 import { EntitiesService } from './entities.service';
+import { TypeFieldRegistry } from './type-field-registry';
 import * as entityAccessModule from '../acl/entity-access';
 import { ConfigModule } from '../config/config.module';
 import { WorldsModule } from '../worlds/worlds.module';
@@ -433,6 +434,98 @@ describe('Entities endpoints', () => {
     const reloaded = await ada.get(`/entities/${id}`).expect(200);
     expect(reloaded.body.document).toEqual(first);
     expect(reloaded.body.version).toBe(2);
+  });
+
+  // The forward-only Field gate (ADR-0048): an active typed edit (a save asserting a `types` set,
+  // as the generic Field view or a plugin form does) must satisfy its types' Fields, while the same
+  // body arriving via import or already at rest is tolerated untouched.
+  describe('the forward-only Field gate on active typed edits', () => {
+    // A plugin-style type declaring a required string Field and an optional number Field.
+    beforeEach(() => {
+      app.get(TypeFieldRegistry).register('test.beast', [
+        { key: 'name', label: 'Name', dataType: { kind: 'string' }, required: true },
+        { key: 'cr', label: 'Challenge Rating', dataType: { kind: 'number' } },
+      ]);
+    });
+
+    const bodyWith = (metadata?: Record<string, unknown>) => ({ content: emptyContent(), metadata });
+
+    it('rejects a typed edit that omits a required Field', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const created = await ada.post('/entities').send({ name: 'Aboleth', types: ['core.note'] });
+
+      const res = await ada
+        .put(`/entities/${created.body.id}`)
+        .send({ document: bodyWith({ cr: 10 }), version: 1, tags: [], types: ['test.beast'] })
+        .expect(400);
+      expect(res.body.code).toBe('invalid-fields');
+      expect(res.body.data.fields).toContainEqual({ key: 'name', code: 'required' });
+    });
+
+    it('rejects a typed edit whose Field value mismatches its data-type', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const created = await ada.post('/entities').send({ name: 'Aboleth', types: ['core.note'] });
+
+      const res = await ada
+        .put(`/entities/${created.body.id}`)
+        .send({
+          document: bodyWith({ name: 'Aboleth', cr: 'huge' }),
+          version: 1,
+          tags: [],
+          types: ['test.beast'],
+        })
+        .expect(400);
+      expect(res.body.data.fields).toContainEqual({ key: 'cr', code: 'type' });
+    });
+
+    it('accepts a typed edit that satisfies the type’s Fields, keeping values in the Metadata map', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const created = await ada.post('/entities').send({ name: 'Aboleth', types: ['core.note'] });
+
+      const res = await ada
+        .put(`/entities/${created.body.id}`)
+        .send({
+          document: bodyWith({ name: 'Aboleth', cr: 10 }),
+          version: 1,
+          tags: [],
+          types: ['test.beast'],
+        })
+        .expect(200);
+      expect(res.body.types).toEqual(['test.beast']);
+      expect(res.body.document.metadata).toEqual({ name: 'Aboleth', cr: 10 });
+    });
+
+    it('accepts a plain body save that omits types — data at rest is never retroactively invalidated', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      // A typed Entity carrying Metadata that would fail the gate; a plain edit (no `types`) is
+      // tolerated, so an unrelated body change never strands the Entity on its malformed Fields.
+      const created = await ada.post('/entities').send({ name: 'Aboleth', types: ['test.beast'] });
+
+      await ada
+        .put(`/entities/${created.body.id}`)
+        .send({ document: bodyWith({ cr: 'still wrong' }), version: 1, tags: [] })
+        .expect(200);
+    });
+
+    it('never validates the same malformed body via import or at rest — the gate is edit-only', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const created = await ada.post('/entities').send({ name: 'Aboleth', types: ['test.beast'] });
+      const worldId = created.body.worldId;
+
+      // Import: bulk-inserted Metadata never faces the gate (ADR-0033), whatever it holds.
+      app
+        .get(EntitiesService)
+        .importNote(adaId, worldId, 'imported-beast', 'Kraken', [], bodyWith({ cr: 'wrong' }));
+      await ada.get('/entities/imported-beast').expect(200);
+
+      // At rest: corrupt the stored Metadata directly, then confirm a read never validates it.
+      db.update(entities)
+        .set({ document: JSON.stringify(bodyWith({ cr: 'wrong at rest' })) })
+        .where(eq(entities.id, created.body.id))
+        .run();
+      const loaded = await ada.get(`/entities/${created.body.id}`).expect(200);
+      expect(loaded.body.document.metadata).toEqual({ cr: 'wrong at rest' });
+    });
   });
 
   it('renames an entity without disturbing its body or version', async () => {
