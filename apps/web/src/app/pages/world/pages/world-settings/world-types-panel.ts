@@ -103,6 +103,7 @@ interface Draft {
               [attr.aria-label]="'worldTypes.fieldName' | transloco"
               [placeholder]="'worldTypes.fieldName' | transloco"
               [value]="f.label"
+              data-testid="field-label"
               (input)="patchField($index, { label: value($event) })"
             />
             <select
@@ -273,25 +274,38 @@ export class WorldTypesPanel implements OnInit {
     });
   }
 
-  /** Every draft edit runs through immer, so a nested change reads as a plain mutation of the draft. */
+  /**
+   * Every draft edit runs through immer, so a nested change reads as a plain mutation of the draft.
+   * Each recipe must return *nothing*: immer reads a returned value as a replacement state and throws
+   * when the draft was also mutated — hence the block bodies below, never a bare `Object.assign(…)`
+   * or `push(…)` expression (both return a value).
+   */
   private mutate(recipe: (draft: Draft) => void): void {
     this.draft.update((d) => (d ? produce(d, recipe) : d));
   }
 
   protected patch(patch: Partial<Draft>): void {
-    this.mutate((d) => Object.assign(d, patch));
+    this.mutate((d) => {
+      Object.assign(d, patch);
+    });
   }
 
   protected patchField(index: number, patch: Partial<DraftField>): void {
-    this.mutate((d) => Object.assign(d.fields[index], patch));
+    this.mutate((d) => {
+      Object.assign(d.fields[index], patch);
+    });
   }
 
   protected addField(): void {
-    this.mutate((d) => d.fields.push(blankField()));
+    this.mutate((d) => {
+      d.fields.push(blankField());
+    });
   }
 
   protected removeField(index: number): void {
-    this.mutate((d) => void d.fields.splice(index, 1));
+    this.mutate((d) => {
+      d.fields.splice(index, 1);
+    });
   }
 
   protected save(event: Event): void {
