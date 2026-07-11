@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, OnInit, si
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { AvailableType, CreateUserDefinedTypeRequest, FieldSchema, USER_TYPE_NAMESPACE } from '@hexly/domain';
 import { ToasterService, WorldsClient } from '@hexly/web-core';
+import { produce } from '@hexly/immer';
 import { Button, Input, Select } from '@hexly/web-ui';
 import { WorldTypesLoader } from '../../../../entity-types/world-types-loader';
 
@@ -272,32 +273,25 @@ export class WorldTypesPanel implements OnInit {
     });
   }
 
+  /** Every draft edit runs through immer, so a nested change reads as a plain mutation of the draft. */
+  private mutate(recipe: (draft: Draft) => void): void {
+    this.draft.update((d) => (d ? produce(d, recipe) : d));
+  }
+
   protected patch(patch: Partial<Draft>): void {
-    this.draft.update((d) => (d ? { ...d, ...patch } : d));
+    this.mutate((d) => Object.assign(d, patch));
   }
 
   protected patchField(index: number, patch: Partial<DraftField>): void {
-    this.draft.update((d) =>
-      d ? { ...d, fields: d.fields.map((f, i) => (i === index ? { ...f, ...patch } : f)) } : d,
-    );
+    this.mutate((d) => Object.assign(d.fields[index], patch));
   }
 
   protected addField(): void {
-    this.draft.update((d) =>
-      d
-        ? {
-            ...d,
-            fields: [
-              ...d.fields,
-              { key: '', label: '', kind: 'string', options: '', required: false, facetable: false },
-            ],
-          }
-        : d,
-    );
+    this.mutate((d) => d.fields.push(blankField()));
   }
 
   protected removeField(index: number): void {
-    this.draft.update((d) => (d ? { ...d, fields: d.fields.filter((_, i) => i !== index) } : d));
+    this.mutate((d) => void d.fields.splice(index, 1));
   }
 
   protected save(event: Event): void {
@@ -345,6 +339,11 @@ export class WorldTypesPanel implements OnInit {
   private error(key: string): void {
     this.toaster.show(this.transloco.translate(key), 'error');
   }
+}
+
+/** A fresh, empty Field row — an optional string with no key yet. */
+function blankField(): DraftField {
+  return { key: '', label: '', kind: 'string', options: '', required: false, facetable: false };
 }
 
 /** An existing Field schema → the flattened form model (enum options joined for the text input). */
