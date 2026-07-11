@@ -4,12 +4,13 @@ import {
   EntityBody,
   EntityEdge,
   GrantRole,
+  ReindexFailure,
   Visibility,
   descriptorsSchema,
   extractText,
   harvestEdges,
 } from '@hexly/domain';
-import { and, eq, inArray, ne, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, ne, sql } from 'drizzle-orm';
 import { EntityAccess, entityAccess, sharedVisibility } from '../acl/entity-access';
 import { DB, Db } from '../db/db';
 import {
@@ -48,6 +49,17 @@ const DESCRIPTOR_COLUMNS = 2;
 function* batched<T>(rows: readonly T[], columns: number): Generator<readonly T[]> {
   const size = Math.floor(MAX_BOUND_PARAMS / columns);
   for (let i = 0; i < rows.length; i += size) yield rows.slice(i, i + size);
+}
+
+/**
+ * What one page of {@link EntityWrites.reindexChunk} did. `reindexed + failures.length === walked`.
+ * A `null` cursor means the walk is exhausted — there is no further page to ask for.
+ */
+export interface ReindexChunk {
+  readonly walked: number;
+  readonly reindexed: number;
+  readonly failures: readonly ReindexFailure[];
+  readonly cursor: string | null;
 }
 
 /** Everything an insert needs. The import path pre-assigns `id` to resolve wikilinks before insert. */
@@ -261,6 +273,71 @@ export class EntityWrites {
         .where(inArray(entities.id, touched))
         .run();
     });
+  }
+
+  /**
+   * Recompute one page of Entities' document-derived state — the unit of the Superadmin Reindex
+   * (ADR-0046), driven to exhaustion by the reindex `AdminService`. A **system write** (no `userId`): the
+   * Superadmin sits outside the collaboration model. Re-runs {@link derive} and
+   * {@link replaceDerived}, so any derivation added there is backfilled retroactively for free;
+   * idempotent, since the writes are wholesale replaces.
+   *
+   * A chunk, not the instance: `better-sqlite3` is synchronous, so a walk of every Entity in one
+   * transaction would pin the event loop. The page is the seam the caller yields on and bounds the
+   * transaction — it commits as it goes, so a crash leaves the instance partly reindexed, harmless
+   * since the next run resumes. {@link derive} runs outside the transaction (pure, the only step a
+   * bad document can throw in): its failures are collected per Entity and skipped while the
+   * successes still write; a write error rolls the chunk back. Ordered by `id`, resumed from
+   * `after`, stable under concurrent inserts.
+   *
+   * Lands with no nudge and no `seq` bump: every column it touches is derived, and a recompute from
+   * an unchanged document writes back what it read — ADR-0046's accepted freshness ceiling.
+   */
+  reindexChunk(after: string | null, limit: number): ReindexChunk {
+    const rows = this.db
+      .select({ id: entities.id, worldId: entities.worldId, document: entities.document })
+      .from(entities)
+      .where(after === null ? undefined : gt(entities.id, after))
+      .orderBy(asc(entities.id))
+      .limit(limit)
+      .all();
+    if (rows.length === 0) return { walked: 0, reindexed: 0, failures: [], cursor: null };
+
+    // Derive first, outside the transaction: pure, and the only step a bad document can throw in.
+    const failures: ReindexFailure[] = [];
+    const derived: { row: (typeof rows)[number]; derived: Derived }[] = [];
+    for (const row of rows) {
+      try {
+        derived.push({ row, derived: this.derive(JSON.parse(row.document) as EntityBody) });
+      } catch (err) {
+        failures.push({
+          entityId: row.id,
+          worldId: row.worldId,
+          reason: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    // A page whose every document was unreadable has nothing to write, and opens no transaction.
+    if (derived.length > 0)
+      this.transact(() => {
+        for (const { row, derived: d } of derived) {
+          this.db
+            .update(entities)
+            .set({ contentText: d.contentText })
+            .where(eq(entities.id, row.id))
+            .run();
+          this.replaceDerived(row.id, row.worldId, d);
+        }
+      });
+
+    return {
+      walked: rows.length,
+      reindexed: derived.length,
+      failures,
+      // A short page is the last page; a full one may not be, so the next call settles it.
+      cursor: rows.length < limit ? null : rows[rows.length - 1].id,
+    };
   }
 
   /**

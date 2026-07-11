@@ -99,7 +99,7 @@ describe('Vault import endpoint', () => {
     app.use(cookieParser());
     await app.init();
 
-    await app.get(AuthService).seedUser('ada@hexly.test', 'correct horse', 'Ada', { canCreateWorlds: true });
+    await app.get(AuthService).seedUser('ada@hexly.test', 'correct horse', 'Ada', { roles: ['create-worlds'] });
   });
 
   afterEach(async () => {
@@ -118,7 +118,7 @@ describe('Vault import endpoint', () => {
     await app
       .get(AuthService)
       .seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob', {
-        canCreateWorlds: false,
+        roles: [],
       });
     const bob = await signIn('bob@hexly.test', 'hunter2 stationery');
     const zip = vaultZip({ 'Note.md': '# Note' });

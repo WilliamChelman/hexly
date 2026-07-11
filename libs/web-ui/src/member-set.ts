@@ -10,7 +10,7 @@ import {
 import { Observable } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { MemberRole, UserSummary, WorldMember } from '@hexly/domain';
-import { WorldsClient, UsersClient, ToasterService } from '@hexly/web-core';
+import { WorldsClient, UserDirectoryClient, ToasterService } from '@hexly/web-core';
 import { Button } from './button';
 import { Select } from './select';
 
@@ -20,7 +20,7 @@ import { Select } from './select';
  * member's role between the two, or removes them. All writes are Owner-only server-side;
  * a refusal surfaces as an error toast, leaving the list untouched.
  *
- * Membership is stored as user ids + roles; names come from the {@link UsersClient}
+ * Membership is stored as user ids + roles; names come from the {@link UserDirectoryClient}
  * directory, which carries no email (ADR-0004). Owners are excluded from the add
  * candidates — promoting to Owner belongs to the owner-set surface, not here.
  */
@@ -131,7 +131,7 @@ export class MemberSet implements OnInit {
   readonly id = input.required<string>();
 
   private readonly worlds = inject(WorldsClient);
-  private readonly users = inject(UsersClient);
+  private readonly users = inject(UserDirectoryClient);
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
 

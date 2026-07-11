@@ -1,223 +1,117 @@
-import {
-  ConflictException,
-  ForbiddenException,
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import {
-  AdminError,
-  AdminErrorCode,
-  AdminUser,
-  AuthUser,
-  CreateUserRequest,
-} from '@hexly/domain';
-import { asc, count, eq } from 'drizzle-orm';
-import { solelyOwnsAnything } from '../acl/owner-set';
-import { AuthService } from '../auth/auth.service';
+import { ConflictException, Inject, Injectable } from '@nestjs/common';
+import { count } from 'drizzle-orm';
+import { ReindexErrorCode, ReindexJob } from '@hexly/domain';
 import { DB, Db } from '../db/db';
+import { entities } from '../db/schema';
 import { EntityWrites } from '../entities/entity-writes';
-import { WorldWrites } from '../worlds/world-writes';
-import { sessions, users } from '../db/schema';
 
 /**
- * The Instance Admin domain (ADR-0037, #163): account management with zero content
- * powers. Creating a user reuses {@link AuthService.seedUser} — the same provisioning
- * trunk as the seed CLI — so there is one hashing/insert path. Nothing here touches a
- * World or Entity: the Admin flag confers no content access.
+ * Entities recomputed per transaction. The walk yields to the event loop between chunks, so this
+ * is the granularity at which a Reindex stops monopolizing the process — small enough that a
+ * chunk's synchronous transaction is imperceptible to a concurrent request, large enough that the
+ * per-chunk overhead stays lost in the derivation cost.
+ */
+const CHUNK_SIZE = 200;
+
+/** The state before any Reindex this process has seen. */
+const IDLE: ReindexJob = {
+  status: 'idle',
+  total: 0,
+  walked: 0,
+  reindexed: 0,
+  failures: [],
+  startedAt: null,
+  finishedAt: null,
+  error: null,
+};
+
+/** Hand the event loop back, so a chunk's transaction is not the only thing this process does. */
+const yieldToEventLoop = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
+
+/**
+ * The Superadmin repair domain (ADR-0046, ADR-0047, #180): the operator's tier, outside the
+ * collaboration model, reaching content the `manage-users` surface may not. Kept apart from
+ * {@link UsersService}, which stops short of any World or Entity.
+ *
+ * Owns the instance's one Reindex job — one, because the walk is instance-wide. Job state lives on
+ * this singleton, not a table: each chunk commits, so a restart just forgets an unfinished job
+ * whose done chunks are already on disk.
  */
 @Injectable()
 export class AdminService {
+  private job: ReindexJob = IDLE;
+
   constructor(
     @Inject(DB) private readonly db: Db,
-    private readonly auth: AuthService,
     private readonly writes: EntityWrites,
-    private readonly worldWrites: WorldWrites,
   ) {}
 
-  /**
-   * Provision a new account (Admin-driven). A duplicate email is a 409 — the
-   * `users.email` UNIQUE index would otherwise surface as an opaque 500.
-   */
-  async createUser(req: CreateUserRequest): Promise<void> {
-    const existing = this.db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.email, req.email.trim().toLowerCase()))
-      .get();
-    if (existing) throw this.conflict(AdminErrorCode.EmailInUse);
-    // In-app provisioned accounts start gated from World Creation (ADR-0040) — an
-    // Admin grants it deliberately. Only the out-of-band seed CLI leaves it on.
-    await this.auth.seedUser(req.email, req.password, req.displayName, {
-      canCreateWorlds: false,
-    });
+  /** Where the instance's Reindex stands. The poll target behind `GET /admin/reindex`. */
+  status(): ReindexJob {
+    return this.job;
   }
 
   /**
-   * Disable or re-enable an account (ADR-0037, #163): the immediate lever. Disabling
-   * stamps `disabled_at` — `AuthService.authenticate`/`login` then refuse it, so live
-   * sessions and fresh logins both stop, while the user's data and memberships stay
-   * untouched. Enabling clears the stamp. Idempotent; an unknown id is a 404.
+   * Start the walk and return at once, leaving it running behind the response — recomputing every
+   * Entity's document-derived state: link edges, the `::` Link Descriptor vocabulary, and
+   * `contentText` (whose `entities_fts` mirror follows via its sync triggers). The document is the
+   * source of truth and the derived tables are a cache of it, so this is idempotent and safe to
+   * run at any time.
    *
-   * Guarded like delete/demote: a plain Admin can't touch a Superadmin, no one may
-   * disable themselves (self-lockout), and the last Superadmin can't be disabled — a
-   * disabled Superadmin can't authenticate, so this must not drain the repair tier to zero.
+   * It is the general tool for applying a *future* document-derivation retroactively, which is why
+   * nothing here names the derivations it rebuilds: adding one to `EntityWrites.derive` is enough
+   * for this button to backfill it.
    */
-  setDisabled(actor: AuthUser, id: string, disabled: boolean): void {
-    const target = this.loadTarget(id);
-    this.assertCanManage(actor, target);
-    if (disabled && actor.id === id) throw this.conflict(AdminErrorCode.SelfDisable);
-    if (disabled && target.isSuperadmin && this.isLastSuperadmin())
-      throw this.conflict(AdminErrorCode.LastSuperadmin);
-    this.db
-      .update(users)
-      .set({ disabledAt: disabled ? Date.now() : null })
-      .where(eq(users.id, id))
-      .run();
+  start(): ReindexJob {
+    if (this.job.status === 'running')
+      throw new ConflictException({ code: ReindexErrorCode.ReindexRunning });
+    this.job = { ...IDLE, status: 'running', total: this.countEntities(), startedAt: Date.now() };
+    // Deliberately not awaited: the walk outlives the request that asked for it, and the client
+    // follows it by polling. `run` never rejects — it lands every fault in the job itself.
+    void this.run();
+    return this.job;
   }
 
   /**
-   * Every account for the admin panel (ADR-0037, #163): id, email (an Admin concern),
-   * display name, the two tier flags, and the disabled stamp — never the hash. Stable
-   * order by display name so the panel doesn't reshuffle between reads.
+   * Drive {@link EntityWrites.reindexChunk} to exhaustion, yielding between chunks. Only a fault
+   * in the *write* reaches the catch: a document this build cannot parse is collected as a
+   * per-Entity failure and the walk carries on, so one corrupt row cannot deny the repair to the
+   * instance that most needs it. `failed` therefore means the database refused, never that the
+   * content was bad.
    */
-  listUsers(): AdminUser[] {
-    return this.db
-      .select({
-        id: users.id,
-        email: users.email,
-        displayName: users.displayName,
-        isAdmin: users.isAdmin,
-        isSuperadmin: users.isSuperadmin,
-        canCreateWorlds: users.canCreateWorlds,
-        disabledAt: users.disabledAt,
-      })
-      .from(users)
-      .orderBy(asc(users.displayName))
-      .all();
+  private async run(): Promise<void> {
+    try {
+      // Yield before the first chunk, not just between them: an `async` function runs
+      // synchronously up to its first `await`, so without this the opening transaction would
+      // execute inside `start()` — and a small instance would be wholly reindexed before the
+      // POST returned, handing the client a job it never saw `running`.
+      await yieldToEventLoop();
+      let cursor: string | null = null;
+      for (;;) {
+        const chunk = this.writes.reindexChunk(cursor, CHUNK_SIZE);
+        this.job = {
+          ...this.job,
+          walked: this.job.walked + chunk.walked,
+          reindexed: this.job.reindexed + chunk.reindexed,
+          failures: [...this.job.failures, ...chunk.failures],
+        };
+        if (chunk.cursor === null) break;
+        cursor = chunk.cursor;
+        await yieldToEventLoop();
+      }
+      this.job = { ...this.job, status: 'succeeded', finishedAt: Date.now() };
+    } catch (err) {
+      this.job = {
+        ...this.job,
+        status: 'failed',
+        finishedAt: Date.now(),
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
   }
 
-  /**
-   * Admin-driven password reset (ADR-0037, #163): no current-password check — the
-   * Admin is resetting on the user's behalf. Re-hashes with argon2 via the shared
-   * {@link AuthService}. An unknown id is a 404. A plain Admin can't reset a Superadmin's
-   * password (that would be a login-as-Superadmin escalation) — see {@link assertCanManage}.
-   */
-  async resetPassword(actor: AuthUser, id: string, password: string): Promise<void> {
-    this.assertCanManage(actor, this.loadTarget(id));
-    await this.auth.setPassword(id, password);
-  }
-
-  /**
-   * Set or clear the Instance Admin flag (ADR-0037, #163). Idempotent; an unknown id
-   * is a 404. Confers no content access — it only opens the account-management surface.
-   * A plain Admin can't touch a Superadmin, and no one may demote themselves out of the
-   * admin surface (self-lockout).
-   */
-  setAdmin(actor: AuthUser, id: string, isAdmin: boolean): void {
-    this.assertCanManage(actor, this.loadTarget(id));
-    if (!isAdmin && actor.id === id) throw this.conflict(AdminErrorCode.SelfAdminRevoke);
-    this.db.update(users).set({ isAdmin }).where(eq(users.id, id)).run();
-  }
-
-  /**
-   * Grant or revoke the World Creation capability (ADR-0040): account management, so
-   * Instance-Admin-gated like {@link setAdmin}. No self-revoke guard — losing your own
-   * World Creation causes no lockout (unlike demoting yourself out of the admin surface).
-   * An Admin may grant it to themselves, an explicit, visible act — the capability is
-   * orthogonal to Admin, so it is never implied. An unknown id is a 404.
-   */
-  setCanCreateWorlds(actor: AuthUser, id: string, canCreateWorlds: boolean): void {
-    this.assertCanManage(actor, this.loadTarget(id));
-    this.db.update(users).set({ canCreateWorlds }).where(eq(users.id, id)).run();
-  }
-
-  /**
-   * Delete an account (ADR-0037, #163). Refused (409) while the user is the sole Owner
-   * of any World or Entity — the ≥1-Owner invariant extended to deletion, so no data is
-   * ever orphaned; deletion follows reassignment (or Superadmin cleanup). Otherwise their
-   * ACL residue — sessions, memberships, and non-sole owner/editor/viewer grants — is
-   * cleared in one transaction (those tables reference `users` with no cascade), then the
-   * row goes. An unknown id is a 404.
-   */
-  deleteUser(actor: AuthUser, id: string): void {
-    const user = this.loadTarget(id);
-    this.assertCanManage(actor, user);
-    if (actor.id === id) throw this.conflict(AdminErrorCode.SelfDelete);
-    // The last Superadmin is irremovable (ADR-0037, #163) — deletion must not lose the
-    // repair capability, the same guard the demote path raises.
-    if (user.isSuperadmin && this.isLastSuperadmin())
-      throw this.conflict(AdminErrorCode.LastSuperadmin);
-    if (solelyOwnsAnything(this.db, id)) throw this.conflict(AdminErrorCode.SoleOwner);
-    // One outermost transaction (ADR-0045), so the membership and grant purges route through the
-    // write handles that own `world_members` and `entity_grants`. Both bump the touched rows' `seq`
-    // and emit nothing: the deleted user's sessions go with them, so they self-evict, and no
-    // surviving principal's Rights changed.
-    this.writes.transact(() => {
-      this.db.delete(sessions).where(eq(sessions.userId, id)).run();
-      this.worldWrites.purgeMembershipsOf(id);
-      this.writes.purgeGrantsOf(id);
-      this.db.delete(users).where(eq(users.id, id)).run();
-    });
-  }
-
-  /**
-   * Set or clear the Superadmin flag (ADR-0037, #163) — the repair tier, so this endpoint
-   * is Superadmin-only (guarded at the route). Demoting the last Superadmin is refused
-   * (409): the operator's in-app repair capability can't be dropped to zero. Idempotent
-   * on promotion; an unknown id is a 404.
-   */
-  setSuperadmin(id: string, isSuperadmin: boolean): void {
-    const user = this.db
-      .select({ isSuperadmin: users.isSuperadmin })
-      .from(users)
-      .where(eq(users.id, id))
-      .get();
-    if (!user) throw this.notFound();
-    if (!isSuperadmin && user.isSuperadmin && this.isLastSuperadmin())
-      throw this.conflict(AdminErrorCode.LastSuperadmin);
-    this.db.update(users).set({ isSuperadmin }).where(eq(users.id, id)).run();
-  }
-
-  /** Whether exactly one Superadmin remains — the ≥1-Superadmin invariant's live count. */
-  private isLastSuperadmin(): boolean {
-    const [{ n }] = this.db
-      .select({ n: count() })
-      .from(users)
-      .where(eq(users.isSuperadmin, true))
-      .all();
-    return n === 1;
-  }
-
-  /** Load the target's id + tier for the id-scoped mutations; an unknown id is a 404. */
-  private loadTarget(id: string): { id: string; isSuperadmin: boolean } {
-    const target = this.db
-      .select({ id: users.id, isSuperadmin: users.isSuperadmin })
-      .from(users)
-      .where(eq(users.id, id))
-      .get();
-    if (!target) throw this.notFound();
-    return target;
-  }
-
-  /** A structured 409 (invariant conflict) carrying a stable {@link AdminErrorCode}. */
-  private conflict(code: AdminErrorCode): ConflictException {
-    return new ConflictException({ code } satisfies AdminError);
-  }
-
-  /** A structured 404 for an unknown account — the id-scoped mutations' existence guard. */
-  private notFound(): NotFoundException {
-    return new NotFoundException({ code: AdminErrorCode.UserNotFound } satisfies AdminError);
-  }
-
-  /**
-   * The actor-vs-target tier gate (ADR-0037, #163): the Admin surface is Admin-gated at the
-   * route, but a plain Admin must not manage a Superadmin — resetting their password (a
-   * login-as-Superadmin escalation), disabling, demoting, or deleting them. Only a Superadmin
-   * manages a Superadmin. The Superadmin-flag toggle is separately SuperadminGuard-gated.
-   */
-  private assertCanManage(actor: AuthUser, target: { isSuperadmin: boolean }): void {
-    if (target.isSuperadmin && !actor.isSuperadmin)
-      throw new ForbiddenException({ code: AdminErrorCode.SuperadminManaged } satisfies AdminError);
+  /** The denominator for progress, read once when the walk starts. */
+  private countEntities(): number {
+    return this.db.select({ n: count() }).from(entities).get()?.n ?? 0;
   }
 }

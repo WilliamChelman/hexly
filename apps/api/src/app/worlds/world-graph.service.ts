@@ -11,10 +11,9 @@ import { linkedEntity } from '../entities/utils/linked-entity';
  * The World Graph read (ADR-0046, #181): a World's readable Entities as nodes, the
  * `entity → entity` rows of the derived edge index between them as edges.
  *
- * Its access rule is the strictest of the three edge surfaces. *References* lets an unreadable
- * target dangle and *Referenced by* filters the source alone; here **both** endpoints are filtered,
- * because a graph names the things at either end of a line. An edge the viewer cannot fully see is
- * dropped, never rendered as a ghost node.
+ * Its access rule is the strictest of the three edge surfaces: *References* lets an unreadable
+ * target dangle and *Referenced by* filters the source alone, but here **both** endpoints are
+ * filtered — an edge the viewer cannot fully see is dropped, not rendered.
  */
 @Injectable()
 export class WorldGraphService {
@@ -33,9 +32,8 @@ export class WorldGraphService {
    * the edge table, so a link-less orphan is a node like any other. Assets are never nodes.
    *
    * An Entity {@link linkedEntity} cannot resolve — one whose stored type is outside the enum — is
-   * dropped rather than thrown on, because a node with no drawable type is a node this canvas has
-   * no colour for. {@link edges} then sieves its edges away for free. One such row must not 500 a
-   * whole World's graph while every other surface renders it.
+   * dropped rather than thrown on; {@link edges} then sieves its edges away for free. One such row
+   * must not 500 a whole World's graph.
    */
   private nodes(access: EntityAccess, worldId: string): LinkedEntity[] {
     return this.db

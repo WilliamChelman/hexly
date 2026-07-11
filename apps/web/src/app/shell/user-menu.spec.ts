@@ -28,7 +28,7 @@ describe('UserMenu', () => {
   });
 
   function signIn(displayName = 'Ada Lovelace'): void {
-    auth.setUser({ id: 'u1', email: 'ada@hexly.test', displayName, preferences: {}, isAdmin: false, isSuperadmin: false, canCreateWorlds: true });
+    auth.setUser({ id: 'u1', email: 'ada@hexly.test', displayName, preferences: {}, roles: ['create-worlds'], isSuperadmin: false });
   }
 
   type Fixture = ReturnType<typeof TestBed.createComponent>;

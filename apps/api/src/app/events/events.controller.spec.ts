@@ -41,7 +41,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
 
     const adaId = await app
       .get(AuthService)
-      .seedUser('ada@hexly.test', 'correct horse', 'Ada', { canCreateWorlds: true });
+      .seedUser('ada@hexly.test', 'correct horse', 'Ada', { roles: ['create-worlds'] });
     // Entity creation needs a World (ADR-0024); mint one for Ada.
     app.get(WorldsService).mintWorld(adaId, 'Aldermoor');
   });
@@ -771,7 +771,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
   it('confines a World-link token to its own World — a sibling World it does not grant is silently not-subscribed (#178)', async () => {
     const bobId = await app
       .get(AuthService)
-      .seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob', { canCreateWorlds: true });
+      .seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob', { roles: ['create-worlds'] });
     const otherWorldId = app.get(WorldsService).mintWorld(bobId, 'Bobland');
     const adaCookie = await sessionCookie('ada@hexly.test', 'correct horse');
     const bobCookie = await sessionCookie('bob@hexly.test', 'hunter2 stationery');
@@ -1060,7 +1060,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     // first, then his note, his first frame being the note proves the World ref delivered nothing.
     const bobId = await app
       .get(AuthService)
-      .seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob', { canCreateWorlds: true });
+      .seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob', { roles: ['create-worlds'] });
     app.get(WorldsService).mintWorld(bobId, 'Bobland');
     const adaCookie = await sessionCookie('ada@hexly.test', 'correct horse');
     const bobCookie = await sessionCookie('bob@hexly.test', 'hunter2 stationery');

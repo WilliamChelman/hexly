@@ -5,7 +5,11 @@ import {
 import { rxResource } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { catchError, finalize, Observable, of, tap, throwError } from 'rxjs';
-import { AuthUser } from '@hexly/domain';
+import {
+  AuthUser,
+  canManageUsers as canManageUsersRule,
+  canCreateWorlds as canCreateWorldsRule,
+} from '@hexly/domain';
 
 /**
  * The web client's view of the session. The actual session lives in an HttpOnly
@@ -40,12 +44,13 @@ export class AuthClient {
   readonly sessionLoading = this.session.isLoading;
 
   /**
-   * Whether the caller may reach the Instance Admin surface: the Admin flag, or
-   * a Superadmin (Superadmin ⊇ Admin).
+   * Whether the caller may reach the user-management (`/users`) surface: holds the
+   * `manage-users` Instance Role, or is a Superadmin (who supersedes every role).
+   * Defers to the domain {@link canManageUsersRule} so the rule can't drift.
    */
-  readonly canAdminister = computed(() => {
+  readonly canManageUsers = computed(() => {
     const u = this.currentUser();
-    return !!u && (u.isAdmin || u.isSuperadmin);
+    return !!u && canManageUsersRule(u);
   });
 
   /** Whether the caller is a Superadmin — gates the Superadmin-only controls. */
@@ -53,11 +58,11 @@ export class AuthClient {
 
   /**
    * Whether the caller may create Worlds. A Superadmin always may, regardless of
-   * the flag.
+   * the roles set. Defers to the domain {@link canCreateWorldsRule}.
    */
   readonly canCreateWorlds = computed(() => {
     const u = this.currentUser();
-    return !!u && (u.canCreateWorlds || u.isSuperadmin);
+    return !!u && canCreateWorldsRule(u);
   });
 
   login(email: string, password: string): Observable<AuthUser> {

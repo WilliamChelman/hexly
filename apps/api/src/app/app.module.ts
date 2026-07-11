@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AdminModule } from './admin/admin.module';
+import { UsersModule } from './admin/users.module';
 import { AssetsModule } from './assets/assets.module';
 import { AuthModule } from './auth/auth.module';
 import { ConfigModule } from './config/config.module';
@@ -31,6 +32,7 @@ const e2eTestingEnabled =
     ConfigModule,
     DbModule,
     AuthModule,
+    UsersModule,
     AdminModule,
     EntitiesModule,
     EventsModule,

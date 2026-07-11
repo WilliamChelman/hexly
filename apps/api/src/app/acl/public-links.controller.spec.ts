@@ -44,7 +44,7 @@ describe('Public links', () => {
   });
 
   async function seed(email: string, name: string): Promise<string> {
-    return app.get(AuthService).seedUser(email, 'correct horse', name, { canCreateWorlds: true });
+    return app.get(AuthService).seedUser(email, 'correct horse', name, { roles: ['create-worlds'] });
   }
 
   async function signIn(email: string) {

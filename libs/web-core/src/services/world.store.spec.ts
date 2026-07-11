@@ -47,7 +47,7 @@ describe('WorldStore', () => {
   }
 
   function login(id = 'u1'): void {
-    auth.setUser({ id, email: 'ada@hexly.test', displayName: 'Ada', preferences: {}, isAdmin: false, isSuperadmin: false, canCreateWorlds: true });
+    auth.setUser({ id, email: 'ada@hexly.test', displayName: 'Ada', preferences: {}, roles: ['create-worlds'], isSuperadmin: false });
   }
 
   it('loads the caller’s Worlds and marks loaded', () => {

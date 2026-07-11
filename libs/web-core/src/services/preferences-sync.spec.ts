@@ -24,9 +24,8 @@ describe('PreferencesSync (ADR-0038)', () => {
     email: 'ada@hexly.test',
     displayName: 'Ada',
     preferences,
-    isAdmin: false,
+    roles: ['create-worlds'],
     isSuperadmin: false,
-    canCreateWorlds: true,
   });
 
   beforeEach(() => {

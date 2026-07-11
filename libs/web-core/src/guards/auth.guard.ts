@@ -26,12 +26,12 @@ export const authGuard: CanActivateFn = (_route, state) => {
 };
 
 /**
- * Like {@link authGuard}, but also requires the caller to reach the Instance Admin
- * surface (ADR-0037, #163) — the Admin flag or Superadmin. A signed-in non-Admin is
- * bounced to the root rather than shown a panel the server would 403 anyway. The
- * server stays the source of truth; this only hides an unusable page.
+ * Like {@link authGuard}, but also requires the caller to reach the user-management
+ * (`/users`) surface (ADR-0047) — the `manage-users` role or Superadmin. A signed-in
+ * user without it is bounced to the root; the server stays the source of truth (it
+ * 403s anyway), so this only hides an unusable page.
  */
-export const adminGuard: CanActivateFn = (_route, state) => {
+export const manageUsersGuard: CanActivateFn = (_route, state) => {
   const auth = inject(AuthClient);
   const router = inject(Router);
   const injector = inject(Injector);
@@ -43,7 +43,29 @@ export const adminGuard: CanActivateFn = (_route, state) => {
     first(),
     map(() => {
       if (!auth.isAuthenticated()) return toLogin();
-      return auth.canAdminister() ? true : router.parseUrl('/');
+      return auth.canManageUsers() ? true : router.parseUrl('/');
+    }),
+  );
+};
+
+/**
+ * Like {@link manageUsersGuard}, but gates the Superadmin `/admin` repair surface
+ * (ADR-0046, the Reindex) on the Superadmin flag alone. A signed-in non-Superadmin
+ * is bounced to the root; the server 403s regardless.
+ */
+export const superadminGuard: CanActivateFn = (_route, state) => {
+  const auth = inject(AuthClient);
+  const router = inject(Router);
+  const injector = inject(Injector);
+  const toLogin = () =>
+    router.createUrlTree(['/login'], { queryParams: { returnUrl: state.url } });
+
+  return toObservable(auth.sessionLoading, { injector }).pipe(
+    filter((loading) => !loading),
+    first(),
+    map(() => {
+      if (!auth.isAuthenticated()) return toLogin();
+      return auth.isSuperadmin() ? true : router.parseUrl('/');
     }),
   );
 };

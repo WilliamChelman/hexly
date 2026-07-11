@@ -127,11 +127,11 @@ _Avoid_: Share link, invite link
 ## Sharing
 
 **Rights**:
-The closed set of actions a given caller may perform on a specific Entity or World — e.g. reading it, editing its substance, deleting it, changing its visibility, managing its sharing. Derived from the sharing rules (a caller's standing as Owner, grantee, or member) rather than granted directly. The vocabulary is per resource kind: a World is not something one "edits the substance" of. Distinct from a role (Owner, Editor, Contributor…), which is *why* a caller holds a Right; the Rights are the resolved *what*.
+The closed set of actions a given caller may perform on a specific Entity or World — e.g. reading it, editing its substance, deleting it, changing its visibility, managing its sharing. Derived from the sharing rules (a caller's standing as Owner, grantee, or member) rather than granted directly. The vocabulary is per resource kind: a World is not something one "edits the substance" of. Distinct from a role (Owner, Editor, Contributor… — a collaboration role, not an Instance Role), which is *why* a caller holds a Right; the Rights are the resolved *what*.
 _Avoid_: Permissions, ACL, capabilities, grants (a grant is one input to Rights, not the Rights)
 
 **Entity Visibility**:
-A two-value field on every Entity: `private` (default) or `shared`. A `private` Entity is accessible only to its Owners and any entity-level grants (named Editor/Viewer, or anonymous via its Public Link) — World Owners and Instance Admins have no special access to it; private is absolute within the collaboration model (only a Superadmin, outside the model, can reach it). A `shared` Entity is accessible to all World members (Contributor, World Viewer, World Public Link holders). Per-user visibility is not a separate feature — it is what an entity-level grant on a `private` Entity delivers.
+A two-value field on every Entity: `private` (default) or `shared`. A `private` Entity is accessible only to its Owners and any entity-level grants (named Editor/Viewer, or anonymous via its Public Link) — World Owners and Instance Role holders have no special access to it; private is absolute within the collaboration model (only a Superadmin, outside the model, can reach it). A `shared` Entity is accessible to all World members (Contributor, World Viewer, World Public Link holders). Per-user visibility is not a separate feature — it is what an entity-level grant on a `private` Entity delivers.
 _Avoid_: Published, public, visible
 
 **Owner**:
@@ -254,12 +254,12 @@ _Avoid_: Server, deployment, tenant
 The folder an operator points Hexly at, holding its database and Instance Configuration — named for holding both data and config.
 _Avoid_: Data directory, data folder, db path, storage dir
 
-**Instance Admin**:
-A user flag granting account management on an Instance — create, disable, and delete users, reset passwords, grant/revoke the Admin flag, and grant/revoke a user's ability to create Worlds. Carries zero content powers: an Admin reads and edits nothing they aren't otherwise an Owner, member, or grantee of, and cannot create Worlds unless separately granted that ability (granting it to oneself is an explicit, visible act). Deleting a user is refused while that user solely owns any World or Entity; disabling (login locked, data and memberships intact) is the immediate lever.
-_Avoid_: Admin (alone, ambiguous with Superadmin), moderator, staff
+**Instance Role**:
+A member of the closed, code-known set of instance-wide powers a user may hold, stored as a set (`roles`) on the user account. Two members today: `manage-users` — account management (create, disable, and delete users, reset passwords, and grant/revoke Instance Roles), refusing a user's deletion while they solely own any World or Entity and using disable (login locked, data and memberships intact) as the immediate lever — and `create-worlds` — may create Worlds. The members are orthogonal: holding one implies nothing about the other, and `manage-users` carries zero content powers, reaching no World or Entity (granting oneself `create-worlds` is an explicit, visible act). "Role" here is account-wide, scoped by the word Instance; distinct from a collaboration role (Owner, Editor, Viewer, Contributor), which is a standing on a specific World or Entity. Superadmin is not an Instance Role.
+_Avoid_: Instance Admin (retired), Admin (ambiguous with Superadmin), capability, permission, flag
 
 **Superadmin**:
-The in-app embodiment of the operator: unrestricted access, sitting outside the collaboration model entirely. Exists for repair — orphaned data, accidental deletions — not for daily administration (that is the Instance Admin's job). At least one per Instance, seeded at setup.
+The in-app embodiment of the operator: unrestricted access, sitting outside the collaboration model entirely and superseding every Instance Role. Exists for repair — orphaned data, accidental deletions — not for day-to-day account management (that is the `manage-users` role's job). A separate account flag, not a member of the `roles` set; at least one per Instance, seeded at setup, and the last one is irremovable. The operator's repair tools are reachable only by a Superadmin today, though an Instance Role could be granted that access later.
 _Avoid_: Root, god mode, owner
 
 **Instance Configuration**:
@@ -267,5 +267,5 @@ Operator-facing settings for one Instance, stored beside the database. Distinct 
 _Avoid_: Config, settings, preferences, environment
 
 **Reindex**:
-A Superadmin repair action that recomputes every Entity's document-derived state — its searchable text, Link Descriptor vocabulary, and link edges — from the authoritative Content and map, across all Worlds. Idempotent and safe to run anytime: the Entity's document is the source of truth, and the derived tables are a cache it rebuilds. A repair tool, not part of daily administration — which is why it is Superadmin's, not the Instance Admin's (whose tier reaches no Entity).
+A Superadmin repair action that recomputes every Entity's document-derived state — its searchable text, Link Descriptor vocabulary, and link edges — from the authoritative Content and map, across all Worlds. Idempotent and safe to run anytime: the Entity's document is the source of truth, and the derived tables are a cache it rebuilds. A repair tool, not part of daily administration — which is why it is the Superadmin's, not the `manage-users` role's (which reaches no Entity). It runs as one instance-wide background job the operator polls, and a document this build cannot parse is skipped and reported rather than allowed to abort the walk.
 _Avoid_: Rebuild, refresh, recompute, sync

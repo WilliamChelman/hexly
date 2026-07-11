@@ -354,6 +354,7 @@
     "expand": "Expand navigation",
     "collapse": "Collapse navigation",
     "home": "Hexly home",
+    "users": "Users",
     "admin": "Admin",
     "worldSettings": "World Settings"
   },
@@ -366,6 +367,7 @@
     "commands": "Commands",
     "createNote": "Create Note",
     "createMap": "Create Map",
+    "goToUsers": "Go to Users",
     "goToAdmin": "Go to Admin",
     "goToStyleguide": "Go to Styleguide",
     "nameLabel": "Name",
@@ -434,12 +436,12 @@
     "emptyHint": "Create your first note or hex map to begin."
   },
   "worldGraph": {
-      "tabTitle": "Hexly — Graph",
-      "eyebrow": "World graph",
-      "counts": "{{nodes}} entities · {{edges}} links",
-      "emptyTitle": "Nothing to draw yet.",
-      "emptyHint": "Create a few entities and link them together to see the shape of your world.",
-      "loadError": "Couldn't load the graph. Try again."
+    "tabTitle": "Hexly — Graph",
+    "eyebrow": "World graph",
+    "counts": "{{nodes}} entities · {{edges}} links",
+    "emptyTitle": "Nothing to draw yet.",
+    "emptyHint": "Create a few entities and link them together to see the shape of your world.",
+    "loadError": "Couldn't load the graph. Try again."
   },
   "entitySearchPicker": {
     "searchPlaceholder": "Search entities…",
@@ -556,10 +558,10 @@
       "error": "Could not change the password."
     }
   },
-  "admin": {
-    "tabTitle": "Admin — Hexly",
-    "heading": "Instance Admin",
-    "subhead": "Manage accounts for this instance. Admin has no access to anyone's Worlds or Entities — content stays private within the collaboration model.",
+  "users": {
+    "tabTitle": "Users — Hexly",
+    "heading": "User management",
+    "subhead": "Manage accounts for this instance. Managing users grants no access to anyone's Worlds or Entities — content stays private within the collaboration model.",
     "create": {
       "heading": "Create a user",
       "displayName": "Display name",
@@ -574,8 +576,8 @@
     "filter": "Filter accounts",
     "col": {
       "account": "Account",
-      "admin": "Admin",
-      "worlds": "Worlds",
+      "manageUsers": "Users",
+      "createWorlds": "Worlds",
       "superadmin": "Super",
       "status": "Status",
       "actions": "Actions"
@@ -586,17 +588,17 @@
     },
     "badge": {
       "superadmin": "Superadmin",
-      "admin": "Admin",
-      "worldCreator": "World creator",
+      "manageUsers": "User manager",
+      "createWorlds": "World creator",
       "disabled": "Disabled"
     },
     "actions": {
       "disable": "Disable",
       "enable": "Enable",
-      "grantAdmin": "Make admin",
-      "revokeAdmin": "Revoke admin",
-      "grantWorldCreation": "Allow world creation",
-      "revokeWorldCreation": "Disallow world creation",
+      "grantManageUsers": "Grant user management",
+      "revokeManageUsers": "Revoke user management",
+      "grantCreateWorlds": "Allow world creation",
+      "revokeCreateWorlds": "Disallow world creation",
       "grantSuperadmin": "Make superadmin",
       "revokeSuperadmin": "Revoke superadmin",
       "reset": "Reset password",
@@ -617,9 +619,28 @@
       "last-superadmin": "This is the last Superadmin — it cannot be removed, demoted, or disabled.",
       "self-delete": "You cannot delete your own account.",
       "self-disable": "You cannot disable your own account.",
-      "self-admin-revoke": "You cannot remove your own Admin access.",
+      "self-manage-users-revoke": "You cannot remove your own user-management access.",
       "superadmin-managed-by-superadmin": "Only a Superadmin can manage a Superadmin account.",
       "user-not-found": "That account no longer exists."
+    }
+  },
+  "admin": {
+    "tabTitle": "Admin — Hexly",
+    "heading": "Instance repair",
+    "reindex": {
+      "heading": "Repair",
+      "description": "Recompute every Entity's search text, Link Descriptors, and links from its content. Safe to run at any time.",
+      "submit": "Reindex all Entities",
+      "progress": "Reindexing… {{walked}} / {{total}}"
+    },
+    "toast": {
+      "reindexed": "Reindexed {count, plural, one {# entity} other {# entities}}",
+      "reindexedWithFailures": "Reindexed {count, plural, one {# entity} other {# entities}}. {failed, plural, one {# entity} other {# entities}} could not be read and {failed, plural, one {was} other {were}} skipped.",
+      "reindexAborted": "The reindex stopped before it finished. Nothing was lost — press Reindex again to resume.",
+      "error": "Something went wrong."
+    },
+    "error": {
+      "reindex-running": "A reindex is already running on this instance."
     }
   }
 }

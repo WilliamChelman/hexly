@@ -29,7 +29,7 @@ describe('Worlds endpoints', () => {
 
     adaId = await app
       .get(AuthService)
-      .seedUser('ada@hexly.test', 'correct horse', 'Ada', { canCreateWorlds: true });
+      .seedUser('ada@hexly.test', 'correct horse', 'Ada', { roles: ['create-worlds'] });
   });
 
   afterEach(async () => {
@@ -70,7 +70,7 @@ describe('Worlds endpoints', () => {
     await app
       .get(AuthService)
       .seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob', {
-        canCreateWorlds: false,
+        roles: [],
       });
     const bob = await signIn('bob@hexly.test', 'hunter2 stationery');
 
@@ -82,7 +82,7 @@ describe('Worlds endpoints', () => {
       .get(AuthService)
       .seedUser('root@hexly.test', 'repair the realm', 'Root', {
         isSuperadmin: true,
-        canCreateWorlds: false,
+        roles: [],
       });
     const root = await signIn('root@hexly.test', 'repair the realm');
 
@@ -114,7 +114,7 @@ describe('Worlds endpoints', () => {
 
   it('includes worlds the caller is a member of, and excludes the rest', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
-    await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob', { canCreateWorlds: true });
+    await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob', { roles: ['create-worlds'] });
     const bob = await signIn('bob@hexly.test', 'battery staple');
 
     const shared = await bob.post('/worlds').send({ name: 'Shared' }).expect(201);

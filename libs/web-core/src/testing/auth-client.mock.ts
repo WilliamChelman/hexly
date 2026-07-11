@@ -1,19 +1,23 @@
 import { computed, signal } from '@angular/core';
 import { EMPTY, Observable, of } from 'rxjs';
-import { AuthUser } from '@hexly/domain';
+import {
+  AuthUser,
+  canManageUsers as canManageUsersRule,
+  canCreateWorlds as canCreateWorldsRule,
+} from '@hexly/domain';
 
 export class MockAuthClient {
   private readonly _user = signal<AuthUser | null>(null);
   readonly currentUser = this._user.asReadonly();
   readonly isAuthenticated = computed(() => this._user() !== null);
-  readonly canAdminister = computed(() => {
+  readonly canManageUsers = computed(() => {
     const u = this._user();
-    return !!u && (u.isAdmin || u.isSuperadmin);
+    return !!u && canManageUsersRule(u);
   });
   readonly isSuperadmin = computed(() => this._user()?.isSuperadmin ?? false);
   readonly canCreateWorlds = computed(() => {
     const u = this._user();
-    return !!u && (u.canCreateWorlds || u.isSuperadmin);
+    return !!u && canCreateWorldsRule(u);
   });
 
   private readonly _loading = signal(false);
