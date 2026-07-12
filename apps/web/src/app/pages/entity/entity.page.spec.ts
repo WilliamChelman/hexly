@@ -41,9 +41,7 @@ const hexmapWithContent = (text: string): EntityDetail => ({
         content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
       },
     },
-    hexes: {},
-    regions: [],
-    labels: [],
+    metadata: { grid: { hexes: {}, regions: [], labels: [] } },
   },
 });
 

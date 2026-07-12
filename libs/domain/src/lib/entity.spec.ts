@@ -1,18 +1,13 @@
 import { emptyHexMap } from './hex/hex-map';
 import {
   contentSchema,
-  CORE_HEXMAP,
-  CORE_NOTE,
   createEntityRequestSchema,
-  emptyEntityBody,
   entityBodySchema,
   entityListQuerySchema,
-  hasHexGrid,
   patchEntityRequestSchema,
   saveEntityRequestSchema,
   tiptapContent,
   visibilitySchema,
-  withPayloadsFor,
 } from './entity';
 
 const content = {
@@ -79,89 +74,40 @@ describe('contentSchema', () => {
 });
 
 describe('entityBodySchema', () => {
-  it('accepts a rich-content body — Content only, the base every Entity carries', () => {
-    const body = { content };
+  it('accepts the one body shape — Content and Metadata, for every Entity (ADR-0050)', () => {
+    const body = { content, metadata: { alignment: 'lawful-good' } };
 
     expect(entityBodySchema.parse(body)).toEqual(body);
   });
 
-  it('accepts a body carrying the hex-grid payload alongside its Content', () => {
-    const body = { content, ...emptyHexMap() };
-
-    const parsed = entityBodySchema.parse(body);
-
-    expect(hasHexGrid(parsed)).toBe(true);
-    expect(parsed).toMatchObject({ hexes: {}, regions: [], labels: [] });
+  it('accepts a body with no Metadata at all', () => {
+    expect(entityBodySchema.parse({ content })).toEqual({ content });
   });
 
-  it('reads a body with no grid fields as rich-content, not hex-grid', () => {
-    // Discrimination is by payload composition (ADR-0048): no grid → the base kind, not a hex map.
-    expect(hasHexGrid(entityBodySchema.parse({ content }))).toBe(false);
+  it("carries a Hex Map's grid as a Metadata value like any other Field's (ADR-0050)", () => {
+    // The collapse: nothing about the grid is special to the body schema — it is a value at a
+    // Metadata key, so the body needs no union and no registry to parse it.
+    const body = { content, metadata: { grid: emptyHexMap() } };
+
+    expect(entityBodySchema.parse(body)).toEqual(body);
   });
 
-  it('rejects a body missing its Content — every payload composes over the rich-content base', () => {
+  it('tolerates a malformed grid at rest — a Metadata value is never type-checked here', () => {
+    // Forward-only (CONTEXT.md → Field): garbage at `grid` parses, so a corrupt document opens
+    // (as an empty plane) rather than 500ing on read. The first edit overwrites it.
+    const body = { content, metadata: { grid: 'not-a-grid' } };
+
+    expect(entityBodySchema.parse(body)).toEqual(body);
+  });
+
+  it('rejects a body missing its Content', () => {
     expect(() => entityBodySchema.parse({ metadata: { note: 'orphan' } })).toThrow();
   });
 
-  it('rejects a body whose hex-grid payload is malformed rather than stripping it to rich-content', () => {
-    // A grid that fails the hex-grid shape must be a hard error, not a silent downgrade to a note:
-    // the base branch is strict, so the stray `hexes` key can't fall through and be dropped.
-    expect(() =>
-      entityBodySchema.parse({
-        content,
-        hexes: 'not-a-record',
-        regions: [],
-        labels: [],
-      }),
-    ).toThrow();
-  });
-});
-
-describe('emptyEntityBody', () => {
-  it('mints a rich-content body with an empty Content envelope and no payload', () => {
-    const body = emptyEntityBody([CORE_NOTE]);
-
-    expect(entityBodySchema.parse(body)).toEqual(body);
-    expect(body).toEqual({
-      content: { format: 'tiptap-v3', snapshot: { type: 'doc', content: [] } },
-    });
-  });
-
-  it('mints a hex-grid body when a type in the set adds the hex-grid payload', () => {
-    const body = emptyEntityBody([CORE_HEXMAP]);
-
-    expect(entityBodySchema.parse(body)).toEqual(body);
-    expect(hasHexGrid(body)).toBe(true);
-    expect(body).toMatchObject({ hexes: {}, regions: [], labels: [] });
-  });
-});
-
-describe('withPayloadsFor (#189)', () => {
-  const note = emptyEntityBody([CORE_NOTE]);
-
-  it('adds the hex-grid payload when core.hexmap is added to a payload-less body', () => {
-    const reconciled = withPayloadsFor(note, [CORE_NOTE, CORE_HEXMAP]);
-
-    expect(hasHexGrid(reconciled)).toBe(true);
-    expect(entityBodySchema.parse(reconciled)).toEqual(reconciled);
-    // The base Content is preserved; only the grid payload is layered on.
-    expect(reconciled.content).toBe(note.content);
-  });
-
-  it('returns the same body reference when the grid payload is already present', () => {
-    const map = emptyEntityBody([CORE_HEXMAP]);
-    expect(withPayloadsFor(map, [CORE_HEXMAP])).toBe(map);
-  });
-
-  it('leaves a body untouched when no type requires a payload', () => {
-    expect(withPayloadsFor(note, [CORE_NOTE])).toBe(note);
-  });
-
-  it('never strips the grid when core.hexmap is dropped — the data outlives the lens', () => {
-    const map = emptyEntityBody([CORE_HEXMAP]);
-    const kept = withPayloadsFor(map, [CORE_NOTE]);
-    expect(kept).toBe(map);
-    expect(hasHexGrid(kept)).toBe(true);
+  it('rejects a pre-collapse body carrying its grid at the root, rather than reading it as a note', () => {
+    // The body root is closed (`.strict()`): an unknown key there is a document this build cannot
+    // represent, and silently dropping it would read a Hex Map as a note that has lost its map.
+    expect(() => entityBodySchema.parse({ content, ...emptyHexMap() })).toThrow();
   });
 });
 
@@ -318,7 +264,7 @@ describe('patchEntityRequestSchema', () => {
 
 describe('saveEntityRequestSchema', () => {
   it('carries the whole body, the base version, and the tags the save replaces', () => {
-    const body = { content, ...emptyHexMap() };
+    const body = { content, metadata: { grid: emptyHexMap() } };
 
     expect(saveEntityRequestSchema.parse({ document: body, version: 3, tags: [] })).toEqual({
       document: body,

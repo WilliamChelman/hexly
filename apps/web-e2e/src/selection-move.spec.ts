@@ -1,4 +1,4 @@
-import { createEntity, enterLibrary, expect, flushSave, test } from './fixtures';
+import { createEntity, enterLibrary, expect, flushSave, savedGrid, test } from './fixtures';
 
 /**
  * Group moves for non-hex selections (issue #64 follow-up, ADR-0017). Two bugs the
@@ -11,16 +11,14 @@ import { createEntity, enterLibrary, expect, flushSave, test } from './fixtures'
  *    cells must translate its whole footprint.
  */
 
-/** Read the saved document for `mapId` after a committed PUT. */
-async function savedDocument(
+/** Flush the pending save, then read the grid `mapId` persisted. */
+async function flushAndReadGrid(
   page: import('@playwright/test').Page,
   request: import('@playwright/test').APIRequestContext,
   mapId: string,
 ) {
   await flushSave(page);
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  return (await res.json()).document;
+  return savedGrid(request, mapId);
 }
 
 test('drags one label of a multi-label selection and the whole group moves', async ({ page, request }) => {
@@ -48,7 +46,7 @@ test('drags one label of a multi-label selection and the whole group moves', asy
     modifiers: ['Shift'],
   });
 
-  const before = (await savedDocument(page, request, mapId)).labels as {
+  const before = (await flushAndReadGrid(page, request, mapId)).labels as {
     id: string;
     position: { x: number; y: number };
   }[];
@@ -62,7 +60,7 @@ test('drags one label of a multi-label selection and the whole group moves', asy
   await page.mouse.move(cx + dx, cy);
   await page.mouse.up();
 
-  const after = (await savedDocument(page, request, mapId)).labels as {
+  const after = (await flushAndReadGrid(page, request, mapId)).labels as {
     id: string;
     position: { x: number; y: number };
   }[];
@@ -105,7 +103,7 @@ test('drags a region on its own and its whole footprint moves', async ({ page, r
   await page.mouse.up();
 
   // The footprint translated by the offset.
-  const doc = await savedDocument(page, request, mapId);
+  const doc = await flushAndReadGrid(page, request, mapId);
   expect(doc.regions).toHaveLength(1);
   expect(doc.regions[0].hexes).toEqual({ '1,0': true });
 });

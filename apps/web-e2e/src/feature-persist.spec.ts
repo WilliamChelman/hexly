@@ -1,4 +1,4 @@
-import { createEntity, enterLibrary, expect, flushSave, test } from './fixtures';
+import { createEntity, enterLibrary, expect, flushSave, test, savedGrid } from './fixtures';
 
 /**
  * The Feature journey (issue #7): a feature placed on a hex survives a save and
@@ -27,10 +27,8 @@ test('places a feature on a hex, saves, and the feature survives a reload', asyn
   await page.reload();
   await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
 
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  const hexes = Object.values(detail.document.hexes) as Array<{
+  const grid = await savedGrid(request, mapId);
+  const hexes = Object.values(grid.hexes) as Array<{
     terrain: string;
     feature?: { ref: string };
   }>;

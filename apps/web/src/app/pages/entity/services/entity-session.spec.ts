@@ -8,6 +8,7 @@ import {
   CORE_HEXMAP,
   CORE_NOTE,
   emptyContent,
+  emptyHexMap,
   EntityDetail,
   EntitySaveOutcome,
   HexMap,
@@ -25,8 +26,8 @@ describe('EntitySession', () => {
   let bus: MockNudgeBusClient;
 
   const content = emptyContent();
-  /** Wrap a hex grid into the hexmap body the store carries end to end. */
-  const bodyOf = (grid: HexMap) => ({ content, ...grid });
+  /** Wrap a hex grid into the hexmap body the store carries end to end: its `grid` Field value. */
+  const bodyOf = (grid: HexMap) => ({ content, metadata: { grid } });
 
   const forestAt00: HexMap = {
     hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' } },
@@ -154,7 +155,7 @@ describe('EntitySession', () => {
     expect(session.dirty()).toBe(false);
   });
 
-  it('mints the hex-grid payload when core.hexmap is added to a note (#189)', () => {
+  it('mints the grid Field’s empty plane when core.hexmap is added to a note (#189)', () => {
     const noteBody = { content };
     const note: EntityDetail = { ...aldermoor, id: 'n1', types: [CORE_NOTE], document: noteBody };
     entities.load.mockReturnValue(of(note));
@@ -164,7 +165,7 @@ describe('EntitySession', () => {
     session.setTypes([CORE_NOTE, CORE_HEXMAP]);
 
     // The body gained an empty grid so the map View has a plane to render; Content is preserved.
-    expect(session.body()).toEqual({ ...noteBody, hexes: {}, regions: [], labels: [] });
+    expect(session.body()).toEqual({ ...noteBody, metadata: { grid: emptyHexMap() } });
     expect(session.dirty()).toBe(true);
   });
 
@@ -749,12 +750,13 @@ describe('EntitySession', () => {
     entities.save.mockReturnValue(of({ status: 'saved', entity: { ...aldermoor, version: 4 } }));
     session.save().subscribe();
 
-    // Body carries both edits; neither surface drops the other's (ADR-0019).
+    // Body carries both edits; neither surface drops the other's (ADR-0019). The grid rides the
+    // Metadata map as the `grid` Field's value, beside whatever other Fields the Entity carries.
     expect(entities.save).toHaveBeenCalledWith(
       'm1',
       {
         content: { format: CONTENT_FORMAT, snapshot },
-        ...editor.document(),
+        metadata: { grid: editor.document() },
       },
       3,
       [],

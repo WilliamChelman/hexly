@@ -160,6 +160,30 @@ describe('GenericFieldView', () => {
     expect(el.querySelector('[data-testid=field-lore]')).toBeNull();
     expect(el.querySelector('input')).toBeNull();
   });
+
+  it('shows a Structured Field neither as a control nor as plain Metadata (ADR-0050)', () => {
+    // A Structured Field's value is a document with its own View — an Entity that is both a
+    // user-defined type and a Hex Map edits its grid on the map, never as a row here. And being
+    // *declared*, it does not fall through to the plain-Metadata display either: it would dump a
+    // wall of JSON on the reader.
+    const grid: FieldSchema = {
+      key: 'grid',
+      label: 'Grid',
+      dataType: { kind: 'core.hex-grid' },
+      required: false,
+      facetable: false,
+    };
+    registry.register(definitionWithFields('world.realm', [...beastFields, grid]));
+
+    const { el } = render(
+      detail(['world.realm'], { name: 'Aldermoor', grid: { hexes: {}, regions: [], labels: [] } }, ['edit']),
+    );
+
+    // The type's ordinary Fields still render.
+    expect((el.querySelector('[data-testid=field-name] input') as HTMLInputElement).value).toBe('Aldermoor');
+    expect(el.querySelector('[data-testid=field-grid]')).toBeNull();
+    expect(el.querySelector('[data-testid=field-plain-metadata]')).toBeNull();
+  });
 });
 
 /** A TypeDefinition carrying a Field schema — the rest of the shape is irrelevant to this view. */

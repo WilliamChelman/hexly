@@ -6,9 +6,9 @@ import { CORE_VIEW_CONTENT, CORE_VIEW_MAP, TypeDefinition } from '@hexly/web-ent
  * constructor a bundled plugin's declaration also goes through — plus the chrome only the web has.
  * They enter the {@link TypeRegistry} through the same `register()` a plugin's do (ADR-0048).
  *
- * `core.note` adds no payload beyond the `rich-content` base and so contributes only the
- * `core.view.content` View; `core.hexmap` adds the `hex-grid` payload and so also contributes
- * `core.view.map`.
+ * `core.note` declares no Fields and so contributes only the `core.view.content` View; `core.hexmap`
+ * declares the grid as a **Structured Field** and so also contributes `core.view.map`, the View that
+ * edits it (ADR-0050).
  *
  * The label values are transloco keys (see `libs/web-core/src/i18n/catalogs`).
  */

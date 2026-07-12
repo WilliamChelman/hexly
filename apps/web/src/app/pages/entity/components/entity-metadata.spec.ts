@@ -2,7 +2,7 @@ import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { CORE_NOTE, EntityDetail } from '@hexly/domain';
+import { CORE_HEXMAP, CORE_NOTE, emptyHexMap, EntityDetail } from '@hexly/domain';
 import { EntitySession } from '../services/entity-session';
 import { ENTITY_SESSION } from '@hexly/web-entity';
 import { EntityMetadata } from './entity-metadata';
@@ -73,5 +73,16 @@ describe('EntityMetadata', () => {
   it('renders nothing when the entity has no Metadata', () => {
     expect(render(undefined).querySelector('[data-testid=entity-metadata]')).toBeNull();
     expect(render({}).querySelector('[data-testid=entity-metadata]')).toBeNull();
+  });
+
+  it('skips a Structured Field’s value — a Hex Map’s grid is not a Metadata row (ADR-0050)', () => {
+    // The grid lives at a Metadata key like every other Field value, but it is a document with its
+    // own View: dumping it here as a line of JSON would tell the reader nothing. A Hex Map carrying
+    // nothing else therefore shows no disclosure at all, exactly as before the grid moved.
+    session.adopt({ ...noteWith({ grid: emptyHexMap() }), types: [CORE_HEXMAP] });
+    const fixture = TestBed.createComponent(EntityMetadata);
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid=entity-metadata]')).toBeNull();
   });
 });

@@ -445,13 +445,20 @@ export class EntitiesService {
   }
 
   create(ownerId: string, req: CreateEntityRequest): EntityDetail {
-    // Seed the minted body with the create dialog's initial Metadata (a picked type's required Field
-    // values). Not gated: like import, a create establishes at-rest data — the gate is save-only
-    // (#187), and the create dialog runs the forward-only check client-side before it sends.
-    const body = req.metadata ? { ...emptyEntityBody(req.types), metadata: req.metadata } : emptyEntityBody(req.types);
+    // The World comes first: a user-defined type's Fields resolve only within their World (#191),
+    // and the minted body is exactly the defaults those Fields declare — a fresh Hex Map's blank
+    // plane among them (ADR-0050).
+    const worldId = this.resolveWorldId(ownerId, req.worldId);
+    const fields = resolveFields(this.typeResolver(worldId), req.types);
+    const minted = emptyEntityBody(fields, this.typeFields.structuredDataTypes);
+    // Seed it with the create dialog's initial Metadata (a picked type's required Field values),
+    // over the minted defaults rather than in place of them. Not gated: like import, a create
+    // establishes at-rest data — the gate is save-only (#187), and the create dialog runs the
+    // forward-only check client-side before it sends.
+    const body: EntityBody = req.metadata ? { ...minted, metadata: { ...minted.metadata, ...req.metadata } } : minted;
     const row = this.writes.insert({
       ownerId,
-      worldId: this.resolveWorldId(ownerId, req.worldId),
+      worldId,
       name: req.name,
       types: req.types,
       tags: req.tags,

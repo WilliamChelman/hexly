@@ -649,9 +649,7 @@ describe('EntityBrowser', () => {
         seq: 5,
         document: {
           content: { format: 'tiptap-v1', snapshot: {} },
-          hexes: {},
-          regions: [],
-          labels: [],
+          metadata: { grid: { hexes: {}, regions: [], labels: [] } },
         },
       }),
     );

@@ -1,4 +1,4 @@
-import { createEntity, enterLibrary, expect, flushSave, test } from './fixtures';
+import { createEntity, enterLibrary, expect, flushSave, test, savedGrid } from './fixtures';
 
 /**
  * The Label journey (issue #10): a free-positioned label placed on the map, its
@@ -25,12 +25,10 @@ test('places a label, edits its text, saves, and it survives a reload', async ({
 
   await flushSave(page);
 
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  expect(detail.document.labels).toHaveLength(1);
-  expect(detail.document.labels[0].text).toBe('The Whisperwood');
-  expect(detail.document.labels[0].position).toMatchObject({
+  const grid = await savedGrid(request, mapId);
+  expect(grid.labels).toHaveLength(1);
+  expect(grid.labels[0].text).toBe('The Whisperwood');
+  expect(grid.labels[0].position).toMatchObject({
     x: expect.any(Number),
     y: expect.any(Number),
   });

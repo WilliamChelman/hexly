@@ -1,6 +1,14 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { FieldSchema, Metadata, NO_STRUCTURED_DATA_TYPES, readField, validateFields, writeField } from '@hexly/domain';
+import {
+  FieldSchema,
+  isStructuredDataType,
+  Metadata,
+  NO_STRUCTURED_DATA_TYPES,
+  readField,
+  validateFields,
+  writeField,
+} from '@hexly/domain';
 import { EntitySession } from '../services/entity-session';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 import { FieldControl } from '@hexly/web-entity';
@@ -101,7 +109,14 @@ export class GenericFieldView {
   protected readonly worldId = computed(() => this.session.current()?.worldId);
 
   /** The union of Field schemas the open Entity's live types declare (primary first, deduped by key). */
-  protected readonly fields = computed(() => this.types.resolveFields(this.session.types()));
+  private readonly declared = computed(() => this.types.resolveFields(this.session.types()));
+
+  /**
+   * The Fields this view renders a control for: every declared Field except a **Structured** one
+   * (ADR-0050), which is edited on its own View, not typed into a form row. Being declared, it is
+   * kept out of the plain-Metadata rows below too.
+   */
+  protected readonly fields = computed(() => this.declared().filter((f) => !isStructuredDataType(f.dataType)));
 
   /** The live working Metadata — read off the central store's body, written back through mutate. */
   private readonly metadata = computed<Metadata>(() => this.session.body().metadata ?? {});
@@ -109,9 +124,9 @@ export class GenericFieldView {
   /** Types with no registered definition: the missing-plugin fallback, shown as inert chips. */
   protected readonly unknownTypes = computed(() => this.session.types().filter((type) => !this.types.get(type)));
 
-  /** Metadata keys the declared Fields don't type — shown read-only as plain Metadata. */
+  /** Metadata keys no declared Field types — shown read-only as plain Metadata. */
   protected readonly plainEntries = computed(() => {
-    const declared = new Set(this.fields().map((field) => field.key));
+    const declared = new Set(this.declared().map((field) => field.key));
     return Object.entries(this.metadata())
       .filter(([key]) => !declared.has(key))
       .map(([key, value]) => ({ key, value: displayPlain(value) }));

@@ -1,4 +1,4 @@
-import { createEntity, enterLibrary, expect, flushSave, test } from './fixtures';
+import { createEntity, enterLibrary, expect, flushSave, savedGrid, test } from './fixtures';
 
 /**
  * The keystone journey: it crosses every seam — the session cookie on API calls,
@@ -29,10 +29,8 @@ test('paints a hex, saves, and the hex survives a reload', async ({ page, reques
   await page.reload();
   await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
 
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  const hexes = Object.values(detail.document.hexes) as Array<{
+  const grid = await savedGrid(request, mapId);
+  const hexes = Object.values(grid.hexes) as Array<{
     terrain: string;
   }>;
   expect(hexes).toHaveLength(1);

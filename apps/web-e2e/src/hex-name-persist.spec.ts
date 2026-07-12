@@ -1,4 +1,4 @@
-import { createEntity, enterLibrary, expect, flushSave, test } from './fixtures';
+import { createEntity, enterLibrary, expect, flushSave, test, savedGrid } from './fixtures';
 
 /**
  * The hex-name journey (issue #60, ADR-0016): a painted Hex is named in the
@@ -35,10 +35,8 @@ test('names a painted hex in the Inspector, and the name survives a reload', asy
 
   await page.reload();
 
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  expect(detail.document.hexes['0,0']).toEqual({
+  const grid = await savedGrid(request, mapId);
+  expect(grid.hexes['0,0']).toEqual({
     terrain: 'ocean',
     name: 'Riverbend',
   });

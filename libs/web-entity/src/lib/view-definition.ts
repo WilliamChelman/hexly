@@ -4,11 +4,10 @@ import { Type } from '@angular/core';
  * A **View** id — an open, `core.view.*`-style namespaced key identifying a
  * togglable renderer+editor an Entity affords (ADR-0048, *Views* amendment).
  *
- * Views are a *third keyspace*, distinct from Entity Type ids (`core.note`,
- * `dnd.monster`) and the closed Payload Kind names (`rich-content`, `hex-grid`):
- * the `core.view.*` sub-namespace keeps a View id from ever being mistaken for
- * either. Supersedes web-map's old two-member `EntityView` union, which was an
- * app-shell concern squatting in the map lib.
+ * Views are their own keyspace, distinct from Entity Type ids (`core.note`, `dnd.monster`) and from
+ * the Field data-type ids a **Structured Field** names (`core.hex-grid`): the `core.view.*`
+ * sub-namespace keeps a View id from ever being mistaken for either (ADR-0050). Supersedes web-map's
+ * old two-member `EntityView` union, which was an app-shell concern squatting in the map lib.
  */
 export type ViewId = string;
 
@@ -28,8 +27,9 @@ export const CORE_VIEW_FIELDS = 'core.view.fields';
 /**
  * One View's registration in the {@link ViewRegistry}: the id, the transloco key
  * for its header-toggle button, and the component the entity page outlets when this
- * View is active. A View is contributed either by a Payload Kind (the two core views)
- * or by a Type (a plugin's bespoke view, the generic Field view).
+ * View is active. A View is contributed either by a Type (a plugin's bespoke view, the generic Field
+ * view, the Content view every Entity affords) or by a **Structured Field**'s data-type (the map
+ * view, which edits the grid — CONTEXT.md → View).
  *
  * The component is declared either eagerly (`component`) or deferred (`loadComponent`),
  * the same pair as an Angular `Route`. Which one to use follows from *where the

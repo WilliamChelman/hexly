@@ -1,4 +1,4 @@
-import { test as base, expect, type Page, type Response } from '@playwright/test';
+import { test as base, expect, type APIRequestContext, type Page, type Response } from '@playwright/test';
 // Reuse the app's own pretty-URL codec (ADR-0042): URL segments are `slug-base62(id)`,
 // so specs decode a segment back to the canonical id and build loose matchers from it.
 // A direct file import (not the @hexly/web-core barrel) keeps the Playwright process off the
@@ -48,6 +48,27 @@ export function entityIdFromUrl(page: Page): string {
  */
 export function segRe(id: string): string {
   return `[^/]*${segment(id)}`;
+}
+
+/** A Hex Map's grid, as the map specs read it back off the server. */
+interface SavedGrid {
+  hexes: Record<string, { terrain: string; name?: string; entityId?: string; feature?: { ref: string } }>;
+  regions: Array<{ id: string; name: string; color: string; hexes: Record<string, true>; entityId?: string }>;
+  labels: Array<{ id: string; text: string; position: { x: number; y: number }; size: number; rotation?: number }>;
+}
+
+/**
+ * The grid a Hex Map has actually persisted, fetched from the API — what a map spec checks after a
+ * save, beyond what the reloaded canvas already shows.
+ *
+ * The one place a test knows *where* the grid is stored (the `grid` Field's value in the Entity's
+ * Metadata, ADR-0050), so moving it again is a one-line change rather than a sweep.
+ */
+export async function savedGrid(request: APIRequestContext, entityId: string): Promise<SavedGrid> {
+  const res = await request.get(`/api/entities/${entityId}`);
+  expect(res.ok()).toBeTruthy();
+  const detail = await res.json();
+  return detail.document.metadata.grid as SavedGrid;
 }
 
 /**

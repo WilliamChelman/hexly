@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import { emptyContent, EntityBody, tiptapContent } from './entity';
 import { fieldSchemaSchema, FieldSchema } from './field';
-import { emptyHexMap } from './hex/hex-map';
+import { emptyHexMap, HexMap } from './hex/hex-map';
+import { HEX_GRID_FIELD } from './hex/hex-grid';
+import { CORE_STRUCTURED_DATA_TYPES } from './plugin-type';
 import { harvestEdges } from './entity-edges';
 import { defineStructuredDataType, NO_STRUCTURED_DATA_TYPES, structuredDataTypeSet } from './structured-data-type';
 
@@ -12,6 +14,18 @@ function harvest(
   dataTypes = NO_STRUCTURED_DATA_TYPES,
 ): ReturnType<typeof harvestEdges> {
   return harvestEdges(body, fields, dataTypes);
+}
+
+/** The core's own set — what the API composes and threads in, so a Hex Map's grid resolves. */
+const CORE_DATA_TYPES = structuredDataTypeSet([...CORE_STRUCTURED_DATA_TYPES]);
+
+/**
+ * Harvest a Hex Map exactly as the write path does: its grid is the `core.hex-grid` **Structured
+ * Field** `core.hexmap` declares, so its placements come back through the generic Field path — the
+ * harvester itself carries no hex-shaped branch (ADR-0050).
+ */
+function harvestMap(body: EntityBody) {
+  return harvest(body, [HEX_GRID_FIELD], CORE_DATA_TYPES);
 }
 
 /** Content holding the given `entityLink` attrs, wrapped in a paragraph. */
@@ -27,14 +41,14 @@ function prose(...links: Record<string, unknown>[]) {
   });
 }
 
-/** A rich-content body whose Content holds the given `entityLink` attrs. */
+/** A body whose Content holds the given `entityLink` attrs. */
 function note(...links: Record<string, unknown>[]): EntityBody {
   return { content: prose(...links) };
 }
 
-/** A hex-grid body: an empty plane plus whatever map payload the test overrides. */
-function hexmap(map: Partial<ReturnType<typeof emptyHexMap>> = {}): EntityBody {
-  return { content: emptyContent(), ...emptyHexMap(), ...map };
+/** A Hex Map body: its grid at the `grid` Metadata key, an empty plane plus the test's overrides. */
+function hexmap(map: Partial<HexMap> = {}, content = emptyContent()): EntityBody {
+  return { content, metadata: { grid: { ...emptyHexMap(), ...map } } };
 }
 
 describe('harvestEdges (#179, ADR-0046)', () => {
@@ -72,7 +86,7 @@ describe('harvestEdges (#179, ADR-0046)', () => {
       ],
     });
 
-    expect(harvest(body)).toEqual(
+    expect(harvestMap(body)).toEqual(
       expect.arrayContaining([
         { targetKind: 'entity', targetId: 'harbour', descriptor: null },
         { targetKind: 'entity', targetId: 'riverbend', descriptor: null },
@@ -83,7 +97,13 @@ describe('harvestEdges (#179, ADR-0046)', () => {
         },
       ]),
     );
-    expect(harvest(body)).toHaveLength(3);
+    expect(harvestMap(body)).toHaveLength(3);
+  });
+
+  it('reads no map edge without the grid Field resolved — a Hex Map is its Fields, like any Entity', () => {
+    // The counterpart of the Entity-Link Field case below: with no type context there is no `grid`
+    // Field, so there is nothing to harvest. The write path always resolves the Entity's types.
+    expect(harvest(hexmap({ hexes: { '0,0': { terrain: 'grass', entityId: 'harbour' } } }))).toEqual([]);
   });
 
   /**
@@ -151,7 +171,7 @@ describe('harvestEdges (#179, ADR-0046)', () => {
 
   /**
    * A Content snapshot is only walkable under a format this build knows — the same guard
-   * `extractText` applies. The map payload is format-independent, so a Hex Map's placements
+   * `extractText` applies. A Field value is format-independent, so a Hex Map's placements
    * survive a Content format this build cannot read.
    */
   it('reads no Content edges under an unknown format tag, but still reads the map', () => {
@@ -159,13 +179,12 @@ describe('harvestEdges (#179, ADR-0046)', () => {
       format: 'prosemirror-v9',
       snapshot: { type: 'entityLink', attrs: { entityId: 'e1' } },
     };
-    const body = {
-      content: alien,
-      ...emptyHexMap(),
-      hexes: { '0,0': { terrain: 'grass', entityId: 'harbour' } },
-    } as unknown as EntityBody;
+    const body = hexmap(
+      { hexes: { '0,0': { terrain: 'grass', entityId: 'harbour' } } },
+      alien as unknown as EntityBody['content'],
+    );
 
-    expect(harvest(body)).toEqual([{ targetKind: 'entity', targetId: 'harbour', descriptor: null }]);
+    expect(harvestMap(body)).toEqual([{ targetKind: 'entity', targetId: 'harbour', descriptor: null }]);
   });
 
   /**
@@ -176,13 +195,12 @@ describe('harvestEdges (#179, ADR-0046)', () => {
    */
   describe('the grain is (target, descriptor)', () => {
     it('collapses a descriptor-less content link and a map placement of the same target', () => {
-      const body: EntityBody = {
-        content: prose({ entityId: 'riverbend', label: 'Riverbend' }),
-        ...emptyHexMap(),
-        hexes: { '0,0': { terrain: 'grass', entityId: 'riverbend' } },
-      };
+      const body = hexmap(
+        { hexes: { '0,0': { terrain: 'grass', entityId: 'riverbend' } } },
+        prose({ entityId: 'riverbend', label: 'Riverbend' }),
+      );
 
-      expect(harvest(body)).toEqual([{ targetKind: 'entity', targetId: 'riverbend', descriptor: null }]);
+      expect(harvestMap(body)).toEqual([{ targetKind: 'entity', targetId: 'riverbend', descriptor: null }]);
     });
 
     it('keeps two descriptors to the same target as two edges', () => {

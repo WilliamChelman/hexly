@@ -1,4 +1,4 @@
-import { createEntity, enterLibrary, expect, flushSave, test } from './fixtures';
+import { createEntity, enterLibrary, expect, flushSave, test, savedGrid } from './fixtures';
 
 /**
  * The whole-Hex move journey (issue #30, ADR-0010). It crosses the one seam the
@@ -49,10 +49,8 @@ test('drags a hex under Select to a new coordinate, and the move survives a relo
 
   await flushSave(page);
 
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  const hexes = detail.document.hexes as Record<string, { terrain: string }>;
+  const grid = await savedGrid(request, mapId);
+  const hexes = grid.hexes as Record<string, { terrain: string }>;
   expect(Object.keys(hexes)).toHaveLength(1);
   expect(hexes['0,0']).toBeUndefined();
   expect(hexes['1,0']).toEqual({ terrain: 'forest' });
@@ -121,10 +119,8 @@ test('drags a hex onto an occupied hex and swaps the two, surviving a reload', a
 
   await flushSave(page);
 
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  const hexes = detail.document.hexes as Record<string, { terrain: string }>;
+  const grid = await savedGrid(request, mapId);
+  const hexes = grid.hexes as Record<string, { terrain: string }>;
   expect(hexes['0,0']).toEqual({ terrain: 'ocean' });
   expect(hexes['1,0']).toEqual({ terrain: 'forest' });
 
@@ -231,10 +227,8 @@ test('drags a multi-hex selection so the whole group moves by one offset', async
   // Each member rode by the same offset, so the cluster kept its shape.
   await flushSave(page);
 
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  const hexes = detail.document.hexes as Record<string, { terrain: string }>;
+  const grid = await savedGrid(request, mapId);
+  const hexes = grid.hexes as Record<string, { terrain: string }>;
   expect(hexes['0,0']).toBeUndefined();
   expect(hexes['1,0']).toEqual({ terrain: 'forest' });
   expect(hexes['2,0']).toEqual({ terrain: 'ocean' });
@@ -296,10 +290,8 @@ test('refuses a blocked group move, leaving every hex where it was', async ({ pa
 
   await flushSave(page);
 
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  const hexes = detail.document.hexes as Record<string, { terrain: string }>;
+  const grid = await savedGrid(request, mapId);
+  const hexes = grid.hexes as Record<string, { terrain: string }>;
   // Every hex is exactly where it was painted.
   expect(hexes['0,0']).toEqual({ terrain: 'forest' });
   expect(hexes['1,0']).toEqual({ terrain: 'ocean' });

@@ -19,7 +19,7 @@ describe('SaveStatus', () => {
   let fixture: ComponentFixture<SaveStatus>;
 
   const content = emptyContent();
-  const bodyOf = (grid: HexMap) => ({ content, ...grid });
+  const bodyOf = (grid: HexMap) => ({ content, metadata: { grid } });
   const forestAt00: HexMap = {
     hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' } },
     regions: [],

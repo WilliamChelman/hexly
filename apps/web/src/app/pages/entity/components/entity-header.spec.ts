@@ -51,7 +51,7 @@ describe('EntityHeader', () => {
     updatedAt: 1,
     // The default opener is an Owner — full Rights (ADR-0039): writable and can manage sharing.
     rights: ['read', 'edit', 'delete', 'set-visibility', 'manage'],
-    document: { content: emptyContent(), hexes: {}, regions: [], labels: [] },
+    document: { content: emptyContent(), metadata: { grid: { hexes: {}, regions: [], labels: [] } } },
   };
 
   /** Open an entity through the real session so the header has one to show/save. */

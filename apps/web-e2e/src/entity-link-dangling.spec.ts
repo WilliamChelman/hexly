@@ -1,4 +1,4 @@
-import { createEntity, enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtures';
+import { createEntity, enterLibrary, entityIdFromUrl, expect, flushSave, test, savedGrid } from './fixtures';
 
 /**
  * Dangling Entity Link journey (issue #78, CONTEXT.md → Entity Link, ADR-0018): a
@@ -48,10 +48,8 @@ test('a link whose target is deleted renders non-navigable, and the map opens wi
   await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
 
   // No cascade, no corruption: the document still carries the link id (AC3).
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  expect(detail.document.hexes['0,0']?.entityId).toBe(noteId);
+  const grid = await savedGrid(request, mapId);
+  expect(grid.hexes['0,0']?.entityId).toBe(noteId);
 
   // Re-select the hex: the Inspector shows the link as non-navigable.
   await canvas.click();

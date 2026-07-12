@@ -59,8 +59,8 @@ export const INITIAL_SEQ = 1;
 
 /**
  * An Entity stored as a single JSON document. The columns are the metadata the
- * list view and access checks need; `document` holds the whole body, discriminated
- * by Payload Kind composition (ADR-0048). `types`/`tags` are denormalized out — each
+ * list view and access checks need; `document` holds the whole body — `{ content, metadata }`, one
+ * shape for every Entity (ADR-0050). `types`/`tags` are denormalized out — each
  * a multi-valued JSON array — so a list can group/filter without loading each body.
  * `version` is the optimistic-concurrency counter (a stale save is a 409). Ownership
  * is not a column — it is an `owner`-role row in `entityGrants`.

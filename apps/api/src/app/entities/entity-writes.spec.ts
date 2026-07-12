@@ -664,7 +664,7 @@ describe('EntityWrites', () => {
         name: 'The Reach',
         types: ['core.hexmap'],
         tags: [],
-        body: { content: emptyContent(), hexes, regions: [], labels: [] },
+        body: { content: emptyContent(), metadata: { grid: { hexes, regions: [], labels: [] } } },
       });
 
       expect(edgesFrom(row.id)).toHaveLength(7000);
@@ -971,7 +971,7 @@ describe('EntityWrites', () => {
         visibility,
         version: 1,
         seq: 1,
-        document: JSON.stringify(emptyEntityBody(['core.note'])),
+        document: JSON.stringify(emptyEntityBody()),
         contentText: '',
         createdAt: now,
         updatedAt: now,

@@ -1,5 +1,7 @@
 # Entity types are an open, plugin- and world-extensible set over a closed set of payload kinds
 
+> **Superseded in part by [ADR-0050](./0050-payload-kinds-collapse-into-structured-fields.md):** the **Payload Kind** layer below is deleted. A body shape is not something a type adds — a **Structured Field** is — so the Entity body collapses to `{ content, metadata }` for every Entity and a Hex Map's grid becomes the `core.hex-grid` Field `core.hexmap` declares at its `grid` key. The three-keyspace table loses its Payload Kind row, leaving Entity Type and View (plus the Field data-type set); `PAYLOAD_KINDS`, `PayloadKind`, `hasHexGrid`, `gridOf`, and `withPayloadsFor` are gone, and a View is contributed by a Type or by a Structured Field's data-type, never by a payload. Everything else here still stands: the open `namespace.id` type set, the ordered `types[]` with a primary, Fields as a lens over Metadata, the View registry and outlet, and the central-store amendment below.
+
 ADR-0018 made **Entity Type** a _closed, code-known enum_ (`note | hexmap`) and explicitly deferred "user- and plugin-defined types" as a long-term goal. This ADR **reverses that deferral**: worldbuilding wants first-class _kinds_ of thing — monsters, spells, deities, factions — each with their own fields, views, and filters, mostly delivered by bundled plugins. So the single `type` concept splits into two layers, and the user-facing layer opens up.
 
 ## Decision

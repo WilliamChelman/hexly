@@ -102,7 +102,8 @@ export class VaultImportService {
         );
         const content = tiptapContent(note.doc);
         // Folder path recorded under the reserved namespace so export can rebuild the tree.
-        // A `rich-content` body (no payload addon): an imported note is a `core.note` (ADR-0048).
+        // The one body shape every Entity has; an imported note is a `core.note`, which declares no
+        // Fields at all, so its frontmatter lands as plain Metadata (ADR-0050).
         const body: EntityBody = {
           content,
           metadata: { ...passThrough, 'hexly.sourcePath': note.path },

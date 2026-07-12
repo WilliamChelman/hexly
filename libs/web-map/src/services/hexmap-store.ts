@@ -3,16 +3,18 @@ import {
   addPoint,
   Axial,
   coordKey,
-  EntityBody,
+  emptyHexMap,
   FeatureId,
   featureLibrary,
-  gridOf,
-  hasHexGrid,
+  HEX_GRID_FIELD,
   HexMap,
+  hexMapSchema,
   Label,
+  Metadata,
   MovePlan,
   planMove,
   Point,
+  readField,
   Region,
   regionById,
   TerrainId,
@@ -119,11 +121,11 @@ export type MoveOutcome = 'moved' | 'blocked' | 'noop';
 
 /**
  * The Hex Map editor: tools, selection, and undo/redo over the grid — but no longer the
- * owner of the grid. The document is the hex-grid slice of the central
- * {@link EntitySession}'s body (ADR-0048, *Central store* amendment): reads project off
- * `session.body`, edits go through `session.mutate` (Immer, patches captured), and undo
- * pushes those inverse patches back through `session.applyPatches`. Nothing mutates the
- * document directly — that discipline is what keeps undo correct.
+ * owner of the grid. The document is the value of the `core.hex-grid` **Structured Field**
+ * `core.hexmap` declares (ADR-0050), at the `grid` key of the central {@link EntitySession}'s
+ * Metadata map: reads project off `session.body`, edits go through `session.mutate` (Immer,
+ * patches captured), and undo pushes those inverse patches back through `session.applyPatches`.
+ * Nothing mutates the document directly, or undo breaks.
  *
  * Route-scoped, bound beside the session it drives (not `providedIn: 'root'`): it injects
  * the route-scoped {@link ENTITY_SESSION}, so it lives and dies with the open Entity.
@@ -133,10 +135,36 @@ export class HexMapStore {
   private readonly session = inject(ENTITY_SESSION);
 
   /**
-   * The live document — the hex-grid slice of the session's body, recomputed once per
-   * grid edit. Read-only to everyone (the store writes through {@link commit}, never here).
+   * Grids this store produced, by reference — well-formed by construction, so {@link grid} takes
+   * them as-is. Without this, every paint stroke would re-parse the whole map. Immer mints a new
+   * object per edit, so a grid written by anything else (a load, a live-follow adopt, a peer View)
+   * is simply absent from the set and gets parsed.
    */
-  readonly document = computed<HexMap>(() => gridOf(this.session.body()));
+  private readonly minted = new WeakSet<object>();
+
+  /**
+   * The plane to render, and whether the stored value already *is* that plane.
+   *
+   * A Field's value is validated forward-only (CONTEXT.md → Field), so `grid` holds whatever was
+   * last written there and this is the one place that checks it. A value that does not parse opens
+   * as an empty plane rather than erroring, and the first {@link commit} replaces it. So does one
+   * whose parse only succeeded by *filling* `regions`/`labels`: a recipe cannot push onto an array
+   * the document does not carry.
+   */
+  private readonly grid = computed<{ map: HexMap; stored: boolean }>(() => {
+    const raw = readField(this.session.body().metadata, HEX_GRID_FIELD);
+    if (isObject(raw) && this.minted.has(raw)) return { map: raw as HexMap, stored: true };
+    const parsed = hexMapSchema.safeParse(raw);
+    if (!parsed.success) return { map: emptyHexMap(), stored: false };
+    const complete = Array.isArray((raw as HexMap).regions) && Array.isArray((raw as HexMap).labels);
+    return { map: parsed.data, stored: complete };
+  });
+
+  /**
+   * The live document — the Entity's grid, recomputed once per grid edit. Read-only to everyone
+   * (the store writes through {@link commit}, never here).
+   */
+  readonly document = computed<HexMap>(() => this.grid().map);
 
   /**
    * The transient Selection: owns the reference set and click-cycle anchor,
@@ -857,20 +885,47 @@ export class HexMapStore {
   }
 
   /**
+   * Claim the grid a {@link commit} just produced: its recipe ran on a valid plane, so the output is
+   * well-formed. Never called for an undo/redo replay — that can restore a grid which was malformed
+   * at rest, and claiming it would hand the renderer exactly what the parse exists to catch. A replay
+   * pays one parse; it is a keystroke, not a drag.
+   */
+  private rememberMintedGrid(): void {
+    const raw = readField(this.session.body().metadata, HEX_GRID_FIELD);
+    if (isObject(raw)) this.minted.add(raw);
+  }
+
+  /**
    * Run `recipe` through the session's {@link ENTITY_SESSION.mutate}, recording the
    * returned patches for undo/redo. Returns whether a step was recorded — callers that
    * re-point the selection use it to know an edit exists to
-   * {@link trackSelectionOnLastEdit stamp}. The recipe touches only the hex-grid slice,
-   * present iff the body carries a grid, so a note's body passes through untouched.
+   * {@link trackSelectionOnLastEdit stamp}. The recipe touches only the `grid` Metadata key —
+   * every other Field, and the Content, pass through untouched.
+   *
+   * An unstored grid (absent, or garbage the editor is showing as an empty plane) is *replaced* by
+   * the plane on screen, inside the same mutation as the edit that provoked it — so the recipe always
+   * writes to a well-formed grid, and the repair is one undoable step with its edit rather than
+   * something the user cannot take back. At most once per document.
    */
   private commit(recipe: (draft: HexMap) => void): boolean {
     const selectionBefore = this.sel.snapshot();
-    const { redo, undo } = this.session.mutate((body: EntityBody) => {
-      if (hasHexGrid(body)) recipe(body);
+    const { map, stored } = this.grid();
+    const { redo, undo } = this.session.mutate((body) => {
+      const metadata: Metadata = (body.metadata ??= {});
+      if (stored) {
+        recipe(metadata[HEX_GRID_FIELD.key] as HexMap);
+        return;
+      }
+      // Cloned first: an assigned value is not a draft, so a recipe run over `map` would mutate the
+      // object {@link grid} is still holding.
+      const fresh = structuredClone(map);
+      recipe(fresh);
+      metadata[HEX_GRID_FIELD.key] = fresh;
     });
     // No patches → the recipe changed nothing; recording it would leave empty undo
     // steps and discard the redo branch.
     if (redo.length === 0) return false;
+    this.rememberMintedGrid();
     // selectionAfter defaults to before; re-pointing edits update it via trackSelectionOnLastEdit.
     this.undoStack.push({
       redo,
@@ -898,6 +953,11 @@ export class HexMapStore {
     this._canUndo.set(this.undoStack.length > 0);
     this._canRedo.set(this.redoStack.length > 0);
   }
+}
+
+/** A non-null object — the only thing a grid value can be, and what a `WeakSet` can hold. */
+function isObject(value: unknown): value is object {
+  return typeof value === 'object' && value !== null;
 }
 
 /**

@@ -1,4 +1,9 @@
-import { PluginTypeDefinition, structuredDataTypeSet, StructuredDataTypeSet } from '@hexly/domain';
+import {
+  CORE_STRUCTURED_DATA_TYPES,
+  PluginTypeDefinition,
+  structuredDataTypeSet,
+  StructuredDataTypeSet,
+} from '@hexly/domain';
 import { DND_MONSTER_TYPE } from '@hexly/plugin-dnd';
 
 /**
@@ -13,7 +18,10 @@ export const BUNDLED_PLUGIN_TYPES: readonly PluginTypeDefinition[] = [DND_MONSTE
 
 /**
  * The **Structured Field** data-types this build bundles (ADR-0050) — the set the domain resolves a
- * Field's `namespace.id` kind against. Empty until a plugin contributes one: `core.hex-grid` arrives
- * with `@hexly/plugin-hexmap`, and joins by being named here, as a plugin type does above.
+ * Field's `namespace.id` kind against, threaded into `validateFields` / `harvestEdges` /
+ * `withFieldDefaults`. The core's own (`core.hex-grid`, the Hex Map's grid) plus, in time, each
+ * bundled plugin's: one joins by being named here, as a plugin type does above.
  */
-export const BUNDLED_STRUCTURED_DATA_TYPES: StructuredDataTypeSet = structuredDataTypeSet([]);
+export const BUNDLED_STRUCTURED_DATA_TYPES: StructuredDataTypeSet = structuredDataTypeSet([
+  ...CORE_STRUCTURED_DATA_TYPES,
+]);

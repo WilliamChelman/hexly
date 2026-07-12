@@ -3,7 +3,7 @@ import { DND_MONSTER_TYPE } from '../lib/monster';
 
 /**
  * The `dnd.monster` bespoke View (#192). It lives in the plugin's own `dnd.view.*` sub-namespace, a
- * keyspace away from the type id (`dnd.monster`) and the closed Payload Kind names (ADR-0048).
+ * keyspace away from the type id (`dnd.monster`) and from the Field data-type ids (ADR-0050).
  */
 export const DND_VIEW_STAT_BLOCK: ViewId = 'dnd.view.stat-block';
 

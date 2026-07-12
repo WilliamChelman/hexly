@@ -2,9 +2,9 @@
  * The `dnd.monster` bundled Plugin type (CONTEXT.md → Type Definition, #192). Namespaced (`dnd.`) so
  * a future `pathfinder.monster` never collides.
  *
- * It adds no payload: a monster is the `rich-content` base plus a Field schema, so its stat block
- * lives entirely in the Metadata map — an instance without this plugin still opens one as rich
- * content plus the generic Field view.
+ * It adds nothing to the body: a monster is the one Entity body plus a Field schema, so its stat
+ * block lives entirely in the Metadata map — an instance without this plugin still opens one as its
+ * Content plus the generic Field view.
  *
  * The framework-free half, which the API reads. The Angular half is `@hexly/plugin-dnd/web`.
  */

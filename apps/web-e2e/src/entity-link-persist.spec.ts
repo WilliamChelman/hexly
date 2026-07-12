@@ -1,4 +1,4 @@
-import { createEntity, enterLibrary, entityIdFromUrl, expect, flushSave, segRe, test } from './fixtures';
+import { createEntity, enterLibrary, entityIdFromUrl, expect, flushSave, segRe, test, savedGrid } from './fixtures';
 
 /**
  * The Entity Link journey (issue #76, CONTEXT.md → Entity Link): a Map element —
@@ -39,10 +39,8 @@ test('links a Hex to an Entity in the Inspector; the link survives a reload and 
 
   await page.reload();
 
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  expect(detail.document.hexes['0,0']?.entityId).toBe(noteId);
+  const grid = await savedGrid(request, mapId);
+  expect(grid.hexes['0,0']?.entityId).toBe(noteId);
 
   await canvas.click();
   await expect(page.getByTestId('entity-link-name')).toBeVisible();

@@ -7,9 +7,9 @@
 
 import { assetHashFromUrl } from './asset';
 import { visit } from './content/content-node';
-import { descriptorSchema, EntityBody, EntityType, hasHexGrid } from './entity';
+import { descriptorSchema, EntityBody, EntityType } from './entity';
 import { entityLinkFieldValues, FieldSchema, readField, resolvedStructuredFields } from './field';
-import { NO_STRUCTURED_DATA_TYPES, StructuredDataTypeSet } from './structured-data-type';
+import type { StructuredDataTypeSet } from './structured-data-type';
 
 /** What an edge points at: another Entity, or an Asset (CONTEXT.md → Asset). */
 export type EdgeTargetKind = 'entity' | 'asset';
@@ -66,15 +66,16 @@ export interface EntityReferences {
 
 /**
  * Every edge the body expresses, deduplicated on `(targetKind, targetId, descriptor)`: the
- * Content's inline links, a Hex Map's placements, and — resolved against the Entity's `fields` —
- * each typed **Entity-Link Field** value (#190). Nothing records *where* a link was expressed, so
- * a prose mention, a map placement, and a Field link to the same target collapse to one edge, while
- * two descriptors to that target stay two.
+ * Content's inline links, and — resolved against the Entity's `fields` — each typed **Entity-Link
+ * Field** value (#190) and each **Structured Field**'s own harvest (a Hex Map's placements,
+ * ADR-0050). Nothing records *where* a link was expressed, so a prose mention, a map placement, and
+ * a Field link to the same target collapse to one edge, while two descriptors to that target stay
+ * two.
  *
  * `fields` is the Entity's resolved Field schema set ({@link resolveFields}) and `dataTypes` the
  * host-composed **Structured Field** set (ADR-0050), from which a structured value harvests its own
- * edges — a Hex placed on a plugin's grid. A caller with no type context passes `[]` and
- * {@link NO_STRUCTURED_DATA_TYPES}, and harvests Content/map edges alone.
+ * edges. A caller with no type context passes `[]` and the empty set, and harvests the Content's
+ * edges alone — every Field edge, the grid's included, needs the type set.
  */
 export function harvestEdges(
   body: EntityBody,
@@ -93,7 +94,7 @@ export function harvestEdges(
     if (targetId) add({ targetKind: 'entity', targetId, descriptor });
   };
 
-  // Only a format this build knows is walkable, as in `extractText`. The map payload below is
+  // Only a format this build knows is walkable, as in `extractText`. The Field edges below are
   // format-independent, so a Hex Map's placements survive a Content format we cannot read.
   if (body.content.format.startsWith('tiptap-')) {
     visit(body.content.snapshot, (node) => {
@@ -112,22 +113,14 @@ export function harvestEdges(
     });
   }
 
-  // A map placement expresses no relationship, so it carries no Link Descriptor. The presence of
-  // the hex-grid payload — not a `type` field — is what marks a body as carrying map placements.
-  if (hasHexGrid(body)) {
-    for (const hex of Object.values(body.hexes)) {
-      entityEdge(hex.entityId, null);
-      entityEdge(hex.feature?.entityId, null);
-    }
-    for (const region of body.regions) entityEdge(region.entityId, null);
-  }
-
   // A typed Entity-Link Field value is a descriptor-less edge to its target (#190), read off the
-  // Metadata map rather than the Content snapshot — so it is format-independent, like the map above.
+  // Metadata map rather than the Content snapshot — so it is format-independent, unlike the above.
   for (const { value } of entityLinkFieldValues(fields, body.metadata)) entityEdge(value.entityId, null);
 
   // A Structured Field harvests its own (ADR-0050): the value goes to the data-type the host
-  // registered, and the edges come back — the domain never learns what is inside it.
+  // registered, and the edges come back — the domain never learns what is inside it. This is how a
+  // Hex Map's placements are harvested now that its grid is the `core.hex-grid` Field at `grid`:
+  // through the same path a plugin's would take, with no hex-shaped branch left here.
   for (const { field, dataType } of resolvedStructuredFields(fields, dataTypes))
     for (const edge of dataType.harvestEdges?.(readField(body.metadata, field)) ?? []) add(edge);
 

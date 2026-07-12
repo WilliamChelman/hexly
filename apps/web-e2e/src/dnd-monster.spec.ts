@@ -65,8 +65,8 @@ test('creates a dnd.monster, fills its required Fields, and reads the stat block
 });
 
 /**
- * View-per-surface (#192): payloads compose, so a monster that is also a hex map affords three Views —
- * the stat block, the Note, and the Map.
+ * View-per-surface (#192): an Entity affords every View its types contribute, so a monster that is
+ * also a hex map affords three — the stat block, the Note, and the Map.
  */
 test('a dnd.monster carrying core.hexmap offers the stat block, Note, and Map views', async ({ page }) => {
   await enterLibrary(page);
@@ -79,7 +79,7 @@ test('a dnd.monster carrying core.hexmap offers the stat block, Note, and Map vi
   await page.getByTestId('create-entity-submit').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
 
-  // Add the hexmap type on the open Entity, which mints the hex-grid payload over the rich-content base.
+  // Add the hexmap type on the open Entity, which mints the empty grid its `grid` Field declares.
   await openEntityActions(page);
   await page.getByTestId('edit-types').click();
   await page.getByTestId('type-add').selectOption('core.hexmap');
@@ -92,7 +92,7 @@ test('a dnd.monster carrying core.hexmap offers the stat block, Note, and Map vi
   // `dnd.monster` is still primary, so its own View stays the default.
   await expect(page.getByTestId('dnd.view.stat-block')).toHaveAttribute('aria-pressed', 'true');
 
-  // The Map view opens on the empty grid the added type minted (`withPayloadsFor`), not a blank frame.
+  // The Map view opens on the empty grid the added type's `grid` Field minted, not a blank frame.
   await page.getByTestId('core.view.map').click();
   await expect(page.getByTestId('tool-terrain')).toBeVisible();
   await expect(page.getByTestId('hex-count')).toHaveText('0 hexes');

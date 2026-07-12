@@ -7,12 +7,10 @@ import { NudgeBusClient } from './nudge-bus.client';
 import { MockNudgeBusClient } from '../testing/nudge-bus.mock';
 import { EVICTED } from './live-follow';
 
-/** The shape the editor round-trips through the client. */
+/** The shape the editor round-trips through the client: a Hex Map's grid is its `grid` Field value. */
 const emptyHexmapBody: EntityBody = {
   content: emptyContent(),
-  hexes: {},
-  regions: [],
-  labels: [],
+  metadata: { grid: { hexes: {}, regions: [], labels: [] } },
 };
 
 describe('EntitiesClient', () => {
@@ -270,8 +268,8 @@ describe('EntitiesClient', () => {
 
   it('saves the body against its base version and reports the saved outcome', () => {
     const painted: EntityBody = {
-      ...emptyHexmapBody,
-      hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' } },
+      content: emptyContent(),
+      metadata: { grid: { hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' } }, regions: [], labels: [] } },
     };
 
     let outcome: unknown;

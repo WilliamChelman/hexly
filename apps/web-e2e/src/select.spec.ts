@@ -1,4 +1,4 @@
-import { createEntity, enterLibrary, expect, flushSave, test } from './fixtures';
+import { createEntity, enterLibrary, expect, flushSave, test, savedGrid } from './fixtures';
 
 /**
  * The universal Select journey (issue #28, ADR-0010). These cross the one seam
@@ -119,16 +119,14 @@ test('a painting Tool over a floating Label paints the hex beneath instead of gr
 
   await flushSave(page);
 
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  const hexes = Object.values(detail.document.hexes) as Array<{
+  const grid = await savedGrid(request, mapId);
+  const hexes = Object.values(grid.hexes) as Array<{
     terrain: string;
   }>;
   expect(hexes).toHaveLength(1);
   expect(hexes[0].terrain).toBe('ocean');
   // Label survived and stayed put.
-  const labels = detail.document.labels as Array<{
+  const labels = grid.labels as Array<{
     position: { x: number; y: number };
   }>;
   expect(labels).toHaveLength(1);

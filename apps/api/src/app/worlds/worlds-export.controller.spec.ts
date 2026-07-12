@@ -164,7 +164,7 @@ describe('Vault export endpoint', () => {
     expect(hero).not.toContain(`/assets/${worldId}`);
   });
 
-  it('exports a hexmap as lore-only markdown, grid dropped and flagged hexly.type: core.hexmap', async () => {
+  it("exports a hexmap's lore as markdown and its grid as nested frontmatter (ADR-0050)", async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const worldId = await importVault(ada, { 'Note.md': '# Note' });
 
@@ -195,9 +195,7 @@ describe('Vault export endpoint', () => {
             },
           ],
         }),
-        hexes: { '0,0': { terrain: 'forest', name: 'Rivertown' } },
-        regions: [],
-        labels: [],
+        metadata: { grid: { hexes: { '0,0': { terrain: 'forest', name: 'Rivertown' } }, regions: [], labels: [] } },
       },
     });
 
@@ -205,13 +203,18 @@ describe('Vault export endpoint', () => {
     const md = text(files, 'Aldermoor Map.md');
     const fm = frontmatter(md);
 
-    // Lore round-trips; the map's type is flagged so the dropped grid is a visible loss (ADR-0033).
+    // Lore round-trips as prose, and the map's type is flagged — no Metadata key records it.
     expect(fm['hexly.type']).toBe('core.hexmap');
     expect(md).toContain('The Aldermoor');
     expect(md).toContain('A wild frontier.');
-    // The grid itself is never serialized — no hex terrain/name leaks into the markdown.
-    expect(md).not.toContain('Rivertown');
-    expect(md).not.toContain('forest');
+    // The grid rides the frontmatter as a nested Field value, so the map survives the round-trip
+    // (ADR-0050 amends ADR-0033's lossy export) — and it does so through the generic Metadata path,
+    // which knows nothing of hexes.
+    expect(fm['grid']).toEqual({
+      hexes: { '0,0': { terrain: 'forest', name: 'Rivertown' } },
+      regions: [],
+      labels: [],
+    });
   });
 
   it('round-trips a fixture vault: import → export reproduces the folder layout and content', async () => {
@@ -299,7 +302,7 @@ describe('Vault export endpoint', () => {
     db.insert(worldMembers).values({ worldId, userId: bobId, role: 'contributor' }).run();
     const entities = app.get(EntitiesService);
     const bobNoteId = 'bob-shared-note';
-    entities.importNote(bobId, worldId, bobNoteId, 'Bob Secret', [], emptyEntityBody(['core.note']));
+    entities.importNote(bobId, worldId, bobNoteId, 'Bob Secret', [], emptyEntityBody());
     entities.patch(bobId, bobNoteId, { visibility: 'shared' });
 
     const { files } = await exportZip(ada, worldId);

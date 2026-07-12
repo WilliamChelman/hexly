@@ -26,7 +26,7 @@ import {
   EntityType,
   tiptapContent,
   Visibility,
-  withPayloadsFor,
+  withFieldDefaults,
 } from '@hexly/domain';
 import {
   EntitiesClient,
@@ -40,6 +40,7 @@ import {
 import { applyPatches as immerApplyPatches, Draft, Patch, produceWithPatches } from '@hexly/immer';
 import type { EntitySession as EntitySessionPort } from '@hexly/web-entity';
 import type { ContentEditorSession } from '@hexly/content-editor';
+import { TypeRegistry } from '../../../entity-types/type-registry';
 
 /**
  * The central mutable store for the open Entity (ADR-0048, *Central store* amendment):
@@ -81,17 +82,19 @@ export class EntitySession implements ContentEditorSession, EntitySessionPort {
   private readonly shell = inject(AppShellStore);
   private readonly destroyRef = inject(DestroyRef);
   private readonly injector = inject(Injector);
+  private readonly typeRegistry = inject(TypeRegistry);
 
   private readonly _current = signal<EntityDetail | null>(null);
   readonly current = this._current.asReadonly();
 
   /**
-   * The working Entity body — the source every View edits (grid now, Fields/Metadata
-   * later). Owned here (ADR-0048): a View reads its slice off {@link body} and writes it
-   * through {@link mutate}. Content is the one exception, still tracked in {@link _content}
-   * (TipTap owns its own live doc) and folded back in at save; `mutate` covers the rest.
+   * The working Entity body — `{ content, metadata }`, the one shape every Entity has, and the
+   * source every View edits. Owned here (ADR-0048): a View reads its slice off {@link body} — a
+   * Field's value, the map editor's grid among them — and writes it through {@link mutate}. Content
+   * is the one exception, still tracked in {@link _content} (TipTap owns its own live doc) and
+   * folded back in at save; `mutate` covers the rest.
    */
-  private readonly _body = signal<EntityBody>(emptyEntityBody([]));
+  private readonly _body = signal<EntityBody>(emptyEntityBody());
   readonly body = this._body.asReadonly();
 
   /**
@@ -402,12 +405,14 @@ export class EntitySession implements ContentEditorSession, EntitySessionPort {
   }
 
   /**
-   * Replace the live type set, `types[0]` primary (#189). {@link withPayloadsFor} mints the hex-grid
-   * payload when `core.hexmap` is added so the map View has a plane; removing never strips it.
+   * Replace the live type set, `types[0]` primary (#189). {@link withFieldDefaults} mints the
+   * defaults the new set's Fields declare — so adding `core.hexmap` gives the map View an empty
+   * plane at `grid` to open on (ADR-0050). Additive: dropping a type never strips its values.
    */
   setTypes(types: readonly EntityType[]): void {
     this._types.set([...types]);
-    const reconciled = withPayloadsFor(this._body(), types);
+    const fields = this.typeRegistry.resolveFields(types);
+    const reconciled = withFieldDefaults(this._body(), fields, this.typeRegistry.structuredDataTypes);
     if (reconciled !== this._body()) this._body.set(reconciled);
   }
 
@@ -440,7 +445,7 @@ export class EntitySession implements ContentEditorSession, EntitySessionPort {
     return concat(
       this.flush().pipe(ignoreElements()),
       defer(() => {
-        this._body.set(emptyEntityBody([])); // clear the previous canvas during load (#7)
+        this._body.set(emptyEntityBody()); // clear the previous canvas during load (#7)
         this._tags.set([]); // and the previous Entity's tags/content, which ride the same load (#88)
         this._types.set([]); // and its type set, re-baselined below so the blank load isn't dirty
         this._content.set(null);
@@ -624,7 +629,7 @@ export class EntitySession implements ContentEditorSession, EntitySessionPort {
   }
 }
 
-/** Fold the live Content into the body on save (ADR-0019); the spread preserves the payload composition. */
+/** Fold the live Content into the body on save (ADR-0019); the spread preserves every Field's value. */
 function withContent(body: EntityBody, content: Content): EntityBody {
   return { ...body, content };
 }

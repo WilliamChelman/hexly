@@ -74,7 +74,7 @@ describe('TypeRegistry', () => {
     expect(registry.viewsFor(undefined)).toEqual([]);
   });
 
-  /** One View per surface the Entity's payloads and types afford — the header's whole rule (#192). */
+  /** One View per surface the Entity's types afford — the header's whole rule (#192). */
   describe('view-per-surface for the bundled dnd.monster plugin', () => {
     it('offers the stat block and the Note view, defaulting to the plugin’s own', () => {
       expect(registry.viewsFor([DND_MONSTER])).toEqual([DND_VIEW_STAT_BLOCK, CORE_VIEW_CONTENT]);

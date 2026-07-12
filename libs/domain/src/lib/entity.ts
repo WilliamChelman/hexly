@@ -1,11 +1,11 @@
 /**
  * The Entity domain: the top-level thing a user owns. The single Zod source of
  * truth for the Entity model and its REST payloads. A Hex Map is an Entity that
- * carries the `core.hexmap` type — the type that adds the `hex-grid` Payload Kind.
+ * carries the `core.hexmap` type — the type that declares the grid as a **Structured
+ * Field**, so its plane is a Metadata value like any other (ADR-0050).
  */
 
 import { z } from 'zod';
-import { emptyHexMap, HexMap, hexMapSchema } from './hex/hex-map';
 import { FieldDataType } from './field';
 
 /** The format tag new saves write; a schema-affecting extension change is a bump + migration. */
@@ -33,9 +33,9 @@ export function tiptapContent(snapshot: unknown): Content {
 
 /**
  * A single Entity Type identity (CONTEXT.md → Entity Type): an **open**,
- * `namespace.id`-keyed string (`core.note`, `core.hexmap`, `dnd.monster`). Unlike
- * the closed Payload Kind it maps to, the set is open — plugins and Worlds extend
- * it — so this validates only the *shape* of an id, never an enumerated value.
+ * `namespace.id`-keyed string (`core.note`, `core.hexmap`, `dnd.monster`) — plugins and
+ * Worlds extend the set — so this validates only the *shape* of an id, never an
+ * enumerated value.
  */
 export const entityTypeSchema = z
   .string()
@@ -61,17 +61,6 @@ export const typesSchema = z
   .transform((types) => [...new Set(types)]);
 
 /**
- * The closed, code-known set of Payload Kinds (CONTEXT.md → Payload Kind): the body
- * shape an Entity Type maps to. `rich-content` is the base every Entity has (Content
- * + Metadata); `hex-grid` is an *additive addon* over it. What actually discriminates
- * the stored document — distinct from the open, user-facing Entity Type.
- */
-export const PAYLOAD_KINDS = ['rich-content', 'hex-grid'] as const;
-
-/** CONTEXT.md → Payload Kind. */
-export type PayloadKind = (typeof PAYLOAD_KINDS)[number];
-
-/**
  * The Entity's Metadata map (CONTEXT.md → Metadata), stored inside the document
  * JSON. Mirrors Obsidian frontmatter on import; Hexly provenance lives under the
  * reserved `hexly.` namespace. Optional so pre-import bodies validate unchanged;
@@ -79,83 +68,27 @@ export type PayloadKind = (typeof PAYLOAD_KINDS)[number];
  */
 export const metadataSchema = z.record(z.string(), z.unknown()).optional();
 
-/** The `rich-content` base payload every Entity carries: Content + Metadata (formerly the `note` payload). */
-const richContentPayload = {
-  content: contentSchema,
-  metadata: metadataSchema,
-};
-
 /**
- * The Entity body — what the `document` column holds — discriminated by **Payload
- * Kind composition**, not by a `type` field (ADR-0048): the `rich-content` base
- * (Content + Metadata) that every Entity has, optionally extended by the additive
- * `hex-grid` payload (the Hex Map grid). The hex-grid branch comes first so a body
- * that carries a grid matches it; a body without one falls through to the base.
+ * The Entity body — what the `document` column holds. One shape, for every Entity: Content plus
+ * Metadata (ADR-0050). Everything a Type adds to an Entity's substance is a **Field** over a Metadata
+ * key, a Hex Map's grid included, so the body needs no discriminant and no registry to parse.
  *
- * The base branch is `.strict()` so a body carrying grid keys that *fail* the grid
- * shape can't quietly fall through and be stripped to rich-content — a malformed
- * Hex Map is a hard parse error (a 400 / a corrupt-document 500 on read), never a
- * silent downgrade to a note. A well-formed body of either kind carries no keys the
- * base doesn't know, so strictness only bites the malformed-grid case.
+ * `.strict()` because the body root is closed: an unknown key there is a document this build cannot
+ * represent (a pre-collapse Hex Map, with its grid at the root), and reading it as a note that has
+ * silently lost its map would be worse than failing loudly. Tolerance lives one level down, in the
+ * data: a Field value that does not inhabit its data-type is left alone, never rejected.
  */
-export const entityBodySchema = z.union([
-  z.object({ ...richContentPayload, ...hexMapSchema.shape }),
-  z.object(richContentPayload).strict(),
-]);
+export const entityBodySchema = z
+  .object({
+    content: contentSchema,
+    metadata: metadataSchema,
+  })
+  .strict();
 
 export type EntityBody = z.infer<typeof entityBodySchema>;
 
-/**
- * Whether a body carries the `hex-grid` payload — the presence of the grid, which
- * re-discriminates a Hex Map now that the body holds no `type` field. Narrows the
- * body so its grid fields (`hexes`/`regions`/`labels`) read without a cast.
- */
-export function hasHexGrid(body: EntityBody): body is EntityBody & HexMap {
-  return 'hexes' in body;
-}
-
-/**
- * The body's hex-grid slice as a standalone {@link HexMap}, or an empty plane when the
- * body carries no grid. A cheap projection off the already-validated body (not a
- * re-parse) — it sits on the map editor's hot read path, one recompute per grid edit, so
- * it hand-picks the grid fields rather than re-running {@link hexMapSchema} (ADR-0048).
- * `regions`/`labels` still fall back to empty (the defaults the schema mints) so a body
- * predating those fields never surfaces `undefined` on the read path.
- */
-export function gridOf(body: EntityBody): HexMap {
-  return hasHexGrid(body)
-    ? {
-        hexes: body.hexes,
-        regions: body.regions ?? [],
-        labels: body.labels ?? [],
-      }
-    : emptyHexMap();
-}
-
 export function emptyContent(): Content {
   return tiptapContent({ type: 'doc', content: [] });
-}
-
-/**
- * The one place that mints an empty body for a fresh Entity as a payload composition:
- * the `rich-content` base always, plus the `hex-grid` addon when a type in the set
- * contributes it (the `core.hexmap` type — the only core type that adds a payload).
- */
-export function emptyEntityBody(types: readonly string[]): EntityBody {
-  const base = { content: emptyContent() };
-  return types.includes(CORE_HEXMAP) ? { ...base, ...emptyHexMap() } : base;
-}
-
-/**
- * Reconcile a body to the payloads its `types` require (ADR-0048): adding `core.hexmap` to a
- * grid-less body mints an empty `hex-grid` so a note authored into a map opens on a blank plane.
- * Additive only — dropping `core.hexmap` never strips the grid (the data outlives the lens, like a
- * removed type's Metadata). Returns the same reference when nothing is missing, keeping the dirty
- * check by reference sound.
- */
-export function withPayloadsFor(body: EntityBody, types: readonly string[]): EntityBody {
-  if (types.includes(CORE_HEXMAP) && !hasHexGrid(body)) return { ...body, ...emptyHexMap() };
-  return body;
 }
 
 /** The reserved Metadata namespace: Hexly provenance keys (`hexly.*`) that drive placement/typing on export and are stripped from author-facing frontmatter. */
@@ -208,7 +141,7 @@ export const descriptorSchema = z.string().trim().min(1);
  */
 export const descriptorsSchema = dedupedTags.default([]);
 
-/** POST /entities: body (Content + payload) is minted server-side from `types`. */
+/** POST /entities: the body is minted server-side from `types` — blank Content plus their Fields' defaults. */
 export const createEntityRequestSchema = z.object({
   name: nameSchema,
   // The ordered type set; `types[0]` is primary. One or more per creation (ADR-0048).

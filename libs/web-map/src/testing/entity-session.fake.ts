@@ -1,12 +1,15 @@
 import { Provider, signal } from '@angular/core';
-import { emptyContent, emptyHexMap, EntityBody, HexMap } from '@hexly/domain';
+import { emptyContent, emptyHexMap, EntityBody, HEX_GRID_FIELD, HexMap } from '@hexly/domain';
 import { applyPatches as immerApplyPatches, Draft, Patch, produceWithPatches } from '@hexly/immer';
 import { ENTITY_SESSION, EntitySession } from '@hexly/web-entity';
 import { HexMapStore } from '../services/hexmap-store';
 
-/** Wrap a bare grid as a full body (the rich-content base + hex-grid addon) for the fake to hold. */
+/**
+ * Wrap a bare grid as a full body for the fake to hold: the grid is a Metadata value at the
+ * `core.hexmap` type's `grid` Field, like any other Field's (ADR-0050).
+ */
 function bodyWithGrid(grid: HexMap): EntityBody {
-  return { content: emptyContent(), ...grid };
+  return { content: emptyContent(), metadata: { [HEX_GRID_FIELD.key]: grid } };
 }
 
 /**
@@ -42,6 +45,15 @@ export class FakeEntitySession implements EntitySession {
   /** Test helper: adopt a fresh grid as the working body and bump the load generation (a fresh load). */
   load(grid: HexMap): void {
     this._body.set(bodyWithGrid(grid));
+    this._loadGeneration.update((n) => n + 1);
+  }
+
+  /**
+   * Test helper: adopt whatever sits at the `grid` key, well-formed or not — a document at rest
+   * this build cannot parse, which Field validation tolerates rather than rejecting (ADR-0050).
+   */
+  loadRawGrid(grid: unknown): void {
+    this._body.set({ content: emptyContent(), metadata: { [HEX_GRID_FIELD.key]: grid } });
     this._loadGeneration.update((n) => n + 1);
   }
 

@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { emptyHexMap, HexMap } from '@hexly/domain';
+import { emptyHexMap, HEX_GRID_FIELD, HexMap } from '@hexly/domain';
 import { HexMapStore } from './hexmap-store';
 import { FakeEntitySession, provideFakeEntitySession } from '../testing/entity-session.fake';
 
@@ -2490,7 +2490,7 @@ describe('HexMapStore central-store seam (ADR-0048)', () => {
 
     // A different View edits the shared body directly; the map's document tracks it live.
     session.mutate((body) => {
-      if ('hexes' in body) body.hexes['0,0'] = { terrain: 'grass' };
+      (body.metadata?.[HEX_GRID_FIELD.key] as HexMap).hexes['0,0'] = { terrain: 'grass' };
     });
 
     expect(store.document().hexes['0,0']).toEqual({ terrain: 'grass' });
@@ -2530,5 +2530,73 @@ describe('HexMapStore central-store seam (ADR-0048)', () => {
       regions: [],
       labels: [],
     });
+  });
+});
+
+/**
+ * A Field's value is validated forward-only (CONTEXT.md → Field): what sits at `grid` is whatever
+ * was last written there, so the editor must open *something* over a value it cannot parse — and the
+ * first edit must land, not be swallowed by the garbage it paints onto.
+ */
+describe('HexMapStore forward-only grid (ADR-0050)', () => {
+  it.each([
+    ['garbage', 'not-a-grid'],
+    ['a grid whose hexes are ill-typed', { hexes: { '0,0': 7 }, regions: [], labels: [] }],
+    ['no grid at all (a Note that gained core.hexmap with no mint)', undefined],
+  ])('opens %s as an empty plane rather than erroring', (_case, raw) => {
+    const store = makeStore();
+
+    session.loadRawGrid(raw);
+    TestBed.flushEffects();
+
+    expect(store.document()).toEqual(emptyHexMap());
+  });
+
+  it('overwrites an unparsable grid with the empty plane on the first edit, in one undoable step', () => {
+    const store = makeStore();
+    session.loadRawGrid('not-a-grid');
+    TestBed.flushEffects();
+
+    store.paintAt({ q: 0, r: 0 }, 'grass');
+
+    expect(store.document()).toEqual({
+      hexes: { '0,0': { terrain: 'grass' } },
+      regions: [],
+      labels: [],
+    });
+    // One step: undoing restores the document as it was, corruption included.
+    expect(store.canUndo()).toBe(true);
+    store.undo();
+    expect(store.document()).toEqual(emptyHexMap());
+    expect(session.body().metadata?.[HEX_GRID_FIELD.key]).toBe('not-a-grid');
+  });
+
+  it('re-parses on undo, so an undo back onto a malformed grid still shows an empty plane', () => {
+    // The store skips re-validating a grid it minted itself. An undo replay is not one: its inverse
+    // patch restores what was at rest, malformed and all, so the guard must still run over it.
+    const store = makeStore();
+    session.loadRawGrid({ hexes: { '0,0': 7 }, regions: [], labels: [] });
+    TestBed.flushEffects();
+    store.paintAt({ q: 1, r: 1 }, 'grass');
+    expect(store.document().hexes['1,1']).toEqual({ terrain: 'grass' });
+
+    store.undo();
+
+    expect(store.document()).toEqual(emptyHexMap());
+    expect(session.body().metadata?.[HEX_GRID_FIELD.key]).toEqual({ hexes: { '0,0': 7 }, regions: [], labels: [] });
+  });
+
+  it('mints a plane the recipe can push onto when the stored grid predates regions/labels', () => {
+    const store = makeStore();
+    // Such a document parses (both default to empty), but its arrays are absent — so a recipe that
+    // pushed onto them would throw.
+    session.loadRawGrid({ hexes: { '0,0': { terrain: 'ocean' } } });
+    TestBed.flushEffects();
+
+    const id = store.addLabel('Open Sea', { x: 1, y: 2 });
+
+    expect(store.document().labels).toEqual([expect.objectContaining({ id, text: 'Open Sea' })]);
+    // The painted hex survives the rewrite — the plane written back is the one on screen.
+    expect(store.document().hexes['0,0']).toEqual({ terrain: 'ocean' });
   });
 });

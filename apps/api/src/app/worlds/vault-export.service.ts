@@ -110,6 +110,10 @@ function rewriteAssetSrcs(snapshot: unknown, srcMap: Map<string, string>): void 
  * key stripped (they drive placement/typing, not frontmatter), plus its Tags re-emitted as
  * `tags` so a vault's `tags:` round-trips (ADR-0033). Returns undefined when nothing remains,
  * so a bare note exports without an empty `---` block.
+ *
+ * A **Structured Field**'s value rides along like any other Field's, as nested YAML (ADR-0050), so a
+ * Hex Map's grid now survives the round-trip — the lossiness ADR-0033 accepted closes here, without
+ * this path learning what a grid is.
  */
 function frontmatter(entity: EntityDetail): Record<string, unknown> | undefined {
   const meta: Record<string, unknown> = {};
@@ -117,7 +121,8 @@ function frontmatter(entity: EntityDetail): Record<string, unknown> | undefined 
     if (!key.startsWith(HEXLY_METADATA_PREFIX)) meta[key] = value;
   }
   if (entity.tags.length) meta['tags'] = [...entity.tags];
-  // A hexmap exports lore only (grid dropped); flag the type so the loss is visible (ADR-0033).
+  // Flag a Hex Map's type, which no Metadata key records (ADR-0033). ADR-0050 generalises this to
+  // stamp `hexly.type` from `entity.types`, with the ticket that moves the Hex Map out of the core.
   if (entity.types.includes(CORE_HEXMAP)) meta['hexly.type'] = CORE_HEXMAP;
   return Object.keys(meta).length ? meta : undefined;
 }

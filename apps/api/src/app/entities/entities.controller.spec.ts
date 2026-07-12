@@ -16,13 +16,20 @@ import { ConfigModule } from '../config/config.module';
 import { WorldsModule } from '../worlds/worlds.module';
 import { WorldsService } from '../worlds/worlds.service';
 
-// Empty hexmap body shape (what create mints; what editor round-trips).
-const emptyHexmapBody = {
-  content: emptyContent(),
-  hexes: {},
-  regions: [],
-  labels: [],
-};
+/**
+ * A Hex Map body: Content plus its grid at the `grid` Metadata key — the `core.hex-grid`
+ * **Structured Field** `core.hexmap` declares (ADR-0050). One body shape for every Entity, so a map
+ * is a note that carries one more Field value.
+ */
+function hexmapBody(hexes: Record<string, unknown> = {}) {
+  return {
+    content: emptyContent(),
+    metadata: { grid: { hexes, regions: [], labels: [] } },
+  };
+}
+
+/** The empty plane a fresh Hex Map is minted with (and the editor round-trips). */
+const emptyHexmapBody = hexmapBody();
 
 describe('Entities endpoints', () => {
   let app: INestApplication;
@@ -111,7 +118,7 @@ describe('Entities endpoints', () => {
     });
   });
 
-  it('creates a note as Content-only, with no hex-grid payload', async () => {
+  it('creates a note as Content-only — it declares no Fields, so it mints no Metadata', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
 
     const res = await ada
@@ -134,8 +141,12 @@ describe('Entities endpoints', () => {
       .expect(201);
 
     expect(res.body.types).toEqual(['core.note', 'core.hexmap']);
-    // `types` carries the hex-grid payload; the collected Metadata rides the same body.
-    expect(res.body.document).toEqual({ ...emptyHexmapBody, metadata: { role: 'lich' } });
+    // The collected Metadata is seeded *over* the defaults the picked types' Fields mint, not in
+    // place of them — so Balthazar keeps his blank plane as well as his role (ADR-0050).
+    expect(res.body.document).toEqual({
+      content: emptyContent(),
+      metadata: { grid: { hexes: {}, regions: [], labels: [] }, role: 'lich' },
+    });
   });
 
   it('trims surrounding whitespace off a created entity name', async () => {
@@ -333,10 +344,7 @@ describe('Entities endpoints', () => {
   it('saves the body against the current version and bumps the version', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const created = await ada.post('/entities').send({ name: 'Aldermoor', types: ['core.hexmap'] });
-    const painted = {
-      ...emptyHexmapBody,
-      hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' } },
-    };
+    const painted = hexmapBody({ [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' } });
 
     const res = await ada
       .put(`/entities/${created.body.id}`)
@@ -411,17 +419,11 @@ describe('Entities endpoints', () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const created = await ada.post('/entities').send({ name: 'Aldermoor', types: ['core.hexmap'] });
     const id = created.body.id;
-    const first = {
-      ...emptyHexmapBody,
-      hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' } },
-    };
+    const first = hexmapBody({ [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' } });
 
     await ada.put(`/entities/${id}`).send({ document: first, version: 1, tags: [] }).expect(200);
 
-    const stale = {
-      ...emptyHexmapBody,
-      hexes: { [coordKey({ q: 9, r: 9 })]: { terrain: 'ocean' } },
-    };
+    const stale = hexmapBody({ [coordKey({ q: 9, r: 9 })]: { terrain: 'ocean' } });
     const conflict = await ada.put(`/entities/${id}`).send({ document: stale, version: 1, tags: [] }).expect(409);
     // 409 includes server's current Entity for client re-pull.
     expect(conflict.body.version).toBe(2);
@@ -546,10 +548,7 @@ describe('Entities endpoints', () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const created = await ada.post('/entities').send({ name: 'Untitled', types: ['core.hexmap'] });
     const id = created.body.id;
-    const painted = {
-      ...emptyHexmapBody,
-      hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' } },
-    };
+    const painted = hexmapBody({ [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' } });
     await ada.put(`/entities/${id}`).send({ document: painted, version: 1, tags: [] }).expect(200);
 
     const res = await ada.patch(`/entities/${id}`).send({ name: 'The Reach of Aldermoor' }).expect(200);
@@ -638,7 +637,7 @@ describe('Entities endpoints', () => {
 
   describe('descriptor vocabulary index (#96)', () => {
     // A note body whose Content carries an entityLink per descriptor — the server
-    // harvests the vocabulary from *this*, not from a payload field (ADR-0023/0035).
+    // harvests the vocabulary from *this*, not from a separate field (ADR-0023/0035).
     function bodyWithDescriptors(...descriptors: string[]) {
       return {
         content: tiptapContent({
@@ -1775,14 +1774,35 @@ describe('Entities endpoints', () => {
       .send({ name: 'X', types: ['spreadsheet'] })
       .expect(400);
     await ada.put(`/entities/${id}`).send({ document: emptyHexmapBody }).expect(400);
+    // A typed save is an active typed edit, so its Fields are gated: an off-palette terrain fails
+    // the `core.hex-grid` value schema like any other ill-typed Field.
     await ada
       .put(`/entities/${id}`)
       .send({
-        document: { ...emptyHexmapBody, hexes: { '0,0': { terrain: 'lava' } } },
+        document: hexmapBody({ '0,0': { terrain: 'lava' } }),
         version: 1,
+        tags: [],
+        types: ['core.hexmap'],
       })
       .expect(400);
     await ada.patch(`/entities/${id}`).send({ name: '' }).expect(400);
+  });
+
+  it('tolerates a malformed grid at rest on an untyped save, rather than 500ing on read (ADR-0050)', async () => {
+    // Forward-only, applied to the grid like any other Field value: a save carrying no `types` is a
+    // plain body edit, so garbage at `grid` stores and reads back as-is. The editor opens it as an
+    // empty plane and the first edit overwrites it.
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const created = await ada.post('/entities').send({ name: 'Aldermoor', types: ['core.hexmap'] });
+    const id = created.body.id;
+
+    await ada
+      .put(`/entities/${id}`)
+      .send({ document: { content: emptyContent(), metadata: { grid: 'not-a-grid' } }, version: 1, tags: [] })
+      .expect(200);
+
+    const reloaded = await ada.get(`/entities/${id}`).expect(200);
+    expect(reloaded.body.document.metadata).toEqual({ grid: 'not-a-grid' });
   });
 
   describe('Entity Visibility & read access (ADR-0037, #160)', () => {
