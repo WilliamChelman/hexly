@@ -30,6 +30,8 @@
       "@hexly/web-core": ["./libs/web-core/src/index.ts"],
       "@hexly/web-core/testing": ["./libs/web-core/src/testing/index.ts"],
       "@hexly/web-entity": ["./libs/web-entity/src/index.ts"],
+      "@hexly/web-entity/controls": ["./libs/web-entity/src/controls/index.ts"],
+      "@hexly/web-entity/entity-link": ["./libs/web-entity/src/entity-link/index.ts"],
       "@hexly/web-entity/i18n": ["./libs/web-entity/src/i18n/index.ts"],
       "@hexly/web-entity/testing": ["./libs/web-entity/src/testing/index.ts"],
       "@hexly/web-ui": ["./libs/web-ui/src/index.ts"],

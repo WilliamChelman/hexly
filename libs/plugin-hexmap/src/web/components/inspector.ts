@@ -1,11 +1,12 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { coordKey, Label, TerrainId } from '../../lib';
 import { Button, Coord, Eyebrow, Field, Input } from '@hexly/web-ui';
+import { EntityLinkPicker } from '@hexly/web-entity/entity-link';
 import { featureKey, terrainKey } from '../utils/catalog-keys';
 import { inputValue } from '../utils/dom';
 import { HexMapStore, Selection } from '../services/hexmap-store';
-import { EntityLink } from './entity-link';
 import { RegionFields } from './region-fields';
 
 /**
@@ -80,8 +81,22 @@ interface SelectedEntity {
   host: {
     class: 'flex flex-col gap-4 p-4 overflow-y-auto bg-surface',
   },
-  imports: [Button, Coord, EntityLink, Eyebrow, Field, Input, RegionFields, TranslocoPipe],
+  imports: [Button, Coord, EntityLinkPicker, Eyebrow, Field, Input, NgTemplateOutlet, RegionFields, TranslocoPipe],
   template: `
+    <!--
+      The Entity Link control, declared once and outletted by each branch whose selection carries a
+      link — a Hex, a Feature, or a Region, never a Label (CONTEXT.md → Map element). The link is the
+      store's; the picker only shows it and offers the next one, and it resets on the selection, so
+      opening it on one Hex and picking on another is impossible (#199).
+    -->
+    <ng-template #entityLink>
+      <app-entity-link-picker
+        [entityId]="store.selectedEntityLink()"
+        [slot]="store.selection()"
+        (linkChange)="onLink($event)"
+      />
+    </ng-template>
+
     @let label = store.selectedLabel();
     @let region = store.selectedRegion();
     @let entity = selectedEntity();
@@ -184,7 +199,7 @@ interface SelectedEntity {
           </div>
         </div>
 
-        <app-entity-link />
+        <ng-container [ngTemplateOutlet]="entityLink" />
       </div>
 
       <div class="flex gap-2 mt-auto pt-2">
@@ -235,7 +250,7 @@ interface SelectedEntity {
           <span class="stub">{{ 'map.inspector.tagsEmpty' | transloco }}</span>
         </div>
 
-        <app-entity-link />
+        <ng-container [ngTemplateOutlet]="entityLink" />
       </div>
 
       <div class="flex gap-2 mt-auto pt-2">
@@ -403,6 +418,12 @@ export class Inspector {
 
   protected onName(entity: SelectedEntity, event: Event): void {
     this.store.editHexName({ q: entity.q, r: entity.r }, inputValue(event));
+  }
+
+  /** Commit the picker's choice onto the selected Map element — an id links it, `null` unlinks it. */
+  protected onLink(entityId: string | null): void {
+    if (entityId) this.store.linkEntity(entityId);
+    else this.store.unlinkEntity();
   }
 
   protected onText(id: string, event: Event): void {

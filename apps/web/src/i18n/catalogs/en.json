@@ -102,9 +102,6 @@
   "editorShell": {
     "tabTitle": "Hexly",
     "tabTitleNamed": "{{name}} — Hexly",
-    "hexMap": "Hex map",
-    "mapTitleLabel": "Map title",
-    "renameMap": "Rename map",
     "reload": "Reload",
     "saving": "Saving…",
     "share": "Share",
@@ -115,10 +112,8 @@
     },
     "view": {
       "switchLabel": "Switch view",
-      "map": "Map",
       "note": "Note",
-      "fields": "Fields",
-      "editorLabel": "Map notes"
+      "fields": "Fields"
     },
     "save": {
       "conflict": "Newer version on server",
@@ -200,8 +195,7 @@
     "footerTokens": "Design tokens"
   },
   "domain": {
-    "untitledNote": "Untitled note",
-    "untitledMap": "Untitled map"
+    "untitledNote": "Untitled note"
   },
   "common": {
     "language": "Language",
@@ -246,7 +240,6 @@
     "worlds": "Worlds",
     "commands": "Commands",
     "createNote": "Create Note",
-    "createMap": "Create Map",
     "goToUsers": "Go to Users",
     "goToAdmin": "Go to Admin",
     "goToStyleguide": "Go to Styleguide",

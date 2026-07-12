@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { FieldSchema } from '@hexly/domain';
-import { FieldControl } from '@hexly/web-entity';
+import { FieldControl } from '@hexly/web-entity/controls';
 
 /**
  * One value slot of the {@link StatBlockView}: the Field's live value, printed as text for a reader

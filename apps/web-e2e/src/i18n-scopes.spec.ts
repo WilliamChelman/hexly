@@ -3,10 +3,13 @@ import { createEntity, enterLibrary, expect, test } from './fixtures';
 /**
  * Each lib's catalog is a Transloco scope, fetched separately from the app's root one (ADR-0049).
  * The failure this catches: copy that renders in English but never follows a language switch, because
- * nothing reloaded the lib's catalog. The hex map is the sharpest case — its scope is the lazy one,
- * so the switch must reach a catalog the app never registered and did not load at boot.
+ * nothing re-resolved the lib's keys once its catalog landed.
+ *
+ * The hex map is the sharpest case: its scope arrives with a plugin's provider and is eager, so no
+ * pipe of the plugin's own reloads it on a switch. The app must load the catalog and then re-announce
+ * the language, or the map renders raw keys for good (ADR-0049's amendment).
  */
-test('a lazily-scoped lib follows a language switch: the map editor flips to French', async ({ page }) => {
+test('a plugin’s scoped copy follows a language switch: the map editor flips to French', async ({ page }) => {
   await enterLibrary(page);
   await createEntity(page, 'core.hexmap');
 

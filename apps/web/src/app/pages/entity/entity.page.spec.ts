@@ -6,10 +6,12 @@ import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angul
 import { of, Subject, throwError } from 'rxjs';
 import { CONTENT_FORMAT, EntityDetail, EntityType } from '@hexly/domain';
 import { CORE_HEXMAP } from '@hexly/plugin-hexmap';
+import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { EntitiesClient, NudgeBusClient, ActiveWorld, TitleService, EVICTED, Watched } from '@hexly/web-core';
 import { MockEntitiesClient, MockNudgeBusClient } from '@hexly/web-core/testing';
 import { EntitySession } from './services/entity-session';
-import { CORE_VIEW_CONTENT, ENTITY_SESSION } from '@hexly/web-entity';
+import { CORE_VIEW_CONTENT, CORE_VIEW_MAP, ENTITY_SESSION } from '@hexly/web-entity';
+import { ViewRegistry } from '../../entity-types/view-registry';
 import { EntityNameResolver, CONTENT_EDITOR_SESSION } from '@hexly/content-editor';
 import { noteDetail } from './components/entity-detail.fixtures';
 import { EntityPage } from './entity.page';
@@ -74,6 +76,7 @@ describe('EntityPage routing', () => {
     await TestBed.configureTestingModule({
       imports: [EntityPage, provideTranslocoTesting()],
       providers: [
+        providePluginHexmap(),
         EntitySession,
         { provide: CONTENT_EDITOR_SESSION, useExisting: EntitySession },
         { provide: ENTITY_SESSION, useExisting: EntitySession },
@@ -125,6 +128,9 @@ describe('EntityPage routing', () => {
     await configure('m1');
     entities.load.mockReturnValue(of(detail('m1', 'hexmap')));
     const fixture = mount();
+    // The map View is a plugin's, so the page fetches its body rather than naming it (#199): the
+    // canvas arrives with its own chunk, and only its id and label were known at startup.
+    await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_MAP);
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
@@ -190,6 +196,7 @@ describe('EntityPage layout', () => {
     await TestBed.configureTestingModule({
       imports: [EntityPage, provideTranslocoTesting()],
       providers: [
+        providePluginHexmap(),
         EntitySession,
         { provide: CONTENT_EDITOR_SESSION, useExisting: EntitySession },
         { provide: ENTITY_SESSION, useExisting: EntitySession },
@@ -208,20 +215,30 @@ describe('EntityPage layout', () => {
     http.verify();
   });
 
-  it('arms the non-destructive Select tool by default', () => {
+  /**
+   * Open the page on a Hex Map and let the map View's chunk land. The View is the plugin's, declared
+   * with `loadComponent` so the canvas never reaches the initial bundle (#199) — so a spec that wants
+   * to see the canvas awaits the very fetch the page kicked off on activation.
+   */
+  async function mountMap() {
     TestBed.inject(EntitySession).adopt(hexmapWithContent('The reach lies north.'));
     const fixture = TestBed.createComponent(EntityPage);
     fixture.detectChanges();
+    await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_MAP);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  it('arms the non-destructive Select tool by default', async () => {
+    const fixture = await mountMap();
 
     // Maps open armed with Select so a stray first click never paints (#27).
     const select = (fixture.nativeElement as HTMLElement).querySelector('[data-testid=tool-select]');
     expect(select?.getAttribute('aria-pressed')).toBe('true');
   });
 
-  it('boots to a clear map: a full-bleed canvas, a bare rail, and the panel closed', () => {
-    TestBed.inject(EntitySession).adopt(hexmapWithContent('The reach lies north.'));
-    const fixture = TestBed.createComponent(EntityPage);
-    fixture.detectChanges();
+  it('boots to a clear map: a full-bleed canvas, a bare rail, and the panel closed', async () => {
+    const fixture = await mountMap();
 
     const el = fixture.nativeElement as HTMLElement;
     // Canvas, strip, and rail present; right panel closed by default (ADR-0013, story 20).
@@ -296,20 +313,16 @@ describe('EntityPage layout', () => {
     expect(column().style.paddingRight).toBe('3.5rem');
   });
 
-  it('shows the hex canvas in the Map view, not the Content editor', () => {
-    TestBed.inject(EntitySession).adopt(hexmapWithContent('The reach lies north.'));
-    const fixture = TestBed.createComponent(EntityPage);
-    fixture.detectChanges();
+  it('shows the hex canvas in the Map view, not the Content editor', async () => {
+    const fixture = await mountMap();
 
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelector('app-map-canvas')).not.toBeNull();
     expect(el.querySelector('app-content-editor')).toBeNull();
   });
 
-  it('swaps the canvas for the Content editor in the Note view, seeded with the map’s Content', () => {
-    TestBed.inject(EntitySession).adopt(hexmapWithContent('The reach lies north.'));
-    const fixture = TestBed.createComponent(EntityPage);
-    fixture.detectChanges(); // mounts on the grid (the empty route leaves the default map view)
+  it('swaps the canvas for the Content editor in the Note view, seeded with the map’s Content', async () => {
+    const fixture = await mountMap(); // mounts on the grid (the empty route leaves the default map view)
     // Flip to the Content view after mount, as the header's toggle would.
     fixture.debugElement.injector.get(EntityViewStore).setView(CORE_VIEW_CONTENT);
     fixture.detectChanges();
@@ -322,10 +335,8 @@ describe('EntityPage layout', () => {
     expect(surface.textContent).toContain('The reach lies north.');
   });
 
-  it('opens the Regions panel from the closed default via the rail', () => {
-    TestBed.inject(EntitySession).adopt(hexmapWithContent('The reach lies north.'));
-    const fixture = TestBed.createComponent(EntityPage);
-    fixture.detectChanges();
+  it('opens the Regions panel from the closed default via the rail', async () => {
+    const fixture = await mountMap();
 
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelector('app-regions-panel')).toBeNull();

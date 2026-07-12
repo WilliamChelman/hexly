@@ -5,10 +5,33 @@ import { of } from 'rxjs';
 import { EntityDetail, EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient } from '@hexly/web-core';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
+import { CORE_VIEW_CONTENT, TypeDefinition } from '@hexly/web-entity';
+import { provideEntityTypesTesting } from '@hexly/web-entity/testing';
 import { HEXMAP_TEST_CATALOGS } from '../../i18n/test-catalogs';
 import { HexMapStore } from '../services/hexmap-store';
 import { provideHexMapStoreTesting } from '../../testing/entity-session.fake';
+import { HEXMAP_TYPE_DEFINITIONS } from '../hexmap-types';
 import { Inspector } from './inspector';
+
+/**
+ * The Note, as the app registers it. The Inspector embeds the shared Entity-Link picker, which reads
+ * the registered Types to offer create-and-link — so the spec composes the registry a build has
+ * (this plugin's type, plus the app's one core type) rather than the picker's own copy of it.
+ */
+const NOTE_TYPE: TypeDefinition = {
+  id: 'core.note' as TypeDefinition['id'],
+  icon: 'label',
+  views: [CORE_VIEW_CONTENT],
+  graphColorToken: '--color-ink-muted',
+  labels: {
+    eyebrow: 'noteView.eyebrow',
+    titleLabel: 'noteView.titleLabel',
+    rename: 'noteView.renameNote',
+    editorLabel: 'noteView.editorLabel',
+    create: 'commandPalette.createNote',
+    untitled: 'domain.untitledNote',
+  },
+};
 
 /** A minimal EntitySummary the Entity Link picker can list (issue #76). */
 function summary(id: string, name: string): EntitySummary {
@@ -39,6 +62,7 @@ function inspectorProviders() {
   return [
     ...provideHexMapStoreTesting(),
     provideRouter([]),
+    ...provideEntityTypesTesting([NOTE_TYPE, ...HEXMAP_TYPE_DEFINITIONS]),
     {
       provide: EntitiesClient,
       useValue: {
@@ -570,6 +594,12 @@ describe('Inspector Entity Link control', () => {
     }).compileComponents();
   });
 
+  /**
+   * The picker itself — its options, its dangling label, its create-and-link row, its copy — is
+   * `web-entity`'s, and has its own spec there (#199). What is the Inspector's, and lives here, is the
+   * *wiring*: which selections carry a link at all, and that a pick, a create, or a remove lands on
+   * the selected Map element through the store — the one undoable, persisted channel.
+   */
   function render() {
     const fixture = TestBed.createComponent(Inspector);
     fixture.detectChanges();
@@ -577,10 +607,10 @@ describe('Inspector Entity Link control', () => {
   }
 
   function byId(el: HTMLElement, testid: string) {
-    return el.querySelector(`[data-testid=${testid}]`) as HTMLElement | null;
+    return el.querySelector(`[data-testid="${testid}"]`) as HTMLElement | null;
   }
 
-  it('opens the picker on a selected Hex and links the chosen Entity', () => {
+  it('links a selected Hex to the Entity picked', () => {
     stubEntities = [summary('n1', 'Riverbend'), summary('n2', 'North Reach')];
     const store = TestBed.inject(HexMapStore);
     store.paintAt({ q: 0, r: 0 }, 'forest');
@@ -588,36 +618,13 @@ describe('Inspector Entity Link control', () => {
     const fixture = render();
     const el = fixture.nativeElement as HTMLElement;
 
-    // Unlinked: a pick affordance, no picker open yet.
     (byId(el, 'entity-link-pick') as HTMLButtonElement).click();
     fixture.detectChanges();
-
-    // The picker lists the owner's entities; choosing one links the Hex.
     (byId(el, 'entity-link-option-n2') as HTMLButtonElement).click();
     fixture.detectChanges();
 
     expect(store.document().hexes['0,0'].entityId).toBe('n2');
     expect(byId(el, 'entity-link-name')?.textContent).toContain('North Reach');
-  });
-
-  it('filters the picker by a case-insensitive name search', () => {
-    stubEntities = [summary('n1', 'Riverbend'), summary('n2', 'North Reach')];
-    const store = TestBed.inject(HexMapStore);
-    store.paintAt({ q: 0, r: 0 }, 'forest');
-    store.select({ q: 0, r: 0 }, null);
-    const fixture = render();
-    const el = fixture.nativeElement as HTMLElement;
-
-    (byId(el, 'entity-link-pick') as HTMLButtonElement).click();
-    fixture.detectChanges();
-
-    const search = byId(el, 'entity-link-search') as HTMLInputElement;
-    search.value = 'river';
-    search.dispatchEvent(new Event('input'));
-    fixture.detectChanges();
-
-    expect(byId(el, 'entity-link-option-n1')).not.toBeNull();
-    expect(byId(el, 'entity-link-option-n2')).toBeNull();
   });
 
   it('removes the link from a selected Hex without deleting the Hex', () => {
@@ -655,39 +662,7 @@ describe('Inspector Entity Link control', () => {
     expect(byId(el, 'entity-link-name')).toBeNull();
   });
 
-  it('renders a non-navigable dangling label when the link cannot be resolved', () => {
-    // The target is deleted/inaccessible, so ids-resolve comes back empty (#78).
-    stubEntities = [];
-    const store = TestBed.inject(HexMapStore);
-    store.paintAt({ q: 0, r: 0 }, 'forest');
-    store.select({ q: 0, r: 0 }, null);
-    store.linkEntity('ghost');
-    const el = render().nativeElement as HTMLElement;
-
-    // Visible but non-navigable — the dangling label, never an anchor.
-    expect(byId(el, 'entity-link-name')).toBeNull();
-    expect(byId(el, 'entity-link-dangling')).not.toBeNull();
-  });
-
-  it('renders the entity name as a real anchor to the linked Entity', () => {
-    stubEntities = [summary('n1', 'Riverbend')];
-    const store = TestBed.inject(HexMapStore);
-    store.paintAt({ q: 0, r: 0 }, 'forest');
-    store.select({ q: 0, r: 0 }, null);
-    store.linkEntity('n1');
-    const el = render().nativeElement as HTMLElement;
-
-    // The name itself is the link — a real <a routerLink> so ctrl/cmd-click opens
-    // it in a new tab — with no separate Follow control. The link is World-agnostic
-    // (#118): /entities/:id resolves the target's World and redirects there.
-    const name = byId(el, 'entity-link-name') as HTMLAnchorElement;
-    expect(name.tagName).toBe('A');
-    expect(name.getAttribute('href')).toBe('/entities/n1');
-    expect(name.textContent).toContain('Riverbend');
-    expect(name.textContent).toContain('note'); // type suffix
-  });
-
-  it('creates a new note and links the selected Hex to it in one flow', () => {
+  it('creates a new Entity through the picker and links the selected Hex to it in one flow', () => {
     nextCreatedId = 'n-new';
     const store = TestBed.inject(HexMapStore);
     store.paintAt({ q: 0, r: 0 }, 'forest');
@@ -697,37 +672,11 @@ describe('Inspector Entity Link control', () => {
 
     (byId(el, 'entity-link-pick') as HTMLButtonElement).click();
     fixture.detectChanges();
-
-    (byId(el, 'entity-link-create-note') as HTMLButtonElement).click();
+    (byId(el, 'entity-link-create-core.note') as HTMLButtonElement).click();
     fixture.detectChanges();
 
-    // A note was created and the Hex now links to it; its name resolves locally.
-    expect(createdCalls).toEqual([{ name: 'Untitled note', type: 'core.note' }]);
+    expect(createdCalls.map((c) => c.type)).toEqual(['core.note']);
     expect(store.document().hexes['0,0'].entityId).toBe('n-new');
-    expect(byId(el, 'entity-link-name')?.textContent).toContain('Untitled note');
-  });
-
-  it('names the created Entity after the typed search query', () => {
-    nextCreatedId = 'iron';
-    const store = TestBed.inject(HexMapStore);
-    store.paintAt({ q: 0, r: 0 }, 'forest');
-    store.select({ q: 0, r: 0 }, null);
-    const fixture = render();
-    const el = fixture.nativeElement as HTMLElement;
-
-    (byId(el, 'entity-link-pick') as HTMLButtonElement).click();
-    fixture.detectChanges();
-
-    const search = byId(el, 'entity-link-search') as HTMLInputElement;
-    search.value = 'Ironhold';
-    search.dispatchEvent(new Event('input'));
-    fixture.detectChanges();
-
-    (byId(el, 'entity-link-create-note') as HTMLButtonElement).click();
-    fixture.detectChanges();
-
-    expect(createdCalls).toEqual([{ name: 'Ironhold', type: 'core.note' }]);
-    expect(byId(el, 'entity-link-name')?.textContent).toContain('Ironhold');
   });
 
   it('creates a new Hex Map and links a selected Feature to it (city pin → city map)', () => {
@@ -741,41 +690,14 @@ describe('Inspector Entity Link control', () => {
 
     (byId(el, 'entity-link-pick') as HTMLButtonElement).click();
     fixture.detectChanges();
-
-    (byId(el, 'entity-link-create-map') as HTMLButtonElement).click();
+    (byId(el, 'entity-link-create-core.hexmap') as HTMLButtonElement).click();
     fixture.detectChanges();
 
-    // The Feature's own link points at the new hexmap — independent of the Hex.
-    expect(createdCalls).toEqual([{ name: 'Untitled map', type: 'core.hexmap' }]);
+    // The Feature's own link points at the new hexmap — independent of the Hex it sits on.
+    expect(createdCalls.map((c) => c.type)).toEqual(['core.hexmap']);
     expect(store.document().hexes['0,0'].feature).toEqual({
       ref: 'settlement',
       entityId: 'city-map',
     });
-  });
-
-  it('renders the control chrome in French', () => {
-    const store = TestBed.inject(HexMapStore);
-    store.paintAt({ q: 0, r: 0 }, 'forest');
-    store.select({ q: 0, r: 0 }, null);
-    const fixture = render();
-    TestBed.inject(TranslocoService).setActiveLang('fr');
-    fixture.detectChanges();
-
-    expect(byId(fixture.nativeElement, 'entity-link-pick')?.textContent).toContain('Lier une entité');
-  });
-
-  it('renders the create-and-link row in French', () => {
-    const store = TestBed.inject(HexMapStore);
-    store.paintAt({ q: 0, r: 0 }, 'forest');
-    store.select({ q: 0, r: 0 }, null);
-    const fixture = render();
-    const el = fixture.nativeElement as HTMLElement;
-
-    (byId(el, 'entity-link-pick') as HTMLButtonElement).click();
-    TestBed.inject(TranslocoService).setActiveLang('fr');
-    fixture.detectChanges();
-
-    expect(byId(el, 'entity-link-create-note')?.textContent).toContain('Nouvelle note');
-    expect(byId(el, 'entity-link-create-map')?.textContent).toContain('Nouvelle carte');
   });
 });

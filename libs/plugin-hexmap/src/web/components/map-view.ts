@@ -1,7 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
-import { provideTranslocoScope, TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { ENTITY_SESSION } from '@hexly/web-entity';
-import { HEXMAP_TRANSLATIONS } from '../../i18n/hexmap-translations';
 import { HexMapStore } from '../services/hexmap-store';
 import { MapCanvas } from './map-canvas';
 import { ToolPalette } from './tool-palette';
@@ -30,10 +29,11 @@ import { EditorRail } from './editor-rail';
   // route-scoped ENTITY_SESSION from an ancestor, and lives and dies with the Map View:
   // its children (canvas, palette, docks) resolve this one instance.
   //
-  // The `map` catalog rides along on the same injector (ADR-0049): this is the only component the
-  // app mounts from this lib, and every `map.*` reader sits in this subtree, so the copy is fetched
-  // when the hex map first renders and never before. Children inherit the scope from here.
-  providers: [HexMapStore, provideTranslocoScope(HEXMAP_TRANSLATIONS)],
+  // The `map` catalog is *not* provided here: it is an eager scope now, registered app-wide by
+  // `providePluginHexmap()` (ADR-0049, #199). It has to be — the type's chrome labels are `map.*`
+  // keys the app's header, browser, and command palette render, where no pipe of this lib exists to
+  // trigger a lazy load. The canvas below still ships in its own chunk; only the copy loads at boot.
+  providers: [HexMapStore],
   imports: [MapCanvas, ToolPalette, Inspector, RegionsPanel, EditorRail, TranslocoPipe],
   template: `
     <!-- Full-bleed canvas; all side chrome floats over it (ADR-0013). -->

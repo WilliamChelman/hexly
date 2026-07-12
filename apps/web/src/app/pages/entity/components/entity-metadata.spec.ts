@@ -6,6 +6,7 @@ import { CORE_NOTE, EntityDetail } from '@hexly/domain';
 import { CORE_HEXMAP, emptyHexMap } from '@hexly/plugin-hexmap';
 import { EntitySession } from '../services/entity-session';
 import { ENTITY_SESSION } from '@hexly/web-entity';
+import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { EntityMetadata } from './entity-metadata';
 
 describe('EntityMetadata', () => {
@@ -32,6 +33,7 @@ describe('EntityMetadata', () => {
     await TestBed.configureTestingModule({
       imports: [EntityMetadata, provideTranslocoTesting()],
       providers: [
+        providePluginHexmap(),
         EntitySession,
         { provide: ENTITY_SESSION, useExisting: EntitySession },
         provideHttpClient(),
@@ -85,5 +87,52 @@ describe('EntityMetadata', () => {
     fixture.detectChanges();
 
     expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid=entity-metadata]')).toBeNull();
+  });
+});
+
+/**
+ * The absent-plugin path, as a reader sees it (ADR-0048). With no map plugin, `core.hexmap` types no
+ * key, so the grid is not a Field at all: it falls through to plain Metadata and is shown, rather than
+ * being skipped as a Structured Field's value (the test above) or dropped.
+ */
+describe('EntityMetadata without the Hex Map plugin', () => {
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [EntityMetadata, provideTranslocoTesting()],
+      providers: [
+        EntitySession,
+        { provide: ENTITY_SESSION, useExisting: EntitySession },
+        provideHttpClient(),
+        provideHttpClientTesting(),
+      ],
+    }).compileComponents();
+  });
+
+  it('shows a Hex Map’s grid as plain Metadata — an unrendered value, never a lost one', () => {
+    TestBed.inject(EntitySession).adopt({
+      id: 'm1',
+      worldId: 'w1',
+      name: 'Aldermoor',
+      types: [CORE_HEXMAP],
+      tags: [],
+      visibility: 'private',
+      version: 1,
+      seq: 1,
+      createdAt: 1,
+      updatedAt: 1,
+      document: {
+        content: { format: 'tiptap-v1', snapshot: {} },
+        metadata: { grid: emptyHexMap(), status: 'canon' },
+      },
+    });
+    const fixture = TestBed.createComponent(EntityMetadata);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    // The dock renders, and the grid is one of its rows: the map's data is still there to read, and
+    // to export.
+    expect(el.querySelector('[data-testid=entity-metadata]')).not.toBeNull();
+    expect(el.textContent).toContain('grid');
+    expect(el.textContent).toContain('status');
   });
 });

@@ -1,28 +1,47 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, signal, untracked } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  DestroyRef,
+  effect,
+  inject,
+  input,
+  output,
+  signal,
+  untracked,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient, ActiveWorld } from '@hexly/web-core';
 import { Button, Field, Icon, EntitySearchPicker } from '@hexly/web-ui';
-import { CORE_HEXMAP } from '../../lib';
-import { HexMapStore } from '../services/hexmap-store';
+import { ENTITY_TYPES } from '../lib/entity-types';
 
 /**
- * The Inspector's Entity Link control (issue #76, CONTEXT.md → Entity Link) for the
- * single selected linkable Map element (a Hex, Feature, or Region — never a Label):
- * pick an Entity to link, follow it, or remove it. The picker searches server-side
- * via `list({ q })` and resolves the linked name via `list({ ids: [id] })` (ADR-0025),
- * never holding the whole owner list. A link to a deleted/inaccessible target renders
- * non-navigable rather than a dead link (issue #78); the id stays in the document.
+ * The **Entity Link** control (issue #76, CONTEXT.md → Entity Link) for one link-carrying slot: pick
+ * an Entity to link, follow it, or remove it. The picker searches server-side via `list({ q })` and
+ * resolves the linked name via `list({ ids: [id] })` (ADR-0025), never holding the whole owner list.
+ * A link to a deleted/inaccessible target renders non-navigable rather than a dead link (issue #78);
+ * the id stays in the document.
+ *
+ * The host owns the link — a Map element's, and any other slot that comes to carry one — and this
+ * component only reads the current value and emits the next one.
+ *
+ * It names no type id. Create-and-link (issue #77) offers every Type the {@link ENTITY_TYPES} registry
+ * knows, so a plugin's type and a World's own are as reachable as a Note, and a created Entity's
+ * fallback name is that type's own untitled label. A type declaring a **required** Field is left out:
+ * it cannot be minted blind (the write gate, #187), and there is no room mid-pick for the dialog that
+ * would collect one — the same rule the New split button applies, and a rule about a type's *schema*,
+ * never about an id.
  */
 @Component({
-  selector: 'app-entity-link',
+  selector: 'app-entity-link-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [Button, Field, Icon, EntitySearchPicker, RouterLink, TranslocoPipe],
   template: `
-    <div appField [label]="'map.inspector.linkedEntity' | transloco">
-      @let id = store.selectedEntityLink();
+    <div appField [label]="'fields.entityLink.linkedEntity' | transloco">
+      @let id = entityId();
       @if (id) {
         <div class="flex items-center gap-2">
           @if (linked(); as e) {
@@ -39,9 +58,9 @@ import { HexMapStore } from '../services/hexmap-store';
             <span
               class="block flex-1 min-w-0 truncate font-display text-base italic text-ink-muted"
               data-testid="entity-link-dangling"
-              [attr.title]="'map.inspector.linkUnavailable' | transloco"
+              [attr.title]="'fields.entityLink.unavailable' | transloco"
             >
-              <span aria-hidden="true">→ </span>{{ 'map.inspector.linkUnavailable' | transloco }}
+              <span aria-hidden="true">→ </span>{{ 'fields.entityLink.unavailable' | transloco }}
             </span>
           } @else {
             <!-- List still loading: neutral placeholder, never a clickable dead link. -->
@@ -57,16 +76,16 @@ import { HexMapStore } from '../services/hexmap-store';
             icon
             danger
             data-testid="entity-link-remove"
-            [attr.aria-label]="'map.inspector.removeLink' | transloco"
-            [attr.title]="'map.inspector.removeLink' | transloco"
-            (click)="remove()"
+            [attr.aria-label]="'fields.entityLink.remove' | transloco"
+            [attr.title]="'fields.entityLink.remove' | transloco"
+            (click)="linkChange.emit(null)"
           >
             <app-icon name="close" [size]="16" />
           </button>
         </div>
       } @else {
         <button type="button" appButton variant="ghost" size="sm" data-testid="entity-link-pick" (click)="toggle()">
-          {{ 'map.inspector.pickLink' | transloco }}
+          {{ 'fields.entityLink.set' | transloco }}
         </button>
       }
 
@@ -74,46 +93,49 @@ import { HexMapStore } from '../services/hexmap-store';
         <app-entity-search-picker
           class="mt-2 block"
           testid="entity-link"
-          placeholderKey="map.inspector.searchLink"
-          emptyKey="map.inspector.linkEmpty"
+          placeholderKey="fields.entityLink.search"
+          emptyKey="fields.entityLink.empty"
           [query]="query()"
           (queryChange)="query.set($event)"
           (pick)="pick($event.id)"
         >
-          <!-- Create-and-link in the same flow (issue #77): query names it, empty → default.
-               Projected below the picker's option list; it stays pinned as the list scrolls. -->
-          <div class="mt-1 flex gap-1 border-t border-line pt-1">
-            <button
-              type="button"
-              appButton
-              variant="ghost"
-              size="sm"
-              class="flex-1"
-              data-testid="entity-link-create-note"
-              (click)="create('core.note')"
-            >
-              + {{ 'map.inspector.newNote' | transloco }}
-            </button>
-            <button
-              type="button"
-              appButton
-              variant="ghost"
-              size="sm"
-              class="flex-1"
-              data-testid="entity-link-create-map"
-              (click)="create('core.hexmap')"
-            >
-              + {{ 'map.inspector.newMap' | transloco }}
-            </button>
+          <!-- Create-and-link in the same flow (issue #77): the query names it, empty → that type's
+               own untitled default. Projected below the picker's option list; it stays pinned as the
+               list scrolls. -->
+          <div class="mt-1 flex flex-wrap gap-1 border-t border-line pt-1">
+            @for (type of creatable(); track type.id) {
+              <button
+                type="button"
+                appButton
+                variant="ghost"
+                size="sm"
+                class="flex-1"
+                [attr.data-testid]="'entity-link-create-' + type.id"
+                (click)="create(type.id)"
+              >
+                + {{ type.name }}
+              </button>
+            }
           </div>
         </app-entity-search-picker>
       }
     </div>
   `,
 })
-export class EntityLink {
-  protected readonly store = inject(HexMapStore);
-  protected readonly activeWorld = inject(ActiveWorld);
+export class EntityLinkPicker {
+  /** The linked Entity's id, as the host holds it — `null` when the slot carries no link. */
+  readonly entityId = input<string | null>(null);
+  /**
+   * *Which slot* the link belongs to, as an opaque handle — the Hex Map passes its selection. When it
+   * changes the picker closes and its query clears, so a pick always lands on the slot the picker was
+   * opened for: two unlinked Hexes both read `entityId === null`, and only this tells them apart.
+   */
+  readonly slot = input<unknown>(null);
+  /** The link the host should adopt: an Entity id when one is picked or created, `null` on remove. */
+  readonly linkChange = output<string | null>();
+
+  private readonly types = inject(ENTITY_TYPES);
+  private readonly activeWorld = inject(ActiveWorld);
   private readonly entitiesClient = inject(EntitiesClient);
   private readonly transloco = inject(TranslocoService);
   private readonly destroyRef = inject(DestroyRef);
@@ -133,11 +155,23 @@ export class EntityLink {
   protected readonly open = signal(false);
   protected readonly query = signal('');
 
+  /**
+   * The Types create-and-link offers, each with the name to print on its button. Re-resolves on a
+   * language switch (`activeLang` is the reactive dependency) and as a World's own types arrive.
+   */
+  protected readonly creatable = computed(() => {
+    this.transloco.activeLang();
+    return this.types
+      .all()
+      .filter((def) => !def.fields?.some((field) => field.required))
+      .map((def) => ({ id: def.id, name: this.types.name(def.id) }));
+  });
+
   constructor() {
     // Resolve the linked name on demand (ADR-0025): created entities are known locally,
     // others fetched by id. onCleanup cancels stale responses on link change.
     effect((onCleanup) => {
-      const id = this.store.selectedEntityLink();
+      const id = this.entityId();
       this.linked.set(null);
       this.resolved.set(false);
       if (!id) {
@@ -160,10 +194,10 @@ export class EntityLink {
       onCleanup(() => sub.unsubscribe());
     });
 
-    // Close the picker and reset the query whenever the selected element changes so
-    // a pick() always targets the element the picker was opened for.
+    // Close the picker and reset the query whenever the host's slot changes, so a pick() always
+    // targets the slot the picker was opened for.
     effect(() => {
-      this.store.selection();
+      this.slot();
       this.open.set(false);
       this.query.set('');
     });
@@ -175,34 +209,28 @@ export class EntityLink {
   }
 
   protected pick(id: string): void {
-    this.store.linkEntity(id);
+    this.linkChange.emit(id);
     this.open.set(false);
   }
 
-  // Create new owner-scoped Entity and link in one flow (issue #77).
-  // Created Entity appended locally so its name resolves immediately.
+  /**
+   * Create a World-scoped Entity of `type` and link it in one flow (issue #77). The typed query names
+   * it; an empty one falls back to the type's own untitled label — the same default the New button
+   * mints with, resolved through the registry rather than branched on an id.
+   */
   protected create(type: EntityType): void {
-    const name =
-      this.query().trim() ||
-      // The fallback name is this lib's own copy (ADR-0049). The app carries the same two
-      // strings for the Entities it mints; they are deliberately duplicated so neither
-      // project reads the other's catalog.
-      this.transloco.translate(type === CORE_HEXMAP ? 'map.untitledMap' : 'map.untitledNote');
+    const name = this.query().trim() || this.types.chromeLabel(type, 'untitled');
     this.entitiesClient
       // Scope the create-and-link Entity to the World in the URL (ADR-0028) so it
-      // lands in the same World as the map being edited, not the owner's oldest.
+      // lands in the same World as the Entity being edited, not the owner's oldest.
       .create(name, [type], this.activeWorld.worldId() ?? undefined)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((entity) => {
         // Remember it locally so its name resolves without a server round trip,
         // then link — the resolve effect picks it up from `created`.
         this.created.update((list) => [...list, entity]);
-        this.store.linkEntity(entity.id);
+        this.linkChange.emit(entity.id);
         this.open.set(false);
       });
-  }
-
-  protected remove(): void {
-    this.store.unlinkEntity();
   }
 }

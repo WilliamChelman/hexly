@@ -8,7 +8,8 @@ import { MockEntitiesClient, MockNudgeBusClient } from '@hexly/web-core/testing'
 import { EntitiesClient, NudgeBusClient, EVICTED, Watched } from '@hexly/web-core';
 import { EntitySession } from './entity-session';
 import { ENTITY_SESSION } from '@hexly/web-entity';
-import { HexMapStore } from '@hexly/plugin-hexmap/web';
+import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
+import { HexMapStore } from '@hexly/plugin-hexmap/testing';
 
 describe('EntitySession', () => {
   let session: EntitySession;
@@ -55,6 +56,7 @@ describe('EntitySession', () => {
     TestBed.configureTestingModule({
       imports: [provideTranslocoTesting()],
       providers: [
+        providePluginHexmap(),
         EntitySession,
         // The session is the central store; HexMapStore edits it through the ENTITY_SESSION
         // token, as the app's composition root wires it (ADR-0048).

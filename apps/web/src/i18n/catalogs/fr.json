@@ -102,9 +102,6 @@
   "editorShell": {
     "tabTitle": "Hexly",
     "tabTitleNamed": "{{name}} — Hexly",
-    "hexMap": "Carte hexagonale",
-    "mapTitleLabel": "Titre de la carte",
-    "renameMap": "Renommer la carte",
     "reload": "Recharger",
     "saving": "Enregistrement…",
     "share": "Partager",
@@ -115,10 +112,8 @@
     },
     "view": {
       "switchLabel": "Changer de vue",
-      "map": "Carte",
       "note": "Note",
-      "fields": "Champs",
-      "editorLabel": "Notes de la carte"
+      "fields": "Champs"
     },
     "save": {
       "conflict": "Version plus récente sur le serveur",
@@ -200,8 +195,7 @@
     "footerTokens": "Jetons de design"
   },
   "domain": {
-    "untitledNote": "Note sans titre",
-    "untitledMap": "Carte sans titre"
+    "untitledNote": "Note sans titre"
   },
   "common": {
     "language": "Langue",
@@ -246,7 +240,6 @@
     "worlds": "Mondes",
     "commands": "Commandes",
     "createNote": "Créer une note",
-    "createMap": "Créer une carte",
     "goToUsers": "Aller aux utilisateurs",
     "goToAdmin": "Aller à l'administration",
     "goToStyleguide": "Aller au guide de style",

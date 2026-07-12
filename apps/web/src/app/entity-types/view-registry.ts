@@ -66,11 +66,17 @@ export class ViewRegistry {
   /**
    * Request `id`'s component, if it is deferred and not already here. Idempotent, so it is safe to call
    * on every activation; toggling back to a fetched View is synchronous.
+   *
+   * Returns when the component is here — the same in-flight promise for concurrent callers, and an
+   * already-resolved one for a View whose body is present. The page ignores it and re-renders off
+   * {@link component}; a caller that must wait for a deferred View's chunk awaits this.
    */
-  fetch(id: ViewId | null | undefined): void {
+  fetch(id: ViewId | null | undefined): Promise<void> {
     const definition = this.resolve(id);
     const { id: viewId, loadComponent } = definition;
-    if (!loadComponent || this.fetched().has(viewId) || this.inFlight.has(viewId)) return;
+    if (!loadComponent || this.fetched().has(viewId)) return Promise.resolve();
+    const inFlight = this.inFlight.get(viewId);
+    if (inFlight) return inFlight;
 
     const done = loadComponent()
       .then((component) => {
@@ -78,5 +84,6 @@ export class ViewRegistry {
       })
       .finally(() => this.inFlight.delete(viewId));
     this.inFlight.set(viewId, done);
+    return done;
   }
 }

@@ -9,6 +9,7 @@ import { CreateEntityDialogState } from './create-entity-dialog.state';
 import { CreateEntityDialog } from './create-entity-dialog';
 import { TypeRegistry } from '../../entity-types/type-registry';
 import { CORE_VIEW_CONTENT, TypeDefinition } from '@hexly/web-entity';
+import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 
 /** A plugin-style type declaring one required Field — to exercise the create-time required-Fields form. */
 const monster: TypeDefinition = {
@@ -48,6 +49,7 @@ describe('CreateEntityDialog', () => {
     TestBed.configureTestingModule({
       imports: [CreateEntityDialog, provideTranslocoTesting()],
       providers: [
+        providePluginHexmap(),
         provideRouter([]),
         { provide: EntitiesClient, useValue: entitiesClient },
         { provide: WorldStore, useValue: { worlds: () => worlds } },

@@ -1,4 +1,15 @@
 {
+  "hexmap": {
+    "eyebrow": "Carte hexagonale",
+    "titleLabel": "Titre de la carte",
+    "rename": "Renommer la carte",
+    "editorLabel": "Notes de la carte",
+    "create": "Créer une carte",
+    "untitled": "Carte sans titre",
+    "view": {
+      "map": "Carte"
+    }
+  },
   "toolPalette": {
     "tools": "Outils",
     "select": "Sélection",
@@ -29,14 +40,6 @@
     "name": "Nom",
     "tags": "Tags",
     "tagsEmpty": "Aucun tag",
-    "linkedEntity": "Entité liée",
-    "pickLink": "Lier une entité…",
-    "removeLink": "Retirer le lien",
-    "searchLink": "Rechercher des entités…",
-    "linkEmpty": "Aucune entité",
-    "linkUnavailable": "Indisponible",
-    "newNote": "Nouvelle note",
-    "newMap": "Nouvelle carte",
     "color": "Couleur",
     "membership": "Appartenance",
     "membershipDirection": "Direction d’appartenance",
@@ -75,8 +78,6 @@
     "label": "Carte hexagonale"
   },
   "moveBlocked": "Déplacement bloqué — un obstacle gêne le passage.",
-  "untitledNote": "Note sans titre",
-  "untitledMap": "Carte sans titre",
   "terrain": {
     "grass": "Prairie",
     "forest": "Forêt",

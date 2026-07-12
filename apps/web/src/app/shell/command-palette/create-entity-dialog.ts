@@ -17,7 +17,7 @@ import { Button, Field, Input, Dialog } from '@hexly/web-ui';
 import { CreateEntityDialogState } from './create-entity-dialog.state';
 import { TypeRegistry } from '../../entity-types/type-registry';
 import { EntityTypesEditor } from '../../pages/entity/components/entity-types-editor';
-import { FieldControl } from '@hexly/web-entity';
+import { FieldControl } from '@hexly/web-entity/controls';
 
 /**
  * The create-Entity flow behind the `>`-prefix Create Note / Create Map

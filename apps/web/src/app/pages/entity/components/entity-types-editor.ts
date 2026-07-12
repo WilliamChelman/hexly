@@ -3,7 +3,7 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { FieldSchema, Metadata, NO_STRUCTURED_DATA_TYPES, validateFields, writeField } from '@hexly/domain';
 import { Button, Chip } from '@hexly/web-ui';
 import { TypeRegistry } from '../../../entity-types/type-registry';
-import { FieldControl } from '@hexly/web-entity';
+import { FieldControl } from '@hexly/web-entity/controls';
 
 /**
  * Pick, add, remove, and reorder an Entity's ordered Entity Type set, `types[0]` primary (ADR-0048,

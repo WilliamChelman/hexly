@@ -5,5 +5,14 @@
   "prefix": "app",
   "projectType": "library",
   "tags": ["scope:web", "type:util"],
-  "targets": {}
+  "targets": {
+    "test": {
+      "executor": "@angular/build:unit-test",
+      "options": {
+        "watch": false,
+        "buildTarget": "web:build:development",
+        "tsConfig": "libs/web-entity/tsconfig.spec.json"
+      }
+    }
+  }
 }

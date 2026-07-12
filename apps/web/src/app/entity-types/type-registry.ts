@@ -1,8 +1,16 @@
 import { inject, Injectable, signal } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
 import { CORE_NOTE, EntityType, FieldSchema, resolveFields, structuredDataTypeSet } from '@hexly/domain';
-import { HEX_GRID_DATA_TYPE } from '@hexly/plugin-hexmap';
-import { CORE_VIEW_FIELDS, PLUGIN_TYPES, TypeDefinition, TypeLabels, ViewId } from '@hexly/web-entity';
+import {
+  CORE_VIEW_CONTENT,
+  CORE_VIEW_FIELDS,
+  EntityTypes,
+  PLUGIN_DATA_TYPES,
+  PLUGIN_TYPES,
+  TypeDefinition,
+  TypeLabels,
+  ViewId,
+} from '@hexly/web-entity';
 import { CORE_TYPE_DEFINITIONS } from './core-types';
 
 /**
@@ -13,13 +21,17 @@ import { CORE_TYPE_DEFINITIONS } from './core-types';
  * per-type icon, labels, and afforded view surfaces, replacing the scattered
  * `type === 'hexmap'` / `type === 'note'` branches (ADR-0048).
  *
- * Core `note`/`hexmap` register through the same path a bundled plugin does — the
- * two seedings below are one call with different data (ADR-0048). A World's
- * user-defined types join the same registry at runtime, projected by
- * {@link WorldTypesLoader} (#191).
+ * `core.note` registers through the same path a bundled plugin does — the two seedings below are one
+ * call with different data (ADR-0048) — and it is the only type the app itself seeds: the Hex Map's
+ * chrome arrives from `providePluginHexmap()` like any other plugin's (ADR-0050, #199). A World's
+ * user-defined types join the same registry at runtime, projected by {@link WorldTypesLoader} (#191).
+ *
+ * It implements {@link EntityTypes}, the read contract a lib injects (the app binds it to
+ * {@link ENTITY_TYPES} in `app.config.ts`), so a shared control can ask what types exist without
+ * depending on `apps/web`.
  */
 @Injectable({ providedIn: 'root' })
-export class TypeRegistry {
+export class TypeRegistry implements EntityTypes {
   private readonly transloco = inject(TranslocoService);
   private readonly definitions = signal<readonly TypeDefinition[]>([]);
 
@@ -28,18 +40,20 @@ export class TypeRegistry {
 
   constructor() {
     for (const def of CORE_TYPE_DEFINITIONS) this.register(def);
-    // The bundled plugins' types (`dnd.monster`, #192): instance-wide, through the call the core just
-    // used. They arrive from whichever `providePluginX()` the app provided, so the registry never
-    // learns a plugin's name — and a spec gets a plugin's types by providing that plugin, nothing else.
+    // The bundled plugins' types (`core.hexmap`, `dnd.monster`): instance-wide, through the call the
+    // core just used. They arrive from whichever `providePluginX()` the app provided, so the registry
+    // never learns a plugin's name — and a spec gets a plugin's types by providing that plugin,
+    // nothing else. Drop one, and its Entities degrade to the generic Field view (see `viewsFor`).
     for (const def of inject(PLUGIN_TYPES, { optional: true }) ?? []) this.register(def);
   }
 
   /**
    * The **Structured Field** data-types this build carries (ADR-0050) — the web twin of the API's
-   * `BUNDLED_STRUCTURED_DATA_TYPES`, threaded into the domain to mint a declared Field's default. A
-   * data-type has no `providePlugin()` contribution yet, so the app names the plugin's directly.
+   * `BUNDLED_STRUCTURED_DATA_TYPES`, threaded into the domain to validate a Field and mint its
+   * default. Composed from the plugins the app provided (#199), so the grid arrives with the Hex Map
+   * rather than being named here: the web registers a data-type exactly as the API does, in one place.
    */
-  readonly structuredDataTypes = structuredDataTypeSet([HEX_GRID_DATA_TYPE]);
+  readonly structuredDataTypes = structuredDataTypeSet(inject(PLUGIN_DATA_TYPES, { optional: true }) ?? []);
 
   register(definition: TypeDefinition): () => void {
     this.definitions.update((list) => [...list, definition]);
@@ -74,16 +88,23 @@ export class TypeRegistry {
    *
    * A registered type affords exactly the Views it declares: a plugin shipping a
    * bespoke view does not also get the generic Field View, while a fields-only type
-   * (every user-defined one, #191) declares `core.view.fields` outright. Only an
-   * unregistered type — a missing plugin — falls back to it, rendering an inert chip
-   * over its values as plain Metadata (#187).
+   * (every user-defined one, #191) declares `core.view.fields` outright.
+   *
+   * An **unregistered** type — a plugin this build does not bundle — affords the Content view and
+   * the generic Field view instead (#199). Both, and in that order: the Entity opens on the lore it
+   * has always had, and one toggle away its type shows as an inert chip over its values as plain
+   * Metadata (#187) — a Hex Map on an Instance without the map plugin, exactly as ADR-0048 promised.
+   * Nothing is hidden by a missing plugin; the Metadata, grid and all, is still there to read.
    */
   viewsFor(types: readonly string[] | null | undefined): ViewId[] {
     const seen = new Set<ViewId>();
     for (const type of types ?? []) {
       const def = this.get(type);
       if (def) for (const view of def.views) seen.add(view);
-      else seen.add(CORE_VIEW_FIELDS);
+      else {
+        seen.add(CORE_VIEW_CONTENT);
+        seen.add(CORE_VIEW_FIELDS);
+      }
     }
     return [...seen];
   }

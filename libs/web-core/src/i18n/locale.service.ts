@@ -89,12 +89,25 @@ export class LocaleService {
     }
   }
 
-  // Switch the UI language live and remember it. Raises `full` curtain while
-  // loading an uncached catalog; shell debounces so cached switches show nothing.
+  /**
+   * Switch the UI language live and remember it. Raises the `full` curtain while loading an uncached
+   * catalog; the shell debounces it, so a cached switch shows nothing.
+   *
+   * The language is re-announced once the catalogs have landed, and that second announcement is what
+   * makes an **eager scope** survive a switch. A Transloco pipe carrying no scope of its own — every
+   * pipe outside the one component that provides one — re-resolves the moment the *root* catalog
+   * lands, and nothing re-emits for a scope that lands after it: the eager copy would sit there
+   * rendering raw keys, which is precisely the copy no pipe of its own lib is mounted to reload
+   * (ADR-0049). `langChanges$` is deliberately not deduplicated, so re-setting the same language
+   * re-emits and every pipe resolves against the catalogs now in hand.
+   */
   set(lang: Locale): void {
     this.pref.set(lang);
     const end = this.shell.beginLoading('full');
-    this.loadCatalogs(lang).finally(end);
+    this.loadCatalogs(lang).finally(() => {
+      this.transloco.setActiveLang(lang);
+      end();
+    });
   }
 
   /**

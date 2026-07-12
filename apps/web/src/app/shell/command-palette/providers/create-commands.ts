@@ -6,11 +6,14 @@ import { Command, CommandProvider } from '../command';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 
 /**
- * The `>`-prefix static Commands that open the create dialog (ADR-0032):
- * "Create Note" and "Create Map" are two distinct Commands, not one with a
- * type picker. Each just flips {@link CreateEntityDialogState} — the dialog
- * itself, not this Provider, drives the name/World form and the actual
- * `EntitiesClient.create()` call.
+ * The `>`-prefix static Commands that open the create dialog (ADR-0032): one Command per registered
+ * Entity Type — "Create Note", "Create Map", "New monster", a World's own — rather than one Command
+ * with a type picker. Each just flips {@link CreateEntityDialogState}; the dialog itself, not this
+ * Provider, drives the name/World form and the actual `EntitiesClient.create()` call.
+ *
+ * Every Command is derived: its id from the type id, its label from the type's own `create` chrome
+ * (ADR-0048). Nothing here is per-type, so a plugin's type gets its Command by being registered —
+ * the palette names no type, not even the Hex Map's (#199).
  */
 @Injectable({ providedIn: 'root' })
 export class CreateCommands implements CommandProvider {
@@ -21,17 +24,10 @@ export class CreateCommands implements CommandProvider {
   readonly prefix = '>';
   readonly label = 'commandPalette.commands';
 
-  // The command id is the palette's stable handle; the type id drives the dialog
-  // and the create label comes from the registry (ADR-0048).
-  private static readonly COMMAND_ID: Record<string, string> = {
-    'core.note': 'create-note',
-    'core.hexmap': 'create-map',
-  };
-
   search(query: string): Observable<readonly Command[]> {
     const q = query.trim().toLowerCase();
     const commands: Command[] = this.types.all().map((def) => ({
-      id: CreateCommands.COMMAND_ID[def.id] ?? `create-${def.id}`,
+      id: `create-${def.id}`,
       label: this.types.chromeLabel(def.id, 'create'),
       run: () => this.dialogState.open(def.id),
     }));

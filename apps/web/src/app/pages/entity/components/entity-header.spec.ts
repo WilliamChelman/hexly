@@ -15,6 +15,7 @@ import { EntityViewStore } from '../services/entity-view-store';
 import { ViewRegistry } from '../../../entity-types/view-registry';
 import { CORE_VIEW_DEFINITIONS } from '../views/core-views';
 import { OwnerSet } from '@hexly/web-ui';
+import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { EntityHeader } from './entity-header';
 import { noteDetail } from './entity-detail.fixtures';
 
@@ -69,6 +70,7 @@ describe('EntityHeader', () => {
     await TestBed.configureTestingModule({
       imports: [EntityHeader, provideTranslocoTesting()],
       providers: [
+        providePluginHexmap(),
         EntitySession,
         { provide: ENTITY_SESSION, useExisting: EntitySession },
         // Page-scoped in the app (provided on EntityPage); provided here since this spec

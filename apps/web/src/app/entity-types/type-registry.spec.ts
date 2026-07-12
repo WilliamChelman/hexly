@@ -1,10 +1,12 @@
 import { provideTranslocoTesting } from '../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { FieldSchema } from '@hexly/domain';
+import { CORE_HEX_GRID } from '@hexly/plugin-hexmap';
 import { DND_MONSTER } from '@hexly/plugin-dnd';
 import { TypeRegistry } from './type-registry';
 import { CORE_VIEW_CONTENT, CORE_VIEW_FIELDS, CORE_VIEW_MAP, TypeDefinition } from '@hexly/web-entity';
 import { DND_VIEW_STAT_BLOCK, providePluginDnd } from '@hexly/plugin-dnd/web';
+import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 
 function definition(id: string, fields?: readonly FieldSchema[]): TypeDefinition {
   return {
@@ -38,14 +40,30 @@ describe('TypeRegistry', () => {
   beforeEach(() => {
     // The registry resolves a code type's name/chrome through Transloco (a user-defined type's
     // authored name never goes near it), so the spec needs the testing catalog. The plugin types are
-    // seeded from DI, so a spec gets `dnd.monster` by composing the plugin as `app.config.ts` does (#192).
-    TestBed.configureTestingModule({ imports: [provideTranslocoTesting()], providers: [providePluginDnd()] });
+    // seeded from DI, so a spec gets `core.hexmap` and `dnd.monster` by composing those plugins as
+    // `app.config.ts` does (#192, ADR-0050).
+    TestBed.configureTestingModule({
+      imports: [provideTranslocoTesting()],
+      providers: [providePluginHexmap(), providePluginDnd()],
+    });
     registry = TestBed.inject(TypeRegistry);
   });
 
-  it('seeds the core types, then the bundled plugins — all through one register()', () => {
-    // `core.note`/`core.hexmap` and `dnd.monster` arrive by the same `register()` (ADR-0048, #192).
+  it('seeds the core type, then the bundled plugins — all through one register()', () => {
+    // `core.note` and the two plugins' types arrive by the same `register()` (ADR-0048): the app seeds
+    // only the base body's type, and every other type in the build is a plugin's.
     expect(registry.all().map((d) => d.id)).toEqual(['core.note', 'core.hexmap', DND_MONSTER]);
+  });
+
+  it('composes its Structured Field data-types from the plugins provided (ADR-0050, #199)', () => {
+    // The web twin of the API's `BUNDLED_STRUCTURED_DATA_TYPES`: the grid arrives with the Hex Map
+    // plugin, so the app names no data-type — and a build without it resolves none.
+    expect([...registry.structuredDataTypes.keys()]).toEqual([CORE_HEX_GRID]);
+    expect(registry.structuredDataTypes.get(CORE_HEX_GRID)?.empty()).toEqual({
+      hexes: {},
+      regions: [],
+      labels: [],
+    });
   });
 
   it('resolves a registered definition by its type id', () => {
@@ -107,10 +125,11 @@ describe('TypeRegistry', () => {
     expect(registry.viewsFor(['core.note'])).toEqual([CORE_VIEW_CONTENT]);
   });
 
-  it('falls back to the generic Field View for an unregistered type — the missing-plugin case', () => {
-    // No definition registered for `pathfinder.monster`: the Entity still affords the generic View,
-    // which renders it as an inert chip over its plain Metadata rather than a blank screen.
-    expect(registry.viewsFor(['pathfinder.monster'])).toEqual([CORE_VIEW_FIELDS]);
+  it('falls back to Content plus the generic Field View for an unregistered type — the missing-plugin case', () => {
+    // No definition registered for `pathfinder.monster`: the Entity still opens on the lore every
+    // Entity has, and the generic View renders its type as an inert chip over its plain Metadata —
+    // never a blank screen, and never a hidden value (#187, #199).
+    expect(registry.viewsFor(['pathfinder.monster'])).toEqual([CORE_VIEW_CONTENT, CORE_VIEW_FIELDS]);
   });
 
   it('resolves the union of Field schemas a types[] set declares, primary type first', () => {
@@ -175,5 +194,39 @@ describe('TypeRegistry', () => {
       expect(registry.name('pathfinder.monster')).toBe('entityBrowser.type.pathfinder.monster');
       expect(registry.chromeLabel('pathfinder.monster', 'create')).toBe('pathfinder.monster.create');
     });
+  });
+});
+
+/**
+ * An Instance that does **not** bundle the map plugin — ADR-0048's absent-plugin degradation, which a
+ * build composed one provider short of the app's is what exercises.
+ */
+describe('TypeRegistry without the Hex Map plugin', () => {
+  let registry: TypeRegistry;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({ imports: [provideTranslocoTesting()], providers: [providePluginDnd()] });
+    registry = TestBed.inject(TypeRegistry);
+  });
+
+  it('knows nothing of core.hexmap — it was the plugin’s, and the plugin is gone', () => {
+    expect(registry.all().map((d) => d.id)).toEqual(['core.note', DND_MONSTER]);
+    expect(registry.get('core.hexmap')).toBeUndefined();
+    // Nor its grid: a Field naming `core.hex-grid` resolves against an empty set (ADR-0050).
+    expect(registry.structuredDataTypes.size).toBe(0);
+  });
+
+  it('opens an existing Hex Map on its Content, with the generic Field view one toggle away', () => {
+    // The Entity opens, and nothing is hidden: the lore renders as it always did, and the grid — a
+    // Metadata value like any other — is still there, under an unrendered Field rather than a canvas.
+    expect(registry.viewsFor(['core.hexmap'])).toEqual([CORE_VIEW_CONTENT, CORE_VIEW_FIELDS]);
+    // No map View is afforded by anything, so the header offers no toggle to a canvas that isn't here.
+    expect(registry.typeIdsForView(CORE_VIEW_MAP)).toEqual([]);
+  });
+
+  it('still renders a Hex Map’s chrome — the core note’s, the always-registered fallback', () => {
+    // `resolve()` never returns undefined, so the header, card, and dashboard have an icon and labels
+    // to draw for an Entity whose primary type this build cannot name.
+    expect(registry.resolve('core.hexmap').id).toBe('core.note');
   });
 });

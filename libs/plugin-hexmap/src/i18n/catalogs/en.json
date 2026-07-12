@@ -1,4 +1,15 @@
 {
+  "hexmap": {
+    "eyebrow": "Hex map",
+    "titleLabel": "Map title",
+    "rename": "Rename map",
+    "editorLabel": "Map notes",
+    "create": "Create Map",
+    "untitled": "Untitled map",
+    "view": {
+      "map": "Map"
+    }
+  },
   "toolPalette": {
     "tools": "Tools",
     "select": "Select",
@@ -29,14 +40,6 @@
     "name": "Name",
     "tags": "Tags",
     "tagsEmpty": "No tags",
-    "linkedEntity": "Linked entity",
-    "pickLink": "Link an entity…",
-    "removeLink": "Remove link",
-    "searchLink": "Search entities…",
-    "linkEmpty": "No entities",
-    "linkUnavailable": "Unavailable",
-    "newNote": "New note",
-    "newMap": "New map",
     "color": "Color",
     "membership": "Membership",
     "membershipDirection": "Membership direction",
@@ -75,8 +78,6 @@
     "label": "Hex map"
   },
   "moveBlocked": "Move blocked — something's in the way.",
-  "untitledNote": "Untitled note",
-  "untitledMap": "Untitled map",
   "terrain": {
     "grass": "Grassland",
     "forest": "Forest",

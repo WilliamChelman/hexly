@@ -7,6 +7,7 @@ import { EntityDetail } from '@hexly/domain';
 import { ActiveWorld, EntitiesClient } from '@hexly/web-core';
 import { MockEntitiesClient } from '@hexly/web-core/testing';
 import { providePluginDnd } from '@hexly/plugin-dnd/web';
+import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { CORE_VIEW_FIELDS } from '@hexly/web-entity';
 import { NewEntityButton } from './new-entity-button';
 import { TypeRegistry } from './type-registry';
@@ -37,7 +38,12 @@ describe('NewEntityButton', () => {
       imports: [NewEntityButton, provideTranslocoTesting()],
       // The D&D plugin is composed exactly as `app.config.ts` does, so `dnd.monster` reaches the
       // registry — and this component — without the app naming it (#192).
-      providers: [provideRouter([]), { provide: EntitiesClient, useValue: entities }, providePluginDnd()],
+      providers: [
+        provideRouter([]),
+        { provide: EntitiesClient, useValue: entities },
+        providePluginHexmap(),
+        providePluginDnd(),
+      ],
     }).compileComponents();
     navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     TestBed.inject(ActiveWorld).set('w1');

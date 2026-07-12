@@ -1,25 +1,21 @@
-import { MapView } from '@hexly/plugin-hexmap/web';
-import { CORE_VIEW_CONTENT, CORE_VIEW_FIELDS, CORE_VIEW_MAP, ViewDefinition } from '@hexly/web-entity';
+import { CORE_VIEW_CONTENT, CORE_VIEW_FIELDS, ViewDefinition } from '@hexly/web-entity';
 import { ContentView } from './content-view';
 import { GenericFieldView } from './generic-field-view';
 
 /**
- * The two core View registrations, bound to the {@link ViewRegistry} the same way a
- * bundled plugin would register its own View (ADR-0048, *Views* amendment). Kept
- * here beside {@link ContentView} — not in the root `ViewRegistry` — so the heavy
- * view bodies (the map canvas, TipTap) load with the lazy entity chunk and never reach the
- * initial bundle. {@link EntityPage} registers these on construct. `MapView` ships
- * from `@hexly/plugin-hexmap/web`; `ContentView` (block editor + docks) is app-level.
+ * The core View registrations, bound to the {@link ViewRegistry} the same way a bundled plugin
+ * registers its own (ADR-0048, *Views* amendment). Kept here beside {@link ContentView} — not in the
+ * root `ViewRegistry` — so the heavy view bodies (TipTap) load with the lazy entity chunk and never
+ * reach the initial bundle. {@link EntityPage} registers these on construct.
  *
- * The toggle label keys are carried verbatim from the old inline `VIEWS` list so the
- * Map / Note buttons read identically (`editorShell.view.note` labels the content view).
+ * Neither belongs to a Type: {@link ContentView} renders the base body every Entity has, and
+ * {@link GenericFieldView} is the fallback for a type with no registered view. The map View is a
+ * plugin's, and registers through `providePluginHexmap()` (#199) — nothing here knows what a hex is.
+ *
+ * The toggle label keys are carried verbatim from the old inline `VIEWS` list so the Note button
+ * reads identically (`editorShell.view.note` labels the content view).
  */
 export const CORE_VIEW_DEFINITIONS: readonly ViewDefinition[] = [
-  {
-    id: CORE_VIEW_MAP,
-    labelKey: 'editorShell.view.map',
-    component: MapView,
-  },
   {
     id: CORE_VIEW_CONTENT,
     labelKey: 'editorShell.view.note',
