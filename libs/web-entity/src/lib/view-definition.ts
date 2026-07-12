@@ -6,7 +6,7 @@ import { Type } from '@angular/core';
  *
  * Views are their own keyspace, distinct from Entity Type ids (`core.note`, `dnd.monster`) and from
  * the Field data-type ids a **Structured Field** names (`core.hex-grid`): the `core.view.*`
- * sub-namespace keeps a View id from ever being mistaken for either (ADR-0050). Supersedes web-map's
+ * sub-namespace keeps a View id from ever being mistaken for either (ADR-0050). Supersedes the map lib's
  * old two-member `EntityView` union, which was an app-shell concern squatting in the map lib.
  */
 export type ViewId = string;

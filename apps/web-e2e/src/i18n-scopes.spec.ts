@@ -15,14 +15,14 @@ test('a lazily-scoped lib follows a language switch: the map editor flips to Fre
   // (ADR-0049). No TestBed can catch that: the testing harness registers catalogs, not scopes.
   await expect(page.getByPlaceholder('Add tags…')).toBeVisible();
 
-  // web-map's copy, in English: the canvas label and the tool palette group.
+  // The map plugin's copy, in English: the canvas label and the tool palette group.
   await expect(page.getByRole('img', { name: 'Hex map' })).toBeVisible();
   await expect(page.getByRole('group', { name: 'Tools' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Open user menu' }).click();
   await page.getByRole('menuitemradio', { name: 'Français' }).click();
 
-  // The same web-map copy, now French — in place, with no reload and no navigation.
+  // The same map-plugin copy, now French — in place, with no reload and no navigation.
   await expect(page.getByRole('img', { name: 'Carte hexagonale' })).toBeVisible();
   await expect(page.getByRole('group', { name: 'Outils' })).toBeVisible();
   await expect(page.getByRole('group', { name: 'Tools' })).toHaveCount(0);

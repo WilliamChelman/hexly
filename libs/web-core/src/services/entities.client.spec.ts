@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { coordKey, emptyContent, EntityBody, EntityDetail, EntitySummary } from '@hexly/domain';
+import { emptyContent, EntityBody, EntityDetail, EntitySummary } from '@hexly/domain';
 import { EntitiesClient, ENTITY_NUDGE_DEBOUNCE_MS } from './entities.client';
 import { NudgeBusClient } from './nudge-bus.client';
 import { MockNudgeBusClient } from '../testing/nudge-bus.mock';
@@ -269,7 +269,8 @@ describe('EntitiesClient', () => {
   it('saves the body against its base version and reports the saved outcome', () => {
     const painted: EntityBody = {
       content: emptyContent(),
-      metadata: { grid: { hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' } }, regions: [], labels: [] } },
+      // A plugin's structured value, spelled out: web-core carries no dependency on the map plugin.
+      metadata: { grid: { hexes: { '0,0': { terrain: 'forest' } }, regions: [], labels: [] } },
     };
 
     let outcome: unknown;

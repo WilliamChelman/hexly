@@ -1,4 +1,4 @@
-import { MapView } from '@hexly/web-map';
+import { MapView } from '@hexly/plugin-hexmap/web';
 import { CORE_VIEW_CONTENT, CORE_VIEW_FIELDS, CORE_VIEW_MAP, ViewDefinition } from '@hexly/web-entity';
 import { ContentView } from './content-view';
 import { GenericFieldView } from './generic-field-view';
@@ -7,9 +7,9 @@ import { GenericFieldView } from './generic-field-view';
  * The two core View registrations, bound to the {@link ViewRegistry} the same way a
  * bundled plugin would register its own View (ADR-0048, *Views* amendment). Kept
  * here beside {@link ContentView} — not in the root `ViewRegistry` — so the heavy
- * view bodies (web-map, TipTap) load with the lazy entity chunk and never reach the
+ * view bodies (the map canvas, TipTap) load with the lazy entity chunk and never reach the
  * initial bundle. {@link EntityPage} registers these on construct. `MapView` ships
- * from web-map; `ContentView` (block editor + docks) is app-level.
+ * from `@hexly/plugin-hexmap/web`; `ContentView` (block editor + docks) is app-level.
  *
  * The toggle label keys are carried verbatim from the old inline `VIEWS` list so the
  * Map / Note buttons read identically (`editorShell.view.note` labels the content view).

@@ -82,7 +82,7 @@ export class EntityPage {
 
   constructor() {
     // Register the core Views from the lazy entity chunk, dropping them when the page is torn down
-    // (ADR-0048). Kept out of the root ViewRegistry so the heavy view bodies (web-map, TipTap) stay
+    // (ADR-0048). Kept out of the root ViewRegistry so the heavy view bodies (the map, TipTap) stay
     // off the initial bundle. A bundled plugin's Views are already there, seeded by its
     // `providePluginX()`, so the page names no plugin.
     const unregister = CORE_VIEW_DEFINITIONS.map((d) => this.views.register(d));

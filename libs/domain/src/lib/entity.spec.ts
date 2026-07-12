@@ -1,4 +1,3 @@
-import { emptyHexMap } from './hex/hex-map';
 import {
   contentSchema,
   createEntityRequestSchema,
@@ -84,17 +83,17 @@ describe('entityBodySchema', () => {
     expect(entityBodySchema.parse({ content })).toEqual({ content });
   });
 
-  it("carries a Hex Map's grid as a Metadata value like any other Field's (ADR-0050)", () => {
-    // The collapse: nothing about the grid is special to the body schema — it is a value at a
-    // Metadata key, so the body needs no union and no registry to parse it.
-    const body = { content, metadata: { grid: emptyHexMap() } };
+  it("carries a plugin's Structured Field value as Metadata like any other Field's (ADR-0050)", () => {
+    // The collapse: nothing about a structured value is special to the body schema — it is a value at
+    // a Metadata key, so the body needs no union and no registry to parse it.
+    const body = { content, metadata: { grid: { tiles: {}, zones: [] } } };
 
     expect(entityBodySchema.parse(body)).toEqual(body);
   });
 
-  it('tolerates a malformed grid at rest — a Metadata value is never type-checked here', () => {
-    // Forward-only (CONTEXT.md → Field): garbage at `grid` parses, so a corrupt document opens
-    // (as an empty plane) rather than 500ing on read. The first edit overwrites it.
+  it('tolerates a malformed structured value at rest — a Metadata value is never type-checked here', () => {
+    // Forward-only (CONTEXT.md → Field): garbage at `grid` parses, so a corrupt document opens (as an
+    // empty value) rather than 500ing on read. The first edit overwrites it.
     const body = { content, metadata: { grid: 'not-a-grid' } };
 
     expect(entityBodySchema.parse(body)).toEqual(body);
@@ -104,10 +103,10 @@ describe('entityBodySchema', () => {
     expect(() => entityBodySchema.parse({ metadata: { note: 'orphan' } })).toThrow();
   });
 
-  it('rejects a pre-collapse body carrying its grid at the root, rather than reading it as a note', () => {
+  it("rejects a pre-collapse body carrying a plugin's value at the root, rather than reading it as a note", () => {
     // The body root is closed (`.strict()`): an unknown key there is a document this build cannot
-    // represent, and silently dropping it would read a Hex Map as a note that has lost its map.
-    expect(() => entityBodySchema.parse({ content, ...emptyHexMap() })).toThrow();
+    // represent, and silently dropping it would read such a body as a note that has lost its substance.
+    expect(() => entityBodySchema.parse({ content, tiles: {}, zones: [] })).toThrow();
   });
 });
 
@@ -125,10 +124,10 @@ describe('entityListQuerySchema Facet params (#155)', () => {
 
   it('keeps repeated Facet values as an array (OR within a category)', () => {
     const parsed = entityListQuerySchema.parse({
-      type: ['core.note', 'core.hexmap'],
+      type: ['core.note', 'dnd.monster'],
       tag: ['deity', 'ruined'],
     });
-    expect(parsed.type).toEqual(['core.note', 'core.hexmap']);
+    expect(parsed.type).toEqual(['core.note', 'dnd.monster']);
     expect(parsed.tag).toEqual(['deity', 'ruined']);
   });
 
@@ -150,20 +149,20 @@ describe('createEntityRequestSchema', () => {
   it('accepts a request that names and types the entity', () => {
     const parsed = createEntityRequestSchema.parse({
       name: 'The Reach of Aldermoor',
-      types: ['core.hexmap'],
+      types: ['dnd.monster'],
     });
 
     expect(parsed.name).toBe('The Reach of Aldermoor');
-    expect(parsed.types).toEqual(['core.hexmap']);
+    expect(parsed.types).toEqual(['dnd.monster']);
   });
 
   it('de-duplicates the ordered type set, keeping the primary first', () => {
     expect(
       createEntityRequestSchema.parse({
         name: 'Aldermoor',
-        types: ['core.hexmap', 'core.note', 'core.hexmap'],
+        types: ['dnd.monster', 'core.note', 'dnd.monster'],
       }).types,
-    ).toEqual(['core.hexmap', 'core.note']);
+    ).toEqual(['dnd.monster', 'core.note']);
   });
 
   it('rejects a create with no types — every Entity has a primary type', () => {
@@ -190,7 +189,7 @@ describe('createEntityRequestSchema', () => {
   });
 
   it('trims the name and rejects an empty or whitespace-only one', () => {
-    // Reuses the same trimmed, non-empty rule the Hex Map title used (#12/#15).
+    // Reuses the same trimmed, non-empty rule the map title used (#12/#15).
     expect(
       createEntityRequestSchema.parse({
         name: '  Aldermoor  ',
@@ -264,7 +263,7 @@ describe('patchEntityRequestSchema', () => {
 
 describe('saveEntityRequestSchema', () => {
   it('carries the whole body, the base version, and the tags the save replaces', () => {
-    const body = { content, metadata: { grid: emptyHexMap() } };
+    const body = { content, metadata: { armor_class: 15 } };
 
     expect(saveEntityRequestSchema.parse({ document: body, version: 3, tags: [] })).toEqual({
       document: body,

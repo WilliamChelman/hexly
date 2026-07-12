@@ -39,7 +39,7 @@ export const appConfig: ApplicationConfig = {
     // Each lib declares its catalog as a scope; these load with the language at
     // bootstrap because their keys are read where no pipe of the declaring lib
     // can trigger a load — from services, and from a type's label keys (ADR-0049).
-    // `map` is absent by design: web-map provides it on MapView, so it is fetched
+    // `map` is absent by design: the Hex Map plugin provides it on MapView, so it is fetched
     // only when a hex map is on screen.
     provideEagerTranslations(
       CORE_TRANSLATIONS,

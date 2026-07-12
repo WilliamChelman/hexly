@@ -33,8 +33,8 @@ function validate(
 }
 
 /**
- * A stand-in for the Hex Map's `core.hex-grid`. The spec declares its own data-type rather than
- * borrowing a real one — that it can is the point of threading the set instead of globalising it.
+ * A stand-in for a plugin's structured data-type. The spec declares its own rather than borrowing a
+ * real one: that it can is the point of threading the set instead of globalising it (ADR-0050).
  */
 const BOARD = defineStructuredDataType({
   id: 'test.board',
@@ -448,8 +448,8 @@ describe('Structured Field data-types (ADR-0050)', () => {
     it('leaves the harvester absent when the data-type declares none', () => {
       const swatch = defineStructuredDataType({
         id: 'test.swatch',
-        valueSchema: z.object({ hex: z.string() }),
-        empty: () => ({ hex: '#000000' }),
+        valueSchema: z.object({ rgb: z.string() }),
+        empty: () => ({ rgb: '#000000' }),
       });
       expect(swatch.harvestEdges).toBeUndefined();
     });
@@ -464,7 +464,7 @@ describe('Structured Field data-types (ADR-0050)', () => {
       expect(boardField.dataType).toEqual({ kind: 'test.board' });
       // Shape, not membership: `defineType()` runs at module load, so no schema could enumerate the
       // very plugin registering a kind. A well-formed typo passes here and dies at resolution.
-      expect(field({ key: 'grid', dataType: { kind: 'core.hex-gird' } }).dataType).toEqual({ kind: 'core.hex-gird' });
+      expect(field({ key: 'board', dataType: { kind: 'test.bord' } }).dataType).toEqual({ kind: 'test.bord' });
     });
 
     it('rejects a kind that is neither a built-in nor `namespace.id`-shaped', () => {
@@ -481,7 +481,7 @@ describe('Structured Field data-types (ADR-0050)', () => {
 
   describe('unresolvedDataTypeErrors — where an unregistered kind is rejected', () => {
     it('flags a well-formed but unregistered kind, against the host-composed set', () => {
-      const typo = field({ key: 'grid', dataType: { kind: 'core.hex-gird' } });
+      const typo = field({ key: 'grid', dataType: { kind: 'test.bord' } });
       expect(unresolvedDataTypeErrors([typo], DATA_TYPES)).toEqual([{ key: 'grid', code: 'unknown-data-type' }]);
     });
 
@@ -514,15 +514,15 @@ describe('Structured Field data-types (ADR-0050)', () => {
     });
 
     /**
-     * The absent-plugin path (ADR-0050): a build that drops the map plugin opens its Hex Maps as lore
-     * plus an unrendered Field, so a Field whose data-type went missing stays saveable — its value is
-     * plain Metadata. Dropping a plugin degrades; it never corrupts.
+     * The absent-plugin path (ADR-0050): a build that drops the plugin owning a data-type opens the
+     * Entities carrying it as lore plus an unrendered Field, so a Field whose data-type went missing
+     * stays saveable — its value is plain Metadata. Dropping a plugin degrades; it never corrupts.
      */
     it('is inert for an unregistered kind — never blocking the save of an Entity whose plugin is absent', () => {
-      const grid = field({ key: 'grid', dataType: { kind: 'core.hex-grid' } });
-      expect(validate([grid], { grid: { hexes: { '0,0': { terrain: 'grass' } } } }).ok).toBe(true);
-      expect(validate([grid], { grid: 'garbage' }).ok).toBe(true);
-      expect(validate([{ ...grid, required: true }], {}).ok).toBe(true);
+      // The empty set stands for the build without the plugin: nothing resolves `test.board`.
+      expect(validate([boardField], { board: { tiles: [{ entityId: 'riverbend' }] } }).ok).toBe(true);
+      expect(validate([boardField], { board: 'garbage' }).ok).toBe(true);
+      expect(validate([{ ...boardField, required: true }], {}).ok).toBe(true);
     });
   });
 

@@ -1,10 +1,11 @@
-import { CORE_HEXMAP_TYPE, CORE_NOTE_TYPE } from '@hexly/domain';
+import { CORE_NOTE_TYPE } from '@hexly/domain';
+import { CORE_HEXMAP_TYPE } from '@hexly/plugin-hexmap';
 import { CORE_VIEW_CONTENT, CORE_VIEW_MAP, TypeDefinition } from '@hexly/web-entity';
 
 /**
- * The two core Entity Types as the web registers them: the domain's `defineType` declarations — the
- * constructor a bundled plugin's declaration also goes through — plus the chrome only the web has.
- * They enter the {@link TypeRegistry} through the same `register()` a plugin's do (ADR-0048).
+ * The two Entity Types the app registers itself: their `defineType` declarations — the constructor a
+ * bundled plugin's declaration also goes through — plus the chrome only the web has. They enter the
+ * {@link TypeRegistry} through the same `register()` a plugin's do (ADR-0048).
  *
  * `core.note` declares no Fields and so contributes only the `core.view.content` View; `core.hexmap`
  * declares the grid as a **Structured Field** and so also contributes `core.view.map`, the View that

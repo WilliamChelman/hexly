@@ -10,7 +10,7 @@ import { CORE_VIEW_CONTENT, PLUGIN_VIEWS, ViewDefinition, ViewId } from '@hexly/
  * Deliberately component-import-free so it stays out of the initial bundle. Its two
  * kinds of registrant reach that end from opposite directions:
  *
- * - The **core views** (which pull in web-map / TipTap) register themselves from the
+ * - The **core views** (which pull in the map plugin / TipTap) register themselves from the
  *   lazily-loaded entity chunk, where naming the class is already free.
  * - A **bundled plugin's** views are seeded here at startup, from `PLUGIN_VIEWS`, and
  *   name their component through a `loadComponent` that keeps the body in its own chunk.

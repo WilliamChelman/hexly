@@ -1,8 +1,8 @@
 /**
  * The Entity domain: the top-level thing a user owns. The single Zod source of
- * truth for the Entity model and its REST payloads. A Hex Map is an Entity that
- * carries the `core.hexmap` type — the type that declares the grid as a **Structured
- * Field**, so its plane is a Metadata value like any other (ADR-0050).
+ * truth for the Entity model and its REST payloads. What an Entity *is* — a note, a
+ * map, a monster — is its **Entity Type** set, an open one the core does not
+ * enumerate: a type declares **Fields**, and nothing here knows what any of them hold.
  */
 
 import { z } from 'zod';
@@ -33,7 +33,7 @@ export function tiptapContent(snapshot: unknown): Content {
 
 /**
  * A single Entity Type identity (CONTEXT.md → Entity Type): an **open**,
- * `namespace.id`-keyed string (`core.note`, `core.hexmap`, `dnd.monster`) — plugins and
+ * `namespace.id`-keyed string (`core.note`, `dnd.monster`, `world.deity`) — plugins and
  * Worlds extend the set — so this validates only the *shape* of an id, never an
  * enumerated value.
  */
@@ -45,9 +45,11 @@ export const entityTypeSchema = z
 /** CONTEXT.md → Entity Type. Open set, so widened to `string`. */
 export type EntityType = z.infer<typeof entityTypeSchema>;
 
-/** The two core Entity Types, registered by the core the same way a plugin would (ADR-0048). */
+/**
+ * The one Entity Type the core itself declares: a Note is nothing but its body, so `core.note` adds
+ * no Field (ADR-0048). Every other type — the Map's included — ships from a plugin (ADR-0050).
+ */
 export const CORE_NOTE = 'core.note';
-export const CORE_HEXMAP = 'core.hexmap';
 
 /**
  * The ordered, deduped set of Entity Types an Entity carries (CONTEXT.md → Entity
@@ -71,12 +73,13 @@ export const metadataSchema = z.record(z.string(), z.unknown()).optional();
 /**
  * The Entity body — what the `document` column holds. One shape, for every Entity: Content plus
  * Metadata (ADR-0050). Everything a Type adds to an Entity's substance is a **Field** over a Metadata
- * key, a Hex Map's grid included, so the body needs no discriminant and no registry to parse.
+ * key — a plugin's **Structured Field** value included — so the body needs no discriminant and no
+ * registry to parse.
  *
  * `.strict()` because the body root is closed: an unknown key there is a document this build cannot
- * represent (a pre-collapse Hex Map, with its grid at the root), and reading it as a note that has
- * silently lost its map would be worse than failing loudly. Tolerance lives one level down, in the
- * data: a Field value that does not inhabit its data-type is left alone, never rejected.
+ * represent (a pre-collapse body, with a plugin's value at the root), and reading it as a note that
+ * has silently lost that value would be worse than failing loudly. Tolerance lives one level down, in
+ * the data: a Field value that does not inhabit its data-type is left alone, never rejected.
  */
 export const entityBodySchema = z
   .object({

@@ -2,22 +2,13 @@ import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { of, Subject, throwError } from 'rxjs';
-import {
-  CONTENT_FORMAT,
-  coordKey,
-  CORE_HEXMAP,
-  CORE_NOTE,
-  emptyContent,
-  emptyHexMap,
-  EntityDetail,
-  EntitySaveOutcome,
-  HexMap,
-} from '@hexly/domain';
+import { CONTENT_FORMAT, CORE_NOTE, emptyContent, EntityDetail, EntitySaveOutcome } from '@hexly/domain';
+import { coordKey, CORE_HEXMAP, emptyHexMap, HexMap } from '@hexly/plugin-hexmap';
 import { MockEntitiesClient, MockNudgeBusClient } from '@hexly/web-core/testing';
 import { EntitiesClient, NudgeBusClient, EVICTED, Watched } from '@hexly/web-core';
 import { EntitySession } from './entity-session';
 import { ENTITY_SESSION } from '@hexly/web-entity';
-import { HexMapStore } from '@hexly/web-map';
+import { HexMapStore } from '@hexly/plugin-hexmap/web';
 
 describe('EntitySession', () => {
   let session: EntitySession;

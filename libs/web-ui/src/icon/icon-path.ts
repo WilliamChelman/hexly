@@ -3,9 +3,9 @@ import { IconHost } from './icon-host';
 
 /**
  * Renders an arbitrary SVG path (`d`) as one `<svg>` glyph in `currentColor`,
- * sized by `size`. Used to draw data-driven library icons (e.g. a Feature's
- * `path` from `featureLibrary`) without inlining raw `<svg>` into feature
- * templates — see ADR-0007 ("SVG glyphs live in their own components").
+ * sized by `size`. Used to draw data-driven library icons — a Feature's marker art,
+ * which the map plugin owns — without inlining raw `<svg>` into feature templates,
+ * and without web-ui learning that art (ADR-0007, ADR-0050).
  *
  * `stroke-linecap="round"` matches the canvas marker (map-renderer sets
  * `lineCap = 'round'`), so an open subpath looks identical in the palette and

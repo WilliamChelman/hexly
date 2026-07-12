@@ -143,6 +143,28 @@ describe('Vault export endpoint', () => {
     expect(fm.tags).toEqual(['deity', 'ruined']);
     // The reserved placement key is still consumed, not written back.
     expect(fm['hexly.sourcePath']).toBeUndefined();
+    // An imported note carries the default type alone, which the import mints anyway — so it goes
+    // unstamped, and a note with no Metadata and no Tags still exports with no `---` block at all.
+    expect(fm['hexly.type']).toBeUndefined();
+  });
+
+  /**
+   * The Type stamp is generic (ADR-0050): the export names no type id, it writes the Entity's whole
+   * ordered set — so a Monster comes back a Monster, and the *primary* type is still the first one.
+   */
+  it("stamps hexly.type from the Entity's ordered types, whatever they are", async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const worldId = await importVault(ada, { 'Bestiary/Owlbear.md': '# Owlbear' });
+    const created = await ada
+      .post('/entities')
+      .send({ name: 'Owlbear', types: ['core.note', 'dnd.monster'], worldId })
+      .expect(201);
+    expect(created.body.types).toEqual(['core.note', 'dnd.monster']);
+
+    const { files } = await exportZip(ada, worldId);
+    const fm = frontmatter(text(files, 'Owlbear.md'));
+
+    expect(fm['hexly.type']).toEqual(['core.note', 'dnd.monster']);
   });
 
   it('writes assets under assets/<originalFilename> and rewrites image src to match', async () => {
@@ -204,7 +226,7 @@ describe('Vault export endpoint', () => {
     const fm = frontmatter(md);
 
     // Lore round-trips as prose, and the map's type is flagged — no Metadata key records it.
-    expect(fm['hexly.type']).toBe('core.hexmap');
+    expect(fm['hexly.type']).toEqual(['core.hexmap']);
     expect(md).toContain('The Aldermoor');
     expect(md).toContain('A wild frontier.');
     // The grid rides the frontmatter as a nested Field value, so the map survives the round-trip

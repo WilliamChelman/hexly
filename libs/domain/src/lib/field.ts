@@ -239,7 +239,7 @@ function valueMatcher(
 
 /**
  * The **declaration** gate (ADR-0050): every Field naming a structured data-type the host's set does
- * not carry — a typo (`core.hex-gird`), or a plugin this build does not bundle. The host runs it where
+ * not carry — a typo (`core.gird`), or a plugin this build does not bundle. The host runs it where
  * a Type is declared (a plugin type at startup, a **User-defined type** as a World Owner saves it),
  * never against an Entity's Metadata.
  */

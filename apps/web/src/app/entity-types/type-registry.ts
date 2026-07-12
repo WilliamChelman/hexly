@@ -1,13 +1,7 @@
 import { inject, Injectable, signal } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
-import {
-  CORE_NOTE,
-  CORE_STRUCTURED_DATA_TYPES,
-  EntityType,
-  FieldSchema,
-  resolveFields,
-  structuredDataTypeSet,
-} from '@hexly/domain';
+import { CORE_NOTE, EntityType, FieldSchema, resolveFields, structuredDataTypeSet } from '@hexly/domain';
+import { HEX_GRID_DATA_TYPE } from '@hexly/plugin-hexmap';
 import { CORE_VIEW_FIELDS, PLUGIN_TYPES, TypeDefinition, TypeLabels, ViewId } from '@hexly/web-entity';
 import { CORE_TYPE_DEFINITIONS } from './core-types';
 
@@ -42,11 +36,10 @@ export class TypeRegistry {
 
   /**
    * The **Structured Field** data-types this build carries (ADR-0050) — the web twin of the API's
-   * `BUNDLED_STRUCTURED_DATA_TYPES`, threaded into the domain to mint a declared Field's default.
-   * The core's own, and only those: a data-type has no `providePlugin()` seam yet, and nothing needs
-   * one until the Hex Map moves out into its own plugin.
+   * `BUNDLED_STRUCTURED_DATA_TYPES`, threaded into the domain to mint a declared Field's default. A
+   * data-type has no `providePlugin()` contribution yet, so the app names the plugin's directly.
    */
-  readonly structuredDataTypes = structuredDataTypeSet([...CORE_STRUCTURED_DATA_TYPES]);
+  readonly structuredDataTypes = structuredDataTypeSet([HEX_GRID_DATA_TYPE]);
 
   register(definition: TypeDefinition): () => void {
     this.definitions.update((list) => [...list, definition]);

@@ -2,19 +2,33 @@ import { z } from 'zod';
 import { emptyEntityBody, withFieldDefaults } from './entity-body';
 import { entityBodySchema } from './entity';
 import { fieldSchemaSchema, resolveFields } from './field';
-import { emptyHexMap } from './hex/hex-map';
-import { CORE_HEXMAP_TYPE, CORE_NOTE_TYPE, CORE_STRUCTURED_DATA_TYPES } from './plugin-type';
+import { CORE_NOTE_TYPE, defineType } from './plugin-type';
 import { defineStructuredDataType, structuredDataTypeSet } from './structured-data-type';
 
-/** The set a host composes from the core's declarations — what the API and the web each thread in. */
-const dataTypes = structuredDataTypeSet([...CORE_STRUCTURED_DATA_TYPES]);
+/**
+ * A stand-in for a plugin's **Structured Field** data-type: the domain bundles none of its own
+ * (ADR-0050), so a spec declares one and threads it in exactly as a host does.
+ */
+const BOARD = defineStructuredDataType({
+  id: 'test.board',
+  valueSchema: z.object({ tiles: z.record(z.string(), z.string()) }),
+  empty: () => ({ tiles: {} }),
+});
+const emptyBoard = () => BOARD.empty();
 
-/** Resolve a type set's Fields exactly as a host does, off the code-registered core types. */
+/** The set a host composes from what it bundles — what the API and the web each thread in. */
+const dataTypes = structuredDataTypeSet([BOARD]);
+
+const BOARD_FIELD = fieldSchemaSchema.parse({ key: 'board', label: 'Board', dataType: { kind: BOARD.id } });
+/** A plugin type whose one Field is that structured value — the shape the Map plugin's type has. */
+const ATLAS_TYPE = defineType({ id: 'test.atlas', label: 'Atlas', fields: [BOARD_FIELD] });
+
+/** Resolve a type set's Fields exactly as a host does, off its registered types. */
 const fieldsOf = (...types: readonly string[]) =>
-  resolveFields((id) => [CORE_NOTE_TYPE, CORE_HEXMAP_TYPE].find((t) => t.id === id)?.fields, types);
+  resolveFields((id) => [CORE_NOTE_TYPE, ATLAS_TYPE].find((t) => t.id === id)?.fields, types);
 
 const noteFields = fieldsOf(CORE_NOTE_TYPE.id);
-const mapFields = fieldsOf(CORE_HEXMAP_TYPE.id);
+const atlasFields = fieldsOf(ATLAS_TYPE.id);
 
 describe('emptyEntityBody', () => {
   it('mints a blank body — Content and nothing else — for a type that declares no Fields', () => {
@@ -32,17 +46,18 @@ describe('emptyEntityBody', () => {
     });
   });
 
-  it('opens a fresh Hex Map on a blank plane — the grid Field mints its data-type default', () => {
-    // The minter knows nothing of hexes: the empty value comes from the registered data-type.
-    const body = emptyEntityBody(mapFields, dataTypes);
+  it("opens a fresh Structured Field on its data-type's empty value", () => {
+    // The minter knows nothing of what the value holds: the default comes from the registered
+    // data-type. A fresh map opens on a blank plane this way.
+    const body = emptyEntityBody(atlasFields, dataTypes);
 
     expect(entityBodySchema.parse(body)).toEqual(body);
-    expect(body.metadata).toEqual({ grid: emptyHexMap() });
+    expect(body.metadata).toEqual({ board: emptyBoard() });
   });
 
   it('leaves a Structured Field unminted when the host has not registered its data-type', () => {
     // An absent plugin: the Field is inert, its value stays plain Metadata, nothing throws.
-    expect(emptyEntityBody(mapFields, structuredDataTypeSet([]))).toEqual({
+    expect(emptyEntityBody(atlasFields, structuredDataTypeSet([]))).toEqual({
       content: { format: 'tiptap-v3', snapshot: { type: 'doc', content: [] } },
     });
   });
@@ -51,10 +66,10 @@ describe('emptyEntityBody', () => {
 describe('withFieldDefaults', () => {
   const note = emptyEntityBody(noteFields, dataTypes);
 
-  it('mints an empty grid when core.hexmap is added to an existing Note (#189)', () => {
-    const reconciled = withFieldDefaults(note, mapFields, dataTypes);
+  it('mints the empty value when a type declaring a Structured Field is added to a Note (#189)', () => {
+    const reconciled = withFieldDefaults(note, atlasFields, dataTypes);
 
-    expect(reconciled.metadata).toEqual({ grid: emptyHexMap() });
+    expect(reconciled.metadata).toEqual({ board: emptyBoard() });
     expect(entityBodySchema.parse(reconciled)).toEqual(reconciled);
     // The Content is untouched — a type change adds a Field value, it does not rebuild the body.
     expect(reconciled.content).toBe(note.content);
@@ -63,32 +78,32 @@ describe('withFieldDefaults', () => {
   it("preserves the Entity's other Metadata when it mints a default", () => {
     const monster = { ...note, metadata: { armor_class: 15 } };
 
-    expect(withFieldDefaults(monster, mapFields, dataTypes).metadata).toEqual({
+    expect(withFieldDefaults(monster, atlasFields, dataTypes).metadata).toEqual({
       armor_class: 15,
-      grid: emptyHexMap(),
+      board: emptyBoard(),
     });
   });
 
   it('returns the same body reference when every declared Field already has a value', () => {
-    const map = emptyEntityBody(mapFields, dataTypes);
+    const atlas = emptyEntityBody(atlasFields, dataTypes);
 
     // Reference equality is what a caller's dirty check rides on — minting nothing must not
     // fabricate a new body and read as an edit.
-    expect(withFieldDefaults(map, mapFields, dataTypes)).toBe(map);
+    expect(withFieldDefaults(atlas, atlasFields, dataTypes)).toBe(atlas);
     expect(withFieldDefaults(note, noteFields, dataTypes)).toBe(note);
   });
 
   it('never overwrites a value already at rest, however malformed — validation is forward-only', () => {
-    const corrupt = { ...note, metadata: { grid: 'not-a-grid' } };
+    const corrupt = { ...note, metadata: { board: 'not-a-board' } };
 
-    expect(withFieldDefaults(corrupt, mapFields, dataTypes)).toBe(corrupt);
+    expect(withFieldDefaults(corrupt, atlasFields, dataTypes)).toBe(corrupt);
   });
 
   it('never strips a Field value when its type is dropped — the data outlives the lens', () => {
-    const map = emptyEntityBody(mapFields, dataTypes);
+    const atlas = emptyEntityBody(atlasFields, dataTypes);
 
-    expect(withFieldDefaults(map, noteFields, dataTypes)).toBe(map);
-    expect(map.metadata).toEqual({ grid: emptyHexMap() });
+    expect(withFieldDefaults(atlas, noteFields, dataTypes)).toBe(atlas);
+    expect(atlas.metadata).toEqual({ board: emptyBoard() });
   });
 
   it("mints a data-type whose empty value is itself empty — a blank timeline's []", () => {

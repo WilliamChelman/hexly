@@ -22,7 +22,7 @@ export function emptyEntityBody(
 
 /**
  * Mint the default value of every declared Field that has none — the reconcile a *type change* runs,
- * so adding `core.hexmap` to a Note gives the map View a plane to open on (#189). Only a
+ * so adding a type to a Note gives its **Structured Field**'s View something to open on (#189). Only a
  * **Structured Field** declares a default ({@link StructuredDataType.empty}); for a `string` or a
  * `number`, absent *is* unset.
  *

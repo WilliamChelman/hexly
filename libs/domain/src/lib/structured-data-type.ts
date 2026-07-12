@@ -4,9 +4,9 @@
  *
  * A built-in data-type (`string`, `number`, `list`, an `entityLink`…) is a form control over a small
  * value. A structured one is a *document*: a value with its own schema, its own link-edge harvesting,
- * and (later) its own View — a Hex Map's grid at the `grid` key, contributed by `core.hex-grid`. It is
- * declared here, framework-free, because both halves consume it: the API validates and harvests it,
- * the web renders it.
+ * and (later) its own View — the Map plugin's grid, at the `grid` key its Type declares. It is declared
+ * here, framework-free, because both halves consume it: the API validates and harvests it, the web
+ * renders it.
  *
  * Two rules give the open set its shape.
  *
@@ -15,7 +15,7 @@
  * typo with no dot, `strig`, is rejected where the Field is declared) while its *membership* is
  * resolved in the host: `defineType()` runs at module load, so a schema enumerating the known
  * structured kinds could not validate the very plugin registering one. A well-formed but unregistered
- * kind (`core.hex-gird`) therefore fails at **resolution**, against the set the host composes.
+ * kind (`core.gird`) therefore fails at **resolution**, against the set the host composes.
  *
  * **The set is threaded explicitly, never global.** {@link validateFields} and {@link harvestEdges}
  * take a {@link StructuredDataTypeSet} as a parameter, exactly as `harvestEdges` already takes the
@@ -27,7 +27,7 @@ import { z } from 'zod';
 import type { EntityEdge } from './entity-edges';
 
 /**
- * A structured data-type's id: a `namespace.id` key (`core.hex-grid`), mirroring the Entity Type
+ * A structured data-type's id: a `namespace.id` key (`dnd.encounter`), mirroring the Entity Type
  * keyspace. The template-literal type is what makes "structured" a *narrowable* fact about a kind —
  * no built-in kind (`string`, `entityLink`) carries a dot, so the two are disjoint at the type level.
  */
@@ -37,7 +37,7 @@ const NAMESPACED_ID = /^[a-z0-9_-]+(\.[a-z0-9_-]+)+$/;
 
 export const structuredDataTypeIdSchema = z.custom<StructuredDataTypeId>(
   // Exact, never trimmed: the id is a *key* — the one a Field's `kind` is looked up under — so
-  // tolerating ` core.hex-grid ` here would register a data-type that could never be resolved.
+  // tolerating ` core.grid ` here would register a data-type that could never be resolved.
   (value) => typeof value === 'string' && NAMESPACED_ID.test(value),
   { message: 'A structured data-type must be a `namespace.id` key' },
 );
@@ -51,10 +51,10 @@ export interface StructuredDataType {
   readonly id: StructuredDataTypeId;
   /** The value's shape — what the forward-only gate holds a value to. */
   readonly valueSchema: z.ZodType;
-  /** A fresh empty value — a Hex Map's untouched plane, an empty timeline. */
+  /** A fresh empty value — a map plugin's untouched plane, an empty timeline. */
   empty(): unknown;
   /**
-   * The Entity Links this value expresses (a Hex's `entityId`, a Region's), harvested into the edge
+   * The Entity Links this value expresses (a map's placements, a timeline's entries), harvested into the edge
    * index alongside the Content's. Absent when the data-type carries no links.
    */
   harvestEdges?(value: unknown): readonly EntityEdge[];

@@ -10,7 +10,7 @@ export function assetUrl(worldId: string, hash: string, ext: string): string {
   return `/assets/${worldId}/${hash}${ext}`;
 }
 
-/** A sha256 hex digest — the content address an Asset is stored and served under. */
+/** A sha256 digest, lowercase base-16 — the content address an Asset is stored and served under. */
 const ASSET_URL = /^\/assets\/[^/]+\/([0-9a-f]{64})(\.[^/.]+)?$/;
 
 /**

@@ -4,7 +4,8 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
-import { CONTENT_FORMAT, CORE_HEXMAP, EntityDetail, EntityType } from '@hexly/domain';
+import { CONTENT_FORMAT, EntityDetail, EntityType } from '@hexly/domain';
+import { CORE_HEXMAP } from '@hexly/plugin-hexmap';
 import { EntitiesClient, NudgeBusClient, ActiveWorld, TitleService, EVICTED, Watched } from '@hexly/web-core';
 import { MockEntitiesClient, MockNudgeBusClient } from '@hexly/web-core/testing';
 import { EntitySession } from './services/entity-session';

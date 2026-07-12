@@ -2,7 +2,7 @@ import { InjectionToken, Signal } from '@angular/core';
 import { EntityBody } from '@hexly/domain';
 import { Patch } from '@hexly/immer';
 
-/** Re-exported so a View lib (e.g. web-map) reads the undo/redo currency from one place. */
+/** Re-exported so a View lib (e.g. the Hex Map plugin) reads the undo/redo currency from one place. */
 export type { Patch } from '@hexly/immer';
 
 /**
@@ -12,7 +12,7 @@ export type { Patch } from '@hexly/immer';
  * returns Immer patches so a View that keeps its own undo/redo (the Hex Map editor)
  * can replay them through {@link applyPatches}.
  *
- * Declared here — not in `@hexly/web-map` or `apps/web` — so a View lib depends on this
+ * Declared here — not in `@hexly/plugin-hexmap` or `apps/web` — so a View lib depends on this
  * abstraction and the concrete session (in the app) binds it at the composition root:
  * the map lib plugs into the session, never the reverse (the ADR-0048 inversion).
  */

@@ -32,11 +32,7 @@ import {
   LucideGlobe,
   LucideWaypoints,
 } from '@lucide/angular';
-import { featureLibrary } from '@hexly/domain';
 import { IconHost } from './icon-host';
-
-/** The settlement marker art, shared with the canvas via `featureLibrary` (ADR-0006). */
-const SETTLEMENT_PATH = featureLibrary.find((f) => f.id === 'settlement')?.path ?? '';
 
 /** The `<svg>` root attrs Lucide glyphs are drawn with (its house stroke, lightened to 1.6). */
 const LUCIDE_ATTRS = 'stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"';
@@ -58,10 +54,12 @@ function lucideBody(data: LucideIconData): string {
 }
 
 /**
- * The three bespoke glyphs that aren't Lucide: the app's hexagon `logo`, the
- * `settlement` marker (domain art from `featureLibrary`, shared with the canvas),
- * and the organic `region` blob. Each is the `<svg>` inner markup plus the root
- * attrs that vary per glyph (ADR-0007). Everything else is Lucide — see {@link LUCIDE}.
+ * The two bespoke glyphs that aren't Lucide: the app's hexagon `logo` and the organic
+ * `region` blob. Each is the `<svg>` inner markup plus the root attrs that vary per
+ * glyph (ADR-0007). Everything else is Lucide — see {@link LUCIDE}.
+ *
+ * A plugin's art stays with the plugin — a Feature's marker is drawn from its own library through
+ * {@link IconPath} — so this vocabulary never depends on one (ADR-0050).
  */
 const CUSTOM = {
   logo: {
@@ -71,10 +69,6 @@ const CUSTOM = {
   region: {
     attrs: 'stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-dasharray="3 2.5"',
     body: '<path d="M5 7c4-3 9-2 12 1s2 8-2 10-11 1-12-4 2-4 2-7z" />',
-  },
-  settlement: {
-    attrs: 'stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"',
-    body: `<path d="${SETTLEMENT_PATH}" />`,
   },
 } as const;
 

@@ -1,6 +1,6 @@
 import { posix } from 'node:path';
 import { Injectable } from '@nestjs/common';
-import { ContentNode, CORE_HEXMAP, EntityDetail, HEXLY_METADATA_PREFIX, visit } from '@hexly/domain';
+import { ContentNode, CORE_NOTE, EntityDetail, HEXLY_METADATA_PREFIX, visit } from '@hexly/domain';
 import { proseMirrorToMarkdown } from '@hexly/obsidian';
 import { strToU8, zipSync, type Zippable } from 'fflate';
 import { AssetsService } from '../assets/assets.service';
@@ -114,6 +114,11 @@ function rewriteAssetSrcs(snapshot: unknown, srcMap: Map<string, string>): void 
  * A **Structured Field**'s value rides along like any other Field's, as nested YAML (ADR-0050), so a
  * Hex Map's grid now survives the round-trip — the lossiness ADR-0033 accepted closes here, without
  * this path learning what a grid is.
+ *
+ * The Entity's ordered Type set rides along under `hexly.type`, which no Metadata key records — named
+ * by no type id (ADR-0050), and written whole and in order, so the primary type stays first. Types
+ * that are *exactly* the default an import mints go unstamped, so a bare note still exports with no
+ * `---` block at all.
  */
 function frontmatter(entity: EntityDetail): Record<string, unknown> | undefined {
   const meta: Record<string, unknown> = {};
@@ -121,9 +126,8 @@ function frontmatter(entity: EntityDetail): Record<string, unknown> | undefined 
     if (!key.startsWith(HEXLY_METADATA_PREFIX)) meta[key] = value;
   }
   if (entity.tags.length) meta['tags'] = [...entity.tags];
-  // Flag a Hex Map's type, which no Metadata key records (ADR-0033). ADR-0050 generalises this to
-  // stamp `hexly.type` from `entity.types`, with the ticket that moves the Hex Map out of the core.
-  if (entity.types.includes(CORE_HEXMAP)) meta['hexly.type'] = CORE_HEXMAP;
+  const isBareNote = entity.types.length === 1 && entity.types[0] === CORE_NOTE;
+  if (!isBareNote) meta['hexly.type'] = [...entity.types];
   return Object.keys(meta).length ? meta : undefined;
 }
 

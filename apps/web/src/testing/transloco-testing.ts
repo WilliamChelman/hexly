@@ -6,7 +6,7 @@ import {
   provideTranslocoTesting as provideCatalogs,
 } from '@hexly/web-core/testing';
 import { WEB_ENTITY_TEST_CATALOGS } from '@hexly/web-entity/testing';
-import { WEB_MAP_TEST_CATALOGS } from '@hexly/web-map/testing';
+import { HEXMAP_TEST_CATALOGS } from '@hexly/plugin-hexmap/testing';
 import { WEB_UI_TEST_CATALOGS } from '@hexly/web-ui/testing';
 import en from '../i18n/catalogs/en.json';
 import fr from '../i18n/catalogs/fr.json';
@@ -26,7 +26,7 @@ export function provideTranslocoTesting(...overrides: readonly TestCatalogs[]) {
     WEB_UI_TEST_CATALOGS,
     WEB_ENTITY_TEST_CATALOGS,
     CONTENT_EDITOR_TEST_CATALOGS,
-    WEB_MAP_TEST_CATALOGS,
+    HEXMAP_TEST_CATALOGS,
     DND_TEST_CATALOGS,
     ...overrides,
   );
