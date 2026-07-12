@@ -25,9 +25,7 @@ describe('Dialog', () => {
   function render() {
     const fixture = TestBed.createComponent(Host);
     fixture.detectChanges();
-    const dialog = fixture.nativeElement.querySelector(
-      'dialog',
-    ) as HTMLDialogElement;
+    const dialog = fixture.nativeElement.querySelector('dialog') as HTMLDialogElement;
     return { fixture, dialog };
   }
 
@@ -83,8 +81,6 @@ describe('Dialog', () => {
   it('projects body content and footer actions', () => {
     const el = render().fixture.nativeElement as HTMLElement;
     expect(el.querySelector('p')?.textContent).toBe('Body');
-    expect(el.querySelector('button[dialogFooter]')?.textContent).toContain(
-      'Confirm',
-    );
+    expect(el.querySelector('button[dialogFooter]')?.textContent).toContain('Confirm');
   });
 });

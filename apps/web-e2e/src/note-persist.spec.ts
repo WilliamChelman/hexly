@@ -4,10 +4,7 @@ import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtur
  * Full-stack note round-trip: real TipTap keyboard input → versioned save → reload
  * re-renders stored Content. Verifies the opaque snapshot via the API (ADR-0009/0019).
  */
-test('types into a note, saves, and the Content survives a reload', async ({
-  page,
-  request,
-}) => {
+test('types into a note, saves, and the Content survives a reload', async ({ page, request }) => {
   await enterLibrary(page);
   await page.getByTestId('new-note').click();
 
@@ -31,7 +28,9 @@ test('types into a note, saves, and the Content survives a reload', async ({
   const res = await request.get(`/api/entities/${noteId}`);
   expect(res.ok()).toBeTruthy();
   const detail = await res.json();
-  expect(detail.document.type).toBe('note');
+  // A note's Entity Type lives in the entity-level `types` set, not in the body — which is
+  // `{ content, metadata }` for every Entity (ADR-0050). `core.note` is the primary type.
+  expect(detail.types).toContain('core.note');
   expect(detail.document.content.format).toBe('tiptap-v3'); // mirrors CONTENT_FORMAT
   expect(JSON.stringify(detail.document.content.snapshot)).toContain(content);
 });

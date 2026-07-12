@@ -1,0 +1,96 @@
+{
+  "dataType": {
+    "hexGrid": "Hex grid"
+  },
+  "hexmap": {
+    "eyebrow": "Hex map",
+    "titleLabel": "Map title",
+    "rename": "Rename map",
+    "editorLabel": "Map notes",
+    "create": "Create Map",
+    "untitled": "Untitled map",
+    "view": {
+      "map": "Map"
+    }
+  },
+  "toolPalette": {
+    "tools": "Tools",
+    "select": "Select",
+    "pick": "Pick",
+    "marquee": "Marquee",
+    "terrain": "Terrain",
+    "feature": "Feature",
+    "label": "Label",
+    "erase": "Erase",
+    "undo": "Undo",
+    "redo": "Redo",
+    "terrainGroup": "Terrain",
+    "featureGroup": "Features",
+    "clearFeature": "Clear feature",
+    "selectGroup": "Select"
+  },
+  "inspector": {
+    "title": "Inspector",
+    "selectedLabel": "Selected label",
+    "selectedRegion": "Selected region",
+    "selectedHex": "Selected hex",
+    "selectedFeature": "Selected feature",
+    "text": "Text",
+    "size": "Size",
+    "rotation": "Rotation (°)",
+    "x": "X",
+    "y": "Y",
+    "name": "Name",
+    "tags": "Tags",
+    "tagsEmpty": "No tags",
+    "color": "Color",
+    "membership": "Membership",
+    "membershipDirection": "Membership direction",
+    "add": "Add",
+    "remove": "Remove",
+    "deleteLabel": "Delete label",
+    "deleteRegion": "Delete region",
+    "deleteHex": "Delete hex",
+    "deleteFeature": "Delete feature",
+    "emptyHint": "Pick the Select tool and click a Hex, Feature, or Label to inspect it. Place a Label with the Label tool, then select it here to edit its text, size, rotation and position.",
+    "multiTitle": "Selection",
+    "selectedCount": "selected",
+    "kindHexCount": "{count, plural, one {# hex} other {# hexes}}",
+    "kindFeatureCount": "{count, plural, one {# feature} other {# features}}",
+    "kindRegionCount": "{count, plural, one {# region} other {# regions}}",
+    "kindLabelCount": "{count, plural, one {# label} other {# labels}}",
+    "deleteAll": "Delete all"
+  },
+  "regionsPanel": {
+    "title": "Regions",
+    "newRegion": "New Region",
+    "emptyHint": "No regions yet. Use New Region to mint one, then paint its member hexes from the Inspector."
+  },
+  "statusBar": {
+    "connecting": "Connecting…",
+    "apiError": "Could not reach the API.",
+    "hexCount": "{count, plural, one {# hex} other {# hexes}}"
+  },
+  "canvas": {
+    "void": "Void",
+    "noHex": "No hex",
+    "zoom": "Zoom",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "fit": "Fit map",
+    "label": "Hex map"
+  },
+  "moveBlocked": "Move blocked — something's in the way.",
+  "terrain": {
+    "grass": "Grassland",
+    "forest": "Forest",
+    "ocean": "Ocean",
+    "mountain": "Mountains",
+    "desert": "Desert",
+    "sky": "Sky"
+  },
+  "feature": {
+    "settlement": "Settlement",
+    "ruin": "Ruin"
+  }
+}

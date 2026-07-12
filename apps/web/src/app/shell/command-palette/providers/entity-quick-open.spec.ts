@@ -11,7 +11,7 @@ function entity(id: string, name: string, worldId = 'w1'): EntitySummary {
     id,
     name,
     worldId,
-    type: 'note',
+    types: ['core.note'],
     tags: [],
     visibility: 'private',
     version: 1,
@@ -28,14 +28,9 @@ describe('EntityQuickOpen', () => {
   beforeEach(() => {
     entitiesClient = new MockEntitiesClient();
     TestBed.configureTestingModule({
-      providers: [
-        provideRouter([]),
-        { provide: EntitiesClient, useValue: entitiesClient },
-      ],
+      providers: [provideRouter([]), { provide: EntitiesClient, useValue: entitiesClient }],
     });
-    navigate = vi
-      .spyOn(TestBed.inject(Router), 'navigate')
-      .mockResolvedValue(true);
+    navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     provider = TestBed.inject(EntityQuickOpen);
   });
 
@@ -44,9 +39,7 @@ describe('EntityQuickOpen', () => {
   });
 
   it('searches globally — not scoped to any World', async () => {
-    entitiesClient.list.mockReturnValue(
-      of({ items: [entity('e1', 'Aldermoor')], nextCursor: null }),
-    );
+    entitiesClient.list.mockReturnValue(of({ items: [entity('e1', 'Aldermoor')], nextCursor: null }));
 
     const commands = await firstValueFrom(provider.search('alder'));
 
@@ -54,9 +47,7 @@ describe('EntityQuickOpen', () => {
       q: 'alder',
       limit: 20,
     });
-    expect(commands).toEqual([
-      expect.objectContaining({ id: 'e1', label: 'Aldermoor' }),
-    ]);
+    expect(commands).toEqual([expect.objectContaining({ id: 'e1', label: 'Aldermoor' })]);
   });
 
   it('skips the request for a blank query', async () => {
@@ -66,10 +57,8 @@ describe('EntityQuickOpen', () => {
     expect(commands).toEqual([]);
   });
 
-  it('navigates to the matched Entity\'s own World when picked', async () => {
-    entitiesClient.list.mockReturnValue(
-      of({ items: [entity('e1', 'Aldermoor', 'w9')], nextCursor: null }),
-    );
+  it("navigates to the matched Entity's own World when picked", async () => {
+    entitiesClient.list.mockReturnValue(of({ items: [entity('e1', 'Aldermoor', 'w9')], nextCursor: null }));
 
     const [command] = await firstValueFrom(provider.search('alder'));
     command.run();

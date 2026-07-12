@@ -1,11 +1,12 @@
+import { provideTranslocoTesting } from '../../../testing/transloco-testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { BehaviorSubject, EMPTY, Observable, of, throwError } from 'rxjs';
-import { CONTENT_FORMAT, EntityDetail } from '@hexly/domain';
+import { CONTENT_FORMAT, CORE_NOTE, EntityDetail } from '@hexly/domain';
 import { EntitiesClient, PublicClient, Watched } from '@hexly/web-core';
-import { MockEntitiesClient, provideTranslocoTesting } from '@hexly/web-core/testing';
+import { MockEntitiesClient } from '@hexly/web-core/testing';
 import { PublicEntityPage } from './public-entity-page';
 
 const TOKEN = 'tok-123';
@@ -15,7 +16,7 @@ const publicDetail = (): EntityDetail => ({
   id: 'n1',
   worldId: 'w1',
   name: 'The Lighthouse',
-  type: 'note',
+  types: [CORE_NOTE],
   tags: [],
   visibility: 'shared',
   version: 1,
@@ -23,7 +24,7 @@ const publicDetail = (): EntityDetail => ({
   createdAt: 1,
   updatedAt: 1,
   rights: ['read'],
-  document: { type: 'note', content: { format: CONTENT_FORMAT, snapshot: {} } },
+  document: { content: { format: CONTENT_FORMAT, snapshot: {} } },
 });
 
 /** Minimal stand-in for the token-scoped Public read client. */

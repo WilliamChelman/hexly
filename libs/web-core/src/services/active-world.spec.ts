@@ -1,11 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import {
-  ActivatedRouteSnapshot,
-  convertToParamMap,
-  Router,
-  RouterStateSnapshot,
-  UrlTree,
-} from '@angular/router';
+import { ActivatedRouteSnapshot, convertToParamMap, Router, RouterStateSnapshot, UrlTree } from '@angular/router';
 import { firstValueFrom, isObservable, Observable, of, Subject, throwError } from 'rxjs';
 import { WorldDetail } from '@hexly/domain';
 import { TranslocoService } from '@jsverse/transloco';
@@ -48,7 +42,10 @@ describe('ActiveWorld', () => {
         { provide: WorldsClient, useValue: worlds },
         { provide: NudgeBusClient, useValue: bus },
         { provide: ToasterService, useValue: toaster },
-        { provide: TranslocoService, useValue: { translate: (k: string) => k } },
+        {
+          provide: TranslocoService,
+          useValue: { translate: (k: string) => k },
+        },
       ],
     });
     active = TestBed.inject(ActiveWorld);
@@ -59,7 +56,9 @@ describe('ActiveWorld', () => {
   function run(worldSeg: string, url = `/w/${worldSeg}`) {
     return TestBed.runInInjectionContext(() =>
       activeWorldGuard(
-        { paramMap: convertToParamMap({ worldId: worldSeg }) } as ActivatedRouteSnapshot,
+        {
+          paramMap: convertToParamMap({ worldId: worldSeg }),
+        } as ActivatedRouteSnapshot,
         { url } as RouterStateSnapshot,
       ),
     );
@@ -86,9 +85,7 @@ describe('ActiveWorld', () => {
 
     const value = await settle(run(WORLD_ID, `/w/${WORLD_ID}/entities?q=orc`));
 
-    expect((value as UrlTree).toString()).toBe(
-      `/w/${segment(WORLD_ID, 'Aldermoor')}/entities?q=orc`,
-    );
+    expect((value as UrlTree).toString()).toBe(`/w/${segment(WORLD_ID, 'Aldermoor')}/entities?q=orc`);
   });
 
   it('passes through when the segment is already canonical', async () => {
@@ -134,7 +131,7 @@ describe('ActiveWorld', () => {
 
     active.commitPins(['a']);
 
-    expect(toaster.show).toHaveBeenCalledWith('worldDashboard.pinError', 'error');
+    expect(toaster.show).toHaveBeenCalledWith('core.pinError', 'error');
     expect(active.world()).toBe(detail);
   });
 
@@ -149,12 +146,7 @@ describe('ActiveWorld', () => {
 
   function deactivate(next: RouterStateSnapshot) {
     return TestBed.runInInjectionContext(() =>
-      clearActiveWorld(
-        null,
-        {} as ActivatedRouteSnapshot,
-        {} as RouterStateSnapshot,
-        next,
-      ),
+      clearActiveWorld(null, {} as ActivatedRouteSnapshot, {} as RouterStateSnapshot, next),
     );
   }
 
@@ -207,7 +199,11 @@ describe('ActiveWorld', () => {
 
     it('re-pins the World on a fresh detail (rename / pin reorder) without navigating away', () => {
       follow();
-      const renamed = { id: WORLD_ID, name: 'Aldermoor Reborn', updatedAt: 2 } as WorldDetail;
+      const renamed = {
+        id: WORLD_ID,
+        name: 'Aldermoor Reborn',
+        updatedAt: 2,
+      } as WorldDetail;
 
       watched.next(renamed);
 
@@ -220,10 +216,18 @@ describe('ActiveWorld', () => {
     // a stale read resolving late must not revert a newer local write back to old pins.
     it('drops a detail staler than a newer local write (apply-guard)', () => {
       follow();
-      const local = { id: WORLD_ID, name: 'Local Reorder', updatedAt: 5 } as WorldDetail;
+      const local = {
+        id: WORLD_ID,
+        name: 'Local Reorder',
+        updatedAt: 5,
+      } as WorldDetail;
       active.set(local, WORLD_ID); // this tab's own commitPins advanced the held detail
 
-      watched.next({ id: WORLD_ID, name: 'Stale', updatedAt: 2 } as WorldDetail);
+      watched.next({
+        id: WORLD_ID,
+        name: 'Stale',
+        updatedAt: 2,
+      } as WorldDetail);
 
       expect(active.world()).toBe(local); // not clobbered back to the stale read
     });

@@ -1,12 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  input,
-  OnInit,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, OnInit, signal } from '@angular/core';
 import { Observable } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntityGrant, GrantRole, UserSummary } from '@hexly/domain';
@@ -41,28 +33,20 @@ import { Select } from './select';
             [value]="g.role"
             (change)="setRole(g, $any($event.target))"
           >
-            <option value="editor">{{ 'grants.editor' | transloco }}</option>
-            <option value="viewer">{{ 'grants.viewer' | transloco }}</option>
+            <option value="editor">{{ 'ui.grants.editor' | transloco }}</option>
+            <option value="viewer">{{ 'ui.grants.viewer' | transloco }}</option>
           </select>
-          <button
-            appButton
-            size="sm"
-            danger
-            [attr.data-testid]="'grant-revoke-' + g.userId"
-            (click)="revoke(g.userId)"
-          >
-            {{ 'grants.revoke' | transloco }}
+          <button appButton size="sm" danger [attr.data-testid]="'grant-revoke-' + g.userId" (click)="revoke(g.userId)">
+            {{ 'ui.grants.revoke' | transloco }}
           </button>
         </li>
       } @empty {
-        <li class="grant-empty">{{ 'grants.empty' | transloco }}</li>
+        <li class="grant-empty">{{ 'ui.grants.empty' | transloco }}</li>
       }
     </ul>
 
     <div class="grant-add">
-      <label class="grant-add-label" for="grant-add-select">{{
-        'grants.addLabel' | transloco
-      }}</label>
+      <label class="grant-add-label" for="grant-add-select">{{ 'ui.grants.addLabel' | transloco }}</label>
       <div class="grant-add-row">
         <select
           appSelect
@@ -72,7 +56,7 @@ import { Select } from './select';
           [value]="selectedUser()"
           (change)="selectedUser.set($any($event.target).value)"
         >
-          <option value="">{{ 'grants.addPlaceholder' | transloco }}</option>
+          <option value="">{{ 'ui.grants.addPlaceholder' | transloco }}</option>
           @for (c of candidates(); track c.id) {
             <option [value]="c.id">{{ c.displayName }}</option>
           }
@@ -84,17 +68,11 @@ import { Select } from './select';
           [value]="selectedRole()"
           (change)="selectedRole.set($any($event.target).value)"
         >
-          <option value="editor">{{ 'grants.editor' | transloco }}</option>
-          <option value="viewer">{{ 'grants.viewer' | transloco }}</option>
+          <option value="editor">{{ 'ui.grants.editor' | transloco }}</option>
+          <option value="viewer">{{ 'ui.grants.viewer' | transloco }}</option>
         </select>
-        <button
-          appButton
-          variant="primary"
-          data-testid="grant-add"
-          [disabled]="!selectedUser()"
-          (click)="add()"
-        >
-          {{ 'grants.add' | transloco }}
+        <button appButton variant="primary" data-testid="grant-add" [disabled]="!selectedUser()" (click)="add()">
+          {{ 'ui.grants.add' | transloco }}
         </button>
       </div>
     </div>
@@ -147,16 +125,17 @@ export class GrantSet implements OnInit {
 
   /** Directory users who are neither grantees nor Owners — the add control's options. */
   readonly candidates = computed(() => {
-    const taken = new Set<string>([
-      ...this.grants().map((g) => g.userId),
-      ...this.owners(),
-    ]);
+    const taken = new Set<string>([...this.grants().map((g) => g.userId), ...this.owners()]);
     return this.directory().filter((u) => !taken.has(u.id));
   });
 
   /** Grantee ids resolved to display rows, in the server's stable order. */
   readonly rows = computed(() =>
-    this.grants().map((g) => ({ userId: g.userId, name: this.nameOf(g.userId), role: g.role })),
+    this.grants().map((g) => ({
+      userId: g.userId,
+      name: this.nameOf(g.userId),
+      role: g.role,
+    })),
   );
 
   ngOnInit(): void {
@@ -176,14 +155,10 @@ export class GrantSet implements OnInit {
   add(): void {
     const userId = this.selectedUser();
     if (!userId) return;
-    this.mutate(
-      this.entities.addGrant(this.id(), userId, this.selectedRole()),
-      'grants.addError',
-      (grants) => {
-        this.grants.set(grants);
-        this.selectedUser.set('');
-      },
-    );
+    this.mutate(this.entities.addGrant(this.id(), userId, this.selectedRole()), 'ui.grants.addError', (grants) => {
+      this.grants.set(grants);
+      this.selectedUser.set('');
+    });
   }
 
   setRole(row: { userId: string; role: GrantRole }, select: HTMLSelectElement): void {
@@ -192,14 +167,14 @@ export class GrantSet implements OnInit {
     // failure (the signal is unchanged, so nothing else would).
     this.mutate(
       this.entities.addGrant(this.id(), row.userId, select.value as GrantRole),
-      'grants.roleError',
+      'ui.grants.roleError',
       (grants) => this.grants.set(grants),
       () => (select.value = row.role),
     );
   }
 
   revoke(userId: string): void {
-    this.mutate(this.entities.removeGrant(this.id(), userId), 'grants.revokeError', (grants) =>
+    this.mutate(this.entities.removeGrant(this.id(), userId), 'ui.grants.revokeError', (grants) =>
       this.grants.set(grants),
     );
   }
@@ -227,7 +202,7 @@ export class GrantSet implements OnInit {
 
   /** A read (directory or grant set) failed — the panel can't be trusted, so say so. */
   private loadFailed(): void {
-    this.toaster.show(this.transloco.translate('grants.loadError'), 'error');
+    this.toaster.show(this.transloco.translate('ui.grants.loadError'), 'error');
   }
 
   private nameOf(id: string): string {

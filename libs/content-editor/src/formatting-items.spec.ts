@@ -1,12 +1,6 @@
 import { Editor } from '@tiptap/core';
 import { CONTENT_EXTENSIONS } from './content-extensions';
-import {
-  FORMAT_ITEMS,
-  FormatItem,
-  applyLink,
-  clearLink,
-  isLinkActive,
-} from './formatting-items';
+import { FORMAT_ITEMS, FormatItem, applyLink, clearLink, isLinkActive } from './formatting-items';
 
 function editorWith(text: string) {
   const editor = new Editor({ extensions: CONTENT_EXTENSIONS });
@@ -74,9 +68,7 @@ describe('FORMAT_ITEMS', () => {
     applyLink(editor, 'https://example.com/mara');
     expect(isLinkActive(editor)).toBe(true);
     const marks = editor.getJSON().content?.[0]?.content?.[0]?.marks ?? [];
-    expect(marks.find((m) => m.type === 'link')?.attrs?.['href']).toBe(
-      'https://example.com/mara',
-    );
+    expect(marks.find((m) => m.type === 'link')?.attrs?.['href']).toBe('https://example.com/mara');
 
     clearLink(editor);
     expect(isLinkActive(editor)).toBe(false);

@@ -1,5 +1,13 @@
 # Importing and exporting Obsidian vaults: markdown is I/O only, one vault ⇄ one World
 
+> **Amended in part by [ADR-0050](./0050-payload-kinds-collapse-into-structured-fields.md) (#203):** two
+> statements below are reversed. Export no longer **drops a Hex Map's grid** — a **Structured Field**'s
+> value rides the frontmatter as nested YAML like any other Field's — and `hexly.type` is stamped from
+> the Entity's whole ordered Type set, naming no type id. Import no longer lands **everything as a
+> `note`**: it reads that stamp back and applies it, so a Monster, a Hex Map, and a user-defined type all
+> survive the round-trip. Everything else here still stands: markdown is I/O only, the boundary is lossy
+> by design, loss is measured at import, and one vault mints one World.
+
 Hexly imports mostly-vanilla Obsidian vaults (a `.zip` of `.md` files, folders, and asset binaries) and exports a World back to the same shape, primarily as a round-trip fidelity check ("what did we lose?"). Markdown is **I/O only** — stored Content stays opaque `tiptap-v*` ProseMirror JSON (ADR-0019); conversion happens in two hand-written pure functions (`mdast → ProseMirror`, `ProseMirror → mdast`) built on **remark/mdast**, chosen for its GFM/frontmatter/wikilink ecosystem and a clean tree to map from. The boundary is deliberately **lossy**: markdown a native extension can't represent is **degraded to the nearest existing node** on import (not preserved verbatim). Loss is measured at **import time** via the summary report, and improvements are iterative by **re-importing the original vault** (which stays authoritative on disk) — not by upgrading stored content in place.
 
 ## Mapping
@@ -18,7 +26,7 @@ Hexly imports mostly-vanilla Obsidian vaults (a `.zip` of `.md` files, folders, 
 
 ## Considered Options
 
-- **Markdown as the stored source of truth** (parse-on-edit) — rejected: overturns ADR-0019, breaks the `entityLink` model (raw markdown can't carry `entityId`/`descriptor`), and makes round-trip lossless *by construction*, defeating the loss-measurement goal.
+- **Markdown as the stored source of truth** (parse-on-edit) — rejected: overturns ADR-0019, breaks the `entityLink` model (raw markdown can't carry `entityId`/`descriptor`), and makes round-trip lossless _by construction_, defeating the loss-measurement goal.
 - **A dedicated raw-passthrough node** (`rawBlock`) carrying unsupported markdown verbatim for byte-faithful re-export — considered and **cut**: its value collapses because the original vaults stay authoritative on disk (improve by re-importing, not by upgrading stored blocks), loss is measured at import, and edit-in-Hexly-then-faithful-export is not a target flow. Revisit only if that flow becomes real. Degrade-to-nearest-node is the lazier choice.
 - **prosemirror-markdown / tiptap-markdown** — rejected: weaker source positions and single-maintainer risk (the trap ADR-0019 already named), respectively; remark also has the richer ecosystem for the Obsidian-specific syntaxes.
 - **Folders as Tags, or as a new Folder concept** — rejected for `hexly.sourcePath` Metadata: no tag pollution, no new domain primitive, and export can still rebuild the tree.

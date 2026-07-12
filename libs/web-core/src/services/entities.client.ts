@@ -1,8 +1,4 @@
-import {
-  HttpClient,
-  HttpErrorResponse,
-  HttpParams,
-} from '@angular/common/http';
+import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { catchError, map, Observable, of, tap, throwError } from 'rxjs';
 import {
@@ -17,6 +13,7 @@ import {
   EntitySaveOutcome,
   EntityType,
   GrantRole,
+  Metadata,
   PublicLink,
   Visibility,
 } from '@hexly/domain';
@@ -33,10 +30,7 @@ export type EntityListParams = Partial<EntityListQuery>;
 export const ENTITY_NUDGE_DEBOUNCE_MS = 150;
 
 /** The subset of list params the Facet-count read narrows against — no paging. */
-export type EntityFacetParams = Pick<
-  EntityListParams,
-  'q' | 'type' | 'tag' | 'visibility' | 'worldId'
->;
+export type EntityFacetParams = Pick<EntityListParams, 'q' | 'type' | 'tag' | 'visibility' | 'field' | 'worldId'>;
 
 /**
  * HTTP client for the entities API.
@@ -91,15 +85,10 @@ export class EntitiesClient {
    * a compile error here rather than a lost write. Metadata never conflicts with an in-progress
    * save.
    */
-  patch(
-    id: string,
-    changes: { name: string } | { visibility: Visibility },
-  ): Observable<EntityDetail> {
+  patch(id: string, changes: { name: string } | { visibility: Visibility }): Observable<EntityDetail> {
     // Write-through: the patched detail feeds the store, so other watchers see the rename/visibility
     // change with no roundtrip and this tab's own echo nudge dedups.
-    return this.http
-      .patch<EntityDetail>(`/api/entities/${id}`, changes)
-      .pipe(tap((d) => this.store.merge(d)));
+    return this.http.patch<EntityDetail>(`/api/entities/${id}`, changes).pipe(tap((d) => this.store.merge(d)));
   }
 
   delete(id: string): Observable<void> {
@@ -128,7 +117,10 @@ export class EntitiesClient {
 
   /** Grant an Instance user Editor or Viewer; returns the updated set. Upsert (200), not a create. */
   addGrant(id: string, userId: string, role: GrantRole): Observable<EntityGrant[]> {
-    return this.http.post<EntityGrant[]>(`/api/entities/${id}/grants`, { userId, role });
+    return this.http.post<EntityGrant[]>(`/api/entities/${id}/grants`, {
+      userId,
+      role,
+    });
   }
 
   /** Revoke a grant; returns the updated set. */
@@ -151,16 +143,16 @@ export class EntitiesClient {
     return this.http.delete<void>(`/api/entities/${id}/link`);
   }
 
-  // worldId omitted, the server defaults to the caller's first World.
-  create(
-    name: string,
-    type: EntityType,
-    worldId?: string,
-  ): Observable<EntityDetail> {
+  /**
+   * Create an Entity with an ordered `types` set, `types[0]` primary (ADR-0048). `metadata` seeds a
+   * picked type's required Fields into the minted body. worldId omitted → the caller's first World.
+   */
+  create(name: string, types: readonly EntityType[], worldId?: string, metadata?: Metadata): Observable<EntityDetail> {
     return this.http.post<EntityDetail>('/api/entities', {
       name,
-      type,
+      types,
       ...(worldId ? { worldId } : {}),
+      ...(metadata ? { metadata } : {}),
     });
   }
 
@@ -194,18 +186,24 @@ export class EntitiesClient {
     return this.http.get<string[]>('/api/entities/tags');
   }
 
-  /** Stale base → `conflict` outcome, not a thrown error; caller branches, not catches. */
+  /**
+   * Stale base → `conflict` outcome, not a thrown error; caller branches, not catches. `types` is
+   * sent only when the session authored the type set (an active typed edit the server gates its
+   * Fields forward-only); a plain body edit omits it, so data at rest is never re-typed (ADR-0048).
+   */
   save(
     id: string,
     body: EntityBody,
     version: number,
     tags: readonly string[],
+    types?: readonly EntityType[],
   ): Observable<EntitySaveOutcome> {
     return this.http
       .put<EntityDetail>(`/api/entities/${id}`, {
         document: body,
         version,
         tags,
+        ...(types !== undefined && { types }),
       })
       .pipe(
         // Write-through: a clean save is the freshest state — feed it to the store so other watchers
@@ -244,6 +242,8 @@ function facetParams(opts: EntityFacetParams): HttpParams {
   for (const t of opts.type ?? []) params = params.append('type', t);
   for (const t of opts.tag ?? []) params = params.append('tag', t);
   for (const v of opts.visibility ?? []) params = params.append('visibility', v);
+  // Filter-by-Field (#188): each `key:op:value` token repeats, like the other facet params.
+  for (const f of opts.field ?? []) params = params.append('field', f);
   if (opts.worldId) params = params.set('worldId', opts.worldId);
   return params;
 }

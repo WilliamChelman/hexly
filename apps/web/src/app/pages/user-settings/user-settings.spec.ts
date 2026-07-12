@@ -1,7 +1,8 @@
+import { provideTranslocoTesting } from '../../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
-import { provideTranslocoTesting, MockAuthClient } from '@hexly/web-core/testing';
+import { MockAuthClient } from '@hexly/web-core/testing';
 import { LocaleService, ThemeService, AuthClient } from '@hexly/web-core';
 import { UserSettings } from './user-settings';
 
@@ -27,13 +28,8 @@ describe('Settings page (ADR-0038)', () => {
     return fixture;
   }
 
-  function el<T extends HTMLElement>(
-    fixture: { nativeElement: HTMLElement },
-    testid: string,
-  ): T {
-    const found = fixture.nativeElement.querySelector(
-      `[data-testid="${testid}"]`,
-    );
+  function el<T extends HTMLElement>(fixture: { nativeElement: HTMLElement }, testid: string): T {
+    const found = fixture.nativeElement.querySelector(`[data-testid="${testid}"]`);
     if (!found) throw new Error(`missing [data-testid="${testid}"]`);
     return found as T;
   }
@@ -46,9 +42,7 @@ describe('Settings page (ADR-0038)', () => {
 
     // Email is the login identity: rendered, never an input (ADR-0038).
     expect(fixture.nativeElement.textContent).toContain('ada@hexly.test');
-    expect(
-      fixture.nativeElement.querySelector('input[value="ada@hexly.test"]'),
-    ).toBeNull();
+    expect(fixture.nativeElement.querySelector('input[value="ada@hexly.test"]')).toBeNull();
 
     expect(el<HTMLInputElement>(fixture, 'display-name').value).toBe('Ada');
   });
@@ -107,9 +101,7 @@ describe('Settings page (ADR-0038)', () => {
 
   it('submits a password change and surfaces a wrong-current-password failure', () => {
     const fixture = render();
-    auth.changePassword.mockReturnValue(
-      throwError(() => new HttpErrorResponse({ status: 401 })),
-    );
+    auth.changePassword.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 401 })));
 
     const current = el<HTMLInputElement>(fixture, 'current-password');
     current.value = 'not it';
@@ -121,10 +113,7 @@ describe('Settings page (ADR-0038)', () => {
     el<HTMLButtonElement>(fixture, 'change-password').click();
     fixture.detectChanges();
 
-    expect(auth.changePassword).toHaveBeenCalledWith(
-      'not it',
-      'battery staple',
-    );
+    expect(auth.changePassword).toHaveBeenCalledWith('not it', 'battery staple');
     // The failure reads in the form, near the field it concerns.
     expect(fixture.nativeElement.textContent).toContain('current password');
   });
@@ -143,9 +132,7 @@ describe('Settings page (ADR-0038)', () => {
     fixture.detectChanges();
 
     // The guard message renders; nothing left the browser.
-    expect(fixture.nativeElement.textContent).toContain(
-      'at least 8 characters',
-    );
+    expect(fixture.nativeElement.textContent).toContain('at least 8 characters');
 
     expect(auth.changePassword).not.toHaveBeenCalled();
   });

@@ -13,9 +13,15 @@
     "test": "nx run-many -t test",
     "lint": "nx run-many -t lint",
     "test:eslint-rules": "node --test eslint-rules/*.spec.mjs",
-    "e2e": "nx e2e web-e2e"
+    "e2e": "nx e2e web-e2e",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky"
   },
   "private": true,
+  "lint-staged": {
+    "*": "prettier --write --ignore-unknown"
+  },
   "pnpm": {
     "onlyBuiltDependencies": [
       "@parcel/watcher",
@@ -67,9 +73,11 @@
     "drizzle-kit": "^0.31.10",
     "eslint": "^9.8.0",
     "eslint-config-prettier": "^10.0.0",
+    "husky": "^9.1.7",
     "jiti": "^2.7.0",
     "jsdom": "^27.1.0",
     "jsonc-eslint-parser": "^2.1.0",
+    "lint-staged": "^17.0.8",
     "nx": "23.0.0",
     "prettier": "^3.8.1",
     "semantic-release": "^25.0.5",

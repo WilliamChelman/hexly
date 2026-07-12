@@ -63,9 +63,13 @@ export class AdminService {
    * for this button to backfill it.
    */
   start(): ReindexJob {
-    if (this.job.status === 'running')
-      throw new ConflictException({ code: ReindexErrorCode.ReindexRunning });
-    this.job = { ...IDLE, status: 'running', total: this.countEntities(), startedAt: Date.now() };
+    if (this.job.status === 'running') throw new ConflictException({ code: ReindexErrorCode.ReindexRunning });
+    this.job = {
+      ...IDLE,
+      status: 'running',
+      total: this.countEntities(),
+      startedAt: Date.now(),
+    };
     // Deliberately not awaited: the walk outlives the request that asked for it, and the client
     // follows it by polling. `run` never rejects — it lands every fault in the job itself.
     void this.run();

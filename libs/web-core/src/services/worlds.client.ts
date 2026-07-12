@@ -2,10 +2,14 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable, merge, tap } from 'rxjs';
 import {
+  AvailableType,
+  CreateUserDefinedTypeRequest,
   FollowSignal,
   ImportSummary,
   MemberRole,
   PublicLink,
+  UpdateUserDefinedTypeRequest,
+  UserDefinedType,
   WorldDetail,
   WorldGraph,
   WorldMember,
@@ -119,9 +123,7 @@ export class WorldsClient {
    */
   setPins(id: string, pinnedEntityIds: string[]): Observable<WorldDetail> {
     // Write-through, as {@link rename} — a pin reorder fans out and its echo dedups.
-    return this.http
-      .patch<WorldDetail>(`/api/worlds/${id}`, { pinnedEntityIds })
-      .pipe(tap((d) => this.store.merge(d)));
+    return this.http.patch<WorldDetail>(`/api/worlds/${id}`, { pinnedEntityIds }).pipe(tap((d) => this.store.merge(d)));
   }
 
   delete(id: string): Observable<void> {
@@ -150,7 +152,10 @@ export class WorldsClient {
 
   /** Add a Contributor or World Viewer; returns the updated member set. Upsert (200), not a create. */
   addMember(id: string, userId: string, role: MemberRole): Observable<WorldMember[]> {
-    return this.http.post<WorldMember[]>(`/api/worlds/${id}/members`, { userId, role });
+    return this.http.post<WorldMember[]>(`/api/worlds/${id}/members`, {
+      userId,
+      role,
+    });
   }
 
   /** Change a member's role between Contributor and Viewer; returns the updated member set. */
@@ -161,6 +166,26 @@ export class WorldsClient {
   /** Remove a member, or leave the World yourself (pass your own id); returns the updated member set. */
   removeMember(id: string, userId: string): Observable<WorldMember[]> {
     return this.http.delete<WorldMember[]>(`/api/worlds/${id}/members/${userId}`);
+  }
+
+  /** The Entity Types available in a World (#191): plugin + user-defined. Reachable-gated server-side. */
+  availableTypes(id: string): Observable<AvailableType[]> {
+    return this.http.get<AvailableType[]>(`/api/worlds/${id}/types`);
+  }
+
+  /** Author a new user-defined type; returns the created type. World-Owner-only server-side. */
+  createType(id: string, req: CreateUserDefinedTypeRequest): Observable<UserDefinedType> {
+    return this.http.post<UserDefinedType>(`/api/worlds/${id}/types`, req);
+  }
+
+  /** Rename / re-Field a user-defined type; returns the updated type. World-Owner-only server-side. */
+  updateType(id: string, typeId: string, patch: UpdateUserDefinedTypeRequest): Observable<UserDefinedType> {
+    return this.http.patch<UserDefinedType>(`/api/worlds/${id}/types/${typeId}`, patch);
+  }
+
+  /** Delete a user-defined type. World-Owner-only server-side. */
+  deleteType(id: string, typeId: string): Observable<void> {
+    return this.http.delete<void>(`/api/worlds/${id}/types/${typeId}`);
   }
 
   /** The World's Public Link — the active token or null. Owner-only server-side. */

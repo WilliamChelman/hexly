@@ -25,12 +25,8 @@ export class NavCommands implements CommandProvider {
   search(query: string): Observable<readonly Command[]> {
     const q = query.trim().toLowerCase();
     const commands: Command[] = [
-      ...(this.auth.canManageUsers()
-        ? [this.nav('go-users', 'commandPalette.goToUsers', ['/users'])]
-        : []),
-      ...(this.auth.isSuperadmin()
-        ? [this.nav('go-admin', 'commandPalette.goToAdmin', ['/admin'])]
-        : []),
+      ...(this.auth.canManageUsers() ? [this.nav('go-users', 'commandPalette.goToUsers', ['/users'])] : []),
+      ...(this.auth.isSuperadmin() ? [this.nav('go-admin', 'commandPalette.goToAdmin', ['/admin'])] : []),
       this.nav('go-styleguide', 'commandPalette.goToStyleguide', ['/styleguide']),
     ];
     return of(commands.filter((c) => c.label.toLowerCase().includes(q)));

@@ -4,7 +4,7 @@ A Hex gains an optional `name` (`hex = { terrain, feature?, name? }`) so a coord
 
 ## Why a name when Labels already exist
 
-A Label is free-positioned cartographic typography placed and styled by hand; it is bound to no cell. A Hex name is *structured metadata bound to its coordinate*: it travels on move/swap, is edited in the Inspector, is searchable, and the renderer draws it automatically. We keep that line crisp by making the name deliberately minimal — small text anchored to the hex (below the feature icon, or hex-centre for a bare named hex), always visible, with no size/rotation/offset controls. Those stay Label-exclusive, so a Hex name never grows into a second, competing Label system.
+A Label is free-positioned cartographic typography placed and styled by hand; it is bound to no cell. A Hex name is _structured metadata bound to its coordinate_: it travels on move/swap, is edited in the Inspector, is searchable, and the renderer draws it automatically. We keep that line crisp by making the name deliberately minimal — small text anchored to the hex (below the feature icon, or hex-centre for a bare named hex), always visible, with no size/rotation/offset controls. Those stay Label-exclusive, so a Hex name never grows into a second, competing Label system.
 
 ## Consequences
 

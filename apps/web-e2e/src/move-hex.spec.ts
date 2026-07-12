@@ -1,4 +1,4 @@
-import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtures';
+import { createEntity, enterLibrary, expect, flushSave, test, savedGrid } from './fixtures';
 
 /**
  * The whole-Hex move journey (issue #30, ADR-0010). It crosses the one seam the
@@ -12,14 +12,9 @@ import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtur
  * The canvas centres the world origin on load, so a press at the canvas centre
  * grabs hex (0,0); dragging ~100px lands the content on a different coordinate.
  */
-test('drags a hex under Select to a new coordinate, and the move survives a reload', async ({
-  page,
-  request,
-}) => {
+test('drags a hex under Select to a new coordinate, and the move survives a reload', async ({ page, request }) => {
   await enterLibrary(page);
-  await page.getByTestId('new-map').click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const mapId = entityIdFromUrl(page);
+  const mapId = await createEntity(page, 'core.hexmap');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
 
@@ -54,10 +49,8 @@ test('drags a hex under Select to a new coordinate, and the move survives a relo
 
   await flushSave(page);
 
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  const hexes = detail.document.hexes as Record<string, { terrain: string }>;
+  const grid = await savedGrid(request, mapId);
+  const hexes = grid.hexes as Record<string, { terrain: string }>;
   expect(Object.keys(hexes)).toHaveLength(1);
   expect(hexes['0,0']).toBeUndefined();
   expect(hexes['1,0']).toEqual({ terrain: 'forest' });
@@ -72,7 +65,9 @@ test('drags a hex under Select to a new coordinate, and the move survives a relo
   await canvas.click({ position: { x: box2.width / 2, y: box2.height / 2 } });
   await expect(page.getByTestId('entity-coord')).toHaveCount(0);
 
-  await canvas.click({ position: { x: box2.width / 2 + dx, y: box2.height / 2 } });
+  await canvas.click({
+    position: { x: box2.width / 2 + dx, y: box2.height / 2 },
+  });
   await expect(page.getByTestId('entity-detail')).toHaveText('Forest');
 });
 
@@ -83,14 +78,9 @@ test('drags a hex under Select to a new coordinate, and the move survives a relo
  * press→drag gesture and proves the swap through the inspector, a direct API read,
  * and a reload — the two terrains end up exchanged at the two coordinates.
  */
-test('drags a hex onto an occupied hex and swaps the two, surviving a reload', async ({
-  page,
-  request,
-}) => {
+test('drags a hex onto an occupied hex and swaps the two, surviving a reload', async ({ page, request }) => {
   await enterLibrary(page);
-  await page.getByTestId('new-map').click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const mapId = entityIdFromUrl(page);
+  const mapId = await createEntity(page, 'core.hexmap');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
   const box = await canvas.boundingBox();
@@ -102,11 +92,10 @@ test('drags a hex onto an occupied hex and swaps the two, surviving a reload', a
   await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
 
   // Paint the neighbour hex (Ocean) so the drop target is occupied.
-  await page
-    .getByRole('group', { name: 'Terrain' })
-    .getByRole('button', { name: 'Ocean' })
-    .click();
-  await canvas.click({ position: { x: box.width / 2 + dx, y: box.height / 2 } });
+  await page.getByRole('group', { name: 'Terrain' }).getByRole('button', { name: 'Ocean' }).click();
+  await canvas.click({
+    position: { x: box.width / 2 + dx, y: box.height / 2 },
+  });
   await expect(page.getByTestId('hex-count')).toHaveText('2 hexes');
 
   await page.getByTestId('tool-select').click();
@@ -130,10 +119,8 @@ test('drags a hex onto an occupied hex and swaps the two, surviving a reload', a
 
   await flushSave(page);
 
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  const hexes = detail.document.hexes as Record<string, { terrain: string }>;
+  const grid = await savedGrid(request, mapId);
+  const hexes = grid.hexes as Record<string, { terrain: string }>;
   expect(hexes['0,0']).toEqual({ terrain: 'ocean' });
   expect(hexes['1,0']).toEqual({ terrain: 'forest' });
 
@@ -143,7 +130,9 @@ test('drags a hex onto an occupied hex and swaps the two, surviving a reload', a
   if (!box2) throw new Error('canvas not laid out after reload');
   await canvas.click({ position: { x: box2.width / 2, y: box2.height / 2 } });
   await expect(page.getByTestId('entity-detail')).toHaveText('Ocean');
-  await canvas.click({ position: { x: box2.width / 2 + dx, y: box2.height / 2 } });
+  await canvas.click({
+    position: { x: box2.width / 2 + dx, y: box2.height / 2 },
+  });
   await expect(page.getByTestId('entity-detail')).toHaveText('Forest');
 });
 
@@ -153,12 +142,9 @@ test('drags a hex onto an occupied hex and swaps the two, surviving a reload', a
  * the move journey this lives in e2e because it rides the real canvas press→drag
  * gesture (ADR-0003/0009).
  */
-test('Escape cancels an in-progress Hex drag, leaving the hex at its origin', async ({
-  page,
-}) => {
+test('Escape cancels an in-progress Hex drag, leaving the hex at its origin', async ({ page }) => {
   await enterLibrary(page);
-  await page.getByTestId('new-map').click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  await createEntity(page, 'core.hexmap');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
 
@@ -187,7 +173,9 @@ test('Escape cancels an in-progress Hex drag, leaving the hex at its origin', as
   await expect(page.getByTestId('entity-detail')).toHaveText('Forest');
 
   // The hex never moved: drag destination is still Void.
-  await canvas.click({ position: { x: box.width / 2 + dx, y: box.height / 2 } });
+  await canvas.click({
+    position: { x: box.width / 2 + dx, y: box.height / 2 },
+  });
   await expect(page.getByTestId('entity-coord')).toHaveCount(0);
 });
 
@@ -198,14 +186,9 @@ test('Escape cancels an in-progress Hex drag, leaving the hex at its origin', as
  * here a press on an already-selected member drags the whole set — and proves the
  * move through the count and a direct API read of the persisted document.
  */
-test('drags a multi-hex selection so the whole group moves by one offset', async ({
-  page,
-  request,
-}) => {
+test('drags a multi-hex selection so the whole group moves by one offset', async ({ page, request }) => {
   await enterLibrary(page);
-  await page.getByTestId('new-map').click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const mapId = entityIdFromUrl(page);
+  const mapId = await createEntity(page, 'core.hexmap');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
   const box = await canvas.boundingBox();
@@ -217,11 +200,10 @@ test('drags a multi-hex selection so the whole group moves by one offset', async
   await page.getByTestId('tool-terrain').click();
   await canvas.click();
   // Paint Ocean at the q1·r0 neighbour.
-  await page
-    .getByRole('group', { name: 'Terrain' })
-    .getByRole('button', { name: 'Ocean' })
-    .click();
-  await canvas.click({ position: { x: box.width / 2 + dx, y: box.height / 2 } });
+  await page.getByRole('group', { name: 'Terrain' }).getByRole('button', { name: 'Ocean' }).click();
+  await canvas.click({
+    position: { x: box.width / 2 + dx, y: box.height / 2 },
+  });
   await expect(page.getByTestId('hex-count')).toHaveText('2 hexes');
 
   // Build a two-hex Selection: click the centre, then Shift-click the neighbour.
@@ -245,10 +227,8 @@ test('drags a multi-hex selection so the whole group moves by one offset', async
   // Each member rode by the same offset, so the cluster kept its shape.
   await flushSave(page);
 
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  const hexes = detail.document.hexes as Record<string, { terrain: string }>;
+  const grid = await savedGrid(request, mapId);
+  const hexes = grid.hexes as Record<string, { terrain: string }>;
   expect(hexes['0,0']).toBeUndefined();
   expect(hexes['1,0']).toEqual({ terrain: 'forest' });
   expect(hexes['2,0']).toEqual({ terrain: 'ocean' });
@@ -260,14 +240,9 @@ test('drags a multi-hex selection so the whole group moves by one offset', async
  * onto the moving group's own path, the whole move is refused. Releasing leaves the
  * document untouched — nothing moves. Rides the real canvas press→drag gesture.
  */
-test('refuses a blocked group move, leaving every hex where it was', async ({
-  page,
-  request,
-}) => {
+test('refuses a blocked group move, leaving every hex where it was', async ({ page, request }) => {
   await enterLibrary(page);
-  await page.getByTestId('new-map').click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const mapId = entityIdFromUrl(page);
+  const mapId = await createEntity(page, 'core.hexmap');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
   const box = await canvas.boundingBox();
@@ -282,9 +257,13 @@ test('refuses a blocked group move, leaving every hex where it was', async ({
   await canvas.click();
   const terrain = page.getByRole('group', { name: 'Terrain' });
   await terrain.getByRole('button', { name: 'Ocean' }).click();
-  await canvas.click({ position: { x: box.width / 2 + dx, y: box.height / 2 } });
+  await canvas.click({
+    position: { x: box.width / 2 + dx, y: box.height / 2 },
+  });
   await terrain.getByRole('button', { name: 'Grassland' }).click();
-  await canvas.click({ position: { x: box.width / 2 + dx2, y: box.height / 2 } });
+  await canvas.click({
+    position: { x: box.width / 2 + dx2, y: box.height / 2 },
+  });
   await expect(page.getByTestId('hex-count')).toHaveText('3 hexes');
 
   // Select only the first two (Forest + Ocean); leave Grassland out.
@@ -311,10 +290,8 @@ test('refuses a blocked group move, leaving every hex where it was', async ({
 
   await flushSave(page);
 
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  const hexes = detail.document.hexes as Record<string, { terrain: string }>;
+  const grid = await savedGrid(request, mapId);
+  const hexes = grid.hexes as Record<string, { terrain: string }>;
   // Every hex is exactly where it was painted.
   expect(hexes['0,0']).toEqual({ terrain: 'forest' });
   expect(hexes['1,0']).toEqual({ terrain: 'ocean' });

@@ -96,9 +96,7 @@ export abstract class ListboxController<T extends { id: string }> {
   }
 }
 
-function toPosition(
-  clientRect?: (() => DOMRect | null) | null,
-): { x: number; y: number } | null {
+function toPosition(clientRect?: (() => DOMRect | null) | null): { x: number; y: number } | null {
   const rect = clientRect?.();
   return rect ? { x: rect.left, y: rect.bottom } : null;
 }

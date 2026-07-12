@@ -1,11 +1,12 @@
+import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { EntityDetail } from '@hexly/domain';
+import { CORE_NOTE, EntityDetail } from '@hexly/domain';
 import { of } from 'rxjs';
 import { EntitySession } from '../services/entity-session';
+import { ENTITY_SESSION } from '@hexly/web-entity';
 import { EntitiesClient } from '@hexly/web-core';
-import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { EntityTags } from './entity-tags';
 
 describe('EntityTags', () => {
@@ -13,7 +14,7 @@ describe('EntityTags', () => {
     id: 'n1',
     worldId: 'w1',
     name: 'Lady Mara',
-    type: 'note',
+    types: [CORE_NOTE],
     tags,
     visibility: 'private',
     version: 1,
@@ -22,7 +23,7 @@ describe('EntityTags', () => {
     updatedAt: 1,
     // Owner by default (ADR-0039): the `edit` Right makes the tag controls editable.
     rights: ['read', 'edit', 'delete', 'set-visibility', 'manage'],
-    document: { type: 'note', content: { format: 'tiptap-v1', snapshot: {} } },
+    document: { content: { format: 'tiptap-v1', snapshot: {} } },
   });
 
   let session: EntitySession;
@@ -34,15 +35,14 @@ describe('EntityTags', () => {
       imports: [EntityTags, provideTranslocoTesting()],
       providers: [
         EntitySession,
+        { provide: ENTITY_SESSION, useExisting: EntitySession },
         provideHttpClient(),
         provideHttpClientTesting(),
       ],
     }).compileComponents();
     session = TestBed.inject(EntitySession);
     // The picker's vocabulary comes from the owner's DISTINCT tags; stub it.
-    vi.spyOn(TestBed.inject(EntitiesClient), 'listTags').mockImplementation(() =>
-      of(vocab),
-    );
+    vi.spyOn(TestBed.inject(EntitiesClient), 'listTags').mockImplementation(() => of(vocab));
   });
 
   function render(tags: string[]) {
@@ -67,11 +67,7 @@ describe('EntityTags', () => {
   it('renders the open entity’s tags as chips', () => {
     const fixture = render(['deity', 'ruined']);
 
-    const text = (
-      fixture.nativeElement.querySelector(
-        '[data-testid=entity-tags]',
-      ) as HTMLElement
-    ).textContent;
+    const text = (fixture.nativeElement.querySelector('[data-testid=entity-tags]') as HTMLElement).textContent;
     expect(text).toContain('deity');
     expect(text).toContain('ruined');
   });
@@ -79,19 +75,13 @@ describe('EntityTags', () => {
   it('removes a tag when its remove control is clicked', () => {
     const fixture = render(['deity', 'ruined']);
 
-    (
-      fixture.nativeElement.querySelector(
-        '[data-testid=tag-remove-deity]',
-      ) as HTMLButtonElement
-    ).click();
+    (fixture.nativeElement.querySelector('[data-testid=tag-remove-deity]') as HTMLButtonElement).click();
 
     expect(session.tags()).toEqual(['ruined']);
   });
 
   function typeTag(fixture: ReturnType<typeof render>, value: string) {
-    const input = fixture.nativeElement.querySelector(
-      '[data-testid=tag-input]',
-    ) as HTMLInputElement;
+    const input = fixture.nativeElement.querySelector('[data-testid=tag-input]') as HTMLInputElement;
     input.value = value;
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
     fixture.detectChanges();
@@ -124,13 +114,8 @@ describe('EntityTags', () => {
     expect(session.tags()).toEqual(['deity']);
   });
 
-  async function queryInput(
-    fixture: ReturnType<typeof render>,
-    value: string,
-  ): Promise<HTMLInputElement> {
-    const input = fixture.nativeElement.querySelector(
-      '[data-testid=tag-input]',
-    ) as HTMLInputElement;
+  async function queryInput(fixture: ReturnType<typeof render>, value: string): Promise<HTMLInputElement> {
+    const input = fixture.nativeElement.querySelector('[data-testid=tag-input]') as HTMLInputElement;
     input.value = value;
     input.dispatchEvent(new Event('input'));
     await fixture.whenStable();

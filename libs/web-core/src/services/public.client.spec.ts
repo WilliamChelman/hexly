@@ -1,8 +1,5 @@
 import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { EntityDetail, PublicWorldView } from '@hexly/domain';
 import { PublicClient } from './public.client';
@@ -18,18 +15,18 @@ describe('PublicClient', () => {
   let http: HttpTestingController;
   let bus: MockNudgeBusClient;
 
-  const worldView: PublicWorldView = { worldId: 'w1', worldName: 'Aldermoor', entities: [] };
+  const worldView: PublicWorldView = {
+    worldId: 'w1',
+    worldName: 'Aldermoor',
+    entities: [],
+  };
   const entity = { id: 'e1', name: 'Ruin' } as EntityDetail;
 
   beforeEach(() => {
     vi.useFakeTimers();
     bus = new MockNudgeBusClient();
     TestBed.configureTestingModule({
-      providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        { provide: NudgeBusClient, useValue: bus },
-      ],
+      providers: [provideHttpClient(), provideHttpClientTesting(), { provide: NudgeBusClient, useValue: bus }],
     });
     client = TestBed.inject(PublicClient);
     http = TestBed.inject(HttpTestingController);
@@ -93,9 +90,7 @@ describe('PublicClient', () => {
 
     it('refetches a world-scoped link via /public/worlds/:token/entities/:id', () => {
       const seen: unknown[] = [];
-      const sub = client
-        .watchEntity(TOKEN, 'worldEntity', 'e1')
-        .subscribe((r) => seen.push(r));
+      const sub = client.watchEntity(TOKEN, 'worldEntity', 'e1').subscribe((r) => seen.push(r));
 
       bus.emit({ id: 'e1', seq: 2 });
       vi.advanceTimersByTime(WORLD_NUDGE_DEBOUNCE_MS);

@@ -1,6 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
+import { isStructuredDataType } from '@hexly/domain';
 import { EntitySession } from '../services/entity-session';
+import { TypeRegistry } from '../../../entity-types/type-registry';
 
 /**
  * Read-only view of the open Entity's Metadata map (CONTEXT.md → Metadata, ADR-0033):
@@ -8,6 +10,9 @@ import { EntitySession } from '../services/entity-session';
  * across, so a worldbuilder can confirm what landed. A dev affordance — a collapsed
  * disclosure atop the note body — not an editor; editing Metadata is out of scope.
  * Renders nothing when the Entity carries no Metadata.
+ *
+ * A **Structured Field**'s value is skipped (ADR-0050): it is a document with its own View, and a
+ * Hex Map's grid dumped here as a line of JSON tells the reader nothing.
  */
 @Component({
   selector: 'app-entity-metadata',
@@ -15,18 +20,11 @@ import { EntitySession } from '../services/entity-session';
   imports: [TranslocoPipe],
   template: `
     @if (entries().length > 0) {
-      <details
-        class="mb-4 rounded-md border border-line bg-surface-sunken"
-        data-testid="entity-metadata"
-      >
-        <summary
-          class="cursor-pointer select-none px-3 py-2 text-2xs uppercase tracking-wider text-ink-muted"
-        >
+      <details class="mb-4 rounded-md border border-line bg-surface-sunken" data-testid="entity-metadata">
+        <summary class="cursor-pointer select-none px-3 py-2 text-2xs uppercase tracking-wider text-ink-muted">
           {{ 'entityMetadata.heading' | transloco }} ({{ entries().length }})
         </summary>
-        <dl
-          class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 border-t border-line px-3 py-2 m-0 text-sm"
-        >
+        <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 border-t border-line px-3 py-2 m-0 text-sm">
           @for (entry of entries(); track entry.key) {
             <dt class="font-mono text-xs text-ink-muted break-all">
               {{ entry.key }}
@@ -40,14 +38,29 @@ import { EntitySession } from '../services/entity-session';
 })
 export class EntityMetadata {
   private readonly session = inject(EntitySession);
+  private readonly types = inject(TypeRegistry);
+
+  /** The Metadata keys a Structured Field types — a document, shown on its own View, never here. */
+  private readonly structuredKeys = computed(
+    () =>
+      new Set(
+        this.types
+          .resolveFields(this.session.types())
+          .filter((field) => isStructuredDataType(field.dataType))
+          .map((field) => field.key),
+      ),
+  );
 
   /** The open Entity's Metadata as displayable key/value rows; empty when there is none. */
   protected readonly entries = computed(() => {
     const metadata = this.session.current()?.document.metadata ?? {};
-    return Object.entries(metadata).map(([key, value]) => ({
-      key,
-      value: display(value),
-    }));
+    const structured = this.structuredKeys();
+    return Object.entries(metadata)
+      .filter(([key]) => !structured.has(key))
+      .map(([key, value]) => ({
+        key,
+        value: display(value),
+      }));
   });
 }
 

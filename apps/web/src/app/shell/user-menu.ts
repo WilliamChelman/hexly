@@ -1,10 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  input,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { AuthClient, Locale, LocaleService, ThemeService } from '@hexly/web-core';
@@ -21,18 +15,7 @@ import { Button, Icon, Rule, MenuGroup, MenuItem, MenuItemRadio, MenuPanel, Menu
 @Component({
   selector: 'app-user-menu',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    MenuTrigger,
-    MenuPanel,
-    MenuItem,
-    MenuItemRadio,
-    MenuGroup,
-    RouterLink,
-    Button,
-    Icon,
-    Rule,
-    TranslocoPipe,
-  ],
+  imports: [MenuTrigger, MenuPanel, MenuItem, MenuItemRadio, MenuGroup, RouterLink, Button, Icon, Rule, TranslocoPipe],
   template: `
     <button
       type="button"
@@ -56,9 +39,7 @@ import { Button, Icon, Rule, MenuGroup, MenuItem, MenuItemRadio, MenuPanel, Menu
       } @else {
         <app-icon name="user" [size]="20" />
         @if (expanded()) {
-          <span class="text-sm text-ink truncate">{{
-            'common.userMenu' | transloco
-          }}</span>
+          <span class="text-sm text-ink truncate">{{ 'common.userMenu' | transloco }}</span>
         }
       }
     </button>
@@ -66,20 +47,13 @@ import { Button, Icon, Rule, MenuGroup, MenuItem, MenuItemRadio, MenuPanel, Menu
     <ng-template #menu>
       <div appMenuPanel>
         @if (user(); as u) {
-          <span class="px-3 py-2 text-sm text-ink-strong">{{
-            u.displayName
-          }}</span>
+          <span class="px-3 py-2 text-sm text-ink-strong">{{ u.displayName }}</span>
           <hr appRule class="mx-1 my-1" />
         }
         <button
           type="button"
           appMenuItem
-          [attr.aria-label]="
-            (theme() === 'dark'
-              ? 'common.theme.toSolar'
-              : 'common.theme.toAstral'
-            ) | transloco
-          "
+          [attr.aria-label]="(theme() === 'dark' ? 'common.theme.toSolar' : 'common.theme.toAstral') | transloco"
           (triggered)="themeService.toggle()"
         >
           @if (theme() === 'dark') {

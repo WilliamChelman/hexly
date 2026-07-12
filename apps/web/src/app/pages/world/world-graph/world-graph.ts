@@ -1,19 +1,8 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { WorldGraph as WorldGraphPayload } from '@hexly/domain';
-import {
-  ActiveWorld,
-  entityRoute,
-  ToasterService,
-  WorldsClient,
-} from '@hexly/web-core';
+import { ActiveWorld, entityRoute, ToasterService, WorldsClient } from '@hexly/web-core';
 import { Eyebrow, PageHeader, Panel } from '@hexly/web-ui';
 import { GraphCanvas, GraphOpen } from './graph-canvas';
 
@@ -33,9 +22,7 @@ import { GraphCanvas, GraphOpen } from './graph-canvas';
   template: `
     <app-page-header sticky>
       <div pageHeaderTitle class="flex flex-col">
-        <span appEyebrow class="text-gold! tracking-[0.28em]">{{
-          'worldGraph.eyebrow' | transloco
-        }}</span>
+        <span appEyebrow class="text-gold! tracking-[0.28em]">{{ 'worldGraph.eyebrow' | transloco }}</span>
         <h1 class="font-display text-[22px] text-ink-strong m-0 leading-tight">
           {{ worldName() }}
         </h1>

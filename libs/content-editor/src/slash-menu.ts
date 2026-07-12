@@ -21,7 +21,7 @@ export type SlashMenuProps = ListboxProps<SlashItem>;
       <ul
         role="listbox"
         data-testid="slash-menu"
-        [attr.aria-label]="'noteView.slashMenu.label' | transloco"
+        [attr.aria-label]="'editor.slashMenu.label' | transloco"
         [attr.aria-activedescendant]="activeItemId()"
         class="fixed z-50 max-h-72 w-56 overflow-auto rounded-md border border-line bg-surface py-1 shadow-2"
         [style.left.px]="position()!.x"
@@ -38,7 +38,7 @@ export type SlashMenuProps = ListboxProps<SlashItem>;
             {{ item.labelKey | transloco }}
           </li>
         } @empty {
-          <li appListboxEmpty>{{ 'noteView.slashMenu.empty' | transloco }}</li>
+          <li appListboxEmpty>{{ 'editor.slashMenu.empty' | transloco }}</li>
         }
       </ul>
     }

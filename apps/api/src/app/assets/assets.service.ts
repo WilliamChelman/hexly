@@ -65,7 +65,11 @@ export class AssetsService {
     if (existing) {
       // Match the on-disk name, which was minted from the FIRST store's extension (lower-cased,
       // like the write path below — else the served URL 404s on a case-sensitive filesystem).
-      return { url: assetUrl(worldId, hash, extname(existing.originalFilename).toLowerCase()), hash, deduped: true };
+      return {
+        url: assetUrl(worldId, hash, extname(existing.originalFilename).toLowerCase()),
+        hash,
+        deduped: true,
+      };
     }
 
     const ext = extname(filename).toLowerCase();
@@ -96,7 +100,10 @@ export class AssetsService {
     if (basename(worldId) !== worldId || basename(file) !== file) return null;
     const path = join(this.dir, worldId, file);
     if (!existsSync(path)) return null;
-    return { bytes: readFileSync(path), mime: MIME_BY_EXT[extname(file).toLowerCase()] ?? 'application/octet-stream' };
+    return {
+      bytes: readFileSync(path),
+      mime: MIME_BY_EXT[extname(file).toLowerCase()] ?? 'application/octet-stream',
+    };
   }
 
   /**
@@ -112,11 +119,20 @@ export class AssetsService {
       .from(assets)
       .where(eq(assets.worldId, worldId))
       .all();
-    const out: { servedUrl: string; originalFilename: string; bytes: Buffer }[] = [];
+    const out: {
+      servedUrl: string;
+      originalFilename: string;
+      bytes: Buffer;
+    }[] = [];
     for (const row of rows) {
       const ext = extname(row.originalFilename).toLowerCase();
       const found = this.read(worldId, row.hash + ext);
-      if (found) out.push({ servedUrl: assetUrl(worldId, row.hash, ext), originalFilename: row.originalFilename, bytes: found.bytes });
+      if (found)
+        out.push({
+          servedUrl: assetUrl(worldId, row.hash, ext),
+          originalFilename: row.originalFilename,
+          bytes: found.bytes,
+        });
     }
     return out;
   }

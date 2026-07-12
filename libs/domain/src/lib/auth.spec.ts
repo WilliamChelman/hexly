@@ -12,8 +12,6 @@ describe('loginRequestSchema', () => {
   });
 
   it('rejects an empty email', () => {
-    expect(() =>
-      loginRequestSchema.parse({ email: '', password: 'correct horse' }),
-    ).toThrow();
+    expect(() => loginRequestSchema.parse({ email: '', password: 'correct horse' })).toThrow();
   });
 });

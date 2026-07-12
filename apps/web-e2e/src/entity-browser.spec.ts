@@ -1,19 +1,10 @@
-import {
-  enterLibrary,
-  entityIdFromUrl,
-  expect,
-  openEntityActions,
-  segRe,
-  test,
-} from './fixtures';
+import { createEntity, enterLibrary, entityIdFromUrl, expect, openEntityActions, segRe, test } from './fixtures';
 
 /**
  * Entity browser lifecycle (#70): create → list → open → rename → delete, over
  * the type-dispatching route (`/entities/:id`). DB is reset before each test.
  */
-test('a note round-trips: create → appears → open → rename → delete', async ({
-  page,
-}) => {
+test('a note round-trips: create → appears → open → rename → delete', async ({ page }) => {
   await enterLibrary(page);
   await expect(page.getByTestId('empty')).toBeVisible();
 
@@ -47,9 +38,7 @@ test('a note round-trips: create → appears → open → rename → delete', as
 // shared from the header, and the Entity Browser's access-scoped Visibility facet
 // reflects the change — a still-private note is absent from the Shared facet, and
 // appears in it once revealed.
-test('an owner toggles a note to shared and the Visibility facet reflects it', async ({
-  page,
-}) => {
+test('an owner toggles a note to shared and the Visibility facet reflects it', async ({ page }) => {
   await enterLibrary(page);
 
   await page.getByTestId('new-note').click();
@@ -79,13 +68,10 @@ test('an owner toggles a note to shared and the Visibility facet reflects it', a
   await expect(page.getByTestId(`open-${id}`)).toBeVisible();
 });
 
-test('creating a map opens the map editor, not the note view', async ({
-  page,
-}) => {
+test('creating a map opens the map editor, not the note view', async ({ page }) => {
   await enterLibrary(page);
 
-  await page.getByTestId('new-map').click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  await createEntity(page, 'core.hexmap');
 
   // Editor chrome present (harmonized header — ADR-0022).
   await expect(page.getByTestId('title')).toBeVisible();

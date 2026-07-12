@@ -1,10 +1,4 @@
-import {
-  DestroyRef,
-  Injectable,
-  WritableSignal,
-  inject,
-  signal,
-} from '@angular/core';
+import { DestroyRef, Injectable, WritableSignal, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Observable, Subject, firstValueFrom, map, share } from 'rxjs';
 import { ENTITY_LIST_MAX_LIMIT, EntitySummary } from '@hexly/domain';
@@ -48,10 +42,7 @@ export class EntityNameResolver {
 
   // Picker's live query stream, shared so overlapping awaits collapse onto one debounced search.
   private readonly pickerQuery$ = new Subject<string>();
-  private readonly pickerResults$ = searchEntities(
-    this.client,
-    this.pickerQuery$,
-  ).pipe(share());
+  private readonly pickerResults$ = searchEntities(this.client, this.pickerQuery$).pipe(share());
 
   /**
    * The owner's entities matching `query`, server-filtered (ADR-0025 `q`) — the
@@ -102,9 +93,7 @@ export class EntityNameResolver {
     const byId = new Map(items.map((e) => [e.id, e]));
     for (const id of ids) {
       const entity = byId.get(id);
-      this.cache
-        .get(id)
-        ?.set(entity ? { status: 'found', entity } : { status: 'missing' });
+      this.cache.get(id)?.set(entity ? { status: 'found', entity } : { status: 'missing' });
     }
   }
 }

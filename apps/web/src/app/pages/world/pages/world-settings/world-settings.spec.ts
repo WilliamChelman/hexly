@@ -1,9 +1,10 @@
+import { provideTranslocoTesting } from '../../../../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideRouter, Router } from '@angular/router';
 import { of } from 'rxjs';
 import { WorldsClient, EntitiesClient, UserDirectoryClient, AuthClient, ActiveWorld } from '@hexly/web-core';
-import { MockWorldsClient, MockEntitiesClient, MockUserDirectoryClient, MockAuthClient, provideTranslocoTesting } from '@hexly/web-core/testing';
+import { MockWorldsClient, MockEntitiesClient, MockUserDirectoryClient, MockAuthClient } from '@hexly/web-core/testing';
 import { OwnerSet } from '@hexly/web-ui';
 import { WorldSettings } from './world-settings';
 
@@ -19,7 +20,10 @@ describe('WorldSettings', () => {
         provideRouter([]),
         { provide: WorldsClient, useValue: worlds },
         { provide: EntitiesClient, useValue: new MockEntitiesClient() },
-        { provide: UserDirectoryClient, useValue: new MockUserDirectoryClient() },
+        {
+          provide: UserDirectoryClient,
+          useValue: new MockUserDirectoryClient(),
+        },
         { provide: AuthClient, useValue: new MockAuthClient() },
       ],
     }).compileComponents();
@@ -36,9 +40,7 @@ describe('WorldSettings', () => {
   });
 
   it('leaves for the World Index once the user resigns', () => {
-    const navigate = vi
-      .spyOn(TestBed.inject(Router), 'navigate')
-      .mockResolvedValue(true);
+    const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     const fixture = TestBed.createComponent(WorldSettings);
     fixture.detectChanges();
 

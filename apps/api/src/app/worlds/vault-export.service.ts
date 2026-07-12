@@ -1,6 +1,6 @@
 import { posix } from 'node:path';
 import { Injectable } from '@nestjs/common';
-import { ContentNode, EntityDetail, HEXLY_METADATA_PREFIX, visit } from '@hexly/domain';
+import { ContentNode, CORE_NOTE, EntityDetail, HEXLY_METADATA_PREFIX, HEXLY_TYPE_KEY, visit } from '@hexly/domain';
 import { proseMirrorToMarkdown } from '@hexly/obsidian';
 import { strToU8, zipSync, type Zippable } from 'fflate';
 import { AssetsService } from '../assets/assets.service';
@@ -110,6 +110,15 @@ function rewriteAssetSrcs(snapshot: unknown, srcMap: Map<string, string>): void 
  * key stripped (they drive placement/typing, not frontmatter), plus its Tags re-emitted as
  * `tags` so a vault's `tags:` round-trips (ADR-0033). Returns undefined when nothing remains,
  * so a bare note exports without an empty `---` block.
+ *
+ * A **Structured Field**'s value rides along like any other Field's, as nested YAML (ADR-0050), so a
+ * Hex Map's grid now survives the round-trip — the lossiness ADR-0033 accepted closes here, without
+ * this path learning what a grid is.
+ *
+ * The Entity's ordered Type set rides along under `hexly.type`, which no Metadata key records — named
+ * by no type id (ADR-0050), and written whole and in order, so the primary type stays first. Types
+ * that are *exactly* the default an import mints go unstamped, so a bare note still exports with no
+ * `---` block at all.
  */
 function frontmatter(entity: EntityDetail): Record<string, unknown> | undefined {
   const meta: Record<string, unknown> = {};
@@ -117,8 +126,8 @@ function frontmatter(entity: EntityDetail): Record<string, unknown> | undefined 
     if (!key.startsWith(HEXLY_METADATA_PREFIX)) meta[key] = value;
   }
   if (entity.tags.length) meta['tags'] = [...entity.tags];
-  // A hexmap exports lore only (grid dropped); flag the type so the loss is visible (ADR-0033).
-  if (entity.type === 'hexmap') meta['hexly.type'] = 'hexmap';
+  const isBareNote = entity.types.length === 1 && entity.types[0] === CORE_NOTE;
+  if (!isBareNote) meta[HEXLY_TYPE_KEY] = [...entity.types];
   return Object.keys(meta).length ? meta : undefined;
 }
 

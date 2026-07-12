@@ -1,12 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  effect,
-  inject,
-  input,
-  output,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, inject, input, output, signal } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { EntitySummary } from '@hexly/domain';
 import { EntitiesClient } from '@hexly/web-core';
@@ -30,10 +22,7 @@ import { Input } from './input';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [Button, Input, TranslocoPipe],
   template: `
-    <div
-      class="rounded-md border border-line bg-surface p-1 shadow-2"
-      [attr.data-testid]="testid() + '-menu'"
-    >
+    <div class="rounded-md border border-line bg-surface p-1 shadow-2" [attr.data-testid]="testid() + '-menu'">
       <input
         appInput
         class="mb-1"
@@ -55,7 +44,7 @@ import { Input } from './input';
             (click)="pick.emit(e)"
           >
             {{ e.name }}
-            <span class="font-mono text-2xs text-ink-muted">({{ e.type }})</span>
+            <span class="font-mono text-2xs text-ink-muted">({{ e.types[0] }})</span>
           </button>
         } @empty {
           <p class="px-2 py-1 text-sm text-ink-muted">
@@ -73,9 +62,9 @@ export class EntitySearchPicker {
   /** Prefix for the search box / option / menu `data-testid`s, per embedding surface. */
   readonly testid = input('entity-picker');
   /** Transloco key for the search input placeholder. */
-  readonly placeholderKey = input('entitySearchPicker.searchPlaceholder');
+  readonly placeholderKey = input('ui.entitySearchPicker.searchPlaceholder');
   /** Transloco key shown when no Entity matches the query. */
-  readonly emptyKey = input('entitySearchPicker.empty');
+  readonly emptyKey = input('ui.entitySearchPicker.empty');
   /** The controlled query — the consumer owns it so it can reset or reuse it. */
   readonly query = input('');
   /**
@@ -84,6 +73,8 @@ export class EntitySearchPicker {
    * pin can only be a same-World Entity, never one from another of the Owner's Worlds.
    */
   readonly worldId = input<string | undefined>(undefined);
+  /** Constrain results to these Entity Types — an Entity-Link Field's target-type constraint (#190). */
+  readonly types = input<readonly string[] | undefined>(undefined);
 
   /** Every raw keystroke; the consumer commits it back to {@link query}. */
   readonly queryChange = output<string>();
@@ -96,8 +87,9 @@ export class EntitySearchPicker {
     // Search server-side as the query changes (ADR-0025). onCleanup cancels a superseded
     // request; a failed search empties the list so the picker never breaks.
     effect((onCleanup) => {
+      const types = this.types();
       const sub = this.entitiesClient
-        .list({ q: this.query().trim(), worldId: this.worldId() })
+        .list({ q: this.query().trim(), worldId: this.worldId(), type: types?.length ? [...types] : undefined })
         .subscribe({
           next: (page) => this.options.set(page.items),
           error: () => this.options.set([]),

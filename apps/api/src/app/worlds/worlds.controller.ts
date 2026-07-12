@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Body,
+  ConflictException,
   Controller,
   Delete,
   ForbiddenException,
@@ -20,11 +21,15 @@ import {
   addMemberRequestSchema,
   addOwnerRequestSchema,
   AuthUser,
+  AvailableType,
+  createUserDefinedTypeRequestSchema,
   createWorldRequestSchema,
   ImportSummary,
   PublicLink,
   setMemberRoleRequestSchema,
+  updateUserDefinedTypeRequestSchema,
   updateWorldRequestSchema,
+  UserDefinedType,
   WorldDetail,
   WorldGraph,
   WorldMember,
@@ -39,13 +44,13 @@ import { VaultExportService } from './vault-export.service';
 import { VaultImportService } from './vault-import.service';
 import { WorldGraphService } from './world-graph.service';
 import { WorldsService } from './worlds.service';
+import { TypeResult, WorldTypesService } from './world-types.service';
 
 /** The subset of multer's uploaded-file shape this controller uses (no @types/multer dep). */
 interface UploadedZip {
   originalname: string;
   buffer: Buffer;
 }
-
 
 /**
  * The World REST surface (ADR-0024). Every route is guarded; World Owners are
@@ -58,6 +63,7 @@ interface UploadedZip {
 export class WorldsController {
   constructor(
     private readonly worlds: WorldsService,
+    private readonly types: WorldTypesService,
     private readonly importer: VaultImportService,
     private readonly exporter: VaultExportService,
     private readonly graphs: WorldGraphService,
@@ -80,10 +86,7 @@ export class WorldsController {
   // is set instance-wide via MulterModule (ADR-0036) and inherited here. The decompressed
   // ceiling (the real zip-bomb guard) lives in the importer, also config-driven.
   @UseInterceptors(FileInterceptor('file'))
-  import(
-    @CurrentUser() user: AuthUser,
-    @UploadedFile() file: UploadedZip | undefined,
-  ): ImportSummary {
+  import(@CurrentUser() user: AuthUser, @UploadedFile() file: UploadedZip | undefined): ImportSummary {
     if (!file) throw new BadRequestException();
     return this.importer.import(user.id, file.originalname, file.buffer);
   }
@@ -111,11 +114,7 @@ export class WorldsController {
    * otherwise mangle the Buffer.
    */
   @Get(':id/export')
-  export(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-    @Res() res: Response,
-  ): void {
+  export(@CurrentUser() user: AuthUser, @Param('id') id: string, @Res() res: Response): void {
     const result = this.exporter.export(user.id, id);
     if (result === 'not-found') throw new NotFoundException();
     if (result === 'forbidden') throw new ForbiddenException();
@@ -148,11 +147,7 @@ export class WorldsController {
   // A partial update of the Owner-curated fields: `name` (rename) and/or `pinnedEntityIds`
   // (Dashboard pins, #168). Owner-gated in the service; reachable-but-not-Owner is a 403.
   @Patch(':id')
-  update(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-    @Body() body: unknown,
-  ): WorldDetail {
+  update(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): WorldDetail {
     const parsed = updateWorldRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
     const result = this.worlds.update(user.id, id, parsed.data);
@@ -169,6 +164,56 @@ export class WorldsController {
     if (result === 'forbidden') throw new ForbiddenException();
   }
 
+  // The Entity Types available in a World (#191): plugin + user-defined. Reachable-gated (any member).
+  @Get(':id/types')
+  availableTypes(@CurrentUser() user: AuthUser, @Param('id') id: string): AvailableType[] {
+    const result = this.types.listAvailable(user.id, id);
+    if (result === 'not-found') throw new NotFoundException();
+    return result;
+  }
+
+  // Author a new user-defined type (#191): Owner-only, id unique in the World (else 409).
+  @Post(':id/types')
+  createType(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): UserDefinedType {
+    const parsed = createUserDefinedTypeRequestSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException();
+    return this.typeResult(this.types.create(user.id, id, parsed.data));
+  }
+
+  // Rename / re-Field a user-defined type (#191): Owner-only. The id is immutable, so it is a path param.
+  @Patch(':id/types/:typeId')
+  updateType(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Param('typeId') typeId: string,
+    @Body() body: unknown,
+  ): UserDefinedType {
+    const parsed = updateUserDefinedTypeRequestSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException();
+    return this.typeResult(this.types.update(user.id, id, typeId, parsed.data));
+  }
+
+  // Delete a user-defined type (#191): Owner-only. Entities keep their Metadata (a Field is a lens).
+  @Delete(':id/types/:typeId')
+  @HttpCode(204)
+  removeType(@CurrentUser() user: AuthUser, @Param('id') id: string, @Param('typeId') typeId: string): void {
+    this.typeResult(this.types.delete(user.id, id, typeId));
+  }
+
+  /** Map a {@link TypeResult} to its HTTP outcome: `ok` unwraps, else the status's exception. */
+  private typeResult<T>(result: TypeResult<T>): T {
+    switch (result.status) {
+      case 'not-found':
+        throw new NotFoundException();
+      case 'forbidden':
+        throw new ForbiddenException();
+      case 'conflict':
+        throw new ConflictException();
+      case 'ok':
+        return result.value;
+    }
+  }
+
   // The World's ownership set (ADR-0037), for an Owner.
   @Get(':id/owners')
   owners(@CurrentUser() user: AuthUser, @Param('id') id: string): string[] {
@@ -179,11 +224,7 @@ export class WorldsController {
   // Returns the updated set (200), idempotent — not a 201 (adding is set membership).
   @Post(':id/owners')
   @HttpCode(200)
-  addOwner(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-    @Body() body: unknown,
-  ): string[] {
+  addOwner(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): string[] {
     const parsed = addOwnerRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
     return ownerSetResponse(this.worlds.addOwner(user.id, id, parsed.data.userId), 'world');
@@ -192,11 +233,7 @@ export class WorldsController {
   // Remove an Owner, or resign your own ownership (ADR-0037). The ≥1-Owner
   // invariant refuses removing the last Owner (409).
   @Delete(':id/owners/:userId')
-  removeOwner(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-    @Param('userId') userId: string,
-  ): string[] {
+  removeOwner(@CurrentUser() user: AuthUser, @Param('id') id: string, @Param('userId') userId: string): string[] {
     return ownerSetResponse(this.worlds.removeOwner(user.id, id, userId), 'world');
   }
 
@@ -212,16 +249,10 @@ export class WorldsController {
   // existing Instance user. Upsert — re-adding updates the role — so a 200, not a 201.
   @Post(':id/members')
   @HttpCode(200)
-  addMember(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-    @Body() body: unknown,
-  ): WorldMember[] {
+  addMember(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): WorldMember[] {
     const parsed = addMemberRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
-    return aclSetResponse(
-      this.worlds.addMember(user.id, id, parsed.data.userId, parsed.data.role), 'world',
-    );
+    return aclSetResponse(this.worlds.addMember(user.id, id, parsed.data.userId, parsed.data.role), 'world');
   }
 
   // Change a member's role between Contributor and World Viewer (ADR-0037, #159): Owner-only.
@@ -234,19 +265,13 @@ export class WorldsController {
   ): WorldMember[] {
     const parsed = setMemberRoleRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
-    return aclSetResponse(
-      this.worlds.setMemberRole(user.id, id, userId, parsed.data.role), 'world',
-    );
+    return aclSetResponse(this.worlds.setMemberRole(user.id, id, userId, parsed.data.role), 'world');
   }
 
   // Remove a member (Owner-only) or leave the World yourself (ADR-0037, #159). The
   // ≥1-Owner invariant refuses a removal that would orphan the World (409).
   @Delete(':id/members/:userId')
-  removeMember(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-    @Param('userId') userId: string,
-  ): WorldMember[] {
+  removeMember(@CurrentUser() user: AuthUser, @Param('id') id: string, @Param('userId') userId: string): WorldMember[] {
     return aclSetResponse(this.worlds.removeMember(user.id, id, userId), 'world');
   }
 

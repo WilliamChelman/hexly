@@ -37,9 +37,7 @@ export class TitleService {
 
   constructor() {
     // Re-resolve the current title on a live language switch, with no navigation.
-    this.transloco.langChanges$
-      .pipe(takeUntilDestroyed())
-      .subscribe(() => this.render());
+    this.transloco.langChanges$.pipe(takeUntilDestroyed()).subscribe(() => this.render());
   }
 
   /** Adopt the active route's title keys — called by the title strategy on navigation. */
@@ -66,9 +64,7 @@ export class TitleService {
     const { key, namedKey } = this.route;
     const name = this._documentName();
     this.title.setTitle(
-      namedKey && name
-        ? this.transloco.translate(namedKey, { name })
-        : this.transloco.translate(key),
+      namedKey && name ? this.transloco.translate(namedKey, { name }) : this.transloco.translate(key),
     );
   }
 }

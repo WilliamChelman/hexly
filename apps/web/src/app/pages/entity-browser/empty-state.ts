@@ -13,11 +13,7 @@ import { Panel } from '@hexly/web-ui';
   imports: [Panel],
   host: { class: 'contents' },
   template: `
-    <section
-      class="p-8 text-center text-ink-muted"
-      [attr.data-testid]="testid()"
-      appPanel
-    >
+    <section class="p-8 text-center text-ink-muted" [attr.data-testid]="testid()" appPanel>
       <p>{{ title() }}</p>
       <p class="text-sm">{{ hint() }}</p>
     </section>

@@ -10,7 +10,11 @@ describe('vocabItems — vocabulary filter + typed free text', () => {
 
   it('offers the typed text as a brand-new entry when it matches nothing', () => {
     const items = vocabItems('mentor', vocab);
-    expect(items[0]).toEqual({ id: expect.any(String), value: 'mentor', isNew: true });
+    expect(items[0]).toEqual({
+      id: expect.any(String),
+      value: 'mentor',
+      isNew: true,
+    });
   });
 
   it('does not duplicate an existing entry as a "new" one (case-folded)', () => {

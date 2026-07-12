@@ -3,33 +3,34 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   EntityBody,
   EntityEdge,
+  FieldFacetValue,
   GrantRole,
   ReindexFailure,
   Visibility,
   descriptorsSchema,
+  deriveFieldFacets,
   extractText,
   harvestEdges,
+  resolveFields,
 } from '@hexly/domain';
 import { and, asc, eq, gt, inArray, ne, sql } from 'drizzle-orm';
 import { EntityAccess, entityAccess, sharedVisibility } from '../acl/entity-access';
 import { DB, Db } from '../db/db';
-import {
-  INITIAL_SEQ,
-  entities,
-  entityDescriptors,
-  entityEdges,
-  entityGrants,
-} from '../db/schema';
+import { INITIAL_SEQ, entities, entityDescriptors, entityEdges, entityFieldFacets, entityGrants } from '../db/schema';
 import { SyncOnly, WriteOutbox } from '../events/write-outbox';
+import { TypeFieldRegistry } from './type-field-registry';
+import { WorldTypeFields } from './world-type-fields';
 
 /** A fresh Entity starts at version 1 — the optimistic-concurrency token's floor. */
 const INITIAL_VERSION = 1;
 
-/** Everything one save derives from the Entity's document, in one pass. */
+/** Everything one save derives from the Entity's document (and its types), in one pass. */
 interface Derived {
   contentText: string;
   descriptors: string[];
   edges: EntityEdge[];
+  /** The denormalised facetable Field values (ADR-0048, #188) — depends on `types` *and* Metadata. */
+  fieldFacets: FieldFacetValue[];
 }
 
 /**
@@ -44,6 +45,8 @@ const MAX_BOUND_PARAMS = 32766;
 const EDGE_COLUMNS = 5;
 /** Columns bound per `entity_descriptors` row: entity, descriptor. */
 const DESCRIPTOR_COLUMNS = 2;
+/** Columns bound per `entity_field_facets` row: entity, world, key, value, num. */
+const FIELD_FACET_COLUMNS = 5;
 
 /** Split `rows` into the largest batches a single `INSERT … VALUES` can bind. Empty in, nothing out. */
 function* batched<T>(rows: readonly T[], columns: number): Generator<readonly T[]> {
@@ -68,6 +71,8 @@ export interface InsertEntityInput {
   ownerId: string;
   worldId: string;
   name: string;
+  /** The ordered Entity Type set; `types[0]` is primary. Carried alongside `tags`, not in the body. */
+  types: readonly string[];
   tags: readonly string[];
   body: EntityBody;
 }
@@ -117,6 +122,8 @@ export type EntityChange =
       kind: 'edit';
       name?: string;
       tags?: readonly string[];
+      /** Present → the type set fully replaces the stored one; omitted → left untouched (ADR-0048). */
+      types?: readonly string[];
       document?: EntityBody;
       /** Present → the base version rides the atomic WHERE and is bumped. */
       version?: number;
@@ -149,6 +156,13 @@ export class EntityWrites {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly outbox: WriteOutbox,
+    // Resolves a `types[]` set to its Field schema **scoped to the Entity's World**, so the derive
+    // pass materialises the facetable Field values (ADR-0048, #188) — including a World's
+    // user-defined types (#191) — the same way it harvests edges and descriptors.
+    private readonly worldTypeFields: WorldTypeFields,
+    // The instance-wide Structured Field data-types (ADR-0050), from which a structured value
+    // harvests its own edges in the same derive pass.
+    private readonly typeFields: TypeFieldRegistry,
   ) {}
 
   /**
@@ -167,12 +181,12 @@ export class EntityWrites {
    */
   insert(input: InsertEntityInput): EntityRow {
     const now = Date.now();
-    const derived = this.derive(input.body);
+    const derived = this.derive(input.body, input.types, input.worldId);
     const row: EntityRow = {
       id: input.id ?? randomUUID(),
       worldId: input.worldId,
       name: input.name,
-      type: input.body.type,
+      types: [...input.types],
       tags: [...input.tags],
       visibility: 'private',
       version: INITIAL_VERSION,
@@ -184,10 +198,7 @@ export class EntityWrites {
     };
     return this.transact(() => {
       this.db.insert(entities).values(row).run();
-      this.db
-        .insert(entityGrants)
-        .values({ entityId: row.id, userId: input.ownerId, role: 'owner' })
-        .run();
+      this.db.insert(entityGrants).values({ entityId: row.id, userId: input.ownerId, role: 'owner' }).run();
       this.replaceDerived(row.id, row.worldId, derived);
       return row;
     });
@@ -201,11 +212,7 @@ export class EntityWrites {
    */
   cascadeDeleteWorld(worldId: string): void {
     this.transact(() => {
-      const doomed = this.db
-        .select({ id: entities.id })
-        .from(entities)
-        .where(eq(entities.worldId, worldId))
-        .all();
+      const doomed = this.db.select({ id: entities.id }).from(entities).where(eq(entities.worldId, worldId)).all();
       // entity_grants, entity_links, entity_descriptors and entity_edges cascade with each row.
       this.db.delete(entities).where(eq(entities.worldId, worldId)).run();
       for (const { id } of doomed) this.enqueue(id);
@@ -295,7 +302,14 @@ export class EntityWrites {
    */
   reindexChunk(after: string | null, limit: number): ReindexChunk {
     const rows = this.db
-      .select({ id: entities.id, worldId: entities.worldId, document: entities.document })
+      .select({
+        id: entities.id,
+        worldId: entities.worldId,
+        // Field facets derive from the type set as well as the document (ADR-0048, #188), so the
+        // reindex projection carries `types` — the one derivation that reads a column beyond `document`.
+        types: entities.types,
+        document: entities.document,
+      })
       .from(entities)
       .where(after === null ? undefined : gt(entities.id, after))
       .orderBy(asc(entities.id))
@@ -308,7 +322,10 @@ export class EntityWrites {
     const derived: { row: (typeof rows)[number]; derived: Derived }[] = [];
     for (const row of rows) {
       try {
-        derived.push({ row, derived: this.derive(JSON.parse(row.document) as EntityBody) });
+        derived.push({
+          row,
+          derived: this.derive(JSON.parse(row.document) as EntityBody, row.types, row.worldId),
+        });
       } catch (err) {
         failures.push({
           entityId: row.id,
@@ -322,11 +339,7 @@ export class EntityWrites {
     if (derived.length > 0)
       this.transact(() => {
         for (const { row, derived: d } of derived) {
-          this.db
-            .update(entities)
-            .set({ contentText: d.contentText })
-            .where(eq(entities.id, row.id))
-            .run();
+          this.db.update(entities).set({ contentText: d.contentText }).where(eq(entities.id, row.id)).run();
           this.replaceDerived(row.id, row.worldId, d);
         }
       });
@@ -352,12 +365,17 @@ export class EntityWrites {
    * `content → entity` edge carries a descriptor, so the non-null ones are exactly the descriptors
    * the Content uses. One traversal, and one definition of what a descriptor is.
    */
-  private derive(body: EntityBody): Derived {
-    const edges = harvestEdges(body);
+  private derive(body: EntityBody, types: readonly string[], worldId: string): Derived {
+    // Resolved once, shared by the two derivations that read the type set: the edge harvest's
+    // Entity-Link Fields (#190) and the facet derivation's facetable Fields (#188). Scoped to the
+    // Entity's World so a user-defined type's Fields resolve too (#191).
+    const fields = resolveFields(this.worldTypeFields.resolverFor(worldId), types);
+    const edges = harvestEdges(body, fields, this.typeFields.structuredDataTypes);
     return {
       contentText: extractText(body.content),
       descriptors: descriptorsSchema.parse(edges.flatMap((e) => e.descriptor ?? [])),
       edges,
+      fieldFacets: deriveFieldFacets(fields, body.metadata),
     };
   }
 
@@ -369,6 +387,30 @@ export class EntityWrites {
   private replaceDerived(id: string, worldId: string, derived: Derived): void {
     this.replaceDescriptors(id, derived.descriptors);
     this.replaceEdges(id, worldId, derived.edges);
+    this.replaceFieldFacets(id, worldId, derived.fieldFacets);
+  }
+
+  /**
+   * Replace the Entity's Field-facet rows with the freshly derived set (self-pruning, ADR-0048,
+   * #188). `worldId` is denormalised off the source, mirroring {@link replaceEdges}, so a
+   * World-scoped facet read is one indexed lookup.
+   */
+  private replaceFieldFacets(id: string, worldId: string, facets: readonly FieldFacetValue[]): void {
+    this.db.delete(entityFieldFacets).where(eq(entityFieldFacets.entityId, id)).run();
+    for (const batch of batched(facets, FIELD_FACET_COLUMNS)) {
+      this.db
+        .insert(entityFieldFacets)
+        .values(
+          batch.map((f) => ({
+            entityId: id,
+            worldId,
+            key: f.key,
+            value: f.value,
+            num: f.num,
+          })),
+        )
+        .run();
+    }
   }
 
   /** Replace the Entity's descriptor rows with the harvested set (self-pruning). */
@@ -462,11 +504,13 @@ export class EntityWrites {
     }
 
     // `edit`: substance. Set only the columns the caller owns, so a concurrent rename isn't
-    // clobbered by a save that never touched the name.
-    const derived = change.document && this.derive(change.document);
+    // clobbered by a save that never touched the name. Field facets ride the document derivation,
+    // resolved against the save's type set when it carries one, else the stored types (ADR-0048).
+    const derived = change.document && this.derive(change.document, change.types ?? row.types, row.worldId);
     const set = {
       ...(change.name !== undefined && { name: change.name }),
       ...(change.tags !== undefined && { tags: [...change.tags] }),
+      ...(change.types !== undefined && { types: [...change.types] }),
       ...(change.document !== undefined && {
         document: JSON.stringify(change.document),
         contentText: derived?.contentText,
@@ -496,15 +540,12 @@ export class EntityWrites {
     // Zero rows: the version moved, or the predicate stopped matching. Re-read to tell them apart.
     const current = access.decide(id);
     if (!current?.canRead) return { status: 'not-found' };
-    return change.version !== undefined
-      ? { status: 'conflict', row: current.row }
-      : { status: 'not-found' };
+    return change.version !== undefined ? { status: 'conflict', row: current.row } : { status: 'not-found' };
   }
 
   /** The `entity_grants` write handle handed to a `manage` change. */
   private aclWriter(id: string): AclWriter {
-    const target = (targetUserId: string) =>
-      and(eq(entityGrants.entityId, id), eq(entityGrants.userId, targetUserId));
+    const target = (targetUserId: string) => and(eq(entityGrants.entityId, id), eq(entityGrants.userId, targetUserId));
     return {
       upsertGrant: (targetUserId, role) => {
         this.db

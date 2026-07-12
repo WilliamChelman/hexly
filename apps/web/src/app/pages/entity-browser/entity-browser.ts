@@ -1,37 +1,66 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  inject,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import {
-  Subject,
-  Subscription,
-  debounceTime,
-  distinctUntilChanged,
-  finalize,
-  map,
-} from 'rxjs';
+import { Subject, Subscription, debounceTime, distinctUntilChanged, finalize, map } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import {
-  EntityFacets,
-  EntityPage,
-  EntitySummary,
-  EntityType,
-  Visibility,
-} from '@hexly/domain';
-import { EntitiesClient, EntityFacetParams, ActiveWorld, ToasterService, entityRoute, AppShellStore } from '@hexly/web-core';
-import { Button, Eyebrow, PageHeader, Icon } from '@hexly/web-ui';
+import { EntityFacets, EntityPage, EntitySummary, EntityType, parseFieldFilters, Visibility } from '@hexly/domain';
+import { EntitiesClient, EntityFacetParams, ActiveWorld, ToasterService, AppShellStore } from '@hexly/web-core';
+import { Button, Eyebrow, PageHeader } from '@hexly/web-ui';
+import { NewEntityButton } from '../../entity-types/new-entity-button';
 import { EntityCard } from './entity-card';
 import { EntitySearch } from './entity-search';
 import { EmptyState } from './empty-state';
-import { ActiveFacets, FacetRail, FacetToggle } from './facet-rail';
+import {
+  ActiveFacets,
+  FacetRail,
+  FacetToggle,
+  FieldRangeChange,
+  FieldSelection,
+  FieldValueToggle,
+  isFieldSelectionEmpty,
+} from './facet-rail';
 
-const NO_FACETS: ActiveFacets = { type: [], tag: [], visibility: [] };
+const NO_FACETS: ActiveFacets = {
+  type: [],
+  tag: [],
+  visibility: [],
+  fields: {},
+};
+
+const NO_FACET_COUNTS: EntityFacets = {
+  type: [],
+  tag: [],
+  visibility: [],
+  fields: [],
+};
+
+/** Serialize the active Field selections to the repeated `key:op:value` tokens the API + URL speak. */
+function fieldTokens(fields: Readonly<Record<string, FieldSelection>>): string[] {
+  const tokens: string[] = [];
+  for (const [key, sel] of Object.entries(fields)) {
+    for (const v of sel.values ?? []) tokens.push(`${key}:eq:${v}`);
+    if (sel.gte) tokens.push(`${key}:gte:${sel.gte}`);
+    if (sel.lte) tokens.push(`${key}:lte:${sel.lte}`);
+  }
+  return tokens;
+}
+
+/** Fold the repeated `field` params back into the per-key {@link FieldSelection} record. */
+function fieldsFromTokens(tokens: readonly string[]): Record<string, FieldSelection> {
+  const out: Record<string, { values: string[]; gte?: string; lte?: string }> = {};
+  for (const f of parseFieldFilters(tokens)) {
+    const sel = (out[f.key] ??= { values: [] });
+    if (f.op === 'eq') sel.values.push(f.value);
+    else if (f.op === 'gte') sel.gte = f.value;
+    else sel.lte = f.value;
+  }
+  return out;
+}
+
+/** Drop a Field key once its selection is empty, so `hasFilters`/the URL never carry a dead entry. */
+function pruneField(sel: FieldSelection): FieldSelection | undefined {
+  return isFieldSelectionEmpty(sel) ? undefined : sel;
+}
 
 // ponytail: bounded first page so a large vault loads fast; bump or make
 // configurable only if a real page size proves wrong in use.
@@ -56,54 +85,23 @@ const FIRST_PAGE_CACHE_LIMIT = 50;
     Button,
     Eyebrow,
     PageHeader,
-    Icon,
     TranslocoPipe,
     EntityCard,
     EntitySearch,
     EmptyState,
     FacetRail,
+    NewEntityButton,
   ],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
     <app-page-header sticky>
       <div pageHeaderTitle class="flex flex-col">
-        <span appEyebrow class="text-gold! tracking-[0.28em]">{{
-          'entityBrowser.eyebrow' | transloco
-        }}</span>
+        <span appEyebrow class="text-gold! tracking-[0.28em]">{{ 'entityBrowser.eyebrow' | transloco }}</span>
         <h1 class="font-display text-[22px] text-ink-strong m-0 leading-tight">
           {{ 'entityBrowser.heading' | transloco }}
         </h1>
       </div>
-      <button
-        type="button"
-        pageHeaderActions
-        appButton
-        variant="default"
-        data-testid="new-note"
-        [disabled]="creating()"
-        (click)="create('note')"
-      >
-        <app-icon name="plus" [size]="16" />
-        {{
-          (creating() ? 'entityBrowser.creating' : 'entityBrowser.newNote')
-            | transloco
-        }}
-      </button>
-      <button
-        type="button"
-        pageHeaderActions
-        appButton
-        variant="primary"
-        data-testid="new-map"
-        [disabled]="creating()"
-        (click)="create('hexmap')"
-      >
-        <app-icon name="plus" [size]="16" />
-        {{
-          (creating() ? 'entityBrowser.creating' : 'entityBrowser.newMap')
-            | transloco
-        }}
-      </button>
+      <app-new-entity-button pageHeaderActions />
     </app-page-header>
 
     <main class="max-w-[72rem] mx-auto py-8 px-6">
@@ -114,65 +112,60 @@ const FIRST_PAGE_CACHE_LIMIT = 50;
           [active]="activeFacets()"
           [canClear]="hasFilters()"
           (toggled)="toggleFacet($event)"
+          (fieldValueToggled)="toggleFieldValue($event)"
+          (fieldRangeChanged)="changeFieldRange($event)"
           (clearAll)="clearAll()"
         />
         <div>
-      @if (cards().length > 0) {
-        <ul
-          class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 m-0 p-0 list-none"
-        >
-          @for (card of cards(); track card.id) {
-            <li>
-              <app-entity-card
-                [card]="card"
-                [worldId]="worldId()"
-                [renaming]="renamingId() === card.id"
-                (startRename)="startRename(card.id)"
-                (commitRename)="commitRename(card.id, $event)"
-                (cancelRename)="cancelRename()"
-                (remove)="remove(card.id)"
-              />
-            </li>
+          @if (cards().length > 0) {
+            <ul class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 m-0 p-0 list-none">
+              @for (card of cards(); track card.id) {
+                <li>
+                  <app-entity-card
+                    [card]="card"
+                    [worldId]="worldId()"
+                    [renaming]="renamingId() === card.id"
+                    (startRename)="startRename(card.id)"
+                    (commitRename)="commitRename(card.id, $event)"
+                    (cancelRename)="cancelRename()"
+                    (remove)="remove(card.id)"
+                  />
+                </li>
+              }
+            </ul>
+            @if (nextCursor() !== null) {
+              <div class="mt-8 flex justify-center">
+                <button
+                  type="button"
+                  appButton
+                  variant="default"
+                  data-testid="load-more"
+                  [disabled]="loadingMore()"
+                  (click)="loadMore()"
+                >
+                  {{ (loadingMore() ? 'entityBrowser.loadingMore' : 'entityBrowser.loadMore') | transloco }}
+                </button>
+              </div>
+            }
+          } @else if (loadError()) {
+            <app-empty-state
+              testid="load-error"
+              [title]="'entityBrowser.loadErrorTitle' | transloco"
+              [hint]="'entityBrowser.loadErrorHint' | transloco"
+            />
+          } @else if (loaded() && query()) {
+            <app-empty-state
+              testid="no-matches"
+              [title]="'entityBrowser.noMatchTitle' | transloco"
+              [hint]="'entityBrowser.noMatchHint' | transloco"
+            />
+          } @else if (loaded()) {
+            <app-empty-state
+              testid="empty"
+              [title]="'entityBrowser.emptyTitle' | transloco"
+              [hint]="'entityBrowser.emptyHint' | transloco"
+            />
           }
-        </ul>
-        @if (nextCursor() !== null) {
-          <div class="mt-8 flex justify-center">
-            <button
-              type="button"
-              appButton
-              variant="default"
-              data-testid="load-more"
-              [disabled]="loadingMore()"
-              (click)="loadMore()"
-            >
-              {{
-                (loadingMore()
-                  ? 'entityBrowser.loadingMore'
-                  : 'entityBrowser.loadMore'
-                ) | transloco
-              }}
-            </button>
-          </div>
-        }
-      } @else if (loadError()) {
-        <app-empty-state
-          testid="load-error"
-          [title]="'entityBrowser.loadErrorTitle' | transloco"
-          [hint]="'entityBrowser.loadErrorHint' | transloco"
-        />
-      } @else if (loaded() && query()) {
-        <app-empty-state
-          testid="no-matches"
-          [title]="'entityBrowser.noMatchTitle' | transloco"
-          [hint]="'entityBrowser.noMatchHint' | transloco"
-        />
-      } @else if (loaded()) {
-        <app-empty-state
-          testid="empty"
-          [title]="'entityBrowser.emptyTitle' | transloco"
-          [hint]="'entityBrowser.emptyHint' | transloco"
-        />
-      }
         </div>
       </div>
     </main>
@@ -196,7 +189,8 @@ export class EntityBrowser {
     this._entities().map((entity) => ({
       id: entity.id,
       title: entity.name,
-      type: entity.type,
+      // The card renders the primary type's icon and label (CONTEXT.md → Entity Type).
+      type: entity.types[0],
       tags: entity.tags,
       updatedAt: entity.updatedAt,
       // The card gates rename/delete on rights.
@@ -207,7 +201,6 @@ export class EntityBrowser {
   protected readonly loadingMore = signal(false);
   protected readonly loaded = signal(false);
   protected readonly loadError = signal(false);
-  protected readonly creating = signal(false);
   protected readonly renamingId = signal<string | null>(null);
 
   /** Debounced full-text query; empty means the default last-edited view.
@@ -220,18 +213,15 @@ export class EntityBrowser {
   protected readonly activeFacets = signal<ActiveFacets>(NO_FACETS, {
     equal: (a, b) => JSON.stringify(a) === JSON.stringify(b),
   });
-  protected readonly facetCounts = signal<EntityFacets>({
-    type: [],
-    tag: [],
-    visibility: [],
-  });
+  protected readonly facetCounts = signal<EntityFacets>(NO_FACET_COUNTS);
   protected readonly hasFilters = computed(() => {
     const f = this.activeFacets();
     return (
       this.query() !== '' ||
       f.type.length > 0 ||
       f.tag.length > 0 ||
-      f.visibility.length > 0
+      f.visibility.length > 0 ||
+      Object.keys(f.fields).length > 0
     );
   });
 
@@ -248,10 +238,7 @@ export class EntityBrowser {
 
   /** First-page cache keyed by World + filters, so returning to a prior query
    * paints instantly (stale-while-revalidate). Bounded, oldest-out. */
-  private readonly firstPageCache = new Map<
-    string,
-    { items: EntitySummary[]; nextCursor: string | null }
-  >();
+  private readonly firstPageCache = new Map<string, { items: EntitySummary[]; nextCursor: string | null }>();
 
   constructor() {
     // Seed query + Facets from the URL and follow back/forward. Subscribed before
@@ -265,6 +252,7 @@ export class EntityBrowser {
           type: params.getAll('type'),
           tag: params.getAll('tag'),
           visibility: params.getAll('visibility'),
+          field: params.getAll('field'),
         })),
         distinctUntilChanged((a, b) => JSON.stringify(a) === JSON.stringify(b)),
         takeUntilDestroyed(),
@@ -275,23 +263,22 @@ export class EntityBrowser {
           type: f.type,
           tag: f.tag,
           visibility: f.visibility,
+          fields: fieldsFromTokens(f.field),
         });
       });
 
-    this.typed
-      .pipe(debounceTime(SEARCH_DEBOUNCE_MS), takeUntilDestroyed())
-      .subscribe((raw) => {
-        const q = raw.trim();
-        this.query.set(q);
-        // Mirror to the URL: merge keeps the World scope, replaceUrl avoids a
-        // history entry per keystroke.
-        this.router.navigate([], {
-          relativeTo: this.route,
-          queryParams: { q: q || null },
-          queryParamsHandling: 'merge',
-          replaceUrl: true,
-        });
+    this.typed.pipe(debounceTime(SEARCH_DEBOUNCE_MS), takeUntilDestroyed()).subscribe((raw) => {
+      const q = raw.trim();
+      this.query.set(q);
+      // Mirror to the URL: merge keeps the World scope, replaceUrl avoids a
+      // history entry per keystroke.
+      this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { q: q || null },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
       });
+    });
 
     // Refetch page one whenever the World, query, or Facets change — covers a
     // param-only switch between Worlds (same component instance).
@@ -309,16 +296,42 @@ export class EntityBrowser {
   protected toggleFacet({ category, value }: FacetToggle): void {
     const current = this.activeFacets();
     const values = current[category];
-    const next = values.includes(value)
-      ? values.filter((v) => v !== value)
-      : [...values, value];
-    const updated = { ...current, [category]: next };
-    this.activeFacets.set(updated);
-    this.mirrorToUrl({
-      type: updated.type,
-      tag: updated.tag,
-      visibility: updated.visibility,
+    const next = values.includes(value) ? values.filter((v) => v !== value) : [...values, value];
+    this.applyFacets({ ...current, [category]: next });
+  }
+
+  /** Toggle one enum/list/string Field-facet value (eq membership, OR within the Field). */
+  protected toggleFieldValue({ key, value }: FieldValueToggle): void {
+    const current = this.activeFacets();
+    const sel = current.fields[key] ?? {};
+    const values = sel.values ?? [];
+    const nextValues = values.includes(value) ? values.filter((v) => v !== value) : [...values, value];
+    this.setFieldSelection(current, key, { ...sel, values: nextValues });
+  }
+
+  /** Set (or clear) one bound of a number/date Field range. */
+  protected changeFieldRange({ key, bound, value }: FieldRangeChange): void {
+    const current = this.activeFacets();
+    const sel = current.fields[key] ?? {};
+    this.setFieldSelection(current, key, {
+      ...sel,
+      [bound]: value || undefined,
     });
+  }
+
+  /** Fold a Field selection back into the active facets, pruning it away once empty. */
+  private setFieldSelection(current: ActiveFacets, key: string, sel: FieldSelection): void {
+    const fields = { ...current.fields };
+    const pruned = pruneField(sel);
+    if (pruned) fields[key] = pruned;
+    else delete fields[key];
+    this.applyFacets({ ...current, fields });
+  }
+
+  /** Commit a new active-facet set: update the signal and mirror it to the URL. */
+  private applyFacets(updated: ActiveFacets): void {
+    this.activeFacets.set(updated);
+    this.mirrorToUrl(updated);
   }
 
   protected clearAll(): void {
@@ -326,19 +339,27 @@ export class EntityBrowser {
     this.activeFacets.set(NO_FACETS);
     this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: { q: null, type: null, tag: null, visibility: null },
+      queryParams: {
+        q: null,
+        type: null,
+        tag: null,
+        visibility: null,
+        field: null,
+      },
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });
   }
 
   private mirrorToUrl(facets: ActiveFacets): void {
+    const field = fieldTokens(facets.fields);
     this.router.navigate([], {
       relativeTo: this.route,
       queryParams: {
         type: facets.type.length ? [...facets.type] : null,
         tag: facets.tag.length ? [...facets.tag] : null,
         visibility: facets.visibility.length ? [...facets.visibility] : null,
+        field: field.length ? field : null,
       },
       queryParamsHandling: 'merge',
       replaceUrl: true,
@@ -405,13 +426,13 @@ export class EntityBrowser {
   private activeFilterParams(): EntityFacetParams {
     const q = this.query();
     const f = this.activeFacets();
+    const field = fieldTokens(f.fields);
     return {
       ...(q ? { q } : {}),
       ...(f.type.length ? { type: [...f.type] as EntityType[] } : {}),
       ...(f.tag.length ? { tag: [...f.tag] } : {}),
-      ...(f.visibility.length
-        ? { visibility: [...f.visibility] as Visibility[] }
-        : {}),
+      ...(f.visibility.length ? { visibility: [...f.visibility] as Visibility[] } : {}),
+      ...(field.length ? { field } : {}),
     };
   }
 
@@ -430,9 +451,7 @@ export class EntityBrowser {
       nextCursor: page.nextCursor,
     });
     if (this.firstPageCache.size > FIRST_PAGE_CACHE_LIMIT)
-      this.firstPageCache.delete(
-        this.firstPageCache.keys().next().value as string,
-      );
+      this.firstPageCache.delete(this.firstPageCache.keys().next().value as string);
   }
 
   /** The `loadingMore` guard makes a double-click a no-op so a page can't append twice. */
@@ -455,40 +474,8 @@ export class EntityBrowser {
           this._entities.update((entities) => [...entities, ...page.items]);
           this.nextCursor.set(page.nextCursor);
         },
-        error: () =>
-          this.toaster.show(
-            this.transloco.translate('entityBrowser.loadMoreError'),
-            'error',
-          ),
+        error: () => this.toaster.show(this.transloco.translate('entityBrowser.loadMoreError'), 'error'),
       });
-  }
-
-  protected create(type: EntityType): void {
-    if (this.creating()) return;
-    this.creating.set(true);
-    this.entitiesClient
-      .create(
-        this.transloco.translate(type === 'note' ? 'domain.untitledNote' : 'domain.untitledMap'),
-        type,
-        this.activeWorld.worldId() ?? undefined,
-      )
-      .pipe(finalize(() => this.creating.set(false)))
-      .subscribe({
-        // EntitySession loads on open; no pre-adopt from here (it would outlive this page).
-        next: (entity) => this.open(entity.id),
-        error: () =>
-          this.toaster.show(
-            this.transloco.translate('entityBrowser.createError'),
-            'error',
-          ),
-      });
-  }
-
-  protected open(id: string): void {
-    // Pretty World slug from the loaded detail; the Entity slug self-heals on load.
-    this.router.navigate(
-      entityRoute(this.activeWorld.worldId()!, id, this.activeWorld.name() ?? undefined),
-    );
   }
 
   protected startRename(id: string): void {
@@ -516,10 +503,7 @@ export class EntityBrowser {
       },
       error: () => {
         this.cancelRename();
-        this.toaster.show(
-          this.transloco.translate('entityBrowser.renameError'),
-          'error',
-        );
+        this.toaster.show(this.transloco.translate('entityBrowser.renameError'), 'error');
       },
     });
   }
@@ -534,11 +518,7 @@ export class EntityBrowser {
         this.invalidateCache();
         this.fetchFirstPage();
       },
-      error: () =>
-        this.toaster.show(
-          this.transloco.translate('entityBrowser.deleteError'),
-          'error',
-        ),
+      error: () => this.toaster.show(this.transloco.translate('entityBrowser.deleteError'), 'error'),
     });
   }
 }

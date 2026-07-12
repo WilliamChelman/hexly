@@ -58,9 +58,7 @@ export function createDb(path: string): Db {
 export function resolveInstanceDir(): string {
   const configured = process.env.HEXLY_DIR;
   if (configured) {
-    return configured === ':memory:' || isAbsolute(configured)
-      ? configured
-      : resolve(process.cwd(), configured);
+    return configured === ':memory:' || isAbsolute(configured) ? configured : resolve(process.cwd(), configured);
   }
   return __dirname;
 }
@@ -77,7 +75,5 @@ export function resolveDbPath(): string {
  * in-memory run still has somewhere real to write bytes.
  */
 export function resolveAssetsDir(instanceDir: string = resolveInstanceDir()): string {
-  return instanceDir === ':memory:'
-    ? mkdtempSync(join(tmpdir(), 'hexly-assets-'))
-    : join(instanceDir, 'assets');
+  return instanceDir === ':memory:' ? mkdtempSync(join(tmpdir(), 'hexly-assets-')) : join(instanceDir, 'assets');
 }

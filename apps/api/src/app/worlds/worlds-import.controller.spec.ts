@@ -26,10 +26,7 @@ function vaultZip(files: Record<string, string | Uint8Array>): Buffer {
 }
 
 /** Collect every `entityLink` node in a converted doc snapshot, in document order. */
-function entityLinks(snapshot: {
-  content?: unknown[];
-  type?: string;
-}): { attrs: Record<string, unknown> }[] {
+function entityLinks(snapshot: { content?: unknown[]; type?: string }): { attrs: Record<string, unknown> }[] {
   const found: { attrs: Record<string, unknown> }[] = [];
   const walk = (node: { type?: string; content?: unknown[]; attrs?: Record<string, unknown> }) => {
     if (node.type === 'entityLink') found.push({ attrs: node.attrs ?? {} });
@@ -44,7 +41,10 @@ async function linksOf(agent: request.Agent, worldId: string, name: string) {
   const list = await agent.get(`/entities?worldId=${worldId}`).expect(200);
   const summary = list.body.items.find((e: { name: string }) => e.name === name);
   const detail = await agent.get(`/entities/${summary.id}`).expect(200);
-  return { id: summary.id, links: entityLinks(detail.body.document.content.snapshot) };
+  return {
+    id: summary.id,
+    links: entityLinks(detail.body.document.content.snapshot),
+  };
 }
 
 /** Map every imported note's `hexly.sourcePath` to its entity id (for notes that share a name). */
@@ -57,6 +57,17 @@ async function pathsToIds(agent: request.Agent, worldId: string): Promise<Record
     if (path) out[path] = item.id;
   }
   return out;
+}
+
+/** Fetch one imported Entity by name: its list summary (types, tags) and its full detail. */
+async function entityNamed(agent: request.Agent, worldId: string, name: string) {
+  const list = await agent.get(`/entities?worldId=${worldId}`).expect(200);
+  const items = list.body.items as { id: string; name: string }[];
+  const summary = items.find((e) => e.name === name);
+  // A miss means the file never imported — say so, rather than dereferencing undefined.
+  expect(summary, `no imported Entity named ${name}`).toBeDefined();
+  const detail = await agent.get(`/entities/${summary?.id}`).expect(200);
+  return { summary, detail: detail.body };
 }
 
 /** Collect every `image` node's `src` in a converted doc snapshot, in document order. */
@@ -99,7 +110,9 @@ describe('Vault import endpoint', () => {
     app.use(cookieParser());
     await app.init();
 
-    await app.get(AuthService).seedUser('ada@hexly.test', 'correct horse', 'Ada', { roles: ['create-worlds'] });
+    await app.get(AuthService).seedUser('ada@hexly.test', 'correct horse', 'Ada', {
+      roles: ['create-worlds'],
+    });
   });
 
   afterEach(async () => {
@@ -115,11 +128,9 @@ describe('Vault import endpoint', () => {
 
   it('forbids importing a vault without the World Creation capability (ADR-0040)', async () => {
     // Import mints a World too, so it is gated identically to POST /worlds.
-    await app
-      .get(AuthService)
-      .seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob', {
-        roles: [],
-      });
+    await app.get(AuthService).seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob', {
+      roles: [],
+    });
     const bob = await signIn('bob@hexly.test', 'hunter2 stationery');
     const zip = vaultZip({ 'Note.md': '# Note' });
 
@@ -128,12 +139,11 @@ describe('Vault import endpoint', () => {
 
   it('imports a vault .zip into a new World named after the file, one note per markdown file', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
-    const zip = vaultZip({ 'Lady Mara.md': '# Lady Mara\n\nA ranger of the north.' });
+    const zip = vaultZip({
+      'Lady Mara.md': '# Lady Mara\n\nA ranger of the north.',
+    });
 
-    const res = await ada
-      .post('/worlds/import')
-      .attach('file', zip, 'Aldermoor.zip')
-      .expect(201);
+    const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
 
     expect(res.body).toMatchObject({
       worldId: expect.any(String),
@@ -146,29 +156,23 @@ describe('Vault import endpoint', () => {
     expect(world.body.name).toBe('Aldermoor');
 
     // The markdown file became a `note` named after its filename (Home + note = 2).
-    const list = await ada
-      .get(`/entities?worldId=${res.body.worldId}`)
-      .expect(200);
+    const list = await ada.get(`/entities?worldId=${res.body.worldId}`).expect(200);
     const mara = list.body.items.find((e: { name: string }) => e.name === 'Lady Mara');
     expect(mara).toBeDefined();
-    expect(mara.type).toBe('note');
+    expect(mara.types).toEqual(['core.note']);
   });
 
   it('makes an imported note findable by its Content prose with no re-save (ADR-0035)', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
-    const zip = vaultZip({ 'Lady Mara.md': '# Lady Mara\n\nA ranger of the sunken citadel.' });
+    const zip = vaultZip({
+      'Lady Mara.md': '# Lady Mara\n\nA ranger of the sunken citadel.',
+    });
 
-    const res = await ada
-      .post('/worlds/import')
-      .attach('file', zip, 'Aldermoor.zip')
-      .expect(201);
+    const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
 
     // The import path (not a save) populated content_text, so the extractor ran
     // and the FTS INSERT trigger indexed it — searchable straight out of import.
-    const found = await ada
-      .get('/entities')
-      .query({ q: 'citadel', worldId: res.body.worldId })
-      .expect(200);
+    const found = await ada.get('/entities').query({ q: 'citadel', worldId: res.body.worldId }).expect(200);
     expect(found.body.items.map((e: { name: string }) => e.name)).toEqual(['Lady Mara']);
   });
 
@@ -187,10 +191,7 @@ describe('Vault import endpoint', () => {
       ].join('\n'),
     });
 
-    const res = await ada
-      .post('/worlds/import')
-      .attach('file', zip, 'Aldermoor.zip')
-      .expect(201);
+    const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
 
     const list = await ada.get(`/entities?worldId=${res.body.worldId}`).expect(200);
     const summary = list.body.items.find((e: { name: string }) => e.name === 'Lady Mara');
@@ -212,16 +213,84 @@ describe('Vault import endpoint', () => {
     });
   });
 
+  /** The read half of the export's generic `hexly.type` stamp (#203, ADR-0050). */
+  describe('hexly.type', () => {
+    it("applies the stamped types to the imported Entity, in order, and doesn't leave them in Metadata", async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const zip = vaultZip({
+        'Bestiary/Owlbear.md': [
+          '---',
+          'hexly.type: [core.note, dnd.monster]',
+          'challenge_rating: 3',
+          'size: Large',
+          '---',
+          '# Owlbear',
+        ].join('\n'),
+      });
+
+      const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
+      const { summary, detail } = await entityNamed(ada, res.body.worldId, 'Owlbear');
+
+      // Primary type first, as stamped.
+      expect(summary.types).toEqual(['core.note', 'dnd.monster']);
+      expect(detail.document.metadata).toMatchObject({ challenge_rating: 3, size: 'Large' });
+      // Reserved provenance: consumed, never stored back as author Metadata.
+      expect(detail.document.metadata).not.toHaveProperty('hexly.type');
+    });
+
+    it('applies a type this build has never heard of — nothing is resolved on the import path', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      // `world.deity`'s definition lives in the World it was authored in, not in the vault. The id
+      // still lands: an unresolvable type degrades to the generic Field view (ADR-0048).
+      const zip = vaultZip({
+        'Deities/Vela.md': ['---', 'hexly.type: [world.deity]', 'domain: dusk', '---', '# Vela'].join('\n'),
+      });
+
+      const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
+      const { summary, detail } = await entityNamed(ada, res.body.worldId, 'Vela');
+
+      expect(summary.types).toEqual(['world.deity']);
+      expect(detail.document.metadata).toMatchObject({ domain: 'dusk' });
+    });
+
+    it('falls back to a plain Note when the stamp is malformed — a stranger’s vault never breaks a World', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const zip = vaultZip({
+        'Junk.md': ['---', 'hexly.type: 42', '---', '# Junk'].join('\n'),
+        'Bare.md': ['---', 'hexly.type: [nodots]', '---', '# Bare'].join('\n'),
+      });
+
+      const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
+
+      // Neither file is skipped.
+      expect(res.body.notesImported).toBe(2);
+      expect((await entityNamed(ada, res.body.worldId, 'Junk')).summary.types).toEqual(['core.note']);
+      expect((await entityNamed(ada, res.body.worldId, 'Bare')).summary.types).toEqual(['core.note']);
+    });
+
+    it('opens an imported note whose grid: frontmatter is not a valid grid', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      // A stranger's vault uses `grid:` for something else. Field validation is forward-only, so the
+      // value is stored as it stands.
+      const zip = vaultZip({
+        'Chart.md': ['---', 'hexly.type: [core.hexmap]', 'grid: hand-drawn, 12 squares', '---', '# Chart'].join('\n'),
+      });
+
+      const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
+      const { summary, detail } = await entityNamed(ada, res.body.worldId, 'Chart');
+
+      expect(summary.types).toEqual(['core.hexmap']);
+      expect(detail.document.metadata).toMatchObject({ grid: 'hand-drawn, 12 squares' });
+    });
+  });
+
   it('reports dangling links, degraded constructs, and zero assets in the summary', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const zip = vaultZip({
       'Keep.md': 'Guarded by [[Lady Mara]] and the [[Watch]].[^1]\n\n[^1]: A footnote.',
     });
 
-    const res = await ada
-      .post('/worlds/import')
-      .attach('file', zip, 'Aldermoor.zip')
-      .expect(201);
+    const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
 
     // Wikilinks are dangling this slice (resolution is the next one); no assets yet.
     expect(res.body.linksResolved).toBe(0);
@@ -238,10 +307,7 @@ describe('Vault import endpoint', () => {
       'Lady Mara.md': '# Lady Mara',
     });
 
-    const res = await ada
-      .post('/worlds/import')
-      .attach('file', zip, 'Aldermoor.zip')
-      .expect(201);
+    const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
 
     expect(res.body.linksResolved).toBe(1);
     expect(res.body.linksDangling).toBe(0);
@@ -255,7 +321,10 @@ describe('Vault import endpoint', () => {
     // re-save (ADR-0046) — the wikilink resolves to an `entityId` *before* the row is written.
     const { referencedBy } = (await ada.get(`/entities/${mara.id}/references`).expect(200)).body;
     expect(referencedBy).toEqual([
-      { descriptor: null, source: { id: keep.id, name: 'Keep', type: 'note' } },
+      {
+        descriptor: null,
+        source: { id: keep.id, name: 'Keep', types: ['core.note'] },
+      },
     ]);
   });
 
@@ -268,10 +337,7 @@ describe('Vault import endpoint', () => {
       'Keep.md': 'The [[South/Guard]] and the bare [[Guard]].',
     });
 
-    const res = await ada
-      .post('/worlds/import')
-      .attach('file', zip, 'Aldermoor.zip')
-      .expect(201);
+    const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
 
     expect(res.body.linksResolved).toBe(2);
     expect(res.body.linksDangling).toBe(0);
@@ -293,10 +359,7 @@ describe('Vault import endpoint', () => {
       'Lady Mara.md': '# Lady Mara',
     });
 
-    const res = await ada
-      .post('/worlds/import')
-      .attach('file', zip, 'Aldermoor.zip')
-      .expect(201);
+    const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
 
     // One target exists, one does not.
     expect(res.body.linksResolved).toBe(1);
@@ -317,10 +380,7 @@ describe('Vault import endpoint', () => {
       'Lady Mara.md': '# Lady Mara',
     });
 
-    const res = await ada
-      .post('/worlds/import')
-      .attach('file', zip, 'Aldermoor.zip')
-      .expect(201);
+    const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
 
     // Two real wikilinks resolve; the embed is a plain link, not an entityLink, so it isn't counted.
     expect(res.body.linksResolved).toBe(2);
@@ -330,8 +390,14 @@ describe('Vault import endpoint', () => {
     const keep = await linksOf(ada, res.body.worldId, 'Keep');
     expect(keep.links).toHaveLength(2);
     // Resolution fills entityId without disturbing the display/heading the converter parsed.
-    expect(keep.links[0].attrs).toMatchObject({ entityId: mara.id, heading: 'Backstory' });
-    expect(keep.links[1].attrs).toMatchObject({ entityId: mara.id, display: 'the ranger' });
+    expect(keep.links[0].attrs).toMatchObject({
+      entityId: mara.id,
+      heading: 'Backstory',
+    });
+    expect(keep.links[1].attrs).toMatchObject({
+      entityId: mara.id,
+      display: 'the ranger',
+    });
   });
 
   it('strips a wrapping vault directory (detected via .obsidian/) so vault-relative links still resolve', async () => {
@@ -345,10 +411,7 @@ describe('Vault import endpoint', () => {
       'Aldermoor/Keep.md': 'The [[South/Guard]] holds.',
     });
 
-    const res = await ada
-      .post('/worlds/import')
-      .attach('file', zip, 'Aldermoor.zip')
-      .expect(201);
+    const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
 
     // The vault-relative link resolves despite the wrapper, and sourcePath is stored wrapper-free.
     expect(res.body.linksResolved).toBe(1);
@@ -366,10 +429,7 @@ describe('Vault import endpoint', () => {
       'Keep.md': 'Jump to [[#Defenses]] below.',
     });
 
-    const res = await ada
-      .post('/worlds/import')
-      .attach('file', zip, 'Aldermoor.zip')
-      .expect(201);
+    const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
 
     // An in-note anchor names no note, so it is not a lost link.
     expect(res.body.linksResolved).toBe(0);
@@ -384,10 +444,7 @@ describe('Vault import endpoint', () => {
       'attachments/portrait.png': new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
     });
 
-    const res = await ada
-      .post('/worlds/import')
-      .attach('file', zip, 'Aldermoor.zip')
-      .expect(201);
+    const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
 
     expect(res.body.notesImported).toBe(1);
     // The World holds just the one imported note (no seeded Home Entity, ADR-0043).
@@ -407,10 +464,7 @@ describe('Vault import endpoint', () => {
       'Broken.md': new Uint8Array([0xff, 0xfe, 0xfd]),
     });
 
-    const res = await ada
-      .post('/worlds/import')
-      .attach('file', zip, 'Aldermoor.zip')
-      .expect(201);
+    const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
 
     expect(res.body.notesImported).toBe(1);
     expect(res.body.filesSkipped).toBe(1);
@@ -425,10 +479,7 @@ describe('Vault import endpoint', () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const before = (await ada.get('/worlds').expect(200)).body.length;
 
-    await ada
-      .post('/worlds/import')
-      .attach('file', Buffer.from('not a zip at all'), 'Aldermoor.zip')
-      .expect(400);
+    await ada.post('/worlds/import').attach('file', Buffer.from('not a zip at all'), 'Aldermoor.zip').expect(400);
 
     // The World is minted only after the archive decompresses, so a bad upload leaves nothing.
     const after = (await ada.get('/worlds').expect(200)).body.length;
@@ -459,10 +510,7 @@ describe('Vault import endpoint', () => {
       'Villain.md': 'Villain\n\n![[portrait.png]]\n\n![logo](https://example.com/logo.png)',
     });
 
-    const res = await ada
-      .post('/worlds/import')
-      .attach('file', zip, 'Aldermoor.zip')
-      .expect(201);
+    const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
 
     // Referenced once effectively, stored once (content-addressed dedup, ADR-0034).
     expect(res.body.assetsStored).toBe(1);
@@ -501,7 +549,7 @@ describe('Vault import endpoint', () => {
       .map((row) => row.targetId);
   }
 
-  it('removes a World\'s asset folder when the World is deleted', async () => {
+  it("removes a World's asset folder when the World is deleted", async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 5, 6, 7, 8]);
     const zip = vaultZip({

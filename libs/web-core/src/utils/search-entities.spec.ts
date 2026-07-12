@@ -8,7 +8,7 @@ function summary(id: string, name = id): EntitySummary {
     id,
     name,
     worldId: 'w1',
-    type: 'note',
+    types: ['core.note'],
     tags: [],
     visibility: 'private',
     version: 1,
@@ -22,13 +22,9 @@ const settle = () => new Promise((r) => setTimeout(r, 250));
 
 describe('searchEntities', () => {
   it('caps the page for autocomplete', async () => {
-    const list = vi
-      .fn()
-      .mockReturnValue(of({ items: [summary('n1')], nextCursor: null }));
+    const list = vi.fn().mockReturnValue(of({ items: [summary('n1')], nextCursor: null }));
     const query$ = new Subject<string>();
-    const result = firstValueFrom(
-      searchEntities({ list } as unknown as EntitiesClient, query$).pipe(share()),
-    );
+    const result = firstValueFrom(searchEntities({ list } as unknown as EntitiesClient, query$).pipe(share()));
     query$.next('a');
 
     expect(await result).toEqual([summary('n1')]);
@@ -38,9 +34,7 @@ describe('searchEntities', () => {
   it('paints a repeated query from cache without revalidating for take-first consumers', async () => {
     // firstValueFrom unsubscribes on the cached paint, so the revalidation request
     // is never fired — the tiptap picker path (short-lived, per-surface).
-    const list = vi
-      .fn()
-      .mockReturnValue(of({ items: [summary('n1')], nextCursor: null }));
+    const list = vi.fn().mockReturnValue(of({ items: [summary('n1')], nextCursor: null }));
     const client = { list } as unknown as EntitiesClient;
     const query$ = new Subject<string>();
     const results$ = searchEntities(client, query$).pipe(share());
@@ -63,10 +57,7 @@ describe('searchEntities', () => {
       .mockReturnValueOnce(of({ items: [summary('n1', 'New')], nextCursor: null }));
     const query$ = new Subject<string>();
     const emissions: EntitySummary[][] = [];
-    const sub = searchEntities(
-      { list } as unknown as EntitiesClient,
-      query$,
-    ).subscribe((v) => emissions.push(v));
+    const sub = searchEntities({ list } as unknown as EntitiesClient, query$).subscribe((v) => emissions.push(v));
 
     query$.next('a');
     await settle();
@@ -79,15 +70,10 @@ describe('searchEntities', () => {
   });
 
   it('does not re-emit when a revalidation returns unchanged results', async () => {
-    const list = vi
-      .fn()
-      .mockReturnValue(of({ items: [summary('n1', 'Same')], nextCursor: null }));
+    const list = vi.fn().mockReturnValue(of({ items: [summary('n1', 'Same')], nextCursor: null }));
     const query$ = new Subject<string>();
     const emissions: EntitySummary[][] = [];
-    const sub = searchEntities(
-      { list } as unknown as EntitiesClient,
-      query$,
-    ).subscribe((v) => emissions.push(v));
+    const sub = searchEntities({ list } as unknown as EntitiesClient, query$).subscribe((v) => emissions.push(v));
 
     query$.next('a');
     await settle();
@@ -105,10 +91,7 @@ describe('searchEntities', () => {
       .mockReturnValueOnce(throwError(() => new Error('boom')));
     const query$ = new Subject<string>();
     const emissions: EntitySummary[][] = [];
-    const sub = searchEntities(
-      { list } as unknown as EntitiesClient,
-      query$,
-    ).subscribe((v) => emissions.push(v));
+    const sub = searchEntities({ list } as unknown as EntitiesClient, query$).subscribe((v) => emissions.push(v));
 
     query$.next('a');
     await settle();
@@ -116,9 +99,6 @@ describe('searchEntities', () => {
     await settle();
     sub.unsubscribe();
 
-    expect(emissions.map((r) => r.map((e) => e.name))).toEqual([
-      ['Old'],
-      ['Old'],
-    ]);
+    expect(emissions.map((r) => r.map((e) => e.name))).toEqual([['Old'], ['Old']]);
   });
 });

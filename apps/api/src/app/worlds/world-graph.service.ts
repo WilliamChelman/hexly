@@ -24,25 +24,28 @@ export class WorldGraphService {
     if (!worldAccess(this.db, userId).decideMeta(worldId)?.reachable) return null;
     const access = entityAccess(this.db, userId);
     const nodes = this.nodes(access, worldId);
-    return { nodes, edges: this.edges(worldId, new Set(nodes.map((n) => n.id))) };
+    return {
+      nodes,
+      edges: this.edges(worldId, new Set(nodes.map((n) => n.id))),
+    };
   }
 
   /**
    * Every Entity of the World the viewer can read — the ordinary accessible-entities filter, not
    * the edge table, so a link-less orphan is a node like any other. Assets are never nodes.
    *
-   * An Entity {@link linkedEntity} cannot resolve — one whose stored type is outside the enum — is
+   * An Entity {@link linkedEntity} cannot resolve — one whose stored types are malformed — is
    * dropped rather than thrown on; {@link edges} then sieves its edges away for free. One such row
    * must not 500 a whole World's graph.
    */
   private nodes(access: EntityAccess, worldId: string): LinkedEntity[] {
     return this.db
-      .select({ id: entities.id, name: entities.name, type: entities.type })
+      .select({ id: entities.id, name: entities.name, types: entities.types })
       .from(entities)
       .where(and(eq(entities.worldId, worldId), access.filter))
       .orderBy(asc(entities.name), asc(entities.id))
       .all()
-      .flatMap((row) => linkedEntity(row.id, row.name, row.type) ?? []);
+      .flatMap((row) => linkedEntity(row.id, row.name, row.types) ?? []);
   }
 
   /**

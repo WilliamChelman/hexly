@@ -1,3 +1,4 @@
+export * from '../i18n/test-catalogs';
 export * from '../i18n/transloco-testing';
 export * from './admin-client.mock';
 export * from './auth-client.mock';

@@ -1,4 +1,4 @@
-import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtures';
+import { createEntity, enterLibrary, expect, flushSave, test, savedGrid } from './fixtures';
 
 /**
  * The Region select-and-edit journey (issue #39): a Region selected on the canvas
@@ -14,10 +14,7 @@ test('selects a Region on the canvas, renames it in the Inspector, and the renam
   request,
 }) => {
   await enterLibrary(page);
-  await page.getByTestId('new-map').click();
-
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const mapId = entityIdFromUrl(page);
+  const mapId = await createEntity(page, 'core.hexmap');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
 
@@ -41,12 +38,10 @@ test('selects a Region on the canvas, renames it in the Inspector, and the renam
 
   await page.reload();
 
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  expect(detail.document.regions).toHaveLength(1);
-  expect(detail.document.regions[0].name).toBe('The Whisperwood');
-  expect(detail.document.regions[0].hexes).toEqual({ '0,0': true });
+  const grid = await savedGrid(request, mapId);
+  expect(grid.regions).toHaveLength(1);
+  expect(grid.regions[0].name).toBe('The Whisperwood');
+  expect(grid.regions[0].hexes).toEqual({ '0,0': true });
 
   // The reloaded map boots in Select (issue #27).
   await canvas.click();

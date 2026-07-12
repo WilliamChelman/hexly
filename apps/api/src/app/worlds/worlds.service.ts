@@ -1,27 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
-import {
-  CreateWorldRequest,
-  MemberRole,
-  PublicLink,
-  WorldDetail,
-  WorldMember,
-  WorldSummary,
-} from '@hexly/domain';
+import { CreateWorldRequest, MemberRole, PublicLink, WorldDetail, WorldMember, WorldSummary } from '@hexly/domain';
 import { and, asc, count, eq, inArray, ne } from 'drizzle-orm';
 import { AssetsService } from '../assets/assets.service';
-import {
-  AclSetResult,
-  gate,
-  OwnerSetResult,
-  removeOwnerOutcome,
-  userExists,
-} from '../acl/owner-set';
-import {
-  mintPublicLink,
-  PublicLinkTable,
-  readPublicLink,
-  revokePublicLink,
-} from '../acl/public-link-store';
+import { AclSetResult, gate, OwnerSetResult, removeOwnerOutcome, userExists } from '../acl/owner-set';
+import { mintPublicLink, PublicLinkTable, readPublicLink, revokePublicLink } from '../acl/public-link-store';
 import { DB, Db } from '../db/db';
 import { worldAccess, worldRightsOf } from '../acl/world-access';
 import { sharedVisibility } from '../acl/entity-access';
@@ -97,7 +79,11 @@ export class WorldsService {
     return rows.map((w) => {
       const owners = ownersByWorld.get(w.id) ?? [];
       // Rights fall out of the owner set already fetched; `managedBy` folds the Superadmin bypass.
-      return { ...w, owners, rights: access.rightsOf({ isOwner: access.managedBy(owners) }) };
+      return {
+        ...w,
+        owners,
+        rights: access.rightsOf({ isOwner: access.managedBy(owners) }),
+      };
     });
   }
 
@@ -205,11 +191,7 @@ export class WorldsService {
    * invariant refuses removing the last Owner (`last-owner` → 409). A co-Owner may
    * evict any other Owner, including the creator.
    */
-  removeOwner(
-    userId: string,
-    id: string,
-    targetUserId: string,
-  ): OwnerSetResult {
+  removeOwner(userId: string, id: string, targetUserId: string): OwnerSetResult {
     const gate = this.gateOwnerManagement(userId, id);
     if (gate) return gate;
     const outcome = removeOwnerOutcome(this.worldOwners(id), targetUserId);
@@ -236,12 +218,7 @@ export class WorldsService {
    * an existing Instance user, role ∈ {contributor, viewer}. Upsert on the
    * (world, user) PK.
    */
-  addMember(
-    userId: string,
-    id: string,
-    targetUserId: string,
-    role: MemberRole,
-  ): AclSetResult<WorldMember[]> {
+  addMember(userId: string, id: string, targetUserId: string, role: MemberRole): AclSetResult<WorldMember[]> {
     const gate = this.gateOwnerManagement(userId, id);
     if (gate) return gate;
     if (!userExists(this.db, targetUserId)) return { status: 'no-such-user' };
@@ -257,12 +234,7 @@ export class WorldsService {
    * Only touches non-owner rows — an unknown user or an Owner is a 404 (Owners are
    * managed through the ownership-set endpoints).
    */
-  setMemberRole(
-    userId: string,
-    id: string,
-    targetUserId: string,
-    role: MemberRole,
-  ): AclSetResult<WorldMember[]> {
+  setMemberRole(userId: string, id: string, targetUserId: string, role: MemberRole): AclSetResult<WorldMember[]> {
     const gate = this.gateOwnerManagement(userId, id);
     if (gate) return gate;
     // A role change moves what the member may do with the World's `shared` Entities, so it rides
@@ -279,11 +251,7 @@ export class WorldsService {
    * (`last-owner` → 409). Hard delete — a departed member who still owns an Entity
    * in the World keeps minimal reachability (derived, not stored).
    */
-  removeMember(
-    userId: string,
-    id: string,
-    targetUserId: string,
-  ): AclSetResult<WorldMember[]> {
+  removeMember(userId: string, id: string, targetUserId: string): AclSetResult<WorldMember[]> {
     // One query resolves reachability + ownership (unreachable ≡ missing → 404).
     const meta = worldAccess(this.db, userId).decideMeta(id);
     if (!meta?.reachable) return { status: 'not-found' };
@@ -293,8 +261,7 @@ export class WorldsService {
     // non-owner member isn't in `owners`, so removeOwnerOutcome returns `not-found`
     // for them and never blocks their removal.
     const owners = this.worldOwners(id);
-    if (removeOwnerOutcome(owners, targetUserId).status === 'last-owner')
-      return { status: 'last-owner' };
+    if (removeOwnerOutcome(owners, targetUserId).status === 'last-owner') return { status: 'last-owner' };
     // Removing *someone else* only touches non-owner members — demoting a co-Owner is the
     // ownership-set endpoints' job. Leaving yourself may drop your own owner row (the ≥1-Owner
     // guard above refused orphaning).
@@ -395,9 +362,7 @@ export class WorldsService {
     return this.db
       .select({ userId: worldMembers.userId })
       .from(worldMembers)
-      .where(
-        and(eq(worldMembers.worldId, worldId), eq(worldMembers.role, 'owner')),
-      )
+      .where(and(eq(worldMembers.worldId, worldId), eq(worldMembers.role, 'owner')))
       .orderBy(asc(worldMembers.userId))
       .all()
       .map((r) => r.userId);
@@ -408,9 +373,7 @@ export class WorldsService {
     return this.db
       .select({ userId: worldMembers.userId, role: worldMembers.role })
       .from(worldMembers)
-      .where(
-        and(eq(worldMembers.worldId, worldId), ne(worldMembers.role, 'owner')),
-      )
+      .where(and(eq(worldMembers.worldId, worldId), ne(worldMembers.role, 'owner')))
       .orderBy(asc(worldMembers.userId))
       .all()
       .map((r) => ({ userId: r.userId, role: r.role as MemberRole }));

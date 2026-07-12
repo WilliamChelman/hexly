@@ -1,10 +1,13 @@
-import { test as base, expect, type Page, type Response } from '@playwright/test';
+import { test as base, expect, type APIRequestContext, type Page, type Response } from '@playwright/test';
 // Reuse the app's own pretty-URL codec (ADR-0042): URL segments are `slug-base62(id)`,
 // so specs decode a segment back to the canonical id and build loose matchers from it.
 // A direct file import (not the @hexly/web-core barrel) keeps the Playwright process off the
 // Angular services layer the barrel re-exports — pretty-id is a pure util. The nx
-// module-boundary rule is waived for these two pure utils via eslint.config.mjs `allow`.
+// module-boundary rule is waived for these pure utils via eslint.config.mjs `allow`.
 import { idFromSegment, segment } from '../../../libs/web-core/src/utils/pretty-id';
+// Same waiver: the View-instance codec is framework-free, and a View's key is what a toggle's testid
+// and the `?view=` param carry — so a spec shares the encoder rather than re-spelling it.
+import { viewInstanceKey } from '../../../libs/web-entity/src/lib/view-instance';
 
 /**
  * The base test for the authenticated suite. An auto fixture resets the database
@@ -50,16 +53,46 @@ export function segRe(id: string): string {
   return `[^/]*${segment(id)}`;
 }
 
+/** A Hex Map's grid, as the map specs read it back off the server. */
+interface SavedGrid {
+  hexes: Record<string, { terrain: string; name?: string; entityId?: string; feature?: { ref: string } }>;
+  regions: Array<{ id: string; name: string; color: string; hexes: Record<string, true>; entityId?: string }>;
+  labels: Array<{ id: string; text: string; position: { x: number; y: number }; size: number; rotation?: number }>;
+}
+
+/**
+ * The grid a Hex Map has actually persisted, fetched from the API — what a map spec checks after a
+ * save, beyond what the reloaded canvas already shows.
+ *
+ * The one place a test knows *where* the grid is stored (a **Structured Field**'s value in the
+ * Entity's one Metadata map, ADR-0050), so moving it again is a one-line change rather than a sweep.
+ * `core.hexmap` declares its grid at `grid`; a World Owner's own type declares its at whatever key
+ * its author chose, which is what `fieldKey` is for (#201).
+ */
+export async function savedGrid(request: APIRequestContext, entityId: string, fieldKey = 'grid'): Promise<SavedGrid> {
+  const res = await request.get(`/api/entities/${entityId}`);
+  expect(res.ok()).toBeTruthy();
+  const detail = await res.json();
+  return detail.document.metadata[fieldKey] as SavedGrid;
+}
+
+/**
+ * A map View toggle's testid — the View id plus the **Structured Field** it renders (ADR-0050).
+ * `core.hexmap` declares its grid at `grid`; a user-defined type declares its own at whatever key its
+ * author chose. Composed through the app's own {@link viewInstanceKey}, so a spec can never disagree
+ * with the header about how a View instance is spelled.
+ */
+export function mapViewToggle(fieldKey = 'grid'): string {
+  return viewInstanceKey({ viewId: 'core.view.map', fieldKey });
+}
+
 /**
  * Wait for a successful entity PUT. Since the Save button is gone (ADR-0026),
  * this is used with Cmd/Ctrl+S to flush autosave immediately.
  */
 export function waitForSave(page: Page): Promise<Response> {
   return page.waitForResponse(
-    (res) =>
-      res.request().method() === 'PUT' &&
-      /\/api\/entities\/[\w-]+$/.test(res.url()) &&
-      res.ok(),
+    (res) => res.request().method() === 'PUT' && /\/api\/entities\/[\w-]+$/.test(res.url()) && res.ok(),
   );
 }
 
@@ -96,8 +129,76 @@ export async function enterLibrary(page: Page): Promise<string> {
   await page.goto('/');
   // The card lands on the World Dashboard — the World root (ADR-0043); the rail's
   // Library link enters the Entity browser from there.
-  await page.getByTestId(/^world-/).first().click();
+  await page
+    .getByTestId(/^world-/)
+    .first()
+    .click();
   await page.getByRole('link', { name: 'Library' }).click();
   await page.waitForURL(/\/w\/[\w-]+\/entities$/);
   return page.url().match(/\/w\/([\w-]+)\/entities/)![1];
+}
+
+/**
+ * Create an Entity of `typeId` through the "New" split button's type menu, and open it (#195).
+ * The menu lists every registered Entity Type and derives each item's testid from the type id,
+ * so the next plugin's create affordance is reachable here with no new helper. Returns the new
+ * Entity's canonical id.
+ *
+ * The caller must already be on a surface carrying the button — `enterLibrary`, or an empty
+ * World Dashboard. A Type declaring a *required* Field opens the create dialog instead, so it
+ * is created through that (see `dnd-monster.spec.ts`), not through this helper.
+ */
+export async function createEntity(page: Page, typeId: string): Promise<string> {
+  await page.getByTestId('new-entity-menu').click();
+  await page.getByTestId(`new-entity-${typeId}`).click();
+  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  return entityIdFromUrl(page);
+}
+
+/** A Field on a user-defined type, as the World Types editor's form takes one. */
+export interface AuthoredField {
+  readonly key: string;
+  readonly label: string;
+  /** A **Structured Field**'s data-type (`core.hex-grid`, #201); absent leaves the form's `string`. */
+  readonly kind?: string;
+}
+
+/**
+ * Author a user-defined type in a World's settings (#191, #201), and land back on the types list with
+ * it saved. Navigates to the settings page itself, so a caller reaches it from anywhere.
+ *
+ * `id` is the bare id the form takes; the World's namespace makes it `world.<id>`.
+ */
+export async function authorWorldType(
+  page: Page,
+  worldId: string,
+  type: { id: string; name: string; fields: readonly AuthoredField[] },
+): Promise<void> {
+  await page.goto(`/w/${worldId}/settings`);
+  await page.getByTestId('type-new').click();
+  await page.getByTestId('type-id-input').fill(type.id);
+  await page.getByTestId('type-name-input').fill(type.name);
+
+  for (const [index, field] of type.fields.entries()) {
+    await page.getByTestId('add-field').click();
+    const row = page.getByTestId(`field-${index}`);
+    await row.getByTestId('field-key').fill(field.key);
+    await row.getByTestId('field-label').fill(field.label);
+    if (field.kind) await row.getByTestId('field-kind').selectOption(field.kind);
+  }
+
+  await page.getByTestId('type-save').click();
+  await expect(page.getByTestId(`type-world.${type.id}`)).toBeVisible();
+}
+
+/**
+ * Add `typeId` to the open Entity through the header's Edit-types dialog (#189), minting the defaults
+ * its Fields declare. For a type whose Fields are all optional: one declaring a *required* Field
+ * prompts for it before the add commits, which a spec drives itself.
+ */
+export async function addType(page: Page, typeId: string): Promise<void> {
+  await openEntityActions(page);
+  await page.getByTestId('edit-types').click();
+  await page.getByTestId('type-add').selectOption(typeId);
+  await page.getByTestId('types-close').click();
 }

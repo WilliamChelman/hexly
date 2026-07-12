@@ -1,18 +1,24 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  inject,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
-import { Router, RouterLink } from '@angular/router';
-import { finalize } from 'rxjs';
-import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { EntityFacets, EntitySummary, EntityType } from '@hexly/domain';
-import { EntitiesClient, ActiveWorld, ToasterService, HexlyDatePipe, entityRoute, worldRoute } from '@hexly/web-core';
-import { Button, Eyebrow, Panel, PageHeader, Icon, IconName, EntitySearchPicker, ACCENT_BAR, accentFor } from '@hexly/web-ui';
+import { EntitiesClient, ActiveWorld, HexlyDatePipe, entityRoute, worldRoute } from '@hexly/web-core';
+import {
+  Button,
+  Eyebrow,
+  Panel,
+  PageHeader,
+  Icon,
+  IconName,
+  EntitySearchPicker,
+  ACCENT_BAR,
+  accentFor,
+} from '@hexly/web-ui';
+import { TypeRegistry } from '../../entity-types/type-registry';
+import { TypeNamePipe } from '../../entity-types/type-name.pipe';
+import { NewEntityButton } from '../../entity-types/new-entity-button';
+import { CORE_VIEW_MAP } from '@hexly/web-entity';
 
 const RECENTS_LIMIT = 8;
 const MAPS_LIMIT = 8;
@@ -20,8 +26,9 @@ const MAPS_LIMIT = 8;
 /**
  * The World Dashboard: the per-World landing at `/w/:worldId`. A read-only
  * *derived* view — it authors nothing, only queries the list/facets endpoints:
- * pins, recents, Hex Maps, and at-a-glance Type counts. An empty World gets a
- * purposeful empty state that creates the first Note or Hex Map.
+ * pins, recents, Hex Maps, and at-a-glance Type counts. Creating is the shared
+ * {@link NewEntityButton}'s job — from the header, or from an empty World's
+ * purposeful empty state — so the first Entity can be of any registered Type (#195).
  */
 @Component({
   selector: 'app-world-dashboard',
@@ -31,12 +38,14 @@ const MAPS_LIMIT = 8;
     RouterLink,
     TranslocoPipe,
     HexlyDatePipe,
+    TypeNamePipe,
     Button,
     Eyebrow,
     Panel,
     PageHeader,
     Icon,
     EntitySearchPicker,
+    NewEntityButton,
   ],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
@@ -49,11 +58,7 @@ const MAPS_LIMIT = 8;
         raised
       >
         <span class="absolute left-0 top-0 bottom-0 w-1.5 {{ bar(e.id) }}"></span>
-        <app-icon
-          [name]="typeIcon(e.type)"
-          [size]="18"
-          class="shrink-0 mt-0.5 text-ink-muted"
-        />
+        <app-icon [name]="typeIcon(e.types[0])" [size]="18" class="shrink-0 mt-0.5 text-ink-muted" />
         <div class="min-w-0 flex-1">
           <a
             class="block no-underline outline-none focus-visible:shadow-none after:content-[''] after:absolute after:inset-0"
@@ -67,7 +72,7 @@ const MAPS_LIMIT = 8;
             >
           </a>
           <span class="mt-1 block text-2xs text-ink-muted">
-            {{ 'entityBrowser.type.' + e.type | transloco }}
+            {{ e.types[0] | typeName }}
             <span class="text-ink-faint">·</span>
             {{ 'entityBrowser.edited' | transloco: { date: (e.updatedAt | hexlyDate) } }}
           </span>
@@ -77,24 +82,22 @@ const MAPS_LIMIT = 8;
 
     <app-page-header sticky>
       <div pageHeaderTitle class="flex flex-col">
-        <span appEyebrow class="text-gold! tracking-[0.28em]">{{
-          'worldDashboard.eyebrow' | transloco
-        }}</span>
+        <span appEyebrow class="text-gold! tracking-[0.28em]">{{ 'worldDashboard.eyebrow' | transloco }}</span>
         <h1 class="font-display text-[22px] text-ink-strong m-0 leading-tight">
           {{ worldName() }}
         </h1>
       </div>
+      <!-- A populated World creates from the header; an empty one from its empty state, so the
+           split button shows exactly once either way. One projected root: a control-flow block
+           projects by its single root node, so two siblings here would land in no slot at all. -->
       @if (!isEmpty()) {
-        <a
-          pageHeaderActions
-          appButton
-          variant="default"
-          [routerLink]="browseAllLink()"
-          data-testid="browse-all"
-        >
-          <app-icon name="library" [size]="16" />
-          {{ 'worldDashboard.browseAll' | transloco }}
-        </a>
+        <div pageHeaderActions class="flex items-center gap-2">
+          <a appButton variant="default" [routerLink]="browseAllLink()" data-testid="browse-all">
+            <app-icon name="library" [size]="16" />
+            {{ 'worldDashboard.browseAll' | transloco }}
+          </a>
+          <app-new-entity-button />
+        </div>
       }
     </app-page-header>
 
@@ -108,30 +111,11 @@ const MAPS_LIMIT = 8;
           <p class="m-0 font-display text-lg text-ink-strong">
             {{ 'worldDashboard.emptyTitle' | transloco }}
           </p>
-          <p class="text-sm m-0">{{ 'worldDashboard.emptyHint' | transloco }}</p>
-          <div class="flex items-center gap-2 mt-1">
-            <button
-              type="button"
-              appButton
-              variant="default"
-              data-testid="create-note"
-              [disabled]="creating()"
-              (click)="create('note')"
-            >
-              <app-icon name="plus" [size]="16" />
-              {{ (creating() ? 'entityBrowser.creating' : 'entityBrowser.newNote') | transloco }}
-            </button>
-            <button
-              type="button"
-              appButton
-              variant="primary"
-              data-testid="create-map"
-              [disabled]="creating()"
-              (click)="create('hexmap')"
-            >
-              <app-icon name="plus" [size]="16" />
-              {{ (creating() ? 'entityBrowser.creating' : 'entityBrowser.newMap') | transloco }}
-            </button>
+          <p class="text-sm m-0">
+            {{ 'worldDashboard.emptyHint' | transloco }}
+          </p>
+          <div class="mt-1">
+            <app-new-entity-button />
           </div>
         </section>
       } @else {
@@ -148,9 +132,7 @@ const MAPS_LIMIT = 8;
                   [attr.data-testid]="'count-type-' + c.value"
                 >
                   <span class="font-display text-2xl text-ink-strong">{{ c.count }}</span>
-                  <span class="text-sm text-ink-muted">{{
-                    'entityBrowser.type.' + c.value | transloco
-                  }}</span>
+                  <span class="text-sm text-ink-muted">{{ c.value | typeName }}</span>
                 </li>
               }
             </ul>
@@ -190,15 +172,10 @@ const MAPS_LIMIT = 8;
               </div>
             }
 
-            <ul
-              class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 m-0 p-0 list-none"
-            >
+            <ul class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 m-0 p-0 list-none">
               @for (e of pins(); track e.id; let i = $index) {
                 <li class="relative">
-                  <ng-container
-                    [ngTemplateOutlet]="tile"
-                    [ngTemplateOutletContext]="{ $implicit: e, prefix: 'pin' }"
-                  />
+                  <ng-container [ngTemplateOutlet]="tile" [ngTemplateOutletContext]="{ $implicit: e, prefix: 'pin' }" />
                   @if (canCurate()) {
                     <!-- z-10 lifts the controls above the tile's full-card link overlay. -->
                     <div class="absolute top-2 right-2 z-10 flex gap-0.5">
@@ -256,9 +233,7 @@ const MAPS_LIMIT = 8;
           <h2 appEyebrow mark class="mb-3">
             {{ 'worldDashboard.recentsHeading' | transloco }}
           </h2>
-          <ul
-            class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 m-0 p-0 list-none"
-          >
+          <ul class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 m-0 p-0 list-none">
             @for (e of recents(); track e.id) {
               <li>
                 <ng-container
@@ -275,15 +250,10 @@ const MAPS_LIMIT = 8;
             <h2 appEyebrow mark class="mb-3">
               {{ 'worldDashboard.mapsHeading' | transloco }}
             </h2>
-            <ul
-              class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 m-0 p-0 list-none"
-            >
+            <ul class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 m-0 p-0 list-none">
               @for (e of maps(); track e.id) {
                 <li>
-                  <ng-container
-                    [ngTemplateOutlet]="tile"
-                    [ngTemplateOutletContext]="{ $implicit: e, prefix: 'map' }"
-                  />
+                  <ng-container [ngTemplateOutlet]="tile" [ngTemplateOutletContext]="{ $implicit: e, prefix: 'map' }" />
                 </li>
               }
             </ul>
@@ -296,9 +266,7 @@ const MAPS_LIMIT = 8;
 export class WorldDashboard {
   private readonly entitiesClient = inject(EntitiesClient);
   private readonly activeWorld = inject(ActiveWorld);
-  private readonly router = inject(Router);
-  private readonly toaster = inject(ToasterService);
-  private readonly transloco = inject(TranslocoService);
+  private readonly types = inject(TypeRegistry);
 
   protected readonly worldName = this.activeWorld.name;
   /** Scopes the pin picker so pins stay same-World. */
@@ -307,34 +275,29 @@ export class WorldDashboard {
   protected readonly maps = signal<EntitySummary[]>([]);
   /** The resolved Pinned Entities, in `pinnedEntityIds` order. */
   protected readonly pins = signal<EntitySummary[]>([]);
-  protected readonly canCurate = computed(
-    () => this.activeWorld.world()?.rights.includes('manage') ?? false,
-  );
+  protected readonly canCurate = computed(() => this.activeWorld.world()?.rights.includes('manage') ?? false);
   protected readonly pinPickerOpen = signal(false);
   protected readonly pinQuery = signal('');
   protected readonly typeCounts = signal<EntityFacets['type']>([]);
   /** Set once the recents read resolves — gates the empty state so it never flashes pre-load. */
   protected readonly loaded = signal(false);
-  protected readonly creating = signal(false);
-  protected readonly isEmpty = computed(
-    () => this.loaded() && this.recents().length === 0,
-  );
+  protected readonly isEmpty = computed(() => this.loaded() && this.recents().length === 0);
 
   constructor() {
     const worldId = this.activeWorld.worldId();
     if (!worldId) return;
+    this.entitiesClient.list({ worldId, limit: RECENTS_LIMIT }).subscribe((page) => {
+      this.recents.set(page.items);
+      this.loaded.set(true);
+    });
     this.entitiesClient
-      .list({ worldId, limit: RECENTS_LIMIT })
-      .subscribe((page) => {
-        this.recents.set(page.items);
-        this.loaded.set(true);
-      });
-    this.entitiesClient
-      .list({ worldId, type: ['hexmap'], limit: MAPS_LIMIT })
+      .list({
+        worldId,
+        type: this.types.typeIdsForView(CORE_VIEW_MAP),
+        limit: MAPS_LIMIT,
+      })
       .subscribe((page) => this.maps.set(page.items));
-    this.entitiesClient
-      .facets({ worldId })
-      .subscribe((facets) => this.typeCounts.set(facets.type));
+    this.entitiesClient.facets({ worldId }).subscribe((facets) => this.typeCounts.set(facets.type));
 
     // Resolve pins through the entity read path so the per-caller access filter
     // applies: an unreachable pinned Entity drops out, and pin order is restored
@@ -349,9 +312,7 @@ export class WorldDashboard {
       // the default page size.
       const sub = this.entitiesClient.list({ ids: [...ids] }).subscribe((page) => {
         const byId = new Map(page.items.map((e) => [e.id, e]));
-        this.pins.set(
-          ids.map((id) => byId.get(id)).filter((e): e is EntitySummary => !!e),
-        );
+        this.pins.set(ids.map((id) => byId.get(id)).filter((e): e is EntitySummary => !!e));
       });
       onCleanup(() => sub.unsubscribe());
     });
@@ -370,36 +331,7 @@ export class WorldDashboard {
   }
 
   protected typeIcon(type: EntityType): IconName {
-    return type === 'hexmap' ? 'terrain' : 'label';
-  }
-
-  protected create(type: EntityType): void {
-    if (this.creating()) return;
-    this.creating.set(true);
-    this.entitiesClient
-      .create(
-        this.transloco.translate(
-          type === 'note' ? 'domain.untitledNote' : 'domain.untitledMap',
-        ),
-        type,
-        this.activeWorld.worldId() ?? undefined,
-      )
-      .pipe(finalize(() => this.creating.set(false)))
-      .subscribe({
-        next: (entity) =>
-          this.router.navigate(
-            entityRoute(
-              this.activeWorld.worldId()!,
-              entity.id,
-              this.activeWorld.name() ?? undefined,
-            ),
-          ),
-        error: () =>
-          this.toaster.show(
-            this.transloco.translate('entityBrowser.createError'),
-            'error',
-          ),
-      });
+    return this.types.resolve(type).icon;
   }
 
   protected togglePinPicker(): void {

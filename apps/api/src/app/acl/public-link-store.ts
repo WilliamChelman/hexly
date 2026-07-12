@@ -22,11 +22,7 @@ export interface PublicLinkTable {
 }
 
 /** The target's active Public Link token, or null when none is minted. */
-export function readPublicLink(
-  db: Db,
-  link: PublicLinkTable,
-  targetId: string,
-): PublicLink | null {
+export function readPublicLink(db: Db, link: PublicLinkTable, targetId: string): PublicLink | null {
   const row = db.select({ id: link.id }).from(link.table).where(eq(link.fk, targetId)).get();
   return row ? { token: String(row.id) } : null;
 }
@@ -36,11 +32,7 @@ export function readPublicLink(
  * re-mint returns the current token rather than rotating it (rotate = revoke + re-mint), keeping
  * the shared URL stable. The token is an anonymous Viewer grant that pierces `private` (ADR-0004).
  */
-export function mintPublicLink(
-  db: Db,
-  link: PublicLinkTable,
-  targetId: string,
-): PublicLink {
+export function mintPublicLink(db: Db, link: PublicLinkTable, targetId: string): PublicLink {
   const existing = readPublicLink(db, link, targetId);
   if (existing) return existing;
   // ponytail: no unique index on the FK — a concurrent double-mint could race two rows.

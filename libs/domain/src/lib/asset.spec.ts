@@ -1,6 +1,6 @@
 import { assetHashFromUrl, assetUrl } from './asset';
 
-/** A sha256 hex digest — the content address an Asset is stored and served under. */
+/** A sha256 digest, lowercase base-16 — the content address an Asset is stored and served under. */
 const HASH = 'a'.repeat(64);
 
 describe('Asset serving URL (ADR-0034)', () => {

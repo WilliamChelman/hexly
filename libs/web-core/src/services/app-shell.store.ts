@@ -22,9 +22,7 @@ export class AppShellStore {
   private readonly subtle = signal(0);
 
   /** The strongest level currently claimed — `full` outranks `subtle` outranks `none`. */
-  readonly loading = computed<LoadingLevel>(() =>
-    this.full() > 0 ? 'full' : this.subtle() > 0 ? 'subtle' : 'none',
-  );
+  readonly loading = computed<LoadingLevel>(() => (this.full() > 0 ? 'full' : this.subtle() > 0 ? 'subtle' : 'none'));
 
   /**
    * Raise `level` for one operation; the returned fn lowers it. Idempotent so a

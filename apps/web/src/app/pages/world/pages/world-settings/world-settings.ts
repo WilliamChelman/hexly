@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ActiveWorld } from '@hexly/web-core';
 import { Eyebrow, Panel, OwnerSet, MemberSet, PublicLinkControl } from '@hexly/web-ui';
+import { WorldTypesPanel } from './world-types-panel';
 
 /**
  * The World settings page (#158, #159): the World's symmetric owner set (view, add,
@@ -15,45 +16,46 @@ import { Eyebrow, Panel, OwnerSet, MemberSet, PublicLinkControl } from '@hexly/w
 @Component({
   selector: 'app-world-settings',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    TranslocoPipe,
-    Eyebrow,
-    Panel,
-    OwnerSet,
-    MemberSet,
-    PublicLinkControl,
-  ],
+  imports: [TranslocoPipe, Eyebrow, Panel, OwnerSet, MemberSet, PublicLinkControl, WorldTypesPanel],
   template: `
     @if (worldId(); as id) {
       <section class="world-settings">
-        <span appEyebrow>{{ 'owners.heading' | transloco }}</span>
+        <span appEyebrow>{{ 'ui.owners.heading' | transloco }}</span>
         <h1 class="world-settings-heading">
-          {{ 'owners.heading' | transloco }}
+          {{ 'ui.owners.heading' | transloco }}
         </h1>
         <p class="world-settings-subhead">
-          {{
-            'owners.subhead' | transloco: { kind: 'owners.world' | transloco }
-          }}
+          {{ 'ui.owners.subhead' | transloco: { kind: 'ui.owners.world' | transloco } }}
         </p>
         <div appPanel>
           <app-owner-set kind="world" [id]="id" (resigned)="leave()" />
         </div>
 
         <h2 class="world-settings-heading">
-          {{ 'members.heading' | transloco }}
+          {{ 'ui.members.heading' | transloco }}
         </h2>
         <p class="world-settings-subhead">
-          {{ 'members.subhead' | transloco }}
+          {{ 'ui.members.subhead' | transloco }}
         </p>
         <div appPanel>
           <app-member-set [id]="id" />
         </div>
 
         <h2 class="world-settings-heading">
-          {{ 'publicLink.worldHeading' | transloco }}
+          {{ 'worldTypes.heading' | transloco }}
         </h2>
         <p class="world-settings-subhead">
-          {{ 'publicLink.worldSubhead' | transloco }}
+          {{ 'worldTypes.subhead' | transloco }}
+        </p>
+        <div appPanel>
+          <app-world-types [id]="id" />
+        </div>
+
+        <h2 class="world-settings-heading">
+          {{ 'ui.publicLink.worldHeading' | transloco }}
+        </h2>
+        <p class="world-settings-subhead">
+          {{ 'ui.publicLink.worldSubhead' | transloco }}
         </p>
         <div appPanel>
           <app-public-link kind="world" [id]="id" />

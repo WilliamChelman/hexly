@@ -1,0 +1,18 @@
+{
+  "name": "web-entity",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/web-entity/src",
+  "prefix": "app",
+  "projectType": "library",
+  "tags": ["scope:web", "type:util"],
+  "targets": {
+    "test": {
+      "executor": "@angular/build:unit-test",
+      "options": {
+        "watch": false,
+        "buildTarget": "web:build:development",
+        "tsConfig": "libs/web-entity/tsconfig.spec.json"
+      }
+    }
+  }
+}

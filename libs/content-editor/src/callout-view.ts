@@ -135,19 +135,32 @@ export function createCalloutNodeView(
       const current = editor.state.doc.nodeAt(pos);
       if (!current) return;
       editor.view.dispatch(
-        editor.state.tr.setNodeMarkup(pos, undefined, { ...current.attrs, type }),
+        editor.state.tr.setNodeMarkup(pos, undefined, {
+          ...current.attrs,
+          type,
+        }),
       );
     }),
     // ArrowDown/Enter/Escape → caret at the start of the callout body (pos+2: into
     // the callout, then into its first child block).
     ref.instance.exitToBody.subscribe(() => {
       const pos = getPos();
-      if (pos != null) editor.chain().focus().setTextSelection(pos + 2).run();
+      if (pos != null)
+        editor
+          .chain()
+          .focus()
+          .setTextSelection(pos + 2)
+          .run();
     }),
     // ArrowUp → caret to the end of the block above the callout (pos-1), clamped.
     ref.instance.exitAbove.subscribe(() => {
       const pos = getPos();
-      if (pos != null) editor.chain().focus().setTextSelection(Math.max(0, pos - 1)).run();
+      if (pos != null)
+        editor
+          .chain()
+          .focus()
+          .setTextSelection(Math.max(0, pos - 1))
+          .run();
     }),
   ];
 

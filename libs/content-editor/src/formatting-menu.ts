@@ -11,13 +11,7 @@ import {
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Editor } from '@tiptap/core';
 import { Button } from '@hexly/web-ui';
-import {
-  FORMAT_ITEMS,
-  FormatItem,
-  applyLink,
-  clearLink,
-  isLinkActive,
-} from './formatting-items';
+import { FORMAT_ITEMS, FormatItem, applyLink, clearLink, isLinkActive } from './formatting-items';
 
 /**
  * The formatting toolbar that floats over a text selection in the Content editor (#74).
@@ -39,7 +33,7 @@ import {
   template: `
     <div
       role="toolbar"
-      [attr.aria-label]="'noteView.formatMenu.label' | transloco"
+      [attr.aria-label]="'editor.formatMenu.label' | transloco"
       class="flex items-center gap-[2px] rounded-md border border-line bg-surface p-1 shadow-2"
     >
       @for (item of items; track item.id) {
@@ -65,22 +59,22 @@ import {
         variant="ghost"
         size="sm"
         type="button"
-        [attr.aria-label]="'noteView.formatMenu.link' | transloco"
-        [attr.title]="'noteView.formatMenu.link' | transloco"
+        [attr.aria-label]="'editor.formatMenu.link' | transloco"
+        [attr.title]="'editor.formatMenu.link' | transloco"
         [active]="linkActive()"
         [attr.aria-pressed]="linkActive()"
         (mousedown)="$event.preventDefault()"
         (click)="toggleLink()"
       >
-        {{ 'noteView.formatMenu.link' | transloco }}
+        {{ 'editor.formatMenu.link' | transloco }}
       </button>
 
       @if (linkEditing()) {
         <input
           #urlInput
           type="url"
-          [attr.aria-label]="'noteView.formatMenu.linkPlaceholder' | transloco"
-          [attr.placeholder]="'noteView.formatMenu.linkPlaceholder' | transloco"
+          [attr.aria-label]="'editor.formatMenu.linkPlaceholder' | transloco"
+          [attr.placeholder]="'editor.formatMenu.linkPlaceholder' | transloco"
           class="ml-1 w-44 rounded-sm border border-line bg-surface-sunken px-2 py-1 text-sm text-ink"
           (keydown.enter)="submitLink($event)"
           (keydown.escape)="cancelLink()"
@@ -94,8 +88,7 @@ export class FormattingMenu {
 
   protected readonly items = FORMAT_ITEMS;
   protected readonly linkEditing = signal(false);
-  private readonly urlInput =
-    viewChild<ElementRef<HTMLInputElement>>('urlInput');
+  private readonly urlInput = viewChild<ElementRef<HTMLInputElement>>('urlInput');
 
   // The editor mutates outside Angular; `tick` bumps on every transaction so the
   // active-state computed re-reads the selection and the toolbar highlights track it.
@@ -106,9 +99,7 @@ export class FormattingMenu {
     this.tick();
     const editor = this.editor();
     return {
-      ids: new Set(
-        FORMAT_ITEMS.filter((i) => i.isActive(editor)).map((i) => i.id),
-      ),
+      ids: new Set(FORMAT_ITEMS.filter((i) => i.isActive(editor)).map((i) => i.id)),
       link: isLinkActive(editor),
     };
   });

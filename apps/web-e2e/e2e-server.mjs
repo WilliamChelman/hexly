@@ -111,4 +111,4 @@ server.on('error', (err) => {
   console.error('[e2e-server] Failed to start the server process:', err);
   process.exit(1);
 });
-server.on('exit', (code, signal) => process.exit(signal ? 1 : code ?? 0));
+server.on('exit', (code, signal) => process.exit(signal ? 1 : (code ?? 0)));

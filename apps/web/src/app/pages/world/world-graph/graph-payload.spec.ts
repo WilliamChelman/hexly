@@ -4,7 +4,11 @@ import { graphPayload } from './graph-payload';
 /** A World of `nodes`, linked by `edges` given as `'source>target'` or `'source-descriptor>target'`. */
 function world(nodes: string[], edges: string[] = []): WorldGraph {
   return {
-    nodes: nodes.map((name) => ({ id: name.toLowerCase(), name, type: 'note' as const })),
+    nodes: nodes.map((name) => ({
+      id: name.toLowerCase(),
+      name,
+      types: ['core.note'],
+    })),
     edges: edges.map((e) => {
       const [left, target] = e.split('>');
       const [source, descriptor] = left.split('-');

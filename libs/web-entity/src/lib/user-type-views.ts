@@ -1,0 +1,36 @@
+import { FieldSchema, isFieldViewPlacement, isStructuredDataType, ViewPlacement } from '@hexly/domain';
+import { CORE_VIEW_CONTENT, CORE_VIEW_FIELDS } from './view-definition';
+
+/**
+ * The **View** order a user-defined type affords (ADR-0050, #201): its Fields, then its Content, then
+ * each **Structured Field** its author chose to show, in declaration order. The whole of what a World
+ * Owner can place — a type shipping no code resolves nothing else.
+ *
+ * The map goes last, so adding a battlemap to a `world.deity` does not change what a deity opens on.
+ * A plugin type places its Fields' Views by hand and may choose otherwise: `core.hexmap` places its
+ * grid first, and opens on its map.
+ *
+ * Called from both directions of the same fact — the World Types editor composes the list a "Show as
+ * a view" toggle authors, and the loader composes the default for a type whose author named no order.
+ */
+export function userTypeViews(
+  fields: readonly FieldSchema[],
+  isShownAsView: (field: FieldSchema) => boolean = () => true,
+): ViewPlacement[] {
+  return [
+    CORE_VIEW_FIELDS,
+    CORE_VIEW_CONTENT,
+    ...fields
+      .filter((field) => isStructuredDataType(field.dataType) && isShownAsView(field))
+      .map((field) => ({ field: field.key })),
+  ];
+}
+
+/**
+ * Whether a type's stored `views` show `field`'s View — what the "Show as a view" toggle reads back.
+ * An **absent** list is not an empty one: the author named no order, so every structured Field shows.
+ */
+export function isShownAsView(views: readonly ViewPlacement[] | undefined, field: FieldSchema): boolean {
+  if (!views) return true;
+  return views.some((view) => isFieldViewPlacement(view) && view.field === field.key);
+}

@@ -27,9 +27,7 @@ async function seed() {
   const withWorld = args.includes('--with-world');
   const [email, password, displayName] = args.filter((a) => !a.startsWith('--'));
   if (!email || !password || !displayName) {
-    Logger.error(
-      'Usage: seed <email> <password> <displayName> [--superadmin] [--with-world]',
-    );
+    Logger.error('Usage: seed <email> <password> <displayName> [--superadmin] [--with-world]');
     process.exitCode = 1;
     return;
   }
@@ -38,15 +36,14 @@ async function seed() {
     logger: ['error', 'warn', 'log'],
   });
   try {
-    const userId = await app
-      .get(AuthService)
-      .seedUser(email, password, displayName, { isSuperadmin, roles: ['create-worlds'] });
+    const userId = await app.get(AuthService).seedUser(email, password, displayName, {
+      isSuperadmin,
+      roles: ['create-worlds'],
+    });
     if (withWorld) {
       app.get(WorldsService).mintWorld(userId, `${displayName}'s World`);
     }
-    Logger.log(
-      `Seeded ${isSuperadmin ? 'Superadmin' : 'user'} ${email}${withWorld ? ' with a starter World' : ''}`,
-    );
+    Logger.log(`Seeded ${isSuperadmin ? 'Superadmin' : 'user'} ${email}${withWorld ? ' with a starter World' : ''}`);
   } catch (err) {
     const message = (err as Error).message;
     // Idempotent boot-seed: the container runs this on every start, so an already

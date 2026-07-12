@@ -27,9 +27,9 @@ describe('Worlds endpoints', () => {
     app.use(cookieParser());
     await app.init();
 
-    adaId = await app
-      .get(AuthService)
-      .seedUser('ada@hexly.test', 'correct horse', 'Ada', { roles: ['create-worlds'] });
+    adaId = await app.get(AuthService).seedUser('ada@hexly.test', 'correct horse', 'Ada', {
+      roles: ['create-worlds'],
+    });
   });
 
   afterEach(async () => {
@@ -67,23 +67,19 @@ describe('Worlds endpoints', () => {
 
   it('forbids creating a World without the World Creation capability (ADR-0040)', async () => {
     // A user provisioned without World Creation — the in-app default — is gated.
-    await app
-      .get(AuthService)
-      .seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob', {
-        roles: [],
-      });
+    await app.get(AuthService).seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob', {
+      roles: [],
+    });
     const bob = await signIn('bob@hexly.test', 'hunter2 stationery');
 
     await bob.post('/worlds').send({ name: 'Nope' }).expect(403);
   });
 
   it('lets a Superadmin create a World even without the capability (repair, ADR-0040)', async () => {
-    await app
-      .get(AuthService)
-      .seedUser('root@hexly.test', 'repair the realm', 'Root', {
-        isSuperadmin: true,
-        roles: [],
-      });
+    await app.get(AuthService).seedUser('root@hexly.test', 'repair the realm', 'Root', {
+      isSuperadmin: true,
+      roles: [],
+    });
     const root = await signIn('root@hexly.test', 'repair the realm');
 
     await root.post('/worlds').send({ name: 'Recovered' }).expect(201);
@@ -96,10 +92,7 @@ describe('Worlds endpoints', () => {
 
     const res = await ada.get('/worlds').expect(200);
 
-    expect(res.body.map((w: { name: string }) => w.name).sort()).toEqual([
-      'Aldermoor',
-      'Whisperwood',
-    ]);
+    expect(res.body.map((w: { name: string }) => w.name).sort()).toEqual(['Aldermoor', 'Whisperwood']);
     // Summary carries no homeEntityId (Detail concern).
     expect(res.body[0]).not.toHaveProperty('homeEntityId');
     expect(res.body[0]).toEqual({
@@ -114,21 +107,19 @@ describe('Worlds endpoints', () => {
 
   it('includes worlds the caller is a member of, and excludes the rest', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
-    await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob', { roles: ['create-worlds'] });
+    await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob', {
+      roles: ['create-worlds'],
+    });
     const bob = await signIn('bob@hexly.test', 'battery staple');
 
     const shared = await bob.post('/worlds').send({ name: 'Shared' }).expect(201);
     await bob.post('/worlds').send({ name: 'Private' }).expect(201);
     db.$client
-      .prepare(
-        `INSERT INTO world_members (world_id, user_id, role) VALUES (?, ?, 'contributor')`,
-      )
+      .prepare(`INSERT INTO world_members (world_id, user_id, role) VALUES (?, ?, 'contributor')`)
       .run(shared.body.id, adaId);
 
     const res = await ada.get('/worlds').expect(200);
-    expect(res.body.map((w: { name: string }) => w.name).sort()).toEqual([
-      'Shared',
-    ]);
+    expect(res.body.map((w: { name: string }) => w.name).sort()).toEqual(['Shared']);
   });
 
   it('gets one reachable World as a Detail', async () => {
@@ -146,10 +137,7 @@ describe('Worlds endpoints', () => {
     // Owner holds read + manage on both Detail and summary.
     expect(world.body.rights).toEqual(['read', 'manage']);
     const adaList = await ada.get('/worlds').expect(200);
-    expect(adaList.body.find((w: { id: string }) => w.id === world.body.id).rights).toEqual([
-      'read',
-      'manage',
-    ]);
+    expect(adaList.body.find((w: { id: string }) => w.id === world.body.id).rights).toEqual(['read', 'manage']);
 
     // A plain member reaches the World read-only — no manage.
     const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob');
@@ -169,7 +157,11 @@ describe('Worlds endpoints', () => {
     expect((await ada.get(`/worlds/${created.body.id}`).expect(200)).body.entityCount).toBe(0);
     await ada
       .post('/entities')
-      .send({ name: 'Lady Mara', type: 'note', worldId: created.body.id })
+      .send({
+        name: 'Lady Mara',
+        types: ['core.note'],
+        worldId: created.body.id,
+      })
       .expect(201);
     expect((await ada.get(`/worlds/${created.body.id}`).expect(200)).body.entityCount).toBe(1);
   });
@@ -190,10 +182,7 @@ describe('Worlds endpoints', () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const created = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
 
-    const res = await ada
-      .patch(`/worlds/${created.body.id}`)
-      .send({ name: 'The Reach of Aldermoor' })
-      .expect(200);
+    const res = await ada.patch(`/worlds/${created.body.id}`).send({ name: 'The Reach of Aldermoor' }).expect(200);
     expect(res.body.name).toBe('The Reach of Aldermoor');
     expect(res.body.id).toBe(created.body.id);
 
@@ -208,10 +197,7 @@ describe('Worlds endpoints', () => {
     await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob');
     const bob = await signIn('bob@hexly.test', 'battery staple');
 
-    await bob
-      .patch(`/worlds/${created.body.id}`)
-      .send({ name: 'Hijacked' })
-      .expect(403);
+    await bob.patch(`/worlds/${created.body.id}`).send({ name: 'Hijacked' }).expect(403);
 
     const reloaded = await ada.get(`/worlds/${created.body.id}`).expect(200);
     expect(reloaded.body.name).toBe('Aldermoor');
@@ -222,7 +208,11 @@ describe('Worlds endpoints', () => {
     const created = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
     const note = await ada
       .post('/entities')
-      .send({ name: 'Lady Mara', type: 'note', worldId: created.body.id })
+      .send({
+        name: 'Lady Mara',
+        types: ['core.note'],
+        worldId: created.body.id,
+      })
       .expect(201);
 
     await ada.delete(`/worlds/${created.body.id}`).expect(204);
@@ -253,11 +243,11 @@ describe('Worlds endpoints', () => {
 
     const a = await ada
       .post('/entities')
-      .send({ name: 'A', type: 'note', worldId: world.body.id })
+      .send({ name: 'A', types: ['core.note'], worldId: world.body.id })
       .expect(201);
     const b = await ada
       .post('/entities')
-      .send({ name: 'B', type: 'note', worldId: world.body.id })
+      .send({ name: 'B', types: ['core.note'], worldId: world.body.id })
       .expect(201);
 
     const res = await ada
@@ -277,7 +267,7 @@ describe('Worlds endpoints', () => {
     for (const name of ['A', 'B', 'C']) {
       const e = await ada
         .post('/entities')
-        .send({ name, type: 'note', worldId: world.body.id })
+        .send({ name, types: ['core.note'], worldId: world.body.id })
         .expect(201);
       ids.push(e.body.id);
     }
@@ -285,25 +275,16 @@ describe('Worlds endpoints', () => {
 
     // Reorder wholesale: reverse the set.
     const reversed = [...ids].reverse();
-    const res = await ada
-      .patch(`/worlds/${world.body.id}`)
-      .send({ pinnedEntityIds: reversed })
-      .expect(200);
+    const res = await ada.patch(`/worlds/${world.body.id}`).send({ pinnedEntityIds: reversed }).expect(200);
     expect(res.body.pinnedEntityIds).toEqual(reversed);
 
     // Remove the middle by omitting it from the array.
     const withoutB = reversed.filter((id) => id !== ids[1]);
-    const removed = await ada
-      .patch(`/worlds/${world.body.id}`)
-      .send({ pinnedEntityIds: withoutB })
-      .expect(200);
+    const removed = await ada.patch(`/worlds/${world.body.id}`).send({ pinnedEntityIds: withoutB }).expect(200);
     expect(removed.body.pinnedEntityIds).toEqual(withoutB);
 
     // A name-only PATCH leaves the pins untouched (independent fields).
-    const renamed = await ada
-      .patch(`/worlds/${world.body.id}`)
-      .send({ name: 'Renamed' })
-      .expect(200);
+    const renamed = await ada.patch(`/worlds/${world.body.id}`).send({ name: 'Renamed' }).expect(200);
     expect(renamed.body.name).toBe('Renamed');
     expect(renamed.body.pinnedEntityIds).toEqual(withoutB);
   });
@@ -313,11 +294,11 @@ describe('Worlds endpoints', () => {
     const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
     const a = await ada
       .post('/entities')
-      .send({ name: 'A', type: 'note', worldId: world.body.id })
+      .send({ name: 'A', types: ['core.note'], worldId: world.body.id })
       .expect(201);
     const b = await ada
       .post('/entities')
-      .send({ name: 'B', type: 'note', worldId: world.body.id })
+      .send({ name: 'B', types: ['core.note'], worldId: world.body.id })
       .expect(201);
 
     // A duplicate id (reachable directly via the API) collapses to one, first-wins order.
@@ -333,33 +314,31 @@ describe('Worlds endpoints', () => {
     const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
     const note = await ada
       .post('/entities')
-      .send({ name: 'Shared lore', type: 'note', worldId: world.body.id })
+      .send({
+        name: 'Shared lore',
+        types: ['core.note'],
+        worldId: world.body.id,
+      })
       .expect(201);
     await ada
       .patch(`/worlds/${world.body.id}`)
       .send({ pinnedEntityIds: [note.body.id] })
       .expect(200);
 
-    const bobId = await app
-      .get(AuthService)
-      .seedUser('bob@hexly.test', 'battery staple', 'Bob');
+    const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob');
     db.$client
       .prepare(`INSERT INTO world_members (world_id, user_id, role) VALUES (?, ?, 'viewer')`)
       .run(world.body.id, bobId);
     const bob = await signIn('bob@hexly.test', 'battery staple');
 
     // The pin set is a World property — the same list for everyone (ADR-0043).
-    expect((await bob.get(`/worlds/${world.body.id}`).expect(200)).body.pinnedEntityIds).toEqual([
-      note.body.id,
-    ]);
+    expect((await bob.get(`/worlds/${world.body.id}`).expect(200)).body.pinnedEntityIds).toEqual([note.body.id]);
   });
 
   it('refuses a Contributor or Viewer setting pins with 403 (#168)', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const world = await ada.post('/worlds').send({ name: 'Aldermoor' }).expect(201);
-    const bobId = await app
-      .get(AuthService)
-      .seedUser('bob@hexly.test', 'battery staple', 'Bob');
+    const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'battery staple', 'Bob');
     db.$client
       .prepare(`INSERT INTO world_members (world_id, user_id, role) VALUES (?, ?, 'contributor')`)
       .run(world.body.id, bobId);

@@ -1,14 +1,7 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { A11yModule } from '@angular/cdk/a11y';
 import { BreakpointObserver } from '@angular/cdk/layout';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  inject,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
@@ -70,9 +63,7 @@ const STATIC_ENTRIES: readonly NavEntry[] = [
         [class.w-56]="docked()"
         [class.w-12]="!docked()"
       >
-        <ng-container
-          *ngTemplateOutlet="body; context: { expanded: docked() }"
-        />
+        <ng-container *ngTemplateOutlet="body; context: { expanded: docked() }" />
       </aside>
     }
 
@@ -125,10 +116,7 @@ const STATIC_ENTRIES: readonly NavEntry[] = [
           <app-world-switcher [expanded]="expanded" />
         }
 
-        <nav
-          class="flex flex-col gap-1 mt-1"
-          [attr.aria-label]="'nav.primary' | transloco"
-        >
+        <nav class="flex flex-col gap-1 mt-1" [attr.aria-label]="'nav.primary' | transloco">
           @for (entry of entries(); track entry.testid) {
             <a
               [routerLink]="entry.link"
@@ -141,9 +129,7 @@ const STATIC_ENTRIES: readonly NavEntry[] = [
               (click)="choose()"
             >
               <app-icon [name]="entry.icon" [size]="20" />
-              <span [class.sr-only]="!expanded">{{
-                entry.labelKey | transloco
-              }}</span>
+              <span [class.sr-only]="!expanded">{{ entry.labelKey | transloco }}</span>
             </a>
           }
         </nav>
@@ -161,17 +147,10 @@ const STATIC_ENTRIES: readonly NavEntry[] = [
           data-testid="rail-toggle"
           [class.ml-auto]="expanded"
           [attr.aria-expanded]="expanded"
-          [attr.aria-label]="
-            (expanded ? 'nav.collapse' : 'nav.expand') | transloco
-          "
+          [attr.aria-label]="(expanded ? 'nav.collapse' : 'nav.expand') | transloco"
           (click)="toggle()"
         >
-          <app-icon
-            name="chevrons"
-            [size]="18"
-            class="transition-transform"
-            [class.rotate-180]="expanded"
-          />
+          <app-icon name="chevrons" [size]="18" class="transition-transform" [class.rotate-180]="expanded" />
         </button>
       </div>
     </ng-template>
@@ -198,11 +177,25 @@ export class NavRail {
       ...STATIC_ENTRIES,
       // User management: manage-users role or Superadmin — the same gate the route enforces.
       ...(this.auth.canManageUsers()
-        ? [{ link: '/users', testid: 'nav-users', icon: 'user' as const, labelKey: 'nav.users' }]
+        ? [
+            {
+              link: '/users',
+              testid: 'nav-users',
+              icon: 'user' as const,
+              labelKey: 'nav.users',
+            },
+          ]
         : []),
       // The Superadmin repair surface — Superadmin only.
       ...(this.auth.isSuperadmin()
-        ? [{ link: '/admin', testid: 'nav-admin', icon: 'settings' as const, labelKey: 'nav.admin' }]
+        ? [
+            {
+              link: '/admin',
+              testid: 'nav-admin',
+              icon: 'settings' as const,
+              labelKey: 'nav.admin',
+            },
+          ]
         : []),
     ];
   });
@@ -219,13 +212,9 @@ export class NavRail {
   protected readonly wide = signal(true);
   protected readonly overlayOpen = signal(false);
 
-  protected readonly expanded = computed(() =>
-    this.wide() ? this.pin.value() === 'expanded' : this.overlayOpen(),
-  );
+  protected readonly expanded = computed(() => (this.wide() ? this.pin.value() === 'expanded' : this.overlayOpen()));
   protected readonly docked = computed(() => this.wide() && this.expanded());
-  protected readonly overlay = computed(
-    () => !this.wide() && this.overlayOpen(),
-  );
+  protected readonly overlay = computed(() => !this.wide() && this.overlayOpen());
 
   constructor() {
     // The rail is the always-present authenticated chrome, so it owns loading

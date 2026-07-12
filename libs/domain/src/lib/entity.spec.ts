@@ -1,8 +1,6 @@
-import { emptyHexMap } from './hex/hex-map';
 import {
   contentSchema,
   createEntityRequestSchema,
-  emptyEntityBody,
   entityBodySchema,
   entityListQuerySchema,
   patchEntityRequestSchema,
@@ -11,7 +9,10 @@ import {
   visibilitySchema,
 } from './entity';
 
-const content = { format: 'tiptap-v1' as const, snapshot: { type: 'doc', content: [] } };
+const content = {
+  format: 'tiptap-v1' as const,
+  snapshot: { type: 'doc', content: [] },
+};
 
 describe('contentSchema', () => {
   it('round-trips an arbitrary snapshot untouched — the domain never inspects it', () => {
@@ -32,7 +33,10 @@ describe('contentSchema', () => {
     // v2 is additive over v1; a reader loads either losslessly with no transform.
     const envelope = {
       format: 'tiptap-v2' as const,
-      snapshot: { type: 'doc', content: [{ type: 'entityLink', attrs: { entityId: 'e1' } }] },
+      snapshot: {
+        type: 'doc',
+        content: [{ type: 'entityLink', attrs: { entityId: 'e1' } }],
+      },
     };
 
     const parsed = contentSchema.parse(envelope);
@@ -46,7 +50,13 @@ describe('contentSchema', () => {
       format: 'tiptap-v3' as const,
       snapshot: {
         type: 'doc',
-        content: [{ type: 'callout', attrs: { type: 'note', title: 'Beware' }, content: [] }],
+        content: [
+          {
+            type: 'callout',
+            attrs: { type: 'note', title: 'Beware' },
+            content: [],
+          },
+        ],
       },
     };
 
@@ -58,82 +68,71 @@ describe('contentSchema', () => {
   });
 
   it('rejects a Content envelope tagged with an unknown format', () => {
-    expect(() =>
-      contentSchema.parse({ format: 'markdown-v9', snapshot: {} }),
-    ).toThrow();
+    expect(() => contentSchema.parse({ format: 'markdown-v9', snapshot: {} })).toThrow();
   });
 });
 
 describe('entityBodySchema', () => {
-  it('accepts a note body — Content only, no typed payload', () => {
-    const body = { type: 'note' as const, content };
+  it('accepts the one body shape — Content and Metadata, for every Entity (ADR-0050)', () => {
+    const body = { content, metadata: { alignment: 'lawful-good' } };
 
     expect(entityBodySchema.parse(body)).toEqual(body);
   });
 
-  it('accepts a hexmap body — Content plus the hex grid alongside it', () => {
-    const body = { type: 'hexmap' as const, content, ...emptyHexMap() };
-
-    const parsed = entityBodySchema.parse(body);
-
-    expect(parsed.type).toBe('hexmap');
-    expect(parsed).toMatchObject({ hexes: {}, regions: [], labels: [] });
+  it('accepts a body with no Metadata at all', () => {
+    expect(entityBodySchema.parse({ content })).toEqual({ content });
   });
 
-  it('rejects a hexmap body missing its hex grid', () => {
-    expect(() =>
-      entityBodySchema.parse({ type: 'hexmap', content }),
-    ).toThrow();
-  });
-
-  it('rejects an unknown entity type', () => {
-    expect(() =>
-      entityBodySchema.parse({ type: 'spreadsheet', content }),
-    ).toThrow();
-  });
-});
-
-describe('emptyEntityBody', () => {
-  it('mints a note body with an empty Content envelope and no payload', () => {
-    const body = emptyEntityBody('note');
+  it("carries a plugin's Structured Field value as Metadata like any other Field's (ADR-0050)", () => {
+    // The collapse: nothing about a structured value is special to the body schema — it is a value at
+    // a Metadata key, so the body needs no union and no registry to parse it.
+    const body = { content, metadata: { grid: { tiles: {}, zones: [] } } };
 
     expect(entityBodySchema.parse(body)).toEqual(body);
-    expect(body).toEqual({
-      type: 'note',
-      content: { format: 'tiptap-v3', snapshot: { type: 'doc', content: [] } },
-    });
   });
 
-  it('mints a hexmap body with an empty Content envelope and an empty grid', () => {
-    const body = emptyEntityBody('hexmap');
+  it('tolerates a malformed structured value at rest — a Metadata value is never type-checked here', () => {
+    // Forward-only (CONTEXT.md → Field): garbage at `grid` parses, so a corrupt document opens (as an
+    // empty value) rather than 500ing on read. The first edit overwrites it.
+    const body = { content, metadata: { grid: 'not-a-grid' } };
 
     expect(entityBodySchema.parse(body)).toEqual(body);
-    expect(body).toMatchObject({ type: 'hexmap', hexes: {}, regions: [], labels: [] });
+  });
+
+  it('rejects a body missing its Content', () => {
+    expect(() => entityBodySchema.parse({ metadata: { note: 'orphan' } })).toThrow();
+  });
+
+  it("rejects a pre-collapse body carrying a plugin's value at the root, rather than reading it as a note", () => {
+    // The body root is closed (`.strict()`): an unknown key there is a document this build cannot
+    // represent, and silently dropping it would read such a body as a note that has lost its substance.
+    expect(() => entityBodySchema.parse({ content, tiles: {}, zones: [] })).toThrow();
   });
 });
 
 describe('entityListQuerySchema Facet params (#155)', () => {
   it('normalizes a single Facet value to an array (a lone query param arrives as a string)', () => {
     const parsed = entityListQuerySchema.parse({
-      type: 'note',
+      type: 'core.note',
       tag: 'deity',
       visibility: 'shared',
     });
-    expect(parsed.type).toEqual(['note']);
+    expect(parsed.type).toEqual(['core.note']);
     expect(parsed.tag).toEqual(['deity']);
     expect(parsed.visibility).toEqual(['shared']);
   });
 
   it('keeps repeated Facet values as an array (OR within a category)', () => {
     const parsed = entityListQuerySchema.parse({
-      type: ['note', 'hexmap'],
+      type: ['core.note', 'dnd.monster'],
       tag: ['deity', 'ruined'],
     });
-    expect(parsed.type).toEqual(['note', 'hexmap']);
+    expect(parsed.type).toEqual(['core.note', 'dnd.monster']);
     expect(parsed.tag).toEqual(['deity', 'ruined']);
   });
 
-  it('rejects an unknown type or visibility value at the boundary (ADR-0001)', () => {
+  it('rejects a malformed type or visibility value at the boundary (ADR-0001)', () => {
+    // The type set is open, but a filter value must still be a `namespace.id` key, not bare flavour.
     expect(() => entityListQuerySchema.parse({ type: 'spreadsheet' })).toThrow();
     expect(() => entityListQuerySchema.parse({ visibility: 'public' })).toThrow();
   });
@@ -150,16 +149,32 @@ describe('createEntityRequestSchema', () => {
   it('accepts a request that names and types the entity', () => {
     const parsed = createEntityRequestSchema.parse({
       name: 'The Reach of Aldermoor',
-      type: 'hexmap',
+      types: ['dnd.monster'],
     });
 
     expect(parsed.name).toBe('The Reach of Aldermoor');
-    expect(parsed.type).toBe('hexmap');
+    expect(parsed.types).toEqual(['dnd.monster']);
+  });
+
+  it('de-duplicates the ordered type set, keeping the primary first', () => {
+    expect(
+      createEntityRequestSchema.parse({
+        name: 'Aldermoor',
+        types: ['dnd.monster', 'core.note', 'dnd.monster'],
+      }).types,
+    ).toEqual(['dnd.monster', 'core.note']);
+  });
+
+  it('rejects a create with no types — every Entity has a primary type', () => {
+    expect(() => createEntityRequestSchema.parse({ name: 'x', types: [] })).toThrow();
   });
 
   it('defaults tags to empty when none are given', () => {
     expect(
-      createEntityRequestSchema.parse({ name: 'Aldermoor', type: 'note' }).tags,
+      createEntityRequestSchema.parse({
+        name: 'Aldermoor',
+        types: ['core.note'],
+      }).tags,
     ).toEqual([]);
   });
 
@@ -167,38 +182,48 @@ describe('createEntityRequestSchema', () => {
     expect(
       createEntityRequestSchema.parse({
         name: 'Aldermoor',
-        type: 'note',
+        types: ['core.note'],
         tags: ['kingdom', 'kingdom', 'coast'],
       }).tags,
     ).toEqual(['kingdom', 'coast']);
   });
 
   it('trims the name and rejects an empty or whitespace-only one', () => {
-    // Reuses the same trimmed, non-empty rule the Hex Map title used (#12/#15).
+    // Reuses the same trimmed, non-empty rule the map title used (#12/#15).
     expect(
-      createEntityRequestSchema.parse({ name: '  Aldermoor  ', type: 'note' })
-        .name,
+      createEntityRequestSchema.parse({
+        name: '  Aldermoor  ',
+        types: ['core.note'],
+      }).name,
     ).toBe('Aldermoor');
-    expect(() =>
-      createEntityRequestSchema.parse({ name: '   ', type: 'note' }),
-    ).toThrow();
+    expect(() => createEntityRequestSchema.parse({ name: '   ', types: ['core.note'] })).toThrow();
   });
 
-  it('rejects an unknown entity type', () => {
-    expect(() =>
-      createEntityRequestSchema.parse({ name: 'x', type: 'spreadsheet' }),
-    ).toThrow();
+  it('rejects a malformed type id — a type is a `namespace.id` key, not bare flavour', () => {
+    expect(() => createEntityRequestSchema.parse({ name: 'x', types: ['spreadsheet'] })).toThrow();
   });
 
   it('accepts an optional worldId, and omits it when absent (server defaults to the owner World)', () => {
     // A client may target a specific World; when omitted the server resolves the owner's World (#101).
     expect(
-      createEntityRequestSchema.parse({ name: 'x', type: 'note', worldId: 'w1' })
-        .worldId,
+      createEntityRequestSchema.parse({
+        name: 'x',
+        types: ['core.note'],
+        worldId: 'w1',
+      }).worldId,
     ).toBe('w1');
-    expect(
-      createEntityRequestSchema.parse({ name: 'x', type: 'note' }).worldId,
-    ).toBeUndefined();
+    expect(createEntityRequestSchema.parse({ name: 'x', types: ['core.note'] }).worldId).toBeUndefined();
+  });
+
+  it('carries an optional initial Metadata map for a picked type’s required Fields (#189)', () => {
+    const parsed = createEntityRequestSchema.parse({
+      name: 'Balthazar',
+      types: ['dnd.monster'],
+      metadata: { cr: 5 },
+    });
+    expect(parsed.metadata).toEqual({ cr: 5 });
+    // Omitted metadata parses to undefined (a blank map, minted server-side).
+    expect(createEntityRequestSchema.parse({ name: 'x', types: ['core.note'] }).metadata).toBeUndefined();
   });
 });
 
@@ -228,22 +253,41 @@ describe('patchEntityRequestSchema', () => {
    */
   it('rejects a patch carrying both name and visibility — they are different write kinds', () => {
     expect(() =>
-      patchEntityRequestSchema.parse({ name: 'Aldermoor', visibility: 'shared' }),
+      patchEntityRequestSchema.parse({
+        name: 'Aldermoor',
+        visibility: 'shared',
+      }),
     ).toThrow();
   });
 });
 
 describe('saveEntityRequestSchema', () => {
   it('carries the whole body, the base version, and the tags the save replaces', () => {
-    const body = { type: 'hexmap' as const, content, ...emptyHexMap() };
+    const body = { content, metadata: { armor_class: 15 } };
+
+    expect(saveEntityRequestSchema.parse({ document: body, version: 3, tags: [] })).toEqual({
+      document: body,
+      version: 3,
+      tags: [],
+    });
+  });
+
+  it('accepts an optional type set the save replaces, and omits it when absent', () => {
+    const body = { content };
 
     expect(
-      saveEntityRequestSchema.parse({ document: body, version: 3, tags: [] }),
-    ).toEqual({ document: body, version: 3, tags: [] });
+      saveEntityRequestSchema.parse({
+        document: body,
+        version: 1,
+        tags: [],
+        types: ['core.note'],
+      }).types,
+    ).toEqual(['core.note']);
+    expect(saveEntityRequestSchema.parse({ document: body, version: 1, tags: [] })).not.toHaveProperty('types');
   });
 
   it('ignores a descriptors field a stale client still sends (server harvests them now, #96)', () => {
-    const body = { type: 'note' as const, content };
+    const body = { content };
 
     // The wire no longer carries descriptors — the server derives them from the
     // saved Content — so an old client's field is a stripped unknown key.
@@ -257,15 +301,13 @@ describe('saveEntityRequestSchema', () => {
   });
 
   it('requires tags on save — the save always carries the full current set', () => {
-    const body = { type: 'note' as const, content };
+    const body = { content };
 
-    expect(() =>
-      saveEntityRequestSchema.parse({ document: body, version: 3 }),
-    ).toThrow();
+    expect(() => saveEntityRequestSchema.parse({ document: body, version: 3 })).toThrow();
   });
 
   it('normalizes tags on save: trims, lower-cases, dedupes, rejects blanks (#88)', () => {
-    const body = { type: 'note' as const, content };
+    const body = { content };
 
     expect(
       saveEntityRequestSchema.parse({
@@ -275,12 +317,16 @@ describe('saveEntityRequestSchema', () => {
       }).tags,
     ).toEqual(['deity', 'ruined']);
     expect(() =>
-      saveEntityRequestSchema.parse({ document: body, version: 1, tags: ['  '] }),
+      saveEntityRequestSchema.parse({
+        document: body,
+        version: 1,
+        tags: ['  '],
+      }),
     ).toThrow();
   });
 
   it('rejects a save that omits the base version', () => {
-    const body = { type: 'note' as const, content };
+    const body = { content };
 
     expect(() => saveEntityRequestSchema.parse({ document: body })).toThrow();
   });
@@ -288,7 +334,7 @@ describe('saveEntityRequestSchema', () => {
   it('rejects a save whose body fails the Entity schema', () => {
     expect(() =>
       saveEntityRequestSchema.parse({
-        document: { type: 'hexmap', content },
+        document: { metadata: { orphan: true } },
         version: 1,
       }),
     ).toThrow();

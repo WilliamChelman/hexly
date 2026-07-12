@@ -41,7 +41,9 @@ export class UsersClient {
   }
 
   setSuperadmin(id: string, isSuperadmin: boolean): Observable<void> {
-    return this.http.patch<void>(`/api/users/${id}/superadmin`, { isSuperadmin });
+    return this.http.patch<void>(`/api/users/${id}/superadmin`, {
+      isSuperadmin,
+    });
   }
 
   deleteUser(id: string): Observable<void> {

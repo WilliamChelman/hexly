@@ -40,12 +40,12 @@ import {
 @Directive({
   selector: '[appMenuTrigger]',
   hostDirectives: [
-    { directive: CdkMenuTrigger, inputs: ['cdkMenuTriggerFor: appMenuTrigger'] },
+    {
+      directive: CdkMenuTrigger,
+      inputs: ['cdkMenuTriggerFor: appMenuTrigger'],
+    },
   ],
-  providers: [
-    { provide: MENU_TRIGGER, useExisting: CdkMenuTrigger },
-    PARENT_OR_NEW_MENU_STACK_PROVIDER,
-  ],
+  providers: [{ provide: MENU_TRIGGER, useExisting: CdkMenuTrigger }, PARENT_OR_NEW_MENU_STACK_PROVIDER],
 })
 export class MenuTrigger {}
 
@@ -60,9 +60,7 @@ export class MenuPanel {}
 /** A plain menu row — a `<button>` action or an `<a>` link. Re-exposes CDK's `(triggered)`. */
 @Directive({
   selector: '[appMenuItem]',
-  hostDirectives: [
-    { directive: CdkMenuItem, outputs: ['cdkMenuItemTriggered: triggered'] },
-  ],
+  hostDirectives: [{ directive: CdkMenuItem, outputs: ['cdkMenuItemTriggered: triggered'] }],
   host: { class: 'menu-item' },
 })
 export class MenuItem {}

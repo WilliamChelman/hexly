@@ -19,21 +19,17 @@ export class WorldQuickOpen implements CommandProvider {
 
   search(query: string): Observable<readonly Command[]> {
     const q = query.trim().toLowerCase();
-    const worlds = this.worldStore
-      .worlds()
-      .filter((w) => !q || w.name.toLowerCase().includes(q));
+    const worlds = this.worldStore.worlds().filter((w) => !q || w.name.toLowerCase().includes(q));
     return of(
-      worlds.map(
-        (world): Command => {
-          const route = worldDashboardRoute(world.id, world.name);
-          return {
-            id: world.id,
-            label: world.name,
-            route,
-            run: () => void this.router.navigate(route),
-          };
-        },
-      ),
+      worlds.map((world): Command => {
+        const route = worldDashboardRoute(world.id, world.name);
+        return {
+          id: world.id,
+          label: world.name,
+          route,
+          run: () => void this.router.navigate(route),
+        };
+      }),
     );
   }
 }

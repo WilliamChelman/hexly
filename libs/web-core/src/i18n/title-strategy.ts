@@ -1,9 +1,5 @@
 import { inject, Injectable } from '@angular/core';
-import {
-  ActivatedRouteSnapshot,
-  RouterStateSnapshot,
-  TitleStrategy,
-} from '@angular/router';
+import { ActivatedRouteSnapshot, RouterStateSnapshot, TitleStrategy } from '@angular/router';
 import { TitleService } from './title.service';
 
 /**
@@ -24,7 +20,10 @@ export class TranslationTitleStrategy extends TitleStrategy {
   override updateTitle(snapshot: RouterStateSnapshot): void {
     const key = this.buildTitle(snapshot);
     if (key === undefined) return;
-    this.titles.setRouteTitle({ key, namedKey: this.documentTitleKey(snapshot) });
+    this.titles.setRouteTitle({
+      key,
+      namedKey: this.documentTitleKey(snapshot),
+    });
   }
 
   /**
@@ -32,11 +31,7 @@ export class TranslationTitleStrategy extends TitleStrategy {
    * or `undefined` when none opts its title into the open document's name.
    */
   private documentTitleKey(snapshot: RouterStateSnapshot): string | undefined {
-    for (
-      let route: ActivatedRouteSnapshot | null = snapshot.root;
-      route;
-      route = route.firstChild
-    ) {
+    for (let route: ActivatedRouteSnapshot | null = snapshot.root; route; route = route.firstChild) {
       const key = route.data['documentTitleKey'];
       if (typeof key === 'string') return key;
     }

@@ -10,6 +10,7 @@ import { ConfigModule } from '../config/config.module';
 import { DB, Db, createDb } from '../db/db';
 import { entities, entityEdges } from '../db/schema';
 import { EntitiesModule } from '../entities/entities.module';
+import { TypeFieldRegistry } from '../entities/type-field-registry';
 import { WorldsModule } from './worlds.module';
 
 /**
@@ -56,10 +57,39 @@ describe('World Graph', () => {
     const { nodes, edges } = await graphOf(ada, world);
 
     expect(nodes).toEqual([
-      { id: ealdred, name: 'Ealdred', type: 'note' },
-      { id: mira, name: 'Mira', type: 'note' },
+      { id: ealdred, name: 'Ealdred', types: ['core.note'] },
+      { id: mira, name: 'Mira', types: ['core.note'] },
     ]);
     expect(edges).toEqual([{ source: ealdred, target: mira, descriptor: 'spouse' }]);
+  });
+
+  /**
+   * A typed Entity-Link Field relation feeds the same edge index as a Content or map link (#190),
+   * so it appears in the graph and rides the identical both-endpoints access sieve — an edge only
+   * when the viewer can read source *and* target.
+   */
+  it('renders an Entity-Link Field relation as a graph edge, hidden when an endpoint is private', async () => {
+    app
+      .get(TypeFieldRegistry)
+      .register('test.monster', [{ key: 'lair', label: 'Lair', dataType: { kind: 'entityLink' }, facetable: false }]);
+    const ada = await signIn('ada@hexly.test');
+    const bob = await signIn('bob@hexly.test');
+    const world = await makeWorld(ada);
+    await addMember(ada, world, bobId);
+
+    const aboleth = await makeEntity(ada, world, 'Aboleth');
+    await share(ada, aboleth);
+    const lair = await makeEntity(ada, world, 'The Whisperwood'); // private by default
+    await linkField(ada, aboleth, { entityId: lair, label: 'The Whisperwood' });
+
+    // Ada owns both, so the Field relation draws as an edge.
+    const asAda = await graphOf(ada, world);
+    expect(asAda.edges).toEqual([{ source: aboleth, target: lair, descriptor: null }]);
+
+    // Bob cannot read the private lair, so the edge (and its endpoint) drop — nothing dangles.
+    const asBob = await graphOf(bob, world);
+    expect(names(asBob.nodes)).toEqual(['Aboleth']);
+    expect(asBob.edges).toEqual([]);
   });
 
   /** Nodes are sourced from the accessible-entities query, not the edge table, so orphans appear. */
@@ -93,16 +123,13 @@ describe('World Graph', () => {
     await link(ada, town, [{ entityId: cabal }]); // shared → private
 
     const asBob = await graphOf(bob, world);
-    expect(asBob.nodes).toEqual([{ id: town, name: 'Riverbend', type: 'note' }]);
+    expect(asBob.nodes).toEqual([{ id: town, name: 'Riverbend', types: ['core.note'] }]);
     expect(asBob.edges).toEqual([]);
 
     // The rows are the same; only the viewer differs. Ada, who owns both, sees the whole picture.
     const asAda = await graphOf(ada, world);
     expect(names(asAda.nodes)).toEqual(['Riverbend', 'Secret Cabal Roster']);
-    expect(drawn(asAda)).toEqual([
-      'Riverbend → Secret Cabal Roster',
-      'Secret Cabal Roster —meets in→ Riverbend',
-    ]);
+    expect(drawn(asAda)).toEqual(['Riverbend → Secret Cabal Roster', 'Secret Cabal Roster —meets in→ Riverbend']);
   });
 
   /** An entity-level Viewer grant pierces `private`, restoring the node *and* the lines into it. */
@@ -191,7 +218,10 @@ describe('World Graph', () => {
     await link(ada, ealdred, [{ entityId: mira, descriptor: 'spouse' }]);
 
     // Written past the API, which would never accept it.
-    db.update(entities).set({ type: 'grimoire' }).where(eq(entities.id, mira)).run();
+    db.update(entities)
+      .set({ types: ['grimoire'] })
+      .where(eq(entities.id, mira))
+      .run();
 
     const { nodes, edges } = await graphOf(ada, world);
     expect(names(nodes)).toEqual(['Ealdred']);
@@ -225,7 +255,12 @@ describe('World Graph', () => {
   }
 
   async function makeEntity(owner: Agent, worldId: string, name: string): Promise<string> {
-    return (await owner.post('/entities').send({ name, type: 'note', worldId }).expect(201)).body.id;
+    return (
+      await owner
+        .post('/entities')
+        .send({ name, types: ['core.note'], worldId })
+        .expect(201)
+    ).body.id;
   }
 
   async function addMember(owner: Agent, worldId: string, userId: string): Promise<void> {
@@ -238,7 +273,11 @@ describe('World Graph', () => {
 
   /** Save `id`'s Content as prose holding one `entityLink` per entry. */
   async function link(owner: Agent, id: string, links: Record<string, unknown>[]): Promise<void> {
-    await save(owner, id, links.map((attrs) => ({ type: 'entityLink', attrs })));
+    await save(
+      owner,
+      id,
+      links.map((attrs) => ({ type: 'entityLink', attrs })),
+    );
   }
 
   /** Save `id`'s Content as prose holding one `image` — which harvests as an Asset edge. */
@@ -246,19 +285,29 @@ describe('World Graph', () => {
     await save(owner, id, [{ type: 'image', attrs: { src } }]);
   }
 
+  /** Typed-save `id` as a `test.monster` whose `lair` Entity-Link Field points at `link` (#190). */
+  async function linkField(owner: Agent, id: string, link: { entityId: string; label: string }): Promise<void> {
+    const current = (await owner.get(`/entities/${id}`).expect(200)).body;
+    await owner
+      .put(`/entities/${id}`)
+      .send({
+        document: { content: tiptapContent({ type: 'doc', content: [] }), metadata: { lair: link } },
+        version: current.version,
+        tags: [],
+        types: ['test.monster'],
+      })
+      .expect(200);
+  }
+
   async function save(owner: Agent, id: string, inline: unknown[]): Promise<void> {
     const current = (await owner.get(`/entities/${id}`).expect(200)).body;
     const document: EntityBody = {
-      type: 'note',
       content: tiptapContent({
         type: 'doc',
         content: [{ type: 'paragraph', content: inline }],
       }),
     };
-    await owner
-      .put(`/entities/${id}`)
-      .send({ document, version: current.version, tags: [] })
-      .expect(200);
+    await owner.put(`/entities/${id}`).send({ document, version: current.version, tags: [] }).expect(200);
   }
 
   /** The raw index rows, unfiltered by any viewer — the truth the read is supposed to hide. */

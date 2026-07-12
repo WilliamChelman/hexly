@@ -60,7 +60,9 @@ describe('Vault export endpoint', () => {
     app.use(cookieParser());
     await app.init();
 
-    adaId = await app.get(AuthService).seedUser('ada@hexly.test', 'correct horse', 'Ada', { roles: ['create-worlds'] });
+    adaId = await app.get(AuthService).seedUser('ada@hexly.test', 'correct horse', 'Ada', {
+      roles: ['create-worlds'],
+    });
   });
 
   afterEach(async () => {
@@ -80,19 +82,13 @@ describe('Vault export endpoint', () => {
     files: Record<string, string | Uint8Array>,
     filename = 'Aldermoor.zip',
   ): Promise<string> {
-    const res = await agent
-      .post('/worlds/import')
-      .attach('file', vaultZip(files), filename)
-      .expect(201);
+    const res = await agent.post('/worlds/import').attach('file', vaultZip(files), filename).expect(201);
     return res.body.worldId;
   }
 
   /** Export a World and return the raw response plus its unzipped entries. */
   async function exportZip(agent: request.Agent, worldId: string) {
-    const res = await agent
-      .get(`/worlds/${worldId}/export`)
-      .responseType('blob')
-      .expect(200);
+    const res = await agent.get(`/worlds/${worldId}/export`).responseType('blob').expect(200);
     return { res, files: unzipSync(new Uint8Array(res.body)) };
   }
 
@@ -147,6 +143,28 @@ describe('Vault export endpoint', () => {
     expect(fm.tags).toEqual(['deity', 'ruined']);
     // The reserved placement key is still consumed, not written back.
     expect(fm['hexly.sourcePath']).toBeUndefined();
+    // An imported note carries the default type alone, which the import mints anyway — so it goes
+    // unstamped, and a note with no Metadata and no Tags still exports with no `---` block at all.
+    expect(fm['hexly.type']).toBeUndefined();
+  });
+
+  /**
+   * The Type stamp is generic (ADR-0050): the export names no type id, it writes the Entity's whole
+   * ordered set — so a Monster comes back a Monster, and the *primary* type is still the first one.
+   */
+  it("stamps hexly.type from the Entity's ordered types, whatever they are", async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const worldId = await importVault(ada, { 'Bestiary/Owlbear.md': '# Owlbear' });
+    const created = await ada
+      .post('/entities')
+      .send({ name: 'Owlbear', types: ['core.note', 'dnd.monster'], worldId })
+      .expect(201);
+    expect(created.body.types).toEqual(['core.note', 'dnd.monster']);
+
+    const { files } = await exportZip(ada, worldId);
+    const fm = frontmatter(text(files, 'Owlbear.md'));
+
+    expect(fm['hexly.type']).toEqual(['core.note', 'dnd.monster']);
   });
 
   it('writes assets under assets/<originalFilename> and rewrites image src to match', async () => {
@@ -168,29 +186,38 @@ describe('Vault export endpoint', () => {
     expect(hero).not.toContain(`/assets/${worldId}`);
   });
 
-  it('exports a hexmap as lore-only markdown, grid dropped and flagged hexly.type: hexmap', async () => {
+  it("exports a hexmap's lore as markdown and its grid as nested frontmatter (ADR-0050)", async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const worldId = await importVault(ada, { 'Note.md': '# Note' });
 
     // Arrange a hexmap with lore Content AND a painted, named hex.
     const entities = app.get(EntitiesService);
-    const created = entities.create(adaId, { type: 'hexmap', name: 'Aldermoor Map', worldId, tags: [] });
+    const created = entities.create(adaId, {
+      types: ['core.hexmap'],
+      name: 'Aldermoor Map',
+      worldId,
+      tags: [],
+    });
     entities.save(adaId, created.id, {
       version: created.version,
       tags: [],
       descriptors: [],
       document: {
-        type: 'hexmap',
         content: tiptapContent({
           type: 'doc',
           content: [
-            { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'The Aldermoor' }] },
-            { type: 'paragraph', content: [{ type: 'text', text: 'A wild frontier.' }] },
+            {
+              type: 'heading',
+              attrs: { level: 1 },
+              content: [{ type: 'text', text: 'The Aldermoor' }],
+            },
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'A wild frontier.' }],
+            },
           ],
         }),
-        hexes: { '0,0': { terrain: 'forest', name: 'Rivertown' } },
-        regions: [],
-        labels: [],
+        metadata: { grid: { hexes: { '0,0': { terrain: 'forest', name: 'Rivertown' } }, regions: [], labels: [] } },
       },
     });
 
@@ -198,13 +225,18 @@ describe('Vault export endpoint', () => {
     const md = text(files, 'Aldermoor Map.md');
     const fm = frontmatter(md);
 
-    // Lore round-trips; the map's type is flagged so the dropped grid is a visible loss (ADR-0033).
-    expect(fm['hexly.type']).toBe('hexmap');
+    // Lore round-trips as prose, and the map's type is flagged — no Metadata key records it.
+    expect(fm['hexly.type']).toEqual(['core.hexmap']);
     expect(md).toContain('The Aldermoor');
     expect(md).toContain('A wild frontier.');
-    // The grid itself is never serialized — no hex terrain/name leaks into the markdown.
-    expect(md).not.toContain('Rivertown');
-    expect(md).not.toContain('forest');
+    // The grid rides the frontmatter as a nested Field value, so the map survives the round-trip
+    // (ADR-0050 amends ADR-0033's lossy export) — and it does so through the generic Metadata path,
+    // which knows nothing of hexes.
+    expect(fm['grid']).toEqual({
+      hexes: { '0,0': { terrain: 'forest', name: 'Rivertown' } },
+      regions: [],
+      labels: [],
+    });
   });
 
   it('round-trips a fixture vault: import → export reproduces the folder layout and content', async () => {
@@ -227,18 +259,17 @@ describe('Vault export endpoint', () => {
     const { res, files } = await exportZip(ada, worldId);
 
     // Exact zip layout: notes under their original folders, assets/ folder — no Home note (ADR-0043).
-    expect(Object.keys(files).sort()).toEqual([
-      'Characters/Lady Mara.md',
-      'Places/Keep.md',
-      'assets/portrait.png',
-    ]);
+    expect(Object.keys(files).sort()).toEqual(['Characters/Lady Mara.md', 'Places/Keep.md', 'assets/portrait.png']);
 
     // Assets kept byte-for-byte under their human-readable name.
     expect(files['assets/portrait.png']).toEqual(png);
 
     // Metadata + tags round-trip; the image src points back at the exported asset.
     const mara = text(files, 'Characters/Lady Mara.md');
-    expect(frontmatter(mara)).toMatchObject({ tags: ['deity'], status: 'alive' });
+    expect(frontmatter(mara)).toMatchObject({
+      tags: ['deity'],
+      status: 'alive',
+    });
     expect(mara).toContain('assets/portrait.png');
     // The resolved entityLink re-emits as an Obsidian wikilink.
     expect(text(files, 'Places/Keep.md')).toContain('[[Lady Mara]]');
@@ -252,6 +283,86 @@ describe('Vault export endpoint', () => {
     expect(reimport.body.linksResolved).toBe(1);
     const world = await ada.get(`/worlds/${reimport.body.worldId}`).expect(200);
     expect(world.body.entityCount).toBe(2); // Just the two notes — no seeded Home Entity.
+  });
+
+  /**
+   * `hexly.type` carries each Entity's ordered Type set out and back, and a Structured Field's value
+   * rides the frontmatter as nested YAML like any other Field's — through code that names no type id
+   * (#203, ADR-0050).
+   */
+  it("round-trips an Entity's types and its structured values: a Monster, a Hex Map, a user-defined type", async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const worldId = await importVault(ada, { 'Note.md': '# Note' });
+    const entities = app.get(EntitiesService);
+
+    // A World-scoped user-defined type — data, not code, and unknown to this build's plugins.
+    await ada
+      .post(`/worlds/${worldId}/types`)
+      .send({
+        id: 'world.deity',
+        label: 'Deity',
+        fields: [{ key: 'domain', label: 'Domain', dataType: { kind: 'string' }, required: false, facetable: true }],
+      })
+      .expect(201);
+
+    // A Monster (plugin type, plain Fields).
+    const owlbear = entities.create(adaId, { types: ['core.note', 'dnd.monster'], name: 'Owlbear', worldId, tags: [] });
+    entities.save(adaId, owlbear.id, {
+      version: owlbear.version,
+      tags: [],
+      descriptors: [],
+      document: {
+        content: tiptapContent({ type: 'doc', content: [] }),
+        metadata: { challenge_rating: 3, size: 'Large' },
+      },
+    });
+
+    // A Deity (user-defined type, a plain Field).
+    const vela = entities.create(adaId, { types: ['world.deity'], name: 'Vela', worldId, tags: [] });
+    entities.save(adaId, vela.id, {
+      version: vela.version,
+      tags: [],
+      descriptors: [],
+      document: { content: tiptapContent({ type: 'doc', content: [] }), metadata: { domain: 'dusk' } },
+    });
+
+    // A Hex Map (plugin type, a Structured Field) — terrain, a feature, a region, and a label.
+    const grid = {
+      hexes: {
+        '0,0': { terrain: 'forest', name: 'Rivertown', feature: { ref: 'settlement' } },
+        '1,0': { terrain: 'mountain' },
+      },
+      regions: [{ id: 'r1', name: 'The Whisperwood', color: '#33aa55', hexes: { '0,0': true } }],
+      labels: [{ id: 'l1', text: 'The Aldermoor', position: { x: 10, y: 20 }, size: 32 }],
+    };
+    const map = entities.create(adaId, { types: ['core.hexmap'], name: 'Aldermoor Map', worldId, tags: [] });
+    entities.save(adaId, map.id, {
+      version: map.version,
+      tags: [],
+      descriptors: [],
+      document: { content: tiptapContent({ type: 'doc', content: [] }), metadata: { grid } },
+    });
+
+    // Export the World, then import the export back as a fresh World.
+    const { res } = await exportZip(ada, worldId);
+    const reimport = await ada
+      .post('/worlds/import')
+      .attach('file', Buffer.from(res.body), 'Aldermoor.zip')
+      .expect(201);
+    const reimported = entities.listByWorld(adaId, reimport.body.worldId);
+    const byName = (name: string) => reimported.find((e) => e.name === name);
+
+    // Primary type first, Fields intact.
+    expect(byName('Owlbear')?.types).toEqual(['core.note', 'dnd.monster']);
+    expect(byName('Owlbear')?.document.metadata).toMatchObject({ challenge_rating: 3, size: 'Large' });
+
+    // The user-defined type on the same footing — neither was resolved.
+    expect(byName('Vela')?.types).toEqual(['world.deity']);
+    expect(byName('Vela')?.document.metadata).toMatchObject({ domain: 'dusk' });
+
+    // Terrain, feature, region, and label all survive.
+    expect(byName('Aldermoor Map')?.types).toEqual(['core.hexmap']);
+    expect(byName('Aldermoor Map')?.document.metadata?.['grid']).toEqual(grid);
   });
 
   it('re-emits a wikilink with the target entity’s CURRENT name after a rename', async () => {
@@ -293,7 +404,15 @@ describe('Vault export endpoint', () => {
     db.insert(worldMembers).values({ worldId, userId: bobId, role: 'contributor' }).run();
     const entities = app.get(EntitiesService);
     const bobNoteId = 'bob-shared-note';
-    entities.importNote(bobId, worldId, bobNoteId, 'Bob Secret', [], emptyEntityBody('note'));
+    entities.importEntity({
+      ownerId: bobId,
+      worldId,
+      id: bobNoteId,
+      name: 'Bob Secret',
+      types: ['core.note'],
+      tags: [],
+      body: emptyEntityBody(),
+    });
     entities.patch(bobId, bobNoteId, { visibility: 'shared' });
 
     const { files } = await exportZip(ada, worldId);

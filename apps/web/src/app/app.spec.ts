@@ -1,10 +1,10 @@
+import { provideTranslocoTesting } from '../testing/transloco-testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { App } from './app';
-import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { AppShellStore } from '@hexly/web-core';
 
 @Component({ template: 'page' })

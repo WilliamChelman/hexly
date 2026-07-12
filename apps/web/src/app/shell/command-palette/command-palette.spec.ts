@@ -1,21 +1,17 @@
+import { provideTranslocoTesting } from '../../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
-import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { Command, CommandProvider } from './command';
 import { CommandRegistry } from './command-registry';
 import { COMMAND_PROVIDERS, CommandPalette } from './command-palette';
 
 function dispatchCmdK(): void {
-  window.dispatchEvent(
-    new KeyboardEvent('keydown', { key: 'k', metaKey: true }),
-  );
+  window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }));
 }
 
 function typeQuery(fixture: ReturnType<typeof render>, value: string): void {
-  const input: HTMLInputElement = fixture.nativeElement.querySelector(
-    '[data-testid="command-palette-input"]',
-  );
+  const input: HTMLInputElement = fixture.nativeElement.querySelector('[data-testid="command-palette-input"]');
   input.value = value;
   input.dispatchEvent(new Event('input'));
   fixture.detectChanges();
@@ -51,7 +47,7 @@ describe('CommandPalette', () => {
     expect(dialogEl(fixture).open).toBe(false);
   });
 
-  it('renders a registered provider\'s matching commands as the query changes', () => {
+  it("renders a registered provider's matching commands as the query changes", () => {
     const command: Command = { id: 'c1', label: 'Aldermoor', run: vi.fn() };
     const provider: CommandProvider = {
       prefix: '',
@@ -64,16 +60,12 @@ describe('CommandPalette', () => {
     dispatchCmdK();
     fixture.detectChanges();
 
-    const input: HTMLInputElement = fixture.nativeElement.querySelector(
-      '[data-testid="command-palette-input"]',
-    );
+    const input: HTMLInputElement = fixture.nativeElement.querySelector('[data-testid="command-palette-input"]');
     input.value = 'ald';
     input.dispatchEvent(new Event('input'));
     fixture.detectChanges();
 
-    const option = fixture.nativeElement.querySelector(
-      '[data-testid="command-palette-option-c1"]',
-    );
+    const option = fixture.nativeElement.querySelector('[data-testid="command-palette-option-c1"]');
     expect(option?.textContent).toContain('Aldermoor');
   });
 
@@ -91,9 +83,7 @@ describe('CommandPalette', () => {
     dispatchCmdK();
     fixture.detectChanges();
 
-    const option: HTMLButtonElement = fixture.nativeElement.querySelector(
-      '[data-testid="command-palette-option-c1"]',
-    );
+    const option: HTMLButtonElement = fixture.nativeElement.querySelector('[data-testid="command-palette-option-c1"]');
     option.click();
     fixture.detectChanges();
 
@@ -119,9 +109,7 @@ describe('CommandPalette', () => {
     dispatchCmdK();
     fixture.detectChanges();
 
-    const input: HTMLInputElement = fixture.nativeElement.querySelector(
-      '[data-testid="command-palette-input"]',
-    );
+    const input: HTMLInputElement = fixture.nativeElement.querySelector('[data-testid="command-palette-input"]');
     // CDK's ListKeyManager reads event.keyCode (40 = ArrowDown), which jsdom does
     // not derive from `key`, so send it explicitly the way a real browser would.
     input.dispatchEvent(
@@ -132,9 +120,7 @@ describe('CommandPalette', () => {
       } as KeyboardEventInit),
     );
     fixture.detectChanges();
-    input.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
-    );
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     fixture.detectChanges();
 
     expect(runA).not.toHaveBeenCalled();
@@ -156,25 +142,19 @@ describe('CommandPalette', () => {
     dispatchCmdK();
     fixture.detectChanges();
 
-    const input: HTMLInputElement = fixture.nativeElement.querySelector(
-      '[data-testid="command-palette-input"]',
-    );
+    const input: HTMLInputElement = fixture.nativeElement.querySelector('[data-testid="command-palette-input"]');
     input.value = 'ald';
     input.dispatchEvent(new Event('input'));
     fixture.detectChanges();
 
     // Rendered without touching CommandRegistry directly — the token is the seam.
-    const option = fixture.nativeElement.querySelector(
-      '[data-testid="command-palette-option-c1"]',
-    );
+    const option = fixture.nativeElement.querySelector('[data-testid="command-palette-option-c1"]');
     expect(option).not.toBeNull();
     // The result list is a proper listbox for AT, following the ListboxController
     // idiom: role=option rows + the input's aria-activedescendant naming the
     // highlighted one (so arrowing is announced with focus still in the input).
     expect(option.getAttribute('role')).toBe('option');
-    expect(
-      fixture.nativeElement.querySelector('[role="listbox"]'),
-    ).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('[role="listbox"]')).not.toBeNull();
     expect(input.getAttribute('aria-activedescendant')).toBe(option.id);
     expect(option.id).toBeTruthy();
   });
@@ -192,10 +172,7 @@ describe('CommandPalette', () => {
       search: () => of([command]),
     };
     TestBed.configureTestingModule({
-      providers: [
-        provideRouter([]),
-        { provide: COMMAND_PROVIDERS, useValue: [provider] },
-      ],
+      providers: [provideRouter([]), { provide: COMMAND_PROVIDERS, useValue: [provider] }],
     });
 
     const fixture = render();
@@ -203,9 +180,7 @@ describe('CommandPalette', () => {
     fixture.detectChanges();
     typeQuery(fixture, 'ald');
 
-    const option = fixture.nativeElement.querySelector(
-      '[data-testid="command-palette-option-e1"]',
-    );
+    const option = fixture.nativeElement.querySelector('[data-testid="command-palette-option-e1"]');
     // A real anchor with an href — so middle-click / Ctrl+click open a new tab.
     expect(option.tagName).toBe('A');
     expect(option.getAttribute('href')).toBe('/w/w1/entities/e1');
@@ -226,10 +201,7 @@ describe('CommandPalette', () => {
       search: () => of([command]),
     };
     TestBed.configureTestingModule({
-      providers: [
-        provideRouter([]),
-        { provide: COMMAND_PROVIDERS, useValue: [provider] },
-      ],
+      providers: [provideRouter([]), { provide: COMMAND_PROVIDERS, useValue: [provider] }],
     });
 
     const fixture = render();
@@ -237,11 +209,13 @@ describe('CommandPalette', () => {
     fixture.detectChanges();
     typeQuery(fixture, 'ald');
 
-    const input: HTMLInputElement = fixture.nativeElement.querySelector(
-      '[data-testid="command-palette-input"]',
-    );
+    const input: HTMLInputElement = fixture.nativeElement.querySelector('[data-testid="command-palette-input"]');
     input.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }),
+      new KeyboardEvent('keydown', {
+        key: 'Enter',
+        ctrlKey: true,
+        bubbles: true,
+      }),
     );
     fixture.detectChanges();
 

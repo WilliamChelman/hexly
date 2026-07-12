@@ -135,10 +135,7 @@ export function tokenReachesEntity(db: Db, token: string, id: string): boolean {
   const viaWorld = db
     .select({ id: entities.id })
     .from(worldLinks)
-    .innerJoin(
-      entities,
-      and(eq(entities.worldId, worldLinks.worldId), eq(entities.id, id), sharedVisibility),
-    )
+    .innerJoin(entities, and(eq(entities.worldId, worldLinks.worldId), eq(entities.id, id), sharedVisibility))
     .where(eq(worldLinks.id, token))
     .get();
   return !!viaWorld;

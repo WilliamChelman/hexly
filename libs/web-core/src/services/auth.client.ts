@@ -1,15 +1,9 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import {
-  computed, Injectable, Injector, inject, Signal,
-} from '@angular/core';
+import { computed, Injectable, Injector, inject, Signal } from '@angular/core';
 import { rxResource } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { catchError, finalize, Observable, of, tap, throwError } from 'rxjs';
-import {
-  AuthUser,
-  canManageUsers as canManageUsersRule,
-  canCreateWorlds as canCreateWorldsRule,
-} from '@hexly/domain';
+import { AuthUser, canManageUsers as canManageUsersRule, canCreateWorlds as canCreateWorldsRule } from '@hexly/domain';
 
 /**
  * The web client's view of the session. The actual session lives in an HttpOnly
@@ -28,10 +22,7 @@ export class AuthClient {
     stream: () =>
       this.http.get<AuthUser>('/api/auth/me').pipe(
         catchError((err: unknown) => {
-          if (
-            err instanceof HttpErrorResponse &&
-            (err.status === 401 || err.status === 403)
-          ) {
+          if (err instanceof HttpErrorResponse && (err.status === 401 || err.status === 403)) {
             return of(null);
           }
           return throwError(() => err);
@@ -66,9 +57,7 @@ export class AuthClient {
   });
 
   login(email: string, password: string): Observable<AuthUser> {
-    return this.http
-      .post<AuthUser>('/api/auth/login', { email, password })
-      .pipe(tap((user) => this.session.set(user)));
+    return this.http.post<AuthUser>('/api/auth/login', { email, password }).pipe(tap((user) => this.session.set(user)));
   }
 
   /** Rename the account; the fresh AuthUser replaces the session state. */

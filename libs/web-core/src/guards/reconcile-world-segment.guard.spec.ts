@@ -1,10 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import {
-  ActivatedRouteSnapshot,
-  convertToParamMap,
-  RouterStateSnapshot,
-  UrlTree,
-} from '@angular/router';
+import { ActivatedRouteSnapshot, convertToParamMap, RouterStateSnapshot, UrlTree } from '@angular/router';
 import { firstValueFrom, isObservable, Observable, of, throwError } from 'rxjs';
 import { EntitySummary } from '@hexly/domain';
 import { EntitiesClient } from '../services/entities.client';
@@ -21,7 +16,7 @@ function summary(over: Partial<EntitySummary>): EntitySummary {
     id: E1,
     worldId: W1,
     name: 'Aldermoor',
-    type: 'note',
+    types: ['core.note'],
     tags: [],
     visibility: 'private',
     version: 1,
@@ -61,30 +56,22 @@ describe('reconcileWorldSegment', () => {
   }
 
   it("redirects to the Entity's real World (bare — the parent heals its slug)", async () => {
-    entities.list.mockReturnValue(
-      of({ items: [summary({ worldId: W9 })], nextCursor: null }),
-    );
+    entities.list.mockReturnValue(of({ items: [summary({ worldId: W9 })], nextCursor: null }));
 
     const value = await settle(run(segment(W1, 'Avalon'), segment(E1, 'Aldermoor')));
-    expect((value as UrlTree).toString()).toBe(
-      `/w/${segment(W9)}/entities/${segment(E1, 'Aldermoor')}`,
-    );
+    expect((value as UrlTree).toString()).toBe(`/w/${segment(W9)}/entities/${segment(E1, 'Aldermoor')}`);
   });
 
   it('passes through when the Entity slug is already canonical', async () => {
     entities.list.mockReturnValue(of({ items: [summary({})], nextCursor: null }));
 
-    expect(
-      await settle(run(segment(W1, 'Avalon'), segment(E1, 'Aldermoor'))),
-    ).toBe(true);
+    expect(await settle(run(segment(W1, 'Avalon'), segment(E1, 'Aldermoor')))).toBe(true);
   });
 
   it('canonicalises a bare Entity slug, preserves the World segment and query', async () => {
     entities.list.mockReturnValue(of({ items: [summary({})], nextCursor: null }));
 
-    const value = await settle(
-      run(segment(W1, 'Avalon'), segment(E1), { view: 'note' }),
-    );
+    const value = await settle(run(segment(W1, 'Avalon'), segment(E1), { view: 'note' }));
     expect(entities.list).toHaveBeenCalledWith({ ids: [E1] });
     expect((value as UrlTree).toString()).toBe(
       `/w/${segment(W1, 'Avalon')}/entities/${segment(E1, 'Aldermoor')}?view=note`,
@@ -96,9 +83,7 @@ describe('reconcileWorldSegment', () => {
 
     const value = await settle(run(W1, E1));
     expect(entities.list).toHaveBeenCalledWith({ ids: [E1] });
-    expect((value as UrlTree).toString()).toBe(
-      `/w/${W1}/entities/${segment(E1, 'Aldermoor')}`,
-    );
+    expect((value as UrlTree).toString()).toBe(`/w/${W1}/entities/${segment(E1, 'Aldermoor')}`);
   });
 
   it('falls through (renders the page) when the target is missing', async () => {

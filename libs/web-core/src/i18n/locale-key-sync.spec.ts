@@ -3,7 +3,10 @@ import { findKeyDrift } from './locale-key-sync';
 describe('findKeyDrift', () => {
   it('reports no drift when both catalogs share the same keys', () => {
     const en = { auth: { heading: 'Sign in' }, common: { save: 'Save' } };
-    const fr = { auth: { heading: 'Se connecter' }, common: { save: 'Enregistrer' } };
+    const fr = {
+      auth: { heading: 'Se connecter' },
+      common: { save: 'Enregistrer' },
+    };
 
     const drift = findKeyDrift(en, fr);
 

@@ -1,11 +1,12 @@
 /**
  * The Entity domain: the top-level thing a user owns. The single Zod source of
- * truth for the Entity model and its REST payloads. A Hex Map is an Entity of
- * `type: 'hexmap'`.
+ * truth for the Entity model and its REST payloads. What an Entity *is* — a note, a
+ * map, a monster — is its **Entity Type** set, an open one the core does not
+ * enumerate: a type declares **Fields**, and nothing here knows what any of them hold.
  */
 
 import { z } from 'zod';
-import { emptyHexMap, hexMapSchema } from './hex/hex-map';
+import { FieldDataType } from './field';
 
 /** The format tag new saves write; a schema-affecting extension change is a bump + migration. */
 export const CONTENT_FORMAT = 'tiptap-v3';
@@ -15,11 +16,7 @@ export const CONTENT_FORMAT = 'tiptap-v3';
  * version's docs round-trip untouched with no transform. Saves always write
  * CONTENT_FORMAT.
  */
-export const READABLE_CONTENT_FORMATS = [
-  'tiptap-v1',
-  'tiptap-v2',
-  'tiptap-v3',
-] as const;
+export const READABLE_CONTENT_FORMATS = ['tiptap-v1', 'tiptap-v2', 'tiptap-v3'] as const;
 
 /** Format-tagged Content; `snapshot` is `z.unknown()` so persistence stays format-agnostic — see ADR-0019. */
 export const contentSchema = z.object({
@@ -35,14 +32,35 @@ export function tiptapContent(snapshot: unknown): Content {
 }
 
 /**
- * The closed, code-known set of Entity shapes: `note` is Content only; `hexmap`
- * adds the hex grid. Only a *typed payload* (like the grid) justifies a new
- * type — mere flavour is a `tag`.
+ * A single Entity Type identity (CONTEXT.md → Entity Type): an **open**,
+ * `namespace.id`-keyed string (`core.note`, `dnd.monster`, `world.deity`) — plugins and
+ * Worlds extend the set — so this validates only the *shape* of an id, never an
+ * enumerated value.
  */
-export const entityTypeSchema = z.enum(['note', 'hexmap']);
+export const entityTypeSchema = z
+  .string()
+  .trim()
+  .regex(/^[a-z0-9_-]+(\.[a-z0-9_-]+)+$/, 'An Entity Type must be a `namespace.id` key');
 
-/** CONTEXT.md → Entity Type. */
+/** CONTEXT.md → Entity Type. Open set, so widened to `string`. */
 export type EntityType = z.infer<typeof entityTypeSchema>;
+
+/**
+ * The one Entity Type the core itself declares: a Note is nothing but its body, so `core.note` adds
+ * no Field (ADR-0048). Every other type — the Map's included — ships from a plugin (ADR-0050).
+ */
+export const CORE_NOTE = 'core.note';
+
+/**
+ * The ordered, deduped set of Entity Types an Entity carries (CONTEXT.md → Entity
+ * Type): `types[0]` is *primary* (drives icon, default view, headline). At least
+ * one — every Entity has a primary type. `Set` insertion order preserves the
+ * authored order while collapsing duplicates.
+ */
+export const typesSchema = z
+  .array(entityTypeSchema)
+  .min(1)
+  .transform((types) => [...new Set(types)]);
 
 /**
  * The Entity's Metadata map (CONTEXT.md → Metadata), stored inside the document
@@ -53,22 +71,22 @@ export type EntityType = z.infer<typeof entityTypeSchema>;
 export const metadataSchema = z.record(z.string(), z.unknown()).optional();
 
 /**
- * The type-discriminated Entity body — what the `document` column holds:
- * `{ type, content, ...typedPayload }`.
+ * The Entity body — what the `document` column holds. One shape, for every Entity: Content plus
+ * Metadata (ADR-0050). Everything a Type adds to an Entity's substance is a **Field** over a Metadata
+ * key — a plugin's **Structured Field** value included — so the body needs no discriminant and no
+ * registry to parse.
+ *
+ * `.strict()` because the body root is closed: an unknown key there is a document this build cannot
+ * represent (a pre-collapse body, with a plugin's value at the root), and reading it as a note that
+ * has silently lost that value would be worse than failing loudly. Tolerance lives one level down, in
+ * the data: a Field value that does not inhabit its data-type is left alone, never rejected.
  */
-export const entityBodySchema = z.discriminatedUnion('type', [
-  z.object({
-    type: z.literal('note'),
+export const entityBodySchema = z
+  .object({
     content: contentSchema,
     metadata: metadataSchema,
-  }),
-  z.object({
-    type: z.literal('hexmap'),
-    content: contentSchema,
-    metadata: metadataSchema,
-    ...hexMapSchema.shape,
-  }),
-]);
+  })
+  .strict();
 
 export type EntityBody = z.infer<typeof entityBodySchema>;
 
@@ -76,15 +94,15 @@ export function emptyContent(): Content {
   return tiptapContent({ type: 'doc', content: [] });
 }
 
-/** The one place that knows the per-type empty payload. */
-export function emptyEntityBody(type: EntityType): EntityBody {
-  return type === 'hexmap'
-    ? { type, content: emptyContent(), ...emptyHexMap() }
-    : { type, content: emptyContent() };
-}
-
 /** The reserved Metadata namespace: Hexly provenance keys (`hexly.*`) that drive placement/typing on export and are stripped from author-facing frontmatter. */
 export const HEXLY_METADATA_PREFIX = 'hexly.';
+
+/**
+ * The reserved key a vault export stamps an Entity's ordered Type set under, and import reads back
+ * (ADR-0050, #203) — no author Metadata key records the types. Shared, because the two halves of the
+ * round-trip contract on it.
+ */
+export const HEXLY_TYPE_KEY = `${HEXLY_METADATA_PREFIX}type`;
 
 /**
  * `.trim()` before `.min(1)` rejects whitespace-only names. Shared with the World
@@ -97,10 +115,7 @@ export const nameSchema = z
   .trim()
   .min(1)
   .max(255)
-  .refine(
-    (s) => !/[\p{Cc}/\\]/u.test(s),
-    'Name cannot contain control characters or slashes',
-  );
+  .refine((s) => !/[\p{Cc}/\\]/u.test(s), 'Name cannot contain control characters or slashes');
 
 /**
  * Free-text Tags on an Entity (CONTEXT.md → Tag), normalized on parse so the
@@ -136,11 +151,15 @@ export const descriptorSchema = z.string().trim().min(1);
  */
 export const descriptorsSchema = dedupedTags.default([]);
 
-/** POST /entities: body (Content + payload) is minted server-side. */
+/** POST /entities: the body is minted server-side from `types` — blank Content plus their Fields' defaults. */
 export const createEntityRequestSchema = z.object({
   name: nameSchema,
-  type: entityTypeSchema,
+  // The ordered type set; `types[0]` is primary. One or more per creation (ADR-0048).
+  types: typesSchema,
   tags: tagsSchema,
+  // Initial Metadata seeded into the minted body — the values the create dialog collected for a
+  // picked type's required Fields. Omitted → a blank map.
+  metadata: metadataSchema,
   // Optional target World; omitted, the server defaults to the owner's World.
   worldId: z.string().optional(),
 });
@@ -153,6 +172,9 @@ export const saveEntityRequestSchema = z.object({
   version: z.number().int().nonnegative(),
   // Always the full current set — a save replaces the stored tags; an empty array clears them.
   tags: dedupedTags,
+  // Optional: a save replaces the type set when present, and leaves it untouched when omitted.
+  // Multi-type authoring is not surfaced yet, so the current client omits it (ADR-0048).
+  types: typesSchema.optional(),
 });
 
 export type SaveEntityRequest = z.infer<typeof saveEntityRequestSchema>;
@@ -257,6 +279,13 @@ export const entityListQuerySchema = z.object({
     .union([visibilitySchema, z.array(visibilitySchema)])
     .transform((v) => (Array.isArray(v) ? v : [v]))
     .optional(),
+  // Filter-by-Field (ADR-0048, #188): each repeated `field` param is a `key:op:value` token
+  // (`challenge_rating:gte:5`, `alignment:eq:lawful-good`). Only shape-normalised to an array here;
+  // the domain `parseFieldFilters` decodes the tokens (a malformed one is dropped, never a 400).
+  field: z
+    .union([z.string(), z.array(z.string())])
+    .transform((v) => (Array.isArray(v) ? v : [v]))
+    .optional(),
   worldId: z.string().min(1).optional(),
   cursor: z.string().optional(),
   // Opt-in per-row Rights; paths that omit it keep `list` a pure read-filter.
@@ -274,22 +303,44 @@ export const entityListQuerySchema = z.object({
 
 export type EntityListQuery = z.infer<typeof entityListQuerySchema>;
 
-/** One Facet value and how many entities carry it under the active filters. */
+/**
+ * One Facet value and how many entities carry it under the active filters. `label` is a display
+ * rendering shown in place of the raw `value` — set for an Entity-Link Field facet, whose `value`
+ * is a target id and `label` its current name (absent when the target dangles); unset elsewhere,
+ * where the value is already human-readable (#188, #190).
+ */
 export interface FacetCount {
   readonly value: string;
   readonly count: number;
+  readonly label?: string;
+}
+
+/**
+ * One type's facetable **Field** as a facet (ADR-0048, #188): the Metadata `key` it types, its
+ * human `label` and `dataType` (so the rail picks a data-type-appropriate control — value toggles
+ * for enum/list/string, a range for number/date), and its live `values` with counts. Surfaced
+ * **contextually** — a Field facet appears only once its type is in the active Type filter.
+ */
+export interface FieldFacet {
+  readonly key: string;
+  readonly label: string;
+  readonly dataType: FieldDataType;
+  readonly values: readonly FacetCount[];
 }
 
 /**
  * `GET /entities/facets`: each Facet category's live values with counts. Counts
  * drill down — every category is computed against all *other* active constraints
  * but not its own, so a category still lists the sibling values you could add.
- * Zero-count values are omitted.
+ * Zero-count values are omitted. The universal facets (`type`/`tag`/`visibility`)
+ * are always present; `fields` carries a type's Field facets only while that type
+ * is the active filter, so the rail stays clean (ADR-0048, #188).
  */
 export interface EntityFacets {
   readonly type: readonly FacetCount[];
   readonly tag: readonly FacetCount[];
   readonly visibility: readonly FacetCount[];
+  readonly fields: readonly FieldFacet[];
 }
 
 /** What `GET /entities` lists; body fetched only on open. */
@@ -298,7 +349,8 @@ export interface EntitySummary {
   /** Every Entity belongs to exactly one World. */
   readonly worldId: string;
   readonly name: string;
-  readonly type: EntityType;
+  /** The ordered Entity Type set; `types[0]` is primary (CONTEXT.md → Entity Type). */
+  readonly types: readonly EntityType[];
   readonly tags: readonly string[];
   readonly visibility: Visibility;
   /** The optimistic-concurrency counter; a save must carry this base value. */

@@ -10,8 +10,7 @@ export class MockNudgeBusClient {
   private readonly nudges = new Subject<FollowSignal>();
 
   readonly follow = vi.fn(
-    (ref: InterestRef): Observable<FollowSignal> =>
-      this.nudges.pipe(filter((n) => n.id === ref.id)),
+    (ref: InterestRef): Observable<FollowSignal> => this.nudges.pipe(filter((n) => n.id === ref.id)),
   );
 
   /** Spy for the anonymous-principal switch — asserts a page connects/clears its token. */

@@ -1,4 +1,4 @@
-import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
   ApiError,
   CreateEntityRequest,
@@ -13,51 +13,46 @@ import {
   EntitySummary,
   EntityType,
   FacetCount,
+  FieldError,
+  FieldFacet,
+  FieldFilter,
+  FieldSchema,
   InboundReference,
   OutboundReference,
-  entityTypeSchema,
+  typesSchema,
   Visibility,
   EntityGrant,
   GrantRole,
+  isEntityLinkDataType,
+  isFacetableField,
   PublicLink,
+  entityLinkConstraints,
+  resolveFields,
   SaveEntityRequest,
   tagsSchema,
+  TypeFieldResolver,
+  validateFields,
   visibilitySchema,
 } from '@hexly/domain';
 import { and, asc, desc, eq, inArray, sql, SQL } from 'drizzle-orm';
-import {
-  AclSetResult,
-  gate,
-  isSuperadmin,
-  OwnerSetResult,
-  removeOwnerOutcome,
-  userExists,
-} from '../acl/owner-set';
-import {
-  EntityAccess,
-  entityAccess,
-  ownsEntity,
-  READ_ONLY_RIGHTS,
-  sharedVisibility,
-} from '../acl/entity-access';
+import { AclSetResult, gate, isSuperadmin, OwnerSetResult, removeOwnerOutcome, userExists } from '../acl/owner-set';
+import { EntityAccess, entityAccess, ownsEntity, READ_ONLY_RIGHTS, sharedVisibility } from '../acl/entity-access';
 import { canCreateEntityFilter, worldOwnerFilter } from '../acl/world-access';
-import {
-  mintPublicLink,
-  PublicLinkTable,
-  readPublicLink,
-  revokePublicLink,
-} from '../acl/public-link-store';
+import { mintPublicLink, PublicLinkTable, readPublicLink, revokePublicLink } from '../acl/public-link-store';
 import { DB, Db } from '../db/db';
 import {
   entities,
   entityDescriptors,
   entityEdges,
+  entityFieldFacets,
   entityGrants,
   entityLinks,
   worlds,
 } from '../db/schema';
 import { HEXLY_CONFIG, HexlyConfig } from '../config/config.module';
-import { EntityWrites } from './entity-writes';
+import { EntityWrites, InsertEntityInput } from './entity-writes';
+import { TypeFieldRegistry } from './type-field-registry';
+import { WorldTypeFields } from './world-type-fields';
 import { linkedEntity } from './utils/linked-entity';
 
 /** Per-entity Public Link table for the shared get/mint/revoke helpers. */
@@ -82,6 +77,9 @@ export interface ListOptions {
   readonly tags?: readonly string[];
   /** Facet: restrict to any of these Visibilities (OR within category). */
   readonly visibility?: readonly Visibility[];
+  /** Filter-by-Field (ADR-0048, #188): each constraint matches a facetable Field value — eq
+   * membership (enum/list/string) or a gte/lte range (number/date). Same key OR / range, diff key AND. */
+  readonly fields?: readonly FieldFilter[];
   /** Restrict to one World. */
   readonly worldId?: string;
   /** Attach the caller's Rights to each summary — opt-in, the Entity Browser sets it. */
@@ -89,10 +87,7 @@ export interface ListOptions {
 }
 
 /** The filter state a facet-count read narrows against — the list filters minus paging/ids. */
-export type FacetOptions = Pick<
-  ListOptions,
-  'worldId' | 'q' | 'type' | 'tags' | 'visibility'
->;
+export type FacetOptions = Pick<ListOptions, 'worldId' | 'q' | 'type' | 'tags' | 'visibility' | 'fields'>;
 
 /** Everything {@link filters} reads — shared by the paged list and the facet-count reads. */
 type FilterOptions = FacetOptions & Pick<ListOptions, 'ids'>;
@@ -120,7 +115,18 @@ export class EntitiesService {
     @Inject(DB) private readonly db: Db,
     @Inject(HEXLY_CONFIG) private readonly config: HexlyConfig,
     private readonly writes: EntityWrites,
+    private readonly typeFields: TypeFieldRegistry,
+    private readonly worldTypeFields: WorldTypeFields,
   ) {}
+
+  /**
+   * The {@link TypeFieldResolver} to resolve a `types[]` set through: scoped to `worldId` when one
+   * is in play (so a World's user-defined types resolve too, #191), else the bare instance-wide
+   * plugin registry.
+   */
+  private typeResolver(worldId: string | undefined): TypeFieldResolver {
+    return worldId ? this.worldTypeFields.resolverFor(worldId) : this.typeFields.resolver;
+  }
 
   /**
    * One reader-scoped page of summaries, metadata only. Stable sort (newest first,
@@ -137,7 +143,7 @@ export class EntitiesService {
         id: entities.id,
         worldId: entities.worldId,
         name: entities.name,
-        type: entities.type,
+        types: entities.types,
         tags: entities.tags,
         visibility: entities.visibility,
         version: entities.version,
@@ -152,21 +158,12 @@ export class EntitiesService {
       query.innerJoin(sql`entities_fts`, sql`entities_fts.rowid = entities.rowid`);
     }
     const rows = query
-      .where(
-        and(
-          access.filter,
-          ...filters(opts),
-          match ? sql`entities_fts MATCH ${match}` : undefined,
-        ),
-      )
+      .where(and(access.filter, ...filters(opts), match ? sql`entities_fts MATCH ${match}` : undefined))
       // With a query: best match first (bm25 ascending), id for a stable page boundary;
       // otherwise newest first. Weight order must match the FTS DDL: name, tags, content_text.
       .orderBy(
         ...(match
-          ? [
-              sql`bm25(entities_fts, ${w.name}, ${w.tags}, ${w.content})`,
-              asc(entities.id),
-            ]
+          ? [sql`bm25(entities_fts, ${w.name}, ${w.tags}, ${w.content})`, asc(entities.id)]
           : [desc(entities.updatedAt), asc(entities.id)]),
       )
       .limit(opts.limit + 1)
@@ -203,22 +200,98 @@ export class EntitiesService {
     const { filter } = entityAccess(this.db, readerId);
     return {
       // Drop a category's own selection before counting it (drill-down).
-      type: this.countColumn({ ...opts, type: undefined }, entities.type, filter),
-      visibility: this.countColumn(
-        { ...opts, visibility: undefined },
-        entities.visibility,
-        filter,
-      ),
-      tag: this.countTags({ ...opts, tags: undefined }, filter),
+      type: this.countJsonArray({ ...opts, type: undefined }, entities.types, filter),
+      visibility: this.countColumn({ ...opts, visibility: undefined }, entities.visibility, filter),
+      tag: this.countJsonArray({ ...opts, tags: undefined }, entities.tags, filter),
+      // A type's Field facets, contextually — only the active types' facetable Fields (ADR-0048, #188).
+      fields: this.countFieldFacets(opts, filter),
     };
   }
 
-  /** Count a denormalized column's values (type/visibility) under `opts`. */
-  private countColumn(
-    opts: FacetOptions,
-    column: typeof entities.type | typeof entities.visibility,
-    filter: SQL,
-  ): FacetCount[] {
+  /**
+   * A type's facetable Field facets, surfaced **contextually** (ADR-0048, #188): resolved across the
+   * *active* Type filter (`opts.type`), so a Field facet is absent until its type is the active
+   * filter, and the universal facets are unaffected. Each Field's values drill down like the
+   * universal facets — counted against every other constraint but that Field's own filter.
+   *
+   * A **Structured Field** is never offered, whatever its flag says ({@link isFacetableField}) — the
+   * rail does not offer to filter a World by a grid (ADR-0050).
+   */
+  private countFieldFacets(opts: FacetOptions, filter: SQL): FieldFacet[] {
+    const fields = resolveFields(this.typeResolver(opts.worldId), opts.type ?? []).filter(isFacetableField);
+    return fields.map((field) => {
+      const values = this.countFieldValues(
+        // Drill-down: drop this Field's own filters, keep every sibling constraint.
+        { ...opts, fields: (opts.fields ?? []).filter((ff) => ff.key !== field.key) },
+        field.key,
+        filter,
+      );
+      return {
+        key: field.key,
+        label: field.label,
+        dataType: field.dataType,
+        // An Entity-Link facet's values are target ids; resolve each to its name for the rail (#190).
+        values: isEntityLinkDataType(field.dataType) ? this.labelLinkValues(values, filter) : values,
+      };
+    });
+  }
+
+  /**
+   * Attach each Entity-Link facet value's target name as its `label` (#190). Filtered by the reader's
+   * access to the *target* — the facet count filters on the readable source, so the target may be one
+   * the reader cannot see, and an unguarded name lookup would leak a `private` Entity (ADR-0046). An
+   * unreadable or deleted target keeps no label, so the rail falls back to the dangling id.
+   */
+  private labelLinkValues(values: readonly FacetCount[], filter: SQL): FacetCount[] {
+    if (values.length === 0) return [];
+    const names = new Map(
+      this.db
+        .select({ id: entities.id, name: entities.name })
+        .from(entities)
+        .where(
+          and(
+            filter,
+            inArray(
+              entities.id,
+              values.map((v) => v.value),
+            ),
+          ),
+        )
+        .all()
+        .map((row) => [row.id, row.name]),
+    );
+    return values.map((v) => (names.has(v.value) ? { ...v, label: names.get(v.value) } : v));
+  }
+
+  /**
+   * Count one facetable Field's distinct values under `opts`, off the denormalised
+   * `entity_field_facets` index. `(entityId, key, value)` is unique, so `count(*)` per value is the
+   * number of Entities carrying it; `GROUP BY` omits zero-count values, exactly like the universal
+   * facets.
+   */
+  private countFieldValues(opts: FacetOptions, key: string, filter: SQL): FacetCount[] {
+    const match = opts.q ? toFtsMatch(opts.q) : null;
+    const query = this.db
+      .select({
+        value: entityFieldFacets.value,
+        count: sql<number>`count(*)`.as('count'),
+      })
+      .from(entities)
+      .innerJoin(entityFieldFacets, and(eq(entityFieldFacets.entityId, entities.id), eq(entityFieldFacets.key, key)))
+      .$dynamic();
+    if (match) {
+      query.innerJoin(sql`entities_fts`, sql`entities_fts.rowid = entities.rowid`);
+    }
+    return query
+      .where(facetWhere(opts, match, filter))
+      .groupBy(entityFieldFacets.value)
+      .orderBy(asc(entityFieldFacets.value))
+      .all()
+      .map((r) => ({ value: r.value, count: r.count }));
+  }
+
+  /** Count a denormalized scalar column's values (visibility) under `opts`. */
+  private countColumn(opts: FacetOptions, column: typeof entities.visibility, filter: SQL): FacetCount[] {
     const match = opts.q ? toFtsMatch(opts.q) : null;
     const query = this.db
       .select({ value: column, count: sql<number>`count(*)`.as('count') })
@@ -235,26 +308,31 @@ export class EntitiesService {
   }
 
   /**
-   * Count Tag-facet values under `opts`. Tags live in the JSON `tags` column, so
-   * `json_each` unrolls each array before grouping — an entity with two tags
-   * counts toward both values.
+   * Count a multi-valued JSON-array column's values (`types`/`tags`) under `opts`. The array lives
+   * in one JSON column, so `json_each` unrolls each entity's array before grouping — an entity with
+   * two types (or two tags) counts toward both values. This is the multi-valued path the Type facet
+   * moved onto when `type` became the `types` set (ADR-0048), shared with the Tag facet it mirrors.
    */
-  private countTags(opts: FacetOptions, filter: SQL): FacetCount[] {
+  private countJsonArray(
+    opts: FacetOptions,
+    column: typeof entities.types | typeof entities.tags,
+    filter: SQL,
+  ): FacetCount[] {
     const match = opts.q ? toFtsMatch(opts.q) : null;
     const query = this.db
       .select({
-        value: sql<string>`tag.value`.as('value'),
+        value: sql<string>`each.value`.as('value'),
         count: sql<number>`count(*)`.as('count'),
       })
       .from(entities)
-      .innerJoin(sql`json_each(${entities.tags}) as tag`, sql`1 = 1`)
+      .innerJoin(sql`json_each(${column}) as each`, sql`1 = 1`)
       .$dynamic();
     if (match) {
       query.innerJoin(sql`entities_fts`, sql`entities_fts.rowid = entities.rowid`);
     }
     return query
       .where(facetWhere(opts, match, filter))
-      .groupBy(sql`tag.value`)
+      .groupBy(sql`each.value`)
       .all()
       .map((r) => ({ value: r.value, count: r.count }));
   }
@@ -269,9 +347,7 @@ export class EntitiesService {
     // Rights let the editor gate itself: a Viewer opens read-only, an entity-level
     // Editor (canWrite false, canEditSubstance true) opens writable. canManage rides
     // the owner-only gate so the Share dialog is only offered to actual Owners.
-    return decision?.canRead
-      ? { ...toDetail(decision.row), rights: access.rightsOf(decision) }
-      : null;
+    return decision?.canRead ? { ...toDetail(decision.row), rights: access.rightsOf(decision) } : null;
   }
 
   /**
@@ -287,7 +363,10 @@ export class EntitiesService {
   references(userId: string, id: string): EntityReferences | null {
     const access = entityAccess(this.db, userId);
     if (!access.decideMeta(id)?.canRead) return null;
-    return { references: this.outbound(access, id), referencedBy: this.inbound(access, id) };
+    return {
+      references: this.outbound(access, id),
+      referencedBy: this.inbound(access, id),
+    };
   }
 
   /**
@@ -296,35 +375,35 @@ export class EntitiesService {
    * target. Asset edges are stored but surface-less, so `entity` targets alone are selected.
    */
   private outbound(access: EntityAccess, id: string): OutboundReference[] {
-    return this.db
-      .select({
-        targetId: entityEdges.targetId,
-        descriptor: entityEdges.descriptor,
-        name: entities.name,
-        type: entities.type,
-      })
-      .from(entityEdges)
-      .leftJoin(entities, and(eq(entities.id, entityEdges.targetId), access.filter))
-      .where(
-        and(eq(entityEdges.sourceEntityId, id), eq(entityEdges.targetKind, 'entity')),
-      )
-      // Resolved targets by name; the dangling ones last, where they read as a footnote. `targetId`
-      // is the final tiebreak, so two Entities sharing a name — or two descriptors to one target —
-      // hold a stable order between reads (as `list` does with `asc(entities.id)`).
-      .orderBy(
-        sql`${entities.name} IS NULL`,
-        asc(entities.name),
-        asc(entityEdges.targetId),
-        asc(entityEdges.descriptor),
-      )
-      .all()
-      .map((row) => ({
-        targetId: row.targetId,
-        descriptor: row.descriptor,
-        // An Entity whose stored type is outside the enum reads as a dangling target, same as an
-        // unreadable or deleted one: the reference is there, the thing at the end of it is not.
-        target: row.name === null ? null : linkedEntity(row.targetId, row.name, row.type),
-      }));
+    return (
+      this.db
+        .select({
+          targetId: entityEdges.targetId,
+          descriptor: entityEdges.descriptor,
+          name: entities.name,
+          types: entities.types,
+        })
+        .from(entityEdges)
+        .leftJoin(entities, and(eq(entities.id, entityEdges.targetId), access.filter))
+        .where(and(eq(entityEdges.sourceEntityId, id), eq(entityEdges.targetKind, 'entity')))
+        // Resolved targets by name; the dangling ones last, where they read as a footnote. `targetId`
+        // is the final tiebreak, so two Entities sharing a name — or two descriptors to one target —
+        // hold a stable order between reads (as `list` does with `asc(entities.id)`).
+        .orderBy(
+          sql`${entities.name} IS NULL`,
+          asc(entities.name),
+          asc(entityEdges.targetId),
+          asc(entityEdges.descriptor),
+        )
+        .all()
+        .map((row) => ({
+          targetId: row.targetId,
+          descriptor: row.descriptor,
+          // An Entity whose stored types can't be read reads as a dangling target, same as an
+          // unreadable or deleted one: the reference is there, the thing at the end of it is not.
+          target: row.name === null ? null : linkedEntity(row.targetId, row.name, row.types),
+        }))
+    );
   }
 
   /**
@@ -332,25 +411,27 @@ export class EntitiesService {
    * the *source*, so an unreadable source drops the row entirely — never cached across viewers.
    */
   private inbound(access: EntityAccess, id: string): InboundReference[] {
-    return this.db
-      .select({
-        sourceId: entities.id,
-        descriptor: entityEdges.descriptor,
-        name: entities.name,
-        type: entities.type,
-      })
-      .from(entityEdges)
-      .innerJoin(entities, and(eq(entities.id, entityEdges.sourceEntityId), access.filter))
-      .where(and(eq(entityEdges.targetKind, 'entity'), eq(entityEdges.targetId, id)))
-      // `id` is the final tiebreak, for the same reason as {@link outbound}'s `targetId`.
-      .orderBy(asc(entities.name), asc(entities.id), asc(entityEdges.descriptor))
-      .all()
-      // A source is the thing doing the linking, so unlike {@link outbound}'s target it cannot
-      // dangle: a row whose source has no drawable type drops out entirely.
-      .flatMap((row) => {
-        const source = linkedEntity(row.sourceId, row.name, row.type);
-        return source ? [{ descriptor: row.descriptor, source }] : [];
-      });
+    return (
+      this.db
+        .select({
+          sourceId: entities.id,
+          descriptor: entityEdges.descriptor,
+          name: entities.name,
+          types: entities.types,
+        })
+        .from(entityEdges)
+        .innerJoin(entities, and(eq(entities.id, entityEdges.sourceEntityId), access.filter))
+        .where(and(eq(entityEdges.targetKind, 'entity'), eq(entityEdges.targetId, id)))
+        // `id` is the final tiebreak, for the same reason as {@link outbound}'s `targetId`.
+        .orderBy(asc(entities.name), asc(entities.id), asc(entityEdges.descriptor))
+        .all()
+        // A source is the thing doing the linking, so unlike {@link outbound}'s target it cannot
+        // dangle: a row whose source has no drawable type drops out entirely.
+        .flatMap((row) => {
+          const source = linkedEntity(row.sourceId, row.name, row.types);
+          return source ? [{ descriptor: row.descriptor, source }] : [];
+        })
+    );
   }
 
   /**
@@ -367,11 +448,22 @@ export class EntitiesService {
   }
 
   create(ownerId: string, req: CreateEntityRequest): EntityDetail {
-    const body = emptyEntityBody(req.type);
+    // The World comes first: a user-defined type's Fields resolve only within their World (#191),
+    // and the minted body is exactly the defaults those Fields declare — a fresh Hex Map's blank
+    // plane among them (ADR-0050).
+    const worldId = this.resolveWorldId(ownerId, req.worldId);
+    const fields = resolveFields(this.typeResolver(worldId), req.types);
+    const minted = emptyEntityBody(fields, this.typeFields.structuredDataTypes);
+    // Seed it with the create dialog's initial Metadata (a picked type's required Field values),
+    // over the minted defaults rather than in place of them. Not gated: like import, a create
+    // establishes at-rest data — the gate is save-only (#187), and the create dialog runs the
+    // forward-only check client-side before it sends.
+    const body: EntityBody = req.metadata ? { ...minted, metadata: { ...minted.metadata, ...req.metadata } } : minted;
     const row = this.writes.insert({
       ownerId,
-      worldId: this.resolveWorldId(ownerId, req.worldId),
+      worldId,
       name: req.name,
+      types: req.types,
       tags: req.tags,
       body,
     });
@@ -379,18 +471,15 @@ export class EntitiesService {
   }
 
   /**
-   * Insert a fully-built Entity for the vault import path: body and metadata come
+   * Insert a fully-built Entity for the vault import path: body, metadata, and Type set come
    * pre-converted, and the target World is the caller's fresh import World.
+   *
+   * The `types` are inserted unresolved (#203) — an unregistered one still lands, and degrades to
+   * the generic Field view. The Fields are unvalidated: an import establishes data at rest, and the
+   * Field gate is forward-only (ADR-0048).
    */
-  importNote(
-    ownerId: string,
-    worldId: string,
-    id: string,
-    name: string,
-    tags: readonly string[],
-    body: EntityBody,
-  ): void {
-    this.writes.insert({ id, ownerId, worldId, name, tags, body });
+  importEntity(input: InsertEntityInput): void {
+    this.writes.insert(input);
   }
 
   /**
@@ -399,11 +488,14 @@ export class EntitiesService {
    * `not-found` (404), a reachable one the caller can't edit a 403.
    */
   save(userId: string, id: string, req: SaveEntityRequest): SaveResult {
+    this.gateTypedEdit(userId, id, req);
     const result = this.writes.mutate(userId, id, {
       kind: 'edit',
       document: req.document,
       // Tags always fully replace (a save carries the full set).
       tags: req.tags,
+      // Types replace only when the save carries them; the current client omits them (ADR-0048).
+      types: req.types,
       version: req.version,
     });
     switch (result.status) {
@@ -419,16 +511,88 @@ export class EntitiesService {
   }
 
   /**
+   * The forward-only Field gate on the write path (ADR-0048). A save that carries an explicit
+   * `types` set is an **active typed edit** — the generic Field view (or a plugin form) asserting
+   * the Entity's type set — so its Metadata must satisfy those types' Fields: every required Field
+   * present, every present value well-typed. A save that omits `types` is a plain body edit and is
+   * left untouched, so an already-stored (or imported) document with malformed Fields is never
+   * *retroactively* invalidated by an unrelated edit — the gate only bites data the caller actively
+   * types. The vault import ({@link importEntity}) never routes here, and reads / reindex never
+   * validate, so data at rest stays tolerated end to end.
+   */
+  private gateTypedEdit(userId: string, id: string, req: SaveEntityRequest): void {
+    if (req.types === undefined) return;
+    // Resolve the Entity's World so its user-defined types' Fields resolve (#191). A missing row
+    // leaves `worldId` undefined — the save 404s in `mutate` regardless.
+    const worldId = this.db
+      .select({ worldId: entities.worldId })
+      .from(entities)
+      .where(eq(entities.id, id))
+      .get()?.worldId;
+    this.assertTypedFieldsValid(userId, worldId, req.types, req.document.metadata);
+  }
+
+  /**
+   * Resolve `types` to their Fields and reject (400 {@link EntityErrorCode.InvalidFields}) when the
+   * Metadata leaves a required Field unmet, ill-types a present value, or an Entity-Link Field
+   * points at a *resolvable* Entity whose types miss its target-type constraint (#190) — the
+   * forward-only check {@link gateTypedEdit} runs for a typed save. A missing or inaccessible
+   * link target stays inert (never an error), so graceful degradation is preserved end to end.
+   */
+  private assertTypedFieldsValid(
+    userId: string,
+    worldId: string | undefined,
+    types: readonly EntityType[],
+    metadata: EntityBody['metadata'],
+  ): void {
+    const fields = resolveFields(this.typeResolver(worldId), types);
+    const errors: FieldError[] = [
+      ...validateFields(fields, metadata, this.typeFields.structuredDataTypes).errors,
+      ...this.linkTargetTypeErrors(userId, fields, metadata),
+    ];
+    if (errors.length > 0)
+      throw new BadRequestException({
+        code: EntityErrorCode.InvalidFields,
+        data: { fields: errors },
+      } satisfies ApiError);
+  }
+
+  /**
+   * The Entity-Link Field target-type check (#190): flag a `type` error when a constrained link
+   * points at a *resolvable* Entity whose types miss the constraint. Resolution runs through the
+   * caller's read filter, so a deleted or inaccessible target resolves to no row and stays inert.
+   */
+  private linkTargetTypeErrors(
+    userId: string,
+    fields: readonly FieldSchema[],
+    metadata: EntityBody['metadata'],
+  ): FieldError[] {
+    const constraints = entityLinkConstraints(fields, metadata);
+    if (constraints.length === 0) return [];
+    const { filter } = entityAccess(this.db, userId);
+    const targetTypes = new Map(
+      this.db
+        .select({ id: entities.id, types: entities.types })
+        .from(entities)
+        .where(and(filter, inArray(entities.id, [...new Set(constraints.map((c) => c.entityId))])))
+        .all()
+        .map((row) => [row.id, row.types]),
+    );
+    return constraints.flatMap((c) => {
+      const actual = targetTypes.get(c.entityId);
+      // Unresolved target → inert. Resolved but off-type → a `type` error on the Field's key.
+      if (!actual || actual.some((t) => c.targetTypes.includes(t))) return [];
+      return [{ key: c.key, code: 'type' as const }];
+    });
+  }
+
+  /**
    * Metadata patch: a rename (substance, so an entity-level Editor may make it) or a Visibility
    * flip (exposure, so it needs full write rights). Exactly one of the two rides a request
    * ({@link patchEntityRequestSchema}), which is what lets the kind name the change and the kind
    * pick the gate. Unreachable → null (404); reachable but not permitted → 403.
    */
-  patch(
-    userId: string,
-    id: string,
-    changes: { name?: string; visibility?: Visibility },
-  ): EntityDetail | null {
+  patch(userId: string, id: string, changes: { name?: string; visibility?: Visibility }): EntityDetail | null {
     const result = this.writes.mutate(
       userId,
       id,
@@ -455,15 +619,17 @@ export class EntitiesService {
    * entities. Reflects last-saved state (reads the index, not edits).
    */
   listDescriptors(ownerId: string): string[] {
-    return this.db
-      .selectDistinct({ descriptor: entityDescriptors.descriptor })
-      .from(entityDescriptors)
-      .innerJoin(entities, eq(entities.id, entityDescriptors.entityId))
-      // Personal suggestion vocabulary — the caller's own descriptors; no Superadmin bypass.
-      .where(ownsEntity(ownerId, false))
-      .orderBy(asc(entityDescriptors.descriptor))
-      .all()
-      .map((row) => row.descriptor);
+    return (
+      this.db
+        .selectDistinct({ descriptor: entityDescriptors.descriptor })
+        .from(entityDescriptors)
+        .innerJoin(entities, eq(entities.id, entityDescriptors.entityId))
+        // Personal suggestion vocabulary — the caller's own descriptors; no Superadmin bypass.
+        .where(ownsEntity(ownerId, false))
+        .orderBy(asc(entityDescriptors.descriptor))
+        .all()
+        .map((row) => row.descriptor)
+    );
   }
 
   /**
@@ -471,15 +637,17 @@ export class EntitiesService {
    * `json_each` unrolls the JSON `tags` column before DISTINCT.
    */
   listTags(ownerId: string): string[] {
-    return this.db
-      .selectDistinct({ value: sql<string>`tag.value` })
-      .from(entities)
-      .innerJoin(sql`json_each(${entities.tags}) as tag`, sql`1 = 1`)
-      // Personal suggestion vocabulary — the caller's own tags only; no Superadmin bypass.
-      .where(ownsEntity(ownerId, false))
-      .orderBy(sql`tag.value`)
-      .all()
-      .map((row) => row.value);
+    return (
+      this.db
+        .selectDistinct({ value: sql<string>`tag.value` })
+        .from(entities)
+        .innerJoin(sql`json_each(${entities.tags}) as tag`, sql`1 = 1`)
+        // Personal suggestion vocabulary — the caller's own tags only; no Superadmin bypass.
+        .where(ownsEntity(ownerId, false))
+        .orderBy(sql`tag.value`)
+        .all()
+        .map((row) => row.value)
+    );
   }
 
   /**
@@ -561,12 +729,7 @@ export class EntitiesService {
    * Grant an Instance user Editor or Viewer: Owner-only; World membership is *not*
    * required. Upsert — re-granting a different role updates it.
    */
-  addGrant(
-    userId: string,
-    id: string,
-    targetUserId: string,
-    role: GrantRole,
-  ): AclSetResult<EntityGrant[]> {
+  addGrant(userId: string, id: string, targetUserId: string, role: GrantRole): AclSetResult<EntityGrant[]> {
     const gate = this.gateOwnerManagement(userId, id);
     if (gate) return gate;
     if (!userExists(this.db, targetUserId)) return { status: 'no-such-user' };
@@ -583,11 +746,7 @@ export class EntitiesService {
    * Revoke a grant: Owner-only. Revoking a non-existent grant is a no-op that
    * still returns the (unchanged) set.
    */
-  removeGrant(
-    userId: string,
-    id: string,
-    targetUserId: string,
-  ): AclSetResult<EntityGrant[]> {
+  removeGrant(userId: string, id: string, targetUserId: string): AclSetResult<EntityGrant[]> {
     const gate = this.gateOwnerManagement(userId, id);
     if (gate) return gate;
     // Editor/viewer rows only — an `owner` row is removed via removeOwner (which enforces the
@@ -718,7 +877,9 @@ export class EntitiesService {
       .orderBy(asc(worlds.createdAt), asc(worlds.id))
       .get();
     if (!world)
-      throw new NotFoundException({ code: EntityErrorCode.NoWritableWorld } satisfies ApiError);
+      throw new NotFoundException({
+        code: EntityErrorCode.NoWritableWorld,
+      } satisfies ApiError);
     return world.id;
   }
 
@@ -737,12 +898,63 @@ function filters(opts: FilterOptions) {
   // Empty id set selects nothing (inArray([]) is always-false).
   if (opts.ids) predicates.push(inArray(entities.id, [...opts.ids]));
   // Facets: OR within a category, AND across them; empty arrays are skipped.
-  if (opts.type?.length) predicates.push(inArray(entities.type, [...opts.type]));
-  if (opts.visibility?.length)
-    predicates.push(inArray(entities.visibility, [...opts.visibility]));
-  if (opts.tags?.length) predicates.push(hasAnyTag(opts.tags));
+  if (opts.type?.length) predicates.push(hasAny(entities.types, opts.type));
+  if (opts.visibility?.length) predicates.push(inArray(entities.visibility, [...opts.visibility]));
+  if (opts.tags?.length) predicates.push(hasAny(entities.tags, opts.tags));
+  if (opts.fields?.length) predicates.push(...fieldFilters(opts.fields));
   if (opts.worldId) predicates.push(eq(entities.worldId, opts.worldId));
   return predicates;
+}
+
+/**
+ * Filter-by-Field predicates (ADR-0048, #188), grouped by Metadata key: `eq` values OR (enum/list
+ * membership), `gte`/`lte` bounds AND (a range), and one `EXISTS` over the denormalised
+ * `entity_field_facets` index per key — so different keys AND, matching the universal facets. A
+ * range on a `number` Field compares the numeric `num` column; a date/string compares `value`
+ * lexically (ISO dates sort correctly as text).
+ */
+function fieldFilters(fields: readonly FieldFilter[]): SQL[] {
+  const byKey = new Map<string, FieldFilter[]>();
+  for (const f of fields) {
+    const group = byKey.get(f.key);
+    if (group) group.push(f);
+    else byKey.set(f.key, [f]);
+  }
+  const predicates: SQL[] = [];
+  for (const [key, group] of byKey) {
+    const conds: SQL[] = [];
+    const eqValues = group.filter((f) => f.op === 'eq').map((f) => f.value);
+    if (eqValues.length) {
+      const list = sql.join(
+        eqValues.map((v) => sql`${v}`),
+        sql`, `,
+      );
+      conds.push(sql`f.value IN (${list})`);
+    }
+    for (const f of group) {
+      if (f.op === 'gte') conds.push(rangeBound(f.value, '>='));
+      if (f.op === 'lte') conds.push(rangeBound(f.value, '<='));
+    }
+    if (conds.length === 0) continue;
+    predicates.push(
+      sql`EXISTS (SELECT 1 FROM ${entityFieldFacets} f WHERE f.entity_id = ${entities.id} AND f.key = ${key} AND ${and(...conds)})`,
+    );
+  }
+  return predicates;
+}
+
+/**
+ * One `gte`/`lte` range bound. The materialised `num` column *is* the numeric-ness signal (set only
+ * for a `number` Field), so a row with `num` compares numerically and one without compares its
+ * `value` lexically (ISO dates sort correctly as text) — no need to know the Field's data-type at
+ * filter time, so a stale URL that omits the active type still compares a number as a number. A
+ * non-finite numeric bound (a hand-edited URL) matches no numeric row rather than binding NaN.
+ */
+function rangeBound(value: string, op: '>=' | '<='): SQL {
+  const n = Number(value);
+  const numeric = Number.isFinite(n) ? sql`f.num ${sql.raw(op)} ${n}` : sql`0`;
+  const lexical = sql`f.value ${sql.raw(op)} ${value}`;
+  return sql`(CASE WHEN f.num IS NOT NULL THEN ${numeric} ELSE ${lexical} END)`;
 }
 
 /**
@@ -750,23 +962,20 @@ function filters(opts: FilterOptions) {
  * facet count and the page it annotates always agree on the filtered set.
  */
 function facetWhere(opts: FacetOptions, match: string | null, filter: SQL) {
-  return and(
-    filter,
-    ...filters(opts),
-    match ? sql`entities_fts MATCH ${match}` : undefined,
-  );
+  return and(filter, ...filters(opts), match ? sql`entities_fts MATCH ${match}` : undefined);
 }
 
 /**
- * A row matches if its JSON `tags` array contains any of `tags`: `json_each`
- * unrolls the stored array so `value IN (...)` can test membership.
+ * A row matches if its JSON-array `column` (`types` or `tags`) contains any of `values`:
+ * `json_each` unrolls the stored array so `value IN (...)` tests array membership. Shared by the
+ * Type and Tag filters, both multi-valued since the `type` → `types` flip (ADR-0048).
  */
-function hasAnyTag(tags: readonly string[]) {
+function hasAny(column: typeof entities.types | typeof entities.tags, values: readonly string[]) {
   const list = sql.join(
-    tags.map((t) => sql`${t}`),
+    values.map((v) => sql`${v}`),
     sql`, `,
   );
-  return sql`EXISTS (SELECT 1 FROM json_each(${entities.tags}) WHERE value IN (${list}))`;
+  return sql`EXISTS (SELECT 1 FROM json_each(${column}) WHERE value IN (${list}))`;
 }
 
 /**
@@ -794,7 +1003,7 @@ function toSummary(row: SummaryColumns): EntitySummary {
     id: row.id,
     worldId: row.worldId,
     name: row.name,
-    type: entityTypeSchema.parse(row.type),
+    types: typesSchema.parse(row.types),
     tags: tagsSchema.parse(row.tags),
     visibility: visibilitySchema.parse(row.visibility),
     version: row.version,
@@ -823,17 +1032,11 @@ function parseDocument(id: string, document: string): EntityBody {
   try {
     parsed = JSON.parse(document);
   } catch (cause) {
-    throw new Error(
-      `Stored entity ${id} has a document that is not valid JSON`,
-      { cause },
-    );
+    throw new Error(`Stored entity ${id} has a document that is not valid JSON`, { cause });
   }
   const result = entityBodySchema.safeParse(parsed);
   if (!result.success) {
-    throw new Error(
-      `Stored entity ${id} has a document that fails the Entity schema`,
-      { cause: result.error },
-    );
+    throw new Error(`Stored entity ${id} has a document that fails the Entity schema`, { cause: result.error });
   }
   return result.data;
 }

@@ -1,19 +1,15 @@
+import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
-import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
-import {
-  CONTENT_FORMAT,
-  coordKey,
-  emptyContent,
-  EntityDetail,
-  EntitySaveOutcome,
-  HexMap,
-} from '@hexly/domain';
-import { provideTranslocoTesting, MockEntitiesClient, MockNudgeBusClient } from '@hexly/web-core/testing';
+import { CONTENT_FORMAT, CORE_NOTE, emptyContent, EntityDetail, EntitySaveOutcome } from '@hexly/domain';
+import { coordKey, CORE_HEXMAP, emptyHexMap, HEX_GRID_FIELD, HexMap } from '@hexly/plugin-hexmap';
+import { MockEntitiesClient, MockNudgeBusClient } from '@hexly/web-core/testing';
 import { EntitiesClient, NudgeBusClient, EVICTED, Watched } from '@hexly/web-core';
 import { EntitySession } from './entity-session';
-import { HexMapStore } from '@hexly/web-map';
+import { ENTITY_SESSION, VIEW_FIELD_KEY } from '@hexly/web-entity';
+import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
+import { HexMapStore } from '@hexly/plugin-hexmap/testing';
 
 describe('EntitySession', () => {
   let session: EntitySession;
@@ -22,8 +18,8 @@ describe('EntitySession', () => {
   let bus: MockNudgeBusClient;
 
   const content = emptyContent();
-  /** Wrap a hex grid into the hexmap body the store carries end to end. */
-  const bodyOf = (grid: HexMap) => ({ type: 'hexmap' as const, content, ...grid });
+  /** Wrap a hex grid into the hexmap body the store carries end to end: its `grid` Field value. */
+  const bodyOf = (grid: HexMap) => ({ content, metadata: { grid } });
 
   const forestAt00: HexMap = {
     hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' } },
@@ -39,7 +35,7 @@ describe('EntitySession', () => {
     id: 'm1',
     worldId: 'w1',
     name: 'Aldermoor',
-    type: 'hexmap',
+    types: [CORE_HEXMAP],
     tags: [],
     visibility: 'private',
     version: 3,
@@ -60,7 +56,14 @@ describe('EntitySession', () => {
     TestBed.configureTestingModule({
       imports: [provideTranslocoTesting()],
       providers: [
+        providePluginHexmap(),
         EntitySession,
+        // The session is the central store; HexMapStore edits it through the ENTITY_SESSION
+        // token, as the app's composition root wires it (ADR-0048).
+        { provide: ENTITY_SESSION, useExisting: EntitySession },
+        HexMapStore,
+        // Which grid the store edits is the page's to say; here, `core.hexmap`'s own.
+        { provide: VIEW_FIELD_KEY, useValue: HEX_GRID_FIELD.key },
         { provide: EntitiesClient, useValue: entities },
         { provide: NudgeBusClient, useValue: bus },
       ],
@@ -98,12 +101,7 @@ describe('EntitySession', () => {
     session.save().subscribe((o) => (outcome = o));
 
     // Content preserved untouched.
-    expect(entities.save).toHaveBeenCalledWith(
-      'm1',
-      bodyOf(editor.document()),
-      3,
-      [],
-    );
+    expect(entities.save).toHaveBeenCalledWith('m1', bodyOf(editor.document()), 3, []);
     expect(outcome).toEqual({ status: 'saved', entity: saved });
   });
 
@@ -123,13 +121,59 @@ describe('EntitySession', () => {
     entities.save.mockReturnValue(of({ status: 'saved', entity: saved }));
     session.save().subscribe();
 
-    expect(entities.save).toHaveBeenCalledWith(
-      'm1',
-      bodyOf(editor.document()),
-      3,
-      ['deity', 'ruined'],
-    );
+    expect(entities.save).toHaveBeenCalledWith('m1', bodyOf(editor.document()), 3, ['deity', 'ruined']);
     expect(session.current()?.tags).toEqual(['deity', 'ruined']);
+  });
+
+  it('seeds the open entity’s types and sends an authored type set with the save (#189)', () => {
+    openAldermoor(); // types: [core.hexmap]
+    expect(session.types()).toEqual([CORE_HEXMAP]);
+    expect(session.dirty()).toBe(false);
+
+    // Reorder to re-primary the note, and add nothing new — a pure type-set edit.
+    session.setTypes([CORE_NOTE, CORE_HEXMAP]);
+    expect(session.types()).toEqual([CORE_NOTE, CORE_HEXMAP]);
+    expect(session.dirty()).toBe(true);
+
+    const saved: EntityDetail = {
+      ...aldermoor,
+      version: 4,
+      types: [CORE_NOTE, CORE_HEXMAP],
+      document: bodyOf(editor.document()),
+    };
+    entities.save.mockReturnValue(of({ status: 'saved', entity: saved }));
+    session.save().subscribe();
+
+    // The type set rides the save as the 5th arg — an active typed edit the server gates.
+    expect(entities.save).toHaveBeenCalledWith('m1', bodyOf(editor.document()), 3, [], [CORE_NOTE, CORE_HEXMAP]);
+    expect(session.current()?.types).toEqual([CORE_NOTE, CORE_HEXMAP]);
+    expect(session.dirty()).toBe(false);
+  });
+
+  it('mints the grid Field’s empty plane when core.hexmap is added to a note (#189)', () => {
+    const noteBody = { content };
+    const note: EntityDetail = { ...aldermoor, id: 'n1', types: [CORE_NOTE], document: noteBody };
+    entities.load.mockReturnValue(of(note));
+    session.open('n1').subscribe();
+    expect(session.body()).toEqual(noteBody);
+
+    session.setTypes([CORE_NOTE, CORE_HEXMAP]);
+
+    // The body gained an empty grid so the map View has a plane to render; Content is preserved.
+    expect(session.body()).toEqual({ ...noteBody, metadata: { grid: emptyHexMap() } });
+    expect(session.dirty()).toBe(true);
+  });
+
+  it('never sends types on a plain body edit — data at rest is not re-typed (#189)', () => {
+    openAldermoor();
+    editor.paintAt({ q: 5, r: 5 }, 'ocean'); // body edit, no type change
+
+    entities.save.mockReturnValue(of({ status: 'saved', entity: { ...aldermoor, version: 4 } }));
+    session.save().subscribe();
+
+    // Four args: the type set is omitted, so the server leaves the stored types untouched.
+    expect(entities.save).toHaveBeenCalledWith('m1', expect.anything(), 3, []);
+    expect(entities.save.mock.calls[0]).toHaveLength(4);
   });
 
   it('preserves the caller’s load-time Rights across a save (ADR-0039)', () => {
@@ -139,7 +183,11 @@ describe('EntitySession', () => {
     session.open('m1').subscribe();
     editor.paintAt({ q: 5, r: 5 }, 'ocean');
 
-    const saved = stripRights({ ...aldermoor, version: 4, document: bodyOf(editor.document()) });
+    const saved = stripRights({
+      ...aldermoor,
+      version: 4,
+      document: bodyOf(editor.document()),
+    });
     entities.save.mockReturnValue(of({ status: 'saved', entity: saved }));
     session.save().subscribe();
 
@@ -217,7 +265,11 @@ describe('EntitySession', () => {
     entities.save.mockReturnValue(
       of({
         status: 'saved',
-        entity: { ...aldermoor, version: 4, document: bodyOf(editor.document()) },
+        entity: {
+          ...aldermoor,
+          version: 4,
+          document: bodyOf(editor.document()),
+        },
       }),
     );
     session.save().subscribe();
@@ -281,7 +333,11 @@ describe('EntitySession', () => {
       entities.save.mockReturnValue(
         of({
           status: 'saved',
-          entity: { ...aldermoor, version: 4, document: bodyOf(editor.document()) },
+          entity: {
+            ...aldermoor,
+            version: 4,
+            document: bodyOf(editor.document()),
+          },
         }),
       );
 
@@ -313,9 +369,7 @@ describe('EntitySession', () => {
       editor.paintAt({ q: 5, r: 5 }, 'ocean'); // dirty, debounce not yet elapsed
       expect(session.dirty()).toBe(true);
 
-      entities.save.mockReturnValue(
-        of({ status: 'saved', entity: { ...aldermoor, version: 4 } }),
-      );
+      entities.save.mockReturnValue(of({ status: 'saved', entity: { ...aldermoor, version: 4 } }));
       let done = false;
       session.flush().subscribe({ complete: () => (done = true) });
 
@@ -351,7 +405,11 @@ describe('EntitySession', () => {
       entities.save.mockReturnValueOnce(second$);
       first$.next({
         status: 'saved',
-        entity: { ...aldermoor, version: 4, document: bodyOf(editor.document()) },
+        entity: {
+          ...aldermoor,
+          version: 4,
+          document: bodyOf(editor.document()),
+        },
       });
       first$.complete();
 
@@ -362,7 +420,11 @@ describe('EntitySession', () => {
 
       second$.next({
         status: 'saved',
-        entity: { ...aldermoor, version: 5, document: bodyOf(editor.document()) },
+        entity: {
+          ...aldermoor,
+          version: 5,
+          document: bodyOf(editor.document()),
+        },
       });
       second$.complete();
 
@@ -384,7 +446,11 @@ describe('EntitySession', () => {
       entities.save.mockReturnValue(
         of({
           status: 'saved',
-          entity: { ...aldermoor, version: 4, document: bodyOf(editor.document()) },
+          entity: {
+            ...aldermoor,
+            version: 4,
+            document: bodyOf(editor.document()),
+          },
         }),
       );
       vi.advanceTimersByTime(300); // 800ms since the last edit
@@ -429,7 +495,11 @@ describe('EntitySession', () => {
       entities.save.mockReturnValue(
         of({
           status: 'saved',
-          entity: { ...aldermoor, version: 8, document: bodyOf(editor.document()) },
+          entity: {
+            ...aldermoor,
+            version: 8,
+            document: bodyOf(editor.document()),
+          },
         }),
       );
       editor.paintAt({ q: 1, r: 1 }, 'ocean');
@@ -456,7 +526,11 @@ describe('EntitySession', () => {
       entities.save.mockReturnValue(
         of({
           status: 'saved',
-          entity: { ...aldermoor, version: 4, document: bodyOf(editor.document()) },
+          entity: {
+            ...aldermoor,
+            version: 4,
+            document: bodyOf(editor.document()),
+          },
         }),
       );
       editor.paintAt({ q: 6, r: 6 }, 'forest');
@@ -521,7 +595,9 @@ describe('EntitySession', () => {
     entities.patch.mockReturnValue(of({ ...aldermoor, name: 'The Whisperwood' }));
     session.rename('The Whisperwood').subscribe();
 
-    expect(entities.patch).toHaveBeenCalledWith('m1', { name: 'The Whisperwood' });
+    expect(entities.patch).toHaveBeenCalledWith('m1', {
+      name: 'The Whisperwood',
+    });
     expect(session.current()?.name).toBe('The Whisperwood');
   });
 
@@ -551,9 +627,7 @@ describe('EntitySession', () => {
   it('surfaces a 403 save as a terminal read-only state, not the retryable save error', () => {
     openAldermoor(); // Owner Rights → writable, so the save is actually attempted
     editor.paintAt({ q: 5, r: 5 }, 'ocean');
-    entities.save.mockReturnValue(
-      throwError(() => new HttpErrorResponse({ status: 403 })),
-    );
+    entities.save.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 403 })));
 
     session.save().subscribe();
 
@@ -580,9 +654,7 @@ describe('EntitySession', () => {
     openAldermoor();
     editor.paintAt({ q: 5, r: 5 }, 'ocean'); // m1 now dirty
 
-    entities.save.mockReturnValue(
-      of({ status: 'saved', entity: { ...aldermoor, version: 4 } }),
-    );
+    entities.save.mockReturnValue(of({ status: 'saved', entity: { ...aldermoor, version: 4 } }));
     const load$ = new Subject<EntityDetail>();
     entities.load.mockReturnValue(load$);
 
@@ -597,7 +669,11 @@ describe('EntitySession', () => {
     expect(editor.document()).toEqual({ hexes: {}, regions: [], labels: [] });
     expect(session.dirty()).toBe(false);
 
-    const other: EntityDetail = { ...aldermoor, id: 'm2', document: bodyOf(forestAt00) };
+    const other: EntityDetail = {
+      ...aldermoor,
+      id: 'm2',
+      document: bodyOf(forestAt00),
+    };
     load$.next(other);
     load$.complete();
     expect(editor.document()).toEqual(forestAt00);
@@ -606,30 +682,28 @@ describe('EntitySession', () => {
   it('saves a non-hexmap entity without coercing it into a hexmap (no data loss)', () => {
     // A note must save back as a note; the editor's empty grid must not
     // overwrite it with a blank hexmap body.
-    const noteBody = { type: 'note' as const, content };
+    const noteBody = { content };
     const note: EntityDetail = {
       ...aldermoor,
       id: 'n1',
-      type: 'note',
+      types: [CORE_NOTE],
       document: noteBody,
     };
     entities.load.mockReturnValue(of(note));
     session.open('n1').subscribe();
 
-    entities.save.mockReturnValue(
-      of({ status: 'saved', entity: { ...note, version: 4 } }),
-    );
+    entities.save.mockReturnValue(of({ status: 'saved', entity: { ...note, version: 4 } }));
     session.save().subscribe();
 
     expect(entities.save).toHaveBeenCalledWith('n1', noteBody, 3, []);
   });
 
   it('saves a note’s edited Content opaquely, round-tripping the snapshot untouched', () => {
-    const noteBody = { type: 'note' as const, content };
+    const noteBody = { content };
     const note: EntityDetail = {
       ...aldermoor,
       id: 'n1',
-      type: 'note',
+      types: [CORE_NOTE],
       document: noteBody,
     };
     entities.load.mockReturnValue(of(note));
@@ -646,18 +720,11 @@ describe('EntitySession', () => {
     };
     session.setContent(snapshot);
 
-    entities.save.mockReturnValue(
-      of({ status: 'saved', entity: { ...note, version: 4 } }),
-    );
+    entities.save.mockReturnValue(of({ status: 'saved', entity: { ...note, version: 4 } }));
     session.save().subscribe();
 
     // Snapshot wrapped in format envelope, never parsed (ADR-0019).
-    expect(entities.save).toHaveBeenCalledWith(
-      'n1',
-      { type: 'note', content: { format: CONTENT_FORMAT, snapshot } },
-      3,
-      [],
-    );
+    expect(entities.save).toHaveBeenCalledWith('n1', { content: { format: CONTENT_FORMAT, snapshot } }, 3, []);
   });
 
   it('rides a hexmap’s edited Content alongside its grid on save (#75)', () => {
@@ -675,18 +742,16 @@ describe('EntitySession', () => {
     };
     session.setContent(snapshot);
 
-    entities.save.mockReturnValue(
-      of({ status: 'saved', entity: { ...aldermoor, version: 4 } }),
-    );
+    entities.save.mockReturnValue(of({ status: 'saved', entity: { ...aldermoor, version: 4 } }));
     session.save().subscribe();
 
-    // Body carries both edits; neither surface drops the other's (ADR-0019).
+    // Body carries both edits; neither surface drops the other's (ADR-0019). The grid rides the
+    // Metadata map as the `grid` Field's value, beside whatever other Fields the Entity carries.
     expect(entities.save).toHaveBeenCalledWith(
       'm1',
       {
-        type: 'hexmap',
         content: { format: CONTENT_FORMAT, snapshot },
-        ...editor.document(),
+        metadata: { grid: editor.document() },
       },
       3,
       [],
@@ -698,9 +763,7 @@ describe('EntitySession', () => {
     editor.paintAt({ q: 5, r: 5 }, 'ocean');
 
     // Navigating away first flushes m1's pending edit (ADR-0026), then loads m2.
-    entities.save.mockReturnValue(
-      of({ status: 'saved', entity: { ...aldermoor, version: 4 } }),
-    );
+    entities.save.mockReturnValue(of({ status: 'saved', entity: { ...aldermoor, version: 4 } }));
     const load$ = new Subject<EntityDetail>();
     entities.load.mockReturnValue(load$);
 
@@ -719,26 +782,8 @@ describe('EntitySession', () => {
     load$.complete();
   });
 
-  it('restores the editor view from the ?view query param on load (#75)', () => {
-    // A shared link with ?view=note lands on the Note view. No id param → no fetch.
-    session.watchRoute({
-      paramMap: of(convertToParamMap({})),
-      queryParamMap: of(convertToParamMap({ view: 'note' })),
-    } as unknown as ActivatedRoute);
-
-    expect(editor.view()).toBe('note');
-  });
-
-  it('opens on the Map view when the URL carries no view param (#75)', () => {
-    editor.setView('note'); // a stale view from a previously open Entity
-
-    session.watchRoute({
-      paramMap: of(convertToParamMap({})),
-      queryParamMap: of(convertToParamMap({})),
-    } as unknown as ActivatedRoute);
-
-    expect(editor.view()).toBe('map');
-  });
+  // The `?view=` → active-View sync moved to EntityPage (ADR-0048, Views amendment);
+  // its coverage lives in entity.page.spec.ts, driven off the outletted view.
 
   it('warns on tab close (beforeunload) only when there are unsaved edits', () => {
     openAldermoor();
@@ -760,7 +805,11 @@ describe('EntitySession', () => {
     entities.save.mockReturnValue(
       of({
         status: 'saved',
-        entity: { ...aldermoor, version: 4, document: bodyOf(editor.document()) },
+        entity: {
+          ...aldermoor,
+          version: 4,
+          document: bodyOf(editor.document()),
+        },
       }),
     );
     const event = new KeyboardEvent('keydown', {

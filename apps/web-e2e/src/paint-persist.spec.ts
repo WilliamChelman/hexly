@@ -1,4 +1,4 @@
-import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtures';
+import { createEntity, enterLibrary, expect, flushSave, savedGrid, test } from './fixtures';
 
 /**
  * The keystone journey: it crosses every seam — the session cookie on API calls,
@@ -7,15 +7,9 @@ import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtur
  * round trip by reloading; a direct API read confirms the persisted document
  * (ADR-0009).
  */
-test('paints a hex, saves, and the hex survives a reload', async ({
-  page,
-  request,
-}) => {
+test('paints a hex, saves, and the hex survives a reload', async ({ page, request }) => {
   await enterLibrary(page);
-  await page.getByTestId('new-map').click();
-
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const mapId = entityIdFromUrl(page);
+  const mapId = await createEntity(page, 'core.hexmap');
 
   // A map opens armed with Select, so a stray click never paints (issue #27).
   await page.getByRole('img', { name: 'Hex map' }).click();
@@ -23,10 +17,7 @@ test('paints a hex, saves, and the hex survives a reload', async ({
 
   // Pick a non-default terrain so the saved document proves our selection.
   await page.getByTestId('tool-terrain').click();
-  await page
-    .getByRole('group', { name: 'Terrain' })
-    .getByRole('button', { name: 'Ocean' })
-    .click();
+  await page.getByRole('group', { name: 'Terrain' }).getByRole('button', { name: 'Ocean' }).click();
 
   await expect(page.getByTestId('hex-count')).toHaveText('0 hexes');
 
@@ -38,10 +29,8 @@ test('paints a hex, saves, and the hex survives a reload', async ({
   await page.reload();
   await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
 
-  const res = await request.get(`/api/entities/${mapId}`);
-  expect(res.ok()).toBeTruthy();
-  const detail = await res.json();
-  const hexes = Object.values(detail.document.hexes) as Array<{
+  const grid = await savedGrid(request, mapId);
+  const hexes = Object.values(grid.hexes) as Array<{
     terrain: string;
   }>;
   expect(hexes).toHaveLength(1);

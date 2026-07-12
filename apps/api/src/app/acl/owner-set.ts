@@ -1,9 +1,4 @@
-import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { AclErrorCode, AclResourceKind, ApiError } from '@hexly/domain';
 import { and, eq, sql } from 'drizzle-orm';
 import { Db } from '../db/db';
@@ -40,7 +35,9 @@ export function aclSetResponse<T>(result: AclSetResult<T>, kind: AclResourceKind
     case 'forbidden':
       throw new ForbiddenException();
     case 'no-such-user':
-      throw new BadRequestException({ code: AclErrorCode.NoSuchUser } satisfies ApiError);
+      throw new BadRequestException({
+        code: AclErrorCode.NoSuchUser,
+      } satisfies ApiError);
     case 'last-owner':
       throw new ConflictException({
         code: AclErrorCode.LastOwner,

@@ -1,10 +1,11 @@
+import { provideTranslocoTesting } from '../../testing/transloco-testing';
 import { BreakpointObserver, BreakpointState } from '@angular/cdk/layout';
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { BehaviorSubject, Observable, map, of } from 'rxjs';
 import { AuthClient, WorldsClient, ActiveWorld } from '@hexly/web-core';
-import { MockAuthClient, MockWorldsClient, provideTranslocoTesting } from '@hexly/web-core/testing';
+import { MockAuthClient, MockWorldsClient } from '@hexly/web-core/testing';
 import { NavRail } from './nav-rail';
 import { NavRailStore } from './nav-rail.store';
 
@@ -51,13 +52,18 @@ describe('NavRail', () => {
 
   afterEach(() => localStorage.clear());
   afterEach(() => {
-    document
-      .querySelectorAll('.cdk-overlay-container')
-      .forEach((el) => el.remove());
+    document.querySelectorAll('.cdk-overlay-container').forEach((el) => el.remove());
   });
 
   function signIn(displayName = 'Ada Lovelace'): void {
-    auth.setUser({ id: 'u1', email: 'ada@hexly.test', displayName, preferences: {}, roles: ['create-worlds'], isSuperadmin: false });
+    auth.setUser({
+      id: 'u1',
+      email: 'ada@hexly.test',
+      displayName,
+      preferences: {},
+      roles: ['create-worlds'],
+      isSuperadmin: false,
+    });
   }
 
   function render() {
@@ -66,10 +72,7 @@ describe('NavRail', () => {
     return fixture;
   }
 
-  function q(
-    fixture: ReturnType<typeof render>,
-    testid: string,
-  ): HTMLElement | null {
+  function q(fixture: ReturnType<typeof render>, testid: string): HTMLElement | null {
     return fixture.nativeElement.querySelector(`[data-testid="${testid}"]`);
   }
 
@@ -82,7 +85,12 @@ describe('NavRail', () => {
     signIn();
     // Inside a World the layout fills the slot (ADR-0041); the rail only renders it.
     TestBed.inject(ActiveWorld).set('w1');
-    injectEntries({ link: '/w/w1/entities', testid: 'nav-entities', icon: 'library', labelKey: 'nav.library' });
+    injectEntries({
+      link: '/w/w1/entities',
+      testid: 'nav-entities',
+      icon: 'library',
+      labelKey: 'nav.library',
+    });
     const fixture = render();
 
     const brand = q(fixture, 'brand') as HTMLAnchorElement;
@@ -135,7 +143,12 @@ describe('NavRail', () => {
     signIn();
     // Pin the active World (switcher gate) and hand the rail the link the layout would.
     TestBed.inject(ActiveWorld).set('w1');
-    injectEntries({ link: '/w/w1/entities', testid: 'nav-entities', icon: 'library', labelKey: 'nav.library' });
+    injectEntries({
+      link: '/w/w1/entities',
+      testid: 'nav-entities',
+      icon: 'library',
+      labelKey: 'nav.library',
+    });
     const fixture = render();
 
     await TestBed.inject(Router).navigateByUrl('/w/w1/entities');
@@ -144,9 +157,7 @@ describe('NavRail', () => {
     await fixture.whenStable();
     fixture.detectChanges();
 
-    expect(q(fixture, 'nav-entities')?.getAttribute('aria-current')).toBe(
-      'page',
-    );
+    expect(q(fixture, 'nav-entities')?.getAttribute('aria-current')).toBe('page');
     // Styleguide is instance-scoped and absent inside a World (ADR-0041).
     expect(q(fixture, 'nav-styleguide')).toBeNull();
   });
@@ -165,17 +176,13 @@ describe('NavRail', () => {
     (q(fixture, 'rail-toggle') as HTMLButtonElement).click();
     fixture.detectChanges();
 
-    const all = (testid: string) =>
-      fixture.nativeElement.querySelectorAll(`[data-testid="${testid}"]`)
-        .length;
+    const all = (testid: string) => fixture.nativeElement.querySelectorAll(`[data-testid="${testid}"]`).length;
     // The overlay is open; the docked strip behind it must not re-render the body.
     expect(q(fixture, 'nav-rail-overlay')).not.toBeNull();
     expect(all('brand')).toBe(1);
     expect(all('rail-toggle')).toBe(1);
     // The lone toggle's ARIA tracks its visibly-open state, not a stale source.
-    expect(q(fixture, 'rail-toggle')?.getAttribute('aria-expanded')).toBe(
-      'true',
-    );
+    expect(q(fixture, 'rail-toggle')?.getAttribute('aria-expanded')).toBe('true');
   });
 
   it('does not resurrect the overlay after a narrow → wide → narrow round trip', () => {

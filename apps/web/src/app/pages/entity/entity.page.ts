@@ -1,179 +1,60 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, Injector, computed, effect, inject } from '@angular/core';
+import { NgComponentOutlet } from '@angular/common';
+import { VIEW_FIELD_KEY } from '@hexly/web-entity';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
-import { TranslocoPipe, translateSignal } from '@jsverse/transloco';
-import { Observable, concat, ignoreElements, of } from 'rxjs';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { Observable, concat, distinctUntilChanged, ignoreElements, map, of } from 'rxjs';
 import { EntitySession } from './services/entity-session';
+import { EntityViewStore } from './services/entity-view-store';
 import { OutlineStore } from './services/outline-store';
 import { ReferencesStore } from './services/references-store';
 import { RightDock } from './services/right-dock';
 import { EntityHeader } from './components/entity-header';
-import {
-  HexMapStore,
-  ToolPalette,
-  MapCanvas,
-  Inspector,
-  RegionsPanel,
-  EditorRail,
-  StatusBar,
-} from '@hexly/web-map';
-import { ContentEditor } from '@hexly/content-editor';
-import { EntityMetadata } from './components/entity-metadata';
-import { OutlinePanel } from './components/outline-panel';
-import { OutlineSource } from './components/outline-source';
-import { ReferencesPanel } from './components/references-panel';
-import { IconButton, Icon } from '@hexly/web-ui';
+import { ViewRegistry } from '../../entity-types/view-registry';
+import { CORE_VIEW_DEFINITIONS } from './views/core-views';
 
 /**
  * The open-Entity route (`/entities/:id`, #70): the routed page that loads the
  * Entity into {@link EntitySession} and lays out its editor — one frame for every
  * Entity type (ADR-0022).
  *
- * The shared {@link EntityHeader} docks above the body; the body is driven by the
- * open Entity:
- * - a `hexmap` shows the full-bleed map editor (canvas + chrome floating over it
- *   as absolute cards, ADR-0013) or — when its Map/Note toggle is on Note (#75) —
- *   its Content body, with the {@link StatusBar} docked below;
- * - a `note` shows only its Content body in a centred reading column (ADR-0019),
- *   with no grid and so no status bar or Map/Note toggle.
+ * A thin host (ADR-0048, *Views* amendment): the {@link EntityHeader} docks above,
+ * and the body is a single `NgComponentOutlet` over the active View's component,
+ * resolved from the {@link ViewRegistry} by {@link EntityViewStore.activeView}. There
+ * is no `isHexmap` branch — the page dispatches on the active View id, and the core
+ * Views (`MapView`, `ContentView`) register themselves the way a plugin would.
  *
- * Staying the routed component across `:id` changes keeps the editor mounted as
- * the open Entity swaps — only the body content changes, never the frame.
+ * Staying the routed component across `:id` changes keeps the editor mounted as the
+ * open Entity swaps — only the outletted body changes, never the frame.
  */
 @Component({
   selector: 'app-entity-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block h-full overflow-hidden' },
-  // The dock's own state, scoped to the page that shows it. Provided *here* rather than beside
-  // EntitySession on the route, because every context that mounts this component needs them and
-  // none overrides them: a Public Link page reuses EntityPage, and mirroring the route's provider
-  // list by hand is a contract nothing enforces (it silently broke the public page once, #179).
-  // The session-shaped providers stay with the mounting context, which does override them.
-  providers: [RightDock, OutlineStore, ReferencesStore],
-  imports: [
-    EntityHeader,
-    ToolPalette,
-    MapCanvas,
-    Inspector,
-    RegionsPanel,
-    EditorRail,
-    StatusBar,
-    ContentEditor,
-    EntityMetadata,
-    OutlinePanel,
-    OutlineSource,
-    ReferencesPanel,
-    IconButton,
-    Icon,
-    TranslocoPipe,
-  ],
+  // The Content view's dock stores, scoped to the page that shows them. Provided *here*
+  // rather than beside EntitySession on the route, because every context that mounts this
+  // component needs them and none overrides them: a Public Link page reuses EntityPage, and
+  // mirroring the route's provider list by hand is a contract nothing enforces (it silently
+  // broke the public page once, #179). ContentView, outletted below, injects them from here.
+  // EntityViewStore joins them: page-scoped, it reads the open Entity's types off the session
+  // (provided above the page in both mounts) to derive the afforded Views and the active one.
+  providers: [RightDock, OutlineStore, ReferencesStore, EntityViewStore],
+  imports: [EntityHeader, NgComponentOutlet, TranslocoPipe],
   template: `
     @if (session.current()) {
-      <div
-        class="grid h-full"
-        [style.grid-template-rows]="
-          isHexmap() ? 'auto 1fr var(--rail-status)' : 'auto 1fr'
-        "
-      >
+      <div class="grid h-full" style="grid-template-rows: auto 1fr">
         <!-- Page-owned header docked above the body (ADR-0022). -->
         <app-entity-header />
-        <main class="body relative min-h-0">
-          @if (showMap()) {
-            <!-- Full-bleed canvas; all side chrome floats over it (ADR-0013). The canvas
-                 itself is a read affordance (pan/zoom); every editing dock below is gated on
-                 writable() so a read-only opener sees the map but no tools (ADR-0037, #162). -->
-            <app-map-canvas class="absolute inset-0" />
-            @if (writable()) {
-              <app-tool-palette class="absolute top-3 left-3 z-[1]" />
-              <!--
-                Right dock: panel (Inspector / Regions) + edge rail as a flex row, no
-                hand-computed offsets (ADR-0013). pointer-events-none so the canvas stays
-                interactive below a short panel; each child re-enables it.
-              -->
-              <div
-                class="absolute top-3 right-3 bottom-3 flex items-start gap-2 z-[1] pointer-events-none"
-              >
-                @if (store.rightPanel() === 'regions') {
-                  <app-regions-panel
-                    class="w-[var(--rail-inspector)] max-h-full border border-line rounded-lg shadow-2 pointer-events-auto"
-                  />
-                } @else if (store.rightPanel() === 'inspector') {
-                  <app-inspector
-                    class="w-[var(--rail-inspector)] max-h-full border border-line rounded-lg shadow-2 pointer-events-auto"
-                  />
-                }
-                <app-editor-rail class="pointer-events-auto" />
-              </div>
-            }
-          } @else {
-            <!-- Content body in a centred reading column: a note, or a hexmap on its Note view (#75).
-                 Opening *either* dock panel reflows this column left (extra right padding) so the
-                 panel never overlaps prose — they share one slot and one width; closed still
-                 reserves room for the floating toggles. -->
-            <div
-              data-content-scroll
-              class="absolute inset-0 overflow-y-auto bg-surface-sunken transition-[padding] duration-200"
-              [style.paddingRight]="dock.isOpen() ? '20rem' : '3.5rem'"
-            >
-              <div class="max-w-[60rem] mx-auto py-6 px-6">
-                <app-entity-metadata />
-                <app-content-editor appOutlineSource [ariaLabel]="editorLabel()" />
-              </div>
-            </div>
-            <!-- Right dock floating top-right (mirrors the map dock, ADR-0013): one panel slot
-                 left of a rail of toggles; pointer-events re-enabled per child. The Outline and
-                 References share the slot, so dock.panel() is a single discriminant and "both
-                 open at once" is unrepresentable. Ungated by writable(): both are read affordances. -->
-            <div
-              class="absolute top-3 right-3 bottom-3 flex items-start gap-2 z-[1] pointer-events-none"
-            >
-              @if (dock.panel() === 'outline') {
-                <app-outline-panel
-                  class="w-[16rem] max-h-full border border-line rounded-lg shadow-2 pointer-events-auto"
-                />
-              } @else if (dock.panel() === 'references') {
-                <app-references-panel
-                  class="w-[16rem] max-h-full border border-line rounded-lg shadow-2 pointer-events-auto"
-                />
-              }
-              <div class="flex flex-col gap-2">
-                <button
-                  appIconButton
-                  toggle
-                  class="pointer-events-auto"
-                  [active]="dock.panel() === 'outline'"
-                  [title]="outlineToggleLabel()"
-                  [attr.aria-label]="outlineToggleLabel()"
-                  data-testid="outline-toggle"
-                  (click)="dock.toggle('outline')"
-                >
-                  <app-icon name="outline" [size]="20" />
-                </button>
-                @if (dock.offers('references')) {
-                  <button
-                    appIconButton
-                    toggle
-                    class="pointer-events-auto"
-                    [active]="dock.panel() === 'references'"
-                    [title]="linksToggleLabel()"
-                    [attr.aria-label]="linksToggleLabel()"
-                    data-testid="references-toggle"
-                    (click)="dock.toggle('references')"
-                  >
-                    <app-icon name="link" [size]="20" />
-                  </button>
-                }
-              </div>
-            </div>
+        <main class="relative min-h-0">
+          <!-- The active View's component (MapView / ContentView / a plugin view),
+               resolved from the ViewRegistry — no type sniffing (ADR-0048). The frame
+               around it is already drawn, so a deferred body arrives into a live page.
+               The injector carries down the Field key of a Structured Field's View. -->
+          @if (activeComponent(); as component) {
+            <ng-container *ngComponentOutlet="component; injector: viewInjector()" />
           }
         </main>
-        @if (isHexmap()) {
-          <app-status-bar />
-        }
       </div>
     } @else if (session.evicted()) {
       <!-- Live eviction (ADR-0044, #174): the followed Entity became unreachable (deleted,
@@ -192,52 +73,56 @@ import { IconButton, Icon } from '@hexly/web-ui';
       </div>
     }
   `,
-  styles: `
-    /*
-      The palette's max-height is the one property with no faithful utility (a
-      calc() over a token, ADR-0021), so it lives here; everything else is inline.
-    */
-    .body app-tool-palette {
-      max-height: calc(100% - 2 * calc(var(--spacing) * 3));
-    }
-  `,
 })
 export class EntityPage {
   protected readonly session = inject(EntitySession);
+  private readonly viewStore = inject(EntityViewStore);
+  private readonly views = inject(ViewRegistry);
+  private readonly injector = inject(Injector);
+
+  /** The component to outlet for the active View — absent only while a deferred body is in flight. */
+  protected readonly activeComponent = computed(() => this.views.component(this.viewStore.activeView().viewId));
+
   /**
-   * Whether the caller may edit (ADR-0037). Gates the map's editing docks — a read-only
-   * opener (Viewer grant, read-only member, or Public Link reader, #162) gets the canvas
-   * as pan/zoom-only, with the tool palette, inspector, and editor rail withheld.
+   * The injector the active View's component is created in — the page's own, plus {@link VIEW_FIELD_KEY}
+   * when the View renders a **Structured Field**. A Type's own View (Content, a stat block) renders no
+   * particular Field and is handed nothing.
+   *
+   * Keyed on {@link EntityViewStore.activeFieldKey}, which settles: `NgComponentOutlet` rebuilds the
+   * component whenever this reference changes, so a recompute on every re-derived view list would tear
+   * down a live map mid-edit.
    */
-  protected readonly writable = this.session.writable;
-  /** Drives the Map/Note surface swap and which view occupies the right column. */
-  protected readonly store = inject(HexMapStore);
-  /** Which panel the Content body's right dock is showing — one slot, so one discriminant. */
-  protected readonly dock = inject(RightDock);
-
-  /** Accessible names / tooltips for the dock's toggles (ADR-0014). */
-  protected readonly outlineToggleLabel = translateSignal('noteView.outline.toggle');
-  protected readonly linksToggleLabel = translateSignal('noteView.links.toggle');
-
-  /** Only a hexmap carries a grid surface — and so the status bar and Map/Note toggle (#75). */
-  protected readonly isHexmap = computed(
-    () => this.session.current()?.document.type === 'hexmap',
-  );
-
-  /** Show the hex grid only for a hexmap on its Map view; everything else shows the Content body (#75). */
-  protected readonly showMap = computed(
-    () => this.isHexmap() && this.store.view() === 'map',
-  );
-
-  private readonly mapEditorLabel = translateSignal('editorShell.view.editorLabel');
-  private readonly noteEditorLabel = translateSignal('noteView.editorLabel');
-  /** The Content editor's accessible name, per Entity type (ADR-0014, #75). */
-  protected readonly editorLabel = computed(() =>
-    this.isHexmap() ? this.mapEditorLabel() : this.noteEditorLabel(),
-  );
+  protected readonly viewInjector = computed(() => {
+    const fieldKey = this.viewStore.activeFieldKey();
+    return Injector.create({
+      parent: this.injector,
+      providers: fieldKey ? [{ provide: VIEW_FIELD_KEY, useValue: fieldKey }] : [],
+    });
+  });
 
   constructor() {
-    this.session.watchRoute(inject(ActivatedRoute));
+    // Register the core Views from the lazy entity chunk, dropping them when the page is torn down
+    // (ADR-0048). Kept out of the root ViewRegistry so the heavy view bodies (the map, TipTap) stay
+    // off the initial bundle. A bundled plugin's Views are already there, seeded by its
+    // `providePluginX()`, so the page names no plugin.
+    const unregister = CORE_VIEW_DEFINITIONS.map((d) => this.views.register(d));
+    inject(DestroyRef).onDestroy(() => unregister.forEach((u) => u()));
+
+    // Fetch a deferred View's body once it is the active one.
+    effect(() => this.views.fetch(this.viewStore.activeView().viewId));
+
+    const route = inject(ActivatedRoute);
+    this.session.watchRoute(route);
+    // The active View lives in the URL: refresh / shared link restores it (the View's key — its id,
+    // and the Field it renders when it has one: `core.view.map:grid`, ADR-0050), opening another
+    // Entity (no `view` param → null) resets to the default View (the primary type's first).
+    route.queryParamMap
+      .pipe(
+        map((q) => q.get('view')),
+        distinctUntilChanged(),
+        takeUntilDestroyed(),
+      )
+      .subscribe((view) => this.viewStore.setView(view));
   }
 
   /**

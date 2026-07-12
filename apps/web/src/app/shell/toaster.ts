@@ -1,10 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  ElementRef,
-  effect,
-  inject,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, effect, inject } from '@angular/core';
 import { NgClass } from '@angular/common';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { TranslocoPipe } from '@jsverse/transloco';
@@ -23,8 +17,7 @@ import { ToasterService } from '@hexly/web-core';
   // The host ignores the pointer so it never blocks the canvas; each toast
   // re-enables it for its own controls.
   host: {
-    class:
-      'fixed left-1/2 bottom-5 -translate-x-1/2 z-[1000] flex flex-col gap-2 items-center pointer-events-none',
+    class: 'fixed left-1/2 bottom-5 -translate-x-1/2 z-[1000] flex flex-col gap-2 items-center pointer-events-none',
     // A manual popover so the stack rides the top layer, above a modal <dialog>'s backdrop
     // (a plain z-index can't beat the top layer). `manual` = we own show/hide; no light-dismiss.
     popover: 'manual',
@@ -76,10 +69,7 @@ export class Toaster {
       const toasts = this.toaster.toasts();
       for (const toast of toasts) {
         if (this.announced.has(toast.id)) continue;
-        this.liveAnnouncer.announce(
-          toast.message,
-          toast.tone === 'error' ? 'assertive' : 'polite',
-        );
+        this.liveAnnouncer.announce(toast.message, toast.tone === 'error' ? 'assertive' : 'polite');
       }
       this.announced = new Set(toasts.map((toast) => toast.id));
       this.syncTopLayer(toasts.length > 0);

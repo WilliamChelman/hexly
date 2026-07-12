@@ -1,7 +1,7 @@
+import { provideTranslocoTesting } from '../../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
-import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { Styleguide } from './styleguide';
 
 describe('Styleguide', () => {
@@ -39,9 +39,7 @@ describe('Styleguide', () => {
   it('renders swatch display names from keys, localized to the active language', () => {
     const fixture = render();
     const swatches = () =>
-      Array.from(
-        (fixture.nativeElement as HTMLElement).querySelectorAll('.swatches'),
-      )
+      Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.swatches'))
         .map((el) => el.textContent)
         .join(' ');
 
@@ -83,10 +81,7 @@ describe('Styleguide', () => {
 
   it('preserves the masthead lede’s inline markup while localizing it', () => {
     const fixture = render();
-    const lede = () =>
-      (fixture.nativeElement as HTMLElement).querySelector(
-        '.hero-lede',
-      ) as HTMLElement;
+    const lede = () => (fixture.nativeElement as HTMLElement).querySelector('.hero-lede') as HTMLElement;
 
     // The emphasis/code markup survives the move into a single key.
     expect(lede().querySelector('strong')).not.toBeNull();
@@ -102,10 +97,8 @@ describe('Styleguide', () => {
   it('keeps the Hexly brand untranslated in both languages', () => {
     const fixture = render();
     const el = fixture.nativeElement as HTMLElement;
-    const eyebrow = () =>
-      (el.querySelector('.hero [appeyebrow]') as HTMLElement).textContent;
-    const brand = () =>
-      (el.querySelector('.brand') as HTMLElement).textContent?.trim();
+    const eyebrow = () => (el.querySelector('.hero [appeyebrow]') as HTMLElement).textContent;
+    const brand = () => (el.querySelector('.brand') as HTMLElement).textContent?.trim();
 
     expect(eyebrow()).toContain('Hexly');
     expect(brand()).toBe('Hexly');

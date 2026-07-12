@@ -9,37 +9,18 @@ import {
   viewChild,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { Button, ButtonGroup, Eyebrow, PageHeader } from '@hexly/web-ui';
 import { EntityActionsMenu } from './entity-actions-menu';
 import { EntityShareDialog } from './entity-share-dialog';
+import { EntityTypesDialog } from './entity-types-dialog';
 import { EntityTags } from './entity-tags';
 import { SaveStatus } from './save-status';
 import { EntitySession } from '../services/entity-session';
-import { EntityView, HexMapStore } from '@hexly/web-map';
-
-/** The view toggle's two segments, in display order; Map (the grid) is the default. */
-const VIEWS: readonly { id: EntityView; labelKey: string; testid: string }[] = [
-  { id: 'map', labelKey: 'editorShell.view.map', testid: 'view-map' },
-  { id: 'note', labelKey: 'editorShell.view.note', testid: 'view-note' },
-];
-
-/** Per-entity-type chrome: the eyebrow tag and the title's a11y labels. */
-const TYPE_LABELS: Record<
-  string,
-  { eyebrow: string; titleLabel: string; rename: string }
-> = {
-  hexmap: {
-    eyebrow: 'editorShell.hexMap',
-    titleLabel: 'editorShell.mapTitleLabel',
-    rename: 'editorShell.renameMap',
-  },
-  note: {
-    eyebrow: 'noteView.eyebrow',
-    titleLabel: 'noteView.titleLabel',
-    rename: 'noteView.renameNote',
-  },
-};
+import { TypeRegistry } from '../../../entity-types/type-registry';
+import { TypeLabels, viewInstanceKey } from '@hexly/web-entity';
+import { ViewRegistry } from '../../../entity-types/view-registry';
+import { EntityViewStore } from '../services/entity-view-store';
 
 /**
  * The open Entity's page-owned header (ADR-0022), rendered by {@link EntityPage}
@@ -47,7 +28,8 @@ const TYPE_LABELS: Record<
  * ({@link SaveStatus}, ADR-0026), Tags and Share. App navigation lives in the NavRail.
  *
  * Fully driven by {@link EntitySession.current} — the eyebrow/title labels switch on
- * the Entity's `type`, and the Map/Note view toggle (#75) shows only for a `hexmap`.
+ * the primary type, and the view toggle (#75) offers one button per View the Entity's
+ * types afford (ADR-0048, *Views* amendment), shown only when there is more than one.
  */
 @Component({
   selector: 'app-entity-header',
@@ -60,6 +42,7 @@ const TYPE_LABELS: Record<
     PageHeader,
     EntityActionsMenu,
     EntityShareDialog,
+    EntityTypesDialog,
     TranslocoPipe,
     EntityTags,
     SaveStatus,
@@ -68,9 +51,7 @@ const TYPE_LABELS: Record<
     <app-page-header>
       <div pageHeaderTitle class="flex items-center gap-3 min-w-0 flex-1">
         <div class="flex items-center gap-3 shrink-0">
-          <span appEyebrow class="text-gold! tracking-[0.28em] whitespace-nowrap">{{
-            labels().eyebrow | transloco
-          }}</span>
+          <span appEyebrow class="text-gold! tracking-[0.28em] whitespace-nowrap">{{ eyebrow() }}</span>
           <!--
             Text is driven imperatively (effect, never while focused) rather than
             interpolated, so re-renders can't move the caret mid-edit.
@@ -85,8 +66,8 @@ const TYPE_LABELS: Record<
             spellcheck="false"
             [attr.tabindex]="editable() ? 0 : null"
             [attr.contenteditable]="editable() ? 'plaintext-only' : null"
-            [attr.aria-label]="labels().titleLabel | transloco"
-            [title]="titleHint() | transloco"
+            [attr.aria-label]="titleLabel()"
+            [title]="titleHint()"
             (focus)="onFocus()"
             (keydown.enter)="onEnter($event)"
             (keydown.escape)="onEscape($event)"
@@ -98,57 +79,66 @@ const TYPE_LABELS: Record<
         <app-entity-tags class="min-w-0 flex-1" />
       </div>
 
-      @if (isHexmap()) {
-        <!-- Map/Note view toggle (#75): a hexmap carries both a grid and a Content
-             body; this flips the editor surface between them, driven off the store's
-             view() so the shell renders whichever is pressed. -->
-        <div
-          pageHeaderActions
-          appButtonGroup
-          [attr.aria-label]="'editorShell.view.switchLabel' | transloco"
-        >
-          @for (v of views; track v.id) {
+      @if (viewToggle().length > 1) {
+        <!-- View toggle (#75, ADR-0048): one button per View the Entity's types afford
+             (a hexmap: Map + Note), flipping the outletted body via the active View. A
+             Structured Field's View is one button per *Field*, so an Entity with two grids
+             toggles between them by name (ADR-0050). -->
+        <div pageHeaderActions appButtonGroup [attr.aria-label]="'editorShell.view.switchLabel' | transloco">
+          @for (v of viewToggle(); track v.key) {
             <button
               type="button"
               appButton
               variant="ghost"
               size="sm"
-              [active]="store.view() === v.id"
-              [attr.aria-pressed]="store.view() === v.id"
-              [attr.data-testid]="v.testid"
-              (click)="selectView(v.id)"
+              [active]="activeKey() === v.key"
+              [attr.aria-pressed]="activeKey() === v.key"
+              [attr.data-testid]="v.key"
+              (click)="selectView(v.key)"
             >
-              {{ v.labelKey | transloco }}
+              {{ v.label }}
             </button>
           }
         </div>
       }
 
-      <!-- The Entity's actions — Visibility, Pin, and Share — gathered behind one overflow
-           menu. Share is this header's dialog surface, so the menu emits (share) and we open it. -->
-      <app-entity-actions-menu
-        pageHeaderActions
-        (share)="ownersOpen.set(true)"
-      />
+      <!-- The Entity's actions — Edit types, Visibility, Pin, and Share — gathered behind one
+           overflow menu. Share and Edit types are this header's dialog surfaces, so the menu emits
+           and we open them. -->
+      <app-entity-actions-menu pageHeaderActions (share)="ownersOpen.set(true)" (editTypes)="typesOpen.set(true)" />
     </app-page-header>
 
-    <app-entity-share-dialog
-      [open]="ownersOpen()"
-      (closed)="ownersOpen.set(false)"
-      (resigned)="onResigned()"
-    />
+    <app-entity-share-dialog [open]="ownersOpen()" (closed)="ownersOpen.set(false)" (resigned)="onResigned()" />
+    <app-entity-types-dialog [open]="typesOpen()" (closed)="typesOpen.set(false)" />
   `,
 })
 export class EntityHeader {
   private readonly session = inject(EntitySession);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-  /** Owns the Map/Note surface choice, shared with the {@link EntityPage} body (#75). */
-  protected readonly store = inject(HexMapStore);
-  protected readonly views = VIEWS;
+  /** Owns the active-View choice, shared with the {@link EntityPage} body (#75). */
+  private readonly viewStore = inject(EntityViewStore);
+  private readonly views = inject(ViewRegistry);
+  private readonly types = inject(TypeRegistry);
+  private readonly transloco = inject(TranslocoService);
+
+  /**
+   * One of the primary type's chrome labels, already resolved — re-derived when the primary type or
+   * the language changes. A user-defined type has no transloco copy, so it resolves to its authored
+   * name rather than being run through translate (#191).
+   */
+  private chromeLabel(key: keyof TypeLabels) {
+    return computed(() => {
+      this.transloco.activeLang(); // reactive dependency: re-resolve on a language switch
+      return this.types.chromeLabel(this.session.types()[0], key);
+    });
+  }
 
   /** Whether the entity Share dialog (#158) is open — toggled by the actions menu's Share item. */
   protected readonly ownersOpen = signal(false);
+
+  /** Whether the Edit-types dialog (#189) is open — toggled by the actions menu's Edit types item. */
+  protected readonly typesOpen = signal(false);
 
   /** Resigning can cost reach to this Entity, so drop back to the World Index. */
   protected onResigned(): void {
@@ -161,24 +151,39 @@ export class EntityHeader {
    * read-only member sees it, can't rename it, and gets no visibility toggle (also
    * `@if (editable())`).
    */
-  protected readonly editable = computed(
-    () => this.session.current() !== null && this.session.writable(),
-  );
-  /** Tooltip key: the in-place rename affordance. */
-  protected readonly titleHint = computed(() => this.labels().rename);
-  /** Only a hexmap carries both surfaces, so only it gets the view toggle (#75). */
-  protected readonly isHexmap = computed(
-    () => this.session.current()?.document.type === 'hexmap',
-  );
-  protected readonly labels = computed(
-    () => TYPE_LABELS[this.session.current()?.document.type ?? ''] ?? TYPE_LABELS['note'],
-  );
-  protected readonly title = computed(
-    () => this.session.current()?.name ?? '',
-  );
+  protected readonly editable = computed(() => this.session.current() !== null && this.session.writable());
+  /** Tooltip: the in-place rename affordance. */
+  protected readonly titleHint = this.chromeLabel('rename');
+  /** The active View's key, driving which toggle button reads as pressed. */
+  protected readonly activeKey = this.viewStore.activeKey;
 
-  private readonly titleEl =
-    viewChild.required<ElementRef<HTMLElement>>('titleEl');
+  /**
+   * The Views the open Entity affords, as toggle buttons: the key (the click target, the URL value,
+   * and the testid) and the label to print.
+   *
+   * A **Structured Field**'s View is labelled from the *Field* it renders — "Map", "Battlemap" — since
+   * a View id cannot tell one grid from another (ADR-0050). A Field's name resolves the way a type's
+   * does (#191): a plugin ships translated copy under a `labelKey`, and a World Owner's authored
+   * `label` is printed verbatim rather than looked up as a key they never wrote.
+   */
+  protected readonly viewToggle = computed(() => {
+    this.transloco.activeLang(); // reactive dependency: re-resolve the labels on a language switch
+    const fields = this.types.resolveFields(this.session.types());
+    return this.viewStore.views().map((view) => {
+      const field = fields.find((f) => f.key === view.fieldKey);
+      const labelKey = field ? field.labelKey : this.views.resolve(view.viewId).labelKey;
+      return {
+        key: viewInstanceKey(view),
+        label: labelKey ? this.transloco.translate(labelKey) : (field?.label ?? view.viewId),
+      };
+    });
+  });
+  /** The header eyebrow tag and the title's accessible name, from the live primary type (`types[0]`). */
+  protected readonly eyebrow = this.chromeLabel('eyebrow');
+  protected readonly titleLabel = this.chromeLabel('titleLabel');
+  protected readonly title = computed(() => this.session.current()?.name ?? '');
+
+  private readonly titleEl = viewChild.required<ElementRef<HTMLElement>>('titleEl');
 
   /**
    * The name at focus time. commit() compares against this, not the live
@@ -233,22 +238,24 @@ export class EntityHeader {
   }
 
   /**
-   * Switch the editor surface (#75). Updates the store for instant feedback, then
-   * mirrors the choice to the URL `view` param (`replaceUrl`, Map drops the param)
-   * so a refresh restores it. Reverts the store if the navigation is cancelled.
+   * Switch the active View (#75, ADR-0048). Updates the store for instant feedback,
+   * then mirrors the choice to the URL `view` param (`replaceUrl`) so a refresh
+   * restores it — the default View (the primary type's first) drops the param, others carry the
+   * View's key (`core.view.map:grid`). Reverts the store if the navigation is cancelled.
    */
-  protected selectView(view: EntityView): void {
-    const previous = this.store.view();
-    this.store.setView(view);
+  protected selectView(key: string): void {
+    const previous = this.viewStore.activeKey();
+    this.viewStore.setView(key);
+    const isDefault = viewInstanceKey(this.viewStore.views()[0]) === key;
     this.router
       .navigate([], {
         relativeTo: this.route,
-        queryParams: { view: view === 'map' ? null : view },
+        queryParams: { view: isDefault ? null : key },
         queryParamsHandling: 'merge',
         replaceUrl: true,
       })
       .then((navigated) => {
-        if (!navigated) this.store.setView(previous);
+        if (!navigated) this.viewStore.setView(previous);
       });
   }
 }

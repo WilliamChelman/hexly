@@ -17,14 +17,14 @@ const stringifier = unified()
  * ones re-emit in their degraded form (e.g. an `entityLink` back to `[[wikilink]]`).
  * Optional `metadata` is re-emitted as YAML frontmatter.
  */
-export function proseMirrorToMarkdown(
-  doc: PMNode,
-  metadata?: Record<string, unknown>
-): string {
+export function proseMirrorToMarkdown(doc: PMNode, metadata?: Record<string, unknown>): string {
   const children = (doc.content ?? []).flatMap(blockToMdast);
 
   if (metadata && Object.keys(metadata).length) {
-    children.unshift({ type: 'yaml', value: stringifyYaml(metadata).trimEnd() } as RootContent);
+    children.unshift({
+      type: 'yaml',
+      value: stringifyYaml(metadata).trimEnd(),
+    } as RootContent);
   }
 
   return unescapeObsidianTokens(stringifier.stringify({ type: 'root', children } as Root));
@@ -60,12 +60,25 @@ function blockToMdast(node: PMNode): RootContent[] {
       ];
     case 'bulletList': {
       const children = listItems(node);
-      return [{ type: 'list', ordered: false, spread: listSpread(children), children }];
+      return [
+        {
+          type: 'list',
+          ordered: false,
+          spread: listSpread(children),
+          children,
+        },
+      ];
     }
     case 'orderedList': {
       const children = listItems(node);
       return [
-        { type: 'list', ordered: true, start: (node.attrs?.['start'] as number) ?? 1, spread: listSpread(children), children },
+        {
+          type: 'list',
+          ordered: true,
+          start: (node.attrs?.['start'] as number) ?? 1,
+          spread: listSpread(children),
+          children,
+        },
       ];
     }
     case 'taskList': {
@@ -78,7 +91,14 @@ function blockToMdast(node: PMNode): RootContent[] {
           children: itemChildren,
         };
       }) as ListItem[];
-      return [{ type: 'list', ordered: false, spread: listSpread(children), children }];
+      return [
+        {
+          type: 'list',
+          ordered: false,
+          spread: listSpread(children),
+          children,
+        },
+      ];
     }
     case 'codeBlock':
       return [
@@ -150,10 +170,7 @@ function calloutToMdast(node: PMNode): RootContent {
   const header = `${RAW_MARK}[!${type}]${title ? ` ${title}` : ''}`;
   return {
     type: 'blockquote',
-    children: [
-      { type: 'paragraph', children: [{ type: 'text', value: header }] },
-      ...blockChildren(node),
-    ],
+    children: [{ type: 'paragraph', children: [{ type: 'text', value: header }] }, ...blockChildren(node)],
   };
 }
 
@@ -179,7 +196,7 @@ function tableToMdast(node: PMNode): RootContent {
 function cellToPhrasing(cell: PMNode): PhrasingContent[] {
   const blocks = cell.content?.length ? cell.content : [{ type: 'paragraph' }];
   return blocks.flatMap((block, i) =>
-    i === 0 ? inlineChildren(block) : [{ type: 'text', value: ' ' } as PhrasingContent, ...inlineChildren(block)]
+    i === 0 ? inlineChildren(block) : [{ type: 'text', value: ' ' } as PhrasingContent, ...inlineChildren(block)],
   );
 }
 
@@ -217,18 +234,21 @@ function entityLinkToWikilink(node: PMNode): string {
  */
 function textToMdast(node: PMNode): PhrasingContent {
   const marks = new Set((node.marks ?? []).map((m) => m.type));
-  const value = marks.has('highlight') ? `==${node.text ?? ''}==` : node.text ?? '';
+  const value = marks.has('highlight') ? `==${node.text ?? ''}==` : (node.text ?? '');
 
-  let leaf: PhrasingContent = marks.has('code')
-    ? { type: 'inlineCode', value }
-    : { type: 'text', value };
+  let leaf: PhrasingContent = marks.has('code') ? { type: 'inlineCode', value } : { type: 'text', value };
 
   if (marks.has('strike')) leaf = { type: 'delete', children: [leaf] };
   if (marks.has('italic')) leaf = { type: 'emphasis', children: [leaf] };
   if (marks.has('bold')) leaf = { type: 'strong', children: [leaf] };
 
   const link = (node.marks ?? []).find((m) => m.type === 'link');
-  if (link) leaf = { type: 'link', url: String(link.attrs?.['href'] ?? ''), children: [leaf] };
+  if (link)
+    leaf = {
+      type: 'link',
+      url: String(link.attrs?.['href'] ?? ''),
+      children: [leaf],
+    };
 
   return leaf;
 }

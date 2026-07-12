@@ -18,11 +18,7 @@ export interface TagItem {
  * otherwise show a "(new)" suggestion whose pick is a silent no-op (deduped away). So
  * typing an existing/added tag yields nothing.
  */
-export function tagItems(
-  query: string,
-  vocab: readonly string[],
-  added: readonly string[],
-): TagItem[] {
+export function tagItems(query: string, vocab: readonly string[], added: readonly string[]): TagItem[] {
   const addedSet = new Set(added.map((a) => a.toLowerCase()));
   return vocabItems(query, vocab)
     .filter((v) => !addedSet.has(v.value.toLowerCase()))

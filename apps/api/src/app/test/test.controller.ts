@@ -1,6 +1,6 @@
 import { Controller, HttpCode, Inject, Post } from '@nestjs/common';
 import { DB, Db } from '../db/db';
-import { entities } from '../db/schema';
+import { entities, users } from '../db/schema';
 
 /**
  * E2E-only test support. This controller is mounted only when {@link AppModule}
@@ -19,9 +19,13 @@ export class TestController {
   constructor(@Inject(DB) private readonly db: Db) {}
 
   /**
-   * Reset to a clean slate: delete every Entity. Users and sessions are left
-   * intact on purpose, so an already-established e2e session survives the reset
-   * (ADR-0009 — entities-only reset).
+   * Reset to a clean slate: delete every Entity, and clear the Preferences on the user row
+   * (ADR-0038). Users and sessions themselves survive, so an established e2e session outlives the
+   * reset (ADR-0009).
+   *
+   * The Preferences go with the Entities because they are server-persisted and hydrated on boot: a
+   * test that flips the UI language would otherwise leave the *account* in French, and every test
+   * after it would load a French app and miss its English selectors.
    */
   @Post('reset')
   @HttpCode(204)
@@ -31,5 +35,6 @@ export class TestController {
     // module is physically absent from a real deploy (ADR-0009).
     // eslint-disable-next-line hexly-writes/no-direct-entity-writes
     this.db.delete(entities).run();
+    this.db.update(users).set({ preferences: '{}' }).run();
   }
 }

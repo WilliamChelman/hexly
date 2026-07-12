@@ -1,9 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  booleanAttribute,
-  input,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, booleanAttribute, input } from '@angular/core';
 
 /** Emphasis of a button — how loudly it asks to be pressed. */
 export type ButtonVariant = 'default' | 'primary' | 'ghost';

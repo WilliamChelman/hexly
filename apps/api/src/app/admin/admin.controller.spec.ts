@@ -63,11 +63,20 @@ describe('Superadmin repair surface', () => {
     db.delete(entityEdges).run(); // The instance as it stood before the derivation shipped.
 
     const started = await ada.post('/admin/reindex').expect(202);
-    expect(started.body).toMatchObject({ status: 'running', total: 2, walked: 0 });
+    expect(started.body).toMatchObject({
+      status: 'running',
+      total: 2,
+      walked: 0,
+    });
 
     const done = await pollUntilDone(ada);
 
-    expect(done).toMatchObject({ status: 'succeeded', walked: 2, reindexed: 2, failures: [] });
+    expect(done).toMatchObject({
+      status: 'succeeded',
+      walked: 2,
+      reindexed: 2,
+      failures: [],
+    });
     expect(edgeTargets(ealdred)).toEqual([mira]);
   });
 
@@ -90,15 +99,16 @@ describe('Superadmin repair surface', () => {
   it.each([
     ['a manage-users holder', { roles: ['manage-users'] as InstanceRole[] }, 403],
     ['a plain user', {}, 403],
-  ] as ReadonlyArray<
-    readonly [string, { roles?: InstanceRole[]; isSuperadmin?: boolean }, number]
-  >)('%s is refused', async (_who, opts, status) => {
-    await app.get(AuthService).seedUser('bob@hexly.test', PASSWORD, 'Bob', opts);
-    const bob = await signIn('bob@hexly.test');
+  ] as ReadonlyArray<readonly [string, { roles?: InstanceRole[]; isSuperadmin?: boolean }, number]>)(
+    '%s is refused',
+    async (_who, opts, status) => {
+      await app.get(AuthService).seedUser('bob@hexly.test', PASSWORD, 'Bob', opts);
+      const bob = await signIn('bob@hexly.test');
 
-    await bob.post('/admin/reindex').expect(status);
-    await bob.get('/admin/reindex').expect(status);
-  });
+      await bob.post('/admin/reindex').expect(status);
+      await bob.get('/admin/reindex').expect(status);
+    },
+  );
 
   it('an anonymous caller is refused before the tier is even consulted', async () => {
     await request(app.getHttpServer()).post('/admin/reindex').expect(401);
@@ -117,9 +127,10 @@ describe('Superadmin repair surface', () => {
   }
 
   async function seedSuperadmin(email: string, name: string) {
-    return app
-      .get(AuthService)
-      .seedUser(email, PASSWORD, name, { isSuperadmin: true, roles: ['create-worlds'] });
+    return app.get(AuthService).seedUser(email, PASSWORD, name, {
+      isSuperadmin: true,
+      roles: ['create-worlds'],
+    });
   }
 
   async function signIn(email: string): Promise<Agent> {
@@ -133,14 +144,18 @@ describe('Superadmin repair surface', () => {
   }
 
   async function makeEntity(owner: Agent, worldId: string, name: string): Promise<string> {
-    return (await owner.post('/entities').send({ name, type: 'note', worldId }).expect(201)).body.id;
+    return (
+      await owner
+        .post('/entities')
+        .send({ name, types: ['core.note'], worldId })
+        .expect(201)
+    ).body.id;
   }
 
   /** Save `id`'s Content as prose holding one `entityLink` to `targetId`. */
   async function link(owner: Agent, id: string, targetId: string): Promise<void> {
     const current = (await owner.get(`/entities/${id}`).expect(200)).body;
     const document: EntityBody = {
-      type: 'note',
       content: tiptapContent({
         type: 'doc',
         content: [
@@ -151,10 +166,7 @@ describe('Superadmin repair surface', () => {
         ],
       }),
     };
-    await owner
-      .put(`/entities/${id}`)
-      .send({ document, version: current.version, tags: [] })
-      .expect(200);
+    await owner.put(`/entities/${id}`).send({ document, version: current.version, tags: [] }).expect(200);
   }
 
   function edgeTargets(sourceEntityId: string): string[] {

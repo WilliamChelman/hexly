@@ -19,11 +19,11 @@ The trade is that "every World has a Home" is no longer a NOT NULL guarantee but
 
 ## World roles
 
-| Role | Read `shared` entities | Create entities (owns them) | Edit others' entities |
-|---|---|---|---|
-| Owner | ✓ | ✓ | ✓ |
-| Contributor | ✓ | ✓ | ✗ |
-| Viewer / Public Link | ✓ | ✗ | ✗ |
+| Role                 | Read `shared` entities | Create entities (owns them) | Edit others' entities |
+| -------------------- | ---------------------- | --------------------------- | --------------------- |
+| Owner                | ✓                      | ✓                           | ✓                     |
+| Contributor          | ✓                      | ✓                           | ✗                     |
+| Viewer / Public Link | ✓                      | ✗                           | ✗                     |
 
 Entity-level Owner/Editor/Viewer grants (ADR-0004) remain available for finer control on top of world-level roles.
 

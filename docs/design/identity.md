@@ -22,12 +22,12 @@ never as generic "dark mode."
 
 The design tokens **are** Tailwind's theme — one source of truth (ADR-0020).
 
-| File                             | Role                                                                                     |
-| -------------------------------- | ---------------------------------------------------------------------------------------- |
-| `apps/web/src/styles.css`        | Entry point + the `@theme` block: the utility-shaped tokens (colour, type, spacing, radius, shadow, fonts). |
+| File                             | Role                                                                                                                       |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/src/styles.css`        | Entry point + the `@theme` block: the utility-shaped tokens (colour, type, spacing, radius, shadow, fonts).                |
 | `apps/web/src/styles/tokens.css` | The dark-theme overrides (reassigning the generated `--color-*`/`--shadow-*`) + non-utility tokens (motion, layout rails). |
-| `apps/web/src/styles/base.css`   | Reset, document typography, the flat table background (`@layer base`).                    |
-| `apps/web/src/app/styleguide/`   | The living `/styleguide` reference page.                                                  |
+| `apps/web/src/styles/base.css`   | Reset, document typography, the flat table background (`@layer base`).                                                     |
+| `apps/web/src/app/styleguide/`   | The living `/styleguide` reference page.                                                                                   |
 
 Primitives (`Button`, `Panel`, `Tool`, …) own their **scoped** styles and consume
 the tokens directly (ADR-0007); there is no global component sheet. Within those
@@ -59,11 +59,11 @@ utilities for slice/shell layout; primitives keep their scoped styles.
 
 ## Typography
 
-| Role               | Family             | Notes                                                                   |
-| ------------------ | ------------------ | ----------------------------------------------------------------------- |
-| Display            | **Cinzel**         | Engraved Roman caps — cartouche titles, the wordmark, section eyebrows. |
+| Role               | Family             | Notes                                                                                                                                                |
+| ------------------ | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Display            | **Cinzel**         | Engraved Roman caps — cartouche titles, the wordmark, section eyebrows.                                                                              |
 | Body / UI          | **Source Serif 4** | Literary serif drawn for screen text — panels, controls, prose. (Replaced Cormorant Garamond, whose thin display strokes read poorly at body sizes.) |
-| Coordinates / code | **JetBrains Mono** | Hex coordinates (`q · r`), tokens, keys — the signature numeric detail. |
+| Coordinates / code | **JetBrains Mono** | Hex coordinates (`q · r`), tokens, keys — the signature numeric detail.                                                                              |
 
 Type scale is modular (~1.25): `--text-2xs` (11px) → `--text-3xl` (41px). Cartouche
 lettering uses `--tracking-wider` (0.14em) uppercase.

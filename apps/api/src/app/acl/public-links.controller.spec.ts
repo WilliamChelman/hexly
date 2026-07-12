@@ -66,7 +66,10 @@ describe('Public links', () => {
 
   async function makeEntity(owner: Agent, worldId: string, name = 'Lady Mara'): Promise<string> {
     return (
-      await owner.post('/entities').send({ name, type: 'note', worldId }).expect(201)
+      await owner
+        .post('/entities')
+        .send({ name, types: ['core.note'], worldId })
+        .expect(201)
     ).body.id;
   }
 
@@ -149,7 +152,10 @@ describe('Public links', () => {
     const worldId = await makeWorld(ada);
     const privateId = await makeEntity(ada, worldId);
     // Bob is a Contributor who can reach a shared Entity but isn't its Owner → 403.
-    await ada.post(`/worlds/${worldId}/members`).send({ userId: (await bobUser(bob)), role: 'contributor' }).expect(200);
+    await ada
+      .post(`/worlds/${worldId}/members`)
+      .send({ userId: await bobUser(bob), role: 'contributor' })
+      .expect(200);
     const sharedId = await makeEntity(ada, worldId, 'Town');
     await share(ada, sharedId);
 
@@ -171,7 +177,7 @@ describe('Public links', () => {
     expect(res.body.token).toEqual(expect.any(String));
   });
 
-  it('a World link serves only that World\'s shared Entities, read-only', async () => {
+  it("a World link serves only that World's shared Entities, read-only", async () => {
     const ada = await signIn('ada@hexly.test');
     const worldId = await makeWorld(ada);
     const sharedId = await makeEntity(ada, worldId, 'Town');
@@ -206,7 +212,10 @@ describe('Public links', () => {
     const bob = await signIn('bob@hexly.test');
     const owned = await makeWorld(ada);
     // Bob is a Viewer of ada's World: reachable, but not an Owner → 403.
-    await ada.post(`/worlds/${owned}/members`).send({ userId: await bobUser(bob), role: 'viewer' }).expect(200);
+    await ada
+      .post(`/worlds/${owned}/members`)
+      .send({ userId: await bobUser(bob), role: 'viewer' })
+      .expect(200);
     await bob.post(`/worlds/${owned}/link`).expect(403);
 
     // A World Bob can't reach at all → 404, no existence leak.

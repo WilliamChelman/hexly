@@ -1,8 +1,5 @@
 import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { AuthUser, Preferences } from '@hexly/domain';
 import { provideTranslocoTesting } from '../i18n/transloco-testing';
@@ -38,11 +35,7 @@ describe('PreferencesSync (ADR-0038)', () => {
     auth = new MockAuthClient();
     TestBed.configureTestingModule({
       imports: [provideTranslocoTesting()],
-      providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        { provide: AuthClient, useValue: auth },
-      ],
+      providers: [provideHttpClient(), provideHttpClientTesting(), { provide: AuthClient, useValue: auth }],
     });
     TestBed.inject(PreferencesSync);
     locale = TestBed.inject(LocaleService);

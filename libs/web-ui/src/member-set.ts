@@ -1,12 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  input,
-  OnInit,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, OnInit, signal } from '@angular/core';
 import { Observable } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { MemberRole, UserSummary, WorldMember } from '@hexly/domain';
@@ -40,28 +32,22 @@ import { Select } from './select';
             [value]="m.role"
             (change)="setRole(m, $any($event.target))"
           >
-            <option value="contributor">{{ 'members.contributor' | transloco }}</option>
-            <option value="viewer">{{ 'members.viewer' | transloco }}</option>
+            <option value="contributor">
+              {{ 'ui.members.contributor' | transloco }}
+            </option>
+            <option value="viewer">{{ 'ui.members.viewer' | transloco }}</option>
           </select>
-          <button
-            appButton
-            size="sm"
-            danger
-            [attr.data-testid]="'remove-' + m.userId"
-            (click)="remove(m.userId)"
-          >
-            {{ 'members.remove' | transloco }}
+          <button appButton size="sm" danger [attr.data-testid]="'remove-' + m.userId" (click)="remove(m.userId)">
+            {{ 'ui.members.remove' | transloco }}
           </button>
         </li>
       } @empty {
-        <li class="member-empty">{{ 'members.empty' | transloco }}</li>
+        <li class="member-empty">{{ 'ui.members.empty' | transloco }}</li>
       }
     </ul>
 
     <div class="member-add">
-      <label class="member-add-label" for="member-add-select">{{
-        'members.addLabel' | transloco
-      }}</label>
+      <label class="member-add-label" for="member-add-select">{{ 'ui.members.addLabel' | transloco }}</label>
       <div class="member-add-row">
         <select
           appSelect
@@ -71,7 +57,7 @@ import { Select } from './select';
           [value]="selectedUser()"
           (change)="selectedUser.set($any($event.target).value)"
         >
-          <option value="">{{ 'members.addPlaceholder' | transloco }}</option>
+          <option value="">{{ 'ui.members.addPlaceholder' | transloco }}</option>
           @for (c of candidates(); track c.id) {
             <option [value]="c.id">{{ c.displayName }}</option>
           }
@@ -83,17 +69,13 @@ import { Select } from './select';
           [value]="selectedRole()"
           (change)="selectedRole.set($any($event.target).value)"
         >
-          <option value="contributor">{{ 'members.contributor' | transloco }}</option>
-          <option value="viewer">{{ 'members.viewer' | transloco }}</option>
+          <option value="contributor">
+            {{ 'ui.members.contributor' | transloco }}
+          </option>
+          <option value="viewer">{{ 'ui.members.viewer' | transloco }}</option>
         </select>
-        <button
-          appButton
-          variant="primary"
-          data-testid="add"
-          [disabled]="!selectedUser()"
-          (click)="add()"
-        >
-          {{ 'members.add' | transloco }}
+        <button appButton variant="primary" data-testid="add" [disabled]="!selectedUser()" (click)="add()">
+          {{ 'ui.members.add' | transloco }}
         </button>
       </div>
     </div>
@@ -152,7 +134,11 @@ export class MemberSet implements OnInit {
 
   /** Member ids resolved to display rows, in the server's stable order. */
   readonly rows = computed(() =>
-    this.members().map((m) => ({ userId: m.userId, name: this.nameOf(m.userId), role: m.role })),
+    this.members().map((m) => ({
+      userId: m.userId,
+      name: this.nameOf(m.userId),
+      role: m.role,
+    })),
   );
 
   ngOnInit(): void {
@@ -172,14 +158,10 @@ export class MemberSet implements OnInit {
   add(): void {
     const userId = this.selectedUser();
     if (!userId) return;
-    this.mutate(
-      this.worlds.addMember(this.id(), userId, this.selectedRole()),
-      'members.addError',
-      (members) => {
-        this.members.set(members);
-        this.selectedUser.set('');
-      },
-    );
+    this.mutate(this.worlds.addMember(this.id(), userId, this.selectedRole()), 'ui.members.addError', (members) => {
+      this.members.set(members);
+      this.selectedUser.set('');
+    });
   }
 
   setRole(row: { userId: string; role: MemberRole }, select: HTMLSelectElement): void {
@@ -188,14 +170,14 @@ export class MemberSet implements OnInit {
     // failure (the signal is unchanged, so nothing else would).
     this.mutate(
       this.worlds.setMemberRole(this.id(), row.userId, select.value as MemberRole),
-      'members.roleError',
+      'ui.members.roleError',
       (members) => this.members.set(members),
       () => (select.value = row.role),
     );
   }
 
   remove(userId: string): void {
-    this.mutate(this.worlds.removeMember(this.id(), userId), 'members.removeError', (members) =>
+    this.mutate(this.worlds.removeMember(this.id(), userId), 'ui.members.removeError', (members) =>
       this.members.set(members),
     );
   }
@@ -223,7 +205,7 @@ export class MemberSet implements OnInit {
 
   /** A read (directory or member set) failed — the panel can't be trusted, so say so. */
   private loadFailed(): void {
-    this.toaster.show(this.transloco.translate('members.loadError'), 'error');
+    this.toaster.show(this.transloco.translate('ui.members.loadError'), 'error');
   }
 
   private nameOf(id: string): string {

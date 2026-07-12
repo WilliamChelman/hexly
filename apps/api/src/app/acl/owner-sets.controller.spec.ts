@@ -64,7 +64,7 @@ describe('Owner sets', () => {
     return (
       await owner
         .post('/entities')
-        .send({ name: 'Lady Mara', type: 'note', worldId })
+        .send({ name: 'Lady Mara', types: ['core.note'], worldId })
         .expect(201)
     ).body.id;
   }
@@ -82,9 +82,7 @@ describe('Owner sets', () => {
 
       await bob.get(`/worlds/${id}`).expect(200);
       // The Detail carries the full ownership set (ADR-0037).
-      expect((await bob.get(`/worlds/${id}`).expect(200)).body.owners.sort()).toEqual(
-        [adaId, bobId].sort(),
-      );
+      expect((await bob.get(`/worlds/${id}`).expect(200)).body.owners.sort()).toEqual([adaId, bobId].sort());
     });
 
     it('shows the Owner set to any Owner via GET /owners', async () => {
@@ -93,9 +91,7 @@ describe('Owner sets', () => {
       const id = await makeWorld(ada);
       await ada.post(`/worlds/${id}/owners`).send({ userId: bobId }).expect(200);
 
-      expect((await bob.get(`/worlds/${id}/owners`).expect(200)).body.sort()).toEqual(
-        [adaId, bobId].sort(),
-      );
+      expect((await bob.get(`/worlds/${id}/owners`).expect(200)).body.sort()).toEqual([adaId, bobId].sort());
     });
 
     it('gives a co-Owner symmetric power — they can evict the original creator', async () => {
@@ -216,9 +212,7 @@ describe('Owner sets', () => {
       const id = await makeEntity(ada, world);
       await ada.post(`/entities/${id}/owners`).send({ userId: bobId }).expect(200);
 
-      expect((await ada.get(`/entities/${id}/owners`).expect(200)).body.sort()).toEqual(
-        [adaId, bobId].sort(),
-      );
+      expect((await ada.get(`/entities/${id}/owners`).expect(200)).body.sort()).toEqual([adaId, bobId].sort());
     });
 
     it('gives a co-Owner symmetric power — they can evict the original creator', async () => {

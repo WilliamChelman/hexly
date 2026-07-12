@@ -1,0 +1,12 @@
+{
+  "plainHeading": "Other metadata",
+  "entityLink": {
+    "set": "Link an entity…",
+    "change": "Change entity…",
+    "linkedEntity": "Linked entity",
+    "remove": "Remove link",
+    "search": "Search entities…",
+    "empty": "No entities",
+    "unavailable": "Unavailable"
+  }
+}

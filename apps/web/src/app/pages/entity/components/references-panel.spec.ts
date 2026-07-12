@@ -1,10 +1,12 @@
+import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { EntityReferences } from '@hexly/domain';
-import { provideTranslocoTesting } from '@hexly/web-core/testing';
+import { CORE_NOTE, EntityReferences } from '@hexly/domain';
+import { CORE_HEXMAP } from '@hexly/plugin-hexmap';
 import { EntitySession } from '../services/entity-session';
+import { ENTITY_SESSION } from '@hexly/web-entity';
 import { ReferencesStore } from '../services/references-store';
 import { RightDock } from '../services/right-dock';
 import { noteDetail } from './entity-detail.fixtures';
@@ -29,6 +31,7 @@ describe('ReferencesPanel', () => {
         // The store is route-scoped and reads the open Entity off the session; no Entity is
         // adopted here, so its fetch effect never fires and `adopt` is the only source.
         EntitySession,
+        { provide: ENTITY_SESSION, useExisting: EntitySession },
         RightDock,
         ReferencesStore,
         provideRouter([]),
@@ -55,7 +58,7 @@ describe('ReferencesPanel', () => {
         {
           targetId: 'mira',
           descriptor: 'spouse',
-          target: { id: 'mira', name: 'Mira', type: 'note' },
+          target: { id: 'mira', name: 'Mira', types: [CORE_NOTE] },
         },
       ],
     });
@@ -80,7 +83,10 @@ describe('ReferencesPanel', () => {
   it('lists each inbound source as a link back to it', () => {
     const el = render({
       referencedBy: [
-        { descriptor: 'capital of', source: { id: 'avalon', name: 'Avalon', type: 'hexmap' } },
+        {
+          descriptor: 'capital of',
+          source: { id: 'avalon', name: 'Avalon', types: [CORE_HEXMAP] },
+        },
       ],
     });
 
@@ -125,7 +131,11 @@ describe('ReferencesPanel', () => {
   it('drops a held list when a different Entity is opened', () => {
     const el = render({
       references: [
-        { targetId: 'mira', descriptor: null, target: { id: 'mira', name: 'Mira', type: 'note' } },
+        {
+          targetId: 'mira',
+          descriptor: null,
+          target: { id: 'mira', name: 'Mira', types: [CORE_NOTE] },
+        },
       ],
     });
     expect(el.querySelector('[data-testid=reference-out]')).not.toBeNull();

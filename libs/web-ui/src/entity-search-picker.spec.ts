@@ -5,13 +5,14 @@ import { EntityPage, EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient } from '@hexly/web-core';
 import { MockEntitiesClient, provideTranslocoTesting } from '@hexly/web-core/testing';
 import { EntitySearchPicker } from './entity-search-picker';
+import { WEB_UI_TEST_CATALOGS } from './i18n/test-catalogs';
 
-function summary(id: string, name = id, type: EntityType = 'note'): EntitySummary {
+function summary(id: string, name = id, type: EntityType = 'core.note'): EntitySummary {
   return {
     id,
     worldId: 'w1',
     name,
-    type,
+    types: [type],
     tags: [],
     visibility: 'private',
     version: 1,
@@ -20,7 +21,10 @@ function summary(id: string, name = id, type: EntityType = 'note'): EntitySummar
   };
 }
 
-const page = (items: EntitySummary[]): EntityPage => ({ items, nextCursor: null });
+const page = (items: EntitySummary[]): EntityPage => ({
+  items,
+  nextCursor: null,
+});
 
 /** A host that owns the controlled query, mirroring how a page embeds the picker. */
 @Component({
@@ -55,13 +59,12 @@ describe('EntitySearchPicker', () => {
       ),
     );
     await TestBed.configureTestingModule({
-      imports: [Host, provideTranslocoTesting()],
+      imports: [Host, provideTranslocoTesting(WEB_UI_TEST_CATALOGS)],
       providers: [{ provide: EntitiesClient, useValue: entities }],
     }).compileComponents();
   });
 
-  const byId = (el: HTMLElement, testid: string) =>
-    el.querySelector(`[data-testid=${testid}]`) as HTMLElement | null;
+  const byId = (el: HTMLElement, testid: string) => el.querySelector(`[data-testid=${testid}]`) as HTMLElement | null;
 
   it('lists entities and emits the chosen one on pick', () => {
     const fixture = TestBed.createComponent(Host);
@@ -80,9 +83,7 @@ describe('EntitySearchPicker', () => {
     fixture.componentInstance.worldId = 'w1';
     fixture.detectChanges();
 
-    expect(entities.list).toHaveBeenCalledWith(
-      expect.objectContaining({ worldId: 'w1' }),
-    );
+    expect(entities.list).toHaveBeenCalledWith(expect.objectContaining({ worldId: 'w1' }));
   });
 
   it('re-searches as the query changes and narrows the options', () => {

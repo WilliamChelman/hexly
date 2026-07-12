@@ -1,9 +1,12 @@
+import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { EntityDetail } from '@hexly/domain';
+import { CORE_NOTE, EntityDetail } from '@hexly/domain';
+import { CORE_HEXMAP, emptyHexMap } from '@hexly/plugin-hexmap';
 import { EntitySession } from '../services/entity-session';
-import { provideTranslocoTesting } from '@hexly/web-core/testing';
+import { ENTITY_SESSION } from '@hexly/web-entity';
+import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { EntityMetadata } from './entity-metadata';
 
 describe('EntityMetadata', () => {
@@ -11,7 +14,7 @@ describe('EntityMetadata', () => {
     id: 'n1',
     worldId: 'w1',
     name: 'Lady Mara',
-    type: 'note',
+    types: [CORE_NOTE],
     tags: [],
     visibility: 'private',
     version: 1,
@@ -19,7 +22,6 @@ describe('EntityMetadata', () => {
     createdAt: 1,
     updatedAt: 1,
     document: {
-      type: 'note',
       content: { format: 'tiptap-v1', snapshot: {} },
       metadata,
     },
@@ -30,7 +32,13 @@ describe('EntityMetadata', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [EntityMetadata, provideTranslocoTesting()],
-      providers: [EntitySession, provideHttpClient(), provideHttpClientTesting()],
+      providers: [
+        providePluginHexmap(),
+        EntitySession,
+        { provide: ENTITY_SESSION, useExisting: EntitySession },
+        provideHttpClient(),
+        provideHttpClientTesting(),
+      ],
     }).compileComponents();
     session = TestBed.inject(EntitySession);
   });
@@ -68,5 +76,63 @@ describe('EntityMetadata', () => {
   it('renders nothing when the entity has no Metadata', () => {
     expect(render(undefined).querySelector('[data-testid=entity-metadata]')).toBeNull();
     expect(render({}).querySelector('[data-testid=entity-metadata]')).toBeNull();
+  });
+
+  it('skips a Structured Field’s value — a Hex Map’s grid is not a Metadata row (ADR-0050)', () => {
+    // The grid lives at a Metadata key like every other Field value, but it is a document with its
+    // own View: dumping it here as a line of JSON would tell the reader nothing. A Hex Map carrying
+    // nothing else therefore shows no disclosure at all, exactly as before the grid moved.
+    session.adopt({ ...noteWith({ grid: emptyHexMap() }), types: [CORE_HEXMAP] });
+    const fixture = TestBed.createComponent(EntityMetadata);
+    fixture.detectChanges();
+
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid=entity-metadata]')).toBeNull();
+  });
+});
+
+/**
+ * The absent-plugin path, as a reader sees it (ADR-0048). With no map plugin, `core.hexmap` types no
+ * key, so the grid is not a Field at all: it falls through to plain Metadata and is shown, rather than
+ * being skipped as a Structured Field's value (the test above) or dropped.
+ */
+describe('EntityMetadata without the Hex Map plugin', () => {
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [EntityMetadata, provideTranslocoTesting()],
+      providers: [
+        EntitySession,
+        { provide: ENTITY_SESSION, useExisting: EntitySession },
+        provideHttpClient(),
+        provideHttpClientTesting(),
+      ],
+    }).compileComponents();
+  });
+
+  it('shows a Hex Map’s grid as plain Metadata — an unrendered value, never a lost one', () => {
+    TestBed.inject(EntitySession).adopt({
+      id: 'm1',
+      worldId: 'w1',
+      name: 'Aldermoor',
+      types: [CORE_HEXMAP],
+      tags: [],
+      visibility: 'private',
+      version: 1,
+      seq: 1,
+      createdAt: 1,
+      updatedAt: 1,
+      document: {
+        content: { format: 'tiptap-v1', snapshot: {} },
+        metadata: { grid: emptyHexMap(), status: 'canon' },
+      },
+    });
+    const fixture = TestBed.createComponent(EntityMetadata);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+
+    // The dock renders, and the grid is one of its rows: the map's data is still there to read, and
+    // to export.
+    expect(el.querySelector('[data-testid=entity-metadata]')).not.toBeNull();
+    expect(el.textContent).toContain('grid');
+    expect(el.textContent).toContain('status');
   });
 });

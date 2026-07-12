@@ -15,7 +15,11 @@ describe('tagItems — Tag entry suggestions', () => {
 
   it('offers the typed text as a brand-new tag when it matches nothing', () => {
     const items = tagItems('undead', vocab, []);
-    expect(items[0]).toEqual({ id: expect.any(String), tag: 'undead', isNew: true });
+    expect(items[0]).toEqual({
+      id: expect.any(String),
+      tag: 'undead',
+      isNew: true,
+    });
   });
 
   it('does not offer a "new" row when the typed text already exists (case-folded)', () => {

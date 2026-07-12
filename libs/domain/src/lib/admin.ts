@@ -65,8 +65,7 @@ export const ReindexErrorCode = {
 } as const;
 
 /** One of the {@link ReindexErrorCode} values. */
-export type ReindexErrorCode =
-  (typeof ReindexErrorCode)[keyof typeof ReindexErrorCode];
+export type ReindexErrorCode = (typeof ReindexErrorCode)[keyof typeof ReindexErrorCode];
 
 /** The body of `POST /users` — provision a new account in the closed set. */
 export const createUserRequestSchema = z
@@ -95,9 +94,7 @@ export type ResetPasswordRequest = z.infer<typeof resetPasswordRequestSchema>;
  * set (grant/revoke `manage-users` and `create-worlds` in one write). Superadmin
  * is not a member and is toggled by its own endpoint.
  */
-export const setUserRolesRequestSchema = z
-  .object({ roles: instanceRolesSchema })
-  .strict();
+export const setUserRolesRequestSchema = z.object({ roles: instanceRolesSchema }).strict();
 
 /** A validated roles-set replacement. */
 export type SetUserRolesRequest = z.infer<typeof setUserRolesRequestSchema>;
@@ -109,9 +106,7 @@ export const setDisabledRequestSchema = z.object({ disabled: z.boolean() }).stri
 export type SetDisabledRequest = z.infer<typeof setDisabledRequestSchema>;
 
 /** The body of `PATCH /users/:id/superadmin` — set (or clear) the Superadmin flag. */
-export const setSuperadminRequestSchema = z
-  .object({ isSuperadmin: z.boolean() })
-  .strict();
+export const setSuperadminRequestSchema = z.object({ isSuperadmin: z.boolean() }).strict();
 
 /** A validated Superadmin-flag toggle. */
 export type SetSuperadminRequest = z.infer<typeof setSuperadminRequestSchema>;

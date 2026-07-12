@@ -29,9 +29,7 @@ import { OutlineStore } from '../services/outline-store';
   imports: [Eyebrow, TranslocoPipe],
   host: { class: 'flex flex-col gap-1 p-3 overflow-y-auto bg-surface' },
   template: `
-    <span appEyebrow mark class="mb-1">{{
-      'noteView.outline.title' | transloco
-    }}</span>
+    <span appEyebrow mark class="mb-1">{{ 'noteView.outline.title' | transloco }}</span>
 
     @for (row of rows(); track $index) {
       <button
@@ -45,10 +43,7 @@ import { OutlineStore } from '../services/outline-store';
         {{ row.text }}
       </button>
     } @empty {
-      <p
-        class="text-sm leading-normal text-ink-muted"
-        data-testid="outline-empty"
-      >
+      <p class="text-sm leading-normal text-ink-muted" data-testid="outline-empty">
         {{ 'noteView.outline.empty' | transloco }}
       </p>
     }
@@ -85,9 +80,7 @@ export class OutlinePanel {
   protected jump(index: number): void {
     const el = this.headingElements()[index];
     if (!el) return;
-    const reduce = window.matchMedia(
-      '(prefers-reduced-motion: reduce)',
-    ).matches;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     // Scroll to read — deliberately not moving the editor cursor or stealing focus.
     el.scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : 'smooth' });
   }
@@ -100,16 +93,14 @@ export class OutlinePanel {
   private headingElements(): HTMLElement[] {
     const root = this.store.contentRoot();
     if (!root) return [];
-    return Array.from(
-      root.querySelectorAll<HTMLElement>('h1, h2, h3, h4, h5, h6'),
-    ).filter((el) => (el.textContent ?? '').trim() !== '');
+    return Array.from(root.querySelectorAll<HTMLElement>('h1, h2, h3, h4, h5, h6')).filter(
+      (el) => (el.textContent ?? '').trim() !== '',
+    );
   }
 
   private setupObserver(): void {
     this.observer?.disconnect();
-    const scrollRoot = this.store
-      .contentRoot()
-      ?.closest('[data-content-scroll]');
+    const scrollRoot = this.store.contentRoot()?.closest('[data-content-scroll]');
     const els = this.headingElements();
     if (!scrollRoot || !els.length) {
       this.activeIndex.set(els.length ? 0 : null);

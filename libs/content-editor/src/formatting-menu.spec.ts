@@ -2,13 +2,14 @@ import { TestBed } from '@angular/core/testing';
 import { Editor } from '@tiptap/core';
 import { TextSelection } from '@tiptap/pm/state';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
+import { CONTENT_EDITOR_TEST_CATALOGS } from './i18n/test-catalogs';
 import { CONTENT_EXTENSIONS } from './content-extensions';
 import { FormattingMenu } from './formatting-menu';
 
 describe('FormattingMenu', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [FormattingMenu, provideTranslocoTesting()],
+      imports: [FormattingMenu, provideTranslocoTesting(CONTENT_EDITOR_TEST_CATALOGS)],
     }).compileComponents();
   });
 
@@ -82,9 +83,7 @@ describe('FormattingMenu', () => {
     fixture.detectChanges();
 
     const marks = editor.getJSON().content?.[0]?.content?.[0]?.marks ?? [];
-    expect(marks.find((m) => m.type === 'link')?.attrs?.['href']).toBe(
-      'https://example.com',
-    );
+    expect(marks.find((m) => m.type === 'link')?.attrs?.['href']).toBe('https://example.com');
     expect(el.querySelector('input[type=url]')).toBeNull();
     expect(editor.state.selection.empty).toBe(true);
   });
@@ -118,9 +117,7 @@ describe('FormattingMenu', () => {
 
     // Create a backwards selection: anchor=10 (end), head=1 (start).
     // selection.to === 10, selection.head === 1.
-    editor.view.dispatch(
-      editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 10, 1)),
-    );
+    editor.view.dispatch(editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 10, 1)));
     fixture.detectChanges();
 
     button(el, 'Bold').click();

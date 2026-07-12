@@ -38,11 +38,6 @@ export function worldGraphRoute(worldId: string, worldName?: string): string[] {
   return ['/w', segment(worldId, worldName), 'graph'];
 }
 
-export function entityRoute(
-  worldId: string,
-  entityId: string,
-  worldName?: string,
-  entityName?: string,
-): string[] {
+export function entityRoute(worldId: string, entityId: string, worldName?: string, entityName?: string): string[] {
   return ['/w', segment(worldId, worldName), 'entities', segment(entityId, entityName)];
 }

@@ -1,10 +1,4 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  input,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { WorldStore, ActiveWorld, worldDashboardRoute } from '@hexly/web-core';
@@ -22,17 +16,7 @@ import { Icon, Rule, MenuGroup, MenuItem, MenuItemRadio, MenuPanel, MenuTrigger 
 @Component({
   selector: 'app-world-switcher',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    MenuTrigger,
-    MenuPanel,
-    MenuItem,
-    MenuItemRadio,
-    MenuGroup,
-    RouterLink,
-    Icon,
-    Rule,
-    TranslocoPipe,
-  ],
+  imports: [MenuTrigger, MenuPanel, MenuItem, MenuItemRadio, MenuGroup, RouterLink, Icon, Rule, TranslocoPipe],
   template: `
     <button
       type="button"
@@ -53,30 +37,20 @@ import { Icon, Rule, MenuGroup, MenuItem, MenuItemRadio, MenuPanel, MenuTrigger 
       <span
         data-testid="switcher-initial"
         class="grid place-items-center shrink-0 rounded-md font-mono text-2xs text-gold bg-surface-sunken border border-gold ring-2 ring-gold/30 [box-shadow:0_0_10px_-2px_var(--color-glow)] transition-colors"
-        [class]="
-          expanded()
-            ? 'size-7'
-            : 'size-6 group-hover:bg-gold-soft group-hover:ring-gold/60'
-        "
+        [class]="expanded() ? 'size-7' : 'size-6 group-hover:bg-gold-soft group-hover:ring-gold/60'"
         aria-hidden="true"
         >{{ initial() }}</span
       >
       @if (expanded()) {
         <span class="flex flex-col min-w-0 flex-1 leading-tight">
-          <span class="text-2xs uppercase tracking-wide text-ink-faint">{{
-            'worlds.crestLabel' | transloco
-          }}</span>
-          <span class="text-sm text-ink-strong truncate">{{
-            activeName() ?? ('worlds.switcher' | transloco)
-          }}</span>
+          <span class="text-2xs uppercase tracking-wide text-ink-faint">{{ 'worlds.crestLabel' | transloco }}</span>
+          <span class="text-sm text-ink-strong truncate">{{ activeName() ?? ('worlds.switcher' | transloco) }}</span>
         </span>
         <app-icon name="chevrons" [size]="13" class="shrink-0 opacity-60" />
       } @else {
         <!-- Keep the World name in the DOM for assistive tech (and so the trigger
              is addressable by name) even when the rail hides it visually. -->
-        <span class="sr-only">{{
-          activeName() ?? ('worlds.switcher' | transloco)
-        }}</span>
+        <span class="sr-only">{{ activeName() ?? ('worlds.switcher' | transloco) }}</span>
       }
     </button>
 
@@ -96,11 +70,7 @@ import { Icon, Rule, MenuGroup, MenuItem, MenuItemRadio, MenuPanel, MenuTrigger 
           }
         </div>
         <hr appRule class="mx-1 my-1" />
-        <a
-          appMenuItem
-          routerLink="/"
-          data-testid="switcher-index-link"
-        >
+        <a appMenuItem routerLink="/" data-testid="switcher-index-link">
           <app-icon name="library" [size]="18" />
           {{ 'worlds.allWorlds' | transloco }}
         </a>
@@ -120,13 +90,9 @@ export class WorldSwitcher {
   protected readonly activeId = this.activeWorld.worldId;
 
   /** The active World's name, or `null` outside a World (the Index). */
-  protected readonly activeName = computed(
-    () => this.worlds().find((w) => w.id === this.activeId())?.name ?? null,
-  );
+  protected readonly activeName = computed(() => this.worlds().find((w) => w.id === this.activeId())?.name ?? null);
   /** The active World's first letter for the collapsed chip; '?' when none. */
-  protected readonly initial = computed(
-    () => this.activeName()?.trim()[0]?.toUpperCase() ?? '?',
-  );
+  protected readonly initial = computed(() => this.activeName()?.trim()[0]?.toUpperCase() ?? '?');
 
   constructor() {
     this.store.load();

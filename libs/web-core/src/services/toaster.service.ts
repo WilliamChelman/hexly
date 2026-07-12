@@ -36,15 +36,14 @@ export class ToasterService {
    * `durationMs` of `0` to keep it until dismissed. The timer is skipped where
    * `setTimeout` is unavailable, so the service is safe to construct under SSR.
    */
-  show(
-    message: string,
-    tone: ToastTone = 'info',
-    durationMs = DEFAULT_TOAST_DURATION_MS,
-  ): number {
+  show(message: string, tone: ToastTone = 'info', durationMs = DEFAULT_TOAST_DURATION_MS): number {
     const id = this.nextId++;
     this._toasts.update((list) => [...list, { id, message, tone }]);
     if (durationMs > 0 && typeof setTimeout === 'function') {
-      this.timers.set(id, setTimeout(() => this.dismiss(id), durationMs));
+      this.timers.set(
+        id,
+        setTimeout(() => this.dismiss(id), durationMs),
+      );
     }
     return id;
   }

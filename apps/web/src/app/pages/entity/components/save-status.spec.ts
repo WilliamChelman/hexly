@@ -1,17 +1,14 @@
+import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
-import {
-  EntityDetail,
-  EntitySaveOutcome,
-  HexMap,
-  coordKey,
-  emptyContent,
-} from '@hexly/domain';
-import { provideTranslocoTesting, MockEntitiesClient } from '@hexly/web-core/testing';
+import { EntityDetail, EntitySaveOutcome, emptyContent } from '@hexly/domain';
+import { coordKey, CORE_HEXMAP, HEX_GRID_FIELD, HexMap } from '@hexly/plugin-hexmap';
+import { MockEntitiesClient } from '@hexly/web-core/testing';
 import { EntitiesClient } from '@hexly/web-core';
 import { EntitySession } from '../services/entity-session';
-import { HexMapStore } from '@hexly/web-map';
+import { HexMapStore } from '@hexly/plugin-hexmap/testing';
+import { ENTITY_SESSION, VIEW_FIELD_KEY } from '@hexly/web-entity';
 import { SaveStatus } from './save-status';
 
 // Autosave feedback chip that replaced the Save button (ADR-0026):
@@ -23,7 +20,7 @@ describe('SaveStatus', () => {
   let fixture: ComponentFixture<SaveStatus>;
 
   const content = emptyContent();
-  const bodyOf = (grid: HexMap) => ({ type: 'hexmap' as const, content, ...grid });
+  const bodyOf = (grid: HexMap) => ({ content, metadata: { grid } });
   const forestAt00: HexMap = {
     hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' } },
     regions: [],
@@ -33,7 +30,7 @@ describe('SaveStatus', () => {
     id: 'm1',
     worldId: 'w1',
     name: 'Aldermoor',
-    type: 'hexmap',
+    types: [CORE_HEXMAP],
     tags: [],
     visibility: 'private',
     version: 3,
@@ -51,6 +48,10 @@ describe('SaveStatus', () => {
       imports: [SaveStatus, provideTranslocoTesting()],
       providers: [
         EntitySession,
+        HexMapStore,
+        // The store edits *a* grid, so it is told which — as the entity page's outlet tells it.
+        { provide: VIEW_FIELD_KEY, useValue: HEX_GRID_FIELD.key },
+        { provide: ENTITY_SESSION, useExisting: EntitySession },
         { provide: EntitiesClient, useValue: entities },
         provideRouter([]),
       ],
@@ -67,9 +68,12 @@ describe('SaveStatus', () => {
   }
 
   const text = () => fixture.nativeElement.textContent as string;
+  /** The routine states are an icon badge, so what they *show* is `data-state`, not words. */
+  const state = () => fixture.nativeElement.querySelector('[data-testid=save-status]')?.getAttribute('data-state');
 
   it('reads Saved when the open entity is clean', () => {
     open();
+    expect(state()).toBe('saved');
     expect(text()).toContain('Saved');
   });
 
@@ -77,6 +81,7 @@ describe('SaveStatus', () => {
     open();
     editor.paintAt({ q: 5, r: 5 }, 'ocean');
     fixture.detectChanges();
+    expect(state()).toBe('unsaved');
     expect(text()).toContain('Unsaved');
   });
 
@@ -87,6 +92,7 @@ describe('SaveStatus', () => {
     entities.save.mockReturnValue(save$);
     session.save().subscribe();
     fixture.detectChanges();
+    expect(state()).toBe('saving');
     expect(text()).toContain('Saving');
 
     save$.next({
@@ -95,6 +101,7 @@ describe('SaveStatus', () => {
     });
     save$.complete();
     fixture.detectChanges();
+    expect(state()).toBe('saved');
     expect(text()).toContain('Saved');
   });
 
@@ -107,11 +114,7 @@ describe('SaveStatus', () => {
     expect(text()).toContain('Newer version on server');
 
     entities.load.mockReturnValue(of(aldermoor));
-    (
-      fixture.nativeElement.querySelector(
-        '[data-testid=conflict-reload]',
-      ) as HTMLButtonElement
-    ).click();
+    (fixture.nativeElement.querySelector('[data-testid=conflict-reload]') as HTMLButtonElement).click();
     fixture.detectChanges();
     expect(session.conflict()).toBeNull();
   });
@@ -126,21 +129,13 @@ describe('SaveStatus', () => {
     // Re-pull fails: the conflict stands, but the user must be told Reload failed
     // else the chip looks unchanged and Reload appears to do nothing (ADR-0026).
     entities.load.mockReturnValue(throwError(() => new Error('network')));
-    (
-      fixture.nativeElement.querySelector(
-        '[data-testid=conflict-reload]',
-      ) as HTMLButtonElement
-    ).click();
+    (fixture.nativeElement.querySelector('[data-testid=conflict-reload]') as HTMLButtonElement).click();
     fixture.detectChanges();
 
     expect(session.conflict()).not.toBeNull();
     expect(session.error()).toBe('reload');
-    expect(
-      fixture.nativeElement.querySelector('[data-testid=reload-error]'),
-    ).not.toBeNull();
-    expect(
-      fixture.nativeElement.querySelector('[data-testid=conflict-reload]'),
-    ).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid=reload-error]')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('[data-testid=conflict-reload]')).not.toBeNull();
   });
 
   it('shows a save error with a Retry that re-saves', () => {
@@ -154,14 +149,14 @@ describe('SaveStatus', () => {
     entities.save.mockReturnValue(
       of({
         status: 'saved',
-        entity: { ...aldermoor, version: 4, document: bodyOf(editor.document()) },
+        entity: {
+          ...aldermoor,
+          version: 4,
+          document: bodyOf(editor.document()),
+        },
       }),
     );
-    (
-      fixture.nativeElement.querySelector(
-        '[data-testid=save-retry]',
-      ) as HTMLButtonElement
-    ).click();
+    (fixture.nativeElement.querySelector('[data-testid=save-retry]') as HTMLButtonElement).click();
     expect(entities.save).toHaveBeenCalledTimes(2);
   });
 

@@ -1,28 +1,7 @@
-import {
-  DestroyRef,
-  Injectable,
-  computed,
-  effect,
-  inject,
-  signal,
-  untracked,
-} from '@angular/core';
+import { DestroyRef, Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
-import {
-  EMPTY,
-  Observable,
-  Subject,
-  catchError,
-  debounceTime,
-  switchMap,
-  tap,
-} from 'rxjs';
-import {
-  FollowSignal,
-  WorldDetail,
-  WorldMember,
-  WorldSummary,
-} from '@hexly/domain';
+import { EMPTY, Observable, Subject, catchError, debounceTime, switchMap, tap } from 'rxjs';
+import { FollowSignal, WorldDetail, WorldMember, WorldSummary } from '@hexly/domain';
 import { AuthClient } from './auth.client';
 import { WorldsClient, WORLD_NUDGE_DEBOUNCE_MS } from './worlds.client';
 import { Logger } from './logger';
@@ -154,29 +133,21 @@ export class WorldStore {
   // itself emits no nudge (this tab didn't yet follow a World that didn't exist); cross-tab
   // discovery of a new World rides the World Index's focus-refetch, not the bus.
   create(name: string): Observable<WorldDetail> {
-    return this.client.create(name).pipe(
-      tap((world) => this._worlds.update((ws) => [...ws, world])),
-    );
+    return this.client.create(name).pipe(tap((world) => this._worlds.update((ws) => [...ws, world])));
   }
 
   // Owner-only server-side. Reflect the acting tab's own confirmed rename immediately (not a guess
   // — the server returned it); *other* tabs following this World reconcile via its readable nudge.
   rename(id: string, name: string): Observable<WorldDetail> {
-    return this.client.rename(id, name).pipe(
-      tap((world) =>
-        this._worlds.update((ws) =>
-          ws.map((w) => (w.id === id ? { ...w, name: world.name } : w)),
-        ),
-      ),
-    );
+    return this.client
+      .rename(id, name)
+      .pipe(tap((world) => this._worlds.update((ws) => ws.map((w) => (w.id === id ? { ...w, name: world.name } : w)))));
   }
 
   // Owner-only server-side, cascades its Entities. Remove it here on the acting tab's confirmed
   // delete; other tabs following this World are evicted by its `unavailable` nudge.
   delete(id: string): Observable<void> {
-    return this.client.delete(id).pipe(
-      tap(() => this._worlds.update((ws) => ws.filter((w) => w.id !== id))),
-    );
+    return this.client.delete(id).pipe(tap(() => this._worlds.update((ws) => ws.filter((w) => w.id !== id))));
   }
 
   /**
@@ -186,9 +157,7 @@ export class WorldStore {
    * can say which Worlds survive leaving.
    */
   leave(id: string): Observable<WorldMember[]> {
-    return this.client.removeMember(id, this.userId() ?? '').pipe(
-      tap(() => this.refresh()),
-    );
+    return this.client.removeMember(id, this.userId() ?? '').pipe(tap(() => this.refresh()));
   }
 
   // Re-fetch the reachable Worlds after an out-of-band change (leaving one, the

@@ -22,10 +22,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const TOKEN_FILES = [
-  'libs/web-styles/src/index.css',
-  'libs/web-styles/src/tokens.css',
-];
+const TOKEN_FILES = ['libs/web-styles/src/index.css', 'libs/web-styles/src/tokens.css'];
 
 /**
  * Tailwind built-ins a component may legitimately reference by name. `--spacing`
@@ -109,7 +106,9 @@ function textOf(node) {
 const noUnknownDesignToken = {
   meta: {
     type: 'problem',
-    docs: { description: 'Disallow var(--…) references to undefined design tokens (ADR-0020).' },
+    docs: {
+      description: 'Disallow var(--…) references to undefined design tokens (ADR-0020).',
+    },
     schema: [],
     messages: {
       unknown:
@@ -139,7 +138,10 @@ const noUnknownDesignToken = {
 const noBuiltinShadow = {
   meta: {
     type: 'problem',
-    docs: { description: 'Disallow Tailwind built-in shadow-* utilities; use the project\'s shadow-1/2/3/inset tokens (ADR-0021).' },
+    docs: {
+      description:
+        "Disallow Tailwind built-in shadow-* utilities; use the project's shadow-1/2/3/inset tokens (ADR-0021).",
+    },
     schema: [],
     messages: {
       builtin:
@@ -167,11 +169,11 @@ const noBuiltinShadow = {
         if (typeof node.value !== 'string') return;
         const p = node.parent;
         const isClassProp =
-          !!p &&
-          p.type === 'Property' &&
-          p.value === node &&
-          (p.key.name === 'class' || p.key.value === 'class');
-        if (isClassProp || node.value.includes('class=')) { const t = textOf(node); if (t) scan(node, t); }
+          !!p && p.type === 'Property' && p.value === node && (p.key.name === 'class' || p.key.value === 'class');
+        if (isClassProp || node.value.includes('class=')) {
+          const t = textOf(node);
+          if (t) scan(node, t);
+        }
       },
     };
   },

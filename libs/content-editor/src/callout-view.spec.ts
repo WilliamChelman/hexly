@@ -147,7 +147,10 @@ describe('CalloutView node view', () => {
   });
 
   it('shows an arbitrary (imported) type verbatim in the input', () => {
-    const { editor, view } = nodeViewFor({ type: 'custom-obsidian', title: null });
+    const { editor, view } = nodeViewFor({
+      type: 'custom-obsidian',
+      title: null,
+    });
     const input = (view.dom as HTMLElement).querySelector('input') as HTMLInputElement;
 
     expect(input.value).toBe('custom-obsidian');

@@ -2,13 +2,17 @@ import { basename, posix } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import {
+  CORE_NOTE,
   ContentNode,
   EntityBody,
+  EntityType,
   HEXLY_METADATA_PREFIX,
+  HEXLY_TYPE_KEY,
   ImportSummary,
   nameSchema,
   tagsSchema,
   tiptapContent,
+  typesSchema,
   visit,
 } from '@hexly/domain';
 import { markdownToProseMirror } from '@hexly/obsidian';
@@ -19,8 +23,9 @@ import { VaultUnzipper } from './vault-unzipper';
 import { WorldsService } from './worlds.service';
 
 /**
- * Vault import (ADR-0033): unzip a `.zip` server-side and turn each markdown file
- * into a `note` Entity in a brand-new World named after the upload. Runs synchronously
+ * Vault import (ADR-0033): unzip a `.zip` server-side and turn each markdown file into an Entity in
+ * a brand-new World named after the upload — a plain Note, unless its frontmatter stamps the types
+ * ({@link toTypes}). Runs synchronously
  * (a job queue is YAGNI at this scale). Two-pass (#147): pass 1 converts every file and
  * assigns it an id; pass 2 resolves each `[[wikilink]]` to the id of the note it names
  * (dangling when none matches) before persisting. Continue-on-error: a file that can't be
@@ -60,7 +65,7 @@ export class VaultImportService {
         const text = decodeUtf8(bytes);
         const name = nameSchema.parse(basename(path, '.md'));
         const { doc, metadata, degraded } = markdownToProseMirror(text);
-        // Every file imports as an ordinary note — there is no Home Entity to route to (ADR-0043).
+        // Every file imports as a top-level Entity — there is no Home Entity to route to (ADR-0043).
         // A legacy `hexly.isHome` flag is just reserved frontmatter, stripped below like any `hexly.*`.
         notes.push({ id: randomUUID(), path, name, doc, metadata });
         for (const [key, n] of Object.entries(degraded)) {
@@ -102,12 +107,21 @@ export class VaultImportService {
         );
         const content = tiptapContent(note.doc);
         // Folder path recorded under the reserved namespace so export can rebuild the tree.
+        // Frontmatter lands as Metadata whatever the types: a Field only types a key that map already
+        // holds, a Structured Field's nested value (a Hex Map's grid) included (ADR-0050).
         const body: EntityBody = {
-          type: 'note',
           content,
           metadata: { ...passThrough, 'hexly.sourcePath': note.path },
         };
-        this.entities.importNote(ownerId, worldId, note.id, note.name, toTags(tags), body);
+        this.entities.importEntity({
+          ownerId,
+          worldId,
+          id: note.id,
+          name: note.name,
+          types: toTypes(note.metadata[HEXLY_TYPE_KEY]),
+          tags: toTags(tags),
+          body,
+        });
       }
     });
 
@@ -277,16 +291,24 @@ function resolveLinks(node: ContentNode, index: NoteIndex): { resolved: number; 
 }
 
 /**
+ * Frontmatter `hexly.type` → the Entity's ordered Type set (#203). Ids are validated for shape and
+ * applied; none is resolved against a registry, so a user-defined type — whose definition lives in
+ * its World, not in the vault — lands like a plugin's.
+ *
+ * Anything not a well-formed set degrades to a plain Note rather than failing the file, and the
+ * whole set goes: a half-applied one is a shape no author asked for.
+ */
+function toTypes(raw: unknown): readonly EntityType[] {
+  return typesSchema.catch([CORE_NOTE]).parse(Array.isArray(raw) ? raw : []);
+}
+
+/**
  * Frontmatter `tags` → Hexly Tags. Obsidian allows a YAML list or a single
  * comma/space-separated string; tagsSchema then trims, lower-cases, and dedupes.
  * Anything else (or absent) yields no tags.
  */
 function toTags(raw: unknown): readonly string[] {
-  const list = Array.isArray(raw)
-    ? raw
-    : typeof raw === 'string'
-      ? raw.split(/[,\s]+/)
-      : [];
+  const list = Array.isArray(raw) ? raw : typeof raw === 'string' ? raw.split(/[,\s]+/) : [];
   return tagsSchema.parse(list.filter((t) => typeof t === 'string' && t.trim() !== ''));
 }
 

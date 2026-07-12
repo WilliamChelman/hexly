@@ -4,6 +4,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { WorldMember } from '@hexly/domain';
 import { WorldsClient, UserDirectoryClient, ToasterService } from '@hexly/web-core';
 import { MockWorldsClient, MockUserDirectoryClient, provideTranslocoTesting } from '@hexly/web-core/testing';
+import { WEB_UI_TEST_CATALOGS } from './i18n/test-catalogs';
 import { MemberSet } from './member-set';
 
 describe('MemberSet', () => {
@@ -15,7 +16,7 @@ describe('MemberSet', () => {
     worlds = new MockWorldsClient();
     users = new MockUserDirectoryClient();
     await TestBed.configureTestingModule({
-      imports: [MemberSet, provideTranslocoTesting()],
+      imports: [MemberSet, provideTranslocoTesting(WEB_UI_TEST_CATALOGS)],
       providers: [
         { provide: WorldsClient, useValue: worlds },
         { provide: UserDirectoryClient, useValue: users },
@@ -52,9 +53,7 @@ describe('MemberSet', () => {
   it('excludes both existing members and Owners from the add candidates', () => {
     // u1 is an Owner, u2 is already a member — only Carol (u3) remains addable.
     const { nativeElement: el } = render('w1', [{ userId: 'u2', role: 'viewer' }], ['u1']);
-    const options = Array.from(
-      ($(el, '[data-testid="add-select"]') as HTMLSelectElement).options,
-    ).map((o) => o.value);
+    const options = Array.from(($(el, '[data-testid="add-select"]') as HTMLSelectElement).options).map((o) => o.value);
 
     expect(options).toEqual(['', 'u3']);
   });

@@ -1,11 +1,5 @@
-import { EdgeTargetKind } from '@hexly/domain';
-import {
-  index,
-  integer,
-  primaryKey,
-  sqliteTable,
-  text,
-} from 'drizzle-orm/sqlite-core';
+import { EdgeTargetKind, FieldSchema, ViewPlacement } from '@hexly/domain';
+import { index, integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 // Keep in sync by hand with the `CREATE TABLE` DDL in `./db.ts`; column changes
 // need a drizzle-kit migration to reach an existing database.
@@ -53,7 +47,7 @@ export const sessions = sqliteTable(
   (table) => [
     // Speeds up expired-session sweep (runs on every login).
     index('idx_sessions_expires_at').on(table.expiresAt),
-  ]
+  ],
 );
 
 /**
@@ -65,11 +59,11 @@ export const INITIAL_SEQ = 1;
 
 /**
  * An Entity stored as a single JSON document. The columns are the metadata the
- * list view and access checks need; `document` holds the whole type-discriminated
- * body. `type`/`tags` are denormalized out so a list can group/filter without
- * loading each body. `version` is the optimistic-concurrency counter (a stale
- * save is a 409). Ownership is not a column — it is an `owner`-role row in
- * `entityGrants`.
+ * list view and access checks need; `document` holds the whole body — `{ content, metadata }`, one
+ * shape for every Entity (ADR-0050). `types`/`tags` are denormalized out — each
+ * a multi-valued JSON array — so a list can group/filter without loading each body.
+ * `version` is the optimistic-concurrency counter (a stale save is a 409). Ownership
+ * is not a column — it is an `owner`-role row in `entityGrants`.
  */
 export const entities = sqliteTable(
   'entities',
@@ -79,7 +73,10 @@ export const entities = sqliteTable(
       .notNull()
       .references(() => worlds.id),
     name: text('name').notNull(),
-    type: text('type').notNull(),
+    // The ordered Entity Type set (CONTEXT.md → Entity Type); `types[0]` is primary. A multi-valued
+    // JSON array mirroring `tags`, unrolled with `json_each` for the Type facet and array-membership
+    // filtering (ADR-0048).
+    types: text('types', { mode: 'json' }).$type<string[]>().notNull(),
     tags: text('tags', { mode: 'json' }).$type<string[]>().notNull(),
     // private | shared.
     visibility: text('visibility').notNull().default('private'),
@@ -100,9 +97,7 @@ export const entities = sqliteTable(
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
-  (table) => [
-    index('idx_entities_world_id').on(table.worldId),
-  ]
+  (table) => [index('idx_entities_world_id').on(table.worldId)],
 );
 
 /**
@@ -124,7 +119,7 @@ export const entityGrants = sqliteTable(
       .references(() => users.id),
     role: text('role').notNull(),
   },
-  (table) => [primaryKey({ columns: [table.entityId, table.userId] })]
+  (table) => [primaryKey({ columns: [table.entityId, table.userId] })],
 );
 
 /**
@@ -142,10 +137,7 @@ export const worlds = sqliteTable('worlds', {
   // Owner-curated Dashboard pins: an ordered JSON array of Entity ids, one shared
   // set per World. References, not enforced FKs — stale or inaccessible ids are
   // filtered per-viewer on read, never pruned on delete.
-  pinnedEntityIds: text('pinned_entity_ids', { mode: 'json' })
-    .$type<string[]>()
-    .notNull()
-    .default([]),
+  pinnedEntityIds: text('pinned_entity_ids', { mode: 'json' }).$type<string[]>().notNull().default([]),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
 });
@@ -166,9 +158,34 @@ export const worldMembers = sqliteTable(
       .references(() => users.id),
     role: text('role').notNull(),
   },
-  (table) => [
-    primaryKey({ columns: [table.worldId, table.userId] }),
-  ]
+  (table) => [primaryKey({ columns: [table.worldId, table.userId] })],
+);
+
+/**
+ * A World's user-defined Type Definitions (ADR-0048): an Entity Type a World Owner authors as data,
+ * scoped to this World. The junction-table pattern of {@link worldMembers}, keyed by `(worldId,
+ * typeId)`; `typeId` is the immutable `world.`-namespaced Entity Type key. Rows cascade with the
+ * World, and writes route through {@link WorldWrites} (the World write choke point).
+ */
+export const worldTypes = sqliteTable(
+  'world_types',
+  {
+    worldId: text('world_id')
+      .notNull()
+      .references(() => worlds.id, { onDelete: 'cascade' }),
+    typeId: text('type_id').notNull(),
+    label: text('label').notNull(),
+    // The type's Field schema (FieldSchema[]), validated at the trust boundary against the shared Zod
+    // schema. A JSON bag, never DB-queried — the write-path resolver loads it whole and unions it.
+    fields: text('fields', { mode: 'json' }).$type<FieldSchema[]>().notNull().default([]),
+    // The type's ordered View list (ViewPlacement[], ADR-0050, #201), what the "Show as a view" toggle
+    // writes. Null is *not* an empty list: it means the author named no order, and the web defaults
+    // it. The API stores and shape-validates the list, as it does `fields`; it never resolves a View.
+    views: text('views', { mode: 'json' }).$type<ViewPlacement[]>(),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.worldId, table.typeId] })],
 );
 
 /**
@@ -184,9 +201,7 @@ export const worldLinks = sqliteTable(
       .references(() => worlds.id, { onDelete: 'cascade' }),
     createdAt: integer('created_at').notNull(),
   },
-  (table) => [
-    index('idx_world_links_world_id').on(table.worldId),
-  ]
+  (table) => [index('idx_world_links_world_id').on(table.worldId)],
 );
 
 /**
@@ -204,7 +219,7 @@ export const entityLinks = sqliteTable(
       .references(() => entities.id, { onDelete: 'cascade' }),
     createdAt: integer('created_at').notNull(),
   },
-  (table) => [index('idx_entity_links_entity_id').on(table.entityId)]
+  (table) => [index('idx_entity_links_entity_id').on(table.entityId)],
 );
 
 /**
@@ -226,7 +241,7 @@ export const assets = sqliteTable(
     size: integer('size').notNull(),
     createdAt: integer('created_at').notNull(),
   },
-  (table) => [primaryKey({ columns: [table.worldId, table.hash] })]
+  (table) => [primaryKey({ columns: [table.worldId, table.hash] })],
 );
 
 /**
@@ -264,7 +279,42 @@ export const entityEdges = sqliteTable(
     index('idx_entity_edges_target').on(table.targetKind, table.targetId),
     // The World Graph's whole-World edge fetch.
     index('idx_entity_edges_world').on(table.worldId, table.targetKind),
-  ]
+  ],
+);
+
+/**
+ * The denormalised **Field-facet** index (ADR-0048, #188): one row per distinct facetable Field
+ * value an Entity's Metadata carries — the Field peer of the `types`/`tags` columns, pulled out so a
+ * Field facet can be counted and filtered without loading each body. Like {@link entityEdges} it is
+ * an **index, never a source of truth**: `EntityWrites` derives it from `document.metadata` on every
+ * save and Reindex rebuilds it, wholesale-replacing an Entity's rows (self-pruning). Deleting the
+ * Entity cascades them away.
+ *
+ * `value` is the canonical string form; `num` is set only for a `number` Field, so a range filter
+ * compares it numerically while an enum/date/string compares `value` lexically. `worldId` is
+ * denormalised off the source, mirroring {@link entityEdges}, so a World-scoped facet read is one
+ * indexed lookup. A `list` Field explodes to one row per item, so the composite PK is
+ * `(entityId, key, value)`.
+ */
+export const entityFieldFacets = sqliteTable(
+  'entity_field_facets',
+  {
+    entityId: text('entity_id')
+      .notNull()
+      .references(() => entities.id, { onDelete: 'cascade' }),
+    worldId: text('world_id').notNull(),
+    // The Metadata key the Field types.
+    key: text('key').notNull(),
+    // The canonical string form of the value; the facet value the rail lists and eq/date filters match.
+    value: text('value').notNull(),
+    // The numeric form of a `number` Field (else null), so a range filter compares as a number.
+    num: real('num'),
+  },
+  (table) => [
+    primaryKey({ columns: [table.entityId, table.key, table.value] }),
+    // The World-scoped facet count and filter: group/match by (world, key, value).
+    index('idx_entity_field_facets_key').on(table.worldId, table.key, table.value),
+  ],
 );
 
 /**
@@ -280,7 +330,5 @@ export const entityDescriptors = sqliteTable(
       .references(() => entities.id, { onDelete: 'cascade' }),
     descriptor: text('descriptor').notNull(),
   },
-  (table) => [
-    primaryKey({ columns: [table.entityId, table.descriptor] }),
-  ]
+  (table) => [primaryKey({ columns: [table.entityId, table.descriptor] })],
 );

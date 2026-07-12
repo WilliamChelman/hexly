@@ -8,6 +8,7 @@ import { CONTENT_FORMAT, Content, EntityDetail, tiptapContent } from '@hexly/dom
 import { Editor } from '@tiptap/core';
 import { EntityNameResolver } from './entity-name-resolver';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
+import { CONTENT_EDITOR_TEST_CATALOGS } from './i18n/test-catalogs';
 import { ContentEditor } from './content-editor';
 import { CONTENT_EDITOR_SESSION, ContentEditorSession } from './content-editor-session';
 
@@ -17,7 +18,7 @@ const noteDetail = (name: string): EntityDetail => ({
   id: 'n1',
   worldId: 'w1',
   name,
-  type: 'note',
+  types: ['core.note'],
   tags: [],
   visibility: 'private',
   version: 1,
@@ -25,7 +26,7 @@ const noteDetail = (name: string): EntityDetail => ({
   createdAt: 1,
   updatedAt: 1,
   rights: ['read', 'edit', 'delete', 'set-visibility', 'manage'],
-  document: { type: 'note', content: { format: CONTENT_FORMAT, snapshot: {} } },
+  document: { content: { format: CONTENT_FORMAT, snapshot: {} } },
 });
 
 // Drives ContentEditor via the token, standing in for the page's EntitySession:
@@ -56,7 +57,6 @@ describe('ContentEditor', () => {
   const noteWithProse = (text: string): EntityDetail => ({
     ...note('Lady Mara'),
     document: {
-      type: 'note',
       content: {
         format: CONTENT_FORMAT,
         snapshot: {
@@ -82,10 +82,7 @@ describe('ContentEditor', () => {
 
   function create() {
     const fixture = TestBed.createComponent(ContentEditor);
-    (fixture.componentRef as ComponentRef<ContentEditor>).setInput(
-      'ariaLabel',
-      'Content',
-    );
+    (fixture.componentRef as ComponentRef<ContentEditor>).setInput('ariaLabel', 'Content');
     fixture.detectChanges();
     return fixture;
   }
@@ -93,7 +90,7 @@ describe('ContentEditor', () => {
   beforeEach(async () => {
     fragment$.next(null);
     await TestBed.configureTestingModule({
-      imports: [ContentEditor, provideTranslocoTesting()],
+      imports: [ContentEditor, provideTranslocoTesting(CONTENT_EDITOR_TEST_CATALOGS)],
       providers: [
         { provide: CONTENT_EDITOR_SESSION, useClass: FakeEditorSession },
         EntityNameResolver,
@@ -106,15 +103,11 @@ describe('ContentEditor', () => {
   });
 
   it('seeds the editor with the open Entity’s stored Content', () => {
-    (TestBed.inject(CONTENT_EDITOR_SESSION) as FakeEditorSession).adopt(
-      noteWithProse('Lady Mara rules the north.'),
-    );
+    (TestBed.inject(CONTENT_EDITOR_SESSION) as FakeEditorSession).adopt(noteWithProse('Lady Mara rules the north.'));
 
     const fixture = create();
 
-    const surface = fixture.nativeElement.querySelector(
-      '[data-testid=note-content]',
-    ) as HTMLElement;
+    const surface = fixture.nativeElement.querySelector('[data-testid=note-content]') as HTMLElement;
     expect(surface.textContent).toContain('Lady Mara rules the north.');
   });
 
@@ -122,7 +115,6 @@ describe('ContentEditor', () => {
     (TestBed.inject(CONTENT_EDITOR_SESSION) as FakeEditorSession).adopt({
       ...note('Lady Mara'),
       document: {
-        type: 'note',
         content: {
           format: CONTENT_FORMAT,
           snapshot: {
@@ -132,7 +124,10 @@ describe('ContentEditor', () => {
                 type: 'callout',
                 attrs: { type: 'warning', title: 'Beware' },
                 content: [
-                  { type: 'paragraph', content: [{ type: 'text', text: 'The pass is watched.' }] },
+                  {
+                    type: 'paragraph',
+                    content: [{ type: 'text', text: 'The pass is watched.' }],
+                  },
                 ],
               },
             ],
@@ -152,21 +147,26 @@ describe('ContentEditor', () => {
   it('scrolls to the first heading matching the route fragment (ADR-0033)', () => {
     // jsdom has no layout; stub scrollIntoView so we can assert which node got it.
     HTMLElement.prototype.scrollIntoView ??= () => undefined;
-    const scrollSpy = vi
-      .spyOn(HTMLElement.prototype, 'scrollIntoView')
-      .mockImplementation(() => undefined);
+    const scrollSpy = vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(() => undefined);
 
     (TestBed.inject(CONTENT_EDITOR_SESSION) as FakeEditorSession).adopt({
       ...note('Lady Mara'),
       document: {
-        type: 'note',
         content: {
           format: CONTENT_FORMAT,
           snapshot: {
             type: 'doc',
             content: [
-              { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Origins' }] },
-              { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'History' }] },
+              {
+                type: 'heading',
+                attrs: { level: 2 },
+                content: [{ type: 'text', text: 'Origins' }],
+              },
+              {
+                type: 'heading',
+                attrs: { level: 2 },
+                content: [{ type: 'text', text: 'History' }],
+              },
             ],
           },
         },
@@ -186,9 +186,7 @@ describe('ContentEditor', () => {
 
   it('does not scroll when the fragment matches no heading (best-effort anchor)', () => {
     HTMLElement.prototype.scrollIntoView ??= () => undefined;
-    const scrollSpy = vi
-      .spyOn(HTMLElement.prototype, 'scrollIntoView')
-      .mockImplementation(() => undefined);
+    const scrollSpy = vi.spyOn(HTMLElement.prototype, 'scrollIntoView').mockImplementation(() => undefined);
 
     (TestBed.inject(CONTENT_EDITOR_SESSION) as FakeEditorSession).adopt(noteWithProse('Just a paragraph.'));
     const fixture = create();
@@ -204,9 +202,7 @@ describe('ContentEditor', () => {
 
     const fixture = create();
 
-    expect(editorOf(fixture).view.dom.getAttribute('aria-label')).toBe(
-      'Content',
-    );
+    expect(editorOf(fixture).view.dom.getAttribute('aria-label')).toBe('Content');
   });
 
   it('opens the slash menu of insertable blocks when “/” is typed', async () => {
@@ -233,7 +229,7 @@ describe('ContentEditor', () => {
   });
 
   it('rebuilds the editor on re-seed and destroys the previous instance', async () => {
-    const session = (TestBed.inject(CONTENT_EDITOR_SESSION) as FakeEditorSession);
+    const session = TestBed.inject(CONTENT_EDITOR_SESSION) as FakeEditorSession;
     session.adopt(noteWithProse('Original prose.'));
 
     const fixture = create();
@@ -252,9 +248,7 @@ describe('ContentEditor', () => {
     expect(first.isDestroyed).toBe(true);
     expect(hasBubbleMenu(second)).toBe(true);
 
-    const surface = fixture.nativeElement.querySelector(
-      '[data-testid=note-content]',
-    ) as HTMLElement;
+    const surface = fixture.nativeElement.querySelector('[data-testid=note-content]') as HTMLElement;
     expect(surface.textContent).toContain('Reseeded prose.');
     expect(surface.textContent).not.toContain('Original prose.');
   });
@@ -263,20 +257,22 @@ describe('ContentEditor', () => {
     // Repro of the Map↔Note toggle bug (#75): the editor is destroyed/recreated
     // across views. A clean save advances the session's live Content but not its
     // seed, so a remount must re-seed from the live edits, not the load snapshot.
-    const session = (TestBed.inject(CONTENT_EDITOR_SESSION) as FakeEditorSession);
+    const session = TestBed.inject(CONTENT_EDITOR_SESSION) as FakeEditorSession;
     session.adopt(noteWithProse('Original prose.'));
 
     const first = create();
-    expect(
-      (first.nativeElement.querySelector('[data-testid=note-content]') as HTMLElement)
-        .textContent,
-    ).toContain('Original prose.');
+    expect((first.nativeElement.querySelector('[data-testid=note-content]') as HTMLElement).textContent).toContain(
+      'Original prose.',
+    );
 
     // The user edits and saves: the live Content advances, the seed does not.
     session.setContent({
       type: 'doc',
       content: [
-        { type: 'paragraph', content: [{ type: 'text', text: 'Edited prose.' }] },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Edited prose.' }],
+        },
       ],
     });
 
@@ -284,15 +280,13 @@ describe('ContentEditor', () => {
     first.destroy();
     const second = create();
 
-    const surface = second.nativeElement.querySelector(
-      '[data-testid=note-content]',
-    ) as HTMLElement;
+    const surface = second.nativeElement.querySelector('[data-testid=note-content]') as HTMLElement;
     expect(surface.textContent).toContain('Edited prose.');
     expect(surface.textContent).not.toContain('Original prose.');
   });
 
   it('streams edits to the session after a re-seed', () => {
-    const session = (TestBed.inject(CONTENT_EDITOR_SESSION) as FakeEditorSession);
+    const session = TestBed.inject(CONTENT_EDITOR_SESSION) as FakeEditorSession;
     session.adopt(noteWithProse('Original prose.'));
 
     const fixture = create();

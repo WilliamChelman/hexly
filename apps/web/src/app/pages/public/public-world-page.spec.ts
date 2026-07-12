@@ -1,16 +1,11 @@
+import { provideTranslocoTesting } from '../../../testing/transloco-testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { BehaviorSubject, Observable, defer, finalize, of, throwError } from 'rxjs';
 import { PublicWorldView } from '@hexly/domain';
-import {
-  PublicClient,
-  NudgeBusClient,
-  WORLD_NUDGE_DEBOUNCE_MS,
-  Watched,
-  watchResource,
-} from '@hexly/web-core';
-import { MockNudgeBusClient, provideTranslocoTesting } from '@hexly/web-core/testing';
+import { PublicClient, NudgeBusClient, WORLD_NUDGE_DEBOUNCE_MS, Watched, watchResource } from '@hexly/web-core';
+import { MockNudgeBusClient } from '@hexly/web-core/testing';
 import { PublicWorldPage } from './public-world-page';
 
 const TOKEN = 'tok-123';
@@ -23,8 +18,7 @@ function view(worldName: string, entities: PublicWorldView['entities'] = []): Pu
 /** Minimal stand-in for the token-scoped Public read client. */
 class MockPublicClient {
   world = vi.fn<(token: string) => Observable<PublicWorldView>>();
-  watchWorld =
-    vi.fn<(token: string, worldId: string) => Observable<Watched<PublicWorldView>>>();
+  watchWorld = vi.fn<(token: string, worldId: string) => Observable<Watched<PublicWorldView>>>();
 }
 
 describe('PublicWorldPage', () => {
@@ -39,10 +33,8 @@ describe('PublicWorldPage', () => {
     return fixture;
   }
 
-  const nameOf = (el: HTMLElement) =>
-    el.querySelector('[data-testid=public-world-name]')?.textContent?.trim() ?? null;
-  const notFound = (el: HTMLElement) =>
-    !!el.querySelector('[data-testid=public-notfound]');
+  const nameOf = (el: HTMLElement) => el.querySelector('[data-testid=public-world-name]')?.textContent?.trim() ?? null;
+  const notFound = (el: HTMLElement) => !!el.querySelector('[data-testid=public-notfound]');
 
   beforeEach(async () => {
     vi.useFakeTimers();
@@ -67,7 +59,10 @@ describe('PublicWorldPage', () => {
         provideRouter([]),
         { provide: PublicClient, useValue: client },
         { provide: NudgeBusClient, useValue: bus },
-        { provide: ActivatedRoute, useValue: { paramMap: params$.asObservable() } },
+        {
+          provide: ActivatedRoute,
+          useValue: { paramMap: params$.asObservable() },
+        },
       ],
     }).compileComponents();
   });

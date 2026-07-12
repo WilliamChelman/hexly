@@ -5,6 +5,7 @@ import { EntityGrant } from '@hexly/domain';
 import { EntitiesClient, UserDirectoryClient, ToasterService } from '@hexly/web-core';
 import { MockEntitiesClient, MockUserDirectoryClient, provideTranslocoTesting } from '@hexly/web-core/testing';
 import { GrantSet } from './grant-set';
+import { WEB_UI_TEST_CATALOGS } from './i18n/test-catalogs';
 
 describe('GrantSet', () => {
   let entities: MockEntitiesClient;
@@ -15,7 +16,7 @@ describe('GrantSet', () => {
     entities = new MockEntitiesClient();
     users = new MockUserDirectoryClient();
     await TestBed.configureTestingModule({
-      imports: [GrantSet, provideTranslocoTesting()],
+      imports: [GrantSet, provideTranslocoTesting(WEB_UI_TEST_CATALOGS)],
       providers: [
         { provide: EntitiesClient, useValue: entities },
         { provide: UserDirectoryClient, useValue: users },
@@ -52,9 +53,9 @@ describe('GrantSet', () => {
   it('excludes both existing grantees and the Entity’s Owners from the add candidates', () => {
     // u1 is an Owner, u2 is already a grantee — only Carol (u3) remains addable.
     const { nativeElement: el } = render('e1', [{ userId: 'u2', role: 'editor' }], ['u1']);
-    const options = Array.from(
-      ($(el, '[data-testid="grant-add-select"]') as HTMLSelectElement).options,
-    ).map((o) => o.value);
+    const options = Array.from(($(el, '[data-testid="grant-add-select"]') as HTMLSelectElement).options).map(
+      (o) => o.value,
+    );
 
     expect(options).toEqual(['', 'u3']);
   });

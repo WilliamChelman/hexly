@@ -25,6 +25,7 @@ import {
   entityListQuerySchema,
   EntityPage,
   EntityReferences,
+  parseFieldFilters,
   patchEntityRequestSchema,
   PublicLink,
   saveEntityRequestSchema,
@@ -51,7 +52,7 @@ export class EntitiesController {
   list(@CurrentUser() user: AuthUser, @Query() query: unknown): EntityPage {
     const parsed = entityListQuerySchema.safeParse(query);
     if (!parsed.success) throw new BadRequestException();
-    const { cursor, limit, ids, q, type, tag, visibility, worldId, rights } = parsed.data;
+    const { cursor, limit, ids, q, type, tag, visibility, field, worldId, rights } = parsed.data;
 
     // Absent cursor is page one; undecodable is a 400 (ADR-0001).
     const offset = cursor === undefined ? 0 : decodeCursor(cursor);
@@ -65,6 +66,8 @@ export class EntitiesController {
       type,
       tags: tag,
       visibility,
+      // A malformed `field` token is dropped, not 400'd, so a stale URL degrades to no-filter.
+      fields: parseFieldFilters(field),
       worldId,
       withRights: rights,
     });
@@ -96,12 +99,13 @@ export class EntitiesController {
   facets(@CurrentUser() user: AuthUser, @Query() query: unknown): EntityFacets {
     const parsed = entityListQuerySchema.safeParse(query);
     if (!parsed.success) throw new BadRequestException();
-    const { q, type, tag, visibility, worldId } = parsed.data;
+    const { q, type, tag, visibility, field, worldId } = parsed.data;
     return this.entities.facets(user.id, {
       q,
       type,
       tags: tag,
       visibility,
+      fields: parseFieldFilters(field),
       worldId,
     });
   }
@@ -127,11 +131,7 @@ export class EntitiesController {
 
   @Put(':id')
   @HttpCode(200)
-  save(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-    @Body() body: unknown,
-  ): EntityDetail {
+  save(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): EntityDetail {
     const parsed = saveEntityRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
 
@@ -150,11 +150,7 @@ export class EntitiesController {
   // A metadata patch (ADR-0037): the name and/or the Visibility. Reachable-but-forbidden
   // is a 403 (thrown in the service), an unreachable Entity a 404.
   @Patch(':id')
-  patch(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-    @Body() body: unknown,
-  ): EntityDetail {
+  patch(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): EntityDetail {
     const parsed = patchEntityRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
 
@@ -179,11 +175,7 @@ export class EntitiesController {
   // Returns the updated set (200), idempotent — not a 201 (adding is set membership).
   @Post(':id/owners')
   @HttpCode(200)
-  addOwner(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-    @Body() body: unknown,
-  ): string[] {
+  addOwner(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): string[] {
     const parsed = addOwnerRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
     return ownerSetResponse(this.entities.addOwner(user.id, id, parsed.data.userId), 'entity');
@@ -192,11 +184,7 @@ export class EntitiesController {
   // Remove an Owner, or resign your own ownership (ADR-0037). The ≥1-Owner
   // invariant refuses removing the last Owner (409).
   @Delete(':id/owners/:userId')
-  removeOwner(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-    @Param('userId') userId: string,
-  ): string[] {
+  removeOwner(@CurrentUser() user: AuthUser, @Param('id') id: string, @Param('userId') userId: string): string[] {
     return ownerSetResponse(this.entities.removeOwner(user.id, id, userId), 'entity');
   }
 
@@ -212,25 +200,15 @@ export class EntitiesController {
   // an existing user (member or not). Upsert — re-granting updates the role — so 200.
   @Post(':id/grants')
   @HttpCode(200)
-  addGrant(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-    @Body() body: unknown,
-  ): EntityGrant[] {
+  addGrant(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): EntityGrant[] {
     const parsed = addGrantRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
-    return aclSetResponse(
-      this.entities.addGrant(user.id, id, parsed.data.userId, parsed.data.role), 'entity',
-    );
+    return aclSetResponse(this.entities.addGrant(user.id, id, parsed.data.userId, parsed.data.role), 'entity');
   }
 
   // Revoke a grant (ADR-0037, #161): Owner-only. Revocation is how entity-level access ends.
   @Delete(':id/grants/:userId')
-  removeGrant(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-    @Param('userId') userId: string,
-  ): EntityGrant[] {
+  removeGrant(@CurrentUser() user: AuthUser, @Param('id') id: string, @Param('userId') userId: string): EntityGrant[] {
     return aclSetResponse(this.entities.removeGrant(user.id, id, userId), 'entity');
   }
 

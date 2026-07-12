@@ -6,8 +6,7 @@
  * id before any API call or guard. Legacy bare-UUID URLs keep resolving forever.
  */
 
-const ALPHABET =
-  '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+const ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SLUG_MAX = 60;
 
@@ -69,11 +68,7 @@ export function segment(id: string, name?: string): string {
  * `null` when the URL is not World-scoped or the segment is already canonical
  * (nothing to do). Used by the non-blocking World-slug self-heal (ADR-0042).
  */
-export function healWorldSegment(
-  url: string,
-  worldId: string,
-  name: string,
-): string | null {
+export function healWorldSegment(url: string, worldId: string, name: string): string | null {
   const u = new URL(url, 'http://_'); // dummy origin — url is a router path
   const parts = u.pathname.split('/'); // ['', 'w', <seg>, …]
   if (parts[1] !== 'w' || parts.length < 3) return null;

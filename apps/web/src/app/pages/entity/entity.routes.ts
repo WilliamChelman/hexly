@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { EntityNameResolver, CONTENT_EDITOR_SESSION } from '@hexly/content-editor';
+import { ENTITY_SESSION } from '@hexly/web-entity';
 import { flushOnLeave } from './flush-on-leave.guard';
 import { EntitySession } from './services/entity-session';
 
@@ -20,6 +21,11 @@ export const ENTITY_ROUTES: Routes = [
     // component-scoped on EntityPage, which is the only thing that shows them.
     providers: [
       EntitySession,
+      // The session is the central store every View edits; bind the token to it so the
+      // map lib (and future Views) reach it without importing the app (ADR-0048). Each
+      // View owns its own store — MapView provides HexMapStore itself — so the route
+      // composition root stays out of View internals.
+      { provide: ENTITY_SESSION, useExisting: EntitySession },
       { provide: CONTENT_EDITOR_SESSION, useExisting: EntitySession },
       EntityNameResolver,
     ],

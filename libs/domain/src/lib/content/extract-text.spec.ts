@@ -6,7 +6,10 @@ describe('extractText (ADR-0035)', () => {
     const content = tiptapContent({
       type: 'doc',
       content: [
-        { type: 'paragraph', content: [{ type: 'text', text: 'Lady Aldermoor' }] },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Lady Aldermoor' }],
+        },
       ],
     });
 
@@ -28,7 +31,11 @@ describe('extractText (ADR-0035)', () => {
                   type: 'paragraph',
                   content: [
                     { type: 'text', text: 'ruled by ' },
-                    { type: 'text', text: 'Lady Aldermoor', marks: [{ type: 'bold' }] },
+                    {
+                      type: 'text',
+                      text: 'Lady Aldermoor',
+                      marks: [{ type: 'bold' }],
+                    },
                   ],
                 },
               ],
@@ -47,7 +54,10 @@ describe('extractText (ADR-0035)', () => {
 
   it('returns empty string for an unknown/future format tag', () => {
     // Not a tiptap-* tag → indexed as no prose, never an error (forward-compatible).
-    const content = { format: 'prosemirror-v9', snapshot: { text: 'ignored' } } as never;
+    const content = {
+      format: 'prosemirror-v9',
+      snapshot: { text: 'ignored' },
+    } as never;
     expect(extractText(content)).toBe('');
   });
 
@@ -59,14 +69,23 @@ describe('extractText (ADR-0035)', () => {
       content: [
         {
           type: 'callout',
-          content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Beware the deep.' }] }],
+          content: [
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'Beware the deep.' }],
+            },
+          ],
         },
         { type: 'image', attrs: { src: 'asset://x', alt: 'a map' } },
         {
           type: 'paragraph',
           content: [
             { type: 'text', text: 'See ' },
-            { type: 'entityLink', attrs: { entityId: 'e1' }, content: [{ type: 'text', text: 'the Keep' }] },
+            {
+              type: 'entityLink',
+              attrs: { entityId: 'e1' },
+              content: [{ type: 'text', text: 'the Keep' }],
+            },
           ],
         },
         {
@@ -75,7 +94,15 @@ describe('extractText (ADR-0035)', () => {
             {
               type: 'tableRow',
               content: [
-                { type: 'tableCell', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'North' }] }] },
+                {
+                  type: 'tableCell',
+                  content: [
+                    {
+                      type: 'paragraph',
+                      content: [{ type: 'text', text: 'North' }],
+                    },
+                  ],
+                },
               ],
             },
           ],

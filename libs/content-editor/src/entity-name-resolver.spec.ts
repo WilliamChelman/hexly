@@ -9,7 +9,7 @@ function summary(id: string, name: string): EntitySummary {
     id,
     worldId: 'w1',
     name,
-    type: 'note',
+    types: ['core.note'],
     tags: [],
     visibility: 'private',
     version: 1,
@@ -88,9 +88,7 @@ describe('EntityNameResolver', () => {
     const client = TestBed.inject(EntitiesClient) as unknown as {
       list: (opts: EntityListParams) => unknown;
     };
-    vi.spyOn(client, 'list').mockReturnValue(
-      of({ items: [summary('n1', 'Avalon')], nextCursor: null }),
-    );
+    vi.spyOn(client, 'list').mockReturnValue(of({ items: [summary('n1', 'Avalon')], nextCursor: null }));
 
     const items = await resolver.search('aval');
 

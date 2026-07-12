@@ -37,7 +37,11 @@ describe('parseSize', () => {
 
 describe('loadConfig', () => {
   const DEFAULTS = {
-    import: { maxUpload: 500 * MB, maxDecompressed: 5 * 1024 * MB, strictZipGuard: false },
+    import: {
+      maxUpload: 500 * MB,
+      maxDecompressed: 5 * 1024 * MB,
+      strictZipGuard: false,
+    },
     search: { weights: { name: 10, tags: 5, content: 1 } },
     liveFollow: { heartbeatSeconds: 30 },
   };
@@ -48,9 +52,7 @@ describe('loadConfig', () => {
 
   it('defaults strictZipGuard off (fast) and lets a file turn it on (airtight)', () => {
     expect(loadConfig(dataDir()).import.strictZipGuard).toBe(false);
-    expect(
-      loadConfig(dataDir('import:\n  strictZipGuard: true\n')).import.strictZipGuard,
-    ).toBe(true);
+    expect(loadConfig(dataDir('import:\n  strictZipGuard: true\n')).import.strictZipGuard).toBe(true);
   });
 
   it('merges a partial file over defaults, resolving sizes to bytes', () => {
@@ -60,9 +62,7 @@ describe('loadConfig', () => {
   });
 
   it('fails boot on an unparseable size, naming the key', () => {
-    expect(() => loadConfig(dataDir('import:\n  maxUpload: 20 potatoes\n'))).toThrow(
-      /maxUpload/,
-    );
+    expect(() => loadConfig(dataDir('import:\n  maxUpload: 20 potatoes\n'))).toThrow(/maxUpload/);
   });
 
   it('fails boot on a wrong-typed value', () => {
@@ -88,8 +88,6 @@ describe('loadConfig', () => {
   });
 
   it('rejects a non-positive heartbeat cadence, naming the key', () => {
-    expect(() => loadConfig(dataDir('liveFollow:\n  heartbeatSeconds: 0\n'))).toThrow(
-      /heartbeatSeconds/,
-    );
+    expect(() => loadConfig(dataDir('liveFollow:\n  heartbeatSeconds: 0\n'))).toThrow(/heartbeatSeconds/);
   });
 });

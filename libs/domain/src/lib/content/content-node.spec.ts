@@ -41,7 +41,13 @@ describe('visit', () => {
 
   it('accepts a bare array of nodes', () => {
     const types: string[] = [];
-    visit([{ type: 'text', text: 'x' }, { type: 'text', text: 'y' }], (n) => types.push(n.type));
+    visit(
+      [
+        { type: 'text', text: 'x' },
+        { type: 'text', text: 'y' },
+      ],
+      (n) => types.push(n.type),
+    );
     expect(types).toEqual(['text', 'text']);
   });
 });

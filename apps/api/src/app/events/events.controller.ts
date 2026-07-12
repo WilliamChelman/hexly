@@ -59,10 +59,9 @@ export class EventsController {
     return from(this.resolvePrincipal(req, token)).pipe(
       switchMap((principal) => {
         const { connectionId, stream } = this.bus.connect(principal);
-        return concat(
-          of<MessageEvent>({ type: 'ready', data: { connectionId } }),
-          stream,
-        ).pipe(finalize(() => this.bus.disconnect(connectionId)));
+        return concat(of<MessageEvent>({ type: 'ready', data: { connectionId } }), stream).pipe(
+          finalize(() => this.bus.disconnect(connectionId)),
+        );
       }),
     );
   }

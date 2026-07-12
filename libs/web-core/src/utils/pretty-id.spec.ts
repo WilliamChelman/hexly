@@ -55,20 +55,12 @@ describe('pretty-id', () => {
     });
 
     it('leaves other segments (and a stale entity slug) untouched', () => {
-      const healed = healWorldSegment(
-        `/w/${segment(WORLD)}/entities/old-slug-${segment(ID)}`,
-        WORLD,
-        'Avalon',
-      );
-      expect(healed).toBe(
-        `/w/${segment(WORLD, 'Avalon')}/entities/old-slug-${segment(ID)}`,
-      );
+      const healed = healWorldSegment(`/w/${segment(WORLD)}/entities/old-slug-${segment(ID)}`, WORLD, 'Avalon');
+      expect(healed).toBe(`/w/${segment(WORLD, 'Avalon')}/entities/old-slug-${segment(ID)}`);
     });
 
     it('returns null when the segment is already canonical', () => {
-      expect(
-        healWorldSegment(`/w/${segment(WORLD, 'Avalon')}/entities`, WORLD, 'Avalon'),
-      ).toBeNull();
+      expect(healWorldSegment(`/w/${segment(WORLD, 'Avalon')}/entities`, WORLD, 'Avalon')).toBeNull();
     });
 
     it('returns null for a non-World-scoped URL', () => {

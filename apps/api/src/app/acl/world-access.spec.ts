@@ -76,7 +76,10 @@ describe('worldAccess', () => {
 
   describe('decideMeta (single-query reachability + ownership)', () => {
     it('agrees with the manage rule for every standing', () => {
-      expect(worldAccess(db, owner).decideMeta(worldId)).toEqual({ reachable: true, isOwner: true });
+      expect(worldAccess(db, owner).decideMeta(worldId)).toEqual({
+        reachable: true,
+        isOwner: true,
+      });
       expect(worldAccess(db, contributor).decideMeta(worldId)).toEqual({
         reachable: true,
         isOwner: false,
@@ -108,7 +111,7 @@ describe('worldAccess', () => {
           id: entityId,
           worldId,
           name: 'Relic',
-          type: 'note',
+          types: ['core.note'],
           tags: [],
           visibility: 'private',
           version: 1,
@@ -146,12 +149,10 @@ describe('worldAccess', () => {
         .map((r) => r.id);
 
     it('lets an Owner create', () => expect(creatable(owner, false)).toEqual([worldId]));
-    it('lets a Contributor create', () =>
-      expect(creatable(contributor, false)).toEqual([worldId]));
+    it('lets a Contributor create', () => expect(creatable(contributor, false)).toEqual([worldId]));
     it('refuses a Viewer', () => expect(creatable(viewer, false)).toEqual([]));
     it('refuses a stranger', () => expect(creatable(stranger, false)).toEqual([]));
-    it('lets a Superadmin create anywhere (repair)', () =>
-      expect(creatable(stranger, true)).toEqual([worldId]));
+    it('lets a Superadmin create anywhere (repair)', () => expect(creatable(stranger, true)).toEqual([worldId]));
   });
 
   describe('worldOwnerFilter (owner only, no Superadmin bypass)', () => {

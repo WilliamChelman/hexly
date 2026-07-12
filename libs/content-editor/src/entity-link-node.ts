@@ -40,21 +40,18 @@ export const entityLinkNode = Node.create({
       descriptor: {
         default: null,
         parseHTML: (el) => el.getAttribute('data-descriptor'),
-        renderHTML: (attrs) =>
-          attrs['descriptor'] ? { 'data-descriptor': attrs['descriptor'] } : {},
+        renderHTML: (attrs) => (attrs['descriptor'] ? { 'data-descriptor': attrs['descriptor'] } : {}),
       },
       // Optional wikilink semantics (ADR-0033), each omitted from HTML when unset.
       display: {
         default: null,
         parseHTML: (el) => el.getAttribute('data-display'),
-        renderHTML: (attrs) =>
-          attrs['display'] ? { 'data-display': attrs['display'] } : {},
+        renderHTML: (attrs) => (attrs['display'] ? { 'data-display': attrs['display'] } : {}),
       },
       heading: {
         default: null,
         parseHTML: (el) => el.getAttribute('data-heading'),
-        renderHTML: (attrs) =>
-          attrs['heading'] ? { 'data-heading': attrs['heading'] } : {},
+        renderHTML: (attrs) => (attrs['heading'] ? { 'data-heading': attrs['heading'] } : {}),
       },
     };
   },

@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
-import { MemberRole } from '@hexly/domain';
+import { MemberRole, UserDefinedType } from '@hexly/domain';
 import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
-import { INITIAL_SEQ, worldMembers, worlds } from '../db/schema';
+import { INITIAL_SEQ, worldMembers, worlds, worldTypes } from '../db/schema';
 import { SyncOnly, WriteOutbox } from '../events/write-outbox';
 import { EntityWrites } from '../entities/entity-writes';
 
@@ -94,9 +94,7 @@ export class WorldWrites {
     const next: WorldRow = {
       ...row,
       ...(patch.name !== undefined ? { name: patch.name } : {}),
-      ...(patch.pinnedEntityIds !== undefined
-        ? { pinnedEntityIds: patch.pinnedEntityIds }
-        : {}),
+      ...(patch.pinnedEntityIds !== undefined ? { pinnedEntityIds: patch.pinnedEntityIds } : {}),
       updatedAt: Date.now(),
       seq: row.seq + 1,
     };
@@ -168,6 +166,80 @@ export class WorldWrites {
   }
 
   /**
+   * Author a new user-defined type (#191): insert the row, then bump `seq` and nudge. It bumps `seq`
+   * alone — like {@link membership} — since a type change touches neither `name` nor pins. The
+   * service has already checked the id is free, so the insert never conflicts.
+   */
+  createType(worldId: string, type: UserDefinedType, now: number = Date.now()): void {
+    this.transact(() => {
+      this.db
+        .insert(worldTypes)
+        .values({
+          worldId,
+          typeId: type.id,
+          label: type.label,
+          fields: [...type.fields],
+          views: type.views ? [...type.views] : null,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .run();
+      this.bumpAndNudge(worldId);
+    });
+  }
+
+  /**
+   * Rename / re-Field a World's user-defined type (#191). Returns whether a row matched — an unknown
+   * type id leaves the World untouched, so the bump and nudge are skipped and the caller can 404.
+   */
+  updateType(
+    worldId: string,
+    typeId: string,
+    patch: { label?: string; fields?: UserDefinedType['fields']; views?: UserDefinedType['views'] },
+  ): boolean {
+    return this.transact(() => {
+      const updated = this.db
+        .update(worldTypes)
+        .set({
+          ...(patch.label !== undefined ? { label: patch.label } : {}),
+          ...(patch.fields !== undefined ? { fields: [...patch.fields] } : {}),
+          // A `fields` patch without `views` re-Fields a type that never named a view order: the
+          // stored `null` stays, and the web defaults the order over the new Fields.
+          ...(patch.views !== undefined ? { views: [...patch.views] } : {}),
+          updatedAt: Date.now(),
+        })
+        .where(and(eq(worldTypes.worldId, worldId), eq(worldTypes.typeId, typeId)))
+        .run();
+      if (updated.changes === 0) return false;
+      this.bumpAndNudge(worldId);
+      return true;
+    });
+  }
+
+  /** Delete a World's user-defined type (#191). Returns whether a row matched, so an unknown id 404s. */
+  deleteType(worldId: string, typeId: string): boolean {
+    return this.transact(() => {
+      const deleted = this.db
+        .delete(worldTypes)
+        .where(and(eq(worldTypes.worldId, worldId), eq(worldTypes.typeId, typeId)))
+        .run();
+      if (deleted.changes === 0) return false;
+      this.bumpAndNudge(worldId);
+      return true;
+    });
+  }
+
+  /** Bump the World's `seq` and nudge its followers — the freshness half every type write shares. */
+  private bumpAndNudge(worldId: string): void {
+    this.db
+      .update(worlds)
+      .set({ seq: sql`${worlds.seq} + 1` })
+      .where(eq(worlds.id, worldId))
+      .run();
+    this.outbox.world(worldId);
+  }
+
+  /**
    * Drop every World membership a departing user holds — a **system write**, called when their
    * account is deleted. It bumps `seq` on each touched World, because the World's membership set
    * moved and a later nudge must read as newer than a follower's held value, but deliberately
@@ -203,8 +275,7 @@ export class WorldWrites {
   } {
     const db = this.db;
     let changed = false;
-    const target = (targetUserId: string) =>
-      and(eq(worldMembers.worldId, id), eq(worldMembers.userId, targetUserId));
+    const target = (targetUserId: string) => and(eq(worldMembers.worldId, id), eq(worldMembers.userId, targetUserId));
     return {
       changed: () => changed,
       writer: {
@@ -241,9 +312,7 @@ export class WorldWrites {
         removeMember: (targetUserId, allowOwner) => {
           const deleted = db
             .delete(worldMembers)
-            .where(
-              and(target(targetUserId), ...(allowOwner ? [] : [ne(worldMembers.role, 'owner')])),
-            )
+            .where(and(target(targetUserId), ...(allowOwner ? [] : [ne(worldMembers.role, 'owner')])))
             .run();
           changed ||= deleted.changes > 0;
         },

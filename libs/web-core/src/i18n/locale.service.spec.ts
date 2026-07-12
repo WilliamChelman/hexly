@@ -1,13 +1,11 @@
 import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideTransloco, TranslocoService } from '@jsverse/transloco';
 import { provideTranslocoTesting } from './transloco-testing';
 import { TranslocoHttpLoader } from './transloco-http.loader';
 import { translocoAppConfig } from './transloco.config';
+import { provideEagerTranslations } from './translation-scope';
 import { LocaleService } from './locale.service';
 
 describe('LocaleService', () => {
@@ -97,9 +95,7 @@ describe('LocaleService', () => {
 
       locale.setFormatLocale('en-GB');
 
-      expect(locale.formatDate(ts)).toBe(
-        new Date(ts).toLocaleDateString('en-GB'),
-      );
+      expect(locale.formatDate(ts)).toBe(new Date(ts).toLocaleDateString('en-GB'));
       // The UI language is a separate axis: still English.
       expect(locale.lang()).toBe('en');
       expect(transloco.getActiveLang()).toBe('en');
@@ -151,15 +147,92 @@ describe('LocaleService', () => {
       // Loading French also pulls the English fallback (forkJoin), so both
       // catalogs are requested; flush both to let init() resolve.
       const ready = locale.init();
-      http
-        .expectOne('assets/i18n/fr.json')
-        .flush({ auth: { signIn: 'Se connecter' } });
-      http
-        .expectOne('assets/i18n/en.json')
-        .flush({ auth: { signIn: 'Sign in' } });
+      http.expectOne('assets/i18n/fr.json').flush({ auth: { signIn: 'Se connecter' } });
+      http.expectOne('assets/i18n/en.json').flush({ auth: { signIn: 'Sign in' } });
       await ready;
 
       expect(transloco.translate('auth.signIn')).toBe('Se connecter');
+      http.verify();
+    });
+
+    /**
+     * A lib's scope is loaded by Transloco only when a pipe or directive that can see its provider
+     * renders — too late for copy read imperatively or carried as data across libs (a toast, a route
+     * title, a plugin's `TypeDefinition.labels`), which is why those scopes are registered eagerly
+     * (ADR-0049). `init()` must therefore load them alongside the root catalog, or the very first
+     * synchronous translate of a lib's key renders the raw key — and the pipe would memoize that
+     * miss.
+     */
+    it('loads an eagerly-registered scope with the language, not on first render', async () => {
+      TestBed.configureTestingModule({
+        providers: [
+          provideHttpClient(),
+          provideHttpClientTesting(),
+          provideTransloco({ config: translocoAppConfig, loader: TranslocoHttpLoader }),
+          provideEagerTranslations({
+            scope: 'ui',
+            loader: {
+              en: () => Promise.resolve({ owners: { heading: 'Owners' } }),
+              fr: () => Promise.resolve({ owners: { heading: 'Propriétaires' } }),
+            },
+          }),
+        ],
+      });
+      const locale = TestBed.inject(LocaleService);
+      const transloco = TestBed.inject(TranslocoService);
+      const http = TestBed.inject(HttpTestingController);
+
+      const ready = locale.init();
+      // The scope rides its own inline loader; only the app's root catalog goes over HTTP.
+      http.expectOne('assets/i18n/en.json').flush({ auth: { signIn: 'Sign in' } });
+      await ready;
+
+      // No component has rendered, so nothing could have triggered the scope's load — yet the key
+      // resolves, exactly as it must for the command palette or a route title.
+      expect(transloco.translate('ui.owners.heading')).toBe('Owners');
+      http.verify();
+    });
+
+    /**
+     * The switch's other half. A pipe with no scope of its own re-resolves the moment the *root*
+     * catalog lands — so an eager scope arriving after it would render raw keys for good, since
+     * nothing re-emits. `set()` re-announces the language once every catalog is in, which is what a
+     * plugin's chrome (a Hex Map's header eyebrow, a Monster's) rides on after a switch (#199).
+     */
+    it('re-announces the language once an eager scope has landed, so its copy follows the switch', async () => {
+      const langChanges: string[] = [];
+      TestBed.configureTestingModule({
+        providers: [
+          provideHttpClient(),
+          provideHttpClientTesting(),
+          provideTransloco({ config: translocoAppConfig, loader: TranslocoHttpLoader }),
+          provideEagerTranslations({
+            scope: 'map',
+            loader: {
+              en: () => Promise.resolve({ canvas: { label: 'Hex map' } }),
+              // Lands *after* the root catalog: the case the re-announcement exists for.
+              fr: () => new Promise((resolve) => setTimeout(() => resolve({ canvas: { label: 'Carte' } }), 10)),
+            },
+          }),
+        ],
+      });
+      const locale = TestBed.inject(LocaleService);
+      const transloco = TestBed.inject(TranslocoService);
+      const http = TestBed.inject(HttpTestingController);
+      transloco.langChanges$.subscribe((lang) => langChanges.push(lang));
+
+      locale.set('fr');
+      // French pulls the English fallback alongside it (forkJoin), as the spec above establishes.
+      http.expectOne('assets/i18n/fr.json').flush({ auth: { signIn: 'Se connecter' } });
+      http.expectOne('assets/i18n/en.json').flush({ auth: { signIn: 'Sign in' } });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(transloco.translate('map.canvas.label')).toBe('Carte');
+      // French was announced twice: once on the flip (root copy live at once), once with the scope
+      // in hand — the second is what re-renders a pipe that had nothing to resolve the first time.
+      expect(langChanges).toEqual(['en', 'fr', 'fr']);
+      // AuthClient's session resource fires on boot within the wait above; not under test here.
+      http.match('/api/auth/me');
       http.verify();
     });
   });

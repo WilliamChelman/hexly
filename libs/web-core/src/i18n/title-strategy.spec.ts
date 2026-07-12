@@ -10,10 +10,26 @@ import { TranslationTitleStrategy } from './title-strategy';
 @Component({ template: '' })
 class Blank {}
 
+/**
+ * Fixture catalogs: the title strategy lives in web-core, which owns i18n plumbing rather than copy
+ * (ADR-0049), so the route-title keys it resolves belong to the app. These mirror the app's real
+ * values, which is all the strategy's behaviour depends on.
+ */
+const TITLE_CATALOGS = {
+  en: {
+    auth: { tabTitle: 'Hexly — Sign in' },
+    editorShell: { tabTitle: 'Hexly', tabTitleNamed: '{{name}} — Hexly' },
+  },
+  fr: {
+    auth: { tabTitle: 'Hexly — Se connecter' },
+    editorShell: { tabTitle: 'Hexly', tabTitleNamed: '{{name}} — Hexly' },
+  },
+};
+
 describe('TranslationTitleStrategy', () => {
   function setup() {
     TestBed.configureTestingModule({
-      imports: [provideTranslocoTesting()],
+      imports: [provideTranslocoTesting(TITLE_CATALOGS)],
       providers: [
         provideRouter([
           { path: 'login', component: Blank, title: 'auth.tabTitle' },

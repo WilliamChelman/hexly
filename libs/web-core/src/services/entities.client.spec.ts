@@ -1,28 +1,16 @@
 import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import {
-  coordKey,
-  emptyContent,
-  EntityBody,
-  EntityDetail,
-  EntitySummary,
-} from '@hexly/domain';
+import { emptyContent, EntityBody, EntityDetail, EntitySummary } from '@hexly/domain';
 import { EntitiesClient, ENTITY_NUDGE_DEBOUNCE_MS } from './entities.client';
 import { NudgeBusClient } from './nudge-bus.client';
 import { MockNudgeBusClient } from '../testing/nudge-bus.mock';
 import { EVICTED } from './live-follow';
 
-/** The shape the editor round-trips through the client. */
+/** The shape the editor round-trips through the client: a Hex Map's grid is its `grid` Field value. */
 const emptyHexmapBody: EntityBody = {
-  type: 'hexmap',
   content: emptyContent(),
-  hexes: {},
-  regions: [],
-  labels: [],
+  metadata: { grid: { hexes: {}, regions: [], labels: [] } },
 };
 
 describe('EntitiesClient', () => {
@@ -34,7 +22,7 @@ describe('EntitiesClient', () => {
     id: 'e1',
     worldId: 'w1',
     name: 'Aldermoor',
-    type: 'hexmap',
+    types: ['core.hexmap'],
     tags: [],
     visibility: 'private',
     version: 1,
@@ -47,11 +35,7 @@ describe('EntitiesClient', () => {
   beforeEach(() => {
     bus = new MockNudgeBusClient();
     TestBed.configureTestingModule({
-      providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        { provide: NudgeBusClient, useValue: bus },
-      ],
+      providers: [provideHttpClient(), provideHttpClientTesting(), { provide: NudgeBusClient, useValue: bus }],
     });
     client = TestBed.inject(EntitiesClient);
     http = TestBed.inject(HttpTestingController);
@@ -111,7 +95,7 @@ describe('EntitiesClient', () => {
     id: 'e1',
     worldId: 'w1',
     name: 'Aldermoor',
-    type: 'hexmap',
+    types: ['core.hexmap'],
     tags: [],
     visibility: 'private',
     version: 1,
@@ -135,7 +119,13 @@ describe('EntitiesClient', () => {
 
   it('serializes ids/q/type/cursor/limit into the query string', () => {
     client
-      .list({ ids: ['a', 'b'], q: 'river', type: ['note'], cursor: 'CUR', limit: 25 })
+      .list({
+        ids: ['a', 'b'],
+        q: 'river',
+        type: ['note'],
+        cursor: 'CUR',
+        limit: 25,
+      })
       .subscribe();
 
     const req = http.expectOne((r) => r.url === '/api/entities');
@@ -167,7 +157,11 @@ describe('EntitiesClient', () => {
 
   it('serializes multi-valued Facet params as repeats (OR within category, #155)', () => {
     client
-      .list({ type: ['note', 'hexmap'], tag: ['deity', 'ruined'], visibility: ['shared'] })
+      .list({
+        type: ['note', 'hexmap'],
+        tag: ['deity', 'ruined'],
+        visibility: ['shared'],
+      })
       .subscribe();
 
     const req = http.expectOne((r) => r.url === '/api/entities');
@@ -185,9 +179,7 @@ describe('EntitiesClient', () => {
     };
 
     let got: unknown;
-    client
-      .facets({ q: 'temple', tag: ['deity'], worldId: 'w1' })
-      .subscribe((f) => (got = f));
+    client.facets({ q: 'temple', tag: ['deity'], worldId: 'w1' }).subscribe((f) => (got = f));
 
     const req = http.expectOne((r) => r.url === '/api/entities/facets');
     expect(req.request.method).toBe('GET');
@@ -199,26 +191,27 @@ describe('EntitiesClient', () => {
     expect(got).toEqual(facets);
   });
 
-  it('creates an entity by name and type', () => {
+  it('creates an entity by name and an ordered type set (#189)', () => {
     let created: EntityDetail | undefined;
-    client.create('Aldermoor', 'hexmap').subscribe((e) => (created = e));
+    client.create('Aldermoor', ['core.hexmap', 'dnd.lair']).subscribe((e) => (created = e));
 
     const req = http.expectOne('/api/entities');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ name: 'Aldermoor', type: 'hexmap' });
+    expect(req.request.body).toEqual({ name: 'Aldermoor', types: ['core.hexmap', 'dnd.lair'] });
     req.flush(aldermoor);
 
     expect(created).toEqual(aldermoor);
   });
 
-  it('scopes a create to a World when worldId is given', () => {
-    client.create('Aldermoor', 'hexmap', 'w9').subscribe();
+  it('scopes a create to a World and carries initial Metadata when given (#189)', () => {
+    client.create('Aldermoor', ['core.hexmap'], 'w9', { cr: 5 }).subscribe();
 
     const req = http.expectOne('/api/entities');
     expect(req.request.body).toEqual({
       name: 'Aldermoor',
-      type: 'hexmap',
+      types: ['core.hexmap'],
       worldId: 'w9',
+      metadata: { cr: 5 },
     });
     req.flush(aldermoor);
   });
@@ -275,14 +268,13 @@ describe('EntitiesClient', () => {
 
   it('saves the body against its base version and reports the saved outcome', () => {
     const painted: EntityBody = {
-      ...emptyHexmapBody,
-      hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' } },
+      content: emptyContent(),
+      // A plugin's structured value, spelled out: web-core carries no dependency on the map plugin.
+      metadata: { grid: { hexes: { '0,0': { terrain: 'forest' } }, regions: [], labels: [] } },
     };
 
     let outcome: unknown;
-    client
-      .save('e1', painted, 1, ['deity', 'ruined'])
-      .subscribe((o) => (outcome = o));
+    client.save('e1', painted, 1, ['deity', 'ruined']).subscribe((o) => (outcome = o));
 
     const req = http.expectOne('/api/entities/e1');
     expect(req.request.method).toBe('PUT');
@@ -297,6 +289,25 @@ describe('EntitiesClient', () => {
     req.flush(saved);
 
     expect(outcome).toEqual({ status: 'saved', entity: saved });
+  });
+
+  it('sends the authored type set only when the save carries one (#189)', () => {
+    // A type-set edit (add/remove/reorder) rides the save as an active typed edit...
+    client.save('e1', emptyHexmapBody, 1, [], ['core.hexmap', 'core.note']).subscribe();
+    const typed = http.expectOne('/api/entities/e1');
+    expect(typed.request.body).toEqual({
+      document: emptyHexmapBody,
+      version: 1,
+      tags: [],
+      types: ['core.hexmap', 'core.note'],
+    });
+    typed.flush(aldermoor);
+
+    // ...a plain body edit omits `types`, so data at rest is never re-typed.
+    client.save('e1', emptyHexmapBody, 2, []).subscribe();
+    const plain = http.expectOne('/api/entities/e1');
+    expect(plain.request.body).not.toHaveProperty('types');
+    plain.flush(aldermoor);
   });
 
   it('reads the owner’s descriptor vocabulary (#96)', () => {
@@ -316,9 +327,7 @@ describe('EntitiesClient', () => {
     let outcome: unknown;
     client.save('e1', emptyHexmapBody, 1, []).subscribe((o) => (outcome = o));
 
-    http
-      .expectOne('/api/entities/e1')
-      .flush(serverCurrent, { status: 409, statusText: 'Conflict' });
+    http.expectOne('/api/entities/e1').flush(serverCurrent, { status: 409, statusText: 'Conflict' });
 
     expect(outcome).toEqual({ status: 'conflict', current: serverCurrent });
   });
@@ -330,9 +339,7 @@ describe('EntitiesClient', () => {
     client.save('e1', emptyHexmapBody, 1, []).subscribe({
       error: () => (errored = true),
     });
-    http
-      .expectOne('/api/entities/e1')
-      .flush('<html>Conflict</html>', { status: 409, statusText: 'Conflict' });
+    http.expectOne('/api/entities/e1').flush('<html>Conflict</html>', { status: 409, statusText: 'Conflict' });
 
     expect(errored).toBe(true);
   });

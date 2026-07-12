@@ -2,7 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
-import { EntityBody, tiptapContent } from '@hexly/domain';
+import { emptyContent, EntityBody, tiptapContent } from '@hexly/domain';
 import { AuthModule } from '../auth/auth.module';
 import { AuthService } from '../auth/auth.service';
 import { ConfigModule } from '../config/config.module';
@@ -58,7 +58,7 @@ describe('Entity references', () => {
         {
           targetId: mira,
           descriptor: 'spouse',
-          target: { id: mira, name: 'Mira', type: 'note' },
+          target: { id: mira, name: 'Mira', types: ['core.note'] },
         },
       ]);
     });
@@ -96,11 +96,71 @@ describe('Entity references', () => {
 
       const asAda = await referencesOf(ada, town);
       expect(asAda.references).toEqual([
-        { targetId: secret, descriptor: null, target: { id: secret, name: 'The Cabal', type: 'note' } },
+        {
+          targetId: secret,
+          descriptor: null,
+          target: { id: secret, name: 'The Cabal', types: ['core.note'] },
+        },
       ]);
 
       const asBob = await referencesOf(bob, town);
       expect(asBob.references).toEqual([{ targetId: secret, descriptor: null, target: null }]);
+    });
+
+    /**
+     * A Hex, a Feature, and a Region each carry an Entity Link, harvested through the **Structured
+     * Field** `core.hexmap` declares (ADR-0050). The one test that the generic path is wired end to
+     * end: the Entity's types must resolve to the `grid` Field and `core.hex-grid` must be
+     * registered, or a map's placements harvest to nothing at all.
+     */
+    it('harvests a Hex, Feature, and Region link off the grid Field, descriptor-less (ADR-0050)', async () => {
+      const ada = await signIn('ada@hexly.test');
+      const world = await makeWorld(ada);
+      const harbour = await makeEntity(ada, world, 'Harbour');
+      const riverbend = await makeEntity(ada, world, 'Riverbend');
+      const avalon = await makeEntity(ada, world, 'Avalon');
+      const map = (
+        await ada
+          .post('/entities')
+          .send({ name: 'The Reach', types: ['core.hexmap'], worldId: world })
+          .expect(201)
+      ).body;
+
+      await ada
+        .put(`/entities/${map.id}`)
+        .send({
+          version: map.version,
+          tags: [],
+          document: {
+            content: emptyContent(),
+            metadata: {
+              grid: {
+                hexes: {
+                  '0,0': { terrain: 'grass', entityId: harbour },
+                  '1,0': { terrain: 'grass', feature: { ref: 'settlement', entityId: riverbend } },
+                },
+                regions: [{ id: 'r1', name: 'Avalon', color: '#aabbcc', hexes: {}, entityId: avalon }],
+                labels: [],
+              },
+            },
+          },
+        })
+        .expect(200);
+
+      const { references } = await referencesOf(ada, map.id);
+      expect(references).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ targetId: harbour, descriptor: null }),
+          expect.objectContaining({ targetId: riverbend, descriptor: null }),
+          expect.objectContaining({ targetId: avalon, descriptor: null }),
+        ]),
+      );
+      expect(references).toHaveLength(3);
+      // And the other direction: the linked Note lists the map among its Referenced by.
+      const { referencedBy } = await referencesOf(ada, harbour);
+      expect(referencedBy).toEqual([
+        { descriptor: null, source: { id: map.id, name: 'The Reach', types: ['core.hexmap'] } },
+      ]);
     });
   });
 
@@ -115,7 +175,10 @@ describe('Entity references', () => {
       const { referencedBy } = await referencesOf(ada, mira);
 
       expect(referencedBy).toEqual([
-        { descriptor: 'spouse', source: { id: ealdred, name: 'Ealdred', type: 'note' } },
+        {
+          descriptor: 'spouse',
+          source: { id: ealdred, name: 'Ealdred', types: ['core.note'] },
+        },
       ]);
     });
 
@@ -144,7 +207,14 @@ describe('Entity references', () => {
       // Ada, who owns the source, sees it. The rows are the same; only the viewer differs.
       const asAda = await referencesOf(ada, town);
       expect(asAda.referencedBy).toEqual([
-        { descriptor: null, source: { id: cabal, name: 'Secret Cabal Roster', type: 'note' } },
+        {
+          descriptor: null,
+          source: {
+            id: cabal,
+            name: 'Secret Cabal Roster',
+            types: ['core.note'],
+          },
+        },
       ]);
     });
 
@@ -164,7 +234,14 @@ describe('Entity references', () => {
 
       const { referencedBy } = await referencesOf(bob, town);
       expect(referencedBy).toEqual([
-        { descriptor: null, source: { id: cabal, name: 'Secret Cabal Roster', type: 'note' } },
+        {
+          descriptor: null,
+          source: {
+            id: cabal,
+            name: 'Secret Cabal Roster',
+            types: ['core.note'],
+          },
+        },
       ]);
     });
   });
@@ -189,9 +266,11 @@ describe('Entity references', () => {
 
     const { references } = await referencesOf(ada, ealdred);
 
-    expect(references.map((r: { target: { name: string } | null; descriptor: string | null }) =>
-      r.target ? `${r.target.name}:${r.descriptor ?? ''}` : 'dangling',
-    )).toEqual(['Avalon:', 'Mira:rival', 'Mira:spouse', 'dangling']);
+    expect(
+      references.map((r: { target: { name: string } | null; descriptor: string | null }) =>
+        r.target ? `${r.target.name}:${r.descriptor ?? ''}` : 'dangling',
+      ),
+    ).toEqual(['Avalon:', 'Mira:rival', 'Mira:spouse', 'dangling']);
   });
 
   it('404s for an Entity the caller cannot reach', async () => {
@@ -222,7 +301,12 @@ describe('Entity references', () => {
   }
 
   async function makeEntity(owner: Agent, worldId: string, name: string): Promise<string> {
-    return (await owner.post('/entities').send({ name, type: 'note', worldId }).expect(201)).body.id;
+    return (
+      await owner
+        .post('/entities')
+        .send({ name, types: ['core.note'], worldId })
+        .expect(201)
+    ).body.id;
   }
 
   async function addMember(owner: Agent, worldId: string, userId: string): Promise<void> {
@@ -237,18 +321,17 @@ describe('Entity references', () => {
   async function link(owner: Agent, id: string, links: Record<string, unknown>[]): Promise<void> {
     const current = (await owner.get(`/entities/${id}`).expect(200)).body;
     const document: EntityBody = {
-      type: 'note',
       content: tiptapContent({
         type: 'doc',
         content: [
-          { type: 'paragraph', content: links.map((attrs) => ({ type: 'entityLink', attrs })) },
+          {
+            type: 'paragraph',
+            content: links.map((attrs) => ({ type: 'entityLink', attrs })),
+          },
         ],
       }),
     };
-    await owner
-      .put(`/entities/${id}`)
-      .send({ document, version: current.version, tags: [] })
-      .expect(200);
+    await owner.put(`/entities/${id}`).send({ document, version: current.version, tags: [] }).expect(200);
   }
 
   async function referencesOf(viewer: Agent, id: string) {

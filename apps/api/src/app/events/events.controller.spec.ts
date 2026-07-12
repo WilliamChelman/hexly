@@ -39,9 +39,9 @@ describe('Events (SSE nudge bus) endpoints', () => {
     await app.listen(0);
     baseUrl = await app.getUrl();
 
-    const adaId = await app
-      .get(AuthService)
-      .seedUser('ada@hexly.test', 'correct horse', 'Ada', { roles: ['create-worlds'] });
+    const adaId = await app.get(AuthService).seedUser('ada@hexly.test', 'correct horse', 'Ada', {
+      roles: ['create-worlds'],
+    });
     // Entity creation needs a World (ADR-0024); mint one for Ada.
     app.get(WorldsService).mintWorld(adaId, 'Aldermoor');
   });
@@ -52,10 +52,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
 
   /** Log in via supertest (reusing the cookie agent), returning the raw session cookie header. */
   async function sessionCookie(email: string, password: string): Promise<string> {
-    const res = await request(app.getHttpServer())
-      .post('/auth/login')
-      .send({ email, password })
-      .expect(200);
+    const res = await request(app.getHttpServer()).post('/auth/login').send({ email, password }).expect(200);
     const setCookie = res.headers['set-cookie'] as unknown as string[];
     return setCookie.map((c) => c.split(';')[0]).join('; ');
   }
@@ -114,9 +111,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     expect(first.event).toBe('ready');
     expect(first.data).toEqual({ connectionId: expect.any(String) });
     // Unguessable: a UUID-length token, not a guessable counter.
-    expect((first.data as { connectionId: string }).connectionId.length).toBeGreaterThanOrEqual(
-      16,
-    );
+    expect((first.data as { connectionId: string }).connectionId.length).toBeGreaterThanOrEqual(16);
 
     await sse.close();
   });
@@ -156,9 +151,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
   });
 
   it('rejects (does not apply) an interest PUT from a principal that does not own the connection', async () => {
-    await app
-      .get(AuthService)
-      .seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob');
+    await app.get(AuthService).seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob');
     const adaCookie = await sessionCookie('ada@hexly.test', 'correct horse');
     const bobCookie = await sessionCookie('bob@hexly.test', 'hunter2 stationery');
     const { sse, connectionId } = await connect(adaCookie);
@@ -196,9 +189,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
   });
 
   it('delivers { id, version } to a subscribed viewer when another user saves the Entity', async () => {
-    const bobId = await app
-      .get(AuthService)
-      .seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob');
+    const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob');
     const adaCookie = await sessionCookie('ada@hexly.test', 'correct horse');
     const bobCookie = await sessionCookie('bob@hexly.test', 'hunter2 stationery');
 
@@ -206,7 +197,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     const created = await request(app.getHttpServer())
       .post('/entities')
       .set('Cookie', adaCookie)
-      .send({ name: 'The Chronicle', type: 'note' })
+      .send({ name: 'The Chronicle', types: ['core.note'] })
       .expect(201);
     const entityId = created.body.id as string;
     const document = created.body.document;
@@ -230,9 +221,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     // Ada receives the nudge for exactly that resource, at the bumped version.
     const nudge = await sse.next();
     expect(nudge.event).toBe('nudge');
-    expect(nudge.data).toEqual([
-      { id: entityId, seq: 2 },
-    ]);
+    expect(nudge.data).toEqual([{ id: entityId, seq: 2 }]);
 
     await sse.close();
   });
@@ -242,7 +231,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     const created = await request(app.getHttpServer())
       .post('/entities')
       .set('Cookie', adaCookie)
-      .send({ name: 'The Chronicle', type: 'note' })
+      .send({ name: 'The Chronicle', types: ['core.note'] })
       .expect(201);
     const entityId = created.body.id as string;
 
@@ -263,9 +252,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     // `updatedAt` is what lets a follower see a same-version rename as newer than held.
     const nudge = await sse.next();
     expect(nudge.event).toBe('nudge');
-    expect(nudge.data).toEqual([
-      { id: entityId, seq: 2 },
-    ]);
+    expect(nudge.data).toEqual([{ id: entityId, seq: 2 }]);
 
     await sse.close();
   });
@@ -273,12 +260,8 @@ describe('Events (SSE nudge bus) endpoints', () => {
   it('shapes one private-flip event per recipient: world-share follower evicted, grant holder kept (ADR-0044)', async () => {
     // Bob follows via world-share (World Viewer); Carol holds a separate entity-level
     // Viewer grant, which pierces `private`. One mutation event, correct per person.
-    const bobId = await app
-      .get(AuthService)
-      .seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob');
-    const carolId = await app
-      .get(AuthService)
-      .seedUser('carol@hexly.test', 'lovelace engine', 'Carol');
+    const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob');
+    const carolId = await app.get(AuthService).seedUser('carol@hexly.test', 'lovelace engine', 'Carol');
     const adaCookie = await sessionCookie('ada@hexly.test', 'correct horse');
     const bobCookie = await sessionCookie('bob@hexly.test', 'hunter2 stationery');
     const carolCookie = await sessionCookie('carol@hexly.test', 'lovelace engine');
@@ -286,7 +269,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     const created = await request(app.getHttpServer())
       .post('/entities')
       .set('Cookie', adaCookie)
-      .send({ name: 'The Chronicle', type: 'note' })
+      .send({ name: 'The Chronicle', types: ['core.note'] })
       .expect(201);
     const entityId = created.body.id as string;
     const worldId = created.body.worldId as string;
@@ -324,9 +307,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     // Carol's grant survives the flip → she keeps following, same event.
     const carolNudge = await carol.sse.next();
     expect(carolNudge.event).toBe('nudge');
-    expect(carolNudge.data).toEqual([
-      { id: entityId, seq: 3 },
-    ]);
+    expect(carolNudge.data).toEqual([{ id: entityId, seq: 3 }]);
 
     await bob.sse.close();
     await carol.sse.close();
@@ -340,9 +321,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
    * change does not possess, so the ACL mutations simply never called it.
    */
   it('evicts a grantee following a private Entity when the Owner revokes the grant', async () => {
-    const carolId = await app
-      .get(AuthService)
-      .seedUser('carol@hexly.test', 'lovelace engine', 'Carol');
+    const carolId = await app.get(AuthService).seedUser('carol@hexly.test', 'lovelace engine', 'Carol');
     const adaCookie = await sessionCookie('ada@hexly.test', 'correct horse');
     const carolCookie = await sessionCookie('carol@hexly.test', 'lovelace engine');
 
@@ -350,7 +329,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     const created = await request(app.getHttpServer())
       .post('/entities')
       .set('Cookie', adaCookie)
-      .send({ name: 'The Chronicle', type: 'note' })
+      .send({ name: 'The Chronicle', types: ['core.note'] })
       .expect(201);
     const entityId = created.body.id as string;
     await request(app.getHttpServer())
@@ -383,7 +362,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     const created = await request(app.getHttpServer())
       .post('/entities')
       .set('Cookie', adaCookie)
-      .send({ name: 'The Chronicle', type: 'note' })
+      .send({ name: 'The Chronicle', types: ['core.note'] })
       .expect(201);
     const entityId = created.body.id as string;
 
@@ -394,10 +373,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
       .send({ refs: [{ kind: 'entity', id: entityId }] })
       .expect(204);
 
-    await request(app.getHttpServer())
-      .delete(`/entities/${entityId}`)
-      .set('Cookie', adaCookie)
-      .expect(204);
+    await request(app.getHttpServer()).delete(`/entities/${entityId}`).set('Cookie', adaCookie).expect(204);
 
     // Deleted rides the same shaping path as unauthorized — the exact match proves the
     // entry is byte-identical to the private-flip eviction and carries no version.
@@ -418,14 +394,19 @@ describe('Events (SSE nudge bus) endpoints', () => {
     const created = await request(app.getHttpServer())
       .post('/entities')
       .set('Cookie', cookie)
-      .send({ name: 'The Chronicle', type: 'note' })
+      .send({ name: 'The Chronicle', types: ['core.note'] })
       .expect(201);
     const entityId = created.body.id as string;
     const link = await request(app.getHttpServer())
       .post(`/entities/${entityId}/link`)
       .set('Cookie', cookie)
       .expect(200);
-    return { cookie, entityId, document: created.body.document, token: link.body.token as string };
+    return {
+      cookie,
+      entityId,
+      document: created.body.document,
+      token: link.body.token as string,
+    };
   }
 
   /** Open the SSE stream authenticated by a Public Link token query param (no cookie). */
@@ -482,10 +463,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
 
     // Revoke rides the same shaping event (ADR-0044, #175): the token now grants nothing, so the
     // follower resolves to opaque, version-free eviction — access withdrawal on the open screen.
-    await request(app.getHttpServer())
-      .delete(`/entities/${entityId}/link`)
-      .set('Cookie', cookie)
-      .expect(204);
+    await request(app.getHttpServer()).delete(`/entities/${entityId}/link`).set('Cookie', cookie).expect(204);
 
     const nudge = await sse.next();
     expect(nudge.event).toBe('nudge');
@@ -499,7 +477,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     const created = await request(app.getHttpServer())
       .post('/entities')
       .set('Cookie', adaCookie)
-      .send({ name: 'The Chronicle', type: 'note' })
+      .send({ name: 'The Chronicle', types: ['core.note'] })
       .expect(201);
     const entityId = created.body.id as string;
     const worldId = created.body.worldId as string;
@@ -534,10 +512,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     expect(nudge.data).toEqual([{ id: entityId, seq: 3 }]);
 
     // Revoking the World link evicts the world-link follower — the same guarantee as the entity path.
-    await request(app.getHttpServer())
-      .delete(`/worlds/${worldId}/link`)
-      .set('Cookie', adaCookie)
-      .expect(204);
+    await request(app.getHttpServer()).delete(`/worlds/${worldId}/link`).set('Cookie', adaCookie).expect(204);
     const evicted = await sse.next();
     expect(evicted.data).toEqual([{ id: entityId, unavailable: true }]);
 
@@ -552,7 +527,9 @@ describe('Events (SSE nudge bus) endpoints', () => {
     const { cookie, entityId, document, token } = await linkedEntity();
     const bobCookie = await sessionCookie('bob@hexly.test', 'hunter2 stationery');
 
-    const sse = await openSseAt(`/events?token=${token}`, { cookie: bobCookie });
+    const sse = await openSseAt(`/events?token=${token}`, {
+      cookie: bobCookie,
+    });
     const connectionId = (await sse.next()).data as { connectionId: string };
     await request(app.getHttpServer())
       .put(`/events/${connectionId.connectionId}/interest?token=${token}`)
@@ -579,7 +556,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     const other = await request(app.getHttpServer())
       .post('/entities')
       .set('Cookie', cookie)
-      .send({ name: 'Sealed Archive', type: 'note' })
+      .send({ name: 'Sealed Archive', types: ['core.note'] })
       .expect(201);
     const forbiddenId = other.body.id as string;
 
@@ -618,9 +595,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     // Existence must not be probeable by subscribing to guessed ids (ADR-0044): the PUT
     // still 204s (silent), but a follower only ever hears about resources it could read
     // when it subscribed.
-    const bobId = await app
-      .get(AuthService)
-      .seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob');
+    const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob');
     const adaCookie = await sessionCookie('ada@hexly.test', 'correct horse');
     const bobCookie = await sessionCookie('bob@hexly.test', 'hunter2 stationery');
 
@@ -629,7 +604,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
       const res = await request(app.getHttpServer())
         .post('/entities')
         .set('Cookie', adaCookie)
-        .send({ name, type: 'note' })
+        .send({ name, types: ['core.note'] })
         .expect(201);
       return res.body.id as string;
     };
@@ -668,19 +643,14 @@ describe('Events (SSE nudge bus) endpoints', () => {
 
     const nudge = await bob.sse.next();
     expect(nudge.event).toBe('nudge');
-    expect(nudge.data).toEqual([
-      { id: grantedId, seq: 2 },
-    ]);
+    expect(nudge.data).toEqual([{ id: grantedId, seq: 2 }]);
 
     await bob.sse.close();
   });
 
   /** Ada's sole World (minted in beforeEach), via her authorized list read. */
   async function adaWorldId(cookie: string): Promise<string> {
-    const res = await request(app.getHttpServer())
-      .get('/worlds')
-      .set('Cookie', cookie)
-      .expect(200);
+    const res = await request(app.getHttpServer()).get('/worlds').set('Cookie', cookie).expect(200);
     return res.body[0].id as string;
   }
 
@@ -711,10 +681,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
 
   /** Mint a World Public Link on `worldId`, returning its token. */
   async function mintWorldLink(worldId: string, cookie: string): Promise<string> {
-    const link = await request(app.getHttpServer())
-      .post(`/worlds/${worldId}/link`)
-      .set('Cookie', cookie)
-      .expect(200);
+    const link = await request(app.getHttpServer()).post(`/worlds/${worldId}/link`).set('Cookie', cookie).expect(200);
     return link.body.token as string;
   }
 
@@ -756,10 +723,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
       .send({ refs: [{ kind: 'world', id: worldId }] })
       .expect(204);
 
-    await request(app.getHttpServer())
-      .delete(`/worlds/${worldId}/link`)
-      .set('Cookie', adaCookie)
-      .expect(204);
+    await request(app.getHttpServer()).delete(`/worlds/${worldId}/link`).set('Cookie', adaCookie).expect(204);
 
     // Revoke rides the world-detail shaping event: the token now reaches no World, so it evicts.
     const nudge = await sse.next();
@@ -769,9 +733,9 @@ describe('Events (SSE nudge bus) endpoints', () => {
   });
 
   it('confines a World-link token to its own World — a sibling World it does not grant is silently not-subscribed (#178)', async () => {
-    const bobId = await app
-      .get(AuthService)
-      .seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob', { roles: ['create-worlds'] });
+    const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob', {
+      roles: ['create-worlds'],
+    });
     const otherWorldId = app.get(WorldsService).mintWorld(bobId, 'Bobland');
     const adaCookie = await sessionCookie('ada@hexly.test', 'correct horse');
     const bobCookie = await sessionCookie('bob@hexly.test', 'hunter2 stationery');
@@ -820,10 +784,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
       .send({ refs: [{ kind: 'world', id: worldId }] })
       .expect(204);
 
-    await request(app.getHttpServer())
-      .delete(`/worlds/${worldId}`)
-      .set('Cookie', adaCookie)
-      .expect(204);
+    await request(app.getHttpServer()).delete(`/worlds/${worldId}`).set('Cookie', adaCookie).expect(204);
 
     // Deleted rides the same shaping path as unauthorized — byte-identical, version-free.
     const nudge = await sse.next();
@@ -843,7 +804,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     const created = await request(app.getHttpServer())
       .post('/entities')
       .set('Cookie', adaCookie)
-      .send({ name: 'The Chronicle', type: 'note' })
+      .send({ name: 'The Chronicle', types: ['core.note'] })
       .expect(201);
     const entityId = created.body.id as string;
     const worldId = created.body.worldId as string;
@@ -856,10 +817,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
       .send({ refs: [{ kind: 'entity', id: entityId }] })
       .expect(204);
 
-    await request(app.getHttpServer())
-      .delete(`/worlds/${worldId}`)
-      .set('Cookie', adaCookie)
-      .expect(204);
+    await request(app.getHttpServer()).delete(`/worlds/${worldId}`).set('Cookie', adaCookie).expect(204);
 
     const nudge = await sse.next();
     expect(nudge.event).toBe('nudge');
@@ -872,9 +830,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     // Bob follows via a World Viewer membership; Ada owns it. Removing Bob is one mutation event,
     // correct per person — Bob loses reachability (opaque eviction), Ada keeps it (version-free
     // detail nudge). This is the worlds-list disappearance from user story 16.
-    const bobId = await app
-      .get(AuthService)
-      .seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob');
+    const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob');
     const adaCookie = await sessionCookie('ada@hexly.test', 'correct horse');
     const bobCookie = await sessionCookie('bob@hexly.test', 'hunter2 stationery');
     const worldId = await adaWorldId(adaCookie);
@@ -913,15 +869,13 @@ describe('Events (SSE nudge bus) endpoints', () => {
     // focus-refetch. `seq` carries the freshness, so `updatedAt` need not lie: before ADR-0045 the
     // bump was the only way to make the nudge read as newer, and a World rose in the World Index's
     // "recently updated" order merely because someone was added to it.
-    const bobId = await app
-      .get(AuthService)
-      .seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob');
+    const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob');
     const adaCookie = await sessionCookie('ada@hexly.test', 'correct horse');
     const bobCookie = await sessionCookie('bob@hexly.test', 'hunter2 stationery');
     const worldId = await adaWorldId(adaCookie);
     db.insert(worldMembers).values({ worldId, userId: bobId, role: 'viewer' }).run();
-    const before = (await request(app.getHttpServer()).get('/worlds').set('Cookie', bobCookie))
-      .body[0].updatedAt as number;
+    const before = (await request(app.getHttpServer()).get('/worlds').set('Cookie', bobCookie)).body[0]
+      .updatedAt as number;
 
     const bob = await connect(bobCookie);
     await request(app.getHttpServer())
@@ -939,8 +893,8 @@ describe('Events (SSE nudge bus) endpoints', () => {
     const nudge = await bob.sse.next();
     expect(nudge.data).toEqual([{ id: worldId, seq: 2 }]);
     // The World's modified timestamp is untouched — nobody edited it.
-    const after = (await request(app.getHttpServer()).get('/worlds').set('Cookie', bobCookie))
-      .body[0].updatedAt as number;
+    const after = (await request(app.getHttpServer()).get('/worlds').set('Cookie', bobCookie)).body[0]
+      .updatedAt as number;
     expect(after).toBe(before);
 
     await bob.sse.close();
@@ -958,15 +912,13 @@ describe('Events (SSE nudge bus) endpoints', () => {
    * arrive if the membership write fanned out to it.
    */
   it('nudges a follower of a shared Entity when they are promoted to Owner of its World', async () => {
-    const bobId = await app
-      .get(AuthService)
-      .seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob');
+    const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob');
     const adaCookie = await sessionCookie('ada@hexly.test', 'correct horse');
     const bobCookie = await sessionCookie('bob@hexly.test', 'hunter2 stationery');
     const created = await request(app.getHttpServer())
       .post('/entities')
       .set('Cookie', adaCookie)
-      .send({ name: 'The Chronicle', type: 'note' })
+      .send({ name: 'The Chronicle', types: ['core.note'] })
       .expect(201);
     const entityId = created.body.id as string;
     const worldId = created.body.worldId as string;
@@ -978,10 +930,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     db.insert(worldMembers).values({ worldId, userId: bobId, role: 'viewer' }).run();
 
     // Bob reads it: shared + World member, so read-only Rights.
-    const before = await request(app.getHttpServer())
-      .get(`/entities/${entityId}`)
-      .set('Cookie', bobCookie)
-      .expect(200);
+    const before = await request(app.getHttpServer()).get(`/entities/${entityId}`).set('Cookie', bobCookie).expect(200);
     expect(before.body.rights).toEqual(['read']);
 
     const bob = await connect(bobCookie);
@@ -1003,10 +952,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     expect(nudge.data).toEqual([{ id: entityId, seq: 3 }]);
 
     // And the refetch it provokes carries the Rights he just gained.
-    const after = await request(app.getHttpServer())
-      .get(`/entities/${entityId}`)
-      .set('Cookie', bobCookie)
-      .expect(200);
+    const after = await request(app.getHttpServer()).get(`/entities/${entityId}`).set('Cookie', bobCookie).expect(200);
     expect(after.body.rights).toContain('edit');
 
     await bob.sse.close();
@@ -1017,15 +963,13 @@ describe('Events (SSE nudge bus) endpoints', () => {
    * Entities, so a follower of one must be evicted, not merely told the World changed.
    */
   it('evicts a follower of a shared Entity when they are removed from its World', async () => {
-    const bobId = await app
-      .get(AuthService)
-      .seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob');
+    const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob');
     const adaCookie = await sessionCookie('ada@hexly.test', 'correct horse');
     const bobCookie = await sessionCookie('bob@hexly.test', 'hunter2 stationery');
     const created = await request(app.getHttpServer())
       .post('/entities')
       .set('Cookie', adaCookie)
-      .send({ name: 'The Chronicle', type: 'note' })
+      .send({ name: 'The Chronicle', types: ['core.note'] })
       .expect(201);
     const entityId = created.body.id as string;
     const worldId = created.body.worldId as string;
@@ -1058,9 +1002,9 @@ describe('Events (SSE nudge bus) endpoints', () => {
     // Bob can't reach Ada's World, so subscribing to it is silently dropped (existence/activity
     // must not leak, user story 18). His own note is the tell-tale: mutating the forbidden World
     // first, then his note, his first frame being the note proves the World ref delivered nothing.
-    const bobId = await app
-      .get(AuthService)
-      .seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob', { roles: ['create-worlds'] });
+    const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob', {
+      roles: ['create-worlds'],
+    });
     app.get(WorldsService).mintWorld(bobId, 'Bobland');
     const adaCookie = await sessionCookie('ada@hexly.test', 'correct horse');
     const bobCookie = await sessionCookie('bob@hexly.test', 'hunter2 stationery');
@@ -1069,7 +1013,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     const bobNote = await request(app.getHttpServer())
       .post('/entities')
       .set('Cookie', bobCookie)
-      .send({ name: 'Bob’s Ledger', type: 'note' })
+      .send({ name: 'Bob’s Ledger', types: ['core.note'] })
       .expect(201);
     const bobEntityId = bobNote.body.id as string;
 

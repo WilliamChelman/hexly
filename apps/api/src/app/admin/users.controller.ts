@@ -55,11 +55,7 @@ export class UsersController {
 
   @Post(':id/password')
   @HttpCode(200)
-  async resetPassword(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-    @Body() body: unknown,
-  ): Promise<void> {
+  async resetPassword(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): Promise<void> {
     const parsed = resetPasswordRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
     await this.users.resetPassword(user, id, parsed.data.password);
@@ -69,11 +65,7 @@ export class UsersController {
   // revoke `manage-users` / `create-worlds`. Orthogonal powers — one is never implied
   // by the other. Superadmin is not a member and has its own endpoint below.
   @Patch(':id/roles')
-  setRoles(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-    @Body() body: unknown,
-  ): void {
+  setRoles(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): void {
     const parsed = setUserRolesRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
     this.users.setRoles(user, id, parsed.data.roles);
@@ -98,11 +90,7 @@ export class UsersController {
   // One toggle (matching the setSuperadmin PATCH style), not split disable/enable
   // routes: the disabled state is a body field, not a verb.
   @Patch(':id/disabled')
-  setDisabled(
-    @CurrentUser() user: AuthUser,
-    @Param('id') id: string,
-    @Body() body: unknown,
-  ): void {
+  setDisabled(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): void {
     const parsed = setDisabledRequestSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException();
     this.users.setDisabled(user, id, parsed.data.disabled);

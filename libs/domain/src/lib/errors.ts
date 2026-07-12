@@ -31,6 +31,12 @@ export type AclErrorCode = (typeof AclErrorCode)[keyof typeof AclErrorCode];
 export const EntityErrorCode = {
   /** No World the caller may create an Entity in (404). */
   NoWritableWorld: 'no-writable-world',
+  /**
+   * An active typed edit failed the forward-only Field gate — a required Field was
+   * omitted or a value mismatched its data-type (400, ADR-0048). `data.fields`
+   * carries the offending `{ key, code }` list so the web can point at each one.
+   */
+  InvalidFields: 'invalid-fields',
 } as const;
 
 /** One of the {@link EntityErrorCode} values. */

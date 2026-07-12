@@ -41,16 +41,8 @@
   /* ---- Gilded chrome — metallic sheen + glow. Raw vars consumed by scoped
      styles. --gradient-gold re-themes via its stop vars; only --color-glow
      needs a dark override (below). */
-  --gradient-gold: linear-gradient(
-    180deg,
-    var(--color-gold-bright),
-    var(--color-gold-deep)
-  );
-  --gradient-gold-radial: radial-gradient(
-    circle at 50% 35%,
-    var(--color-gold-bright),
-    var(--color-gold-deep)
-  );
+  --gradient-gold: linear-gradient(180deg, var(--color-gold-bright), var(--color-gold-deep));
+  --gradient-gold-radial: radial-gradient(circle at 50% 35%, var(--color-gold-bright), var(--color-gold-deep));
   --color-glow: rgba(210, 150, 40, 0.5); /* gilded glow for active chrome */
 
   color-scheme: light;

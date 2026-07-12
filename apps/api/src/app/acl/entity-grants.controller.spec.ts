@@ -65,7 +65,7 @@ describe('Entity grants', () => {
     return (
       await owner
         .post('/entities')
-        .send({ name: 'Lady Mara', type: 'note', worldId })
+        .send({ name: 'Lady Mara', types: ['core.note'], worldId })
         .expect(201)
     ).body.id;
   }
@@ -75,7 +75,11 @@ describe('Entity grants', () => {
     const current = (await agent.get(`/entities/${id}`).expect(200)).body;
     return agent
       .put(`/entities/${id}`)
-      .send({ document: current.document, version: current.version, tags: ['edited'] })
+      .send({
+        document: current.document,
+        version: current.version,
+        tags: ['edited'],
+      })
       .expect(expectStatus);
   }
 
@@ -85,10 +89,7 @@ describe('Entity grants', () => {
     const world = await makeWorld(ada);
     const entity = await makeEntity(ada, world); // Private, Ada-owned.
 
-    await ada
-      .post(`/entities/${entity}/grants`)
-      .send({ userId: bobId, role: 'editor' })
-      .expect(200);
+    await ada.post(`/entities/${entity}/grants`).send({ userId: bobId, role: 'editor' }).expect(200);
 
     // The editor opens the Entity writable — Rights carry `edit` but not the lifecycle
     // verbs (delete/set-visibility) or `manage` (ADR-0039).
@@ -132,16 +133,11 @@ describe('Entity grants', () => {
     await ada.post(`/entities/${entity}/grants`).send({ userId: bobId, role: 'viewer' }).expect(200);
     await resave(bob, entity, 403); // Viewer can't write substance.
 
-    const promoted = await ada
-      .post(`/entities/${entity}/grants`)
-      .send({ userId: bobId, role: 'editor' })
-      .expect(200);
+    const promoted = await ada.post(`/entities/${entity}/grants`).send({ userId: bobId, role: 'editor' }).expect(200);
     expect(promoted.body).toEqual([{ userId: bobId, role: 'editor' }]);
     await resave(bob, entity, 200); // Now an Editor, the save lands.
 
-    expect((await ada.get(`/entities/${entity}/grants`).expect(200)).body).toEqual([
-      { userId: bobId, role: 'editor' },
-    ]);
+    expect((await ada.get(`/entities/${entity}/grants`).expect(200)).body).toEqual([{ userId: bobId, role: 'editor' }]);
   });
 
   it('never strips an Owner through the grant surface — grant is owner-wins, revoke spares the owner row', async () => {
@@ -277,10 +273,7 @@ describe('Entity grants', () => {
     // Before the grant, an outsider can't even tell it exists.
     await bob.get(`/entities/${entity}`).expect(404);
 
-    await ada
-      .post(`/entities/${entity}/grants`)
-      .send({ userId: bobId, role: 'viewer' })
-      .expect(200);
+    await ada.post(`/entities/${entity}/grants`).send({ userId: bobId, role: 'viewer' }).expect(200);
 
     // Bob now reads the private Entity; Carol (ungranted) still gets nothing.
     await bob.get(`/entities/${entity}`).expect(200);

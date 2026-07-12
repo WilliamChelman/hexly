@@ -1,12 +1,4 @@
-import {
-  computed,
-  DestroyRef,
-  Injectable,
-  Injector,
-  effect,
-  inject,
-  signal,
-} from '@angular/core';
+import { computed, DestroyRef, Injectable, Injector, effect, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
@@ -14,7 +6,6 @@ import {
   catchError,
   concat,
   defer,
-  distinctUntilChanged,
   EMPTY,
   filter,
   finalize,
@@ -28,22 +19,36 @@ import {
 } from 'rxjs';
 import {
   Content,
-  emptyHexMap,
+  emptyEntityBody,
   EntityBody,
   EntityDetail,
   EntitySaveOutcome,
-  HexMap,
-  hexMapSchema,
+  EntityType,
   tiptapContent,
   Visibility,
+  withFieldDefaults,
 } from '@hexly/domain';
-import { EntitiesClient, ActiveWorld, idFromSegment, worldRoute, TitleService, AppShellStore, EVICTED } from '@hexly/web-core';
-import { EntityView, HexMapStore } from '@hexly/web-map';
+import {
+  EntitiesClient,
+  ActiveWorld,
+  idFromSegment,
+  worldRoute,
+  TitleService,
+  AppShellStore,
+  EVICTED,
+} from '@hexly/web-core';
+import { applyPatches as immerApplyPatches, Draft, Patch, produceWithPatches } from '@hexly/immer';
+import type { EntitySession as EntitySessionPort } from '@hexly/web-entity';
 import type { ContentEditorSession } from '@hexly/content-editor';
+import { TypeRegistry } from '../../../entity-types/type-registry';
 
 /**
- * Bridges {@link EntitiesClient} and {@link HexMapStore} for `/entities/:id`:
- * unwraps the stored grid on open, re-wraps it on save.
+ * The central mutable store for the open Entity (ADR-0048, *Central store* amendment):
+ * the concrete {@link EntitySessionPort}. Owns the working body every View edits through
+ * {@link mutate}, and bridges it to {@link EntitiesClient} for `/entities/:id` — load,
+ * autosave, conflict, live-follow. `HexMapStore` and the other Views bind to it through
+ * the {@link ENTITY_SESSION} token, so the map lib plugs into the session rather than the
+ * session reaching into it (the inversion this ADR set up).
  *
  * Route-scoped (`providers`), not root: leaving the route destroys it, so
  * open-Entity state resets implicitly.
@@ -60,24 +65,45 @@ const FLUSH_TIMEOUT_MS = 10_000;
 
 /** The savable payload references captured at one instant. */
 interface SaveSnapshot {
-  grid: HexMap;
+  body: EntityBody;
   content: Content;
   tags: readonly string[];
+  types: readonly EntityType[];
+  /** True when the type set was authored this session — only then does the save carry `types`. */
+  typesChanged: boolean;
 }
 
 @Injectable()
-export class EntitySession implements ContentEditorSession {
+export class EntitySession implements ContentEditorSession, EntitySessionPort {
   private readonly entities = inject(EntitiesClient);
-  private readonly editor = inject(HexMapStore);
   private readonly title = inject(TitleService);
   private readonly router = inject(Router);
   private readonly activeWorld = inject(ActiveWorld);
   private readonly shell = inject(AppShellStore);
   private readonly destroyRef = inject(DestroyRef);
   private readonly injector = inject(Injector);
+  private readonly typeRegistry = inject(TypeRegistry);
 
   private readonly _current = signal<EntityDetail | null>(null);
   readonly current = this._current.asReadonly();
+
+  /**
+   * The working Entity body — `{ content, metadata }`, the one shape every Entity has, and the
+   * source every View edits. Owned here (ADR-0048): a View reads its slice off {@link body} — a
+   * Field's value, the map editor's grid among them — and writes it through {@link mutate}. Content
+   * is the one exception, still tracked in {@link _content} (TipTap owns its own live doc) and
+   * folded back in at save; `mutate` covers the rest.
+   */
+  private readonly _body = signal<EntityBody>(emptyEntityBody());
+  readonly body = this._body.asReadonly();
+
+  /**
+   * Bumped on a *fresh* load — a new Entity adopted, or the canvas cleared for a route
+   * swap — never on a {@link mutate}. A View watches it to reset the transient state tied
+   * to the old body (a map editor's undo history and selection); an edit leaves it be.
+   */
+  private readonly _loadGeneration = signal(0);
+  readonly loadGeneration = this._loadGeneration.asReadonly();
 
   private readonly _conflict = signal<EntityDetail | null>(null);
   /** The server's current Entity when a save was rejected as stale, else `null`. */
@@ -101,8 +127,10 @@ export class EntitySession implements ContentEditorSession {
   readonly evicted = this._evicted.asReadonly();
 
   /**
-   * Whether the load-time Rights carry the `edit` verb. False → a read-only
-   * opener: {@link save} no-ops so no autosave ever hits a 403 wall.
+   * Whether the load-time Rights carry the `edit` verb (ADR-0037). False → a read-only
+   * opener: {@link save} no-ops so no autosave ever hits a 403 wall. Exposed straight off
+   * the `ENTITY_SESSION` token so a View gates its own tools without the session pushing
+   * edit-ability into it — a visibility flip that revokes write updates it live.
    */
   readonly writable = computed(() => !!this._current()?.rights?.includes('edit'));
 
@@ -129,6 +157,13 @@ export class EntitySession implements ContentEditorSession {
   private readonly _tags = signal<readonly string[]>([]);
   readonly tags = this._tags.asReadonly();
 
+  /**
+   * The live, ordered type set every type-driven surface reads, so the header, view toggle, and
+   * Field View re-primary the moment a type is added/removed/reordered, before any save (#189).
+   */
+  private readonly _types = signal<readonly EntityType[]>([]);
+  readonly types = this._types.asReadonly();
+
   private readonly _saving = signal(false);
   readonly saving = this._saving.asReadonly();
 
@@ -138,17 +173,19 @@ export class EntitySession implements ContentEditorSession {
    * reference equality against these — sound because immer and TipTap-minted
    * Content only yield a new reference on a real edit.
    */
-  private readonly _baseGrid = signal<HexMap | null>(null);
+  private readonly _baseBody = signal<EntityBody | null>(null);
   private readonly _baseContent = signal<Content | null>(null);
   private readonly _baseTags = signal<readonly string[]>([]);
+  private readonly _baseTypes = signal<readonly EntityType[]>([]);
 
   /** True when any savable input has moved off its baseline; false with none open. */
   readonly dirty = computed(
     () =>
       this._current() !== null &&
-      (this.editor.document() !== this._baseGrid() ||
+      (this._body() !== this._baseBody() ||
         this._content() !== this._baseContent() ||
-        this._tags() !== this._baseTags()),
+        this._tags() !== this._baseTags() ||
+        this._types() !== this._baseTypes()),
   );
 
   /**
@@ -156,9 +193,7 @@ export class EntitySession implements ContentEditorSession {
    * live-follow: the reconciler switches its server subscription to this id, so a
    * swap unfollows the old and follows the new without manual bookkeeping.
    */
-  private readonly _followedId = computed(() =>
-    this.externallyDriven ? null : this._current()?.id ?? null,
-  );
+  private readonly _followedId = computed(() => (this.externallyDriven ? null : (this._current()?.id ?? null)));
 
   /**
    * Route load in flight. `current` still holds the previous Entity until the new
@@ -212,15 +247,11 @@ export class EntitySession implements ContentEditorSession {
     // conflict, during route load, and after a failed save until the payload
     // changes — else _saving flipping false would retry the same failing PUT.
     effect((onCleanup) => {
-      this.editor.document();
+      this._body();
       this._content();
       this._tags();
-      const armed =
-        this.dirty() &&
-        !this._conflict() &&
-        !this._saving() &&
-        !this._loading() &&
-        !this.unsavedFailure();
+      this._types();
+      const armed = this.dirty() && !this._conflict() && !this._saving() && !this._loading() && !this.unsavedFailure();
       if (!armed) return;
       const timer = setTimeout(() => this.save().subscribe(), AUTOSAVE_DELAY_MS);
       onCleanup(() => clearTimeout(timer));
@@ -292,16 +323,6 @@ export class EntitySession implements ContentEditorSession {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe();
-
-    // Editor surface lives in the URL: refresh/shared link restores the view,
-    // opening another Entity (no `view` param) resets to the grid.
-    route.queryParamMap
-      .pipe(
-        map((q): EntityView => (q.get('view') === 'note' ? 'note' : 'map')),
-        distinctUntilChanged(),
-        takeUntilDestroyed(this.destroyRef),
-      )
-      .subscribe((view) => this.editor.setView(view));
   }
 
   open(id: string): Observable<EntityDetail> {
@@ -332,14 +353,18 @@ export class EntitySession implements ContentEditorSession {
     this._evicted.set(false);
     this.failed = null;
     this._current.set(detail);
+    this._body.set(detail.document); // the working body — grid and all — is the loaded body
     this._content.set(detail.document.content); // before seed: seed effect reads content()
     this._seed.set(detail);
     this._tags.set(detail.tags);
-    this.editor.load(gridOf(detail.document));
+    this._types.set(detail.types);
     // Baseline = exactly the references now live, so a load never reads as dirty.
-    this._baseGrid.set(this.editor.document());
+    this._baseBody.set(this._body());
     this._baseContent.set(this._content());
     this._baseTags.set(this._tags());
+    this._baseTypes.set(this._types());
+    // A fresh Entity: reset every View's body-tied transient state (a map's undo/selection).
+    this._loadGeneration.update((n) => n + 1);
     // Live-follow tracks the open Entity reactively off _current (see the reconciler), so adopt
     // needs no follow bookkeeping — swapping id re-points the subscription on its own.
   }
@@ -379,6 +404,38 @@ export class EntitySession implements ContentEditorSession {
     this._tags.set(tags);
   }
 
+  /**
+   * Replace the live type set, `types[0]` primary (#189). {@link withFieldDefaults} mints the
+   * defaults the new set's Fields declare — so adding `core.hexmap` gives the map View an empty
+   * plane at `grid` to open on (ADR-0050). Additive: dropping a type never strips its values.
+   */
+  setTypes(types: readonly EntityType[]): void {
+    this._types.set([...types]);
+    const fields = this.typeRegistry.resolveFields(types);
+    const reconciled = withFieldDefaults(this._body(), fields, this.typeRegistry.structuredDataTypes);
+    if (reconciled !== this._body()) this._body.set(reconciled);
+  }
+
+  /**
+   * Run `recipe` against a draft of the body through Immer, adopting the result and
+   * returning the forward/inverse patches (ADR-0048). The universal write-channel every
+   * View shares; a View that owns undo/redo (the map editor) keeps the patches to replay.
+   * Bumps no load generation — an edit must not reset a View's history.
+   */
+  mutate(recipe: (draft: EntityBody) => void): {
+    redo: Patch[];
+    undo: Patch[];
+  } {
+    const [next, redo, undo] = produceWithPatches(this._body(), recipe as (draft: Draft<EntityBody>) => void);
+    this._body.set(next as EntityBody);
+    return { redo, undo };
+  }
+
+  /** Apply raw patches to the body — the undo/redo channel a View replays its own stack through. */
+  applyPatches(patches: Patch[]): void {
+    this._body.set(immerApplyPatches(this._body(), patches));
+  }
+
   /** Always a fresh fetch: the session outlives library trips, so a cached `current` can be stale (#70). */
   openRoute(id: string): Observable<EntityDetail> {
     // Flush the previous Entity AND WAIT before clearing its canvas (ADR-0026): an in-app
@@ -388,15 +445,20 @@ export class EntitySession implements ContentEditorSession {
     return concat(
       this.flush().pipe(ignoreElements()),
       defer(() => {
-        this.editor.load(emptyHexMap()); // clear the previous canvas during load (#7)
+        this._body.set(emptyEntityBody()); // clear the previous canvas during load (#7)
         this._tags.set([]); // and the previous Entity's tags/content, which ride the same load (#88)
+        this._types.set([]); // and its type set, re-baselined below so the blank load isn't dirty
         this._content.set(null);
+        // A cleared canvas is a fresh start: reset the Views' body-tied state (#7) — the same
+        // bump adopt() makes, so a load that never resolves still leaves no stale map state.
+        this._loadGeneration.update((n) => n + 1);
         // Re-baseline onto the cleared placeholder so the load window isn't dirty — else a
         //404 redirect (which clears then leaves) would flush this empty state over the
         // Entity the user just left (ADR-0026).
-        this._baseGrid.set(this.editor.document());
+        this._baseBody.set(this._body());
         this._baseContent.set(this._content());
         this._baseTags.set(this._tags());
+        this._baseTypes.set(this._types());
         // Eviction belongs to the Entity just left (#174): clear it as the new load starts —
         // waiting for a successful adopt() would let it mask this load's own failure state.
         this._evicted.set(false);
@@ -426,9 +488,7 @@ export class EntitySession implements ContentEditorSession {
    * None open, or one loading under navigation → no-op (not a throw), so a stale patch
    * can't write to the Entity the user navigated away from (#4).
    */
-  private patch(
-    changes: { name: string } | { visibility: Visibility },
-  ): Observable<EntityDetail> {
+  private patch(changes: { name: string } | { visibility: Visibility }): Observable<EntityDetail> {
     const open = this._current();
     if (!open || this._loading()) return EMPTY;
     return this.entities.patch(open.id, changes).pipe(
@@ -462,28 +522,30 @@ export class EntitySession implements ContentEditorSession {
     return this.runSave(
       open,
       {
-        grid: this.editor.document(),
+        body: this._body(),
         content,
         tags: this._tags(),
+        types: this._types(),
+        typesChanged: this._types() !== this._baseTypes(),
       },
       showLoading,
     );
   }
 
   /** The version-checked PUT for a captured snapshot; callers own the gating. */
-  private runSave(
-    open: EntityDetail,
-    snapshot: SaveSnapshot,
-    showLoading: boolean,
-  ): Observable<EntitySaveOutcome> {
+  private runSave(open: EntityDetail, snapshot: SaveSnapshot, showLoading: boolean): Observable<EntitySaveOutcome> {
     this._saving.set(true);
     this._error.set(null);
     this.failed = null;
-    const { grid, content, tags } = snapshot;
-    const body = withContent(withGrid(open.document, grid), content);
-    const save$ = this.entities
-      .save(open.id, body, open.version, tags)
-      .pipe(
+    const { body, content, tags, types, typesChanged } = snapshot;
+    // The working body already carries every grid/metadata edit (mutate wrote them in
+    // place); fold in only the live Content, which TipTap tracks separately (ADR-0019).
+    const saved = withContent(body, content);
+    // Send `types` only when this edit authored them, so a plain body save never re-types data at rest.
+    const request$ = typesChanged
+      ? this.entities.save(open.id, saved, open.version, tags, types)
+      : this.entities.save(open.id, saved, open.version, tags);
+    const save$ = request$.pipe(
       tap((outcome) => {
         // Drop a late response if the user has since navigated to another Entity — it
         // must not write its result over the Entity now open (generalises #4/#70).
@@ -495,9 +557,10 @@ export class EntitySession implements ContentEditorSession {
         } else {
           this._conflict.set(null);
           this._current.set(this.withPermissions(outcome.entity, open));
-          this._baseGrid.set(grid);
+          this._baseBody.set(body);
           this._baseContent.set(content);
           this._baseTags.set(tags);
+          this._baseTypes.set(types);
         }
       }),
       catchError((err: unknown) => {
@@ -505,9 +568,7 @@ export class EntitySession implements ContentEditorSession {
         // a role revoked mid-session): a terminal read-only state, not a retryable blip —
         // the chip offers no Retry. `failed` still pauses the scheduler so it can't loop
         // the same rejected PUT every 800ms (it only re-attempts once per fresh edit).
-        this._error.set(
-          err instanceof HttpErrorResponse && err.status === 403 ? 'readonly' : 'save',
-        );
+        this._error.set(err instanceof HttpErrorResponse && err.status === 403 ? 'readonly' : 'save');
         this.failed = snapshot;
         return EMPTY;
       }),
@@ -525,9 +586,7 @@ export class EntitySession implements ContentEditorSession {
    * a hung network can't trap the user on the page.
    */
   flush(): Observable<unknown> {
-    return this.pendingSave().pipe(
-      timeout({ first: FLUSH_TIMEOUT_MS, with: () => EMPTY }),
-    );
+    return this.pendingSave().pipe(timeout({ first: FLUSH_TIMEOUT_MS, with: () => EMPTY }));
   }
 
   private pendingSave(): Observable<unknown> {
@@ -548,9 +607,10 @@ export class EntitySession implements ContentEditorSession {
     const failed = this.failed;
     return (
       failed !== null &&
-      this.editor.document() === failed.grid &&
+      this._body() === failed.body &&
       this._content() === failed.content &&
-      this._tags() === failed.tags
+      this._tags() === failed.tags &&
+      this._types() === failed.types
     );
   }
 
@@ -569,20 +629,7 @@ export class EntitySession implements ContentEditorSession {
   }
 }
 
-/** Parse through {@link hexMapSchema} so the schema drops `type`/`content`, not a hand-listed field set; empty for notes. */
-function gridOf(body: EntityBody): HexMap {
-  return body.type === 'hexmap' ? hexMapSchema.parse(body) : emptyHexMap();
-}
-
-/**
- * Re-wrap an edited grid into the body, carrying Content and type through (ADR-0019).
- * Non-hexmap bodies pass through as-is, so the hex seam can't coerce a note on save.
- */
-function withGrid(body: EntityBody, grid: HexMap): EntityBody {
-  return body.type === 'hexmap' ? { ...body, ...grid } : body;
-}
-
-/** Fold the live Content into the body on save (ADR-0019); spread preserves the type discriminant. */
+/** Fold the live Content into the body on save (ADR-0019); the spread preserves every Field's value. */
 function withContent(body: EntityBody, content: Content): EntityBody {
   return { ...body, content };
 }

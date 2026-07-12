@@ -6,7 +6,14 @@ import { WorldStore } from '@hexly/web-core';
 import { WorldQuickOpen } from './world-quick-open';
 
 function world(id: string, name: string): WorldSummary {
-  return { id, name, owners: ['u1'], rights: ['read', 'manage'], createdAt: 1, updatedAt: 1 };
+  return {
+    id,
+    name,
+    owners: ['u1'],
+    rights: ['read', 'manage'],
+    createdAt: 1,
+    updatedAt: 1,
+  };
 }
 
 describe('WorldQuickOpen', () => {
@@ -14,14 +21,9 @@ describe('WorldQuickOpen', () => {
 
   function setup(worlds: WorldSummary[]): WorldQuickOpen {
     TestBed.configureTestingModule({
-      providers: [
-        provideRouter([]),
-        { provide: WorldStore, useValue: { worlds: () => worlds } },
-      ],
+      providers: [provideRouter([]), { provide: WorldStore, useValue: { worlds: () => worlds } }],
     });
-    navigate = vi
-      .spyOn(TestBed.inject(Router), 'navigate')
-      .mockResolvedValue(true);
+    navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     return TestBed.inject(WorldQuickOpen);
   }
 
@@ -30,16 +32,11 @@ describe('WorldQuickOpen', () => {
   });
 
   it('filters the already-loaded World list client-side, case-insensitively', async () => {
-    const provider = setup([
-      world('w1', 'Aldermoor'),
-      world('w2', 'Whisperwood'),
-    ]);
+    const provider = setup([world('w1', 'Aldermoor'), world('w2', 'Whisperwood')]);
 
     const commands = await firstValueFrom(provider.search('ALDER'));
 
-    expect(commands).toEqual([
-      expect.objectContaining({ id: 'w1', label: 'Aldermoor' }),
-    ]);
+    expect(commands).toEqual([expect.objectContaining({ id: 'w1', label: 'Aldermoor' })]);
   });
 
   it('lists every loaded World for a blank query', async () => {

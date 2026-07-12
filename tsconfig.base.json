@@ -16,13 +16,27 @@
     "baseUrl": ".",
     "paths": {
       "@hexly/content-editor": ["./libs/content-editor/src/index.ts"],
+      "@hexly/content-editor/i18n": ["./libs/content-editor/src/i18n/index.ts"],
+      "@hexly/content-editor/testing": ["./libs/content-editor/src/testing/index.ts"],
       "@hexly/domain": ["./libs/domain/src/index.ts"],
       "@hexly/immer": ["./libs/immer/src/index.ts"],
       "@hexly/obsidian": ["./libs/obsidian/src/index.ts"],
+      "@hexly/plugin-dnd": ["./libs/plugin-dnd/src/index.ts"],
+      "@hexly/plugin-dnd/testing": ["./libs/plugin-dnd/src/testing/index.ts"],
+      "@hexly/plugin-dnd/web": ["./libs/plugin-dnd/src/web/index.ts"],
+      "@hexly/plugin-hexmap": ["./libs/plugin-hexmap/src/index.ts"],
+      "@hexly/plugin-hexmap/testing": ["./libs/plugin-hexmap/src/testing/index.ts"],
+      "@hexly/plugin-hexmap/web": ["./libs/plugin-hexmap/src/web/index.ts"],
       "@hexly/web-core": ["./libs/web-core/src/index.ts"],
       "@hexly/web-core/testing": ["./libs/web-core/src/testing/index.ts"],
-      "@hexly/web-map": ["./libs/web-map/src/index.ts"],
-      "@hexly/web-ui": ["./libs/web-ui/src/index.ts"]
+      "@hexly/web-entity": ["./libs/web-entity/src/index.ts"],
+      "@hexly/web-entity/controls": ["./libs/web-entity/src/controls/index.ts"],
+      "@hexly/web-entity/entity-link": ["./libs/web-entity/src/entity-link/index.ts"],
+      "@hexly/web-entity/i18n": ["./libs/web-entity/src/i18n/index.ts"],
+      "@hexly/web-entity/testing": ["./libs/web-entity/src/testing/index.ts"],
+      "@hexly/web-ui": ["./libs/web-ui/src/index.ts"],
+      "@hexly/web-ui/i18n": ["./libs/web-ui/src/i18n/index.ts"],
+      "@hexly/web-ui/testing": ["./libs/web-ui/src/testing/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]

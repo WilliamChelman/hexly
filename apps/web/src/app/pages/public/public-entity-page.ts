@@ -5,6 +5,7 @@ import { EMPTY, catchError, combineLatest, of, switchMap, tap } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { EntityNudge, StaleNudge } from '@hexly/domain';
 import { PublicClient, PublicEntityMode, AppShellStore, EVICTED } from '@hexly/web-core';
+import { ENTITY_SESSION } from '@hexly/web-entity';
 import { EntitySession } from '../entity/services/entity-session';
 import { EntityNameResolver, CONTENT_EDITOR_SESSION } from '@hexly/content-editor';
 import { PublicEntityNameResolver } from './public-entity-name-resolver';
@@ -31,6 +32,7 @@ interface Followed {
   host: { class: 'flex h-full flex-col' },
   providers: [
     EntitySession,
+    { provide: ENTITY_SESSION, useExisting: EntitySession },
     { provide: CONTENT_EDITOR_SESSION, useExisting: EntitySession },
     { provide: EntityNameResolver, useClass: PublicEntityNameResolver },
     // The dock offers the Outline alone: References would need `/entities/:id/references`, which
@@ -108,9 +110,7 @@ export class PublicEntityPage {
             ? this.client.worldEntity(token, params.get('entityId') ?? '')
             : this.client.entity(token);
           return read$.pipe(
-            tap((entity) =>
-              this.followed.set({ token, mode, id: entity.id }),
-            ),
+            tap((entity) => this.followed.set({ token, mode, id: entity.id })),
             catchError(() => of(null)),
           );
         }),
@@ -132,15 +132,11 @@ export class PublicEntityPage {
     toObservable(this.followed)
       .pipe(
         switchMap((f) =>
-          f === null
-            ? EMPTY
-            : this.client.watchEntity(f.token, f.mode, f.id, (n) => this.wantsRefetch(n)),
+          f === null ? EMPTY : this.client.watchEntity(f.token, f.mode, f.id, (n) => this.wantsRefetch(n)),
         ),
         takeUntilDestroyed(),
       )
-      .subscribe((result) =>
-        result === EVICTED ? this.evict() : this.session.adopt(result),
-      );
+      .subscribe((result) => (result === EVICTED ? this.evict() : this.session.adopt(result)));
   }
 
   /** Strictly past the freshness key the open Entity carries (ADR-0045). */

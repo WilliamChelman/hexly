@@ -130,12 +130,25 @@ describe('entityAccess', () => {
     // grant here, must not read this shared Entity.
     it('does not read a shared Entity for a member of a different World', () => {
       const otherWorld = randomUUID();
-      db.insert(worlds).values({ id: otherWorld, name: 'Elsewhere', createdAt: 1, updatedAt: 1 }).run();
+      db.insert(worlds)
+        .values({
+          id: otherWorld,
+          name: 'Elsewhere',
+          createdAt: 1,
+          updatedAt: 1,
+        })
+        .run();
       const outsider = seedUser();
       db.insert(worldMembers).values({ worldId: otherWorld, userId: outsider, role: 'contributor' }).run();
-      expect(entityAccess(db, outsider).decideMeta(shared)).toEqual({ canRead: false, isOwner: false });
+      expect(entityAccess(db, outsider).decideMeta(shared)).toEqual({
+        canRead: false,
+        isOwner: false,
+      });
       // And the branch genuinely works — a member of THIS World does read the shared Entity.
-      expect(entityAccess(db, wContrib).decideMeta(shared)).toEqual({ canRead: true, isOwner: false });
+      expect(entityAccess(db, wContrib).decideMeta(shared)).toEqual({
+        canRead: true,
+        isOwner: false,
+      });
     });
   });
 
@@ -185,7 +198,7 @@ describe('entityAccess', () => {
         id,
         worldId,
         name: `e-${visibility}`,
-        type: 'note',
+        types: ['core.note'],
         tags: [],
         visibility,
         version: 1,

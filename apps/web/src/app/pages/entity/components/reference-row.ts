@@ -28,9 +28,9 @@ import { LinkedEntity } from '@hexly/domain';
     } @else {
       <span
         data-dangling=""
-        [attr.title]="'noteView.entityLink.dangling' | transloco"
+        [attr.title]="'editor.entityLink.dangling' | transloco"
         class="min-w-0 flex-1 truncate text-sm italic text-ink-muted"
-        >{{ 'noteView.entityLink.dangling' | transloco }}</span
+        >{{ 'editor.entityLink.dangling' | transloco }}</span
       >
     }
     @if (descriptor()) {

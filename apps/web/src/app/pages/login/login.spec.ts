@@ -1,9 +1,10 @@
+import { provideTranslocoTesting } from '../../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
-import { provideTranslocoTesting, MockAuthClient } from '@hexly/web-core/testing';
+import { MockAuthClient } from '@hexly/web-core/testing';
 import { AuthClient } from '@hexly/web-core';
 import { Login } from './login';
 
@@ -53,7 +54,14 @@ describe('Login', () => {
 
   it('submits the typed credentials and enters the app on success', () => {
     auth.login.mockReturnValue(
-      of({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada', preferences: {}, roles: ['create-worlds'], isSuperadmin: false }),
+      of({
+        id: 'u1',
+        email: 'ada@hexly.test',
+        displayName: 'Ada',
+        preferences: {},
+        roles: ['create-worlds'],
+        isSuperadmin: false,
+      }),
     );
     const fixture = TestBed.createComponent(Login);
     const el = fixture.nativeElement as HTMLElement;
@@ -76,7 +84,14 @@ describe('Login', () => {
 
   it('trims the typed email before sending it', () => {
     auth.login.mockReturnValue(
-      of({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada', preferences: {}, roles: ['create-worlds'], isSuperadmin: false }),
+      of({
+        id: 'u1',
+        email: 'ada@hexly.test',
+        displayName: 'Ada',
+        preferences: {},
+        roles: ['create-worlds'],
+        isSuperadmin: false,
+      }),
     );
     const fixture = TestBed.createComponent(Login);
     const el = fixture.nativeElement as HTMLElement;
@@ -91,7 +106,14 @@ describe('Login', () => {
 
   it('navigates to returnUrl when one is present', () => {
     auth.login.mockReturnValue(
-      of({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada', preferences: {}, roles: ['create-worlds'], isSuperadmin: false }),
+      of({
+        id: 'u1',
+        email: 'ada@hexly.test',
+        displayName: 'Ada',
+        preferences: {},
+        roles: ['create-worlds'],
+        isSuperadmin: false,
+      }),
     );
     queryParams = { returnUrl: '/atlas/42' };
     const fixture = TestBed.createComponent(Login);
@@ -123,9 +145,7 @@ describe('Login', () => {
   });
 
   it('shows the rejection error translated when French is active', () => {
-    auth.login.mockReturnValue(
-      throwError(() => new HttpErrorResponse({ status: 401 })),
-    );
+    auth.login.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 401 })));
     const fixture = TestBed.createComponent(Login);
     const el = fixture.nativeElement as HTMLElement;
     fixture.detectChanges();
@@ -141,9 +161,7 @@ describe('Login', () => {
   });
 
   it('shows an error and stays put when the credentials are rejected', () => {
-    auth.login.mockReturnValue(
-      throwError(() => new HttpErrorResponse({ status: 401 })),
-    );
+    auth.login.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 401 })));
     const fixture = TestBed.createComponent(Login);
     const el = fixture.nativeElement as HTMLElement;
     fixture.detectChanges();

@@ -2,7 +2,14 @@ import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { AuthClient, WorldsClient, EntitiesClient, UserDirectoryClient, ToasterService } from '@hexly/web-core';
-import { MockAuthClient, MockWorldsClient, MockEntitiesClient, MockUserDirectoryClient, provideTranslocoTesting } from '@hexly/web-core/testing';
+import {
+  MockAuthClient,
+  MockWorldsClient,
+  MockEntitiesClient,
+  MockUserDirectoryClient,
+  provideTranslocoTesting,
+} from '@hexly/web-core/testing';
+import { WEB_UI_TEST_CATALOGS } from './i18n/test-catalogs';
 import { OwnerSet } from './owner-set';
 
 describe('OwnerSet', () => {
@@ -18,7 +25,7 @@ describe('OwnerSet', () => {
     users = new MockUserDirectoryClient();
     auth = new MockAuthClient();
     await TestBed.configureTestingModule({
-      imports: [OwnerSet, provideTranslocoTesting()],
+      imports: [OwnerSet, provideTranslocoTesting(WEB_UI_TEST_CATALOGS)],
       providers: [
         { provide: WorldsClient, useValue: worlds },
         { provide: EntitiesClient, useValue: entities },
@@ -27,7 +34,14 @@ describe('OwnerSet', () => {
       ],
     }).compileComponents();
     toaster = TestBed.inject(ToasterService);
-    auth.setUser({ id: 'u1', email: 'ada@hexly.test', displayName: 'Ada', preferences: {}, roles: ['create-worlds'], isSuperadmin: false });
+    auth.setUser({
+      id: 'u1',
+      email: 'ada@hexly.test',
+      displayName: 'Ada',
+      preferences: {},
+      roles: ['create-worlds'],
+      isSuperadmin: false,
+    });
     users.list.mockReturnValue(
       of([
         { id: 'u1', displayName: 'Ada' },
@@ -46,8 +60,7 @@ describe('OwnerSet', () => {
     return fixture;
   }
 
-  const $ = (el: HTMLElement, sel: string) =>
-    el.querySelector(sel) as HTMLElement | null;
+  const $ = (el: HTMLElement, sel: string) => el.querySelector(sel) as HTMLElement | null;
 
   it('names each Owner from the directory', () => {
     const { nativeElement: el } = render('world', 'w1', ['u1', 'u2']);
@@ -59,9 +72,7 @@ describe('OwnerSet', () => {
 
   it('warns instead of throwing when the owner set fails to load', () => {
     const show = vi.spyOn(toaster, 'show');
-    worlds.owners.mockReturnValue(
-      throwError(() => new HttpErrorResponse({ status: 404 })),
-    );
+    worlds.owners.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
     const fixture = TestBed.createComponent(OwnerSet);
     fixture.componentRef.setInput('kind', 'world');
     fixture.componentRef.setInput('id', 'w1');
@@ -118,9 +129,7 @@ describe('OwnerSet', () => {
     const resigned = vi.fn();
     fixture.componentInstance.resigned.subscribe(resigned);
     const show = vi.spyOn(toaster, 'show');
-    worlds.removeOwner.mockReturnValue(
-      throwError(() => new HttpErrorResponse({ status: 409 })),
-    );
+    worlds.removeOwner.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 409 })));
 
     ($(el, '[data-testid="resign-u1"]') as HTMLButtonElement).click();
     fixture.detectChanges();

@@ -1,12 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
+import { CONTENT_EDITOR_TEST_CATALOGS } from './i18n/test-catalogs';
 import { SLASH_ITEMS, SlashItem } from './slash-menu-items';
 import { SlashMenu } from './slash-menu';
 
 describe('SlashMenu', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [SlashMenu, provideTranslocoTesting()],
+      imports: [SlashMenu, provideTranslocoTesting(CONTENT_EDITOR_TEST_CATALOGS)],
     }).compileComponents();
   });
 
@@ -14,7 +15,11 @@ describe('SlashMenu', () => {
     const fixture = TestBed.createComponent(SlashMenu);
     const menu = fixture.componentInstance;
     const command = vi.fn();
-    menu.open({ items, command, clientRect: () => ({ left: 100, bottom: 200 } as DOMRect) });
+    menu.open({
+      items,
+      command,
+      clientRect: () => ({ left: 100, bottom: 200 }) as DOMRect,
+    });
     fixture.detectChanges();
     return { fixture, menu, command };
   }
@@ -36,9 +41,7 @@ describe('SlashMenu', () => {
     const fixture = TestBed.createComponent(SlashMenu);
     fixture.detectChanges();
 
-    expect(
-      el(fixture).querySelector('[data-testid=slash-menu]'),
-    ).toBeNull();
+    expect(el(fixture).querySelector('[data-testid=slash-menu]')).toBeNull();
   });
 
   it('moves the active option with ArrowDown and selects it on Enter', () => {
@@ -74,13 +77,9 @@ describe('SlashMenu', () => {
   it('selects an option when it is clicked', () => {
     const { fixture, command } = open();
 
-    (
-      el(fixture).querySelector('[data-testid=slash-item-blockquote]') as HTMLElement
-    ).click();
+    (el(fixture).querySelector('[data-testid=slash-item-blockquote]') as HTMLElement).click();
 
-    expect(command).toHaveBeenCalledWith(
-      SLASH_ITEMS.find((i) => i.id === 'blockquote'),
-    );
+    expect(command).toHaveBeenCalledWith(SLASH_ITEMS.find((i) => i.id === 'blockquote'));
   });
 
   it('ignores keys it does not handle, leaving them for the editor', () => {
@@ -90,9 +89,7 @@ describe('SlashMenu', () => {
   });
 
   it('keeps the current items on a loading update, so an async query never blanks', () => {
-    const { fixture, menu } = open([
-      SLASH_ITEMS.find((i) => i.id === 'heading1')!,
-    ]);
+    const { fixture, menu } = open([SLASH_ITEMS.find((i) => i.id === 'heading1')!]);
 
     menu.update({
       items: [],

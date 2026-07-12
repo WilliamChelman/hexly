@@ -1,5 +1,14 @@
 import { Route } from '@angular/router';
-import { manageUsersGuard, superadminGuard, authGuard, loginGuard, entityWorldRedirect, reconcileWorldSegment, activeWorldGuard, clearActiveWorld } from '@hexly/web-core';
+import {
+  manageUsersGuard,
+  superadminGuard,
+  authGuard,
+  loginGuard,
+  entityWorldRedirect,
+  reconcileWorldSegment,
+  activeWorldGuard,
+  clearActiveWorld,
+} from '@hexly/web-core';
 
 // `title` values are transloco keys, resolved by TranslationTitleStrategy.
 export const appRoutes: Route[] = [
@@ -14,16 +23,14 @@ export const appRoutes: Route[] = [
     path: '',
     pathMatch: 'full',
     canActivate: [authGuard],
-    loadComponent: () =>
-      import('./pages/world-index/world-index').then((m) => m.WorldIndex),
+    loadComponent: () => import('./pages/world-index/world-index').then((m) => m.WorldIndex),
     title: 'worldIndex.tabTitle',
   },
   {
     // Account-scoped, so it sits outside the World scope.
     path: 'settings',
     canActivate: [authGuard],
-    loadComponent: () =>
-      import('./pages/user-settings/user-settings').then((m) => m.UserSettings),
+    loadComponent: () => import('./pages/user-settings/user-settings').then((m) => m.UserSettings),
     title: 'settings.tabTitle',
   },
   {
@@ -48,33 +55,25 @@ export const appRoutes: Route[] = [
     path: 'w/:worldId',
     canActivate: [authGuard, activeWorldGuard],
     canDeactivate: [clearActiveWorld],
-    loadComponent: () =>
-      import('./pages/world/world-layout').then((m) => m.WorldLayout),
+    loadComponent: () => import('./pages/world/world-layout').then((m) => m.WorldLayout),
     children: [
       {
         path: '',
         pathMatch: 'full',
-        loadComponent: () =>
-          import('./pages/world/world-dashboard').then((m) => m.WorldDashboard),
+        loadComponent: () => import('./pages/world/world-dashboard').then((m) => m.WorldDashboard),
         title: 'worldDashboard.tabTitle',
       },
       {
         // World-level owner management; Owner-only.
         path: 'settings',
         pathMatch: 'full',
-        loadComponent: () =>
-          import('./pages/world/pages/world-settings/world-settings').then(
-            (m) => m.WorldSettings,
-          ),
-        title: 'owners.tabTitle',
+        loadComponent: () => import('./pages/world/pages/world-settings/world-settings').then((m) => m.WorldSettings),
+        title: 'ui.owners.tabTitle',
       },
       {
         path: 'entities',
         pathMatch: 'full',
-        loadComponent: () =>
-          import('./pages/entity-browser/entity-browser').then(
-            (m) => m.EntityBrowser,
-          ),
+        loadComponent: () => import('./pages/entity-browser/entity-browser').then((m) => m.EntityBrowser),
         title: 'entityBrowser.tabTitle',
       },
       {
@@ -82,8 +81,7 @@ export const appRoutes: Route[] = [
         // of WebGL that nothing outside this page needs.
         path: 'graph',
         pathMatch: 'full',
-        loadComponent: () =>
-          import('./pages/world/world-graph/world-graph').then((m) => m.WorldGraph),
+        loadComponent: () => import('./pages/world/world-graph/world-graph').then((m) => m.WorldGraph),
         title: 'worldGraph.tabTitle',
       },
       {
@@ -95,8 +93,7 @@ export const appRoutes: Route[] = [
         canActivate: [reconcileWorldSegment],
         // The editor's providers + component live in a lazy child config so the
         // ContentEditor barrel (TipTap) never lands in the initial bundle.
-        loadChildren: () =>
-          import('./pages/entity/entity.routes').then((m) => m.ENTITY_ROUTES),
+        loadChildren: () => import('./pages/entity/entity.routes').then((m) => m.ENTITY_ROUTES),
       },
     ],
   },
@@ -106,14 +103,12 @@ export const appRoutes: Route[] = [
     // `/w/:worldId/entities/:id`; a missing/inaccessible target renders the error page.
     path: 'entities/:id',
     canActivate: [authGuard, entityWorldRedirect],
-    loadComponent: () =>
-      import('./pages/error/error-page').then((m) => m.ErrorPage),
+    loadComponent: () => import('./pages/error/error-page').then((m) => m.ErrorPage),
     title: 'error.tabTitle',
   },
   {
     path: 'styleguide',
-    loadComponent: () =>
-      import('./pages/styleguide/styleguide').then((m) => m.Styleguide),
+    loadComponent: () => import('./pages/styleguide/styleguide').then((m) => m.Styleguide),
     title: 'styleguide.tabTitle',
   },
   // Unauthenticated Public Link surface: token-scoped, read-only. Deliberately
@@ -121,16 +116,12 @@ export const appRoutes: Route[] = [
   {
     path: 'public/e/:token',
     data: { mode: 'entity' },
-    loadComponent: () =>
-      import('./pages/public/public-entity-page').then(
-        (m) => m.PublicEntityPage,
-      ),
+    loadComponent: () => import('./pages/public/public-entity-page').then((m) => m.PublicEntityPage),
     title: 'publicView.tabTitle',
   },
   {
     path: 'public/w/:token',
-    loadComponent: () =>
-      import('./pages/public/public-world-page').then((m) => m.PublicWorldPage),
+    loadComponent: () => import('./pages/public/public-world-page').then((m) => m.PublicWorldPage),
     title: 'publicView.tabTitle',
   },
   {
@@ -138,10 +129,7 @@ export const appRoutes: Route[] = [
     // PublicEntityPage marks the session externally driven and is the sole data source.
     path: 'public/w/:token/e/:entityId',
     data: { mode: 'worldEntity' },
-    loadComponent: () =>
-      import('./pages/public/public-entity-page').then(
-        (m) => m.PublicEntityPage,
-      ),
+    loadComponent: () => import('./pages/public/public-entity-page').then((m) => m.PublicEntityPage),
     title: 'publicView.tabTitle',
   },
   // Unmatched URLs render the error page rather than bouncing to the Index, so a
@@ -149,8 +137,7 @@ export const appRoutes: Route[] = [
   {
     path: '**',
     canActivate: [authGuard],
-    loadComponent: () =>
-      import('./pages/error/error-page').then((m) => m.ErrorPage),
+    loadComponent: () => import('./pages/error/error-page').then((m) => m.ErrorPage),
     title: 'error.tabTitle',
   },
 ];

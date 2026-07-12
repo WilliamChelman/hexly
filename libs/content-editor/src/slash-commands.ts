@@ -1,8 +1,5 @@
 import { Extension } from '@tiptap/core';
-import Suggestion, {
-  SuggestionKeyDownProps,
-  SuggestionProps,
-} from '@tiptap/suggestion';
+import Suggestion, { SuggestionKeyDownProps, SuggestionProps } from '@tiptap/suggestion';
 import { SLASH_ITEMS, SlashItem, filterSlashItems } from './slash-menu-items';
 import { SlashMenu } from './slash-menu';
 
@@ -16,10 +13,7 @@ import { SlashMenu } from './slash-menu';
  * `items` defaults to `SLASH_ITEMS`; callers can override to patch individual items
  * (e.g. ContentEditor patches `/link` to set the programmatic-trigger flag).
  */
-export function slashCommands(
-  getMenu: () => SlashMenu | undefined,
-  items: SlashItem[] = SLASH_ITEMS,
-): Extension {
+export function slashCommands(getMenu: () => SlashMenu | undefined, items: SlashItem[] = SLASH_ITEMS): Extension {
   return Extension.create({
     name: 'slashCommands',
     addProseMirrorPlugins() {
@@ -32,12 +26,9 @@ export function slashCommands(
           // The selected item knows how to insert itself; range covers the typed "/query".
           command: ({ editor, range, props }) => props.apply(editor, range),
           render: () => ({
-            onStart: (props: SuggestionProps<SlashItem, SlashItem>) =>
-              getMenu()?.open(props),
-            onUpdate: (props: SuggestionProps<SlashItem, SlashItem>) =>
-              getMenu()?.update(props),
-            onKeyDown: (props: SuggestionKeyDownProps) =>
-              getMenu()?.onKeyDown(props.event) ?? false,
+            onStart: (props: SuggestionProps<SlashItem, SlashItem>) => getMenu()?.open(props),
+            onUpdate: (props: SuggestionProps<SlashItem, SlashItem>) => getMenu()?.update(props),
+            onKeyDown: (props: SuggestionKeyDownProps) => getMenu()?.onKeyDown(props.event) ?? false,
             onExit: () => getMenu()?.close(),
           }),
         }),

@@ -10,10 +10,12 @@ import {
   viewChild,
 } from '@angular/core';
 import type { Graph } from '@cosmos.gl/graph';
-import { LinkedEntity, WorldGraph } from '@hexly/domain';
+import { CORE_NOTE, LinkedEntity, WorldGraph } from '@hexly/domain';
 import { Logger, ThemeService, isTrackpadWheel, wheelDeltaPixels } from '@hexly/web-core';
 import { GraphPayload, graphPayload } from './graph-payload';
 import { LabelGrid, selectLabels } from './label-selection';
+import { TypeRegistry } from '../../../entity-types/type-registry';
+import { TypeDefinition } from '@hexly/web-entity';
 
 /**
  * The declutter: at most one Entity label per {@link LABEL_GRID.pointCell} of screen, and one Link
@@ -77,8 +79,7 @@ const REHEAT_ALPHA = 0.3;
  * links crossing behind it, in either theme. Cheaper and crisper at 9px than `-webkit-text-stroke`,
  * which thins the glyphs.
  */
-const LABEL_CONTOUR =
-  '-1px -1px 0 #111, 1px -1px 0 #111, -1px 1px 0 #111, 1px 1px 0 #111, 0 1px 2px rgba(0,0,0,0.6)';
+const LABEL_CONTOUR = '-1px -1px 0 #111, 1px -1px 0 #111, -1px 1px 0 #111, 1px 1px 0 #111, 0 1px 2px rgba(0,0,0,0.6)';
 
 /**
  * How long the pointer must settle before the focus grey-out commits. A sweep across the canvas
@@ -89,11 +90,7 @@ const LABEL_CONTOUR =
 const HOVER_DEBOUNCE_MS = 50;
 
 /** Read a design token, so the canvas follows the theme (ADR-0007's palette, not hardcoded hex). */
-function token(
-  style: CSSStyleDeclaration,
-  name: string,
-  fallback: string,
-): string {
+function token(style: CSSStyleDeclaration, name: string, fallback: string): string {
   return style.getPropertyValue(name).trim() || fallback;
 }
 
@@ -102,34 +99,39 @@ function token(
  * That is why {@link GraphCanvas.repaint} exists at all — and why the whole palette is resolved in
  * one computed-style read rather than one per token.
  */
+/** The muted fallback hue if a colour token fails to resolve (jsdom, missing var). */
+const FALLBACK_NODE_COLOR = '#6f5a36';
+
 interface Palette {
   readonly background: string;
-  readonly note: [number, number, number, number];
-  readonly hexmap: [number, number, number, number];
+  /** RGBA node colour per Entity type, keyed by type id — the registry's `graphColorToken` resolved (ADR-0048). */
+  readonly byType: ReadonlyMap<string, [number, number, number, number]>;
+  /** Fallback node colour for an unregistered type — the core note's hue, matching the old non-hexmap default. */
+  readonly node: [number, number, number, number];
   readonly link: [number, number, number, number];
 }
 
-function palette(): Palette {
+function palette(defs: readonly TypeDefinition[]): Palette {
   const style = getComputedStyle(document.documentElement);
+  const byType = new Map<string, [number, number, number, number]>();
+  for (const def of defs) {
+    byType.set(def.id, toRgba(token(style, def.graphColorToken, FALLBACK_NODE_COLOR)));
+  }
   return {
     background: token(style, '--color-surface-sunken', '#ece0c0'),
-    note: toRgba(token(style, '--color-ink-muted', '#6f5a36')),
-    hexmap: toRgba(token(style, '--color-gold', '#9a6a16')),
+    byType,
+    // An unregistered type reads as a note, exactly as the old note/hexmap ternary did.
+    node: byType.get(CORE_NOTE) ?? toRgba(token(style, '--color-ink-muted', FALLBACK_NODE_COLOR)),
     link: toRgba(token(style, '--color-line-strong', '#b89a62')),
   };
 }
 
-/** One RGBA quad per point, by point index. */
-function pointColors(
-  nodes: readonly LinkedEntity[],
-  palette: Palette,
-): Float32Array {
+/** One RGBA quad per point, by point index; a node's colour is its type's registered hue. */
+function pointColors(nodes: readonly LinkedEntity[], palette: Palette): Float32Array {
   const colors = new Float32Array(nodes.length * 4);
   for (let i = 0; i < nodes.length; i++) {
-    colors.set(
-      nodes[i].type === 'hexmap' ? palette.hexmap : palette.note,
-      i * 4,
-    );
+    // Colour by the node's primary type (`types[0]`); an unregistered or absent one takes the fallback.
+    colors.set(palette.byType.get(nodes[i].types[0]) ?? palette.node, i * 4);
   }
   return colors;
 }
@@ -190,11 +192,7 @@ export interface GraphOpen {
   template: `
     <div #host class="relative w-full h-full" data-testid="graph-canvas">
       <!-- The text layer cosmos.gl doesn't have. Pointer-transparent: the canvas below owns hover. -->
-      <div
-        #overlay
-        class="absolute inset-0 pointer-events-none overflow-hidden select-none"
-        aria-hidden="true"
-      ></div>
+      <div #overlay class="absolute inset-0 pointer-events-none overflow-hidden select-none" aria-hidden="true"></div>
     </div>
   `,
 })
@@ -203,12 +201,11 @@ export class GraphCanvas {
   /** The Entity a reader clicked, for the page to navigate to. */
   readonly open = output<GraphOpen>();
 
-  private readonly hostEl =
-    viewChild.required<ElementRef<HTMLDivElement>>('host');
-  private readonly overlayEl =
-    viewChild.required<ElementRef<HTMLDivElement>>('overlay');
+  private readonly hostEl = viewChild.required<ElementRef<HTMLDivElement>>('host');
+  private readonly overlayEl = viewChild.required<ElementRef<HTMLDivElement>>('overlay');
   private readonly theme = inject(ThemeService);
   private readonly logger = inject(Logger);
+  private readonly types = inject(TypeRegistry);
 
   private mounted: Mounted | null = null;
   /** The label loop's rAF id; `0` means it has parked itself, waiting on {@link wake} to restart. */
@@ -274,17 +271,14 @@ export class GraphCanvas {
   private repaint(): void {
     if (!this.mounted) return;
     const { cosmos, payload } = this.mounted;
-    const colors = palette();
+    const colors = palette(this.types.all());
     cosmos.setPointColors(pointColors(payload.nodes, colors));
     cosmos.setLinkColors(linkColors(payload.links.length / 2, colors));
     cosmos.setConfigPartial({ backgroundColor: colors.background });
     cosmos.render();
   }
 
-  private async mount(
-    graph: WorldGraph,
-    host: HTMLDivElement,
-  ): Promise<Mounted | null> {
+  private async mount(graph: WorldGraph, host: HTMLDivElement): Promise<Mounted | null> {
     const { Graph } = await import('@cosmos.gl/graph');
     if (graph.nodes.length === 0) return null;
 
@@ -292,7 +286,7 @@ export class GraphCanvas {
     const { nodes, degrees, links } = payload;
     /** The settle re-fit happens once, on the first tick that cools past the threshold. */
     let fitted = false;
-    const colors = palette();
+    const colors = palette(this.types.all());
 
     const positions = new Float32Array(nodes.length * 2);
     const sizes = new Float32Array(nodes.length);
@@ -319,10 +313,7 @@ export class GraphCanvas {
                 focusedPointIndex: undefined,
               }
             : {
-                highlightedPointIndices: [
-                  index,
-                  ...cosmos.getNeighboringPointIndices(index),
-                ],
+                highlightedPointIndices: [index, ...cosmos.getNeighboringPointIndices(index)],
                 focusedPointIndex: index,
               },
         );
@@ -408,11 +399,7 @@ export class GraphCanvas {
    * Only ever called on a live mount, past the effect's stale check — the loop it starts owns
    * {@link frame} until {@link teardown} cancels it.
    */
-  private paintLabels(
-    { cosmos, payload, positions }: Mounted,
-    host: HTMLDivElement,
-    overlay: HTMLDivElement,
-  ): void {
+  private paintLabels({ cosmos, payload, positions }: Mounted, host: HTMLDivElement, overlay: HTMLDivElement): void {
     const { nodes, links, descriptors } = payload;
 
     /** The camera, in the space units `selectLabels` elects on. */
@@ -422,10 +409,7 @@ export class GraphCanvas {
       const [originX] = cosmos.spaceToScreenPosition([0, 0]);
       const [unitX] = cosmos.spaceToScreenPosition([1, 0]);
       const [ax, ay] = cosmos.screenToSpacePosition([0, 0]);
-      const [bx, by] = cosmos.screenToSpacePosition([
-        host.clientWidth,
-        host.clientHeight,
-      ]);
+      const [bx, by] = cosmos.screenToSpacePosition([host.clientWidth, host.clientHeight]);
       return {
         scale: unitX - originX,
         minX: Math.min(ax, bx),
@@ -438,12 +422,7 @@ export class GraphCanvas {
     const tick = () => {
       let used = 0;
 
-      const place = (
-        text: string,
-        x: number,
-        y: number,
-        angle: number | null,
-      ) => {
+      const place = (text: string, x: number, y: number, angle: number | null) => {
         if (!text || used >= LABEL_GRID.max) return;
         let label = this.labels[used];
         if (!label) {
@@ -457,10 +436,7 @@ export class GraphCanvas {
         label.style.display = '';
         label.style.left = `${x}px`;
         label.style.top = `${y}px`;
-        label.style.transform =
-          angle === null
-            ? 'translate(-50%, 0)'
-            : `translate(-50%, -100%) rotate(${angle}rad)`;
+        label.style.transform = angle === null ? 'translate(-50%, 0)' : `translate(-50%, -100%) rotate(${angle}rad)`;
         // Entity names are white-on-contour for readability over any node or the links behind them;
         // Link Descriptors stay in the muted line colour, riding along the edge they annotate. Spans
         // are reused across both roles, so each branch sets the shadow the other would otherwise leave.
@@ -483,48 +459,25 @@ export class GraphCanvas {
       // to be. Once both are quiet the loop parks below and stops reading entirely.
       positions.set(cosmos.getPointPositions());
 
-      const selection = selectLabels(
-        payload,
-        positions,
-        currentView(),
-        LABEL_GRID,
-      );
+      const selection = selectLabels(payload, positions, currentView(), LABEL_GRID);
 
       for (const index of selection.points) {
-        const [x, y] = cosmos.spaceToScreenPosition([
-          positions[index * 2],
-          positions[index * 2 + 1],
-        ]);
+        const [x, y] = cosmos.spaceToScreenPosition([positions[index * 2], positions[index * 2 + 1]]);
         place(nodes[index].name, x, y + 6, null);
       }
       for (const index of selection.links) {
         const source = links[index * 2];
         const target = links[index * 2 + 1];
-        const [sx, sy] = cosmos.spaceToScreenPosition([
-          positions[source * 2],
-          positions[source * 2 + 1],
-        ]);
-        const [tx, ty] = cosmos.spaceToScreenPosition([
-          positions[target * 2],
-          positions[target * 2 + 1],
-        ]);
+        const [sx, sy] = cosmos.spaceToScreenPosition([positions[source * 2], positions[source * 2 + 1]]);
+        const [tx, ty] = cosmos.spaceToScreenPosition([positions[target * 2], positions[target * 2 + 1]]);
         // Angle in screen space, so the label lies along the edge as drawn, at any zoom.
-        place(
-          descriptors[index],
-          (sx + tx) / 2,
-          (sy + ty) / 2,
-          upright(Math.atan2(ty - sy, tx - sx)),
-        );
+        place(descriptors[index], (sx + tx) / 2, (sy + ty) / 2, upright(Math.atan2(ty - sy, tx - sx)));
       }
 
-      for (let i = used; i < this.labels.length; i++)
-        this.labels[i].style.display = 'none';
+      for (let i = used; i < this.labels.length; i++) this.labels[i].style.display = 'none';
 
       // Keep going only while there is motion to track; otherwise park and wait for `wake`.
-      this.frame =
-        cosmos.isSimulationRunning || this.interacting
-          ? requestAnimationFrame(tick)
-          : 0;
+      this.frame = cosmos.isSimulationRunning || this.interacting ? requestAnimationFrame(tick) : 0;
     };
 
     // Restart the parked loop from an interaction handler, keeping at most one frame in flight.
@@ -557,10 +510,7 @@ export class GraphCanvas {
    * animation: refit the current viewport box, shifted by the swipe, with zero duration and zero
    * padding — same zoom, new centre.
    */
-  private enableTwoFingerPan(
-    cosmos: Graph,
-    host: HTMLDivElement,
-  ): AbortController {
+  private enableTwoFingerPan(cosmos: Graph, host: HTMLDivElement): AbortController {
     const controls = new AbortController();
     let idle = 0;
 
@@ -579,17 +529,12 @@ export class GraphCanvas {
       const scale = unitX - originX;
       if (!scale) return;
 
-      const dx =
-        wheelDeltaPixels(event.deltaX, event, host.clientWidth) / scale;
+      const dx = wheelDeltaPixels(event.deltaX, event, host.clientWidth) / scale;
       // Space y runs opposite screen y here, so the vertical swipe is negated while the horizontal
       // one is not — scrolling down still walks the view down the World, as a scrollbar would.
-      const dy =
-        -wheelDeltaPixels(event.deltaY, event, host.clientHeight) / scale;
+      const dy = -wheelDeltaPixels(event.deltaY, event, host.clientHeight) / scale;
       const [ax, ay] = cosmos.screenToSpacePosition([0, 0]);
-      const [bx, by] = cosmos.screenToSpacePosition([
-        host.clientWidth,
-        host.clientHeight,
-      ]);
+      const [bx, by] = cosmos.screenToSpacePosition([host.clientWidth, host.clientHeight]);
       // Shift both corners by the swipe and refit: the box keeps its size (zoom holds) and only its
       // centre moves.
       const box = new Float32Array([ax + dx, ay + dy, bx + dx, by + dy]);

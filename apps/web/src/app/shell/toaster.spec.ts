@@ -1,7 +1,7 @@
+import { provideTranslocoTesting } from '../../testing/transloco-testing';
 import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { TestBed } from '@angular/core/testing';
 import { vi } from 'vitest';
-import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { ToasterService } from '@hexly/web-core';
 import { Toaster } from './toaster';
 
@@ -69,9 +69,7 @@ describe('Toaster', () => {
     toaster.show('Move blocked', 'error', 0);
     const fixture = render();
 
-    fixture.nativeElement
-      .querySelector('[data-testid="toast-dismiss"]')
-      .click();
+    fixture.nativeElement.querySelector('[data-testid="toast-dismiss"]').click();
     fixture.detectChanges();
 
     expect(toaster.toasts()).toHaveLength(0);
