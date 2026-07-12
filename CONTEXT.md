@@ -5,7 +5,7 @@ A web application for TTRPG worldbuilding: authoring interlinked **Entities** �
 ## Entities
 
 **Entity**:
-The top-level thing a user creates, owns, and shares. Carries a `name`, an ordered set of **Entity Types**, `tags`, an optional **Metadata** map, and a rich-text **Content** body. A **Hex Map** is one kind of Entity. The unit of ownership, sharing, and saving.
+The top-level thing a user creates, owns, and shares. Carries a `name`, an ordered set of **Entity Types**, `tags`, and a **Metadata** map — which is its whole body, prose included. A **Hex Map** is one kind of Entity. The unit of ownership, sharing, and saving.
 _Avoid_: Document, page, record, object
 
 **Entity Type**:
@@ -13,7 +13,7 @@ A user-facing identity an Entity carries — `core.note`, `core.hexmap`, `dnd.mo
 _Avoid_: Kind, category, class; payload kind (retired — a type adds Fields, not a body shape)
 
 **View**:
-A distinct togglable renderer + editor an Entity affords — today's Note/Map toggle, generalized. An **open**, `namespace.id`-keyed set, sub-namespaced `core.view.*` to stay distinct from **Entity Type** ids. A View is contributed either by a **Type** (a plugin's stat-block; the generic Field view that renders user-defined and absent-plugin types; the Content view every Entity affords) or by a **Structured Field's** data-type (the map view) — and a Structured Field's View is bound to _that Field_, so an Entity with two grids affords two map Views, each labelled by its Field. A Type _places_ a Field's View in its own ordered list, so a Hex Map still opens on its map and a deity with a battlemap still opens on its Fields. The primary type's first View is the default; a single-View Entity shows no toggle.
+A distinct togglable renderer + editor an Entity affords — today's Note/Map toggle, generalized. An **open**, `namespace.id`-keyed set, sub-namespaced `core.view.*` to stay distinct from **Entity Type** ids. A View is contributed either by a **Type** (a plugin's stat-block; the generic Field view that renders user-defined and absent-plugin types) or by a **Structured Field's** data-type (the map view, the content view) — and a Structured Field's View is bound to _that Field_, so an Entity with two grids affords two map Views, and one with a `content` and a `secrets` Field affords two content Views, each labelled by its Field. A Type _places_ a Field's View in its own ordered list, so a Hex Map still opens on its map and a deity with a battlemap still opens on its Fields. The primary type's first View is the default; a single-View Entity shows no toggle. No View is guaranteed: an Entity whose Type this build does not register affords only the generic Field view, its prose among the values it shows unrendered.
 _Avoid_: Surface (kept only for informal prose like "landing surface"), tab, mode, panel
 
 **Field**:
@@ -21,20 +21,24 @@ A typed slot an **Entity Type** gives to a specific **Metadata** key — a name,
 _Avoid_: Property, attribute, column, custom field
 
 **Structured Field**:
-A **Field** whose data-type a plugin contributes rather than the built-in set: a value with its own schema, its own link-edge harvesting, and its own **View** — edited on that View, not in a form row. A Hex Map's grid is one (`core.hex-grid`, at the `grid` key). Its `kind` is a `namespace.id` id, which is what marks a data-type structured; it is never facetable (it has no discrete values to count), and its value exports to frontmatter as nested YAML like any other Field value. The concept that _replaced_ the retired Payload Kind: a plugin adds a body by adding a Field, so the Entity body stays one shape (**Content** + **Metadata**) for every Entity.
+A **Field** whose data-type a plugin contributes rather than the built-in set: a value with its own schema, its own link-edge harvesting, its own searchable text, its own **Vault Projection**, and its own **View** — edited on that View, not in a form row. A Hex Map's grid is one (`core.hex-grid`, at the `grid` key); so is an Entity's prose (`core.rich-content`, at the `content` key). Its `kind` is a `namespace.id` id, which is what marks a data-type structured; it is never facetable (it has no discrete values to count). The concept that _replaced_ the retired Payload Kind, and then swallowed **Content** too: everything a Type adds is a Field, so the Entity body is one shape — the **Metadata** map — for every Entity.
 _Avoid_: Payload, payload kind, blob, opaque field, complex field
 
+**Vault Projection**:
+How a **Field**'s value takes its place in an exported Markdown file, declared by the Field (a **Structured Field's** data-type supplying the default): the `body` — the Markdown prose below the frontmatter — or `frontmatter` (YAML, nested if need be), or `omit`. Prose projects to the body, a grid to frontmatter. An Entity may hold **several** body Fields — a deity with `content` and `secrets` — and they are written in Field order, each preceded by an HTML comment naming its key (`<!-- hexly:field secrets -->`) so the file round-trips; the comment is emitted only when there is more than one, so an ordinary Note is plain Markdown. An unmarked body — a hand-written note, a foreign vault — imports into the Entity's first body Field.
+_Avoid_: Export strategy, serialization, slot
+
 **Type Definition**:
-The registration that gives an **Entity Type** its Fields, Views, and facets. Either a **Plugin type** — declared in code by a bundled plugin at startup, instance-wide, shipping a bespoke view (even `core.note` and `core.hexmap` register this way — the Hex Map ships as a bundled plugin, framework-free half and all — so the plugin API is dogfooded) — or a **User-defined type** — authored as data by a **World Owner**, scoped to one World, rendered by the generic Field view. Code buys only the bespoke view; everything else — Fields, facets, link-fields, a **Structured Field** and its View, primary, multi-type — works code-lessly.
+The registration that gives an **Entity Type** its Fields, Views, and facets. Either a **Plugin type** — declared in code by a bundled plugin at startup, instance-wide, shipping a bespoke view (even `core.note` and `core.hexmap` register this way — both the Note and the Hex Map ship as bundled plugins, framework-free half and all, so the app itself names no type and the plugin API cannot rot un-exercised) — or a **User-defined type** — authored as data by a **World Owner**, scoped to one World, rendered by the generic Field view. Code buys only the bespoke view; everything else — Fields, facets, link-fields, a **Structured Field** and its View, primary, multi-type — works code-lessly.
 _Avoid_: Schema, template, model, class
 
 **Content**:
-The rich-text body every Entity carries — the result of block-based editing. Replaces the old per-element "Note".
-_Avoid_: Body, rich text, document, prose
+Rich text — the result of block-based editing. Not a place on the Entity but a **Structured Field's** data-type (`core.rich-content`), so an Entity has prose only where a **Type** declares a Field for it, and may have more than one (a deity's public `content` and its `secrets`). Every Type that means to carry prose declares the same canonical Field, at the `content` key. Shipped by a bundled plugin, like the **Hex Map**: an Instance without it has no editor to open one on.
+_Avoid_: Body (the Entity has no body but its Metadata), rich text, document, prose
 
 **Metadata**:
-An arbitrary key→value map on an Entity, mirroring Obsidian frontmatter/properties. With **Content**, it is the whole Entity body — there is no third store. Populated from a note's frontmatter on import and re-emitted as YAML frontmatter on export. Keys under the reserved `hexly.` namespace carry Hexly's own provenance and are consumed on export rather than written back to frontmatter. A key an **Entity Type** declares a **Field** for is still Metadata — the Field only types and surfaces it — and that holds for a **Structured Field** too: a Hex Map's grid is a Metadata value like any other.
-_Avoid_: Frontmatter, properties, attributes, custom fields
+The one key→value map on an Entity — its whole body, there is no second store. A key an **Entity Type** declares a **Field** for is still Metadata: the Field only types and surfaces it, and that holds for a **Structured Field** too — a Hex Map's grid and an Entity's prose are Metadata values like any other, which is why a missing plugin leaves them intact and readable as plain Metadata. Frontmatter is not what Metadata _is_ but one **Vault Projection** of it: an imported note's frontmatter populates it, and on export a Field goes to frontmatter or to the Markdown body as its projection says. Keys under the reserved `hexly.` namespace carry Hexly's own provenance and are consumed on export rather than written back.
+_Avoid_: Frontmatter (a projection of Metadata, not a synonym), properties, attributes, custom fields
 
 **Asset**:
 A binary file — typically an image, but also a PDF or other media — belonging to a World and referenced from an Entity's Content. Served by an unguessable, unauthenticated link, so possession of the link is the only access control (even for an Asset referenced from a `private` Entity).
@@ -59,7 +63,7 @@ _Avoid_: Entity, item, object
 ## Language
 
 **Hex Map**:
-An **Entity** carrying the `core.hexmap` type — the type that declares the grid as a **Structured Field**: its Content (lore) plus a grid of hexes, overlays, regions, and labels. The grid is an infinite sparse plane — a Hex exists only where painted. Ownership, sharing, and saving are properties of the Entity, not the grid. Shipped by a bundled plugin, not by the core: an Instance without it opens a Hex Map as its lore plus an unrendered Field, the ordinary absent-plugin degradation.
+An **Entity** carrying the `core.hexmap` type — the type that declares two **Structured Fields**, the canonical **Content** Field (its lore) and the grid of hexes, overlays, regions, and labels. The grid is an infinite sparse plane — a Hex exists only where painted. Ownership, sharing, and saving are properties of the Entity, not the grid. Shipped by a bundled plugin, not by the core: an Instance without it opens a Hex Map on the generic Field view, grid and lore alike unrendered Metadata — the ordinary absent-plugin degradation.
 _Avoid_: Map document, board, canvas
 
 **Hex**:
@@ -87,7 +91,7 @@ A named, colored grouping of hex coordinates with optional notes (e.g. "The King
 _Avoid_: Area, zone, territory, group
 
 **Note**:
-An Entity carrying the `core.note` type — the type that declares no Fields at all, so an Entity is nothing but its body: a prose worldbuilding page (a character, a faction, a place, a bit of history) whose substance is its Content. The lore, description, and secrets — a first-class Entity that Map elements link to, not text attached to a single Map element.
+An Entity carrying the `core.note` type — the type that declares nothing but the canonical **Content** Field, so an Entity is its prose and nothing else: a worldbuilding page (a character, a faction, a place, a bit of history). The lore, description, and secrets — a first-class Entity that Map elements link to, not text attached to a single Map element. Shipped by the same bundled plugin as the Content Field and the editor that fills it.
 _Avoid_: Description, comment, annotation, lore
 
 **Name**:
@@ -283,5 +287,5 @@ Operator-facing settings for one Instance, stored beside the database. Distinct 
 _Avoid_: Config, settings, preferences, environment
 
 **Reindex**:
-A Superadmin repair action that recomputes every Entity's document-derived state — its searchable text, Link Descriptor vocabulary, link edges (Content, map, and **Field** links), and **Field** facets — from the authoritative Content and map, across all Worlds. Idempotent and safe to run anytime: the Entity's document is the source of truth, and the derived tables are a cache it rebuilds. A repair tool, not part of daily administration — which is why it is the Superadmin's, not the `manage-users` role's (which reaches no Entity). It runs as one instance-wide background job the operator polls, and a document this build cannot parse is skipped and reported rather than allowed to abort the walk.
+A Superadmin repair action that recomputes every Entity's document-derived state — its searchable text, Link Descriptor vocabulary, link edges, and facets — from the authoritative **Metadata**, across all Worlds, asking each **Field** for the text and edges its value carries. Idempotent and safe to run anytime: the Entity's document is the source of truth, and the derived tables are a cache it rebuilds. A repair tool, not part of daily administration — which is why it is the Superadmin's, not the `manage-users` role's (which reaches no Entity). It runs as one instance-wide background job the operator polls, and a document this build cannot parse is skipped and reported rather than allowed to abort the walk.
 _Avoid_: Rebuild, refresh, recompute, sync
