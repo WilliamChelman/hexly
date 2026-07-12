@@ -9,23 +9,23 @@ The top-level thing a user creates, owns, and shares. Carries a `name`, an order
 _Avoid_: Document, page, record, object
 
 **Entity Type**:
-A user-facing identity an Entity carries — `core.note`, `core.hexmap`, `dnd.monster`, `world.deity`. An **open**, `namespace.id`-keyed set (contrast the closed **Payload Kind** it maps to). Each type declares an optional payload addon, a **Field** schema, a view, and its facetable Fields. An Entity holds an **ordered set** of types; the first is _primary_ — driving its icon, default view, and headline. Two flavours: a **Plugin type** (code, instance-wide, bespoke view) and a **User-defined type** (data, World-scoped, generic view).
-_Avoid_: Kind, category, class
-
-**Payload Kind**:
-The body shape and editing surface an **Entity Type** maps to — a **closed, code-known** set: `rich-content` (the base every Entity has: Content + Metadata — formerly the `note` payload) and `hex-grid` (an _additive addon_ over that base). Payloads compose rather than rival: a Hex Map is `rich-content` + `hex-grid`. What actually discriminates the stored document — distinct from the open, user-facing Entity Type.
-_Avoid_: Body type, document type, schema, variant
+A user-facing identity an Entity carries — `core.note`, `core.hexmap`, `dnd.monster`, `world.deity`. An **open**, `namespace.id`-keyed set. Each type declares a **Field** schema, an ordered set of **Views**, and its facetable Fields — and nothing else: everything a type adds to an Entity's substance is a Field. An Entity holds an **ordered set** of types; the first is _primary_ — driving its icon, default view, and headline. Two flavours: a **Plugin type** (code, instance-wide, bespoke view) and a **User-defined type** (data, World-scoped, generic view).
+_Avoid_: Kind, category, class; payload kind (retired — a type adds Fields, not a body shape)
 
 **View**:
-A distinct togglable renderer + editor an Entity affords — today's Note/Map toggle, generalized. The header offers one View per View an Entity's **Payload Kinds** afford (`rich-content` → the Content view, `hex-grid` → the map view), plus any View a **Type** contributes (a plugin's stat-block, or the generic Field view that renders user-defined and absent-plugin types). An **open**, `namespace.id`-keyed set, sub-namespaced `core.view.*` to stay distinct from **Entity Type** ids and **Payload Kind** names. The primary type's first View is the default; a single-View Entity shows no toggle.
+A distinct togglable renderer + editor an Entity affords — today's Note/Map toggle, generalized. An **open**, `namespace.id`-keyed set, sub-namespaced `core.view.*` to stay distinct from **Entity Type** ids. A View is contributed either by a **Type** (a plugin's stat-block; the generic Field view that renders user-defined and absent-plugin types; the Content view every Entity affords) or by a **Structured Field's** data-type (the map view) — and a Structured Field's View is bound to _that Field_, so an Entity with two grids affords two map Views, each labelled by its Field. A Type _places_ a Field's View in its own ordered list, so a Hex Map still opens on its map and a deity with a battlemap still opens on its Fields. The primary type's first View is the default; a single-View Entity shows no toggle.
 _Avoid_: Surface (kept only for informal prose like "landing surface"), tab, mode, panel
 
 **Field**:
-A structured, typed slot an **Entity Type** gives to a specific **Metadata** key — a name, a data-type (scalar, enum, date, list, or a typed **Entity Link**), and whether it is facetable. A typing _lens_ over Metadata, not a separate store: values live in the one Metadata map, so a missing plugin leaves them as plain Metadata. Validated _forward-only_ — enforced on active typed edits, tolerated on imported or at-rest data.
+A typed slot an **Entity Type** gives to a specific **Metadata** key — a name, a data-type, and whether it is facetable. A typing _lens_ over Metadata, not a separate store: values live in the one Metadata map, so a missing plugin leaves them as plain Metadata. The data-type is one of the built-ins (`string`, `number`, `boolean`, `date`, `enum`, `list`, or a typed **Entity Link**) or is plugin-contributed — a **Structured Field**. Validated _forward-only_ — enforced on active typed edits, tolerated on imported or at-rest data.
 _Avoid_: Property, attribute, column, custom field
 
+**Structured Field**:
+A **Field** whose data-type a plugin contributes rather than the built-in set: a value with its own schema, its own link-edge harvesting, and its own **View** — edited on that View, not in a form row. A Hex Map's grid is one (`core.hex-grid`, at the `grid` key). Its `kind` is a `namespace.id` id, which is what marks a data-type structured; it is never facetable (it has no discrete values to count), and its value exports to frontmatter as nested YAML like any other Field value. The concept that _replaced_ the retired Payload Kind: a plugin adds a body by adding a Field, so the Entity body stays one shape (**Content** + **Metadata**) for every Entity.
+_Avoid_: Payload, payload kind, blob, opaque field, complex field
+
 **Type Definition**:
-The registration that gives an **Entity Type** its Fields, view, and facets. Either a **Plugin type** — declared in code by a bundled plugin at startup, instance-wide, shipping a bespoke view (even `core.note`/`core.hexmap` register this way, so the plugin API is dogfooded) — or a **User-defined type** — authored as data by a **World Owner**, scoped to one World, rendered by the generic Field view. Code buys only the bespoke view; everything else works code-lessly.
+The registration that gives an **Entity Type** its Fields, Views, and facets. Either a **Plugin type** — declared in code by a bundled plugin at startup, instance-wide, shipping a bespoke view (even `core.note` and `core.hexmap` register this way — the Hex Map ships as a bundled plugin, framework-free half and all — so the plugin API is dogfooded) — or a **User-defined type** — authored as data by a **World Owner**, scoped to one World, rendered by the generic Field view. Code buys only the bespoke view; everything else — Fields, facets, link-fields, a **Structured Field** and its View, primary, multi-type — works code-lessly.
 _Avoid_: Schema, template, model, class
 
 **Content**:
@@ -33,7 +33,7 @@ The rich-text body every Entity carries — the result of block-based editing. R
 _Avoid_: Body, rich text, document, prose
 
 **Metadata**:
-An arbitrary key→value map on an Entity, mirroring Obsidian frontmatter/properties. Populated from a note's frontmatter on import and re-emitted as YAML frontmatter on export. Keys under the reserved `hexly.` namespace carry Hexly's own provenance and are consumed on export rather than written back to frontmatter. A key an **Entity Type** declares a **Field** for is still Metadata — the Field only types and surfaces it.
+An arbitrary key→value map on an Entity, mirroring Obsidian frontmatter/properties. With **Content**, it is the whole Entity body — there is no third store. Populated from a note's frontmatter on import and re-emitted as YAML frontmatter on export. Keys under the reserved `hexly.` namespace carry Hexly's own provenance and are consumed on export rather than written back to frontmatter. A key an **Entity Type** declares a **Field** for is still Metadata — the Field only types and surfaces it — and that holds for a **Structured Field** too: a Hex Map's grid is a Metadata value like any other.
 _Avoid_: Frontmatter, properties, attributes, custom fields
 
 **Asset**:
@@ -59,7 +59,7 @@ _Avoid_: Entity, item, object
 ## Language
 
 **Hex Map**:
-An **Entity** carrying the `core.hexmap` type — the type that adds the `hex-grid` **Payload Kind**: its Content (lore) plus a grid of hexes, overlays, regions, and labels. The grid is an infinite sparse plane — a Hex exists only where painted. Ownership, sharing, and saving are properties of the Entity, not the grid.
+An **Entity** carrying the `core.hexmap` type — the type that declares the grid as a **Structured Field**: its Content (lore) plus a grid of hexes, overlays, regions, and labels. The grid is an infinite sparse plane — a Hex exists only where painted. Ownership, sharing, and saving are properties of the Entity, not the grid. Shipped by a bundled plugin, not by the core: an Instance without it opens a Hex Map as its lore plus an unrendered Field, the ordinary absent-plugin degradation.
 _Avoid_: Map document, board, canvas
 
 **Hex**:
@@ -87,7 +87,7 @@ A named, colored grouping of hex coordinates with optional notes (e.g. "The King
 _Avoid_: Area, zone, territory, group
 
 **Note**:
-An Entity carrying the `core.note` type — the type that adds no payload beyond the `rich-content` base: a prose worldbuilding page (a character, a faction, a place, a bit of history) whose substance is its Content. The lore, description, and secrets — a first-class Entity that Map elements link to, not text attached to a single Map element.
+An Entity carrying the `core.note` type — the type that declares no Fields at all, so an Entity is nothing but its body: a prose worldbuilding page (a character, a faction, a place, a bit of history) whose substance is its Content. The lore, description, and secrets — a first-class Entity that Map elements link to, not text attached to a single Map element.
 _Avoid_: Description, comment, annotation, lore
 
 **Name**:
