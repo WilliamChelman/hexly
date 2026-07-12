@@ -18,8 +18,8 @@ export const DND_VIEW_STAT_BLOCK: ViewId = 'dnd.view.stat-block';
  * Field View — that is what shipping a bespoke one replaces. Add `core.hexmap` and the Entity affords
  * all three, by the ordinary view-per-surface union.
  *
- * Component-import-free so it can seed the root registry at startup; the stat-block component
- * registers from the lazy entity chunk (`dnd-views.ts`).
+ * Component-import-free, so {@link providePluginDnd} can seed the root registry at startup; the
+ * stat-block component itself hangs off that provider's `loadComponent`.
  */
 export const DND_TYPE_DEFINITIONS: readonly TypeDefinition[] = [
   {

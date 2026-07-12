@@ -1,22 +1,36 @@
-import { Injectable, signal } from '@angular/core';
-import { CORE_VIEW_CONTENT, ViewDefinition, ViewId } from '@hexly/web-entity';
+import { Injectable, Type, inject, signal } from '@angular/core';
+import { CORE_VIEW_CONTENT, PLUGIN_VIEWS, ViewDefinition, ViewId } from '@hexly/web-entity';
 
 /**
  * Root registry mapping a {@link ViewId} to the component that renders it, the
  * sibling of {@link TypeRegistry} for Views (ADR-0048, *Views* amendment). The
- * {@link EntityPage} outlets `resolve(activeView).component`, so the residual
- * `isHexmap` branch is gone — the page dispatches on the active View, not the type.
+ * {@link EntityPage} outlets `component(activeView)`, so the residual `isHexmap`
+ * branch is gone — the page dispatches on the active View, not the type.
  *
- * Deliberately component-import-free so it stays out of the initial bundle: the
- * core view components (which pull in web-map / TipTap) register themselves from
- * the lazily-loaded entity chunk, the same way a bundled plugin would.
+ * Deliberately component-import-free so it stays out of the initial bundle. Its two
+ * kinds of registrant reach that end from opposite directions:
+ *
+ * - The **core views** (which pull in web-map / TipTap) register themselves from the
+ *   lazily-loaded entity chunk, where naming the class is already free.
+ * - A **bundled plugin's** views are seeded here at startup, from `PLUGIN_VIEWS`, and
+ *   name their component through a `loadComponent` that keeps the body in its own chunk.
  */
 @Injectable({ providedIn: 'root' })
 export class ViewRegistry {
   private readonly definitions = signal<readonly ViewDefinition[]>([]);
+  /** Deferred components, once fetched. Keyed by View id, and never evicted: a component class is stable. */
+  private readonly fetched = signal<ReadonlyMap<ViewId, Type<unknown>>>(new Map());
+  private readonly inFlight = new Map<ViewId, Promise<void>>();
 
-  /** Every registered View, in registration order (core first). */
+  /** Every registered View, in registration order (the bundled plugins' first, then core). */
   readonly all = this.definitions.asReadonly();
+
+  constructor() {
+    // The bundled plugins' Views (#192), from whichever `providePluginX()` the app provided. Seeded at
+    // startup, unlike the core views: the header must know a View to draw its toggle, and only the
+    // *body* of a plugin view is deferred.
+    for (const def of inject(PLUGIN_VIEWS, { optional: true }) ?? []) this.register(def);
+  }
 
   register(definition: ViewDefinition): () => void {
     this.definitions.update((list) => [...list, definition]);
@@ -36,5 +50,33 @@ export class ViewRegistry {
    */
   resolve(id: ViewId | null | undefined): ViewDefinition {
     return this.get(id) ?? this.get(CORE_VIEW_CONTENT)!;
+  }
+
+  /**
+   * The component to outlet for `id` — `undefined` only while a deferred View's chunk is in flight.
+   * An eagerly-declared View (every core one) resolves synchronously.
+   *
+   * Pair it with {@link fetch}: this reads, that requests. Kept apart so the read stays side-effect-free.
+   */
+  component(id: ViewId | null | undefined): Type<unknown> | undefined {
+    const definition = this.resolve(id);
+    return definition.component ?? this.fetched().get(definition.id);
+  }
+
+  /**
+   * Request `id`'s component, if it is deferred and not already here. Idempotent, so it is safe to call
+   * on every activation; toggling back to a fetched View is synchronous.
+   */
+  fetch(id: ViewId | null | undefined): void {
+    const definition = this.resolve(id);
+    const { id: viewId, loadComponent } = definition;
+    if (!loadComponent || this.fetched().has(viewId) || this.inFlight.has(viewId)) return;
+
+    const done = loadComponent()
+      .then((component) => {
+        this.fetched.update((map) => new Map(map).set(viewId, component));
+      })
+      .finally(() => this.inFlight.delete(viewId));
+    this.inFlight.set(viewId, done);
   }
 }

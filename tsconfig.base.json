@@ -22,7 +22,6 @@
       "@hexly/immer": ["./libs/immer/src/index.ts"],
       "@hexly/obsidian": ["./libs/obsidian/src/index.ts"],
       "@hexly/plugin-dnd": ["./libs/plugin-dnd/src/index.ts"],
-      "@hexly/plugin-dnd/i18n": ["./libs/plugin-dnd/src/i18n/index.ts"],
       "@hexly/plugin-dnd/testing": ["./libs/plugin-dnd/src/testing/index.ts"],
       "@hexly/plugin-dnd/web": ["./libs/plugin-dnd/src/web/index.ts"],
       "@hexly/web-core": ["./libs/web-core/src/index.ts"],

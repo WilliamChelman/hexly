@@ -30,11 +30,29 @@ export const CORE_VIEW_FIELDS = 'core.view.fields';
  * for its header-toggle button, and the component the entity page outlets when this
  * View is active. A View is contributed either by a Payload Kind (the two core views)
  * or by a Type (a plugin's bespoke view, the generic Field view).
+ *
+ * The component is declared either eagerly (`component`) or deferred (`loadComponent`),
+ * the same pair as an Angular `Route`. Which one to use follows from *where the
+ * definition is registered*, not from the view's weight: `component` for a View
+ * registered from the lazy entity chunk, whose body already ships there (the core
+ * Views); `loadComponent` for one registered at bootstrap, where an eager class
+ * reference would drag the body onto the initial bundle (a plugin's, via
+ * {@link providePlugin}). Either way the id and `labelKey` are known up front, so the
+ * header's view toggle can label a View it has not fetched.
  */
-export interface ViewDefinition {
+export type ViewDefinition = {
   readonly id: ViewId;
   /** transloco key for the view-toggle button label (ADR-0014). */
   readonly labelKey: string;
-  /** The component the {@link EntityPage} host outlets for this View. */
-  readonly component: Type<unknown>;
-}
+} & (
+  | {
+      /** The component the {@link EntityPage} host outlets for this View. */
+      readonly component: Type<unknown>;
+      readonly loadComponent?: never;
+    }
+  | {
+      readonly component?: never;
+      /** Fetches that component on first show, keeping its body off the initial bundle. */
+      readonly loadComponent: () => Promise<Type<unknown>>;
+    }
+);

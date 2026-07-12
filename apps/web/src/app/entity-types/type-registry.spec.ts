@@ -4,7 +4,7 @@ import { FieldSchema } from '@hexly/domain';
 import { DND_MONSTER } from '@hexly/plugin-dnd';
 import { TypeRegistry } from './type-registry';
 import { CORE_VIEW_CONTENT, CORE_VIEW_FIELDS, CORE_VIEW_MAP, TypeDefinition } from '@hexly/web-entity';
-import { DND_VIEW_STAT_BLOCK } from '@hexly/plugin-dnd/web';
+import { DND_VIEW_STAT_BLOCK, providePluginDnd } from '@hexly/plugin-dnd/web';
 
 function definition(id: string, fields?: readonly FieldSchema[]): TypeDefinition {
   return {
@@ -37,8 +37,9 @@ describe('TypeRegistry', () => {
 
   beforeEach(() => {
     // The registry resolves a code type's name/chrome through Transloco (a user-defined type's
-    // authored name never goes near it), so the spec needs the testing catalog.
-    TestBed.configureTestingModule({ imports: [provideTranslocoTesting()] });
+    // authored name never goes near it), so the spec needs the testing catalog. The plugin types are
+    // seeded from DI, so a spec gets `dnd.monster` by composing the plugin as `app.config.ts` does (#192).
+    TestBed.configureTestingModule({ imports: [provideTranslocoTesting()], providers: [providePluginDnd()] });
     registry = TestBed.inject(TypeRegistry);
   });
 

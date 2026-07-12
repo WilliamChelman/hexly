@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject } from '@angular/core';
 import { NgComponentOutlet } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
@@ -12,7 +12,6 @@ import { RightDock } from './services/right-dock';
 import { EntityHeader } from './components/entity-header';
 import { ViewRegistry } from '../../entity-types/view-registry';
 import { CORE_VIEW_DEFINITIONS } from './views/core-views';
-import { PLUGIN_VIEW_DEFINITIONS } from '../../plugins/bundled-views';
 
 /**
  * The open-Entity route (`/entities/:id`, #70): the routed page that loads the
@@ -48,8 +47,11 @@ import { PLUGIN_VIEW_DEFINITIONS } from '../../plugins/bundled-views';
         <app-entity-header />
         <main class="relative min-h-0">
           <!-- The active View's component (MapView / ContentView / a plugin view),
-               resolved from the ViewRegistry — no type sniffing (ADR-0048). -->
-          <ng-container *ngComponentOutlet="activeComponent()" />
+               resolved from the ViewRegistry — no type sniffing (ADR-0048). The frame
+               around it is already drawn, so a deferred body arrives into a live page. -->
+          @if (activeComponent(); as component) {
+            <ng-container *ngComponentOutlet="component" />
+          }
         </main>
       </div>
     } @else if (session.evicted()) {
@@ -75,15 +77,19 @@ export class EntityPage {
   private readonly viewStore = inject(EntityViewStore);
   private readonly views = inject(ViewRegistry);
 
-  /** The component to outlet for the active View — always resolves (content fallback). */
-  protected readonly activeComponent = computed(() => this.views.resolve(this.viewStore.activeView()).component);
+  /** The component to outlet for the active View — absent only while a deferred body is in flight. */
+  protected readonly activeComponent = computed(() => this.views.component(this.viewStore.activeView()));
 
   constructor() {
-    // Register the core Views and the bundled plugins' (#192) from the lazy entity chunk, dropping
-    // them when the page is torn down (ADR-0048). Kept out of the root ViewRegistry so the heavy view
-    // bodies stay off the initial bundle.
-    const unregister = [...CORE_VIEW_DEFINITIONS, ...PLUGIN_VIEW_DEFINITIONS].map((d) => this.views.register(d));
+    // Register the core Views from the lazy entity chunk, dropping them when the page is torn down
+    // (ADR-0048). Kept out of the root ViewRegistry so the heavy view bodies (web-map, TipTap) stay
+    // off the initial bundle. A bundled plugin's Views are already there, seeded by its
+    // `providePluginX()`, so the page names no plugin.
+    const unregister = CORE_VIEW_DEFINITIONS.map((d) => this.views.register(d));
     inject(DestroyRef).onDestroy(() => unregister.forEach((u) => u()));
+
+    // Fetch a deferred View's body once it is the active one.
+    effect(() => this.views.fetch(this.viewStore.activeView()));
 
     const route = inject(ActivatedRoute);
     this.session.watchRoute(route);

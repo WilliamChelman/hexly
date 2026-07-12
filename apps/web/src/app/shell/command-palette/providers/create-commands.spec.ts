@@ -1,5 +1,6 @@
 import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
+import { providePluginDnd } from '@hexly/plugin-dnd/web';
 import { firstValueFrom } from 'rxjs';
 import { CreateEntityDialogState } from '../create-entity-dialog.state';
 import { CreateCommands } from './create-commands';
@@ -9,7 +10,7 @@ describe('CreateCommands', () => {
   let state: CreateEntityDialogState;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({ imports: [provideTranslocoTesting()] });
+    TestBed.configureTestingModule({ imports: [provideTranslocoTesting()], providers: [providePluginDnd()] });
     provider = TestBed.inject(CreateCommands);
     state = TestBed.inject(CreateEntityDialogState);
   });
@@ -20,7 +21,7 @@ describe('CreateCommands', () => {
 
   it('offers a create Command per registered type — core first, then the bundled plugins', async () => {
     const commands = await firstValueFrom(provider.search(''));
-    // `create-dnd.monster` is enumerated nowhere: the bundled plugin registers its type and the
+    // `create-dnd.monster` is enumerated nowhere: `providePluginDnd()` registers the type and the
     // Command falls out of `types.all()` (#192).
     expect(commands.map((c) => c.id)).toEqual(['create-note', 'create-map', 'create-dnd.monster']);
   });

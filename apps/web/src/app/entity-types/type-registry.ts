@@ -1,9 +1,8 @@
 import { inject, Injectable, signal } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
 import { CORE_NOTE, EntityType, FieldSchema, resolveFields } from '@hexly/domain';
-import { CORE_VIEW_FIELDS, TypeDefinition, TypeLabels, ViewId } from '@hexly/web-entity';
+import { CORE_VIEW_FIELDS, PLUGIN_TYPES, TypeDefinition, TypeLabels, ViewId } from '@hexly/web-entity';
 import { CORE_TYPE_DEFINITIONS } from './core-types';
-import { PLUGIN_TYPE_DEFINITIONS } from '../plugins/bundled-types';
 
 /**
  * Root registry where Entity Types make themselves known to the type-specific UI
@@ -28,8 +27,10 @@ export class TypeRegistry {
 
   constructor() {
     for (const def of CORE_TYPE_DEFINITIONS) this.register(def);
-    // The bundled plugins (`dnd.monster`, #192): instance-wide, through the call the core just used.
-    for (const def of PLUGIN_TYPE_DEFINITIONS) this.register(def);
+    // The bundled plugins' types (`dnd.monster`, #192): instance-wide, through the call the core just
+    // used. They arrive from whichever `providePluginX()` the app provided, so the registry never
+    // learns a plugin's name — and a spec gets a plugin's types by providing that plugin, nothing else.
+    for (const def of inject(PLUGIN_TYPES, { optional: true }) ?? []) this.register(def);
   }
 
   register(definition: TypeDefinition): () => void {
