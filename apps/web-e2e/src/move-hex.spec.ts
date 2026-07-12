@@ -1,4 +1,4 @@
-import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtures';
+import { createEntity, enterLibrary, expect, flushSave, test } from './fixtures';
 
 /**
  * The whole-Hex move journey (issue #30, ADR-0010). It crosses the one seam the
@@ -14,9 +14,7 @@ import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtur
  */
 test('drags a hex under Select to a new coordinate, and the move survives a reload', async ({ page, request }) => {
   await enterLibrary(page);
-  await page.getByTestId('new-map').click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const mapId = entityIdFromUrl(page);
+  const mapId = await createEntity(page, 'core.hexmap');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
 
@@ -84,9 +82,7 @@ test('drags a hex under Select to a new coordinate, and the move survives a relo
  */
 test('drags a hex onto an occupied hex and swaps the two, surviving a reload', async ({ page, request }) => {
   await enterLibrary(page);
-  await page.getByTestId('new-map').click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const mapId = entityIdFromUrl(page);
+  const mapId = await createEntity(page, 'core.hexmap');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
   const box = await canvas.boundingBox();
@@ -152,8 +148,7 @@ test('drags a hex onto an occupied hex and swaps the two, surviving a reload', a
  */
 test('Escape cancels an in-progress Hex drag, leaving the hex at its origin', async ({ page }) => {
   await enterLibrary(page);
-  await page.getByTestId('new-map').click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  await createEntity(page, 'core.hexmap');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
 
@@ -197,9 +192,7 @@ test('Escape cancels an in-progress Hex drag, leaving the hex at its origin', as
  */
 test('drags a multi-hex selection so the whole group moves by one offset', async ({ page, request }) => {
   await enterLibrary(page);
-  await page.getByTestId('new-map').click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const mapId = entityIdFromUrl(page);
+  const mapId = await createEntity(page, 'core.hexmap');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
   const box = await canvas.boundingBox();
@@ -255,9 +248,7 @@ test('drags a multi-hex selection so the whole group moves by one offset', async
  */
 test('refuses a blocked group move, leaving every hex where it was', async ({ page, request }) => {
   await enterLibrary(page);
-  await page.getByTestId('new-map').click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const mapId = entityIdFromUrl(page);
+  const mapId = await createEntity(page, 'core.hexmap');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
   const box = await canvas.boundingBox();

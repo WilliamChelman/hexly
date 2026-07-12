@@ -89,11 +89,11 @@ describe('EntityBrowser', () => {
     fixture.detectChanges();
 
     expect(el.querySelector('h1')?.textContent).toContain('Votre bibliothèque');
-    const newMap = el.querySelector('[data-testid=new-map]') as HTMLElement;
-    expect(newMap.textContent).toContain('Nouvelle carte');
-    expect(newMap.textContent).not.toContain('New map');
+    const newNote = el.querySelector('[data-testid=new-note]') as HTMLElement;
+    expect(newNote.textContent).toContain('Nouvelle note');
+    expect(newNote.textContent).not.toContain('New note');
     expect(el.querySelector('[data-testid=empty]')?.textContent).toContain('Votre bibliothèque est vide.');
-    expect(el.textContent).toContain('Créez une note ou une carte pour commencer.');
+    expect(el.textContent).toContain('Créez votre première entité pour commencer.');
   });
 
   it('owns its page heading in its page-owned header', () => {
@@ -424,16 +424,16 @@ describe('EntityBrowser', () => {
   });
 
   it('renders an entity name verbatim — never translated — even when it collides with a UI string', () => {
-    // "New map" is also a UI action label; an entity a user happened to name
-    // that must stay their words, not get swapped for the French action copy.
-    const fixture = renderWith([summary({ id: 'm1', name: 'New map' })]);
+    // "New note" is a UI action label; an entity a user happened to name that must stay
+    // their words, not get swapped for the French action copy.
+    const fixture = renderWith([summary({ id: 'm1', name: 'New note' })]);
 
     TestBed.inject(TranslocoService).setActiveLang('fr');
     fixture.detectChanges();
 
     const title = fixture.nativeElement.querySelector('[data-testid=entity-title]') as HTMLElement;
-    expect(title.textContent?.trim()).toBe('New map');
-    expect(title.textContent).not.toContain('Nouvelle carte');
+    expect(title.textContent?.trim()).toBe('New note');
+    expect(title.textContent).not.toContain('Nouvelle note');
   });
 
   it('shows a load-more affordance while there is a next page', () => {
@@ -599,28 +599,8 @@ describe('EntityBrowser', () => {
     expect(fixture.nativeElement.querySelector('[data-testid=empty]')).toBeNull();
   });
 
-  it('creates a new hexmap and opens it in the editor', () => {
-    const fixture = renderWith([]);
-
-    client.create.mockReturnValueOnce(
-      of({
-        ...summary({ id: 'created', name: 'Untitled map' }),
-        seq: 1,
-        document: {
-          content: { format: 'tiptap-v1', snapshot: {} },
-          hexes: {},
-          regions: [],
-          labels: [],
-        },
-      }),
-    );
-    (fixture.nativeElement.querySelector('[data-testid=new-map]') as HTMLButtonElement).click();
-
-    // Scoped to the World in the URL (ADR-0028).
-    expect(client.create).toHaveBeenCalledWith('Untitled map', ['core.hexmap'], 'w1');
-    expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'created']);
-  });
-
+  // Creating a Type *other* than the default Note goes through the split button's menu, which
+  // owns that behaviour and is specced with it (`new-entity-button.spec.ts`).
   it('creates a new note and opens it', () => {
     const fixture = renderWith([]);
 

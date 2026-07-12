@@ -1,4 +1,4 @@
-import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtures';
+import { createEntity, enterLibrary, expect, flushSave, test } from './fixtures';
 
 /**
  * The Feature journey (issue #7): a feature placed on a hex survives a save and
@@ -9,10 +9,7 @@ import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtur
  */
 test('places a feature on a hex, saves, and the feature survives a reload', async ({ page, request }) => {
   await enterLibrary(page);
-  await page.getByTestId('new-map').click();
-
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const mapId = entityIdFromUrl(page);
+  const mapId = await createEntity(page, 'core.hexmap');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
 

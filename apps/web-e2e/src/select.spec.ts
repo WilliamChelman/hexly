@@ -1,4 +1,4 @@
-import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtures';
+import { createEntity, enterLibrary, expect, flushSave, test } from './fixtures';
 
 /**
  * The universal Select journey (issue #28, ADR-0010). These cross the one seam
@@ -17,9 +17,7 @@ import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtur
 /** A new map, opened in its editor; returns the canvas locator and the map id. */
 async function newMap(page: import('@playwright/test').Page) {
   await enterLibrary(page);
-  await page.getByTestId('new-map').click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const mapId = entityIdFromUrl(page);
+  const mapId = await createEntity(page, 'core.hexmap');
   const canvas = page.getByRole('img', { name: 'Hex map' });
   return { canvas, mapId };
 }

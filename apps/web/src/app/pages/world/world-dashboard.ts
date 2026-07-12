@@ -1,10 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
-import { Router, RouterLink } from '@angular/router';
-import { finalize } from 'rxjs';
-import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
+import { RouterLink } from '@angular/router';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { EntityFacets, EntitySummary, EntityType } from '@hexly/domain';
-import { EntitiesClient, ActiveWorld, ToasterService, HexlyDatePipe, entityRoute, worldRoute } from '@hexly/web-core';
+import { EntitiesClient, ActiveWorld, HexlyDatePipe, entityRoute, worldRoute } from '@hexly/web-core';
 import {
   Button,
   Eyebrow,
@@ -18,6 +17,7 @@ import {
 } from '@hexly/web-ui';
 import { TypeRegistry } from '../../entity-types/type-registry';
 import { TypeNamePipe } from '../../entity-types/type-name.pipe';
+import { NewEntityButton } from '../../entity-types/new-entity-button';
 import { CORE_VIEW_MAP } from '@hexly/web-entity';
 
 const RECENTS_LIMIT = 8;
@@ -26,8 +26,9 @@ const MAPS_LIMIT = 8;
 /**
  * The World Dashboard: the per-World landing at `/w/:worldId`. A read-only
  * *derived* view — it authors nothing, only queries the list/facets endpoints:
- * pins, recents, Hex Maps, and at-a-glance Type counts. An empty World gets a
- * purposeful empty state that creates the first Note or Hex Map.
+ * pins, recents, Hex Maps, and at-a-glance Type counts. Creating is the shared
+ * {@link NewEntityButton}'s job — from the header, or from an empty World's
+ * purposeful empty state — so the first Entity can be of any registered Type (#195).
  */
 @Component({
   selector: 'app-world-dashboard',
@@ -44,6 +45,7 @@ const MAPS_LIMIT = 8;
     PageHeader,
     Icon,
     EntitySearchPicker,
+    NewEntityButton,
   ],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
@@ -85,11 +87,17 @@ const MAPS_LIMIT = 8;
           {{ worldName() }}
         </h1>
       </div>
+      <!-- A populated World creates from the header; an empty one from its empty state, so the
+           split button shows exactly once either way. One projected root: a control-flow block
+           projects by its single root node, so two siblings here would land in no slot at all. -->
       @if (!isEmpty()) {
-        <a pageHeaderActions appButton variant="default" [routerLink]="browseAllLink()" data-testid="browse-all">
-          <app-icon name="library" [size]="16" />
-          {{ 'worldDashboard.browseAll' | transloco }}
-        </a>
+        <div pageHeaderActions class="flex items-center gap-2">
+          <a appButton variant="default" [routerLink]="browseAllLink()" data-testid="browse-all">
+            <app-icon name="library" [size]="16" />
+            {{ 'worldDashboard.browseAll' | transloco }}
+          </a>
+          <app-new-entity-button />
+        </div>
       }
     </app-page-header>
 
@@ -106,29 +114,8 @@ const MAPS_LIMIT = 8;
           <p class="text-sm m-0">
             {{ 'worldDashboard.emptyHint' | transloco }}
           </p>
-          <div class="flex items-center gap-2 mt-1">
-            <button
-              type="button"
-              appButton
-              variant="default"
-              data-testid="create-note"
-              [disabled]="creating()"
-              (click)="create('core.note')"
-            >
-              <app-icon name="plus" [size]="16" />
-              {{ (creating() ? 'entityBrowser.creating' : 'entityBrowser.newNote') | transloco }}
-            </button>
-            <button
-              type="button"
-              appButton
-              variant="primary"
-              data-testid="create-map"
-              [disabled]="creating()"
-              (click)="create('core.hexmap')"
-            >
-              <app-icon name="plus" [size]="16" />
-              {{ (creating() ? 'entityBrowser.creating' : 'entityBrowser.newMap') | transloco }}
-            </button>
+          <div class="mt-1">
+            <app-new-entity-button />
           </div>
         </section>
       } @else {
@@ -279,9 +266,6 @@ const MAPS_LIMIT = 8;
 export class WorldDashboard {
   private readonly entitiesClient = inject(EntitiesClient);
   private readonly activeWorld = inject(ActiveWorld);
-  private readonly router = inject(Router);
-  private readonly toaster = inject(ToasterService);
-  private readonly transloco = inject(TranslocoService);
   private readonly types = inject(TypeRegistry);
 
   protected readonly worldName = this.activeWorld.name;
@@ -297,7 +281,6 @@ export class WorldDashboard {
   protected readonly typeCounts = signal<EntityFacets['type']>([]);
   /** Set once the recents read resolves — gates the empty state so it never flashes pre-load. */
   protected readonly loaded = signal(false);
-  protected readonly creating = signal(false);
   protected readonly isEmpty = computed(() => this.loaded() && this.recents().length === 0);
 
   constructor() {
@@ -349,21 +332,6 @@ export class WorldDashboard {
 
   protected typeIcon(type: EntityType): IconName {
     return this.types.resolve(type).icon;
-  }
-
-  protected create(type: EntityType): void {
-    if (this.creating()) return;
-    this.creating.set(true);
-    this.entitiesClient
-      .create(this.types.chromeLabel(type, 'untitled'), [type], this.activeWorld.worldId() ?? undefined)
-      .pipe(finalize(() => this.creating.set(false)))
-      .subscribe({
-        next: (entity) =>
-          this.router.navigate(
-            entityRoute(this.activeWorld.worldId()!, entity.id, this.activeWorld.name() ?? undefined),
-          ),
-        error: () => this.toaster.show(this.transloco.translate('entityBrowser.createError'), 'error'),
-      });
   }
 
   protected togglePinPicker(): void {

@@ -1,4 +1,4 @@
-import { enterLibrary, expect, openEntityActions, test } from './fixtures';
+import { createEntity, enterLibrary, expect, openEntityActions, test } from './fixtures';
 
 /**
  * The persistent nav rail and page-owned headers (ADR-0022, #89), driven as a
@@ -18,8 +18,7 @@ test('the rail navigates, exposes account controls, and pages own their headers'
   await expect(page.getByRole('menuitem', { name: 'Sign out' })).toBeVisible();
   await page.keyboard.press('Escape');
 
-  await page.getByRole('button', { name: 'New map' }).click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  await createEntity(page, 'core.hexmap');
   await expect(page.getByTestId('title')).toBeVisible();
   await expect(page.getByTestId('save-status')).toBeVisible();
   // Share now lives in the entity actions overflow menu.

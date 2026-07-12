@@ -252,12 +252,20 @@ describe('WorldDashboard', () => {
     expect(($(el, '[data-testid=browse-all]') as HTMLAnchorElement).getAttribute('href')).toBe('/w/w1/entities');
   });
 
-  it('shows an empty state prompting Note or Map creation for an empty World', () => {
+  it('offers the shared New split button from the header of a populated World (#195)', () => {
+    const el = render({ recents: [summary('e1')] });
+
+    expect($(el, '[data-testid=new-note]')).not.toBeNull();
+    expect($(el, '[data-testid=new-entity-menu]')).not.toBeNull();
+  });
+
+  it('offers the shared New split button from the empty state of an empty World (#195)', () => {
     const el = render({ recents: [], maps: [] });
 
     expect($(el, '[data-testid=dashboard-empty]')).not.toBeNull();
-    expect($(el, '[data-testid=create-note]')).not.toBeNull();
-    expect($(el, '[data-testid=create-map]')).not.toBeNull();
+    // The one create affordance: a Note by default, every registered Type behind the arrowhead.
+    expect($(el, '[data-testid=new-note]')).not.toBeNull();
+    expect($(el, '[data-testid=new-entity-menu]')).not.toBeNull();
     // No recents section when there's nothing to recent.
     expect($(el, '[data-testid=browse-all]')).toBeNull();
   });
@@ -267,7 +275,7 @@ describe('WorldDashboard', () => {
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     entities.create.mockReturnValue(of(summary('new1', 'Untitled note') as unknown as EntityDetail));
 
-    ($(el, '[data-testid=create-note]') as HTMLButtonElement).click();
+    ($(el, '[data-testid=new-note]') as HTMLButtonElement).click();
 
     expect(entities.create).toHaveBeenCalledWith(expect.any(String), ['core.note'], 'w1');
     expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'new1']);

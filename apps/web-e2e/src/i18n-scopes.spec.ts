@@ -1,4 +1,4 @@
-import { enterLibrary, expect, test } from './fixtures';
+import { createEntity, enterLibrary, expect, test } from './fixtures';
 
 /**
  * Each lib's catalog is a Transloco scope, fetched separately from the app's root one (ADR-0049).
@@ -8,8 +8,7 @@ import { enterLibrary, expect, test } from './fixtures';
  */
 test('a lazily-scoped lib follows a language switch: the map editor flips to French', async ({ page }) => {
   await enterLibrary(page);
-  await page.getByTestId('new-map').click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  await createEntity(page, 'core.hexmap');
 
   // App copy read through `translateSignal`, which prefixes its key with any injected scope — so a
   // lib's scope reaching this injector would render the raw 'dnd.entityTags.addPlaceholder'

@@ -1,4 +1,4 @@
-import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtures';
+import { createEntity, enterLibrary, expect, flushSave, test } from './fixtures';
 
 /**
  * The Label journey (issue #10): a free-positioned label placed on the map, its
@@ -10,10 +10,7 @@ import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtur
  */
 test('places a label, edits its text, saves, and it survives a reload', async ({ page, request }) => {
   await enterLibrary(page);
-  await page.getByTestId('new-map').click();
-
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
-  const mapId = entityIdFromUrl(page);
+  const mapId = await createEntity(page, 'core.hexmap');
 
   const canvas = page.getByRole('img', { name: 'Hex map' });
 

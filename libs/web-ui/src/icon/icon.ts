@@ -3,6 +3,7 @@ import { DomSanitizer } from '@angular/platform-browser';
 import {
   type LucideIconData,
   LucideChevronsRight,
+  LucideChevronDown,
   LucideLayoutDashboard,
   LucideX,
   LucideEllipsisVertical,
@@ -85,6 +86,8 @@ const CUSTOM = {
  */
 const LUCIDE: Record<string, LucideIconData> = {
   chevrons: LucideChevronsRight.icon,
+  /** A menu trigger's arrowhead — the split "New" button's, and any dropdown's. */
+  'chevron-down': LucideChevronDown.icon,
   close: LucideX.icon,
   dashboard: LucideLayoutDashboard.icon,
   more: LucideEllipsisVertical.icon,

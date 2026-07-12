@@ -12,8 +12,8 @@
     "tabTitle": "Hexly — Your library",
     "eyebrow": "Library",
     "heading": "Your library",
-    "newMap": "New map",
     "newNote": "New note",
+    "newOtherType": "New entity of another type",
     "rename": "Rename",
     "renameLabel": "New name",
     "searchLabel": "Search entities",
@@ -38,7 +38,7 @@
     "loadingMore": "Loading…",
     "loadMoreError": "Couldn't load more. Please try again.",
     "emptyTitle": "Your library is empty.",
-    "emptyHint": "Create a note or a map to begin.",
+    "emptyHint": "Create your first entity to begin.",
     "noMatchTitle": "No entities match your search.",
     "noMatchHint": "Try a different name, tag, or word.",
     "facets": {
@@ -312,7 +312,7 @@
     "movePinDown": "Move down",
     "browseAll": "Browse all entities",
     "emptyTitle": "Your world is a blank map.",
-    "emptyHint": "Create your first note or hex map to begin."
+    "emptyHint": "Create your first entity to begin."
   },
   "worldGraph": {
     "tabTitle": "Hexly — Graph",

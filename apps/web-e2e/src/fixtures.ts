@@ -101,3 +101,20 @@ export async function enterLibrary(page: Page): Promise<string> {
   await page.waitForURL(/\/w\/[\w-]+\/entities$/);
   return page.url().match(/\/w\/([\w-]+)\/entities/)![1];
 }
+
+/**
+ * Create an Entity of `typeId` through the "New" split button's type menu, and open it (#195).
+ * The menu lists every registered Entity Type and derives each item's testid from the type id,
+ * so the next plugin's create affordance is reachable here with no new helper. Returns the new
+ * Entity's canonical id.
+ *
+ * The caller must already be on a surface carrying the button — `enterLibrary`, or an empty
+ * World Dashboard. A Type declaring a *required* Field opens the create dialog instead, so it
+ * is created through that (see `dnd-monster.spec.ts`), not through this helper.
+ */
+export async function createEntity(page: Page, typeId: string): Promise<string> {
+  await page.getByTestId('new-entity-menu').click();
+  await page.getByTestId(`new-entity-${typeId}`).click();
+  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  return entityIdFromUrl(page);
+}

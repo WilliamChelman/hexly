@@ -4,16 +4,9 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subject, Subscription, debounceTime, distinctUntilChanged, finalize, map } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntityFacets, EntityPage, EntitySummary, EntityType, parseFieldFilters, Visibility } from '@hexly/domain';
-import {
-  EntitiesClient,
-  EntityFacetParams,
-  ActiveWorld,
-  ToasterService,
-  entityRoute,
-  AppShellStore,
-} from '@hexly/web-core';
-import { Button, Eyebrow, PageHeader, Icon } from '@hexly/web-ui';
-import { TypeRegistry } from '../../entity-types/type-registry';
+import { EntitiesClient, EntityFacetParams, ActiveWorld, ToasterService, AppShellStore } from '@hexly/web-core';
+import { Button, Eyebrow, PageHeader } from '@hexly/web-ui';
+import { NewEntityButton } from '../../entity-types/new-entity-button';
 import { EntityCard } from './entity-card';
 import { EntitySearch } from './entity-search';
 import { EmptyState } from './empty-state';
@@ -88,7 +81,17 @@ const FIRST_PAGE_CACHE_LIMIT = 50;
 @Component({
   selector: 'app-entity-browser',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Eyebrow, PageHeader, Icon, TranslocoPipe, EntityCard, EntitySearch, EmptyState, FacetRail],
+  imports: [
+    Button,
+    Eyebrow,
+    PageHeader,
+    TranslocoPipe,
+    EntityCard,
+    EntitySearch,
+    EmptyState,
+    FacetRail,
+    NewEntityButton,
+  ],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
     <app-page-header sticky>
@@ -98,30 +101,7 @@ const FIRST_PAGE_CACHE_LIMIT = 50;
           {{ 'entityBrowser.heading' | transloco }}
         </h1>
       </div>
-      <button
-        type="button"
-        pageHeaderActions
-        appButton
-        variant="default"
-        data-testid="new-note"
-        [disabled]="creating()"
-        (click)="create('core.note')"
-      >
-        <app-icon name="plus" [size]="16" />
-        {{ (creating() ? 'entityBrowser.creating' : 'entityBrowser.newNote') | transloco }}
-      </button>
-      <button
-        type="button"
-        pageHeaderActions
-        appButton
-        variant="primary"
-        data-testid="new-map"
-        [disabled]="creating()"
-        (click)="create('core.hexmap')"
-      >
-        <app-icon name="plus" [size]="16" />
-        {{ (creating() ? 'entityBrowser.creating' : 'entityBrowser.newMap') | transloco }}
-      </button>
+      <app-new-entity-button pageHeaderActions />
     </app-page-header>
 
     <main class="max-w-[72rem] mx-auto py-8 px-6">
@@ -199,7 +179,6 @@ export class EntityBrowser {
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
   private readonly shell = inject(AppShellStore);
-  private readonly types = inject(TypeRegistry);
 
   protected readonly worldId = this.activeWorld.worldId;
 
@@ -222,7 +201,6 @@ export class EntityBrowser {
   protected readonly loadingMore = signal(false);
   protected readonly loaded = signal(false);
   protected readonly loadError = signal(false);
-  protected readonly creating = signal(false);
   protected readonly renamingId = signal<string | null>(null);
 
   /** Debounced full-text query; empty means the default last-edited view.
@@ -498,24 +476,6 @@ export class EntityBrowser {
         },
         error: () => this.toaster.show(this.transloco.translate('entityBrowser.loadMoreError'), 'error'),
       });
-  }
-
-  protected create(type: EntityType): void {
-    if (this.creating()) return;
-    this.creating.set(true);
-    this.entitiesClient
-      .create(this.types.chromeLabel(type, 'untitled'), [type], this.activeWorld.worldId() ?? undefined)
-      .pipe(finalize(() => this.creating.set(false)))
-      .subscribe({
-        // EntitySession loads on open; no pre-adopt from here (it would outlive this page).
-        next: (entity) => this.open(entity.id),
-        error: () => this.toaster.show(this.transloco.translate('entityBrowser.createError'), 'error'),
-      });
-  }
-
-  protected open(id: string): void {
-    // Pretty World slug from the loaded detail; the Entity slug self-heals on load.
-    this.router.navigate(entityRoute(this.activeWorld.worldId()!, id, this.activeWorld.name() ?? undefined));
   }
 
   protected startRename(id: string): void {

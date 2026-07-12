@@ -12,8 +12,8 @@
     "tabTitle": "Hexly — Votre bibliothèque",
     "eyebrow": "Bibliothèque",
     "heading": "Votre bibliothèque",
-    "newMap": "Nouvelle carte",
     "newNote": "Nouvelle note",
+    "newOtherType": "Nouvelle entité d'un autre type",
     "rename": "Renommer",
     "renameLabel": "Nouveau nom",
     "searchLabel": "Rechercher des entités",
@@ -38,7 +38,7 @@
     "loadingMore": "Chargement…",
     "loadMoreError": "Chargement impossible. Veuillez réessayer.",
     "emptyTitle": "Votre bibliothèque est vide.",
-    "emptyHint": "Créez une note ou une carte pour commencer.",
+    "emptyHint": "Créez votre première entité pour commencer.",
     "noMatchTitle": "Aucune entité ne correspond à votre recherche.",
     "noMatchHint": "Essayez un autre nom, une étiquette ou un mot.",
     "facets": {
@@ -312,7 +312,7 @@
     "movePinDown": "Déplacer vers le bas",
     "browseAll": "Parcourir toutes les entités",
     "emptyTitle": "Votre monde est une carte vierge.",
-    "emptyHint": "Créez votre première note ou carte hexagonale pour commencer."
+    "emptyHint": "Créez votre première entité pour commencer."
   },
   "worldGraph": {
     "tabTitle": "Hexly — Graphe",

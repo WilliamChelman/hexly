@@ -1,4 +1,4 @@
-import { enterLibrary, entityIdFromUrl, expect, openEntityActions, segRe, test } from './fixtures';
+import { createEntity, enterLibrary, entityIdFromUrl, expect, openEntityActions, segRe, test } from './fixtures';
 
 /**
  * Entity browser lifecycle (#70): create → list → open → rename → delete, over
@@ -71,8 +71,7 @@ test('an owner toggles a note to shared and the Visibility facet reflects it', a
 test('creating a map opens the map editor, not the note view', async ({ page }) => {
   await enterLibrary(page);
 
-  await page.getByTestId('new-map').click();
-  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  await createEntity(page, 'core.hexmap');
 
   // Editor chrome present (harmonized header — ADR-0022).
   await expect(page.getByTestId('title')).toBeVisible();
