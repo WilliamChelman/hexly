@@ -29,9 +29,12 @@ export function providePluginHexmap(): EnvironmentProviders {
       {
         id: CORE_VIEW_MAP,
         // The `core.hex-grid` data-type's View, not the `core.hexmap` type's: it renders whichever
-        // grid Field placed it, and takes its toggle's label from that Field — hence no copy of its
-        // own (ADR-0050).
+        // grid Field placed it, and takes its toggle's label from that Field — hence no toggle copy
+        // of its own (ADR-0050).
         dataType: CORE_HEX_GRID,
+        // The copy that names the *kind* where a World Owner picks it, in the World Types editor
+        // (#201) — so a `world.deity` can carry a `battlemap` with no code and no borrowed type.
+        dataTypeLabelKey: 'map.dataType.hexGrid',
         loadComponent: () => import('./components/map-view').then((m) => m.MapView),
       },
     ],

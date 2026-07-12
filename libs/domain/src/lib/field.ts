@@ -17,7 +17,12 @@
 
 import { z } from 'zod';
 import { entityTypeSchema } from './entity';
-import { StructuredDataType, structuredDataTypeIdSchema, StructuredDataTypeSet } from './structured-data-type';
+import {
+  StructuredDataType,
+  StructuredDataTypeId,
+  structuredDataTypeIdSchema,
+  StructuredDataTypeSet,
+} from './structured-data-type';
 
 /** The Metadata map a Field reads from and writes to — the one store, never forked (CONTEXT.md → Metadata). */
 export type Metadata = Record<string, unknown>;
@@ -95,9 +100,18 @@ export const fieldDataTypeSchema = z.union([builtInDataTypeSchema, structuredDat
 
 export type FieldDataType = z.infer<typeof fieldDataTypeSchema>;
 
-/** Whether a Field's data-type is structured. No built-in kind carries a dot, so the dot *is* the mark. */
+/**
+ * Whether a data-type *kind* is structured. No built-in kind carries a dot, so the dot **is** the mark
+ * (ADR-0050) — and this is the one place that says so. Takes the bare kind, for the caller holding one
+ * loose: the World Types editor's data-type `<select>`, whose value is a string until it is a Field.
+ */
+export function isStructuredKind(kind: string): kind is StructuredDataTypeId {
+  return kind.includes('.');
+}
+
+/** Whether a Field's data-type is structured — {@link isStructuredKind}, narrowing the data-type. */
 export function isStructuredDataType(dataType: FieldDataType): dataType is StructuredDataTypeRef {
-  return dataType.kind.includes('.');
+  return isStructuredKind(dataType.kind);
 }
 
 /**
@@ -129,6 +143,19 @@ export type EntityLinkValue = z.infer<typeof entityLinkValueSchema>;
 /** Whether a data-type is a typed Entity Link. For callers that need only the yes/no, not narrowing. */
 export function isEntityLinkDataType(dataType: FieldDataType): boolean {
   return dataType.kind === 'entityLink';
+}
+
+/**
+ * Whether a Field is actually offered as a **Facet** — the one home of the rule that a **Structured
+ * Field** never is, whatever its `facetable` flag says (ADR-0050): a document has no discrete values
+ * to count, so a facet over one could only offer to filter by a grid.
+ *
+ * Read by both halves of the facet: the derivation that indexes a value ({@link deriveFieldFacets})
+ * and the API's count of the Facets to *offer* — which is what keeps an empty "Battlemap" section out
+ * of the Entity Browser's rail rather than merely keeping it unpopulated.
+ */
+export function isFacetableField(field: FieldSchema): field is FieldSchema & { dataType: BuiltInDataType } {
+  return field.facetable && !isStructuredDataType(field.dataType);
 }
 
 /**
@@ -295,7 +322,7 @@ export function deriveFieldFacets(fields: readonly FieldSchema[], metadata: Meta
   const seen = new Set<string>();
   const out: FieldFacetValue[] = [];
   for (const field of fields) {
-    if (!field.facetable || isStructuredDataType(field.dataType)) continue;
+    if (!isFacetableField(field)) continue;
     const raw = readField(metadata, field);
     if (raw === undefined || raw === null) continue;
     for (const item of facetItems(field.dataType, raw)) {

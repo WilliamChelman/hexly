@@ -1,4 +1,7 @@
 {
+  "dataType": {
+    "hexGrid": "Hex grid"
+  },
   "hexmap": {
     "eyebrow": "Hex map",
     "titleLabel": "Map title",

@@ -1,0 +1,1 @@
+ALTER TABLE `world_types` ADD `views` text;

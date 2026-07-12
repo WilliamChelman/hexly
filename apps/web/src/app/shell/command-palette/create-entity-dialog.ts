@@ -11,7 +11,15 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { EntityType, FieldSchema, Metadata, NO_STRUCTURED_DATA_TYPES, validateFields, writeField } from '@hexly/domain';
+import {
+  EntityType,
+  FieldSchema,
+  isStructuredDataType,
+  Metadata,
+  NO_STRUCTURED_DATA_TYPES,
+  validateFields,
+  writeField,
+} from '@hexly/domain';
 import { ActiveWorld, EntitiesClient, WorldStore, entityRoute } from '@hexly/web-core';
 import { Button, Field, Input, Dialog } from '@hexly/web-ui';
 import { CreateEntityDialogState } from './create-entity-dialog.state';
@@ -139,8 +147,17 @@ export class CreateEntityDialog {
   /** The union of Field schemas the picked types afford (primary first, deduped) — via the registry. */
   private readonly fields = computed(() => this.typeRegistry.resolveFields(this.types()));
 
-  /** The required Fields the author must supply before creating — rendered as the gated form (#189). */
-  protected readonly requiredFields = computed(() => this.fields().filter((field) => field.required));
+  /**
+   * The required Fields the author must supply before creating — rendered as the gated form (#189).
+   *
+   * A **Structured Field** is never among them, whatever it was flagged: it is edited on its own View,
+   * not typed into a form row (ADR-0050), so there is no control here to collect it with — the same
+   * rule the generic Field view applies. Its value is minted empty at create instead, and the Entity
+   * opens on the View that can actually draw it.
+   */
+  protected readonly requiredFields = computed(() =>
+    this.fields().filter((field) => field.required && !isStructuredDataType(field.dataType)),
+  );
 
   /** Every picked type's required Fields must validate before the create is allowed (#189). */
   protected readonly valid = computed(

@@ -179,6 +179,7 @@ export class WorldWrites {
           typeId: type.id,
           label: type.label,
           fields: [...type.fields],
+          views: type.views ? [...type.views] : null,
           createdAt: now,
           updatedAt: now,
         })
@@ -191,13 +192,20 @@ export class WorldWrites {
    * Rename / re-Field a World's user-defined type (#191). Returns whether a row matched — an unknown
    * type id leaves the World untouched, so the bump and nudge are skipped and the caller can 404.
    */
-  updateType(worldId: string, typeId: string, patch: { label?: string; fields?: UserDefinedType['fields'] }): boolean {
+  updateType(
+    worldId: string,
+    typeId: string,
+    patch: { label?: string; fields?: UserDefinedType['fields']; views?: UserDefinedType['views'] },
+  ): boolean {
     return this.transact(() => {
       const updated = this.db
         .update(worldTypes)
         .set({
           ...(patch.label !== undefined ? { label: patch.label } : {}),
           ...(patch.fields !== undefined ? { fields: [...patch.fields] } : {}),
+          // A `fields` patch without `views` re-Fields a type that never named a view order: the
+          // stored `null` stays, and the web defaults the order over the new Fields.
+          ...(patch.views !== undefined ? { views: [...patch.views] } : {}),
           updatedAt: Date.now(),
         })
         .where(and(eq(worldTypes.worldId, worldId), eq(worldTypes.typeId, typeId)))

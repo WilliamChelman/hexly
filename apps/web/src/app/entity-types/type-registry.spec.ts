@@ -160,6 +160,63 @@ describe('TypeRegistry', () => {
     expect(viewKeys(registry.viewsFor(['dnd.beast']))).toEqual([CORE_VIEW_CONTENT]);
   });
 
+  /**
+   * The payoff of the merge (#201): a World Owner gives a type they defined a map by declaring one
+   * Field, and it resolves through the *same* path `core.hexmap` runs — a `{ field }` placement, the
+   * Field's `kind`, the View registered for that kind. No second branch for the code-less half.
+   */
+  describe('a user-defined type carrying a Structured Field', () => {
+    const battlemap: FieldSchema = {
+      key: 'battlemap',
+      label: 'Battlemap',
+      dataType: { kind: CORE_HEX_GRID },
+      required: false,
+      facetable: false,
+    };
+
+    it('affords the grid’s map View, bound to the Field — and still opens on its Fields', () => {
+      registry.register({
+        ...definition('world.deity', [battlemap]),
+        views: [CORE_VIEW_FIELDS, CORE_VIEW_CONTENT, { field: 'battlemap' }],
+      });
+
+      // The map is last, so the default View — the primary type's first — is the deity's own Fields.
+      // Adding a battlemap does not hijack how a deity presents itself.
+      expect(viewKeys(registry.viewsFor(['world.deity']))).toEqual([
+        CORE_VIEW_FIELDS,
+        CORE_VIEW_CONTENT,
+        `${CORE_VIEW_MAP}:battlemap`,
+      ]);
+    });
+
+    it('affords *two* map Views when it also carries core.hexmap — one per grid', () => {
+      registry.register({
+        ...definition('world.deity', [battlemap]),
+        views: [CORE_VIEW_FIELDS, { field: 'battlemap' }],
+      });
+
+      // The world map and the battlemap are two Views of one Entity, each bound to its own Field —
+      // which is the whole reason a View is an instance rather than a bare id (#200).
+      expect(viewKeys(registry.viewsFor(['core.hexmap', 'world.deity']))).toEqual([
+        `${CORE_VIEW_MAP}:grid`,
+        CORE_VIEW_CONTENT,
+        CORE_VIEW_FIELDS,
+        `${CORE_VIEW_MAP}:battlemap`,
+      ]);
+    });
+
+    it('drops the Field’s View when "Show as a view" is off, leaving the Field itself alone', () => {
+      // The toggle authors the *views* list, never the Field: the value stays, and stays declared.
+      registry.register({
+        ...definition('world.deity', [battlemap]),
+        views: [CORE_VIEW_FIELDS, CORE_VIEW_CONTENT],
+      });
+
+      expect(viewKeys(registry.viewsFor(['world.deity']))).toEqual([CORE_VIEW_FIELDS, CORE_VIEW_CONTENT]);
+      expect(registry.resolveFields(['world.deity']).map((f) => f.key)).toEqual(['battlemap']);
+    });
+  });
+
   it('falls back to Content plus the generic Field View for an unregistered type — the missing-plugin case', () => {
     // No definition registered for `pathfinder.monster`: the Entity still opens on the lore every
     // Entity has, and the generic View renders its type as an inert chip over its plain Metadata —

@@ -6,6 +6,9 @@ import { of } from 'rxjs';
 import { AvailableType, UserDefinedType } from '@hexly/domain';
 import { ActiveWorld, WorldsClient } from '@hexly/web-core';
 import { MockWorldsClient } from '@hexly/web-core/testing';
+import { CORE_VIEW_CONTENT, CORE_VIEW_FIELDS } from '@hexly/web-entity';
+import { CORE_HEX_GRID } from '@hexly/plugin-hexmap';
+import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { WorldTypesPanel } from './world-types-panel';
 
 /**
@@ -23,9 +26,13 @@ describe('WorldTypesPanel', () => {
     worlds = new MockWorldsClient();
     worlds.availableTypes.mockReturnValue(of<AvailableType[]>([]));
     worlds.createType.mockReturnValue(of(created));
+    worlds.updateType.mockReturnValue(of(created));
     await TestBed.configureTestingModule({
       imports: [WorldTypesPanel, provideTranslocoTesting()],
-      providers: [provideRouter([]), { provide: WorldsClient, useValue: worlds }],
+      // The map plugin, composed as `app.config.ts` does: it is what puts `core.hex-grid` on the
+      // data-type picker, so the panel learns of the grid the way the app does — from a provider,
+      // never by naming it (ADR-0050, #199).
+      providers: [provideRouter([]), providePluginHexmap(), { provide: WorldsClient, useValue: worlds }],
     }).compileComponents();
     TestBed.inject(ActiveWorld).set('w1');
 
@@ -46,6 +53,21 @@ describe('WorldTypesPanel', () => {
     input.value = value;
     input.dispatchEvent(new Event('input'));
     fixture.detectChanges();
+  }
+
+  /** Pick an option in the `<select>` with `data-testid` (same one-way bind as {@link type}). */
+  function select(testid: string, value: string): void {
+    const el: HTMLSelectElement = fixture.debugElement.query(By.css(`[data-testid="${testid}"]`)).nativeElement;
+    el.value = value;
+    el.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+  }
+
+  /** Submit the open editor form. */
+  function submit(): void {
+    fixture.debugElement
+      .query(By.css('[data-testid="type-editor"]'))
+      .triggerEventHandler('submit', new Event('submit'));
   }
 
   /** The Field rows themselves — by row class, not `data-testid^="field-"` (which the inputs share). */
@@ -88,14 +110,208 @@ describe('WorldTypesPanel', () => {
     flags[1].nativeElement.click();
     fixture.detectChanges();
 
-    fixture.debugElement
-      .query(By.css('[data-testid="type-editor"]'))
-      .triggerEventHandler('submit', new Event('submit'));
+    submit();
 
     expect(worlds.createType).toHaveBeenCalledWith('w1', {
       id: 'world.deity',
       label: 'Deity',
       fields: [{ key: 'domain', label: 'Domain', dataType: { kind: 'string' }, required: false, facetable: true }],
+      // A type with no Structured Field still names its order: its Fields, then its Content.
+      views: [CORE_VIEW_FIELDS, CORE_VIEW_CONTENT],
     });
+  });
+
+  it('hands back a data-type the form cannot author, rather than retyping the Field', () => {
+    // A `list` carries an item type and an `entityLink` a target-type constraint — neither has a
+    // control in this form, and both are reachable through the API. Editing the type beside them must
+    // not silently retype them: the row shows the kind it has, and re-sends the data-type whole.
+    worlds.availableTypes.mockReturnValue(
+      of<AvailableType[]>([
+        {
+          id: 'world.deity',
+          label: 'Deity',
+          source: 'user',
+          fields: [
+            {
+              key: 'titles',
+              label: 'Titles',
+              dataType: { kind: 'list', of: { kind: 'string' } },
+              required: false,
+              facetable: true,
+            },
+          ],
+        },
+      ]),
+    );
+    fixture.componentInstance.ngOnInit();
+    fixture.detectChanges();
+
+    click('edit-world.deity');
+    // The picker names the kind it cannot offer, so the row is never blank and never mis-shows.
+    const kind: HTMLSelectElement = fixture.debugElement.query(By.css('[data-testid="field-kind"]')).nativeElement;
+    expect(kind.value).toBe('list');
+
+    type('type-name-input', 'God');
+    submit();
+
+    expect(worlds.updateType).toHaveBeenCalledWith('w1', 'world.deity', {
+      label: 'God',
+      // The item type survives — it would be lost by rebuilding the data-type from the kind alone.
+      fields: [
+        {
+          key: 'titles',
+          label: 'Titles',
+          dataType: { kind: 'list', of: { kind: 'string' } },
+          required: false,
+          facetable: true,
+        },
+      ],
+      views: [CORE_VIEW_FIELDS, CORE_VIEW_CONTENT],
+    });
+  });
+
+  /**
+   * The user-facing payoff of ADR-0050 (#201): a World Owner gives a type they defined a map by
+   * picking a data-type, the way they pick `enum` — no code, and no borrowing the whole `core.hexmap`
+   * type to get one grid.
+   */
+  describe('a Structured Field', () => {
+    /** The kinds the picker offers, in order — the built-ins, then this build's plugin data-types. */
+    function kindOptions(): string[] {
+      return fixture.debugElement
+        .queryAll(By.css('[data-testid="field-kind"] option'))
+        .map((option) => option.nativeElement.value);
+    }
+
+    it('offers the map plugin’s data-type beside the built-ins', () => {
+      click('type-new');
+      click('add-field');
+
+      expect(kindOptions()).toEqual(['string', 'number', 'boolean', 'date', 'enum', CORE_HEX_GRID]);
+    });
+
+    it('posts a hex-grid Field and places its View last, so the type still opens on its Fields', () => {
+      click('type-new');
+      type('type-id-input', 'deity');
+      type('type-name-input', 'Deity');
+      click('add-field');
+      type('field-key', 'battlemap');
+      type('field-label', 'Battlemap');
+      select('field-kind', CORE_HEX_GRID);
+
+      submit();
+
+      expect(worlds.createType).toHaveBeenCalledWith('w1', {
+        id: 'world.deity',
+        label: 'Deity',
+        fields: [
+          {
+            key: 'battlemap',
+            label: 'Battlemap',
+            dataType: { kind: CORE_HEX_GRID },
+            // Never required (no form row to collect it), never a facet (nothing to count).
+            required: false,
+            facetable: false,
+          },
+        ],
+        // "Show as a view" defaults on, and the grid's View sits *after* the Fields and the Content.
+        views: [CORE_VIEW_FIELDS, CORE_VIEW_CONTENT, { field: 'battlemap' }],
+      });
+    });
+
+    it('swaps the required/facetable flags for one "Show as a view" toggle', () => {
+      click('type-new');
+      click('add-field');
+      select('field-kind', CORE_HEX_GRID);
+
+      // A grid is edited on its View, so neither flag is on offer — only where that View sits.
+      const flags = fixture.debugElement.queryAll(By.css('[data-testid="field-0"] input[type="checkbox"]'));
+      expect(flags).toHaveLength(1);
+      expect(flags[0].nativeElement.dataset.testid).toBe('field-show-as-view');
+      expect(flags[0].nativeElement.checked).toBe(true);
+    });
+
+    it('withholds the Field’s View when the toggle is off, keeping the Field itself', () => {
+      click('type-new');
+      type('type-id-input', 'deity');
+      type('type-name-input', 'Deity');
+      click('add-field');
+      type('field-key', 'battlemap');
+      type('field-label', 'Battlemap');
+      select('field-kind', CORE_HEX_GRID);
+      click('field-show-as-view');
+
+      submit();
+
+      const [, req] = worlds.createType.mock.calls[0];
+      // The Field is declared as ever — the toggle authors the *view* list, never the Field.
+      expect(req.fields).toHaveLength(1);
+      expect(req.views).toEqual([CORE_VIEW_FIELDS, CORE_VIEW_CONTENT]);
+    });
+
+    it('reads the toggle back off an existing type’s view order', () => {
+      worlds.availableTypes.mockReturnValue(
+        of<AvailableType[]>([
+          {
+            id: 'world.deity',
+            label: 'Deity',
+            source: 'user',
+            fields: [
+              {
+                key: 'battlemap',
+                label: 'Battlemap',
+                dataType: { kind: CORE_HEX_GRID },
+                required: false,
+                facetable: false,
+              },
+            ],
+            // Authored with the toggle off: the Field is declared, but places no View.
+            views: [CORE_VIEW_FIELDS, CORE_VIEW_CONTENT],
+          },
+        ]),
+      );
+      fixture.componentInstance.ngOnInit();
+      fixture.detectChanges();
+
+      click('edit-world.deity');
+
+      const toggle = fixture.debugElement.query(By.css('[data-testid="field-show-as-view"]'));
+      expect(toggle.nativeElement.checked).toBe(false);
+    });
+  });
+});
+
+/**
+ * An Instance that does **not** bundle the map plugin — the absent-plugin degradation (ADR-0048),
+ * composed one provider short of the app's, exactly as `type-registry.spec` does it.
+ */
+describe('WorldTypesPanel without the Hex Map plugin', () => {
+  let fixture: ComponentFixture<WorldTypesPanel>;
+
+  beforeEach(async () => {
+    const worlds = new MockWorldsClient();
+    worlds.availableTypes.mockReturnValue(of<AvailableType[]>([]));
+    await TestBed.configureTestingModule({
+      imports: [WorldTypesPanel, provideTranslocoTesting()],
+      providers: [provideRouter([]), { provide: WorldsClient, useValue: worlds }],
+    }).compileComponents();
+    TestBed.inject(ActiveWorld).set('w1');
+
+    fixture = TestBed.createComponent(WorldTypesPanel);
+    fixture.componentRef.setInput('id', 'w1');
+    fixture.detectChanges();
+  });
+
+  it('offers only the built-in data-types — it never learns the name of a kind it cannot render', () => {
+    fixture.debugElement.query(By.css('[data-testid="type-new"]')).nativeElement.click();
+    fixture.detectChanges();
+    fixture.debugElement.query(By.css('[data-testid="add-field"]')).nativeElement.click();
+    fixture.detectChanges();
+
+    const kinds = fixture.debugElement
+      .queryAll(By.css('[data-testid="field-kind"] option'))
+      .map((option) => option.nativeElement.value);
+    // No grid on the menu: a Field a World Owner could never edit is worse than one they cannot declare.
+    expect(kinds).toEqual(['string', 'number', 'boolean', 'date', 'enum']);
   });
 });

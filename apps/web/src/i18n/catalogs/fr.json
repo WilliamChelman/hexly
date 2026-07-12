@@ -340,6 +340,7 @@
     "fieldType": "Type",
     "fieldRequired": "Requis",
     "fieldFacetable": "Filtrable",
+    "fieldShowAsView": "Afficher comme vue",
     "fieldOptions": "Options",
     "fieldOptionsHint": "Séparées par des virgules",
     "removeField": "Retirer le champ",

@@ -1,24 +1,53 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, OnInit, signal } from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { AvailableType, CreateUserDefinedTypeRequest, FieldSchema, USER_TYPE_NAMESPACE } from '@hexly/domain';
+import {
+  AvailableType,
+  CreateUserDefinedTypeRequest,
+  FieldDataType,
+  FieldSchema,
+  isStructuredKind,
+  USER_TYPE_NAMESPACE,
+} from '@hexly/domain';
 import { ToasterService, WorldsClient } from '@hexly/web-core';
 import { produce } from '@hexly/immer';
+import { isShownAsView, userTypeViews } from '@hexly/web-entity';
 import { Button, Input, Select } from '@hexly/web-ui';
 import { WorldTypesLoader } from '../../../../entity-types/world-types-loader';
+import { ViewRegistry } from '../../../../entity-types/view-registry';
 
-/** The scalar/enum data-types the authoring UI offers — the subset a code-less type needs (#191). */
-const DATA_TYPE_KINDS = ['string', 'number', 'boolean', 'date', 'enum'] as const;
-type DataTypeKind = (typeof DATA_TYPE_KINDS)[number];
+/** The built-in data-types the authoring UI offers — the subset a code-less type needs (#191). */
+const BUILT_IN_KINDS = ['string', 'number', 'boolean', 'date', 'enum'] as const;
+type BuiltInKind = (typeof BUILT_IN_KINDS)[number];
 
 /** One Field as the form edits it — flattened so an enum's `options` bind to a single text input. */
 interface DraftField {
   key: string;
   label: string;
-  kind: DataTypeKind;
+  /**
+   * The picked data-type's kind: a built-in, or a plugin's **Structured Field** data-type by its
+   * `namespace.id` id (`core.hex-grid`, #201). A bare string because it is a `<select>` value — one
+   * picker over both keyspaces, which is the point of the merge: a grid is a data-type a World Owner
+   * picks, like `enum`, not a payload only code can reach.
+   */
+  kind: string;
   /** Comma-separated enum options; ignored for non-enum kinds. */
   options: string;
   required: boolean;
   facetable: boolean;
+  /**
+   * **Structured** Fields only: whether this Field's View is placed in the type's ordered view list —
+   * the "Show as a view" toggle, on by default (ADR-0050). Off keeps the Field and its value exactly
+   * as they are and merely withholds the toggle, so a type with several grids does not bury its
+   * Fields under a stack of them. Ignored for a built-in kind, which has a form row, not a View.
+   */
+  showAsView: boolean;
+  /**
+   * The data-type this Field was loaded with, kept whole. The form authors only a `kind` (and an
+   * enum's options), so a data-type carrying more than its kind — a `list`'s item type, an
+   * `entityLink`'s target-type constraint — can only survive a round trip by being handed back
+   * verbatim. Absent on a Field the author just added, which has nothing stored yet.
+   */
+  stored?: FieldDataType;
 }
 
 /** The open editor: creating (`editingId === null`) or editing an existing type by id. */
@@ -106,15 +135,27 @@ interface Draft {
               data-testid="field-label"
               (input)="patchField($index, { label: value($event) })"
             />
+            <!-- One picker over both keyspaces: the built-ins, then whatever Structured data-types
+                 this build's plugins render — a grid is picked here like an enum (#201). -->
+            <!-- The picked kind is marked on the option, not bound as the select's [value]: the
+                 options are rendered by @for/@if, so a [value] naming one of them runs before it
+                 exists and the browser falls back to the first — silently mis-showing the row. -->
             <select
               appSelect
               [attr.aria-label]="'worldTypes.fieldType' | transloco"
-              [value]="f.kind"
               data-testid="field-kind"
-              (change)="patchField($index, { kind: $any(value($event)) })"
+              (change)="patchField($index, { kind: value($event) })"
             >
-              @for (k of dataTypeKinds; track k) {
-                <option [value]="k">{{ 'worldTypes.dataType.' + k | transloco }}</option>
+              @for (k of builtInKinds; track k) {
+                <option [value]="k" [selected]="k === f.kind">{{ 'worldTypes.dataType.' + k | transloco }}</option>
+              }
+              @for (d of structuredKinds(); track d.kind) {
+                <option [value]="d.kind" [selected]="d.kind === f.kind">{{ d.labelKey | transloco }}</option>
+              }
+              <!-- A kind this form cannot author (a list, an entityLink, a dropped plugin's) still
+                   names itself, rather than leaving the row blank and inviting a blind re-pick. -->
+              @if (unofferedKind(f); as kind) {
+                <option [value]="kind" selected>{{ kind }}</option>
               }
             </select>
             @if (f.kind === 'enum') {
@@ -127,22 +168,37 @@ interface Draft {
                 (input)="patchField($index, { options: value($event) })"
               />
             }
-            <label class="type-flag">
-              <input
-                type="checkbox"
-                [checked]="f.required"
-                (change)="patchField($index, { required: checked($event) })"
-              />
-              {{ 'worldTypes.fieldRequired' | transloco }}
-            </label>
-            <label class="type-flag">
-              <input
-                type="checkbox"
-                [checked]="f.facetable"
-                (change)="patchField($index, { facetable: checked($event) })"
-              />
-              {{ 'worldTypes.fieldFacetable' | transloco }}
-            </label>
+            <!-- A Structured Field is edited on its own View, never as a form row: it cannot be
+                 collected in the create dialog (so never required) and has no discrete values to
+                 count (so never a facet). What it carries instead is where its View sits. -->
+            @if (isStructured(f)) {
+              <label class="type-flag">
+                <input
+                  type="checkbox"
+                  data-testid="field-show-as-view"
+                  [checked]="f.showAsView"
+                  (change)="patchField($index, { showAsView: checked($event) })"
+                />
+                {{ 'worldTypes.fieldShowAsView' | transloco }}
+              </label>
+            } @else {
+              <label class="type-flag">
+                <input
+                  type="checkbox"
+                  [checked]="f.required"
+                  (change)="patchField($index, { required: checked($event) })"
+                />
+                {{ 'worldTypes.fieldRequired' | transloco }}
+              </label>
+              <label class="type-flag">
+                <input
+                  type="checkbox"
+                  [checked]="f.facetable"
+                  (change)="patchField($index, { facetable: checked($event) })"
+                />
+                {{ 'worldTypes.fieldFacetable' | transloco }}
+              </label>
+            }
             <button
               appButton
               size="sm"
@@ -237,10 +293,18 @@ export class WorldTypesPanel implements OnInit {
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
   private readonly loader = inject(WorldTypesLoader);
+  private readonly views = inject(ViewRegistry);
 
-  protected readonly dataTypeKinds = DATA_TYPE_KINDS;
+  protected readonly builtInKinds = BUILT_IN_KINDS;
   protected readonly types = signal<readonly AvailableType[]>([]);
   protected readonly draft = signal<Draft | null>(null);
+
+  /**
+   * The **Structured Field** data-types this build offers, beside the built-ins (#201). Read off the
+   * registered Views, so the picker offers exactly the kinds this build can *render*: drop the map
+   * plugin and "Hex grid" is simply not on the menu — the app never names it.
+   */
+  protected readonly structuredKinds = computed(() => this.views.offerableDataTypes());
 
   /** Save is enabled once the type has a name and (when creating) an id slug. */
   protected readonly canSave = computed(() => {
@@ -270,8 +334,30 @@ export class WorldTypesPanel implements OnInit {
       // The id is immutable when editing; the slug is shown for reference but not sent.
       slug: type.id.slice(`${USER_TYPE_NAMESPACE}.`.length),
       label: type.label,
-      fields: type.fields.map(toDraftField),
+      // Each structured Field's toggle reads back the type's own view order — the two halves of the
+      // same fact, so what the author sees ticked is what they placed.
+      fields: type.fields.map((field) => toDraftField(field, isShownAsView(type.views, field))),
     });
+  }
+
+  /** Whether a draft row names a plugin's data-type — the mark being the dot (ADR-0050). */
+  protected isStructured(field: DraftField): boolean {
+    return isStructuredKind(field.kind);
+  }
+
+  /**
+   * A row's `kind` when the picker offers no option for it — a `list` or an `entityLink` (authored
+   * through the API, or by a later build of this form), or a structured kind whose plugin this build
+   * dropped. `null` for every kind on the menu.
+   *
+   * Such a Field is shown, and round-trips untouched ({@link DraftField.stored}); what it cannot be is
+   * silently retyped because the form had nothing to draw.
+   */
+  protected unofferedKind(field: DraftField): string | null {
+    const offered =
+      (BUILT_IN_KINDS as readonly string[]).includes(field.kind) ||
+      this.structuredKinds().some((d) => d.kind === field.kind);
+    return offered ? null : field.kind;
   }
 
   /**
@@ -313,6 +399,11 @@ export class WorldTypesPanel implements OnInit {
     const d = this.draft();
     if (!d || !this.canSave()) return;
     const fields = d.fields.map(toFieldSchema);
+    // The Fields and the view order travel together, always: composing the list here from the live
+    // toggles is what keeps a placement from ever outliving the Field it names. Zipped by index
+    // against the *mapped* Fields, so the two agree on a key the form has yet to trim.
+    const shown = new Set(fields.filter((_, i) => d.fields[i].showAsView).map((field) => field.key));
+    const views = userTypeViews(fields, (field) => shown.has(field.key));
     const label = d.label.trim();
     const op$ =
       d.editingId === null
@@ -320,8 +411,9 @@ export class WorldTypesPanel implements OnInit {
             id: `${USER_TYPE_NAMESPACE}.${d.slug.trim()}`,
             label,
             fields,
+            views,
           } satisfies CreateUserDefinedTypeRequest)
-        : this.worlds.updateType(this.id(), d.editingId, { label, fields });
+        : this.worlds.updateType(this.id(), d.editingId, { label, fields, views });
     op$.subscribe({
       next: () => {
         this.draft.set(null);
@@ -355,36 +447,70 @@ export class WorldTypesPanel implements OnInit {
   }
 }
 
-/** A fresh, empty Field row — an optional string with no key yet. */
+/** A fresh, empty Field row — an optional string with no key yet, and shown as a View if made one. */
 function blankField(): DraftField {
-  return { key: '', label: '', kind: 'string', options: '', required: false, facetable: false };
+  return { key: '', label: '', kind: 'string', options: '', required: false, facetable: false, showAsView: true };
 }
 
-/** An existing Field schema → the flattened form model (enum options joined for the text input). */
-function toDraftField(field: FieldSchema): DraftField {
-  const kind = field.dataType.kind;
-  const supported = (DATA_TYPE_KINDS as readonly string[]).includes(kind) ? (kind as DataTypeKind) : 'string';
+/**
+ * An existing Field schema → the flattened form model (enum options joined for the text input).
+ *
+ * It keeps the whole {@link FieldSchema.dataType} in {@link DraftField.stored}, not just its `kind`,
+ * so a data-type the picker cannot *rebuild* still survives an edit of the Field beside it: a `list`
+ * carries an item type and an `entityLink` a target-type constraint, and neither has a control here to
+ * re-author them from. The alternative this replaces — coercing an unofferable kind to `string` —
+ * silently retyped a Field the author never touched.
+ */
+function toDraftField(field: FieldSchema, showAsView: boolean): DraftField {
   return {
     key: field.key,
     label: field.label,
-    kind: supported,
+    kind: field.dataType.kind,
     options: field.dataType.kind === 'enum' ? field.dataType.options.join(', ') : '',
     required: field.required,
     facetable: field.facetable,
+    showAsView,
+    stored: field.dataType,
   };
 }
 
-/** The form model → a Field schema for the request (the server re-validates through the shared Zod). */
+/**
+ * The form model → a Field schema for the request (the server re-validates through the shared Zod).
+ *
+ * A **Structured Field** is neither required nor facetable, whatever a stale draft carries: it is
+ * edited on its own View, so the create dialog could never collect it, and a document has no discrete
+ * values to count (ADR-0050). The form withholds both checkboxes; this is where that holds.
+ */
 function toFieldSchema(f: DraftField): FieldSchema {
-  const dataType =
-    f.kind === 'enum'
-      ? {
-          kind: 'enum' as const,
-          options: f.options
-            .split(',')
-            .map((option) => option.trim())
-            .filter(Boolean),
-        }
-      : { kind: f.kind };
-  return { key: f.key.trim(), label: f.label.trim(), dataType, required: f.required, facetable: f.facetable };
+  const structured = isStructuredKind(f.kind);
+  return {
+    key: f.key.trim(),
+    label: f.label.trim(),
+    dataType: toDataType(f),
+    required: !structured && f.required,
+    facetable: !structured && f.facetable,
+  };
+}
+
+/**
+ * The picked kind → a data-type: an `enum` rebuilds from its options text, a structured kind is its id
+ * alone, and a scalar is its bare literal.
+ *
+ * A kind the author left untouched hands back the **stored** data-type verbatim, which is the only way
+ * a `list`'s item type or an `entityLink`'s target-type constraint — neither of which this form can
+ * author — survives an edit of the type around them.
+ */
+function toDataType(f: DraftField): FieldDataType {
+  if (f.kind === 'enum')
+    return {
+      kind: 'enum',
+      options: f.options
+        .split(',')
+        .map((option) => option.trim())
+        .filter(Boolean),
+    };
+  if (f.stored?.kind === f.kind) return f.stored;
+  if (isStructuredKind(f.kind)) return { kind: f.kind };
+  // The remaining built-ins the picker offers are the scalars — one literal kind each, no payload.
+  return { kind: f.kind as Exclude<BuiltInKind, 'enum'> };
 }

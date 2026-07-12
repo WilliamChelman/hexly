@@ -1,5 +1,5 @@
 import { InjectionToken, Type } from '@angular/core';
-import { StructuredDataTypeId } from '@hexly/domain';
+import { StructuredDataTypeId, ViewPlacement } from '@hexly/domain';
 import { ViewId } from './view-instance';
 
 /**
@@ -36,8 +36,12 @@ export const CORE_VIEW_FIELDS = 'core.view.fields';
  * `[{ field: 'grid' }, CORE_VIEW_CONTENT]` and opens on its map, while a `world.deity` with a
  * battlemap opens on its Fields. Ordering a Field's View implicitly (always first, or always last) is
  * wrong in both directions.
+ *
+ * The domain's shape, not one of ours: a **User-defined type** is data, so its ordered View list is
+ * persisted and validated at the trust boundary — and it is the *same* list, so a plugin type and a
+ * World Owner's type run one view-resolution path rather than two (#201).
  */
-export type ViewPlacement = ViewId | { readonly field: string };
+export type { ViewPlacement };
 
 /**
  * The Metadata key of the **Structured Field** the active View renders — provided by {@link EntityPage}
@@ -87,6 +91,17 @@ export type ViewDefinition = {
        * ({@link StructuredDataType}) carries no View, the API having none.
        */
       readonly dataType: StructuredDataTypeId;
+      /**
+       * The transloco key naming the **data-type itself** ("Hex grid") — what the World Types editor
+       * offers alongside `string` and `enum` when a World Owner declares a Field (#201). Distinct
+       * from the toggle label above, which a structured View takes from the *Field* that placed it:
+       * one names the kind you pick, the other the grid you painted.
+       *
+       * Declaring it here rather than on the framework-free data-type is the same split the View is:
+       * the API has no copy. And it is what makes a data-type *offerable* — a kind with no View is a
+       * Field a World Owner could never edit, so the editor offers exactly the kinds that render.
+       */
+      readonly dataTypeLabelKey: string;
     }
 ) &
   (

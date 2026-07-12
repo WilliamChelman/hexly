@@ -81,6 +81,23 @@ render a _specific_ Field: an Entity carrying `[core.hexmap, world.deity]` where
   in the World Types editor (default on), so a deity may offer its battlemap, or not. Plugin types and
   user-defined types run one view-resolution path.
 
+  **Amended in #201**, on two points the ADR left open:
+
+  - The list is **persisted** (a `views` JSON column on `world_types`, and a `ViewPlacement[]` on the
+    user-defined-type payloads), because a user-defined type is data — so its view order round-trips
+    through the API like its Fields. The domain owns the placement _shape_ and validates it (every
+    `{ field }` names one of the type's own Fields); it never resolves a View, which stays the web's.
+    The editor recomposes the whole list from the live Fields and toggles on every save, so the two
+    always travel together and a placement can never outlive the Field it names. `null` is not `[]`:
+    it means "the author named no order", and the web defaults it.
+  - A plugin's structured data-type carries a **`dataTypeLabelKey`** on its View definition — the copy
+    that names the _kind_ where a World Owner picks it ("Hex grid"), distinct from the toggle label,
+    which a structured View takes from the Field that placed it ("Battlemap"). One names the kind you
+    pick, the other the grid you painted. It hangs off the View, not the framework-free data-type,
+    because the API has no copy — the same split the View itself is — and it makes "offerable in the
+    editor" fall out of "renderable": a kind with no View is a Field a World Owner could never edit,
+    so the picker offers exactly the kinds this build can draw.
+
 **The Hex Map ships as `libs/plugin-hexmap`** — the rename of `web-map`, and the first plugin with a
 server half:
 

@@ -3,7 +3,7 @@ import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { catchError, map, merge, of, Subject, switchMap } from 'rxjs';
 import { ActiveWorld, Logger, WorldsClient } from '@hexly/web-core';
 import { AvailableType } from '@hexly/domain';
-import { CORE_VIEW_FIELDS, TypeDefinition } from '@hexly/web-entity';
+import { TypeDefinition, userTypeViews } from '@hexly/web-entity';
 import { TypeRegistry } from './type-registry';
 
 /**
@@ -62,17 +62,23 @@ export class WorldTypesLoader {
 }
 
 /**
- * Project a user-defined {@link AvailableType} onto a {@link TypeDefinition}: the generic Field View
- * as its only View (so an Entity carrying it always renders), its Field schema, and its authored name
- * as `labelText`. It declares **no** transloco `labels` — a user-defined type ships no copy, so every
- * label it shows is that authored name, resolved through {@link TypeRegistry.name}/`chromeLabel`.
+ * Project a user-defined {@link AvailableType} onto a {@link TypeDefinition}: its authored **View**
+ * order, its Field schema, and its authored name as `labelText`. It declares **no** transloco
+ * `labels` — a user-defined type ships no copy, so every label it shows is that authored name,
+ * resolved through {@link TypeRegistry.name}/`chromeLabel`.
+ *
+ * The `views` list is the *same* {@link ViewPlacement} list a plugin type declares in code, so the
+ * registry resolves both down one path (#201) — a user-defined type is not a second kind of citizen
+ * with a hardcoded view.
  */
 function toDefinition(type: AvailableType): TypeDefinition {
   return {
     id: type.id,
     icon: 'label',
     labelText: type.label,
-    views: [CORE_VIEW_FIELDS],
+    // Absent is not empty: a type whose author never named an order (every one predating the "Show as
+    // a view" toggle) falls back to Fields, Content, and each of its Structured Fields.
+    views: type.views ?? userTypeViews(type.fields),
     fields: type.fields,
     graphColorToken: '--color-ink-muted',
   };

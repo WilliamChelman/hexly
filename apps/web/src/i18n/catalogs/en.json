@@ -340,6 +340,7 @@
     "fieldType": "Type",
     "fieldRequired": "Required",
     "fieldFacetable": "Filterable",
+    "fieldShowAsView": "Show as a view",
     "fieldOptions": "Options",
     "fieldOptionsHint": "Comma-separated",
     "removeField": "Remove field",

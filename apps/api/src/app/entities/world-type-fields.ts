@@ -21,12 +21,19 @@ export class WorldTypeFields {
   /** A World's stored user-defined types, in a stable id order (the CRUD read + the merge source). */
   list(worldId: string): UserDefinedType[] {
     return this.db
-      .select({ id: worldTypes.typeId, label: worldTypes.label, fields: worldTypes.fields })
+      .select({ id: worldTypes.typeId, label: worldTypes.label, fields: worldTypes.fields, views: worldTypes.views })
       .from(worldTypes)
       .where(eq(worldTypes.worldId, worldId))
       .orderBy(worldTypes.typeId)
       .all()
-      .map((row) => ({ id: row.id, label: row.label, fields: row.fields ?? [] }));
+      .map((row) => ({
+        id: row.id,
+        label: row.label,
+        fields: row.fields ?? [],
+        // A stored `null` is "the author named no order", which the web defaults — so it stays absent
+        // rather than becoming an empty list, which would mean "this type affords no View at all".
+        ...(row.views ? { views: row.views } : {}),
+      }));
   }
 
   /**

@@ -8,5 +8,6 @@ export * from './lib/entity-session';
 export * from './lib/entity-types';
 export * from './lib/plugin';
 export * from './lib/type-definition';
+export * from './lib/user-type-views';
 export * from './lib/view-definition';
 export * from './lib/view-instance';

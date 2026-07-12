@@ -25,6 +25,7 @@ import {
   EntityGrant,
   GrantRole,
   isEntityLinkDataType,
+  isFacetableField,
   PublicLink,
   entityLinkConstraints,
   resolveFields,
@@ -213,9 +214,12 @@ export class EntitiesService {
    * *active* Type filter (`opts.type`), so a Field facet is absent until its type is the active
    * filter, and the universal facets are unaffected. Each Field's values drill down like the
    * universal facets — counted against every other constraint but that Field's own filter.
+   *
+   * A **Structured Field** is never offered, whatever its flag says ({@link isFacetableField}) — the
+   * rail does not offer to filter a World by a grid (ADR-0050).
    */
   private countFieldFacets(opts: FacetOptions, filter: SQL): FieldFacet[] {
-    const fields = resolveFields(this.typeResolver(opts.worldId), opts.type ?? []).filter((field) => field.facetable);
+    const fields = resolveFields(this.typeResolver(opts.worldId), opts.type ?? []).filter(isFacetableField);
     return fields.map((field) => {
       const values = this.countFieldValues(
         // Drill-down: drop this Field's own filters, keep every sibling constraint.

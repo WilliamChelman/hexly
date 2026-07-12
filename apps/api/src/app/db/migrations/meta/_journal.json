@@ -134,6 +134,13 @@
       "when": 1783806324669,
       "tag": "0018_world_types",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1783888977265,
+      "tag": "0019_world_type_views",
+      "breakpoints": true
     }
   ]
 }

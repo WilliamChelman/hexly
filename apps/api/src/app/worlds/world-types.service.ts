@@ -5,9 +5,11 @@ import {
   CreateUserDefinedTypeRequest,
   EntityErrorCode,
   FieldSchema,
+  isFieldViewPlacement,
   UpdateUserDefinedTypeRequest,
   unresolvedDataTypeErrors,
   UserDefinedType,
+  ViewPlacement,
 } from '@hexly/domain';
 import { DB, Db } from '../db/db';
 import { worldAccess } from '../acl/world-access';
@@ -41,7 +43,7 @@ export class WorldTypesService {
     if (gate) return gate;
     if (this.types.list(worldId).some((type) => type.id === req.id)) return { status: 'conflict' };
     this.assertDataTypesResolve(req.fields);
-    const type: UserDefinedType = { id: req.id, label: req.label, fields: req.fields };
+    const type: UserDefinedType = { id: req.id, label: req.label, fields: req.fields, views: req.views };
     this.writes.createType(worldId, type);
     return { status: 'ok', value: type };
   }
@@ -59,9 +61,28 @@ export class WorldTypesService {
     const gate = this.gateOwner(userId, worldId);
     if (gate) return gate;
     if (patch.fields) this.assertDataTypesResolve(patch.fields);
-    if (!this.writes.updateType(worldId, typeId, patch)) return { status: 'not-found' };
+    const stored = this.types.list(worldId).find((type) => type.id === typeId);
+    if (!stored) return { status: 'not-found' };
+    if (!this.writes.updateType(worldId, typeId, { ...patch, views: this.survivingViews(stored, patch) }))
+      return { status: 'not-found' };
     // Just written in the same synchronous transaction, so it always resolves.
     return { status: 'ok', value: this.types.list(worldId).find((type) => type.id === typeId)! };
+  }
+
+  /**
+   * The View list to write, so that a placement never outlives the Field it names (ADR-0050, #201).
+   *
+   * The editor sends `fields` and `views` together, and the payload schema checks them against each
+   * other — but a caller may legally re-Field a type without re-placing its Views, and *that* patch
+   * cannot be self-checked: the stored list is the only thing the dropped Field is named in. So the
+   * pruning happens here, where the stored type is in hand. `undefined` leaves the stored list alone
+   * — the only case being a patch that touches neither list.
+   */
+  private survivingViews(stored: UserDefinedType, patch: UpdateUserDefinedTypeRequest): ViewPlacement[] | undefined {
+    if (patch.views) return patch.views;
+    if (!patch.fields || !stored.views) return undefined;
+    const keys = new Set(patch.fields.map((field) => field.key));
+    return stored.views.filter((view) => !isFieldViewPlacement(view) || keys.has(view.field));
   }
 
   /**

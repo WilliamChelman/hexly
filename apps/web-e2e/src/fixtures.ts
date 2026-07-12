@@ -64,14 +64,16 @@ interface SavedGrid {
  * The grid a Hex Map has actually persisted, fetched from the API — what a map spec checks after a
  * save, beyond what the reloaded canvas already shows.
  *
- * The one place a test knows *where* the grid is stored (the `grid` Field's value in the Entity's
- * Metadata, ADR-0050), so moving it again is a one-line change rather than a sweep.
+ * The one place a test knows *where* the grid is stored (a **Structured Field**'s value in the
+ * Entity's one Metadata map, ADR-0050), so moving it again is a one-line change rather than a sweep.
+ * `core.hexmap` declares its grid at `grid`; a World Owner's own type declares its at whatever key
+ * its author chose, which is what `fieldKey` is for (#201).
  */
-export async function savedGrid(request: APIRequestContext, entityId: string): Promise<SavedGrid> {
+export async function savedGrid(request: APIRequestContext, entityId: string, fieldKey = 'grid'): Promise<SavedGrid> {
   const res = await request.get(`/api/entities/${entityId}`);
   expect(res.ok()).toBeTruthy();
   const detail = await res.json();
-  return detail.document.metadata.grid as SavedGrid;
+  return detail.document.metadata[fieldKey] as SavedGrid;
 }
 
 /**

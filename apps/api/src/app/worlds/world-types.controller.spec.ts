@@ -288,4 +288,164 @@ describe('World user-defined types endpoints', () => {
       expect(read.body.document.metadata).toEqual({ domain: 'sun' });
     });
   });
+
+  /**
+   * The payoff of ADR-0050 (#201): a World Owner gives a type they defined a **map**, code-lessly, by
+   * declaring a Field of the map plugin's `core.hex-grid` data-type. The API's part is to persist the
+   * declaration — Field and View placement — validate the grid it types, and harvest its links; it
+   * never learns what a hex is.
+   */
+  describe('a user-defined type carrying a Structured Field', () => {
+    /** `world.deity`, plus a `battlemap` grid placed *after* its Fields — a deity opens on its Fields. */
+    const deityWithMap = {
+      id: 'world.deity',
+      label: 'Deity',
+      fields: [
+        { key: 'domain', label: 'Domain', dataType: { kind: 'string' }, facetable: true },
+        { key: 'battlemap', label: 'Battlemap', dataType: { kind: 'core.hex-grid' } },
+      ],
+      views: ['core.view.fields', 'core.view.content', { field: 'battlemap' }],
+    };
+
+    /** One painted hex — the smallest grid that proves the value survived the round trip. */
+    const paintedGrid = { hexes: { '0,0': { terrain: 'ocean' } }, regions: [], labels: [] };
+
+    it('stores a hex-grid Field and its View placement, and hands both back', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const world = await makeWorld(ada);
+
+      const created = await ada.post(`/worlds/${world}/types`).send(deityWithMap).expect(201);
+      expect(created.body.fields).toContainEqual(
+        expect.objectContaining({ key: 'battlemap', dataType: { kind: 'core.hex-grid' } }),
+      );
+      // The View list round-trips verbatim: the API stores an order it does not resolve.
+      expect(created.body.views).toEqual(['core.view.fields', 'core.view.content', { field: 'battlemap' }]);
+
+      const listed = await ada.get(`/worlds/${world}/types`).expect(200);
+      expect(listed.body).toContainEqual(
+        expect.objectContaining({
+          id: 'world.deity',
+          source: 'user',
+          views: ['core.view.fields', 'core.view.content', { field: 'battlemap' }],
+        }),
+      );
+    });
+
+    it('prunes a stored View placement whose Field a re-Fielding patch dropped', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const world = await makeWorld(ada);
+      await ada.post(`/worlds/${world}/types`).send(deityWithMap).expect(201);
+
+      // A caller may legally re-Field a type without re-placing its Views — a patch no payload schema
+      // can self-check, since the dropped Field is named only in the *stored* list.
+      const patched = await ada
+        .patch(`/worlds/${world}/types/world.deity`)
+        .send({ fields: [{ key: 'domain', label: 'Domain', dataType: { kind: 'string' } }] })
+        .expect(200);
+
+      // The battlemap's placement goes with its Field; the type's own Views survive.
+      expect(patched.body.views).toEqual(['core.view.fields', 'core.view.content']);
+    });
+
+    it('refuses a Field naming a data-type this build does not register', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const world = await makeWorld(ada);
+
+      // Well-formed, but no plugin ships it — caught at *declaration*, against the composed set.
+      const res = await ada
+        .post(`/worlds/${world}/types`)
+        .send({
+          id: 'world.deity',
+          label: 'Deity',
+          fields: [{ key: 'battlemap', label: 'Battlemap', dataType: { kind: 'core.hex-gird' } }],
+        })
+        .expect(400);
+      expect(res.body.data.fields).toContainEqual({ key: 'battlemap', code: 'unknown-data-type' });
+    });
+
+    it('validates and persists the grid the user-defined Field types, and harvests its links', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const world = await makeWorld(ada);
+      await ada.post(`/worlds/${world}/types`).send(deityWithMap).expect(201);
+
+      const lair = await ada
+        .post('/entities')
+        .send({ name: 'The Sunken Keep', types: ['core.note'] })
+        .expect(201);
+      const pelor = await ada
+        .post('/entities')
+        .send({ name: 'Pelor', types: ['world.deity'] })
+        .expect(201);
+
+      // An ill-typed grid is refused by the same forward-only gate a `string` Field rides — the write
+      // path resolves `core.hex-grid`'s own schema from the bundled plugins, not from a map branch.
+      const bad = await ada
+        .put(`/entities/${pelor.body.id}`)
+        .send({
+          document: { content: emptyContent(), metadata: { battlemap: 'not a grid' } },
+          version: 1,
+          tags: [],
+          types: ['world.deity'],
+        })
+        .expect(400);
+      expect(bad.body.data.fields).toContainEqual({ key: 'battlemap', code: 'type' });
+
+      // A well-formed grid saves, links and all.
+      await ada
+        .put(`/entities/${pelor.body.id}`)
+        .send({
+          document: {
+            content: emptyContent(),
+            metadata: {
+              domain: 'sun',
+              battlemap: { ...paintedGrid, hexes: { '0,0': { terrain: 'ocean', entityId: lair.body.id } } },
+            },
+          },
+          version: 1,
+          tags: [],
+          types: ['world.deity'],
+        })
+        .expect(200);
+
+      const read = await ada.get(`/entities/${pelor.body.id}`).expect(200);
+      expect(read.body.document.metadata.battlemap.hexes['0,0'].terrain).toBe('ocean');
+
+      // The grid's Entity Links are harvested like a Hex Map's: the data-type owns its edges, so a
+      // World Owner's map feeds the World Graph and the References panel for free.
+      const refs = await ada.get(`/entities/${lair.body.id}/references`).expect(200);
+      expect(refs.body.referencedBy.map((r: { source: { id: string } }) => r.source.id)).toContain(pelor.body.id);
+    });
+
+    it('never offers the grid Field as a facet, however it was flagged', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const world = await makeWorld(ada);
+      // A World Owner ticking `facetable` on a grid gets no facet: a document has no discrete values
+      // to count, so the rail never offers to filter by it (ADR-0050).
+      await ada
+        .post(`/worlds/${world}/types`)
+        .send({
+          id: 'world.deity',
+          label: 'Deity',
+          fields: [{ key: 'battlemap', label: 'Battlemap', dataType: { kind: 'core.hex-grid' }, facetable: true }],
+        })
+        .expect(201);
+
+      const pelor = await ada
+        .post('/entities')
+        .send({ name: 'Pelor', types: ['world.deity'] })
+        .expect(201);
+      await ada
+        .put(`/entities/${pelor.body.id}`)
+        .send({
+          document: { content: emptyContent(), metadata: { battlemap: paintedGrid } },
+          version: 1,
+          tags: [],
+          types: ['world.deity'],
+        })
+        .expect(200);
+
+      const facets = await ada.get('/entities/facets').query({ worldId: world, type: 'world.deity' }).expect(200);
+      expect(facets.body.fields).toEqual([]);
+    });
+  });
 });

@@ -1,4 +1,4 @@
-import { EdgeTargetKind, FieldSchema } from '@hexly/domain';
+import { EdgeTargetKind, FieldSchema, ViewPlacement } from '@hexly/domain';
 import { index, integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 // Keep in sync by hand with the `CREATE TABLE` DDL in `./db.ts`; column changes
@@ -178,6 +178,11 @@ export const worldTypes = sqliteTable(
     // The type's Field schema (FieldSchema[]), validated at the trust boundary against the shared Zod
     // schema. A JSON bag, never DB-queried — the write-path resolver loads it whole and unions it.
     fields: text('fields', { mode: 'json' }).$type<FieldSchema[]>().notNull().default([]),
+    // The type's ordered View list (ViewPlacement[], ADR-0050, #201) — what the "Show as a view"
+    // toggle writes. Nullable, and null is *not* an empty list: it means the author never named an
+    // order, so the web defaults it (Fields, Content, then the type's Structured Fields). The API
+    // never resolves a View; it stores the list and validates its shape, as it does for `fields`.
+    views: text('views', { mode: 'json' }).$type<ViewPlacement[]>(),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },

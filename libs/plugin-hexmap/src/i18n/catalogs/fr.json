@@ -1,4 +1,7 @@
 {
+  "dataType": {
+    "hexGrid": "Grille hexagonale"
+  },
   "hexmap": {
     "eyebrow": "Carte hexagonale",
     "titleLabel": "Titre de la carte",
