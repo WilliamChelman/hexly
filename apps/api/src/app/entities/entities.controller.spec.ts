@@ -531,8 +531,8 @@ describe('Entities endpoints', () => {
       const created = await ada.post('/entities').send({ name: 'Aboleth', types: ['test.beast'] });
       const worldId = created.body.worldId;
 
-      // Import: bulk-inserted Metadata never faces the gate (ADR-0033), whatever it holds — and that
-      // holds for a *typed* import too, now that a vault stamps an Entity's types (#203).
+      // Import: bulk-inserted Metadata never faces the gate (ADR-0033), whatever it holds — a typed
+      // import (#203) included.
       app.get(EntitiesService).importEntity({
         ownerId: adaId,
         worldId,

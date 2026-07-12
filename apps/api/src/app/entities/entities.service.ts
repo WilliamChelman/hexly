@@ -474,11 +474,9 @@ export class EntitiesService {
    * Insert a fully-built Entity for the vault import path: body, metadata, and Type set come
    * pre-converted, and the target World is the caller's fresh import World.
    *
-   * The `types` arrive as the vault stamped them and are inserted as they stand — nothing is
-   * resolved here (#203). That is deliberate: an Entity's types are an open set, so a type this
-   * build never registered (a user-defined one, whose definition lives in the World it was authored
-   * in, not in the vault) still lands, and degrades to the generic Field view. Nor are the Fields
-   * validated: an import establishes data at rest, and the Field gate is forward-only (ADR-0048).
+   * The `types` are inserted unresolved (#203) — an unregistered one still lands, and degrades to
+   * the generic Field view. The Fields are unvalidated: an import establishes data at rest, and the
+   * Field gate is forward-only (ADR-0048).
    */
   importEntity(input: InsertEntityInput): void {
     this.writes.insert(input);

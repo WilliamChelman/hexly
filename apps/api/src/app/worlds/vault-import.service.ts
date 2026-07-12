@@ -24,8 +24,8 @@ import { WorldsService } from './worlds.service';
 
 /**
  * Vault import (ADR-0033): unzip a `.zip` server-side and turn each markdown file into an Entity in
- * a brand-new World named after the upload — a plain Note, unless the file's frontmatter stamps its
- * types (see {@link toTypes}), which is how a Hexly export's own vault comes home. Runs synchronously
+ * a brand-new World named after the upload — a plain Note, unless its frontmatter stamps the types
+ * ({@link toTypes}). Runs synchronously
  * (a job queue is YAGNI at this scale). Two-pass (#147): pass 1 converts every file and
  * assigns it an id; pass 2 resolves each `[[wikilink]]` to the id of the note it names
  * (dangling when none matches) before persisting. Continue-on-error: a file that can't be
@@ -107,10 +107,8 @@ export class VaultImportService {
         );
         const content = tiptapContent(note.doc);
         // Folder path recorded under the reserved namespace so export can rebuild the tree.
-        // The one body shape every Entity has, whatever its types: frontmatter lands as Metadata, and
-        // a Field only *types* a key that map already holds — so an imported Entity needs no
-        // per-type unpacking, a **Structured Field**'s nested value (a Hex Map's grid) included
-        // (ADR-0050).
+        // Frontmatter lands as Metadata whatever the types: a Field only types a key that map already
+        // holds, a Structured Field's nested value (a Hex Map's grid) included (ADR-0050).
         const body: EntityBody = {
           content,
           metadata: { ...passThrough, 'hexly.sourcePath': note.path },
@@ -293,17 +291,12 @@ function resolveLinks(node: ContentNode, index: NoteIndex): { resolved: number; 
 }
 
 /**
- * Frontmatter `hexly.type` → the Entity's ordered Type set (#203) — the read that makes an Entity's
- * types survive an export/import round-trip, so a Monster comes back a Monster and a Hex Map comes
- * back with its grid.
+ * Frontmatter `hexly.type` → the Entity's ordered Type set (#203). Ids are validated for shape and
+ * applied; none is resolved against a registry, so a user-defined type — whose definition lives in
+ * its World, not in the vault — lands like a plugin's.
  *
- * The ids are validated for *shape* and applied; none is resolved against a registry. That is what
- * makes the path generic (it names no type id) and what lets a user-defined type — whose definition
- * lives in the World it was authored in, not in the vault — land on the same footing as a plugin's.
- *
- * A vault authored elsewhere must not be able to break a World, so anything that is not a
- * well-formed set falls back to a plain Note rather than failing the file: the whole set, not just
- * the bad id, because a half-applied type set is a shape no author asked for.
+ * Anything not a well-formed set degrades to a plain Note rather than failing the file, and the
+ * whole set goes: a half-applied one is a shape no author asked for.
  */
 function toTypes(raw: unknown): readonly EntityType[] {
   return typesSchema.catch([CORE_NOTE]).parse(Array.isArray(raw) ? raw : []);

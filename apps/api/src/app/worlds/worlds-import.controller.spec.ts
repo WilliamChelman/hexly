@@ -213,12 +213,7 @@ describe('Vault import endpoint', () => {
     });
   });
 
-  /**
-   * The other half of the export's generic `hexly.type` stamp (#203, ADR-0050): import reads it back,
-   * so an Entity's whole ordered Type set survives a vault round-trip. Import resolves nothing — it
-   * applies the ids the frontmatter names, which is what lets a plugin type and a user-defined type
-   * arrive on the same footing, with no type id spelled out in the vault code.
-   */
+  /** The read half of the export's generic `hexly.type` stamp (#203, ADR-0050). */
   describe('hexly.type', () => {
     it("applies the stamped types to the imported Entity, in order, and doesn't leave them in Metadata", async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
@@ -236,18 +231,17 @@ describe('Vault import endpoint', () => {
       const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
       const { summary, detail } = await entityNamed(ada, res.body.worldId, 'Owlbear');
 
-      // Primary type first, as stamped — a Monster comes back a Monster, with its Fields intact.
+      // Primary type first, as stamped.
       expect(summary.types).toEqual(['core.note', 'dnd.monster']);
       expect(detail.document.metadata).toMatchObject({ challenge_rating: 3, size: 'Large' });
-      // Reserved provenance, consumed on import and re-derived on the next export — never author Metadata.
+      // Reserved provenance: consumed, never stored back as author Metadata.
       expect(detail.document.metadata).not.toHaveProperty('hexly.type');
     });
 
     it('applies a type this build has never heard of — nothing is resolved on the import path', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      // `world.deity` is a user-defined type, and its definition lives in the World it was authored
-      // in, not in the vault. The id still lands: an Entity's types are an open set, and an
-      // unresolvable one degrades to the generic Field view rather than being dropped (ADR-0048).
+      // `world.deity`'s definition lives in the World it was authored in, not in the vault. The id
+      // still lands: an unresolvable type degrades to the generic Field view (ADR-0048).
       const zip = vaultZip({
         'Deities/Vela.md': ['---', 'hexly.type: [world.deity]', 'domain: dusk', '---', '# Vela'].join('\n'),
       });
@@ -268,7 +262,7 @@ describe('Vault import endpoint', () => {
 
       const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
 
-      // Neither file is skipped: bad data at rest is tolerated, never fatal.
+      // Neither file is skipped.
       expect(res.body.notesImported).toBe(2);
       expect((await entityNamed(ada, res.body.worldId, 'Junk')).summary.types).toEqual(['core.note']);
       expect((await entityNamed(ada, res.body.worldId, 'Bare')).summary.types).toEqual(['core.note']);
@@ -276,8 +270,8 @@ describe('Vault import endpoint', () => {
 
     it('opens an imported note whose grid: frontmatter is not a valid grid', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      // A stranger's vault happens to use `grid:` for something else. Field validation is
-      // forward-only, so the value is stored as it stands and the note still reads back.
+      // A stranger's vault uses `grid:` for something else. Field validation is forward-only, so the
+      // value is stored as it stands.
       const zip = vaultZip({
         'Chart.md': ['---', 'hexly.type: [core.hexmap]', 'grid: hand-drawn, 12 squares', '---', '# Chart'].join('\n'),
       });

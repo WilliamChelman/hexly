@@ -99,9 +99,8 @@ export const HEXLY_METADATA_PREFIX = 'hexly.';
 
 /**
  * The reserved key a vault export stamps an Entity's ordered Type set under, and import reads back
- * (ADR-0050, #203) — no author Metadata key records the types, so the round-trip needs one. It lives
- * here rather than in either vault service because the two halves contract on it: export writes the
- * key import reads, and a rename must move both at once.
+ * (ADR-0050, #203) — no author Metadata key records the types. Shared, because the two halves of the
+ * round-trip contract on it.
  */
 export const HEXLY_TYPE_KEY = `${HEXLY_METADATA_PREFIX}type`;
 

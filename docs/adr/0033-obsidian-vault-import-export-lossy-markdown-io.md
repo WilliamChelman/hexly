@@ -2,13 +2,11 @@
 
 > **Amended in part by [ADR-0050](./0050-payload-kinds-collapse-into-structured-fields.md) (#203):** two
 > statements below are reversed. Export no longer **drops a Hex Map's grid** — a **Structured Field**'s
-> value rides the frontmatter as nested YAML like any other Field's, so the grid round-trips — and
-> `hexly.type` is stamped from the Entity's whole ordered Type set, naming no type id. Import no longer
-> lands **everything as a `note`**: it reads that stamp back and applies it, so a Monster, a Hex Map, and
-> a user-defined type all survive the round-trip (a malformed stamp still falls back to a plain Note, and
-> a `grid:` that is not a grid is tolerated at rest, never fatal). Everything else here still stands:
-> markdown is I/O only, the boundary is lossy by design, loss is measured at import, and one vault mints
-> one World.
+> value rides the frontmatter as nested YAML like any other Field's — and `hexly.type` is stamped from
+> the Entity's whole ordered Type set, naming no type id. Import no longer lands **everything as a
+> `note`**: it reads that stamp back and applies it, so a Monster, a Hex Map, and a user-defined type all
+> survive the round-trip. Everything else here still stands: markdown is I/O only, the boundary is lossy
+> by design, loss is measured at import, and one vault mints one World.
 
 Hexly imports mostly-vanilla Obsidian vaults (a `.zip` of `.md` files, folders, and asset binaries) and exports a World back to the same shape, primarily as a round-trip fidelity check ("what did we lose?"). Markdown is **I/O only** — stored Content stays opaque `tiptap-v*` ProseMirror JSON (ADR-0019); conversion happens in two hand-written pure functions (`mdast → ProseMirror`, `ProseMirror → mdast`) built on **remark/mdast**, chosen for its GFM/frontmatter/wikilink ecosystem and a clean tree to map from. The boundary is deliberately **lossy**: markdown a native extension can't represent is **degraded to the nearest existing node** on import (not preserved verbatim). Loss is measured at **import time** via the summary report, and improvements are iterative by **re-importing the original vault** (which stays authoritative on disk) — not by upgrading stored content in place.
 

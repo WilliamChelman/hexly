@@ -286,10 +286,9 @@ describe('Vault export endpoint', () => {
   });
 
   /**
-   * The round-trip a vault is *for* (#203): a World's whole vocabulary survives it, not just its
-   * prose. `hexly.type` carries each Entity's ordered Type set out and back, and a **Structured
-   * Field**'s value rides the frontmatter as nested YAML like any other Field's — so the Hex Map's
-   * grid comes home, and it does so through code that names no type id and knows no hex (ADR-0050).
+   * `hexly.type` carries each Entity's ordered Type set out and back, and a Structured Field's value
+   * rides the frontmatter as nested YAML like any other Field's — through code that names no type id
+   * (#203, ADR-0050).
    */
   it("round-trips an Entity's types and its structured values: a Monster, a Hex Map, a user-defined type", async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
@@ -353,15 +352,15 @@ describe('Vault export endpoint', () => {
     const reimported = entities.listByWorld(adaId, reimport.body.worldId);
     const byName = (name: string) => reimported.find((e) => e.name === name);
 
-    // The Monster is a Monster again, primary type first, with its Fields intact.
+    // Primary type first, Fields intact.
     expect(byName('Owlbear')?.types).toEqual(['core.note', 'dnd.monster']);
     expect(byName('Owlbear')?.document.metadata).toMatchObject({ challenge_rating: 3, size: 'Large' });
 
-    // The user-defined type survives on the same footing — the import resolved neither of them.
+    // The user-defined type on the same footing — neither was resolved.
     expect(byName('Vela')?.types).toEqual(['world.deity']);
     expect(byName('Vela')?.document.metadata).toMatchObject({ domain: 'dusk' });
 
-    // The Hex Map comes home whole: its type, and its grid down to the last label.
+    // Terrain, feature, region, and label all survive.
     expect(byName('Aldermoor Map')?.types).toEqual(['core.hexmap']);
     expect(byName('Aldermoor Map')?.document.metadata?.['grid']).toEqual(grid);
   });
