@@ -1,15 +1,12 @@
 /**
- * The `dnd.monster` bundled Plugin type (#192) — the first type with a **bespoke view**, proving a
- * compiled-in plugin can teach Hexly a whole game system through the same `defineType` the core
- * dogfoods (CONTEXT.md → Type Definition).
+ * The `dnd.monster` bundled Plugin type (CONTEXT.md → Type Definition, #192). Namespaced (`dnd.`) so
+ * a future `pathfinder.monster` never collides.
  *
- * Namespaced (`dnd.`) so a future `pathfinder.monster` never collides. It adds **no payload**: a
- * monster is the `rich-content` base (its lore is its Content) plus a Field schema, so its stat block
- * lives entirely in the one Metadata map — which is why an instance *without* this plugin still opens
- * a monster fine, as rich content plus the generic Field view (CONTEXT.md → Field).
+ * It adds no payload: a monster is the `rich-content` base plus a Field schema, so its stat block
+ * lives entirely in the Metadata map — an instance without this plugin still opens one as rich
+ * content plus the generic Field view.
  *
- * This module is the framework-free half, the one the API reads. The Angular half — chrome and the
- * stat-block View — is `@hexly/plugin-dnd/web`.
+ * The framework-free half, which the API reads. The Angular half is `@hexly/plugin-dnd/web`.
  */
 
 import { defineType, FieldSchema } from '@hexly/domain';
@@ -18,9 +15,9 @@ import { defineType, FieldSchema } from '@hexly/domain';
 export const DND_MONSTER = 'dnd.monster';
 
 /**
- * The Metadata keys the stat block prints, grouped as it prints them — the identity line, the
- * defences, the abilities, and the Challenge Rating. The view resolves its rows from these rather
- * than re-typing the key strings, so renaming a Field here can't silently drop a row from the block.
+ * The Metadata keys the stat block prints, grouped as it prints them. The view resolves its rows from
+ * these rather than re-typing the key strings; `monster.spec.ts` pins the two together, since the
+ * view skips a key it can't resolve and would otherwise drop a renamed Field's row in silence.
  */
 export const DND_IDENTITY_KEYS = ['size', 'creature_type', 'alignment'] as const;
 export const DND_DEFENCE_KEYS = ['armor_class', 'hit_points', 'speed'] as const;
@@ -49,10 +46,9 @@ export const DND_ABILITY_ABBREVIATIONS: Readonly<Record<DndAbilityKey, string>> 
 };
 
 /**
- * A D&D ability modifier: `floor((score - 10) / 2)` — the derived number a stat block prints beside
- * the raw score. Pure and shared so the view never re-invents the rule. `null` for an absent or
- * ill-typed score, which the view renders as a blank rather than a bogus `-5` (forward-only: a
- * monster at rest with garbage in `strength` still displays).
+ * A D&D ability modifier: `floor((score - 10) / 2)`, the number a stat block prints beside the raw
+ * score. `null` for an absent or ill-typed score, so the view renders a blank rather than a bogus
+ * `-5` — a monster at rest with garbage in `strength` still displays (forward-only).
  */
 export function abilityModifier(score: unknown): number | null {
   if (typeof score !== 'number' || !Number.isFinite(score)) return null;
@@ -73,10 +69,9 @@ const ABILITY_FIELDS: readonly FieldSchema[] = DND_ABILITY_KEYS.map((key) => ({
 }));
 
 /**
- * The bundled `dnd.monster` type. `challenge_rating` is the one **required** Field — the number a
- * worldbuilder filters and sorts by, so a monster without it is not yet a monster — and, with `size`
- * and `creature_type`, is **facetable**, unfolding in the Entity Browser's rail once `dnd.monster` is
- * the active Type filter (ADR-0035, #188).
+ * The bundled `dnd.monster` type. `challenge_rating` is the one required Field; it, `size`, and
+ * `creature_type` are facetable, unfolding in the Entity Browser's rail once `dnd.monster` is the
+ * active Type filter (ADR-0035, #188).
  */
 export const DND_MONSTER_TYPE = defineType({
   id: DND_MONSTER,

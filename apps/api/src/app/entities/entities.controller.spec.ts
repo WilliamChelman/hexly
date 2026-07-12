@@ -1655,10 +1655,9 @@ describe('Entities endpoints', () => {
   });
 
   /**
-   * The bundled `dnd.monster` plugin (#192). Nothing here registers a type: the plugin declared it in
-   * code and {@link TypeFieldRegistry} seeded it at startup — which is what "the plugin's Field schema
-   * is known on the API side" means. The API knows nothing of the plugin's stat-block view; it knows
-   * its Fields, and that is enough to validate and facet a monster.
+   * The bundled `dnd.monster` plugin (#192). Nothing here registers a type: the plugin declares it in
+   * code and {@link TypeFieldRegistry} seeds it at startup. The API never sees the stat-block view —
+   * the Fields alone are enough to validate and facet a monster.
    */
   describe('the bundled dnd.monster plugin type', () => {
     /** Typed-save a monster with the given Metadata — an active typed edit, so the gate applies. */

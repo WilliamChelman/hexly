@@ -14,9 +14,9 @@ import { PLUGIN_TYPE_DEFINITIONS } from '../plugins/bundled-types';
  * `type === 'hexmap'` / `type === 'note'` branches (ADR-0048).
  *
  * Core `note`/`hexmap` register through the same path a bundled plugin does — the
- * two seedings below are the same call with different data, which is what keeps the
- * plugin API from rotting un-exercised (ADR-0048). A World's user-defined types join
- * the same registry at runtime, projected by {@link WorldTypesLoader} (#191).
+ * two seedings below are one call with different data (ADR-0048). A World's
+ * user-defined types join the same registry at runtime, projected by
+ * {@link WorldTypesLoader} (#191).
  */
 @Injectable({ providedIn: 'root' })
 export class TypeRegistry {
@@ -28,8 +28,7 @@ export class TypeRegistry {
 
   constructor() {
     for (const def of CORE_TYPE_DEFINITIONS) this.register(def);
-    // The bundled plugins (`dnd.monster`, #192) — registered instance-wide at startup, through the
-    // identical `register()` the core just used. The registry knows the list, never a plugin.
+    // The bundled plugins (`dnd.monster`, #192): instance-wide, through the call the core just used.
     for (const def of PLUGIN_TYPE_DEFINITIONS) this.register(def);
   }
 
@@ -64,12 +63,11 @@ export class TypeRegistry {
    * `[core.view.map, core.view.content]`; a `[dnd.monster, core.hexmap]` composes
    * all three (stat block, Note, and Map). `types[0]`'s first view is the default.
    *
-   * A registered type affords exactly the Views it declares — so a plugin shipping a
-   * bespoke view (the stat block) does *not* also drag in the generic Field View,
-   * while a fields-only type (every user-defined one, #191) declares
-   * `core.view.fields` outright. Only an **unregistered** type — a missing plugin —
-   * falls back to it, which is the graceful-absence path: an inert chip over the
-   * values, still plain Metadata (#187).
+   * A registered type affords exactly the Views it declares: a plugin shipping a
+   * bespoke view does not also get the generic Field View, while a fields-only type
+   * (every user-defined one, #191) declares `core.view.fields` outright. Only an
+   * unregistered type — a missing plugin — falls back to it, rendering an inert chip
+   * over its values as plain Metadata (#187).
    */
   viewsFor(types: readonly string[] | null | undefined): ViewId[] {
     const seen = new Set<ViewId>();

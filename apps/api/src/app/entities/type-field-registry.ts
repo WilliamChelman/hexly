@@ -9,16 +9,14 @@ interface RegisteredType {
 }
 
 /**
- * The API-side registry of every **code-registered** Entity Type — its Field schema and label
- * (ADR-0048) — the backend twin of the web `TypeRegistry`. It is seeded at startup from the core types
- * and the bundled plugins through one loop, because they are the same kind of thing: a
- * `defineType` declaration. That is what makes a plugin's Fields real on this side — the write path
- * resolves them for the forward-only gate and materialises their facets, with no knowledge of the
- * plugin's Angular view.
+ * The API-side registry of every code-registered Entity Type — its Field schema and label (ADR-0048),
+ * the backend twin of the web `TypeRegistry`. Seeded at startup from the core types and the bundled
+ * plugins in one loop, since both are `defineType` declarations. The write path resolves a plugin's
+ * Fields from here for the forward-only gate and the facet build, knowing nothing of its Angular view.
  *
- * The core types declare no Fields, so they add nothing to resolve; they are registered anyway so the
- * available-types list a World reports is the whole code-registered set, not just the plugins. An
- * unregistered type resolves to `undefined` ("no Fields", never a throw).
+ * The core types declare no Fields, so they add nothing to resolve; they are registered so a World's
+ * available-types list reports the whole code-registered set. An unregistered type resolves to
+ * `undefined` ("no Fields", never a throw).
  *
  * A World's user-defined types are not here — they are stored per-World and merged in by
  * {@link WorldTypeFields}.

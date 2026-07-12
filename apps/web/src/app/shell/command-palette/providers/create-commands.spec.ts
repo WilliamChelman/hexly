@@ -20,8 +20,8 @@ describe('CreateCommands', () => {
 
   it('offers a create Command per registered type — core first, then the bundled plugins', async () => {
     const commands = await firstValueFrom(provider.search(''));
-    // `create-dnd.monster` is not enumerated anywhere: the bundled plugin registers its type and the
-    // Command falls out of `types.all()`, which is exactly the plugin API doing its job (#192).
+    // `create-dnd.monster` is enumerated nowhere: the bundled plugin registers its type and the
+    // Command falls out of `types.all()` (#192).
     expect(commands.map((c) => c.id)).toEqual(['create-note', 'create-map', 'create-dnd.monster']);
   });
 

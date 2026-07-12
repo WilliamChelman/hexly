@@ -9,9 +9,8 @@ import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { StatBlockView } from './stat-block-view';
 
 /**
- * The plugin's bespoke View (#192). It is bound to nothing but the {@link ENTITY_SESSION} contract, so
- * the spec stands a minimal fake session in for the app's — which is the coupling being proved: the
- * app composes this plugin, the plugin never reaches into the app.
+ * The plugin's bespoke View (#192). It binds to nothing but the {@link ENTITY_SESSION} contract, so a
+ * minimal fake session stands in for the app's.
  */
 describe('StatBlockView', () => {
   /** A stand-in for the app's central store: the one body every View reads its slice off. */
@@ -50,9 +49,9 @@ describe('StatBlockView', () => {
       strength: 30,
     });
 
-    // The flavour line a player reads first — derived from the Fields, never authored as prose.
+    // The flavour line is derived from the Fields, not authored as prose.
     expect(el.querySelector('[data-testid=stat-block-subtitle]')?.textContent).toContain('Huge dragon, chaotic evil');
-    // The derived ability modifier is the whole point of a bespoke view: a raw 30 means +10.
+    // The derived ability modifier: a raw 30 means +10.
     expect(el.querySelector('[data-testid=stat-mod-strength]')?.textContent).toContain('+10');
   });
 
@@ -70,9 +69,9 @@ describe('StatBlockView', () => {
   });
 
   /**
-   * The block is the *only* surface a monster's optional Fields have — the create dialog collects
-   * required ones only, and a type with a bespoke view affords no generic Field view. So every
-   * declared Field must be editable here, or a facetable Field would be unsettable in the whole app.
+   * The block is the only surface a monster's optional Fields have: the create dialog collects required
+   * ones only, and a type with a bespoke view affords no generic Field view. An unrendered Field would
+   * be unsettable anywhere in the app.
    */
   it('offers an editable slot for every Field the type declares, not just the required one', () => {
     const { fixture, session, el } = render({ challenge_rating: 5 });

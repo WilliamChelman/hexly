@@ -12,7 +12,7 @@ import {
 
 describe('defineType', () => {
   it('rejects a malformed plugin at declaration time, not at runtime', () => {
-    // A bare id (no namespace) would collide with a future plugin's — the whole point of `dnd.`.
+    // A bare id (no namespace) would collide with a future plugin's.
     expect(() => defineType({ id: 'monster', label: 'Monster' })).toThrow();
     // Two Fields typing one Metadata key is a plugin bug: the key can only mean one thing.
     expect(() =>

@@ -43,8 +43,7 @@ describe('TypeRegistry', () => {
   });
 
   it('seeds the core types, then the bundled plugins — all through one register()', () => {
-    // The core dogfoods the plugin API: `core.note`/`core.hexmap` and `dnd.monster` arrive by the
-    // same call, and the registry cannot tell which is which (ADR-0048, #192).
+    // `core.note`/`core.hexmap` and `dnd.monster` arrive by the same `register()` (ADR-0048, #192).
     expect(registry.all().map((d) => d.id)).toEqual(['core.note', 'core.hexmap', DND_MONSTER]);
   });
 

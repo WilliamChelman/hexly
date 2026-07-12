@@ -79,10 +79,9 @@ export class EntityPage {
   protected readonly activeComponent = computed(() => this.views.resolve(this.viewStore.activeView()).component);
 
   constructor() {
-    // Register the core Views from the lazy entity chunk — and, through the identical call, the
-    // bundled plugins' own (the `dnd.monster` stat block, #192) — dropping them when the page is
-    // torn down (ADR-0048). Kept out of the root ViewRegistry so the heavy view bodies stay off the
-    // initial bundle.
+    // Register the core Views and the bundled plugins' (#192) from the lazy entity chunk, dropping
+    // them when the page is torn down (ADR-0048). Kept out of the root ViewRegistry so the heavy view
+    // bodies stay off the initial bundle.
     const unregister = [...CORE_VIEW_DEFINITIONS, ...PLUGIN_VIEW_DEFINITIONS].map((d) => this.views.register(d));
     inject(DestroyRef).onDestroy(() => unregister.forEach((u) => u()));
 
