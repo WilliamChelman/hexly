@@ -1,11 +1,10 @@
 import { TestBed } from '@angular/core/testing';
 import { FieldSchema } from '@hexly/domain';
-import { DND_MONSTER } from '@hexly/plugins';
+import { DND_MONSTER } from '@hexly/plugin-dnd';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { TypeRegistry } from './type-registry';
-import { TypeDefinition } from './type-definition';
-import { DND_VIEW_STAT_BLOCK } from '../plugins/dnd/dnd-types';
-import { CORE_VIEW_CONTENT, CORE_VIEW_FIELDS, CORE_VIEW_MAP } from './view-definition';
+import { CORE_VIEW_CONTENT, CORE_VIEW_FIELDS, CORE_VIEW_MAP, TypeDefinition } from '@hexly/web-entity';
+import { DND_VIEW_STAT_BLOCK } from '@hexly/plugin-dnd/web';
 
 function definition(id: string, fields?: readonly FieldSchema[]): TypeDefinition {
   return {

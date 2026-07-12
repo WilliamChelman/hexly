@@ -18,10 +18,9 @@ import { EntityTags } from './entity-tags';
 import { SaveStatus } from './save-status';
 import { EntitySession } from '../services/entity-session';
 import { TypeRegistry } from '../../../entity-types/type-registry';
-import { TypeLabels } from '../../../entity-types/type-definition';
+import { TypeLabels, ViewId } from '@hexly/web-entity';
 import { ViewRegistry } from '../../../entity-types/view-registry';
 import { EntityViewStore } from '../services/entity-view-store';
-import { ViewId } from '../../../entity-types/view-definition';
 
 /**
  * The open Entity's page-owned header (ADR-0022), rendered by {@link EntityPage}

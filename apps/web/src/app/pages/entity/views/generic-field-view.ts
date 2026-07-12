@@ -3,7 +3,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { FieldSchema, Metadata, readField, validateFields, writeField } from '@hexly/domain';
 import { EntitySession } from '../services/entity-session';
 import { TypeRegistry } from '../../../entity-types/type-registry';
-import { FieldControl } from './field-control';
+import { FieldControl } from '@hexly/web-entity';
 
 /**
  * The **generic Field View** (`core.view.fields`, ADR-0048, #187): renders an Entity's

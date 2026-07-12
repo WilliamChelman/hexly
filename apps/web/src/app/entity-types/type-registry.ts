@@ -1,10 +1,9 @@
 import { inject, Injectable, signal } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
 import { CORE_NOTE, EntityType, FieldSchema, resolveFields } from '@hexly/domain';
-import { TypeDefinition, TypeLabels } from './type-definition';
+import { CORE_VIEW_FIELDS, TypeDefinition, TypeLabels, ViewId } from '@hexly/web-entity';
 import { CORE_TYPE_DEFINITIONS } from './core-types';
 import { PLUGIN_TYPE_DEFINITIONS } from '../plugins/bundled-types';
-import { CORE_VIEW_FIELDS, ViewId } from './view-definition';
 
 /**
  * Root registry where Entity Types make themselves known to the type-specific UI

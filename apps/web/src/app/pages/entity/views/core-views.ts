@@ -1,10 +1,5 @@
 import { MapView } from '@hexly/web-map';
-import {
-  CORE_VIEW_CONTENT,
-  CORE_VIEW_FIELDS,
-  CORE_VIEW_MAP,
-  ViewDefinition,
-} from '../../../entity-types/view-definition';
+import { CORE_VIEW_CONTENT, CORE_VIEW_FIELDS, CORE_VIEW_MAP, ViewDefinition } from '@hexly/web-entity';
 import { ContentView } from './content-view';
 import { GenericFieldView } from './generic-field-view';
 

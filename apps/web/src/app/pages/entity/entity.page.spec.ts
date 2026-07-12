@@ -7,12 +7,11 @@ import { CONTENT_FORMAT, CORE_HEXMAP, EntityDetail, EntityType } from '@hexly/do
 import { EntitiesClient, NudgeBusClient, ActiveWorld, TitleService, EVICTED, Watched } from '@hexly/web-core';
 import { MockEntitiesClient, MockNudgeBusClient, provideTranslocoTesting } from '@hexly/web-core/testing';
 import { EntitySession } from './services/entity-session';
-import { ENTITY_SESSION } from '@hexly/web-entity';
+import { CORE_VIEW_CONTENT, ENTITY_SESSION } from '@hexly/web-entity';
 import { EntityNameResolver, CONTENT_EDITOR_SESSION } from '@hexly/content-editor';
 import { noteDetail } from './components/entity-detail.fixtures';
 import { EntityPage } from './entity.page';
 import { EntityViewStore } from './services/entity-view-store';
-import { CORE_VIEW_CONTENT } from '../../entity-types/view-definition';
 
 /** Resolve AuthClient's boot `/auth/me` as anonymous so `whenStable()` settles. */
 function flushAuth(http: HttpTestingController) {

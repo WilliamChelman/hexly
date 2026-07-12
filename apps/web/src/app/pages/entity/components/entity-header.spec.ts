@@ -14,10 +14,9 @@ import {
 } from '@hexly/web-core/testing';
 import { EntitiesClient, WorldsClient, ActiveWorld, UserDirectoryClient, AuthClient } from '@hexly/web-core';
 import { EntitySession } from '../services/entity-session';
-import { ENTITY_SESSION } from '@hexly/web-entity';
+import { CORE_VIEW_CONTENT, ENTITY_SESSION } from '@hexly/web-entity';
 import { EntityViewStore } from '../services/entity-view-store';
 import { ViewRegistry } from '../../../entity-types/view-registry';
-import { CORE_VIEW_CONTENT } from '../../../entity-types/view-definition';
 import { CORE_VIEW_DEFINITIONS } from '../views/core-views';
 import { OwnerSet } from '@hexly/web-ui';
 import { EntityHeader } from './entity-header';

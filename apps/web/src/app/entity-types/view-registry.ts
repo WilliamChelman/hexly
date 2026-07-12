@@ -1,5 +1,5 @@
 import { Injectable, signal } from '@angular/core';
-import { CORE_VIEW_CONTENT, ViewDefinition, ViewId } from './view-definition';
+import { CORE_VIEW_CONTENT, ViewDefinition, ViewId } from '@hexly/web-entity';
 
 /**
  * Root registry mapping a {@link ViewId} to the component that renders it, the

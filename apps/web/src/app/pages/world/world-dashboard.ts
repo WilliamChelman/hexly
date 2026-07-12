@@ -18,7 +18,7 @@ import {
 } from '@hexly/web-ui';
 import { TypeRegistry } from '../../entity-types/type-registry';
 import { TypeNamePipe } from '../../entity-types/type-name.pipe';
-import { CORE_VIEW_MAP } from '../../entity-types/view-definition';
+import { CORE_VIEW_MAP } from '@hexly/web-entity';
 
 const RECENTS_LIMIT = 8;
 const MAPS_LIMIT = 8;

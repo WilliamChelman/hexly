@@ -3,9 +3,8 @@ import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { catchError, map, merge, of, Subject, switchMap } from 'rxjs';
 import { ActiveWorld, Logger, WorldsClient } from '@hexly/web-core';
 import { AvailableType } from '@hexly/domain';
-import { TypeDefinition } from './type-definition';
+import { CORE_VIEW_FIELDS, TypeDefinition } from '@hexly/web-entity';
 import { TypeRegistry } from './type-registry';
-import { CORE_VIEW_FIELDS } from './view-definition';
 
 /**
  * Projects the active World's user-defined types into the root {@link TypeRegistry} (ADR-0048, #191),

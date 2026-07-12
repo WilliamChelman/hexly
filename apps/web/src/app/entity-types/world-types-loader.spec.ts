@@ -6,7 +6,7 @@ import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { AvailableType } from '@hexly/domain';
 import { WorldTypesLoader } from './world-types-loader';
 import { TypeRegistry } from './type-registry';
-import { CORE_VIEW_FIELDS } from './view-definition';
+import { CORE_VIEW_FIELDS } from '@hexly/web-entity';
 
 /**
  * The loader projects the active World's user-defined types into the root {@link TypeRegistry} and

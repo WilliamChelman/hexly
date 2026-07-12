@@ -1,63 +1,55 @@
+import { signal } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { TestBed } from '@angular/core/testing';
-import { EntityDetail, EntityVerb, Metadata } from '@hexly/domain';
-import { DND_MONSTER } from '@hexly/plugins';
-import { ENTITY_SESSION } from '@hexly/web-entity';
+import { EntityBody, Metadata } from '@hexly/domain';
+import { produceWithPatches } from '@hexly/immer';
+import { ENTITY_SESSION, EntitySession } from '@hexly/web-entity';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
-import { EntitySession } from '../../pages/entity/services/entity-session';
 import { StatBlockView } from './stat-block-view';
 
 /**
- * The bundled plugin's bespoke View (#192). Nothing here registers a type: `dnd.monster` is already
- * in the root {@link TypeRegistry} because the plugin registered it at startup — which is the thing
- * being proved.
+ * The plugin's bespoke View (#192). It is bound to nothing but the {@link ENTITY_SESSION} contract, so
+ * the spec stands a minimal fake session in for the app's — which is the coupling being proved: the
+ * app composes this plugin, the plugin never reaches into the app.
  */
 describe('StatBlockView', () => {
-  const monster = (metadata: Metadata, rights: EntityVerb[] = ['edit'], types: string[] = [DND_MONSTER]) =>
-    ({
-      id: 'e1',
-      worldId: 'w1',
-      name: 'Ancient Red Dragon',
-      types,
-      tags: [],
-      visibility: 'private',
-      version: 1,
-      seq: 1,
-      createdAt: 1,
-      updatedAt: 1,
-      rights,
-      document: { content: { format: 'tiptap-v1', snapshot: {} }, metadata },
-    }) satisfies EntityDetail;
+  /** A stand-in for the app's central store: the one body every View reads its slice off. */
+  function fakeSession(metadata: Metadata, writable = true): EntitySession {
+    const body = signal<EntityBody>({ content: { format: 'tiptap-v1', snapshot: {} }, metadata });
+    return {
+      body: body.asReadonly(),
+      writable: signal(writable).asReadonly(),
+      loadGeneration: signal(0).asReadonly(),
+      mutate: (recipe) => {
+        const [next, redo, undo] = produceWithPatches(body(), recipe);
+        body.set(next);
+        return { redo, undo };
+      },
+      applyPatches: () => undefined,
+    };
+  }
 
-  let session: EntitySession;
-
-  beforeEach(async () => {
-    await TestBed.configureTestingModule({
+  function render(metadata: Metadata, writable = true) {
+    const session = fakeSession(metadata, writable);
+    TestBed.configureTestingModule({
       imports: [StatBlockView, provideTranslocoTesting()],
-      providers: [
-        EntitySession,
-        { provide: ENTITY_SESSION, useExisting: EntitySession },
-        provideHttpClient(),
-        provideHttpClientTesting(),
-      ],
-    }).compileComponents();
-    session = TestBed.inject(EntitySession);
-  });
-
-  function render(detail: EntityDetail) {
-    session.adopt(detail);
+      providers: [{ provide: ENTITY_SESSION, useValue: session }, provideHttpClient(), provideHttpClientTesting()],
+    });
     const fixture = TestBed.createComponent(StatBlockView);
     fixture.detectChanges();
-    return { fixture, el: fixture.nativeElement as HTMLElement };
+    return { fixture, session, el: fixture.nativeElement as HTMLElement };
   }
 
   it('prints the monster as a stat block, not as raw Metadata', () => {
-    const { el } = render(
-      monster({ size: 'Huge', creature_type: 'dragon', alignment: 'chaotic evil', challenge_rating: 24, strength: 30 }),
-    );
+    const { el } = render({
+      size: 'Huge',
+      creature_type: 'dragon',
+      alignment: 'chaotic evil',
+      challenge_rating: 24,
+      strength: 30,
+    });
 
-    expect(el.querySelector('[data-testid=stat-block-view]')).not.toBeNull();
     // The flavour line a player reads first — derived from the Fields, never authored as prose.
     expect(el.querySelector('[data-testid=stat-block-subtitle]')?.textContent).toContain('Huge dragon, chaotic evil');
     // The derived ability modifier is the whole point of a bespoke view: a raw 30 means +10.
@@ -65,7 +57,7 @@ describe('StatBlockView', () => {
   });
 
   it('edits a stat straight into the one Metadata map every other View reads', () => {
-    const { fixture, el } = render(monster({ challenge_rating: 5 }));
+    const { fixture, session, el } = render({ challenge_rating: 5 });
 
     const cr = el.querySelector('[data-testid=stat-challenge_rating] input') as HTMLInputElement;
     expect(cr.value).toBe('5');
@@ -83,7 +75,7 @@ describe('StatBlockView', () => {
    * declared Field must be editable here, or a facetable Field would be unsettable in the whole app.
    */
   it('offers an editable slot for every Field the type declares, not just the required one', () => {
-    const { fixture, el } = render(monster({ challenge_rating: 5 }));
+    const { fixture, session, el } = render({ challenge_rating: 5 });
 
     const size = el.querySelector('[data-testid=stat-size] select') as HTMLSelectElement;
     expect(Array.from(size.options).map((o) => o.value)).toContain('Huge');
@@ -101,14 +93,14 @@ describe('StatBlockView', () => {
   });
 
   it('flags a missing required Field rather than silently accepting an incomplete monster', () => {
-    const { el } = render(monster({ size: 'Large' }));
+    const { el } = render({ size: 'Large' });
 
     const cr = el.querySelector('[data-testid=stat-challenge_rating] input') as HTMLInputElement;
     expect(cr.getAttribute('aria-invalid')).toBe('true');
   });
 
   it('prints, rather than edits, for a read-only opener', () => {
-    const { el } = render(monster({ challenge_rating: 5, dexterity: 8 }, ['read']));
+    const { el } = render({ challenge_rating: 5, dexterity: 8 }, false);
 
     expect(el.querySelector('input')).toBeNull();
     expect(el.querySelector('[data-testid=stat-challenge_rating]')?.textContent).toContain('5');
@@ -116,7 +108,7 @@ describe('StatBlockView', () => {
   });
 
   it('leaves an unfilled stat blank instead of deriving a bogus modifier (forward-only tolerance)', () => {
-    const { el } = render(monster({ challenge_rating: 1 }, ['read']));
+    const { el } = render({ challenge_rating: 1 }, false);
 
     expect(el.querySelector('[data-testid=stat-mod-wisdom]')?.textContent).toContain('—');
     expect(el.querySelector('[data-testid=stat-block-subtitle]')?.textContent?.trim()).toBe('');

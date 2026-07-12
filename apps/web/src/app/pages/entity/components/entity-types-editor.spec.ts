@@ -4,8 +4,7 @@ import { FieldSchema } from '@hexly/domain';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { EntityTypesEditor } from './entity-types-editor';
 import { TypeRegistry } from '../../../entity-types/type-registry';
-import { TypeDefinition } from '../../../entity-types/type-definition';
-import { CORE_VIEW_CONTENT } from '../../../entity-types/view-definition';
+import { CORE_VIEW_CONTENT, TypeDefinition } from '@hexly/web-entity';
 
 function definition(id: string, fields?: readonly FieldSchema[]): TypeDefinition {
   return {

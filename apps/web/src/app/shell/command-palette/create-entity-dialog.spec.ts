@@ -7,8 +7,7 @@ import { MockEntitiesClient, provideTranslocoTesting } from '@hexly/web-core/tes
 import { CreateEntityDialogState } from './create-entity-dialog.state';
 import { CreateEntityDialog } from './create-entity-dialog';
 import { TypeRegistry } from '../../entity-types/type-registry';
-import { TypeDefinition } from '../../entity-types/type-definition';
-import { CORE_VIEW_CONTENT } from '../../entity-types/view-definition';
+import { CORE_VIEW_CONTENT, TypeDefinition } from '@hexly/web-entity';
 
 /** A plugin-style type declaring one required Field — to exercise the create-time required-Fields form. */
 const monster: TypeDefinition = {

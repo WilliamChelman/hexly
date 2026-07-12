@@ -15,7 +15,7 @@ import { Logger, ThemeService, isTrackpadWheel, wheelDeltaPixels } from '@hexly/
 import { GraphPayload, graphPayload } from './graph-payload';
 import { LabelGrid, selectLabels } from './label-selection';
 import { TypeRegistry } from '../../../entity-types/type-registry';
-import { TypeDefinition } from '../../../entity-types/type-definition';
+import { TypeDefinition } from '@hexly/web-entity';
 
 /**
  * The declutter: at most one Entity label per {@link LABEL_GRID.pointCell} of screen, and one Link

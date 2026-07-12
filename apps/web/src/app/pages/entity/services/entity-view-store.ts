@@ -1,6 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { TypeRegistry } from '../../../entity-types/type-registry';
-import { CORE_VIEW_CONTENT, ViewId } from '../../../entity-types/view-definition';
+import { CORE_VIEW_CONTENT, ViewId } from '@hexly/web-entity';
 import { EntitySession } from './entity-session';
 
 /**

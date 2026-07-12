@@ -1,6 +1,4 @@
-import { resolveFields, validateFields } from '@hexly/domain';
-import { BUNDLED_PLUGIN_TYPES } from '../bundled';
-import { defineType } from '../define-type';
+import { defineType, resolveFields, validateFields } from '@hexly/domain';
 import {
   abilityModifier,
   DND_ABILITY_KEYS,
@@ -15,7 +13,7 @@ import {
 describe('defineType', () => {
   it('rejects a malformed plugin at declaration time, not at runtime', () => {
     // A bare id (no namespace) would collide with a future plugin's — the whole point of `dnd.`.
-    expect(() => defineType({ id: 'monster', label: 'Monster', fields: [] })).toThrow();
+    expect(() => defineType({ id: 'monster', label: 'Monster' })).toThrow();
     // Two Fields typing one Metadata key is a plugin bug: the key can only mean one thing.
     expect(() =>
       defineType({
@@ -31,11 +29,10 @@ describe('defineType', () => {
 });
 
 describe('dnd.monster', () => {
-  it('is bundled, namespaced, and declares challenge_rating as a required number', () => {
-    expect(BUNDLED_PLUGIN_TYPES.map((type) => type.id)).toContain(DND_MONSTER);
+  it('is namespaced, and declares challenge_rating as a required number', () => {
     expect(DND_MONSTER).toBe('dnd.monster');
 
-    const cr = DND_MONSTER_TYPE.fields.find((field) => field.key === 'challenge_rating');
+    const cr = DND_MONSTER_TYPE.fields.find((field) => field.key === DND_CHALLENGE_KEY);
     expect(cr).toMatchObject({ dataType: { kind: 'number' }, required: true, facetable: true });
   });
 
@@ -43,7 +40,7 @@ describe('dnd.monster', () => {
     const resolver = (id: string) => (id === DND_MONSTER ? DND_MONSTER_TYPE.fields : undefined);
     const fields = resolveFields(resolver, [DND_MONSTER]);
 
-    expect(fields.map((field) => field.key)).toContain('challenge_rating');
+    expect(fields.map((field) => field.key)).toContain(DND_CHALLENGE_KEY);
     // The forward-only gate: a monster without its required Field is rejected on an active typed edit…
     expect(validateFields(fields, { size: 'Large' }).ok).toBe(false);
     // …and passes once it's supplied, with the rest of the stat block optional.
@@ -62,12 +59,12 @@ describe('dnd.monster', () => {
    * declare (forward-only). That tolerance would let a Field renamed here vanish from the block in
    * silence — so the two are pinned together as a declared invariant of the plugin, not a convention.
    */
-  it('declares a Field for every key the stat block prints', () => {
+  it('declares a Field for every key the stat block prints, and prints every Field it declares', () => {
     const declared = new Set(DND_MONSTER_TYPE.fields.map((field) => field.key));
     const printed = [...DND_IDENTITY_KEYS, ...DND_DEFENCE_KEYS, ...DND_ABILITY_KEYS, DND_CHALLENGE_KEY];
 
     expect(printed.filter((key) => !declared.has(key))).toEqual([]);
-    // …and the block prints every Field the type declares — no Field is unreachable in the UI.
+    // The block is a monster's only authoring surface, so an unprinted Field would be unsettable.
     expect([...declared].filter((key) => !printed.includes(key))).toEqual([]);
   });
 });

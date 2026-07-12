@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { AvailableType, FieldSchema, fieldSchemaSchema, TypeFieldResolver } from '@hexly/domain';
-import { BUNDLED_PLUGIN_TYPES } from '@hexly/plugins';
+import { AvailableType, CORE_TYPES, FieldSchema, fieldSchemaSchema, TypeFieldResolver } from '@hexly/domain';
+import { BUNDLED_PLUGIN_TYPES } from './bundled-plugins';
 
 /** A registered instance-wide type: its Field schema plus an optional display label. */
 interface RegisteredType {
@@ -9,12 +9,16 @@ interface RegisteredType {
 }
 
 /**
- * The API-side registry of each instance-wide plugin Entity Type — its Field schema and label
- * (ADR-0048) — the backend twin of the web `TypeRegistry`. It is seeded at startup from the
- * **bundled plugins** (`dnd.monster`, #192), which is what makes a plugin's Fields real on this side:
- * the write path resolves them for the forward-only gate and materialises their facets, with no
- * knowledge of the plugin's Angular view. Core `note`/`hexmap` declare no Fields, so they say nothing
- * here, and an unregistered type resolves to `undefined` ("no Fields", never a throw).
+ * The API-side registry of every **code-registered** Entity Type — its Field schema and label
+ * (ADR-0048) — the backend twin of the web `TypeRegistry`. It is seeded at startup from the core types
+ * and the bundled plugins through one loop, because they are the same kind of thing: a
+ * `defineType` declaration. That is what makes a plugin's Fields real on this side — the write path
+ * resolves them for the forward-only gate and materialises their facets, with no knowledge of the
+ * plugin's Angular view.
+ *
+ * The core types declare no Fields, so they add nothing to resolve; they are registered anyway so the
+ * available-types list a World reports is the whole code-registered set, not just the plugins. An
+ * unregistered type resolves to `undefined` ("no Fields", never a throw).
  *
  * A World's user-defined types are not here — they are stored per-World and merged in by
  * {@link WorldTypeFields}.
@@ -24,7 +28,7 @@ export class TypeFieldRegistry {
   private readonly byType = new Map<string, RegisteredType>();
 
   constructor() {
-    for (const plugin of BUNDLED_PLUGIN_TYPES) this.register(plugin.id, plugin.fields, plugin.label);
+    for (const type of [...CORE_TYPES, ...BUNDLED_PLUGIN_TYPES]) this.register(type.id, type.fields, type.label);
   }
 
   /**

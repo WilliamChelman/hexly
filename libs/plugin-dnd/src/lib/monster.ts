@@ -1,16 +1,18 @@
 /**
  * The `dnd.monster` bundled Plugin type (#192) — the first type with a **bespoke view**, proving a
- * compiled-in plugin can teach Hexly a whole game system through the same {@link defineType} the core
- * dogfoods.
+ * compiled-in plugin can teach Hexly a whole game system through the same `defineType` the core
+ * dogfoods (CONTEXT.md → Type Definition).
  *
  * Namespaced (`dnd.`) so a future `pathfinder.monster` never collides. It adds **no payload**: a
  * monster is the `rich-content` base (its lore is its Content) plus a Field schema, so its stat block
  * lives entirely in the one Metadata map — which is why an instance *without* this plugin still opens
  * a monster fine, as rich content plus the generic Field view (CONTEXT.md → Field).
+ *
+ * This module is the framework-free half, the one the API reads. The Angular half — chrome and the
+ * stat-block View — is `@hexly/plugin-dnd/web`.
  */
 
-import { FieldSchema } from '@hexly/domain';
-import { defineType } from '../define-type';
+import { defineType, FieldSchema } from '@hexly/domain';
 
 /** The Entity Type id — the namespaced key an Entity carries in its `types[]`. */
 export const DND_MONSTER = 'dnd.monster';
@@ -24,7 +26,7 @@ export const DND_IDENTITY_KEYS = ['size', 'creature_type', 'alignment'] as const
 export const DND_DEFENCE_KEYS = ['armor_class', 'hit_points', 'speed'] as const;
 export const DND_CHALLENGE_KEY = 'challenge_rating';
 
-/** The six ability scores, in the order a stat block prints them. Shared with the web's stat-block view. */
+/** The six ability scores, in the order a stat block prints them. */
 export const DND_ABILITY_KEYS = [
   'strength',
   'dexterity',
@@ -118,7 +120,7 @@ export const DND_MONSTER_TYPE = defineType({
     { key: 'speed', label: 'Speed', dataType: { kind: 'string' }, required: false, facetable: false },
     ...ABILITY_FIELDS,
     {
-      key: 'challenge_rating',
+      key: DND_CHALLENGE_KEY,
       label: 'Challenge Rating',
       dataType: { kind: 'number' },
       required: true,
