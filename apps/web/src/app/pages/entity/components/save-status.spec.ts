@@ -68,9 +68,12 @@ describe('SaveStatus', () => {
   }
 
   const text = () => fixture.nativeElement.textContent as string;
+  /** The routine states are an icon badge, so what they *show* is `data-state`, not words. */
+  const state = () => fixture.nativeElement.querySelector('[data-testid=save-status]')?.getAttribute('data-state');
 
   it('reads Saved when the open entity is clean', () => {
     open();
+    expect(state()).toBe('saved');
     expect(text()).toContain('Saved');
   });
 
@@ -78,6 +81,7 @@ describe('SaveStatus', () => {
     open();
     editor.paintAt({ q: 5, r: 5 }, 'ocean');
     fixture.detectChanges();
+    expect(state()).toBe('unsaved');
     expect(text()).toContain('Unsaved');
   });
 
@@ -88,6 +92,7 @@ describe('SaveStatus', () => {
     entities.save.mockReturnValue(save$);
     session.save().subscribe();
     fixture.detectChanges();
+    expect(state()).toBe('saving');
     expect(text()).toContain('Saving');
 
     save$.next({
@@ -96,6 +101,7 @@ describe('SaveStatus', () => {
     });
     save$.complete();
     fixture.detectChanges();
+    expect(state()).toBe('saved');
     expect(text()).toContain('Saved');
   });
 

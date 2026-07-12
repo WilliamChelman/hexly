@@ -2,9 +2,12 @@ import { ChangeDetectionStrategy, Component, computed, inject, input } from '@an
 import { DomSanitizer } from '@angular/platform-browser';
 import {
   type LucideIconData,
+  LucideCheck,
   LucideChevronsRight,
   LucideChevronDown,
   LucideLayoutDashboard,
+  LucideLoaderCircle,
+  LucidePencil,
   LucideX,
   LucideEllipsisVertical,
   LucideListTree,
@@ -79,11 +82,16 @@ const CUSTOM = {
  * dependency is honest and tree-shaken while call sites keep our vocabulary.
  */
 const LUCIDE: Record<string, LucideIconData> = {
+  check: LucideCheck.icon,
   chevrons: LucideChevronsRight.icon,
   /** A menu trigger's arrowhead — the split "New" button's, and any dropdown's. */
   'chevron-down': LucideChevronDown.icon,
   close: LucideX.icon,
   dashboard: LucideLayoutDashboard.icon,
+  /** Pending edits — the autosave chip's dirty glyph. */
+  pencil: LucidePencil.icon,
+  /** Work in flight; spun by the caller (`animate-spin`). */
+  spinner: LucideLoaderCircle.icon,
   more: LucideEllipsisVertical.icon,
   outline: LucideListTree.icon,
   link: LucideLink2.icon,

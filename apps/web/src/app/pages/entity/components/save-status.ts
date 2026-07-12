@@ -1,17 +1,34 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { Chip } from '@hexly/web-ui';
+import { Chip, Icon, IconName } from '@hexly/web-ui';
 import { EntitySession } from '../services/entity-session';
+
+/** The routine autosave states, in the order the ladder falls through them. */
+type QuietState = 'saving' | 'unsaved' | 'saved';
+
+/** Each routine state's glyph and its copy — the tooltip, and the text assistive tech hears. */
+const QUIET: Record<QuietState, { icon: IconName; key: string }> = {
+  saving: { icon: 'spinner', key: 'editorShell.saving' },
+  unsaved: { icon: 'pencil', key: 'editorShell.save.unsaved' },
+  saved: { icon: 'check', key: 'editorShell.save.saved' },
+};
 
 /**
  * Autosave feedback chip (ADR-0026) replacing the Save button. One aria-live region
  * over the session's persistence state. States, highest priority first:
  * conflict → save error (Retry) → saving → dirty → saved.
+ *
+ * The three routine states are a **fixed-size icon badge**, not words: they cycle on
+ * every edit, and a chip that resizes from "Saved" to "Unsaved…" to "Saving…" shoves the
+ * header around while you type. The glyph carries the state (spinner / pencil / check),
+ * with the words kept for the tooltip and for assistive tech. The exceptional states —
+ * conflict, save failure, read-only — stay spelled out, since they must be read and
+ * (twice) acted on; those are rare enough that the reflow costs nothing.
  */
 @Component({
   selector: 'app-save-status',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Chip, TranslocoPipe],
+  imports: [Chip, Icon, TranslocoPipe],
   template: `
     <span aria-live="polite" class="inline-flex items-center">
       @if (conflict()) {
@@ -43,12 +60,24 @@ import { EntitySession } from '../services/entity-session';
             {{ 'editorShell.save.retry' | transloco }}
           </button>
         </app-chip>
-      } @else if (saving()) {
-        <app-chip tone="gold" data-testid="save-status">{{ 'editorShell.saving' | transloco }}</app-chip>
-      } @else if (dirty()) {
-        <app-chip data-testid="save-status">{{ 'editorShell.save.unsaved' | transloco }}</app-chip>
       } @else {
-        <app-chip data-testid="save-status">{{ 'editorShell.save.saved' | transloco }}</app-chip>
+        <span
+          class="inline-flex items-center justify-center w-6 h-6 rounded-full border border-line-strong bg-surface-sunken"
+          [class.text-ink-faint]="quiet() === 'saved'"
+          [class.text-gold]="quiet() !== 'saved'"
+          [attr.data-state]="quiet()"
+          [title]="QUIET[quiet()].key | transloco"
+          data-testid="save-status"
+        >
+          <app-icon
+            [name]="QUIET[quiet()].icon"
+            [size]="14"
+            [class.animate-spin]="quiet() === 'saving'"
+            class="motion-reduce:animate-none"
+          />
+          <!-- The state still reaches the aria-live region as words, just not as pixels. -->
+          <span class="sr-only">{{ QUIET[quiet()].key | transloco }}</span>
+        </span>
       }
     </span>
   `,
@@ -59,6 +88,13 @@ export class SaveStatus {
   protected readonly dirty = this.session.dirty;
   protected readonly conflict = this.session.conflict;
   protected readonly error = this.session.error;
+
+  protected readonly QUIET = QUIET;
+
+  /** Which routine state the badge is showing, once the exceptional branches have passed. */
+  protected readonly quiet = computed<QuietState>(() =>
+    this.saving() ? 'saving' : this.dirty() ? 'unsaved' : 'saved',
+  );
 
   protected reload(): void {
     this.session.reload().subscribe();
