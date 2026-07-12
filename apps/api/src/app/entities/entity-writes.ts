@@ -160,8 +160,8 @@ export class EntityWrites {
     // pass materialises the facetable Field values (ADR-0048, #188) — including a World's
     // user-defined types (#191) — the same way it harvests edges and descriptors.
     private readonly worldTypeFields: WorldTypeFields,
-    // The instance-wide Structured Field data-types (ADR-0050): a structured value harvests its own
-    // edges, and the domain is handed the set rather than reaching for one.
+    // The instance-wide Structured Field data-types (ADR-0050), from which a structured value
+    // harvests its own edges in the same derive pass.
     private readonly typeFields: TypeFieldRegistry,
   ) {}
 

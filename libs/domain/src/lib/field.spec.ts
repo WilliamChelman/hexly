@@ -23,10 +23,7 @@ function field(partial: Partial<FieldSchema> & Pick<FieldSchema, 'key' | 'dataTy
   return fieldSchemaSchema.parse({ label: partial.key, ...partial });
 }
 
-/**
- * `validateFields` takes the host's structured data-type set explicitly (ADR-0050) — it is never
- * reached for, so this spec supplies its own. The built-in data-types need none.
- */
+/** `validateFields` takes the data-type set explicitly, and the built-in data-types need none of it. */
 function validate(
   fields: readonly FieldSchema[],
   metadata: Metadata | undefined,
@@ -36,9 +33,8 @@ function validate(
 }
 
 /**
- * A stand-in for the Hex Map's `core.hex-grid`: a plugin's structured value with its own schema and
- * its own link harvesting. The domain knows nothing of what is inside one, so the spec declares its
- * own rather than borrowing a real one.
+ * A stand-in for the Hex Map's `core.hex-grid`. The spec declares its own data-type rather than
+ * borrowing a real one — that it can is the point of threading the set instead of globalising it.
  */
 const BOARD = defineStructuredDataType({
   id: 'test.board',
@@ -518,10 +514,9 @@ describe('Structured Field data-types (ADR-0050)', () => {
     });
 
     /**
-     * The absent-plugin path (ADR-0050): a build that drops the map plugin must open its Hex Maps as
-     * lore plus an unrendered Field. So a Field whose data-type has gone missing is *inert* on the
-     * value gate — its value stays plain Metadata and the Entity stays saveable. Dropping a plugin
-     * degrades; it never corrupts. The typo is caught where the Type is declared, above.
+     * The absent-plugin path (ADR-0050): a build that drops the map plugin opens its Hex Maps as lore
+     * plus an unrendered Field, so a Field whose data-type went missing stays saveable — its value is
+     * plain Metadata. Dropping a plugin degrades; it never corrupts.
      */
     it('is inert for an unregistered kind — never blocking the save of an Entity whose plugin is absent', () => {
       const grid = field({ key: 'grid', dataType: { kind: 'core.hex-grid' } });

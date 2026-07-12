@@ -75,14 +75,9 @@ export class WorldTypesService {
   }
 
   /**
-   * The **declaration** gate for a **Structured Field** (ADR-0050): a Field may name a plugin's
-   * data-type (`core.hex-grid`), and this is where a well-formed but unregistered kind — a typo
-   * (`core.hex-gird`), or a plugin this build does not bundle — is rejected, against the set the host
-   * composed. It runs here rather than in the schema because `defineType()` runs at module load, so
-   * no schema could enumerate the very plugin registering one.
-   *
-   * Declaration-time only: an Entity whose *stored* value has lost its data-type stays inert and
-   * saveable (`validateFields`), so dropping a plugin degrades rather than corrupts.
+   * A user-defined type's Fields may name a plugin's **Structured Field** data-type (`core.hex-grid`),
+   * so authoring one is where an unregistered kind is rejected (ADR-0050) — against the composed set,
+   * since no schema could enumerate a kind a plugin registers at module load.
    */
   private assertDataTypesResolve(fields: readonly FieldSchema[]): void {
     const errors = unresolvedDataTypeErrors(fields, this.plugins.structuredDataTypes);

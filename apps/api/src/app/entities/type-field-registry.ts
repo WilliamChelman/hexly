@@ -39,17 +39,16 @@ export class TypeFieldRegistry {
 
   /**
    * The **Structured Field** data-types this build bundles (ADR-0050) — instance-wide and code-known,
-   * like the plugin types beside them, so a World never contributes one. Threaded into the domain's
-   * `validateFields` / `harvestEdges` by the write path, and resolved against here.
+   * like the plugin types beside them, so a World never contributes one. The write path threads this
+   * into the domain's `validateFields` / `harvestEdges`.
    */
   readonly structuredDataTypes: StructuredDataTypeSet = BUNDLED_STRUCTURED_DATA_TYPES;
 
   /**
    * Register (or replace) a plugin type's Field schema and optional `label`, validating each Field
-   * through the shared Zod so a malformed plugin fails loudly at startup. A **Structured Field**
-   * naming a data-type this build does not bundle fails just as loudly (ADR-0050): a plugin type is
-   * code, so an unresolvable kind is a build error, not a degradation to tolerate. Returns an
-   * unregister fn.
+   * through the shared Zod so a malformed plugin fails loudly at startup — including a **Structured
+   * Field** naming a data-type this build does not bundle, which for a plugin type (code, not data)
+   * is a build error rather than something to degrade around. Returns an unregister fn.
    */
   register(typeId: string, fields: readonly FieldSchema[], label?: string): () => void {
     const parsed = fields.map((field) => fieldSchemaSchema.parse(field));

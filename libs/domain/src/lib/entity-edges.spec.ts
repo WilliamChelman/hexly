@@ -5,10 +5,7 @@ import { emptyHexMap } from './hex/hex-map';
 import { harvestEdges } from './entity-edges';
 import { defineStructuredDataType, NO_STRUCTURED_DATA_TYPES, structuredDataTypeSet } from './structured-data-type';
 
-/**
- * `harvestEdges` takes the resolved Fields and the host's structured data-type set explicitly
- * (ADR-0050) — neither is reached for, so this spec supplies its own. Most cases need neither.
- */
+/** `harvestEdges` takes the resolved Fields and the data-type set explicitly; most cases need neither. */
 function harvest(
   body: EntityBody,
   fields: readonly FieldSchema[] = [],
@@ -265,12 +262,7 @@ describe('harvestEdges (#179, ADR-0046)', () => {
     });
   });
 
-  /**
-   * A **Structured Field** harvests its own edges (ADR-0050): the domain hands the value to the
-   * data-type the host registered and takes the edges back, knowing nothing of what is inside. The
-   * spec brings its own data-type rather than borrowing a real one — that it *can* is the point of
-   * threading the set explicitly.
-   */
+  /** A **Structured Field** harvests its own edges (ADR-0050) — a Hex placed on a plugin's grid. */
   describe('Structured Field edges (ADR-0050)', () => {
     const BOARD = defineStructuredDataType({
       id: 'test.board',

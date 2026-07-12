@@ -44,32 +44,29 @@ export const structuredDataTypeIdSchema = z.custom<StructuredDataTypeId>(
 
 /**
  * One registered structured data-type, as the domain consumes it — type-erased over its value, so a
- * heterogeneous set of them fits in one map. {@link defineStructuredDataType} is the typed
- * constructor a plugin actually calls; it is what closes over the value type.
+ * heterogeneous set of them fits in one map. Plugins go through {@link defineStructuredDataType},
+ * which keeps the value type.
  */
 export interface StructuredDataType {
   readonly id: StructuredDataTypeId;
-  /** The value's shape. The forward-only gate rides it, and a garbage value at rest simply fails it. */
+  /** The value's shape — what the forward-only gate holds a value to. */
   readonly valueSchema: z.ZodType;
   /** A fresh empty value — a Hex Map's untouched plane, an empty timeline. */
   empty(): unknown;
   /**
    * The Entity Links this value expresses (a Hex's `entityId`, a Region's), harvested into the edge
-   * index alongside the Content's. Absent when the data-type carries no links. Never throws on a
-   * malformed value: {@link defineStructuredDataType} parses first and yields no edges if it fails.
+   * index alongside the Content's. Absent when the data-type carries no links.
    */
   harvestEdges?(value: unknown): readonly EntityEdge[];
 }
 
 /**
- * Declare a structured data-type — the constructor a plugin's framework-free half goes through, the
- * peer of `defineType()`. A malformed id (`strig` — no namespace) throws at module load rather than
- * at runtime.
+ * Declare a structured data-type — a plugin's framework-free half, the peer of `defineType()`. A
+ * malformed id (`strig` — no namespace) throws at module load.
  *
- * The declared `harvestEdges` sees a *parsed* value, so a plugin writes it against its own type and
- * never against `unknown`; a value that does not inhabit `valueSchema` yields no edges, which is the
- * forward-only tolerance the write path needs — an at-rest document this build cannot parse is
- * skipped, never a 500.
+ * The declared `harvestEdges` sees a *parsed* value, so a plugin writes it against its own type; a
+ * value that does not inhabit `valueSchema` yields no edges rather than throwing, which is the
+ * forward-only tolerance the write path needs for a document at rest this build cannot parse.
  */
 export function defineStructuredDataType<T>(definition: {
   readonly id: string;

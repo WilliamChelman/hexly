@@ -12,11 +12,8 @@ import { DND_MONSTER_TYPE } from '@hexly/plugin-dnd';
 export const BUNDLED_PLUGIN_TYPES: readonly PluginTypeDefinition[] = [DND_MONSTER_TYPE];
 
 /**
- * The **Structured Field** data-types this build bundles (ADR-0050) — the composition root the domain
- * resolves a `namespace.id` kind against, threaded in rather than reached for. Empty until a plugin
- * contributes one: `core.hex-grid` arrives with `@hexly/plugin-hexmap`, and joins by being named here.
- *
- * A Field naming a kind this set does not carry is rejected where its Type is declared, and its value
- * is inert everywhere else — so an operator dropping a plugin from the build degrades, never corrupts.
+ * The **Structured Field** data-types this build bundles (ADR-0050) — the set the domain resolves a
+ * Field's `namespace.id` kind against. Empty until a plugin contributes one: `core.hex-grid` arrives
+ * with `@hexly/plugin-hexmap`, and joins by being named here, as a plugin type does above.
  */
 export const BUNDLED_STRUCTURED_DATA_TYPES: StructuredDataTypeSet = structuredDataTypeSet([]);
