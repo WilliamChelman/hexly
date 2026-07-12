@@ -98,6 +98,14 @@ export function emptyContent(): Content {
 export const HEXLY_METADATA_PREFIX = 'hexly.';
 
 /**
+ * The reserved key a vault export stamps an Entity's ordered Type set under, and import reads back
+ * (ADR-0050, #203) — no author Metadata key records the types, so the round-trip needs one. It lives
+ * here rather than in either vault service because the two halves contract on it: export writes the
+ * key import reads, and a rename must move both at once.
+ */
+export const HEXLY_TYPE_KEY = `${HEXLY_METADATA_PREFIX}type`;
+
+/**
  * `.trim()` before `.min(1)` rejects whitespace-only names. Shared with the World
  * name. Bounded to 255 chars and free of control characters and path separators:
  * names flow unescaped into filesystem paths, zip entry keys, and the vault-export

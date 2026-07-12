@@ -2,13 +2,17 @@ import { basename, posix } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import {
+  CORE_NOTE,
   ContentNode,
   EntityBody,
+  EntityType,
   HEXLY_METADATA_PREFIX,
+  HEXLY_TYPE_KEY,
   ImportSummary,
   nameSchema,
   tagsSchema,
   tiptapContent,
+  typesSchema,
   visit,
 } from '@hexly/domain';
 import { markdownToProseMirror } from '@hexly/obsidian';
@@ -19,8 +23,9 @@ import { VaultUnzipper } from './vault-unzipper';
 import { WorldsService } from './worlds.service';
 
 /**
- * Vault import (ADR-0033): unzip a `.zip` server-side and turn each markdown file
- * into a `note` Entity in a brand-new World named after the upload. Runs synchronously
+ * Vault import (ADR-0033): unzip a `.zip` server-side and turn each markdown file into an Entity in
+ * a brand-new World named after the upload — a plain Note, unless the file's frontmatter stamps its
+ * types (see {@link toTypes}), which is how a Hexly export's own vault comes home. Runs synchronously
  * (a job queue is YAGNI at this scale). Two-pass (#147): pass 1 converts every file and
  * assigns it an id; pass 2 resolves each `[[wikilink]]` to the id of the note it names
  * (dangling when none matches) before persisting. Continue-on-error: a file that can't be
@@ -60,7 +65,7 @@ export class VaultImportService {
         const text = decodeUtf8(bytes);
         const name = nameSchema.parse(basename(path, '.md'));
         const { doc, metadata, degraded } = markdownToProseMirror(text);
-        // Every file imports as an ordinary note — there is no Home Entity to route to (ADR-0043).
+        // Every file imports as a top-level Entity — there is no Home Entity to route to (ADR-0043).
         // A legacy `hexly.isHome` flag is just reserved frontmatter, stripped below like any `hexly.*`.
         notes.push({ id: randomUUID(), path, name, doc, metadata });
         for (const [key, n] of Object.entries(degraded)) {
@@ -102,13 +107,23 @@ export class VaultImportService {
         );
         const content = tiptapContent(note.doc);
         // Folder path recorded under the reserved namespace so export can rebuild the tree.
-        // The one body shape every Entity has; an imported note is a `core.note`, which declares no
-        // Fields at all, so its frontmatter lands as plain Metadata (ADR-0050).
+        // The one body shape every Entity has, whatever its types: frontmatter lands as Metadata, and
+        // a Field only *types* a key that map already holds — so an imported Entity needs no
+        // per-type unpacking, a **Structured Field**'s nested value (a Hex Map's grid) included
+        // (ADR-0050).
         const body: EntityBody = {
           content,
           metadata: { ...passThrough, 'hexly.sourcePath': note.path },
         };
-        this.entities.importNote(ownerId, worldId, note.id, note.name, toTags(tags), body);
+        this.entities.importEntity({
+          ownerId,
+          worldId,
+          id: note.id,
+          name: note.name,
+          types: toTypes(note.metadata[HEXLY_TYPE_KEY]),
+          tags: toTags(tags),
+          body,
+        });
       }
     });
 
@@ -275,6 +290,23 @@ function resolveLinks(node: ContentNode, index: NoteIndex): { resolved: number; 
     }
   });
   return { resolved, dangling };
+}
+
+/**
+ * Frontmatter `hexly.type` → the Entity's ordered Type set (#203) — the read that makes an Entity's
+ * types survive an export/import round-trip, so a Monster comes back a Monster and a Hex Map comes
+ * back with its grid.
+ *
+ * The ids are validated for *shape* and applied; none is resolved against a registry. That is what
+ * makes the path generic (it names no type id) and what lets a user-defined type — whose definition
+ * lives in the World it was authored in, not in the vault — land on the same footing as a plugin's.
+ *
+ * A vault authored elsewhere must not be able to break a World, so anything that is not a
+ * well-formed set falls back to a plain Note rather than failing the file: the whole set, not just
+ * the bad id, because a half-applied type set is a shape no author asked for.
+ */
+function toTypes(raw: unknown): readonly EntityType[] {
+  return typesSchema.catch([CORE_NOTE]).parse(Array.isArray(raw) ? raw : []);
 }
 
 /**

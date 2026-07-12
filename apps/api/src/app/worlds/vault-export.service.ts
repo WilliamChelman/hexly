@@ -1,6 +1,6 @@
 import { posix } from 'node:path';
 import { Injectable } from '@nestjs/common';
-import { ContentNode, CORE_NOTE, EntityDetail, HEXLY_METADATA_PREFIX, visit } from '@hexly/domain';
+import { ContentNode, CORE_NOTE, EntityDetail, HEXLY_METADATA_PREFIX, HEXLY_TYPE_KEY, visit } from '@hexly/domain';
 import { proseMirrorToMarkdown } from '@hexly/obsidian';
 import { strToU8, zipSync, type Zippable } from 'fflate';
 import { AssetsService } from '../assets/assets.service';
@@ -127,7 +127,7 @@ function frontmatter(entity: EntityDetail): Record<string, unknown> | undefined 
   }
   if (entity.tags.length) meta['tags'] = [...entity.tags];
   const isBareNote = entity.types.length === 1 && entity.types[0] === CORE_NOTE;
-  if (!isBareNote) meta['hexly.type'] = [...entity.types];
+  if (!isBareNote) meta[HEXLY_TYPE_KEY] = [...entity.types];
   return Object.keys(meta).length ? meta : undefined;
 }
 

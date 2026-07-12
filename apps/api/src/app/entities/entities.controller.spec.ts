@@ -531,8 +531,17 @@ describe('Entities endpoints', () => {
       const created = await ada.post('/entities').send({ name: 'Aboleth', types: ['test.beast'] });
       const worldId = created.body.worldId;
 
-      // Import: bulk-inserted Metadata never faces the gate (ADR-0033), whatever it holds.
-      app.get(EntitiesService).importNote(adaId, worldId, 'imported-beast', 'Kraken', [], bodyWith({ cr: 'wrong' }));
+      // Import: bulk-inserted Metadata never faces the gate (ADR-0033), whatever it holds — and that
+      // holds for a *typed* import too, now that a vault stamps an Entity's types (#203).
+      app.get(EntitiesService).importEntity({
+        ownerId: adaId,
+        worldId,
+        id: 'imported-beast',
+        name: 'Kraken',
+        types: ['test.beast'],
+        tags: [],
+        body: bodyWith({ cr: 'wrong' }),
+      });
       await ada.get('/entities/imported-beast').expect(200);
 
       // At rest: corrupt the stored Metadata directly, then confirm a read never validates it.

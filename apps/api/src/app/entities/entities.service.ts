@@ -1,7 +1,6 @@
 import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
   ApiError,
-  CORE_NOTE,
   CreateEntityRequest,
   emptyEntityBody,
   EntityBody,
@@ -51,7 +50,7 @@ import {
   worlds,
 } from '../db/schema';
 import { HEXLY_CONFIG, HexlyConfig } from '../config/config.module';
-import { EntityWrites } from './entity-writes';
+import { EntityWrites, InsertEntityInput } from './entity-writes';
 import { TypeFieldRegistry } from './type-field-registry';
 import { WorldTypeFields } from './world-type-fields';
 import { linkedEntity } from './utils/linked-entity';
@@ -472,27 +471,17 @@ export class EntitiesService {
   }
 
   /**
-   * Insert a fully-built Entity for the vault import path: body and metadata come
+   * Insert a fully-built Entity for the vault import path: body, metadata, and Type set come
    * pre-converted, and the target World is the caller's fresh import World.
+   *
+   * The `types` arrive as the vault stamped them and are inserted as they stand — nothing is
+   * resolved here (#203). That is deliberate: an Entity's types are an open set, so a type this
+   * build never registered (a user-defined one, whose definition lives in the World it was authored
+   * in, not in the vault) still lands, and degrades to the generic Field view. Nor are the Fields
+   * validated: an import establishes data at rest, and the Field gate is forward-only (ADR-0048).
    */
-  importNote(
-    ownerId: string,
-    worldId: string,
-    id: string,
-    name: string,
-    tags: readonly string[],
-    body: EntityBody,
-  ): void {
-    // An imported note is always a single `core.note` — multi-type authoring is not an import path.
-    this.writes.insert({
-      id,
-      ownerId,
-      worldId,
-      name,
-      tags,
-      types: [CORE_NOTE],
-      body,
-    });
+  importEntity(input: InsertEntityInput): void {
+    this.writes.insert(input);
   }
 
   /**
@@ -530,7 +519,7 @@ export class EntitiesService {
    * present, every present value well-typed. A save that omits `types` is a plain body edit and is
    * left untouched, so an already-stored (or imported) document with malformed Fields is never
    * *retroactively* invalidated by an unrelated edit — the gate only bites data the caller actively
-   * types. The vault import ({@link importNote}) never routes here, and reads / reindex never
+   * types. The vault import ({@link importEntity}) never routes here, and reads / reindex never
    * validate, so data at rest stays tolerated end to end.
    */
   private gateTypedEdit(userId: string, id: string, req: SaveEntityRequest): void {

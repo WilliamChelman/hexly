@@ -285,6 +285,87 @@ describe('Vault export endpoint', () => {
     expect(world.body.entityCount).toBe(2); // Just the two notes — no seeded Home Entity.
   });
 
+  /**
+   * The round-trip a vault is *for* (#203): a World's whole vocabulary survives it, not just its
+   * prose. `hexly.type` carries each Entity's ordered Type set out and back, and a **Structured
+   * Field**'s value rides the frontmatter as nested YAML like any other Field's — so the Hex Map's
+   * grid comes home, and it does so through code that names no type id and knows no hex (ADR-0050).
+   */
+  it("round-trips an Entity's types and its structured values: a Monster, a Hex Map, a user-defined type", async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const worldId = await importVault(ada, { 'Note.md': '# Note' });
+    const entities = app.get(EntitiesService);
+
+    // A World-scoped user-defined type — data, not code, and unknown to this build's plugins.
+    await ada
+      .post(`/worlds/${worldId}/types`)
+      .send({
+        id: 'world.deity',
+        label: 'Deity',
+        fields: [{ key: 'domain', label: 'Domain', dataType: { kind: 'string' }, required: false, facetable: true }],
+      })
+      .expect(201);
+
+    // A Monster (plugin type, plain Fields).
+    const owlbear = entities.create(adaId, { types: ['core.note', 'dnd.monster'], name: 'Owlbear', worldId, tags: [] });
+    entities.save(adaId, owlbear.id, {
+      version: owlbear.version,
+      tags: [],
+      descriptors: [],
+      document: {
+        content: tiptapContent({ type: 'doc', content: [] }),
+        metadata: { challenge_rating: 3, size: 'Large' },
+      },
+    });
+
+    // A Deity (user-defined type, a plain Field).
+    const vela = entities.create(adaId, { types: ['world.deity'], name: 'Vela', worldId, tags: [] });
+    entities.save(adaId, vela.id, {
+      version: vela.version,
+      tags: [],
+      descriptors: [],
+      document: { content: tiptapContent({ type: 'doc', content: [] }), metadata: { domain: 'dusk' } },
+    });
+
+    // A Hex Map (plugin type, a Structured Field) — terrain, a feature, a region, and a label.
+    const grid = {
+      hexes: {
+        '0,0': { terrain: 'forest', name: 'Rivertown', feature: { ref: 'settlement' } },
+        '1,0': { terrain: 'mountain' },
+      },
+      regions: [{ id: 'r1', name: 'The Whisperwood', color: '#33aa55', hexes: { '0,0': true } }],
+      labels: [{ id: 'l1', text: 'The Aldermoor', position: { x: 10, y: 20 }, size: 32 }],
+    };
+    const map = entities.create(adaId, { types: ['core.hexmap'], name: 'Aldermoor Map', worldId, tags: [] });
+    entities.save(adaId, map.id, {
+      version: map.version,
+      tags: [],
+      descriptors: [],
+      document: { content: tiptapContent({ type: 'doc', content: [] }), metadata: { grid } },
+    });
+
+    // Export the World, then import the export back as a fresh World.
+    const { res } = await exportZip(ada, worldId);
+    const reimport = await ada
+      .post('/worlds/import')
+      .attach('file', Buffer.from(res.body), 'Aldermoor.zip')
+      .expect(201);
+    const reimported = entities.listByWorld(adaId, reimport.body.worldId);
+    const byName = (name: string) => reimported.find((e) => e.name === name);
+
+    // The Monster is a Monster again, primary type first, with its Fields intact.
+    expect(byName('Owlbear')?.types).toEqual(['core.note', 'dnd.monster']);
+    expect(byName('Owlbear')?.document.metadata).toMatchObject({ challenge_rating: 3, size: 'Large' });
+
+    // The user-defined type survives on the same footing — the import resolved neither of them.
+    expect(byName('Vela')?.types).toEqual(['world.deity']);
+    expect(byName('Vela')?.document.metadata).toMatchObject({ domain: 'dusk' });
+
+    // The Hex Map comes home whole: its type, and its grid down to the last label.
+    expect(byName('Aldermoor Map')?.types).toEqual(['core.hexmap']);
+    expect(byName('Aldermoor Map')?.document.metadata?.['grid']).toEqual(grid);
+  });
+
   it('re-emits a wikilink with the target entity’s CURRENT name after a rename', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const worldId = await importVault(ada, {
@@ -324,7 +405,15 @@ describe('Vault export endpoint', () => {
     db.insert(worldMembers).values({ worldId, userId: bobId, role: 'contributor' }).run();
     const entities = app.get(EntitiesService);
     const bobNoteId = 'bob-shared-note';
-    entities.importNote(bobId, worldId, bobNoteId, 'Bob Secret', [], emptyEntityBody());
+    entities.importEntity({
+      ownerId: bobId,
+      worldId,
+      id: bobNoteId,
+      name: 'Bob Secret',
+      types: ['core.note'],
+      tags: [],
+      body: emptyEntityBody(),
+    });
     entities.patch(bobId, bobNoteId, { visibility: 'shared' });
 
     const { files } = await exportZip(ada, worldId);
