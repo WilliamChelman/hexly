@@ -1,4 +1,4 @@
-import { enterLibrary, entityIdFromUrl, expect, flushSave, mapViewToggle, openEntityActions, test } from './fixtures';
+import { addType, enterLibrary, entityIdFromUrl, expect, flushSave, mapViewToggle, test } from './fixtures';
 
 /** The Hex Map's map View toggle: bound to the `grid` Field `core.hexmap` declares. */
 const MAP_VIEW = mapViewToggle();
@@ -84,10 +84,7 @@ test('a dnd.monster carrying core.hexmap offers the stat block, Note, and Map vi
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
 
   // Add the hexmap type on the open Entity, which mints the empty grid its `grid` Field declares.
-  await openEntityActions(page);
-  await page.getByTestId('edit-types').click();
-  await page.getByTestId('type-add').selectOption('core.hexmap');
-  await page.getByTestId('types-close').click();
+  await addType(page, 'core.hexmap');
 
   await expect(page.getByTestId('dnd.view.stat-block')).toBeVisible();
   await expect(page.getByTestId('core.view.content')).toBeVisible();

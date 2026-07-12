@@ -154,3 +154,51 @@ export async function createEntity(page: Page, typeId: string): Promise<string> 
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   return entityIdFromUrl(page);
 }
+
+/** A Field on a user-defined type, as the World Types editor's form takes one. */
+export interface AuthoredField {
+  readonly key: string;
+  readonly label: string;
+  /** A **Structured Field**'s data-type (`core.hex-grid`, #201); absent leaves the form's `string`. */
+  readonly kind?: string;
+}
+
+/**
+ * Author a user-defined type in a World's settings (#191, #201), and land back on the types list with
+ * it saved. Navigates to the settings page itself, so a caller reaches it from anywhere.
+ *
+ * `id` is the bare id the form takes; the World's namespace makes it `world.<id>`.
+ */
+export async function authorWorldType(
+  page: Page,
+  worldId: string,
+  type: { id: string; name: string; fields: readonly AuthoredField[] },
+): Promise<void> {
+  await page.goto(`/w/${worldId}/settings`);
+  await page.getByTestId('type-new').click();
+  await page.getByTestId('type-id-input').fill(type.id);
+  await page.getByTestId('type-name-input').fill(type.name);
+
+  for (const [index, field] of type.fields.entries()) {
+    await page.getByTestId('add-field').click();
+    const row = page.getByTestId(`field-${index}`);
+    await row.getByTestId('field-key').fill(field.key);
+    await row.getByTestId('field-label').fill(field.label);
+    if (field.kind) await row.getByTestId('field-kind').selectOption(field.kind);
+  }
+
+  await page.getByTestId('type-save').click();
+  await expect(page.getByTestId(`type-world.${type.id}`)).toBeVisible();
+}
+
+/**
+ * Add `typeId` to the open Entity through the header's Edit-types dialog (#189), minting the defaults
+ * its Fields declare. For a type whose Fields are all optional: one declaring a *required* Field
+ * prompts for it before the add commits, which a spec drives itself.
+ */
+export async function addType(page: Page, typeId: string): Promise<void> {
+  await openEntityActions(page);
+  await page.getByTestId('edit-types').click();
+  await page.getByTestId('type-add').selectOption(typeId);
+  await page.getByTestId('types-close').click();
+}

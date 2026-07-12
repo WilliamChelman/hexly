@@ -1,4 +1,13 @@
-import { createEntity, enterLibrary, expect, flushSave, mapViewToggle, savedGrid, test } from './fixtures';
+import {
+  authorWorldType,
+  createEntity,
+  enterLibrary,
+  expect,
+  flushSave,
+  mapViewToggle,
+  savedGrid,
+  test,
+} from './fixtures';
 
 /** The deity's own grid: its `battlemap` Field, not the Hex Map's `grid` — one View per Field. */
 const BATTLEMAP_VIEW = mapViewToggle('battlemap');
@@ -14,26 +23,22 @@ const BATTLEMAP_VIEW = mapViewToggle('battlemap');
 test('a World Owner gives a user-defined type a map, and painting it persists', async ({ page, request }) => {
   const worldId = await enterLibrary(page);
 
-  // Author `world.deity` with a `domain` string and a `battlemap` hex-grid.
-  await page.goto(`/w/${worldId}/settings`);
-  await page.getByTestId('type-new').click();
-  await page.getByTestId('type-id-input').fill('deity');
-  await page.getByTestId('type-name-input').fill('Deity');
+  // Author `world.deity` with a `domain` string and a `battlemap` hex-grid — the map plugin's
+  // data-type, offered beside `string` and `enum`, and the whole ceremony.
+  await authorWorldType(page, worldId, {
+    id: 'deity',
+    name: 'Deity',
+    fields: [
+      { key: 'domain', label: 'Domain' },
+      { key: 'battlemap', label: 'Battlemap', kind: 'core.hex-grid' },
+    ],
+  });
 
-  await page.getByTestId('add-field').click();
-  await page.getByTestId('field-0').getByTestId('field-key').fill('domain');
-  await page.getByTestId('field-0').getByTestId('field-label').fill('Domain');
-
-  await page.getByTestId('add-field').click();
-  const gridRow = page.getByTestId('field-1');
-  await gridRow.getByTestId('field-key').fill('battlemap');
-  await gridRow.getByTestId('field-label').fill('Battlemap');
-  // The map plugin's data-type, offered beside `string` and `enum` — the whole ceremony.
-  await gridRow.getByTestId('field-kind').selectOption('core.hex-grid');
-  await expect(gridRow.getByTestId('field-show-as-view')).toBeChecked();
-
-  await page.getByTestId('type-save').click();
-  await expect(page.getByTestId('type-world.deity')).toBeVisible();
+  // "Show as a view" defaulted to on, and stayed on through the save — which is what affords the
+  // View toggled below.
+  await page.getByTestId('edit-world.deity').click();
+  await expect(page.getByTestId('field-1').getByTestId('field-show-as-view')).toBeChecked();
+  await page.getByTestId('type-cancel').click();
 
   // The type reaches the "New" menu like a plugin's: the registry does not care who authored one.
   await enterLibrary(page);
