@@ -58,8 +58,7 @@ describe('WorldTypesLoader', () => {
 
     const def = registry.get('world.deity');
     expect(def?.labelText).toBe('Deity');
-    // No authored order: the type falls back to its Fields, then its Content (#201). Fields first,
-    // so an Entity carrying it opens on the values its author gave it.
+    // No authored order: the type falls back to its Fields, then its Content (#201).
     expect(def?.views).toEqual([CORE_VIEW_FIELDS, CORE_VIEW_CONTENT]);
     // Its Fields resolve, so the generic view and facets pick them up.
     expect(registry.resolveFields(['world.deity']).map((f) => f.key)).toEqual(['domain']);
@@ -74,8 +73,7 @@ describe('WorldTypesLoader', () => {
   });
 
   it('projects the author’s own View order verbatim, so "Show as a view" can drop one', () => {
-    // The editor's toggle, off: the `battlemap` Field keeps its value and its place in the form, but
-    // places no View — so the Entity affords no map toggle for it.
+    // The toggle, off: the `battlemap` Field is still declared, but places no View.
     availableTypes.mockReturnValue(
       of([{ ...deity, fields: [battlemapField], views: [CORE_VIEW_FIELDS, CORE_VIEW_CONTENT] }]),
     );

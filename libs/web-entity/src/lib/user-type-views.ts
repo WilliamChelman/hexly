@@ -3,20 +3,15 @@ import { CORE_VIEW_CONTENT, CORE_VIEW_FIELDS } from './view-definition';
 
 /**
  * The **View** order a user-defined type affords (ADR-0050, #201): its Fields, then its Content, then
- * each **Structured Field** its author chose to show — in declaration order.
+ * each **Structured Field** its author chose to show, in declaration order. The whole of what a World
+ * Owner can place — a type shipping no code resolves nothing else.
  *
- * The whole of what a World Owner can place, and the one place that list is spelled. A user-defined
- * type ships no code, so it can resolve only the generic Field view, the Content view every Entity
- * affords, and the Views its own structured Fields bring; there is nothing else for it to order.
+ * The map goes last, so adding a battlemap to a `world.deity` does not change what a deity opens on.
+ * A plugin type places its Fields' Views by hand and may choose otherwise: `core.hexmap` places its
+ * grid first, and opens on its map.
  *
- * Fields first, and the map last, because that is what the author made the type *for*: adding a
- * battlemap to a `world.deity` must not hijack how a deity presents itself. A plugin type places its
- * Fields' Views by hand and can choose otherwise — `core.hexmap` places its grid first, and opens on
- * its map. Same list, same resolution; only the author differs.
- *
- * Its two callers are the two directions of the same fact: the **World Types editor** composes the
- * list a "Show as a view" toggle authors, and the **loader** composes the default for a type whose
- * author never named an order (every type predating the toggle).
+ * Called from both directions of the same fact — the World Types editor composes the list a "Show as
+ * a view" toggle authors, and the loader composes the default for a type whose author named no order.
  */
 export function userTypeViews(
   fields: readonly FieldSchema[],
@@ -32,9 +27,8 @@ export function userTypeViews(
 }
 
 /**
- * Whether a type's stored `views` show `field`'s View — what the editor's "Show as a view" toggle
- * reads back. An **absent** list is not an empty one: it means the author never named an order, so
- * every structured Field is shown, which is the toggle's default (on).
+ * Whether a type's stored `views` show `field`'s View — what the "Show as a view" toggle reads back.
+ * An **absent** list is not an empty one: the author named no order, so every structured Field shows.
  */
 export function isShownAsView(views: readonly ViewPlacement[] | undefined, field: FieldSchema): boolean {
   if (!views) return true;

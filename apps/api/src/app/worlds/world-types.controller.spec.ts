@@ -290,10 +290,9 @@ describe('World user-defined types endpoints', () => {
   });
 
   /**
-   * The payoff of ADR-0050 (#201): a World Owner gives a type they defined a **map**, code-lessly, by
-   * declaring a Field of the map plugin's `core.hex-grid` data-type. The API's part is to persist the
-   * declaration — Field and View placement — validate the grid it types, and harvest its links; it
-   * never learns what a hex is.
+   * A user-defined type declaring a Field of the map plugin's `core.hex-grid` data-type (#201). The
+   * API persists the declaration — Field and View placement — validates the grid it types, and
+   * harvests its links; it never learns what a hex is.
    */
   describe('a user-defined type carrying a Structured Field', () => {
     /** `world.deity`, plus a `battlemap` grid placed *after* its Fields — a deity opens on its Fields. */
@@ -377,8 +376,8 @@ describe('World user-defined types endpoints', () => {
         .send({ name: 'Pelor', types: ['world.deity'] })
         .expect(201);
 
-      // An ill-typed grid is refused by the same forward-only gate a `string` Field rides — the write
-      // path resolves `core.hex-grid`'s own schema from the bundled plugins, not from a map branch.
+      // Refused by the same forward-only gate a `string` Field rides: the write path resolves
+      // `core.hex-grid`'s own schema from the bundled plugins, not from a map branch.
       const bad = await ada
         .put(`/entities/${pelor.body.id}`)
         .send({
@@ -410,8 +409,7 @@ describe('World user-defined types endpoints', () => {
       const read = await ada.get(`/entities/${pelor.body.id}`).expect(200);
       expect(read.body.document.metadata.battlemap.hexes['0,0'].terrain).toBe('ocean');
 
-      // The grid's Entity Links are harvested like a Hex Map's: the data-type owns its edges, so a
-      // World Owner's map feeds the World Graph and the References panel for free.
+      // The data-type owns its edges, so a World Owner's map feeds References and the World Graph.
       const refs = await ada.get(`/entities/${lair.body.id}/references`).expect(200);
       expect(refs.body.referencedBy.map((r: { source: { id: string } }) => r.source.id)).toContain(pelor.body.id);
     });
@@ -419,8 +417,7 @@ describe('World user-defined types endpoints', () => {
     it('never offers the grid Field as a facet, however it was flagged', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const world = await makeWorld(ada);
-      // A World Owner ticking `facetable` on a grid gets no facet: a document has no discrete values
-      // to count, so the rail never offers to filter by it (ADR-0050).
+      // Ticking `facetable` on a grid buys no facet: a document has no discrete values to count.
       await ada
         .post(`/worlds/${world}/types`)
         .send({

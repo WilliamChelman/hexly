@@ -55,14 +55,11 @@ export class ViewRegistry {
   }
 
   /**
-   * The **Structured Field** data-types a World Owner may declare a Field of (#201) — the plugin
-   * kinds this build renders, each with the copy that names it in the World Types editor's data-type
-   * picker, beside `string` and `enum`.
+   * The **Structured Field** data-types a World Owner may declare a Field of (#201), each with the
+   * copy naming it in the World Types editor's picker.
    *
-   * Derived from the registered Views rather than from the data-type set, and that is the rule: a
-   * data-type with no View is a Field whose value has no editor, so offering it would hand a World
-   * Owner a slot they could never fill. Drop the map plugin and the picker loses "Hex grid" — it
-   * never learns the name of a kind it cannot render.
+   * Derived from the registered Views, not the data-type set: a data-type with no View is a Field
+   * whose value has no editor, so offering it would hand a World Owner a slot they could never fill.
    */
   offerableDataTypes(): { kind: StructuredDataTypeId; labelKey: string }[] {
     return this.definitions().flatMap((d) => (d.dataType ? [{ kind: d.dataType, labelKey: d.dataTypeLabelKey }] : []));

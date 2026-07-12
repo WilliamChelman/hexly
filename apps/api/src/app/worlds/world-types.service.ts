@@ -70,13 +70,10 @@ export class WorldTypesService {
   }
 
   /**
-   * The View list to write, so that a placement never outlives the Field it names (ADR-0050, #201).
-   *
-   * The editor sends `fields` and `views` together, and the payload schema checks them against each
-   * other — but a caller may legally re-Field a type without re-placing its Views, and *that* patch
-   * cannot be self-checked: the stored list is the only thing the dropped Field is named in. So the
-   * pruning happens here, where the stored type is in hand. `undefined` leaves the stored list alone
-   * — the only case being a patch that touches neither list.
+   * The View list to write, so a placement never outlives the Field it names (ADR-0050, #201). The
+   * payload schema checks a patch's `views` against its own `fields`, but a patch that re-Fields a
+   * type *without* re-placing its Views can only be checked against the stored type — so it is
+   * pruned here. `undefined` leaves the stored list alone.
    */
   private survivingViews(stored: UserDefinedType, patch: UpdateUserDefinedTypeRequest): ViewPlacement[] | undefined {
     if (patch.views) return patch.views;

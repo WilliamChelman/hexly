@@ -92,14 +92,10 @@ export type ViewDefinition = {
        */
       readonly dataType: StructuredDataTypeId;
       /**
-       * The transloco key naming the **data-type itself** ("Hex grid") — what the World Types editor
-       * offers alongside `string` and `enum` when a World Owner declares a Field (#201). Distinct
-       * from the toggle label above, which a structured View takes from the *Field* that placed it:
-       * one names the kind you pick, the other the grid you painted.
-       *
-       * Declaring it here rather than on the framework-free data-type is the same split the View is:
-       * the API has no copy. And it is what makes a data-type *offerable* — a kind with no View is a
-       * Field a World Owner could never edit, so the editor offers exactly the kinds that render.
+       * The transloco key naming the **data-type** ("Hex grid") where the World Types editor offers
+       * it, beside `string` and `enum` (#201). Distinct from the toggle label, which a structured
+       * View takes from the Field that placed it ("Battlemap"). It lives on the View, not on the
+       * framework-free data-type, for the same reason the View does: the API has no copy.
        */
       readonly dataTypeLabelKey: string;
     }

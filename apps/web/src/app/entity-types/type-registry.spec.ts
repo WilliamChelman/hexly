@@ -161,9 +161,8 @@ describe('TypeRegistry', () => {
   });
 
   /**
-   * The payoff of the merge (#201): a World Owner gives a type they defined a map by declaring one
-   * Field, and it resolves through the *same* path `core.hexmap` runs — a `{ field }` placement, the
-   * Field's `kind`, the View registered for that kind. No second branch for the code-less half.
+   * A user-defined type's grid resolves through the same path `core.hexmap` runs (#201) — a
+   * `{ field }` placement, the Field's `kind`, the View registered for that kind. No second branch.
    */
   describe('a user-defined type carrying a Structured Field', () => {
     const battlemap: FieldSchema = {
@@ -181,7 +180,6 @@ describe('TypeRegistry', () => {
       });
 
       // The map is last, so the default View — the primary type's first — is the deity's own Fields.
-      // Adding a battlemap does not hijack how a deity presents itself.
       expect(viewKeys(registry.viewsFor(['world.deity']))).toEqual([
         CORE_VIEW_FIELDS,
         CORE_VIEW_CONTENT,
@@ -195,8 +193,7 @@ describe('TypeRegistry', () => {
         views: [CORE_VIEW_FIELDS, { field: 'battlemap' }],
       });
 
-      // The world map and the battlemap are two Views of one Entity, each bound to its own Field —
-      // which is the whole reason a View is an instance rather than a bare id (#200).
+      // Two Views of one Entity, each bound to its own Field — why a View is an instance (#200).
       expect(viewKeys(registry.viewsFor(['core.hexmap', 'world.deity']))).toEqual([
         `${CORE_VIEW_MAP}:grid`,
         CORE_VIEW_CONTENT,

@@ -25,9 +25,8 @@ interface DraftField {
   label: string;
   /**
    * The picked data-type's kind: a built-in, or a plugin's **Structured Field** data-type by its
-   * `namespace.id` id (`core.hex-grid`, #201). A bare string because it is a `<select>` value — one
-   * picker over both keyspaces, which is the point of the merge: a grid is a data-type a World Owner
-   * picks, like `enum`, not a payload only code can reach.
+   * `namespace.id` id (`core.hex-grid`, #201). A bare string — it is a `<select>` value, over the two
+   * keyspaces the one picker offers.
    */
   kind: string;
   /** Comma-separated enum options; ignored for non-enum kinds. */
@@ -35,17 +34,16 @@ interface DraftField {
   required: boolean;
   facetable: boolean;
   /**
-   * **Structured** Fields only: whether this Field's View is placed in the type's ordered view list —
-   * the "Show as a view" toggle, on by default (ADR-0050). Off keeps the Field and its value exactly
-   * as they are and merely withholds the toggle, so a type with several grids does not bury its
-   * Fields under a stack of them. Ignored for a built-in kind, which has a form row, not a View.
+   * **Structured** Fields only: whether this Field's View is placed in the type's view list — the
+   * "Show as a view" toggle, on by default (ADR-0050). Off withholds the toggle and leaves the Field
+   * and its value untouched. Ignored for a built-in kind, which has a form row, not a View.
    */
   showAsView: boolean;
   /**
    * The data-type this Field was loaded with, kept whole. The form authors only a `kind` (and an
-   * enum's options), so a data-type carrying more than its kind — a `list`'s item type, an
-   * `entityLink`'s target-type constraint — can only survive a round trip by being handed back
-   * verbatim. Absent on a Field the author just added, which has nothing stored yet.
+   * enum's options), so a data-type carrying more — a `list`'s item type, an `entityLink`'s
+   * target-type constraint — survives a round trip only by being handed back verbatim. Absent on a
+   * Field the author just added.
    */
   stored?: FieldDataType;
 }
@@ -135,11 +133,9 @@ interface Draft {
               data-testid="field-label"
               (input)="patchField($index, { label: value($event) })"
             />
-            <!-- One picker over both keyspaces: the built-ins, then whatever Structured data-types
-                 this build's plugins render — a grid is picked here like an enum (#201). -->
-            <!-- The picked kind is marked on the option, not bound as the select's [value]: the
-                 options are rendered by @for/@if, so a [value] naming one of them runs before it
-                 exists and the browser falls back to the first — silently mis-showing the row. -->
+            <!-- The kind is marked on the option, not bound as the select's [value]: the options are
+                 rendered by @for/@if, so a [value] naming one of them runs before it exists and the
+                 browser falls back to the first. -->
             <select
               appSelect
               [attr.aria-label]="'worldTypes.fieldType' | transloco"
@@ -152,8 +148,7 @@ interface Draft {
               @for (d of structuredKinds(); track d.kind) {
                 <option [value]="d.kind" [selected]="d.kind === f.kind">{{ d.labelKey | transloco }}</option>
               }
-              <!-- A kind this form cannot author (a list, an entityLink, a dropped plugin's) still
-                   names itself, rather than leaving the row blank and inviting a blind re-pick. -->
+              <!-- A kind this form cannot author names itself, rather than leaving the row blank. -->
               @if (unofferedKind(f); as kind) {
                 <option [value]="kind" selected>{{ kind }}</option>
               }
@@ -168,9 +163,9 @@ interface Draft {
                 (input)="patchField($index, { options: value($event) })"
               />
             }
-            <!-- A Structured Field is edited on its own View, never as a form row: it cannot be
-                 collected in the create dialog (so never required) and has no discrete values to
-                 count (so never a facet). What it carries instead is where its View sits. -->
+            <!-- A Structured Field is edited on its own View, so it is never required (nothing
+                 collects it) and never a facet (no discrete values to count) — it carries where its
+                 View sits instead. -->
             @if (isStructured(f)) {
               <label class="type-flag">
                 <input
@@ -301,8 +296,8 @@ export class WorldTypesPanel implements OnInit {
 
   /**
    * The **Structured Field** data-types this build offers, beside the built-ins (#201). Read off the
-   * registered Views, so the picker offers exactly the kinds this build can *render*: drop the map
-   * plugin and "Hex grid" is simply not on the menu — the app never names it.
+   * registered Views, so the picker offers exactly the kinds this build can render — drop the map
+   * plugin and "Hex grid" leaves the menu.
    */
   protected readonly structuredKinds = computed(() => this.views.offerableDataTypes());
 
@@ -334,8 +329,7 @@ export class WorldTypesPanel implements OnInit {
       // The id is immutable when editing; the slug is shown for reference but not sent.
       slug: type.id.slice(`${USER_TYPE_NAMESPACE}.`.length),
       label: type.label,
-      // Each structured Field's toggle reads back the type's own view order — the two halves of the
-      // same fact, so what the author sees ticked is what they placed.
+      // Each structured Field's toggle reads back off the type's own view order.
       fields: type.fields.map((field) => toDraftField(field, isShownAsView(type.views, field))),
     });
   }
@@ -347,11 +341,8 @@ export class WorldTypesPanel implements OnInit {
 
   /**
    * A row's `kind` when the picker offers no option for it — a `list` or an `entityLink` (authored
-   * through the API, or by a later build of this form), or a structured kind whose plugin this build
-   * dropped. `null` for every kind on the menu.
-   *
-   * Such a Field is shown, and round-trips untouched ({@link DraftField.stored}); what it cannot be is
-   * silently retyped because the form had nothing to draw.
+   * through the API), or a structured kind whose plugin this build dropped. `null` for a kind on the
+   * menu. Such a Field still shows, and round-trips untouched ({@link DraftField.stored}).
    */
   protected unofferedKind(field: DraftField): string | null {
     const offered =
@@ -399,9 +390,8 @@ export class WorldTypesPanel implements OnInit {
     const d = this.draft();
     if (!d || !this.canSave()) return;
     const fields = d.fields.map(toFieldSchema);
-    // The Fields and the view order travel together, always: composing the list here from the live
-    // toggles is what keeps a placement from ever outliving the Field it names. Zipped by index
-    // against the *mapped* Fields, so the two agree on a key the form has yet to trim.
+    // Fields and view order are always sent together, so a placement never outlives the Field it
+    // names. Zipped against the *mapped* Fields, so both agree on a key the form has yet to trim.
     const shown = new Set(fields.filter((_, i) => d.fields[i].showAsView).map((field) => field.key));
     const views = userTypeViews(fields, (field) => shown.has(field.key));
     const label = d.label.trim();
@@ -453,13 +443,9 @@ function blankField(): DraftField {
 }
 
 /**
- * An existing Field schema → the flattened form model (enum options joined for the text input).
- *
- * It keeps the whole {@link FieldSchema.dataType} in {@link DraftField.stored}, not just its `kind`,
- * so a data-type the picker cannot *rebuild* still survives an edit of the Field beside it: a `list`
- * carries an item type and an `entityLink` a target-type constraint, and neither has a control here to
- * re-author them from. The alternative this replaces — coercing an unofferable kind to `string` —
- * silently retyped a Field the author never touched.
+ * An existing Field schema → the flattened form model (enum options joined for the text input). It
+ * keeps the whole `dataType` in {@link DraftField.stored}, not just its `kind`, so a data-type this
+ * form cannot rebuild survives an edit of the Field beside it.
  */
 function toDraftField(field: FieldSchema, showAsView: boolean): DraftField {
   return {
@@ -476,10 +462,8 @@ function toDraftField(field: FieldSchema, showAsView: boolean): DraftField {
 
 /**
  * The form model → a Field schema for the request (the server re-validates through the shared Zod).
- *
- * A **Structured Field** is neither required nor facetable, whatever a stale draft carries: it is
- * edited on its own View, so the create dialog could never collect it, and a document has no discrete
- * values to count (ADR-0050). The form withholds both checkboxes; this is where that holds.
+ * A **Structured Field** is neither required nor facetable whatever a stale draft carries (ADR-0050);
+ * the form withholds both checkboxes, and this is where that holds.
  */
 function toFieldSchema(f: DraftField): FieldSchema {
   const structured = isStructuredKind(f.kind);
@@ -494,11 +478,8 @@ function toFieldSchema(f: DraftField): FieldSchema {
 
 /**
  * The picked kind → a data-type: an `enum` rebuilds from its options text, a structured kind is its id
- * alone, and a scalar is its bare literal.
- *
- * A kind the author left untouched hands back the **stored** data-type verbatim, which is the only way
- * a `list`'s item type or an `entityLink`'s target-type constraint — neither of which this form can
- * author — survives an edit of the type around them.
+ * alone, a scalar its bare literal — and a kind the author left untouched hands back the stored
+ * data-type verbatim, item type and target-type constraint intact.
  */
 function toDataType(f: DraftField): FieldDataType {
   if (f.kind === 'enum')

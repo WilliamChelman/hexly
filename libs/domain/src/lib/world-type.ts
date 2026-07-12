@@ -33,22 +33,15 @@ export const uniqueFieldsSchema = z
 
 /**
  * A user-defined type's ordered **View** list (ADR-0050, #201) — the same {@link ViewPlacement} list a
- * plugin type declares in code, so both run one view-resolution path. A `{ field }` entry must name
- * one of the type's own Fields: a type cannot place a View for a Field it does not declare.
- *
- * Which Views the ids resolve to is the web's business, not the domain's — a user-defined type can
- * only resolve the generic Field view, the Content view, and its own **Structured Fields**, and an id
- * outside that set simply contributes no toggle.
+ * plugin type declares in code, so both run one view-resolution path. Which View an id resolves to is
+ * the web's business: a well-formed id this build does not register contributes no toggle.
  */
 const typeViewsSchema = z.array(viewPlacementSchema);
 
 /**
- * The shared refinement both payloads carry: every `{ field }` **View** placement names a Field the
- * same declaration makes. Shared as arguments to `.refine(...)` because the two schemas differ in
- * their optionality, not in this rule.
- *
- * An update patching `views` without `fields` fails it, which is the point: the two travel together,
- * so re-Fielding a type can never orphan a placement.
+ * The refinement both payloads carry: every `{ field }` placement names a Field the same declaration
+ * makes. Passed as `.refine(...)` arguments because the two schemas differ in their optionality, not
+ * in this rule — so a patch placing a Field must send that Field with it.
  */
 const placesOnlyItsOwnFields = [
   (type: { fields?: readonly FieldSchema[]; views?: readonly ViewPlacement[] }) => {
@@ -60,11 +53,9 @@ const placesOnlyItsOwnFields = [
 
 /**
  * A stored user-defined type: its `world.`-namespaced `id`, a display `label`, its `fields`, and the
- * optional ordered `views` those Fields and the core afford.
- *
- * `views` is **optional, and absent is not empty**: a type that never named an order falls back to
- * Fields, then Content, then its Structured Fields (resolved by the host, which is the only half that
- * knows what a View is) — so a deity that grows a battlemap still opens on its Fields.
+ * ordered `views` they afford. `views` is optional, and **absent is not empty**: a type that named no
+ * order falls back to Fields, Content, then its Structured Fields — defaulted by the host, the only
+ * half that knows what a View is.
  */
 export const userDefinedTypeSchema = z
   .object({
@@ -86,10 +77,9 @@ export type CreateUserDefinedTypeRequest = z.infer<typeof createUserDefinedTypeR
  * PATCH /worlds/:id/types/:typeId — rename and/or replace an existing type's `fields` and `views`. The
  * id is a path param (immutable); every body field is optional and each list is sent wholesale.
  *
- * A `views` patch is checked against the `fields` **in the same patch**, which is all a payload schema
- * can see: so placing one of the type's Fields means sending that Field with it, as the editor always
- * does. The other half of the invariant — that re-Fielding a type without re-placing its Views cannot
- * orphan a stored placement — needs the *stored* type, so the host prunes it there (WorldTypesService).
+ * A `views` patch is checked against the `fields` in the same patch — all a payload schema can see —
+ * so placing a Field means sending it too, as the editor always does. Re-Fielding a type *without*
+ * re-placing its Views is checked against the stored type instead, by `WorldTypesService`.
  */
 export const updateUserDefinedTypeRequestSchema = z
   .object({

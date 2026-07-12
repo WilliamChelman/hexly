@@ -101,9 +101,9 @@ export const fieldDataTypeSchema = z.union([builtInDataTypeSchema, structuredDat
 export type FieldDataType = z.infer<typeof fieldDataTypeSchema>;
 
 /**
- * Whether a data-type *kind* is structured. No built-in kind carries a dot, so the dot **is** the mark
- * (ADR-0050) — and this is the one place that says so. Takes the bare kind, for the caller holding one
- * loose: the World Types editor's data-type `<select>`, whose value is a string until it is a Field.
+ * Whether a data-type *kind* is structured. No built-in kind carries a dot, so the dot is the mark
+ * (ADR-0050), and this is the one place that says so. Takes a bare kind, for the caller holding one
+ * loose — the World Types editor's `<select>`, whose value is a string until it is a Field.
  */
 export function isStructuredKind(kind: string): kind is StructuredDataTypeId {
   return kind.includes('.');
@@ -146,13 +146,11 @@ export function isEntityLinkDataType(dataType: FieldDataType): boolean {
 }
 
 /**
- * Whether a Field is actually offered as a **Facet** — the one home of the rule that a **Structured
- * Field** never is, whatever its `facetable` flag says (ADR-0050): a document has no discrete values
- * to count, so a facet over one could only offer to filter by a grid.
+ * Whether a Field is offered as a **Facet** — the one home of the rule that a **Structured Field**
+ * never is, whatever its `facetable` flag says (ADR-0050): a document has no discrete values to count.
  *
- * Read by both halves of the facet: the derivation that indexes a value ({@link deriveFieldFacets})
- * and the API's count of the Facets to *offer* — which is what keeps an empty "Battlemap" section out
- * of the Entity Browser's rail rather than merely keeping it unpopulated.
+ * Read by both halves of the facet: the derivation that indexes a value ({@link deriveFieldFacets}),
+ * and the API's count of the Facets to *offer*, which keeps an unpopulated section out of the rail.
  */
 export function isFacetableField(field: FieldSchema): field is FieldSchema & { dataType: BuiltInDataType } {
   return field.facetable && !isStructuredDataType(field.dataType);

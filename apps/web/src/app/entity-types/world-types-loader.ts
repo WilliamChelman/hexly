@@ -65,19 +65,16 @@ export class WorldTypesLoader {
  * Project a user-defined {@link AvailableType} onto a {@link TypeDefinition}: its authored **View**
  * order, its Field schema, and its authored name as `labelText`. It declares **no** transloco
  * `labels` — a user-defined type ships no copy, so every label it shows is that authored name,
- * resolved through {@link TypeRegistry.name}/`chromeLabel`.
- *
- * The `views` list is the *same* {@link ViewPlacement} list a plugin type declares in code, so the
- * registry resolves both down one path (#201) — a user-defined type is not a second kind of citizen
- * with a hardcoded view.
+ * resolved through {@link TypeRegistry.name}/`chromeLabel`. Its `views` is the same list a plugin
+ * type declares in code, so the registry resolves both down one path (#201).
  */
 function toDefinition(type: AvailableType): TypeDefinition {
   return {
     id: type.id,
     icon: 'label',
     labelText: type.label,
-    // Absent is not empty: a type whose author never named an order (every one predating the "Show as
-    // a view" toggle) falls back to Fields, Content, and each of its Structured Fields.
+    // Absent is not empty: an author who named no order gets Fields, Content, then their Structured
+    // Fields (#201).
     views: type.views ?? userTypeViews(type.fields),
     fields: type.fields,
     graphColorToken: '--color-ink-muted',

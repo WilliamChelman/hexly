@@ -29,9 +29,8 @@ describe('WorldTypesPanel', () => {
     worlds.updateType.mockReturnValue(of(created));
     await TestBed.configureTestingModule({
       imports: [WorldTypesPanel, provideTranslocoTesting()],
-      // The map plugin, composed as `app.config.ts` does: it is what puts `core.hex-grid` on the
-      // data-type picker, so the panel learns of the grid the way the app does — from a provider,
-      // never by naming it (ADR-0050, #199).
+      // The map plugin, composed as `app.config.ts` does — what puts `core.hex-grid` on the picker,
+      // so the panel learns of the grid from a provider rather than by naming it (#199).
       providers: [provideRouter([]), providePluginHexmap(), { provide: WorldsClient, useValue: worlds }],
     }).compileComponents();
     TestBed.inject(ActiveWorld).set('w1');
@@ -122,9 +121,9 @@ describe('WorldTypesPanel', () => {
   });
 
   it('hands back a data-type the form cannot author, rather than retyping the Field', () => {
-    // A `list` carries an item type and an `entityLink` a target-type constraint — neither has a
-    // control in this form, and both are reachable through the API. Editing the type beside them must
-    // not silently retype them: the row shows the kind it has, and re-sends the data-type whole.
+    // A `list` carries an item type and an `entityLink` a target-type constraint; neither has a
+    // control here, and both are reachable through the API. Editing the type beside them must not
+    // retype them.
     worlds.availableTypes.mockReturnValue(
       of<AvailableType[]>([
         {
@@ -147,7 +146,7 @@ describe('WorldTypesPanel', () => {
     fixture.detectChanges();
 
     click('edit-world.deity');
-    // The picker names the kind it cannot offer, so the row is never blank and never mis-shows.
+    // The picker names the kind it cannot offer, rather than leaving the row blank.
     const kind: HTMLSelectElement = fixture.debugElement.query(By.css('[data-testid="field-kind"]')).nativeElement;
     expect(kind.value).toBe('list');
 
@@ -156,7 +155,7 @@ describe('WorldTypesPanel', () => {
 
     expect(worlds.updateType).toHaveBeenCalledWith('w1', 'world.deity', {
       label: 'God',
-      // The item type survives — it would be lost by rebuilding the data-type from the kind alone.
+      // The item type survives — rebuilding the data-type from the kind alone would lose it.
       fields: [
         {
           key: 'titles',
@@ -170,11 +169,7 @@ describe('WorldTypesPanel', () => {
     });
   });
 
-  /**
-   * The user-facing payoff of ADR-0050 (#201): a World Owner gives a type they defined a map by
-   * picking a data-type, the way they pick `enum` — no code, and no borrowing the whole `core.hexmap`
-   * type to get one grid.
-   */
+  /** A World Owner gives a type they defined a map by picking a data-type, as they pick `enum` (#201). */
   describe('a Structured Field', () => {
     /** The kinds the picker offers, in order — the built-ins, then this build's plugin data-types. */
     function kindOptions(): string[] {
@@ -282,8 +277,8 @@ describe('WorldTypesPanel', () => {
 });
 
 /**
- * An Instance that does **not** bundle the map plugin — the absent-plugin degradation (ADR-0048),
- * composed one provider short of the app's, exactly as `type-registry.spec` does it.
+ * An Instance that does **not** bundle the map plugin — composed one provider short of the app's, as
+ * `type-registry.spec` does it (ADR-0048).
  */
 describe('WorldTypesPanel without the Hex Map plugin', () => {
   let fixture: ComponentFixture<WorldTypesPanel>;
@@ -311,7 +306,6 @@ describe('WorldTypesPanel without the Hex Map plugin', () => {
     const kinds = fixture.debugElement
       .queryAll(By.css('[data-testid="field-kind"] option'))
       .map((option) => option.nativeElement.value);
-    // No grid on the menu: a Field a World Owner could never edit is worse than one they cannot declare.
     expect(kinds).toEqual(['string', 'number', 'boolean', 'date', 'enum']);
   });
 });
