@@ -1,7 +1,12 @@
 import { TestBed } from '@angular/core/testing';
+import { VIEW_FIELD_KEY } from '@hexly/web-entity';
 import { emptyHexMap, HEX_GRID_FIELD, HexMap } from '../../lib';
 import { HexMapStore } from './hexmap-store';
-import { FakeEntitySession, provideFakeEntitySession } from '../../testing/entity-session.fake';
+import {
+  FakeEntitySession,
+  provideFakeEntitySession,
+  provideHexMapStoreTesting,
+} from '../../testing/entity-session.fake';
 
 /**
  * The store is now route-scoped and injects the central {@link ENTITY_SESSION} (ADR-0048),
@@ -13,9 +18,9 @@ import { FakeEntitySession, provideFakeEntitySession } from '../../testing/entit
 let session: FakeEntitySession;
 
 beforeEach(() => {
-  TestBed.configureTestingModule({
-    providers: [HexMapStore, provideFakeEntitySession()],
-  });
+  // `provideHexMapStoreTesting()` binds the store to `core.hexmap`'s own `grid` Field, as the entity
+  // page's outlet does in the app — the store requires a Field key rather than assuming one (#200).
+  TestBed.configureTestingModule({ providers: provideHexMapStoreTesting() });
   session = TestBed.inject(FakeEntitySession);
 });
 
@@ -2598,5 +2603,38 @@ describe('HexMapStore forward-only grid (ADR-0050)', () => {
     expect(store.document().labels).toEqual([expect.objectContaining({ id, text: 'Open Sea' })]);
     // The painted hex survives the rewrite — the plane written back is the one on screen.
     expect(store.document().hexes['0,0']).toEqual({ terrain: 'ocean' });
+  });
+});
+
+/**
+ * The store edits *a* grid, not *the* grid (ADR-0050, #200): which Field it renders is
+ * {@link VIEW_FIELD_KEY}, provided by the entity page into the injector it outlets the map View
+ * with. This is what lets an Entity carry two grids — a world map and a battlemap — and paint each
+ * without touching the other (#202).
+ */
+describe('HexMapStore bound to a Field', () => {
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [HexMapStore, provideFakeEntitySession(), { provide: VIEW_FIELD_KEY, useValue: 'battlemap' }],
+    });
+    session = TestBed.inject(FakeEntitySession);
+  });
+
+  it('reads and writes the Metadata slice its Field key names, leaving every other grid alone', () => {
+    const store = makeStore();
+    // The session's body carries a painted grid at `core.hexmap`'s own `grid` key. This store renders
+    // a *different* Field, so it sees none of it: an unpainted plane, not the world map.
+    reload({ ...emptyHexMap(), hexes: { '0,0': { terrain: 'ocean' } } });
+    expect(store.document().hexes).toEqual({});
+
+    store.paintAt({ q: 1, r: 1 }, 'forest');
+
+    // The stroke lands at `battlemap`…
+    expect((session.body().metadata?.['battlemap'] as HexMap).hexes).toEqual({ '1,1': { terrain: 'forest' } });
+    // …and the grid it is not bound to is exactly as it was.
+    expect((session.body().metadata?.[HEX_GRID_FIELD.key] as HexMap).hexes).toEqual({
+      '0,0': { terrain: 'ocean' },
+    });
   });
 });

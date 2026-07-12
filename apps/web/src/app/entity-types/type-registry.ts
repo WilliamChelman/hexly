@@ -10,8 +10,11 @@ import {
   TypeDefinition,
   TypeLabels,
   ViewId,
+  ViewInstance,
+  viewInstanceKey,
 } from '@hexly/web-entity';
 import { CORE_TYPE_DEFINITIONS } from './core-types';
+import { ViewRegistry } from './view-registry';
 
 /**
  * Root registry where Entity Types make themselves known to the type-specific UI
@@ -33,6 +36,12 @@ import { CORE_TYPE_DEFINITIONS } from './core-types';
 @Injectable({ providedIn: 'root' })
 export class TypeRegistry implements EntityTypes {
   private readonly transloco = inject(TranslocoService);
+  /**
+   * Read-only, and only from {@link viewsFor}: a Type *places* one of its Fields among its Views, and
+   * which View renders that Field's data-type is the {@link ViewRegistry}'s to say (ADR-0050). The
+   * dependency runs one way — the View registry never asks about types.
+   */
+  private readonly views = inject(ViewRegistry);
   private readonly definitions = signal<readonly TypeDefinition[]>([]);
 
   /** Every registered definition, in registration order (core, then the bundled plugins). */
@@ -79,16 +88,25 @@ export class TypeRegistry implements EntityTypes {
   }
 
   /**
-   * The ordered, de-duplicated {@link ViewId}s an Entity carrying `types` affords —
-   * the union of every type's contributed views, in `types` order, primary type
-   * first (ADR-0048, *Views* amendment). Drives the header view toggle: a note
-   * yields `[core.view.content]` (one view, no toggle); a hexmap yields
-   * `[core.view.map, core.view.content]`; a `[dnd.monster, core.hexmap]` composes
-   * all three (stat block, Note, and Map). `types[0]`'s first view is the default.
+   * The ordered, de-duplicated {@link ViewInstance}s an Entity carrying `types` affords — the union of
+   * every type's placed views, in `types` order, primary type first (ADR-0048, *Views* amendment).
+   * Drives the header view toggle: a note yields `[core.view.content]` (one view, no toggle); a hexmap
+   * yields `[core.view.map:grid, core.view.content]`; a `[dnd.monster, core.hexmap]` composes all
+   * three (stat block, Note, and Map). `types[0]`'s first view is the default.
    *
-   * A registered type affords exactly the Views it declares: a plugin shipping a
-   * bespoke view does not also get the generic Field View, while a fields-only type
-   * (every user-defined one, #191) declares `core.view.fields` outright.
+   * A View is an **instance**, not a bare id (ADR-0050, #200): a Type's own View (a plugin's stat
+   * block, Content, the generic Field view) names no Field, while a **Structured Field**'s View is
+   * bound to the Field it renders. A type places a Field's View by listing `{ field: key }` among its
+   * views; the placement resolves Field → data-type `kind` → the View the {@link ViewRegistry} holds
+   * for that kind. Two grids on one Entity therefore afford two map Views, distinct by Field key.
+   *
+   * A placement that cannot resolve — a Field the type never declared, a built-in data-type (which
+   * has a form row, not a View), or a structured one whose plugin this build omits — contributes
+   * nothing, rather than a toggle to a view that cannot render.
+   *
+   * A registered type affords exactly the Views it declares: a plugin shipping a bespoke view does not
+   * also get the generic Field View, while a fields-only type (every user-defined one, #191) declares
+   * `core.view.fields` outright.
    *
    * An **unregistered** type — a plugin this build does not bundle — affords the Content view and
    * the generic Field view instead (#199). Both, and in that order: the Entity opens on the lore it
@@ -96,17 +114,31 @@ export class TypeRegistry implements EntityTypes {
    * Metadata (#187) — a Hex Map on an Instance without the map plugin, exactly as ADR-0048 promised.
    * Nothing is hidden by a missing plugin; the Metadata, grid and all, is still there to read.
    */
-  viewsFor(types: readonly string[] | null | undefined): ViewId[] {
-    const seen = new Set<ViewId>();
+  viewsFor(types: readonly string[] | null | undefined): ViewInstance[] {
+    const seen = new Map<string, ViewInstance>();
+    const afford = (instance: ViewInstance) => {
+      const key = viewInstanceKey(instance);
+      if (!seen.has(key)) seen.set(key, instance);
+    };
+
     for (const type of types ?? []) {
       const def = this.get(type);
-      if (def) for (const view of def.views) seen.add(view);
-      else {
-        seen.add(CORE_VIEW_CONTENT);
-        seen.add(CORE_VIEW_FIELDS);
+      if (!def) {
+        afford({ viewId: CORE_VIEW_CONTENT });
+        afford({ viewId: CORE_VIEW_FIELDS });
+        continue;
+      }
+      for (const placement of def.views) {
+        if (typeof placement === 'string') {
+          afford({ viewId: placement });
+          continue;
+        }
+        const field = def.fields?.find((f) => f.key === placement.field);
+        const view = this.views.forDataType(field?.dataType.kind);
+        if (field && view) afford({ viewId: view.id, fieldKey: field.key });
       }
     }
-    return [...seen];
+    return [...seen.values()];
   }
 
   /**
@@ -147,12 +179,14 @@ export class TypeRegistry implements EntityTypes {
   }
 
   /**
-   * The type ids that contribute `view` — e.g. `typeIdsForView('core.view.map')`
-   * backs the dashboard/list "maps" filter (the types that afford the map view).
+   * The type ids that afford `view` — e.g. `typeIdsForView('core.view.map')` backs the dashboard/list
+   * "maps" filter (the types that afford the map view). Asks {@link viewsFor} rather than reading the
+   * declared list, so a type affords the map View by *placing a grid Field* — which is the only way
+   * any type does now, `core.hexmap` included (#200).
    */
   typeIdsForView(view: ViewId): EntityType[] {
     return this.definitions()
-      .filter((d) => d.views.includes(view))
+      .filter((d) => this.viewsFor([d.id]).some((v) => v.viewId === view))
       .map((d) => d.id);
   }
 }

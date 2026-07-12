@@ -52,9 +52,25 @@ render a _specific_ Field: an Entity carrying `[core.hexmap, world.deity]` where
 
 - The afforded-View list is `{ viewId, fieldKey? }[]`, not `ViewId[]`. A data-type View's toggle is
   labelled from the **Field's** label ("Grid", "Battlemap"); the URL carries `?view=core.view.map:battlemap`;
-  `EntityPage`'s outlet passes `fieldKey` as an input, and `HexMapStore` — provided by `MapView` — reads
-  and mutates that key's slice of `EntitySession.body`. A Type-contributed View (stat-block, content,
-  generic fields) carries no `fieldKey` and is unchanged.
+  `EntityPage`'s outlet passes `fieldKey` down to the View's component, and `HexMapStore` — provided by
+  `MapView` — reads and mutates that key's slice of `EntitySession.body`. A Type-contributed View
+  (stat-block, content, generic fields) carries no `fieldKey` and is unchanged.
+
+  **Amended in #200:** the outlet passes the key through a **DI token** (`VIEW_FIELD_KEY`) in a
+  per-View-instance `Injector`, not as the component `@Input` this ADR first sketched. An input cannot
+  work: a Structured Field's View provides its store in `providers`, which Angular constructs _before_
+  it sets any input, so the store would be built before it knew which Field it edits. Passing the key
+  through the injector also buys the teardown the two-grid case needs — `NgComponentOutlet` rebuilds a
+  component when its injector changes, so switching from the world map to the battlemap yields a fresh
+  store and a fresh undo stack, where an input would have re-pointed a live store (and its undo stack)
+  at another Field mid-edit.
+
+- **A Field may carry a `labelKey`** (#200). Once a Structured Field's `label` names a **View** in the
+  header, it is chrome — and a plugin ships translated copy where a World Owner ships one authored
+  name (ADR-0014). So `FieldSchema` gains an optional transloco key, exactly as a Type already splits
+  its `labels` (keys, code-registered) from a user-defined type's `labelText` (authored, never
+  translated). `core.hexmap`'s grid Field declares one, so its toggle still reads "Map" / "Carte"; a
+  `world.deity`'s battlemap Field has none, and reads "Battlemap" verbatim.
 - A `TypeDefinition.views` entry becomes **`ViewId | { field: key }`**, so a Type _places_ a Field's View
   in its own order: `core.hexmap` declares `[{ field: 'grid' }, CORE_VIEW_CONTENT]` and so still opens on
   the map. Ordering structured-field Views implicitly (always first, or always last) is wrong in both

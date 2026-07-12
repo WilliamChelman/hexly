@@ -1,6 +1,6 @@
 import { EnvironmentProviders } from '@angular/core';
 import { CORE_VIEW_MAP, providePlugin } from '@hexly/web-entity';
-import { HEX_GRID_DATA_TYPE } from '../lib';
+import { CORE_HEX_GRID, HEX_GRID_DATA_TYPE } from '../lib';
 import { HEXMAP_TRANSLATIONS } from '../i18n/hexmap-translations';
 import { HEXMAP_TYPE_DEFINITIONS } from './hexmap-types';
 
@@ -28,7 +28,11 @@ export function providePluginHexmap(): EnvironmentProviders {
     views: [
       {
         id: CORE_VIEW_MAP,
-        labelKey: 'map.hexmap.view.map',
+        // The View of the `core.hex-grid` data-type, not of the `core.hexmap` type: it renders
+        // *whichever* grid Field placed it, so an Entity with two grids gets two of these — and each
+        // takes its toggle's label from its Field ("Grid", "Battlemap"), which is why this View
+        // declares no copy of its own (ADR-0050, #200).
+        dataType: CORE_HEX_GRID,
         loadComponent: () => import('./components/map-view').then((m) => m.MapView),
       },
     ],

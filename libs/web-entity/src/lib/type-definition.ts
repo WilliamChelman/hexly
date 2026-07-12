@@ -1,6 +1,6 @@
 import { EntityType, FieldSchema } from '@hexly/domain';
 import { IconName } from '@hexly/web-ui';
-import { ViewId } from './view-definition';
+import { ViewPlacement } from './view-definition';
 
 /**
  * The transloco *keys* a type contributes to its page chrome (resolved live by
@@ -50,13 +50,17 @@ export interface TypeDefinition {
    */
   readonly labelText?: string;
   /**
-   * The {@link ViewId}s this type contributes, in header display order (ADR-0048,
-   * *Views* amendment). A plain note contributes only `core.view.content`; a hexmap
-   * also contributes `core.view.map`, so it gets the view toggle and the status bar.
-   * The header toggles the *union* an Entity's types afford, defaulting to the
-   * primary type's first View.
+   * The Views this type contributes, in header display order (ADR-0048, *Views* amendment). The
+   * header toggles the *union* an Entity's types afford, defaulting to the primary type's first View.
+   *
+   * An entry is either a {@link ViewId} the type contributes outright — a plain note contributes only
+   * `core.view.content` — or a reference to one of the type's own {@link fields}, whose **Structured
+   * Field** data-type contributes the View: `core.hexmap` declares `[{ field: 'grid' },
+   * CORE_VIEW_CONTENT]`, so it opens on its map with its lore one toggle away (ADR-0050, #200). A
+   * `{ field }` entry naming a Field this type does not declare, or one whose data-type this build
+   * does not register (its plugin is absent), contributes nothing.
    */
-  readonly views: readonly ViewId[];
+  readonly views: readonly ViewPlacement[];
   /**
    * The type's **Field schema** (ADR-0048, #187): the Metadata keys it types, each
    * with a data-type and required-ness. A typing *lens* over Metadata — values stay

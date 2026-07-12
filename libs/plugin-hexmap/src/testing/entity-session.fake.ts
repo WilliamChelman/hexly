@@ -2,7 +2,7 @@ import { Provider, signal } from '@angular/core';
 import { emptyContent, EntityBody } from '@hexly/domain';
 import { emptyHexMap, HEX_GRID_FIELD, HexMap } from '../lib';
 import { applyPatches as immerApplyPatches, Draft, Patch, produceWithPatches } from '@hexly/immer';
-import { ENTITY_SESSION, EntitySession } from '@hexly/web-entity';
+import { ENTITY_SESSION, EntitySession, VIEW_FIELD_KEY } from '@hexly/web-entity';
 import { HexMapStore } from '../web/services/hexmap-store';
 
 /**
@@ -75,9 +75,13 @@ export function provideFakeEntitySession(): Provider[] {
 
 /**
  * Providers for a component spec that injects {@link HexMapStore}: the route-scoped store
- * (no longer `providedIn: 'root'`) bound to a fresh fake session. Inject
- * {@link FakeEntitySession} to reach its test helpers when a spec needs to seed the body.
+ * (no longer `providedIn: 'root'`) bound to a fresh fake session, over `core.hexmap`'s own `grid`
+ * Field. Inject {@link FakeEntitySession} to reach its test helpers when a spec needs to seed the body.
+ *
+ * The Field key is explicit because the store requires one (#200) — in the app it comes from the
+ * entity page's outlet, which knows *which* grid the active map View renders. A spec that means to
+ * exercise a second grid overrides {@link VIEW_FIELD_KEY} with its own key.
  */
 export function provideHexMapStoreTesting(): Provider[] {
-  return [HexMapStore, ...provideFakeEntitySession()];
+  return [HexMapStore, { provide: VIEW_FIELD_KEY, useValue: HEX_GRID_FIELD.key }, ...provideFakeEntitySession()];
 }

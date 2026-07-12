@@ -39,12 +39,20 @@ export const HEX_GRID_DATA_TYPE = defineStructuredDataType({
  * The Field `core.hexmap` declares. Exported so the map editor reads and writes its Metadata slice
  * through it, rather than spelling the key out at each end.
  *
+ * Its label is what the header's View toggle reads, because a Structured Field's View is bound to the
+ * Field it renders (ADR-0050, #200) — so the Field carries `labelKey`, the copy this plugin ships,
+ * and the toggle stays translated ("Map" / "Carte") rather than falling back to an English `label`.
+ * A World Owner's own grid Field has no key and shows its authored name ("Battlemap") verbatim, which
+ * is the right answer for both.
+ *
  * Not `required`: an absent grid opens as an empty plane and the first edit mints one, which beats
  * refusing the save. Never facetable — a document has no discrete values to count (ADR-0050).
  */
 export const HEX_GRID_FIELD: FieldSchema = Object.freeze({
   key: 'grid',
-  label: 'Grid',
+  // The untranslated fallback the API's available-types list reports; the web resolves `labelKey`.
+  label: 'Map',
+  labelKey: 'map.hexmap.view.map',
   dataType: { kind: CORE_HEX_GRID },
   required: false,
   facetable: false,

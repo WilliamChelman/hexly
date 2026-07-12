@@ -9,3 +9,4 @@ export * from './lib/entity-types';
 export * from './lib/plugin';
 export * from './lib/type-definition';
 export * from './lib/view-definition';
+export * from './lib/view-instance';

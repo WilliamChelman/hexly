@@ -1,4 +1,7 @@
-import { enterLibrary, entityIdFromUrl, expect, flushSave, openEntityActions, test } from './fixtures';
+import { enterLibrary, entityIdFromUrl, expect, flushSave, mapViewToggle, openEntityActions, test } from './fixtures';
+
+/** The Hex Map's map View toggle: bound to the `grid` Field `core.hexmap` declares (#200). */
+const MAP_VIEW = mapViewToggle();
 
 /**
  * The bundled `dnd.monster` plugin (#192): a Field schema the API validates and facets, and a bespoke
@@ -33,7 +36,9 @@ test('creates a dnd.monster, fills its required Fields, and reads the stat block
   // primary type's own (ADR-0048, Views amendment).
   await expect(page.getByTestId('dnd.view.stat-block')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByTestId('core.view.content')).toBeVisible();
-  await expect(page.getByTestId('core.view.map')).toHaveCount(0);
+  // A map View is bound to the Field it renders, so its toggle is keyed by that Field
+  // (`core.view.map:grid`, ADR-0050/#200) — and a monster has no grid at all.
+  await expect(page.getByTestId(MAP_VIEW)).toHaveCount(0);
 
   // The CR carries over from the create dialog; the rest of the block is editable in place.
   await expect(page.getByTestId('stat-block-view')).toBeVisible();
@@ -87,13 +92,13 @@ test('a dnd.monster carrying core.hexmap offers the stat block, Note, and Map vi
 
   await expect(page.getByTestId('dnd.view.stat-block')).toBeVisible();
   await expect(page.getByTestId('core.view.content')).toBeVisible();
-  await expect(page.getByTestId('core.view.map')).toBeVisible();
+  await expect(page.getByTestId(MAP_VIEW)).toBeVisible();
 
   // `dnd.monster` is still primary, so its own View stays the default.
   await expect(page.getByTestId('dnd.view.stat-block')).toHaveAttribute('aria-pressed', 'true');
 
   // The Map view opens on the empty grid the added type's `grid` Field minted, not a blank frame.
-  await page.getByTestId('core.view.map').click();
+  await page.getByTestId(MAP_VIEW).click();
   await expect(page.getByTestId('tool-terrain')).toBeVisible();
   await expect(page.getByTestId('hex-count')).toHaveText('0 hexes');
 });

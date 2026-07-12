@@ -3,11 +3,11 @@ import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { of, Subject, throwError } from 'rxjs';
 import { CONTENT_FORMAT, CORE_NOTE, emptyContent, EntityDetail, EntitySaveOutcome } from '@hexly/domain';
-import { coordKey, CORE_HEXMAP, emptyHexMap, HexMap } from '@hexly/plugin-hexmap';
+import { coordKey, CORE_HEXMAP, emptyHexMap, HEX_GRID_FIELD, HexMap } from '@hexly/plugin-hexmap';
 import { MockEntitiesClient, MockNudgeBusClient } from '@hexly/web-core/testing';
 import { EntitiesClient, NudgeBusClient, EVICTED, Watched } from '@hexly/web-core';
 import { EntitySession } from './entity-session';
-import { ENTITY_SESSION } from '@hexly/web-entity';
+import { ENTITY_SESSION, VIEW_FIELD_KEY } from '@hexly/web-entity';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { HexMapStore } from '@hexly/plugin-hexmap/testing';
 
@@ -62,6 +62,8 @@ describe('EntitySession', () => {
         // token, as the app's composition root wires it (ADR-0048).
         { provide: ENTITY_SESSION, useExisting: EntitySession },
         HexMapStore,
+        // Which grid the store edits is the page's to say (#200); here, `core.hexmap`'s own.
+        { provide: VIEW_FIELD_KEY, useValue: HEX_GRID_FIELD.key },
         { provide: EntitiesClient, useValue: entities },
         { provide: NudgeBusClient, useValue: bus },
       ],

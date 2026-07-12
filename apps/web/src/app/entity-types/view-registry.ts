@@ -44,6 +44,20 @@ export class ViewRegistry {
   }
 
   /**
+   * The View that renders a **Structured Field** of data-type `kind` (`core.hex-grid` → the map View),
+   * or `undefined` when this build registers none — the plugin that ships the data-type ships the
+   * View, so the two are absent together (ADR-0050, #200).
+   *
+   * This is the whole of the Field→View binding {@link TypeRegistry.viewsFor} walks: a Type places one
+   * of its Fields, the Field names its data-type by `kind`, and the kind resolves here. No registry
+   * ever learns that a grid in particular has a View.
+   */
+  forDataType(kind: string | null | undefined): ViewDefinition | undefined {
+    if (kind == null) return undefined;
+    return this.definitions().find((d) => d.dataType === kind);
+  }
+
+  /**
    * The definition for `id`, falling back to the always-present `core.view.content`
    * for an absent/unregistered View — the base every Entity affords, so the host
    * always resolves to *something* to outlet (mirrors {@link TypeRegistry.resolve}).

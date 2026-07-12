@@ -5,12 +5,12 @@ import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 import { CONTENT_FORMAT, EntityDetail, EntityType } from '@hexly/domain';
-import { CORE_HEXMAP } from '@hexly/plugin-hexmap';
+import { CORE_HEXMAP, HEX_GRID_FIELD } from '@hexly/plugin-hexmap';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { EntitiesClient, NudgeBusClient, ActiveWorld, TitleService, EVICTED, Watched } from '@hexly/web-core';
 import { MockEntitiesClient, MockNudgeBusClient } from '@hexly/web-core/testing';
 import { EntitySession } from './services/entity-session';
-import { CORE_VIEW_CONTENT, CORE_VIEW_MAP, ENTITY_SESSION } from '@hexly/web-entity';
+import { CORE_VIEW_CONTENT, CORE_VIEW_MAP, ENTITY_SESSION, viewInstanceKey } from '@hexly/web-entity';
 import { ViewRegistry } from '../../entity-types/view-registry';
 import { EntityNameResolver, CONTENT_EDITOR_SESSION } from '@hexly/content-editor';
 import { noteDetail } from './components/entity-detail.fixtures';
@@ -147,6 +147,24 @@ describe('EntityPage routing', () => {
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelector('app-content-editor')).not.toBeNull();
     expect(el.querySelector('app-map-canvas')).toBeNull();
+  });
+
+  it('restores a Structured Field’s View — Field key and all — from ?view (ADR-0050, #200)', async () => {
+    // A map View is bound to the Field it renders, so the param carries both: a reload or a shared
+    // link has to land on *this* grid, not merely on "a map". The Field key round-trips through the
+    // URL, which is what will tell the world map from the battlemap when an Entity has both (#202).
+    await configure('m1', { view: viewInstanceKey({ viewId: CORE_VIEW_MAP, fieldKey: HEX_GRID_FIELD.key }) });
+    entities.load.mockReturnValue(of(detail('m1', 'hexmap')));
+    const fixture = mount();
+    await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_MAP);
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('app-map-canvas')).not.toBeNull();
+    expect(fixture.debugElement.injector.get(EntityViewStore).activeView()).toEqual({
+      viewId: CORE_VIEW_MAP,
+      fieldKey: HEX_GRID_FIELD.key,
+    });
   });
 
   it('titles the tab with the open Entity name (owned by the session, not the view)', async () => {

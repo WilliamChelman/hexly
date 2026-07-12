@@ -1,5 +1,5 @@
 import { computed, effect, inject, Injectable, signal } from '@angular/core';
-import { Metadata, readField } from '@hexly/domain';
+import { FieldSchema, Metadata, readField } from '@hexly/domain';
 import {
   addPoint,
   Axial,
@@ -20,7 +20,7 @@ import {
   terrainPalette,
 } from '../../lib';
 import { Patch } from '@hexly/immer';
-import { ENTITY_SESSION } from '@hexly/web-entity';
+import { ENTITY_SESSION, VIEW_FIELD_KEY } from '@hexly/web-entity';
 import { MapSelection } from './map-selection';
 import type { Selection, SelectMode, SelectionRef } from './map-selection';
 
@@ -120,11 +120,16 @@ export type MoveOutcome = 'moved' | 'blocked' | 'noop';
 
 /**
  * The Hex Map editor: tools, selection, and undo/redo over the grid — but no longer the
- * owner of the grid. The document is the value of the `core.hex-grid` **Structured Field**
- * `core.hexmap` declares (ADR-0050), at the `grid` key of the central {@link EntitySession}'s
- * Metadata map: reads project off `session.body`, edits go through `session.mutate` (Immer,
- * patches captured), and undo pushes those inverse patches back through `session.applyPatches`.
- * Nothing mutates the document directly, or undo breaks.
+ * owner of the grid. The document is the value of a `core.hex-grid` **Structured Field**
+ * (ADR-0050), at that Field's key in the central {@link EntitySession}'s Metadata map: reads project
+ * off `session.body`, edits go through `session.mutate` (Immer, patches captured), and undo pushes
+ * those inverse patches back through `session.applyPatches`. Nothing mutates the document directly,
+ * or undo breaks.
+ *
+ * *Which* Field is {@link VIEW_FIELD_KEY}, provided by the entity page into the injector it outlets
+ * the map View with (#200) — not necessarily `core.hexmap`'s `grid`. An Entity carrying two grids
+ * affords two map Views, and each gets one of these over its own slice of the body, so painting one
+ * never touches the other.
  *
  * Route-scoped, bound beside the session it drives (not `providedIn: 'root'`): it injects
  * the route-scoped {@link ENTITY_SESSION}, so it lives and dies with the open Entity.
@@ -132,6 +137,18 @@ export type MoveOutcome = 'moved' | 'blocked' | 'noop';
 @Injectable()
 export class HexMapStore {
   private readonly session = inject(ENTITY_SESSION);
+
+  /**
+   * The Field this store's grid lives at — the one the active map View renders. The grid data-type's
+   * Field schema, re-keyed to it: every other property (the `core.hex-grid` kind, never-facetable,
+   * not required) is the data-type's, not the declaring Field's, so only the key varies.
+   *
+   * Required, with no default: a host that outlets the map View without a key is a wiring bug, and
+   * silently falling back to `core.hexmap`'s own `grid` would make it *paint the wrong map* rather
+   * than fail (#200). Injection throws instead. A spec provides it through
+   * `provideHexMapStoreTesting()`.
+   */
+  private readonly field: FieldSchema = { ...HEX_GRID_FIELD, key: inject(VIEW_FIELD_KEY) };
 
   /**
    * Grids this store produced, by reference — well-formed by construction, so {@link grid} takes
@@ -151,7 +168,7 @@ export class HexMapStore {
    * the document does not carry.
    */
   private readonly grid = computed<{ map: HexMap; stored: boolean }>(() => {
-    const raw = readField(this.session.body().metadata, HEX_GRID_FIELD);
+    const raw = readField(this.session.body().metadata, this.field);
     if (isObject(raw) && this.minted.has(raw)) return { map: raw as HexMap, stored: true };
     const parsed = hexMapSchema.safeParse(raw);
     if (!parsed.success) return { map: emptyHexMap(), stored: false };
@@ -890,7 +907,7 @@ export class HexMapStore {
    * pays one parse; it is a keystroke, not a drag.
    */
   private rememberMintedGrid(): void {
-    const raw = readField(this.session.body().metadata, HEX_GRID_FIELD);
+    const raw = readField(this.session.body().metadata, this.field);
     if (isObject(raw)) this.minted.add(raw);
   }
 
@@ -912,14 +929,14 @@ export class HexMapStore {
     const { redo, undo } = this.session.mutate((body) => {
       const metadata: Metadata = (body.metadata ??= {});
       if (stored) {
-        recipe(metadata[HEX_GRID_FIELD.key] as HexMap);
+        recipe(metadata[this.field.key] as HexMap);
         return;
       }
       // Cloned first: an assigned value is not a draft, so a recipe run over `map` would mutate the
       // object {@link grid} is still holding.
       const fresh = structuredClone(map);
       recipe(fresh);
-      metadata[HEX_GRID_FIELD.key] = fresh;
+      metadata[this.field.key] = fresh;
     });
     // No patches → the recipe changed nothing; recording it would leave empty undo
     // steps and discard the redo branch.

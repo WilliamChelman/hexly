@@ -58,7 +58,9 @@ import { FieldControl } from '@hexly/web-entity/controls';
           <dl class="grid grid-cols-[minmax(8rem,12rem)_1fr] items-center gap-x-6 gap-y-3 m-0">
             @for (field of fields(); track field.key) {
               <dt class="text-sm text-ink-muted">
-                {{ field.label }}
+                <!-- A plugin's Field ships translated copy under a labelKey; a World Owner's Field
+                     shows its authored label verbatim, never as a key (ADR-0014, #191, #200). -->
+                {{ field.labelKey ? (field.labelKey | transloco) : field.label }}
                 @if (field.required) {
                   <span class="text-danger" aria-hidden="true">&nbsp;*</span>
                 }

@@ -18,7 +18,7 @@ import { EntityTags } from './entity-tags';
 import { SaveStatus } from './save-status';
 import { EntitySession } from '../services/entity-session';
 import { TypeRegistry } from '../../../entity-types/type-registry';
-import { TypeLabels, ViewId } from '@hexly/web-entity';
+import { TypeLabels, viewInstanceKey } from '@hexly/web-entity';
 import { ViewRegistry } from '../../../entity-types/view-registry';
 import { EntityViewStore } from '../services/entity-view-store';
 
@@ -81,20 +81,22 @@ import { EntityViewStore } from '../services/entity-view-store';
 
       @if (viewToggle().length > 1) {
         <!-- View toggle (#75, ADR-0048): one button per View the Entity's types afford
-             (a hexmap: Map + Note), flipping the outletted body via the active View. -->
+             (a hexmap: Grid + Note), flipping the outletted body via the active View. A
+             Structured Field's View is one button per *Field* (ADR-0050, #200), so an Entity
+             with two grids toggles between them by name. -->
         <div pageHeaderActions appButtonGroup [attr.aria-label]="'editorShell.view.switchLabel' | transloco">
-          @for (v of viewToggle(); track v.id) {
+          @for (v of viewToggle(); track v.key) {
             <button
               type="button"
               appButton
               variant="ghost"
               size="sm"
-              [active]="activeView() === v.id"
-              [attr.aria-pressed]="activeView() === v.id"
-              [attr.data-testid]="v.id"
-              (click)="selectView(v.id)"
+              [active]="activeKey() === v.key"
+              [attr.aria-pressed]="activeKey() === v.key"
+              [attr.data-testid]="v.key"
+              (click)="selectView(v.key)"
             >
-              {{ v.labelKey | transloco }}
+              {{ v.label }}
             </button>
           }
         </div>
@@ -152,10 +154,33 @@ export class EntityHeader {
   protected readonly editable = computed(() => this.session.current() !== null && this.session.writable());
   /** Tooltip: the in-place rename affordance. */
   protected readonly titleHint = this.chromeLabel('rename');
-  /** The active View id, driving which toggle button reads as pressed. */
-  protected readonly activeView = this.viewStore.activeView;
-  /** The Views the open Entity affords, resolved to their toggle definitions (label + testid). */
-  protected readonly viewToggle = computed(() => this.viewStore.views().map((id) => this.views.resolve(id)));
+  /** The active View's key, driving which toggle button reads as pressed. */
+  protected readonly activeKey = this.viewStore.activeKey;
+
+  /**
+   * The Views the open Entity affords, resolved to their toggle buttons: the key (the click target,
+   * the URL value, and the testid) and the label to print.
+   *
+   * A **Structured Field**'s View is labelled from the *Field* it renders — "Map", "Battlemap" —
+   * because that is what tells one grid from the other, and a View id cannot (ADR-0050, #200). A
+   * Field's name resolves the same way a *type's* does (#191): a plugin ships translated copy under a
+   * `labelKey`, and a World Owner's authored `label` is printed verbatim, never looked up as a key it
+   * was never written as. A Type's own View carries its own `labelKey`.
+   */
+  protected readonly viewToggle = computed(() => {
+    this.transloco.activeLang(); // reactive dependency: re-resolve the labels on a language switch
+    const fields = this.types.resolveFields(this.session.types());
+    return this.viewStore.views().map((view) => {
+      const field = fields.find((f) => f.key === view.fieldKey);
+      // A data-type's View has no copy of its own, and a Type's View has no Field: exactly one side
+      // of this resolves, because `labelKey` and `dataType` are alternatives on `ViewDefinition`.
+      const labelKey = field ? field.labelKey : this.views.resolve(view.viewId).labelKey;
+      return {
+        key: viewInstanceKey(view),
+        label: labelKey ? this.transloco.translate(labelKey) : (field?.label ?? view.viewId),
+      };
+    });
+  });
   /** The header eyebrow tag and the title's accessible name, from the live primary type (`types[0]`). */
   protected readonly eyebrow = this.chromeLabel('eyebrow');
   protected readonly titleLabel = this.chromeLabel('titleLabel');
@@ -219,16 +244,17 @@ export class EntityHeader {
    * Switch the active View (#75, ADR-0048). Updates the store for instant feedback,
    * then mirrors the choice to the URL `view` param (`replaceUrl`) so a refresh
    * restores it — the default View (the primary type's first) drops the param, others
-   * carry the full View id. Reverts the store if the navigation is cancelled.
+   * carry the View's key, which names the Field for a Structured Field's View
+   * (`core.view.map:grid`, ADR-0050). Reverts the store if the navigation is cancelled.
    */
-  protected selectView(view: ViewId): void {
-    const previous = this.viewStore.activeView();
-    this.viewStore.setView(view);
-    const isDefault = this.viewStore.views()[0] === view;
+  protected selectView(key: string): void {
+    const previous = this.viewStore.activeKey();
+    this.viewStore.setView(key);
+    const isDefault = viewInstanceKey(this.viewStore.views()[0]) === key;
     this.router
       .navigate([], {
         relativeTo: this.route,
-        queryParams: { view: isDefault ? null : view },
+        queryParams: { view: isDefault ? null : key },
         queryParamsHandling: 'merge',
         replaceUrl: true,
       })

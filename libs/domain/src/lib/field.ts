@@ -137,10 +137,23 @@ export function isEntityLinkDataType(dataType: FieldDataType): boolean {
  * is `facetable` (surfaced as a per-type facet in the Entity Browser, ADR-0035).
  * `required` and `facetable` default to false so a terse `{ key, label, dataType }`
  * declares an optional, non-facetable Field.
+ *
+ * A **code-registered** Field (a plugin's, the core's) may add a {@link labelKey} — the transloco key
+ * its shipped copy lives under — because a plugin ships translated copy where a World Owner ships
+ * one authored name. This is the same split a Type already makes between its `labels` (transloco keys)
+ * and a user-defined type's `labelText` (authored, never translated); a Field needed it once its
+ * `label` began naming a **View** in the header (ADR-0014, ADR-0050, #200).
  */
 export const fieldSchemaSchema = z.object({
   key: z.string().trim().min(1),
   label: z.string().trim().min(1),
+  /**
+   * A transloco key for this Field's display name, when one ships with the code that declares it. The
+   * web prefers it over {@link label}; the API has no copy, so `label` stays the untranslated name it
+   * reports. A user-defined Field has none — its `label` is authored data, and translating it would
+   * mean looking up a key its author never wrote.
+   */
+  labelKey: z.string().trim().min(1).optional(),
   dataType: fieldDataTypeSchema,
   required: z.boolean().default(false),
   facetable: z.boolean().default(false),

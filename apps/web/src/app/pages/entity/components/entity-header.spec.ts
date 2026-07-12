@@ -6,11 +6,11 @@ import { provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { of, throwError } from 'rxjs';
 import { emptyContent, EntityDetail, WorldDetail, WorldVerb } from '@hexly/domain';
-import { CORE_HEXMAP } from '@hexly/plugin-hexmap';
+import { CORE_HEXMAP, HEX_GRID_FIELD } from '@hexly/plugin-hexmap';
 import { MockEntitiesClient, MockWorldsClient, MockUserDirectoryClient, MockAuthClient } from '@hexly/web-core/testing';
 import { EntitiesClient, WorldsClient, ActiveWorld, UserDirectoryClient, AuthClient } from '@hexly/web-core';
 import { EntitySession } from '../services/entity-session';
-import { CORE_VIEW_CONTENT, ENTITY_SESSION } from '@hexly/web-entity';
+import { CORE_VIEW_CONTENT, CORE_VIEW_MAP, ENTITY_SESSION, viewInstanceKey } from '@hexly/web-entity';
 import { EntityViewStore } from '../services/entity-view-store';
 import { ViewRegistry } from '../../../entity-types/view-registry';
 import { CORE_VIEW_DEFINITIONS } from '../views/core-views';
@@ -18,6 +18,12 @@ import { OwnerSet } from '@hexly/web-ui';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { EntityHeader } from './entity-header';
 import { noteDetail } from './entity-detail.fixtures';
+
+/**
+ * The Hex Map's map View, as the toggle keys it: the View id plus the **Structured Field** it renders
+ * (`core.view.map:grid`, ADR-0050/#200) — the testid, and the `?view=` value.
+ */
+const MAP_VIEW_KEY = viewInstanceKey({ viewId: CORE_VIEW_MAP, fieldKey: HEX_GRID_FIELD.key });
 
 /** The active World the header reads for pin state — 'm1' is the opened entity's id. */
 function worldDetail(pinnedEntityIds: string[] = [], rights: WorldVerb[] = ['read', 'manage']): WorldDetail {
@@ -328,16 +334,21 @@ describe('EntityHeader', () => {
   });
 
   // Map/Note toggle (#75): a hexmap carries both a grid and a Content body, so the
-  // header switches between the two editor surfaces.
-  it('offers a Map/Note view toggle for a hexmap, with Map active by default', () => {
+  // header switches between the two editor surfaces. The map View is the *grid Field*'s
+  // (ADR-0050, #200), so its button is keyed and labelled by that Field.
+  it('offers a Map/Note view toggle for a hexmap, with the Map active by default', () => {
     open(aldermoor);
     const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 
-    const map = fixture.nativeElement.querySelector('[data-testid="core.view.map"]') as HTMLButtonElement;
+    const map = fixture.nativeElement.querySelector(`[data-testid="${MAP_VIEW_KEY}"]`) as HTMLButtonElement;
     const noteBtn = fixture.nativeElement.querySelector('[data-testid="core.view.content"]') as HTMLButtonElement;
     expect(map).not.toBeNull();
     expect(noteBtn).not.toBeNull();
+    // Labelled from the Field it renders — which is what will tell a world map from a battlemap when
+    // an Entity carries both (#202). The grid Field ships copy, so the label is still translated: a
+    // plugin's Field resolves its `labelKey`, where a World Owner's shows its authored name verbatim.
+    expect(map.textContent?.trim()).toBe('Map');
     // Default is the grid: Map pressed, Note not.
     expect(map.getAttribute('aria-pressed')).toBe('true');
     expect(noteBtn.getAttribute('aria-pressed')).toBe('false');
@@ -348,7 +359,7 @@ describe('EntityHeader', () => {
     const fixture = TestBed.createComponent(EntityHeader);
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('[data-testid="core.view.map"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector(`[data-testid="${MAP_VIEW_KEY}"]`)).toBeNull();
     expect(fixture.nativeElement.querySelector('[data-testid="core.view.content"]')).toBeNull();
     // The title is still editable — a note can be renamed too.
     expect(fixture.nativeElement.textContent).toContain('Lady Mara');
@@ -363,7 +374,7 @@ describe('EntityHeader', () => {
     fixture.detectChanges();
 
     // The store is the single owner of the active-View choice (shared with the page body).
-    expect(TestBed.inject(EntityViewStore).activeView()).toBe(CORE_VIEW_CONTENT);
+    expect(TestBed.inject(EntityViewStore).activeView()).toEqual({ viewId: CORE_VIEW_CONTENT });
     expect(
       (fixture.nativeElement.querySelector('[data-testid="core.view.content"]') as HTMLButtonElement).getAttribute(
         'aria-pressed',
@@ -446,7 +457,7 @@ describe('EntityHeader', () => {
     const nav = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
 
     (fixture.nativeElement.querySelector('[data-testid="core.view.content"]') as HTMLButtonElement).click();
-    // Persisted as the full View id (replaceUrl — a view flip is not a navigation).
+    // Persisted as the View's key (replaceUrl — a view flip is not a navigation).
     expect(nav).toHaveBeenCalledWith(
       [],
       expect.objectContaining({
@@ -455,7 +466,7 @@ describe('EntityHeader', () => {
       }),
     );
 
-    (fixture.nativeElement.querySelector('[data-testid="core.view.map"]') as HTMLButtonElement).click();
+    (fixture.nativeElement.querySelector(`[data-testid="${MAP_VIEW_KEY}"]`) as HTMLButtonElement).click();
     // The default Map view drops the param to keep the URL clean.
     expect(nav).toHaveBeenCalledWith(
       [],

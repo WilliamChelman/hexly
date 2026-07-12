@@ -4,9 +4,26 @@ import { FieldSchema } from '@hexly/domain';
 import { CORE_HEX_GRID } from '@hexly/plugin-hexmap';
 import { DND_MONSTER } from '@hexly/plugin-dnd';
 import { TypeRegistry } from './type-registry';
-import { CORE_VIEW_CONTENT, CORE_VIEW_FIELDS, CORE_VIEW_MAP, TypeDefinition } from '@hexly/web-entity';
+import {
+  CORE_VIEW_CONTENT,
+  CORE_VIEW_FIELDS,
+  CORE_VIEW_MAP,
+  TypeDefinition,
+  ViewInstance,
+  viewInstanceKey,
+} from '@hexly/web-entity';
 import { DND_VIEW_STAT_BLOCK, providePluginDnd } from '@hexly/plugin-dnd/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
+
+/**
+ * The afforded Views as their string keys — a View a Type contributes is its bare id, and a
+ * Structured Field's View carries the Field it renders (`core.view.map:grid`, #200). Asserting on the
+ * key rather than the object keeps these expectations readable and is exactly what the URL and the
+ * toggle testids carry.
+ */
+function viewKeys(instances: readonly ViewInstance[]): string[] {
+  return instances.map(viewInstanceKey);
+}
 
 function definition(id: string, fields?: readonly FieldSchema[]): TypeDefinition {
   return {
@@ -84,52 +101,76 @@ describe('TypeRegistry', () => {
   });
 
   it('unions the ordered Views a type set affords — primary first, deduped', () => {
-    expect(registry.viewsFor(['core.hexmap'])).toEqual([CORE_VIEW_MAP, CORE_VIEW_CONTENT]);
-    expect(registry.viewsFor(['core.note'])).toEqual([CORE_VIEW_CONTENT]);
+    expect(viewKeys(registry.viewsFor(['core.hexmap']))).toEqual([`${CORE_VIEW_MAP}:grid`, CORE_VIEW_CONTENT]);
+    expect(viewKeys(registry.viewsFor(['core.note']))).toEqual([CORE_VIEW_CONTENT]);
     // A multi-type set unions in `types` order, deduping the shared content view.
-    expect(registry.viewsFor(['core.hexmap', 'core.note'])).toEqual([CORE_VIEW_MAP, CORE_VIEW_CONTENT]);
+    expect(viewKeys(registry.viewsFor(['core.hexmap', 'core.note']))).toEqual([
+      `${CORE_VIEW_MAP}:grid`,
+      CORE_VIEW_CONTENT,
+    ]);
     expect(registry.viewsFor([])).toEqual([]);
     expect(registry.viewsFor(undefined)).toEqual([]);
+  });
+
+  it('binds a Structured Field’s View to the Field it renders, and a Type’s View to nothing', () => {
+    // The whole of #200: a View id was the identity of a View while an Entity could afford each once.
+    // `core.hexmap` places its `grid` Field's View first, so the Map still opens by default — but the
+    // instance names the Field, which is what lets a second grid afford a second map View (#202).
+    expect(registry.viewsFor(['core.hexmap'])).toEqual([
+      { viewId: CORE_VIEW_MAP, fieldKey: 'grid' },
+      { viewId: CORE_VIEW_CONTENT },
+    ]);
   });
 
   /** One View per surface the Entity's types afford — the header's whole rule (#192). */
   describe('view-per-surface for the bundled dnd.monster plugin', () => {
     it('offers the stat block and the Note view, defaulting to the plugin’s own', () => {
-      expect(registry.viewsFor([DND_MONSTER])).toEqual([DND_VIEW_STAT_BLOCK, CORE_VIEW_CONTENT]);
+      expect(viewKeys(registry.viewsFor([DND_MONSTER]))).toEqual([DND_VIEW_STAT_BLOCK, CORE_VIEW_CONTENT]);
     });
 
     it('offers the stat block, Note, and Map when the monster also carries core.hexmap', () => {
-      expect(registry.viewsFor([DND_MONSTER, 'core.hexmap'])).toEqual([
+      expect(viewKeys(registry.viewsFor([DND_MONSTER, 'core.hexmap']))).toEqual([
         DND_VIEW_STAT_BLOCK,
         CORE_VIEW_CONTENT,
-        CORE_VIEW_MAP,
+        `${CORE_VIEW_MAP}:grid`,
       ]);
       // Re-primarying the hexmap re-orders the union, so the Map becomes the default View.
-      expect(registry.viewsFor(['core.hexmap', DND_MONSTER])).toEqual([
-        CORE_VIEW_MAP,
+      expect(viewKeys(registry.viewsFor(['core.hexmap', DND_MONSTER]))).toEqual([
+        `${CORE_VIEW_MAP}:grid`,
         CORE_VIEW_CONTENT,
         DND_VIEW_STAT_BLOCK,
       ]);
     });
 
     it('does not drag in the generic Field View — a bespoke view is what the code bought', () => {
-      expect(registry.viewsFor([DND_MONSTER])).not.toContain(CORE_VIEW_FIELDS);
+      expect(viewKeys(registry.viewsFor([DND_MONSTER]))).not.toContain(CORE_VIEW_FIELDS);
     });
   });
 
   it('affords exactly the Views a registered type declares', () => {
     // A fields-only type (every user-defined one) declares the generic Field View outright…
     registry.register({ ...definition('dnd.beast', [crField]), views: [CORE_VIEW_FIELDS] });
-    expect(registry.viewsFor(['dnd.beast'])).toEqual([CORE_VIEW_FIELDS]);
+    expect(viewKeys(registry.viewsFor(['dnd.beast']))).toEqual([CORE_VIEW_FIELDS]);
     // …and a core type declaring no Fields never surfaces it.
-    expect(registry.viewsFor(['core.note'])).toEqual([CORE_VIEW_CONTENT]);
+    expect(viewKeys(registry.viewsFor(['core.note']))).toEqual([CORE_VIEW_CONTENT]);
+  });
+
+  it('drops a placed Field it cannot resolve to a View, rather than offering a dead toggle', () => {
+    // A `{ field }` placement resolves Field → data-type `kind` → the View registered for that kind.
+    // Neither a Field the type never declared nor a built-in data-type (which has a form row, not a
+    // View) resolves to one — so the type affords only the Views that can actually render.
+    registry.register({
+      ...definition('dnd.beast', [crField]),
+      views: [{ field: 'cr' }, { field: 'nonesuch' }, CORE_VIEW_CONTENT],
+    });
+    expect(viewKeys(registry.viewsFor(['dnd.beast']))).toEqual([CORE_VIEW_CONTENT]);
   });
 
   it('falls back to Content plus the generic Field View for an unregistered type — the missing-plugin case', () => {
     // No definition registered for `pathfinder.monster`: the Entity still opens on the lore every
     // Entity has, and the generic View renders its type as an inert chip over its plain Metadata —
     // never a blank screen, and never a hidden value (#187, #199).
-    expect(registry.viewsFor(['pathfinder.monster'])).toEqual([CORE_VIEW_CONTENT, CORE_VIEW_FIELDS]);
+    expect(viewKeys(registry.viewsFor(['pathfinder.monster']))).toEqual([CORE_VIEW_CONTENT, CORE_VIEW_FIELDS]);
   });
 
   it('resolves the union of Field schemas a types[] set declares, primary type first', () => {
@@ -219,9 +260,28 @@ describe('TypeRegistry without the Hex Map plugin', () => {
   it('opens an existing Hex Map on its Content, with the generic Field view one toggle away', () => {
     // The Entity opens, and nothing is hidden: the lore renders as it always did, and the grid — a
     // Metadata value like any other — is still there, under an unrendered Field rather than a canvas.
-    expect(registry.viewsFor(['core.hexmap'])).toEqual([CORE_VIEW_CONTENT, CORE_VIEW_FIELDS]);
+    expect(viewKeys(registry.viewsFor(['core.hexmap']))).toEqual([CORE_VIEW_CONTENT, CORE_VIEW_FIELDS]);
     // No map View is afforded by anything, so the header offers no toggle to a canvas that isn't here.
     expect(registry.typeIdsForView(CORE_VIEW_MAP)).toEqual([]);
+  });
+
+  it('drops a *registered* type’s placed grid Field too, when the data-type’s plugin is absent', () => {
+    // The degradation a user-defined type with a grid Field hits (#201): the type itself is here (it
+    // is World data, not the plugin's), but `core.hex-grid` resolves against an empty set, so its
+    // placement contributes no View. The Field's value stays in Metadata, unrendered — never a toggle
+    // to a canvas this build cannot draw.
+    registry.register({
+      id: 'world.deity' as TypeDefinition['id'],
+      icon: 'label',
+      labelText: 'Deity',
+      views: [CORE_VIEW_FIELDS, { field: 'battlemap' }],
+      fields: [
+        { key: 'battlemap', label: 'Battlemap', dataType: { kind: CORE_HEX_GRID }, required: false, facetable: false },
+      ],
+      graphColorToken: '--color-ink-muted',
+    });
+
+    expect(viewKeys(registry.viewsFor(['world.deity']))).toEqual([CORE_VIEW_FIELDS]);
   });
 
   it('still renders a Hex Map’s chrome — the core note’s, the always-registered fallback', () => {
