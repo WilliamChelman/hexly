@@ -149,10 +149,9 @@ describe('EntityPage routing', () => {
     expect(el.querySelector('app-map-canvas')).toBeNull();
   });
 
-  it('restores a Structured Field’s View — Field key and all — from ?view (ADR-0050, #200)', async () => {
-    // A map View is bound to the Field it renders, so the param carries both: a reload or a shared
-    // link has to land on *this* grid, not merely on "a map". The Field key round-trips through the
-    // URL, which is what will tell the world map from the battlemap when an Entity has both (#202).
+  it('restores a Structured Field’s View — Field key and all — from ?view (ADR-0050)', async () => {
+    // A map View is bound to the Field it renders, so the param carries both: a reload or a shared link
+    // has to land on *this* grid, not merely on "a map".
     await configure('m1', { view: viewInstanceKey({ viewId: CORE_VIEW_MAP, fieldKey: HEX_GRID_FIELD.key }) });
     entities.load.mockReturnValue(of(detail('m1', 'hexmap')));
     const fixture = mount();

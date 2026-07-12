@@ -28,10 +28,9 @@ export function providePluginHexmap(): EnvironmentProviders {
     views: [
       {
         id: CORE_VIEW_MAP,
-        // The View of the `core.hex-grid` data-type, not of the `core.hexmap` type: it renders
-        // *whichever* grid Field placed it, so an Entity with two grids gets two of these — and each
-        // takes its toggle's label from its Field ("Grid", "Battlemap"), which is why this View
-        // declares no copy of its own (ADR-0050, #200).
+        // The `core.hex-grid` data-type's View, not the `core.hexmap` type's: it renders whichever
+        // grid Field placed it, and takes its toggle's label from that Field — hence no copy of its
+        // own (ADR-0050).
         dataType: CORE_HEX_GRID,
         loadComponent: () => import('./components/map-view').then((m) => m.MapView),
       },

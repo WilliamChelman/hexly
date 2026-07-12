@@ -1,6 +1,6 @@
 import { enterLibrary, entityIdFromUrl, expect, flushSave, mapViewToggle, openEntityActions, test } from './fixtures';
 
-/** The Hex Map's map View toggle: bound to the `grid` Field `core.hexmap` declares (#200). */
+/** The Hex Map's map View toggle: bound to the `grid` Field `core.hexmap` declares. */
 const MAP_VIEW = mapViewToggle();
 
 /**
@@ -36,8 +36,7 @@ test('creates a dnd.monster, fills its required Fields, and reads the stat block
   // primary type's own (ADR-0048, Views amendment).
   await expect(page.getByTestId('dnd.view.stat-block')).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByTestId('core.view.content')).toBeVisible();
-  // A map View is bound to the Field it renders, so its toggle is keyed by that Field
-  // (`core.view.map:grid`, ADR-0050/#200) — and a monster has no grid at all.
+  // A map View's toggle is keyed by the Field it renders — and a monster has no grid at all.
   await expect(page.getByTestId(MAP_VIEW)).toHaveCount(0);
 
   // The CR carries over from the create dialog; the rest of the block is editable in place.

@@ -19,10 +19,7 @@ import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { EntityHeader } from './entity-header';
 import { noteDetail } from './entity-detail.fixtures';
 
-/**
- * The Hex Map's map View, as the toggle keys it: the View id plus the **Structured Field** it renders
- * (`core.view.map:grid`, ADR-0050/#200) — the testid, and the `?view=` value.
- */
+/** The Hex Map's map View, as the toggle keys it: the View id plus the Field it renders. */
 const MAP_VIEW_KEY = viewInstanceKey({ viewId: CORE_VIEW_MAP, fieldKey: HEX_GRID_FIELD.key });
 
 /** The active World the header reads for pin state — 'm1' is the opened entity's id. */
@@ -333,9 +330,9 @@ describe('EntityHeader', () => {
     expect(title.textContent?.trim()).toBe('Save');
   });
 
-  // Map/Note toggle (#75): a hexmap carries both a grid and a Content body, so the
-  // header switches between the two editor surfaces. The map View is the *grid Field*'s
-  // (ADR-0050, #200), so its button is keyed and labelled by that Field.
+  // Map/Note toggle (#75): a hexmap carries both a grid and a Content body, so the header switches
+  // between the two editor surfaces. The map View is the grid *Field*'s, so its button is keyed and
+  // labelled by that Field (ADR-0050).
   it('offers a Map/Note view toggle for a hexmap, with the Map active by default', () => {
     open(aldermoor);
     const fixture = TestBed.createComponent(EntityHeader);
@@ -345,9 +342,8 @@ describe('EntityHeader', () => {
     const noteBtn = fixture.nativeElement.querySelector('[data-testid="core.view.content"]') as HTMLButtonElement;
     expect(map).not.toBeNull();
     expect(noteBtn).not.toBeNull();
-    // Labelled from the Field it renders — which is what will tell a world map from a battlemap when
-    // an Entity carries both (#202). The grid Field ships copy, so the label is still translated: a
-    // plugin's Field resolves its `labelKey`, where a World Owner's shows its authored name verbatim.
+    // Labelled from the Field it renders, and still translated: the grid Field ships copy, so its
+    // `labelKey` resolves, where a World Owner's Field would show its authored name verbatim.
     expect(map.textContent?.trim()).toBe('Map');
     // Default is the grid: Map pressed, Note not.
     expect(map.getAttribute('aria-pressed')).toBe('true');

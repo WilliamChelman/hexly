@@ -15,12 +15,7 @@ import {
 import { DND_VIEW_STAT_BLOCK, providePluginDnd } from '@hexly/plugin-dnd/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 
-/**
- * The afforded Views as their string keys — a View a Type contributes is its bare id, and a
- * Structured Field's View carries the Field it renders (`core.view.map:grid`, #200). Asserting on the
- * key rather than the object keeps these expectations readable and is exactly what the URL and the
- * toggle testids carry.
- */
+/** The afforded Views as their string keys — what the URL and the toggle testids carry. */
 function viewKeys(instances: readonly ViewInstance[]): string[] {
   return instances.map(viewInstanceKey);
 }
@@ -113,9 +108,8 @@ describe('TypeRegistry', () => {
   });
 
   it('binds a Structured Field’s View to the Field it renders, and a Type’s View to nothing', () => {
-    // The whole of #200: a View id was the identity of a View while an Entity could afford each once.
-    // `core.hexmap` places its `grid` Field's View first, so the Map still opens by default — but the
-    // instance names the Field, which is what lets a second grid afford a second map View (#202).
+    // `core.hexmap` places its `grid` Field's View first, so the Map opens by default — and the
+    // instance names the Field, which is what lets a second grid afford a second map View.
     expect(registry.viewsFor(['core.hexmap'])).toEqual([
       { viewId: CORE_VIEW_MAP, fieldKey: 'grid' },
       { viewId: CORE_VIEW_CONTENT },
@@ -266,10 +260,9 @@ describe('TypeRegistry without the Hex Map plugin', () => {
   });
 
   it('drops a *registered* type’s placed grid Field too, when the data-type’s plugin is absent', () => {
-    // The degradation a user-defined type with a grid Field hits (#201): the type itself is here (it
-    // is World data, not the plugin's), but `core.hex-grid` resolves against an empty set, so its
-    // placement contributes no View. The Field's value stays in Metadata, unrendered — never a toggle
-    // to a canvas this build cannot draw.
+    // The type itself is here — it is World data, not the plugin's — but `core.hex-grid` resolves
+    // against an empty set, so its placement contributes no View. The Field's value stays in Metadata,
+    // unrendered, rather than offering a toggle to a canvas this build cannot draw.
     registry.register({
       id: 'world.deity' as TypeDefinition['id'],
       icon: 'label',

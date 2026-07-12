@@ -81,9 +81,9 @@ import { EntityViewStore } from '../services/entity-view-store';
 
       @if (viewToggle().length > 1) {
         <!-- View toggle (#75, ADR-0048): one button per View the Entity's types afford
-             (a hexmap: Grid + Note), flipping the outletted body via the active View. A
-             Structured Field's View is one button per *Field* (ADR-0050, #200), so an Entity
-             with two grids toggles between them by name. -->
+             (a hexmap: Map + Note), flipping the outletted body via the active View. A
+             Structured Field's View is one button per *Field*, so an Entity with two grids
+             toggles between them by name (ADR-0050). -->
         <div pageHeaderActions appButtonGroup [attr.aria-label]="'editorShell.view.switchLabel' | transloco">
           @for (v of viewToggle(); track v.key) {
             <button
@@ -158,22 +158,19 @@ export class EntityHeader {
   protected readonly activeKey = this.viewStore.activeKey;
 
   /**
-   * The Views the open Entity affords, resolved to their toggle buttons: the key (the click target,
-   * the URL value, and the testid) and the label to print.
+   * The Views the open Entity affords, as toggle buttons: the key (the click target, the URL value,
+   * and the testid) and the label to print.
    *
-   * A **Structured Field**'s View is labelled from the *Field* it renders — "Map", "Battlemap" —
-   * because that is what tells one grid from the other, and a View id cannot (ADR-0050, #200). A
-   * Field's name resolves the same way a *type's* does (#191): a plugin ships translated copy under a
-   * `labelKey`, and a World Owner's authored `label` is printed verbatim, never looked up as a key it
-   * was never written as. A Type's own View carries its own `labelKey`.
+   * A **Structured Field**'s View is labelled from the *Field* it renders — "Map", "Battlemap" — since
+   * a View id cannot tell one grid from another (ADR-0050). A Field's name resolves the way a type's
+   * does (#191): a plugin ships translated copy under a `labelKey`, and a World Owner's authored
+   * `label` is printed verbatim rather than looked up as a key they never wrote.
    */
   protected readonly viewToggle = computed(() => {
     this.transloco.activeLang(); // reactive dependency: re-resolve the labels on a language switch
     const fields = this.types.resolveFields(this.session.types());
     return this.viewStore.views().map((view) => {
       const field = fields.find((f) => f.key === view.fieldKey);
-      // A data-type's View has no copy of its own, and a Type's View has no Field: exactly one side
-      // of this resolves, because `labelKey` and `dataType` are alternatives on `ViewDefinition`.
       const labelKey = field ? field.labelKey : this.views.resolve(view.viewId).labelKey;
       return {
         key: viewInstanceKey(view),
@@ -243,9 +240,8 @@ export class EntityHeader {
   /**
    * Switch the active View (#75, ADR-0048). Updates the store for instant feedback,
    * then mirrors the choice to the URL `view` param (`replaceUrl`) so a refresh
-   * restores it — the default View (the primary type's first) drops the param, others
-   * carry the View's key, which names the Field for a Structured Field's View
-   * (`core.view.map:grid`, ADR-0050). Reverts the store if the navigation is cancelled.
+   * restores it — the default View (the primary type's first) drops the param, others carry the
+   * View's key (`core.view.map:grid`). Reverts the store if the navigation is cancelled.
    */
   protected selectView(key: string): void {
     const previous = this.viewStore.activeKey();

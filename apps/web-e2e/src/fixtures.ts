@@ -3,10 +3,10 @@ import { test as base, expect, type APIRequestContext, type Page, type Response 
 // so specs decode a segment back to the canonical id and build loose matchers from it.
 // A direct file import (not the @hexly/web-core barrel) keeps the Playwright process off the
 // Angular services layer the barrel re-exports — pretty-id is a pure util. The nx
-// module-boundary rule is waived for these two pure utils via eslint.config.mjs `allow`.
+// module-boundary rule is waived for these pure utils via eslint.config.mjs `allow`.
 import { idFromSegment, segment } from '../../../libs/web-core/src/utils/pretty-id';
-// Same waiver, same reason: the View-instance codec is framework-free, and a View's key is what a
-// toggle's testid and the `?view=` param carry — so a spec shares the encoder rather than re-spelling it.
+// Same waiver: the View-instance codec is framework-free, and a View's key is what a toggle's testid
+// and the `?view=` param carry — so a spec shares the encoder rather than re-spelling it.
 import { viewInstanceKey } from '../../../libs/web-entity/src/lib/view-instance';
 
 /**
@@ -75,12 +75,10 @@ export async function savedGrid(request: APIRequestContext, entityId: string): P
 }
 
 /**
- * A map View toggle's testid — the View id plus the **Structured Field** it renders (ADR-0050, #200),
- * which is what tells a world map from a battlemap when an Entity carries both. `core.hexmap` declares
- * its grid at `grid`; a user-defined type declares its own at whatever key its author chose.
- *
- * Composed through the app's own {@link viewInstanceKey}, so a test can never disagree with the
- * header about how a View instance is spelled.
+ * A map View toggle's testid — the View id plus the **Structured Field** it renders (ADR-0050).
+ * `core.hexmap` declares its grid at `grid`; a user-defined type declares its own at whatever key its
+ * author chose. Composed through the app's own {@link viewInstanceKey}, so a spec can never disagree
+ * with the header about how a View instance is spelled.
  */
 export function mapViewToggle(fieldKey = 'grid'): string {
   return viewInstanceKey({ viewId: 'core.view.map', fieldKey });

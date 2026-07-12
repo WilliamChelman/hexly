@@ -12,9 +12,8 @@ import { EntitySession } from './entity-session';
  * mounts), so the afforded Views resolve synchronously with no effect indirection.
  *
  * A View is a {@link ViewInstance} — an id, plus the **Structured Field** it renders when it is a
- * Field's View rather than a Type's (ADR-0050, #200). The *selection* is carried as that instance's
- * {@link viewInstanceKey}, because a key is the form the choice takes wherever it is stored: the
- * `?view=` param, and a toggle's testid.
+ * Field's View rather than a Type's (ADR-0050). The selection is carried as that instance's
+ * {@link viewInstanceKey}, the form the choice takes wherever it is stored.
  *
  * The raw selection is kept separate from the effective {@link activeView}: a
  * selection the current Entity doesn't afford (a stale `?view=` after navigating to
@@ -46,23 +45,15 @@ export class EntityViewStore {
   });
 
   /**
-   * The active View's key — what the URL carries, and what the toggle's testid reads.
+   * The active View's key — what the URL carries and the toggle's testid reads.
    *
-   * It is also the *identity* the page outlets on, because it is a string: it settles to the same
-   * value on every recompute, where {@link activeView} mints a fresh object each time the afforded set
-   * is rebuilt. An outlet keyed on the object would tear the live View down and rebuild it — losing a
-   * map's undo stack — every time an unrelated type was added to the Entity.
+   * A string, so it settles where {@link activeView} mints a fresh object each time the afforded set is
+   * rebuilt. The page outlets on this identity: keyed on the object, an unrelated type added to the
+   * Entity would tear the live View down and rebuild it, losing a map's undo stack.
    */
   readonly activeKey = computed(() => viewInstanceKey(this.activeView()));
 
-  /**
-   * The **Structured Field** the active View renders, or `undefined` for a Type's own View — what the
-   * page hands the outletted component (#200).
-   *
-   * Derived from {@link activeKey} rather than from {@link activeView} so it, too, settles: it changes
-   * only when the active View really changes, never merely because the afforded set was re-derived.
-   * The page keys the View's injector on it, and rebuilding that injector rebuilds the View.
-   */
+  /** The **Structured Field** the active View renders, or `undefined` for a Type's own View. */
   readonly activeFieldKey = computed(() => parseViewInstanceKey(this.activeKey())?.fieldKey);
 
   /** Select a View by its key; `null` (no `?view=` param) falls back to the default. */

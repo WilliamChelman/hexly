@@ -50,10 +50,7 @@ import { CORE_VIEW_DEFINITIONS } from './views/core-views';
           <!-- The active View's component (MapView / ContentView / a plugin view),
                resolved from the ViewRegistry — no type sniffing (ADR-0048). The frame
                around it is already drawn, so a deferred body arrives into a live page.
-
-               The injector carries the Field key of a Structured Field's View down to the component
-               that renders it (ADR-0050, #200). It is minted per View instance, so switching from one
-               grid to another rebuilds the View and its store rather than re-pointing a live one. -->
+               The injector carries down the Field key of a Structured Field's View. -->
           @if (activeComponent(); as component) {
             <ng-container *ngComponentOutlet="component; injector: viewInjector()" />
           }
@@ -87,19 +84,13 @@ export class EntityPage {
   protected readonly activeComponent = computed(() => this.views.component(this.viewStore.activeView().viewId));
 
   /**
-   * The injector the active View's component is created in — the page's own, plus the Metadata key of
-   * the **Structured Field** that View renders (ADR-0050, #200). A map View reads its grid at *this*
-   * key, so an Entity carrying two grids gives each map View its own store over its own slice of the
-   * body. A Type's own View (Content, a stat block) renders no particular Field and is handed nothing.
+   * The injector the active View's component is created in — the page's own, plus {@link VIEW_FIELD_KEY}
+   * when the View renders a **Structured Field**. A Type's own View (Content, a stat block) renders no
+   * particular Field and is handed nothing.
    *
-   * DI rather than a component `@Input`, because a View provides its store in `providers` — which
-   * Angular constructs before it sets an input, so an input would arrive too late for the store that
-   * needs it. That it is the *injector* also earns the teardown: `NgComponentOutlet` rebuilds the
-   * component when this reference changes, so switching between two grids yields a fresh store and a
-   * fresh undo stack rather than re-pointing a live one at another Field.
-   *
-   * Recomputed only when the View instance's key changes ({@link EntityViewStore.activeKey}, a
-   * string), so a re-derived afforded set cannot silently rebuild a live View.
+   * Keyed on {@link EntityViewStore.activeFieldKey}, which settles: `NgComponentOutlet` rebuilds the
+   * component whenever this reference changes, so a recompute on every re-derived view list would tear
+   * down a live map mid-edit.
    */
   protected readonly viewInjector = computed(() => {
     const fieldKey = this.viewStore.activeFieldKey();

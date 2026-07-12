@@ -6,11 +6,11 @@ import { CORE_HEXMAP_TYPE, HEX_GRID_FIELD } from '../lib';
  * declaration — the id and the grid **Structured Field** the API reads too — plus the chrome only the
  * web has: the icon, the transloco copy, the graph colour, and the Views it affords.
  *
- * It **places** its grid Field's View first and the Content view second, so a Hex Map still opens on
- * its map (the primary type's first View) with its lore one toggle away. The map View is the grid
- * data-type's, not this type's (ADR-0050, #200): the type says only *where in its order* that Field's
- * View sits, which is what stops a deity from opening on its battlemap. It contributes no generic
- * Field View — shipping a bespoke one is what the plugin's code buys, and a grid is not a form row.
+ * It **places** its grid Field's View first and the Content view second, so a Hex Map opens on its map
+ * (the primary type's first View) with its lore one toggle away. The map View is the grid data-type's,
+ * not this type's (ADR-0050) — the type says only where in its order that Field's View sits. It
+ * contributes no generic Field View: shipping a bespoke one is what the plugin's code buys, and a grid
+ * is not a form row.
  *
  * Component-import-free, so {@link providePluginHexmap} can seed the root registry at startup; the
  * canvas itself hangs off that provider's `loadComponent`.

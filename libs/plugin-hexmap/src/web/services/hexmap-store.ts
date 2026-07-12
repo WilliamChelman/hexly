@@ -126,10 +126,9 @@ export type MoveOutcome = 'moved' | 'blocked' | 'noop';
  * those inverse patches back through `session.applyPatches`. Nothing mutates the document directly,
  * or undo breaks.
  *
- * *Which* Field is {@link VIEW_FIELD_KEY}, provided by the entity page into the injector it outlets
- * the map View with (#200) — not necessarily `core.hexmap`'s `grid`. An Entity carrying two grids
- * affords two map Views, and each gets one of these over its own slice of the body, so painting one
- * never touches the other.
+ * *Which* Field is {@link VIEW_FIELD_KEY}, provided by the entity page — not necessarily
+ * `core.hexmap`'s `grid`. An Entity carrying two grids affords two map Views, each with one of these
+ * over its own slice of the body, so painting one never touches the other.
  *
  * Route-scoped, bound beside the session it drives (not `providedIn: 'root'`): it injects
  * the route-scoped {@link ENTITY_SESSION}, so it lives and dies with the open Entity.
@@ -139,14 +138,12 @@ export class HexMapStore {
   private readonly session = inject(ENTITY_SESSION);
 
   /**
-   * The Field this store's grid lives at — the one the active map View renders. The grid data-type's
-   * Field schema, re-keyed to it: every other property (the `core.hex-grid` kind, never-facetable,
-   * not required) is the data-type's, not the declaring Field's, so only the key varies.
+   * The Field this store's grid lives at — the grid data-type's Field schema, re-keyed to whichever
+   * Field the active map View renders. Only the key varies: every other property (the `core.hex-grid`
+   * kind, never-facetable, not required) belongs to the data-type, not to the declaring Field.
    *
-   * Required, with no default: a host that outlets the map View without a key is a wiring bug, and
-   * silently falling back to `core.hexmap`'s own `grid` would make it *paint the wrong map* rather
-   * than fail (#200). Injection throws instead. A spec provides it through
-   * `provideHexMapStoreTesting()`.
+   * Required, with no default. A host that outlets the map View without a key is a wiring bug, and
+   * falling back to `core.hexmap`'s `grid` would make it *paint the wrong map* rather than fail.
    */
   private readonly field: FieldSchema = { ...HEX_GRID_FIELD, key: inject(VIEW_FIELD_KEY) };
 

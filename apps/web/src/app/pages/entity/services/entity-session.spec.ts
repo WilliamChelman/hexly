@@ -62,7 +62,7 @@ describe('EntitySession', () => {
         // token, as the app's composition root wires it (ADR-0048).
         { provide: ENTITY_SESSION, useExisting: EntitySession },
         HexMapStore,
-        // Which grid the store edits is the page's to say (#200); here, `core.hexmap`'s own.
+        // Which grid the store edits is the page's to say; here, `core.hexmap`'s own.
         { provide: VIEW_FIELD_KEY, useValue: HEX_GRID_FIELD.key },
         { provide: EntitiesClient, useValue: entities },
         { provide: NudgeBusClient, useValue: bus },

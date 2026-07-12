@@ -18,8 +18,7 @@ import {
 let session: FakeEntitySession;
 
 beforeEach(() => {
-  // `provideHexMapStoreTesting()` binds the store to `core.hexmap`'s own `grid` Field, as the entity
-  // page's outlet does in the app — the store requires a Field key rather than assuming one (#200).
+  // Binds the store to `core.hexmap`'s own `grid` Field, as the entity page's outlet does in the app.
   TestBed.configureTestingModule({ providers: provideHexMapStoreTesting() });
   session = TestBed.inject(FakeEntitySession);
 });
@@ -2607,10 +2606,9 @@ describe('HexMapStore forward-only grid (ADR-0050)', () => {
 });
 
 /**
- * The store edits *a* grid, not *the* grid (ADR-0050, #200): which Field it renders is
- * {@link VIEW_FIELD_KEY}, provided by the entity page into the injector it outlets the map View
- * with. This is what lets an Entity carry two grids — a world map and a battlemap — and paint each
- * without touching the other (#202).
+ * The store edits *a* grid, not *the* grid (ADR-0050): which Field it renders is {@link VIEW_FIELD_KEY},
+ * provided by the entity page. This is what lets an Entity carry a world map and a battlemap, and paint
+ * each without touching the other.
  */
 describe('HexMapStore bound to a Field', () => {
   beforeEach(() => {
@@ -2623,8 +2621,8 @@ describe('HexMapStore bound to a Field', () => {
 
   it('reads and writes the Metadata slice its Field key names, leaving every other grid alone', () => {
     const store = makeStore();
-    // The session's body carries a painted grid at `core.hexmap`'s own `grid` key. This store renders
-    // a *different* Field, so it sees none of it: an unpainted plane, not the world map.
+    // The body carries a painted grid at `core.hexmap`'s own `grid` key; this store renders a
+    // *different* Field, so it sees none of it — an unpainted plane, not the world map.
     reload({ ...emptyHexMap(), hexes: { '0,0': { terrain: 'ocean' } } });
     expect(store.document().hexes).toEqual({});
 

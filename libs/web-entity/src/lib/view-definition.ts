@@ -29,25 +29,24 @@ export const CORE_VIEW_FIELDS = 'core.view.fields';
 
 /**
  * One entry in a Type's ordered {@link TypeDefinition.views} list: either a View id the Type
- * contributes outright, or a reference to one of *its own* Fields — whose data-type contributes the
- * View (ADR-0050). So a Type **places** a Structured Field's View in its own order: `core.hexmap`
- * declares `[{ field: 'grid' }, CORE_VIEW_CONTENT]` and so still opens on its map, while a
- * `world.deity` with a battlemap opens on its Fields.
+ * contributes outright, or a reference to one of *its own* Fields, whose data-type contributes the
+ * View (ADR-0050).
  *
- * Ordering a Field's View implicitly — always first, or always last — is wrong in both directions: it
- * would open a deity on its battlemap.
+ * So a Type **places** a Structured Field's View in its own order — `core.hexmap` declares
+ * `[{ field: 'grid' }, CORE_VIEW_CONTENT]` and opens on its map, while a `world.deity` with a
+ * battlemap opens on its Fields. Ordering a Field's View implicitly (always first, or always last) is
+ * wrong in both directions.
  */
 export type ViewPlacement = ViewId | { readonly field: string };
 
 /**
- * The Metadata key of the **Structured Field** the active View renders, provided by {@link EntityPage}
- * into the injector it outlets that View's component with. `MapView` and its `HexMapStore` read the
- * grid at *this* key, so two grids on one Entity get one store each.
+ * The Metadata key of the **Structured Field** the active View renders — provided by {@link EntityPage}
+ * into the injector it outlets that View's component with, so two grids on one Entity get one store each.
  *
- * A DI token rather than the component `@Input` ADR-0050 sketched, because a Structured Field's View
- * provides its store in `providers` — constructed before an input is ever set. The outlet mints a
- * fresh injector per View instance, so switching from one grid to another rebuilds the component and
- * its store rather than re-pointing a live one (and its undo stack) at a different Field.
+ * A token rather than an `@Input`, because a Structured Field's View provides its store in `providers`,
+ * which Angular constructs before it sets any input. The page mints a fresh injector per View instance,
+ * so switching grids rebuilds the component and its store rather than re-pointing a live one — and its
+ * undo stack — at a different Field.
  */
 export const VIEW_FIELD_KEY = new InjectionToken<string>('hexly.view.fieldKey');
 
@@ -56,15 +55,9 @@ export const VIEW_FIELD_KEY = new InjectionToken<string>('hexly.view.fieldKey');
  * and the component the entity page outlets when this View is active.
  *
  * A View is contributed **either by a Type or by a Structured Field's data-type** (CONTEXT.md → View),
- * and which it is decides how it is labelled — so the two are alternatives here, not a required key
- * beside an optional one:
- *
- * - A **Type's** View — a plugin's stat block, the generic Field view, the Content view every Entity
- *   affords — is one thing an Entity either shows or does not, so it carries its own translated
- *   `labelKey`.
- * - A **data-type's** View is bound to the Field that placed it, and takes that **Field's** label
- *   ("Grid", "Battlemap") — the only thing that tells one grid from another when an Entity carries
- *   two (ADR-0050, #200). A `labelKey` on it would be copy nothing could ever render.
+ * and that decides how it is labelled — hence the alternatives below rather than one optional key. A
+ * Type's View carries its own translated `labelKey`; a data-type's View is bound to the Field that
+ * placed it and takes that **Field's** label, which is the only thing that tells one grid from another.
  *
  * The component is declared either eagerly (`component`) or deferred (`loadComponent`),
  * the same pair as an Angular `Route`. Which one to use follows from *where the
@@ -86,13 +79,12 @@ export type ViewDefinition = {
   | {
       readonly labelKey?: never;
       /**
-       * The **Structured Field** data-type this View renders (`core.hex-grid`). This is the whole of
-       * the Field→View binding: a Type places one of its Fields in {@link TypeDefinition.views}, the
-       * Field names its data-type by `kind`, and the kind resolves here — so a plugin registers its
-       * View exactly as it always did, and no registry learns that a grid in particular has one.
+       * The **Structured Field** data-type this View renders (`core.hex-grid`) — the whole of the
+       * Field→View binding: a Type places one of its Fields, the Field names its data-type by `kind`,
+       * and the kind resolves here, so no registry learns that a grid in particular has a View.
        *
-       * The framework-free half of a data-type ({@link StructuredDataType}) carries no View, because
-       * the API has none; this is the web half of the same declaration.
+       * The web half of a data-type's declaration; its framework-free half
+       * ({@link StructuredDataType}) carries no View, the API having none.
        */
       readonly dataType: StructuredDataTypeId;
     }

@@ -37,9 +37,8 @@ import { ViewRegistry } from './view-registry';
 export class TypeRegistry implements EntityTypes {
   private readonly transloco = inject(TranslocoService);
   /**
-   * Read-only, and only from {@link viewsFor}: a Type *places* one of its Fields among its Views, and
-   * which View renders that Field's data-type is the {@link ViewRegistry}'s to say (ADR-0050). The
-   * dependency runs one way — the View registry never asks about types.
+   * Read only from {@link viewsFor}, to resolve a placed Field's data-type to the View that renders it.
+   * The dependency runs one way — the View registry never asks about types.
    */
   private readonly views = inject(ViewRegistry);
   private readonly definitions = signal<readonly TypeDefinition[]>([]);
@@ -94,15 +93,14 @@ export class TypeRegistry implements EntityTypes {
    * yields `[core.view.map:grid, core.view.content]`; a `[dnd.monster, core.hexmap]` composes all
    * three (stat block, Note, and Map). `types[0]`'s first view is the default.
    *
-   * A View is an **instance**, not a bare id (ADR-0050, #200): a Type's own View (a plugin's stat
-   * block, Content, the generic Field view) names no Field, while a **Structured Field**'s View is
-   * bound to the Field it renders. A type places a Field's View by listing `{ field: key }` among its
-   * views; the placement resolves Field → data-type `kind` → the View the {@link ViewRegistry} holds
-   * for that kind. Two grids on one Entity therefore afford two map Views, distinct by Field key.
+   * A View is an **instance**, not a bare id (ADR-0050): a Type's own View names no Field, while a
+   * **Structured Field**'s View is bound to the Field it renders. A type places a Field's View by
+   * listing `{ field: key }` among its views, and the placement resolves Field → data-type `kind` → the
+   * View the {@link ViewRegistry} holds for that kind — so two grids afford two map Views.
    *
-   * A placement that cannot resolve — a Field the type never declared, a built-in data-type (which
-   * has a form row, not a View), or a structured one whose plugin this build omits — contributes
-   * nothing, rather than a toggle to a view that cannot render.
+   * A placement that cannot resolve — a Field the type never declared, a built-in data-type (which has
+   * a form row, not a View), or a structured one whose plugin this build omits — contributes nothing,
+   * rather than a toggle to a view that cannot render.
    *
    * A registered type affords exactly the Views it declares: a plugin shipping a bespoke view does not
    * also get the generic Field View, while a fields-only type (every user-defined one, #191) declares
@@ -180,9 +178,8 @@ export class TypeRegistry implements EntityTypes {
 
   /**
    * The type ids that afford `view` — e.g. `typeIdsForView('core.view.map')` backs the dashboard/list
-   * "maps" filter (the types that afford the map view). Asks {@link viewsFor} rather than reading the
-   * declared list, so a type affords the map View by *placing a grid Field* — which is the only way
-   * any type does now, `core.hexmap` included (#200).
+   * "maps" filter. Asks {@link viewsFor} rather than reading the declared list, because a type affords
+   * the map View by *placing a grid Field*, which is the only way any type does.
    */
   typeIdsForView(view: ViewId): EntityType[] {
     return this.definitions()
