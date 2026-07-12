@@ -11,7 +11,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { EntityType, FieldSchema, Metadata, validateFields, writeField } from '@hexly/domain';
+import { EntityType, FieldSchema, Metadata, NO_STRUCTURED_DATA_TYPES, validateFields, writeField } from '@hexly/domain';
 import { ActiveWorld, EntitiesClient, WorldStore, entityRoute } from '@hexly/web-core';
 import { Button, Field, Input, Dialog } from '@hexly/web-ui';
 import { CreateEntityDialogState } from './create-entity-dialog.state';
@@ -143,11 +143,16 @@ export class CreateEntityDialog {
   protected readonly requiredFields = computed(() => this.fields().filter((field) => field.required));
 
   /** Every picked type's required Fields must validate before the create is allowed (#189). */
-  protected readonly valid = computed(() => validateFields(this.fields(), this.metadata()).ok);
+  protected readonly valid = computed(
+    () => validateFields(this.fields(), this.metadata(), NO_STRUCTURED_DATA_TYPES).ok,
+  );
 
   /** Keys still failing the forward-only gate, so a required control can flag itself invalid. */
   protected readonly invalidKeys = computed(
-    () => new Set(validateFields(this.fields(), this.metadata()).errors.map((error) => error.key)),
+    () =>
+      new Set(
+        validateFields(this.fields(), this.metadata(), NO_STRUCTURED_DATA_TYPES).errors.map((error) => error.key),
+      ),
   );
 
   constructor() {

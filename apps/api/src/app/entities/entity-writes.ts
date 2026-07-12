@@ -18,6 +18,7 @@ import { EntityAccess, entityAccess, sharedVisibility } from '../acl/entity-acce
 import { DB, Db } from '../db/db';
 import { INITIAL_SEQ, entities, entityDescriptors, entityEdges, entityFieldFacets, entityGrants } from '../db/schema';
 import { SyncOnly, WriteOutbox } from '../events/write-outbox';
+import { TypeFieldRegistry } from './type-field-registry';
 import { WorldTypeFields } from './world-type-fields';
 
 /** A fresh Entity starts at version 1 — the optimistic-concurrency token's floor. */
@@ -159,6 +160,9 @@ export class EntityWrites {
     // pass materialises the facetable Field values (ADR-0048, #188) — including a World's
     // user-defined types (#191) — the same way it harvests edges and descriptors.
     private readonly worldTypeFields: WorldTypeFields,
+    // The instance-wide Structured Field data-types (ADR-0050): a structured value harvests its own
+    // edges, and the domain is handed the set rather than reaching for one.
+    private readonly typeFields: TypeFieldRegistry,
   ) {}
 
   /**
@@ -366,7 +370,7 @@ export class EntityWrites {
     // Entity-Link Fields (#190) and the facet derivation's facetable Fields (#188). Scoped to the
     // Entity's World so a user-defined type's Fields resolve too (#191).
     const fields = resolveFields(this.worldTypeFields.resolverFor(worldId), types);
-    const edges = harvestEdges(body, fields);
+    const edges = harvestEdges(body, fields, this.typeFields.structuredDataTypes);
     return {
       contentText: extractText(body.content),
       descriptors: descriptorsSchema.parse(edges.flatMap((e) => e.descriptor ?? [])),

@@ -1,4 +1,4 @@
-import { defineType, resolveFields, validateFields } from '@hexly/domain';
+import { defineType, NO_STRUCTURED_DATA_TYPES, resolveFields, validateFields } from '@hexly/domain';
 import {
   abilityModifier,
   DND_ABILITY_KEYS,
@@ -42,11 +42,11 @@ describe('dnd.monster', () => {
 
     expect(fields.map((field) => field.key)).toContain(DND_CHALLENGE_KEY);
     // The forward-only gate: a monster without its required Field is rejected on an active typed edit…
-    expect(validateFields(fields, { size: 'Large' }).ok).toBe(false);
+    expect(validateFields(fields, { size: 'Large' }, NO_STRUCTURED_DATA_TYPES).ok).toBe(false);
     // …and passes once it's supplied, with the rest of the stat block optional.
-    expect(validateFields(fields, { challenge_rating: 5 }).ok).toBe(true);
+    expect(validateFields(fields, { challenge_rating: 5 }, NO_STRUCTURED_DATA_TYPES).ok).toBe(true);
     // A wrong data-type is rejected too — a CR is a number, not the string a stat block prints.
-    expect(validateFields(fields, { challenge_rating: '5' }).ok).toBe(false);
+    expect(validateFields(fields, { challenge_rating: '5' }, NO_STRUCTURED_DATA_TYPES).ok).toBe(false);
   });
 
   it('exposes exactly the facetable Fields the Browser unfolds under the type filter', () => {

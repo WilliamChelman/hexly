@@ -17,6 +17,7 @@
 
 import { z } from 'zod';
 import { entityTypeSchema } from './entity';
+import { StructuredDataType, structuredDataTypeIdSchema, StructuredDataTypeSet } from './structured-data-type';
 
 /** The Metadata map a Field reads from and writes to — the one store, never forked (CONTEXT.md → Metadata). */
 export type Metadata = Record<string, unknown>;
@@ -64,11 +65,11 @@ const entityLinkType = z.object({
 });
 
 /**
- * The Field data-type: a scalar (`string`/`number`/`boolean`/`date`), an `enum`
- * over a closed option set, a `list` of any of those, or a typed `entityLink`
- * pointing at another Entity. The open, code-known set a Field declares (ADR-0048).
+ * The **built-in** Field data-types: a scalar (`string`/`number`/`boolean`/`date`), an `enum` over a
+ * closed option set, a `list` of any of those, or a typed `entityLink` pointing at another Entity.
+ * A closed set of exact literals — each is a form control the core knows how to render (ADR-0048).
  */
-export const fieldDataTypeSchema = z.discriminatedUnion('kind', [
+export const builtInDataTypeSchema = z.discriminatedUnion('kind', [
   stringType,
   numberType,
   booleanType,
@@ -78,7 +79,54 @@ export const fieldDataTypeSchema = z.discriminatedUnion('kind', [
   entityLinkType,
 ]);
 
+export type BuiltInDataType = z.infer<typeof builtInDataTypeSchema>;
+
+/**
+ * A **Structured Field**'s data-type, named by the `namespace.id` id of a plugin-contributed
+ * declaration (`core.hex-grid`) — see `structured-data-type.ts`. Only the *shape* is checked here;
+ * whether the kind is registered is resolved against the host's {@link StructuredDataTypeSet}, which
+ * is why a well-formed typo (`core.hex-gird`) survives declaration and dies at resolution.
+ */
+const structuredDataTypeRefSchema = z.object({ kind: structuredDataTypeIdSchema });
+
+export type StructuredDataTypeRef = z.infer<typeof structuredDataTypeRefSchema>;
+
+/**
+ * The Field data-type: a built-in, or a plugin-contributed structured one (ADR-0050). The set is
+ * **open** — a data-type is structured *iff* its kind is namespaced, so no flag declares it and no
+ * enumeration closes it. A kind that is neither a built-in literal nor `namespace.id`-shaped (`strig`)
+ * is rejected right where the Field is declared.
+ */
+export const fieldDataTypeSchema = z.union([builtInDataTypeSchema, structuredDataTypeRefSchema]);
+
 export type FieldDataType = z.infer<typeof fieldDataTypeSchema>;
+
+/**
+ * Whether a Field's data-type is structured — the one predicate the whole feature turns on. A dot is
+ * the whole test: no built-in kind carries one, so `namespace.id` *is* the mark (ADR-0050).
+ */
+export function isStructuredDataType(dataType: FieldDataType): dataType is StructuredDataTypeRef {
+  return dataType.kind.includes('.');
+}
+
+/**
+ * Resolve a structured Field's data-type against the host-composed set. `undefined` for an
+ * unregistered kind — the plugin is absent, or the declaration carries a typo. The two callers below
+ * read that `undefined` in opposite directions, which is the whole of the design:
+ *
+ * - **Where a Type is declared** ({@link unresolvedDataTypeErrors}) it is an error: a typo
+ *   (`core.hex-gird`) is caught the moment a World Owner or a plugin declares the Field.
+ * - **Where a value is validated** ({@link validateFields}) it is *inert*: the Field is skipped and
+ *   the value stays plain Metadata. A build that drops the map plugin must open its Hex Maps as lore
+ *   plus an unrendered Field (ADR-0050) — dropping a plugin degrades, it never corrupts, and a gate
+ *   that 400'd every save of an Entity whose type names an absent plugin's data-type would corrupt.
+ */
+function resolveStructuredDataType(
+  dataTypes: StructuredDataTypeSet,
+  dataType: StructuredDataTypeRef,
+): StructuredDataType | undefined {
+  return dataTypes.get(dataType.kind);
+}
 
 /**
  * The stored value of an `entityLink` Field: the target's `entityId` plus a `label` snapshot of its
@@ -137,10 +185,15 @@ export function resolveFields(resolver: TypeFieldResolver, types: readonly strin
   return [...byKey.values()];
 }
 
-/** Why one Field's value failed validation: `required` (absent) or `type` (present but ill-typed). */
+/**
+ * Why one Field failed validation: `required` (absent), `type` (present but ill-typed), or
+ * `unknown-data-type` — a **Structured Field** naming a data-type the host has not registered
+ * (ADR-0050). The last is a broken *declaration*, not a bad value, so it is raised by
+ * {@link unresolvedDataTypeErrors} where a Type is declared, never by the value gate.
+ */
 export interface FieldError {
   readonly key: string;
-  readonly code: 'required' | 'type';
+  readonly code: 'required' | 'type' | 'unknown-data-type';
 }
 
 /** The outcome of {@link validateFields}: `ok` with the offending Fields, if any. */
@@ -159,18 +212,67 @@ export interface FieldValidation {
  * Pure and side-effect-free: the caller (the API write path) decides *when* to
  * enforce it — active typed edits only, never on import or data at rest — so already
  * stored or imported Metadata is never retroactively invalidated.
+ *
+ * `dataTypes` is the host-composed **Structured Field** set (ADR-0050), threaded in as an explicit
+ * parameter rather than read from a module global, so import order cannot change behaviour and a test
+ * brings its own. A **Structured Field** validates against its data-type's own `valueSchema`; one
+ * whose kind the set does not carry is *inert* — skipped, its value left as plain Metadata, exactly
+ * as an absent plugin's Fields are (see {@link resolveStructuredDataType}).
  */
-export function validateFields(fields: readonly FieldSchema[], metadata: Metadata | undefined): FieldValidation {
+export function validateFields(
+  fields: readonly FieldSchema[],
+  metadata: Metadata | undefined,
+  dataTypes: StructuredDataTypeSet,
+): FieldValidation {
   const errors: FieldError[] = [];
   for (const field of fields) {
+    const matches = valueMatcher(field.dataType, dataTypes);
+    if (!matches) continue;
     const value = metadata?.[field.key];
     if (isAbsent(value)) {
       if (field.required) errors.push({ key: field.key, code: 'required' });
       continue;
     }
-    if (!matchesDataType(field.dataType, value)) errors.push({ key: field.key, code: 'type' });
+    if (!matches(value)) errors.push({ key: field.key, code: 'type' });
   }
   return { ok: errors.length === 0, errors };
+}
+
+/**
+ * The value predicate a Field's data-type resolves to: the built-in type check, or a structured
+ * data-type's own `valueSchema`. `undefined` when a structured kind resolves to nothing — there is no
+ * shape to hold the value to, so the value gate skips it and the declaration gate below complains.
+ */
+function valueMatcher(
+  dataType: FieldDataType,
+  dataTypes: StructuredDataTypeSet,
+): ((value: unknown) => boolean) | undefined {
+  if (!isStructuredDataType(dataType)) return (value) => matchesBuiltInDataType(dataType, value);
+  const structured = resolveStructuredDataType(dataTypes, dataType);
+  return structured && ((value: unknown) => structured.valueSchema.safeParse(value).success);
+}
+
+/**
+ * The **declaration** gate (ADR-0050): every Field naming a structured data-type the host's set does
+ * not carry. This is where a well-formed but unregistered kind — a typo (`core.hex-gird`), or a kind
+ * whose plugin this build does not bundle — is *rejected*, and it is rejected against the composed
+ * set rather than a schema, because `defineType()` runs at module load and so could never enumerate
+ * the very plugin registering one.
+ *
+ * The host runs it where a Type is declared: on a plugin type at startup, and on a **User-defined
+ * type** as a World Owner saves it. Never on an Entity's Metadata — a *value* whose data-type went
+ * missing is inert, not invalid ({@link validateFields}), which is what makes dropping a plugin a
+ * degradation rather than a corruption.
+ */
+export function unresolvedDataTypeErrors(
+  fields: readonly FieldSchema[],
+  dataTypes: StructuredDataTypeSet,
+): FieldError[] {
+  return fields.flatMap((field) =>
+    isStructuredDataType(field.dataType) && !resolveStructuredDataType(dataTypes, field.dataType)
+      ? [{ key: field.key, code: 'unknown-data-type' as const }]
+      : [],
+  );
 }
 
 /**
@@ -194,12 +296,15 @@ export interface FieldFacetValue {
  * a `list` explodes to one value per item, and values repeated within one Entity collapse so a facet
  * count is per-Entity rather than per-occurrence. Side-effect-free — the write path feeds the result
  * to the denormalised table, and Reindex re-runs it from the stored document for free.
+ *
+ * A **Structured Field** never contributes a facet whatever its `facetable` flag says (ADR-0050): a
+ * document has no discrete values to count, so there is nothing a facet could offer.
  */
 export function deriveFieldFacets(fields: readonly FieldSchema[], metadata: Metadata | undefined): FieldFacetValue[] {
   const seen = new Set<string>();
   const out: FieldFacetValue[] = [];
   for (const field of fields) {
-    if (!field.facetable) continue;
+    if (!field.facetable || isStructuredDataType(field.dataType)) continue;
     const raw = readField(metadata, field);
     if (raw === undefined || raw === null) continue;
     for (const item of facetItems(field.dataType, raw)) {
@@ -219,7 +324,7 @@ export function deriveFieldFacets(fields: readonly FieldSchema[], metadata: Meta
  * (so the facet filters "lair = <place>" by a stable id, not the mutable name), a scalar its one
  * well-typed value.
  */
-function facetItems(dataType: FieldDataType, raw: unknown): { value: string; num: number | null }[] {
+function facetItems(dataType: BuiltInDataType, raw: unknown): { value: string; num: number | null }[] {
   if (dataType.kind === 'list') return Array.isArray(raw) ? raw.flatMap((item) => scalarFacet(dataType.of, item)) : [];
   if (dataType.kind === 'entityLink') {
     const parsed = entityLinkValueSchema.safeParse(raw);
@@ -230,7 +335,7 @@ function facetItems(dataType: FieldDataType, raw: unknown): { value: string; num
 
 /** A scalar's facet row, or nothing if it doesn't inhabit the data-type (forward-only tolerance). */
 function scalarFacet(dataType: ScalarDataType, raw: unknown): { value: string; num: number | null }[] {
-  if (!matchesDataType(dataType, raw)) return [];
+  if (!matchesBuiltInDataType(dataType, raw)) return [];
   return dataType.kind === 'number'
     ? [{ value: String(raw), num: raw as number }]
     : [{ value: String(raw), num: null }];
@@ -250,6 +355,24 @@ export function entityLinkFieldValues(
     if (field.dataType.kind !== 'entityLink') continue;
     const parsed = entityLinkValueSchema.safeParse(readField(metadata, field));
     if (parsed.success) out.push({ key: field.key, value: parsed.data });
+  }
+  return out;
+}
+
+/**
+ * Every **Structured Field** in a resolved set, paired with the data-type it resolves to (ADR-0050).
+ * An unregistered kind drops out rather than throwing: the Field is unrenderable and unharvestable,
+ * and the loud complaint belongs to {@link validateFields}, which the write path runs first.
+ */
+export function resolvedStructuredFields(
+  fields: readonly FieldSchema[],
+  dataTypes: StructuredDataTypeSet,
+): { field: FieldSchema; dataType: StructuredDataType }[] {
+  const out: { field: FieldSchema; dataType: StructuredDataType }[] = [];
+  for (const field of fields) {
+    if (!isStructuredDataType(field.dataType)) continue;
+    const dataType = resolveStructuredDataType(dataTypes, field.dataType);
+    if (dataType) out.push({ field, dataType });
   }
   return out;
 }
@@ -349,8 +472,12 @@ function isEmpty(value: unknown): boolean {
   return isAbsent(value) || value === '' || (Array.isArray(value) && value.length === 0);
 }
 
-/** Whether `value` inhabits `dataType` — the per-kind type check the forward-only gate rides. */
-function matchesDataType(dataType: FieldDataType, value: unknown): boolean {
+/**
+ * Whether `value` inhabits a *built-in* `dataType` — the per-kind type check the forward-only gate
+ * rides. A structured data-type is checked against its own `valueSchema` instead ({@link valueMatcher}),
+ * which is exactly why this switch stays closed and exhaustive.
+ */
+function matchesBuiltInDataType(dataType: BuiltInDataType, value: unknown): boolean {
   switch (dataType.kind) {
     case 'string':
       return typeof value === 'string';
@@ -365,7 +492,7 @@ function matchesDataType(dataType: FieldDataType, value: unknown): boolean {
     case 'enum':
       return typeof value === 'string' && dataType.options.includes(value);
     case 'list':
-      return Array.isArray(value) && value.every((item) => matchesDataType(dataType.of, item));
+      return Array.isArray(value) && value.every((item) => matchesBuiltInDataType(dataType.of, item));
     case 'entityLink':
       // Shape only — the *target-type* constraint needs the target's own types, so it is enforced
       // by the API write gate (a DB read the pure gate can't make), not here (#190).

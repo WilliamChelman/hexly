@@ -51,7 +51,7 @@ describe('EntityWrites', () => {
     typeFields = new TypeFieldRegistry();
     // The world-scoped resolver over the same registry — no World-defined types are seeded here, so
     // it resolves through to the plugin registry (#191).
-    writes = new EntityWrites(db, new WriteOutbox(db, bus), new WorldTypeFields(db, typeFields));
+    writes = new EntityWrites(db, new WriteOutbox(db, bus), new WorldTypeFields(db, typeFields), typeFields);
 
     seedUser(ADA);
     seedWorld(WORLD, ADA);

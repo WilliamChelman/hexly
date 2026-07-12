@@ -1,21 +1,56 @@
+import { z } from 'zod';
 import {
   deriveFieldFacets,
   entityLinkConstraints,
   entityLinkFieldValues,
   FieldSchema,
   fieldSchemaSchema,
+  FieldValidation,
+  Metadata,
   parseFieldFilter,
   parseFieldFilters,
   readField,
   resolveFields,
+  unresolvedDataTypeErrors,
   validateFields,
   writeField,
 } from './field';
+import { defineStructuredDataType, NO_STRUCTURED_DATA_TYPES, structuredDataTypeSet } from './structured-data-type';
+import { defineType } from './plugin-type';
 
 /** A terse FieldSchema builder for the specs — required/facetable default to false. */
 function field(partial: Partial<FieldSchema> & Pick<FieldSchema, 'key' | 'dataType'>): FieldSchema {
   return fieldSchemaSchema.parse({ label: partial.key, ...partial });
 }
+
+/**
+ * `validateFields` takes the host's structured data-type set explicitly (ADR-0050) — it is never
+ * reached for, so this spec supplies its own. The built-in data-types need none.
+ */
+function validate(
+  fields: readonly FieldSchema[],
+  metadata: Metadata | undefined,
+  dataTypes = NO_STRUCTURED_DATA_TYPES,
+): FieldValidation {
+  return validateFields(fields, metadata, dataTypes);
+}
+
+/**
+ * A stand-in for the Hex Map's `core.hex-grid`: a plugin's structured value with its own schema and
+ * its own link harvesting. The domain knows nothing of what is inside one, so the spec declares its
+ * own rather than borrowing a real one.
+ */
+const BOARD = defineStructuredDataType({
+  id: 'test.board',
+  valueSchema: z.object({ tiles: z.array(z.object({ entityId: z.string() })) }),
+  empty: () => ({ tiles: [] }),
+  harvestEdges: (board) =>
+    board.tiles.map((tile) => ({ targetKind: 'entity' as const, targetId: tile.entityId, descriptor: null })),
+});
+
+const DATA_TYPES = structuredDataTypeSet([BOARD]);
+
+const boardField = field({ key: 'board', dataType: { kind: 'test.board' } });
 
 describe('fieldSchemaSchema', () => {
   it('accepts a scalar / enum / date / list declaration and defaults required + facetable to false', () => {
@@ -145,7 +180,7 @@ describe('validateFields (forward-only)', () => {
   ];
 
   it('passes well-typed data with the required Field present', () => {
-    const result = validateFields(fields, {
+    const result = validate(fields, {
       name: 'Aboleth',
       cr: 10,
       legendary: true,
@@ -158,19 +193,19 @@ describe('validateFields (forward-only)', () => {
   });
 
   it('passes when an optional Field is simply absent', () => {
-    expect(validateFields(fields, { name: 'Kobold' }).ok).toBe(true);
+    expect(validate(fields, { name: 'Kobold' }).ok).toBe(true);
     // No metadata at all still passes as long as no required Field exists — here `name` is required.
-    expect(validateFields([fields[1]], undefined).ok).toBe(true);
+    expect(validate([fields[1]], undefined).ok).toBe(true);
   });
 
   it('rejects a missing required Field', () => {
-    const result = validateFields(fields, { cr: 1 });
+    const result = validate(fields, { cr: 1 });
     expect(result.ok).toBe(false);
     expect(result.errors).toContainEqual({ key: 'name', code: 'required' });
   });
 
   it('rejects a wrong data-type for each kind', () => {
-    const wrong = validateFields(fields, {
+    const wrong = validate(fields, {
       name: 42,
       cr: 'ten',
       legendary: 'yes',
@@ -185,14 +220,14 @@ describe('validateFields (forward-only)', () => {
 
   it('accepts a full ISO datetime and rejects an out-of-range calendar date', () => {
     const dateField = [field({ key: 'born', dataType: { kind: 'date' } })];
-    expect(validateFields(dateField, { born: '2026-07-11T09:30:00Z' }).ok).toBe(true);
-    expect(validateFields(dateField, { born: '2026-13-40' }).ok).toBe(false);
+    expect(validate(dateField, { born: '2026-07-11T09:30:00Z' }).ok).toBe(true);
+    expect(validate(dateField, { born: '2026-13-40' }).ok).toBe(false);
   });
 
   it('rejects a NaN / non-finite number', () => {
     const numberField = [field({ key: 'cr', dataType: { kind: 'number' } })];
-    expect(validateFields(numberField, { cr: Number.NaN }).ok).toBe(false);
-    expect(validateFields(numberField, { cr: Infinity }).ok).toBe(false);
+    expect(validate(numberField, { cr: Number.NaN }).ok).toBe(false);
+    expect(validate(numberField, { cr: Infinity }).ok).toBe(false);
   });
 });
 
@@ -275,12 +310,12 @@ describe('entityLink Fields (#190)', () => {
   const ally = field({ key: 'ally', dataType: { kind: 'entityLink' } });
 
   it('validates the value shape forward-only — an object with a non-blank entityId', () => {
-    expect(validateFields([lair], { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } }).ok).toBe(true);
+    expect(validate([lair], { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } }).ok).toBe(true);
     // Bare id, a string, and a blank-id object all fail the shape gate.
-    expect(validateFields([lair], { lair: 'whisperwood' }).ok).toBe(false);
-    expect(validateFields([lair], { lair: { entityId: '  ' } }).ok).toBe(false);
+    expect(validate([lair], { lair: 'whisperwood' }).ok).toBe(false);
+    expect(validate([lair], { lair: { entityId: '  ' } }).ok).toBe(false);
     // Absent is fine for an optional Field.
-    expect(validateFields([lair], {}).ok).toBe(true);
+    expect(validate([lair], {}).ok).toBe(true);
   });
 
   it('reads each present, shape-valid Entity-Link Field value as an edge target', () => {
@@ -382,5 +417,124 @@ describe('readField / writeField (a lens over the one Metadata map)', () => {
         [],
       ),
     ).toEqual({});
+  });
+});
+
+/**
+ * The **Structured Field** — a Field whose data-type a plugin contributes (CONTEXT.md → Structured
+ * Field, ADR-0050). The set is open: a data-type is structured *iff* its kind is a `namespace.id` id,
+ * so the domain validates the *shape* of a kind and the host resolves its *membership*.
+ */
+describe('Structured Field data-types (ADR-0050)', () => {
+  describe('defineStructuredDataType — the framework-free declaration', () => {
+    it('declares an id, a value schema, an empty value, and an optional edge harvester', () => {
+      expect(BOARD.id).toBe('test.board');
+      expect(BOARD.empty()).toEqual({ tiles: [] });
+      expect(BOARD.harvestEdges?.({ tiles: [{ entityId: 'riverbend' }] })).toEqual([
+        { targetKind: 'entity', targetId: 'riverbend', descriptor: null },
+      ]);
+    });
+
+    it('rejects an id that is not `namespace.id`-shaped, at declaration', () => {
+      expect(() => defineStructuredDataType({ id: 'board', valueSchema: z.unknown(), empty: () => null })).toThrow();
+      // Never trimmed: the id is the key a Field's `kind` is looked up under, so a padded one would
+      // register a data-type that could never resolve.
+      expect(() =>
+        defineStructuredDataType({ id: ' test.board ', valueSchema: z.unknown(), empty: () => null }),
+      ).toThrow();
+    });
+
+    it('yields no edges for a value its schema cannot parse — forward-only, never a throw', () => {
+      expect(BOARD.harvestEdges?.({ tiles: 'garbage' })).toEqual([]);
+      expect(BOARD.harvestEdges?.(undefined)).toEqual([]);
+    });
+
+    it('leaves the harvester absent when the data-type declares none', () => {
+      const swatch = defineStructuredDataType({
+        id: 'test.swatch',
+        valueSchema: z.object({ hex: z.string() }),
+        empty: () => ({ hex: '#000000' }),
+      });
+      expect(swatch.harvestEdges).toBeUndefined();
+    });
+
+    it('refuses to compose a set with a duplicate id', () => {
+      expect(() => structuredDataTypeSet([BOARD, BOARD])).toThrow(/test\.board/);
+    });
+  });
+
+  describe('declaring a Field that names one', () => {
+    it('accepts a well-formed `namespace.id` kind', () => {
+      expect(boardField.dataType).toEqual({ kind: 'test.board' });
+      // Shape, not membership: `defineType()` runs at module load, so no schema could enumerate the
+      // very plugin registering a kind. A well-formed typo passes here and dies at resolution.
+      expect(field({ key: 'grid', dataType: { kind: 'core.hex-gird' } }).dataType).toEqual({ kind: 'core.hex-gird' });
+    });
+
+    it('rejects a kind that is neither a built-in nor `namespace.id`-shaped', () => {
+      expect(() => field({ key: 'name', dataType: { kind: 'strig' } as never })).toThrow();
+      expect(() =>
+        defineType({
+          id: 'test.thing',
+          label: 'Thing',
+          fields: [{ key: 'name', label: 'Name', dataType: { kind: 'strig' } } as never],
+        }),
+      ).toThrow();
+    });
+  });
+
+  describe('unresolvedDataTypeErrors — where an unregistered kind is rejected', () => {
+    it('flags a well-formed but unregistered kind, against the host-composed set', () => {
+      const typo = field({ key: 'grid', dataType: { kind: 'core.hex-gird' } });
+      expect(unresolvedDataTypeErrors([typo], DATA_TYPES)).toEqual([{ key: 'grid', code: 'unknown-data-type' }]);
+    });
+
+    it('resolves against the set it is handed, not a global — an empty set knows no structured kind', () => {
+      expect(unresolvedDataTypeErrors([boardField], NO_STRUCTURED_DATA_TYPES)).toEqual([
+        { key: 'board', code: 'unknown-data-type' },
+      ]);
+      expect(unresolvedDataTypeErrors([boardField], DATA_TYPES)).toEqual([]);
+    });
+
+    it('never flags a built-in data-type', () => {
+      expect(unresolvedDataTypeErrors([field({ key: 'cr', dataType: { kind: 'number' } })], DATA_TYPES)).toEqual([]);
+    });
+  });
+
+  describe('validateFields against a host-composed data-type set', () => {
+    it('validates a present value against the data-type’s own schema', () => {
+      expect(validate([boardField], { board: { tiles: [] } }, DATA_TYPES).ok).toBe(true);
+      expect(validate([boardField], { board: { tiles: [{ entityId: 'riverbend' }] } }, DATA_TYPES).ok).toBe(true);
+      expect(validate([boardField], { board: { tiles: 'garbage' } }, DATA_TYPES).errors).toEqual([
+        { key: 'board', code: 'type' },
+      ]);
+    });
+
+    it('leaves an absent optional value alone, and still misses a required one', () => {
+      expect(validate([boardField], {}, DATA_TYPES).ok).toBe(true);
+      expect(validate([{ ...boardField, required: true }], {}, DATA_TYPES).errors).toEqual([
+        { key: 'board', code: 'required' },
+      ]);
+    });
+
+    /**
+     * The absent-plugin path (ADR-0050): a build that drops the map plugin must open its Hex Maps as
+     * lore plus an unrendered Field. So a Field whose data-type has gone missing is *inert* on the
+     * value gate — its value stays plain Metadata and the Entity stays saveable. Dropping a plugin
+     * degrades; it never corrupts. The typo is caught where the Type is declared, above.
+     */
+    it('is inert for an unregistered kind — never blocking the save of an Entity whose plugin is absent', () => {
+      const grid = field({ key: 'grid', dataType: { kind: 'core.hex-grid' } });
+      expect(validate([grid], { grid: { hexes: { '0,0': { terrain: 'grass' } } } }).ok).toBe(true);
+      expect(validate([grid], { grid: 'garbage' }).ok).toBe(true);
+      expect(validate([{ ...grid, required: true }], {}).ok).toBe(true);
+    });
+  });
+
+  describe('deriveFieldFacets and a Structured Field', () => {
+    it('never facets one, whatever its facetable flag says — a document has no values to count', () => {
+      const facetable = field({ key: 'board', dataType: { kind: 'test.board' }, facetable: true });
+      expect(deriveFieldFacets([facetable], { board: { tiles: [{ entityId: 'riverbend' }] } })).toEqual([]);
+    });
   });
 });

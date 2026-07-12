@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { FieldSchema, Metadata, readField, validateFields, writeField } from '@hexly/domain';
+import { FieldSchema, Metadata, NO_STRUCTURED_DATA_TYPES, readField, validateFields, writeField } from '@hexly/domain';
 import { EntitySession } from '../services/entity-session';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 import { FieldControl } from '@hexly/web-entity';
@@ -119,7 +119,10 @@ export class GenericFieldView {
 
   /** The forward-only validation of the live Metadata, so an invalid control can flag itself. */
   private readonly invalidKeys = computed(
-    () => new Set(validateFields(this.fields(), this.metadata()).errors.map((error) => error.key)),
+    () =>
+      new Set(
+        validateFields(this.fields(), this.metadata(), NO_STRUCTURED_DATA_TYPES).errors.map((error) => error.key),
+      ),
   );
 
   protected isInvalid(field: FieldSchema): boolean {

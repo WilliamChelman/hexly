@@ -1,6 +1,14 @@
 import { Injectable } from '@nestjs/common';
-import { AvailableType, CORE_TYPES, FieldSchema, fieldSchemaSchema, TypeFieldResolver } from '@hexly/domain';
-import { BUNDLED_PLUGIN_TYPES } from './bundled-plugins';
+import {
+  AvailableType,
+  CORE_TYPES,
+  FieldSchema,
+  fieldSchemaSchema,
+  StructuredDataTypeSet,
+  TypeFieldResolver,
+  unresolvedDataTypeErrors,
+} from '@hexly/domain';
+import { BUNDLED_PLUGIN_TYPES, BUNDLED_STRUCTURED_DATA_TYPES } from './bundled-plugins';
 
 /** A registered instance-wide type: its Field schema plus an optional display label. */
 interface RegisteredType {
@@ -30,14 +38,29 @@ export class TypeFieldRegistry {
   }
 
   /**
+   * The **Structured Field** data-types this build bundles (ADR-0050) — instance-wide and code-known,
+   * like the plugin types beside them, so a World never contributes one. Threaded into the domain's
+   * `validateFields` / `harvestEdges` by the write path, and resolved against here.
+   */
+  readonly structuredDataTypes: StructuredDataTypeSet = BUNDLED_STRUCTURED_DATA_TYPES;
+
+  /**
    * Register (or replace) a plugin type's Field schema and optional `label`, validating each Field
-   * through the shared Zod so a malformed plugin fails loudly at startup. Returns an unregister fn.
+   * through the shared Zod so a malformed plugin fails loudly at startup. A **Structured Field**
+   * naming a data-type this build does not bundle fails just as loudly (ADR-0050): a plugin type is
+   * code, so an unresolvable kind is a build error, not a degradation to tolerate. Returns an
+   * unregister fn.
    */
   register(typeId: string, fields: readonly FieldSchema[], label?: string): () => void {
-    this.byType.set(typeId, {
-      fields: fields.map((field) => fieldSchemaSchema.parse(field)),
-      label,
-    });
+    const parsed = fields.map((field) => fieldSchemaSchema.parse(field));
+    const unresolved = unresolvedDataTypeErrors(parsed, this.structuredDataTypes);
+    if (unresolved.length > 0)
+      throw new Error(
+        `Type ${typeId} declares Fields with unregistered structured data-types: ${unresolved
+          .map((error) => error.key)
+          .join(', ')}`,
+      );
+    this.byType.set(typeId, { fields: parsed, label });
     return () => this.byType.delete(typeId);
   }
 

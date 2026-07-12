@@ -1,12 +1,17 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { BadRequestException, Injectable, Inject } from '@nestjs/common';
 import {
+  ApiError,
   AvailableType,
   CreateUserDefinedTypeRequest,
+  EntityErrorCode,
+  FieldSchema,
   UpdateUserDefinedTypeRequest,
+  unresolvedDataTypeErrors,
   UserDefinedType,
 } from '@hexly/domain';
 import { DB, Db } from '../db/db';
 import { worldAccess } from '../acl/world-access';
+import { TypeFieldRegistry } from '../entities/type-field-registry';
 import { WorldTypeFields } from '../entities/world-type-fields';
 import { WorldWrites } from './world-writes';
 
@@ -21,6 +26,7 @@ export class WorldTypesService {
     @Inject(DB) private readonly db: Db,
     private readonly types: WorldTypeFields,
     private readonly writes: WorldWrites,
+    private readonly plugins: TypeFieldRegistry,
   ) {}
 
   /** The types available in a World (plugin + user-defined). Reachable-gated; unreachable → `not-found`. */
@@ -34,6 +40,7 @@ export class WorldTypesService {
     const gate = this.gateOwner(userId, worldId);
     if (gate) return gate;
     if (this.types.list(worldId).some((type) => type.id === req.id)) return { status: 'conflict' };
+    this.assertDataTypesResolve(req.fields);
     const type: UserDefinedType = { id: req.id, label: req.label, fields: req.fields };
     this.writes.createType(worldId, type);
     return { status: 'ok', value: type };
@@ -51,6 +58,7 @@ export class WorldTypesService {
   ): TypeResult<UserDefinedType> {
     const gate = this.gateOwner(userId, worldId);
     if (gate) return gate;
+    if (patch.fields) this.assertDataTypesResolve(patch.fields);
     if (!this.writes.updateType(worldId, typeId, patch)) return { status: 'not-found' };
     // Just written in the same synchronous transaction, so it always resolves.
     return { status: 'ok', value: this.types.list(worldId).find((type) => type.id === typeId)! };
@@ -64,6 +72,25 @@ export class WorldTypesService {
     const gate = this.gateOwner(userId, worldId);
     if (gate) return gate;
     return this.writes.deleteType(worldId, typeId) ? { status: 'ok', value: null } : { status: 'not-found' };
+  }
+
+  /**
+   * The **declaration** gate for a **Structured Field** (ADR-0050): a Field may name a plugin's
+   * data-type (`core.hex-grid`), and this is where a well-formed but unregistered kind — a typo
+   * (`core.hex-gird`), or a plugin this build does not bundle — is rejected, against the set the host
+   * composed. It runs here rather than in the schema because `defineType()` runs at module load, so
+   * no schema could enumerate the very plugin registering one.
+   *
+   * Declaration-time only: an Entity whose *stored* value has lost its data-type stays inert and
+   * saveable (`validateFields`), so dropping a plugin degrades rather than corrupts.
+   */
+  private assertDataTypesResolve(fields: readonly FieldSchema[]): void {
+    const errors = unresolvedDataTypeErrors(fields, this.plugins.structuredDataTypes);
+    if (errors.length > 0)
+      throw new BadRequestException({
+        code: EntityErrorCode.InvalidFields,
+        data: { fields: errors },
+      } satisfies ApiError);
   }
 
   /** Gate a mutation: undefined when Owner, else unreachable → `not-found`, non-Owner → `forbidden`. */

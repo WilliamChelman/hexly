@@ -8,7 +8,8 @@
 import { assetHashFromUrl } from './asset';
 import { visit } from './content/content-node';
 import { descriptorSchema, EntityBody, EntityType, hasHexGrid } from './entity';
-import { entityLinkFieldValues, FieldSchema } from './field';
+import { entityLinkFieldValues, FieldSchema, readField, resolvedStructuredFields } from './field';
+import { NO_STRUCTURED_DATA_TYPES, StructuredDataTypeSet } from './structured-data-type';
 
 /** What an edge points at: another Entity, or an Asset (CONTEXT.md → Asset). */
 export type EdgeTargetKind = 'entity' | 'asset';
@@ -70,10 +71,17 @@ export interface EntityReferences {
  * a prose mention, a map placement, and a Field link to the same target collapse to one edge, while
  * two descriptors to that target stay two.
  *
- * `fields` is the Entity's resolved Field schema set ({@link resolveFields}); it defaults to none,
- * so a caller with no type context still harvests Content/map edges unchanged.
+ * `fields` is the Entity's resolved Field schema set ({@link resolveFields}) and `dataTypes` the
+ * host-composed **Structured Field** set (ADR-0050) — both threaded in explicitly, never reached for:
+ * a structured value harvests its own edges (a Hex placed on a plugin's grid), and the domain learns
+ * how only from the set it is handed. A caller with no type context passes `[]` and
+ * {@link NO_STRUCTURED_DATA_TYPES} and harvests Content/map edges alone.
  */
-export function harvestEdges(body: EntityBody, fields: readonly FieldSchema[] = []): EntityEdge[] {
+export function harvestEdges(
+  body: EntityBody,
+  fields: readonly FieldSchema[],
+  dataTypes: StructuredDataTypeSet,
+): EntityEdge[] {
   const edges = new Map<string, EntityEdge>();
   const add = (edge: EntityEdge) => {
     // `\0` cannot occur in an id or a descriptor, so the key is unambiguous. The descriptor folds
@@ -118,6 +126,12 @@ export function harvestEdges(body: EntityBody, fields: readonly FieldSchema[] = 
   // A typed Entity-Link Field value is a descriptor-less edge to its target (#190), read off the
   // Metadata map rather than the Content snapshot — so it is format-independent, like the map above.
   for (const { value } of entityLinkFieldValues(fields, body.metadata)) entityEdge(value.entityId, null);
+
+  // A Structured Field harvests its own (ADR-0050): the domain hands its value to the data-type the
+  // host registered and takes the edges back, knowing nothing of what is inside. A data-type that
+  // declares no harvester, or a value it cannot parse, contributes nothing.
+  for (const { field, dataType } of resolvedStructuredFields(fields, dataTypes))
+    for (const edge of dataType.harvestEdges?.(readField(body.metadata, field)) ?? []) add(edge);
 
   return [...edges.values()];
 }

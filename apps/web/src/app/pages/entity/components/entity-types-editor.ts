@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { FieldSchema, Metadata, validateFields, writeField } from '@hexly/domain';
+import { FieldSchema, Metadata, NO_STRUCTURED_DATA_TYPES, validateFields, writeField } from '@hexly/domain';
 import { Button, Chip } from '@hexly/web-ui';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 import { FieldControl } from '@hexly/web-entity';
@@ -158,11 +158,16 @@ export class EntityTypesEditor {
       .filter((id) => !this.types().includes(id)),
   );
 
-  protected readonly pendingValid = computed(() => validateFields(this.pendingFields(), this.pendingMetadata()).ok);
+  protected readonly pendingValid = computed(
+    () => validateFields(this.pendingFields(), this.pendingMetadata(), NO_STRUCTURED_DATA_TYPES).ok,
+  );
 
   /** Keys still failing the forward-only gate, so a control can flag itself invalid. */
   protected readonly invalidPendingKeys = computed(
-    () => new Set(validateFields(this.pendingFields(), this.pendingMetadata()).errors.map((e) => e.key)),
+    () =>
+      new Set(
+        validateFields(this.pendingFields(), this.pendingMetadata(), NO_STRUCTURED_DATA_TYPES).errors.map((e) => e.key),
+      ),
   );
 
   /** A friendly label: a registered type's name (authored, for a user-defined one), else the raw id. */
@@ -200,7 +205,7 @@ export class EntityTypesEditor {
     select.value = '';
     if (!type || this.types().includes(type)) return;
     const required = this.registry.resolveFields([type]).filter((f) => f.required);
-    const unmet = required.filter((f) => !validateFields([f], this.metadata()).ok);
+    const unmet = required.filter((f) => !validateFields([f], this.metadata(), NO_STRUCTURED_DATA_TYPES).ok);
     if (unmet.length === 0 || !this.promptOnAdd()) {
       this.typesChange.emit([...this.types(), type]);
       return;

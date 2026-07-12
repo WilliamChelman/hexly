@@ -1,7 +1,21 @@
+import { z } from 'zod';
 import { emptyContent, EntityBody, tiptapContent } from './entity';
-import { fieldSchemaSchema } from './field';
+import { fieldSchemaSchema, FieldSchema } from './field';
 import { emptyHexMap } from './hex/hex-map';
 import { harvestEdges } from './entity-edges';
+import { defineStructuredDataType, NO_STRUCTURED_DATA_TYPES, structuredDataTypeSet } from './structured-data-type';
+
+/**
+ * `harvestEdges` takes the resolved Fields and the host's structured data-type set explicitly
+ * (ADR-0050) — neither is reached for, so this spec supplies its own. Most cases need neither.
+ */
+function harvest(
+  body: EntityBody,
+  fields: readonly FieldSchema[] = [],
+  dataTypes = NO_STRUCTURED_DATA_TYPES,
+): ReturnType<typeof harvestEdges> {
+  return harvestEdges(body, fields, dataTypes);
+}
 
 /** Content holding the given `entityLink` attrs, wrapped in a paragraph. */
 function prose(...links: Record<string, unknown>[]) {
@@ -34,7 +48,7 @@ describe('harvestEdges (#179, ADR-0046)', () => {
       descriptor: 'spouse',
     });
 
-    expect(harvestEdges(body)).toEqual([{ targetKind: 'entity', targetId: 'mira', descriptor: 'spouse' }]);
+    expect(harvest(body)).toEqual([{ targetKind: 'entity', targetId: 'mira', descriptor: 'spouse' }]);
   });
 
   /**
@@ -61,7 +75,7 @@ describe('harvestEdges (#179, ADR-0046)', () => {
       ],
     });
 
-    expect(harvestEdges(body)).toEqual(
+    expect(harvest(body)).toEqual(
       expect.arrayContaining([
         { targetKind: 'entity', targetId: 'harbour', descriptor: null },
         { targetKind: 'entity', targetId: 'riverbend', descriptor: null },
@@ -72,7 +86,7 @@ describe('harvestEdges (#179, ADR-0046)', () => {
         },
       ]),
     );
-    expect(harvestEdges(body)).toHaveLength(3);
+    expect(harvest(body)).toHaveLength(3);
   });
 
   /**
@@ -92,7 +106,7 @@ describe('harvestEdges (#179, ADR-0046)', () => {
       }),
     };
 
-    expect(harvestEdges(body)).toEqual([{ targetKind: 'asset', targetId: hash, descriptor: null }]);
+    expect(harvest(body)).toEqual([{ targetKind: 'asset', targetId: hash, descriptor: null }]);
   });
 
   /**
@@ -103,8 +117,8 @@ describe('harvestEdges (#179, ADR-0046)', () => {
    * relationship to characterise.
    */
   it('ignores an entityLink that names no target, descriptor or not', () => {
-    expect(harvestEdges(note({ entityId: null, label: 'Ghost', descriptor: 'rival' }))).toEqual([]);
-    expect(harvestEdges(note({ label: 'Ghost' }))).toEqual([]);
+    expect(harvest(note({ entityId: null, label: 'Ghost', descriptor: 'rival' }))).toEqual([]);
+    expect(harvest(note({ label: 'Ghost' }))).toEqual([]);
   });
 
   it('finds links nested deep in the Content tree', () => {
@@ -135,7 +149,7 @@ describe('harvestEdges (#179, ADR-0046)', () => {
       }),
     };
 
-    expect(harvestEdges(body)).toEqual([{ targetKind: 'entity', targetId: 'e1', descriptor: 'liege' }]);
+    expect(harvest(body)).toEqual([{ targetKind: 'entity', targetId: 'e1', descriptor: 'liege' }]);
   });
 
   /**
@@ -154,7 +168,7 @@ describe('harvestEdges (#179, ADR-0046)', () => {
       hexes: { '0,0': { terrain: 'grass', entityId: 'harbour' } },
     } as unknown as EntityBody;
 
-    expect(harvestEdges(body)).toEqual([{ targetKind: 'entity', targetId: 'harbour', descriptor: null }]);
+    expect(harvest(body)).toEqual([{ targetKind: 'entity', targetId: 'harbour', descriptor: null }]);
   });
 
   /**
@@ -171,13 +185,13 @@ describe('harvestEdges (#179, ADR-0046)', () => {
         hexes: { '0,0': { terrain: 'grass', entityId: 'riverbend' } },
       };
 
-      expect(harvestEdges(body)).toEqual([{ targetKind: 'entity', targetId: 'riverbend', descriptor: null }]);
+      expect(harvest(body)).toEqual([{ targetKind: 'entity', targetId: 'riverbend', descriptor: null }]);
     });
 
     it('keeps two descriptors to the same target as two edges', () => {
       const body = note({ entityId: 'mira', descriptor: 'spouse' }, { entityId: 'mira', descriptor: 'rival' });
 
-      expect(harvestEdges(body)).toEqual([
+      expect(harvest(body)).toEqual([
         { targetKind: 'entity', targetId: 'mira', descriptor: 'spouse' },
         { targetKind: 'entity', targetId: 'mira', descriptor: 'rival' },
       ]);
@@ -198,7 +212,7 @@ describe('harvestEdges (#179, ADR-0046)', () => {
         { entityId: 'mira' },
       );
 
-      expect(harvestEdges(body)).toEqual([
+      expect(harvest(body)).toEqual([
         { targetKind: 'entity', targetId: 'mira', descriptor: 'Spouse' },
         { targetKind: 'entity', targetId: 'mira', descriptor: null },
       ]);
@@ -206,7 +220,7 @@ describe('harvestEdges (#179, ADR-0046)', () => {
 
     /** Surrounding whitespace is never part of a descriptor, whatever its case. */
     it('trims the authored descriptor', () => {
-      expect(harvestEdges(note({ entityId: 'mira', descriptor: '  Capital Of  ' }))).toEqual([
+      expect(harvest(note({ entityId: 'mira', descriptor: '  Capital Of  ' }))).toEqual([
         { targetKind: 'entity', targetId: 'mira', descriptor: 'Capital Of' },
       ]);
     });
@@ -226,7 +240,7 @@ describe('harvestEdges (#179, ADR-0046)', () => {
         content: emptyContent(),
         metadata: { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } },
       };
-      expect(harvestEdges(body, [lair])).toEqual([{ targetKind: 'entity', targetId: 'whisperwood', descriptor: null }]);
+      expect(harvest(body, [lair])).toEqual([{ targetKind: 'entity', targetId: 'whisperwood', descriptor: null }]);
     });
 
     it('reads no Field edge without the resolved fields (the default), so Content/map edges are unchanged', () => {
@@ -234,7 +248,7 @@ describe('harvestEdges (#179, ADR-0046)', () => {
         content: prose({ entityId: 'mira', label: 'Mira' }),
         metadata: { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } },
       };
-      expect(harvestEdges(body)).toEqual([{ targetKind: 'entity', targetId: 'mira', descriptor: null }]);
+      expect(harvest(body)).toEqual([{ targetKind: 'entity', targetId: 'mira', descriptor: null }]);
     });
 
     it('collapses a Field link and a content link to the same target into one edge', () => {
@@ -242,12 +256,60 @@ describe('harvestEdges (#179, ADR-0046)', () => {
         content: prose({ entityId: 'whisperwood', label: 'The Whisperwood' }),
         metadata: { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } },
       };
-      expect(harvestEdges(body, [lair])).toEqual([{ targetKind: 'entity', targetId: 'whisperwood', descriptor: null }]);
+      expect(harvest(body, [lair])).toEqual([{ targetKind: 'entity', targetId: 'whisperwood', descriptor: null }]);
     });
 
     it('ignores a blank or ill-typed Field value — inert, never an edge', () => {
       const body: EntityBody = { content: emptyContent(), metadata: { lair: { label: 'Ghost' } } };
-      expect(harvestEdges(body, [lair])).toEqual([]);
+      expect(harvest(body, [lair])).toEqual([]);
+    });
+  });
+
+  /**
+   * A **Structured Field** harvests its own edges (ADR-0050): the domain hands the value to the
+   * data-type the host registered and takes the edges back, knowing nothing of what is inside. The
+   * spec brings its own data-type rather than borrowing a real one — that it *can* is the point of
+   * threading the set explicitly.
+   */
+  describe('Structured Field edges (ADR-0050)', () => {
+    const BOARD = defineStructuredDataType({
+      id: 'test.board',
+      valueSchema: z.object({ tiles: z.array(z.object({ entityId: z.string() })) }),
+      empty: () => ({ tiles: [] }),
+      harvestEdges: (board) =>
+        board.tiles.map((tile) => ({ targetKind: 'entity' as const, targetId: tile.entityId, descriptor: null })),
+    });
+    const DATA_TYPES = structuredDataTypeSet([BOARD]);
+    const boardField = fieldSchemaSchema.parse({ key: 'board', label: 'Board', dataType: { kind: 'test.board' } });
+    const board = (body: EntityBody = { content: emptyContent() }) => ({
+      ...body,
+      metadata: { board: { tiles: [{ entityId: 'riverbend' }, { entityId: 'harbour' }] } },
+    });
+
+    it('takes the edges the data-type harvests from its own value', () => {
+      expect(harvest(board(), [boardField], DATA_TYPES)).toEqual([
+        { targetKind: 'entity', targetId: 'riverbend', descriptor: null },
+        { targetKind: 'entity', targetId: 'harbour', descriptor: null },
+      ]);
+    });
+
+    it('harvests nothing when the kind is unregistered, or the set is empty', () => {
+      const typo = fieldSchemaSchema.parse({ key: 'board', label: 'Board', dataType: { kind: 'core.hex-gird' } });
+      expect(harvest(board(), [boardField])).toEqual([]);
+      expect(harvest(board(), [typo], DATA_TYPES)).toEqual([]);
+    });
+
+    it('harvests nothing from a malformed value at rest, rather than throwing', () => {
+      const body: EntityBody = { content: emptyContent(), metadata: { board: 'garbage' } };
+      expect(harvest(body, [boardField], DATA_TYPES)).toEqual([]);
+    });
+
+    it('collapses a structured edge and a content link to the same target into one edge', () => {
+      const body = board({ content: prose({ entityId: 'riverbend', label: 'Riverbend' }) });
+      expect(harvest(body, [boardField], DATA_TYPES)).toEqual([
+        { targetKind: 'entity', targetId: 'riverbend', descriptor: null },
+        { targetKind: 'entity', targetId: 'harbour', descriptor: null },
+      ]);
     });
   });
 });

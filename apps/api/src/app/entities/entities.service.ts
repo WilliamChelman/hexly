@@ -549,7 +549,7 @@ export class EntitiesService {
   ): void {
     const fields = resolveFields(this.typeResolver(worldId), types);
     const errors: FieldError[] = [
-      ...validateFields(fields, metadata).errors,
+      ...validateFields(fields, metadata, this.typeFields.structuredDataTypes).errors,
       ...this.linkTargetTypeErrors(userId, fields, metadata),
     ];
     if (errors.length > 0)

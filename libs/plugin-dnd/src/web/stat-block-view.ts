@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { FieldSchema, Metadata, readField, validateFields, writeField } from '@hexly/domain';
+import { FieldSchema, Metadata, NO_STRUCTURED_DATA_TYPES, readField, validateFields, writeField } from '@hexly/domain';
 import { ENTITY_SESSION } from '@hexly/web-entity';
 import {
   abilityModifier,
@@ -121,7 +121,12 @@ export class StatBlockView {
   private readonly metadata = computed<Metadata>(() => this.session.body().metadata ?? {});
 
   private readonly invalidKeys = computed(
-    () => new Set(validateFields(DND_MONSTER_TYPE.fields, this.metadata()).errors.map((error) => error.key)),
+    () =>
+      new Set(
+        validateFields(DND_MONSTER_TYPE.fields, this.metadata(), NO_STRUCTURED_DATA_TYPES).errors.map(
+          (error) => error.key,
+        ),
+      ),
   );
 
   /** The labelled rows above the ability grid: the identity Fields, then the defences. */
