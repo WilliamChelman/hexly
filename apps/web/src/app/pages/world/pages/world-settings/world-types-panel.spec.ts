@@ -1,10 +1,11 @@
+import { provideTranslocoTesting } from '../../../../../testing/transloco-testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { AvailableType, UserDefinedType } from '@hexly/domain';
 import { ActiveWorld, WorldsClient } from '@hexly/web-core';
-import { MockWorldsClient, provideTranslocoTesting } from '@hexly/web-core/testing';
+import { MockWorldsClient } from '@hexly/web-core/testing';
 import { WorldTypesPanel } from './world-types-panel';
 
 /**

@@ -20,22 +20,22 @@ import { WorldTypesPanel } from './world-types-panel';
   template: `
     @if (worldId(); as id) {
       <section class="world-settings">
-        <span appEyebrow>{{ 'owners.heading' | transloco }}</span>
+        <span appEyebrow>{{ 'ui.owners.heading' | transloco }}</span>
         <h1 class="world-settings-heading">
-          {{ 'owners.heading' | transloco }}
+          {{ 'ui.owners.heading' | transloco }}
         </h1>
         <p class="world-settings-subhead">
-          {{ 'owners.subhead' | transloco: { kind: 'owners.world' | transloco } }}
+          {{ 'ui.owners.subhead' | transloco: { kind: 'ui.owners.world' | transloco } }}
         </p>
         <div appPanel>
           <app-owner-set kind="world" [id]="id" (resigned)="leave()" />
         </div>
 
         <h2 class="world-settings-heading">
-          {{ 'members.heading' | transloco }}
+          {{ 'ui.members.heading' | transloco }}
         </h2>
         <p class="world-settings-subhead">
-          {{ 'members.subhead' | transloco }}
+          {{ 'ui.members.subhead' | transloco }}
         </p>
         <div appPanel>
           <app-member-set [id]="id" />
@@ -52,10 +52,10 @@ import { WorldTypesPanel } from './world-types-panel';
         </div>
 
         <h2 class="world-settings-heading">
-          {{ 'publicLink.worldHeading' | transloco }}
+          {{ 'ui.publicLink.worldHeading' | transloco }}
         </h2>
         <p class="world-settings-subhead">
-          {{ 'publicLink.worldSubhead' | transloco }}
+          {{ 'ui.publicLink.worldSubhead' | transloco }}
         </p>
         <div appPanel>
           <app-public-link kind="world" [id]="id" />

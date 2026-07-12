@@ -1,0 +1,494 @@
+{
+  "auth": {
+    "tabTitle": "Hexly — Sign in",
+    "heading": "Sign in",
+    "email": "Email",
+    "password": "Password",
+    "signIn": "Sign in",
+    "signingIn": "Signing in…",
+    "invalidCredentials": "Incorrect email or password."
+  },
+  "entityBrowser": {
+    "tabTitle": "Hexly — Your library",
+    "eyebrow": "Library",
+    "heading": "Your library",
+    "newMap": "New map",
+    "newNote": "New note",
+    "rename": "Rename",
+    "renameLabel": "New name",
+    "searchLabel": "Search entities",
+    "searchPlaceholder": "Search by name, tag, or content…",
+    "creating": "Creating…",
+    "edited": "Edited {{date}}",
+    "type": {
+      "core": {
+        "note": "Note",
+        "hexmap": "Map"
+      },
+      "dnd": {
+        "monster": "Monster"
+      }
+    },
+    "loadErrorTitle": "Couldn't load your library.",
+    "loadErrorHint": "Something went wrong. Please try again in a moment.",
+    "createError": "Couldn't create that. Please try again.",
+    "renameError": "Couldn't rename that. Please try again.",
+    "deleteError": "Couldn't delete that. Please try again.",
+    "loadMore": "Load more",
+    "loadingMore": "Loading…",
+    "loadMoreError": "Couldn't load more. Please try again.",
+    "emptyTitle": "Your library is empty.",
+    "emptyHint": "Create a note or a map to begin.",
+    "noMatchTitle": "No entities match your search.",
+    "noMatchHint": "Try a different name, tag, or word.",
+    "facets": {
+      "heading": "Filters",
+      "type": "Type",
+      "tag": "Tag",
+      "visibility": "Visibility",
+      "clearAll": "Clear all",
+      "private": "Private",
+      "shared": "Shared",
+      "rangeMin": "{{field}} minimum",
+      "rangeMax": "{{field}} maximum"
+    }
+  },
+  "entityTags": {
+    "addLabel": "Add a tag",
+    "addPlaceholder": "Add tags…",
+    "removeLabel": "Remove tag: {{tag}}",
+    "picker": {
+      "label": "Suggested tags",
+      "create": "(new)",
+      "empty": "Type a tag"
+    }
+  },
+  "entityMetadata": {
+    "heading": "Metadata"
+  },
+  "entityTypes": {
+    "primary": "Primary",
+    "addLabel": "Add type…",
+    "removeLabel": "Remove type: {{type}}",
+    "moveUpLabel": "Move up: {{type}}",
+    "moveDownLabel": "Move down: {{type}}",
+    "editTypes": "Edit types",
+    "heading": "Entity types",
+    "hint": "The first type is primary — it drives the icon, default view, and headline.",
+    "requiredHeading": "{{type}} needs these fields before it can be added:",
+    "confirmAdd": "Add type",
+    "requiredFieldsHeading": "Required fields"
+  },
+  "noteView": {
+    "eyebrow": "Note",
+    "titleLabel": "Note title",
+    "renameNote": "Rename note",
+    "backToLibrary": "Back to library",
+    "editorLabel": "Note content",
+    "outline": {
+      "title": "Outline",
+      "toggle": "Toggle outline",
+      "empty": "No headings yet"
+    },
+    "links": {
+      "title": "Links",
+      "toggle": "Toggle links",
+      "references": "References",
+      "referencedBy": "Referenced by",
+      "referencesEmpty": "This entity links to nothing",
+      "referencedByEmpty": "Nothing links here"
+    }
+  },
+  "editorShell": {
+    "tabTitle": "Hexly",
+    "tabTitleNamed": "{{name}} — Hexly",
+    "hexMap": "Hex map",
+    "mapTitleLabel": "Map title",
+    "renameMap": "Rename map",
+    "reload": "Reload",
+    "saving": "Saving…",
+    "share": "Share",
+    "visibility": {
+      "shared": "Shared",
+      "private": "Private",
+      "toggle": "Toggle visibility"
+    },
+    "view": {
+      "switchLabel": "Switch view",
+      "map": "Map",
+      "note": "Note",
+      "fields": "Fields",
+      "editorLabel": "Map notes"
+    },
+    "save": {
+      "conflict": "Newer version on server",
+      "saved": "Saved",
+      "unsaved": "Unsaved…",
+      "failed": "Save failed",
+      "retry": "Retry",
+      "readonly": "Read-only — you don't have permission to edit.",
+      "reloadFailed": "Reload failed — couldn't reach the server."
+    },
+    "pin": {
+      "pin": "Pin to Dashboard",
+      "toggle": "Pin this Entity to the World Dashboard"
+    },
+    "actionsMenu": "Entity actions",
+    "unavailable": {
+      "title": "No longer available",
+      "body": "This page was deleted or its sharing changed, so you no longer have access to it."
+    }
+  },
+  "styleguide": {
+    "tabTitle": "Hexly — Design system",
+    "backToMap": "Back to map",
+    "eyebrow": "Hexly design system",
+    "heroTitle": "The cartographer’s table,<br />by starlight.",
+    "heroLede": "One identity told at two hours of the day. <strong>Solar</strong> is the sunlit almanac on the cartographer’s table; <strong>Astral</strong> is the same chart under the night sky. Gold is the through-line — heliograph ink by day, constellation lines by night — and the text stays a warm ivory-cream in both. Everything below is driven by the same CSS custom-property layer that <code>apps/web</code> ships.",
+    "swatch": {
+      "table": "Table",
+      "paper": "Paper",
+      "pinnedNote": "Pinned note",
+      "well": "Well",
+      "ink": "Ink",
+      "inkMuted": "Ink muted",
+      "compassGold": "Compass gold",
+      "seaAurora": "Sea / aurora",
+      "nebula": "Nebula",
+      "marginalia": "Marginalia",
+      "moss": "Moss",
+      "drawnRule": "Drawn rule",
+      "grassland": "Grassland",
+      "forest": "Forest",
+      "ocean": "Ocean",
+      "mountains": "Mountains",
+      "desert": "Desert",
+      "marsh": "Marsh"
+    },
+    "fontDisplay": "Cinzel · display",
+    "fontBody": "Spectral · body",
+    "fontCoord": "JetBrains Mono · coordinates",
+    "paletteSemantic": "Palette · semantic roles",
+    "paletteNote": "Slices request a role, never a raw colour. Showing the active theme.",
+    "paletteTerrain": "Palette · terrain fills",
+    "typeScale": "Type scale",
+    "spacing": "Spacing",
+    "radii": "Radii",
+    "components": "Components",
+    "buttons": "Buttons",
+    "iconButtons": "Icon buttons",
+    "chipsCoords": "Chips & coordinates",
+    "fields": "Fields",
+    "shareMap": "Share map",
+    "addRegion": "Add region",
+    "clearHex": "Clear hex",
+    "small": "Small",
+    "iconSelectTitle": "Select (S)",
+    "iconSelectLabel": "Select",
+    "iconTerrainTitle": "Terrain (T)",
+    "iconTerrainLabel": "Terrain",
+    "iconForestTitle": "Forest (2)",
+    "iconForestLabel": "Forest",
+    "iconUndo": "Undo",
+    "chipDefault": "Default",
+    "chipSettlement": "Settlement",
+    "chipEditing": "Editing",
+    "chipRegion": "Region",
+    "fieldMapName": "Map name",
+    "fieldNote": "Note",
+    "fieldTerrain": "Terrain",
+    "footerTokens": "Design tokens"
+  },
+  "domain": {
+    "untitledNote": "Untitled note",
+    "untitledMap": "Untitled map"
+  },
+  "common": {
+    "language": "Language",
+    "userMenu": "Open user menu",
+    "signOut": "Sign out",
+    "login": "Login",
+    "theme": {
+      "solar": "Solar (light)",
+      "astral": "Astral (dark)",
+      "toSolar": "Switch to solar theme",
+      "toAstral": "Switch to astral theme"
+    },
+    "cancel": "Cancel",
+    "close": "Close",
+    "delete": "Delete",
+    "create": "Create",
+    "settings": "Settings",
+    "locale": {
+      "en": "English",
+      "fr": "Français"
+    }
+  },
+  "nav": {
+    "primary": "Primary navigation",
+    "worlds": "Worlds",
+    "dashboard": "Dashboard",
+    "library": "Library",
+    "graph": "Graph",
+    "styleguide": "Styleguide",
+    "expand": "Expand navigation",
+    "collapse": "Collapse navigation",
+    "home": "Hexly home",
+    "users": "Users",
+    "admin": "Admin",
+    "worldSettings": "World Settings"
+  },
+  "commandPalette": {
+    "searchLabel": "Search or run a command",
+    "placeholder": "Search or type > for commands…",
+    "empty": "No matches",
+    "entities": "Entities",
+    "worlds": "Worlds",
+    "commands": "Commands",
+    "createNote": "Create Note",
+    "createMap": "Create Map",
+    "goToUsers": "Go to Users",
+    "goToAdmin": "Go to Admin",
+    "goToStyleguide": "Go to Styleguide",
+    "nameLabel": "Name",
+    "worldLabel": "World"
+  },
+  "worlds": {
+    "switcherLabel": "Active world",
+    "crestLabel": "World",
+    "switcher": "Worlds",
+    "allWorlds": "All worlds",
+    "new": "New world",
+    "untitled": "Untitled world",
+    "createError": "Couldn't create that world. Please try again.",
+    "import": "Import vault",
+    "importing": "Importing…",
+    "importError": "Couldn't import that vault. Please try again.",
+    "export": "Export vault",
+    "exportError": "Couldn't export that world. Please try again.",
+    "importSummaryHeading": "Vault imported",
+    "importNotes": "Notes imported",
+    "importLinksResolved": "Links resolved",
+    "importLinksDangling": "Links dangling",
+    "importAssets": "Assets stored",
+    "importSkipped": "Files skipped",
+    "openImported": "Open world"
+  },
+  "worldIndex": {
+    "tabTitle": "Hexly — Worlds",
+    "eyebrow": "Worlds",
+    "heading": "Your worlds",
+    "greeting": "Welcome back, {{name}}.",
+    "greetingFallback": "cartographer",
+    "subhead": "Pick up where you left off, or chart somewhere new.",
+    "continue": "Continue",
+    "creating": "Creating…",
+    "owned": "Owned",
+    "member": "Member",
+    "loadErrorTitle": "Couldn't load your worlds.",
+    "loadErrorHint": "Something went wrong. Please try again in a moment.",
+    "emptyTitle": "No worlds yet.",
+    "emptyHint": "Create your first world to begin.",
+    "rename": "Rename",
+    "renameLabel": "World name",
+    "renameError": "Couldn't rename that world. Please try again.",
+    "deleteHeading": "Delete world?",
+    "deleteCounting": "Counting entities…",
+    "deleteCount": "This permanently destroys {count, plural, one {# entity} other {# entities}}. This cannot be undone.",
+    "deleteConfirmPrompt": "Type {{name}} to confirm.",
+    "deleteConfirmLabel": "Type the world name to confirm deletion",
+    "deleteError": "Couldn't delete that world. Please try again."
+  },
+  "worldDashboard": {
+    "tabTitle": "Hexly — Dashboard",
+    "eyebrow": "World",
+    "recentsHeading": "Recently edited",
+    "mapsHeading": "Hex maps",
+    "countsHeading": "At a glance",
+    "pinsHeading": "Pinned",
+    "addPin": "Pin an entity",
+    "removePin": "Unpin",
+    "movePinUp": "Move up",
+    "movePinDown": "Move down",
+    "browseAll": "Browse all entities",
+    "emptyTitle": "Your world is a blank map.",
+    "emptyHint": "Create your first note or hex map to begin."
+  },
+  "worldGraph": {
+    "tabTitle": "Hexly — Graph",
+    "eyebrow": "World graph",
+    "counts": "{{nodes}} entities · {{edges}} links",
+    "emptyTitle": "Nothing to draw yet.",
+    "emptyHint": "Create a few entities and link them together to see the shape of your world.",
+    "loadError": "Couldn't load the graph. Try again."
+  },
+  "error": {
+    "tabTitle": "Hexly — Not found",
+    "eyebrow": "Hexly",
+    "heading": "We couldn't find that.",
+    "hint": "The page or entity you're looking for doesn't exist, or you don't have access to it.",
+    "backToWorlds": "Back to your worlds"
+  },
+  "worldTypes": {
+    "heading": "Custom types",
+    "subhead": "Define your own kinds of entity for this world, each with typed fields you can filter on.",
+    "empty": "No custom types yet.",
+    "add": "New type",
+    "edit": "Edit",
+    "remove": "Delete",
+    "idLabel": "Id",
+    "idPrefix": "world.",
+    "idHint": "A short key like deity.",
+    "nameLabel": "Name",
+    "fieldsHeading": "Fields",
+    "addField": "Add field",
+    "fieldKey": "Key",
+    "fieldName": "Label",
+    "fieldType": "Type",
+    "fieldRequired": "Required",
+    "fieldFacetable": "Filterable",
+    "fieldOptions": "Options",
+    "fieldOptionsHint": "Comma-separated",
+    "removeField": "Remove field",
+    "noFields": "No fields — the type is a plain label until you add some.",
+    "save": "Save",
+    "cancel": "Cancel",
+    "dataType": {
+      "string": "Text",
+      "number": "Number",
+      "boolean": "Yes / No",
+      "date": "Date",
+      "enum": "Choice"
+    },
+    "loadError": "Couldn't load this world's custom types.",
+    "createError": "Couldn't create that type. Please try again.",
+    "updateError": "Couldn't save that type. Please try again.",
+    "removeError": "Couldn't delete that type. Please try again."
+  },
+  "publicView": {
+    "tabTitle": "Shared — Hexly",
+    "banner": "You're viewing a read-only shared page.",
+    "worldEntities": "Pages in this world",
+    "notFound": "This link is no longer active.",
+    "notFoundBody": "The link may have been revoked, or the address is wrong."
+  },
+  "settings": {
+    "tabTitle": "Settings",
+    "heading": "User Settings",
+    "subhead": "Your preferences follow your account on every device.",
+    "preferences": {
+      "heading": "Preferences",
+      "theme": "Theme",
+      "language": "Language",
+      "formatLocale": "Regional formatting",
+      "formatLocaleHint": "How dates and numbers read, independent of the language.",
+      "format": {
+        "same": "Same as language"
+      }
+    },
+    "profile": {
+      "heading": "Profile",
+      "email": "Email",
+      "emailHint": "Your email is your login; only an administrator can change it.",
+      "displayName": "Display name",
+      "save": "Save",
+      "saved": "Display name saved.",
+      "saveError": "Could not save the display name."
+    },
+    "password": {
+      "heading": "Change password",
+      "current": "Current password",
+      "new": "New password",
+      "submit": "Change password",
+      "changed": "Password changed.",
+      "tooShort": "The new password must be at least 8 characters.",
+      "wrongCurrent": "The current password is incorrect.",
+      "error": "Could not change the password."
+    }
+  },
+  "users": {
+    "tabTitle": "Users — Hexly",
+    "heading": "User management",
+    "subhead": "Manage accounts for this instance. Managing users grants no access to anyone's Worlds or Entities — content stays private within the collaboration model.",
+    "create": {
+      "heading": "Create a user",
+      "displayName": "Display name",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Create user"
+    },
+    "users": {
+      "heading": "Accounts",
+      "empty": "No accounts."
+    },
+    "filter": "Filter accounts",
+    "col": {
+      "account": "Account",
+      "manageUsers": "Users",
+      "createWorlds": "Worlds",
+      "superadmin": "Super",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "status": {
+      "active": "Active",
+      "disabled": "Disabled"
+    },
+    "badge": {
+      "superadmin": "Superadmin",
+      "manageUsers": "User manager",
+      "createWorlds": "World creator",
+      "disabled": "Disabled"
+    },
+    "actions": {
+      "disable": "Disable",
+      "enable": "Enable",
+      "grantManageUsers": "Grant user management",
+      "revokeManageUsers": "Revoke user management",
+      "grantCreateWorlds": "Allow world creation",
+      "revokeCreateWorlds": "Disallow world creation",
+      "grantSuperadmin": "Make superadmin",
+      "revokeSuperadmin": "Revoke superadmin",
+      "reset": "Reset password",
+      "resetSave": "Save",
+      "delete": "Delete"
+    },
+    "confirmDelete": "Delete {{name}}? This cannot be undone.",
+    "toast": {
+      "created": "User created",
+      "saved": "Saved",
+      "reset": "Password reset",
+      "deleted": "User deleted",
+      "error": "Something went wrong."
+    },
+    "error": {
+      "email-in-use": "That email is already in use by another account.",
+      "sole-owner": "This user is the sole Owner of a World or Entity. Reassign ownership before deleting them.",
+      "last-superadmin": "This is the last Superadmin — it cannot be removed, demoted, or disabled.",
+      "self-delete": "You cannot delete your own account.",
+      "self-disable": "You cannot disable your own account.",
+      "self-manage-users-revoke": "You cannot remove your own user-management access.",
+      "superadmin-managed-by-superadmin": "Only a Superadmin can manage a Superadmin account.",
+      "user-not-found": "That account no longer exists."
+    }
+  },
+  "admin": {
+    "tabTitle": "Admin — Hexly",
+    "heading": "Instance repair",
+    "reindex": {
+      "heading": "Repair",
+      "description": "Recompute every Entity's search text, Link Descriptors, and links from its content. Safe to run at any time.",
+      "submit": "Reindex all Entities",
+      "progress": "Reindexing… {{walked}} / {{total}}"
+    },
+    "toast": {
+      "reindexed": "Reindexed {count, plural, one {# entity} other {# entities}}",
+      "reindexedWithFailures": "Reindexed {count, plural, one {# entity} other {# entities}}. {failed, plural, one {# entity} other {# entities}} could not be read and {failed, plural, one {was} other {were}} skipped.",
+      "reindexAborted": "The reindex stopped before it finished. Nothing was lost — press Reindex again to resume.",
+      "error": "Something went wrong."
+    },
+    "error": {
+      "reindex-running": "A reindex is already running on this instance."
+    }
+  }
+}

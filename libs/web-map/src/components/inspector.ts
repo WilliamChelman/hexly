@@ -19,10 +19,10 @@ const SELECTION_KINDS: readonly {
   /** ICU plural key — renders both the count and the (localized) noun. */
   countKey: string;
 }[] = [
-  { kind: 'hex', countKey: 'editorShell.inspector.kindHexCount' },
-  { kind: 'feature', countKey: 'editorShell.inspector.kindFeatureCount' },
-  { kind: 'region', countKey: 'editorShell.inspector.kindRegionCount' },
-  { kind: 'label', countKey: 'editorShell.inspector.kindLabelCount' },
+  { kind: 'hex', countKey: 'map.inspector.kindHexCount' },
+  { kind: 'feature', countKey: 'map.inspector.kindFeatureCount' },
+  { kind: 'region', countKey: 'map.inspector.kindRegionCount' },
+  { kind: 'label', countKey: 'map.inspector.kindLabelCount' },
 ];
 
 /**
@@ -34,12 +34,12 @@ const SELECTION_KINDS: readonly {
 const DIRECTIONS = [
   {
     direction: 'add',
-    labelKey: 'editorShell.inspector.add',
+    labelKey: 'map.inspector.add',
     testid: 'region-add',
   },
   {
     direction: 'remove',
-    labelKey: 'editorShell.inspector.remove',
+    labelKey: 'map.inspector.remove',
     testid: 'region-remove',
   },
 ] as const;
@@ -53,7 +53,7 @@ interface SelectedEntity {
   readonly terrain: TerrainId;
   /**
    * The translation key for the entity's built-in catalog label, keyed by its
-   * stable id (`domain.terrain.<id>` / `domain.feature.<id>`, ADR-0014): the
+   * stable id (`map.terrain.<id>` / `map.feature.<id>`, ADR-0014): the
    * Feature's key for a Feature selection, else the Terrain's. The catalog label
    * is localized at this UI layer, not in the framework-agnostic domain lib.
    */
@@ -88,15 +88,15 @@ interface SelectedEntity {
     @let multi = selectionSummary();
     @if (label) {
       <header class="flex items-center justify-between">
-        <span appEyebrow mark>{{ 'editorShell.inspector.selectedLabel' | transloco }}</span>
+        <span appEyebrow mark>{{ 'map.inspector.selectedLabel' | transloco }}</span>
       </header>
 
       <div class="leaf">
-        <div appField [label]="'editorShell.inspector.text' | transloco">
+        <div appField [label]="'map.inspector.text' | transloco">
           <input appInput data-testid="label-text" [value]="label.text" (change)="onText(label.id, $event)" />
         </div>
 
-        <div appField [label]="'editorShell.inspector.size' | transloco">
+        <div appField [label]="'map.inspector.size' | transloco">
           <input
             appInput
             type="number"
@@ -107,7 +107,7 @@ interface SelectedEntity {
           />
         </div>
 
-        <div appField [label]="'editorShell.inspector.rotation' | transloco">
+        <div appField [label]="'map.inspector.rotation' | transloco">
           <input
             appInput
             type="number"
@@ -118,7 +118,7 @@ interface SelectedEntity {
         </div>
 
         <div class="flex gap-3">
-          <div appField class="flex-1 min-w-0" [label]="'editorShell.inspector.x' | transloco">
+          <div appField class="flex-1 min-w-0" [label]="'map.inspector.x' | transloco">
             <input
               appInput
               type="number"
@@ -127,7 +127,7 @@ interface SelectedEntity {
               (change)="onX(label, $event)"
             />
           </div>
-          <div appField class="flex-1 min-w-0" [label]="'editorShell.inspector.y' | transloco">
+          <div appField class="flex-1 min-w-0" [label]="'map.inspector.y' | transloco">
             <input
               appInput
               type="number"
@@ -149,12 +149,12 @@ interface SelectedEntity {
           data-testid="label-delete"
           (click)="store.deleteLabel(label.id)"
         >
-          {{ 'editorShell.inspector.deleteLabel' | transloco }}
+          {{ 'map.inspector.deleteLabel' | transloco }}
         </button>
       </div>
     } @else if (region) {
       <header class="flex items-center justify-between">
-        <span appEyebrow mark>{{ 'editorShell.inspector.selectedRegion' | transloco }}</span>
+        <span appEyebrow mark>{{ 'map.inspector.selectedRegion' | transloco }}</span>
       </header>
 
       <div class="leaf">
@@ -168,12 +168,8 @@ interface SelectedEntity {
         same store.regionDirection() the brush paints by, so the active one reads
         as set and can never disagree with the stroke.
       -->
-        <div appField [label]="'editorShell.inspector.membership' | transloco">
-          <div
-            class="flex gap-2"
-            role="group"
-            [attr.aria-label]="'editorShell.inspector.membershipDirection' | transloco"
-          >
+        <div appField [label]="'map.inspector.membership' | transloco">
+          <div class="flex gap-2" role="group" [attr.aria-label]="'map.inspector.membershipDirection' | transloco">
             @for (d of directions; track d.direction) {
               <button
                 type="button"
@@ -201,14 +197,13 @@ interface SelectedEntity {
           data-testid="region-delete"
           (click)="store.deleteRegion(region.id)"
         >
-          {{ 'editorShell.inspector.deleteRegion' | transloco }}
+          {{ 'map.inspector.deleteRegion' | transloco }}
         </button>
       </div>
     } @else if (entity) {
       <header class="flex items-center justify-between">
         <span appEyebrow mark>{{
-          (entity.kind === 'feature' ? 'editorShell.inspector.selectedFeature' : 'editorShell.inspector.selectedHex')
-            | transloco
+          (entity.kind === 'feature' ? 'map.inspector.selectedFeature' : 'map.inspector.selectedHex') | transloco
         }}</span>
       </header>
 
@@ -227,7 +222,7 @@ interface SelectedEntity {
           </div>
         </div>
 
-        <div appField [label]="'editorShell.inspector.name' | transloco">
+        <div appField [label]="'map.inspector.name' | transloco">
           <input appInput data-testid="entity-name" [value]="entity.name" (change)="onName(entity, $event)" />
         </div>
 
@@ -236,8 +231,8 @@ interface SelectedEntity {
           top-level Entity (CONTEXT.md). Placeholder until a Map element's Entity Link
           surfaces the linked Entity's tags here.
         -->
-        <div appField [label]="'editorShell.inspector.tags' | transloco">
-          <span class="stub">{{ 'editorShell.inspector.tagsEmpty' | transloco }}</span>
+        <div appField [label]="'map.inspector.tags' | transloco">
+          <span class="stub">{{ 'map.inspector.tagsEmpty' | transloco }}</span>
         </div>
 
         <app-entity-link />
@@ -253,10 +248,7 @@ interface SelectedEntity {
           data-testid="entity-delete"
           (click)="store.deleteSelected()"
         >
-          {{
-            (entity.kind === 'feature' ? 'editorShell.inspector.deleteFeature' : 'editorShell.inspector.deleteHex')
-              | transloco
-          }}
+          {{ (entity.kind === 'feature' ? 'map.inspector.deleteFeature' : 'map.inspector.deleteHex') | transloco }}
         </button>
       </div>
     } @else if (multi) {
@@ -267,12 +259,12 @@ interface SelectedEntity {
         across the set is deliberately out of scope.
       -->
       <header class="flex items-center justify-between">
-        <span appEyebrow mark>{{ 'editorShell.inspector.multiTitle' | transloco }}</span>
+        <span appEyebrow mark>{{ 'map.inspector.multiTitle' | transloco }}</span>
       </header>
 
       <p class="text-sm font-semibold text-ink" data-testid="selection-count">
         {{ multi.count }}
-        {{ 'editorShell.inspector.selectedCount' | transloco }}
+        {{ 'map.inspector.selectedCount' | transloco }}
       </p>
 
       <ul class="m-0 pl-4 flex flex-col gap-1 text-sm text-ink-muted" data-testid="selection-breakdown">
@@ -293,15 +285,15 @@ interface SelectedEntity {
           data-testid="selection-delete-all"
           (click)="store.deleteSelected()"
         >
-          {{ 'editorShell.inspector.deleteAll' | transloco }}
+          {{ 'map.inspector.deleteAll' | transloco }}
         </button>
       </div>
     } @else {
       <header class="flex items-center justify-between">
-        <span appEyebrow mark>{{ 'editorShell.inspector.title' | transloco }}</span>
+        <span appEyebrow mark>{{ 'map.inspector.title' | transloco }}</span>
       </header>
       <p class="muted text-sm leading-normal text-ink-muted">
-        {{ 'editorShell.inspector.emptyHint' | transloco }}
+        {{ 'map.inspector.emptyHint' | transloco }}
       </p>
     }
   `,

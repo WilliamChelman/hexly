@@ -9,10 +9,19 @@ import {
   translocoAppConfig,
   TranslocoHttpLoader,
   TranslationTitleStrategy,
+  provideEagerTranslations,
   provideLocale,
   provideTheme,
   providePreferencesSync,
+  CORE_TRANSLATIONS,
 } from '@hexly/web-core';
+// The `/i18n` entry points carry the scope declaration and nothing else: importing a lib's
+// translations through its main barrel drags that lib's code into the initial bundle (content-editor
+// would pull Tiptap out of the lazy entity chunk).
+import { WEB_UI_TRANSLATIONS } from '@hexly/web-ui/i18n';
+import { WEB_ENTITY_TRANSLATIONS } from '@hexly/web-entity/i18n';
+import { CONTENT_EDITOR_TRANSLATIONS } from '@hexly/content-editor/i18n';
+import { DND_TRANSLATIONS } from '@hexly/plugin-dnd/i18n';
 import { provideBuiltInCommands } from './shell/command-palette/command-palette';
 
 export const appConfig: ApplicationConfig = {
@@ -21,11 +30,24 @@ export const appConfig: ApplicationConfig = {
     provideRouter(appRoutes),
     provideHttpClient(withInterceptors([withCredentialsInterceptor])),
     // Runtime i18n (ADR-0014): one bundle ships every language; LocaleService
-    // picks the active one on boot and the switcher flips it live.
+    // picks the active one on boot and the switcher flips it live. The loader
+    // fetches the app's own catalog — the copy of its pages and shell (ADR-0049).
     provideTransloco({
       config: translocoAppConfig,
       loader: TranslocoHttpLoader,
     }),
+    // Each lib declares its catalog as a scope; these load with the language at
+    // bootstrap because their keys are read where no pipe of the declaring lib
+    // can trigger a load — from services, and from a type's label keys (ADR-0049).
+    // `map` is absent by design: web-map provides it on MapView, so it is fetched
+    // only when a hex map is on screen.
+    provideEagerTranslations(
+      CORE_TRANSLATIONS,
+      WEB_UI_TRANSLATIONS,
+      WEB_ENTITY_TRANSLATIONS,
+      CONTENT_EDITOR_TRANSLATIONS,
+      DND_TRANSLATIONS,
+    ),
     // ICU MessageFormat transpiler: count-aware plural keys (e.g. the hex count)
     // resolve per the active locale's plural rules. It delegates {{…}} to the
     // default transpiler, so existing double-brace interpolation is unaffected.

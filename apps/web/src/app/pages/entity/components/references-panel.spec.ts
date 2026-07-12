@@ -1,9 +1,9 @@
+import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { CORE_HEXMAP, CORE_NOTE, EntityReferences } from '@hexly/domain';
-import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { EntitySession } from '../services/entity-session';
 import { ENTITY_SESSION } from '@hexly/web-entity';
 import { ReferencesStore } from '../services/references-store';

@@ -28,16 +28,16 @@ import { Select } from './select';
           <span class="owner-name"
             >{{ o.name }}
             @if (o.isSelf) {
-              <span class="owner-you"> ({{ 'owners.you' | transloco }})</span>
+              <span class="owner-you"> ({{ 'ui.owners.you' | transloco }})</span>
             }
           </span>
           @if (o.isSelf) {
             <button appButton size="sm" [attr.data-testid]="'resign-' + o.id" (click)="resign()">
-              {{ 'owners.resign' | transloco }}
+              {{ 'ui.owners.resign' | transloco }}
             </button>
           } @else {
             <button appButton size="sm" danger [attr.data-testid]="'remove-' + o.id" (click)="remove(o.id)">
-              {{ 'owners.remove' | transloco }}
+              {{ 'ui.owners.remove' | transloco }}
             </button>
           }
         </li>
@@ -45,7 +45,7 @@ import { Select } from './select';
     </ul>
 
     <div class="owner-add">
-      <label class="owner-add-label" for="owner-add-select">{{ 'owners.addLabel' | transloco }}</label>
+      <label class="owner-add-label" for="owner-add-select">{{ 'ui.owners.addLabel' | transloco }}</label>
       <div class="owner-add-row">
         <select
           appSelect
@@ -55,13 +55,13 @@ import { Select } from './select';
           [value]="selected()"
           (change)="selected.set($any($event.target).value)"
         >
-          <option value="">{{ 'owners.addPlaceholder' | transloco }}</option>
+          <option value="">{{ 'ui.owners.addPlaceholder' | transloco }}</option>
           @for (c of candidates(); track c.id) {
             <option [value]="c.id">{{ c.displayName }}</option>
           }
         </select>
         <button appButton variant="primary" data-testid="add" [disabled]="!selected()" (click)="add()">
-          {{ 'owners.add' | transloco }}
+          {{ 'ui.owners.add' | transloco }}
         </button>
       </div>
     </div>
@@ -143,14 +143,14 @@ export class OwnerSet implements OnInit {
   add(): void {
     const userId = this.selected();
     if (!userId) return;
-    this.mutate(this.client().addOwner(this.id(), userId), 'owners.addError', (owners) => {
+    this.mutate(this.client().addOwner(this.id(), userId), 'ui.owners.addError', (owners) => {
       this.owners.set(owners);
       this.selected.set('');
     });
   }
 
   remove(userId: string): void {
-    this.mutate(this.client().removeOwner(this.id(), userId), 'owners.removeError', (owners) =>
+    this.mutate(this.client().removeOwner(this.id(), userId), 'ui.owners.removeError', (owners) =>
       this.owners.set(owners),
     );
   }
@@ -158,7 +158,7 @@ export class OwnerSet implements OnInit {
   resign(): void {
     const me = this.me();
     if (!me) return;
-    this.mutate(this.client().removeOwner(this.id(), me), 'owners.removeError', () => this.resigned.emit());
+    this.mutate(this.client().removeOwner(this.id(), me), 'ui.owners.removeError', () => this.resigned.emit());
   }
 
   /**
@@ -173,10 +173,10 @@ export class OwnerSet implements OnInit {
       next: onOk,
       error: (err: unknown) => {
         const lastOwner = err instanceof HttpErrorResponse && err.status === 409;
-        const key = lastOwner ? 'owners.lastOwner' : genericKey;
+        const key = lastOwner ? 'ui.owners.lastOwner' : genericKey;
         this.toaster.show(
           this.transloco.translate(key, {
-            kind: this.transloco.translate(`owners.${this.kind()}`),
+            kind: this.transloco.translate(`ui.owners.${this.kind()}`),
           }),
           'error',
         );
@@ -195,7 +195,7 @@ export class OwnerSet implements OnInit {
 
   /** A read (directory or owner set) failed — the panel can't be trusted, so say so. */
   private loadFailed(): void {
-    this.toaster.show(this.transloco.translate('owners.loadError'), 'error');
+    this.toaster.show(this.transloco.translate('ui.owners.loadError'), 'error');
   }
 
   private client(): WorldsClient | EntitiesClient {

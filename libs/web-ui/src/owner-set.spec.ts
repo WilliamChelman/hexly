@@ -9,6 +9,7 @@ import {
   MockUserDirectoryClient,
   provideTranslocoTesting,
 } from '@hexly/web-core/testing';
+import { WEB_UI_TEST_CATALOGS } from './i18n/test-catalogs';
 import { OwnerSet } from './owner-set';
 
 describe('OwnerSet', () => {
@@ -24,7 +25,7 @@ describe('OwnerSet', () => {
     users = new MockUserDirectoryClient();
     auth = new MockAuthClient();
     await TestBed.configureTestingModule({
-      imports: [OwnerSet, provideTranslocoTesting()],
+      imports: [OwnerSet, provideTranslocoTesting(WEB_UI_TEST_CATALOGS)],
       providers: [
         { provide: WorldsClient, useValue: worlds },
         { provide: EntitiesClient, useValue: entities },

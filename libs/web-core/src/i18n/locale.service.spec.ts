@@ -5,6 +5,7 @@ import { provideTransloco, TranslocoService } from '@jsverse/transloco';
 import { provideTranslocoTesting } from './transloco-testing';
 import { TranslocoHttpLoader } from './transloco-http.loader';
 import { translocoAppConfig } from './transloco.config';
+import { provideEagerTranslations } from './translation-scope';
 import { LocaleService } from './locale.service';
 
 describe('LocaleService', () => {
@@ -151,6 +152,44 @@ describe('LocaleService', () => {
       await ready;
 
       expect(transloco.translate('auth.signIn')).toBe('Se connecter');
+      http.verify();
+    });
+
+    /**
+     * A lib's scope is loaded by Transloco only when a pipe or directive that can see its provider
+     * renders — too late for copy read imperatively or carried as data across libs (a toast, a route
+     * title, a plugin's `TypeDefinition.labels`), which is why those scopes are registered eagerly
+     * (ADR-0049). `init()` must therefore load them alongside the root catalog, or the very first
+     * synchronous translate of a lib's key renders the raw key — and the pipe would memoize that
+     * miss.
+     */
+    it('loads an eagerly-registered scope with the language, not on first render', async () => {
+      TestBed.configureTestingModule({
+        providers: [
+          provideHttpClient(),
+          provideHttpClientTesting(),
+          provideTransloco({ config: translocoAppConfig, loader: TranslocoHttpLoader }),
+          provideEagerTranslations({
+            scope: 'ui',
+            loader: {
+              en: () => Promise.resolve({ owners: { heading: 'Owners' } }),
+              fr: () => Promise.resolve({ owners: { heading: 'Propriétaires' } }),
+            },
+          }),
+        ],
+      });
+      const locale = TestBed.inject(LocaleService);
+      const transloco = TestBed.inject(TranslocoService);
+      const http = TestBed.inject(HttpTestingController);
+
+      const ready = locale.init();
+      // The scope rides its own inline loader; only the app's root catalog goes over HTTP.
+      http.expectOne('assets/i18n/en.json').flush({ auth: { signIn: 'Sign in' } });
+      await ready;
+
+      // No component has rendered, so nothing could have triggered the scope's load — yet the key
+      // resolves, exactly as it must for the command palette or a route title.
+      expect(transloco.translate('ui.owners.heading')).toBe('Owners');
       http.verify();
     });
   });

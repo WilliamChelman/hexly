@@ -1,3 +1,4 @@
+import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
@@ -6,7 +7,6 @@ import { of } from 'rxjs';
 import { EntitySession } from '../services/entity-session';
 import { ENTITY_SESSION } from '@hexly/web-entity';
 import { EntitiesClient } from '@hexly/web-core';
-import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { EntityTags } from './entity-tags';
 
 describe('EntityTags', () => {

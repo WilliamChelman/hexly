@@ -1,0 +1,494 @@
+{
+  "auth": {
+    "tabTitle": "Hexly — Se connecter",
+    "heading": "Se connecter",
+    "email": "E-mail",
+    "password": "Mot de passe",
+    "signIn": "Se connecter",
+    "signingIn": "Connexion…",
+    "invalidCredentials": "E-mail ou mot de passe incorrect."
+  },
+  "entityBrowser": {
+    "tabTitle": "Hexly — Votre bibliothèque",
+    "eyebrow": "Bibliothèque",
+    "heading": "Votre bibliothèque",
+    "newMap": "Nouvelle carte",
+    "newNote": "Nouvelle note",
+    "rename": "Renommer",
+    "renameLabel": "Nouveau nom",
+    "searchLabel": "Rechercher des entités",
+    "searchPlaceholder": "Rechercher par nom, étiquette ou contenu…",
+    "creating": "Création…",
+    "edited": "Modifié le {{date}}",
+    "type": {
+      "core": {
+        "note": "Note",
+        "hexmap": "Carte"
+      },
+      "dnd": {
+        "monster": "Monstre"
+      }
+    },
+    "loadErrorTitle": "Impossible de charger votre bibliothèque.",
+    "loadErrorHint": "Une erreur est survenue. Veuillez réessayer dans un instant.",
+    "createError": "Création impossible. Veuillez réessayer.",
+    "renameError": "Renommage impossible. Veuillez réessayer.",
+    "deleteError": "Suppression impossible. Veuillez réessayer.",
+    "loadMore": "Charger plus",
+    "loadingMore": "Chargement…",
+    "loadMoreError": "Chargement impossible. Veuillez réessayer.",
+    "emptyTitle": "Votre bibliothèque est vide.",
+    "emptyHint": "Créez une note ou une carte pour commencer.",
+    "noMatchTitle": "Aucune entité ne correspond à votre recherche.",
+    "noMatchHint": "Essayez un autre nom, une étiquette ou un mot.",
+    "facets": {
+      "heading": "Filtres",
+      "type": "Type",
+      "tag": "Étiquette",
+      "visibility": "Visibilité",
+      "clearAll": "Tout effacer",
+      "private": "Privé",
+      "shared": "Partagé",
+      "rangeMin": "{{field}} minimum",
+      "rangeMax": "{{field}} maximum"
+    }
+  },
+  "entityTags": {
+    "addLabel": "Ajouter un tag",
+    "addPlaceholder": "Ajouter des tags…",
+    "removeLabel": "Supprimer le tag : {{tag}}",
+    "picker": {
+      "label": "Tags suggérés",
+      "create": "(nouveau)",
+      "empty": "Saisir un tag"
+    }
+  },
+  "entityMetadata": {
+    "heading": "Métadonnées"
+  },
+  "entityTypes": {
+    "primary": "Principal",
+    "addLabel": "Ajouter un type…",
+    "removeLabel": "Supprimer le type : {{type}}",
+    "moveUpLabel": "Monter : {{type}}",
+    "moveDownLabel": "Descendre : {{type}}",
+    "editTypes": "Modifier les types",
+    "heading": "Types de l’entité",
+    "hint": "Le premier type est le principal — il détermine l’icône, la vue par défaut et l’en-tête.",
+    "requiredHeading": "{{type}} nécessite ces champs avant de pouvoir être ajouté :",
+    "confirmAdd": "Ajouter le type",
+    "requiredFieldsHeading": "Champs requis"
+  },
+  "noteView": {
+    "eyebrow": "Note",
+    "titleLabel": "Titre de la note",
+    "renameNote": "Renommer la note",
+    "backToLibrary": "Retour à la bibliothèque",
+    "editorLabel": "Contenu de la note",
+    "outline": {
+      "title": "Plan",
+      "toggle": "Afficher/masquer le plan",
+      "empty": "Aucun titre pour l’instant"
+    },
+    "links": {
+      "title": "Liens",
+      "toggle": "Afficher/masquer les liens",
+      "references": "Références",
+      "referencedBy": "Référencé par",
+      "referencesEmpty": "Cette entité ne renvoie à rien",
+      "referencedByEmpty": "Rien ne renvoie ici"
+    }
+  },
+  "editorShell": {
+    "tabTitle": "Hexly",
+    "tabTitleNamed": "{{name}} — Hexly",
+    "hexMap": "Carte hexagonale",
+    "mapTitleLabel": "Titre de la carte",
+    "renameMap": "Renommer la carte",
+    "reload": "Recharger",
+    "saving": "Enregistrement…",
+    "share": "Partager",
+    "visibility": {
+      "shared": "Partagé",
+      "private": "Privé",
+      "toggle": "Changer la visibilité"
+    },
+    "view": {
+      "switchLabel": "Changer de vue",
+      "map": "Carte",
+      "note": "Note",
+      "fields": "Champs",
+      "editorLabel": "Notes de la carte"
+    },
+    "save": {
+      "conflict": "Version plus récente sur le serveur",
+      "saved": "Enregistré",
+      "unsaved": "Non enregistré…",
+      "failed": "Échec de l'enregistrement",
+      "retry": "Réessayer",
+      "readonly": "Lecture seule — vous n'avez pas la permission de modifier.",
+      "reloadFailed": "Échec du rechargement — serveur injoignable."
+    },
+    "pin": {
+      "pin": "Épingler au tableau de bord",
+      "toggle": "Épingler cette Entité au tableau de bord du monde"
+    },
+    "actionsMenu": "Actions de l’entité",
+    "unavailable": {
+      "title": "N’est plus disponible",
+      "body": "Cette page a été supprimée ou son partage a changé, vous n’y avez donc plus accès."
+    }
+  },
+  "styleguide": {
+    "tabTitle": "Hexly — Système de design",
+    "backToMap": "Retour à la carte",
+    "eyebrow": "Système de design Hexly",
+    "heroTitle": "La table du cartographe,<br />à la lueur des étoiles.",
+    "heroLede": "Une seule identité racontée à deux heures du jour. <strong>Solaire</strong> est l’almanach ensoleillé posé sur la table du cartographe ; <strong>Astral</strong> est la même carte sous le ciel nocturne. L’or est le fil conducteur — encre d’héliographe le jour, lignes de constellations la nuit — et le texte reste d’un crème ivoire chaleureux dans les deux. Tout ce qui suit est piloté par la même couche de propriétés personnalisées CSS que <code>apps/web</code> embarque.",
+    "swatch": {
+      "table": "Table",
+      "paper": "Papier",
+      "pinnedNote": "Note épinglée",
+      "well": "Puits",
+      "ink": "Encre",
+      "inkMuted": "Encre atténuée",
+      "compassGold": "Or de boussole",
+      "seaAurora": "Mer / aurore",
+      "nebula": "Nébuleuse",
+      "marginalia": "Marginalia",
+      "moss": "Mousse",
+      "drawnRule": "Filet tracé",
+      "grassland": "Prairie",
+      "forest": "Forêt",
+      "ocean": "Océan",
+      "mountains": "Montagnes",
+      "desert": "Désert",
+      "marsh": "Marais"
+    },
+    "fontDisplay": "Cinzel · titrage",
+    "fontBody": "Spectral · corps",
+    "fontCoord": "JetBrains Mono · coordonnées",
+    "paletteSemantic": "Palette · rôles sémantiques",
+    "paletteNote": "Les tranches demandent un rôle, jamais une couleur brute. Thème actif affiché.",
+    "paletteTerrain": "Palette · remplissages de terrain",
+    "typeScale": "Échelle typographique",
+    "spacing": "Espacement",
+    "radii": "Rayons",
+    "components": "Composants",
+    "buttons": "Boutons",
+    "iconButtons": "Boutons-icônes",
+    "chipsCoords": "Puces et coordonnées",
+    "fields": "Champs",
+    "shareMap": "Partager la carte",
+    "addRegion": "Ajouter une région",
+    "clearHex": "Effacer le hex",
+    "small": "Petit",
+    "iconSelectTitle": "Sélection (S)",
+    "iconSelectLabel": "Sélection",
+    "iconTerrainTitle": "Terrain (T)",
+    "iconTerrainLabel": "Terrain",
+    "iconForestTitle": "Forêt (2)",
+    "iconForestLabel": "Forêt",
+    "iconUndo": "Annuler",
+    "chipDefault": "Par défaut",
+    "chipSettlement": "Colonie",
+    "chipEditing": "Édition",
+    "chipRegion": "Région",
+    "fieldMapName": "Nom de la carte",
+    "fieldNote": "Note",
+    "fieldTerrain": "Terrain",
+    "footerTokens": "Jetons de design"
+  },
+  "domain": {
+    "untitledNote": "Note sans titre",
+    "untitledMap": "Carte sans titre"
+  },
+  "common": {
+    "language": "Langue",
+    "userMenu": "Ouvrir le menu utilisateur",
+    "signOut": "Se déconnecter",
+    "login": "Connexion",
+    "theme": {
+      "solar": "Solaire (clair)",
+      "astral": "Astral (sombre)",
+      "toSolar": "Passer au thème solaire",
+      "toAstral": "Passer au thème astral"
+    },
+    "cancel": "Annuler",
+    "close": "Fermer",
+    "delete": "Supprimer",
+    "create": "Créer",
+    "settings": "Paramètres",
+    "locale": {
+      "en": "English",
+      "fr": "Français"
+    }
+  },
+  "nav": {
+    "primary": "Navigation principale",
+    "worlds": "Mondes",
+    "dashboard": "Tableau de bord",
+    "library": "Bibliothèque",
+    "graph": "Graphe",
+    "styleguide": "Guide de style",
+    "expand": "Déployer la navigation",
+    "collapse": "Réduire la navigation",
+    "home": "Accueil Hexly",
+    "users": "Utilisateurs",
+    "admin": "Admin",
+    "worldSettings": "Paramètres du monde"
+  },
+  "commandPalette": {
+    "searchLabel": "Rechercher ou exécuter une commande",
+    "placeholder": "Rechercher ou taper > pour les commandes…",
+    "empty": "Aucun résultat",
+    "entities": "Entités",
+    "worlds": "Mondes",
+    "commands": "Commandes",
+    "createNote": "Créer une note",
+    "createMap": "Créer une carte",
+    "goToUsers": "Aller aux utilisateurs",
+    "goToAdmin": "Aller à l'administration",
+    "goToStyleguide": "Aller au guide de style",
+    "nameLabel": "Nom",
+    "worldLabel": "Monde"
+  },
+  "worlds": {
+    "switcherLabel": "Monde actif",
+    "crestLabel": "Monde",
+    "switcher": "Mondes",
+    "allWorlds": "Tous les mondes",
+    "new": "Nouveau monde",
+    "untitled": "Monde sans titre",
+    "createError": "Impossible de créer ce monde. Veuillez réessayer.",
+    "import": "Importer un coffre",
+    "importing": "Importation…",
+    "importError": "Impossible d'importer ce coffre. Veuillez réessayer.",
+    "export": "Exporter le coffre",
+    "exportError": "Impossible d'exporter ce monde. Veuillez réessayer.",
+    "importSummaryHeading": "Coffre importé",
+    "importNotes": "Notes importées",
+    "importLinksResolved": "Liens résolus",
+    "importLinksDangling": "Liens orphelins",
+    "importAssets": "Ressources stockées",
+    "importSkipped": "Fichiers ignorés",
+    "openImported": "Ouvrir le monde"
+  },
+  "worldIndex": {
+    "tabTitle": "Hexly — Mondes",
+    "eyebrow": "Mondes",
+    "heading": "Vos mondes",
+    "greeting": "Bon retour, {{name}}.",
+    "greetingFallback": "cartographe",
+    "subhead": "Reprenez où vous en étiez, ou tracez un nouveau monde.",
+    "continue": "Reprendre",
+    "creating": "Création…",
+    "owned": "Propriétaire",
+    "member": "Membre",
+    "loadErrorTitle": "Impossible de charger vos mondes.",
+    "loadErrorHint": "Une erreur s'est produite. Veuillez réessayer dans un instant.",
+    "emptyTitle": "Aucun monde pour l'instant.",
+    "emptyHint": "Créez votre premier monde pour commencer.",
+    "rename": "Renommer",
+    "renameLabel": "Nom du monde",
+    "renameError": "Impossible de renommer ce monde. Veuillez réessayer.",
+    "deleteHeading": "Supprimer le monde ?",
+    "deleteCounting": "Décompte des entités…",
+    "deleteCount": "Cette action détruit définitivement {count, plural, one {# entité} other {# entités}}. Elle est irréversible.",
+    "deleteConfirmPrompt": "Tapez {{name}} pour confirmer.",
+    "deleteConfirmLabel": "Tapez le nom du monde pour confirmer la suppression",
+    "deleteError": "Impossible de supprimer ce monde. Veuillez réessayer."
+  },
+  "worldDashboard": {
+    "tabTitle": "Hexly — Tableau de bord",
+    "eyebrow": "Monde",
+    "recentsHeading": "Modifié récemment",
+    "mapsHeading": "Cartes hexagonales",
+    "countsHeading": "Aperçu",
+    "pinsHeading": "Épinglés",
+    "addPin": "Épingler une entité",
+    "removePin": "Désépingler",
+    "movePinUp": "Déplacer vers le haut",
+    "movePinDown": "Déplacer vers le bas",
+    "browseAll": "Parcourir toutes les entités",
+    "emptyTitle": "Votre monde est une carte vierge.",
+    "emptyHint": "Créez votre première note ou carte hexagonale pour commencer."
+  },
+  "worldGraph": {
+    "tabTitle": "Hexly — Graphe",
+    "eyebrow": "Graphe du monde",
+    "counts": "{{nodes}} entités · {{edges}} liens",
+    "emptyTitle": "Rien à dessiner pour l'instant.",
+    "emptyHint": "Créez quelques entités et reliez-les pour voir la forme de votre monde.",
+    "loadError": "Impossible de charger le graphe. Réessayez."
+  },
+  "error": {
+    "tabTitle": "Hexly — Introuvable",
+    "eyebrow": "Hexly",
+    "heading": "Introuvable.",
+    "hint": "La page ou l'entité que vous cherchez n'existe pas, ou vous n'y avez pas accès.",
+    "backToWorlds": "Retour à vos mondes"
+  },
+  "worldTypes": {
+    "heading": "Types personnalisés",
+    "subhead": "Définissez vos propres types d'entités pour ce monde, chacun avec des champs typés filtrables.",
+    "empty": "Aucun type personnalisé pour l'instant.",
+    "add": "Nouveau type",
+    "edit": "Modifier",
+    "remove": "Supprimer",
+    "idLabel": "Identifiant",
+    "idPrefix": "world.",
+    "idHint": "Une clé courte comme deity.",
+    "nameLabel": "Nom",
+    "fieldsHeading": "Champs",
+    "addField": "Ajouter un champ",
+    "fieldKey": "Clé",
+    "fieldName": "Libellé",
+    "fieldType": "Type",
+    "fieldRequired": "Requis",
+    "fieldFacetable": "Filtrable",
+    "fieldOptions": "Options",
+    "fieldOptionsHint": "Séparées par des virgules",
+    "removeField": "Retirer le champ",
+    "noFields": "Aucun champ — le type reste un simple libellé tant que vous n'en ajoutez pas.",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "dataType": {
+      "string": "Texte",
+      "number": "Nombre",
+      "boolean": "Oui / Non",
+      "date": "Date",
+      "enum": "Choix"
+    },
+    "loadError": "Impossible de charger les types personnalisés de ce monde.",
+    "createError": "Impossible de créer ce type. Veuillez réessayer.",
+    "updateError": "Impossible d'enregistrer ce type. Veuillez réessayer.",
+    "removeError": "Impossible de supprimer ce type. Veuillez réessayer."
+  },
+  "publicView": {
+    "tabTitle": "Partagé — Hexly",
+    "banner": "Vous consultez une page partagée en lecture seule.",
+    "worldEntities": "Pages de ce monde",
+    "notFound": "Ce lien n’est plus actif.",
+    "notFoundBody": "Le lien a peut-être été révoqué, ou l’adresse est incorrecte."
+  },
+  "settings": {
+    "tabTitle": "Paramètres",
+    "heading": "Paramètres du compte",
+    "subhead": "Vos préférences suivent votre compte sur tous vos appareils.",
+    "preferences": {
+      "heading": "Préférences",
+      "theme": "Thème",
+      "language": "Langue",
+      "formatLocale": "Format régional",
+      "formatLocaleHint": "Le format des dates et des nombres, indépendant de la langue.",
+      "format": {
+        "same": "Comme la langue"
+      }
+    },
+    "profile": {
+      "heading": "Profil",
+      "email": "E-mail",
+      "emailHint": "Votre e-mail est votre identifiant ; seul un administrateur peut le changer.",
+      "displayName": "Nom affiché",
+      "save": "Enregistrer",
+      "saved": "Nom affiché enregistré.",
+      "saveError": "Impossible d’enregistrer le nom affiché."
+    },
+    "password": {
+      "heading": "Changer le mot de passe",
+      "current": "Mot de passe actuel",
+      "new": "Nouveau mot de passe",
+      "submit": "Changer le mot de passe",
+      "changed": "Mot de passe changé.",
+      "tooShort": "Le nouveau mot de passe doit contenir au moins 8 caractères.",
+      "wrongCurrent": "Le mot de passe actuel est incorrect.",
+      "error": "Impossible de changer le mot de passe."
+    }
+  },
+  "users": {
+    "tabTitle": "Utilisateurs — Hexly",
+    "heading": "Gestion des utilisateurs",
+    "subhead": "Gérez les comptes de cette instance. Gérer les utilisateurs ne donne accès à aucun Monde ni aucune Entité — le contenu reste privé au sein du modèle de collaboration.",
+    "create": {
+      "heading": "Créer un utilisateur",
+      "displayName": "Nom affiché",
+      "email": "E-mail",
+      "password": "Mot de passe",
+      "submit": "Créer l'utilisateur"
+    },
+    "users": {
+      "heading": "Comptes",
+      "empty": "Aucun compte."
+    },
+    "filter": "Filtrer les comptes",
+    "col": {
+      "account": "Compte",
+      "manageUsers": "Utilisateurs",
+      "createWorlds": "Mondes",
+      "superadmin": "Super",
+      "status": "Statut",
+      "actions": "Actions"
+    },
+    "status": {
+      "active": "Actif",
+      "disabled": "Désactivé"
+    },
+    "badge": {
+      "superadmin": "Superadmin",
+      "manageUsers": "Gestionnaire d'utilisateurs",
+      "createWorlds": "Créateur de mondes",
+      "disabled": "Désactivé"
+    },
+    "actions": {
+      "disable": "Désactiver",
+      "enable": "Activer",
+      "grantManageUsers": "Autoriser la gestion des utilisateurs",
+      "revokeManageUsers": "Retirer la gestion des utilisateurs",
+      "grantCreateWorlds": "Autoriser la création de mondes",
+      "revokeCreateWorlds": "Interdire la création de mondes",
+      "grantSuperadmin": "Nommer superadmin",
+      "revokeSuperadmin": "Retirer superadmin",
+      "reset": "Réinitialiser le mot de passe",
+      "resetSave": "Enregistrer",
+      "delete": "Supprimer"
+    },
+    "confirmDelete": "Supprimer {{name}} ? Cette action est irréversible.",
+    "toast": {
+      "created": "Utilisateur créé",
+      "saved": "Enregistré",
+      "reset": "Mot de passe réinitialisé",
+      "deleted": "Utilisateur supprimé",
+      "error": "Une erreur est survenue."
+    },
+    "error": {
+      "email-in-use": "Cet e-mail est déjà utilisé par un autre compte.",
+      "sole-owner": "Cet utilisateur est l'unique propriétaire d'un Monde ou d'une Entité. Réattribuez la propriété avant de le supprimer.",
+      "last-superadmin": "C'est le dernier Superadmin — il ne peut être ni supprimé, ni rétrogradé, ni désactivé.",
+      "self-delete": "Vous ne pouvez pas supprimer votre propre compte.",
+      "self-disable": "Vous ne pouvez pas désactiver votre propre compte.",
+      "self-manage-users-revoke": "Vous ne pouvez pas retirer votre propre accès de gestion des utilisateurs.",
+      "superadmin-managed-by-superadmin": "Seul un Superadmin peut gérer un compte Superadmin.",
+      "user-not-found": "Ce compte n'existe plus."
+    }
+  },
+  "admin": {
+    "tabTitle": "Admin — Hexly",
+    "heading": "Réparation de l'instance",
+    "reindex": {
+      "heading": "Réparation",
+      "description": "Recalcule le texte de recherche, les Descripteurs de lien et les liens de chaque Entité à partir de son contenu. Peut être lancé à tout moment sans risque.",
+      "submit": "Réindexer toutes les Entités",
+      "progress": "Réindexation… {{walked}} / {{total}}"
+    },
+    "toast": {
+      "reindexed": "{count, plural, one {# entité réindexée} other {# entités réindexées}}",
+      "reindexedWithFailures": "{count, plural, one {# entité réindexée} other {# entités réindexées}}. {failed, plural, one {# entité illisible a été ignorée} other {# entités illisibles ont été ignorées}}.",
+      "reindexAborted": "La réindexation s'est interrompue avant la fin. Rien n'est perdu — relancez-la pour reprendre.",
+      "error": "Une erreur est survenue."
+    },
+    "error": {
+      "reindex-running": "Une réindexation est déjà en cours sur cette instance."
+    }
+  }
+}

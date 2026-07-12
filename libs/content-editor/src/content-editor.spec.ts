@@ -8,6 +8,7 @@ import { CONTENT_FORMAT, Content, EntityDetail, tiptapContent } from '@hexly/dom
 import { Editor } from '@tiptap/core';
 import { EntityNameResolver } from './entity-name-resolver';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
+import { CONTENT_EDITOR_TEST_CATALOGS } from './i18n/test-catalogs';
 import { ContentEditor } from './content-editor';
 import { CONTENT_EDITOR_SESSION, ContentEditorSession } from './content-editor-session';
 
@@ -89,7 +90,7 @@ describe('ContentEditor', () => {
   beforeEach(async () => {
     fragment$.next(null);
     await TestBed.configureTestingModule({
-      imports: [ContentEditor, provideTranslocoTesting()],
+      imports: [ContentEditor, provideTranslocoTesting(CONTENT_EDITOR_TEST_CATALOGS)],
       providers: [
         { provide: CONTENT_EDITOR_SESSION, useClass: FakeEditorSession },
         EntityNameResolver,

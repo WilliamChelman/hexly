@@ -10,7 +10,7 @@ import { StatBlockView } from './stat-block-view';
 export const DND_VIEW_DEFINITIONS: readonly ViewDefinition[] = [
   {
     id: DND_VIEW_STAT_BLOCK,
-    labelKey: 'plugins.dnd.monster.view.statBlock',
+    labelKey: 'dnd.monster.view.statBlock',
     component: StatBlockView,
   },
 ];

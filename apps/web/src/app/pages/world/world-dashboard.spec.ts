@@ -1,3 +1,4 @@
+import { provideTranslocoTesting } from '../../../testing/transloco-testing';
 import { signal, WritableSignal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
@@ -12,7 +13,7 @@ import {
   WorldVerb,
 } from '@hexly/domain';
 import { EntitiesClient, WorldsClient, ActiveWorld } from '@hexly/web-core';
-import { MockEntitiesClient, MockWorldsClient, provideTranslocoTesting } from '@hexly/web-core/testing';
+import { MockEntitiesClient, MockWorldsClient } from '@hexly/web-core/testing';
 import { WorldDashboard } from './world-dashboard';
 
 function summary(id: string, name = id, type: EntityType = 'core.note', updatedAt = 1): EntitySummary {

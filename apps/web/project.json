@@ -21,7 +21,7 @@
           },
           {
             "glob": "*.json",
-            "input": "libs/web-core/src/i18n/catalogs",
+            "input": "apps/web/src/i18n/catalogs",
             "output": "assets/i18n"
           },
           {
@@ -84,7 +84,8 @@
       "executor": "nx:run-commands",
       "cache": true,
       "inputs": [
-        "{workspaceRoot}/libs/web-core/src/i18n/catalogs/**/*.json",
+        "{workspaceRoot}/libs/*/src/i18n/catalogs/**/*.json",
+        "{workspaceRoot}/apps/web/src/i18n/catalogs/**/*.json",
         "{projectRoot}/tools/check-locale-sync.ts",
         "{projectRoot}/tools/tsconfig.json",
         "{workspaceRoot}/libs/web-core/src/i18n/locale-key-sync.ts"

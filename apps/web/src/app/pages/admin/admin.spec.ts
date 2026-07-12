@@ -1,9 +1,10 @@
+import { provideTranslocoTesting } from '../../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ReindexJob } from '@hexly/domain';
 import { AdminClient, ToasterService } from '@hexly/web-core';
-import { MockAdminClient, provideTranslocoTesting, reindexJob } from '@hexly/web-core/testing';
+import { MockAdminClient, reindexJob } from '@hexly/web-core/testing';
 import { Admin } from './admin';
 
 /** Matches the panel's own poll interval; one `tick` of it advances the walk by one poll. */

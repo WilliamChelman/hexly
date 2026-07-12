@@ -1,0 +1,69 @@
+{
+  "owners": {
+    "heading": "Propriétaires",
+    "subhead": "Chaque personne ici a un contrôle total et égal sur cette {kind}.",
+    "you": "vous",
+    "resign": "Se retirer",
+    "remove": "Retirer",
+    "addLabel": "Ajouter un propriétaire",
+    "addPlaceholder": "Choisir une personne…",
+    "add": "Ajouter",
+    "addError": "Impossible d’ajouter ce propriétaire. Veuillez réessayer.",
+    "removeError": "Impossible de retirer ce propriétaire. Veuillez réessayer.",
+    "lastOwner": "Une {kind} doit conserver au moins un propriétaire.",
+    "loadError": "Impossible de charger les propriétaires.",
+    "world": "monde",
+    "entity": "entité",
+    "tabTitle": "Hexly — Propriétaires"
+  },
+  "grants": {
+    "heading": "Partagé avec",
+    "subhead": "Donnez à une personne précise l’accès à cette seule entité — même si elle n’est pas dans ce monde.",
+    "editor": "Éditeur",
+    "viewer": "Lecteur",
+    "revoke": "Révoquer",
+    "empty": "Partagé avec personne pour l’instant.",
+    "addLabel": "Partager avec une personne",
+    "addPlaceholder": "Choisir une personne…",
+    "add": "Partager",
+    "addError": "Impossible de partager avec cette personne. Veuillez réessayer.",
+    "roleError": "Impossible de modifier l’accès de cette personne. Veuillez réessayer.",
+    "revokeError": "Impossible de révoquer cet accès. Veuillez réessayer.",
+    "loadError": "Impossible de charger les partages."
+  },
+  "members": {
+    "heading": "Membres",
+    "subhead": "Les personnes que vous avez ajoutées à ce monde comme contributeurs ou lecteurs.",
+    "contributor": "Contributeur",
+    "viewer": "Lecteur",
+    "remove": "Retirer",
+    "empty": "Aucun membre pour l’instant.",
+    "addLabel": "Ajouter un membre",
+    "addPlaceholder": "Choisir une personne…",
+    "add": "Ajouter",
+    "addError": "Impossible d’ajouter ce membre. Veuillez réessayer.",
+    "roleError": "Impossible de changer le rôle de ce membre. Veuillez réessayer.",
+    "removeError": "Impossible de retirer ce membre. Veuillez réessayer.",
+    "loadError": "Impossible de charger les membres.",
+    "leave": "Quitter",
+    "leaveError": "Impossible de quitter ce monde. Veuillez réessayer."
+  },
+  "publicLink": {
+    "worldHeading": "Lien public",
+    "worldSubhead": "Toute personne disposant de ce lien peut lire les entités partagées de ce monde — sans compte.",
+    "entityHeading": "Lien public",
+    "entitySubhead": "Toute personne disposant de ce lien peut lire cette entité — sans compte. Il fonctionne même lorsque l’entité est privée.",
+    "create": "Créer un lien public",
+    "copy": "Copier",
+    "revoke": "Révoquer",
+    "copied": "Lien copié dans le presse-papiers.",
+    "copyError": "Impossible de copier le lien.",
+    "loadError": "Impossible de charger le lien public.",
+    "mintError": "Impossible de créer le lien public. Veuillez réessayer.",
+    "revokeError": "Impossible de révoquer le lien public. Veuillez réessayer."
+  },
+  "entitySearchPicker": {
+    "searchPlaceholder": "Rechercher des entités…",
+    "empty": "Aucune entité correspondante"
+  }
+}

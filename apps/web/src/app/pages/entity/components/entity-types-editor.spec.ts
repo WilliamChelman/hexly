@@ -1,7 +1,7 @@
+import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { ComponentRef } from '@angular/core';
 import { FieldSchema } from '@hexly/domain';
-import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { EntityTypesEditor } from './entity-types-editor';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 import { CORE_VIEW_CONTENT, TypeDefinition } from '@hexly/web-entity';

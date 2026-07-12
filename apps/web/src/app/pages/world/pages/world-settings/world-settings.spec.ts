@@ -1,15 +1,10 @@
+import { provideTranslocoTesting } from '../../../../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideRouter, Router } from '@angular/router';
 import { of } from 'rxjs';
 import { WorldsClient, EntitiesClient, UserDirectoryClient, AuthClient, ActiveWorld } from '@hexly/web-core';
-import {
-  MockWorldsClient,
-  MockEntitiesClient,
-  MockUserDirectoryClient,
-  MockAuthClient,
-  provideTranslocoTesting,
-} from '@hexly/web-core/testing';
+import { MockWorldsClient, MockEntitiesClient, MockUserDirectoryClient, MockAuthClient } from '@hexly/web-core/testing';
 import { OwnerSet } from '@hexly/web-ui';
 import { WorldSettings } from './world-settings';
 

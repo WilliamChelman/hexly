@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { TranslocoService } from '@jsverse/transloco';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
+import { WEB_MAP_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { provideHexMapStoreTesting } from '../testing/entity-session.fake';
 import { HexMapStore } from '../services/hexmap-store';
 import { ToolPalette } from './tool-palette';
@@ -29,7 +30,7 @@ function has(fixture: ReturnType<typeof TestBed.createComponent>, testid: string
 describe('ToolPalette primary Tool row', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [ToolPalette, provideTranslocoTesting()],
+      imports: [ToolPalette, provideTranslocoTesting(WEB_MAP_TEST_CATALOGS)],
       providers: provideHexMapStoreTesting(),
     }).compileComponents();
   });
@@ -66,7 +67,7 @@ describe('ToolPalette primary Tool row', () => {
 describe('ToolPalette contextual Subtool panel', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [ToolPalette, provideTranslocoTesting()],
+      imports: [ToolPalette, provideTranslocoTesting(WEB_MAP_TEST_CATALOGS)],
       providers: provideHexMapStoreTesting(),
     }).compileComponents();
   });
@@ -127,7 +128,7 @@ describe('ToolPalette contextual Subtool panel', () => {
 describe('ToolPalette history', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [ToolPalette, provideTranslocoTesting()],
+      imports: [ToolPalette, provideTranslocoTesting(WEB_MAP_TEST_CATALOGS)],
       providers: provideHexMapStoreTesting(),
     }).compileComponents();
   });
@@ -168,7 +169,7 @@ describe('ToolPalette history', () => {
 describe('ToolPalette regions', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [ToolPalette, provideTranslocoTesting()],
+      imports: [ToolPalette, provideTranslocoTesting(WEB_MAP_TEST_CATALOGS)],
       providers: provideHexMapStoreTesting(),
     }).compileComponents();
   });
@@ -207,7 +208,7 @@ describe('ToolPalette regions', () => {
 describe('ToolPalette flyout binding', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [ToolPalette, provideTranslocoTesting()],
+      imports: [ToolPalette, provideTranslocoTesting(WEB_MAP_TEST_CATALOGS)],
       providers: provideHexMapStoreTesting(),
     }).compileComponents();
   });
@@ -242,7 +243,7 @@ describe('ToolPalette flyout binding', () => {
 describe('ToolPalette localization', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [ToolPalette, provideTranslocoTesting()],
+      imports: [ToolPalette, provideTranslocoTesting(WEB_MAP_TEST_CATALOGS)],
       providers: provideHexMapStoreTesting(),
     }).compileComponents();
   });

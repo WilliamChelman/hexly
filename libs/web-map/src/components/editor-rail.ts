@@ -60,7 +60,7 @@ export class EditorRail {
     {
       id: 'regions',
       testid: 'rail-regions',
-      titleKey: 'editorShell.regionsPanel.title',
+      titleKey: 'map.regionsPanel.title',
       glyph: 'region',
     },
   ];

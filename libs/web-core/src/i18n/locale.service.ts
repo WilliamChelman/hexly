@@ -4,6 +4,7 @@ import { TranslocoService } from '@jsverse/transloco';
 import { FORMAT_LOCALE_TAGS } from '@hexly/domain';
 import { AuthScopedStorage } from '../services/auth-scoped-storage';
 import { LOCALES } from './transloco.config';
+import { EAGER_TRANSLATION_SCOPES, scopedInlineLoader } from './translation-scope';
 import { AppShellStore } from '../services/app-shell.store';
 
 /** The languages Hexly ships (ADR-0014). English is the source and fallback. */
@@ -41,6 +42,9 @@ export function detectLocale(): Locale {
 export class LocaleService {
   private readonly transloco = inject(TranslocoService);
   private readonly shell = inject(AppShellStore);
+
+  /** The libs whose catalogs load with the language rather than on first render (ADR-0049). */
+  private readonly eagerScopes = inject(EAGER_TRANSLATION_SCOPES, { optional: true }) ?? [];
 
   private readonly pref = inject(AuthScopedStorage).preference<Locale>({
     storageKey: 'hexly-locale',
@@ -90,11 +94,25 @@ export class LocaleService {
   set(lang: Locale): void {
     this.pref.set(lang);
     const end = this.shell.beginLoading('full');
-    firstValueFrom(this.transloco.load(lang)).finally(end);
+    this.loadCatalogs(lang).finally(end);
   }
 
   /**
-   * Load the active language's catalog before the app bootstraps. Wired through
+   * The app's root catalog plus every eager scope, in the given language (ADR-0049). A lazily-
+   * provided scope reloads itself — its pipes re-resolve on the language change — but an eager one
+   * has no such trigger, so the switch loads it here.
+   */
+  private loadCatalogs(lang: Locale): Promise<unknown> {
+    return Promise.all([
+      firstValueFrom(this.transloco.load(lang)),
+      ...this.eagerScopes.map((scope) =>
+        firstValueFrom(this.transloco.load(`${scope.scope}/${lang}`, { inlineLoader: scopedInlineLoader(scope) })),
+      ),
+    ]);
+  }
+
+  /**
+   * Load the active language's catalogs before the app bootstraps. Wired through
    * `provideAppInitializer` (which blocks initial navigation until it resolves),
    * this guarantees the first *synchronous* translation — notably the route
    * title resolved by {@link TranslationTitleStrategy} — sees a populated
@@ -103,7 +121,7 @@ export class LocaleService {
    */
   async init(): Promise<void> {
     try {
-      await firstValueFrom(this.transloco.load(this.lang()));
+      await this.loadCatalogs(this.lang());
     } catch {
       /* a missing catalog degrades to the fallback rather than blocking boot */
     }

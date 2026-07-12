@@ -17,25 +17,15 @@ import { Icon } from '@hexly/web-ui';
   },
   imports: [Icon, TranslocoPipe],
   template: `
-    <button
-      type="button"
-      class="zbtn"
-      [attr.aria-label]="'editorShell.canvas.zoomOut' | transloco"
-      (click)="zoomOut.emit()"
-    >
+    <button type="button" class="zbtn" [attr.aria-label]="'map.canvas.zoomOut' | transloco" (click)="zoomOut.emit()">
       <app-icon name="minus" [size]="16" />
     </button>
     <span class="lvl">{{ percent() }}%</span>
-    <button
-      type="button"
-      class="zbtn"
-      [attr.aria-label]="'editorShell.canvas.zoomIn' | transloco"
-      (click)="zoomIn.emit()"
-    >
+    <button type="button" class="zbtn" [attr.aria-label]="'map.canvas.zoomIn' | transloco" (click)="zoomIn.emit()">
       <app-icon name="plus" [size]="16" />
     </button>
     <span class="div"></span>
-    <button type="button" class="zbtn" [attr.aria-label]="'editorShell.canvas.fit' | transloco" (click)="fit.emit()">
+    <button type="button" class="zbtn" [attr.aria-label]="'map.canvas.fit' | transloco" (click)="fit.emit()">
       <app-icon name="fit" [size]="16" />
     </button>
   `,
@@ -74,7 +64,7 @@ export class ZoomControl {
   readonly zoomOut = output<void>();
   readonly fit = output<void>();
 
-  protected readonly groupLabel = toSignal(this.transloco.selectTranslate('editorShell.canvas.zoom'), {
+  protected readonly groupLabel = toSignal(this.transloco.selectTranslate('map.canvas.zoom'), {
     initialValue: '',
   });
 }

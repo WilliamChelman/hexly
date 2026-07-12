@@ -27,10 +27,10 @@ function glyphFor(subtool: SelectSubtool): IconName {
       class="flex flex-col gap-2 p-2 min-h-0 max-h-full overflow-y-auto"
       appPanel
       role="group"
-      [attr.aria-label]="'editorShell.toolPalette.tools' | transloco"
+      [attr.aria-label]="'map.toolPalette.tools' | transloco"
     >
       @for (t of tools; track t.id) {
-        @let toolName = 'editorShell.toolPalette.' + t.id | transloco;
+        @let toolName = 'map.toolPalette.' + t.id | transloco;
         <button
           appIconButton
           toggle
@@ -48,8 +48,8 @@ function glyphFor(subtool: SelectSubtool): IconName {
 
       <button
         appIconButton
-        [title]="'editorShell.toolPalette.undo' | transloco"
-        [attr.aria-label]="'editorShell.toolPalette.undo' | transloco"
+        [title]="'map.toolPalette.undo' | transloco"
+        [attr.aria-label]="'map.toolPalette.undo' | transloco"
         data-testid="undo"
         [disabled]="!store.canUndo()"
         (click)="store.undo()"
@@ -58,8 +58,8 @@ function glyphFor(subtool: SelectSubtool): IconName {
       </button>
       <button
         appIconButton
-        [title]="'editorShell.toolPalette.redo' | transloco"
-        [attr.aria-label]="'editorShell.toolPalette.redo' | transloco"
+        [title]="'map.toolPalette.redo' | transloco"
+        [attr.aria-label]="'map.toolPalette.redo' | transloco"
         data-testid="redo"
         [disabled]="!store.canRedo()"
         (click)="store.redo()"
@@ -70,7 +70,7 @@ function glyphFor(subtool: SelectSubtool): IconName {
 
     @switch (store.tool()) {
       @case ('select') {
-        <div class="flyout" appPanel role="group" [attr.aria-label]="'editorShell.toolPalette.selectGroup' | transloco">
+        <div class="flyout" appPanel role="group" [attr.aria-label]="'map.toolPalette.selectGroup' | transloco">
           @for (s of selectTools; track s.id) {
             @let subName = s.nameKey | transloco;
             <button
@@ -88,12 +88,7 @@ function glyphFor(subtool: SelectSubtool): IconName {
         </div>
       }
       @case ('terrain') {
-        <div
-          class="flyout"
-          appPanel
-          role="group"
-          [attr.aria-label]="'editorShell.toolPalette.terrainGroup' | transloco"
-        >
+        <div class="flyout" appPanel role="group" [attr.aria-label]="'map.toolPalette.terrainGroup' | transloco">
           @for (t of terrainTools; track t.id) {
             @let terrainName = t.nameKey | transloco;
             <button
@@ -110,12 +105,7 @@ function glyphFor(subtool: SelectSubtool): IconName {
         </div>
       }
       @case ('feature') {
-        <div
-          class="flyout"
-          appPanel
-          role="group"
-          [attr.aria-label]="'editorShell.toolPalette.featureGroup' | transloco"
-        >
+        <div class="flyout" appPanel role="group" [attr.aria-label]="'map.toolPalette.featureGroup' | transloco">
           @for (f of features; track f.id) {
             @let featureName = f.nameKey | transloco;
             <button
@@ -134,8 +124,8 @@ function glyphFor(subtool: SelectSubtool): IconName {
             appIconButton
             toggle
             [active]="store.feature() === 'clear'"
-            [title]="('editorShell.toolPalette.clearFeature' | transloco) + ' (' + clearKey + ')'"
-            [attr.aria-label]="'editorShell.toolPalette.clearFeature' | transloco"
+            [title]="('map.toolPalette.clearFeature' | transloco) + ' (' + clearKey + ')'"
+            [attr.aria-label]="'map.toolPalette.clearFeature' | transloco"
             data-testid="clear-feature"
             (click)="store.armFeature('clear')"
           >
@@ -169,7 +159,7 @@ export class ToolPalette {
   // Select Subtools: keycap is the slot in selectSubtools, shared with keyboard 1/2.
   protected readonly selectTools = selectSubtools.map((id, i) => ({
     id,
-    nameKey: `editorShell.toolPalette.${id}`,
+    nameKey: `map.toolPalette.${id}`,
     glyph: glyphFor(id),
     key: String(i + 1),
   }));

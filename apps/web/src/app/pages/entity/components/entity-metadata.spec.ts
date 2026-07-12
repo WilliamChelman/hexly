@@ -1,10 +1,10 @@
+import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { CORE_NOTE, EntityDetail } from '@hexly/domain';
 import { EntitySession } from '../services/entity-session';
 import { ENTITY_SESSION } from '@hexly/web-entity';
-import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { EntityMetadata } from './entity-metadata';
 
 describe('EntityMetadata', () => {

@@ -131,7 +131,7 @@ describe('ActiveWorld', () => {
 
     active.commitPins(['a']);
 
-    expect(toaster.show).toHaveBeenCalledWith('worldDashboard.pinError', 'error');
+    expect(toaster.show).toHaveBeenCalledWith('core.pinError', 'error');
     expect(active.world()).toBe(detail);
   });
 

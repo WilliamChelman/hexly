@@ -1,7 +1,7 @@
+import { provideTranslocoTesting } from '../../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
-import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { Command, CommandProvider } from './command';
 import { CommandRegistry } from './command-registry';
 import { COMMAND_PROVIDERS, CommandPalette } from './command-palette';

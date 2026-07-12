@@ -54,7 +54,7 @@ import { EntitySearchPicker } from '@hexly/web-ui';
                 [attr.aria-invalid]="invalid() || null"
                 (click)="picking.set(true)"
               >
-                {{ (link() ? 'genericFieldView.entityLink.change' : 'genericFieldView.entityLink.set') | transloco }}
+                {{ (link() ? 'fields.entityLink.change' : 'fields.entityLink.set') | transloco }}
               </button>
             }
           }

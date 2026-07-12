@@ -1,3 +1,4 @@
+import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { of, Subject, throwError } from 'rxjs';
@@ -11,7 +12,7 @@ import {
   EntitySaveOutcome,
   HexMap,
 } from '@hexly/domain';
-import { provideTranslocoTesting, MockEntitiesClient, MockNudgeBusClient } from '@hexly/web-core/testing';
+import { MockEntitiesClient, MockNudgeBusClient } from '@hexly/web-core/testing';
 import { EntitiesClient, NudgeBusClient, EVICTED, Watched } from '@hexly/web-core';
 import { EntitySession } from './entity-session';
 import { ENTITY_SESSION } from '@hexly/web-entity';

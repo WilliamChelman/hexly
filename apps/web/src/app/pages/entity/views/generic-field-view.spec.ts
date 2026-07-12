@@ -1,9 +1,9 @@
+import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { EntityDetail, EntityVerb, FieldSchema } from '@hexly/domain';
 import { ENTITY_SESSION } from '@hexly/web-entity';
-import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { EntitySession } from '../services/entity-session';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 import { GenericFieldView } from './generic-field-view';

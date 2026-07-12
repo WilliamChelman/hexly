@@ -1,10 +1,11 @@
+import { provideTranslocoTesting } from '../../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { Subject, of, throwError } from 'rxjs';
 import { ImportSummary, WorldSummary } from '@hexly/domain';
 import { AuthClient, WorldsClient, ToasterService } from '@hexly/web-core';
-import { MockAuthClient, MockWorldsClient, provideTranslocoTesting } from '@hexly/web-core/testing';
+import { MockAuthClient, MockWorldsClient } from '@hexly/web-core/testing';
 import { WorldIndex } from './world-index';
 
 function world(id: string, name = id, ownerId = 'u1'): WorldSummary {

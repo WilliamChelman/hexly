@@ -1,10 +1,11 @@
+import { provideTranslocoTesting } from '../../testing/transloco-testing';
 import { BreakpointObserver, BreakpointState } from '@angular/cdk/layout';
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { BehaviorSubject, Observable, map, of } from 'rxjs';
 import { AuthClient, WorldsClient, ActiveWorld } from '@hexly/web-core';
-import { MockAuthClient, MockWorldsClient, provideTranslocoTesting } from '@hexly/web-core/testing';
+import { MockAuthClient, MockWorldsClient } from '@hexly/web-core/testing';
 import { NavRail } from './nav-rail';
 import { NavRailStore } from './nav-rail.store';
 

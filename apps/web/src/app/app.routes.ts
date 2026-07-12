@@ -68,7 +68,7 @@ export const appRoutes: Route[] = [
         path: 'settings',
         pathMatch: 'full',
         loadComponent: () => import('./pages/world/pages/world-settings/world-settings').then((m) => m.WorldSettings),
-        title: 'owners.tabTitle',
+        title: 'ui.owners.tabTitle',
       },
       {
         path: 'entities',

@@ -1,7 +1,8 @@
+import { provideTranslocoTesting } from '../../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
-import { provideTranslocoTesting, MockAuthClient } from '@hexly/web-core/testing';
+import { MockAuthClient } from '@hexly/web-core/testing';
 import { LocaleService, ThemeService, AuthClient } from '@hexly/web-core';
 import { UserSettings } from './user-settings';
 

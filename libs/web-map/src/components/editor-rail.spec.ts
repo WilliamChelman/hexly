@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { TranslocoService } from '@jsverse/transloco';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
+import { WEB_MAP_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { provideHexMapStoreTesting } from '../testing/entity-session.fake';
 import { HexMapStore } from '../services/hexmap-store';
 import { EditorRail } from './editor-rail';
@@ -16,7 +17,7 @@ function setup() {
 describe('EditorRail', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [EditorRail, provideTranslocoTesting()],
+      imports: [EditorRail, provideTranslocoTesting(WEB_MAP_TEST_CATALOGS)],
       providers: provideHexMapStoreTesting(),
     }).compileComponents();
   });

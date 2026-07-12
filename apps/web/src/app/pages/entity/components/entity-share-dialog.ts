@@ -20,20 +20,20 @@ import { EntitySession } from '../services/entity-session';
   imports: [Button, Dialog, GrantSet, OwnerSet, PublicLinkControl, TranslocoPipe],
   template: `
     @if (open() && entityId(); as id) {
-      <app-dialog [open]="true" [heading]="'owners.heading' | transloco" (closed)="closed.emit()">
+      <app-dialog [open]="true" [heading]="'ui.owners.heading' | transloco" (closed)="closed.emit()">
         <app-owner-set kind="entity" [id]="id" (resigned)="resigned.emit()" />
         <!-- Named per-Entity grants (ADR-0037, #161): the surgical layer below ownership —
              hand a specific user Editor/Viewer on just this Entity, piercing private. -->
-        <h3 class="grants-heading">{{ 'grants.heading' | transloco }}</h3>
-        <p class="grants-subhead">{{ 'grants.subhead' | transloco }}</p>
+        <h3 class="grants-heading">{{ 'ui.grants.heading' | transloco }}</h3>
+        <p class="grants-subhead">{{ 'ui.grants.subhead' | transloco }}</p>
         <app-grant-set [id]="id" />
         <!-- Anonymous per-entity Public Link (ADR-0037, #162): one revocable read-only URL
              for someone without an account — pierces private, like a named Viewer grant. -->
         <h3 class="grants-heading">
-          {{ 'publicLink.entityHeading' | transloco }}
+          {{ 'ui.publicLink.entityHeading' | transloco }}
         </h3>
         <p class="grants-subhead">
-          {{ 'publicLink.entitySubhead' | transloco }}
+          {{ 'ui.publicLink.entitySubhead' | transloco }}
         </p>
         <app-public-link kind="entity" [id]="id" />
         <button dialogFooter type="button" appButton data-testid="owners-close" (click)="closed.emit()">

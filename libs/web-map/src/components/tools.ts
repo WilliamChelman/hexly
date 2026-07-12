@@ -18,7 +18,7 @@ export interface ToolDef {
  * palette (order, glyph, keycap) and the keyboard hotkeys (issue #27). `region` is
  * absent: it has no palette button or hotkey and is armed via the Inspector's
  * Add/Remove brush (ADR-0012). The visible name is resolved at the UI layer from the
- * stable `id` (`editorShell.toolPalette.<id>`, ADR-0014), so it can localize.
+ * stable `id` (`map.toolPalette.<id>`, ADR-0014), so it can localize.
  */
 export const TOOLS: readonly ToolDef[] = [
   { id: 'select', hotkey: 's', glyph: 'select' },

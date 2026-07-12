@@ -1,9 +1,10 @@
+import { provideTranslocoTesting } from '../../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
-import { provideTranslocoTesting, MockAuthClient } from '@hexly/web-core/testing';
+import { MockAuthClient } from '@hexly/web-core/testing';
 import { AuthClient } from '@hexly/web-core';
 import { Login } from './login';
 

@@ -5,6 +5,7 @@ import { of } from 'rxjs';
 import { EntityDetail, EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient } from '@hexly/web-core';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
+import { WEB_MAP_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { HexMapStore } from '../services/hexmap-store';
 import { provideHexMapStoreTesting } from '../testing/entity-session.fake';
 import { Inspector } from './inspector';
@@ -69,7 +70,7 @@ describe('Inspector label editing', () => {
   beforeEach(async () => {
     stubEntities = [];
     await TestBed.configureTestingModule({
-      imports: [Inspector, provideTranslocoTesting()],
+      imports: [Inspector, provideTranslocoTesting(WEB_MAP_TEST_CATALOGS)],
       providers: inspectorProviders(),
     }).compileComponents();
   });
@@ -179,7 +180,7 @@ describe('Inspector hex and feature selection', () => {
   beforeEach(async () => {
     stubEntities = [];
     await TestBed.configureTestingModule({
-      imports: [Inspector, provideTranslocoTesting()],
+      imports: [Inspector, provideTranslocoTesting(WEB_MAP_TEST_CATALOGS)],
       providers: inspectorProviders(),
     }).compileComponents();
   });
@@ -256,7 +257,7 @@ describe('Inspector hex and feature selection', () => {
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
 
-    // The built-in Feature label renders via domain.feature.settlement → Colonie,
+    // The built-in Feature label renders via map.feature.settlement → Colonie,
     // not the English domain label.
     expect(el.querySelector('[data-testid=entity-detail]')?.textContent).toContain('Colonie');
     expect(el.querySelector('[data-testid=entity-detail]')?.textContent).not.toContain('Settlement');
@@ -338,7 +339,7 @@ describe('Inspector multi-selection', () => {
   beforeEach(async () => {
     stubEntities = [];
     await TestBed.configureTestingModule({
-      imports: [Inspector, provideTranslocoTesting()],
+      imports: [Inspector, provideTranslocoTesting(WEB_MAP_TEST_CATALOGS)],
       providers: inspectorProviders(),
     }).compileComponents();
   });
@@ -412,7 +413,7 @@ describe('Inspector region editing', () => {
   beforeEach(async () => {
     stubEntities = [];
     await TestBed.configureTestingModule({
-      imports: [Inspector, provideTranslocoTesting()],
+      imports: [Inspector, provideTranslocoTesting(WEB_MAP_TEST_CATALOGS)],
       providers: inspectorProviders(),
     }).compileComponents();
   });
@@ -564,7 +565,7 @@ describe('Inspector Entity Link control', () => {
     createdCalls = [];
     nextCreatedId = 'created-1';
     await TestBed.configureTestingModule({
-      imports: [Inspector, provideTranslocoTesting()],
+      imports: [Inspector, provideTranslocoTesting(WEB_MAP_TEST_CATALOGS)],
       providers: inspectorProviders(),
     }).compileComponents();
   });

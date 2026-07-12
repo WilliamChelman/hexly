@@ -33,12 +33,12 @@ export const DND_TYPE_DEFINITIONS: readonly TypeDefinition[] = [
     // A plugin ships translated copy, so its chrome is transloco keys — unlike a user-defined type,
     // whose every label is its one authored name (#191).
     labels: {
-      eyebrow: 'plugins.dnd.monster.eyebrow',
-      titleLabel: 'plugins.dnd.monster.titleLabel',
-      rename: 'plugins.dnd.monster.rename',
-      editorLabel: 'plugins.dnd.monster.editorLabel',
-      create: 'plugins.dnd.monster.create',
-      untitled: 'plugins.dnd.monster.untitled',
+      eyebrow: 'dnd.monster.eyebrow',
+      titleLabel: 'dnd.monster.titleLabel',
+      rename: 'dnd.monster.rename',
+      editorLabel: 'dnd.monster.editorLabel',
+      create: 'dnd.monster.create',
+      untitled: 'dnd.monster.untitled',
     },
   },
 ];

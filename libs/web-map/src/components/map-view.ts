@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
-import { TranslocoPipe } from '@jsverse/transloco';
+import { provideTranslocoScope, TranslocoPipe } from '@jsverse/transloco';
 import { ENTITY_SESSION } from '@hexly/web-entity';
+import { WEB_MAP_TRANSLATIONS } from '../i18n/web-map-translations';
 import { HexMapStore } from '../services/hexmap-store';
 import { MapCanvas } from './map-canvas';
 import { ToolPalette } from './tool-palette';
@@ -28,7 +29,11 @@ import { EditorRail } from './editor-rail';
   // it, not hoisted into the page/route composition roots (ADR-0048). It injects the
   // route-scoped ENTITY_SESSION from an ancestor, and lives and dies with the Map View:
   // its children (canvas, palette, docks) resolve this one instance.
-  providers: [HexMapStore],
+  //
+  // The `map` catalog rides along on the same injector (ADR-0049): this is the only component the
+  // app mounts from web-map, and every `map.*` reader sits in this subtree, so the copy is fetched
+  // when the hex map first renders and never before. Children inherit the scope from here.
+  providers: [HexMapStore, provideTranslocoScope(WEB_MAP_TRANSLATIONS)],
   imports: [MapCanvas, ToolPalette, Inspector, RegionsPanel, EditorRail, TranslocoPipe],
   template: `
     <!-- Full-bleed canvas; all side chrome floats over it (ADR-0013). -->
@@ -42,7 +47,7 @@ import { EditorRail } from './editor-rail';
       Outside the writable gate: a read-only opener's map still has a hex count.
     -->
     <span class="sr-only" aria-live="polite" data-testid="hex-count">{{
-      'editorShell.statusBar.hexCount' | transloco: { count: hexCount() }
+      'map.statusBar.hexCount' | transloco: { count: hexCount() }
     }}</span>
     @if (session.writable()) {
       <app-tool-palette class="absolute top-3 left-3 z-[1]" />

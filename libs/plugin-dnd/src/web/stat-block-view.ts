@@ -107,7 +107,7 @@ const FIELDS_BY_KEY = new Map(DND_MONSTER_TYPE.fields.map((field) => [field.key,
         </dl>
       }
 
-      <p class="mt-4 mb-0 text-xs text-ink-muted">{{ 'plugins.dnd.monster.loreHint' | transloco }}</p>
+      <p class="mt-4 mb-0 text-xs text-ink-muted">{{ 'dnd.monster.loreHint' | transloco }}</p>
     </article>
   `,
 })

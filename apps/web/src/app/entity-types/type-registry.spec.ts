@@ -1,7 +1,7 @@
+import { provideTranslocoTesting } from '../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { FieldSchema } from '@hexly/domain';
 import { DND_MONSTER } from '@hexly/plugin-dnd';
-import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { TypeRegistry } from './type-registry';
 import { CORE_VIEW_CONTENT, CORE_VIEW_FIELDS, CORE_VIEW_MAP, TypeDefinition } from '@hexly/web-entity';
 import { DND_VIEW_STAT_BLOCK } from '@hexly/plugin-dnd/web';

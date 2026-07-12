@@ -68,7 +68,7 @@ const HEX_DRAG_THRESHOLD = 4;
       #canvas
       class="absolute inset-0 w-full h-full block touch-none"
       role="img"
-      [attr.aria-label]="'editorShell.hexMap' | transloco"
+      [attr.aria-label]="'map.canvas.label' | transloco"
       [class.cursor-grab]="!dragging()"
       [class.cursor-grabbing]="dragging()"
       (pointerdown)="onPointerDown($event)"
@@ -221,9 +221,9 @@ export class MapCanvas {
    */
   protected readonly readoutKey = computed(() => {
     const hex = this.hover();
-    if (!hex) return 'editorShell.canvas.noHex';
+    if (!hex) return 'map.canvas.noHex';
     const painted = this.store.document().hexes[coordKey(hex)];
-    if (!painted) return 'editorShell.canvas.void';
+    if (!painted) return 'map.canvas.void';
     return terrainKey(painted.terrain);
   });
 
@@ -554,7 +554,7 @@ export class MapCanvas {
     if (drag) {
       const outcome = this.store.moveSelection(drag.offset, drag.labelDelta);
       if (outcome === 'blocked') {
-        this.toaster.show(this.transloco.translate('editorShell.moveBlocked'), 'error');
+        this.toaster.show(this.transloco.translate('map.moveBlocked'), 'error');
       } else if (outcome === 'noop') {
         // A drag that resolved to no movement (jiggled within the origin hex, or
         // dragged back to the press point) is still a plain pick.

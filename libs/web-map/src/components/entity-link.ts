@@ -20,7 +20,7 @@ import { HexMapStore } from '../services/hexmap-store';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [Button, Field, Icon, EntitySearchPicker, RouterLink, TranslocoPipe],
   template: `
-    <div appField [label]="'editorShell.inspector.linkedEntity' | transloco">
+    <div appField [label]="'map.inspector.linkedEntity' | transloco">
       @let id = store.selectedEntityLink();
       @if (id) {
         <div class="flex items-center gap-2">
@@ -38,9 +38,9 @@ import { HexMapStore } from '../services/hexmap-store';
             <span
               class="block flex-1 min-w-0 truncate font-display text-base italic text-ink-muted"
               data-testid="entity-link-dangling"
-              [attr.title]="'editorShell.inspector.linkUnavailable' | transloco"
+              [attr.title]="'map.inspector.linkUnavailable' | transloco"
             >
-              <span aria-hidden="true">→ </span>{{ 'editorShell.inspector.linkUnavailable' | transloco }}
+              <span aria-hidden="true">→ </span>{{ 'map.inspector.linkUnavailable' | transloco }}
             </span>
           } @else {
             <!-- List still loading: neutral placeholder, never a clickable dead link. -->
@@ -56,8 +56,8 @@ import { HexMapStore } from '../services/hexmap-store';
             icon
             danger
             data-testid="entity-link-remove"
-            [attr.aria-label]="'editorShell.inspector.removeLink' | transloco"
-            [attr.title]="'editorShell.inspector.removeLink' | transloco"
+            [attr.aria-label]="'map.inspector.removeLink' | transloco"
+            [attr.title]="'map.inspector.removeLink' | transloco"
             (click)="remove()"
           >
             <app-icon name="close" [size]="16" />
@@ -65,7 +65,7 @@ import { HexMapStore } from '../services/hexmap-store';
         </div>
       } @else {
         <button type="button" appButton variant="ghost" size="sm" data-testid="entity-link-pick" (click)="toggle()">
-          {{ 'editorShell.inspector.pickLink' | transloco }}
+          {{ 'map.inspector.pickLink' | transloco }}
         </button>
       }
 
@@ -73,8 +73,8 @@ import { HexMapStore } from '../services/hexmap-store';
         <app-entity-search-picker
           class="mt-2 block"
           testid="entity-link"
-          placeholderKey="editorShell.inspector.searchLink"
-          emptyKey="editorShell.inspector.linkEmpty"
+          placeholderKey="map.inspector.searchLink"
+          emptyKey="map.inspector.linkEmpty"
           [query]="query()"
           (queryChange)="query.set($event)"
           (pick)="pick($event.id)"
@@ -91,7 +91,7 @@ import { HexMapStore } from '../services/hexmap-store';
               data-testid="entity-link-create-note"
               (click)="create('core.note')"
             >
-              + {{ 'editorShell.inspector.newNote' | transloco }}
+              + {{ 'map.inspector.newNote' | transloco }}
             </button>
             <button
               type="button"
@@ -102,7 +102,7 @@ import { HexMapStore } from '../services/hexmap-store';
               data-testid="entity-link-create-map"
               (click)="create('core.hexmap')"
             >
-              + {{ 'editorShell.inspector.newMap' | transloco }}
+              + {{ 'map.inspector.newMap' | transloco }}
             </button>
           </div>
         </app-entity-search-picker>
@@ -183,7 +183,10 @@ export class EntityLink {
   protected create(type: EntityType): void {
     const name =
       this.query().trim() ||
-      this.transloco.translate(type === CORE_HEXMAP ? 'domain.untitledMap' : 'domain.untitledNote');
+      // The fallback name is this lib's own copy (ADR-0049). The app carries the same two
+      // strings for the Entities it mints; they are deliberately duplicated so neither
+      // project reads the other's catalog.
+      this.transloco.translate(type === CORE_HEXMAP ? 'map.untitledMap' : 'map.untitledNote');
     this.entitiesClient
       // Scope the create-and-link Entity to the World in the URL (ADR-0028) so it
       // lands in the same World as the map being edited, not the owner's oldest.

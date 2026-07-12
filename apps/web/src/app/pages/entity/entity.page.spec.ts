@@ -1,3 +1,4 @@
+import { provideTranslocoTesting } from '../../../testing/transloco-testing';
 import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
@@ -5,7 +6,7 @@ import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angul
 import { of, Subject, throwError } from 'rxjs';
 import { CONTENT_FORMAT, CORE_HEXMAP, EntityDetail, EntityType } from '@hexly/domain';
 import { EntitiesClient, NudgeBusClient, ActiveWorld, TitleService, EVICTED, Watched } from '@hexly/web-core';
-import { MockEntitiesClient, MockNudgeBusClient, provideTranslocoTesting } from '@hexly/web-core/testing';
+import { MockEntitiesClient, MockNudgeBusClient } from '@hexly/web-core/testing';
 import { EntitySession } from './services/entity-session';
 import { CORE_VIEW_CONTENT, ENTITY_SESSION } from '@hexly/web-entity';
 import { EntityNameResolver, CONTENT_EDITOR_SESSION } from '@hexly/content-editor';

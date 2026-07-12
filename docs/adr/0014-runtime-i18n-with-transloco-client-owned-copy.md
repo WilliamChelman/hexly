@@ -1,5 +1,7 @@
 # Runtime i18n with Transloco and client-owned copy
 
+> **Superseded in part by [ADR-0049](./0049-per-lib-translation-scopes.md):** two decisions below are reversed — "one global file per language" (a single key tree, explicitly not per-feature scopes) and copy owned by `web-core`. Each lib now declares its own catalog as a Transloco **scope**, and the app keeps the root catalog; `web-core` is left with the i18n plumbing. Everything else here still stands: runtime switching, Transloco over ngx-translate, semantic namespaced keys, English as the source and fallback, locale chosen client-side, an unlocalized server, and the CI key-sync gate (now run per catalog).
+
 The app ships English-only today, with user-facing strings hardcoded across ~48 inline component templates and a few catalog labels in the shared domain lib. We are adding internationalization to ship **French** (and stay translation-ready), using **[Transloco](https://jsverse.gitbook.io/transloco)** for **runtime** language switching, with **all user-facing copy owned by the web client** and the locale chosen entirely client-side.
 
 ## What we decided

@@ -38,7 +38,7 @@ import { EntityNameResolver } from './entity-name-resolver';
         data-testid="entity-link"
         data-dangling=""
         [attr.data-entity-id]="entityId()"
-        [attr.title]="'noteView.entityLink.dangling' | transloco"
+        [attr.title]="'editor.entityLink.dangling' | transloco"
         class="inline-block rounded bg-ink-faint/15 px-1.5 py-0.5 italic leading-tight text-ink-muted"
         >{{ text() }}</span
       >

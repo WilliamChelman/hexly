@@ -1,3 +1,4 @@
+import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
 import { signal, WritableSignal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
@@ -5,13 +6,7 @@ import { provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { of, throwError } from 'rxjs';
 import { CORE_HEXMAP, emptyContent, EntityDetail, WorldDetail, WorldVerb } from '@hexly/domain';
-import {
-  provideTranslocoTesting,
-  MockEntitiesClient,
-  MockWorldsClient,
-  MockUserDirectoryClient,
-  MockAuthClient,
-} from '@hexly/web-core/testing';
+import { MockEntitiesClient, MockWorldsClient, MockUserDirectoryClient, MockAuthClient } from '@hexly/web-core/testing';
 import { EntitiesClient, WorldsClient, ActiveWorld, UserDirectoryClient, AuthClient } from '@hexly/web-core';
 import { EntitySession } from '../services/entity-session';
 import { CORE_VIEW_CONTENT, ENTITY_SESSION } from '@hexly/web-entity';

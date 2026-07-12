@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { TranslocoService } from '@jsverse/transloco';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
+import { WEB_MAP_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { provideHexMapStoreTesting } from '../testing/entity-session.fake';
 import { HexMapStore } from '../services/hexmap-store';
 import { RegionsPanel } from './regions-panel';
@@ -8,7 +9,7 @@ import { RegionsPanel } from './regions-panel';
 describe('RegionsPanel', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [RegionsPanel, provideTranslocoTesting()],
+      imports: [RegionsPanel, provideTranslocoTesting(WEB_MAP_TEST_CATALOGS)],
       providers: provideHexMapStoreTesting(),
     }).compileComponents();
   });

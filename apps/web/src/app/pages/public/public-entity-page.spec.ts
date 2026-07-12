@@ -1,3 +1,4 @@
+import { provideTranslocoTesting } from '../../../testing/transloco-testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
@@ -5,7 +6,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { BehaviorSubject, EMPTY, Observable, of, throwError } from 'rxjs';
 import { CONTENT_FORMAT, CORE_NOTE, EntityDetail } from '@hexly/domain';
 import { EntitiesClient, PublicClient, Watched } from '@hexly/web-core';
-import { MockEntitiesClient, provideTranslocoTesting } from '@hexly/web-core/testing';
+import { MockEntitiesClient } from '@hexly/web-core/testing';
 import { PublicEntityPage } from './public-entity-page';
 
 const TOKEN = 'tok-123';

@@ -151,8 +151,8 @@ import {
                         size="sm"
                         [routerLink]="settingsRoute(card.id, card.name)"
                         [attr.data-testid]="'owners-world-' + card.id"
-                        [attr.aria-label]="'owners.heading' | transloco"
-                        [attr.title]="'owners.heading' | transloco"
+                        [attr.aria-label]="'ui.owners.heading' | transloco"
+                        [attr.title]="'ui.owners.heading' | transloco"
                       >
                         <app-icon name="user" [size]="16" />
                       </a>
@@ -209,10 +209,10 @@ import {
                         size="sm"
                         danger
                         [attr.data-testid]="'leave-world-' + card.id"
-                        [attr.title]="'members.leave' | transloco"
+                        [attr.title]="'ui.members.leave' | transloco"
                         (click)="leaveWorld(card.id)"
                       >
-                        {{ 'members.leave' | transloco }}
+                        {{ 'ui.members.leave' | transloco }}
                       </button>
                     </span>
                   }
@@ -454,7 +454,7 @@ export class WorldIndex {
 
   protected leaveWorld(id: string): void {
     this.store.leave(id).subscribe({
-      error: () => this.toaster.show(this.transloco.translate('members.leaveError'), 'error'),
+      error: () => this.toaster.show(this.transloco.translate('ui.members.leaveError'), 'error'),
     });
   }
 

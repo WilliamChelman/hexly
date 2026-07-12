@@ -1,9 +1,10 @@
+import { provideTranslocoTesting } from '../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { WorldSummary } from '@hexly/domain';
 import { ActiveWorld, AuthClient, WorldsClient } from '@hexly/web-core';
-import { MockAuthClient, MockWorldsClient, provideTranslocoTesting } from '@hexly/web-core/testing';
+import { MockAuthClient, MockWorldsClient } from '@hexly/web-core/testing';
 import { WorldSwitcher } from './world-switcher';
 
 function world(id: string, name = id): WorldSummary {

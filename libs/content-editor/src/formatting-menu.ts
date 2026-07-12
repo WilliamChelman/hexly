@@ -33,7 +33,7 @@ import { FORMAT_ITEMS, FormatItem, applyLink, clearLink, isLinkActive } from './
   template: `
     <div
       role="toolbar"
-      [attr.aria-label]="'noteView.formatMenu.label' | transloco"
+      [attr.aria-label]="'editor.formatMenu.label' | transloco"
       class="flex items-center gap-[2px] rounded-md border border-line bg-surface p-1 shadow-2"
     >
       @for (item of items; track item.id) {
@@ -59,22 +59,22 @@ import { FORMAT_ITEMS, FormatItem, applyLink, clearLink, isLinkActive } from './
         variant="ghost"
         size="sm"
         type="button"
-        [attr.aria-label]="'noteView.formatMenu.link' | transloco"
-        [attr.title]="'noteView.formatMenu.link' | transloco"
+        [attr.aria-label]="'editor.formatMenu.link' | transloco"
+        [attr.title]="'editor.formatMenu.link' | transloco"
         [active]="linkActive()"
         [attr.aria-pressed]="linkActive()"
         (mousedown)="$event.preventDefault()"
         (click)="toggleLink()"
       >
-        {{ 'noteView.formatMenu.link' | transloco }}
+        {{ 'editor.formatMenu.link' | transloco }}
       </button>
 
       @if (linkEditing()) {
         <input
           #urlInput
           type="url"
-          [attr.aria-label]="'noteView.formatMenu.linkPlaceholder' | transloco"
-          [attr.placeholder]="'noteView.formatMenu.linkPlaceholder' | transloco"
+          [attr.aria-label]="'editor.formatMenu.linkPlaceholder' | transloco"
+          [attr.placeholder]="'editor.formatMenu.linkPlaceholder' | transloco"
           class="ml-1 w-44 rounded-sm border border-line bg-surface-sunken px-2 py-1 text-sm text-ink"
           (keydown.enter)="submitLink($event)"
           (keydown.escape)="cancelLink()"

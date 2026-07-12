@@ -18,9 +18,9 @@ import { HexMapStore } from '../services/hexmap-store';
   imports: [Button, Eyebrow, Swatch, TranslocoPipe],
   template: `
     <header class="flex items-center justify-between gap-3">
-      <span appEyebrow mark>{{ 'editorShell.regionsPanel.title' | transloco }}</span>
+      <span appEyebrow mark>{{ 'map.regionsPanel.title' | transloco }}</span>
       <button type="button" appButton variant="ghost" size="sm" data-testid="new-region" (click)="store.newRegion()">
-        {{ 'editorShell.regionsPanel.newRegion' | transloco }}
+        {{ 'map.regionsPanel.newRegion' | transloco }}
       </button>
     </header>
 
@@ -36,13 +36,13 @@ import { HexMapStore } from '../services/hexmap-store';
         <span class="flex-1 min-w-0 truncate" data-testid="region-name">{{ region.name }}</span>
         <span
           class="font-mono text-2xs text-ink-faint tabular-nums"
-          [attr.aria-label]="'editorShell.statusBar.hexCount' | transloco: { count: memberCount(region) }"
+          [attr.aria-label]="'map.statusBar.hexCount' | transloco: { count: memberCount(region) }"
           >{{ memberCount(region) }}</span
         >
       </button>
     } @empty {
       <p class="muted text-sm leading-normal text-ink-muted">
-        {{ 'editorShell.regionsPanel.emptyHint' | transloco }}
+        {{ 'map.regionsPanel.emptyHint' | transloco }}
       </p>
     }
   `,

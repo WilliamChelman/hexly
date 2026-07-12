@@ -1,10 +1,11 @@
+import { provideTranslocoTesting } from '../../../testing/transloco-testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { BehaviorSubject, Observable, defer, finalize, of, throwError } from 'rxjs';
 import { PublicWorldView } from '@hexly/domain';
 import { PublicClient, NudgeBusClient, WORLD_NUDGE_DEBOUNCE_MS, Watched, watchResource } from '@hexly/web-core';
-import { MockNudgeBusClient, provideTranslocoTesting } from '@hexly/web-core/testing';
+import { MockNudgeBusClient } from '@hexly/web-core/testing';
 import { PublicWorldPage } from './public-world-page';
 
 const TOKEN = 'tok-123';

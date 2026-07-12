@@ -20,49 +20,49 @@ const chainFrom = (editor: Editor, range: Range) => editor.chain().focus().delet
 export const SLASH_ITEMS: SlashItem[] = [
   {
     id: 'text',
-    labelKey: 'noteView.slashMenu.text',
+    labelKey: 'editor.slashMenu.text',
     keywords: ['text', 'paragraph', 'body'],
     apply: (editor, range) => chainFrom(editor, range).setNode('paragraph').run(),
   },
   {
     id: 'heading1',
-    labelKey: 'noteView.slashMenu.heading1',
+    labelKey: 'editor.slashMenu.heading1',
     keywords: ['heading', 'title', 'h1'],
     apply: (editor, range) => chainFrom(editor, range).setNode('heading', { level: 1 }).run(),
   },
   {
     id: 'heading2',
-    labelKey: 'noteView.slashMenu.heading2',
+    labelKey: 'editor.slashMenu.heading2',
     keywords: ['heading', 'title', 'h2', 'subtitle'],
     apply: (editor, range) => chainFrom(editor, range).setNode('heading', { level: 2 }).run(),
   },
   {
     id: 'heading3',
-    labelKey: 'noteView.slashMenu.heading3',
+    labelKey: 'editor.slashMenu.heading3',
     keywords: ['heading', 'title', 'h3'],
     apply: (editor, range) => chainFrom(editor, range).setNode('heading', { level: 3 }).run(),
   },
   {
     id: 'heading4',
-    labelKey: 'noteView.slashMenu.heading4',
+    labelKey: 'editor.slashMenu.heading4',
     keywords: ['heading', 'h4'],
     apply: (editor, range) => chainFrom(editor, range).setNode('heading', { level: 4 }).run(),
   },
   {
     id: 'heading5',
-    labelKey: 'noteView.slashMenu.heading5',
+    labelKey: 'editor.slashMenu.heading5',
     keywords: ['heading', 'h5'],
     apply: (editor, range) => chainFrom(editor, range).setNode('heading', { level: 5 }).run(),
   },
   {
     id: 'heading6',
-    labelKey: 'noteView.slashMenu.heading6',
+    labelKey: 'editor.slashMenu.heading6',
     keywords: ['heading', 'h6'],
     apply: (editor, range) => chainFrom(editor, range).setNode('heading', { level: 6 }).run(),
   },
   {
     id: 'bulletList',
-    labelKey: 'noteView.slashMenu.bulletList',
+    labelKey: 'editor.slashMenu.bulletList',
     keywords: ['bullet', 'list', 'unordered', 'ul'],
     // ponytail: two-step avoids toggle un-wrapping an existing list
     apply: (editor, range) => {
@@ -72,7 +72,7 @@ export const SLASH_ITEMS: SlashItem[] = [
   },
   {
     id: 'orderedList',
-    labelKey: 'noteView.slashMenu.orderedList',
+    labelKey: 'editor.slashMenu.orderedList',
     keywords: ['ordered', 'numbered', 'list', 'ol'],
     apply: (editor, range) => {
       chainFrom(editor, range).run();
@@ -81,7 +81,7 @@ export const SLASH_ITEMS: SlashItem[] = [
   },
   {
     id: 'blockquote',
-    labelKey: 'noteView.slashMenu.blockquote',
+    labelKey: 'editor.slashMenu.blockquote',
     keywords: ['quote', 'blockquote', 'citation'],
     apply: (editor, range) => {
       chainFrom(editor, range).run();
@@ -90,13 +90,13 @@ export const SLASH_ITEMS: SlashItem[] = [
   },
   {
     id: 'codeBlock',
-    labelKey: 'noteView.slashMenu.codeBlock',
+    labelKey: 'editor.slashMenu.codeBlock',
     keywords: ['code', 'codeblock', 'snippet', 'pre'],
     apply: (editor, range) => chainFrom(editor, range).setCodeBlock().run(),
   },
   {
     id: 'horizontalRule',
-    labelKey: 'noteView.slashMenu.horizontalRule',
+    labelKey: 'editor.slashMenu.horizontalRule',
     keywords: ['divider', 'rule', 'separator', 'hr', 'line'],
     apply: (editor, range) => chainFrom(editor, range).setHorizontalRule().run(),
   },
@@ -105,7 +105,7 @@ export const SLASH_ITEMS: SlashItem[] = [
     // paragraph, ready to type into. No dedicated command — `insertContent` from
     // the node's own schema shape is enough (ponytail).
     id: 'callout',
-    labelKey: 'noteView.slashMenu.callout',
+    labelKey: 'editor.slashMenu.callout',
     keywords: ['callout', 'admonition', 'note', 'warning', 'aside', 'box'],
     apply: (editor, range) =>
       chainFrom(editor, range)
@@ -118,13 +118,13 @@ export const SLASH_ITEMS: SlashItem[] = [
   },
   {
     id: 'table',
-    labelKey: 'noteView.slashMenu.table',
+    labelKey: 'editor.slashMenu.table',
     keywords: ['table', 'grid', 'rows', 'columns'],
     apply: (editor, range) => chainFrom(editor, range).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
   },
   {
     id: 'taskList',
-    labelKey: 'noteView.slashMenu.taskList',
+    labelKey: 'editor.slashMenu.taskList',
     keywords: ['task', 'todo', 'checklist', 'checkbox'],
     apply: (editor, range) => {
       chainFrom(editor, range).run();
@@ -136,7 +136,7 @@ export const SLASH_ITEMS: SlashItem[] = [
     // so prompt for a URL — external URLs pass through as the src. ponytail: swap the
     // prompt for a real picker when asset upload lands.
     id: 'image',
-    labelKey: 'noteView.slashMenu.image',
+    labelKey: 'editor.slashMenu.image',
     keywords: ['image', 'picture', 'photo', 'img', 'asset'],
     apply: (editor, range) => {
       const src = globalThis.prompt?.('Image URL')?.trim();
@@ -148,7 +148,7 @@ export const SLASH_ITEMS: SlashItem[] = [
     // Routes into the same `@` Entity picker (issue #95, ADR-0023): replace the
     // typed "/link" with "@", letting the mention suggestion drive the one picker.
     id: 'link',
-    labelKey: 'noteView.slashMenu.entityLink',
+    labelKey: 'editor.slashMenu.entityLink',
     keywords: ['link', 'entity', 'mention', 'reference', 'note', 'map'],
     apply: (editor, range) => chainFrom(editor, range).insertContent('@').run(),
   },

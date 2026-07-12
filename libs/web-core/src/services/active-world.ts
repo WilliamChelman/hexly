@@ -87,7 +87,7 @@ export class ActiveWorld {
     if (!worldId) return;
     this.worlds.setPins(worldId, pinnedEntityIds).subscribe({
       next: (detail) => this.set(detail),
-      error: () => this.toaster.show(this.transloco.translate('worldDashboard.pinError'), 'error'),
+      error: () => this.toaster.show(this.transloco.translate('core.pinError'), 'error'),
     });
   }
 }

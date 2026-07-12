@@ -1,8 +1,9 @@
+import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 import { CORE_HEXMAP, EntityDetail, EntitySaveOutcome, HexMap, coordKey, emptyContent } from '@hexly/domain';
-import { provideTranslocoTesting, MockEntitiesClient } from '@hexly/web-core/testing';
+import { MockEntitiesClient } from '@hexly/web-core/testing';
 import { EntitiesClient } from '@hexly/web-core';
 import { EntitySession } from '../services/entity-session';
 import { HexMapStore } from '@hexly/web-map';

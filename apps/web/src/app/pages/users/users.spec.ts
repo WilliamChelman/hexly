@@ -1,9 +1,10 @@
+import { provideTranslocoTesting } from '../../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { UserAccount } from '@hexly/domain';
 import { UsersClient, AuthClient, ToasterService } from '@hexly/web-core';
-import { MockUsersClient, MockAuthClient, provideTranslocoTesting } from '@hexly/web-core/testing';
+import { MockUsersClient, MockAuthClient } from '@hexly/web-core/testing';
 import { Users } from './users';
 
 /**

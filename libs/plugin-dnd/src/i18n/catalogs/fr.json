@@ -1,0 +1,14 @@
+{
+  "monster": {
+    "eyebrow": "Monstre",
+    "titleLabel": "Nom du monstre",
+    "rename": "Renommer le monstre",
+    "editorLabel": "Description du monstre",
+    "create": "Nouveau monstre",
+    "untitled": "Monstre sans titre",
+    "loreHint": "Passez à la vue Note pour la description, les tactiques et le trésor de ce monstre.",
+    "view": {
+      "statBlock": "Bloc de stats"
+    }
+  }
+}

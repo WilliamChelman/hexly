@@ -1,10 +1,11 @@
+import { provideTranslocoTesting } from '../../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, ParamMap, provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 import { EntityPage, EntitySummary } from '@hexly/domain';
 import { EntitiesClient, ActiveWorld, ToasterService, LocaleService } from '@hexly/web-core';
-import { MockEntitiesClient, provideTranslocoTesting } from '@hexly/web-core/testing';
+import { MockEntitiesClient } from '@hexly/web-core/testing';
 import { EntityBrowser } from './entity-browser';
 
 describe('EntityBrowser', () => {

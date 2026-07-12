@@ -34,10 +34,10 @@ export type PublicLinkKind = 'world' | 'entity';
           (focus)="$any($event.target).select()"
         />
         <button appButton size="sm" data-testid="public-link-copy" (click)="copy()">
-          {{ 'publicLink.copy' | transloco }}
+          {{ 'ui.publicLink.copy' | transloco }}
         </button>
         <button appButton size="sm" danger data-testid="public-link-revoke" (click)="revoke()">
-          {{ 'publicLink.revoke' | transloco }}
+          {{ 'ui.publicLink.revoke' | transloco }}
         </button>
       </div>
     } @else {
@@ -49,7 +49,7 @@ export type PublicLinkKind = 'world' | 'entity';
         [disabled]="busy()"
         (click)="mint()"
       >
-        {{ 'publicLink.create' | transloco }}
+        {{ 'ui.publicLink.create' | transloco }}
       </button>
     }
   `,
@@ -88,7 +88,7 @@ export class PublicLinkControl implements OnInit {
   ngOnInit(): void {
     this.link(this.id()).subscribe({
       next: (l) => this.token.set(l?.token ?? null),
-      error: () => this.toaster.show(this.transloco.translate('publicLink.loadError'), 'error'),
+      error: () => this.toaster.show(this.transloco.translate('ui.publicLink.loadError'), 'error'),
     });
   }
 
@@ -101,7 +101,7 @@ export class PublicLinkControl implements OnInit {
       },
       error: () => {
         this.busy.set(false);
-        this.toaster.show(this.transloco.translate('publicLink.mintError'), 'error');
+        this.toaster.show(this.transloco.translate('ui.publicLink.mintError'), 'error');
       },
     });
   }
@@ -109,7 +109,7 @@ export class PublicLinkControl implements OnInit {
   revoke(): void {
     this.revokeLink(this.id()).subscribe({
       next: () => this.token.set(null),
-      error: () => this.toaster.show(this.transloco.translate('publicLink.revokeError'), 'error'),
+      error: () => this.toaster.show(this.transloco.translate('ui.publicLink.revokeError'), 'error'),
     });
   }
 
@@ -118,12 +118,12 @@ export class PublicLinkControl implements OnInit {
     // the `?.` would silently no-op, so surface the same copyError toast a rejection gives.
     const copied = navigator.clipboard?.writeText(this.url());
     if (!copied) {
-      this.toaster.show(this.transloco.translate('publicLink.copyError'), 'error');
+      this.toaster.show(this.transloco.translate('ui.publicLink.copyError'), 'error');
       return;
     }
     copied.then(
-      () => this.toaster.show(this.transloco.translate('publicLink.copied'), 'success'),
-      () => this.toaster.show(this.transloco.translate('publicLink.copyError'), 'error'),
+      () => this.toaster.show(this.transloco.translate('ui.publicLink.copied'), 'success'),
+      () => this.toaster.show(this.transloco.translate('ui.publicLink.copyError'), 'error'),
     );
   }
 

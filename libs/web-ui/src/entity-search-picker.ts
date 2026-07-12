@@ -62,9 +62,9 @@ export class EntitySearchPicker {
   /** Prefix for the search box / option / menu `data-testid`s, per embedding surface. */
   readonly testid = input('entity-picker');
   /** Transloco key for the search input placeholder. */
-  readonly placeholderKey = input('entitySearchPicker.searchPlaceholder');
+  readonly placeholderKey = input('ui.entitySearchPicker.searchPlaceholder');
   /** Transloco key shown when no Entity matches the query. */
-  readonly emptyKey = input('entitySearchPicker.empty');
+  readonly emptyKey = input('ui.entitySearchPicker.empty');
   /** The controlled query — the consumer owns it so it can reset or reuse it. */
   readonly query = input('');
   /**

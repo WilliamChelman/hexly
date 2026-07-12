@@ -74,7 +74,7 @@ import { FieldControl } from '@hexly/web-entity';
         @if (plainEntries().length > 0) {
           <div>
             <h2 class="mb-2 text-2xs uppercase tracking-wider text-ink-muted">
-              {{ 'genericFieldView.plainHeading' | transloco }}
+              {{ 'fields.plainHeading' | transloco }}
             </h2>
             <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 m-0 text-sm" data-testid="field-plain-metadata">
               @for (entry of plainEntries(); track entry.key) {

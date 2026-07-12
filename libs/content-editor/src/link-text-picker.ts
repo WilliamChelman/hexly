@@ -52,7 +52,7 @@ export class LinkTextPicker extends ListboxController<VocabItem> {
   readonly kind = input.required<LinkTextKind>();
   protected readonly optionIdPrefix = 'link-text-opt-';
 
-  protected readonly labelKey = computed(() => `noteView.${this.kind()}Picker.label`);
-  protected readonly emptyKey = computed(() => `noteView.${this.kind()}Picker.empty`);
-  protected readonly removeKey = computed(() => `noteView.${this.kind()}Picker.remove`);
+  protected readonly labelKey = computed(() => `editor.${this.kind()}Picker.label`);
+  protected readonly emptyKey = computed(() => `editor.${this.kind()}Picker.empty`);
+  protected readonly removeKey = computed(() => `editor.${this.kind()}Picker.remove`);
 }

@@ -6,6 +6,7 @@ import { EntityBody, Metadata } from '@hexly/domain';
 import { produceWithPatches } from '@hexly/immer';
 import { ENTITY_SESSION, EntitySession } from '@hexly/web-entity';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
+import { DND_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { StatBlockView } from './stat-block-view';
 
 /**
@@ -32,7 +33,7 @@ describe('StatBlockView', () => {
   function render(metadata: Metadata, writable = true) {
     const session = fakeSession(metadata, writable);
     TestBed.configureTestingModule({
-      imports: [StatBlockView, provideTranslocoTesting()],
+      imports: [StatBlockView, provideTranslocoTesting(DND_TEST_CATALOGS)],
       providers: [{ provide: ENTITY_SESSION, useValue: session }, provideHttpClient(), provideHttpClientTesting()],
     });
     const fixture = TestBed.createComponent(StatBlockView);
@@ -53,6 +54,9 @@ describe('StatBlockView', () => {
     expect(el.querySelector('[data-testid=stat-block-subtitle]')?.textContent).toContain('Huge dragon, chaotic evil');
     // The derived ability modifier: a raw 30 means +10.
     expect(el.querySelector('[data-testid=stat-mod-strength]')?.textContent).toContain('+10');
+    // The plugin ships its own copy under its own scope (ADR-0049): proof the `dnd.*` keys resolve
+    // from the plugin's catalog, and not as the raw key a missing scope would print.
+    expect(el.textContent).toContain('Switch to the Note view');
   });
 
   it('edits a stat straight into the one Metadata map every other View reads', () => {

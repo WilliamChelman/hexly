@@ -21,7 +21,7 @@ export type EntityPickerProps = ListboxProps<EntitySummary>;
     @if (visible()) {
       <app-listbox
         testid="entity-picker"
-        [ariaLabel]="'noteView.entityPicker.label' | transloco"
+        [ariaLabel]="'editor.entityPicker.label' | transloco"
         [activeItemId]="activeItemId()"
         [x]="position()!.x"
         [y]="position()!.y"
@@ -39,7 +39,7 @@ export type EntityPickerProps = ListboxProps<EntitySummary>;
           </li>
         } @empty {
           <li appListboxEmpty>
-            {{ 'noteView.entityPicker.empty' | transloco }}
+            {{ 'editor.entityPicker.empty' | transloco }}
           </li>
         }
       </app-listbox>

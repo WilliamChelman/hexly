@@ -1,7 +1,7 @@
+import { provideTranslocoTesting } from '../../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
-import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { Styleguide } from './styleguide';
 
 describe('Styleguide', () => {

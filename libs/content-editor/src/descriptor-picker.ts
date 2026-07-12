@@ -19,7 +19,7 @@ import { VocabItem } from './vocab-items';
     @if (visible()) {
       <app-listbox
         testid="descriptor-picker"
-        [ariaLabel]="'noteView.descriptorPicker.label' | transloco"
+        [ariaLabel]="'editor.descriptorPicker.label' | transloco"
         [activeItemId]="activeItemId()"
         [x]="position()!.x"
         [y]="position()!.y"
@@ -34,12 +34,12 @@ import { VocabItem } from './vocab-items';
           >
             {{ item.value }}
             @if (item.isNew) {
-              <span class="text-2xs text-ink-muted"> {{ 'noteView.descriptorPicker.create' | transloco }}</span>
+              <span class="text-2xs text-ink-muted"> {{ 'editor.descriptorPicker.create' | transloco }}</span>
             }
           </li>
         } @empty {
           <li appListboxEmpty>
-            {{ 'noteView.descriptorPicker.empty' | transloco }}
+            {{ 'editor.descriptorPicker.empty' | transloco }}
           </li>
         }
       </app-listbox>

@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { EntitiesClient, WorldsClient, ToasterService } from '@hexly/web-core';
 import { MockEntitiesClient, MockWorldsClient, provideTranslocoTesting } from '@hexly/web-core/testing';
+import { WEB_UI_TEST_CATALOGS } from './i18n/test-catalogs';
 import { PublicLinkControl, PublicLinkKind } from './public-link';
 
 /**
@@ -17,7 +18,7 @@ describe('PublicLinkControl', () => {
     entities = new MockEntitiesClient();
     worlds = new MockWorldsClient();
     await TestBed.configureTestingModule({
-      imports: [PublicLinkControl, provideTranslocoTesting()],
+      imports: [PublicLinkControl, provideTranslocoTesting(WEB_UI_TEST_CATALOGS)],
       providers: [
         { provide: EntitiesClient, useValue: entities },
         { provide: WorldsClient, useValue: worlds },
