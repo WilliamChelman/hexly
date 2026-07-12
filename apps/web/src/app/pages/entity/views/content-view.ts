@@ -1,14 +1,14 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
-import { TranslocoPipe, TranslocoService, translateSignal } from '@jsverse/transloco';
 import { ContentEditor } from '@hexly/content-editor';
 import { Icon, IconButton } from '@hexly/web-ui';
-import { EntitySession } from '../services/entity-session';
-import { RightDock } from '../services/right-dock';
+import { TranslocoService, translateSignal } from '@jsverse/transloco';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 import { EntityMetadata } from '../components/entity-metadata';
 import { OutlinePanel } from '../components/outline-panel';
 import { OutlineSource } from '../components/outline-source';
 import { ReferencesPanel } from '../components/references-panel';
+import { EntitySession } from '../services/entity-session';
+import { RightDock } from '../services/right-dock';
 
 /**
  * The `core.view.content` renderer (ADR-0048, *Views* amendment): the Content body
@@ -25,16 +25,7 @@ import { ReferencesPanel } from '../components/references-panel';
   selector: 'app-content-view',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'contents' },
-  imports: [
-    ContentEditor,
-    EntityMetadata,
-    OutlinePanel,
-    OutlineSource,
-    ReferencesPanel,
-    IconButton,
-    Icon,
-    TranslocoPipe,
-  ],
+  imports: [ContentEditor, EntityMetadata, OutlinePanel, OutlineSource, ReferencesPanel, IconButton, Icon],
   template: `
     <!-- Content body in a centred reading column. Opening either dock panel reflows
          this column left (extra right padding) so the panel never overlaps prose —
