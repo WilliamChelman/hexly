@@ -87,9 +87,10 @@ export const entities = sqliteTable(
     seq: integer('seq').notNull().default(INITIAL_SEQ),
     // Serialized Entity body (entityBodySchema), validated at the edge.
     document: text('document').notNull(),
-    // Plain-text prose extracted from Content for full-text search; EntityWrites derives it on every
-    // write (ADR-0045). Nullable: pre-FTS rows predate the column. The FTS table and its sync
-    // triggers are raw SQL, outside Drizzle's typed API.
+    // The Entity's searchable text: the Content's prose *and* the text each Structured Field's value
+    // carries (a grid's Hex and Region names, #205). EntityWrites derives it on every write
+    // (ADR-0045). Nullable: pre-FTS rows predate the column. The FTS table and its sync triggers are
+    // raw SQL, outside Drizzle's typed API.
     contentText: text('content_text'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
