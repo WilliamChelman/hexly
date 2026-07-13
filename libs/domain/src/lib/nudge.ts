@@ -2,8 +2,7 @@ import { z } from 'zod';
 
 /**
  * The live-follow nudge bus. A single server→client SSE stream carries *nudges* —
- * "resource X is now at version N, refetch it" — never resource data. This module
- * holds the wire vocabulary shared by the API and the web client.
+ * "resource X is now at version N, refetch it" — never resource data.
  */
 
 /** A resource a connection is watching. A World is just another ref — one channel. */
@@ -34,11 +33,7 @@ export interface ConnectionReady {
  * One changed Entity. `seq` is the sole freshness key (ADR-0045): a monotonic counter the server
  * bumps on *every* committed change, whatever its kind — substance, exposure, sharing, lifecycle.
  * A holder refetches exactly when a nudge's `seq` exceeds the one it holds, which dedupes
- * self/cross-tab echo.
- *
- * Neither `version` nor `updatedAt` rides the wire. `version` is an optimistic-concurrency token
- * that must not move on a sharing change; `updatedAt` is a domain-visible timestamp that must not
- * either. Comparing the pair also silently dropped a second change landing in the same millisecond.
+ * self/cross-tab echo. Neither `version` nor `updatedAt` rides the wire.
  */
 export interface EntityNudge {
   id: string;
@@ -46,9 +41,8 @@ export interface EntityNudge {
 }
 
 /**
- * A changed World — structurally the peer of {@link EntityNudge}, and keyed the same way. A World
- * is just another `ref`: rename, pin reorder, and membership changes all flow here. The two stay
- * distinct types because the names carry domain meaning, not because the shapes differ.
+ * A changed World — keyed like {@link EntityNudge}. Rename, pin reorder, and membership changes
+ * all flow here.
  */
 export interface WorldNudge {
   id: string;
@@ -72,8 +66,8 @@ export type NudgeEntry = EntityNudge | WorldNudge | UnavailableNudge;
  * A client-minted refetch pulse — **never a server frame**, so it is not part of {@link NudgeEntry}
  * (the wire union parsed from SSE JSON). On reconnect the client can't know what changed during the
  * gap (there is no server-side event log or `Last-Event-ID` replay), so its bus pulses each watched
- * ref `stale` and the follower refetches unconditionally, reconciling from the `GET`. Version-free:
- * it carries no claim about the resource, only "your held state may be stale."
+ * ref `stale` and the follower refetches unconditionally. Version-free: it carries no claim about
+ * the resource, only "your held state may be stale."
  */
 export interface StaleNudge {
   id: string;

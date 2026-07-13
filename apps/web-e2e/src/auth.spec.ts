@@ -2,10 +2,8 @@ import { expect, test } from './fixtures';
 import { TEST_USER } from './test-user';
 
 /**
- * The auth journey owns its session: it signs in and then signs out, which
- * deletes the session row server-side. Sharing the suite's stored session would
- * invalidate every other test's reused cookie, so this starts logged out
- * (ADR-0009).
+ * Starts logged out: signing out deletes the session row server-side, so reusing the
+ * suite's stored session here would invalidate every other test's cookie (ADR-0009).
  */
 test.use({ storageState: { cookies: [], origins: [] } });
 

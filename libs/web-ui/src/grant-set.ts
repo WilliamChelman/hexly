@@ -7,15 +7,14 @@ import { Button } from './button';
 import { Select } from './select';
 
 /**
- * An Entity's named grant set (ADR-0037, #161): the surgical per-Entity layer beside the
- * owner set. An Owner hands any Instance user an Editor or Viewer grant on this one Entity
- * — World membership is not a precondition, and a Viewer grant on a `private` Entity is
- * per-user visibility. An Owner adds, changes the role of, or revokes a grant. All writes
- * are Owner-only server-side; a refusal surfaces as an error toast, leaving the list intact.
+ * An Entity's named grant set (ADR-0037): the Editor or Viewer grants an Owner hands any
+ * Instance user on this one Entity. World membership is not a precondition, and a Viewer
+ * grant on a `private` Entity is per-user visibility. Writes are Owner-only server-side;
+ * a refusal surfaces as an error toast, leaving the list intact.
  *
- * Grants are stored as user ids + roles; names come from the {@link UserDirectoryClient} directory,
- * which carries no email (ADR-0004). The Entity's Owners are excluded from the add
- * candidates — an Owner already has full access, so granting them is meaningless.
+ * Grants are stored as user ids + roles; names come from the {@link UserDirectoryClient}
+ * directory, which carries no email (ADR-0004). The Entity's Owners are excluded from the
+ * add candidates.
  */
 @Component({
   selector: 'app-grant-set',
@@ -180,10 +179,9 @@ export class GrantSet implements OnInit {
   }
 
   /**
-   * Run a grant-set mutation, applying its result on success or surfacing the failure as
-   * an error toast. The list is only ever mutated inside `onOk`, so a refusal leaves it
-   * exactly as it was; `onErr` runs first on failure for any DOM the signal can't revert
-   * on its own (the row role `<select>`).
+   * Run a grant-set mutation, applying its result on success or surfacing the failure as an
+   * error toast. The list is mutated only inside `onOk`; `onErr` runs first on failure, for
+   * DOM the signal can't revert on its own (the row role `<select>`).
    */
   private mutate(
     op$: Observable<EntityGrant[]>,

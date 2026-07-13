@@ -8,11 +8,9 @@ import { Button } from './button';
 import { Select } from './select';
 
 /**
- * The symmetric ownership set of a World or Entity (ADR-0037, #158): view every
- * Owner, add a co-Owner from the Instance directory, remove an Owner, or resign
- * your own ownership. All Owners are equal — no hidden hierarchy — so the only
- * guard is the ≥1-Owner invariant the server enforces (a refused last-Owner
- * removal surfaces as an error toast, leaving the set untouched).
+ * The symmetric ownership set of a World or Entity (ADR-0037): view, add, remove, or
+ * resign an Owner. All Owners are equal; the only guard is the ≥1-Owner invariant the
+ * server enforces (a refused last-Owner removal leaves the set untouched).
  *
  * Ownership is stored as user ids; names come from the {@link UserDirectoryClient}
  * directory, which carries no email (ADR-0004).
@@ -98,9 +96,8 @@ export class OwnerSet implements OnInit {
   readonly id = input.required<string>();
 
   /**
-   * Emitted after the current user resigns their own ownership: resigning can
-   * cost them reach to this resource, so the host navigates away rather than
-   * leaving a now-forbidden page open.
+   * Emitted after the current user resigns their own ownership — which can cost them
+   * reach to this resource, so the host is expected to navigate away.
    */
   readonly resigned = output<void>();
 
@@ -162,11 +159,10 @@ export class OwnerSet implements OnInit {
   }
 
   /**
-   * Run an owner-set mutation, applying its result on success or surfacing the
-   * failure as an error toast. The server's ≥1-Owner invariant comes back as a
-   * 409 — named specifically so the user learns *why* it was refused — while any
-   * other failure falls back to the operation's generic message. The set is only
-   * ever mutated inside `onOk`, so a refusal leaves it exactly as it was.
+   * Run an owner-set mutation, applying its result on success or toasting the failure.
+   * A 409 is the server's ≥1-Owner refusal and gets its own message; anything else falls
+   * back to `genericKey`. The set is only ever mutated inside `onOk`, so a refusal leaves
+   * it exactly as it was.
    */
   private mutate(op$: Observable<string[]>, genericKey: string, onOk: (owners: string[]) => void): void {
     op$.subscribe({

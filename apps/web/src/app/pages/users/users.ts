@@ -7,11 +7,10 @@ import { UsersClient, ToasterService, AuthClient } from '@hexly/web-core';
 import { Eyebrow, Field, Input, Panel, Button } from '@hexly/web-ui';
 
 /**
- * The user-management panel (ADR-0047): account management with zero content powers.
- * Every action is a thin {@link UsersClient} call followed by a reload — the server is
- * the source of truth, so a refusal surfaces as an error toast and leaves the list
- * unchanged. The Superadmin repair surface (the Reindex) lives on its own {@link Admin}
- * page.
+ * The user-management panel (ADR-0047): account management with zero content powers. Every action
+ * is a {@link UsersClient} call followed by a reload, so a server refusal surfaces as an error
+ * toast and leaves the list unchanged. The Superadmin repair surface (the Reindex) lives on its
+ * own {@link Admin} page.
  */
 @Component({
   selector: 'app-users',
@@ -318,11 +317,7 @@ export class Users {
     this.reload();
   }
 
-  /**
-   * Whether the caller may edit this account's roles. Only a Superadmin may manage a
-   * Superadmin account (the server enforces it too); everyone with the panel may
-   * manage a plain account.
-   */
+  /** Only a Superadmin may manage a Superadmin account (the server enforces it too). */
   protected canManage(u: UserAccount): boolean {
     return !u.isSuperadmin || this.isSuperadmin();
   }
@@ -358,11 +353,7 @@ export class Users {
     this.run(this.users.setDisabled(u.id, u.disabledAt === null), 'users.toast.saved');
   }
 
-  /**
-   * Add or remove the role from the account's set, then write the whole set back
-   * (ADR-0047). The server replaces the stored `roles` wholesale, so the panel sends
-   * the new array rather than a delta.
-   */
+  /** The server replaces the stored `roles` wholesale (ADR-0047), so send the whole set, not a delta. */
   protected toggleRole(u: UserAccount, role: InstanceRole): void {
     const next = u.roles.includes(role) ? u.roles.filter((r) => r !== role) : [...u.roles, role];
     this.run(this.users.setRoles(u.id, next), 'users.toast.saved');

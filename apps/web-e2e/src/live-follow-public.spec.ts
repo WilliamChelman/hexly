@@ -1,13 +1,9 @@
 import { enterLibrary, expect, flushSave, openEntityActions, test } from './fixtures';
 
 /**
- * Seam B (ADR-0044, #175): an anonymous Public Link viewer is a first-class live-follow
- * participant. Two contexts in one serial test — an authenticated GM edits an Entity while a
- * second, account-less Public-Link context watches the same page. It reuses the mint-link flow
- * (public-link.spec.ts) and the save-flush helper, and asserts on rendered UI and real API
- * round-trips (`waitForResponse`): the anonymous page updates on a GM edit *without a reload*,
- * and evicts to the dead-link panel the moment the Owner revokes the link — access withdrawal
- * taking effect on the open screen.
+ * An anonymous Public Link viewer is a first-class live-follow participant (ADR-0044): its
+ * page updates on a GM edit without a reload, and evicts to the dead-link panel the moment
+ * the Owner revokes the link.
  */
 test('an anonymous Public Link viewer live-follows a GM edit, then evicts on revoke — no reload', async ({
   page,

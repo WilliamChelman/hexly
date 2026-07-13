@@ -1,5 +1,5 @@
 /**
- * The World Graph: a World's Entities as nodes, their Entity Links as edges (ADR-0046, #181).
+ * The World Graph: a World's Entities as nodes, their Entity Links as edges (ADR-0046).
  * A projection of the derived edge index, resolved per viewer — see `CONTEXT.md → World Graph`.
  */
 
@@ -17,9 +17,8 @@ export interface WorldGraphEdge {
 }
 
 /**
- * `GET /worlds/:id/graph`: the whole readable World in one payload. Nodes are every Entity of the
- * World the viewer can read — orphans included — so a node is a {@link LinkedEntity}, the same
- * name-and-navigate shape both reference directions speak. Assets are never nodes.
+ * `GET /worlds/:id/graph`. Nodes are every Entity of the World the viewer can read — orphans
+ * included. Assets are never nodes.
  */
 export interface WorldGraph {
   readonly nodes: readonly LinkedEntity[];

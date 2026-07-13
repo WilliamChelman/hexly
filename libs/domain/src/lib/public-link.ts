@@ -16,9 +16,8 @@ export interface PublicLink {
 }
 
 /**
- * What a World Public Link resolves to: the World's identity plus the summaries
- * of its `shared` Entities — and nothing else. `private` Entities never appear
- * here — the token can't reach them.
+ * What a World Public Link resolves to: the World's identity plus the summaries of its `shared`
+ * Entities — and nothing else. A `private` Entity never appears here.
  */
 export interface PublicWorldView {
   readonly worldId: string;

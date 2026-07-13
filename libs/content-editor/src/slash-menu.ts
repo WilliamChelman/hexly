@@ -7,10 +7,9 @@ import { ListboxController, ListboxProps, ListboxEmpty, ListboxOption } from '@h
 export type SlashMenuProps = ListboxProps<SlashItem>;
 
 /**
- * The keyboard-driven block picker that opens on `/` in the Content editor (#73).
- * Headless TipTap owns no chrome, so this is ours (ADR-0019). All the open/update/
- * close/keyboard state lives in {@link ListboxController}; this is just the slash-item
- * template over it.
+ * The keyboard-driven block picker that opens on `/` in the Content editor.
+ * Open/update/close/keyboard state lives in {@link ListboxController}; this is the
+ * slash-item template over it.
  */
 @Component({
   selector: 'app-slash-menu',

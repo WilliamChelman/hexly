@@ -21,14 +21,12 @@ import { SESSION_COOKIE } from '../auth/auth.controller';
 import { NudgeBus, Principal } from './nudge-bus';
 
 /**
- * The SSE nudge bus surface (ADR-0044, #173/#175). One multiplexed stream per tab: `GET /events`
- * mints a `connectionId`; `PUT /events/:connectionId/interest` declares the whole watched set.
+ * The SSE nudge bus surface (ADR-0044). One multiplexed stream per tab: `GET /events` mints a
+ * `connectionId`; `PUT /events/:connectionId/interest` declares the whole watched set.
  *
- * The principal is a session cookie **or** an anonymous Public Link `?token=` (#175) — the
- * highest-value live-follow audience is a player without an account watching a shared Entity. It
- * is *not* session-guarded: {@link resolvePrincipal} accepts either credential and 401s only when
- * neither is present, resolving the token exactly as the unguarded `GET /public/…` routes do (the
- * token *is* the grant). A token that grants nothing simply subscribes to nothing (silent).
+ * Deliberately *not* session-guarded: the principal is a session cookie **or** an anonymous Public
+ * Link `?token=`. {@link resolvePrincipal} accepts either and 401s only when neither is present. A
+ * token that grants nothing simply subscribes to nothing (silent).
  */
 @Controller('events')
 export class EventsController {
@@ -38,12 +36,11 @@ export class EventsController {
   ) {}
 
   /**
-   * The connection's principal: a `?token=` names an anonymous Public Link connection and *wins*
-   * over any session cookie — the public page is token-scoped exactly like the unguarded `GET
-   * /public/…` routes, so a signed-in user opening a shared link follows as the link grants, not
-   * as their own (possibly nil) rights on that Entity. Absent a token, a valid session cookie →
-   * the user; neither → 401. The token isn't validated here — an unresolvable one opens a
-   * connection that can never subscribe (forbidden==nonexistent silence), never a leak.
+   * The connection's principal. A `?token=` *wins* over any session cookie: a signed-in user
+   * opening a shared link follows as the link grants, not as their own (possibly nil) rights on
+   * that Entity, exactly as the unguarded `GET /public/…` routes behave. Absent a token, a valid
+   * session cookie → the user; neither → 401. The token isn't validated here — an unresolvable one
+   * opens a connection that can never subscribe, never a leak.
    */
   private async resolvePrincipal(req: Request, token?: string): Promise<Principal> {
     if (token) return { kind: 'token', token };

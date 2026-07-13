@@ -7,9 +7,8 @@ import { TypeFieldRegistry } from './type-field-registry';
 
 /**
  * The World-scoped view of the Entity Type set (ADR-0048): a World's user-defined types layered over
- * the instance-wide plugin types. It lives in the Entity module (not Worlds) so the write-path gate
- * and derived-index build can resolve a World's Fields without a module cycle — Worlds already
- * depends on Entities. Reads are keyed by `worldId`, so one World's types never leak into another.
+ * the instance-wide plugin types. Lives in the Entity module (not Worlds) because Worlds already
+ * depends on Entities, and the write-path gate resolves through it.
  */
 @Injectable()
 export class WorldTypeFields {
@@ -38,8 +37,8 @@ export class WorldTypeFields {
 
   /**
    * A {@link TypeFieldResolver} scoped to one World: user-defined Fields first, else the plugin
-   * registry. The World's types are loaded once and closed over, so unioning a `types[]` set is a
-   * map lookup, not a query per type.
+   * registry. The World's types are loaded once and closed over — resolving is a map lookup, not a
+   * query per type.
    */
   resolverFor(worldId: string): TypeFieldResolver {
     const userFields = new Map(this.list(worldId).map((type) => [type.id, type.fields]));

@@ -31,9 +31,6 @@ const STATIC_ENTRIES: readonly NavEntry[] = [
  * The persistent global nav rail. Expands to reveal labels on wide viewports
  * (docked, persisted); overlays transiently on narrow viewports (focus-trapped,
  * dismissed on click-away / Escape / destination chosen).
- *
- * ponytail: appearance/account stay in {@link UserMenu}'s popover at both widths.
- * Build the inline section if expanded-rail affordances grow.
  */
 @Component({
   selector: 'app-nav-rail',

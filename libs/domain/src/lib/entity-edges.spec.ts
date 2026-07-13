@@ -16,8 +16,7 @@ function harvest(
 /**
  * A stand-in for a plugin's **Structured Field** data-type: the domain bundles none of its own
  * (ADR-0050), so a spec declares one and threads it in as a host does. A placement expresses no
- * relationship, so it carries no Link Descriptor — a real data-type's own edges are its plugin's spec
- * to prove, not the domain's.
+ * relationship, so it carries no Link Descriptor.
  */
 const BOARD = defineStructuredDataType({
   id: 'test.board',
@@ -89,10 +88,8 @@ describe('harvestEdges (#179, ADR-0046)', () => {
 
   /**
    * A wikilink the import could not resolve keeps `entityId: null` (and, from that path, a null
-   * descriptor with it). It names no target, so it is no edge — and since the `::` vocabulary is
-   * now a projection of the edge set, a descriptor stranded on such a link joins no vocabulary
-   * either. A descriptor characterises a relationship *to* something; with no target there is no
-   * relationship to characterise.
+   * descriptor with it). It names no target, so it is no edge — and since the `::` vocabulary is a
+   * projection of the edge set, a descriptor stranded on such a link joins no vocabulary either.
    */
   it('ignores an entityLink that names no target, descriptor or not', () => {
     expect(harvest(note({ entityId: null, label: 'Ghost', descriptor: 'rival' }))).toEqual([]);
@@ -149,10 +146,9 @@ describe('harvestEdges (#179, ADR-0046)', () => {
   });
 
   /**
-   * The grain is `(targetKind, targetId, descriptor)`. Nothing records *where* a link was
-   * expressed (ADR-0046 rejects a `sourceKind` column), so a prose mention and a map
-   * placement of the same target are the same edge — while two descriptors to that target
-   * are two.
+   * Nothing records *where* a link was expressed (ADR-0046 rejects a `sourceKind` column), so a
+   * prose mention and a map placement of the same target are the same edge — while two descriptors
+   * to that target are two.
    */
   describe('the grain is (target, descriptor)', () => {
     it('keeps two descriptors to the same target as two edges', () => {
@@ -196,8 +192,7 @@ describe('harvestEdges (#179, ADR-0046)', () => {
   /**
    * A typed Entity-Link Field value (#190) is an edge to its target, descriptor-less like a map
    * placement — harvested against the Entity's resolved `fields`, from the Metadata map rather than
-   * the Content snapshot. Feeds the same materialised index, so a Field relation appears in the
-   * World Graph.
+   * the Content snapshot.
    */
   describe('Entity-Link Field edges (#190)', () => {
     const lair = fieldSchemaSchema.parse({ key: 'lair', label: 'Lair', dataType: { kind: 'entityLink' } });

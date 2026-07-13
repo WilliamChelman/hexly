@@ -11,18 +11,13 @@ export type { Patch } from '@hexly/immer';
  * {@link body} and writes through {@link mutate}, the universal write-channel. `mutate`
  * returns Immer patches so a View that keeps its own undo/redo (the Hex Map editor)
  * can replay them through {@link applyPatches}.
- *
- * Declared here — not in `@hexly/plugin-hexmap` or `apps/web` — so a View lib depends on this
- * abstraction and the concrete session (in the app) binds it at the composition root:
- * the map lib plugs into the session, never the reverse (the ADR-0048 inversion).
  */
 export interface EntitySession {
   /** The working Entity body; a View reads its own slice (grid now, Fields/Metadata later). */
   readonly body: Signal<EntityBody>;
   /**
-   * Run `recipe` against a draft of the body through Immer, adopting the result and
-   * returning the forward/inverse patches — the one write-channel every View shares.
-   * A View that owns undo/redo pushes the returned patches onto its own stack.
+   * Run `recipe` against an Immer draft of the body, adopting the result and returning the
+   * forward/inverse patches for a View that owns its undo/redo stack.
    */
   mutate(recipe: (draft: EntityBody) => void): { redo: Patch[]; undo: Patch[] };
   /** Apply raw patches to the body — the undo/redo channel for a View replaying its own stack. */

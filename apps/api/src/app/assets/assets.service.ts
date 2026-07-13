@@ -11,9 +11,8 @@ import { assets } from '../db/schema';
 export const ASSETS_DIR = Symbol('ASSETS_DIR');
 
 /**
- * Content type by lower-cased file extension, for the handful of Asset kinds a vault
- * carries (ADR-0034: images, PDFs). Kept deliberately small — a full mime library is
- * YAGNI for a personal tool; anything unlisted serves as a generic download.
+ * Content type by lower-cased file extension, for the Asset kinds a vault carries (ADR-0034: images,
+ * PDFs). Anything unlisted serves as a generic download.
  */
 const MIME_BY_EXT: Record<string, string> = {
   '.png': 'image/png',
@@ -39,9 +38,8 @@ export interface StoredAsset {
 
 /**
  * Per-World content-addressed Asset storage (ADR-0034). Bytes are written to disk under
- * `<ASSETS_DIR>/<worldId>/<sha256>.<ext>`; metadata rows the `assets` table. Content-addressing
- * buys free dedup (same bytes → same hash → one file) and an unguessable path in one move — the
- * hash IS the capability token the unauthenticated serving route relies on.
+ * `<ASSETS_DIR>/<worldId>/<sha256>.<ext>`; metadata rows the `assets` table. The hash IS the
+ * capability token the unauthenticated serving route relies on.
  */
 @Injectable()
 export class AssetsService {
@@ -107,11 +105,9 @@ export class AssetsService {
   }
 
   /**
-   * Every stored Asset for a World, for the vault export (ADR-0033, #150): the capability URL its
-   * docs reference (built by the same {@link url} helper the store path uses, so the export's src
-   * rewrite can't drift from the stored format), the human-readable `originalFilename` to write
-   * into the zip, and its bytes. A row whose file is missing on disk is skipped rather than
-   * aborting the export.
+   * Every stored Asset for a World, for the vault export (ADR-0033): the capability URL its docs
+   * reference, the human-readable `originalFilename` to write into the zip, and its bytes. A row
+   * whose file is missing on disk is skipped rather than aborting the export.
    */
   exportAssets(worldId: string): { servedUrl: string; originalFilename: string; bytes: Buffer }[] {
     const rows = this.db

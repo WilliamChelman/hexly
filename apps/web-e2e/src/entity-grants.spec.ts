@@ -3,10 +3,8 @@ import { TEST_GRANTEE } from './test-user';
 
 /**
  * Entity-level grants (ADR-0037, #161): an Owner shares one Entity with a named Instance
- * user — Editor or Viewer — from the Share dialog, even someone who isn't in the World.
- * This drives the whole surface: open Share, pick a person + role, see the grant land,
- * then revoke it. The grantee's read access is proven at the HTTP layer (supertests);
- * here we assert the Owner-facing UI round-trips through the real API.
+ * user — Editor or Viewer — even someone who isn't in the World. The grantee's read access
+ * is proven at the HTTP layer (supertests); this covers the Owner-facing UI.
  */
 test('an Owner shares an Entity with a named user, then revokes it', async ({ page }) => {
   await enterLibrary(page);

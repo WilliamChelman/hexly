@@ -1,12 +1,9 @@
 import type { Editor, Range } from '@tiptap/core';
 
 /**
- * One insertable block in the Content editor's slash menu (#73). `labelKey` is a
- * Transloco key (copy is client-owned, ADR-0014); `keywords` drive locale-independent
- * filtering; `apply` replaces the typed `/query` range with the block via TipTap commands.
- *
- * Every block here is already in {@link CONTENT_EXTENSIONS} (StarterKit), so inserting one
- * needs no format bump and round-trips through the opaque snapshot for free (ADR-0019).
+ * One insertable block in the Content editor's slash menu. `labelKey` is a Transloco key;
+ * `keywords` drive locale-independent filtering; `apply` replaces the typed `/query` range
+ * with the block via TipTap commands.
  */
 export interface SlashItem {
   id: string;

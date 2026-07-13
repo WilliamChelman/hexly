@@ -7,11 +7,11 @@ import { entityRoute } from '../utils/routes';
 
 /**
  * Resolves an Entity's World from its id and redirects the World-agnostic
- * `/entities/:id` link to its canonical `/w/:worldId/entities/:id` route
- * (issue #118 follow-up). Content Links don't carry their target's World — a link
- * can point across Worlds — so this is the one place that looks it up, by id only
- * (ADR-0025), never pulling the whole list. A missing or inaccessible target falls
- * through (returns `true`) so the route's error page renders instead of redirecting.
+ * `/entities/:id` link to its canonical `/w/:worldId/entities/:id` route.
+ * Content Links don't carry their target's World — a link can point across
+ * Worlds — so it is looked up here by id only (ADR-0025). A missing or
+ * inaccessible target falls through (returns `true`) so the route's error page
+ * renders instead of redirecting.
  */
 export const entityWorldRedirect: CanActivateFn = (route) => {
   const id = idFromSegment(route.paramMap.get('id') ?? '');

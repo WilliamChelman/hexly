@@ -15,11 +15,8 @@ import { ConfigModule } from '../config/config.module';
 
 /**
  * Account management (ADR-0037, ADR-0047): the `manage-users` role administers accounts
- * with zero content powers; the Superadmin is the operator's in-app self, outside the
- * collaboration model, whose bypass reaches anything for repair. These specs assert the
- * externally observable rules at the HTTP edge — who can call the `/users` surface, that
- * the `manage-users` role confers no content access, disable-vs-delete, the sole-owner
- * deletion refusal, and last-Superadmin irremovability.
+ * with zero content powers; the Superadmin sits outside the collaboration model and its
+ * bypass reaches anything for repair.
  */
 describe('Account management (/users)', () => {
   let app: INestApplication;

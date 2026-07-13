@@ -11,15 +11,11 @@ import { EntityWrites } from '../entities/entity-writes';
 export type WorldRow = typeof worlds.$inferSelect;
 
 /**
- * The narrow handle a membership change writes `world_members` rows through — the World peer of
- * `EntityWrites`'s `AclWriter`. It exists so the *invariants* (≥1-Owner, no-such-user, owner-wins
- * upsert) can stay in the service that reads best with them, while the write itself stays inside
- * {@link WorldWrites}, which is what makes the bump-and-nudge structural rather than a convention.
- * Runs inside the transaction, before the `seq` bump.
+ * The narrow handle a membership change writes `world_members` rows through. Runs inside the
+ * transaction, before the `seq` bump.
  *
- * A writer that matched no row leaves the World untouched, and {@link WorldWrites.membership}
- * then skips the bump and the nudge — a no-op write must not tell followers to refetch — and
- * reports `false`, which is the `not-found` every matchless caller already returns.
+ * A writer that matched no row leaves the World untouched: {@link WorldWrites.membership} then
+ * skips the bump and the nudge and reports `false`.
  */
 export interface MembershipWriter {
   /** Promote to Owner — deliberately overwrites any contributor/viewer role the target held. */
@@ -40,18 +36,12 @@ export interface MembershipWriter {
 }
 
 /**
- * The single write handle for `worlds` and `world_members` — the World peer of `EntityWrites`
- * (ADR-0045). It owns the `seq` bump, the post-commit emit, and the fan-out to the World's shared
- * Entities, so a write *cannot* land without nudging its followers. An ESLint rule bans
+ * The single write handle for `worlds` and `world_members` (ADR-0045). It owns the `seq` bump, the
+ * post-commit emit, and the fan-out to the World's shared Entities. An ESLint rule bans
  * `insert|update|delete(worlds)` and `insert|update|delete(worldMembers)` everywhere else.
  *
- * The fan-out is the reason this module exists rather than a convention on the service. A World
- * membership change moves Rights on two resources at once — the World, and every `shared` Entity
- * in it (`canRead` = `… ∨ (shared ∧ world-member)`, `canWrite` = `… ∨ (shared ∧ world-owner)`).
- * `bumpAndNudge` did only the first, so promoting a member to World Owner left them live-following
- * a shared Entity with a read-only `rights` array and no Save button: the same "Rights never
- * refreshed" defect ADR-0045 made unstatable for entity grants, surviving on the World path
- * because nothing structural forced the second half.
+ * A World membership change moves Rights on two resources at once — the World, and every `shared`
+ * Entity in it (`canRead` = `… ∨ (shared ∧ world-member)`, `canWrite` = `… ∨ (shared ∧ world-owner)`).
  */
 @Injectable()
 export class WorldWrites {
@@ -81,14 +71,14 @@ export class WorldWrites {
   }
 
   /**
-   * Write a World's Owner-curated fields — `name` and/or the ordered `pinnedEntityIds`. A rename
-   * or a pin reorder *is* a modification, so both timestamps move, unlike {@link membership} which
-   * moves `seq` alone. An absent field is left untouched.
+   * Write a World's Owner-curated fields — `name` and/or the ordered `pinnedEntityIds`. Both
+   * timestamps move, unlike {@link membership} which moves `seq` alone. An absent field is left
+   * untouched.
    *
-   * The post-write `seq` is computed once, in JS, and used for both the SET and the returned row:
-   * the caller's own write-through then advances its held freshness to exactly what the row holds,
-   * so the server's echo nudge for this very write dedups to nothing. Safe because `better-sqlite3`
-   * is synchronous and the read rode the same transaction.
+   * The post-write `seq` is computed in JS and used for both the SET and the returned row, so the
+   * caller's write-through holds exactly what the row holds and the server's echo nudge for this
+   * write dedups to nothing. Safe because `better-sqlite3` is synchronous and the read rode the
+   * same transaction.
    */
   update(row: WorldRow, patch: { name?: string; pinnedEntityIds?: string[] }): WorldRow {
     const next: WorldRow = {
@@ -117,10 +107,9 @@ export class WorldWrites {
   }
 
   /**
-   * Delete a World and cascade its Entities, nudging each. Deletion is eviction: the rows are gone,
-   * so the bus shapes every follower — of the World and of each cascaded Entity — to `unavailable`.
-   * The Entity cascade joins this transaction, so its buffered nudges flush only once the World row
-   * is gone too, never under a rollback.
+   * Delete a World and cascade its Entities, nudging each: every follower — of the World and of
+   * each cascaded Entity — is shaped to `unavailable`. The Entity cascade joins this transaction,
+   * so its buffered nudges flush only once the World row is gone too, never under a rollback.
    *
    * On-disk Asset bytes do not cascade; dropping them is the caller's, after the commit.
    */
@@ -137,10 +126,9 @@ export class WorldWrites {
    * the World's `seq`, nudge its followers, and fan out to every `shared` Entity in it. Returns
    * whether anything changed, so a caller whose target was not a (removable) member can 404.
    *
-   * It bumps **`seq` alone** on the World: a membership mutation touches neither `name` nor pins,
-   * so bumping `updatedAt` would send the World to the top of the World Index's "recently updated"
-   * order merely because someone was added to it. `seq` is the freshness key; `updatedAt` stays the
-   * domain-visible modified timestamp.
+   * It bumps **`seq` alone**: bumping `updatedAt` would send the World to the top of the World
+   * Index's "recently updated" order merely because someone was added to it. `seq` is the freshness
+   * key; `updatedAt` stays the domain-visible modified timestamp.
    *
    * Shaping is per recipient: a principal whose access ended resolves to `unavailable`, everyone
    * still-reachable to a detail nudge carrying their freshly-computed Rights.
@@ -166,9 +154,8 @@ export class WorldWrites {
   }
 
   /**
-   * Author a new user-defined type (#191): insert the row, then bump `seq` and nudge. It bumps `seq`
-   * alone — like {@link membership} — since a type change touches neither `name` nor pins. The
-   * service has already checked the id is free, so the insert never conflicts.
+   * Author a new user-defined type. Bumps `seq` alone, like {@link membership}. The service has
+   * already checked the id is free, so the insert never conflicts.
    */
   createType(worldId: string, type: UserDefinedType, now: number = Date.now()): void {
     this.transact(() => {
@@ -189,8 +176,8 @@ export class WorldWrites {
   }
 
   /**
-   * Rename / re-Field a World's user-defined type (#191). Returns whether a row matched — an unknown
-   * type id leaves the World untouched, so the bump and nudge are skipped and the caller can 404.
+   * Rename / re-Field a World's user-defined type. Returns whether a row matched — an unknown type
+   * id leaves the World untouched, so the bump and nudge are skipped and the caller can 404.
    */
   updateType(
     worldId: string,
@@ -216,7 +203,7 @@ export class WorldWrites {
     });
   }
 
-  /** Delete a World's user-defined type (#191). Returns whether a row matched, so an unknown id 404s. */
+  /** Delete a World's user-defined type. Returns whether a row matched, so an unknown id 404s. */
   deleteType(worldId: string, typeId: string): boolean {
     return this.transact(() => {
       const deleted = this.db
@@ -241,10 +228,9 @@ export class WorldWrites {
 
   /**
    * Drop every World membership a departing user holds — a **system write**, called when their
-   * account is deleted. It bumps `seq` on each touched World, because the World's membership set
-   * moved and a later nudge must read as newer than a follower's held value, but deliberately
-   * **emits nothing**: the user's own sessions are dropped with the account, so they self-evict,
-   * and no surviving principal's standing on the World or its Entities changed.
+   * account is deleted. Bumps `seq` on each touched World, so a later nudge reads as newer than a
+   * follower's held value, but **emits nothing**: the user's own sessions are dropped with the
+   * account, and no surviving principal's standing on the World or its Entities changed.
    */
   purgeMembershipsOf(userId: string): void {
     this.transact(() => {
@@ -266,8 +252,8 @@ export class WorldWrites {
 
   /**
    * The `world_members` write handle handed to a {@link membership} change, paired with the
-   * "did anything actually change" predicate the caller gates its bump on. The flag is a closure,
-   * not a property, so a destructured writer still reports its writes.
+   * "did anything change" predicate the caller gates its bump on. The flag is a closure, not a
+   * property, so a destructured writer still reports its writes.
    */
   private membershipWriter(id: string): {
     writer: MembershipWriter;

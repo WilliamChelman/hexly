@@ -5,12 +5,10 @@ import { AuthClient, Locale, LocaleService, ThemeService } from '@hexly/web-core
 import { Button, Icon, Rule, MenuGroup, MenuItem, MenuItemRadio, MenuPanel, MenuTrigger } from '@hexly/web-ui';
 
 /**
- * The header's account control (ADR-0015): a single trigger that opens a CDK
- * menu gathering the global, account-independent preferences — theme and
- * language — plus the session action. The menu is offered to everyone, anonymous
- * public-link viewers included (ADR-0014); only the session row swaps, between
- * Sign out when authenticated and Login otherwise. The trigger shows the
- * signed-in user's initials, or a neutral person glyph when signed out.
+ * The header's account control (ADR-0015): a trigger opening a CDK menu with the
+ * global, account-independent preferences — theme and language — plus the session
+ * action. Offered to everyone, anonymous public-link viewers included (ADR-0014);
+ * the session row is Sign out when authenticated, Login otherwise.
  */
 @Component({
   selector: 'app-user-menu',

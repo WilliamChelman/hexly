@@ -27,9 +27,8 @@ import {
 } from '@hexly/web-ui';
 
 /**
- * The World Index (`/`): lists every World the caller can reach — owned and
- * member — and owns World create. It is the chooser, not an auto-redirect:
- * zero Worlds shows an empty state with a Create affordance.
+ * The World Index (`/`): lists every World the caller can reach — owned and member — and owns
+ * World create. Zero Worlds shows an empty state with a Create affordance, never an auto-redirect.
  */
 @Component({
   selector: 'app-world-index',

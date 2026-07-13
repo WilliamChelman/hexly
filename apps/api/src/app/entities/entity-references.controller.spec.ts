@@ -11,12 +11,11 @@ import { WorldsModule } from '../worlds/worlds.module';
 import { EntitiesModule } from './entities.module';
 
 /**
- * `GET /entities/:id/references` — the read side of the Entity Link index (ADR-0046, #179).
+ * `GET /entities/:id/references` — the read side of the Entity Link index (ADR-0046).
  *
- * The rows are raw truth (A → B regardless of who may see either); confidentiality lives entirely
- * here, in the read. **Inbound** is filtered by the viewer's access to the *source*, so a `private`
- * "Secret Cabal Roster" never leaks its name through a `shared` town it links. **Outbound** needs
- * no hiding — an unreadable or deleted target simply renders as a non-navigable dangling label.
+ * The rows are raw truth (A → B regardless of who may see either); confidentiality lives in the
+ * read. Inbound is filtered by the viewer's access to the *source*. Outbound is not filtered — an
+ * unreadable or deleted target renders as a non-navigable dangling label.
  */
 describe('Entity references', () => {
   let app: INestApplication;
@@ -63,10 +62,7 @@ describe('Entity references', () => {
       ]);
     });
 
-    /**
-     * A link to a missing Entity is a valid document, so the edge survives its target's deletion —
-     * it just stops resolving. The client renders it as the existing non-navigable dangling label.
-     */
+    /** The edge survives its target's deletion — it just stops resolving. */
     it('reports a deleted target as unresolved rather than dropping the link', async () => {
       const ada = await signIn('ada@hexly.test');
       const world = await makeWorld(ada);
@@ -80,10 +76,7 @@ describe('Entity references', () => {
       expect(references).toEqual([{ targetId: mira, descriptor: null, target: null }]);
     });
 
-    /**
-     * `private` is absolute: a viewer who cannot read the target must not learn its name from
-     * someone else's page. Unreadable and deleted are indistinguishable here — both dangle.
-     */
+    /** Unreadable and deleted are indistinguishable to the viewer — both dangle. */
     it('reports a target the viewer cannot read as unresolved', async () => {
       const ada = await signIn('ada@hexly.test');
       const bob = await signIn('bob@hexly.test');
@@ -108,10 +101,10 @@ describe('Entity references', () => {
     });
 
     /**
-     * A Hex, a Feature, and a Region each carry an Entity Link, harvested through the **Structured
-     * Field** `core.hexmap` declares (ADR-0050). The one test that the generic path is wired end to
-     * end: the Entity's types must resolve to the `grid` Field and `core.hex-grid` must be
-     * registered, or a map's placements harvest to nothing at all.
+     * A Hex, a Feature, and a Region each carry an Entity Link, harvested through the Structured
+     * Field `core.hexmap` declares (ADR-0050). Covers the generic path end to end: the Entity's
+     * types must resolve to the `grid` Field and `core.hex-grid` must be registered, or a map's
+     * placements harvest to nothing at all.
      */
     it('harvests a Hex, Feature, and Region link off the grid Field, descriptor-less (ADR-0050)', async () => {
       const ada = await signIn('ada@hexly.test');
@@ -183,11 +176,8 @@ describe('Entity references', () => {
     });
 
     /**
-     * The acceptance criterion, and the reason the access rule lives in the read (ADR-0046):
-     * a `private` source must never appear in another viewer's *Referenced by* for a `shared`
-     * target it links. Otherwise a `private` "Secret Cabal Roster" leaks its name and its very
-     * existence to anyone who can reach the town it names — which `private` (absolute; no World
-     * Owner or Admin override) forbids.
+     * A `private` source must never appear in another viewer's *Referenced by* for a `shared`
+     * target it links — `private` is absolute, with no World Owner or Admin override.
      */
     it('hides a private source from a viewer without access to it', async () => {
       const ada = await signIn('ada@hexly.test');
@@ -247,9 +237,8 @@ describe('Entity references', () => {
   });
 
   /**
-   * The grain lets one target carry several descriptors, and two Entities may share a name, so
-   * every ORDER BY ends in an id tiebreak. Without it these rows would swap between reads and the
-   * panel would reshuffle under the reader.
+   * One target may carry several descriptors and two Entities may share a name, so every ORDER BY
+   * ends in an id tiebreak — otherwise these rows swap between reads.
    */
   it('orders References by target name, dangling last, with a stable tiebreak', async () => {
     const ada = await signIn('ada@hexly.test');

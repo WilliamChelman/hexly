@@ -9,11 +9,6 @@ function applyMigration(sqlite: Database.Database, file: string): void {
   sqlite.exec(readFileSync(resolve(__dirname, 'migrations', file), 'utf8'));
 }
 
-/**
- * `createDb` applies the migration files at boot (ADR-0027). This proves the
- * migrations folder resolves via `__dirname` under vitest and that `0000` builds
- * the full schema on a fresh DB — the path every spec and the real boot share.
- */
 describe('createDb boot migration (ADR-0027)', () => {
   it('builds the full schema on a fresh in-memory DB', () => {
     const db = createDb(':memory:');
@@ -70,10 +65,9 @@ describe('createDb boot migration (ADR-0027)', () => {
 });
 
 /**
- * The symmetric-owners migration (ADR-0037, #158) backfills each prior single Owner
- * into the new ownership sets, then retires the `owner_id` columns. A fresh test DB
- * runs the backfill over empty tables, so this rebuilds the pre-0037 schema by hand,
- * seeds real owned data, applies 0003, and asserts the round-trip preserves it.
+ * 0003 backfills each prior single Owner into the ownership sets, then retires the
+ * `owner_id` columns. A fresh test DB would run the backfill over empty tables, so
+ * the pre-0037 schema is rebuilt by hand and seeded with owned data.
  */
 describe('symmetric-owners migration round-trip (0003)', () => {
   function seededPre0037(): Database.Database {
@@ -143,11 +137,10 @@ describe('symmetric-owners migration round-trip (0003)', () => {
 });
 
 /**
- * The entity_owners fold (ADR-0037, 0007): entity ownership stops being its own table and
- * becomes a `role: 'owner'` row in `entity_grants`, mirroring `world_members`. The migration
- * backfills every `entity_owners` row as an owner grant, then drops the table. Owner wins the
- * merge — a user who was both an Owner and held an editor/viewer grant collapses to one owner
- * row. A fresh DB folds an empty table, so this seeds the pre-fold shape and asserts the move.
+ * 0007 backfills every `entity_owners` row as a `role: 'owner'` row in `entity_grants`,
+ * then drops the table. Owner wins the merge — a user who was both an Owner and held an
+ * editor/viewer grant collapses to one owner row. A fresh DB would fold an empty table,
+ * so the pre-fold shape is seeded by hand.
  */
 describe('entity_owners fold migration (0007)', () => {
   it('backfills owners as owner grants (owner wins the merge), preserves other grants, drops the table', () => {
@@ -197,10 +190,8 @@ describe('entity_owners fold migration (0007)', () => {
 });
 
 /**
- * The Home-visibility backfill (ADR-0037, 0005) flips every pre-existing Home Entity to
- * 'shared'. New Homes are created locked-shared, but old rows stored 'private' became
- * unreadable to members. A fresh DB has no old Homes, so this seeds a 'private' Home the
- * old way, applies 0005, and asserts the flip.
+ * 0005 flips every pre-existing Home Entity to 'shared' — old rows stored 'private' and
+ * were unreadable to members. A fresh DB has no old Homes, so one is seeded the old way.
  */
 describe('Home-visibility backfill migration (0005)', () => {
   it('flips every pre-existing private Home Entity to shared', () => {
@@ -233,12 +224,10 @@ describe('Home-visibility backfill migration (0005)', () => {
 });
 
 /**
- * The Home-Entity removal migration (ADR-0043, 0011): drops `entities.is_home` and the
- * `idx_world_home` partial unique index, and adds `worlds.pinned_entity_ids`. Pre-launch, so
- * an existing home note simply survives as an ordinary row — no demotion. A fresh DB has no
- * old home, so this seeds one the old way, applies 0011, and asserts the column/index are gone,
- * the note survives, and the new pins column defaults empty. The entities rebuild carries rowid
- * forward, so the FTS index stays aligned (the round-trip below proves it still matches).
+ * 0011 drops `entities.is_home` and the `idx_world_home` partial unique index, and adds
+ * `worlds.pinned_entity_ids`. An existing home note survives as an ordinary row — no
+ * demotion — and the entities rebuild carries rowid forward so the FTS index stays aligned.
+ * A fresh DB has no old home, so one is seeded the old way.
  */
 describe('Home-Entity removal migration (0011)', () => {
   function seededPre0011(): Database.Database {

@@ -7,12 +7,6 @@ import { AuthService } from './auth.service';
 import { AuthModule } from './auth.module';
 import { ConfigModule } from '../config/config.module';
 
-/**
- * The Instance user directory (#158): the owner-set UI needs to name owners and
- * pick a co-Owner, but only the current user's identity is otherwise reachable.
- * This surface exposes id + displayName for every Instance user — never the
- * email, which is private (ADR-0004).
- */
 describe('User directory', () => {
   let app: INestApplication;
   let db: Db;

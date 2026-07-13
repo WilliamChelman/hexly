@@ -11,11 +11,6 @@ import { TypeFieldRegistry } from '../entities/type-field-registry';
 import { ConfigModule } from '../config/config.module';
 import { WorldsModule } from './worlds.module';
 
-/**
- * The World user-defined type surface (ADR-0048, #191): World-Owner-gated CRUD, World scoping, and
- * an Entity carrying a user-defined type filtering/faceting by its Fields. A sibling of
- * `entities.controller.spec`, on the same in-process Nest + `:memory:` harness.
- */
 describe('World user-defined types endpoints', () => {
   let app: INestApplication;
   let db: Db;
@@ -289,11 +284,6 @@ describe('World user-defined types endpoints', () => {
     });
   });
 
-  /**
-   * A user-defined type declaring a Field of the map plugin's `core.hex-grid` data-type (#201). The
-   * API persists the declaration — Field and View placement — validates the grid it types, and
-   * harvests its links; it never learns what a hex is.
-   */
   describe('a user-defined type carrying a Structured Field', () => {
     /** `world.deity`, plus a `battlemap` grid placed *after* its Fields — a deity opens on its Fields. */
     const deityWithMap = {

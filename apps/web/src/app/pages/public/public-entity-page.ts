@@ -124,11 +124,10 @@ export class PublicEntityPage {
         }
       });
 
-    // Live-follow the open Entity: the client's watchEntity() owns the source — connecting the bus
-    // as this token principal, then relaying nudges into a refetch-and-replace; EVICTED (link
-    // revoked, deleted, a 403/404 refetch) → the dead-link panel without a reload. switchMap off
-    // `followed` tears down the old follow (reverting the token principal) when the Entity swaps. A
-    // public reader never edits, so the only gate is newer-than-held.
+    // Live-follow the open Entity. watchEntity() connects the bus as this token principal and
+    // relays nudges into a refetch-and-replace; EVICTED (link revoked, deleted, a 403/404 refetch)
+    // → the dead-link panel. switchMap off `followed` tears down the old follow (reverting the
+    // token principal) when the Entity swaps.
     toObservable(this.followed)
       .pipe(
         switchMap((f) =>

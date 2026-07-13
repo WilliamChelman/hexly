@@ -22,10 +22,8 @@ function newToken(): string {
 }
 
 /**
- * Under NODE_ENV=test (set by vitest), skip the native argon2 addon entirely: it's
- * the CPU contention under parallel workers that makes auth-heavy specs flaky, not
- * the cost params. The fake keeps the `$argon2`-ish shape so specs asserting the
- * stored form still pass. Production always runs real argon2 with memory-hard defaults.
+ * Under NODE_ENV=test (set by vitest), the native argon2 addon is skipped entirely:
+ * its CPU contention under parallel workers makes auth-heavy specs flaky.
  */
 const isTest = process.env.NODE_ENV === 'test';
 
@@ -43,27 +41,18 @@ function verifyPassword(stored: string, password: string): Promise<boolean> {
 }
 
 /**
- * A precomputed hash verified against when no user matches, so the unknown-email
- * path costs roughly the same as the wrong-password path and response timing
- * cannot be used to enumerate which emails exist. (No-op cost under test.)
+ * Verified against when no user matches, so the unknown-email path costs roughly the
+ * same as the wrong-password path and timing cannot enumerate which emails exist.
  */
 const DUMMY_PASSWORD_HASH = hashPassword('hexly-dummy-password');
 
-/**
- * The auth domain behind a small interface: provisioning members of the closed
- * set, exchanging credentials for a session, resolving a session back to its
- * user, and ending one. All hashing, token minting, and persistence live here;
- * callers only ever hold opaque tokens and {@link AuthUser} values.
- */
 @Injectable()
 export class AuthService {
   constructor(@Inject(DB) private readonly db: Db) {}
 
   /**
-   * Provision a user out-of-band (no public signup): the seed CLI, the
-   * `--superadmin` setup path, and the `manage-users` create-user endpoint all
-   * route through here. The password is hashed with argon2; the plaintext is
-   * never stored. Roles default to the empty set and Superadmin to off.
+   * Provision a user out-of-band (there is no public signup). The plaintext password
+   * is never stored. Roles default to the empty set and Superadmin to off.
    */
   async seedUser(
     email: string,
@@ -92,11 +81,10 @@ export class AuthService {
   }
 
   /**
-   * Verify credentials and open a session. Returns the new session token plus
-   * the user on success, or `null` if the email is unknown or the password is
-   * wrong. The two failure paths are timing-equalized: an unknown email still
-   * runs an argon2 verify against a dummy hash, so the caller cannot tell which
-   * failed (nor enumerate emails) by response timing.
+   * Verify credentials and open a session, or `null` if the email is unknown or the
+   * password is wrong. Both failure paths are timing-equalized: an unknown email still
+   * runs a verify against a dummy hash, so timing reveals neither which check failed
+   * nor which emails exist.
    */
   async login(email: string, password: string): Promise<{ token: string; user: AuthUser } | null> {
     const user = this.db
@@ -151,9 +139,8 @@ export class AuthService {
   }
 
   /**
-   * Merge a Preferences patch into the user's stored bag and return the merged
-   * result. PATCH semantics: absent fields keep their stored value, an explicit
-   * `null` clears a field back to "no choice".
+   * PATCH semantics: an absent field keeps its stored value, an explicit `null` clears
+   * the field back to "no choice".
    */
   async updatePreferences(userId: string, patch: PreferencesPatch): Promise<Preferences> {
     const row = this.db.select().from(users).where(eq(users.id, userId)).get();
@@ -181,9 +168,8 @@ export class AuthService {
   }
 
   /**
-   * Change the user's password: verify the current one, then re-hash and store
-   * the new one. Returns `false` — with nothing written — when the current
-   * password does not verify. The user's other sessions stay valid.
+   * Returns `false` — with nothing written — when the current password does not
+   * verify. The user's other sessions stay valid.
    */
   async changePassword(userId: string, currentPassword: string, newPassword: string): Promise<boolean> {
     const row = this.db.select().from(users).where(eq(users.id, userId)).get();
@@ -202,10 +188,7 @@ export class AuthService {
     return true;
   }
 
-  /**
-   * Set a user's password unconditionally — the Instance Admin reset path, which
-   * carries no current-password check because the Admin acts on the user's behalf.
-   */
+  /** Set a user's password unconditionally: the Instance Admin reset path, with no current-password check. */
   async setPassword(userId: string, newPassword: string): Promise<void> {
     const passwordHash = await hashPassword(newPassword);
     this.db.update(users).set({ passwordHash }).where(eq(users.id, userId)).run();
@@ -223,11 +206,7 @@ export class AuthService {
   }
 }
 
-/**
- * Canonicalize an email for storage and lookup so a user seeded as
- * `ada@hexly.test` can still log in typing `Ada@hexly.test` or with stray
- * whitespace.
- */
+/** Canonical form for both storage and lookup: login is case- and whitespace-insensitive. */
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
@@ -244,11 +223,7 @@ function toAuthUser(row: typeof users.$inferSelect): AuthUser {
   };
 }
 
-/**
- * Parse the stored `roles` JSON through the domain schema. A corrupt or
- * hand-edited set degrades to no roles rather than breaking auth — the
- * Superadmin flag (a separate column) is unaffected.
- */
+/** A corrupt or hand-edited set degrades to no roles rather than breaking auth. */
 function parseRoles(raw: string): InstanceRole[] {
   try {
     const parsed = instanceRolesSchema.safeParse(JSON.parse(raw));
@@ -258,10 +233,7 @@ function parseRoles(raw: string): InstanceRole[] {
   }
 }
 
-/**
- * Parse the stored Preferences JSON through the domain schema. A corrupt or
- * hand-edited bag degrades to app defaults rather than breaking auth.
- */
+/** A corrupt or hand-edited bag degrades to app defaults rather than breaking auth. */
 function parsePreferences(raw: string): Preferences {
   try {
     const parsed = preferencesSchema.safeParse(JSON.parse(raw));

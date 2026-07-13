@@ -27,16 +27,15 @@ const LABEL_GRID: LabelGrid = { pointCell: 90, linkCell: 120, max: 400 };
 const SPACE = 4096;
 
 /**
- * A link spring of 1 (the default) drags clusters into an unreadable knot. This is the one layout
- * knob that matters — raising `simulationRepulsion` does nothing visible, and lowering
- * `simulationGravity` backfires by letting orphan Entities drift off screen.
+ * A link spring of 1 (the default) drags clusters into an unreadable knot. Raising
+ * `simulationRepulsion` does nothing visible, and lowering `simulationGravity` lets orphan Entities
+ * drift off screen.
  */
 const LINK_SPRING = 0.3;
 
 /**
- * "Readable" is an alpha threshold, crossed long before the simulation truly ends (`onSimulationEnd`
- * fires at alpha < 1e-3, ~{@link SIMULATION_DECAY} frames further on). The re-fit fires here so the
- * graph is framed the moment it's legible, not tens of seconds later once the layout has frozen.
+ * The alpha at which the layout reads as settled — crossed long before the simulation truly ends
+ * (`onSimulationEnd` fires at alpha < 1e-3, ~{@link SIMULATION_DECAY} frames further on).
  */
 const SETTLED_ALPHA = 0.05;
 
@@ -51,8 +50,7 @@ const SIMULATION_DECAY = 1500;
 /**
  * Wait for the layout to contract before framing it. cosmos.gl's default 250 ms fits the seed
  * *ring*, and the simulation then pulls the graph into a fraction of that box — leaving a speck in
- * the middle of an empty canvas until the reader zooms. Fitting late is what makes the first
- * paint usable, so this tracks the settle above rather than the library's default.
+ * the middle of an empty canvas until the reader zooms.
  */
 const FIT_VIEW_DELAY_MS = 1200;
 
@@ -60,16 +58,15 @@ const FIT_VIEW_DELAY_MS = 1200;
 const FIT_MS = 250;
 
 /**
- * After the last pan wheel event, how long to keep the label loop awake so it tracks the final
- * frame in. A trackpad swipe fires a burst of `wheel` events with no "end" signal, so the loop is
- * held live for a beat past the last one, then parks itself as any settled graph does.
+ * How long the label loop stays awake past the last pan wheel event. A trackpad swipe fires a burst
+ * of `wheel` events with no "end" signal, so the loop is held live for a beat past the last one.
  */
 const PAN_IDLE_MS = 120;
 
 /**
- * Reheat energy held on the simulation *throughout* a drag, so the moved Entity's neighbours follow
- * in real time rather than snapping into place on release. Re-applied each `onDrag` frame — like
- * d3's `alphaTarget` — then left to cool once the reader lets go.
+ * Reheat energy held on the simulation *throughout* a drag — re-applied each `onDrag` frame, like
+ * d3's `alphaTarget` — so the moved Entity's neighbours follow in real time rather than snapping
+ * into place on release.
  */
 const REHEAT_ALPHA = 0.3;
 
@@ -84,8 +81,7 @@ const LABEL_CONTOUR = '-1px -1px 0 #111, 1px -1px 0 #111, -1px 1px 0 #111, 1px 1
 /**
  * How long the pointer must settle before the focus grey-out commits. A sweep across the canvas
  * fires a burst of over/out events — one per node brushed — and applying each would flash the whole
- * graph light and dark. Debouncing coalesces the burst into a single commit on the node the pointer
- * finally rests on, so focus only ever reflects where a reader actually paused.
+ * graph light and dark.
  */
 const HOVER_DEBOUNCE_MS = 50;
 
@@ -94,11 +90,6 @@ function token(style: CSSStyleDeclaration, name: string, fallback: string): stri
   return style.getPropertyValue(name).trim() || fallback;
 }
 
-/**
- * The theme's colours, as cosmos.gl holds them: baked into GPU buffers, never read back from CSS.
- * That is why {@link GraphCanvas.repaint} exists at all — and why the whole palette is resolved in
- * one computed-style read rather than one per token.
- */
 /** The muted fallback hue if a colour token fails to resolve (jsdom, missing var). */
 const FALLBACK_NODE_COLOR = '#6f5a36';
 
@@ -169,14 +160,8 @@ interface Mounted {
 
 /**
  * The World Graph's renderer: a GPU force simulation (cosmos.gl) under a DOM label overlay.
- *
- * cosmos.gl renders **no text at all**, so every label here is DOM we own. It does supply the hard
- * part: `getSampledPointPositionsMap` / `getSampledLinkPositionsMap` return only what is on screen,
- * thinned to one element per sampling cell — declutter and viewport cull in one call, without
- * touching the other nodes. Reading *all* positions each frame instead costs twice as much.
- *
- * The library is dynamically imported: it is ~168 kB gzip of WebGL that renders nothing
- * server-side, and nothing outside this page needs it.
+ * cosmos.gl renders **no text at all**, so every label here is DOM we own. The library is
+ * dynamically imported — ~168 kB gzip of WebGL that renders nothing server-side.
  */
 /** A reader's click on a node: the Entity to open, and whether a modifier asked for a new tab. */
 export interface GraphOpen {
@@ -387,14 +372,12 @@ export class GraphCanvas {
 
   /**
    * The label pass. `selectLabels` decides *which* Entities and Link Descriptors are labelled — on a
-   * grid anchored in graph space, so panning never changes the set — and this only projects the
-   * winners to the screen and writes the DOM.
+   * grid anchored in graph space, so panning never changes the set — and this projects the winners
+   * to the screen and writes the DOM.
    *
-   * Render-on-demand: the loop repaints only while something still moves the labels — the force
-   * simulation is running (`cosmos.isSimulationRunning`), or a drag/pan is in flight
-   * ({@link interacting}). When both go quiet it parks itself ({@link frame} = 0), so a settled graph
-   * costs nothing per frame. {@link wake} restarts it when the reader next interacts, and a drag
-   * reheats the simulation — which brings `isSimulationRunning` back true and re-drives the loop.
+   * The loop repaints only while the simulation is running (`cosmos.isSimulationRunning`) or a
+   * drag/pan is in flight ({@link interacting}); when both go quiet it parks itself
+   * ({@link frame} = 0) until {@link wake}.
    *
    * Only ever called on a live mount, past the effect's stale check — the loop it starts owns
    * {@link frame} until {@link teardown} cancels it.
@@ -453,10 +436,9 @@ export class GraphCanvas {
         used++;
       };
 
-      // Re-read the GPU's positions while anything still moves them — the simulation's forces, or a
-      // reader dragging a point. `isSimulationRunning` goes false mid-drag, which is why the loop
-      // also stays awake on `interacting`; skipping this read would strand labels where a node used
-      // to be. Once both are quiet the loop parks below and stops reading entirely.
+      // Re-read the GPU's positions while anything still moves them. `isSimulationRunning` goes
+      // false mid-drag, which is why the loop also stays awake on `interacting`; skipping this read
+      // would strand labels where a node used to be.
       positions.set(cosmos.getPointPositions());
 
       const selection = selectLabels(payload, positions, currentView(), LABEL_GRID);
@@ -495,20 +477,17 @@ export class GraphCanvas {
 
   /**
    * Two-finger trackpad pan. cosmos.gl's zoom is d3-zoom on the canvas, which reads *every* wheel
-   * event as a zoom — so a two-finger swipe zooms instead of panning, and there is no built-in pan
-   * to swap in. The pan gestures are intercepted in the capture phase, before d3-zoom on the canvas
-   * below can see them, and turned into a pan. What falls through to the built-in zoom: a zoom
-   * modifier (pinch or Ctrl/Cmd+wheel), and a *vertical* mouse-wheel notch — so a mouse still zooms
-   * the graph as it always has.
+   * event as a zoom, and there is no built-in pan. Pan gestures are intercepted in the capture
+   * phase, before d3-zoom sees them; a zoom modifier (pinch or Ctrl/Cmd+wheel) and a *vertical*
+   * mouse-wheel notch fall through to the built-in zoom.
    *
-   * A horizontal-dominant wheel is *always* taken as a pan, even when it looks like a mouse notch.
+   * A horizontal-dominant wheel is *always* taken as a pan, even when it looks like a mouse notch:
    * `preventDefault` on it is what stops the browser reading a leftward two-finger swipe as history
-   * back-navigation — and `isTrackpadWheel` keys off `deltaY` alone, so a mostly-sideways swipe can
-   * momentarily read as a mouse and leak the event to the browser. The axis check closes that hole.
+   * back-navigation, and `isTrackpadWheel` keys off `deltaY` alone, so a mostly-sideways swipe can
+   * momentarily read as a mouse and leak the event to the browser.
    *
-   * There is no `panBy`, so the pan goes through the one public lever that moves the camera without
-   * animation: refit the current viewport box, shifted by the swipe, with zero duration and zero
-   * padding — same zoom, new centre.
+   * There is no `panBy`, so the pan refits the current viewport box, shifted by the swipe, with zero
+   * duration and zero padding — same zoom, new centre.
    */
   private enableTwoFingerPan(cosmos: Graph, host: HTMLDivElement): AbortController {
     const controls = new AbortController();

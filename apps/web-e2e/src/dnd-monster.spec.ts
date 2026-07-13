@@ -3,11 +3,6 @@ import { addType, enterLibrary, entityIdFromUrl, expect, flushSave, mapViewToggl
 /** The Hex Map's map View toggle: bound to the `grid` Field `core.hexmap` declares. */
 const MAP_VIEW = mapViewToggle();
 
-/**
- * The bundled `dnd.monster` plugin (#192): a Field schema the API validates and facets, and a bespoke
- * stat-block View the web renders. Walks the worldbuilder's path — create a monster, fill its required
- * Field, read the stat block.
- */
 test('creates a dnd.monster, fills its required Fields, and reads the stat block', async ({ page, request }) => {
   await enterLibrary(page);
 
@@ -68,10 +63,6 @@ test('creates a dnd.monster, fills its required Fields, and reads the stat block
   expect(body.document.metadata).toMatchObject({ challenge_rating: 24, strength: 30, size: 'Huge' });
 });
 
-/**
- * View-per-surface (#192): an Entity affords every View its types contribute, so a monster that is
- * also a hex map affords three — the stat block, the Note, and the Map.
- */
 test('a dnd.monster carrying core.hexmap offers the stat block, Note, and Map views', async ({ page }) => {
   await enterLibrary(page);
 

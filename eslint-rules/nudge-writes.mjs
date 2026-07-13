@@ -7,12 +7,7 @@
  * them. `WorldWrites` additionally fans a membership change out to the World's `shared` Entities,
  * whose Rights derive from that membership set.
  *
- * That property is only real if nothing else writes those tables. ADR-0044 enumerated its emit
- * points and the implementation faithfully built what was enumerated; `addGrant`, `removeGrant`,
- * `addOwner` and `removeOwner` emitted nothing, so revoking a Viewer's grant left them live-
- * following a `private` Entity. The World path repeated the mistake one level up: `bumpAndNudge`
- * nudged the World and forgot its shared Entities, so a promoted World Owner kept a read-only
- * Rights array. These rules make that bug class unstatable, in the idiom of the raw-`immer` ban.
+ * That property is only real if nothing else writes those tables:
  *
  *   no-direct-entity-writes — `insert|update|delete` on `entities` / `entityGrants`, and raw SQL
  *                             writing those tables, outside EntityWrites itself.
@@ -40,10 +35,9 @@ function staticText(node) {
  *                     Siblings that cascade with the guarded row (`entityDescriptors`,
  *                     `entityEdges`, `entityLinks`, `worldLinks`) carry no freshness key and are
  *                     open — a change to them rides its owner's `seq` bump.
- * @param sqlTables    the same tables as raw SQL names. Raw SQL escapes the drizzle selector
- *                     entirely (`db.$client.prepare(...)`), and the codebase reaches for it.
- * @param ownerFile    the module that *is* the write handle, identified by path so the exemption
- *                     is testable.
+ * @param sqlTables    the same tables as raw SQL names, since raw SQL (`db.$client.prepare(...)`)
+ *                     escapes the drizzle selector entirely.
+ * @param ownerFile    path of the module that *is* the write handle; exempt from the rule.
  * @param handle       the write handle's name, for the message.
  * @param entryPoints  its public methods, named so the message says where to go instead.
  */

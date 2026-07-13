@@ -6,10 +6,9 @@ import { AuthClient } from '../services/auth.client';
 
 /**
  * Blocks a route until the session boot-check settles, then redirects to
- * `/login` if there is no authenticated user (ADR-0004). Guards wait for
- * `sessionLoading` rather than re-validating against the server on every
- * navigation — the rxResource auto-fetch runs once at boot and the result is
- * stable until an explicit login/logout.
+ * `/login` if there is no authenticated user (ADR-0004). No per-navigation
+ * re-validation: the session resource fetches once at boot and stays valid
+ * until an explicit login/logout.
  */
 export const authGuard: CanActivateFn = (_route, state) => {
   const auth = inject(AuthClient);
@@ -25,10 +24,9 @@ export const authGuard: CanActivateFn = (_route, state) => {
 };
 
 /**
- * Like {@link authGuard}, but also requires the caller to reach the user-management
- * (`/users`) surface (ADR-0047) — the `manage-users` role or Superadmin. A signed-in
- * user without it is bounced to the root; the server stays the source of truth (it
- * 403s anyway), so this only hides an unusable page.
+ * Like {@link authGuard}, but also requires the `manage-users` role or Superadmin
+ * for the `/users` surface (ADR-0047); a signed-in user without it goes to the root.
+ * Not a security boundary — the server 403s regardless; this only hides an unusable page.
  */
 export const manageUsersGuard: CanActivateFn = (_route, state) => {
   const auth = inject(AuthClient);
@@ -47,9 +45,8 @@ export const manageUsersGuard: CanActivateFn = (_route, state) => {
 };
 
 /**
- * Like {@link manageUsersGuard}, but gates the Superadmin `/admin` repair surface
- * (ADR-0046, the Reindex) on the Superadmin flag alone. A signed-in non-Superadmin
- * is bounced to the root; the server 403s regardless.
+ * Like {@link manageUsersGuard}, but gates the `/admin` repair surface (ADR-0046,
+ * the Reindex) on the Superadmin flag alone.
  */
 export const superadminGuard: CanActivateFn = (_route, state) => {
   const auth = inject(AuthClient);
@@ -68,9 +65,8 @@ export const superadminGuard: CanActivateFn = (_route, state) => {
 };
 
 /**
- * The mirror image of {@link authGuard} for the `/login` route: an already
- * authenticated user has no business on the sign-in screen, so bounce them to
- * where they were headed (`returnUrl`) or the editor root.
+ * The mirror image of {@link authGuard} for `/login`: an already authenticated user
+ * is sent to `returnUrl`, or the editor root when there is none.
  */
 export const loginGuard: CanActivateFn = (route) => {
   const auth = inject(AuthClient);

@@ -1,13 +1,9 @@
 import { createEntity, enterLibrary, expect, flushSave, test, savedGrid } from './fixtures';
 
 /**
- * The Region journey (issue #8, #38, #39, ADR-0012): a region created in the Regions
- * panel and painted onto a hex survives a save and reload. Like the paint and feature
- * journeys it crosses every seam — the panel, canvas input, a versioned save, and a
- * load on reload. Region membership is an independent set of coordinates (CONTEXT.md →
- * Region), so we prove the round trip with a direct API read of the persisted
- * document (ADR-0009) and confirm the Inspector re-renders the loaded region after
- * re-selecting it.
+ * The Region journey (ADR-0012): a region created in the Regions panel and painted onto
+ * a hex survives a save and reload. Region membership is an independent set of
+ * coordinates (CONTEXT.md → Region).
  */
 test('creates a region in the panel, paints a hex, saves, and the region survives a reload', async ({
   page,

@@ -6,14 +6,13 @@ import { entityLinkPosBefore, setLinkAttr } from './descriptors';
 import { VocabItem, vocabItems } from './vocab-items';
 
 /**
- * The `::` trigger that characterises a Content Entity Link (issue #96, ADR-0023). Like
- * {@link entityMention}, a non-schema extension — it adds a ProseMirror plugin, no
- * node/mark — so it stays out of {@link CONTENT_EXTENSIONS} and changes no format contract
- * (ADR-0019). It **arms only when the node immediately before the cursor is an
- * `entityLink`** ({@link entityLinkPosBefore}); everywhere else `::` is literal text.
- * Selecting a suggestion — or the typed free text — sets that link's `descriptor` attr
- * (set/change/clear), sourced from the owner's last-saved vocabulary. `getPicker`/`loadVocab`
- * are deferred so the editor builds before the picker `viewChild` and the client resolve.
+ * The `::` trigger that characterises a Content Entity Link (ADR-0023). A non-schema
+ * extension (ProseMirror plugin, no node/mark), so it stays out of {@link CONTENT_EXTENSIONS}.
+ * It **arms only when the node immediately before the cursor is an `entityLink`**
+ * ({@link entityLinkPosBefore}); everywhere else `::` is literal text. Selecting a
+ * suggestion — or the typed free text — sets that link's `descriptor` attr
+ * (set/change/clear). `getPicker`/`loadVocab` are deferred so the editor builds before
+ * the picker `viewChild` and the client resolve.
  */
 export function descriptorSuggestion(
   getPicker: () => DescriptorPicker | undefined,

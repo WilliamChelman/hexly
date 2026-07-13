@@ -10,29 +10,23 @@ import { EditorRail } from './editor-rail';
 
 /**
  * The `core.view.map` renderer (ADR-0048, *Views* amendment): the full-bleed hex
- * canvas with its floating tool palette and Inspector / Regions dock. Lives in
- * the map plugin — it composes only this lib's pieces and reads its edit-ability off the
- * central {@link ENTITY_SESSION.writable} (the same token the {@link HexMapStore} edits
- * through), so it never reaches back to the app's session concretely.
+ * canvas with its floating tool palette and Inspector / Regions dock.
  *
  * The canvas itself is a read affordance (pan/zoom); every editing dock is gated on
- * `writable()`, so a read-only opener (Viewer grant, read-only member, Public Link
- * reader, #162) sees the map but no tools (ADR-0037). `display:contents` so the
- * canvas and floating chrome position against the entity page's `<main>`.
+ * {@link ENTITY_SESSION.writable}, so a read-only opener sees the map but no tools (ADR-0037).
+ * `display:contents` so the canvas and floating chrome position against the entity page's `<main>`.
  */
 @Component({
   selector: 'app-map-view',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'contents' },
-  // The Hex Map editor is this View's own store — scoped to the component that renders
-  // it, not hoisted into the page/route composition roots (ADR-0048). It injects the
-  // route-scoped ENTITY_SESSION from an ancestor, and lives and dies with the Map View:
-  // its children (canvas, palette, docks) resolve this one instance.
+  // The store lives and dies with the Map View; its children (canvas, palette, docks) resolve this
+  // one instance, and it injects the route-scoped ENTITY_SESSION from an ancestor (ADR-0048).
   //
-  // The `map` catalog is *not* provided here: it is an eager scope now, registered app-wide by
-  // `providePluginHexmap()` (ADR-0049, #199). It has to be — the type's chrome labels are `map.*`
-  // keys the app's header, browser, and command palette render, where no pipe of this lib exists to
-  // trigger a lazy load. The canvas below still ships in its own chunk; only the copy loads at boot.
+  // The `map` catalog is *not* provided here: it is an eager scope registered app-wide by
+  // `providePluginHexmap()` (ADR-0049), because the type's chrome labels are `map.*` keys the app's
+  // header, browser, and command palette render, where no pipe of this lib exists to trigger a lazy
+  // load.
   providers: [HexMapStore],
   imports: [MapCanvas, ToolPalette, Inspector, RegionsPanel, EditorRail, TranslocoPipe],
   template: `

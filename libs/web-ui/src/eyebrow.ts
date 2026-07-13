@@ -1,10 +1,8 @@
 import { booleanAttribute, ChangeDetectionStrategy, Component, input } from '@angular/core';
 
 /**
- * A small uppercase section eyebrow/label. Uses an attribute selector so it
- * keeps its host element (`<span>`, `<h2>`, `<figcaption>`…). Projects its
- * content. `mark` prefixes the gilded codex section glyph (✦) — opt-in, since
- * the header/library eyebrows wear no mark. See ADR-0007.
+ * A small uppercase section eyebrow/label. Attribute selector, so it keeps its
+ * host element (`<span>`, `<h2>`, `<figcaption>`…). See ADR-0007.
  *
  *   <span appEyebrow>Hex map</span>
  *   <h2 appEyebrow mark>Terrain</h2>

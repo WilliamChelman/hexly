@@ -1,11 +1,11 @@
 import { expect, test } from './fixtures';
 
 /**
- * The language switcher works for any actor (ADR-0014), now behind the rail's
- * avatar (ADR-0022). Login itself is standalone with no rail, so an anonymous
- * actor flips the language from the reduced rail on a public page (the
- * styleguide) and the choice carries over to login. A clean slate — no session,
- * no stored locale — means the first visit reflects genuine default detection.
+ * The language switcher works for any actor (ADR-0014), behind the rail's avatar
+ * (ADR-0022). Login is standalone with no rail, so an anonymous actor flips the language
+ * from the reduced rail on a public page (the styleguide). The empty storageState is
+ * required: with no session and no stored locale, the first visit exercises genuine
+ * default detection.
  */
 test.use({ storageState: { cookies: [], origins: [] } });
 

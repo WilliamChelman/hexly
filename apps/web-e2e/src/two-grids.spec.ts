@@ -17,12 +17,9 @@ const MAP_VIEW = mapViewToggle();
 const BATTLEMAP_VIEW = mapViewToggle('battlemap');
 
 /**
- * Two grids on one Entity (#194/#202): it carries `core.hexmap` *and* a user-defined type declaring
- * its own grid Field, so it affords two map Views — the payoff a View instance (#200) exists for.
- *
- * ADR-0009 defers undo to the unit specs, and the map's undo is indeed covered there. What is asserted
- * here is not that undo works but that there are *two* of it: a store per View, over its own Field's
- * slice. That is a composition of the page, the injector, and the store, so no unit seam sees it.
+ * An Entity carrying `core.hexmap` *and* a user-defined type with its own grid Field affords two map
+ * Views. What is asserted here is not that undo works (the unit specs cover that) but that each View
+ * has its own store and its own undo stack, over its own Field's slice.
  */
 test('an Entity with two grids affords two map Views, each with its own paint and undo', async ({ page, request }) => {
   const worldId = await enterLibrary(page);

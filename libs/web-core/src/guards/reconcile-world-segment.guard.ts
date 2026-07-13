@@ -5,24 +5,22 @@ import { EntitiesClient } from '../services/entities.client';
 import { idFromSegment, segment } from '../utils/pretty-id';
 
 /**
- * Reconcile guard for `/w/:worldId/entities/:id` (ADR-0028, issue #119): the
- * highest-point guard on the detail route. The Entity's own `world_id` is the
- * data source of truth; the `:worldId` segment is only navigation context. When a
- * stale or hand-edited segment contradicts the loaded Entity's real World, this
- * redirects to the same Entity under its correct World segment, so the user always
- * lands somewhere coherent. A matching segment passes through untouched.
+ * Reconcile guard for `/w/:worldId/entities/:id` (ADR-0028). The Entity's own
+ * `world_id` is the source of truth; the `:worldId` segment is only navigation
+ * context. A segment contradicting the loaded Entity's real World redirects to
+ * the same Entity under its correct World segment; a matching segment passes
+ * through untouched.
  *
  * It also self-heals the decorative Entity slug (ADR-0042): the `:id` segment carries
- * a `slug-base62(id)` form, and this rewrites a stale, bare, or legacy one to the
- * canonical slug (name from the fetched target) via a redirect that preserves query
- * params. The World slug is the parent {@link activeWorldGuard}'s job — a wrong-World
- * redirect here emits a bare World segment that the parent then heals on the restart.
- * A wrong or absent slug is only ever cosmetic — the base62 suffix (or a legacy UUID)
- * is the sole authority, decoded here before the lookup.
+ * a `slug-base62(id)` form, and a stale, bare, or legacy one is rewritten to the
+ * canonical slug via a redirect that preserves query params. A wrong or absent slug is
+ * only ever cosmetic — the base62 suffix (or a legacy UUID) is the sole authority,
+ * decoded here before the lookup. The World slug is the parent {@link activeWorldGuard}'s
+ * job — a wrong-World redirect here emits a bare World segment that the parent then heals
+ * on the restart.
  *
- * It looks the Entity up by id only (ADR-0025), the same pattern as
- * {@link entityWorldRedirect}. A missing or inaccessible target falls through
- * (returns `true`) so the Entity page renders its own error state rather than
+ * The Entity is looked up by id only (ADR-0025). A missing or inaccessible target falls
+ * through (returns `true`) so the Entity page renders its own error state rather than
  * bouncing. This handles stale URLs only — not move-between-Worlds (ADR-0024).
  */
 export const reconcileWorldSegment: CanActivateFn = (route) => {

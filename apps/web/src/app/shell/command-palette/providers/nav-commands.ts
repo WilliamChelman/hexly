@@ -6,12 +6,11 @@ import { AuthClient } from '@hexly/web-core';
 import { Command, CommandProvider } from '../command';
 
 /**
- * The `>`-prefix navigation Commands (ADR-0041): jumps to the instance-scoped
- * destinations the contextual nav rail hides while inside a World — Users (gated on
- * {@link AuthClient.canManageUsers}), the Superadmin Admin repair surface (gated on
- * {@link AuthClient.isSuperadmin}), and the Styleguide — the same gates the rail and
- * routes enforce. Each carries a `route`, so the Palette renders the row as an anchor
- * that opens in a new tab too.
+ * The `>`-prefix navigation Commands (ADR-0041): the instance-scoped destinations the
+ * contextual nav rail hides while inside a World — Users (gated on
+ * {@link AuthClient.canManageUsers}), the Admin repair surface (gated on
+ * {@link AuthClient.isSuperadmin}), and the Styleguide. Each carries a `route`, so the
+ * Palette renders the row as an anchor that opens in a new tab too.
  */
 @Injectable({ providedIn: 'root' })
 export class NavCommands implements CommandProvider {

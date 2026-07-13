@@ -45,10 +45,8 @@ export class EntitiesClient {
   });
 
   /**
-   * Live-follow one Entity through the write-through store (ADR-0044): a shared, freshness-deduped
-   * stream that also surfaces this tab's own saves/patches with no roundtrip. Emits the fresh detail
-   * or `EVICTED`. A consumer that shouldn't apply a given emission (e.g. an editor mid-edit) ignores
-   * it at subscribe time — refetching is freshness-gated by the store, not by the caller.
+   * Live-follow one Entity through the write-through store (ADR-0044). Emits the fresh detail or
+   * `EVICTED`; a consumer that shouldn't apply a given emission (e.g. an editor mid-edit) ignores it.
    */
   watch(id: string): Observable<Watched<EntityDetail>> {
     return this.store.watch(id, () => this.read(id));
@@ -78,12 +76,8 @@ export class EntitiesClient {
   }
 
   /**
-   * Patch an Entity's metadata — the `name` **or** the Visibility, never both (ADR-0045). The two
-   * are different write kinds with different gates: a rename is substance, which an entity-level
-   * Editor may make; a Visibility flip is exposure, which needs full write rights. The union type
-   * is the client-side half of the server's `exactly one` schema — sending both is a 400, so it is
-   * a compile error here rather than a lost write. Metadata never conflicts with an in-progress
-   * save.
+   * Patch an Entity's metadata — the `name` **or** the Visibility, never both (ADR-0045): they have
+   * different write gates, and sending both is a 400. Metadata never conflicts with an in-progress save.
    */
   patch(id: string, changes: { name: string } | { visibility: Visibility }): Observable<EntityDetail> {
     // Write-through: the patched detail feeds the store, so other watchers see the rename/visibility
@@ -232,9 +226,8 @@ export class EntitiesClient {
 }
 
 /**
- * Serialize the shared query + Facet filters — the params both the paged list
- * and the Facet-count read carry. `type`/`tag`/`visibility` each repeat in the
- * query string (`?tag=a&tag=b`, OR within category); `q`/`worldId` are single-valued.
+ * `type`/`tag`/`visibility` each repeat in the query string (`?tag=a&tag=b`, OR within category);
+ * `q`/`worldId` are single-valued.
  */
 function facetParams(opts: EntityFacetParams): HttpParams {
   let params = new HttpParams();
@@ -242,7 +235,7 @@ function facetParams(opts: EntityFacetParams): HttpParams {
   for (const t of opts.type ?? []) params = params.append('type', t);
   for (const t of opts.tag ?? []) params = params.append('tag', t);
   for (const v of opts.visibility ?? []) params = params.append('visibility', v);
-  // Filter-by-Field (#188): each `key:op:value` token repeats, like the other facet params.
+  // Filter-by-Field: each `key:op:value` token repeats, like the other facet params.
   for (const f of opts.field ?? []) params = params.append('field', f);
   if (opts.worldId) params = params.set('worldId', opts.worldId);
   return params;

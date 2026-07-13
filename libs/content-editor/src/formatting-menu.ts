@@ -14,11 +14,10 @@ import { Button } from '@hexly/web-ui';
 import { FORMAT_ITEMS, FormatItem, applyLink, clearLink, isLinkActive } from './formatting-items';
 
 /**
- * The formatting toolbar that floats over a text selection in the Content editor (#74).
- * Headless TipTap owns no chrome (ADR-0019), so this is ours: a `@tiptap/extension-bubble-menu`
- * plugin (wired in {@link ContentEditor}) positions this component's host element over the selection
- * and toggles its visibility. The toolbar itself just reads/drives the editor through
- * {@link FORMAT_ITEMS} — every action round-trips through the opaque snapshot for free.
+ * The formatting toolbar that floats over a text selection in the Content editor. The
+ * `@tiptap/extension-bubble-menu` plugin (wired in {@link ContentEditor}) owns this host
+ * element's position and visibility; the toolbar only reads/drives the editor through
+ * {@link FORMAT_ITEMS}.
  */
 @Component({
   selector: 'app-formatting-menu',

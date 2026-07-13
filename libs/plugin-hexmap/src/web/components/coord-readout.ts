@@ -3,9 +3,8 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { Axial } from '../../lib';
 
 /**
- * Map's hover readout showing coordinate and terrain. Purely presentational: renders
- * {@link coord} and {@link terrainKey}; canvas owns hover state (ADR-0003).
- * Owns its own chrome (ADR-0007). Inert to pointer.
+ * Map's hover readout showing coordinate and terrain. Purely presentational; the canvas owns
+ * hover state (ADR-0003). Inert to pointer.
  */
 @Component({
   selector: 'app-coord-readout',

@@ -4,11 +4,8 @@ import { FieldControl } from '@hexly/web-entity/controls';
 
 /**
  * One value slot of the {@link StatBlockView}: the Field's live value, printed as text for a reader
- * and offered as a {@link FieldControl} to a writer. Shared by the block's three groups (the labelled
- * rows, the ability grid, and the Challenge Rating), which drifted apart when inlined per group.
- *
- * A reader gets printed text rather than a disabled control, so the block reads as a stat block
- * rather than as a greyed-out form (#192).
+ * and offered as a {@link FieldControl} to a writer. A reader gets printed text, never a disabled
+ * control.
  */
 @Component({
   selector: 'dnd-stat-slot',

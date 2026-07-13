@@ -4,13 +4,8 @@ import { ViewId } from './view-instance';
 
 /**
  * A **View** id — an open, `core.view.*`-style namespaced key identifying a togglable renderer+editor
- * an Entity affords (ADR-0048, *Views* amendment). Declared in `view-instance.ts` beside the
- * {@link ViewInstance} it keys, which is framework-free so the e2e suite can share the codec.
- *
- * Views are their own keyspace, distinct from Entity Type ids (`core.note`, `dnd.monster`) and from
- * the Field data-type ids a **Structured Field** names (`core.hex-grid`): the `core.view.*`
- * sub-namespace keeps a View id from ever being mistaken for either (ADR-0050). Supersedes the map lib's
- * old two-member `EntityView` union, which was an app-shell concern squatting in the map lib.
+ * an Entity affords (ADR-0048). Its own keyspace, distinct from Entity Type ids (`core.note`) and from
+ * the Field data-type ids a **Structured Field** names (`core.hex-grid`).
  */
 export type { ViewId };
 
@@ -19,11 +14,10 @@ export const CORE_VIEW_CONTENT = 'core.view.content';
 /** The hex-grid View a `hex-grid`-carrying Entity additionally affords. */
 export const CORE_VIEW_MAP = 'core.view.map';
 /**
- * The **generic Field View** (ADR-0048, #187): renders a type's declared Fields off
- * the Entity's Metadata and edits them back into it. Contributed by any type that
- * declares Fields, and the graceful fallback for an Entity whose type has no
- * registered view (a missing plugin, a World-defined type) — where it shows the type
- * as an inert chip and the values as plain Metadata.
+ * The **generic Field View**: renders a type's declared Fields off the Entity's Metadata and edits
+ * them back into it. Contributed by any type that declares Fields, and the fallback for an Entity
+ * whose type has no registered view (a missing plugin, a World-defined type) — where it shows the
+ * type as an inert chip and the values as plain Metadata.
  */
 export const CORE_VIEW_FIELDS = 'core.view.fields';
 
@@ -32,14 +26,9 @@ export const CORE_VIEW_FIELDS = 'core.view.fields';
  * contributes outright, or a reference to one of *its own* Fields, whose data-type contributes the
  * View (ADR-0050).
  *
- * So a Type **places** a Structured Field's View in its own order — `core.hexmap` declares
- * `[{ field: 'grid' }, CORE_VIEW_CONTENT]` and opens on its map, while a `world.deity` with a
- * battlemap opens on its Fields. Ordering a Field's View implicitly (always first, or always last) is
- * wrong in both directions.
- *
- * The domain's shape, not one of ours: a **User-defined type** is data, so its ordered View list is
- * persisted and validated at the trust boundary — and it is the *same* list, so a plugin type and a
- * World Owner's type run one view-resolution path rather than two (#201).
+ * A Type thereby **places** a Structured Field's View in its own order — `core.hexmap` declares
+ * `[{ field: 'grid' }, CORE_VIEW_CONTENT]` and opens on its map. A User-defined type's list is data:
+ * persisted, and validated at the trust boundary.
  */
 export type { ViewPlacement };
 
@@ -58,19 +47,16 @@ export const VIEW_FIELD_KEY = new InjectionToken<string>('hexly.view.fieldKey');
  * One View's registration in the {@link ViewRegistry}: the id, what labels its header-toggle button,
  * and the component the entity page outlets when this View is active.
  *
- * A View is contributed **either by a Type or by a Structured Field's data-type** (CONTEXT.md → View),
- * and that decides how it is labelled — hence the alternatives below rather than one optional key. A
- * Type's View carries its own translated `labelKey`; a data-type's View is bound to the Field that
- * placed it and takes that **Field's** label, which is the only thing that tells one grid from another.
+ * A View is contributed **either by a Type or by a Structured Field's data-type**, and that decides
+ * how it is labelled: a Type's View carries its own translated `labelKey`; a data-type's View takes
+ * the label of the **Field** that placed it, which is the only thing that tells one grid from another.
  *
- * The component is declared either eagerly (`component`) or deferred (`loadComponent`),
- * the same pair as an Angular `Route`. Which one to use follows from *where the
- * definition is registered*, not from the view's weight: `component` for a View
- * registered from the lazy entity chunk, whose body already ships there (the core
- * Views); `loadComponent` for one registered at bootstrap, where an eager class
- * reference would drag the body onto the initial bundle (a plugin's, via
- * {@link providePlugin}). Either way the id and the label are known up front, so the
- * header's view toggle can label a View it has not fetched.
+ * Which of `component` / `loadComponent` to use follows from *where the definition is registered*,
+ * not from the view's weight: `component` for a View registered from the lazy entity chunk, whose
+ * body already ships there (the core Views); `loadComponent` for one registered at bootstrap, where
+ * an eager class reference would drag the body onto the initial bundle (a plugin's, via
+ * {@link providePlugin}). Either way the id and the label are known up front, so the header's view
+ * toggle can label a View it has not fetched.
  */
 export type ViewDefinition = {
   readonly id: ViewId;
@@ -83,19 +69,16 @@ export type ViewDefinition = {
   | {
       readonly labelKey?: never;
       /**
-       * The **Structured Field** data-type this View renders (`core.hex-grid`) — the whole of the
-       * Field→View binding: a Type places one of its Fields, the Field names its data-type by `kind`,
-       * and the kind resolves here, so no registry learns that a grid in particular has a View.
-       *
-       * The web half of a data-type's declaration; its framework-free half
-       * ({@link StructuredDataType}) carries no View, the API having none.
+       * The **Structured Field** data-type this View renders (`core.hex-grid`): a Type places one of
+       * its Fields, the Field names its data-type by `kind`, and the kind resolves here. The web half
+       * of a data-type's declaration; the framework-free half ({@link StructuredDataType}) carries no
+       * View.
        */
       readonly dataType: StructuredDataTypeId;
       /**
        * The transloco key naming the **data-type** ("Hex grid") where the World Types editor offers
-       * it, beside `string` and `enum` (#201). Distinct from the toggle label, which a structured
-       * View takes from the Field that placed it ("Battlemap"). It lives on the View, not on the
-       * framework-free data-type, for the same reason the View does: the API has no copy.
+       * it, beside `string` and `enum`. Distinct from the toggle label, which a structured View takes
+       * from the Field that placed it ("Battlemap").
        */
       readonly dataTypeLabelKey: string;
     }

@@ -1,15 +1,6 @@
 import { createEntity, enterLibrary, entityIdFromUrl, expect, flushSave, segRe, test, savedGrid } from './fixtures';
 
-/**
- * The Entity Link journey (issue #76, CONTEXT.md → Entity Link): a Map element —
- * here a painted Hex — is linked from the Inspector to another Entity, and the
- * link survives a save and reload and stays followable. Like the other entity
- * journeys it crosses every seam: canvas paint and selection, the Inspector edit,
- * a versioned save, and a load on reload. We prove the round trip with a direct
- * API read of the persisted document (ADR-0009) and confirm the Inspector
- * re-renders the link after re-selecting the hex, then that Follow navigates to
- * the linked Entity. Prior art: region-inspector-persist.spec.ts.
- */
+/** The Entity Link journey (issue #76, CONTEXT.md → Entity Link). */
 test('links a Hex to an Entity in the Inspector; the link survives a reload and is followable', async ({
   page,
   request,

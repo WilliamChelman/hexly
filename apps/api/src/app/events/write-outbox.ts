@@ -3,10 +3,10 @@ import { DB, Db } from '../db/db';
 import { NudgeBus } from './nudge-bus';
 
 /**
- * A callback's return type, or `never` if it is a Promise — the shape that makes an async
- * {@link WriteOutbox.transact} callback a *type* error rather than a convention. `T` infers from
- * the naked occurrence in the false branch, so an `async` argument infers `T = Promise<…>`, the
- * conditional collapses to `never`, and the argument has nowhere to land.
+ * A callback's return type, or `never` if it is a Promise, making an async
+ * {@link WriteOutbox.transact} callback a type error. `T` infers from the naked occurrence in the
+ * false branch, so an `async` argument infers `T = Promise<…>` and the conditional collapses to
+ * `never`.
  */
 export type SyncOnly<T> = T extends Promise<unknown> ? never : T;
 
@@ -16,9 +16,8 @@ type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ?
 type Assert<T extends true> = T;
 
 /**
- * Compile-time proof of the above, compiled by the `build` target (which typechecks, unlike the
- * spec run — vitest strips types). Loosen {@link SyncOnly} and CI goes red *here*, rather than
- * silently in production the day a stray `await` mid-transaction races the outbox.
+ * Compile-time proof of {@link SyncOnly}, checked by the `build` target — the spec run does not
+ * typecheck (vitest strips types).
  */
 export type TransactRejectsAsync = [
   Assert<Equal<SyncOnly<Promise<number>>, never>>,
@@ -28,19 +27,17 @@ export type TransactRejectsAsync = [
 
 /**
  * The outermost transaction and the post-commit nudge buffer, shared by every write handle
- * (ADR-0045). It exists as its own seam because a single user action can move both kinds — a World
- * membership change bumps the World *and* every shared Entity in it — and those nudges must flush
- * from **one** commit, in one buffer, or a rollback would strand half of them.
+ * (ADR-0045). All nudges of one user action flush from a single commit, or a rollback would strand
+ * half of them.
  *
- * Nudges queue post-commit: emitting inside the transaction would tell followers to refetch a
- * version a rollback then erased, and because their held `seq` never advanced, nothing later would
- * correct it. The buffer is a plain array on a Nest singleton, which is safe *only* because
+ * Nudges are emitted only after commit: emitting inside the transaction would tell followers to
+ * refetch a version a rollback then erased, and because their held `seq` never advanced, nothing
+ * later would correct it. The buffer is a plain array on a Nest singleton, safe *only* because
  * `better-sqlite3` is synchronous — hence {@link transact} rejects async callbacks at the type
- * level rather than by convention.
+ * level.
  *
- * Ids are deduplicated on flush: one user action may touch the same resource more than once (a
- * nested `mutate`, an Entity that is both renamed and re-shared), and a follower learns nothing
- * from the second byte-identical `{ id, seq }` frame.
+ * Ids are deduplicated on flush; a follower learns nothing from a second byte-identical
+ * `{ id, seq }` frame.
  */
 @Injectable()
 export class WriteOutbox {
@@ -61,21 +58,18 @@ export class WriteOutbox {
    * rollback. Re-entrant: a nested call joins the open transaction rather than opening another, so
    * a World delete that cascades its Entities commits — and nudges — exactly once.
    *
-   * {@link SyncOnly} makes an async callback a *type* error, not a convention: one `await`
-   * mid-transaction and the singleton's buffers become a cross-request data race.
+   * `fn` must be synchronous ({@link SyncOnly}): one `await` mid-transaction and the singleton's
+   * buffers become a cross-request data race.
    */
   transact<T>(fn: () => SyncOnly<T>): T {
     if (this.depth > 0) return fn() as T;
     this.depth++;
     try {
       const result = this.db.transaction(() => fn()) as T;
-      // Committed: the rows followers will refetch are durable, so the buffer may drain.
       this.flush();
       return result;
     } catch (err) {
-      // Rolled back: the writes never landed, so neither may the nudges. A follower told to
-      // refetch an erased version would advance its held `seq` past reality and then ignore the
-      // real change, staying stale with nothing left to correct it.
+      // Rolled back: the writes never landed, so neither may the nudges.
       this.discard();
       throw err;
     } finally {
@@ -83,10 +77,7 @@ export class WriteOutbox {
     }
   }
 
-  /**
-   * Queue an Entity nudge. Every call sits inside the open transaction, so the id is either
-   * flushed by the commit or dropped by the rollback — never emitted for a write that vanished.
-   */
+  /** Queue an Entity nudge: flushed by the commit, or dropped by the rollback. */
   entity(id: string): void {
     this.entityIds.push(id);
   }

@@ -4,16 +4,6 @@ import { Db } from '../db/db';
 import { entities, entityGrants, worldLinks, worldMembers, worlds } from '../db/schema';
 import { isSuperadmin } from './owner-set';
 
-/**
- * The World authorization rule (ADR-0024, ADR-0037, ADR-0039), in one home — the peer of
- * `entity-access.ts`. Unlike an Entity (read / substance / lifecycle verbs over a visibility
- * axis), a World has a single management axis: `manage`, held by a World Owner. Every reachable
- * World carries `read`. The SQL predicates below are the single source of truth; {@link
- * worldRightsOf} is the only JS projector off them, and {@link WorldAccess.managedBy} the only
- * set-form derivation. Superadmin is resolved once per context and closed over by every
- * predicate, so no caller re-threads the flag.
- */
-
 /** A Superadmin reaches and manages every World (ADR-0037, #163): predicates short-circuit here. */
 const MATCH_ALL = sql`1`;
 
@@ -29,10 +19,9 @@ const MATCH_ALL = sql`1`;
 
 /**
  * The World reachability rule (ADR-0024, ADR-0037): derived, not stored — the caller has a member
- * row OR any row in an Entity's ACE set inside the World (ownership *and* entity grants, one table
- * since owner folded into entity_grants, migration 0007). Covers the ex-member residue (a departed
- * member who kept Entities keeps minimal reachability) and a grantee navigating to what they were
- * given (#161). Unreachable is indistinguishable from nonexistent (ADR-0004).
+ * row OR any row in an Entity's ACE set inside the World. So a departed member who kept Entities,
+ * and a grantee navigating to what they were given, both keep minimal reachability (#161).
+ * Unreachable is indistinguishable from nonexistent (ADR-0004).
  */
 function reachableBy(userId: string, worldRef: SQLWrapper) {
   return sql`(EXISTS (SELECT 1 FROM ${worldMembers} WHERE ${worldMembers.worldId} = ${worldRef} AND ${worldMembers.userId} = ${userId})
@@ -51,8 +40,8 @@ function creatableBy(userId: string, worldRef: SQLWrapper) {
 }
 
 /**
- * The World reachability predicate — {@link reachableBy} correlated to `worlds.id`. Composes into
- * any WHERE over `worlds` (the one predicate both `list` and `get` share). Superadmin → match-all.
+ * The World reachability predicate — {@link reachableBy} correlated to `worlds.id`, for a WHERE
+ * over `worlds`. Superadmin → match-all.
  */
 export function worldReachFilter(userId: string, superadmin: boolean) {
   return superadmin ? MATCH_ALL : reachableBy(userId, worlds.id);
@@ -60,20 +49,19 @@ export function worldReachFilter(userId: string, superadmin: boolean) {
 
 /**
  * The Entity-creation predicate (ADR-0024, CONTEXT.md → Contributor): the caller may author a new
- * Entity in a World when they hold the `owner` *or* `contributor` role — a Contributor's defining
- * capability. Broader than the management rule on purpose: creating an Entity is not a World
- * management power. A Superadmin short-circuits to match-all. Composes into a WHERE over `worlds`
- * so `resolveWorldId` can scope its default-World select without re-deriving the rule.
+ * Entity in a World when they hold the `owner` *or* `contributor` role — broader than the
+ * management rule, since creating an Entity is not a World management power. Superadmin →
+ * match-all. Composes into a WHERE over `worlds`.
  */
 export function canCreateEntityFilter(userId: string, superadmin: boolean) {
   return superadmin ? MATCH_ALL : creatableBy(userId, worlds.id);
 }
 
 /**
- * The World ownership predicate (ADR-0037): the caller holds the `owner` role. Composes into a
- * WHERE over `worlds`. Deliberately *no* Superadmin bypass — this expresses personal ownership
- * (the entity-create default's "my own oldest World"), not a repair capability, so it must never
- * widen to match-all and default an un-scoped create into an arbitrary World.
+ * The World ownership predicate (ADR-0037): the caller holds the `owner` role, for a WHERE over
+ * `worlds`. No Superadmin bypass — this expresses personal ownership (the entity-create default's
+ * "my own oldest World"), and must never widen to match-all and default an un-scoped create into
+ * an arbitrary World.
  */
 export function worldOwnerFilter(userId: string) {
   return ownedBy(userId, worlds.id);
@@ -81,10 +69,9 @@ export function worldOwnerFilter(userId: string) {
 
 /**
  * Whether a World Public Link *token* currently reaches World `id` — the reachability seam the
- * nudge bus checks for a token principal (ADR-0044, #178), the World peer of `tokenReachesEntity`.
- * The token *is* the grant: a live `world_links` row pointing at the World grants anonymous
- * Dashboard reach, so rename/pin/metadata nudges flow and a revoked token (row gone) reaches
- * nothing (→ eviction). Blob-free and index-backed, so fine on the per-emit path.
+ * nudge bus checks for a token principal (ADR-0044, #178). The token *is* the grant: a live
+ * `world_links` row pointing at the World grants anonymous Dashboard reach; a revoked token (row
+ * gone) reaches nothing (→ eviction).
  */
 export function tokenReachesWorld(db: Db, token: string, id: string): boolean {
   const row = db
@@ -96,10 +83,9 @@ export function tokenReachesWorld(db: Db, token: string, id: string): boolean {
 }
 
 /**
- * The caller's World Rights from a resolved management standing (ADR-0039) — the single place the
- * verb correspondence lives. Every reachable World carries `read` (a decision only exists when
- * reachable); an Owner (or Superadmin, folded into `isOwner`) also `manage`. Order is stable for
- * assertions.
+ * The caller's World Rights from a resolved management standing (ADR-0039). Every reachable World
+ * carries `read` (a decision only exists when reachable); an Owner (or Superadmin, folded into
+ * `isOwner`) also `manage`. Order is stable.
  */
 export function worldRightsOf(a: { isOwner: boolean }): WorldVerb[] {
   const rights: WorldVerb[] = ['read'];
@@ -115,17 +101,13 @@ export interface WorldAccess {
   superadmin: boolean;
   /** Project a resolved management standing to the caller's verbs. */
   rightsOf: typeof worldRightsOf;
-  /**
-   * Whether the caller manages a World, from an *already-loaded* Owner set (the read paths fetch
-   * it for the payload, so this is free — no extra query). The set form of {@link managesWorld}.
-   */
+  /** Whether the caller manages a World, from an *already-loaded* Owner set (no extra query). */
   managedBy(owners: string[]): boolean;
   /** The World row if the caller can reach `id`, else undefined (unreachable ≡ missing). */
   decide(id: string): typeof worlds.$inferSelect | undefined;
   /**
    * Blob-free reachability + ownership in one query (no owner-set fetch), or undefined if no such
-   * World — the owner/member/link management gates' single-row decision. Collapses the former
-   * `decide()`-then-`isOwner()` two-query dance; feeds the shared {@link gate} directly.
+   * World.
    */
   decideMeta(id: string): { reachable: boolean; isOwner: boolean } | undefined;
 }

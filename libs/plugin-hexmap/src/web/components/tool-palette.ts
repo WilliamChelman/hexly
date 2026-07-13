@@ -14,8 +14,8 @@ function glyphFor(subtool: SelectSubtool): IconName {
 /**
  * Floating tool palette: icon strip + contextual flyout of Subtools (ADR-0013, ADR-0017).
  * Flyout opens only for Tools with Subtools (Select, Terrain, Feature). Region is not
- * a palette Tool (ADR-0012): affordance is the Inspector's Add/Remove.
- * Armed Tool lives in {@link HexMapStore} so canvas applies it (ADR-0005).
+ * a palette Tool (ADR-0012): its affordance is the Inspector's Add/Remove. The armed
+ * Tool lives in {@link HexMapStore} (ADR-0005).
  */
 @Component({
   selector: 'app-tool-palette',
@@ -152,10 +152,8 @@ function glyphFor(subtool: SelectSubtool): IconName {
 export class ToolPalette {
   protected readonly store = inject(HexMapStore);
 
-  // Keycap is the hotkey upper-cased for display; the letter itself lives in TOOLS,
-  // shared with the keyboard so the tooltip can't disagree with what the key arms. The glyph is
-  // flattened to its two cases here — a built-in icon, or this lib's own path art (the Feature
-  // tool's settlement marker) — because a template cannot narrow a union.
+  // Keycap is the hotkey upper-cased for display. The glyph is flattened to its two cases —
+  // a built-in icon, or this lib's own path art — because a template cannot narrow a union.
   protected readonly tools = TOOLS.map((t) => ({
     id: t.id,
     icon: 'icon' in t.glyph ? t.glyph.icon : undefined,

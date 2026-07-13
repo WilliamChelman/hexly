@@ -1,11 +1,9 @@
 import { createEntity, enterLibrary, expect, flushSave, test, savedGrid } from './fixtures';
 
 /**
- * The Feature journey (issue #7): a feature placed on a hex survives a save and
- * reload. Like the paint journey it crosses every seam — canvas input, a
- * versioned save, and a load on reload. Map state lives as Canvas pixels
- * (ADR-0003), so we assert on the model-derived hex count and prove the round
- * trip with a direct API read of the persisted document (ADR-0009).
+ * A feature placed on a hex survives a save and reload. Canvas pixels are opaque to
+ * Playwright (ADR-0003), so we assert on the model-derived hex count and on a direct
+ * API read of the persisted document (ADR-0009).
  */
 test('places a feature on a hex, saves, and the feature survives a reload', async ({ page, request }) => {
   await enterLibrary(page);

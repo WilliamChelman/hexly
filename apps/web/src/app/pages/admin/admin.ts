@@ -7,18 +7,13 @@ import { switchMap, takeWhile, timer } from 'rxjs';
 import { AdminClient, ToasterService } from '@hexly/web-core';
 import { Eyebrow, Panel, Button } from '@hexly/web-ui';
 
-/**
- * How often a running Reindex is polled. Slow enough to cost the server nothing next to the walk
- * it watches, fast enough that the count visibly moves.
- */
+/** How often a running Reindex is polled. */
 const REINDEX_POLL_MS = 1000;
 
 /**
  * The Superadmin repair surface (ADR-0046): the Reindex, which recomputes every Entity's
- * document-derived state. The tier outside the collaboration model — no Entity is reachable to a
- * plain user-manager, so this lives apart from the {@link Users} account panel. The walk outlives
- * the request that starts it, so the panel follows it by polling; the server is the source of
- * truth for whether one is running.
+ * document-derived state. The walk outlives the request that starts it, so the panel follows it by
+ * polling; the server is the source of truth for whether one is running.
  */
 @Component({
   selector: 'app-admin',
@@ -84,11 +79,7 @@ export class Admin {
     this.admin.reindexStatus().subscribe((job) => this.follow(job));
   }
 
-  /**
-   * The Superadmin Reindex (ADR-0046): recompute every Entity's derived state.
-   *
-   * The walk outlives its request, so the POST only starts it; {@link follow} watches it home.
-   */
+  /** The POST only starts the walk; {@link follow} watches it home. */
   protected reindex(): void {
     if (this.reindexing()) return;
     this.admin.reindex().subscribe({
@@ -100,9 +91,8 @@ export class Admin {
   /**
    * Adopt `job`, and if it is still walking, poll until it stops — then announce how it landed.
    *
-   * `switchMap` off a `timer` rather than a chain of delays: a poll that never answers is
-   * abandoned when the next tick fires, so a single stalled request cannot strand the button in
-   * its disabled state. The status is the server's, so there is no local latch to leak.
+   * `switchMap` off a `timer` rather than a chain of delays: a poll that never answers is abandoned
+   * when the next tick fires, so a single stalled request cannot strand the button as disabled.
    */
   private follow(job: ReindexJob): void {
     this.job.set(job);
@@ -128,12 +118,9 @@ export class Admin {
   }
 
   /**
-   * Report a finished Reindex: how much it rebuilt, and what it could not read.
-   *
-   * Anything but `succeeded` is a walk that did not land. `failed` is the database refusing;
-   * `idle` is the API having restarted and forgotten a job we watched start — neither is a
-   * success, and both are answered by pressing the button again, since the chunks that committed
-   * stay committed.
+   * Report a finished Reindex. Anything but `succeeded` is a walk that did not land: `failed` is the
+   * database refusing, `idle` is the API having restarted and forgotten a job we watched start. Both
+   * are answered by pressing the button again — the chunks that committed stay committed.
    */
   private announce(job: ReindexJob): void {
     if (job.status !== 'succeeded') {

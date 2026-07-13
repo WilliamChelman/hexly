@@ -7,9 +7,8 @@ import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import * as schema from './schema';
 
 /**
- * Drizzle handle bound to the Hexly schema; the type AuthService depends on.
- * Includes `$client`, the underlying better-sqlite3 `Database`, so the
- * connection lifecycle (DbModule shutdown) can close it.
+ * Drizzle handle bound to the Hexly schema. Exposes `$client`, the underlying
+ * better-sqlite3 `Database`, so DbModule can close the connection on shutdown.
  */
 export type Db = BetterSQLite3Database<typeof schema> & {
   $client: Database.Database;
@@ -19,25 +18,22 @@ export type Db = BetterSQLite3Database<typeof schema> & {
 export const DB = Symbol('DB');
 
 /**
- * Open a SQLite database at `path` (use `':memory:'` for tests), put it in WAL
- * mode for concurrent reads (ADR-0002), bring the schema up to date by applying
- * any unapplied migrations, and return a Drizzle handle over it. The whole app
- * shares one connection — one NestJS process for a handful of users.
+ * Open a SQLite database at `path` (`':memory:'` for tests) in WAL mode for
+ * concurrent reads (ADR-0002), apply any unapplied migrations, and return a
+ * Drizzle handle over it. The whole app shares this one connection.
  */
 export function createDb(path: string): Db {
   const sqlite = new Database(path);
   sqlite.pragma('journal_mode = WAL');
   const db = drizzle(sqlite, { schema });
-  // Apply unapplied migrations at boot (ADR-0027). Migrations are generated
-  // from schema.ts and shipped in the bundle; __dirname resolves them in both
-  // prod and tests (same __dirname pattern as resolveDbPath).
+  // Migrations are shipped in the bundle; __dirname resolves them in both prod and tests.
   //
   // Foreign keys stay OFF for the migration window: drizzle runs every migration
   // inside one transaction, where `PRAGMA foreign_keys` is a no-op, so a table
-  // rebuild (SQLite's only way to drop a FK-referenced column, e.g. ADR-0037's
-  // owner_id retirement) would fire ON DELETE CASCADE on the implicit DROP TABLE
-  // and wipe dependent rows mid-migration. Enable enforcement only afterwards, for
-  // the runtime connection. Foreign keys are per-connection (set on every one).
+  // rebuild (SQLite's only way to drop a FK-referenced column) would fire
+  // ON DELETE CASCADE on the implicit DROP TABLE and wipe dependent rows
+  // mid-migration. Enforcement is enabled only afterwards, for the runtime
+  // connection. Foreign keys are per-connection (set on every one).
   sqlite.pragma('foreign_keys = OFF');
   migrate(db, { migrationsFolder: resolve(__dirname, 'migrations') });
   sqlite.pragma('foreign_keys = ON');
@@ -46,14 +42,12 @@ export function createDb(path: string): Db {
 
 /**
  * Resolve the Instance Directory (ADR-0036) — the folder holding `hexly.db` and
- * `hexly.yml` — identically for every entry point (server, seed CLI) so they
- * agree on one location.
+ * `hexly.yml`.
  *
- * - `':memory:'` verbatim (tests rely on a fresh per-process DB; config falls
- *   back to defaults for it).
+ * - `':memory:'` verbatim (config falls back to defaults for it).
  * - `HEXLY_DIR` honoured as-is if absolute, else resolved against cwd.
- * - Nothing set: default to `__dirname` (where both entry points bundle), not
- *   cwd, which differs between the server and the seed CLI.
+ * - Nothing set: `__dirname` (where both entry points bundle), not cwd, which
+ *   differs between the server and the seed CLI.
  */
 export function resolveInstanceDir(): string {
   const configured = process.env.HEXLY_DIR;
@@ -70,9 +64,8 @@ export function resolveDbPath(): string {
 }
 
 /**
- * The Asset bytes folder beside the database (ADR-0034), `<instanceDir>/assets`. For a
- * `:memory:` instance (no real directory) it falls back to a throwaway OS temp dir, so an
- * in-memory run still has somewhere real to write bytes.
+ * The Asset bytes folder beside the database (ADR-0034), `<instanceDir>/assets`. A
+ * `:memory:` instance has no real directory, so it falls back to a throwaway OS temp dir.
  */
 export function resolveAssetsDir(instanceDir: string = resolveInstanceDir()): string {
   return instanceDir === ':memory:' ? mkdtempSync(join(tmpdir(), 'hexly-assets-')) : join(instanceDir, 'assets');

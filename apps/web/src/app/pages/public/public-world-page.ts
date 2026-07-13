@@ -8,10 +8,10 @@ import { PublicClient, AppShellStore, EVICTED } from '@hexly/web-core';
 import { Eyebrow } from '@hexly/web-ui';
 
 /**
- * A World Public Link landing page (ADR-0037, #162): lists the World's `shared` Entities —
- * and nothing else — as links a reader with no account opens read-only through
- * {@link PublicEntityPage} at `/public/w/:token/e/:entityId`. Standalone chrome, like login.
- * A revoked or bad token resolves to a calm dead-link panel, never an error.
+ * A World Public Link landing page: lists the World's `shared` Entities — and nothing else — as
+ * links a reader with no account opens read-only through {@link PublicEntityPage} at
+ * `/public/w/:token/e/:entityId`. A revoked or bad token resolves to a dead-link panel, never an
+ * error.
  */
 @Component({
   selector: 'app-public-world-page',
@@ -107,9 +107,7 @@ export class PublicWorldPage {
         }
       });
 
-    // Live-follow the open World (ADR-0044, #178): the client's watchWorld() owns the source —
-    // connecting the bus as this token principal, then relaying nudges into a refetch-and-replace;
-    // EVICTED (link revoked, World deleted, a 403/404 refetch) → the dead-link panel without a
+    // EVICTED (link revoked, World deleted, a 403/404 refetch) → the dead-link panel, without a
     // reload. switchMap off `followed` tears down the old follow (reverting the token principal) on
     // a token swap.
     toObservable(this.followed)

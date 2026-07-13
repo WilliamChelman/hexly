@@ -8,13 +8,6 @@ import {
   provideHexMapStoreTesting,
 } from '../../testing/entity-session.fake';
 
-/**
- * The store is now route-scoped and injects the central {@link ENTITY_SESSION} (ADR-0048),
- * so it needs an injection context and a session to edit through — a fresh TestBed per test
- * provides both. `makeStore()` returns the store; `reload()` stands in for the old
- * `reload(grid)`, driving the session's load (which bumps loadGeneration) and flushing
- * the store's reset effect so the reset is observable synchronously.
- */
 let session: FakeEntitySession;
 
 beforeEach(() => {
@@ -2607,8 +2600,7 @@ describe('HexMapStore forward-only grid (ADR-0050)', () => {
 
 /**
  * The store edits *a* grid, not *the* grid (ADR-0050): which Field it renders is {@link VIEW_FIELD_KEY},
- * provided by the entity page. This is what lets an Entity carry a world map and a battlemap, and paint
- * each without touching the other.
+ * provided by the entity page.
  */
 describe('HexMapStore bound to a Field', () => {
   beforeEach(() => {

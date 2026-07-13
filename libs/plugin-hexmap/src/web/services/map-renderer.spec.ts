@@ -19,9 +19,7 @@ class FakeContext {
   private currentPath: { x: number; y: number }[] = [];
   /**
    * Each path `fill()` with its colour and the path's centroid. A traced hex is a
-   * regular polygon, so the centroid of its corners is the hex's screen centre —
-   * which lets a test assert *which* hex a fill landed on, not just that a colour
-   * was used somewhere.
+   * regular polygon, so the centroid of its corners is the hex's screen centre.
    */
   readonly pathDraws: { fill: string; cx: number; cy: number }[] = [];
 
@@ -452,11 +450,9 @@ describe('Canvas2dMapRenderer swap drag preview', () => {
       labels: [],
     };
 
-    // Drag the forest hex onto the occupied ocean hex: the preview overlays the
-    // plan's writes (the swapped outcome) — forest's record at the destination AND
-    // ocean's record slid back to the origin — so both hexes stay visible before
-    // release (ADR-0017). The canvas hands the renderer the plan's hex writes; here
-    // they are spelled out so the renderer draws exactly what it is told.
+    // Drag the forest hex onto the occupied ocean hex: the preview overlays the plan's
+    // writes (the swapped outcome) — forest at the destination, ocean slid back to the
+    // origin — so both hexes stay visible before release (ADR-0017).
     renderer.render(camera, doc, null, {
       movePreview: [
         {

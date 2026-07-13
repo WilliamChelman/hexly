@@ -23,19 +23,12 @@ interface Slot {
 const FIELDS_BY_KEY = new Map(DND_MONSTER_TYPE.fields.map((field) => [field.key, field]));
 
 /**
- * The `dnd.monster` bespoke View (`dnd.view.stat-block`, #192): the stat block a player expects,
- * rather than the prose of the Content view or the flat list of the generic Field view.
+ * The `dnd.monster` bespoke View (`dnd.view.stat-block`): edits the same Metadata map every other
+ * View reads, through {@link ENTITY_SESSION}.
  *
- * It edits the same Metadata map every other View reads — a Field is a lens, not a store — so a CR
- * typed here is the CR the Entity Browser facets on (CONTEXT.md → Field).
- *
- * It renders every Field the type declares, because it is a monster's only authoring surface: the
- * create dialog collects required Fields only, and a type with a bespoke view affords no generic
- * Field view, so an unrendered Field would be unsettable. Untyped Metadata still shows in the Note
- * view's Metadata dock, as for any Entity.
- *
- * It depends on the {@link ENTITY_SESSION} contract and `@hexly/web-entity`, never on `apps/web`, so
- * the app composes the plugin rather than hosting it (the ADR-0048 inversion `MapView` also rides).
+ * It must render every Field the type declares: it is a monster's only authoring surface (the create
+ * dialog collects required Fields only, and a type with a bespoke view affords no generic Field
+ * view), so an unrendered Field would be unsettable.
  */
 @Component({
   selector: 'dnd-stat-block-view',
@@ -134,10 +127,7 @@ export class StatBlockView {
   protected readonly abilities = computed(() => this.slots(DND_ABILITY_KEYS));
   protected readonly challenge = computed(() => this.slots([DND_CHALLENGE_KEY])[0]);
 
-  /**
-   * The flavour line ("Large dragon, chaotic evil"), assembled from whichever identity Fields are
-   * filled — a monster mid-authoring shows the parts it has, not a line of placeholder commas.
-   */
+  /** The flavour line ("Large dragon, chaotic evil"), assembled from whichever identity Fields are filled. */
   protected readonly subtitle = computed(() => {
     const [size, creatureType, alignment] = DND_IDENTITY_KEYS.map((key) => text(this.metadata()[key]));
     const creature = [size, creatureType].filter(Boolean).join(' ');

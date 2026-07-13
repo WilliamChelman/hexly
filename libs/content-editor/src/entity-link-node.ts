@@ -11,12 +11,11 @@ declare module '@tiptap/core' {
 }
 
 /**
- * The `entityLink` inline atom node — part of the `tiptap-v2`/`tiptap-v3` format
- * contract (ADR-0019/0023/0033). Schema only: the live-name Angular node view is
- * attached at the editor via `editorProps.nodeViews`, so this stays framework-free
- * and loads in plain `new Editor({ extensions: CONTENT_EXTENSIONS })` specs.
- * `renderHTML` is the copy-paste / no-node-view fallback, showing the static
- * `display` text when set, else the stored `label`.
+ * The `entityLink` inline atom node — part of the format contract (ADR-0023/0033).
+ * Schema only: the live-name Angular node view is attached at the editor via
+ * `editorProps.nodeViews`, so this stays framework-free. `renderHTML` is the
+ * copy-paste / no-node-view fallback, showing the static `display` text when set,
+ * else the stored `label`.
  */
 export const entityLinkNode = Node.create({
   name: 'entityLink',

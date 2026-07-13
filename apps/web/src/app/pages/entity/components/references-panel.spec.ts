@@ -16,7 +16,7 @@ import { ReferencesPanel } from './references-panel';
  * The References panel (ADR-0046, #179): an Entity's own links (*References*) and the Entities
  * that link to it (*Referenced by*), read from the derived edge index. The server has already
  * dropped every inbound edge whose source this viewer may not read, so the panel renders what it
- * is given — the only judgement it makes is navigable vs dangling.
+ * is given.
  */
 describe('ReferencesPanel', () => {
   const NONE: EntityReferences = { references: [], referencedBy: [] };
@@ -95,10 +95,7 @@ describe('ReferencesPanel', () => {
     expect(item?.querySelector('a')?.getAttribute('href')).toBe('/entities/avalon');
   });
 
-  /**
-   * "Nothing links here" is a claim about the edge index, not about the fetch. Asserting it before
-   * the response lands tells the reader something false, and they cannot tell it from the truth.
-   */
+  /** "Nothing links here" is a claim about the edge index, not about the fetch: it must not appear before the list lands. */
   it('claims nothing until the list has landed', () => {
     session.adopt(noteDetail('Ealdred'));
     const fixture = TestBed.createComponent(ReferencesPanel);
@@ -125,8 +122,7 @@ describe('ReferencesPanel', () => {
 
   /**
    * The page keeps this store alive across `:id` changes, so a list held for the Entity just
-   * closed must never be shown against the one just opened — a reader would attribute Ealdred's
-   * links to Mira for as long as the next fetch takes.
+   * closed must never be shown against the one just opened.
    */
   it('drops a held list when a different Entity is opened', () => {
     const el = render({

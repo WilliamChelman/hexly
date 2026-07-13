@@ -2,9 +2,8 @@
  * A **View instance** and its string key — the form "which View is showing" takes in the `?view=` param
  * and in a toggle's `data-testid` (ADR-0050).
  *
- * Framework-free, and so kept apart from `view-definition.ts` (which names Angular's `InjectionToken`
- * and a component `Type`): the Playwright suite reaches this codec by direct file path, under the same
- * waiver `pretty-id` has, rather than re-spelling the format in a fixture.
+ * Must stay framework-free (hence kept apart from `view-definition.ts`): the Playwright suite imports
+ * this codec by direct file path.
  */
 
 /** A View id — see `view-definition.ts` for the keyspace. */
@@ -25,8 +24,7 @@ export interface ViewInstance {
  * A View instance as one string: `core.view.content`, `core.view.map:grid`, `core.view.map:battlemap`.
  *
  * A `:` cannot occur in either half (a View id is `namespace.id`; a Field key is a Metadata key), so
- * the split is unambiguous — and a Type's View keys to its bare id, which keeps an already-shared
- * `?view=core.view.content` link working.
+ * the split is unambiguous. A Type's own View keys to its bare id.
  */
 export function viewInstanceKey({ viewId, fieldKey }: ViewInstance): string {
   return fieldKey ? `${viewId}:${fieldKey}` : viewId;

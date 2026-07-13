@@ -37,7 +37,6 @@ export class AuthClient {
   /**
    * Whether the caller may reach the user-management (`/users`) surface: holds the
    * `manage-users` Instance Role, or is a Superadmin (who supersedes every role).
-   * Defers to the domain {@link canManageUsersRule} so the rule can't drift.
    */
   readonly canManageUsers = computed(() => {
     const u = this.currentUser();
@@ -47,10 +46,7 @@ export class AuthClient {
   /** Whether the caller is a Superadmin — gates the Superadmin-only controls. */
   readonly isSuperadmin = computed(() => this.currentUser()?.isSuperadmin ?? false);
 
-  /**
-   * Whether the caller may create Worlds. A Superadmin always may, regardless of
-   * the roles set. Defers to the domain {@link canCreateWorldsRule}.
-   */
+  /** Whether the caller may create Worlds. A Superadmin always may, regardless of the roles set. */
   readonly canCreateWorlds = computed(() => {
     const u = this.currentUser();
     return !!u && canCreateWorldsRule(u);

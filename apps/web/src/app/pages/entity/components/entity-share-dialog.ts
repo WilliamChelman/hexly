@@ -4,12 +4,10 @@ import { Button, Dialog, GrantSet, OwnerSet, PublicLinkControl } from '@hexly/we
 import { EntitySession } from '../services/entity-session';
 
 /**
- * The open Entity's Share dialog (ADR-0037): owner-set (#158), named per-Entity grants
- * (#161), and the anonymous Public Link (#162) — the owner-only sharing surface, opened
- * from the entity actions menu. Driven by the {@link open} input; its content mounts only
- * while open (so it never fetches owners/grants for a closed dialog). Emits {@link closed}
- * for the caller to flip its state, and {@link resigned} when the caller resigns ownership
- * (which can cost reach to the Entity — the caller navigates away).
+ * The open Entity's Share dialog (ADR-0037): owner-set, named per-Entity grants, and the anonymous
+ * Public Link — the owner-only sharing surface. Driven by the {@link open} input; its content mounts
+ * only while open, so it never fetches owners/grants for a closed dialog. {@link resigned} fires when
+ * the caller resigns ownership, which can cost reach to the Entity — the caller navigates away.
  *
  * `display:contents` (host) so the wrapper adds no box to the header's layout.
  */

@@ -1,9 +1,7 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 
 /**
- * The cartouche wordmark treatment — an uppercase display-face label. Uses an
- * attribute selector so it keeps its host element. Projects its content.
- * See ADR-0007.
+ * The cartouche wordmark treatment — an uppercase display-face label. See ADR-0007.
  *
  *   <span appCartouche>Hexly</span>
  */

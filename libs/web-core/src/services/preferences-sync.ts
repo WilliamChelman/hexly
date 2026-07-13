@@ -22,21 +22,15 @@ interface Snapshot {
 
 /**
  * Two-way glue between the local preference signals and the account bag
- * (ADR-0038). When `/auth/me` resolves, an explicit server field overwrites the
- * local state; an absent field means "no expressed choice" and the device keeps
- * whatever it already resolved (a remembered choice or its own detection), so a
- * pre-existing local theme/locale survives the login rather than being reset.
- * Afterwards, any change to the signals (the user menu and the Settings page
- * both write the same ones) is PATCHed to the server, fire-and-forget.
+ * (ADR-0038). On `/auth/me` resolve, an explicit server field overwrites the
+ * local state; an *absent* field means "no expressed choice" and the device
+ * keeps whatever it already resolved. Afterwards, signal changes are PATCHed
+ * fire-and-forget.
  *
- * Roaming is at session (re)resolve — login or reload — not live: `/auth/me` is
- * read once per session, so a preference changed on another device is picked up
- * on the next load here, not pushed into an already-open session. Two open
- * sessions can therefore differ until one reloads; that's accepted for a
- * best-effort, fire-and-forget pref (a lost or late write is benign).
+ * Roaming happens at session (re)resolve — login or reload — not live: `/auth/me`
+ * is read once per session, so two open sessions can differ until one reloads.
  *
- * While anonymous, nothing is sent: public-link viewers keep the ADR-0014
- * local-only behaviour.
+ * While anonymous, nothing is sent (ADR-0014 local-only behaviour).
  */
 @Injectable({ providedIn: 'root' })
 export class PreferencesSync {
@@ -72,10 +66,7 @@ export class PreferencesSync {
 
     if (this.synced?.userId !== user.id) {
       // Session (re)resolved: hydrate. An explicit server field wins; an absent
-      // one keeps the device's current value (already resolved from a remembered
-      // choice or detection), so a locally-chosen theme/locale isn't clobbered
-      // back to a detected default on login — notably after the 0004 migration
-      // reset every account bag to '{}'.
+      // one keeps the device's current value rather than a detected default.
       const target: Snapshot = {
         locale: user.preferences.locale ?? current.locale,
         formatLocale: user.preferences.formatLocale ?? current.formatLocale,

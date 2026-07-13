@@ -148,10 +148,6 @@ describe('Vault export endpoint', () => {
     expect(fm['hexly.type']).toBeUndefined();
   });
 
-  /**
-   * The Type stamp is generic (ADR-0050): the export names no type id, it writes the Entity's whole
-   * ordered set — so a Monster comes back a Monster, and the *primary* type is still the first one.
-   */
   it("stamps hexly.type from the Entity's ordered types, whatever they are", async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const worldId = await importVault(ada, { 'Bestiary/Owlbear.md': '# Owlbear' });
@@ -285,11 +281,6 @@ describe('Vault export endpoint', () => {
     expect(world.body.entityCount).toBe(2); // Just the two notes — no seeded Home Entity.
   });
 
-  /**
-   * `hexly.type` carries each Entity's ordered Type set out and back, and a Structured Field's value
-   * rides the frontmatter as nested YAML like any other Field's — through code that names no type id
-   * (#203, ADR-0050).
-   */
   it("round-trips an Entity's types and its structured values: a Monster, a Hex Map, a user-defined type", async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const worldId = await importVault(ada, { 'Note.md': '# Note' });

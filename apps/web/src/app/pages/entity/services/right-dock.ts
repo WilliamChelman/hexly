@@ -8,28 +8,19 @@ export type RightPanel = 'outline' | 'references';
 const STORAGE_KEY = 'entity.rightPanel';
 
 /**
- * The panels the mounting context actually offers, narrowing the dock's rail.
- *
- * A Public Link page mounts the same `EntityPage` for an anonymous reader, and References is
- * not a panel it can serve: `GET /entities/:id/references` answers a `CurrentUser`, and a Public
- * Link grants only its own Entity's scope — the same reason in-content Entity Links there resolve
- * to a frozen label rather than a navigable one. So availability is a property of the *context*,
- * not of the viewer's Rights: an authenticated reader with no `edit` verb still gets References,
- * which is why the toggles are ungated by `writable()`.
- *
- * Defaults to every panel, so the authenticated route says nothing and the exception states itself.
+ * The panels the mounting context actually offers, narrowing the dock's rail. Availability is a
+ * property of the *context*, not of the viewer's Rights: a reader with no `edit` verb still gets
+ * every panel, but a Public Link page cannot offer References — `GET /entities/:id/references`
+ * answers a `CurrentUser`, which an anonymous reader has none of. Defaults to every panel.
  */
 export const RIGHT_DOCK_PANELS = new InjectionToken<readonly RightPanel[]>('RIGHT_DOCK_PANELS', {
   factory: (): readonly RightPanel[] => ['outline', 'references'],
 });
 
 /**
- * Which panel the Content body's right dock is showing (ADR-0013) — the note-view peer of
- * `HexMapStore.rightPanel`, and modelled the same way on purpose.
- *
- * The dock holds **one** panel slot beside a rail of toggles, so "at most one panel is open" is a
- * dock invariant, not a caller's rule. One discriminant, not a boolean per panel, makes "both open
- * at once" — one panel hidden behind another while both toggles read active — unrepresentable.
+ * Which panel the Content body's right dock is showing (ADR-0013). The dock holds **one** panel
+ * slot beside a rail of toggles: at most one panel is open, and that is a dock invariant rather
+ * than a caller's rule.
  */
 @Injectable()
 export class RightDock {
@@ -62,8 +53,7 @@ export class RightDock {
   /**
    * A stored value is honoured only if it still names a panel this context offers — an old or
    * corrupt one opens nothing, and so does a Public Link viewer's carried-over `references`
-   * (the preference is per-browser, and {@link AuthScopedStorage} deliberately keeps it while
-   * the session is anonymous).
+   * ({@link AuthScopedStorage} keeps the per-browser preference while the session is anonymous).
    */
   private restore(stored: string | null): RightPanel | null {
     const panel = stored === 'outline' || stored === 'references' ? stored : null;

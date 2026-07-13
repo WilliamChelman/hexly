@@ -4,9 +4,7 @@ import { DND_TRANSLATIONS } from '../i18n/dnd-translations';
 import { DND_TYPE_DEFINITIONS, DND_VIEW_STAT_BLOCK } from './dnd-types';
 
 /**
- * The D&D plugin's one entry point into the app (ADR-0048, #192): `app.config.ts` names this and
- * nothing else — the `dnd.monster` type reaches the root `TypeRegistry`, the stat block the
- * `ViewRegistry`, and `dnd.*` the app's vocabulary.
+ * The D&D plugin's one entry point into the app (ADR-0048).
  *
  * The stat block is deferred because this provider runs in the root injector, where naming the class
  * would pull the view body onto the initial bundle. Its id and label still register at startup, so the

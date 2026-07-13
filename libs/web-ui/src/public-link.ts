@@ -10,13 +10,10 @@ import { Input } from './input';
 export type PublicLinkKind = 'world' | 'entity';
 
 /**
- * The Public Link control (ADR-0037, #162): mint / show / revoke the one active anonymous
- * read-only link for a World or an Entity. Owner-gated server-side — a refusal surfaces as an
- * error toast, leaving the shown state intact. One active link per target (rotate = revoke +
- * re-mint), so there is no "add another"; minting again just returns the current token.
- *
- * The token becomes a shareable `/public/{w|e}/:token` URL a person without an account can
- * open. Revoking is the kill-switch — the URL stops resolving immediately.
+ * Mint / show / revoke the one active anonymous read-only link for a World or an Entity.
+ * Exactly one active link per target: minting again returns the current token, so rotating
+ * means revoke + re-mint. The token is a shareable `/public/{w|e}/:token` URL openable
+ * without an account; a revoke stops it resolving immediately.
  */
 @Component({
   selector: 'app-public-link',

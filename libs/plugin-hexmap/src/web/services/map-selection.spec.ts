@@ -3,11 +3,10 @@ import { coordKey, emptyHexMap, HexMap } from '../../lib';
 import { MapSelection } from './map-selection';
 
 /**
- * Unit tests for the {@link MapSelection} module in isolation — no store, no TestBed.
- * A plain document `signal` stands in for the live map, so a test can mutate the
- * document under the selection to exercise the self-heal that used to be reachable
- * only through the whole {@link HexMapStore}. The store spec keeps covering the
- * façade + orchestration (panel projection, brush disarm, undo/redo lockstep).
+ * Unit tests for {@link MapSelection} in isolation — no store, no TestBed. A plain document `signal`
+ * stands in for the live map, so a test can mutate the document under the selection. The
+ * {@link HexMapStore} spec covers the façade + orchestration (panel projection, brush disarm,
+ * undo/redo lockstep).
  */
 
 /** Build a document signal from partial pieces; keys are `coordKey`s. */

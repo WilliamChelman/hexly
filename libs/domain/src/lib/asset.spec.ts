@@ -4,11 +4,6 @@ import { assetHashFromUrl, assetUrl } from './asset';
 const HASH = 'a'.repeat(64);
 
 describe('Asset serving URL (ADR-0034)', () => {
-  /**
-   * The builder and the parser are inverses, and that is the whole point of them sharing a home:
-   * the Assets service mints the `src` an `image` node carries, and the edge harvest reads the
-   * Asset `hash` back out of it (ADR-0046).
-   */
   it('round-trips a hash through the served URL', () => {
     expect(assetHashFromUrl(assetUrl('world-1', HASH, '.png'))).toBe(HASH);
   });

@@ -8,9 +8,8 @@ import { TagPicker } from './tag-picker';
 import { tagItems } from './tag-suggestions';
 
 /**
- * Free-text tag editor for the open Entity (CONTEXT.md → Tag, #72), with autocomplete
- * over the owner's tag vocabulary — the Tag analog of the `::` descriptor picker.
- * Changes persist through the version-checked Save, shared with Content.
+ * Free-text tag editor for the open Entity (CONTEXT.md → Tag), with autocomplete over the
+ * owner's tag vocabulary. Changes persist through the version-checked Save, shared with Content.
  */
 @Component({
   selector: 'app-entity-tags',
@@ -64,11 +63,9 @@ export class EntityTags {
   private readonly input = viewChild.required<ElementRef<HTMLInputElement>>('tagInput');
   private readonly picker = viewChild.required(TagPicker);
 
-  // Fetched lazily on first keystroke and memoized for the component's lifetime —
-  // reflects last-saved state, exactly like the descriptor vocab (#96). Caching the
-  // in-flight promise (not just its result) means a fast first burst of keystrokes fires
-  // one request, not one per key; catchError → [] degrades a failed fetch to "no
-  // suggestions" once instead of re-throwing every keystroke (mirrors content-editor.ts).
+  // Fetched lazily on first keystroke and memoized for the component's lifetime; reflects
+  // last-saved state. Caching the in-flight promise (not just its result) makes a fast burst of
+  // keystrokes fire one request; catchError → [] degrades a failed fetch to "no suggestions".
   private vocab: Promise<readonly string[]> | undefined;
 
   /** Open/refresh the suggestion menu for the current input text. */
@@ -86,9 +83,9 @@ export class EntityTags {
   }
 
   /**
-   * The menu wins the arrow/Enter/Tab/Escape keys while open (mirrors the descriptor
-   * picker): Enter commits the highlighted suggestion. When the menu is closed, Enter
-   * falls through to {@link add} so a query the menu never showed still adds as raw text.
+   * The menu wins the arrow/Enter/Tab/Escape keys while open: Enter commits the highlighted
+   * suggestion. When the menu is closed, Enter falls through to {@link add} so a query the
+   * menu never showed still adds as raw text.
    */
   protected onKeyDown(event: KeyboardEvent): void {
     // Tab keeps its native focus-move even with the menu open. The shared menu (built for
@@ -124,8 +121,7 @@ export class EntityTags {
 
   /**
    * Comma-splits for paste; trims, lower-cases and deduplicates against current tags to
-   * match server normalization immediately (entity.ts dedupedTags). The single client
-   * mirror shared by typed entry ({@link add}) and picked suggestions ({@link commit}).
+   * match server normalization immediately (entity.ts dedupedTags).
    */
   private addTags(raw: string): void {
     const incoming = raw

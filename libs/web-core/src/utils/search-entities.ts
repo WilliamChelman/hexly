@@ -22,18 +22,13 @@ const SEARCH_DEBOUNCE_MS = 150;
 const CACHE_LIMIT = 50;
 
 /**
- * The shared server-side Entity search (ADR-0025): debounce the query stream,
- * trim it, switch to the latest search (cancelling superseded ones), cap the page
- * for autocomplete, and swallow errors to an empty list so a picker or the Command
- * Palette never breaks on a failed search. Callers push queries as they type;
- * those that must not hit the server on a blank query guard that themselves.
+ * The shared server-side Entity search (ADR-0025). A blank query still hits the server:
+ * callers that must not search on blank guard that themselves. Errors surface as an empty
+ * list, never a stream error.
  *
- * Repeated queries (backspacing, retyping) paint instantly from a small per-stream
- * cache, then revalidate: the server is queried anyway and the results replace the
- * cached ones only if they changed (stale-while-revalidate), so a rename shows up
- * without ever blanking the list. A failed revalidation keeps the cached results.
- * Take-first consumers (a `firstValueFrom` picker) get the cached paint and skip
- * revalidation — fine for a short-lived per-surface stream.
+ * Repeated queries paint from a small per-stream cache, then revalidate: results replace
+ * the cached ones only if they changed (stale-while-revalidate), and a failed revalidation
+ * keeps the cached results. Take-first consumers get the cached paint and skip revalidation.
  */
 export function searchEntities(client: EntitiesClient, query$: Observable<string>): Observable<EntitySummary[]> {
   // Per call, so it lives with the stream (a per-surface resolver's cache dies with

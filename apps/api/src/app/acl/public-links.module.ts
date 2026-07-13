@@ -5,10 +5,8 @@ import { PublicLinksController } from './public-links.controller';
 import { PublicLinksService } from './public-links.service';
 
 /**
- * The Public Link read module (ADR-0037, #162): the unauthenticated token-scoped read
- * surface. Imports DbModule (token resolution, ADR-0002) and EntitiesModule (reuses
- * {@link EntitiesService} to build read-only Entity detail/summaries). The mint/revoke
- * write paths live on the guarded Worlds/Entities controllers, not here.
+ * The unauthenticated token-scoped read surface (ADR-0037). The mint/revoke write paths live on
+ * the guarded Worlds/Entities controllers, not here.
  */
 @Module({
   imports: [DbModule, EntitiesModule],

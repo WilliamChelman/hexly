@@ -162,10 +162,8 @@ describe('GenericFieldView', () => {
   });
 
   it('shows a Structured Field neither as a control nor as plain Metadata (ADR-0050)', () => {
-    // A Structured Field's value is a document with its own View — an Entity that is both a
-    // user-defined type and a Hex Map edits its grid on the map, never as a row here. And being
-    // *declared*, it does not fall through to the plain-Metadata display either: it would dump a
-    // wall of JSON on the reader.
+    // A Structured Field's value is a document with its own View (the grid is edited on the map),
+    // and being *declared* it does not fall through to the plain-Metadata display either.
     const grid: FieldSchema = {
       key: 'grid',
       label: 'Grid',

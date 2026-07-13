@@ -29,12 +29,7 @@ interface TypeRow {
   readonly sample: string;
 }
 
-/**
- * The living design-system reference. It renders the token layer back to the
- * reader — colours, type, spacing, components — so other UI slices can see
- * exactly what is available and adopt it. It is built only from the primitives
- * and global classes it documents.
- */
+/** The living design-system reference: renders the token layer — colours, type, spacing, components. */
 @Component({
   selector: 'app-styleguide',
   imports: [

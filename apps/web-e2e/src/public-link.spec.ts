@@ -1,11 +1,7 @@
 import { enterLibrary, expect, flushSave, openEntityActions, test } from './fixtures';
 
 /**
- * Public Links (ADR-0037, #162): an Owner mints a per-entity Public Link from the Share
- * dialog, and a visitor with no account opens it to a strictly read-only rendering. This
- * drives the whole loop full-stack: author a note, mint the link, follow it in a fresh
- * (unauthenticated) browser context, see the content rendered read-only with no editing
- * chrome, then revoke it and watch the link go dead. The token-route authorization itself
+ * Public Links (ADR-0037). Only the UI loop is covered here; the token-route authorization
  * (private-piercing, shared-only scope) is proven at the HTTP layer (supertests).
  */
 test('an Owner mints a public link; an anonymous visitor reads it, then loses it on revoke', async ({
@@ -39,9 +35,7 @@ test('an Owner mints a public link; an anonymous visitor reads it, then loses it
   const visitor = await anonContext.newPage();
   await visitor.goto(url);
 
-  // They see a read-only rendering through the REUSED editor (ADR-0037, #162): the banner,
-  // the real note content — but genuinely read-only (the ProseMirror surface is
-  // contenteditable=false) and with none of the edit chrome (no Share, no tag input).
+  // The public page reuses the editor, so read-only means contenteditable=false plus no edit chrome.
   await expect(visitor.getByTestId('public-banner')).toBeVisible();
   await expect(visitor.getByTestId('note-content')).toContainText(content);
   await expect(visitor.locator('.ProseMirror')).toHaveAttribute('contenteditable', 'false');

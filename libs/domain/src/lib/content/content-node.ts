@@ -1,10 +1,6 @@
 /**
- * The single content-aware seam (ADR-0019). `ContentNode` is the canonical shape
- * of a node within a Content snapshot (TipTap/ProseMirror JSON); `visit` is the one
- * sanctioned walk over it. Every derivation *from* Content — FTS text, Outline,
- * descriptor harvest, vault import/export rewrites — routes through here, so the
- * snapshot shape is known in exactly one place and a format bump touches only this
- * seam and the registered extension set, never the Entity model or storage.
+ * The single content-aware seam (ADR-0019): every derivation from a Content snapshot
+ * (TipTap/ProseMirror JSON) routes through `ContentNode` + `visit`.
  */
 
 /** A node within a Content snapshot: its type, optional attrs/children/marks, and (for a leaf) its text. */
@@ -17,10 +13,9 @@ export interface ContentNode {
 }
 
 /**
- * Pre-order walk of a Content snapshot: calls `fn` on every node, then descends its
- * `content`. Narrows the opaque `unknown` snapshot to `ContentNode` in this one place,
- * so callers never cast. Readers close over an accumulator; rewriters mutate the node
- * they are handed in place (no site needs structural transforms — add them if one ever does).
+ * Pre-order walk of a Content snapshot: calls `fn` on every node, then descends its `content`.
+ * Readers close over an accumulator; rewriters mutate the node they are handed in place —
+ * structural transforms are not supported.
  */
 export function visit(snapshot: unknown, fn: (node: ContentNode) => void): void {
   if (Array.isArray(snapshot)) {

@@ -11,10 +11,9 @@ import { WorldsService } from './worlds.service';
 export type ExportResult = { filename: string; zip: Buffer } | 'not-found' | 'forbidden';
 
 /**
- * Vault export (ADR-0033, #150): serialize a World back to a `.zip` of markdown + assets in the
- * original folder shape — the round-trip fidelity check for a vault the owner imported. Pure
- * serialization; stores nothing new. Owner-only: entities are stored under the World Owner's id,
- * so a member's owner-scoped read returns nothing anyway (ADR-0004, ADR-0024).
+ * Serialize a World back to a `.zip` of markdown + assets in its original folder shape (ADR-0033).
+ * Owner-only: entities are stored under the World Owner's id, so a member's owner-scoped read
+ * returns nothing anyway (ADR-0004, ADR-0024).
  */
 @Injectable()
 export class VaultExportService {
@@ -33,10 +32,9 @@ export class VaultExportService {
 
     const files: Zippable = {};
 
-    // Assets go under `assets/<originalFilename>` (human-readable, not the content hash); the map
-    // rewrites each doc's capability-URL src back to that path. Basename only, so two assets
-    // sharing a filename across folders would collide under assets/ — uniquePath suffixes the
-    // later ones (` (2)`) so no bytes are lost, and srcMap points each doc at its own copy.
+    // Assets go under `assets/<originalFilename>` (human-readable, not the content hash), basename
+    // only: two assets sharing a filename across folders collide, and uniquePath suffixes the later
+    // ones. srcMap points each doc's capability-URL src at its own copy.
     const srcMap = new Map<string, string>();
     for (const asset of this.assets.exportAssets(worldId)) {
       const zipPath = uniquePath(files, posix.join('assets', posix.basename(asset.originalFilename)));
@@ -67,10 +65,7 @@ export class VaultExportService {
   }
 }
 
-/**
- * A zip key not already taken in `files`: on collision, inserts ` (2)`, ` (3)`… before the
- * extension so two entities/assets that resolve to the same path both survive the export (#150).
- */
+/** A zip key not already taken in `files`: on collision, inserts ` (2)`, ` (3)`… before the extension. */
 function uniquePath(files: Zippable, path: string): string {
   if (!(path in files)) return path;
   const ext = posix.extname(path);
@@ -82,9 +77,9 @@ function uniquePath(files: Zippable, path: string): string {
 }
 
 /**
- * Point each `entityLink`'s wikilink label at its target's CURRENT name, so an entity renamed after
- * import still exports a `[[name]]` that resolves to the right file on re-import (#150). A link whose
- * target isn't in this World (deleted/cross-World) keeps its stored label.
+ * Point each `entityLink`'s wikilink label at its target's CURRENT name, so a renamed entity still
+ * exports a `[[name]]` that resolves on re-import. A link whose target isn't in this World
+ * (deleted/cross-World) keeps its stored label.
  */
 function rewriteEntityLinks(snapshot: unknown, nameById: Map<string, string>): void {
   visit(snapshot, (node) => {
@@ -106,19 +101,11 @@ function rewriteAssetSrcs(snapshot: unknown, srcMap: Map<string, string>): void 
 }
 
 /**
- * The YAML frontmatter for an Entity: its pass-through Metadata with every reserved `hexly.*`
- * key stripped (they drive placement/typing, not frontmatter), plus its Tags re-emitted as
- * `tags` so a vault's `tags:` round-trips (ADR-0033). Returns undefined when nothing remains,
- * so a bare note exports without an empty `---` block.
- *
- * A **Structured Field**'s value rides along like any other Field's, as nested YAML (ADR-0050), so a
- * Hex Map's grid now survives the round-trip — the lossiness ADR-0033 accepted closes here, without
- * this path learning what a grid is.
- *
- * The Entity's ordered Type set rides along under `hexly.type`, which no Metadata key records — named
- * by no type id (ADR-0050), and written whole and in order, so the primary type stays first. Types
- * that are *exactly* the default an import mints go unstamped, so a bare note still exports with no
- * `---` block at all.
+ * The YAML frontmatter for an Entity: its pass-through Metadata with every reserved `hexly.*` key
+ * stripped (they drive placement/typing, not frontmatter), plus its Tags re-emitted as `tags`
+ * (ADR-0033) and its ordered Type set under `hexly.type` — written whole and in order, so the
+ * primary type stays first (ADR-0050). A bare note (types are exactly the import default) goes
+ * unstamped; undefined when nothing remains, so it exports without an empty `---` block.
  */
 function frontmatter(entity: EntityDetail): Record<string, unknown> | undefined {
   const meta: Record<string, unknown> = {};

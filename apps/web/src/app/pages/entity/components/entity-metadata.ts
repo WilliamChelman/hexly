@@ -5,14 +5,11 @@ import { EntitySession } from '../services/entity-session';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 
 /**
- * Read-only view of the open Entity's Metadata map (CONTEXT.md → Metadata, ADR-0033):
- * the frontmatter keys and Hexly provenance (`hexly.sourcePath`) an import brought
- * across, so a worldbuilder can confirm what landed. A dev affordance — a collapsed
- * disclosure atop the note body — not an editor; editing Metadata is out of scope.
- * Renders nothing when the Entity carries no Metadata.
+ * Read-only view of the open Entity's Metadata map (CONTEXT.md → Metadata, ADR-0033): the
+ * frontmatter keys and Hexly provenance (`hexly.sourcePath`) an import brought across. Read-only,
+ * not an editor. Renders nothing when the Entity carries no Metadata.
  *
- * A **Structured Field**'s value is skipped (ADR-0050): it is a document with its own View, and a
- * Hex Map's grid dumped here as a line of JSON tells the reader nothing.
+ * A **Structured Field**'s value is skipped (ADR-0050): it is a document with its own View.
  */
 @Component({
   selector: 'app-entity-metadata',

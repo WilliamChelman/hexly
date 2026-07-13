@@ -27,10 +27,9 @@ describe('graphPayload', () => {
   });
 
   /**
-   * Hub bias, and the reason point order is ours to choose. cosmos.gl's label sampling is a GPU
-   * pass with no blending, drawn in point-index order — so within a sampling cell the **highest
-   * index wins**. There is no API for it; ordering by ascending degree is how a hub out-labels the
-   * orphans drifting around it. Get this backwards and the busiest Entity is the one never named.
+   * cosmos.gl's label sampling is a GPU pass with no blending, drawn in point-index order: within a
+   * sampling cell the **highest index wins**, and there is no API for it. Ascending degree is the
+   * only lever that makes a hub out-label the orphans around it.
    */
   it('orders points by ascending degree, so the highest index in a cell is the hub', () => {
     const payload = graphPayload(
@@ -50,10 +49,9 @@ describe('graphPayload', () => {
   });
 
   /**
-   * The server guarantees `edges ⊆ nodes × nodes`, so this is belt-and-braces — but a link naming
-   * a point that isn't there would index off the end of the position array, and cosmos.gl would
-   * draw a line to the origin rather than fail. Dropping it must not shift `descriptors`, which is
-   * keyed by *link* index and is the only way back from a sampled link to its Link Descriptor.
+   * A link naming a point that isn't there indexes off the end of the position array, and cosmos.gl
+   * draws a line to the origin rather than failing. Dropping it must not shift `descriptors`, which
+   * is keyed by *link* index.
    */
   it('drops a link to an absent node without misaligning the descriptors', () => {
     const payload = graphPayload(world(['Mira'], ['mira-haunts>the-drowned-keep', 'mira-loves>mira']));
@@ -62,12 +60,7 @@ describe('graphPayload', () => {
     expect(payload.descriptors).toEqual(['loves']);
   });
 
-  /**
-   * The degree that *ordered* a node and the degree that *sizes* it are one number, so an edge the
-   * payload drops may inflate neither. Count Mira's two links into the void and she sorts above the
-   * Entities that actually link — handing the top index, and with it the hub's label priority, to
-   * the one node drawn with no lines at all.
-   */
+  /** One degree both orders a node (label priority) and sizes it, so a dropped edge may inflate neither. */
   it('counts only the links it draws, so a dropped one never inflates a degree', () => {
     const payload = graphPayload(
       world(

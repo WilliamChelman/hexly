@@ -12,17 +12,15 @@ import { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { NodeView } from '@tiptap/pm/view';
 
 /**
- * The `callout` node view (ADR-0033): renders an Obsidian admonition as a coloured
- * box with a non-editable header above an **editable body**. The header carries a
- * freetext `<input>` for the callout `type` (any value, matching Obsidian's open set)
- * and the optional `title`. The body element is handed to ProseMirror as `contentDOM`,
- * so the block children render into it natively — inner `entityLink`s and other nodes
- * stay live and clickable, the point of modelling callout as block content.
+ * The `callout` node view (ADR-0033): an Obsidian admonition as a coloured box with a non-editable
+ * header above an **editable body**. The header carries a freetext `<input>` for the callout `type`
+ * (any value, matching Obsidian's open set) and the optional `title`. The body element is handed to
+ * ProseMirror as `contentDOM`, so its block children render into it natively.
  *
- * Keyboard model (arrow-driven, not Tab — the input is `tabindex=-1` so it never
- * hijacks the document's Tab order): `ArrowUp` from the top line of the body focuses
- * the type input (see {@link focusCalloutTypeAtTop}); from the input, `ArrowDown`/
- * `Enter`/`Escape` drop back into the body and `ArrowUp` leaves to the block above.
+ * Keyboard model (arrow-driven, not Tab — the input is `tabindex=-1` so it never hijacks the
+ * document's Tab order): `ArrowUp` from the top line of the body focuses the type input (see
+ * {@link focusCalloutTypeAtTop}); from the input, `ArrowDown`/`Enter`/`Escape` drop back into the
+ * body and `ArrowUp` leaves to the block above.
  */
 @Component({
   selector: 'app-callout-view',
@@ -69,12 +67,10 @@ export class CalloutView {
 }
 
 /**
- * ProseMirror keymap (wired at the editor): `ArrowUp` when the caret is on the top
- * line of a callout's first block focuses that callout's type input — the arrow-key
- * way into the chrome. Returns false otherwise so normal cursor motion is untouched.
- * `view.endOfTextblock('up')` accounts for wrapped lines, so it only fires from the
- * genuine top line. In a bare editor with no node view (specs) there's no input, so
- * it's a safe no-op.
+ * ProseMirror keymap: `ArrowUp` on the top line of a callout's first block focuses that callout's
+ * type input; false otherwise, leaving normal cursor motion untouched. `view.endOfTextblock('up')`
+ * accounts for wrapped lines, so it only fires from the genuine top line. With no node view (specs)
+ * there is no input, and it's a no-op.
  */
 export function focusCalloutTypeAtTop(editor: Editor): boolean {
   const { state, view } = editor;
@@ -98,16 +94,14 @@ export function focusCalloutTypeAtTop(editor: Editor): boolean {
 }
 
 /**
- * Bridge a ProseMirror `callout` node to a {@link CalloutView}. Mirrors the
- * entityLink bridge, but returns a `contentDOM` (the `[data-callout-body]` element)
- * because a callout has editable children — so no `stopEvent`/`ignoreMutation`
- * blanket blocks; `ignoreMutation` only shields Angular's own chrome re-renders
+ * Bridge a ProseMirror `callout` node to a {@link CalloutView}. Returns a `contentDOM` (the
+ * `[data-callout-body]` element) because a callout has editable children, so `stopEvent` /
+ * `ignoreMutation` may not blanket-block: `ignoreMutation` shields only Angular's chrome re-renders
  * (the header) from ProseMirror's mutation observer, leaving the body to PM.
  *
- * `editor` + `getPos` let the type `<input>` write back and drive arrow-key exits: a
- * change dispatches `setNodeMarkup`; an exit moves the PM selection (into the body,
- * or to the block above) and refocuses the editor. No `elementInjector` needed
- * (unlike entityLink): the chrome carries no `routerLink`, so no `ActivatedRoute`.
+ * `editor` + `getPos` let the type `<input>` write back and drive arrow-key exits: a change
+ * dispatches `setNodeMarkup`; an exit moves the PM selection (into the body, or to the block above)
+ * and refocuses the editor.
  */
 export function createCalloutNodeView(
   node: ProseMirrorNode,

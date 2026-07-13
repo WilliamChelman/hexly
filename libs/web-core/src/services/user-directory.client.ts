@@ -4,10 +4,9 @@ import { Observable } from 'rxjs';
 import { UserSummary } from '@hexly/domain';
 
 /**
- * HTTP client for the Instance user directory (#158). Stateless — the owner-set
- * UI reads it to name owners and pick a co-Owner. Only id + displayName; the
+ * HTTP client for the Instance user directory. Exposes only id + displayName; the
  * email stays private (ADR-0004). Distinct from the {@link UsersClient}
- * account-management surface, which carries the email and lives under `/api/users`.
+ * account-management surface, which carries the email.
  */
 @Injectable({ providedIn: 'root' })
 export class UserDirectoryClient {

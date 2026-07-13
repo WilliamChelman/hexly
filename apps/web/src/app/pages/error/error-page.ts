@@ -5,9 +5,7 @@ import { Button, Eyebrow } from '@hexly/web-ui';
 
 /**
  * The catch-all error page: shown for an unmatched URL and when `/entities/:id`
- * can't resolve its target's World (missing/inaccessible Entity). It is a dead
- * end with one way out — back to the World Index — so a bad link never strands
- * the user on a blank screen.
+ * can't resolve its target's World (missing/inaccessible Entity).
  */
 @Component({
   selector: 'app-error-page',

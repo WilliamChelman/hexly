@@ -8,8 +8,7 @@ import { Command, CommandProvider } from '../command';
 /**
  * The empty-prefix Quick Open Provider (ADR-0032, CONTEXT.md → Command
  * Palette): matches Entities server-side (ADR-0025), globally — not scoped to
- * the active World, unlike the entity browser. Picking one navigates straight
- * to it since a search result already carries its own `worldId`.
+ * the active World. A search result carries its own `worldId`.
  */
 @Injectable({ providedIn: 'root' })
 export class EntityQuickOpen implements CommandProvider {
@@ -19,9 +18,8 @@ export class EntityQuickOpen implements CommandProvider {
   readonly prefix = '';
   readonly label = 'commandPalette.entities';
 
-  // The live query stream feeding the shared, debounced server search. Kept
-  // permanently hot (constructor subscription) so the debounce window survives
-  // the palette re-subscribing per keystroke.
+  // Kept permanently hot (constructor subscription) so the debounce window
+  // survives the palette re-subscribing per keystroke.
   // ponytail: no unsubscribe — app-lifetime root singleton, nothing to leak.
   private readonly query$ = new Subject<string>();
   private readonly commands$ = searchEntities(this.entitiesClient, this.query$).pipe(

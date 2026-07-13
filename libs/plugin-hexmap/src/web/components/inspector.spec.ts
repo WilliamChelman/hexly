@@ -13,11 +13,7 @@ import { provideHexMapStoreTesting } from '../../testing/entity-session.fake';
 import { HEXMAP_TYPE_DEFINITIONS } from '../hexmap-types';
 import { Inspector } from './inspector';
 
-/**
- * The Note, as the app registers it. The Inspector embeds the shared Entity-Link picker, which reads
- * the registered Types to offer create-and-link — so the spec composes the registry a build has
- * (this plugin's type, plus the app's one core type) rather than the picker's own copy of it.
- */
+/** The Note, as the app registers it. */
 const NOTE_TYPE: TypeDefinition = {
   id: 'core.note' as TypeDefinition['id'],
   icon: 'label',
@@ -594,12 +590,6 @@ describe('Inspector Entity Link control', () => {
     }).compileComponents();
   });
 
-  /**
-   * The picker itself — its options, its dangling label, its create-and-link row, its copy — is
-   * `web-entity`'s, and has its own spec there (#199). What is the Inspector's, and lives here, is the
-   * *wiring*: which selections carry a link at all, and that a pick, a create, or a remove lands on
-   * the selected Map element through the store — the one undoable, persisted channel.
-   */
   function render() {
     const fixture = TestBed.createComponent(Inspector);
     fixture.detectChanges();

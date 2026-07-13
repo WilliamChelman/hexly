@@ -72,9 +72,7 @@ describe('PublicEntityPage', () => {
 
   /**
    * The Public Link page mounts the shared {@link EntityPage}, so every route-scoped dependency
-   * that component acquires must resolve here too. When they were listed on the entity *route*,
-   * this page had to mirror the list by hand — and a missed one (`RightDock`, #179) threw
-   * NullInjectorError during construction, rendering the banner over an empty page.
+   * that component acquires must resolve here too, or construction throws NullInjectorError.
    */
   it('renders the reused editor for an anonymous reader', () => {
     const el = render();
@@ -86,8 +84,7 @@ describe('PublicEntityPage', () => {
 
   /**
    * References is not a panel this context can serve: the endpoint answers a `CurrentUser`, and a
-   * Public Link grants no scope beyond its own Entity. So the dock offers the Outline alone —
-   * no toggle, and therefore no fetch that could only ever 403.
+   * Public Link grants no scope beyond its own Entity — the fetch could only ever 403.
    */
   it('offers the Outline but not References', () => {
     const el = render();

@@ -15,9 +15,9 @@ export function addPoint(point: Point, delta: Point): Point {
 export type Orientation = 'pointy' | 'flat';
 
 /**
- * Everything the geometry needs to map between hexes and pixels: the
- * `orientation`, the per-axis hex `size` (centre→corner radius), and the pixel
- * `origin` that hex `(0, 0)` sits on. The renderer is parameterized by this.
+ * Everything the geometry needs to map between hexes and pixels: the `orientation`,
+ * the per-axis hex `size` (centre→corner radius), and the pixel `origin` that hex
+ * `(0, 0)` sits on.
  */
 export interface Layout {
   readonly orientation: Orientation;
@@ -30,11 +30,11 @@ const SQRT3 = Math.sqrt(3);
 type Matrix = readonly [number, number, number, number];
 
 /**
- * The geometry constants for one orientation, kept together so a hex shape lives
- * in a single place: the `forward` matrix (axial → unit pixel offset), its
- * `inverse` (pixel → fractional axial), and the corner `startAngle` in turns
- * (pointy corners at 30° + 60°·i, flat at 0° + 60°·i — what makes a pointy hex
- * point up and a flat hex point sideways). Red Blob Games convention.
+ * The geometry constants for one orientation: the `forward` matrix (axial → unit
+ * pixel offset), its `inverse` (pixel → fractional axial), and the corner
+ * `startAngle` in turns (pointy corners at 30° + 60°·i, flat at 0° + 60°·i — what
+ * makes a pointy hex point up and a flat hex point sideways). Red Blob Games
+ * convention.
  */
 const ORIENTATIONS: Record<Orientation, { forward: Matrix; inverse: Matrix; startAngle: number }> = {
   pointy: {

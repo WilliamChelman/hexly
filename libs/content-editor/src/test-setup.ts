@@ -1,8 +1,6 @@
 /**
- * Global unit-test setup. jsdom implements `<dialog>` markup but not its imperative
- * API (`showModal`/`close`), which the {@link Dialog} primitive (ADR-0007) relies on.
- * Polyfill the gap once so dialog-driven components are testable; real browsers and
- * the e2e suite use the native implementation untouched.
+ * jsdom implements `<dialog>` markup but not its imperative API (`showModal`/`close`),
+ * which the {@link Dialog} primitive relies on. Polyfilled here for unit tests only.
  */
 const dialogProto = HTMLDialogElement.prototype;
 

@@ -10,10 +10,8 @@ export default [
     files: ['**/*.ts'],
     plugins: { 'hexly-design': hexlyDesignTokens },
     rules: {
-      // ADR-0020 — the design tokens *are* the Tailwind theme; these guard the
-      // curation: every var(--…) must resolve to a defined token, and built-in
-      // shadow utilities (which bake a light value) are barred (ADR-0021).
-      // Spacing is no longer fenced — ADR-0030 opened it to Tailwind's defaults.
+      // Every var(--…) must resolve to a defined design token (ADR-0020); built-in
+      // shadow utilities are barred because they bake in a light value (ADR-0021).
       'hexly-design/no-unknown-design-token': 'error',
       'hexly-design/no-builtin-shadow': 'error',
       '@angular-eslint/directive-selector': [
@@ -24,11 +22,9 @@ export default [
           style: 'camelCase',
         },
       ],
-      // Element components (Chip, Coord, Icon) stay kebab-case. Components may
-      // also attach to a native element via an attribute selector (Button,
-      // Panel, Tool, …) so the primitive keeps that element's semantics/a11y
-      // while owning its scoped styles (ADR-0007); those are camelCase like a
-      // directive. Both forms are configured via the rule's multi-config array.
+      // Element components (Chip, Coord, Icon) are kebab-case. Components that attach to a
+      // native element via an attribute selector (Button, Panel, Tool, …) to keep that
+      // element's semantics/a11y (ADR-0007) are camelCase, like a directive.
       '@angular-eslint/component-selector': [
         'error',
         [

@@ -1,16 +1,11 @@
 import { createEntity, enterLibrary, entityIdFromUrl, expect, flushSave, test, savedGrid } from './fixtures';
 
 /**
- * Dangling Entity Link journey (issue #78, CONTEXT.md → Entity Link, ADR-0018): a
- * Map element linked to an Entity that is later deleted (or otherwise not
- * resolvable for the current user) must render its link **non-navigable** — visible
- * but not followable — and the referencing map must still open without error.
- * `entityId` is not referentially enforced, so deleting the target neither cascades
- * to nor corrupts the Map element; the id stays in the document and simply stops
- * resolving. We exercise the real path: link a hex, save, delete the target via the
- * API (ADR-0009 seam), reload, and assert the Inspector shows the non-navigable
- * state while the persisted document still carries the id. Prior art:
- * entity-link-persist.spec.ts.
+ * Dangling Entity Link journey (issue #78, CONTEXT.md → Entity Link, ADR-0018): a link whose
+ * target is deleted — or is not resolvable for the current user — renders visible but not
+ * followable, and the referencing map still opens. `entityId` is not referentially enforced:
+ * deleting the target neither cascades to nor corrupts the Map element; the id stays in the
+ * document and simply stops resolving.
  */
 test('a link whose target is deleted renders non-navigable, and the map opens without error', async ({
   page,

@@ -1,10 +1,6 @@
 /**
- * The shape of a drift report between two language catalogs.
- *
- * Keys are compared, not values: a translation differs by design, but the *set*
- * of keys must match so a non-reference catalog can never silently miss (or
- * orphan) a string. Array values are treated as opaque leaves — this gate
- * guards the key *set*, not value types or array contents.
+ * A drift report between two language catalogs. Key *sets* are compared, never
+ * values; arrays are opaque leaves (their contents are not inspected).
  */
 export interface KeyDrift {
   /** Dot-path keys in the reference catalog that the target catalog lacks. */
@@ -16,12 +12,8 @@ export interface KeyDrift {
 }
 
 /**
- * Compare two translation catalogs by their key sets and report any drift.
- *
- * `reference` is the source-of-truth catalog (English, per ADR-0014); `target`
- * is the catalog being checked against it. A key present in `reference` but not
- * `target` is reported as `missing`; a key present only in `target` is reported
- * as `orphaned`.
+ * Compare two translation catalogs by their key sets. `reference` is the
+ * source-of-truth catalog (English, per ADR-0014); `target` is checked against it.
  */
 export function findKeyDrift(reference: Record<string, unknown>, target: Record<string, unknown>): KeyDrift {
   const referencePaths = flattenPaths(reference);
@@ -42,8 +34,7 @@ export function findKeyDrift(reference: Record<string, unknown>, target: Record<
 /**
  * Flatten a nested catalog into its leaf dot-paths
  * (`{ auth: { heading: '…' } }` → `['auth.heading']`). An empty object is itself
- * a leaf (`{ settings: {} }` → `['settings']`), so a stubbed namespace present
- * in one catalog but absent from another is still caught as drift.
+ * a leaf (`{ settings: {} }` → `['settings']`).
  */
 export function flattenKeys(catalog: Record<string, unknown>): string[] {
   return flattenPaths(catalog).map(toDotPath);
@@ -59,8 +50,7 @@ function flattenPaths(catalog: Record<string, unknown>, prefix: readonly string[
     const path = [...prefix, key];
     if (!isCatalog(value)) return [path];
     const nested = flattenPaths(value, path);
-    // An empty object yields no nested leaves; treat the namespace itself as a
-    // leaf so an empty-vs-absent namespace still registers as drift.
+    // An empty object yields no nested leaves; the namespace itself is the leaf.
     return nested.length ? nested : [path];
   });
 }

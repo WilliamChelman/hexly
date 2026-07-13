@@ -1,14 +1,6 @@
 import { enterLibrary, entityIdFromUrl, expect, flushSave, segRe, test } from './fixtures';
 
-/**
- * The Content Entity Link journey (issue #95, ADR-0023): an author drops a live
- * link into prose via the `@` picker, and it survives a save + reload, renders the
- * target's live name, navigates on click, and falls back to a dangling label once
- * the target is deleted. Crosses every seam: real TipTap `@` suggestion, the
- * picker, a versioned save, an API read of the opaque snapshot (ADR-0009/0019),
- * SPA navigation, and the id→name resolver's live/missing states.
- * Prior art: entity-link-persist.spec.ts (the Map-element link).
- */
+/** The Content Entity Link journey (issue #95, ADR-0023). */
 test('inserts a Content Entity Link via @, persists it, navigates it, and dangles when the target is gone', async ({
   page,
   request,

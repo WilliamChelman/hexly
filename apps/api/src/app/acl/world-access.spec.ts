@@ -7,11 +7,8 @@ import { entities, entityGrants, users, worldMembers, worlds } from '../db/schem
 import { canCreateEntityFilter, worldAccess, worldOwnerFilter } from './world-access';
 
 /**
- * The World authorization rule (ADR-0024, ADR-0037, ADR-0039), driven directly against a seeded
- * SQLite — no Nest, no HTTP. The single source of truth for the role × superadmin → verbs matrix,
- * so it doubles as the deepening's safety net: if a re-homing changes a cell here, the rule moved.
- * `decide`/`rightsOf`, `decideMeta`, `managedBy`, and `canCreateEntityFilter` compute the same
- * predicates the live read/write paths do.
+ * The World authorization rule (ADR-0024, ADR-0037, ADR-0039) — the role × superadmin → verbs
+ * matrix, driven against a seeded SQLite with no Nest and no HTTP.
  */
 describe('worldAccess', () => {
   let db: Db;

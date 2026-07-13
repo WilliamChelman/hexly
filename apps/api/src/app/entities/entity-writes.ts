@@ -81,11 +81,8 @@ export interface InsertEntityInput {
 export type EntityRow = typeof entities.$inferSelect;
 
 /**
- * The narrow handle a `manage` change writes ACL rows through. It exists so the *invariants*
- * (≥1-Owner, no-such-user, owner-wins upsert) can stay in the service that reads best with them,
- * while the `entity_grants` write itself stays inside {@link EntityWrites} — which is what makes
- * the "no write without a nudge" guard structural rather than a convention. Runs inside the
- * transaction, before the `seq` bump.
+ * The narrow handle a `manage` change writes ACL rows through. Runs inside the transaction, before
+ * the `seq` bump. The ≥1-Owner / no-such-user / owner-wins invariants are enforced by the caller.
  */
 export interface AclWriter {
   /**
@@ -143,22 +140,20 @@ export type MutateResult =
   | { status: 'forbidden' };
 
 /**
- * The single write handle for `entities` and `entity_grants` (ADR-0045). It owns the `seq` bump,
- * the derived indexes, and the post-commit emit — so a write *cannot* land without nudging its
- * followers. An ESLint rule bans `update(entities)` and `insert|delete(entityGrants)` everywhere
- * else.
+ * The single write handle for `entities` and `entity_grants` (ADR-0045): it owns the `seq` bump,
+ * the derived indexes, and the post-commit emit. An ESLint rule bans `update(entities)` and
+ * `insert|delete(entityGrants)` everywhere else.
  *
- * The transaction and the nudge buffer live in {@link WriteOutbox}, shared with `WorldWrites`, so
- * a World membership change can bump the World and its shared Entities under one commit.
+ * The transaction and the nudge buffer live in {@link WriteOutbox}, shared with `WorldWrites`, so a
+ * World membership change can bump the World and its shared Entities under one commit.
  */
 @Injectable()
 export class EntityWrites {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly outbox: WriteOutbox,
-    // Resolves a `types[]` set to its Field schema **scoped to the Entity's World**, so the derive
-    // pass materialises the facetable Field values (ADR-0048, #188) — including a World's
-    // user-defined types (#191) — the same way it harvests edges and descriptors.
+    // Resolves a `types[]` set to its Field schema **scoped to the Entity's World**, so a World's
+    // user-defined types resolve too.
     private readonly worldTypeFields: WorldTypeFields,
     // The instance-wide Structured Field data-types (ADR-0050), from which a structured value
     // harvests its own edges in the same derive pass.
@@ -166,8 +161,7 @@ export class EntityWrites {
   ) {}
 
   /**
-   * Run `fn` in the outermost transaction, flushing the nudge outbox on commit — the seam a caller
-   * that spans several write handles (the Admin account purge) reaches for. Delegates to
+   * Run `fn` in the outermost transaction, flushing the nudge outbox on commit. Delegates to
    * {@link WriteOutbox.transact}; see there for why an async callback is a type error.
    */
   transact<T>(fn: () => SyncOnly<T>): T {
@@ -175,9 +169,8 @@ export class EntityWrites {
   }
 
   /**
-   * Insert a fully-built Entity — the single trunk behind `create` and the vault import. The row
-   * and its initial Owner land together, so a new Entity is never ownerless. No nudge: nothing can
-   * be following an id that did not exist a moment ago.
+   * Insert a fully-built Entity. The row and its initial Owner land together, so a new Entity is
+   * never ownerless. No nudge: nothing can be following an id that did not exist a moment ago.
    */
   insert(input: InsertEntityInput): EntityRow {
     const now = Date.now();
@@ -205,10 +198,8 @@ export class EntityWrites {
   }
 
   /**
-   * Delete every Entity in a World, nudging each — a **system write**, so it takes no `userId`:
-   * the World's own Owner gate has already run, and no per-Entity Right could refuse it. Each
-   * cascaded Entity's followers evict to `unavailable` on their own ref, which ADR-0044 deferred
-   * and left them stranded on a ghost row.
+   * Delete every Entity in a World, nudging each — a **system write**, so it takes no `userId`: the
+   * World's own Owner gate has already run, and no per-Entity Right could refuse it.
    */
   cascadeDeleteWorld(worldId: string): void {
     this.transact(() => {
@@ -226,18 +217,15 @@ export class EntityWrites {
    *
    * Entity access reads `owner ∨ grant ∨ (shared ∧ world-member)` and Entity write reads
    * `owner ∨ (shared ∧ world-owner)`, so *every* `world_members` mutation — promotion, demotion,
-   * add, remove — changes some principal's standing on the World's shared Entities. It therefore
-   * bumps each one's `seq` and nudges: a promoted World Owner's open Entity gains its Save button,
-   * and a removed member's follow evicts. Emitting without the bump would be a half-fix — the
-   * follower's freshness gate would drop the nudge and its `rights` array would stay stale
-   * (ADR-0045 rejects exactly that).
+   * add, remove — changes some principal's standing on the World's shared Entities. Each one's
+   * `seq` must be bumped as well as nudged, or the follower's freshness gate drops the nudge and
+   * its `rights` array stays stale.
    *
-   * `private` Entities are untouched: World membership confers nothing on them, so nobody's Rights
-   * moved and there is nothing to refetch.
+   * `private` Entities are untouched: World membership confers nothing on them.
    *
-   * ponytail: fans out over *all* the World's shared Entities, not just the followed ones — the
-   * bus keeps no per-World interest index, and `emitEntityChange` short-circuits on no followers.
-   * Fine on a small instance; add an index if a huge shared World ever makes this loop hurt.
+   * ponytail: fans out over *all* the World's shared Entities, not just the followed ones — the bus
+   * keeps no per-World interest index, and `emitEntityChange` short-circuits on no followers. Fine
+   * on a small instance; add an index if a huge shared World ever makes this loop hurt.
    */
   bumpWorldShared(worldId: string): void {
     this.transact(() => {
@@ -259,9 +247,8 @@ export class EntityWrites {
 
   /**
    * Drop every grant a departing user holds — a **system write**, called when their account is
-   * deleted. It bumps `seq` on each touched Entity, because the Entity's sharing state moved and a
-   * later nudge must read as newer than a follower's held value, but deliberately **emits
-   * nothing**: the user's own sessions are dropped with the account, so they self-evict, and no
+   * deleted. Bumps `seq` on each touched Entity, so a later nudge reads as newer than a follower's
+   * held value, but **emits nothing**: the user's own sessions are dropped with the account, and no
    * other principal's Rights on those Entities changed.
    */
   purgeGrantsOf(userId: string): void {
@@ -284,21 +271,18 @@ export class EntityWrites {
 
   /**
    * Recompute one page of Entities' document-derived state — the unit of the Superadmin Reindex
-   * (ADR-0046), driven to exhaustion by the reindex `AdminService`. A **system write** (no `userId`): the
-   * Superadmin sits outside the collaboration model. Re-runs {@link derive} and
-   * {@link replaceDerived}, so any derivation added there is backfilled retroactively for free;
-   * idempotent, since the writes are wholesale replaces.
+   * (ADR-0046), driven to exhaustion by the reindex `AdminService`. A **system write** (no
+   * `userId`). Idempotent: the writes are wholesale replaces.
    *
    * A chunk, not the instance: `better-sqlite3` is synchronous, so a walk of every Entity in one
-   * transaction would pin the event loop. The page is the seam the caller yields on and bounds the
-   * transaction — it commits as it goes, so a crash leaves the instance partly reindexed, harmless
-   * since the next run resumes. {@link derive} runs outside the transaction (pure, the only step a
-   * bad document can throw in): its failures are collected per Entity and skipped while the
-   * successes still write; a write error rolls the chunk back. Ordered by `id`, resumed from
-   * `after`, stable under concurrent inserts.
+   * transaction would pin the event loop. Each page commits as it goes, so a crash leaves the
+   * instance partly reindexed — harmless, since the next run resumes. {@link derive} runs outside
+   * the transaction (pure, the only step a bad document can throw in): its failures are collected
+   * per Entity and skipped while the successes still write; a write error rolls the chunk back.
+   * Ordered by `id`, resumed from `after`, stable under concurrent inserts.
    *
-   * Lands with no nudge and no `seq` bump: every column it touches is derived, and a recompute from
-   * an unchanged document writes back what it read — ADR-0046's accepted freshness ceiling.
+   * Lands with no nudge and no `seq` bump: every column it touches is derived — ADR-0046's accepted
+   * freshness ceiling.
    */
   reindexChunk(after: string | null, limit: number): ReindexChunk {
     const rows = this.db
@@ -354,21 +338,16 @@ export class EntityWrites {
   }
 
   /**
-   * The one derivation of the Entity's document, in one place — {@link EntityWrites} is the only
-   * caller of `extractText` and `harvestEdges`. Splitting them is what let an imported vault
-   * populate the search index while contributing nothing to the `::` Link Descriptor vocabulary.
-   *
-   * It takes the whole body, not just the Content: a Hex Map's Entity Links live on its Hexes,
-   * Features, and Regions as well as in its prose (ADR-0046).
+   * The one derivation of the Entity's document. It takes the whole body, not just the Content: a
+   * Hex Map's Entity Links live on its Hexes, Features, and Regions as well as in its prose
+   * (ADR-0046).
    *
    * The `::` vocabulary is a *projection* of the edge set, not a second walk: only a
    * `content → entity` edge carries a descriptor, so the non-null ones are exactly the descriptors
-   * the Content uses. One traversal, and one definition of what a descriptor is.
+   * the Content uses.
    */
   private derive(body: EntityBody, types: readonly string[], worldId: string): Derived {
-    // Resolved once, shared by the two derivations that read the type set: the edge harvest's
-    // Entity-Link Fields (#190) and the facet derivation's facetable Fields (#188). Scoped to the
-    // Entity's World so a user-defined type's Fields resolve too (#191).
+    // Scoped to the Entity's World so a user-defined type's Fields resolve too.
     const fields = resolveFields(this.worldTypeFields.resolverFor(worldId), types);
     const edges = harvestEdges(body, fields, this.typeFields.structuredDataTypes);
     return {
@@ -381,8 +360,8 @@ export class EntityWrites {
 
   /**
    * Replace the Entity's derived index rows with the freshly harvested sets — wholesale, no
-   * diffing, so both are self-pruning. Always runs in the same transaction as the body write, so
-   * the indexes reflect the last *successful* save and never a rejected one.
+   * diffing, so they are self-pruning. Must run in the same transaction as the body write, so the
+   * indexes reflect the last *successful* save and never a rejected one.
    */
   private replaceDerived(id: string, worldId: string, derived: Derived): void {
     this.replaceDescriptors(id, derived.descriptors);
@@ -391,9 +370,8 @@ export class EntityWrites {
   }
 
   /**
-   * Replace the Entity's Field-facet rows with the freshly derived set (self-pruning, ADR-0048,
-   * #188). `worldId` is denormalised off the source, mirroring {@link replaceEdges}, so a
-   * World-scoped facet read is one indexed lookup.
+   * Replace the Entity's Field-facet rows with the freshly derived set (self-pruning, ADR-0048).
+   * `worldId` is denormalised off the source, so a World-scoped facet read is one indexed lookup.
    */
   private replaceFieldFacets(id: string, worldId: string, facets: readonly FieldFacetValue[]): void {
     this.db.delete(entityFieldFacets).where(eq(entityFieldFacets.entityId, id)).run();

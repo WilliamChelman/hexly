@@ -12,9 +12,7 @@ const SIZE_UNITS: Record<string, number> = {
 
 /**
  * Parse a human-readable size (`"100mb"`, `"1.5gb"`, `"512 kb"`) into bytes.
- * Case-insensitive, whitespace-tolerant; a unit is required. Throws on anything
- * else so a typo'd limit in `hexly.yml` fails boot rather than silently meaning
- * "1 byte" (ADR-0036).
+ * Case-insensitive, whitespace-tolerant; a unit is required. Throws on anything else.
  */
 export function parseSize(input: string): number {
   const match = /^\s*(\d+(?:\.\d+)?)\s*(b|kb|mb|gb)\s*$/i.exec(input);
@@ -42,30 +40,24 @@ function isValidSize(input: string): boolean {
 /**
  * The literal, validated shape of `hexly.yml` (ADR-0036) — sizes are still
  * human-readable strings here. Unknown top-level keys are stripped, not rejected
- * (zod default), so a future reserved `featureFlags:` block won't crash an older
- * binary. `prefault` (not `default`) so an absent block is *parsed* as `{}` and
- * its field defaults fill in, rather than yielding a literal empty object.
+ * (zod default). `prefault` (not `default`) so an absent block is *parsed* as `{}`
+ * and its field defaults fill in, rather than yielding a literal empty object.
  */
 const rawConfigSchema = z.object({
   import: z
     .object({
-      // Generous by default: an image-heavy vault balloons the *compressed* upload
-      // (assets ride inside the .zip), so maxUpload is the ceiling that actually bites.
-      // maxDecompressed meters all inflated bytes — markdown AND assets (ADR-0034) — so a
-      // real vault stays well under it; it's a high zip-bomb backstop, not a tuning knob.
+      // maxDecompressed meters all inflated bytes — markdown AND assets (ADR-0034); it's a high
+      // zip-bomb backstop, not a tuning knob.
       maxUpload: sizeString('500mb'),
       maxDecompressed: sizeString('5gb'),
-      // Default false: batch-decompress fast, guarding on the zip's *declared* uncompressed
-      // size (a maliciously crafted archive can spoof it) — the right trade for the common
-      // trusted/personal deployment. Set true on an untrusted/public instance to stream and
-      // meter *actual* output, aborting a zip bomb mid-inflate at the cost of a slower import.
+      // false: batch-decompress, guarding on the zip's *declared* uncompressed size (a crafted
+      // archive can spoof it). true: stream and meter *actual* output, aborting a zip bomb
+      // mid-inflate at the cost of a slower import.
       strictZipGuard: z.boolean().default(false),
     })
     .prefault({}),
-  // Full-text search relevance tuning (ADR-0035). bm25 multiplies each indexed
-  // column's contribution by its weight, so a name hit outranks a body hit at the
-  // same frequency. Defaults favour name > tags > body; a deployment with, say,
-  // very long notes can retune without a code change. Positive numbers only.
+  // Full-text search relevance tuning (ADR-0035). bm25 multiplies each indexed column's
+  // contribution by its weight, so a name hit outranks a body hit at the same frequency.
   search: z
     .object({
       weights: z
@@ -77,9 +69,8 @@ const rawConfigSchema = z.object({
         .prefault({}),
     })
     .prefault({}),
-  // Live-follow SSE heartbeat cadence (ADR-0044, #177): how often the server pings each open
-  // stream to keep it alive and surface a dead half-open socket for reaping. 30s suits most
-  // deployments; a proxy with a tighter idle timeout can lower it. Positive seconds only.
+  // Live-follow SSE heartbeat cadence (ADR-0044): how often the server pings each open stream to
+  // keep it alive and surface a dead half-open socket for reaping.
   liveFollow: z
     .object({
       heartbeatSeconds: z.number().positive().default(30),
@@ -110,12 +101,7 @@ export interface HexlyConfig {
   };
 }
 
-/**
- * Preprocess the raw config into the shape the rest of the app consumes: sizes
- * become byte counts here (and any future derived values compute here), so no
- * consumer re-parses `"100mb"`. Sizes are already validated by the schema, so
- * `parseSize` cannot throw.
- */
+/** Sizes are already validated by the schema, so `parseSize` cannot throw here. */
 function processConfig(raw: HexlyConfigRaw): HexlyConfig {
   return {
     import: {
@@ -129,11 +115,9 @@ function processConfig(raw: HexlyConfigRaw): HexlyConfig {
 }
 
 /**
- * Load, validate, and preprocess the Instance Configuration from `hexly.yml` in
- * the Instance Directory (ADR-0036). A missing file, empty file, or `:memory:`
- * dir yields all defaults; a present file is merged over them. An invalid file
- * (bad YAML, wrong type, unparseable size) throws — a boot crash naming the bad
- * key beats a typo'd limit silently reverting to a default.
+ * Load, validate, and preprocess the Instance Configuration from `hexly.yml` in the Instance
+ * Directory (ADR-0036). A missing file, empty file, or `:memory:` dir yields all defaults; a
+ * present file is merged over them. An invalid file (bad YAML, wrong type, unparseable size) throws.
  */
 export function loadConfig(instanceDir: string): HexlyConfig {
   const text = readConfigText(instanceDir);

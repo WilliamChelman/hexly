@@ -9,10 +9,7 @@ export interface FollowStoreConfig {
   kind: InterestRef['kind'];
   /** Trailing-debounce window before a nudge triggers a refetch. */
   debounceMs: number;
-  /**
-   * Log a swallowed transient refetch failure (5xx / network blip) — omit to stay silent. Parity
-   * with the list stores that log the same class, so a silently-stale follow isn't unexplained.
-   */
+  /** Log a swallowed transient refetch failure (5xx / network blip) — omit to stay silent. */
   onRefetchError?: (err: unknown) => void;
 }
 
@@ -25,8 +22,7 @@ interface Sequenced {
 /**
  * The write-through live-follow store for one resource kind (ADR-0044) — **library-internal**,
  * reached only through its client ({@link EntitiesClient}, {@link WorldsClient}), never a consumer.
- * It is the single source of truth for "the freshest version of resource X anyone here has seen",
- * fed from *both* directions:
+ * It holds the freshest version of resource X anyone here has seen, fed from *both* directions:
  *
  * - the **network**: a server nudge newer than the held version drives one debounced refetch, shared
  *   by every watcher (N followers → one `GET`), and the result advances the held version.
@@ -34,18 +30,14 @@ interface Sequenced {
  *   fans out to every other watcher with *no roundtrip*, and — because the held version advances —
  *   the server's own echo nudge for that write dedups to nothing (no self-refetch).
  *
- * This is why the freshness gate lives here, not in the consumer: it must see local writes too. A
- * consumer that shouldn't *apply* a given emission (an editor mid-edit, a stale in-flight read)
- * filters it at subscribe time — *when to fetch* is shared truth, not a per-caller gate.
- *
- * Not an `@Injectable`: each client news up its own configured instance, so the client stays the
- * only thing that knows the store exists.
+ * The store decides *when to fetch*; a consumer that shouldn't *apply* a given emission (an editor
+ * mid-edit, a stale in-flight read) filters it at subscribe time.
  */
 export class FollowStore<T extends Sequenced> {
   /**
    * Held freshness per id — persistent, so it outlives a watch and a reopened follow still dedups a
-   * self-echo. Seeded by every read/write/refetch, monotonically. ponytail: unbounded (one detail
-   * per resource ever touched); prune by an LRU cap if a long-lived session's footprint matters.
+   * self-echo. Seeded monotonically by every read/write/refetch. Unbounded: one detail per resource
+   * ever touched.
    */
   private readonly held = new Map<string, T>();
   /** The refcounted fanout stream per id (shared across concurrent watchers). */
@@ -109,11 +101,7 @@ export class FollowStore<T extends Sequenced> {
     if (!held || d.seq > held.seq) this.held.set(d.id, d);
   }
 
-  /**
-   * The freshness gate. One `seq` on every resource kind, bumped by every committed change, so the
-   * comparison is the same for Entities and Worlds and lives here rather than in a per-kind
-   * adapter (ADR-0045).
-   */
+  /** The freshness gate: one `seq` on every resource kind, bumped by every committed change (ADR-0045). */
   private isNewer(id: string, n: FollowSignal): boolean {
     // A signal carrying no `seq` makes no freshness claim, so it is never gated: a `stale`
     // reconnect pulse must refetch unconditionally to reconcile the gap. (An `unavailable`

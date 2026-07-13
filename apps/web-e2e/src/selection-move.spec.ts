@@ -1,14 +1,9 @@
 import { createEntity, enterLibrary, expect, flushSave, savedGrid, test } from './fixtures';
 
 /**
- * Group moves for non-hex selections (issue #64 follow-up, ADR-0017). Two bugs the
- * unified selection-drag fixes, each riding the real canvas press→drag gesture and
- * proven through a direct API read of the persisted document (ADR-0009):
- *
- * 1. Dragging a label that is part of a multi-selection moved only that one label
- *    and discarded the rest — it must move the whole set.
- * 2. A Region on its own could not be dragged at all — grabbing one of its member
- *    cells must translate its whole footprint.
+ * Group moves for non-hex selections (ADR-0017): dragging one label of a multi-selection
+ * moves the whole set, and grabbing a member cell of a Region translates its whole
+ * footprint.
  */
 
 /** Flush the pending save, then read the grid `mapId` persisted. */

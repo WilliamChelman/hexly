@@ -7,11 +7,9 @@ import { ListboxController, ListboxProps, Listbox, ListboxEmpty, ListboxOption }
 export type EntityPickerProps = ListboxProps<EntitySummary>;
 
 /**
- * The keyboard-driven Entity picker that opens on `@` (and via the `/link` slash
- * item) in the Content editor (issue #95, ADR-0023). Same open/update/close/keyboard
- * behaviour as {@link SlashMenu} — both share {@link ListboxController}; this is the
- * entity-result template over it. Matching by name is the suggestion plugin's job
- * (server-side `q` search, ADR-0025), so the picker only renders what it is handed.
+ * The keyboard-driven Entity picker that opens on `@` (and via the `/link` slash item).
+ * Matching by name is the suggestion plugin's job (server-side `q` search, ADR-0025);
+ * the picker only renders what it is handed.
  */
 @Component({
   selector: 'app-entity-picker',

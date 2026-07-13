@@ -7,8 +7,7 @@ import { z } from 'zod';
 
 /**
  * The Format Locale choices as BCP-47 tags. `Intl` can't enumerate locales, so
- * the list stays curated. Shared so the server validates against the exact set
- * the web picker offers.
+ * the list stays curated.
  */
 export const FORMAT_LOCALE_TAGS = [
   'en-US',
@@ -45,9 +44,9 @@ const formatLocaleField = z.enum(FORMAT_LOCALE_TAGS);
 const themeField = z.enum(['light', 'dark']);
 
 // The roaming Preferences bag stored on the user row; an absent field means "no
-// expressed choice" and the client falls back to its own detection. Read path is
-// lenient (`.strip()`): an unknown key drops instead of failing the whole parse
-// and resetting the other prefs. The PATCH boundary below stays `.strict()`.
+// expressed choice" and the client falls back to its own detection. `.strip()`
+// on the read path: an unknown key drops instead of failing the whole parse and
+// resetting the other prefs.
 export const preferencesSchema = z
   .object({
     /** UI language (the Locale). */
@@ -81,9 +80,8 @@ export type PreferencesPatch = z.infer<typeof preferencesPatchSchema>;
 /**
  * The closed, code-known set of Instance Roles — account-wide powers a user may
  * hold on their account (ADR-0047). Orthogonal: holding one implies nothing
- * about the other. `manage-users` was the old `is_admin` flag; `create-worlds`
- * the old `can_create_worlds`. Superadmin is not a member — it is a separate
- * flag that supersedes the whole set.
+ * about the other. Superadmin is not a member — it is a separate flag that
+ * supersedes the whole set.
  */
 export const INSTANCE_ROLES = ['manage-users', 'create-worlds'] as const;
 
@@ -99,12 +97,7 @@ export interface InstanceRoleHolder {
   readonly isSuperadmin: boolean;
 }
 
-/**
- * Holds the `manage-users` role, or is a Superadmin (who supersedes every role).
- * The single home of the `Superadmin ⊇ everything` implication for account
- * management — call it rather than checking the array inline, so the rule can't
- * drift.
- */
+/** Holds the `manage-users` role, or is a Superadmin (who supersedes every role). */
 export function canManageUsers(user: InstanceRoleHolder): boolean {
   return user.isSuperadmin || user.roles.includes('manage-users');
 }
@@ -126,18 +119,15 @@ export interface AuthUser {
   readonly isSuperadmin: boolean;
 }
 
-/**
- * A single Instance user in the directory `GET /users`. Deliberately omits the
- * email — that is private, so it never enters the directory.
- */
+/** A single Instance user in the directory `GET /users`. The email is private and never enters it. */
 export interface UserSummary {
   readonly id: string;
   readonly displayName: string;
 }
 
 /**
- * The body of `PATCH /auth/me/profile` — the display name only. Email is
- * deliberately absent: it is the login identity and stays read-only.
+ * The body of `PATCH /auth/me/profile` — the display name only. Email is the
+ * login identity and stays read-only.
  */
 export const updateProfileRequestSchema = z
   .object({

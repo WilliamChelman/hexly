@@ -2,10 +2,8 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { IconHost } from './icon-host';
 
 /**
- * Renders an arbitrary SVG path (`d`) as one `<svg>` glyph in `currentColor`,
- * sized by `size`. Used to draw data-driven library icons — a Feature's marker art,
- * which the map plugin owns — without inlining raw `<svg>` into feature templates,
- * and without web-ui learning that art (ADR-0007, ADR-0050).
+ * Renders an arbitrary SVG path (`d`) as one `<svg>` glyph in `currentColor` — for
+ * data-driven library icons such as a Feature's marker art (ADR-0007, ADR-0050).
  *
  * `stroke-linecap="round"` matches the canvas marker (map-renderer sets
  * `lineCap = 'round'`), so an open subpath looks identical in the palette and

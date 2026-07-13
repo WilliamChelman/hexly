@@ -1,8 +1,6 @@
 /**
- * Harvest the Entity Links an Entity's document expresses, as a flat edge set
- * (ADR-0046). The write path derives this on every save and materializes it into
- * the derived edge index, so *References* / *Referenced by* and the World Graph
- * become indexed lookups instead of a walk over every Entity's document.
+ * Harvest the Entity Links an Entity's document expresses, as a flat edge set (ADR-0046). The write
+ * path derives this on every save and materializes it into the derived edge index.
  */
 
 import { assetHashFromUrl } from './asset';
@@ -15,9 +13,8 @@ import type { StructuredDataTypeSet } from './structured-data-type';
 export type EdgeTargetKind = 'entity' | 'asset';
 
 /**
- * One link the source Entity's document expresses. The source is the Entity the
- * document belongs to, so it is the caller's to supply — an edge only names its
- * target. `descriptor` is the Link Descriptor, set on Content links alone.
+ * One link the source Entity's document expresses. An edge only names its target; the source is the
+ * caller's to supply. `descriptor` is the Link Descriptor, set on Content links alone.
  */
 export interface EntityEdge {
   readonly targetKind: EdgeTargetKind;
@@ -27,9 +24,8 @@ export interface EntityEdge {
 }
 
 /**
- * An Entity at one end of a link, as a link list renders it: enough to name it and navigate to
- * it. Names are never stored on an edge — a rename needs no edge rewrite, so both directions
- * resolve the current name from `entities` live (ADR-0046).
+ * An Entity at one end of a link, as a link list renders it: enough to name it and navigate to it.
+ * Names are never stored on an edge — both directions resolve the current name from `entities` live.
  */
 export interface LinkedEntity {
   readonly id: string;
@@ -72,9 +68,8 @@ export interface EntityReferences {
  * to the same target collapse to one edge, while two descriptors to that target stay two.
  *
  * `fields` is the Entity's resolved Field schema set ({@link resolveFields}) and `dataTypes` the
- * host-composed **Structured Field** set (ADR-0050), from which a structured value harvests its own
- * edges. A caller with no type context passes `[]` and the empty set, and harvests the Content's
- * edges alone — every Field edge, a structured value's included, needs the type set.
+ * host-composed **Structured Field** set (ADR-0050). A caller with no type context passes `[]` and
+ * the empty set, and harvests the Content's edges alone — every Field edge needs the type set.
  */
 export function harvestEdges(
   body: EntityBody,
@@ -117,9 +112,7 @@ export function harvestEdges(
   for (const { value } of entityLinkFieldValues(fields, body.metadata)) entityEdge(value.entityId, null);
 
   // A Structured Field harvests its own (ADR-0050): the value goes to the data-type the host
-  // registered, and the edges come back — the domain never learns what is inside it. This is how the
-  // Map plugin's placements reach the index: through the same path any plugin's would take, with no
-  // map-shaped branch left here.
+  // registered, and the edges come back — the domain never learns what is inside it.
   for (const { field, dataType } of resolvedStructuredFields(fields, dataTypes))
     for (const edge of dataType.harvestEdges?.(readField(body.metadata, field)) ?? []) add(edge);
 

@@ -366,11 +366,7 @@ export class EntityBrowser {
     });
   }
 
-  /**
-   * Fetch page one and replace the accumulated list. Used on load and after every
-   * create/rename/delete: refreshing from page one keeps the view coherent
-   * without reconciling a stale accumulated tail.
-   */
+  /** Fetch page one and replace the accumulated list — on load and after every create/rename/delete. */
   private fetchFirstPage(): void {
     const worldId = this.activeWorld.worldId();
     // Never fetch the whole owner list (every World) if the segment is somehow absent.

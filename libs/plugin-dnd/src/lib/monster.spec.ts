@@ -55,9 +55,8 @@ describe('dnd.monster', () => {
   });
 
   /**
-   * The stat-block view resolves its rows from these key groups and skips any key the schema doesn't
-   * declare (forward-only). That tolerance would let a Field renamed here vanish from the block in
-   * silence — so the two are pinned together as a declared invariant of the plugin, not a convention.
+   * The stat-block view skips any key the schema doesn't declare (forward-only), so a Field renamed
+   * here would vanish from the block in silence unless the two lists are pinned together.
    */
   it('declares a Field for every key the stat block prints, and prints every Field it declares', () => {
     const declared = new Set(DND_MONSTER_TYPE.fields.map((field) => field.key));

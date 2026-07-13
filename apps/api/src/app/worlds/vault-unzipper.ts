@@ -17,12 +17,7 @@ export interface UnzippedVault {
   readonly assets: Record<string, Uint8Array>;
 }
 
-/**
- * Facade over the vault unzipper (ADR-0036): holds the decompressed-size ceiling from
- * the Instance Configuration so callers unzip an archive without threading the limit
- * through. The actual streaming/zip-bomb logic stays in the file-private
- * {@link unzipVault} / {@link unzipVaultFast}.
- */
+/** Facade holding the decompressed-size ceiling from the Instance Configuration (ADR-0036); the streaming/zip-bomb logic lives in {@link unzipVault} / {@link unzipVaultFast}. */
 @Injectable()
 export class VaultUnzipper {
   constructor(@Inject(HEXLY_CONFIG) private readonly config: HexlyConfig) {}
@@ -39,15 +34,13 @@ export class VaultUnzipper {
 }
 
 /**
- * Classify a zip entry: a `.md` file is a `note`, a file with a known importable Asset
- * extension is an `asset` (ADR-0034), and everything else — directory entries, Obsidian's
- * `.obsidian/` config, and unsupported files (videos, nested zips, stray `.txt`) — is
- * `skip`ped and never inflated, so an unreferenced non-Asset attachment can't balloon memory.
+ * Classify a zip entry: `.md` is a `note`, a known importable Asset extension is an `asset`
+ * (ADR-0034), everything else is `skip`ped and never inflated, so an unreferenced non-Asset
+ * attachment can't balloon memory.
  *
- * macOS zip tools inject an `__MACOSX/` tree of `._name` AppleDouble resource-fork files
- * that keep the original extension (`._Note.md`, `._pic.png`): binary junk, not content.
- * Skipping them here keeps them out of the note/asset sets entirely — otherwise a
- * Mac-zipped vault imports half its files as undecodable "skipped" notes.
+ * macOS zip tools inject an `__MACOSX/` tree of `._name` AppleDouble resource-fork files that keep
+ * the original extension (`._Note.md`, `._pic.png`): binary junk, not content. Without skipping
+ * them, a Mac-zipped vault imports half its files as undecodable notes.
  */
 function classifyEntry(path: string): 'note' | 'asset' | 'skip' {
   if (path.endsWith('/')) return 'skip'; // directory entry
@@ -59,16 +52,11 @@ function classifyEntry(path: string): 'note' | 'asset' | 'skip' {
 }
 
 /**
- * Stream-decompress the archive into its vault notes and assets (`.obsidian/` config and
- * directory entries are skipped without inflating). Airtight against zip bombs: the archive is
- * pushed in small slices and cumulative *decompressed* output — notes AND assets — is metered,
- * so a bomb trips `maxBytes` mid-inflate, long before it can materialize (ADR-0034 stores assets
- * uncapped, but this ceiling still backstops a malicious archive). A non-zip/corrupt archive
- * throws {@link BadRequestException} (400); an oversized one {@link PayloadTooLargeException}
- * (413) — never a 500.
- *
- * File-private: callers go through {@link VaultUnzipper}, which supplies `maxBytes` from
- * the Instance Configuration (ADR-0036).
+ * Stream-decompress the archive into its vault notes and assets. Airtight against zip bombs: the
+ * archive is pushed in small slices and cumulative *decompressed* output — notes AND assets — is
+ * metered, so a bomb trips `maxBytes` mid-inflate, before it can materialize. A non-zip/corrupt
+ * archive throws {@link BadRequestException} (400); an oversized one
+ * {@link PayloadTooLargeException} (413) — never a 500.
  */
 function unzipVault(archive: Buffer, maxBytes: number): UnzippedVault {
   const notes: Record<string, Uint8Array> = {};

@@ -5,10 +5,7 @@ import { Field, Input } from '@hexly/web-ui';
 import { inputValue } from '../utils/dom';
 import { HexMapStore } from '../services/hexmap-store';
 
-/**
- * Name + colour editor for a single {@link Region} (issue #36).
- * Fields laid out as a stack; host is `display: contents`.
- */
+/** Name + colour editor for a single {@link Region}. */
 @Component({
   selector: 'app-region-fields',
   changeDetection: ChangeDetectionStrategy.OnPush,

@@ -1,8 +1,7 @@
 /**
- * The Entity contracts a lib depends on and the app binds (ADR-0048): the central store's token, the
- * type/view registries' shapes, and the plugin seam. Component-free by construction — the shared
- * controls live behind `@hexly/web-entity/controls`, so the root injector reading these tokens never
- * drags a view body onto the initial bundle.
+ * The Entity contracts a lib depends on and the app binds (ADR-0048). Must stay component-free: the
+ * root injector reads these tokens, so any view exported here would land on the initial bundle. Shared
+ * controls belong in `@hexly/web-entity/controls`.
  */
 export * from './lib/entity-session';
 export * from './lib/entity-types';

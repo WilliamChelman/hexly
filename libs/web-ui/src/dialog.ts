@@ -14,13 +14,10 @@ import { Panel } from './panel';
 let nextDialogId = 0;
 
 /**
- * A modal dialog built on the native `<dialog>` element (ADR-0007). Leaning on
- * `showModal()` means the platform owns the hard parts — top-layer stacking, the
- * `::backdrop`, focus trapping, and Escape-to-close — so this primitive only
- * bridges that imperative API to a declarative `[open]` input and a `(closed)`
- * output. The caller projects the body as content and the footer actions into the
- * `[dialogFooter]` slot; passing a `heading` labels the dialog (`aria-labelledby`)
- * for assistive tech.
+ * A modal dialog built on the native `<dialog>` element (ADR-0007): `showModal()` bridged to a
+ * declarative `[open]` input and a `(closed)` output, so the platform owns top-layer stacking, the
+ * `::backdrop`, focus trapping, and Escape-to-close. The caller projects the body as content and the
+ * footer actions into the `[dialogFooter]` slot; a `heading` labels the dialog (`aria-labelledby`).
  *
  *   <app-dialog [open]="confirming()" heading="Delete?" (closed)="cancel()">
  *     <p>This cannot be undone.</p>
@@ -84,10 +81,8 @@ export class Dialog {
   readonly closed = output<void>();
 
   /**
-   * Dismiss on a backdrop click. The native `<dialog>` fills the top layer, so a
-   * click outside the content lands on the element itself (`target === dialog`)
-   * while a click on the projected body targets an inner node — closing the
-   * former mirrors the platform Escape-to-dismiss, without swallowing body clicks.
+   * Dismiss on a backdrop click. The `<dialog>` fills the top layer, so a click outside the content
+   * lands on the element itself (`target === dialog`) while a body click targets an inner node.
    */
   protected onClick(event: MouseEvent): void {
     const el = this.dialog().nativeElement as HTMLDialogElement;

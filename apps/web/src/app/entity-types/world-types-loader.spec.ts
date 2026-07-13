@@ -8,11 +8,6 @@ import { WorldTypesLoader } from './world-types-loader';
 import { TypeRegistry } from './type-registry';
 import { CORE_VIEW_CONTENT, CORE_VIEW_FIELDS } from '@hexly/web-entity';
 
-/**
- * The loader projects the active World's user-defined types into the root {@link TypeRegistry} and
- * swaps the set on a World change, so every type-aware surface resolves a World's own types without
- * a second source — and one World's types never leak into another (#191).
- */
 describe('WorldTypesLoader', () => {
   const deity: AvailableType = {
     id: 'world.deity',

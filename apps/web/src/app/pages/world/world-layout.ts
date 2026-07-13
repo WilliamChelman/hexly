@@ -5,11 +5,10 @@ import { NavRailStore } from '../../shell/nav-rail.store';
 import { WorldTypesLoader } from '../../entity-types/world-types-loader';
 
 /**
- * The World scope's layout: a thin owner for the `w/:worldId` subtree (previously
- * componentless). It exists so the World — not the nav rail — declares its own
- * contextual links (ADR-0041), filling the rail slot from the pinned active World
- * and clearing it on leave. Reactive so a World switch or slug self-heal (ADR-0042)
- * re-derives the links without the rail knowing anything about Worlds.
+ * The World scope's layout: owner of the `w/:worldId` subtree. The World — not the nav
+ * rail — declares its own contextual links (ADR-0041), filling the rail slot from the
+ * pinned active World and clearing it on leave. Reactive, so a World switch or a slug
+ * self-heal (ADR-0042) re-derives the links.
  */
 @Component({
   selector: 'app-world-layout',

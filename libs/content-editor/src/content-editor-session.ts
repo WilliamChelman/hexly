@@ -2,10 +2,8 @@ import { InjectionToken, Signal } from '@angular/core';
 import { Content, EntityDetail } from '@hexly/domain';
 
 /**
- * The slice of the host's Entity session the {@link ContentEditor} drives against
- * (ADR-0019). Extracting the editor to its own lib inverts the old direct dependency
- * on the entity page's `EntitySession`: the page provides its session against this
- * token, keeping page state in the page while the editor stays framework-of-page-free.
+ * The slice of the host's Entity session the {@link ContentEditor} drives against (ADR-0019).
+ * The host page provides its own session against {@link CONTENT_EDITOR_SESSION}.
  */
 export interface ContentEditorSession {
   /** Live Content to (re)seed the editor from on mount; null mid-load. */

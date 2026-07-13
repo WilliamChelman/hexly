@@ -5,9 +5,8 @@ import { Button, Eyebrow, Swatch } from '@hexly/web-ui';
 import { HexMapStore } from '../services/hexmap-store';
 
 /**
- * Regions panel sharing the Inspector's column (ADR-0011, issue #39).
- * Lists every Region (including emptied ones), with New Region action.
- * Selection routes through the same {@link HexMapStore.selectRegion} as canvas.
+ * Regions panel sharing the Inspector's column (ADR-0011).
+ * Lists every Region, including ones with no member hexes.
  */
 @Component({
   selector: 'app-regions-panel',

@@ -28,9 +28,8 @@ import { Logger } from './logger';
 export const WORLD_NUDGE_DEBOUNCE_MS = 150;
 
 /**
- * HTTP client for the worlds API. Stateless per HTTP call; also the seam that fronts the
- * live-follow store for Worlds ({@link watch}/{@link watchAll}), so callers never touch
- * {@link NudgeBusClient} directly.
+ * HTTP client for the worlds API. Stateless per HTTP call; also fronts the live-follow store for
+ * Worlds ({@link watch}/{@link watchAll}) — callers never touch {@link NudgeBusClient} directly.
  */
 @Injectable({ providedIn: 'root' })
 export class WorldsClient {
@@ -40,24 +39,23 @@ export class WorldsClient {
   private readonly store = new FollowStore<WorldDetail>(this.bus, {
     kind: 'world',
     debounceMs: WORLD_NUDGE_DEBOUNCE_MS,
-    // A transient refetch failure leaves the Dashboard stale (self-heals on the next nudge/reconnect):
-    // log it — as WorldStore does — so it isn't silently unexplained. Restores the log ActiveWorld had.
+    // A transient refetch failure leaves the Dashboard stale; it self-heals on the next nudge/reconnect.
     onRefetchError: (err) => this.logger.error('Failed to refetch the active World from a nudge', err),
   });
 
   /**
    * Live-follow one World through the write-through store (ADR-0044): a shared, freshness-deduped
    * stream that also surfaces this tab's own rename/pin writes with no roundtrip. Emits the fresh
-   * detail or `EVICTED`. A consumer applies only what it wants (e.g. drops a stale in-flight read).
+   * detail or `EVICTED`.
    */
   watch(id: string): Observable<Watched<WorldDetail>> {
     return this.store.watch(id, () => this.read(id));
   }
 
   /**
-   * Follow a *set* of Worlds and relay their raw nudges — for a list store that reconciles at the
-   * list level (a readable nudge → refetch the list, an `unavailable` → drop that row), not the
-   * per-resource refetch {@link watch} owns.
+   * Follow a *set* of Worlds and relay their raw nudges, for a caller that reconciles at the list
+   * level (readable nudge → refetch the list, `unavailable` → drop that row). No per-resource
+   * refetch, unlike {@link watch}.
    */
   watchAll(ids: string[]): Observable<FollowSignal> {
     return merge(...ids.map((id) => this.bus.follow({ kind: 'world', id })));
@@ -73,8 +71,8 @@ export class WorldsClient {
   }
 
   /**
-   * Import an Obsidian vault `.zip` into a fresh World. The browser sets the
-   * multipart boundary, so we deliberately don't touch Content-Type.
+   * Import an Obsidian vault `.zip` into a fresh World. Don't set Content-Type — the browser must
+   * set the multipart boundary itself.
    */
   importVault(file: File): Observable<ImportSummary> {
     const form = new FormData();
@@ -83,10 +81,9 @@ export class WorldsClient {
   }
 
   /**
-   * The World Graph (#181): every readable Entity of the World, and the links between them, in one
-   * payload. Deliberately outside the live-follow store — the graph is a derived read of the
-   * *whole* World, and a `world` nudge (a rename, a pin reorder) says nothing about whether its
-   * Entities' links moved. It refreshes when the page is opened.
+   * The World Graph: every readable Entity of the World, and the links between them, in one payload.
+   * Outside the live-follow store — a `world` nudge says nothing about whether its Entities' links
+   * moved — so it only refreshes when the page is opened.
    */
   graph(id: string): Observable<WorldGraph> {
     return this.http.get<WorldGraph>(`/api/worlds/${id}/graph`);

@@ -529,12 +529,9 @@ describe('Vault import endpoint', () => {
     const served = await anon.get(heroImages[0]).expect(200);
     expect(new Uint8Array(served.body)).toEqual(png);
 
-    /*
-     * Both notes' asset edges land (ADR-0046) — which is only true because `storeImages` rewrites
-     * the src *before* `importNote` inserts the row and harvests it. Move it after, and every
-     * imported image silently harvests no edge (a vault-relative src names no Asset). The external
-     * URL is no Asset, so it is no edge: Villain has one asset edge, not two.
-     */
+    // `storeImages` must rewrite the src *before* `importNote` inserts the row and harvests edges;
+    // after, a vault-relative src names no Asset and the edge is silently lost. An external URL is
+    // no Asset, so it is no edge: Villain has one asset edge, not two.
     const hash = heroImages[0].split('/').pop()!.replace('.png', '');
     expect(assetEdgesIn(worldId)).toEqual([hash, hash]);
   });

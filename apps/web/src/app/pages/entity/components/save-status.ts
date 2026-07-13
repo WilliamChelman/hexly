@@ -14,16 +14,13 @@ const QUIET: Record<QuietState, { icon: IconName; key: string }> = {
 };
 
 /**
- * Autosave feedback chip (ADR-0026) replacing the Save button. One aria-live region
- * over the session's persistence state. States, highest priority first:
- * conflict → save error (Retry) → saving → dirty → saved.
+ * Autosave feedback chip (ADR-0026). One aria-live region over the session's persistence state.
+ * States, highest priority first: conflict → save error (Retry) → saving → dirty → saved.
  *
- * The three routine states are a **fixed-size icon badge**, not words: they cycle on
- * every edit, and a chip that resizes from "Saved" to "Unsaved…" to "Saving…" shoves the
- * header around while you type. The glyph carries the state (spinner / pencil / check),
- * with the words kept for the tooltip and for assistive tech. The exceptional states —
- * conflict, save failure, read-only — stay spelled out, since they must be read and
- * (twice) acted on; those are rare enough that the reflow costs nothing.
+ * The three routine states render as a fixed-size icon badge, not words: they cycle on every edit,
+ * and a chip resizing between "Saved" / "Unsaved…" / "Saving…" would shove the header around while
+ * you type; the words are kept for the tooltip and assistive tech. The exceptional states —
+ * conflict, save failure, read-only — stay spelled out, since they must be read and acted on.
  */
 @Component({
   selector: 'app-save-status',

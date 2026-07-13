@@ -4,11 +4,10 @@ import { ListboxController, Listbox, ListboxEmpty, ListboxOption } from '@hexly/
 import { TagItem } from './tag-suggestions';
 
 /**
- * The keyboard-driven Tag entry picker: the Tag analog of {@link DescriptorPicker},
- * sharing {@link ListboxController}/{@link Listbox} but driven by the plain
- * {@link EntityTags} `<input>` (open/update/close/onKeyDown called by hand) rather than by
- * `@tiptap/suggestion`. A row flagged `isNew` is the typed free text offered as a brand-new
- * tag; picking it adds that text.
+ * The keyboard-driven Tag entry picker. Unlike the `@tiptap/suggestion`-driven pickers, it is
+ * driven by the plain {@link EntityTags} `<input>` — open/update/close/onKeyDown are called by
+ * hand. A row flagged `isNew` is the typed free text offered as a brand-new tag; picking it adds
+ * that text.
  */
 @Component({
   selector: 'app-tag-picker',
@@ -49,12 +48,7 @@ export class TagPicker extends ListboxController<TagItem> {
   /** A row was picked (click or keyboard) — the parent adds this tag. */
   readonly picked = output<string>();
 
-  /**
-   * Angular-facing open: the parent hands rows + the anchor element; picks come back
-   * via {@link picked}. This is where the `@tiptap/suggestion`-shaped callback plumbing
-   * ({@link ListboxController.open}'s `command`/`clientRect`) is adapted to a plain input,
-   * so the parent binds an idiomatic `(picked)` output instead of passing callbacks.
-   */
+  /** Angular-facing open: the parent hands rows + the anchor element; picks come back via {@link picked}. */
   showFor(items: TagItem[], anchor: HTMLElement): void {
     this.open({
       items,

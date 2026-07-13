@@ -839,9 +839,8 @@ describe('EntitySession', () => {
 
   /**
    * Live-follow (ADR-0044): the session reacts to what `EntitiesClient.watch` emits — a fresh detail
-   * (adopt if newer and not mid-edit) or `EVICTED` (blank, unless dirty). The follow / debounced
-   * refetch / freshness dedup / write-through fanout all live in EntityStore + watchResource (their
-   * specs) — here we test only the session's reaction, driving the store's stream directly.
+   * (adopt if newer and not mid-edit) or `EVICTED` (blank, unless dirty). The follow itself lives in
+   * EntityStore + watchResource; these drive the store's stream directly.
    */
   describe('live-follow', () => {
     let watched: Subject<Watched<EntityDetail>>;
@@ -877,10 +876,8 @@ describe('EntitySession', () => {
     });
 
     /**
-     * The bug this gate shipped with: a grant or ownership change bumps `seq` **alone** — the
-     * server deliberately leaves `version` and `updatedAt` where they are, so a sharing change
-     * can't 409 an in-flight save or reorder "Recently edited". A demoted Editor must lose their
-     * Save button on the nudge, not on the next unrelated edit.
+     * A grant or ownership change bumps `seq` **alone** — `version` and `updatedAt` stay put, so a
+     * sharing change can't 409 an in-flight save or reorder "Recently edited".
      */
     it('adopts a seq-only detail whose rights changed, so a demoted Editor loses `edit`', () => {
       openAndFollow(); // seq 1, full Rights

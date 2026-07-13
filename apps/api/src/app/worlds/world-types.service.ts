@@ -18,8 +18,8 @@ import { WorldTypeFields } from '../entities/world-type-fields';
 import { WorldWrites } from './world-writes';
 
 /**
- * A World's user-defined type CRUD, plus the per-World available-types read (ADR-0048, #191). The
- * read is reachable-gated (any member); the mutations are World-Owner-gated and route through
+ * A World's user-defined type CRUD, plus the per-World available-types read (ADR-0048). The read is
+ * reachable-gated (any member); the mutations are World-Owner-gated and route through
  * {@link WorldWrites}, so a type change bumps the World's `seq` and nudges its followers.
  */
 @Injectable()
@@ -70,10 +70,9 @@ export class WorldTypesService {
   }
 
   /**
-   * The View list to write, so a placement never outlives the Field it names (ADR-0050, #201). The
-   * payload schema checks a patch's `views` against its own `fields`, but a patch that re-Fields a
-   * type *without* re-placing its Views can only be checked against the stored type — so it is
-   * pruned here. `undefined` leaves the stored list alone.
+   * The View list to write, so a placement never outlives the Field it names (ADR-0050). A patch
+   * that re-Fields a type without re-placing its Views is beyond the payload schema's reach, so its
+   * stored placements are pruned here. `undefined` leaves the stored list alone.
    */
   private survivingViews(stored: UserDefinedType, patch: UpdateUserDefinedTypeRequest): ViewPlacement[] | undefined {
     if (patch.views) return patch.views;

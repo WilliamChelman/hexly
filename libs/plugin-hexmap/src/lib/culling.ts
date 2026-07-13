@@ -10,9 +10,8 @@ export interface Rect {
 }
 
 /**
- * The axis-aligned {@link Rect} spanning two corner points, in whichever order —
- * a drag from bottom-right to top-left yields the same rect as top-left to
- * bottom-right. The single place two-corner→Rect normalisation lives.
+ * The axis-aligned {@link Rect} spanning two corner points, in whichever order — a
+ * drag from bottom-right to top-left yields the same rect as top-left to bottom-right.
  */
 export function rectFromCorners(a: Point, b: Point): Rect {
   return {
@@ -24,10 +23,8 @@ export function rectFromCorners(a: Point, b: Point): Rect {
 }
 
 /**
- * Every hex intersecting the rectangle — the viewport-culling query the renderer
- * runs each frame so it paints only what's on screen, not the infinite plane.
- * Over-includes by at most a one-hex margin (cheap and safe); never misses a
- * hex that is actually visible.
+ * Every hex intersecting the rectangle — the viewport-culling query. Over-includes
+ * by at most a one-hex margin; never misses a hex that is actually visible.
  */
 export function hexesInRect(layout: Layout, rect: Rect): Axial[] {
   const corners: Point[] = [

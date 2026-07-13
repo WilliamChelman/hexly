@@ -6,9 +6,9 @@ import { EntitySession } from '../services/entity-session';
 import { EntityTypesEditor } from './entity-types-editor';
 
 /**
- * The open Entity's Edit-types dialog (#189), opened from the actions menu: binds
- * {@link EntityTypesEditor} to the {@link EntitySession} — a type-set edit lands on `setTypes`, the
- * add-type prompt's Field values on `mutate` — so both ride the version-checked autosave.
+ * The open Entity's Edit-types dialog: binds {@link EntityTypesEditor} to the {@link EntitySession}
+ * — a type-set edit lands on `setTypes`, the add-type prompt's Field values on `mutate`, so both
+ * ride the version-checked autosave.
  */
 @Component({
   selector: 'app-entity-types-dialog',

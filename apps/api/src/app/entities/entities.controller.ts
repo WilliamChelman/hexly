@@ -38,10 +38,9 @@ import { encodeCursor } from './utils/encode-cursor';
 import { EntitiesService } from './entities.service';
 
 /**
- * The Entity REST surface (ADR-0018). Every route is owner-scoped: the guard
- * resolves the session to a user and the service only ever touches that user's
- * rows. Bodies are validated against the shared Zod schema (ADR-0001) so an
- * invalid payload is a 400 here, never a 500 deeper down.
+ * The Entity REST surface (ADR-0018). Every route is owner-scoped: the guard resolves the session to
+ * a user and the service only ever touches that user's rows. Bodies are validated against the shared
+ * Zod schema (ADR-0001), so an invalid payload is a 400 here, never a 500 deeper down.
  */
 @Controller('entities')
 @UseGuards(SessionAuthGuard)

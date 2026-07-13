@@ -11,9 +11,8 @@ import { Admin } from './admin';
 const POLL_MS = 1000;
 
 /**
- * The Superadmin repair surface (ADR-0046): the Reindex. The route gates it to a Superadmin,
- * so the panel itself just drives the walk — it starts one, follows it by polling (the walk
- * outlives the request), and reports how it landed. These specs own the clock: `advance(POLL_MS)`
+ * The Superadmin repair surface (ADR-0046): the Reindex. The walk outlives the request that
+ * started it, so the panel follows it by polling. These specs own the clock: `advance(POLL_MS)`
  * is one poll.
  */
 describe('Admin panel (Reindex)', () => {
@@ -46,9 +45,9 @@ describe('Admin panel (Reindex)', () => {
   const reindexButton = (el: HTMLElement) => $(el, '[data-testid="reindex"]') as HTMLButtonElement;
 
   /**
-   * Script the job reads for a panel that loads with nothing running: the panel reads the job
-   * once on load (idle, so the button is live), then `jobs` answer the polls in order. Without
-   * that idle read the panel would rejoin a walk on load and refuse the click under test.
+   * Script the job reads for a panel that loads with nothing running: an idle read on load (so the
+   * button is live), then `jobs` answer the polls in order. Without the idle read the panel would
+   * rejoin a walk on load and refuse the click under test.
    */
   function loadsIdleThenPolls(...jobs: ReindexJob[]) {
     admin.reindexStatus.mockReturnValueOnce(of(reindexJob()));
@@ -60,11 +59,7 @@ describe('Admin panel (Reindex)', () => {
     expect(reindexButton(el)).not.toBeNull();
   });
 
-  /**
-   * The count is the point: a Superadmin presses this to repair an instance, and the only
-   * evidence it did anything is how many Entities it walked. The walk outlives its request, so
-   * the count arrives on a poll rather than in the response that started it.
-   */
+  /** The count arrives on a poll, not in the response that started the walk. */
   it('reindexes through the client and reports how many Entities were walked', () => {
     admin.reindex.mockReturnValue(of(reindexJob({ status: 'running', total: 412 })));
     loadsIdleThenPolls(
@@ -104,8 +99,8 @@ describe('Admin panel (Reindex)', () => {
   });
 
   /**
-   * A document this build cannot parse is skipped, not fatal — so the toast has to say *both*
-   * that the repair happened and that something in the instance still needs a human.
+   * A document this build cannot parse is skipped, not fatal — so the toast reports both the
+   * reindexed count and the skipped one.
    */
   it('names the skipped Entities when the walk could not read every document', () => {
     admin.reindex.mockReturnValue(of(reindexJob({ status: 'running', total: 3 })));
@@ -130,8 +125,8 @@ describe('Admin panel (Reindex)', () => {
   });
 
   /**
-   * The API forgot the job — it restarted mid-walk, and job state does not survive that. The
-   * chunks that committed stay committed, so this is "press again to resume", never "done".
+   * An `idle` read mid-walk means the API restarted and forgot the job (job state does not survive
+   * that). Committed chunks stay committed, so this is "press again to resume", never "done".
    */
   it('does not read a forgotten job as a successful walk', () => {
     admin.reindex.mockReturnValue(of(reindexJob({ status: 'running', total: 9 })));
@@ -160,10 +155,7 @@ describe('Admin panel (Reindex)', () => {
     expect(reindexButton(el).disabled).toBe(false);
   });
 
-  /**
-   * The job lives on the server, not in this page. A Superadmin who opens the panel while a walk
-   * is already running rejoins it — rather than being offered a button that would 409.
-   */
+  /** The job lives on the server: a panel opened mid-walk rejoins it, rather than offering a button that would 409. */
   it('rejoins a walk that was already running when the panel loaded', () => {
     admin.reindexStatus.mockReturnValueOnce(of(reindexJob({ status: 'running', total: 9, walked: 4 }))).mockReturnValue(
       of(

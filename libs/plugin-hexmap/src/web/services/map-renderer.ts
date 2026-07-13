@@ -24,11 +24,7 @@ import type { MapRenderer, MarqueeOverride, RenderOverrides } from '../models/ma
 
 /** The built-in features keyed by id, for a marker's path lookup. */
 const FEATURE_BY_ID = new Map(featureLibrary.map((f) => [f.id, f]));
-/**
- * A region border's stroke weight in screen pixels, held constant across zoom.
- * Regions are drawn as coloured boundaries rather than surface tints, keeping
- * the terrain legible where regions overlap.
- */
+/** A region border's stroke weight in screen pixels, held constant across zoom. */
 const REGION_BORDER_WIDTH = 2.5;
 /** A marker's drawn size as a fraction of the on-screen hex radius. */
 const MARKER_SCALE = 1.3;
@@ -37,15 +33,11 @@ const MARKER_STROKE = 1.6;
 /** The 24×24 viewBox feature `path`s are authored in (matches the UI icons);
  *  markers scale from this box and translate by half (12) to centre on the hex. */
 const ICON_BOX = 24;
-/**
- * Display-serif stack for both Labels and Hex names — falls back through common
- * serifs so the map reads without the bundled webfont.
- */
+/** Display-serif stack for both Labels and Hex names. */
 const MAP_FONT = 'Marcellus, Georgia, "Times New Roman", serif';
 /**
  * The halo stroked behind name and Label glyphs (canvas's stand-in for CSS
- * `paint-order: stroke`), as a fraction of the font's pixel size, keeping the
- * text legible over any terrain.
+ * `paint-order: stroke`), as a fraction of the font's pixel size.
  */
 const TEXT_HALO_FRACTION = 0.16;
 /** A Label's gilded glow blur, as a fraction of its font px. */
@@ -72,10 +64,7 @@ const NAME_FEATURE_OFFSET = 0.78;
 const MIN_LABEL_HALF_WIDTH_FACTOR = 1;
 /** A selection highlight's stroke weight in screen pixels, constant across zoom. */
 const SELECTION_STROKE = 3;
-/**
- * The opacity a selected Region's member-hex fill is drawn at — translucent so
- * the terrain and the region's own border stay legible beneath the tint.
- */
+/** The opacity a selected Region's member-hex fill is drawn at. */
 const SELECTION_FILL_ALPHA = 0.25;
 /** The opacity a blocked-move cell is washed at, so the danger tint reads over the terrain. */
 const BLOCKED_FILL_ALPHA = 0.45;
@@ -133,11 +122,9 @@ interface Palette {
 }
 
 /**
- * Draws the infinite hex plane onto a `<canvas>` using the 2D context. Each
- * frame it culls to the visible viewport (so it never iterates the infinite
- * plane), paints Void as a flat themed background, and strokes the grid for the
- * hexes that intersect the view. Colours come from CSS custom properties so it
- * tracks the active theme.
+ * Draws the infinite hex plane onto a `<canvas>` using the 2D context. Each frame
+ * culls to the visible viewport, so it never iterates the infinite plane. Colours
+ * come from CSS custom properties, so it tracks the active theme.
  */
 export class Canvas2dMapRenderer implements MapRenderer {
   private width = 0;
@@ -150,17 +137,13 @@ export class Canvas2dMapRenderer implements MapRenderer {
   /** Lazily-built `Path2D` per feature id — the geometry is constant, so cache it. */
   private readonly markerPaths = new Map<FeatureId, Path2D>();
   /**
-   * Each Label's screen-space box from the most recent frame, in draw order, so
-   * {@link labelAt} can hit-test a click against what the user sees. Labels move
-   * with the camera, so this is rebuilt every render rather than cached.
+   * Each Label's screen-space box from the most recent frame, in draw order, for
+   * {@link labelAt}. Rebuilt every render, since labels move with the camera.
    */
   private labelBoxes: LabelBox[] = [];
   /**
-   * Cached, fully-rendered Label bitmaps keyed by `text|roundedFontPx`. The glow's
-   * stacked `shadowBlur` strokes are the renderer's hot cost and {@link render}
-   * repaints on every hover/pan, so each Label is rasterized once offscreen and
-   * blitted thereafter. Cleared on a theme switch and capped so a zoom sweep
-   * can't grow it without bound.
+   * Cached, fully-rendered Label bitmaps keyed by `text|roundedFontPx`. Cleared on
+   * a theme switch (the bitmaps bake the themed colours) and capped.
    */
   private readonly labelGlyphCache = new Map<string, LabelGlyph>();
   /**
@@ -316,8 +299,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
 
     // Region borders ride above the grid: each region strokes only its boundary
     // edges in its own colour. Each boundary edge is its own single-segment
-    // subpath, so lineJoin never fires; lineCap 'round' fills the notches at
-    // corners. Work is proportional to region membership, not the viewport.
+    // subpath, so lineJoin never fires; lineCap 'round' fills the notches at corners.
     if (doc.regions.length > 0) {
       ctx.save();
       ctx.lineWidth = REGION_BORDER_WIDTH;
@@ -399,10 +381,8 @@ export class Canvas2dMapRenderer implements MapRenderer {
     }
 
     // The selection highlight, drawn last: a Hex/Feature gets an outline, a Label
-    // a bounds rectangle, a Region a translucent member-fill. A live drag hands
-    // this pass the selection already translated to the destinations, so the
-    // renderer does no drag-tracking. The two id→entity indexes keep the pass
-    // O(selected) per frame; both preserve first-wins.
+    // a bounds rectangle, a Region a translucent member-fill. Both id→entity
+    // indexes preserve first-wins.
     const labelBoxById = new Map<string, LabelBox>();
     for (const box of this.labelBoxes) {
       if (!labelBoxById.has(box.id)) labelBoxById.set(box.id, box);
@@ -423,10 +403,9 @@ export class Canvas2dMapRenderer implements MapRenderer {
   }
 
   /**
-   * Stroke the live marquee box as a dashed accent rectangle. The world corners
-   * are normalised via the shared `rectFromCorners` so the outline matches the
-   * canvas's hit-test box whichever way the drag runs; save/restore keeps the
-   * dash from leaking into the next frame's grid stroke.
+   * Stroke the live marquee box as a dashed accent rectangle. The corners are
+   * normalised via `rectFromCorners` so the outline matches the canvas's hit-test
+   * box whichever way the drag runs.
    */
   private drawMarquee(ctx: CanvasRenderingContext2D, camera: Camera, marquee: MarqueeOverride): void {
     const { minX, minY, maxX, maxY } = rectFromCorners(
@@ -460,9 +439,8 @@ export class Canvas2dMapRenderer implements MapRenderer {
   }
 
   /**
-   * Draw the selection highlight: an outline tracing the selected Hex/Feature's
-   * hex, or a padded bounds rectangle around the selected Label's recorded box.
-   * A label whose box is absent (off-screen) highlights nothing.
+   * Draw the selection highlight. A label whose box is absent (off-screen)
+   * highlights nothing.
    */
   private drawSelection(
     ctx: CanvasRenderingContext2D,
@@ -502,10 +480,9 @@ export class Canvas2dMapRenderer implements MapRenderer {
   }
 
   /**
-   * Highlight the selected Region by tinting its member hexes with a translucent
-   * fill in its own colour; the boundary stroke is left to the regions pass. A
-   * region that no longer exists tints nothing; off-screen members are skipped,
-   * so the work is proportional to the visible membership.
+   * Tint the selected Region's member hexes; the boundary stroke is left to the
+   * regions pass. A region that no longer exists tints nothing; off-screen members
+   * are skipped.
    */
   private fillRegionMembers(
     ctx: CanvasRenderingContext2D,
@@ -528,10 +505,9 @@ export class Canvas2dMapRenderer implements MapRenderer {
   }
 
   /**
-   * Draw one Label's text centred on world `position` (which may be a live drag
-   * override), scaled so `size` is a world measure. Records an axis-aligned
-   * screen box for hit-testing; the box ignores rotation (a close-enough bound
-   * that keeps click-to-select cheap).
+   * Draw one Label's text centred on world `position`, scaled so `size` is a world
+   * measure. Records an axis-aligned screen box for hit-testing; the box ignores
+   * rotation (a close-enough bound).
    */
   private drawLabel(ctx: CanvasRenderingContext2D, camera: Camera, label: Label, position: Point): void {
     const centre = camera.worldToScreen(position);
@@ -606,8 +582,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
   /**
    * Draw a Label's illuminated treatment centred on the current origin, returning
    * the measured text width. Back to front: glow strokes (which also lay the
-   * legibility halo), then the gilded fill on top. Used both to rasterize the
-   * cache tile and as the fallback when no offscreen context exists.
+   * legibility halo), then the gilded fill on top.
    */
   private paintLabel(ctx: CanvasRenderingContext2D, text: string, fontPx: number): number {
     ctx.font = `italic ${fontPx}px ${MAP_FONT}`;
@@ -638,8 +613,7 @@ export class Canvas2dMapRenderer implements MapRenderer {
 
   /**
    * Stroke a feature's icon, centred on `hex`. The library art is authored in a
-   * 24×24 box; this scales it to a fraction of the on-screen hex and keeps the
-   * stroke a constant screen weight whatever the zoom.
+   * 24×24 box; the stroke stays a constant screen weight whatever the zoom.
    */
   private strokeMarker(ctx: CanvasRenderingContext2D, camera: Camera, hex: Axial, id: FeatureId, scale: number): void {
     const path = this.markerPath(id);

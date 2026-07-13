@@ -228,9 +228,8 @@ function entityLinkToWikilink(node: PMNode): string {
 }
 
 /**
- * Rebuilds the mdast phrasing for a marked PM text node. `code` becomes inlineCode
- * and `highlight` re-wraps in `==…==` (no mdast node); emphasis/strong/delete/link
- * nest outward. The inverse of the import mark-carrying walker.
+ * Rebuilds the mdast phrasing for a marked PM text node. `highlight` has no mdast node, so it
+ * re-wraps in literal `==…==`; emphasis/strong/delete/link nest outward.
  */
 function textToMdast(node: PMNode): PhrasingContent {
   const marks = new Set((node.marks ?? []).map((m) => m.type));

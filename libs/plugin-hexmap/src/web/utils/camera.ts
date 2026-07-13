@@ -2,9 +2,7 @@ import { Point } from '../../lib';
 
 /**
  * The viewport transform for the map renderer: an immutable pan (`offset`, in
- * screen pixels) and `zoom` (scale). World/pixel coordinates come from the
- * domain hex geometry; the Camera places them on screen and back, so pan and
- * zoom never touch the hex math itself.
+ * screen pixels) and `zoom` (scale).
  *
  * `screen = world * zoom + offset`.
  */
@@ -44,9 +42,8 @@ export class Camera {
   }
 
   /**
-   * A camera zoomed by `factor` about a fixed screen anchor (the cursor). The
-   * world point under the anchor stays under it, so wheel-zoom feels like it
-   * pulls toward the pointer rather than the origin.
+   * A camera zoomed by `factor` about a fixed screen anchor (the cursor): the
+   * world point under the anchor stays under it.
    */
   zoomAt(anchor: Point, factor: number): Camera {
     const world = this.screenToWorld(anchor);

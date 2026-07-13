@@ -1,18 +1,10 @@
 /**
  * Typed **Fields** as a lens over **Metadata** (CONTEXT.md → Field, ADR-0048).
  *
- * A Field is not a store: it gives one Metadata key a name, a data-type, and
- * facet-ability, while the value stays in the Entity's one Metadata map. So a
- * missing plugin (an absent Type Definition) leaves the value as plain Metadata,
- * and Obsidian import/export (ADR-0033) is untouched — the Field only *types and
- * surfaces* a key it never owns.
- *
- * This module is the pure heart of the feature, shared by the API write-path gate
- * and the web generic Field view: the Field vocabulary, the `types[] → union of
- * Field schemas` resolution, the **forward-only** value validation, and the
- * value reader/writer over the Metadata map. A typed **Entity Link** field (ADR-0046, #190) joins
- * the scalar / enum / date / list data-types here: a Field pointing at another Entity, harvested
- * into the World Graph edge index and degrading gracefully when the target is gone.
+ * A Field is not a store: it gives one Metadata key a name, a data-type, and facet-ability, while the
+ * value stays in the Entity's one Metadata map. An absent Type Definition (a missing plugin) leaves
+ * the value as plain Metadata, and Obsidian import/export (ADR-0033) is untouched — the Field only
+ * *types and surfaces* a key it never owns.
  */
 
 import { z } from 'zod';
@@ -38,10 +30,7 @@ const enumType = z.object({
   options: z.array(z.string().trim().min(1)).min(1),
 });
 
-/**
- * A scalar Field data-type — everything but `list`, so a list's item type can be
- * declared without admitting a list of lists (kept one level deep on purpose).
- */
+/** A scalar Field data-type — everything but `list`, so a list's item type admits no list of lists. */
 export const scalarDataTypeSchema = z.discriminatedUnion('kind', [
   stringType,
   numberType,
@@ -59,10 +48,9 @@ const listType = z.object({
 });
 
 /**
- * A typed **Entity Link** Field (CONTEXT.md → Entity Link, ADR-0046, #190): a Field pointing at
- * another Entity. `targetTypes` is the optional target-type constraint (a `lair` must point at a
- * place); omitted or empty means any Entity is valid. Not a scalar — so no `list` of links, which
- * would need a multi-picker the ticket doesn't build.
+ * A typed **Entity Link** Field (CONTEXT.md → Entity Link, ADR-0046): a Field pointing at another
+ * Entity. `targetTypes` is the optional target-type constraint (a `lair` must point at a place);
+ * omitted or empty means any Entity is valid. Not a scalar — there is no `list` of links.
  */
 const entityLinkType = z.object({
   kind: z.literal('entityLink'),
@@ -70,9 +58,8 @@ const entityLinkType = z.object({
 });
 
 /**
- * The **built-in** Field data-types: a scalar (`string`/`number`/`boolean`/`date`), an `enum` over a
- * closed option set, a `list` of any of those, or a typed `entityLink` pointing at another Entity.
- * A closed set of exact literals — each is a form control the core knows how to render (ADR-0048).
+ * The **built-in** Field data-types — a closed set of exact literals, each a form control the core
+ * knows how to render (ADR-0048).
  */
 export const builtInDataTypeSchema = z.discriminatedUnion('kind', [
   stringType,
@@ -94,16 +81,15 @@ export type StructuredDataTypeRef = z.infer<typeof structuredDataTypeRefSchema>;
 /**
  * The Field data-type: a built-in, or a plugin-contributed structured one — an **open** set, since a
  * kind is structured *iff* it is namespaced (ADR-0050). A kind that is neither a built-in literal nor
- * `namespace.id`-shaped (`strig`) is rejected here, where the Field is declared.
+ * `namespace.id`-shaped is rejected here, where the Field is declared.
  */
 export const fieldDataTypeSchema = z.union([builtInDataTypeSchema, structuredDataTypeRefSchema]);
 
 export type FieldDataType = z.infer<typeof fieldDataTypeSchema>;
 
 /**
- * Whether a data-type *kind* is structured. No built-in kind carries a dot, so the dot is the mark
- * (ADR-0050), and this is the one place that says so. Takes a bare kind, for the caller holding one
- * loose — the World Types editor's `<select>`, whose value is a string until it is a Field.
+ * Whether a data-type *kind* is structured: no built-in kind carries a dot, so the dot is the mark
+ * (ADR-0050). Takes a bare kind, for a caller holding one loose (a `<select>`'s string value).
  */
 export function isStructuredKind(kind: string): kind is StructuredDataTypeId {
   return kind.includes('.');
@@ -116,9 +102,8 @@ export function isStructuredDataType(dataType: FieldDataType): dataType is Struc
 
 /**
  * Resolve a structured Field's data-type against the host-composed set. `undefined` for an
- * unregistered kind — an absent plugin, or a typo. Its two readers take that `undefined` in opposite
- * directions: an error where a Type is declared ({@link unresolvedDataTypeErrors}), inert where a
- * value is validated ({@link validateFields}).
+ * unregistered kind — an absent plugin, or a typo — which is an error where a Type is declared
+ * ({@link unresolvedDataTypeErrors}) but inert where a value is validated ({@link validateFields}).
  */
 function resolveStructuredDataType(
   dataTypes: StructuredDataTypeSet,
@@ -130,8 +115,8 @@ function resolveStructuredDataType(
 /**
  * The stored value of an `entityLink` Field: the target's `entityId` plus a `label` snapshot of its
  * name at pick time — the last-known name a deleted/inaccessible target degrades to instead of
- * erroring (CONTEXT.md → Entity Link), mirroring the Content link's `{ entityId, label }`. Non-strict,
- * so a hand-authored value carrying only `entityId` (label defaults to blank) is tolerated.
+ * erroring (CONTEXT.md → Entity Link). Non-strict, so a hand-authored value carrying only `entityId`
+ * (label defaults to blank) is tolerated.
  */
 export const entityLinkValueSchema = z.object({
   entityId: z.string().trim().min(1),
@@ -146,36 +131,25 @@ export function isEntityLinkDataType(dataType: FieldDataType): boolean {
 }
 
 /**
- * Whether a Field is offered as a **Facet** — the one home of the rule that a **Structured Field**
- * never is, whatever its `facetable` flag says (ADR-0050): a document has no discrete values to count.
- *
- * Read by both halves of the facet: the derivation that indexes a value ({@link deriveFieldFacets}),
- * and the API's count of the Facets to *offer*, which keeps an unpopulated section out of the rail.
+ * Whether a Field is offered as a **Facet**. A **Structured Field** never is, whatever its `facetable`
+ * flag says (ADR-0050): a document has no discrete values to count.
  */
 export function isFacetableField(field: FieldSchema): field is FieldSchema & { dataType: BuiltInDataType } {
   return field.facetable && !isStructuredDataType(field.dataType);
 }
 
 /**
- * One Field's declaration in a Type Definition's schema: the Metadata `key` it
- * types, a human `label`, its `dataType`, whether it is `required`, and whether it
- * is `facetable` (surfaced as a per-type facet in the Entity Browser, ADR-0035).
- * `required` and `facetable` default to false so a terse `{ key, label, dataType }`
- * declares an optional, non-facetable Field.
- *
- * A **code-registered** Field (a plugin's, the core's) may add a {@link labelKey}, the transloco key
- * its shipped copy lives under: a plugin ships translated copy where a World Owner ships one authored
- * name — the split a Type already makes between its `labels` and a user-defined type's `labelText`
- * (ADR-0014).
+ * One Field's declaration in a Type Definition's schema: the Metadata `key` it types, a human `label`,
+ * its `dataType`, whether it is `required`, and whether it is `facetable` (surfaced as a per-type facet
+ * in the Entity Browser, ADR-0035).
  */
 export const fieldSchemaSchema = z.object({
   key: z.string().trim().min(1),
   label: z.string().trim().min(1),
   /**
-   * A transloco key for this Field's display name, when one ships with the code that declares it. The
-   * web prefers it over {@link label}; the API has no copy, so `label` stays the untranslated name it
-   * reports. A user-defined Field has none — its `label` is authored data, and translating it would
-   * mean looking up a key its author never wrote.
+   * A transloco key for this Field's display name, set only on a **code-registered** Field (a plugin's,
+   * the core's). The web prefers it over {@link label}; the API has no copy, so it reports the
+   * untranslated `label`. A user-defined Field has none — its `label` is authored data (ADR-0014).
    */
   labelKey: z.string().trim().min(1).optional(),
   dataType: fieldDataTypeSchema,
@@ -186,18 +160,15 @@ export const fieldSchemaSchema = z.object({
 export type FieldSchema = z.infer<typeof fieldSchemaSchema>;
 
 /**
- * The Field schemas a single Entity Type declares, keyed by type id — the shape
- * both the web {@link TypeRegistry} and the API type registry resolve against.
- * Returns `undefined` for a type that declares no Fields (a core type, or an
- * absent plugin), which resolves to nothing rather than throwing.
+ * The Field schemas a single Entity Type declares, keyed by type id. `undefined` for a type that
+ * declares no Fields (a core type, or an absent plugin) — it resolves to nothing rather than throwing.
  */
 export type TypeFieldResolver = (typeId: string) => readonly FieldSchema[] | undefined;
 
 /**
- * The union of Field schemas an Entity carrying `types` affords — every type's
- * declared Fields, in `types` order (primary type first), deduped by `key`. When
- * two types type the same Metadata key, the primary type's declaration wins, so a
- * Field's meaning is stable regardless of the secondary types layered on.
+ * The union of Field schemas an Entity carrying `types` affords — every type's declared Fields, in
+ * `types` order (primary type first), deduped by `key`. When two types type the same Metadata key,
+ * the primary type's declaration wins.
  */
 export function resolveFields(resolver: TypeFieldResolver, types: readonly string[]): FieldSchema[] {
   const byKey = new Map<string, FieldSchema>();
@@ -210,7 +181,7 @@ export function resolveFields(resolver: TypeFieldResolver, types: readonly strin
 /**
  * Why one Field failed validation: `required` (absent), `type` (present but ill-typed), or
  * `unknown-data-type` — a **Structured Field** naming a data-type the host has not registered
- * (ADR-0050). The last is a broken *declaration*, not a bad value, so it is raised by
+ * (ADR-0050). The last is a broken *declaration*, not a bad value: raised by
  * {@link unresolvedDataTypeErrors} where a Type is declared, never by the value gate.
  */
 export interface FieldError {
@@ -225,21 +196,18 @@ export interface FieldValidation {
 }
 
 /**
- * The **forward-only** validation gate (CONTEXT.md → Field, ADR-0048): validate a
- * resolved Field set against an Entity's Metadata. A required Field must be present;
- * a *present* value — required or not — must match its data-type. An absent optional
- * Field is fine, and any Metadata key with no Field is ignored entirely (a Field is
- * a lens, not a whitelist).
+ * The **forward-only** validation gate (CONTEXT.md → Field, ADR-0048): validate a resolved Field set
+ * against an Entity's Metadata. A required Field must be present; a *present* value — required or not
+ * — must match its data-type. An absent optional Field is fine, and any Metadata key with no Field is
+ * ignored entirely (a Field is a lens, not a whitelist).
  *
- * Pure and side-effect-free: the caller (the API write path) decides *when* to
- * enforce it — active typed edits only, never on import or data at rest — so already
- * stored or imported Metadata is never retroactively invalidated.
+ * The caller decides *when* to enforce it — active typed edits only, never on import or data at rest,
+ * so already stored Metadata is never retroactively invalidated.
  *
  * A **Structured Field** validates against its data-type's own `valueSchema`, resolved from the
  * host-composed `dataTypes` (ADR-0050). One whose kind that set does not carry is *inert* — skipped,
- * its value left as plain Metadata, exactly as an absent plugin's Fields are. That is what lets a
- * build that drops a plugin still open and save its Entities; the unregistered kind is rejected
- * where the Type is declared instead ({@link unresolvedDataTypeErrors}).
+ * its value left as plain Metadata, exactly as an absent plugin's Fields are; the unregistered kind is
+ * rejected where the Type is declared instead ({@link unresolvedDataTypeErrors}).
  */
 export function validateFields(
   fields: readonly FieldSchema[],
@@ -262,8 +230,8 @@ export function validateFields(
 
 /**
  * The value predicate a Field's data-type resolves to: the built-in type check, or a structured
- * data-type's own `valueSchema`. `undefined` when a structured kind resolves to nothing — there is no
- * shape to hold the value to, so the gate above skips it.
+ * data-type's own `valueSchema`. `undefined` when a structured kind resolves to nothing — no shape to
+ * hold the value to, so the gate skips it.
  */
 function valueMatcher(
   dataType: FieldDataType,
@@ -276,9 +244,8 @@ function valueMatcher(
 
 /**
  * The **declaration** gate (ADR-0050): every Field naming a structured data-type the host's set does
- * not carry — a typo (`core.gird`), or a plugin this build does not bundle. The host runs it where
- * a Type is declared (a plugin type at startup, a **User-defined type** as a World Owner saves it),
- * never against an Entity's Metadata.
+ * not carry. Run where a Type is declared (a plugin type at startup, a **User-defined type** as a
+ * World Owner saves it), never against an Entity's Metadata.
  */
 export function unresolvedDataTypeErrors(
   fields: readonly FieldSchema[],
@@ -292,12 +259,10 @@ export function unresolvedDataTypeErrors(
 }
 
 /**
- * One denormalised **facetable** Field value (ADR-0048, #188), the Field peer of the `types`/`tags`
- * denormalisation: the Metadata `key` it types, its canonical string `value`, and a `num` — the
- * numeric form of a `number` Field, else `null`. `num` is what lets a range filter compare a number
- * *as a number* (`cr >= 5`), while an enum/date/string compares its `value` lexically (ISO dates sort
- * correctly as text). Materialised on write and rebuilt by Reindex, so a Field facet is queryable
- * without loading each body.
+ * One denormalised **facetable** Field value (ADR-0048): the Metadata `key` it types, its canonical
+ * string `value`, and a `num` — the numeric form of a `number` Field, else `null`. `num` lets a range
+ * filter compare a number *as a number* (`cr >= 5`), while an enum/date/string compares its `value`
+ * lexically (ISO dates sort correctly as text). Materialised on write and rebuilt by Reindex.
  */
 export interface FieldFacetValue {
   readonly key: string;
@@ -306,15 +271,11 @@ export interface FieldFacetValue {
 }
 
 /**
- * The pure Field-facet derivation (ADR-0048, #188): a resolved Field set + an Entity's Metadata →
- * the denormalised facet values to materialise. Only **facetable** Fields contribute, only a
- * *present, well-typed* value is indexed (an ill-typed value at rest is tolerated, never faceted),
- * a `list` explodes to one value per item, and values repeated within one Entity collapse so a facet
- * count is per-Entity rather than per-occurrence. Side-effect-free — the write path feeds the result
- * to the denormalised table, and Reindex re-runs it from the stored document for free.
- *
- * A **Structured Field** never contributes a facet whatever its `facetable` flag says (ADR-0050): a
- * document has no discrete values to count, so there is nothing a facet could offer.
+ * The pure Field-facet derivation (ADR-0048): a resolved Field set + an Entity's Metadata → the
+ * denormalised facet values to materialise. Only **facetable** Fields contribute (never a
+ * **Structured Field**, ADR-0050), only a *present, well-typed* value is indexed (an ill-typed value
+ * at rest is tolerated, never faceted), a `list` explodes to one value per item, and values repeated
+ * within one Entity collapse so a facet count is per-Entity rather than per-occurrence.
  */
 export function deriveFieldFacets(fields: readonly FieldSchema[], metadata: Metadata | undefined): FieldFacetValue[] {
   const seen = new Set<string>();
@@ -336,9 +297,8 @@ export function deriveFieldFacets(fields: readonly FieldSchema[], metadata: Meta
 }
 
 /**
- * A Field's facet rows: a `list` maps each well-typed item, an `entityLink` yields its target id
- * (so the facet filters "lair = <place>" by a stable id, not the mutable name), a scalar its one
- * well-typed value.
+ * A Field's facet rows: a `list` maps each well-typed item, an `entityLink` yields its target id (the
+ * facet filters by a stable id, not the mutable name), a scalar its one well-typed value.
  */
 function facetItems(dataType: BuiltInDataType, raw: unknown): { value: string; num: number | null }[] {
   if (dataType.kind === 'list') return Array.isArray(raw) ? raw.flatMap((item) => scalarFacet(dataType.of, item)) : [];
@@ -358,9 +318,9 @@ function scalarFacet(dataType: ScalarDataType, raw: unknown): { value: string; n
 }
 
 /**
- * Every Entity-Link Field value an Entity's Metadata carries (#190), keyed by the Field. Only an
- * `entityLink` Field with a present, shape-valid value contributes (a blank or ill-typed one is
- * skipped, forward-only). Feeds {@link harvestEdges}.
+ * Every Entity-Link Field value an Entity's Metadata carries, keyed by the Field. Only an `entityLink`
+ * Field with a present, shape-valid value contributes (a blank or ill-typed one is skipped,
+ * forward-only). Feeds {@link harvestEdges}.
  */
 export function entityLinkFieldValues(
   fields: readonly FieldSchema[],
@@ -393,10 +353,10 @@ export function resolvedStructuredFields(
 }
 
 /**
- * One Entity-Link Field whose target-type constraint the write gate must check (#190): the Field
- * `key`, the linked `entityId`, and the non-empty `targetTypes` the target's types must intersect.
- * Only a constrained Field (`targetTypes` non-empty) with a present value yields one. The caller
- * resolves each `entityId`'s actual types from the DB — a missing target has nothing to check.
+ * One Entity-Link Field whose target-type constraint the write gate must check: the Field `key`, the
+ * linked `entityId`, and the non-empty `targetTypes` the target's types must intersect. Only a
+ * constrained Field (`targetTypes` non-empty) with a present value yields one. The caller resolves
+ * each `entityId`'s actual types from the DB — a missing target has nothing to check.
  */
 export interface EntityLinkConstraint {
   readonly key: string;
@@ -425,9 +385,9 @@ export type FieldFilterOp = 'eq' | 'gte' | 'lte';
 const FIELD_FILTER_OPS: ReadonlySet<string> = new Set<FieldFilterOp>(['eq', 'gte', 'lte']);
 
 /**
- * One filter-by-Field constraint (ADR-0048, #188): the Metadata `key`, an `op`, and the compared
- * `value`. `eq` on the same key OR together (enum/list membership); `gte`/`lte` on the same key form
- * a range; different keys AND — mirroring the universal facets. Wire form is `key:op:value`.
+ * One filter-by-Field constraint (ADR-0048): the Metadata `key`, an `op`, and the compared `value`.
+ * `eq` on the same key OR together (enum/list membership); `gte`/`lte` on the same key form a range;
+ * different keys AND. Wire form is `key:op:value`.
  */
 export interface FieldFilter {
   readonly key: string;
@@ -465,10 +425,8 @@ export function readField(metadata: Metadata | undefined, field: FieldSchema): u
 }
 
 /**
- * Write a Field's value back into the Metadata map, returning a fresh map (pure —
- * the caller feeds it to an Immer draft or a signal). An emptied value clears the
- * key, leaving every sibling Metadata entry untouched, so the map never accretes
- * blank keys and removing a Field's value is indistinguishable from never setting it.
+ * Write a Field's value back into the Metadata map, returning a fresh map. An emptied value clears the
+ * key — a cleared Field is absent, not blank — leaving every sibling Metadata entry untouched.
  */
 export function writeField(metadata: Metadata | undefined, field: FieldSchema, value: unknown): Metadata {
   const next: Metadata = { ...(metadata ?? {}) };
@@ -488,9 +446,8 @@ function isEmpty(value: unknown): boolean {
 }
 
 /**
- * Whether `value` inhabits a *built-in* `dataType` — the per-kind type check the forward-only gate
- * rides. A structured data-type rides its own `valueSchema` instead ({@link valueMatcher}), so this
- * switch stays closed and exhaustive.
+ * Whether `value` inhabits a *built-in* `dataType`. A structured data-type rides its own `valueSchema`
+ * instead ({@link valueMatcher}), so this switch stays closed and exhaustive.
  */
 function matchesBuiltInDataType(dataType: BuiltInDataType, value: unknown): boolean {
   switch (dataType.kind) {
@@ -516,10 +473,9 @@ function matchesBuiltInDataType(dataType: BuiltInDataType, value: unknown): bool
 }
 
 /**
- * An ISO-8601 date (`YYYY-MM-DD`) with an optional time part. Metadata dates arrive
- * as strings (frontmatter YAML re-serialized to JSON, ADR-0033), so a Field date is
- * a string, not a `Date`. The shape regex fences out garbage before the parse, and
- * the parse rejects an impossible calendar date the shape alone would admit.
+ * An ISO-8601 date (`YYYY-MM-DD`) with an optional time part. Metadata dates arrive as strings
+ * (frontmatter YAML re-serialized to JSON, ADR-0033), so a Field date is a string, not a `Date`. The
+ * regex fences out garbage; the parse then rejects an impossible calendar date the shape would admit.
  */
 function isIsoDateString(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2})?(\.\d+)?(Z|[+-]\d{2}:\d{2})?)?$/.test(value)) return false;

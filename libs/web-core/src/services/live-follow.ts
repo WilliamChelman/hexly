@@ -4,8 +4,7 @@ import { FollowSignal, UnavailableNudge } from '@hexly/domain';
 
 /**
  * The followed resource's access ended: an `unavailable` eviction nudge, or a refetch that
- * came back 403/404 (access gone across a gap). A single sentinel both `watch()` outcomes
- * collapse to, so a consumer branches on `=== EVICTED` and otherwise gets the fresh resource.
+ * came back 403/404 (access gone across a gap).
  */
 export const EVICTED = Symbol('evicted');
 export type Evicted = typeof EVICTED;
@@ -24,24 +23,20 @@ export interface WatchResource<T> {
   /** The caller's freshness/echo gate, checked at fire time; omit to always refetch. */
   shouldRefetch?: (n: FollowSignal) => boolean;
   /**
-   * Notified when a refetch fails *transiently* (not access-loss) and is swallowed — the seam to log
-   * it, so a silently-stale follow isn't unexplained (parity with the list stores that log the same
-   * class). Access-loss (403/404) evicts instead and never calls this.
+   * Notified when a refetch fails *transiently* (not access-loss) and is swallowed. Access-loss
+   * (403/404) evicts instead and never calls this.
    */
   onTransientError?: (err: unknown) => void;
 }
 
 /**
  * The shared live-follow loop behind every client `watch()` (ADR-0044): relay one resource's
- * server nudges into a refetch-and-emit, mapping eviction and access-loss to {@link EVICTED}.
+ * server nudges into a debounced refetch-and-emit, mapping eviction and access-loss to
+ * {@link EVICTED}.
  *
- * Owns the *source* — follow + debounced refetch — but no view state. Two concerns stay with the
- * caller and ride in from outside: `shouldRefetch` gates a readable nudge (its own held-version /
- * dirty / loading check), run at *fire time* after the debounce since it reads live state; and
- * applying the emitted value — or reacting to {@link EVICTED} — is the caller's `subscribe`. An
- * eviction jumps the debounce queue: access ended, so it reports at once without waiting to
- * coalesce. A transient refetch failure (5xx, a blip) is swallowed — the next nudge or reconnect
- * heals it — so it must not blank a valid follow.
+ * `shouldRefetch` runs at *fire time*, after the debounce, since it reads live caller state. An
+ * eviction jumps the debounce queue and reports at once. A transient refetch failure (5xx, a blip)
+ * is swallowed rather than blanking a valid follow — the next nudge or reconnect heals it.
  */
 export function watchResource<T>({
   follow,

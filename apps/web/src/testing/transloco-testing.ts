@@ -15,9 +15,8 @@ import fr from '../i18n/catalogs/fr.json';
 export const APP_TEST_CATALOGS: TestCatalogs = { en, fr } as TestCatalogs;
 
 /**
- * Every catalog the app can render — its own plus each lib's scoped one (ADR-0049): an app page
- * reaches across most of the libs, so the full set is composed once here rather than enumerated per
- * spec. `overrides` win on collision, for a spec proving a translation behaviour.
+ * Every catalog the app can render — its own plus each lib's scoped one (ADR-0049).
+ * `overrides` win on collision.
  */
 export function provideTranslocoTesting(...overrides: readonly TestCatalogs[]) {
   return provideCatalogs(

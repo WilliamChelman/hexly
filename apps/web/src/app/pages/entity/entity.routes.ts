@@ -5,10 +5,9 @@ import { flushOnLeave } from './flush-on-leave.guard';
 import { EntitySession } from './services/entity-session';
 
 /**
- * Lazy route config for `/w/:worldId/entities/:id`. Split out of app.routes so the
- * editor's providers — and the ContentEditor barrel (TipTap) they reference — load
- * with the entity chunk, never the initial bundle. The parent route keeps
- * `reconcileWorldSegment`: its parent is still `w/:worldId`, where the segment lives.
+ * Lazy route config for `/w/:worldId/entities/:id`. Kept out of app.routes so the editor's
+ * providers — and the ContentEditor barrel (TipTap) they reference — load with the entity
+ * chunk, never the initial bundle.
  */
 export const ENTITY_ROUTES: Routes = [
   {
@@ -21,10 +20,8 @@ export const ENTITY_ROUTES: Routes = [
     // component-scoped on EntityPage, which is the only thing that shows them.
     providers: [
       EntitySession,
-      // The session is the central store every View edits; bind the token to it so the
-      // map lib (and future Views) reach it without importing the app (ADR-0048). Each
-      // View owns its own store — MapView provides HexMapStore itself — so the route
-      // composition root stays out of View internals.
+      // The session is the central store every View edits; bind the token to it so the map lib
+      // (and future Views) reach it without importing the app (ADR-0048).
       { provide: ENTITY_SESSION, useExisting: EntitySession },
       { provide: CONTENT_EDITOR_SESSION, useExisting: EntitySession },
       EntityNameResolver,

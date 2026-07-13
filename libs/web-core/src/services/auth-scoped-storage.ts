@@ -25,14 +25,12 @@ export interface AuthPreference<T extends string> {
  * localStorage gateway for per-user preferences. Keys live under a shared
  * {@link PREFIX} (no per-user suffix); localStorage holds *one* user's
  * preferences at a time, tagged in {@link SCOPE_KEY} with whose they are. When a
- * *different* authenticated user is confirmed, every prefixed key is wiped so
- * preferences never leak across logout/re-login on the same browser.
+ * *different* authenticated user is confirmed, every prefixed key is wiped.
  *
  * The wipe waits for a real authenticated user: while the session is anonymous —
  * logged out, a public-link viewer, or the brief window before `/auth/me`
  * resolves on boot — nothing is touched, so a returning user's choices survive
- * reload (flat keys are read with the same name they were written under,
- * regardless of when auth resolves).
+ * reload.
  */
 @Injectable({ providedIn: 'root' })
 export class AuthScopedStorage {
@@ -84,9 +82,8 @@ export class AuthScopedStorage {
   }
 
   /**
-   * A reactive preference: reads from storage on creation, applies it
-   * immediately, and persists on every `set()` call. Discarded along with all
-   * other prefixed keys when a different user logs in.
+   * A reactive preference: falls back to `detect()` when storage holds nothing
+   * valid, and `apply()` runs once on creation as well as on every `set()`.
    */
   preference<T extends string>({
     storageKey,

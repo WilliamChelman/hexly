@@ -8,9 +8,8 @@ import { Eyebrow, Field, Input, Panel, Select, Button } from '@hexly/web-ui';
 type PasswordError = '' | 'tooShort' | 'wrongCurrent' | 'error';
 
 /**
- * User Settings: Preferences applied instantly through the same signals the
- * user menu writes (one source of truth, two entry points), plus the
- * self-service profile forms. Email is the login identity and stays read-only.
+ * User Settings: Preferences (applied instantly through the same signals the user menu writes)
+ * plus the self-service profile forms. Email is the login identity and stays read-only.
  */
 @Component({
   selector: 'app-user-settings',

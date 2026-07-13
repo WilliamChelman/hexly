@@ -3,12 +3,10 @@ import { ActivatedRouteSnapshot, RouterStateSnapshot, TitleStrategy } from '@ang
 import { TitleService } from './title.service';
 
 /**
- * The router's title hook (ADR-0014). It does no rendering itself — it reads the
- * active route's title intent and hands it to {@link TitleService}, the single
- * owner of the tab title. A route's `title` is a translation key (so titles
- * localize); a route may additionally derive its title from the open document by
- * declaring `data.documentTitleKey`, a brand template with a `{{name}}` slot the
- * page fills via {@link TitleService.setDocumentName} (the editor reads
+ * The router's title hook (ADR-0014): it reads the active route's title intent and
+ * hands it to {@link TitleService}. A route's `title` is a translation key; a route
+ * may additionally declare `data.documentTitleKey`, a brand template with a `{{name}}`
+ * slot the page fills via {@link TitleService.setDocumentName} (the editor reads
  * `"Aldermoor — Hexly"`).
  *
  * A route with no `title` leaves the current tab title untouched.

@@ -6,11 +6,8 @@ import { entities, entityGrants, users, worldMembers, worlds } from '../db/schem
 import { entityAccess } from './entity-access';
 
 /**
- * The Entity authorization rule (ADR-0037), driven directly against a seeded SQLite — no
- * Nest, no HTTP, no cookies. This is the single source of truth for the role × visibility ×
- * superadmin → verbs matrix, so it doubles as the refactor's safety net: if a re-homing changes
- * a cell here, the ADR-0037 rule moved. `decide`/`rightsOf` compute the same predicates the
- * live read/write paths do, so a green matrix is a green authorization surface.
+ * The Entity authorization rule (ADR-0037) — the role × visibility × superadmin → verbs
+ * matrix, driven against a seeded SQLite with no Nest, no HTTP, no cookies.
  */
 describe('entityAccess', () => {
   let db: Db;

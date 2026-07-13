@@ -16,13 +16,10 @@ import { NodeView } from '@tiptap/pm/view';
 import { EntityNameResolver } from './entity-name-resolver';
 
 /**
- * The app's first Angular TipTap node view (ADR-0023): renders a Content Entity
- * Link inline. It resolves `entityId` to the target's **live** name via the
- * shared {@link EntityNameResolver}, falling back to the stored `label` while the
- * owner list loads (no placeholder flash) or — in a muted *dangling* style — when
- * the target is missing/deleted. `routerLink` SPA-navigates to `/entities/:id` on
- * a plain click while letting Ctrl/Cmd/middle-click open a new tab; a dangling link
- * is non-navigable (issue #78). Deletion is plain atom backspace.
+ * Renders a Content Entity Link inline (ADR-0023). Resolves `entityId` to the target's
+ * **live** name via {@link EntityNameResolver}, falling back to the stored `label` while
+ * the owner list loads (no placeholder flash) or when the target is missing/deleted — a
+ * dangling link renders muted and is non-navigable.
  */
 @Component({
   selector: 'app-entity-link-view',
@@ -88,9 +85,9 @@ export class EntityLinkView {
   protected readonly dangling = computed(() => this.resolution().status === 'missing');
 
   /**
-   * What the link shows: the static `display` override when set (the one exception
-   * to the live-name rule, ADR-0033); otherwise the live name when resolved, and
-   * the stored label while loading or dangling.
+   * The static `display` override when set (the one exception to the live-name rule,
+   * ADR-0033); otherwise the live name when resolved, and the stored label while
+   * loading or dangling.
    */
   protected readonly text = computed(() => {
     const override = this.display();
@@ -101,15 +98,12 @@ export class EntityLinkView {
 }
 
 /**
- * Bridge a ProseMirror node to an {@link EntityLinkView}. No `ngx-tiptap` here —
- * we mount the component imperatively (matching the hand-rolled `TiptapDirective`)
- * and feed node attrs through its signal inputs, re-applying on `update`.
+ * Bridge a ProseMirror node to an {@link EntityLinkView}.
  *
- * `environmentInjector` is the route-level injector where {@link EntityNameResolver}
- * is provided (so every node view shares the one resolver the picker reads).
- * `elementInjector` is ContentEditor's node injector, which lives inside the router
- * outlet — passing it lets the component's `routerLink` resolve `ActivatedRoute`
- * (absent from the environment injector alone, which is why this arg exists).
+ * `environmentInjector` must be the route-level injector where {@link EntityNameResolver}
+ * is provided. `elementInjector` must be ContentEditor's node injector, which lives inside
+ * the router outlet: the environment injector alone cannot resolve the `ActivatedRoute` the
+ * component's `routerLink` needs.
  */
 export function createEntityLinkNodeView(
   node: ProseMirrorNode,

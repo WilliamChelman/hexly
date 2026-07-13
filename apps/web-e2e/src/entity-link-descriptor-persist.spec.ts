@@ -1,14 +1,6 @@
 import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtures';
 
-/**
- * The Link Descriptor journey (issue #96, ADR-0023): an author characterises a Content
- * Entity Link with a free-text descriptor via the `::` trigger, and it survives a save +
- * reload, rendering the target's live name with the descriptor as a corner badge. Crosses every
- * seam: the `::` suggestion arming only after a link, the descriptor picker's free-text
- * entry, the versioned save, the server harvesting the descriptor from the saved Content
- * into its index (#96, ADR-0035), and an API read of the opaque snapshot (ADR-0009/0019).
- * Prior art: entity-link-content-persist.spec.ts (the `@` link itself).
- */
+/** The Link Descriptor journey (issue #96, ADR-0023/0035). */
 test('characterises a Content Entity Link via :: , persists the descriptor, and reloads as Name (descriptor)', async ({
   page,
   request,

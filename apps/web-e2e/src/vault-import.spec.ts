@@ -2,13 +2,8 @@ import { strToU8, zipSync } from 'fflate';
 import { expect, segRe, test } from './fixtures';
 
 /**
- * Vault-import smoke (#149, ADR-0033). Proves the wiring end to end: the World
- * Index "Import vault" affordance uploads a `.zip`, the summary modal reports what
- * landed, opening the World shows the imported notes, an imported note's Metadata
- * is visible read-only, and a `[[wikilink]]` resolved to a clickable Entity Link.
- *
- * The vault is built in memory (fflate) — the same helper the API's import spec
- * uses — so there's no committed binary fixture.
+ * Vault-import smoke (ADR-0033). The vault is built in memory (fflate) so there's no
+ * committed binary fixture.
  */
 function vaultZip(): Buffer {
   return Buffer.from(

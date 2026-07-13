@@ -32,13 +32,10 @@ export class ActiveWorld {
   readonly name = computed(() => this._world()?.name ?? null);
 
   constructor() {
-    // Live-follow the active World (ADR-0044, #176/#178). The client's write-through store owns the
-    // source (shared follow + debounced refetch + freshness dedup, fed by our own commitPins too);
-    // we only decide what to apply:
+    // Live-follow the active World (ADR-0044):
     // - EVICTED (membership loss, World deleted, a 403/404 reconnect refetch) → blank the World and
     //   send the viewer to the Index rather than leave an open Dashboard they can't enter.
-    // - a fresh detail (rename, pin reorder, metadata) → re-pin it, so an open Dashboard — which
-    //   derives its name and pins from world() — reflects the change without a reload.
+    // - a fresh detail (rename, pin reorder, metadata) → re-pin it.
     toObservable(this._worldId)
       .pipe(
         switchMap((id) => (id === null ? EMPTY : this.worlds.watch(id))),
@@ -80,7 +77,7 @@ export class ActiveWorld {
   /**
    * Persist the active World's pin set wholesale and re-pin from the returned
    * Detail. Owner-only server-side; a failure toasts and leaves the pins as they
-   * were. The single home for every pin-mutating surface, so all share one error UX.
+   * were.
    */
   commitPins(pinnedEntityIds: string[]): void {
     const worldId = this._worldId();
@@ -93,13 +90,12 @@ export class ActiveWorld {
 }
 
 /**
- * Pins {@link ActiveWorld} from the `:worldId` segment and self-heals its
- * decorative slug. It decodes the id, fetches the World detail (reusing an
- * already-pinned one so the heal redirect never re-fetches), and pins it. With the
- * name in hand it rewrites a bare, stale, or legacy World segment to the canonical
- * `slug-base62` form via a `replaceUrl` redirect that preserves the child path and
- * query — the base62 suffix stays the sole authority, so an un-healed URL still
- * resolves. A failed fetch pins the id alone and lets the page render its own error.
+ * Pins {@link ActiveWorld} from the `:worldId` segment and self-heals its decorative slug: it
+ * decodes the id, fetches the World detail (reusing an already-pinned one, so the heal redirect
+ * never re-fetches), and rewrites a bare, stale, or legacy World segment to the canonical
+ * `slug-base62` form via a `replaceUrl` redirect that preserves the child path and query. The base62
+ * suffix stays the sole authority, so an un-healed URL still resolves. A failed fetch pins the id
+ * alone and lets the page render its own error.
  */
 export const activeWorldGuard: CanActivateFn = (route, state) => {
   const worldId = idFromSegment(route.paramMap.get('worldId') ?? '');

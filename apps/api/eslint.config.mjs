@@ -11,10 +11,8 @@ export default [
     ignores: ['**/*.spec.ts'],
     plugins: { 'hexly-writes': hexlyNudgeWrites },
     rules: {
-      // ADR-0045 — one write handle per resource, so that the `seq` bump and the post-commit nudge
-      // cannot be forgotten. Without these guards the omission is silent: a revoked grant leaves
-      // its Viewer live-following a private Entity, and a World-owner promotion leaves them
-      // holding a read-only Rights array on the World's shared Entities. Both shipped.
+      // ADR-0045 — one write handle per resource: a direct write skips the `seq` bump and the
+      // post-commit nudge, and the omission is silent (stale Viewers keep live-following).
       'hexly-writes/no-direct-entity-writes': 'error',
       'hexly-writes/no-direct-world-writes': 'error',
     },

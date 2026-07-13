@@ -17,16 +17,10 @@ interface RailEntry {
 }
 
 /**
- * The right-edge icon rail — a narrow floating strip pinned top-right whose
- * entries open management panels into the dismissible right panel (ADR-0011,
- * ADR-0013, issue #39). It is built to take further entries later; only the
- * Regions entry ships now. The Regions entry toggles the panel between the
- * Regions list and closed ({@link HexMapStore.toggleRegionsPanel}); it reads as
- * active while that list is showing, and clicking it again reclaims the map.
- *
- * Each entry's chrome — its glyph, tooltip, and active state — is data ({@link
- * entries}) rendered by a shared {@link IconButton}, so a second entry brings its
- * own glyph without copied markup, per ADR-0013's "every widget is a primitive."
+ * The right-edge icon rail — a narrow floating strip pinned top-right whose entries open
+ * management panels into the dismissible right panel (ADR-0011, ADR-0013). The Regions entry
+ * toggles the panel between the Regions list and closed ({@link HexMapStore.toggleRegionsPanel}),
+ * and reads as active while that list is showing.
  */
 @Component({
   selector: 'app-editor-rail',
@@ -55,7 +49,7 @@ interface RailEntry {
 export class EditorRail {
   protected readonly store = inject(HexMapStore);
 
-  /** Rail entries rendered top-to-bottom; only Regions ships now (issue #39). */
+  /** Rail entries, rendered top-to-bottom. */
   protected readonly entries: readonly RailEntry[] = [
     {
       id: 'regions',

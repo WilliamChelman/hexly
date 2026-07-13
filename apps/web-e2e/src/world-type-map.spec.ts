@@ -13,12 +13,9 @@ import {
 const BATTLEMAP_VIEW = mapViewToggle('battlemap');
 
 /**
- * A World Owner gives a type they defined a map, code-lessly (#194/#201) — the mirror of
- * `dnd-monster.spec.ts`, for a type that ships no code at all: it is authored in the World's settings,
- * and the map plugin contributed only a data-type on a dropdown.
- *
- * The load-bearing claim is not that a map renders, but that adding one to a deity does not turn it
- * into a map: the Entity still opens on its Fields, with the grid one toggle away.
+ * A World Owner gives a type they authored in the World's settings a map, code-lessly: the map
+ * plugin contributes only a data-type on a dropdown. Adding a grid to a deity does not turn it into
+ * a map — the Entity still opens on its Fields, with the grid one toggle away.
  */
 test('a World Owner gives a user-defined type a map, and painting it persists', async ({ page, request }) => {
   const worldId = await enterLibrary(page);

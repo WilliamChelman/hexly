@@ -17,14 +17,11 @@ interface RegisteredType {
 }
 
 /**
- * The API-side registry of every code-registered Entity Type — its Field schema and label (ADR-0048),
- * the backend twin of the web `TypeRegistry`. Seeded at startup from the core types and the bundled
- * plugins in one loop, since both are `defineType` declarations. The write path resolves a plugin's
- * Fields from here for the forward-only gate and the facet build, knowing nothing of its Angular view.
+ * The API-side registry of every code-registered Entity Type — its Field schema and label (ADR-0048).
+ * Seeded at startup from the core types and the bundled plugins.
  *
- * The core types declare no Fields, so they add nothing to resolve; they are registered so a World's
- * available-types list reports the whole code-registered set. An unregistered type resolves to
- * `undefined` ("no Fields", never a throw).
+ * The core types declare no Fields; they are registered so a World's available-types list reports the
+ * whole code-registered set. An unregistered type resolves to `undefined` ("no Fields", never a throw).
  *
  * A World's user-defined types are not here — they are stored per-World and merged in by
  * {@link WorldTypeFields}.
@@ -39,16 +36,14 @@ export class TypeFieldRegistry {
 
   /**
    * The **Structured Field** data-types this build bundles (ADR-0050) — instance-wide and code-known,
-   * like the plugin types beside them, so a World never contributes one. The write path threads this
-   * into the domain's `validateFields` / `harvestEdges`.
+   * so a World never contributes one.
    */
   readonly structuredDataTypes: StructuredDataTypeSet = BUNDLED_STRUCTURED_DATA_TYPES;
 
   /**
-   * Register (or replace) a plugin type's Field schema and optional `label`, validating each Field
-   * through the shared Zod so a malformed plugin fails loudly at startup — including a **Structured
-   * Field** naming a data-type this build does not bundle, which for a plugin type (code, not data)
-   * is a build error rather than something to degrade around. Returns an unregister fn.
+   * Register (or replace) a plugin type's Field schema and optional `label`. A malformed Field — or a
+   * **Structured Field** naming a data-type this build does not bundle — throws at startup rather than
+   * degrading. Returns an unregister fn.
    */
   register(typeId: string, fields: readonly FieldSchema[], label?: string): () => void {
     const parsed = fields.map((field) => fieldSchemaSchema.parse(field));

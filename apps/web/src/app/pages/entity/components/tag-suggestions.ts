@@ -11,12 +11,10 @@ export interface TagItem {
 }
 
 /**
- * Tag entry suggestions — built on the shared {@link vocabItems} so there is one
- * matching/normalization rule (case-insensitive substring filter + typed-text "new" row
- * with the `\0` sentinel id) across every picker. On top of that, every row already on the
- * Entity (`added`) is dropped — including the "new" row for a just-added tag, which would
- * otherwise show a "(new)" suggestion whose pick is a silent no-op (deduped away). So
- * typing an existing/added tag yields nothing.
+ * Tag entry suggestions: {@link vocabItems} matching (case-insensitive substring filter +
+ * typed-text "new" row with the `\0` sentinel id), minus every tag already on the Entity (`added`)
+ * — including the "new" row for a just-added tag, whose pick would be a silent no-op (deduped
+ * away). So typing an existing/added tag yields nothing.
  */
 export function tagItems(query: string, vocab: readonly string[], added: readonly string[]): TagItem[] {
   const addedSet = new Set(added.map((a) => a.toLowerCase()));

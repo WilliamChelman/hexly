@@ -6,10 +6,7 @@ import { AdminService } from './admin.service';
 
 /**
  * The Superadmin operator surface (ADR-0037, ADR-0046, ADR-0047): the `/admin` repair
- * routes, content-reaching, gated by {@link SuperadminGuard}. Reindex is its first tool.
- * Named for the surface (`admin`), not the flag (`superadmin`), so an Instance Role could
- * be granted access here later without a rename. Kept separate from {@link UsersController},
- * whose `manage-users` surface has no content powers.
+ * routes, content-reaching, gated by {@link SuperadminGuard}.
  */
 @Controller('admin')
 @UseGuards(SessionAuthGuard, SuperadminGuard)

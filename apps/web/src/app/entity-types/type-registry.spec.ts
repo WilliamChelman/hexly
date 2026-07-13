@@ -50,10 +50,9 @@ describe('TypeRegistry', () => {
   let registry: TypeRegistry;
 
   beforeEach(() => {
-    // The registry resolves a code type's name/chrome through Transloco (a user-defined type's
-    // authored name never goes near it), so the spec needs the testing catalog. The plugin types are
-    // seeded from DI, so a spec gets `core.hexmap` and `dnd.monster` by composing those plugins as
-    // `app.config.ts` does (#192, ADR-0050).
+    // A code type's name/chrome resolves through Transloco, so the spec needs the testing catalog.
+    // Plugin types are seeded from DI: composing the plugins is what supplies `core.hexmap` and
+    // `dnd.monster`.
     TestBed.configureTestingModule({
       imports: [provideTranslocoTesting()],
       providers: [providePluginHexmap(), providePluginDnd()],
@@ -160,10 +159,6 @@ describe('TypeRegistry', () => {
     expect(viewKeys(registry.viewsFor(['dnd.beast']))).toEqual([CORE_VIEW_CONTENT]);
   });
 
-  /**
-   * A user-defined type's grid resolves through the same path `core.hexmap` runs (#201) — a
-   * `{ field }` placement, the Field's `kind`, the View registered for that kind. No second branch.
-   */
   describe('a user-defined type carrying a Structured Field', () => {
     const battlemap: FieldSchema = {
       key: 'battlemap',
@@ -286,10 +281,7 @@ describe('TypeRegistry', () => {
   });
 });
 
-/**
- * An Instance that does **not** bundle the map plugin — ADR-0048's absent-plugin degradation, which a
- * build composed one provider short of the app's is what exercises.
- */
+/** ADR-0048's absent-plugin degradation: a build composed one provider short of the app's. */
 describe('TypeRegistry without the Hex Map plugin', () => {
   let registry: TypeRegistry;
 

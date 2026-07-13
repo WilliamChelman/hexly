@@ -248,8 +248,7 @@ describe('patchEntityRequestSchema', () => {
 
   /**
    * A rename is substance (an entity-level Editor may make it); a Visibility flip is exposure
-   * (full write rights). They are different write kinds with different gates, so one request
-   * cannot carry both without making the caller choose the rule that judges it (ADR-0045).
+   * (full write rights). Different gates, so one request cannot carry both (ADR-0045).
    */
   it('rejects a patch carrying both name and visibility — they are different write kinds', () => {
     expect(() =>

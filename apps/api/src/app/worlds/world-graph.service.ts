@@ -8,12 +8,11 @@ import { entities, entityEdges } from '../db/schema';
 import { linkedEntity } from '../entities/utils/linked-entity';
 
 /**
- * The World Graph read (ADR-0046, #181): a World's readable Entities as nodes, the
- * `entity → entity` rows of the derived edge index between them as edges.
+ * The World Graph read (ADR-0046): a World's readable Entities as nodes, the `entity → entity` rows
+ * of the derived edge index between them as edges.
  *
- * Its access rule is the strictest of the three edge surfaces: *References* lets an unreadable
- * target dangle and *Referenced by* filters the source alone, but here **both** endpoints are
- * filtered — an edge the viewer cannot fully see is dropped, not rendered.
+ * Unlike the other edge surfaces, **both** endpoints are access-filtered here: an edge the viewer
+ * cannot fully see is dropped, not rendered as a dangling target.
  */
 @Injectable()
 export class WorldGraphService {
@@ -31,12 +30,11 @@ export class WorldGraphService {
   }
 
   /**
-   * Every Entity of the World the viewer can read — the ordinary accessible-entities filter, not
-   * the edge table, so a link-less orphan is a node like any other. Assets are never nodes.
+   * Every Entity of the World the viewer can read — filtered off the entities table, not the edge
+   * table, so a link-less orphan is a node like any other. Assets are never nodes.
    *
    * An Entity {@link linkedEntity} cannot resolve — one whose stored types are malformed — is
-   * dropped rather than thrown on; {@link edges} then sieves its edges away for free. One such row
-   * must not 500 a whole World's graph.
+   * dropped rather than thrown on, so one bad row cannot 500 a whole World's graph.
    */
   private nodes(access: EntityAccess, worldId: string): LinkedEntity[] {
     return this.db
@@ -49,17 +47,14 @@ export class WorldGraphService {
   }
 
   /**
-   * The World's `entity → entity` edges, kept only where **both** endpoints are nodes. Sieving
-   * against the node set rather than restating the read predicate in SQL is what makes the graph's
-   * central invariant true by construction — `edges ⊆ nodes × nodes` — and it cannot drift from
-   * {@link nodes} the way a second copy of the filter could. It also settles the other three drops
-   * for free, because none of those targets is a node either: a target the viewer cannot read, a
-   * deleted one (the row survives its target, ADR-0046), and one in another World.
+   * The World's `entity → entity` edges, kept only where **both** endpoints are nodes:
+   * `edges ⊆ nodes × nodes`. Sieving against the node set from {@link nodes} also drops, for free,
+   * targets the viewer cannot read, deleted ones (an edge row survives its target, ADR-0046), and
+   * ones in another World.
    *
-   * The indexed `WHERE worldId = ? AND targetKind = 'entity'` (`idx_entity_edges_world`) is the
-   * reason `worldId` is denormalized onto an edge at all. `targetKind` keeps Assets out: they are
-   * harvested as edges but are never nodes, so they could never survive the sieve anyway — naming
-   * them in the WHERE lets the index do it instead of the loop.
+   * `worldId` is denormalized onto an edge to serve the indexed
+   * `WHERE worldId = ? AND targetKind = 'entity'` (`idx_entity_edges_world`). Assets are harvested
+   * as edges but are never nodes, so `targetKind` lets the index exclude them rather than the loop.
    */
   private edges(worldId: string, nodeIds: ReadonlySet<string>): WorldGraphEdge[] {
     return this.db

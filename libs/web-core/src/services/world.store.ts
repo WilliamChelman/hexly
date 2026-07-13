@@ -8,8 +8,7 @@ import { Logger } from './logger';
 
 /**
  * The caller's loaded Worlds. Which World is *active* is a URL fact
- * ({@link ActiveWorld}), not held here — this is just the loaded list plus the
- * create plumbing; the caller navigates into a created World by URL.
+ * ({@link ActiveWorld}), not held here.
  */
 @Injectable({ providedIn: 'root' })
 export class WorldStore {
@@ -59,10 +58,9 @@ export class WorldStore {
       });
     });
 
-    // Live-follow the reachable Worlds (ADR-0044, #176) for *cross-tab* freshness and eviction —
-    // the acting tab reflects its own confirmed create/rename/delete optimistically (below), the
-    // nudge covers changes made elsewhere. `switchMap` off the id-set follows every held World;
-    // membership changes re-point the subscription without manual add/remove bookkeeping.
+    // Live-follow the reachable Worlds (ADR-0044) for *cross-tab* freshness and eviction: the acting
+    // tab reflects its own confirmed create/rename/delete below, the nudge covers changes made
+    // elsewhere. `switchMap` off the id-set re-points the subscription when membership changes.
     toObservable(this.followKey)
       .pipe(
         switchMap((key) => {
@@ -95,8 +93,8 @@ export class WorldStore {
 
   /**
    * Reconcile one world nudge from *another* tab. `unavailable` (membership loss, delete) → drop
-   * that World at once — access has ended, no refetch needed. A readable nudge (rename, pin reorder,
-   * a still-reachable membership change) → a debounced, `switchMap`-guarded authoritative refetch.
+   * that World at once, access has ended. A readable nudge (rename, pin reorder, a still-reachable
+   * membership change) → a debounced authoritative refetch.
    */
   private reconcile(n: FollowSignal): void {
     if ('unavailable' in n) {
@@ -128,9 +126,8 @@ export class WorldStore {
     });
   }
 
-  // Server mints an empty World; append the *authoritative* create response so it shows (and gets
-  // followed) at once — connection-independent, unlike a follow-up refetch that could fail. Create
-  // itself emits no nudge (this tab didn't yet follow a World that didn't exist); cross-tab
+  // Append the *authoritative* create response so the new World shows (and gets followed) at once.
+  // Create emits no nudge — this tab didn't yet follow a World that didn't exist — so cross-tab
   // discovery of a new World rides the World Index's focus-refetch, not the bus.
   create(name: string): Observable<WorldDetail> {
     return this.client.create(name).pipe(tap((world) => this._worlds.update((ws) => [...ws, world])));

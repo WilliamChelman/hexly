@@ -10,10 +10,9 @@ import { DB, Db } from '../db/db';
 import { HEXLY_CONFIG, HexlyConfig } from '../config/config.module';
 
 /**
- * The principal that opened a connection (ADR-0044, #175). Either a signed-in user (cookie) or
- * an anonymous **Public Link token** — the token *is* the grant, there is no anonymous user
- * object. Reachability resolves the same single access seam for both ({@link canRead}), which is
- * what makes an anonymous Public Link viewer a first-class live-follow participant.
+ * The principal that opened a connection: either a signed-in user (cookie) or an anonymous
+ * **Public Link token** — the token *is* the grant, there is no anonymous user object.
+ * Reachability resolves the same access seam for both ({@link canRead}).
  */
 export type Principal = { kind: 'user'; userId: string } | { kind: 'token'; token: string };
 
@@ -28,14 +27,12 @@ function principalsEqual(a: Principal, b: Principal): boolean {
 }
 
 /**
- * The in-process nudge bus (ADR-0044, #173/#174). Fan-out is a per-connection rxjs `Subject`,
- * and the server holds only an in-memory `Map<connectionId → {principal, interest, stream}>` —
- * justified by the single-process Instance (ADR-0036). A multi-process Instance would need a
- * shared broker (out of scope while ADR-0036 holds).
+ * State of the in-process nudge bus: connections live only in memory, which assumes the
+ * single-process Instance of ADR-0036 (a multi-process Instance needs a shared broker).
  *
  * Emit-time ACL shapes the payload per recipient — it does not gate recipients (ADR-0044):
- * every subscriber of the changed ref gets an entry computed against *their own current* rights,
- * which is what delivers live eviction. Re-filtering recipients instead would silently break it.
+ * every subscriber of the changed ref gets an entry computed against *their own current* rights.
+ * That is what delivers live eviction; re-filtering recipients would silently break it.
  */
 interface Connection {
   principal: Principal;
@@ -61,10 +58,8 @@ export class NudgeBus implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Start the shared heartbeat once the app is up (#177). One timer for every connection, not one
-   * per stream. `unref()` so an idle heartbeat can't hold the process open. The timer never runs in
-   * a unit test (it constructs the bus directly, skipping the Nest lifecycle) — {@link heartbeat}
-   * is the seam those tests drive.
+   * One shared timer for all connections, not one per stream. `unref()` so an idle heartbeat can't
+   * hold the process open. Unit tests construct the bus directly and drive {@link heartbeat}.
    */
   onModuleInit(): void {
     this.timer = setInterval(() => this.heartbeat(), this.heartbeatMs);
@@ -76,10 +71,9 @@ export class NudgeBus implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Push a heartbeat frame onto every open stream (#177). Its purpose is liveness, not data: a
-   * client ignores the unlistened `heartbeat` event, and a write to a dead half-open socket
-   * surfaces the close so the existing `finalize` reaps it — so the map can't grow unbounded over
-   * uptime without a separate reaper.
+   * Liveness, not data: a client ignores the unlistened `heartbeat` event, and a write to a dead
+   * half-open socket surfaces the close so `finalize` reaps the connection — which is what keeps
+   * the map from growing unbounded without a separate reaper.
    */
   heartbeat(): void {
     for (const conn of this.connections.values()) {
@@ -93,8 +87,8 @@ export class NudgeBus implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Register a new connection for `principal`, minting an unguessable `connectionId`. The
-   * returned `stream` is what the SSE handler pipes to the client; nudges are pushed onto it.
+   * Registers a connection with an unguessable `connectionId`. The returned `stream` is what the
+   * SSE handler pipes to the client; nudges are pushed onto it.
    */
   connect(principal: Principal): {
     connectionId: string;
@@ -107,9 +101,8 @@ export class NudgeBus implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Whether a principal can currently read Entity `id` — the boolean reachability seam shared by
-   * subscribe-time filtering and per-emit shaping (ADR-0044). A cookie principal resolves the
-   * ADR-0037 rule via {@link entityAccess}; a token principal resolves the Public Link grant.
+   * Whether a principal can *currently* read Entity `id`. A cookie principal resolves the ADR-0037
+   * rule via {@link entityAccess}; a token principal resolves the Public Link grant.
    */
   private canRead(principal: Principal, id: string): boolean {
     return principal.kind === 'user'
@@ -118,11 +111,9 @@ export class NudgeBus implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Whether a principal can currently reach World `id` — the World peer of {@link canRead}. A
+   * Whether a principal can *currently* reach World `id` — the World peer of {@link canRead}. A
    * cookie principal resolves the same `reachableBy` rule the worlds-list read uses (member row OR
-   * any Entity grant inside the World); a token principal resolves its World Public Link grant
-   * (ADR-0044, #178), so an anonymous World-link viewer follows the open Dashboard live and a
-   * revoked link reaches nothing.
+   * any Entity grant inside the World); a token principal resolves its World Public Link grant.
    */
   private canReadWorld(principal: Principal, id: string): boolean {
     return principal.kind === 'user'
@@ -144,29 +135,24 @@ export class NudgeBus implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Replace a connection's *whole* interest set (ADR-0044): idempotent, client-owned. Authorized
-   * to the same principal that opened the connection — the `connectionId` is unguessable *and*
-   * ownership-checked, so one tab cannot set another's interest.
+   * Replaces a connection's *whole* interest set: idempotent, and authorized to the same principal
+   * that opened the connection, so one tab cannot set another's interest.
    *
-   * A forbidden or nonexistent entity ref is *silently* not-subscribed (ADR-0044): the write
-   * still succeeds, so existence can't be probed by subscribing to guessed ids — a recipient
-   * only ever hears about resources it could read when it subscribed.
+   * A forbidden or nonexistent ref is *silently* not-subscribed and the write still succeeds, so
+   * existence can't be probed by subscribing to guessed ids.
    */
   setInterest(connectionId: string, principal: Principal, refs: InterestRef[]): InterestOutcome {
     const conn = this.connections.get(connectionId);
     if (!conn) return 'not-found';
     if (!principalsEqual(conn.principal, principal)) return 'forbidden';
-    // A forbidden or nonexistent ref of either kind is silently not-subscribed, so existence
-    // can't be probed by guessing ids — a recipient only hears about what it could reach.
     conn.interest = refs.filter((ref) => this.canReach(principal, ref));
     return 'ok';
   }
 
   /**
-   * The shared fan-out (ADR-0044): to every connection whose interest matches `matches`, push a
-   * per-recipient-shaped delta. The shaping invariant — *shape the payload per recipient, never
-   * filter recipients* — lives here once so Entity and World emits can't drift apart. `shape` is
-   * memoized per principal, so N tabs of one user cost one access resolution per emit, not N.
+   * Pushes a delta to every connection whose interest matches, shaped per recipient — *shape the
+   * payload, never filter recipients* (ADR-0044). `shape` is memoized per principal, so N tabs of
+   * one user cost one access resolution per emit, not N.
    */
   private fanOut(matches: (ref: InterestRef) => boolean, shape: (principal: Principal) => NudgeEntry): void {
     const byPrincipal = new Map<string, NudgeEntry>();
@@ -192,13 +178,9 @@ export class NudgeBus implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Emit a change for an Entity to every subscriber (ADR-0044, ADR-0045). Still-readable →
-   * `{ id, seq }`; access ended (private flip, revoked grant, deleted row) → opaque
-   * `{ id, unavailable }`.
-   *
-   * Takes **only an id** and looks up its own freshness, mirroring {@link emitWorldChange} — an ACL
-   * mutation has no version/updatedAt to pass (ADR-0045). A missing row is not an error but the
-   * eviction path: a cascade-deleted Entity fans out `unavailable`.
+   * Still-readable → `{ id, seq }`; access ended (private flip, revoked grant, deleted row) →
+   * opaque `{ id, unavailable }`. A missing row is not an error but the eviction path: a
+   * cascade-deleted Entity fans out `unavailable`.
    */
   emitEntityChange(id: string): void {
     const matches = (ref: InterestRef) => ref.kind === 'entity' && ref.id === id;
@@ -211,11 +193,8 @@ export class NudgeBus implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Emit a change for a World to every subscriber (ADR-0044, #176) — the World peer of
-   * {@link emitEntityChange}. Still-reachable → `{ id, seq }`; access ended (member removed,
-   * World deleted) → opaque `{ id, unavailable }`. The `seq` read is guarded behind a follower
-   * check, so the common no-followers emit costs one interest scan and no query; a deleted World
-   * simply has no row and shapes everyone to `unavailable`.
+   * The World peer of {@link emitEntityChange}. Still-reachable → `{ id, seq }`; access ended
+   * (member removed, World deleted) → opaque `{ id, unavailable }`.
    */
   emitWorldChange(id: string): void {
     const matches = (ref: InterestRef) => ref.kind === 'world' && ref.id === id;

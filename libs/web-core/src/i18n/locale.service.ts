@@ -11,12 +11,10 @@ import { AppShellStore } from '../services/app-shell.store';
 export type Locale = (typeof LOCALES)[number];
 
 /**
- * The Format Locale choices (ADR-0038): the curated BCP-47 tags (shared with the
- * server via {@link FORMAT_LOCALE_TAGS}, which validates the same set), plus a
- * leading `''` = "Same as language" (follow the UI Locale) that only the picker
- * knows — the server never stores it (it clears the field instead). Labels come
- * from `Intl.DisplayNames` and previews from `toLocaleDateString`. (`en-CA`
- * doubles as the ISO-style choice — its short date reads `2026-07-05`.)
+ * The Format Locale choices (ADR-0038): the curated BCP-47 tags of
+ * {@link FORMAT_LOCALE_TAGS}, plus a leading `''` = "Same as language" that only the
+ * picker knows — the server never stores it (it clears the field instead). `en-CA`
+ * doubles as the ISO-style choice: its short date reads `2026-07-05`.
  */
 export const FORMAT_LOCALES = ['', ...FORMAT_LOCALE_TAGS] as const;
 
@@ -30,13 +28,9 @@ export function detectLocale(): Locale {
 }
 
 /**
- * Owns the active {@link Locale} for every actor — signed-in users and
- * anonymous public-link viewers alike — with no backend involvement (ADR-0014).
- * On first visit it follows the browser language (French when `navigator.language`
- * starts with `fr`, else English); thereafter a remembered choice wins. {@link set}
- * flips the active Transloco language so the UI updates live, and persists the
- * choice. It shares the detect/remember/apply mechanism with {@link ThemeService}
- * through {@link AuthScopedStorage#preference}.
+ * Owns the active {@link Locale} for every actor — signed-in users and anonymous
+ * public-link viewers alike — with no backend involvement (ADR-0014). On first visit it
+ * follows the browser language; thereafter a remembered choice wins.
  */
 @Injectable({ providedIn: 'root' })
 export class LocaleService {
@@ -74,11 +68,9 @@ export class LocaleService {
   }
 
   /**
-   * Format an epoch-millis timestamp as a short date under the Format Locale,
-   * falling back to the active UI language (the live Transloco signal, so
-   * "Same as language" tracks a switch), then to the runtime default if the
-   * tag is somehow invalid — a bad locale must never take a render down
-   * (ADR-0014).
+   * Format an epoch-millis timestamp as a short date under the Format Locale, falling back
+   * to the active UI language (the live Transloco signal, so "Same as language" tracks a
+   * switch), then to the runtime default — an invalid tag must never take a render down.
    */
   formatDate(timestamp: number): string {
     const date = new Date(timestamp);
@@ -93,13 +85,10 @@ export class LocaleService {
    * Switch the UI language live and remember it. Raises the `full` curtain while loading an uncached
    * catalog; the shell debounces it, so a cached switch shows nothing.
    *
-   * The language is re-announced once the catalogs have landed, and that second announcement is what
-   * makes an **eager scope** survive a switch. A Transloco pipe carrying no scope of its own — every
-   * pipe outside the one component that provides one — re-resolves the moment the *root* catalog
-   * lands, and nothing re-emits for a scope that lands after it: the eager copy would sit there
-   * rendering raw keys, which is precisely the copy no pipe of its own lib is mounted to reload
-   * (ADR-0049). `langChanges$` is deliberately not deduplicated, so re-setting the same language
-   * re-emits and every pipe resolves against the catalogs now in hand.
+   * The language is re-announced *after* the catalogs land: a pipe with no scope of its own
+   * re-resolves the moment the root catalog lands and nothing re-emits for an eager scope landing
+   * later, which would leave that copy rendering raw keys (ADR-0049). `langChanges$` is not
+   * deduplicated, so re-setting the same language re-emits against the catalogs now in hand.
    */
   set(lang: Locale): void {
     this.pref.set(lang);
@@ -111,9 +100,8 @@ export class LocaleService {
   }
 
   /**
-   * The app's root catalog plus every eager scope, in the given language (ADR-0049). A lazily-
-   * provided scope reloads itself — its pipes re-resolve on the language change — but an eager one
-   * has no such trigger, so the switch loads it here.
+   * The app's root catalog plus every eager scope, in the given language. A lazily-provided scope
+   * reloads itself on the language change; an eager one has no such trigger, so it loads here.
    */
   private loadCatalogs(lang: Locale): Promise<unknown> {
     return Promise.all([
@@ -125,12 +113,10 @@ export class LocaleService {
   }
 
   /**
-   * Load the active language's catalogs before the app bootstraps. Wired through
-   * `provideAppInitializer` (which blocks initial navigation until it resolves),
-   * this guarantees the first *synchronous* translation — notably the route
-   * title resolved by {@link TranslationTitleStrategy} — sees a populated
-   * catalog instead of rendering the raw key (ADR-0014). A failed fetch must not
-   * white-screen the app, so it degrades to Transloco's missing-key fallback.
+   * Load the active language's catalogs before the app bootstraps, so the first *synchronous*
+   * translation — notably the route title resolved by {@link TranslationTitleStrategy} — sees a
+   * populated catalog instead of the raw key. A failed fetch degrades to Transloco's missing-key
+   * fallback rather than white-screening the app.
    */
   async init(): Promise<void> {
     try {
@@ -141,12 +127,7 @@ export class LocaleService {
   }
 }
 
-/**
- * Load the active language's catalog before initial navigation (ADR-0014), so
- * the first synchronous translation — the route title resolved by
- * {@link TranslationTitleStrategy} — sees a populated catalog rather than the
- * raw key. Initial navigation blocks on this app initializer.
- */
+/** Loads the active language's catalog via an app initializer: initial navigation blocks on it. */
 export function provideLocale(): EnvironmentProviders {
   return provideAppInitializer(() => inject(LocaleService).init());
 }

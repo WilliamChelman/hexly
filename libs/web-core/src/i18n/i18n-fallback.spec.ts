@@ -4,10 +4,8 @@ import { provideTranslocoTesting } from './transloco-testing';
 
 /**
  * English is the runtime fallback (ADR-0014): a gap in the French catalog must
- * render the English value, never a raw key, so the UI is never broken by an
- * untranslated string.
- *
- * Fixture catalogs, not a project's real copy — web-core owns the plumbing, not the words (ADR-0049).
+ * render the English value, never a raw key. Catalogs here are fixtures, not the
+ * project's real copy.
  */
 describe('i18n fallback', () => {
   it('renders the English value when a French key is missing', () => {

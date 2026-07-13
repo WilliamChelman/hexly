@@ -14,10 +14,10 @@ export interface Toast {
 const DEFAULT_TOAST_DURATION_MS = 4000;
 
 /**
- * The app's transient notifications: a signal-backed queue of {@link Toast}s any
- * feature can raise. Deliberately copy-agnostic — callers pass an already-resolved
- * string, so the i18n lives at the call site. Each `show` auto-dismisses after its
- * duration; a duration of `0` keeps the toast until {@link dismiss} or {@link clear}.
+ * A signal-backed queue of {@link Toast}s any feature can raise. Copy-agnostic:
+ * callers pass an already-resolved string, so i18n lives at the call site. Each
+ * `show` auto-dismisses after its duration; `0` keeps the toast until
+ * {@link dismiss} or {@link clear}.
  */
 @Injectable({ providedIn: 'root' })
 export class ToasterService {
@@ -32,9 +32,8 @@ export class ToasterService {
   private readonly timers = new Map<number, ReturnType<typeof setTimeout>>();
 
   /**
-   * Raise a toast, returning its id so the caller can dismiss it early. Pass
-   * `durationMs` of `0` to keep it until dismissed. The timer is skipped where
-   * `setTimeout` is unavailable, so the service is safe to construct under SSR.
+   * Raise a toast, returning its id. Pass `durationMs` of `0` to keep it until
+   * dismissed. The timer is skipped where `setTimeout` is unavailable (SSR).
    */
   show(message: string, tone: ToastTone = 'info', durationMs = DEFAULT_TOAST_DURATION_MS): number {
     const id = this.nextId++;

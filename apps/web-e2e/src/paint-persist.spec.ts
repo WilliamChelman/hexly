@@ -1,11 +1,8 @@
 import { createEntity, enterLibrary, expect, flushSave, savedGrid, test } from './fixtures';
 
 /**
- * The keystone journey: it crosses every seam — the session cookie on API calls,
- * canvas input, a versioned save, and a load on reload. Map state lives as Canvas
- * pixels (ADR-0003), so we assert on the model-derived hex count and prove the
- * round trip by reloading; a direct API read confirms the persisted document
- * (ADR-0009).
+ * Map state lives as Canvas pixels (ADR-0003), so there is nothing in the DOM to assert on:
+ * we go through the model-derived hex count, plus a direct API read of the persisted document.
  */
 test('paints a hex, saves, and the hex survives a reload', async ({ page, request }) => {
   await enterLibrary(page);

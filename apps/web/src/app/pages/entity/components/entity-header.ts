@@ -23,13 +23,10 @@ import { ViewRegistry } from '../../../entity-types/view-registry';
 import { EntityViewStore } from '../services/entity-view-store';
 
 /**
- * The open Entity's page-owned header (ADR-0022), rendered by {@link EntityPage}
- * for every Entity type: an eyebrow tag, editable title, autosave status chip
- * ({@link SaveStatus}, ADR-0026), Tags and Share. App navigation lives in the NavRail.
- *
- * Fully driven by {@link EntitySession.current} — the eyebrow/title labels switch on
- * the primary type, and the view toggle (#75) offers one button per View the Entity's
- * types afford (ADR-0048, *Views* amendment), shown only when there is more than one.
+ * The open Entity's page-owned header (ADR-0022), rendered by {@link EntityPage} for every
+ * Entity type: eyebrow tag, editable title, autosave status chip ({@link SaveStatus}), Tags
+ * and Share. Driven by {@link EntitySession.current}; the view toggle shows one button per
+ * View the Entity's types afford (ADR-0048), only when there is more than one.
  */
 @Component({
   selector: 'app-entity-header',
@@ -123,9 +120,9 @@ export class EntityHeader {
   private readonly transloco = inject(TranslocoService);
 
   /**
-   * One of the primary type's chrome labels, already resolved — re-derived when the primary type or
-   * the language changes. A user-defined type has no transloco copy, so it resolves to its authored
-   * name rather than being run through translate (#191).
+   * One of the primary type's chrome labels, re-derived when the primary type or the language
+   * changes. A user-defined type has no transloco copy: it resolves to its authored name rather
+   * than being run through translate.
    */
   private chromeLabel(key: keyof TypeLabels) {
     return computed(() => {
@@ -146,11 +143,7 @@ export class EntityHeader {
     this.router.navigate(['/']);
   }
 
-  /**
-   * The title is editable when an Entity is open and the caller may write it (ADR-0037) — a
-   * read-only member sees it, can't rename it, and gets no visibility toggle (also
-   * `@if (editable())`).
-   */
+  /** Editable when an Entity is open and the caller may write it (ADR-0037); a read-only member sees the title but cannot rename it. */
   protected readonly editable = computed(() => this.session.current() !== null && this.session.writable());
   /** Tooltip: the in-place rename affordance. */
   protected readonly titleHint = this.chromeLabel('rename');
@@ -158,13 +151,12 @@ export class EntityHeader {
   protected readonly activeKey = this.viewStore.activeKey;
 
   /**
-   * The Views the open Entity affords, as toggle buttons: the key (the click target, the URL value,
-   * and the testid) and the label to print.
+   * The Views the open Entity affords, as toggle buttons: the key (click target, URL value, testid)
+   * and the label to print.
    *
-   * A **Structured Field**'s View is labelled from the *Field* it renders — "Map", "Battlemap" — since
-   * a View id cannot tell one grid from another (ADR-0050). A Field's name resolves the way a type's
-   * does (#191): a plugin ships translated copy under a `labelKey`, and a World Owner's authored
-   * `label` is printed verbatim rather than looked up as a key they never wrote.
+   * A Structured Field's View is labelled from the *Field* it renders — "Map", "Battlemap" — since a
+   * View id cannot tell one grid from another (ADR-0050). A `labelKey` is translated; a World Owner's
+   * authored `label` is printed verbatim rather than looked up as a key they never wrote.
    */
   protected readonly viewToggle = computed(() => {
     this.transloco.activeLang(); // reactive dependency: re-resolve the labels on a language switch
@@ -238,10 +230,9 @@ export class EntityHeader {
   }
 
   /**
-   * Switch the active View (#75, ADR-0048). Updates the store for instant feedback,
-   * then mirrors the choice to the URL `view` param (`replaceUrl`) so a refresh
-   * restores it — the default View (the primary type's first) drops the param, others carry the
-   * View's key (`core.view.map:grid`). Reverts the store if the navigation is cancelled.
+   * Switch the active View, mirroring the choice to the URL `view` param so a refresh restores it:
+   * the default View (the primary type's first) drops the param, others carry the View's key
+   * (`core.view.map:grid`). Reverts the store if the navigation is cancelled.
    */
   protected selectView(key: string): void {
     const previous = this.viewStore.activeKey();

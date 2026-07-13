@@ -10,15 +10,12 @@ import { TypeNamePipe } from './type-name.pipe';
 import { CreateEntityDialogState } from '../shell/command-palette/create-entity-dialog.state';
 
 /**
- * The one "New" affordance, shared by the World Dashboard and the Entity Browser — a split
- * button: the primary action creates a **Note**, the arrowhead lists *every* Type the
- * {@link TypeRegistry} knows (#195). Core, plugin, and user-defined types sit on the same
- * footing, so a Monster is as reachable as a Note, and the app names no type but `core.note` —
- * honest, since Content is the base body every Entity has.
+ * A split button: the primary action creates a **Note**, the arrowhead lists *every* Type the
+ * {@link TypeRegistry} knows.
  *
  * A type declaring a **required** Field can't be minted blind, so it opens the create dialog,
- * which collects those Fields first (#189) — the same dialog the `>` Commands open. That is a
- * rule about a type's *schema*, not about any one type: nothing here branches on an id.
+ * which collects those Fields first. That is a rule about a type's *schema*: nothing here branches
+ * on an id.
  */
 @Component({
   selector: 'app-new-entity-button',

@@ -11,11 +11,11 @@ import { Watched, watchResource } from './live-follow';
 export type PublicEntityMode = 'entity' | 'worldEntity';
 
 /**
- * HTTP client for the unauthenticated Public Link read surface (ADR-0037, #162). Hits the
- * token-scoped `/api/public/*` routes — no session, no cookie needed. Every call is strictly
- * read-only; a revoked or bad token is a 404 the caller renders as "link no longer active".
- * Also the seam that fronts the live-follow bus for public readers, owning the anonymous-token
- * principal for the follow's lifetime so pages never touch {@link NudgeBusClient}.
+ * HTTP client for the unauthenticated Public Link read surface (ADR-0037). Hits the token-scoped
+ * `/api/public/*` routes — no session, no cookie needed. Every call is strictly read-only; a
+ * revoked or bad token is a 404 the caller renders as "link no longer active". Also fronts the
+ * live-follow bus for public readers, owning the anonymous-token principal for the follow's
+ * lifetime.
  */
 @Injectable({ providedIn: 'root' })
 export class PublicClient {
@@ -38,10 +38,8 @@ export class PublicClient {
   }
 
   /**
-   * Live-follow a World a public reader has open: connect the bus as this anonymous `token`
-   * principal for the follow's lifetime (reset on unsubscribe), then relay nudges into a debounced
-   * `world()` refetch — emitting the fresh view, or `EVICTED` when the link is revoked / the World
-   * deleted. A public World read never version-gates, so it always refetches.
+   * Live-follow a World a public reader has open. Emits the fresh view, or `EVICTED` when the link
+   * is revoked / the World deleted. A public World read never version-gates, so it always refetches.
    */
   watchWorld(token: string, worldId: string): Observable<Watched<PublicWorldView>> {
     return this.followAsToken(token, () =>

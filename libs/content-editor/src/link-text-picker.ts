@@ -8,11 +8,10 @@ export type LinkTextKind = 'display' | 'heading';
 
 /**
  * The keyboard-driven picker behind the `|` display (`[[Target|text]]`) and `#` heading
- * (`[[Target#Heading]]`) triggers on an `entityLink` (ADR-0033). Free text only — there is
- * no vocabulary, so it shows the single typed row (the {@link VocabItem} `isNew`
- * entry) that {@link vocabItems} yields for an empty vocab, and an empty query shows
- * a "type something" prompt. One component drives both attrs: `kind` picks the testid and
- * the i18n strings; the `::` descriptor picker keeps its own because it lists a vocabulary.
+ * (`[[Target#Heading]]`) triggers on an `entityLink` (ADR-0033). Free text only — there is no
+ * vocabulary, so it shows the single typed row (the {@link VocabItem} `isNew` entry) that
+ * {@link vocabItems} yields for an empty vocab, and an empty query shows a "type something"
+ * prompt. `kind` picks the testid and the i18n strings.
  */
 @Component({
   selector: 'app-link-text-picker',

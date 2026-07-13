@@ -51,9 +51,8 @@ export const sessions = sqliteTable(
 );
 
 /**
- * The sequence a freshly-inserted Entity or World starts at — no follower can hold anything
- * older. It is the column default *and* the value the write handles put on the row they return,
- * so the two cannot drift: a creator's held freshness always equals what the DB stored.
+ * The sequence a freshly-inserted Entity or World starts at — no follower can hold anything older.
+ * Both the column default and the value the write handles put on the row they return.
  */
 export const INITIAL_SEQ = 1;
 
@@ -88,11 +87,9 @@ export const entities = sqliteTable(
     seq: integer('seq').notNull().default(INITIAL_SEQ),
     // Serialized Entity body (entityBodySchema), validated at the edge.
     document: text('document').notNull(),
-    // Plain-text prose extracted from Content for full-text search. EntityWrites derives it on
-    // every write (ADR-0045), alongside the Link Descriptor index, so it can no longer be missed;
-    // the boot backfill that once repaired NULL rows is gone with the gap it compensated for.
-    // Still nullable: pre-FTS rows predate the column. The FTS table and its sync triggers are raw
-    // SQL, outside Drizzle's typed API.
+    // Plain-text prose extracted from Content for full-text search; EntityWrites derives it on every
+    // write (ADR-0045). Nullable: pre-FTS rows predate the column. The FTS table and its sync
+    // triggers are raw SQL, outside Drizzle's typed API.
     contentText: text('content_text'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
@@ -163,9 +160,8 @@ export const worldMembers = sqliteTable(
 
 /**
  * A World's user-defined Type Definitions (ADR-0048): an Entity Type a World Owner authors as data,
- * scoped to this World. The junction-table pattern of {@link worldMembers}, keyed by `(worldId,
- * typeId)`; `typeId` is the immutable `world.`-namespaced Entity Type key. Rows cascade with the
- * World, and writes route through {@link WorldWrites} (the World write choke point).
+ * scoped to this World. Keyed by `(worldId, typeId)`; `typeId` is the immutable `world.`-namespaced
+ * Entity Type key. Rows cascade with the World; writes route through {@link WorldWrites}.
  */
 export const worldTypes = sqliteTable(
   'world_types',

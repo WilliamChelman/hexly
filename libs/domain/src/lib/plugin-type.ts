@@ -2,10 +2,8 @@
  * Plugin types and `defineType` — the code-registered flavour of a Type Definition (CONTEXT.md →
  * Type Definition, ADR-0048). Its data twin, the World-scoped user-defined type, is `world-type.ts`.
  *
- * A declaration is framework-free because both sides consume it: the API resolves the Fields for
- * forward-only validation and faceting, the web adds the chrome and Views. `core.note` is declared
- * through the same {@link defineType} a bundled plugin uses — and every other type, the Map's
- * included, *is* a plugin's (ADR-0050) — so the plugin API stays exercised.
+ * A declaration is framework-free: both sides consume it — the API resolves the Fields for
+ * forward-only validation and faceting, the web adds the chrome and Views.
  */
 
 import { z } from 'zod';
@@ -31,9 +29,8 @@ const pluginTypeSchema = z.object({
 });
 
 /**
- * Declare a code-registered Entity Type — the constructor both a bundled plugin and the core go
- * through. Validates against the same Zod a user-defined type rides, so a malformed type (a bare id,
- * a duplicate Field key, an unknown data-type) throws at module load rather than at runtime.
+ * Declare a code-registered Entity Type. A malformed type (a bare id, a duplicate Field key, an
+ * unknown data-type) throws at module load rather than at runtime.
  */
 export function defineType(definition: {
   readonly id: string;
@@ -44,14 +41,10 @@ export function defineType(definition: {
 }
 
 /**
- * The one type the core declares, through {@link defineType} as a plugin's is: `core.note` declares no
- * Fields at all — a Note is nothing but its body. `label` is the untranslated fallback — the web
- * resolves the name through transloco.
+ * `core.note` declares no Fields at all — a Note is nothing but its body. `label` is the untranslated
+ * fallback; the web resolves the name through transloco.
  */
 export const CORE_NOTE_TYPE = defineType({ id: CORE_NOTE, label: 'Note' });
 
-/**
- * Every core type, for the registries that seed themselves from the code-registered set. One today: a
- * host's other types come from the plugins it bundles, the Map plugin's among them (ADR-0050).
- */
+/** Every core type, for the registries that seed themselves from the code-registered set. */
 export const CORE_TYPES: readonly PluginTypeDefinition[] = [CORE_NOTE_TYPE];

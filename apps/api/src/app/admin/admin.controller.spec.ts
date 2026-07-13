@@ -14,12 +14,6 @@ import { WorldsModule } from '../worlds/worlds.module';
 import { EntitiesModule } from '../entities/entities.module';
 import { ConfigModule } from '../config/config.module';
 
-/**
- * The Superadmin repair surface (ADR-0046, #180): Reindex. Separate from the Instance Admin
- * surface on purpose — the Admin tier reaches no Entity, and this route reaches every one of
- * them. These specs assert what is observable at the HTTP edge: who may call it, and that a
- * derived index thrown away comes back.
- */
 describe('Superadmin repair surface', () => {
   let app: INestApplication;
   let db: Db;
@@ -44,15 +38,7 @@ describe('Superadmin repair surface', () => {
 
   const PASSWORD = 'correct horse battery';
 
-  /**
-   * The Reindex is how an Entity that predates a derivation gains it. There is no pre-derivation
-   * Entity to seed against a current build, so the spec manufactures one the only honest way:
-   * save a document that expresses an edge, then throw the derived row away. Recomputing it is
-   * the whole contract.
-   *
-   * The walk outlives the request that starts it, so the spec does what the client does: accept
-   * the `202`, then poll until the job stops.
-   */
+  /** The walk outlives the request that starts it: accept the `202`, then poll until the job stops. */
   it('recomputes the edge index for every Entity, and reports how many it walked', async () => {
     await seedSuperadmin('ada@hexly.test', 'Ada');
     const ada = await signIn('ada@hexly.test');
@@ -90,12 +76,7 @@ describe('Superadmin repair surface', () => {
     expect(res.body).toMatchObject({ status: 'idle', walked: 0, failures: [] });
   });
 
-  /**
-   * The tier boundary. A `manage-users` holder is the interesting row: they hold the *account*
-   * surface, and the Reindex is content — so the role buys nothing here. The other row is the
-   * floor. Both verbs are gated at the class, so neither starting a walk nor watching one is
-   * reachable from the account tier (ADR-0047).
-   */
+  /** The account tier (`manage-users`) reaches no content, so neither verb is reachable from it (ADR-0047). */
   it.each([
     ['a manage-users holder', { roles: ['manage-users'] as InstanceRole[] }, 403],
     ['a plain user', {}, 403],

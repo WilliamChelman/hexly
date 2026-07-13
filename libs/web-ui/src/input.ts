@@ -1,10 +1,9 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 
 /**
- * A single-line text input — the shared sunken-well field styling. Uses an
- * attribute selector on the native `<input>`, so it keeps its type, value, form
- * participation and a11y. It is a void element, so it owns no template.
- * See ADR-0007.
+ * A single-line text input — the shared sunken-well field styling. Attribute
+ * selector on the native `<input>`, so it keeps its type, value, form
+ * participation and a11y. A void element, hence no template. See ADR-0007.
  *
  *   <input appInput value="The Reach of Aldermoor" />
  */

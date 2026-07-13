@@ -8,12 +8,9 @@ import { UsersService } from './users.service';
 
 /**
  * The account-management surface (ADR-0037, ADR-0047): the `manage-users` `/users`
- * routes. Imports {@link AuthModule} for the session guard and {@link AuthService}
- * (the shared provisioning trunk), {@link DbModule} for the DB token — the same
- * in-memory swap the specs rely on — and the two write-handle modules,
- * {@link EntitiesModule} and {@link WorldsModule}, through which a deleted account's
- * Entity grants and World memberships are purged (ADR-0045: the one write handle per
- * table). Reaches no content: the `manage-users` role has zero content powers.
+ * routes. {@link EntitiesModule} and {@link WorldsModule} are imported for the write
+ * handles that purge a deleted account's Entity grants and World memberships (ADR-0045).
+ * Reaches no content: the `manage-users` role has zero content powers.
  */
 @Module({
   imports: [AuthModule, DbModule, EntitiesModule, WorldsModule],

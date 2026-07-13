@@ -7,15 +7,12 @@ import { Input } from './input';
 
 /**
  * The shared server-side Entity picker (ADR-0025): a search box over the owner-scoped
- * `list({ q })` read, rendering matching Entities as pickable rows. Extracted from the
- * Inspector's Entity Link control so the World Dashboard's pin curation (#168) reuses
- * one search+pick surface. Presentation + search only — the consumer decides what a
- * pick *means* (link a Map element, pin an Entity) and owns the `query` (so it can reset
- * or reuse it, e.g. to name a create-and-link Entity). Projected content renders below
- * the option list, for consumer-specific actions like create-and-link.
+ * `list({ q })` read, rendering matching Entities as pickable rows. Presentation + search
+ * only — the consumer decides what a pick *means* (link a Map element, pin an Entity) and
+ * owns the `query`. Projected content renders below the option list, for consumer-specific
+ * actions like create-and-link.
  *
- * ponytail: no debounce — small owner lists, fine until list sizes force it (matches the
- * former inline picker).
+ * ponytail: no debounce — small owner lists, fine until list sizes force it.
  */
 @Component({
   selector: 'app-entity-search-picker',
@@ -68,12 +65,11 @@ export class EntitySearchPicker {
   /** The controlled query — the consumer owns it so it can reset or reuse it. */
   readonly query = input('');
   /**
-   * Scope the search to one World (ADR-0024). Omitted → the caller's whole owner scope
-   * (the Inspector's cross-map link picker). The Dashboard passes the active World so a
-   * pin can only be a same-World Entity, never one from another of the Owner's Worlds.
+   * Scope the search to one World (ADR-0024). Omitted → the caller's whole owner scope, i.e.
+   * results may come from any of the Owner's Worlds.
    */
   readonly worldId = input<string | undefined>(undefined);
-  /** Constrain results to these Entity Types — an Entity-Link Field's target-type constraint (#190). */
+  /** Constrain results to these Entity Types — e.g. an Entity-Link Field's target-type constraint. */
   readonly types = input<readonly string[] | undefined>(undefined);
 
   /** Every raw keystroke; the consumer commits it back to {@link query}. */

@@ -25,12 +25,10 @@ import { WorldsService } from './worlds.service';
 /**
  * Vault import (ADR-0033): unzip a `.zip` server-side and turn each markdown file into an Entity in
  * a brand-new World named after the upload — a plain Note, unless its frontmatter stamps the types
- * ({@link toTypes}). Runs synchronously
- * (a job queue is YAGNI at this scale). Two-pass (#147): pass 1 converts every file and
- * assigns it an id; pass 2 resolves each `[[wikilink]]` to the id of the note it names
- * (dangling when none matches) before persisting. Continue-on-error: a file that can't be
- * read or named is skipped and tallied, never aborting the import. The returned
- * {@link ImportSummary} is the primary "what did we lose" instrument.
+ * ({@link toTypes}). Runs synchronously. Two-pass: pass 1 converts every file and assigns it an id;
+ * pass 2 resolves each `[[wikilink]]` to the id of the note it names (dangling when none matches)
+ * before persisting. Continue-on-error: a file that can't be read or named is skipped and tallied,
+ * never aborting the import.
  */
 @Injectable()
 export class VaultImportService {
@@ -85,14 +83,10 @@ export class VaultImportService {
     let linksResolved = 0;
     let linksDangling = 0;
     let assetsStored = 0;
-    // One transaction for the whole persist pass: SQLite runs at synchronous=FULL (WAL),
-    // so a per-note implicit transaction would fsync once each — a big vault then pays
-    // hundreds of fsyncs. Batching collapses them to a single commit, and makes the *notes*
-    // all-or-nothing (no partially-populated note set if an insert throws mid-loop).
-    // Not a full rollback of the import: the World was already committed by mintWorld above,
-    // and storeImages' writeFileSync (below) isn't transactional — so a throw here leaves an
-    // empty World and any already-written asset files behind. That's
-    // acceptable for a synchronous single-operator import (the caller sees the 500 and retries).
+    // One transaction for the whole persist pass: SQLite runs at synchronous=FULL (WAL), so a
+    // per-note implicit transaction would fsync once each. Makes the *notes* all-or-nothing, but
+    // not the import: the World was already committed by mintWorld, and storeImages' writeFileSync
+    // isn't transactional — a throw here leaves an empty World and written asset files behind.
     this.db.transaction(() => {
       for (const note of notes) {
         const { resolved, dangling } = resolveLinks(note.doc, index);
@@ -140,8 +134,8 @@ export class VaultImportService {
    * Walk a converted doc's `image` nodes (mutating in place): a vault-relative src is resolved
    * against the vault's asset files, stored content-addressed (ADR-0034), and its src rewritten
    * to the served `/assets/...` capability URL. External URLs (`https://…`, `data:`) and images
-   * that resolve to no vault file are left untouched. Returns how many *new* assets it stored
-   * (dedup makes a repeat reference cost nothing), so the summary counts unique stored assets.
+   * that resolve to no vault file are left untouched. Returns how many *new* assets it stored — a
+   * deduped repeat reference does not count.
    */
   private storeImages(
     doc: ContentNode,
@@ -291,12 +285,9 @@ function resolveLinks(node: ContentNode, index: NoteIndex): { resolved: number; 
 }
 
 /**
- * Frontmatter `hexly.type` → the Entity's ordered Type set (#203). Ids are validated for shape and
- * applied; none is resolved against a registry, so a user-defined type — whose definition lives in
- * its World, not in the vault — lands like a plugin's.
- *
- * Anything not a well-formed set degrades to a plain Note rather than failing the file, and the
- * whole set goes: a half-applied one is a shape no author asked for.
+ * Frontmatter `hexly.type` → the Entity's ordered Type set. Ids are validated for shape only; none
+ * is resolved against a registry. Anything not a well-formed set degrades the *whole* set to a plain
+ * Note rather than failing the file — never half-applied.
  */
 function toTypes(raw: unknown): readonly EntityType[] {
   return typesSchema.catch([CORE_NOTE]).parse(Array.isArray(raw) ? raw : []);

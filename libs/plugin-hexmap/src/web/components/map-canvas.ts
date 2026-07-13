@@ -241,10 +241,8 @@ export class MapCanvas {
     // Reading the signals inside renderFrame() registers them as dependencies.
     effect(() => this.renderFrame());
 
-    // Theme switches re-read the renderer's cached palette — the one place that
-    // pays for a style read, keeping the per-frame path free of
-    // `getComputedStyle`. Render inputs are read untracked so only a theme
-    // switch drives this costlier path.
+    // Render inputs are read untracked: only a theme switch may drive this path,
+    // which re-reads the palette via `getComputedStyle`.
     effect(() => {
       this.theme.theme();
       if (!this.renderer) return;

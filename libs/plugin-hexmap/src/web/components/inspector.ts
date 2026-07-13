@@ -9,12 +9,7 @@ import { inputValue } from '../utils/dom';
 import { HexMapStore, Selection } from '../services/hexmap-store';
 import { RegionFields } from './region-fields';
 
-/**
- * The Selection kinds in the order the multi-selection breakdown lists them, each
- * paired with its singular and plural translation keys so a row of count 1 reads
- * "1 hex" not "1 hexes". A single table so the breakdown can't list a kind the
- * set never holds, nor drift from the labels (ADR-0017).
- */
+/** The Selection kinds, in the order the multi-selection breakdown lists them. */
 const SELECTION_KINDS: readonly {
   kind: Selection['kind'];
   /** ICU plural key — renders both the count and the (localized) noun. */
@@ -27,10 +22,8 @@ const SELECTION_KINDS: readonly {
 ];
 
 /**
- * The membership-paint directions, as the Inspector's Add/Remove toggle pair,
- * kept in one data table so the two buttons can't drift. The Inspector is the
- * only place a Region's membership direction is set now that the Region tool's
- * legend is gone (issue #38).
+ * The membership-paint directions, as the Inspector's Add/Remove toggle pair. The
+ * Inspector is the only place a Region's membership direction is set.
  */
 const DIRECTIONS = [
   {
@@ -53,10 +46,9 @@ interface SelectedEntity {
   /** The hex's terrain id, for the identity swatch colour. */
   readonly terrain: TerrainId;
   /**
-   * The translation key for the entity's built-in catalog label, keyed by its
-   * stable id (`map.terrain.<id>` / `map.feature.<id>`, ADR-0014): the
-   * Feature's key for a Feature selection, else the Terrain's. The catalog label
-   * is localized at this UI layer, not in the framework-agnostic domain lib.
+   * The translation key for the entity's built-in catalog label, keyed by its stable
+   * id (`map.terrain.<id>` / `map.feature.<id>`, ADR-0014): the Feature's key for a
+   * Feature selection, else the Terrain's.
    */
   readonly detailKey: string;
   /** The hex's current name, or `''` when unnamed — what the Name input shows. */
@@ -64,16 +56,12 @@ interface SelectedEntity {
 }
 
 /**
- * The right rail. It reflects the single selection (issue #28): a selected Label
- * gets its full editor — text, size, rotation and world position, plus Delete
- * (issue #10); a selected Region gets a name, color, and Delete editor (issue
- * #36) — the only place a Region's details are edited (CONTEXT.md → Inspector);
- * while a selected Hex or Feature gets a minimal panel showing its identity and a
- * Delete action. The entity panel's Delete dispatches through the store's single
- * {@link HexMapStore.deleteSelected} gesture (issue #29): a Hex erases the whole
- * record, a Feature clears only its feature, a Label is removed, a Region is
- * destroyed. Every field commits through the {@link HexMapStore}, so each edit is
- * undoable and persists. With nothing selected it shows a hint instead.
+ * The right rail: the editor for the current selection — a Label, a Region, or a
+ * Hex/Feature — and a hint when nothing is selected. It is the only place a Region's
+ * details are edited (CONTEXT.md → Inspector). Every field commits through the
+ * {@link HexMapStore}, so each edit is undoable and persists. Delete dispatches through
+ * {@link HexMapStore.deleteSelected}: a Hex erases the whole record, a Feature clears
+ * only its feature, a Label is removed, a Region is destroyed.
  */
 @Component({
   selector: 'app-inspector',
@@ -368,25 +356,18 @@ export class Inspector {
   protected readonly directions = DIRECTIONS;
 
   /**
-   * The selected Hex or Feature resolved for display, or `null` when the
-   * selection is a Label, empty, or points at a coordinate that is no longer
-   * painted (e.g. after an undo). Identity *display* — the terrain and feature
-   * labels — is presentation, resolved here; the selection precedence itself
-   * lives in the store (issue #28).
+   * The selected Hex or Feature resolved for display, or `null` when the selection is
+   * a Label, empty, or points at a coordinate that is no longer painted (e.g. after an
+   * undo).
    */
   protected readonly selectedEntity = computed<SelectedEntity | null>(() => {
     const sel = this.store.selection();
-    // Only a Hex/Feature selection drives this identity panel: a Label has the
-    // label editor and a Region its own Inspector editor (issue #36). A positive
-    // check keeps any future Selection kind out of this panel by default and
-    // narrows `sel` to the coordinate-bearing variants used just below.
+    // A positive check keeps any future Selection kind out of this panel by default,
+    // and narrows `sel` to the coordinate-bearing variants used just below.
     if (sel?.kind !== 'hex' && sel?.kind !== 'feature') return null;
     const hex = this.store.document().hexes[coordKey(sel.coord)];
     if (!hex) return null;
-    // Resolve the built-in catalog label at the UI layer, keyed by stable id
-    // (ADR-0014). A Feature selection shows the feature's label, else the hex's
-    // terrain; the ids are schema-constrained to the built-ins, so the key
-    // always resolves.
+    // The ids are schema-constrained to the built-ins, so the key always resolves.
     const detailKey = hex.feature ? featureKey(hex.feature.ref) : terrainKey(hex.terrain);
     return {
       kind: sel.kind,
@@ -399,12 +380,9 @@ export class Inspector {
   });
 
   /**
-   * The multi-selection summary — the set's size and a per-kind breakdown — or
-   * `null` when fewer than two entities are selected (a single selection has its
-   * own editor; an empty selection the hint). Resolved from the live
-   * {@link HexMapStore.selections} set, so it self-heals as members drop out
-   * (ADR-0017). Kinds the set doesn't hold are filtered away, so the breakdown
-   * lists only what is actually selected.
+   * The multi-selection summary — the set's size and a per-kind breakdown — or `null`
+   * when fewer than two entities are selected. Kinds the set doesn't hold are filtered
+   * away, so the breakdown lists only what is actually selected.
    */
   protected readonly selectionSummary = computed(() => {
     const sels = this.store.selections();

@@ -2,13 +2,10 @@ import { Directive, ElementRef, effect, inject, input } from '@angular/core';
 import type { Editor } from '@tiptap/core';
 
 /**
- * Mounts a TipTap {@link Editor}'s editable surface into the host element.
+ * Mounts a TipTap {@link Editor}'s editable surface (a detached `<div>`) into the host element.
  *
- * TipTap renders into a detached `<div>` by default; this relocates that surface into
- * our host. Done in an `effect` (not `ngOnInit`), so it re-runs when the `editor`
- * instance is swapped — the seed reload in {@link ContentEditor} recreates the editor, and
- * `replaceChildren` drops the old surface and mounts the new one in one step. ngx-tiptap
- * mounted only once in `ngOnInit` and couldn't react to that swap; this replaces it.
+ * Mounted in an `effect`, not `ngOnInit`: the `editor` instance can be swapped (the seed reload
+ * in {@link ContentEditor} recreates it), and the mount must follow the swap.
  */
 @Directive({ selector: '[appTiptap]' })
 export class TiptapDirective {

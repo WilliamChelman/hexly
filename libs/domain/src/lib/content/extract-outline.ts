@@ -1,8 +1,4 @@
-/**
- * The heading Outline of an Entity's Content — derived, never stored. Knows the
- * `heading` node and its `level` attr, plus the `entityLink` atom's visible text,
- * so a heading made only of an @mention still lists.
- */
+/** The heading Outline of an Entity's Content — derived, never stored. */
 
 import { Content } from '../entity';
 import { ContentNode, visit } from './content-node';
@@ -28,10 +24,10 @@ export function extractOutline(content: Content): OutlineHeading[] {
 }
 
 /**
- * Concatenate every `text` under a heading, plus an `entityLink` atom's rendered
- * text (`display ?? label`). The atom carries no `text` field but shows a name in
- * the DOM; skipping it would make a mention-only heading read as empty and slip the
- * Outline panel's positional index (row i ↔ i-th rendered heading).
+ * Concatenate every `text` under a heading, plus an `entityLink` atom's rendered text.
+ * The atom carries no `text` field but shows a name in the DOM; skipping it would make a
+ * mention-only heading read as empty and slip the Outline panel's positional index
+ * (row i ↔ i-th rendered heading).
  */
 function headingText(heading: ContentNode): string {
   let text = '';

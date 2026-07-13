@@ -5,13 +5,11 @@ import { LinkedEntity } from '@hexly/domain';
 
 /**
  * One row of the References panel: an Entity at the far end of a link, plus the Link Descriptor
- * characterising it. Both directions render through here — a *References* row and a *Referenced by*
- * row differ only in which end of the edge they were handed.
+ * characterising it. Both directions render through here.
  *
- * `entity` of `null` is the outbound dangling case: a target that is deleted, or that this viewer
- * cannot read. It renders non-navigable under the same `noteView.entityLink.dangling` string a
- * Content link shows (#78), so the two surfaces cannot drift apart. An inbound row never passes
- * `null` — its sources are access-filtered server-side.
+ * `entity` of `null` is the outbound dangling case — a target that is deleted, or that this viewer
+ * cannot read — rendered non-navigable under the same dangling string a Content link shows. An
+ * inbound row never passes `null`: its sources are access-filtered server-side.
  */
 @Component({
   selector: 'app-reference-row',

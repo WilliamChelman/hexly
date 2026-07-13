@@ -1,13 +1,7 @@
 import { createEntity, enterLibrary, expect, flushSave, test, savedGrid } from './fixtures';
 
 /**
- * The Region select-and-edit journey (issue #39): a Region selected on the canvas
- * with the universal Select tool, renamed in the Inspector — the only place a
- * Region's details are edited (CONTEXT.md → Inspector, ADR-0011) — survives a save
- * and reload. Like the other entity journeys it crosses every seam: canvas
- * selection, the Inspector edit, a versioned save, and a load on reload. We prove
- * the round trip with a direct API read of the persisted document (ADR-0009) and
- * confirm the Inspector re-renders the renamed Region after re-selecting it.
+ * The Inspector is the only place a Region's details are edited (CONTEXT.md → Inspector, ADR-0011).
  */
 test('selects a Region on the canvas, renames it in the Inspector, and the rename survives a reload', async ({
   page,

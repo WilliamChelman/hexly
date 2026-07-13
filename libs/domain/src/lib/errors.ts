@@ -1,9 +1,7 @@
 /**
- * Structured API error bodies shared by the server and the web. A refused
- * mutation returns `{ code }` — a stable, localizable identifier — never prose,
- * so the web maps a code to its own copy instead of string-matching English.
- * The HTTP status still carries the category. (The Instance Admin surface has
- * its own {@link UsersErrorCode} vocabulary in `./admin`.)
+ * Structured API error bodies. A refused mutation returns `{ code }` — a stable, localizable
+ * identifier — never prose; the HTTP status carries the category. (The Instance Admin surface
+ * has its own {@link UsersErrorCode} vocabulary in `./admin`.)
  */
 export interface ApiError {
   readonly code: string;
@@ -32,9 +30,9 @@ export const EntityErrorCode = {
   /** No World the caller may create an Entity in (404). */
   NoWritableWorld: 'no-writable-world',
   /**
-   * An active typed edit failed the forward-only Field gate — a required Field was
-   * omitted or a value mismatched its data-type (400, ADR-0048). `data.fields`
-   * carries the offending `{ key, code }` list so the web can point at each one.
+   * An active typed edit failed the forward-only Field gate — a required Field was omitted or a
+   * value mismatched its data-type (400, ADR-0048). `data.fields` carries the offending
+   * `{ key, code }` list.
    */
   InvalidFields: 'invalid-fields',
 } as const;

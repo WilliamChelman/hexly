@@ -169,10 +169,6 @@ describe('planMove — regions stay put', () => {
 
 describe('planMove — group rigid translation onto Void', () => {
   it('moves every selected hex by the one offset, keeping the cluster shape', () => {
-    // Two painted hexes picked together; a clear destination region (Void). Each
-    // selected source is snapshotted, its origin cleared, and its whole record
-    // written at source + offset — the rigid translation that keeps the internal
-    // shape (CONTEXT.md → "a group move is a rigid translation by one offset").
     const a = { q: 0, r: 0 };
     const b = { q: 1, r: 0 };
     const doc = docWith({
@@ -203,10 +199,8 @@ describe('planMove — group rigid translation onto Void', () => {
 
 describe('planMove — intra-group overlap (shift-by-one)', () => {
   it('shifts a blob by one cell without fighting itself: the vacated tail clears, the rest is reclaimed', () => {
-    // A,B are a contiguous pair; nudging right by one lands A on B's old cell. That
-    // is the group shifting onto its own path, not a collision — B's source is a
-    // group destination, so it is written (not cleared), and only the tail (0,0)
-    // that nothing reclaims goes back to Void.
+    // Nudging the contiguous pair right by one lands A on B's old cell: the group
+    // shifting onto its own path, not a collision.
     const a = { q: 0, r: 0 };
     const b = { q: 1, r: 0 };
     const doc = docWith({
@@ -234,10 +228,6 @@ describe('planMove — intra-group overlap (shift-by-one)', () => {
 
 describe('planMove — group collision swaps a non-selected occupant', () => {
   it('displaces the occupant to d − offset when that cell is free', () => {
-    // A two-hex group lands on a non-selected occupant at one destination. The
-    // occupant is pushed back by the inverse offset to a free cell — here a source
-    // the group is vacating — so the drop stays non-destructive (CONTEXT.md →
-    // "a destination occupied by a non-selected hex swaps that occupant back").
     const a = { q: 0, r: 0 };
     const b = { q: 0, r: 1 };
     const occupant = { q: 3, r: 0 };
@@ -271,9 +261,7 @@ describe('planMove — group collision swaps a non-selected occupant', () => {
 describe('planMove — self-overlap blocks the contested cell', () => {
   it('blocks a destination whose occupant can only go where the group is landing', () => {
     // A,B nudge right by one. B lands on a non-selected occupant X at (2,0); pushing
-    // X back by the inverse offset targets (1,0) — but that is exactly where A is
-    // landing. The geometry is ambiguous, so the cell blocks (CONTEXT.md →
-    // "where d − offset is occupied by the moving group, that cell is blocked").
+    // X back by the inverse offset targets (1,0) — exactly where A is landing.
     const a = { q: 0, r: 0 };
     const b = { q: 1, r: 0 };
     const x = { q: 2, r: 0 };
@@ -353,10 +341,6 @@ describe('planMove — region footprint translation', () => {
 
 describe('planMove — mixed selection', () => {
   it('translates hexes and a region footprint together by the same offset', () => {
-    // A hex and a region picked together translate by the same offset. Labels are
-    // not the planner's concern at all — they are free-positioned pixels that never
-    // collide, so the MoveSelection it reads carries no labels (the caller nudges
-    // them by the equivalent pixels).
     const a = { q: 0, r: 0 };
     const doc: HexMap = {
       hexes: { [coordKey(a)]: { terrain: 'forest' } },

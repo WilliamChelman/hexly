@@ -5,11 +5,9 @@ import { PublicLink } from '@hexly/domain';
 import { Db } from '../db/db';
 
 /**
- * A Public-Link table (`world_links` / `entity_links`, ADR-0037, #162): an unguessable token
- * as primary key (`id`), keyed to one target by a foreign key, at most one active row per
- * target. The get / mint / revoke logic is identical across the two link surfaces — only the
- * table, its FK, and the ownership gate differ — so it lives here once, parameterized, and each
- * service supplies its own gate around these calls.
+ * A Public-Link table (`world_links` / `entity_links`, ADR-0037): an unguessable token as
+ * primary key (`id`), keyed to one target by a foreign key, at most one active row per target.
+ * The ownership gate is not part of this — each service supplies its own around these calls.
  */
 export interface PublicLinkTable {
   readonly table: SQLiteTable;
@@ -29,8 +27,8 @@ export function readPublicLink(db: Db, link: PublicLinkTable, targetId: string):
 
 /**
  * Mint (or return the existing) Public Link for the target: one active link per target, so a
- * re-mint returns the current token rather than rotating it (rotate = revoke + re-mint), keeping
- * the shared URL stable. The token is an anonymous Viewer grant that pierces `private` (ADR-0004).
+ * re-mint returns the current token rather than rotating it (rotate = revoke + re-mint). The
+ * token is an anonymous Viewer grant that pierces `private` (ADR-0004).
  */
 export function mintPublicLink(db: Db, link: PublicLinkTable, targetId: string): PublicLink {
   const existing = readPublicLink(db, link, targetId);

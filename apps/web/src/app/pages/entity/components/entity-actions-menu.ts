@@ -5,10 +5,10 @@ import { EntitySession } from '../services/entity-session';
 import { ActiveWorld } from '@hexly/web-core';
 
 /**
- * The open Entity's actions overflow menu (like the account menu): Visibility, Pin, and
- * Share behind one trigger. The trigger shows only when the caller has at least one of
- * them; each item is independently guarded. Visibility and Pin act in place; Share is the
- * header's dialog surface, so this only emits {@link share} and the header opens it.
+ * The open Entity's actions overflow menu: Visibility, Pin, and Share behind one trigger.
+ * The trigger shows only when the caller has at least one of them; each item is independently
+ * guarded. Visibility and Pin act in place; Share is the header's dialog surface, so this only
+ * emits {@link share} and the header opens it.
  *
  * `display:contents` (host) so the trigger sits directly in the page header's action row.
  */
@@ -106,8 +106,7 @@ export class EntityActionsMenu {
 
   /**
    * Whether the caller owns the open Entity (ADR-0037) — gates the Share item, whose dialog
-   * (owners, grants, Public Link) is owner-only server-side. A writer who isn't an Owner never
-   * sees it, so it can't open onto a dialog that only 403s.
+   * (owners, grants, Public Link) is owner-only server-side.
    */
   protected readonly manageable = this.session.manageable;
 
@@ -115,9 +114,8 @@ export class EntityActionsMenu {
   protected readonly shared = computed(() => this.session.current()?.visibility === 'shared');
 
   /**
-   * Whether the caller is a World Owner (`manage` Right on the active World, ADR-0039) —
-   * gates the Pin toggle, matching the World Dashboard's curation controls (#168). A
-   * non-Owner's pin would 403 server-side, so the toggle stays hidden entirely.
+   * Whether the caller is a World Owner (`manage` Right on the active World, ADR-0039) — gates the
+   * Pin toggle; a non-Owner's pin would 403 server-side, so the toggle stays hidden entirely.
    */
   protected readonly canPin = computed(() => this.activeWorld.world()?.rights.includes('manage') ?? false);
 
@@ -128,9 +126,8 @@ export class EntityActionsMenu {
   });
 
   /**
-   * Pin/unpin the open Entity to the World Dashboard (ADR-0043, #169): add or drop its id and
-   * send the pin set wholesale via {@link ActiveWorld.commitPins}, the shared home the Dashboard
-   * curation controls also use — so both re-pin the World and toast a rejected curation alike.
+   * Pin/unpin the open Entity to the World Dashboard (ADR-0043): the pin set is sent wholesale via
+   * {@link ActiveWorld.commitPins}, never as a single-id delta.
    */
   protected togglePin(): void {
     const world = this.activeWorld.world();

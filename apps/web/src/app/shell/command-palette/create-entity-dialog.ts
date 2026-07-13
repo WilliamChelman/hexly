@@ -28,13 +28,10 @@ import { EntityTypesEditor } from '../../pages/entity/components/entity-types-ed
 import { FieldControl } from '@hexly/web-entity/controls';
 
 /**
- * The create-Entity flow behind the `>`-prefix Create Note / Create Map
- * Commands (ADR-0032): name + World select, prefilled to
- * `activeWorld() ?? worlds()[0]`. A separate, more explicit flow from the
- * Inspector's inline create-and-link (EntityLink) — not a replacement for it.
- * Mounted once alongside {@link CommandPalette}; driven by
- * {@link CreateEntityDialogState} rather than route/component state so a
- * Command's `run()` can open it without a reference to this component.
+ * The create-Entity flow behind the `>`-prefix Create Note / Create Map Commands (ADR-0032): name +
+ * World select, prefilled to `activeWorld() ?? worlds()[0]`. Mounted once alongside
+ * {@link CommandPalette} and driven by {@link CreateEntityDialogState}, so a Command's `run()` can
+ * open it without a reference to this component.
  *
  * The Command seeds one primary type; the embedded {@link EntityTypesEditor} lets the author pick
  * more (ADR-0048), and required Fields are collected below, gating Create until they validate.
@@ -148,12 +145,10 @@ export class CreateEntityDialog {
   private readonly fields = computed(() => this.typeRegistry.resolveFields(this.types()));
 
   /**
-   * The required Fields the author must supply before creating — rendered as the gated form (#189).
+   * The required Fields the author must supply before creating.
    *
-   * A **Structured Field** is never among them, whatever it was flagged: it is edited on its own View,
-   * not typed into a form row (ADR-0050), so there is no control here to collect it with — the same
-   * rule the generic Field view applies. Its value is minted empty at create instead, and the Entity
-   * opens on the View that can actually draw it.
+   * A **Structured Field** is never among them, whatever it was flagged: it is edited on its own
+   * View, not typed into a form row (ADR-0050). Its value is minted empty at create instead.
    */
   protected readonly requiredFields = computed(() =>
     this.fields().filter((field) => field.required && !isStructuredDataType(field.dataType)),

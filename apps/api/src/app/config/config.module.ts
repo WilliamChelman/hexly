@@ -7,10 +7,8 @@ export const HEXLY_CONFIG = Symbol('HEXLY_CONFIG');
 
 /**
  * Loads `hexly.yml` from the Data Directory once at boot and exposes it under
- * {@link HEXLY_CONFIG} (ADR-0036). Marked `@Global()` so any module — including
- * `MulterModule.registerAsync` for the upload limit — can inject it without
- * re-importing. Mirrors {@link DbModule}: one sync read at startup, no async DI.
- * An invalid file throws here, failing boot with the offending key named.
+ * {@link HEXLY_CONFIG} (ADR-0036). One sync read at startup, no async DI; an
+ * invalid file throws here, failing boot with the offending key named.
  */
 @Global()
 @Module({

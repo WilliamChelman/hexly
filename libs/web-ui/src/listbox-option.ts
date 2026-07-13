@@ -11,10 +11,9 @@ import {
 
 /**
  * One selectable row — the `<li><button role="option">` a listbox repeats. Attribute
- * selector on the `<li>` itself so the `<ul>` (in {@link Listbox}) keeps a valid, a11y-clean
- * `ul > li` structure; the button and its projected label live in the template. `mousedown`
- * is swallowed so the click doesn't first blur whatever holds focus (losing the selection the
- * pick acts on); the caller wires `(pick)` to its own `select(item)`.
+ * selector on the `<li>` itself so the `<ul>` (in {@link Listbox}) keeps a valid `ul > li`
+ * structure. `mousedown` is swallowed so the click doesn't first blur whatever holds focus
+ * (losing the selection the pick acts on).
  */
 @Component({
   selector: 'li[appListboxOption]',

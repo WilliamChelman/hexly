@@ -1,11 +1,6 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 
-/**
- * A hairline divider drawn like a map rule (a faint inner edge). Renders an
- * `<hr>`. See ADR-0007.
- *
- *   <hr appRule />
- */
+/** A hairline divider drawn like a map rule (a faint inner edge). See ADR-0007. */
 @Component({
   selector: 'hr[appRule]',
   changeDetection: ChangeDetectionStrategy.OnPush,

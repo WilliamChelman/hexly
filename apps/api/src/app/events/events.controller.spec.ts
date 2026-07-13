@@ -13,10 +13,9 @@ import { WorldsService } from '../worlds/worlds.service';
 import { EventsModule } from './events.module';
 
 /**
- * Seam A (ADR-0044, #173): the SSE nudge bus over the wire. These tests open a real
- * `text/event-stream` and read pushed frames — the net-new bit is {@link openSse}, a frame
- * reader that composes the existing supertest cookie login (supertest itself buffers to
- * end-of-response, which an SSE stream never reaches).
+ * The SSE nudge bus over the wire (ADR-0044). These tests read pushed frames from a real
+ * `text/event-stream` via {@link openSse} — supertest buffers to end-of-response, which an SSE
+ * stream never reaches.
  */
 describe('Events (SSE nudge bus) endpoints', () => {
   let app: INestApplication;
@@ -58,9 +57,8 @@ describe('Events (SSE nudge bus) endpoints', () => {
   }
 
   /**
-   * Open the SSE stream and read parsed frames one at a time. `next()` resolves the next
-   * complete `event:/data:` frame; `close()` cancels the reader. Frames are `{ event, data }`
-   * with `data` JSON-parsed.
+   * `next()` resolves the next complete `event:/data:` frame as `{ event, data }` with `data`
+   * JSON-parsed; `close()` cancels the reader.
    */
   async function openSse(cookie: string) {
     return openSseAt('/events', { cookie });
@@ -313,13 +311,6 @@ describe('Events (SSE nudge bus) endpoints', () => {
     await carol.sse.close();
   });
 
-  /**
-   * The eviction ADR-0044 promised and never tested (ADR-0045). `removeGrant` deleted the row and
-   * returned, so a Viewer live-following a `private` Entity through an entity-level grant kept
-   * following it after the grant was revoked — the precise scenario live-eviction exists for.
-   * The structural cause: `emitEntityChange(id, version, updatedAt)` demanded two facts a grant
-   * change does not possess, so the ACL mutations simply never called it.
-   */
   it('evicts a grantee following a private Entity when the Owner revokes the grant', async () => {
     const carolId = await app.get(AuthService).seedUser('carol@hexly.test', 'lovelace engine', 'Carol');
     const adaCookie = await sessionCookie('ada@hexly.test', 'correct horse');
@@ -384,11 +375,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     await sse.close();
   });
 
-  /**
-   * Seam B principal (ADR-0044, #175): a Public Link *token* opens the stream in place of a
-   * session cookie — the anonymous audience. Ada authors a note and mints its per-entity link;
-   * the token is the grant, resolving the same single access seam a `GET /public/…` does.
-   */
+  /** A note plus its per-entity Public Link token — the token stands in for a session cookie. */
   async function linkedEntity() {
     const cookie = await sessionCookie('ada@hexly.test', 'correct horse');
     const created = await request(app.getHttpServer())
@@ -794,11 +781,6 @@ describe('Events (SSE nudge bus) endpoints', () => {
     await sse.close();
   });
 
-  /**
-   * ADR-0044 deferred this: a World delete cascaded its Entities away but emitted only the World
-   * event, so a follower watching one of those Entities sat on a ghost row until it happened to
-   * reload. The cascade now routes through EntityWrites and nudges per Entity (ADR-0045).
-   */
   it('evicts a follower of an Entity when the Entity’s World is deleted', async () => {
     const adaCookie = await sessionCookie('ada@hexly.test', 'correct horse');
     const created = await request(app.getHttpServer())
@@ -864,11 +846,9 @@ describe('Events (SSE nudge bus) endpoints', () => {
   });
 
   it('nudges an existing follower on an additive membership change (promotion), without touching updatedAt', async () => {
-    // A World Viewer already follows the World; promoting them to Owner grants `manage`, so the
-    // additive membership path must nudge too (not only removals) or their UI stays stale until a
-    // focus-refetch. `seq` carries the freshness, so `updatedAt` need not lie: before ADR-0045 the
-    // bump was the only way to make the nudge read as newer, and a World rose in the World Index's
-    // "recently updated" order merely because someone was added to it.
+    // Promoting a Viewer to Owner grants `manage`, so the additive membership path must nudge too,
+    // not only removals. Freshness rides `seq`, so `updatedAt` stays untouched — a membership
+    // change must not raise the World in the "recently updated" order.
     const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob');
     const adaCookie = await sessionCookie('ada@hexly.test', 'correct horse');
     const bobCookie = await sessionCookie('bob@hexly.test', 'hunter2 stationery');
@@ -901,15 +881,9 @@ describe('Events (SSE nudge bus) endpoints', () => {
   });
 
   /**
-   * The World-membership fan-out (ADR-0045). Rights on a `shared` Entity derive from the World's
-   * membership set — `canWrite` = `owner ∨ (shared ∧ world-owner)` — so promoting Bob to World
-   * Owner grants him `edit`/`delete` on every shared Entity in it. Nothing told his open Entity
-   * view: `bumpAndNudge` moved the World's `seq` and stopped there, so his Save button never
-   * appeared. That is the "Rights never refreshed" defect ADR-0045 made unstatable for entity
-   * grants, surviving one level up on the World path.
-   *
-   * He follows the **Entity** ref alone here — nothing watches the World — so the nudge can only
-   * arrive if the membership write fanned out to it.
+   * Rights on a `shared` Entity derive from the World's membership set (`canWrite` =
+   * `owner ∨ (shared ∧ world-owner)`). Bob follows the **Entity** ref alone here — nothing watches
+   * the World — so the nudge can only arrive if the membership write fanned out to it.
    */
   it('nudges a follower of a shared Entity when they are promoted to Owner of its World', async () => {
     const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob');
@@ -958,10 +932,7 @@ describe('Events (SSE nudge bus) endpoints', () => {
     await bob.sse.close();
   });
 
-  /**
-   * The other side of the same fan-out: losing World membership ends read access to its `shared`
-   * Entities, so a follower of one must be evicted, not merely told the World changed.
-   */
+  /** Losing World membership ends read access to its `shared` Entities: evict, not merely nudge. */
   it('evicts a follower of a shared Entity when they are removed from its World', async () => {
     const bobId = await app.get(AuthService).seedUser('bob@hexly.test', 'hunter2 stationery', 'Bob');
     const adaCookie = await sessionCookie('ada@hexly.test', 'correct horse');

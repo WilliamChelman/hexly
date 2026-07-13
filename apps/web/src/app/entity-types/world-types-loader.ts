@@ -7,11 +7,9 @@ import { TypeDefinition, userTypeViews } from '@hexly/web-entity';
 import { TypeRegistry } from './type-registry';
 
 /**
- * Projects the active World's user-defined types into the root {@link TypeRegistry} (ADR-0048, #191),
- * so every type-aware surface (create dialog, Type facet, generic Field View) resolves them without a
- * second World-scoped source. On a World change it fetches the World's types, registers each, and
- * unregisters the previous set — so one World's types never linger into another. The World layout
- * injects it so it lives while a World is open.
+ * Projects the active World's user-defined types into the root {@link TypeRegistry} (ADR-0048). On a
+ * World change it registers that World's types and unregisters the previous set, so one World's types
+ * never linger into another. The World layout injects it so it lives while a World is open.
  */
 @Injectable({ providedIn: 'root' })
 export class WorldTypesLoader {
@@ -62,11 +60,9 @@ export class WorldTypesLoader {
 }
 
 /**
- * Project a user-defined {@link AvailableType} onto a {@link TypeDefinition}: its authored **View**
- * order, its Field schema, and its authored name as `labelText`. It declares **no** transloco
- * `labels` — a user-defined type ships no copy, so every label it shows is that authored name,
- * resolved through {@link TypeRegistry.name}/`chromeLabel`. Its `views` is the same list a plugin
- * type declares in code, so the registry resolves both down one path (#201).
+ * Project a user-defined {@link AvailableType} onto a {@link TypeDefinition}. It declares **no**
+ * transloco `labels` — a user-defined type ships no copy, so every label it shows is its authored
+ * name, resolved through {@link TypeRegistry.name}/`chromeLabel`.
  */
 function toDefinition(type: AvailableType): TypeDefinition {
   return {

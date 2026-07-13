@@ -132,11 +132,8 @@ describe('EntityBrowser', () => {
   });
 
   it('renders entities in the server-returned order, never re-sorted client-side (#154)', () => {
-    // The server owns ordering now: bm25 relevance while a query is active, updatedAt
-    // desc otherwise. The browser must render the page verbatim — the old client-side
-    // updatedAt re-sort would clobber relevance rank once a query narrows the set.
-    // Here the server deliberately returns the lower updatedAt first; the browser must
-    // NOT hoist the newer one to the top.
+    // The server owns ordering (bm25 relevance under a query, updatedAt desc otherwise) and the
+    // browser renders the page verbatim. Here the server returns the lower updatedAt first.
     const fixture = renderWith([
       summary({ id: 'first', name: 'Aldermoor', updatedAt: 100 }),
       summary({ id: 'second', name: 'The Whisperwood', updatedAt: 300 }),

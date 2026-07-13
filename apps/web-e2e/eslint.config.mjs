@@ -3,10 +3,8 @@ import baseConfig from '../../eslint.config.mjs';
 export default [
   ...baseConfig,
   {
-    // The e2e project drives the real web app, so it may reuse the app's own
-    // source helpers — the pretty-URL codec (web-core) and the View-instance codec
-    // (web-entity), both framework-free — directly by file path, rather than
-    // duplicating them or dragging in the Angular barrel.
+    // The e2e project drives the real web app, so it may reuse the app's own framework-free
+    // helpers (pretty-URL codec, View-instance codec) directly by file path.
     files: ['**/*.ts'],
     rules: {
       '@nx/enforce-module-boundaries': [

@@ -1,14 +1,11 @@
 import { FeatureId, TerrainId } from '../../lib';
 
 /**
- * The i18n keys for the built-in catalog labels, keyed by their stable `id`
- * (`map.terrain.<id>` / `map.feature.<id>`, ADR-0014). The label is
- * localized at this UI layer, not in the framework-agnostic domain lib.
- *
- * The id is schema-constrained to the built-in palette/library
+ * i18n keys for the built-in catalog labels, keyed by their stable `id`
+ * (`map.terrain.<id>` / `map.feature.<id>`, ADR-0014). The id is
+ * schema-constrained to the built-in palette/library
  * (`terrainIdSchema`/`featureIdSchema`), so every stored id resolves to a real
- * key — no fallback guard is needed. These centralize the key construction the
- * inspector, map-canvas readout, and tool palette all share.
+ * key and no fallback guard is needed.
  */
 export const terrainKey = (id: TerrainId): string => `map.terrain.${id}`;
 

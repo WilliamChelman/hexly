@@ -2,16 +2,13 @@ import { FieldSchema, isFieldViewPlacement, isStructuredDataType, ViewPlacement 
 import { CORE_VIEW_CONTENT, CORE_VIEW_FIELDS } from './view-definition';
 
 /**
- * The **View** order a user-defined type affords (ADR-0050, #201): its Fields, then its Content, then
- * each **Structured Field** its author chose to show, in declaration order. The whole of what a World
- * Owner can place — a type shipping no code resolves nothing else.
+ * The **View** order a user-defined type affords (ADR-0050): its Fields, then its Content, then each
+ * **Structured Field** its author chose to show, in declaration order. A type shipping no code
+ * resolves nothing else.
  *
- * The map goes last, so adding a battlemap to a `world.deity` does not change what a deity opens on.
- * A plugin type places its Fields' Views by hand and may choose otherwise: `core.hexmap` places its
- * grid first, and opens on its map.
- *
- * Called from both directions of the same fact — the World Types editor composes the list a "Show as
- * a view" toggle authors, and the loader composes the default for a type whose author named no order.
+ * Structured Views go last, so adding a battlemap to a `world.deity` does not change what a deity
+ * opens on. A plugin type places its Fields' Views by hand and may choose otherwise: `core.hexmap`
+ * places its grid first, and opens on its map.
  */
 export function userTypeViews(
   fields: readonly FieldSchema[],

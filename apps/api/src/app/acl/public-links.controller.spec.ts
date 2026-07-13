@@ -11,12 +11,9 @@ import { WorldsModule } from '../worlds/worlds.module';
 import { PublicLinksModule } from './public-links.module';
 
 /**
- * Public Links (ADR-0037, #162): the unauthenticated read surface. An Owner mints a
- * token-scoped, revocable link; a reader with no account follows it to a strictly
- * read-only view. A per-entity link pierces `private` (an anonymous Viewer grant); a
- * World link serves only that World's `shared` Entities. These specs assert the
- * externally observable lifecycle across the guarded mint/revoke routes and the
- * unauthenticated token routes.
+ * Public Links (ADR-0037): an Owner mints a token-scoped, revocable link an account-less reader
+ * follows to a read-only view. A per-entity link pierces `private` (an anonymous Viewer grant);
+ * a World link serves only that World's `shared` Entities.
  */
 describe('Public links', () => {
   let app: INestApplication;

@@ -1,11 +1,10 @@
 import { expect, test, type Page } from './fixtures';
 
 /**
- * User Settings (ADR-0038): the Format Locale chosen on `/settings` persists on
- * the account (rides `/auth/me`) and reformats displayed dates — the entity
- * browser's "Edited" date — without touching the UI language. The test restores
- * "Same as language" at the end: preferences roam on the shared e2e user and
- * survive the entities-only reset.
+ * User Settings (ADR-0038): the Format Locale chosen on `/settings` persists on the
+ * account (rides `/auth/me`) and reformats displayed dates without touching the UI
+ * language. Preferences roam on the shared e2e user and survive the entities-only
+ * reset, so the test must restore "Same as language" at the end.
  */
 
 /** Pick a Format Locale on /settings and wait for the roaming PATCH to land. */

@@ -179,10 +179,6 @@ describe('WorldStore', () => {
     expect(store.loaded()).toBe(true);
   });
 
-  /**
-   * Live-follow reconciliation (ADR-0044, #176): the store follows the Worlds it holds and
-   * reconciles from world nudges instead of hand-written optimistic in-place mutation.
-   */
   describe('nudge reconciler', () => {
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => vi.useRealTimers());

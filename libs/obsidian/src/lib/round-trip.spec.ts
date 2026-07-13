@@ -2,12 +2,6 @@ import { markdownToProseMirror } from './markdown-to-pm';
 import { proseMirrorToMarkdown } from './pm-to-markdown';
 
 /**
- * The round-trip contract (#145): importing markdown, exporting it, and re-importing
- * must land on the identical ProseMirror doc. Faithful constructs survive; already-
- * degraded ones re-emit in their degraded form and are therefore stable on re-import.
- * We pin against the PM doc, never the intermediate markdown/AST string.
- */
-/**
  * Mark order within a text node is not semantic (`**_x_**` ≡ `_**x**_`), and remark
  * normalizes the nesting on stringify. Sort marks by type so the round-trip pins
  * semantic equivalence, not incidental nesting order.

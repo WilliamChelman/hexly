@@ -180,10 +180,6 @@ describe('ToolPalette regions', () => {
     store.armTool('region'); // the internal brush state the Inspector arms (ADR-0012)
     fixture.detectChanges();
 
-    // The Region brush has no Subtools and no legend (issue #38, ADR-0012): the old
-    // legend — its New Region action, per-region rows, keycaps, paint/erase, and
-    // delete — is gone (Region details live in the Inspector, #36; creation in the
-    // Regions panel, #39).
     expect(has(fixture, 'new-region')).toBe(false);
     expect(fixture.nativeElement.querySelector('.legend')).toBeNull();
     expect(has(fixture, `region-paint-${id}`)).toBe(false);

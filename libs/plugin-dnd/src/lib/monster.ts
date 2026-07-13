@@ -1,9 +1,6 @@
 /**
- * The `dnd.monster` bundled Plugin type (CONTEXT.md → Type Definition, #192). Namespaced (`dnd.`) so
- * a future `pathfinder.monster` never collides.
- *
- * It adds nothing to the body: a monster is the one Entity body plus a Field schema, so its stat
- * block lives entirely in the Metadata map — an instance without this plugin still opens one as its
+ * The `dnd.monster` bundled Plugin type (CONTEXT.md → Type Definition). A monster's stat block
+ * lives entirely in the Metadata map, so an instance opened without this plugin still shows its
  * Content plus the generic Field view.
  *
  * The framework-free half, which the API reads. The Angular half is `@hexly/plugin-dnd/web`.
@@ -15,9 +12,9 @@ import { defineType, FieldSchema } from '@hexly/domain';
 export const DND_MONSTER = 'dnd.monster';
 
 /**
- * The Metadata keys the stat block prints, grouped as it prints them. The view resolves its rows from
- * these rather than re-typing the key strings; `monster.spec.ts` pins the two together, since the
- * view skips a key it can't resolve and would otherwise drop a renamed Field's row in silence.
+ * The Metadata keys the stat block prints, grouped as it prints them. `monster.spec.ts` pins these
+ * to the Field schema below: the view silently skips a key it can't resolve, so a renamed Field
+ * would otherwise drop its row without a word.
  */
 export const DND_IDENTITY_KEYS = ['size', 'creature_type', 'alignment'] as const;
 export const DND_DEFENCE_KEYS = ['armor_class', 'hit_points', 'speed'] as const;
@@ -46,9 +43,8 @@ export const DND_ABILITY_ABBREVIATIONS: Readonly<Record<DndAbilityKey, string>> 
 };
 
 /**
- * A D&D ability modifier: `floor((score - 10) / 2)`, the number a stat block prints beside the raw
- * score. `null` for an absent or ill-typed score, so the view renders a blank rather than a bogus
- * `-5` — a monster at rest with garbage in `strength` still displays (forward-only).
+ * A D&D ability modifier: `floor((score - 10) / 2)`. `null` for an absent or ill-typed score, so
+ * the view renders a blank rather than a bogus `-5`.
  */
 export function abilityModifier(score: unknown): number | null {
   if (typeof score !== 'number' || !Number.isFinite(score)) return null;
@@ -69,9 +65,8 @@ const ABILITY_FIELDS: readonly FieldSchema[] = DND_ABILITY_KEYS.map((key) => ({
 }));
 
 /**
- * The bundled `dnd.monster` type. `challenge_rating` is the one required Field; it, `size`, and
- * `creature_type` are facetable, unfolding in the Entity Browser's rail once `dnd.monster` is the
- * active Type filter (ADR-0035, #188).
+ * The bundled `dnd.monster` type. Facetable Fields unfold in the Entity Browser's rail once
+ * `dnd.monster` is the active Type filter (ADR-0035).
  */
 export const DND_MONSTER_TYPE = defineType({
   id: DND_MONSTER,

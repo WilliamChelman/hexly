@@ -1,26 +1,16 @@
 /**
  * The **Structured Field**'s data-type — the plugin-contributed member of the Field data-type set
- * (CONTEXT.md → Structured Field, ADR-0050).
+ * (CONTEXT.md → Structured Field, ADR-0050). Unlike a built-in data-type (`string`, `number`,
+ * `entityLink`…), which is a form control over a small value, a structured one is a *document*: a
+ * value with its own schema and its own link-edge harvesting.
  *
- * A built-in data-type (`string`, `number`, `list`, an `entityLink`…) is a form control over a small
- * value. A structured one is a *document*: a value with its own schema, its own link-edge harvesting,
- * and (later) its own View — the Map plugin's grid, at the `grid` key its Type declares. It is declared
- * here, framework-free, because both halves consume it: the API validates and harvests it, the web
- * renders it.
+ * A data-type is structured _iff_ its kind is a `namespace.id` id — no boolean flag declares it. The
+ * *shape* of a kind is validated in the domain; its *membership* is resolved in the host, so a
+ * well-formed but unregistered kind (`core.gird`) fails at resolution, against the set the host
+ * composes.
  *
- * Two rules give the open set its shape.
- *
- * **A data-type is structured _iff_ its kind is a `namespace.id` id** — no boolean flag declares it,
- * exactly as an Entity Type is namespaced. So the *shape* of a kind is validated in the domain (a
- * typo with no dot, `strig`, is rejected where the Field is declared) while its *membership* is
- * resolved in the host: `defineType()` runs at module load, so a schema enumerating the known
- * structured kinds could not validate the very plugin registering one. A well-formed but unregistered
- * kind (`core.gird`) therefore fails at **resolution**, against the set the host composes.
- *
- * **The set is threaded explicitly, never global.** {@link validateFields} and {@link harvestEdges}
- * take a {@link StructuredDataTypeSet} as a parameter, exactly as `harvestEdges` already takes the
- * resolved Fields. The domain grows no mutable registry, so import order cannot change behaviour and
- * a test passes its own set.
+ * The set is threaded explicitly, never global: {@link validateFields} and {@link harvestEdges} take
+ * a {@link StructuredDataTypeSet} as a parameter. The domain grows no mutable registry.
  */
 
 import { z } from 'zod';
@@ -28,8 +18,8 @@ import type { EntityEdge } from './entity-edges';
 
 /**
  * A structured data-type's id: a `namespace.id` key (`dnd.encounter`), mirroring the Entity Type
- * keyspace. The template-literal type is what makes "structured" a *narrowable* fact about a kind —
- * no built-in kind (`string`, `entityLink`) carries a dot, so the two are disjoint at the type level.
+ * keyspace. No built-in kind (`string`, `entityLink`) carries a dot, so the two are disjoint at the
+ * type level and "structured" narrows.
  */
 export type StructuredDataTypeId = `${string}.${string}`;
 
@@ -43,9 +33,8 @@ export const structuredDataTypeIdSchema = z.custom<StructuredDataTypeId>(
 );
 
 /**
- * One registered structured data-type, as the domain consumes it — type-erased over its value, so a
- * heterogeneous set of them fits in one map. Plugins go through {@link defineStructuredDataType},
- * which keeps the value type.
+ * One registered structured data-type, as the domain consumes it — type-erased over its value.
+ * Plugins go through {@link defineStructuredDataType}, which keeps the value type.
  */
 export interface StructuredDataType {
   readonly id: StructuredDataTypeId;
@@ -61,12 +50,11 @@ export interface StructuredDataType {
 }
 
 /**
- * Declare a structured data-type — a plugin's framework-free half, the peer of `defineType()`. A
- * malformed id (`strig` — no namespace) throws at module load.
+ * Declare a structured data-type. A malformed id (`strig` — no namespace) throws at module load.
  *
- * The declared `harvestEdges` sees a *parsed* value, so a plugin writes it against its own type; a
- * value that does not inhabit `valueSchema` yields no edges rather than throwing, which is the
- * forward-only tolerance the write path needs for a document at rest this build cannot parse.
+ * The declared `harvestEdges` sees a *parsed* value; a value that does not inhabit `valueSchema`
+ * yields no edges rather than throwing — the forward-only tolerance the write path needs for a
+ * document at rest this build cannot parse.
  */
 export function defineStructuredDataType<T>(definition: {
   readonly id: string;

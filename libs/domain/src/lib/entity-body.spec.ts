@@ -5,10 +5,7 @@ import { fieldSchemaSchema, resolveFields } from './field';
 import { CORE_NOTE_TYPE, defineType } from './plugin-type';
 import { defineStructuredDataType, structuredDataTypeSet } from './structured-data-type';
 
-/**
- * A stand-in for a plugin's **Structured Field** data-type: the domain bundles none of its own
- * (ADR-0050), so a spec declares one and threads it in exactly as a host does.
- */
+/** A stand-in for a plugin's Structured Field data-type — the domain bundles none of its own. */
 const BOARD = defineStructuredDataType({
   id: 'test.board',
   valueSchema: z.object({ tiles: z.record(z.string(), z.string()) }),

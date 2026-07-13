@@ -5,12 +5,7 @@ import { DB, Db } from '../db/db';
 import { entities } from '../db/schema';
 import { EntityWrites } from '../entities/entity-writes';
 
-/**
- * Entities recomputed per transaction. The walk yields to the event loop between chunks, so this
- * is the granularity at which a Reindex stops monopolizing the process — small enough that a
- * chunk's synchronous transaction is imperceptible to a concurrent request, large enough that the
- * per-chunk overhead stays lost in the derivation cost.
- */
+/** Entities recomputed per transaction, and the granularity at which the walk yields the event loop. */
 const CHUNK_SIZE = 200;
 
 /** The state before any Reindex this process has seen. */
@@ -29,13 +24,12 @@ const IDLE: ReindexJob = {
 const yieldToEventLoop = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
 
 /**
- * The Superadmin repair domain (ADR-0046, ADR-0047, #180): the operator's tier, outside the
- * collaboration model, reaching content the `manage-users` surface may not. Kept apart from
- * {@link UsersService}, which stops short of any World or Entity.
+ * The Superadmin repair domain (ADR-0046, ADR-0047): the operator's tier, outside the collaboration
+ * model, reaching content the `manage-users` surface may not.
  *
  * Owns the instance's one Reindex job — one, because the walk is instance-wide. Job state lives on
- * this singleton, not a table: each chunk commits, so a restart just forgets an unfinished job
- * whose done chunks are already on disk.
+ * this singleton, not a table: each chunk commits, so a restart forgets an unfinished job whose
+ * done chunks are already on disk.
  */
 @Injectable()
 export class AdminService {
@@ -53,14 +47,9 @@ export class AdminService {
 
   /**
    * Start the walk and return at once, leaving it running behind the response — recomputing every
-   * Entity's document-derived state: link edges, the `::` Link Descriptor vocabulary, and
-   * `contentText` (whose `entities_fts` mirror follows via its sync triggers). The document is the
-   * source of truth and the derived tables are a cache of it, so this is idempotent and safe to
-   * run at any time.
-   *
-   * It is the general tool for applying a *future* document-derivation retroactively, which is why
-   * nothing here names the derivations it rebuilds: adding one to `EntityWrites.derive` is enough
-   * for this button to backfill it.
+   * Entity's document-derived state (whatever `EntityWrites.derive` produces). The document is the
+   * source of truth and the derived tables are a cache of it, so this is idempotent and safe to run
+   * at any time.
    */
   start(): ReindexJob {
     if (this.job.status === 'running') throw new ConflictException({ code: ReindexErrorCode.ReindexRunning });
@@ -77,11 +66,9 @@ export class AdminService {
   }
 
   /**
-   * Drive {@link EntityWrites.reindexChunk} to exhaustion, yielding between chunks. Only a fault
-   * in the *write* reaches the catch: a document this build cannot parse is collected as a
-   * per-Entity failure and the walk carries on, so one corrupt row cannot deny the repair to the
-   * instance that most needs it. `failed` therefore means the database refused, never that the
-   * content was bad.
+   * Drive {@link EntityWrites.reindexChunk} to exhaustion, yielding between chunks. Only a fault in
+   * the *write* reaches the catch: an unparseable document is collected as a per-Entity failure and
+   * the walk carries on. `failed` therefore means the database refused, never that content was bad.
    */
   private async run(): Promise<void> {
     try {

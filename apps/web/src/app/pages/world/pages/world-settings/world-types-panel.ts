@@ -25,8 +25,7 @@ interface DraftField {
   label: string;
   /**
    * The picked data-type's kind: a built-in, or a plugin's **Structured Field** data-type by its
-   * `namespace.id` id (`core.hex-grid`, #201). A bare string — it is a `<select>` value, over the two
-   * keyspaces the one picker offers.
+   * `namespace.id` id (`core.hex-grid`). A bare string — a `<select>` value over both keyspaces.
    */
   kind: string;
   /** Comma-separated enum options; ignored for non-enum kinds. */
@@ -34,9 +33,9 @@ interface DraftField {
   required: boolean;
   facetable: boolean;
   /**
-   * **Structured** Fields only: whether this Field's View is placed in the type's view list — the
-   * "Show as a view" toggle, on by default (ADR-0050). Off withholds the toggle and leaves the Field
-   * and its value untouched. Ignored for a built-in kind, which has a form row, not a View.
+   * **Structured** Fields only: whether this Field's View is placed in the type's view list (on by
+   * default, ADR-0050). Off leaves the Field and its value untouched. Ignored for a built-in kind,
+   * which has a form row, not a View.
    */
   showAsView: boolean;
   /**
@@ -58,10 +57,10 @@ interface Draft {
 }
 
 /**
- * The World-Owner surface for authoring user-defined types (ADR-0048, #191): list, create, rename /
+ * The World-Owner surface for authoring user-defined types (ADR-0048): list, create, rename /
  * re-Field, and delete a World's custom types. Writes are Owner-gated server-side; a refusal toasts
  * and leaves the list untouched. On success it reloads its list and asks {@link WorldTypesLoader} to
- * re-project, so the Type facet and generic Field View reflect the change without a World switch.
+ * re-project.
  */
 @Component({
   selector: 'app-world-types',
@@ -295,9 +294,8 @@ export class WorldTypesPanel implements OnInit {
   protected readonly draft = signal<Draft | null>(null);
 
   /**
-   * The **Structured Field** data-types this build offers, beside the built-ins (#201). Read off the
-   * registered Views, so the picker offers exactly the kinds this build can render — drop the map
-   * plugin and "Hex grid" leaves the menu.
+   * The **Structured Field** data-types this build offers, beside the built-ins. Read off the
+   * registered Views, so the picker offers exactly the kinds this build can render.
    */
   protected readonly structuredKinds = computed(() => this.views.offerableDataTypes());
 
@@ -443,9 +441,9 @@ function blankField(): DraftField {
 }
 
 /**
- * An existing Field schema → the flattened form model (enum options joined for the text input). It
- * keeps the whole `dataType` in {@link DraftField.stored}, not just its `kind`, so a data-type this
- * form cannot rebuild survives an edit of the Field beside it.
+ * An existing Field schema → the flattened form model. Keeps the whole `dataType` in
+ * {@link DraftField.stored}, so a data-type this form cannot rebuild survives an edit of the Field
+ * beside it.
  */
 function toDraftField(field: FieldSchema, showAsView: boolean): DraftField {
   return {
@@ -461,9 +459,8 @@ function toDraftField(field: FieldSchema, showAsView: boolean): DraftField {
 }
 
 /**
- * The form model → a Field schema for the request (the server re-validates through the shared Zod).
- * A **Structured Field** is neither required nor facetable whatever a stale draft carries (ADR-0050);
- * the form withholds both checkboxes, and this is where that holds.
+ * The form model → a Field schema for the request. A **Structured Field** is neither required nor
+ * facetable, whatever a stale draft carries (ADR-0050).
  */
 function toFieldSchema(f: DraftField): FieldSchema {
   const structured = isStructuredKind(f.kind);
@@ -477,9 +474,8 @@ function toFieldSchema(f: DraftField): FieldSchema {
 }
 
 /**
- * The picked kind → a data-type: an `enum` rebuilds from its options text, a structured kind is its id
- * alone, a scalar its bare literal — and a kind the author left untouched hands back the stored
- * data-type verbatim, item type and target-type constraint intact.
+ * The picked kind → a data-type. A kind the author left untouched hands back the stored data-type
+ * verbatim, item type and target-type constraint intact.
  */
 function toDataType(f: DraftField): FieldDataType {
   if (f.kind === 'enum')

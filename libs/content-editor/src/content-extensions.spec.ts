@@ -2,9 +2,8 @@ import { Editor, JSONContent } from '@tiptap/core';
 import { CONTENT_EXTENSIONS } from './content-extensions';
 
 /**
- * The extension set is the `tiptap-v3` format contract (ADR-0019/0033): ProseMirror
- * silently drops content for any node/mark not registered here, so "the node loads"
- * is verified by round-tripping a doc that uses it and asserting it survives.
+ * ProseMirror silently drops content for any node/mark not registered in the extension
+ * set, so "the node loads" is asserted by round-tripping a doc that uses it.
  */
 function survives(doc: JSONContent): JSONContent {
   const editor = new Editor({ extensions: CONTENT_EXTENSIONS, content: doc });

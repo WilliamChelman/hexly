@@ -5,18 +5,15 @@ import { EntitySummary } from '@hexly/domain';
 import { EntityPicker } from './entity-picker';
 
 /**
- * The `@` trigger for inserting a Content Entity Link (issue #95, ADR-0023).
- * Like {@link slashCommands}, a non-schema extension (it adds a ProseMirror plugin,
- * no node/mark) so it stays out of {@link CONTENT_EXTENSIONS} and changes no format
- * contract (ADR-0019). It searches the owner's Entity summaries server-side as the
- * user types — unfiltered by type or self (ADR-0025 `q`) — and a pick inserts the
- * `entityLink` atom, snapshotting the name as `label`. `search`/`getPicker` are
- * deferred so the editor builds before the resolver and the picker's `viewChild`
- * resolve.
+ * The `@` trigger for inserting a Content Entity Link (ADR-0023). A non-schema extension
+ * (ProseMirror plugin, no node/mark), so it stays out of {@link CONTENT_EXTENSIONS}. It
+ * searches the owner's Entity summaries server-side as the user types — unfiltered by type
+ * or self (ADR-0025 `q`) — and a pick inserts the `entityLink` atom, snapshotting the name
+ * as `label`. `search`/`getPicker` are deferred so the editor builds before the resolver and
+ * the picker's `viewChild` resolve.
  *
- * Returns `setProgrammatic` so the `/link` slash item can flag that the `@` was
- * inserted by code, not typed; `onExit` then cleans up the stray `@` if the user
- * pressed Escape instead of picking.
+ * `setProgrammatic` flags an `@` inserted by code (the `/link` slash item) rather than typed;
+ * `onExit` then removes the stray `@` if the user escaped instead of picking.
  */
 export function entityMention(
   getPicker: () => EntityPicker | undefined,

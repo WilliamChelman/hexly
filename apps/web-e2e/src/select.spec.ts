@@ -1,13 +1,8 @@
 import { createEntity, enterLibrary, expect, flushSave, test, savedGrid } from './fixtures';
 
 /**
- * The universal Select journey (issue #28, ADR-0010). These cross the one seam
- * the store/renderer/inspector unit tests cannot reach: real pointer input on
- * the Canvas, where the canvas turns a click into the geometric inputs (the hex
- * under the pointer and the label hit) it hands to the store. Map state lives as
- * Canvas pixels (ADR-0003), so we observe selection through the inspector panel
- * the selection drives, and prove paint-beneath with a direct API read of the
- * persisted document (ADR-0009).
+ * The universal Select journey (issue #28, ADR-0010). Map state lives as Canvas pixels
+ * (ADR-0003), so selection is observed through the inspector panel it drives.
  *
  * The canvas centres the world origin on load, so a plain `canvas.click()` lands
  * on hex (0,0); {@link clickVoid} lands on a far, Void coordinate clear of the
@@ -23,12 +18,10 @@ async function newMap(page: import('@playwright/test').Page) {
 }
 
 /**
- * Click a far, Void coordinate with no label hit, to deselect. The canvas is
- * full-bleed with the chrome floating over it (ADR-0013), so the corners are no
- * longer empty: the tool palette sits top-left, the rail/inspector top-right, the
- * coordinate readout bottom-left and the zoom controls bottom-right. The
- * top-centre strip is clear, and far above the centred origin, so a click there
- * lands on the canvas (not a button) and on a Void hex.
+ * Click a far, Void coordinate with no label hit, to deselect. The chrome floats over the
+ * full-bleed canvas (ADR-0013) and fills every corner (tool palette, rail/inspector,
+ * coordinate readout, zoom controls); only the top-centre strip is clear of it, and it sits
+ * far above the centred origin — so a click there lands on the canvas, on a Void hex.
  */
 async function clickVoid(canvas: import('@playwright/test').Locator) {
   const box = await canvas.boundingBox();
@@ -249,12 +242,8 @@ test('under Select, dragging a selected Label repositions it', async ({ page }) 
 });
 
 /**
- * The Marquee Subtool journey (issue #63, ADR-0017). It crosses the one seam the
- * store/renderer unit tests cannot reach: the real canvas drag, where a press in
- * select+marquee draws a live rectangle and the release runs the pure marquee
- * hit-test over the document and folds the contained Hexes and Labels into the
- * Selection. Marquee works *over painted hexes* — where a pick-drag would instead
- * move a hex — so the box here starts on a painted hex and must select, never move.
+ * Marquee works *over painted hexes* — where a pick-drag would instead move a hex — so the
+ * box here starts on a painted hex and must select, never move (issue #63, ADR-0017).
  */
 test('Marquee box-selects the hexes and a label inside it, dragging over painted hexes', async ({ page }) => {
   const { canvas } = await newMap(page);
@@ -292,11 +281,6 @@ test('Marquee box-selects the hexes and a label inside it, dragging over painted
   await expect(page.getByTestId('hex-count')).toHaveText('2 hexes');
 });
 
-/**
- * A Shift-marquee adds its box to the Selection instead of replacing it, so
- * several boxes accumulate (issue #63, ADR-0017). A plain marquee first selects
- * one hex; a Shift-marquee over the other two grows the set to all three.
- */
 test('Shift-marquee adds a second box to the Selection rather than replacing it', async ({ page }) => {
   const { canvas } = await newMap(page);
   const box = await canvas.boundingBox();

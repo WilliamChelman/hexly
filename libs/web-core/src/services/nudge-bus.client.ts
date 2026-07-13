@@ -8,13 +8,11 @@ import { ConnectionReady, FollowSignal, InterestRef, NudgeDelta } from '@hexly/d
  * (`GET /api/events`) for the whole tab, captures the `connectionId` its first frame
  * mints, and declares the *whole* interest set via `PUT /api/events/:connectionId/interest`.
  *
- * Interest is subscription-scoped: {@link follow} returns the nudge stream for one ref, and
- * *subscribing* is what declares interest — unsubscribing withdraws it. A ref is
- * reference-counted, so N followers share one server-side subscription and only the last to
- * leave withdraws it. The stream opens lazily on the first follower — a tab watching nothing
- * holds no connection. An entry is either a `{ id, version }` delta or an opaque
- * `{ id, unavailable }` eviction — the bus relays both; what eviction means is the
- * follower's business.
+ * Interest is subscription-scoped: *subscribing* to {@link follow} declares interest,
+ * unsubscribing withdraws it. A ref is reference-counted, so N followers share one server-side
+ * subscription and only the last to leave withdraws it. The stream opens lazily on the first
+ * follower — a tab watching nothing holds no connection. An entry is either a `{ id, version }`
+ * delta or an opaque `{ id, unavailable }` eviction; the bus relays both.
  */
 @Injectable({ providedIn: 'root' })
 export class NudgeBusClient {
@@ -24,8 +22,7 @@ export class NudgeBusClient {
   private connectionId: string | null = null;
   /**
    * The anonymous Public Link token this tab connects as, or null for a cookie principal.
-   * When set it rides the `EventSource` URL and the interest `PUT` as `?token=` — the
-   * token *is* the grant.
+   * When set it rides the `EventSource` URL and the interest `PUT` as `?token=`.
    */
   private token: string | null = null;
   /** Live interest, reference-counted per ref key, so shared follows don't clobber each other. */
@@ -55,9 +52,8 @@ export class NudgeBusClient {
   }
 
   /**
-   * The stream of nudges for one resource. Subscribing declares interest (and opens the
-   * connection if this is the first follower); unsubscribing withdraws it once the last
-   * follower leaves — teardown handles withdrawal.
+   * The stream of nudges for one resource. Subscribing declares interest (opening the connection
+   * if this is the first follower); unsubscribing withdraws it once the last follower leaves.
    */
   follow(ref: InterestRef): Observable<FollowSignal> {
     return new Observable<FollowSignal>((subscriber) => {

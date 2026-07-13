@@ -1,8 +1,7 @@
 /**
- * The Entity domain: the top-level thing a user owns. The single Zod source of
- * truth for the Entity model and its REST payloads. What an Entity *is* — a note, a
- * map, a monster — is its **Entity Type** set, an open one the core does not
- * enumerate: a type declares **Fields**, and nothing here knows what any of them hold.
+ * The Entity domain: the top-level thing a user owns. What an Entity *is* — a note, a
+ * map, a monster — is its **Entity Type** set, an open one the core does not enumerate:
+ * a type declares **Fields**, and nothing here knows what any of them hold.
  */
 
 import { z } from 'zod';
@@ -34,7 +33,7 @@ export function tiptapContent(snapshot: unknown): Content {
 /**
  * A single Entity Type identity (CONTEXT.md → Entity Type): an **open**,
  * `namespace.id`-keyed string (`core.note`, `dnd.monster`, `world.deity`) — plugins and
- * Worlds extend the set — so this validates only the *shape* of an id, never an
+ * Worlds extend the set, so this validates only the *shape* of an id, never an
  * enumerated value.
  */
 export const entityTypeSchema = z
@@ -46,16 +45,15 @@ export const entityTypeSchema = z
 export type EntityType = z.infer<typeof entityTypeSchema>;
 
 /**
- * The one Entity Type the core itself declares: a Note is nothing but its body, so `core.note` adds
- * no Field (ADR-0048). Every other type — the Map's included — ships from a plugin (ADR-0050).
+ * The one Entity Type the core itself declares; it adds no Field — a Note is nothing but its body.
+ * Every other type ships from a plugin (ADR-0050).
  */
 export const CORE_NOTE = 'core.note';
 
 /**
  * The ordered, deduped set of Entity Types an Entity carries (CONTEXT.md → Entity
- * Type): `types[0]` is *primary* (drives icon, default view, headline). At least
- * one — every Entity has a primary type. `Set` insertion order preserves the
- * authored order while collapsing duplicates.
+ * Type): `types[0]` is *primary* (drives icon, default view, headline). At least one —
+ * every Entity has a primary type. Deduping preserves the authored order.
  */
 export const typesSchema = z
   .array(entityTypeSchema)
@@ -63,23 +61,21 @@ export const typesSchema = z
   .transform((types) => [...new Set(types)]);
 
 /**
- * The Entity's Metadata map (CONTEXT.md → Metadata), stored inside the document
- * JSON. Mirrors Obsidian frontmatter on import; Hexly provenance lives under the
- * reserved `hexly.` namespace. Optional so pre-import bodies validate unchanged;
- * the domain never interprets the values.
+ * The Entity's Metadata map (CONTEXT.md → Metadata), stored inside the document JSON.
+ * Mirrors Obsidian frontmatter on import; Hexly provenance lives under the reserved
+ * `hexly.` namespace. The domain never interprets the values.
  */
 export const metadataSchema = z.record(z.string(), z.unknown()).optional();
 
 /**
- * The Entity body — what the `document` column holds. One shape, for every Entity: Content plus
- * Metadata (ADR-0050). Everything a Type adds to an Entity's substance is a **Field** over a Metadata
- * key — a plugin's **Structured Field** value included — so the body needs no discriminant and no
- * registry to parse.
+ * The Entity body — what the `document` column holds. One shape for every Entity: Content plus
+ * Metadata (ADR-0050). Everything a Type adds to an Entity's substance is a **Field** over a
+ * Metadata key, a plugin's **Structured Field** value included.
  *
- * `.strict()` because the body root is closed: an unknown key there is a document this build cannot
- * represent (a pre-collapse body, with a plugin's value at the root), and reading it as a note that
- * has silently lost that value would be worse than failing loudly. Tolerance lives one level down, in
- * the data: a Field value that does not inhabit its data-type is left alone, never rejected.
+ * The body root is closed (`.strict()`): an unknown key there is a document this build cannot
+ * represent, and must fail loudly rather than be read as a note that silently lost that value.
+ * Tolerance lives one level down, in the data: a Field value that does not inhabit its data-type
+ * is left alone, never rejected.
  */
 export const entityBodySchema = z
   .object({
@@ -99,8 +95,7 @@ export const HEXLY_METADATA_PREFIX = 'hexly.';
 
 /**
  * The reserved key a vault export stamps an Entity's ordered Type set under, and import reads back
- * (ADR-0050, #203) — no author Metadata key records the types. Shared, because the two halves of the
- * round-trip contract on it.
+ * — no author Metadata key records the types.
  */
 export const HEXLY_TYPE_KEY = `${HEXLY_METADATA_PREFIX}type`;
 
@@ -118,15 +113,9 @@ export const nameSchema = z
   .refine((s) => !/[\p{Cc}/\\]/u.test(s), 'Name cannot contain control characters or slashes');
 
 /**
- * Free-text Tags on an Entity (CONTEXT.md → Tag), normalized on parse so the
- * schema — not just the UI — owns what a tag is: trimmed, lower-cased, blanks
- * rejected, duplicates collapsed. Defaults to empty so a tagless Entity still
- * lists with an array.
- */
-/**
- * One free-text label as a *vocabulary* stores it: trimmed, lower-cased, blanks
- * rejected. The single definition a Tag and the `::` Link Descriptor vocabulary
- * fold through, so `"Spouse"` and `" spouse "` are one value in both.
+ * One free-text label as a *vocabulary* stores it: trimmed, lower-cased, blanks rejected.
+ * Both a Tag and the `::` Link Descriptor vocabulary fold through it, so `"Spouse"` and
+ * `" spouse "` are one value in either.
  */
 const normalizedLabel = z.string().trim().toLowerCase().min(1);
 
@@ -136,18 +125,17 @@ export const tagsSchema = dedupedTags.default([]);
 
 /**
  * A single Link Descriptor ("spouse", "Capital Of") **as authored**: trimmed, blanks
- * rejected, case preserved. Deliberately *not* folded — a Content link renders this
- * exact string in the prose, so the edge index that mirrors it must too, or one link
- * would show two spellings of its descriptor on one screen. Folding is a property of
- * the vocabulary ({@link descriptorsSchema}), not of the descriptor itself.
+ * rejected, case preserved. Not folded — a Content link renders this exact string in the
+ * prose, so the edge index that mirrors it must too, or one link would show two spellings
+ * of its descriptor on one screen. Folding is a property of the vocabulary
+ * ({@link descriptorsSchema}), not of the descriptor itself.
  */
 export const descriptorSchema = z.string().trim().min(1);
 
 /**
- * Link Descriptors — the distinct relationship labels ("spouse", "capital of")
- * an Entity's links use — normalized exactly like {@link tagsSchema} so the
- * owner vocabulary folds case the same way. Defaults to empty so a linkless doc
- * yields an (empty) set, which replace-on-save then prunes.
+ * Link Descriptors — the distinct relationship labels ("spouse", "capital of") an Entity's
+ * links use — case-folded like {@link tagsSchema}. A linkless doc yields an empty set,
+ * which replace-on-save then prunes.
  */
 export const descriptorsSchema = dedupedTags.default([]);
 
@@ -189,9 +177,7 @@ export type Visibility = z.infer<typeof visibilitySchema>;
  * The closed set of actions a caller may exercise on an Entity (CONTEXT.md →
  * Rights): `read`, `edit` (substance — content/name/tags/metadata), `delete` and
  * `set-visibility` (the lifecycle gate — Owner or World Owner of a shared Entity),
- * `manage` (owners/grants/Public Link — Owner only). Reported *with* the Entity so
- * a surface gates its controls on exactly what the server enforces, never
- * re-deriving standing.
+ * `manage` (owners/grants/Public Link — Owner only).
  */
 export const entityVerbSchema = z.enum(['read', 'edit', 'delete', 'set-visibility', 'manage']);
 
@@ -200,12 +186,9 @@ export type EntityVerb = z.infer<typeof entityVerbSchema>;
 
 /**
  * PATCH /entities/:id: a metadata patch — the `name` **or** the Visibility, never both, and no
- * `version` (outside the document's concurrency check).
- *
- * The two are different write kinds with different gates: a rename is substance, which an
- * entity-level Editor may make; a Visibility flip is exposure, which needs full write rights
- * (ADR-0039, ADR-0045). Accepting both in one request forced the *caller* to decide which rule
- * judged it. Requiring exactly one lets the kind name the change and the kind pick the gate.
+ * `version` (outside the document's concurrency check). The two are different write kinds with
+ * different gates: a rename is substance, which an entity-level Editor may make; a Visibility flip
+ * is exposure, which needs full write rights (ADR-0039, ADR-0045).
  */
 export const patchEntityRequestSchema = z
   .object({
@@ -316,10 +299,10 @@ export interface FacetCount {
 }
 
 /**
- * One type's facetable **Field** as a facet (ADR-0048, #188): the Metadata `key` it types, its
- * human `label` and `dataType` (so the rail picks a data-type-appropriate control — value toggles
- * for enum/list/string, a range for number/date), and its live `values` with counts. Surfaced
- * **contextually** — a Field facet appears only once its type is in the active Type filter.
+ * One type's facetable **Field** as a facet: the Metadata `key` it types, its human `label` and
+ * `dataType` (the rail picks a data-type-appropriate control — value toggles for enum/list/string,
+ * a range for number/date), and its live `values` with counts. Surfaced **contextually** — a Field
+ * facet appears only once its type is in the active Type filter.
  */
 export interface FieldFacet {
   readonly key: string;
@@ -334,7 +317,7 @@ export interface FieldFacet {
  * but not its own, so a category still lists the sibling values you could add.
  * Zero-count values are omitted. The universal facets (`type`/`tag`/`visibility`)
  * are always present; `fields` carries a type's Field facets only while that type
- * is the active filter, so the rail stays clean (ADR-0048, #188).
+ * is the active filter.
  */
 export interface EntityFacets {
   readonly type: readonly FacetCount[];
@@ -379,9 +362,9 @@ export interface EntityDetail extends EntitySummary {
 }
 
 /**
- * One page of summaries plus an opaque {@link cursor} clients pass back as
- * `cursor` for the next page; `nextCursor` is `null` on the final page. The
- * cursor's encoding is server-only — clients never construct or inspect it.
+ * One page of summaries plus an opaque cursor clients pass back as `cursor` for the next
+ * page; `nextCursor` is `null` on the final page. The cursor's encoding is server-only —
+ * clients never construct or inspect it.
  */
 export interface EntityPage {
   readonly items: EntitySummary[];

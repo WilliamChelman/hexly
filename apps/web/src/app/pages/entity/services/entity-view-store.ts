@@ -4,20 +4,17 @@ import { CORE_VIEW_CONTENT, ViewInstance, parseViewInstanceKey, viewInstanceKey 
 import { EntitySession } from './entity-session';
 
 /**
- * Holds which View the open Entity is showing — the app-shell state that used to
- * live as `HexMapStore.view`, a general "which view" concern squatting in the map
- * lib (ADR-0048, *Views* amendment). Page-scoped like the dock stores and shared
- * with the {@link EntityHeader}; reads the open Entity's types straight off
- * {@link EntitySession} (provided above the page in both the routed and Public Link
- * mounts), so the afforded Views resolve synchronously with no effect indirection.
+ * Holds which View the open Entity is showing (ADR-0048, *Views* amendment). Page-scoped and shared
+ * with the {@link EntityHeader}; reads the open Entity's types off {@link EntitySession}, provided
+ * above the page in both the routed and Public Link mounts.
  *
  * A View is a {@link ViewInstance} — an id, plus the **Structured Field** it renders when it is a
  * Field's View rather than a Type's (ADR-0050). The selection is carried as that instance's
- * {@link viewInstanceKey}, the form the choice takes wherever it is stored.
+ * {@link viewInstanceKey}.
  *
- * The raw selection is kept separate from the effective {@link activeView}: a
- * selection the current Entity doesn't afford (a stale `?view=` after navigating to
- * a note, say) falls back to the default rather than outletting a blank view.
+ * The raw selection is kept separate from the effective {@link activeView}: a selection the current
+ * Entity doesn't afford (a stale `?view=` after navigating to a note, say) falls back to the default
+ * rather than outletting a blank view.
  */
 @Injectable()
 export class EntityViewStore {

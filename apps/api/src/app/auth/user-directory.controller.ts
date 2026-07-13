@@ -5,13 +5,11 @@ import { users } from '../db/schema';
 import { SessionAuthGuard } from './session-auth.guard';
 
 /**
- * The Instance user directory (#158). The owner-set UI needs to name an owner and
- * pick a co-Owner, but the closed user set is otherwise opaque to the web. This
- * exposes only id + displayName — never the email, which is private (ADR-0004).
+ * The Instance user directory: id + displayName only — never the email, which is
+ * private (ADR-0004). Readable by any signed-in user.
  *
- * Lives at `/users/directory`, distinct from the `manage-users` account surface at
- * `/users` (ADR-0047): this directory is readable by any signed-in user; that
- * surface administers accounts and is role-gated.
+ * Distinct from the role-gated `manage-users` account surface at `/users`
+ * (ADR-0047).
  */
 @Controller('users/directory')
 @UseGuards(SessionAuthGuard)

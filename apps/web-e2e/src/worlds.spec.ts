@@ -1,11 +1,9 @@
 import { entityIdFromUrl, expect, segRe, test, type Page } from './fixtures';
 
 /**
- * URL-scoped Worlds + World Index (#118, ADR-0028): the root `/` is the World
- * Index — it lists reachable Worlds and owns create; the active World is a URL
- * fact (`/w/:worldId/entities`), so the entity browser is scoped by the segment
- * and switching Worlds re-scopes the list. The World switcher is a compact
- * dropdown docked by the user menu in the nav-rail foot, at both widths (#121).
+ * URL-scoped Worlds + World Index (ADR-0028): the root `/` is the World Index; the
+ * active World is a URL fact (`/w/:worldId/entities`), so the entity browser is scoped
+ * by the segment and switching Worlds re-scopes the list.
  */
 
 /** Create a World from the Index and land on its Dashboard (the World root). Returns its id. */

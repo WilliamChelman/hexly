@@ -4,10 +4,9 @@ import { ReindexChunk } from '../entities/entity-writes';
 import { AdminService } from './admin.service';
 
 /**
- * The Reindex job (ADR-0046, #180). `EntityWrites.reindexChunk` is a stub here on purpose: what
- * this spec is about is the *job* — that the walk leaves the request, that it paces itself across
- * chunks, that a bad document is reported rather than fatal, and that only one runs at a time.
- * The walk's own correctness is `EntityWrites`' spec.
+ * `EntityWrites.reindexChunk` is stubbed here: this spec covers the *job* (the walk leaves the
+ * request, paces itself across chunks, collects failures, runs one at a time). The walk's own
+ * correctness is `EntityWrites`' spec.
  */
 describe('AdminService — the Reindex job', () => {
   let db: Db;
@@ -63,11 +62,7 @@ describe('AdminService — the Reindex job', () => {
     });
   });
 
-  /**
-   * The whole point of the 202: `start` returns before a single row is touched. If the walk ran
-   * inside the request, the client would be handed a finished job it never saw running — and on a
-   * large instance the request would time out before it saw anything at all.
-   */
+  /** The 202 contract: `start` returns before a single row is touched. */
   it('returns running before the walk has touched a row', () => {
     chunks = [chunk({ walked: 1, reindexed: 1 })];
 
@@ -96,10 +91,6 @@ describe('AdminService — the Reindex job', () => {
     expect(service.status().finishedAt).not.toBeNull();
   });
 
-  /**
-   * A document this build cannot parse is a fact to report, not a fault to abort on: the walk
-   * finishes, and the Superadmin gets the ids of what it could not read.
-   */
   it('succeeds with failures collected across chunks, never aborting on a bad document', async () => {
     const bad = {
       entityId: 'broken',
@@ -139,10 +130,7 @@ describe('AdminService — the Reindex job', () => {
     expect(service.status().finishedAt).not.toBeNull();
   });
 
-  /**
-   * There is only ever one job: the walk is instance-wide, so a second concurrent run would
-   * contend with the first for the same rows and discover nothing the first would not.
-   */
+  /** The walk is instance-wide: a second concurrent run would contend with the first for the same rows. */
   it('refuses to start a second walk while one is running', () => {
     chunks = [chunk({ walked: 1, reindexed: 1 })];
 

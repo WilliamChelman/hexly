@@ -4,10 +4,8 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 export type ChipTone = 'gold' | 'sea' | 'astra';
 
 /**
- * A chip / badge — its own decorative span, so it owns its styles rather than
- * borrowing a global `.chip` class. Projects its content (which may include a
- * nested swatch). `tone` selects a colour family; omit it for the neutral chip.
- * See ADR-0007.
+ * A chip / badge. Projects its content, which may include a nested swatch.
+ * `tone` selects a colour family; omit it for the neutral chip. See ADR-0007.
  *
  *   <app-chip>Default</app-chip>
  *   <app-chip tone="gold">Settlement</app-chip>

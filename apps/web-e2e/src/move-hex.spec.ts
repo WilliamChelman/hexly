@@ -1,16 +1,11 @@
 import { createEntity, enterLibrary, expect, flushSave, test, savedGrid } from './fixtures';
 
 /**
- * The whole-Hex move journey (issue #30, ADR-0010). It crosses the one seam the
- * store unit tests cannot reach: the canvas press→drag-threshold gesture, where a
- * press over a selected hex arms a move and crossing a small pixel threshold turns
- * it into a `moveSelection`, committed once on release. Like the other canvas journeys
- * it then proves persistence with a direct API read of the saved document and a
- * reload (ADR-0003/0009): map state lives as Canvas pixels, so we observe the move
- * through the hex count, the inspector, and the persisted hexes record.
+ * The whole-Hex move journey (ADR-0010): a press over a selected hex arms a move, crossing a small
+ * pixel threshold turns it into a `moveSelection`, committed once on release.
  *
- * The canvas centres the world origin on load, so a press at the canvas centre
- * grabs hex (0,0); dragging ~100px lands the content on a different coordinate.
+ * The canvas centres the world origin on load, so a press at the canvas centre grabs hex (0,0);
+ * dragging ~100px lands the content on a different coordinate.
  */
 test('drags a hex under Select to a new coordinate, and the move survives a reload', async ({ page, request }) => {
   await enterLibrary(page);
@@ -24,10 +19,9 @@ test('drags a hex under Select to a new coordinate, and the move survives a relo
   await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
   await page.getByTestId('tool-select').click();
 
-  // Press on the painted hex and drag it ~100px to the right. Explicit
-  // intermediate moves: the canvas drives the gesture off `pointermove`, so the
-  // pointer must step across the threshold for the drag to register. The drag is
-  // well past the ~69px column spacing, so it lands on a different hex.
+  // Explicit intermediate moves: the canvas drives the gesture off `pointermove`, so the pointer
+  // must step across the threshold for the drag to register. 100px is well past the ~69px column
+  // spacing, so it lands on a different hex.
   const box = await canvas.boundingBox();
   if (!box) throw new Error('canvas not laid out');
   const cx = box.x + box.width / 2;
@@ -72,11 +66,8 @@ test('drags a hex under Select to a new coordinate, and the move survives a relo
 });
 
 /**
- * The non-destructive swap (issue #62, ADR-0017): dropping a Hex onto an occupied
- * hex exchanges the two whole records rather than overwriting, so a move never
- * silently destroys content. Like the move journey it rides the real canvas
- * press→drag gesture and proves the swap through the inspector, a direct API read,
- * and a reload — the two terrains end up exchanged at the two coordinates.
+ * The non-destructive swap (ADR-0017): dropping a Hex onto an occupied hex exchanges the two whole
+ * records rather than overwriting, so a move never silently destroys content.
  */
 test('drags a hex onto an occupied hex and swaps the two, surviving a reload', async ({ page, request }) => {
   await enterLibrary(page);
@@ -137,10 +128,8 @@ test('drags a hex onto an occupied hex and swaps the two, surviving a reload', a
 });
 
 /**
- * Escape aborts an in-progress Hex drag (issue #30 follow-up): the move is never
- * committed, so the hex stays at its origin and the destination stays Void. Like
- * the move journey this lives in e2e because it rides the real canvas press→drag
- * gesture (ADR-0003/0009).
+ * Escape aborts an in-progress Hex drag: the move is never committed, so the hex stays at its
+ * origin and the destination stays Void.
  */
 test('Escape cancels an in-progress Hex drag, leaving the hex at its origin', async ({ page }) => {
   await enterLibrary(page);
@@ -180,11 +169,9 @@ test('Escape cancels an in-progress Hex drag, leaving the hex at its origin', as
 });
 
 /**
- * The whole-group move (issue #64, ADR-0017): dragging a multi-hex Selection
- * translates *every* member by one offset in a single step, keeping the cluster's
- * shape. Like the single-hex journey it rides the real canvas press→drag gesture —
- * here a press on an already-selected member drags the whole set — and proves the
- * move through the count and a direct API read of the persisted document.
+ * The whole-group move (ADR-0017): dragging a multi-hex Selection translates *every* member by one
+ * offset in a single step, keeping the cluster's shape. A press on an already-selected member drags
+ * the whole set.
  */
 test('drags a multi-hex selection so the whole group moves by one offset', async ({ page, request }) => {
   await enterLibrary(page);
@@ -235,10 +222,9 @@ test('drags a multi-hex selection so the whole group moves by one offset', async
 });
 
 /**
- * A blocked group move is a no-op that snaps back (issue #64, ADR-0017): when a
- * member's destination is occupied by a non-selected hex that can only be displaced
- * onto the moving group's own path, the whole move is refused. Releasing leaves the
- * document untouched — nothing moves. Rides the real canvas press→drag gesture.
+ * A blocked group move is a no-op that snaps back (ADR-0017): when a member's destination is
+ * occupied by a non-selected hex that can only be displaced onto the moving group's own path, the
+ * whole move is refused and the document is left untouched — nothing moves.
  */
 test('refuses a blocked group move, leaving every hex where it was', async ({ page, request }) => {
   await enterLibrary(page);

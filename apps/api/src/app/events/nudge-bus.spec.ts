@@ -3,12 +3,6 @@ import { createDb } from '../db/db';
 import { loadConfig } from '../config/config';
 import { NudgeBus, Principal } from './nudge-bus';
 
-/**
- * Connection-layer reliability (#177): the in-memory connection map must not leak over an
- * Instance's uptime, and every open stream must carry periodic heartbeats. These are unit-level
- * — the `setInterval`/`finalize` wiring is trivial glue exercised over the wire by the controller
- * spec; here we pin the reap-and-heartbeat *behaviour* the ADR-0044 hardening slice adds.
- */
 describe('NudgeBus connection layer', () => {
   const user = (id: string): Principal => ({ kind: 'user', userId: id });
 

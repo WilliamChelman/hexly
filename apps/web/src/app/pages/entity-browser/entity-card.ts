@@ -20,10 +20,9 @@ export interface EntityCardVm {
 }
 
 /**
- * One Entity tile: the sigil accent, the stretched open-link, type + last-edited
- * meta, the hover rename/delete actions, and the in-place rename input. Purely
- * presentational — all list, order, and rename state lives in {@link EntityBrowser};
- * the card just renders a {@link EntityCardVm} and emits intent. `display: contents`
+ * One Entity tile: the sigil accent, the stretched open-link, type + last-edited meta, the hover
+ * rename/delete actions, and the in-place rename input. List, order, and rename state live in
+ * {@link EntityBrowser}; the card renders a {@link EntityCardVm} and emits intent. `display: contents`
  * on the host so the `<section>` is the parent `<li>`'s grid child directly.
  */
 @Component({

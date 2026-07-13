@@ -114,8 +114,7 @@ export class WorldsService {
   }
 
   /**
-   * Mint an empty World — the shared trunk behind {@link create}, the vault import,
-   * and the seed CLI. The World row and its creator's `owner` membership row land
+   * Mint an empty World: the World row and its creator's `owner` membership row land
    * together. Returns the new World id.
    */
   mintWorld(ownerId: string, name: string, now: number = Date.now()): string {
@@ -200,9 +199,9 @@ export class WorldsService {
     // row is an owner (nothing writes contributor/viewer yet). When lower-role grants
     // land, an un-owned member must demote to their prior role here, not be ejected.
     //
-    // Removing an Owner deletes their membership row — eviction for them if it ends their
+    // Removing an Owner deletes their membership row: eviction for them if it ends their
     // reachability, a detail nudge for everyone else, on the World and its `shared` Entities alike
-    // (they lose write there too). Same shaping path as removeMember.
+    // (they lose write there too).
     this.writes.membership(id, (w) => w.removeMember(targetUserId, true));
     return outcome;
   }
@@ -266,10 +265,9 @@ export class WorldsService {
     // ownership-set endpoints' job. Leaving yourself may drop your own owner row (the ≥1-Owner
     // guard above refused orphaning).
     //
-    // Membership removal is eviction for the removed principal (world-share loss rides the same
-    // shaping path): they resolve to `unavailable` on the World and on every `shared` Entity in it,
-    // while remaining members get a detail nudge. No row matched → the target isn't a (removable)
-    // member — an Owner or unknown user — and `membership` skips the bump and nudge.
+    // Membership removal is eviction for the removed principal: they resolve to `unavailable` on
+    // the World and on every `shared` Entity in it, while remaining members get a detail nudge.
+    // No row matched → the target isn't a (removable) member — an Owner or unknown user.
     const removed = this.writes.membership(id, (w) => w.removeMember(targetUserId, isLeave));
     if (!removed) return { status: 'not-found' };
     return { status: 'ok', value: this.worldMembers(id) };

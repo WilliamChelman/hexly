@@ -1,11 +1,7 @@
 import { enterLibrary, expect, flushSave, test } from './fixtures';
 import type { Page } from '@playwright/test';
 
-/**
- * The Outline panel end-to-end: derives its heading list from the live editor,
- * jumps to a heading on click, and remembers its open/closed choice. Drives real
- * TipTap keyboard input (markdown `# ` input rules) against the production build.
- */
+/** The Outline panel end-to-end, driven with real TipTap keyboard input (markdown `# ` input rules). */
 
 /** Create a fresh note and land on its editor surface, returning the content locator. */
 async function newNote(page: Page) {

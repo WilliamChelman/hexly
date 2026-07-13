@@ -26,10 +26,7 @@ import { WorldQuickOpen } from './providers/world-quick-open';
 import { CreateCommands } from './providers/create-commands';
 import { NavCommands } from './providers/nav-commands';
 
-/**
- * Built-in Command Providers, registered by the Palette on mount. A DI seam:
- * a test provides its own set instead of reaching into the root registry.
- */
+/** Built-in Command Providers, registered by the Palette on mount. */
 export const COMMAND_PROVIDERS = new InjectionToken<readonly CommandProvider[]>('COMMAND_PROVIDERS');
 
 /** Listing order is the palette's section order. */

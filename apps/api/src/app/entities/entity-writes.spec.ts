@@ -18,14 +18,8 @@ import { TypeFieldRegistry } from './type-field-registry';
 import { WorldTypeFields } from './world-type-fields';
 
 /**
- * `EntityWrites` is the single write handle for `entities` and `entity_grants` (ADR-0045), so
- * its interface is the test surface — the first service-level spec in `apps/api`, and justified
- * only because this module *is* the seam. Everything else here stays controller-level.
- *
- * The table below is the load-bearing part: it enumerates the write kinds, so a fifth kind added
- * without an emit fails CI rather than shipping the bug class ADR-0044 shipped twice.
- *
- * Real in-memory SQLite, real ACL. Only the bus is a recorder — it *is* the observation.
+ * `EntityWrites` is the single write handle for `entities` and `entity_grants` (ADR-0045).
+ * Real in-memory SQLite, real ACL; only the bus is a recorder.
  */
 describe('EntityWrites', () => {
   const ADA = 'ada';
@@ -94,10 +88,9 @@ describe('EntityWrites', () => {
   });
 
   /**
-   * `version` is the concurrency token in `edit`'s atomic WHERE. Bump it on a sharing or exposure
-   * change and sharing an Entity would 409 a colleague's in-flight save. `updatedAt` is
-   * user-visible ("edited {date}", `ORDER BY updatedAt DESC`): bump it and a GM who shares thirty
-   * Entities before a session sends all thirty to the top of "Recently edited".
+   * `version` is the concurrency token in `edit`'s atomic WHERE — bumping it on a sharing change
+   * would 409 an in-flight save. `updatedAt` is user-visible ("edited {date}",
+   * `ORDER BY updatedAt DESC`), so sharing must not reorder "Recently edited".
    */
   it.each([
     ['set-visibility', { kind: 'set-visibility', visibility: 'shared' }],
@@ -138,11 +131,6 @@ describe('EntityWrites', () => {
     expect(rowOf(ENTITY).version).toBe(before.version + 1);
   });
 
-  /**
-   * `contentText` and `descriptors` are both derived from Content, but `insertEntity` computed
-   * only the first — so a created or imported Entity contributed nothing to the `::` Link
-   * Descriptor vocabulary until someone happened to re-save it. One derivation, one place.
-   */
   describe('derived indexes', () => {
     const CONTENT = tiptapContent({
       type: 'doc',
@@ -200,9 +188,8 @@ describe('EntityWrites', () => {
     });
 
     /**
-     * The edge mirrors the Content link, so it keeps the descriptor the author typed — the prose
-     * chip and the References panel must not show two spellings of one descriptor. The `::`
-     * vocabulary is a *vocabulary*, so it folds case, exactly as Tags do.
+     * The edge keeps the descriptor as the author typed it; the `::` vocabulary folds case, as
+     * Tags do.
      */
     it('stores the authored descriptor on the edge, and its folded form in the vocabulary', () => {
       writes.insert({
@@ -316,16 +303,11 @@ describe('EntityWrites', () => {
     });
 
     /**
-     * The Superadmin Reindex (ADR-0046, #180). The derived tables are a cache of the document, so
-     * they can always be thrown away and recomputed — which is how the Entities that predate a
-     * derivation gain it, no backfill migration involved.
+     * The Superadmin Reindex (ADR-0046, #180). The derived tables are a cache of the document:
+     * always discardable and recomputable, so no backfill migration is involved.
      */
     describe('reindexChunk', () => {
-      /**
-       * Drive the pages to exhaustion, exactly as the reindex `AdminService`'s job loop does. The unit
-       * under test is one chunk; every assertion below about *the instance* is about this loop
-       * over it, so the loop belongs here rather than being mocked away.
-       */
+      /** Drives the pages to exhaustion, as the reindex `AdminService`'s job loop does. */
       function reindexAll(limit = 100) {
         let cursor: string | null = null;
         const walk = {
@@ -363,12 +345,9 @@ describe('EntityWrites', () => {
       });
 
       /**
-       * The one write in this class that lands without a nudge *and* without a `seq` bump — and
-       * the exemption is earned, not conceded. Clients do read the rows it rewrites; what saves it
-       * is that recomputing from an unchanged document writes back what it read. Reindex yields
-       * new derived state only just after a deploy adds a derivation, and that stale window closes
-       * on the reader's next navigation. Bumping `seq` on every Entity in the instance would fan a
-       * nudge out to every open document to announce that nothing about them changed.
+       * The one write here that lands without a nudge *and* without a `seq` bump: recomputing from
+       * an unchanged document writes back what it read. Only just after a deploy adds a derivation
+       * does it yield new state, and that stale window closes on the reader's next navigation.
        */
       it('rewrites the indexes silently: no seq bump, no nudge', () => {
         seedUnindexed('ealdred', WORLD, { content: CONTENT });
@@ -380,11 +359,7 @@ describe('EntityWrites', () => {
         expect(rowOf(ENTITY).seq).toBe(1);
       });
 
-      /**
-       * Safe to re-run, because the document is the source of truth and the write is a wholesale
-       * replace. This is what lets the button be the general tool for applying *any* future
-       * document-derivation retroactively: a Superadmin never has to ask whether it already ran.
-       */
+      /** Safe to re-run: the document is authoritative and the write is a wholesale replace. */
       it('is idempotent: a second run leaves the same rows and reports the same count', () => {
         seedUnindexed('ealdred', WORLD, { content: CONTENT });
 
@@ -402,10 +377,8 @@ describe('EntityWrites', () => {
       });
 
       /**
-       * Every Entity in every World, and the count says how many. The Superadmin sits outside the
-       * collaboration model, so there is no World to scope the walk to and no membership to filter
-       * it by — a World nobody has touched since the derivation shipped is exactly the one that
-       * needs it. `WORLD`'s own seeded `ENTITY` is walked too, hence three.
+       * The walk is instance-wide: no World scoping, no membership filter. `WORLD`'s own seeded
+       * `ENTITY` is walked too, hence three.
        */
       it('walks every Entity in every World, and counts them', () => {
         const OTHER = 'world-2';
@@ -431,9 +404,8 @@ describe('EntityWrites', () => {
       });
 
       /**
-       * The walk is paged so the event loop can breathe between transactions — an instance-wide
-       * reindex in one synchronous transaction would serve no other request while it ran. A page
-       * of one proves the cursor advances: every Entity is reached, none twice.
+       * Paged so the event loop can breathe between transactions: one synchronous instance-wide
+       * transaction would serve no other request while it ran.
        */
       it('pages through the instance, reaching every Entity exactly once', () => {
         seedUnindexed('ealdred', WORLD, { content: CONTENT });
@@ -469,10 +441,8 @@ describe('EntityWrites', () => {
       });
 
       /**
-       * The repair tool has to work on the instance that needs repairing. A document this build
-       * cannot parse is skipped and named, never allowed to roll back the Entities around it —
-       * otherwise one corrupt row denies every other Entity its derivation, and the button that
-       * exists to fix a damaged instance is exactly the button a damaged instance cannot press.
+       * A document this build cannot parse is skipped and named, never allowed to roll back the
+       * Entities around it: one corrupt row must not deny every other Entity its derivation.
        */
       it('skips a document it cannot parse, reports it, and reindexes the rest', () => {
         seedUnindexed('ealdred', WORLD, { content: CONTENT });
@@ -494,9 +464,8 @@ describe('EntityWrites', () => {
       });
 
       /**
-       * A row exactly as an instance that predates the derivation holds it: an authoritative
-       * document, and not one derived row to its name. Seeded raw, so the walk's behaviour is
-       * observed independently of `insert`'s — which would have derived them on the way in.
+       * A document with no derived rows at all. Seeded raw, so the walk is observed independently
+       * of `insert`, which would have derived them on the way in.
        */
       function seedUnindexed(id: string, worldId: string, body: EntityBody): void {
         seedRaw(id, worldId, JSON.stringify(body), 'note');
@@ -530,10 +499,8 @@ describe('EntityWrites', () => {
     });
 
     /**
-     * A typed Entity-Link Field (#190) feeds both derived indexes through the one derive pass: its
-     * value materialises an edge (so a Field relation reaches the World Graph) and, when facetable,
-     * a Field-facet row keyed by the *target id* (so filter-by-link is a stable lookup). Both are
-     * resolved against the Entity's registered Fields, then wholesale-replaced like every derivation.
+     * A typed Entity-Link Field (#190) feeds both derived indexes: its value materialises an edge
+     * and, when facetable, a Field-facet row keyed by the *target id*.
      */
     describe('Entity-Link Field edges + facets (#190)', () => {
       beforeEach(() => {
@@ -648,10 +615,8 @@ describe('EntityWrites', () => {
 
     /**
      * SQLite binds at most 32766 parameters per statement, and an edge row binds five. A single
-     * `VALUES` list therefore hard-fails past 6553 edges with "too many SQL variables" — rolling
-     * back the save and leaving the document permanently unsavable. A Hex Map naming that many
-     * Entities across its Hexes, Features, and Regions is inside the "low thousands of nodes" a
-     * World is expected to hold, so the insert chunks.
+     * `VALUES` list therefore hard-fails past 6553 edges with "too many SQL variables", rolling
+     * back the save and leaving the document unsavable — so the insert chunks.
      */
     it('stores an edge set far larger than SQLite’s bound-parameter limit', () => {
       const hexes = Object.fromEntries(
@@ -702,11 +667,8 @@ describe('EntityWrites', () => {
   });
 
   /**
-   * The kind *is* the Rights verb, so the kind determines the predicate — this is what deletes
-   * `patch()`'s `changesVisibility ? writeFilter : editFilter` ternary, in which the caller chose
-   * the rule that judged it.
-   *
-   * All four actors below can *read* the Entity; only the verb separates them.
+   * The kind *is* the Rights verb, so the kind determines the predicate. All four actors below
+   * can *read* the Entity; only the verb separates them.
    */
   describe('the kind picks the predicate', () => {
     const CARL = 'carl'; // A World Owner — curates the shared surface, owns no Entity.
@@ -877,11 +839,10 @@ describe('EntityWrites', () => {
     });
 
     /**
-     * The World-membership fan-out. Rights on a `shared` Entity derive from the World's membership
-     * set (`canRead` = `… ∨ (shared ∧ member)`, `canWrite` = `… ∨ (shared ∧ world-owner)`), so a
-     * membership change moves them — and the follower must be told. The `seq` bump is the
-     * load-bearing half: nudging without it would leave the follower's freshness gate dropping the
-     * frame and its `rights` array stale, which is the half-fix ADR-0045 rejects.
+     * Rights on a `shared` Entity derive from the World's membership set (`canRead` =
+     * `… ∨ (shared ∧ member)`, `canWrite` = `… ∨ (shared ∧ world-owner)`), so a membership change
+     * moves them and the follower must be told. The `seq` bump is required: nudging without it
+     * leaves the follower's freshness gate dropping the frame and its `rights` array stale.
      */
     it('bumpWorldShared bumps and nudges the World’s shared Entities, and only those', () => {
       const OTHER = 'world-2';

@@ -7,10 +7,7 @@ import {
 
 const domainField = { key: 'domain', label: 'Domain', dataType: { kind: 'string' as const } };
 const alignmentField = { key: 'alignment', label: 'Alignment', dataType: { kind: 'string' as const } };
-/**
- * A World Owner's own **Structured Field**: a plugin data-type on a type they defined, no code (#201).
- * An invented kind, as everywhere in the domain's specs — no plugin's id belongs here.
- */
+/** An invented kind, as everywhere in the domain's specs — no plugin's id belongs here. */
 const battlemapField = { key: 'battlemap', label: 'Battlemap', dataType: { kind: 'test.board' as const } };
 
 describe('userDefinedTypeIdSchema', () => {

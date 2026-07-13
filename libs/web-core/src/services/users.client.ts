@@ -4,12 +4,9 @@ import { Observable } from 'rxjs';
 import { CreateUserRequest, InstanceRole, UserAccount } from '@hexly/domain';
 
 /**
- * HTTP client for the user-management (`/api/users`) surface (ADR-0047): account
- * management with zero content powers. Stateless — the users panel reads {@link list}
- * and issues the mutations. Unlike the public {@link UserDirectoryClient} directory,
- * these rows carry the email (a management concern). The Superadmin flag is toggled
- * here too — one page, one client — even though the server refuses it for a plain
- * `manage-users` holder.
+ * HTTP client for the user-management (`/api/users`) surface (ADR-0047). Unlike the public
+ * {@link UserDirectoryClient} directory, these rows carry the email. {@link setSuperadmin} lives
+ * here too, though the server refuses it for a plain `manage-users` holder.
  */
 @Injectable({ providedIn: 'root' })
 export class UsersClient {
@@ -32,9 +29,8 @@ export class UsersClient {
   }
 
   /**
-   * Replace the account's whole Instance-Role set (ADR-0047) — grant/revoke
-   * `manage-users` and `create-worlds` in one write. Superadmin is not a member;
-   * it has its own endpoint.
+   * Replace the account's whole Instance-Role set (ADR-0047). Superadmin is not a member of
+   * the set; it has its own endpoint.
    */
   setRoles(id: string, roles: readonly InstanceRole[]): Observable<void> {
     return this.http.patch<void>(`/api/users/${id}/roles`, { roles });

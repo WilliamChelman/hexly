@@ -15,13 +15,10 @@ interface RouteTitle {
 }
 
 /**
- * The single owner of the browser tab title (ADR-0014). It composes two inputs —
- * the active route's title key (fed by {@link TranslationTitleStrategy}) and the
- * open document's name (pushed by the page that owns the document, e.g. the
- * editor) — and re-resolves whenever either changes or the language flips, with
- * no navigation. Centralising the write here means a feature page sets its title
- * by calling {@link setDocumentName}, never by reaching for the DOM `Title` or
- * knowing the brand format.
+ * The single owner of the browser tab title (ADR-0014): it composes the active route's title key
+ * (fed by {@link TranslationTitleStrategy}) with the open document's name, and re-resolves whenever
+ * either changes or the language flips, with no navigation. A feature page sets its title through
+ * {@link setDocumentName}, never through the DOM `Title`.
  */
 @Injectable({ providedIn: 'root' })
 export class TitleService {
@@ -47,11 +44,10 @@ export class TitleService {
   }
 
   /**
-   * Set (or clear with `null`) the open document's display name. A route with a
-   * brand template composes it ("Aldermoor — Hexly"); until it is set, that route
-   * falls back to its static key. The page that owns the document pushes its name
-   * here and clears it (`null`) when it leaves, so a stale name never shadows the
-   * next page's title.
+   * Set (or clear with `null`) the open document's display name. A route with a brand template
+   * composes it ("Aldermoor — Hexly"); until it is set, that route falls back to its static key.
+   * The owning page must clear it (`null`) when it leaves, or a stale name shadows the next
+   * page's title.
    */
   setDocumentName(name: string | null): void {
     this._documentName.set(name);

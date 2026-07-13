@@ -11,11 +11,10 @@ import {
 } from '@angular/cdk/menu';
 
 /**
- * The app's menu primitives over CDK Menu (ADR-0007). CDK owns the behavior — focus,
- * keyboard, the overlay, ARIA roles, and the menu-stack DI that closes menus on select;
- * these primitives own the one consistent panel + row chrome (`menu-panel` / `menu-item`,
- * styles.css), composed onto the CDK directives via `hostDirectives` so callers write
- * plain buttons and links:
+ * The app's menu primitives over CDK Menu (ADR-0007): CDK's behaviour — focus, keyboard, the
+ * overlay, ARIA roles, and the menu-stack DI that closes menus on select — composed via
+ * `hostDirectives` under the app's panel + row chrome (`menu-panel` / `menu-item`,
+ * styles.css), so callers write plain buttons and links:
  *
  *   <button [appMenuTrigger]="actions">…</button>
  *   <ng-template #actions>
@@ -32,10 +31,10 @@ import {
  */
 
 /**
- * Opens a menu from the host element: `[appMenuTrigger]="theTemplate"`. Composes
- * {@link CdkMenuTrigger} and re-declares its two providers — `hostDirectives` don't carry a
- * directive's `providers`, so without this the root trigger's menu-stack goes missing
- * (`NG0201: cdk-menu-stack`). The `cdkMenuTriggerFor` input is re-aliased to the selector.
+ * Opens a menu from the host element: `[appMenuTrigger]="theTemplate"`. Re-declares
+ * {@link CdkMenuTrigger}'s two providers — `hostDirectives` don't carry a directive's
+ * `providers`, so without this the root trigger's menu-stack goes missing
+ * (`NG0201: cdk-menu-stack`).
  */
 @Directive({
   selector: '[appMenuTrigger]',

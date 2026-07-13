@@ -13,10 +13,8 @@ import { OutlineStore } from '../services/outline-store';
 
 /**
  * The Outline panel (CONTEXT.md): a nested, click-to-jump list of the Content's
- * headings with the heading currently scrolled into view highlighted. Reads the
- * derived heading list from {@link OutlineStore} and owns the only DOM work —
- * scrolling to a heading and the scrollspy that tracks the active one. Rendered
- * only while open, so its scrollspy lives exactly as long as the panel.
+ * headings, highlighting the one currently scrolled into view. Rendered only while
+ * open, so its scrollspy lives exactly as long as the panel.
  *
  * Heading identity is positional: index i is the i-th non-empty heading in
  * document order, matching {@link extractOutline}'s skip rule — so the same index

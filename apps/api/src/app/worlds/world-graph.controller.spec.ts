@@ -14,12 +14,9 @@ import { TypeFieldRegistry } from '../entities/type-field-registry';
 import { WorldsModule } from './worlds.module';
 
 /**
- * `GET /worlds/:id/graph` — the World Graph (ADR-0046, #181).
- *
- * The node-link picture of a World, read off the derived edge index. Its access rule is the
- * strictest of the three edge surfaces: a node appears only if the viewer can read it, and an edge
- * only when the viewer can read *both* endpoints. Unlike *References*, nothing dangles — an edge
- * the viewer cannot fully see is absent, never a ghost node.
+ * `GET /worlds/:id/graph` — the node-link picture of a World, read off the derived edge index
+ * (ADR-0046). A node appears only if the viewer can read it, and an edge only when the viewer can
+ * read *both* endpoints — an edge the viewer cannot fully see is absent, never a ghost node.
  */
 describe('World Graph', () => {
   let app: INestApplication;
@@ -63,11 +60,7 @@ describe('World Graph', () => {
     expect(edges).toEqual([{ source: ealdred, target: mira, descriptor: 'spouse' }]);
   });
 
-  /**
-   * A typed Entity-Link Field relation feeds the same edge index as a Content or map link (#190),
-   * so it appears in the graph and rides the identical both-endpoints access sieve — an edge only
-   * when the viewer can read source *and* target.
-   */
+  /** A typed Entity-Link Field relation feeds the same edge index as a Content or map link. */
   it('renders an Entity-Link Field relation as a graph edge, hidden when an endpoint is private', async () => {
     app
       .get(TypeFieldRegistry)
@@ -105,10 +98,8 @@ describe('World Graph', () => {
   });
 
   /**
-   * The acceptance criterion of #181, and the reason both endpoints are filtered. A `private`
-   * Entity is absolute (no World Owner or Admin override), so it must appear neither as a node —
-   * which would leak its name — nor as the bare id at the far end of a line, which would leak its
-   * existence and its neighbours. Both directions of the edge drop, and nothing dangles.
+   * `private` is absolute (no World Owner or Admin override): the Entity appears neither as a node
+   * nor as the bare id at the far end of a line. Both directions of the edge drop.
    */
   it('never leaks a private Entity as a node or as an edge endpoint', async () => {
     const ada = await signIn('ada@hexly.test');
@@ -152,9 +143,8 @@ describe('World Graph', () => {
   });
 
   /**
-   * The three drops the graph shares one mechanism for: an edge survives only where both endpoints
-   * are nodes. Each case first asserts the raw row *is* in the index — the rows are raw truth
-   * (ADR-0046) — so a green here means the read dropped the edge, not that nothing was written.
+   * An edge survives only where both endpoints are nodes. Each case first asserts the raw row *is*
+   * in the index, so a green means the read dropped the edge, not that nothing was written.
    */
   describe('drops an edge whose target is not a node', () => {
     it('when the target has been deleted', async () => {
@@ -205,10 +195,9 @@ describe('World Graph', () => {
   });
 
   /**
-   * `entities.type` is a plain text column, so a row can carry a type this build does not know: a
-   * legacy row, or a vault imported from a Hexly that has one more Entity Type. The canvas has no
-   * shape to draw it with, so the node drops and the sieve takes its edges with it. Throwing on the
-   * unknown value instead would 500 a whole World's graph over one row every other surface renders.
+   * `entities.type` is a plain text column, so a row can carry a type this build does not know (an
+   * imported vault, say). The node drops and the sieve takes its edges with it; throwing instead
+   * would 500 a whole World's graph over one row every other surface renders.
    */
   it('drops an Entity whose stored type is outside the known set, rather than failing the read', async () => {
     const ada = await signIn('ada@hexly.test');
@@ -331,8 +320,8 @@ describe('World Graph', () => {
   }
 
   /**
-   * The graph as a reader would see it drawn: each edge by the *names* at its ends. Edge ids sort
-   * by uuid, which is stable between reads but arbitrary to a test, so the lines are sorted here.
+   * Each edge rendered by the *names* at its ends. Edges arrive in uuid order — stable but
+   * arbitrary to a test — so the lines are sorted here.
    */
   function drawn({ nodes, edges }: WorldGraph): string[] {
     const name = new Map(nodes.map((n) => [n.id, n.name]));

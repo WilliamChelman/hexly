@@ -1,17 +1,15 @@
 /**
- * User-management and Reindex contracts shared by the API and the web panel. The
- * `/users` surface manages accounts, so — unlike the public `UserSummary`
- * directory — it *does* carry the email: it is the login identity being
- * administered. The Reindex contracts serve the Superadmin `/admin` surface.
+ * User-management (`/users`) and Reindex (Superadmin `/admin`) contracts shared by the API and the
+ * web panel.
  */
 
 import { z } from 'zod';
 import { InstanceRole, instanceRolesSchema, MIN_PASSWORD_LENGTH } from './auth';
 
 /**
- * One account row in the user-management panel (`GET /users`). Carries the roles
- * set and the disabled state the panel renders, plus the email (a management
- * concern), but never the password hash.
+ * One account row in the user-management panel (`GET /users`). Unlike the public `UserSummary`
+ * directory it carries the email — the login identity being administered — but never the password
+ * hash.
  */
 export interface UserAccount {
   readonly id: string;
@@ -25,10 +23,9 @@ export interface UserAccount {
 }
 
 /**
- * The stable, structured reasons the user-management surface refuses a mutation.
- * Returned as `{ code }` in the 4xx body — never prose — so the web maps a code
- * to localized copy rather than string-matching English. The HTTP status still
- * carries the category (409 invariant conflict, 403 tier, 404 unknown).
+ * The stable, structured reasons the user-management surface refuses a mutation. Returned as
+ * `{ code }` in the 4xx body — never prose. The HTTP status carries the category (409 invariant
+ * conflict, 403 tier, 404 unknown).
  */
 export const UsersErrorCode = {
   /** The email is already taken by another account. */

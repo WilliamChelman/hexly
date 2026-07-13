@@ -91,9 +91,8 @@ describe('EntityMetadata', () => {
 });
 
 /**
- * The absent-plugin path, as a reader sees it (ADR-0048). With no map plugin, `core.hexmap` types no
- * key, so the grid is not a Field at all: it falls through to plain Metadata and is shown, rather than
- * being skipped as a Structured Field's value (the test above) or dropped.
+ * With no map plugin, `core.hexmap` types no key: the grid is not a Field at all, so it falls through
+ * to plain Metadata and is shown rather than skipped as a Structured Field's value (ADR-0048).
  */
 describe('EntityMetadata without the Hex Map plugin', () => {
   beforeEach(async () => {

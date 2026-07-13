@@ -1,8 +1,7 @@
 /**
  * The Asset serving URL (ADR-0034): `/assets/<worldId>/<hash>.<ext>`. An
  * unguessable, unauthenticated link — possession of it is the only access control
- * (CONTEXT.md → Asset). The shape lives here so the service that mints it and the
- * edge harvest that reads it back cannot drift.
+ * (CONTEXT.md → Asset).
  */
 
 /** Where an Asset's bytes are served from. `ext` carries its own leading dot (`'.png'`). */

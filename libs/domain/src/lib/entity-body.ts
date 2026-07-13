@@ -1,7 +1,5 @@
 /**
- * Minting an Entity body from the **Fields** its Entity Types declare (ADR-0050) — the join of the
- * body and the Field lens, so it sits beside `entity.ts` rather than in it (`field.ts` already
- * depends on `entity.ts`; only this needs both).
+ * Minting an Entity body from the **Fields** its Entity Types declare (ADR-0050).
  */
 
 import { emptyContent, EntityBody } from './entity';
@@ -9,9 +7,8 @@ import { FieldSchema, Metadata, readField, resolvedStructuredFields } from './fi
 import { NO_STRUCTURED_DATA_TYPES, StructuredDataTypeSet } from './structured-data-type';
 
 /**
- * The one place that mints an empty body for a fresh Entity: blank Content, plus the defaults
- * `fields` declare. With no arguments — a caller with no type context, or one clearing the editor —
- * it yields Content and nothing else.
+ * An empty body for a fresh Entity: blank Content, plus the defaults `fields` declare. With no
+ * arguments it yields Content and nothing else.
  */
 export function emptyEntityBody(
   fields: readonly FieldSchema[] = [],
@@ -21,10 +18,9 @@ export function emptyEntityBody(
 }
 
 /**
- * Mint the default value of every declared Field that has none — the reconcile a *type change* runs,
- * so adding a type to a Note gives its **Structured Field**'s View something to open on (#189). Only a
- * **Structured Field** declares a default ({@link StructuredDataType.empty}); for a `string` or a
- * `number`, absent *is* unset.
+ * Mint the default value of every declared Field that has none — the reconcile a *type change* runs.
+ * Only a **Structured Field** declares a default ({@link StructuredDataType.empty}); for a `string`
+ * or a `number`, absent *is* unset.
  *
  * Adds, never overwrites: a present value stays, however malformed (validation is forward-only), and
  * dropping a type never strips its values. Returns the same reference when there is nothing to mint,

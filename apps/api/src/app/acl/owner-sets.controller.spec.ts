@@ -10,10 +10,8 @@ import { ConfigModule } from '../config/config.module';
 import { WorldsModule } from '../worlds/worlds.module';
 
 /**
- * Symmetric ownership sets (ADR-0037, #158): ownership of Worlds and Entities is a
- * set of equal Owners, guarded by a single ≥1-Owner invariant. These specs assert
- * externally observable authorization outcomes across seeded users — who can reach
- * and manage what after add/remove/resign — never the predicate internals.
+ * Symmetric ownership sets (ADR-0037): ownership of Worlds and Entities is a set of equal
+ * Owners, guarded by a single ≥1-Owner invariant.
  */
 describe('Owner sets', () => {
   let app: INestApplication;

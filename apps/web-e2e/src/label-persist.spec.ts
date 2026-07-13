@@ -1,12 +1,9 @@
 import { createEntity, enterLibrary, expect, flushSave, test, savedGrid } from './fixtures';
 
 /**
- * The Label journey (issue #10): a free-positioned label placed on the map, its
- * text edited, survives a save and reload. Like the paint and feature journeys
- * it crosses every seam — canvas input, the inspector edit, a versioned save,
- * and a load on reload. A Label is free-positioned (a world point, not a hex),
- * so we prove the round trip with a direct API read of the persisted document
- * (ADR-0009) and confirm it re-renders by re-selecting it on the canvas.
+ * A Label is free-positioned (a world point, not a hex). Its text survives a save and
+ * reload: proven with a direct API read of the persisted document (ADR-0009), then by
+ * re-selecting it on the canvas to show it re-rendered where it was saved.
  */
 test('places a label, edits its text, saves, and it survives a reload', async ({ page, request }) => {
   await enterLibrary(page);

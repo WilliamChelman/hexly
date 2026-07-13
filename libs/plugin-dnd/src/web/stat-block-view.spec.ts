@@ -72,11 +72,8 @@ describe('StatBlockView', () => {
     expect(session.body().metadata).toMatchObject({ challenge_rating: 13 });
   });
 
-  /**
-   * The block is the only surface a monster's optional Fields have: the create dialog collects required
-   * ones only, and a type with a bespoke view affords no generic Field view. An unrendered Field would
-   * be unsettable anywhere in the app.
-   */
+  // The block is the only surface a monster's optional Fields have (the create dialog collects the
+  // required ones only), so an unrendered Field would be unsettable anywhere in the app.
   it('offers an editable slot for every Field the type declares, not just the required one', () => {
     const { fixture, session, el } = render({ challenge_rating: 5 });
 

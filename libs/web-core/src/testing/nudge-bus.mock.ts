@@ -1,11 +1,7 @@
 import { Observable, Subject, filter } from 'rxjs';
 import { FollowSignal, InterestRef } from '@hexly/domain';
 
-/**
- * Spy-backed stand-in for {@link NudgeBusClient} (ADR-0044). `follow` is a spy returning the
- * ref's nudge stream (subscribing = declaring interest); {@link emit} pushes a nudge as if the
- * server sent one.
- */
+/** Spy-backed stand-in for {@link NudgeBusClient}. */
 export class MockNudgeBusClient {
   private readonly nudges = new Subject<FollowSignal>();
 

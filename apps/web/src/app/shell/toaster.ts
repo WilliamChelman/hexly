@@ -93,8 +93,7 @@ export class Toaster {
       el.showPopover();
     } catch {
       // The Popover API is absent under jsdom, where the `popover` attribute is
-      // inert and toasts render in normal flow. In a real browser the host is an
-      // always-connected singleton, so showPopover() doesn't throw in practice.
+      // inert and toasts render in normal flow.
     }
   }
 }

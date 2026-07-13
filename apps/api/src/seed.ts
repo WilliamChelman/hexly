@@ -1,18 +1,12 @@
 /**
- * Out-of-band user provisioning for the closed set (ADR-0004) — there is no
- * signup endpoint, so this is how members are added. Boots a standalone Nest
- * context and delegates to the same {@link AuthService.seedUser} the tests
- * exercise. Run against the configured `HEXLY_DIR`:
+ * Out-of-band user provisioning for the closed set (ADR-0004) — there is no signup endpoint, so
+ * this is how members are added. Run against the configured `HEXLY_DIR`:
  *
  *   node dist/apps/api/seed.js <email> <password> "<display name>" [--superadmin]
  *
- * `--superadmin` seeds the setup Superadmin (ADR-0037, #163) — the operator's
- * in-app self, outside the collaboration model. Seed at least one at setup so the
- * repair capability exists; every other account is a plain member.
- *
- * `--with-world` also mints a starter World owned by the new user. Off by default so
- * production provisioning stays a bare account; the e2e boot opts in so the suite's
- * World Index is never empty (its `enterLibrary` fixture picks a seeded World card).
+ * `--superadmin` seeds the setup Superadmin (ADR-0037), outside the collaboration model: seed at
+ * least one at setup or no account holds the repair capability. Every other account is a plain
+ * member. `--with-world` also mints a starter World owned by the new user; off by default.
  */
 
 import { Logger } from '@nestjs/common';

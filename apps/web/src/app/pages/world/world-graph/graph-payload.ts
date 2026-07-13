@@ -20,11 +20,10 @@ export interface GraphPayload {
 /**
  * Build the index-addressed arrays for one World Graph.
  *
- * Points come out ordered by **ascending degree**, which buys hub-biased labels for free.
+ * Points come out ordered by **ascending degree**, which buys hub-biased labels.
  * `getSampledPointPositionsMap` is a GPU pass: points rasterise into a grid-sized framebuffer with
  * `depthCompare: 'always'` and no blending, in point-index order, so within a sampling cell the
- * highest index wins. There is no API for choosing the winner — ordering is the API. Put the hubs
- * at the top indices and they out-label the orphans drifting around them.
+ * highest index wins. There is no API for choosing the winner — ordering is the API.
  */
 export function graphPayload(graph: WorldGraph): GraphPayload {
   // Degree by id, before any index exists — the ordering below is what mints the indices. Only the

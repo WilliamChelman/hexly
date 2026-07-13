@@ -7,13 +7,10 @@ import { TypeRegistry } from '../../../entity-types/type-registry';
 
 /**
  * The `>`-prefix static Commands that open the create dialog (ADR-0032): one Command per registered
- * Entity Type — "Create Note", "Create Map", "New monster", a World's own — rather than one Command
- * with a type picker. Each just flips {@link CreateEntityDialogState}; the dialog itself, not this
- * Provider, drives the name/World form and the actual `EntitiesClient.create()` call.
- *
- * Every Command is derived: its id from the type id, its label from the type's own `create` chrome
- * (ADR-0048). Nothing here is per-type, so a plugin's type gets its Command by being registered —
- * the palette names no type, not even the Hex Map's (#199).
+ * Entity Type, rather than one Command with a type picker. Each just flips
+ * {@link CreateEntityDialogState}; the dialog, not this Provider, drives the name/World form and the
+ * `EntitiesClient.create()` call. Ids derive from the type id, labels from the type's own `create`
+ * chrome (ADR-0048), so a registered type gets its Command for free.
  */
 @Injectable({ providedIn: 'root' })
 export class CreateCommands implements CommandProvider {

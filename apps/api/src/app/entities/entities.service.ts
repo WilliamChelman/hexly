@@ -120,9 +120,8 @@ export class EntitiesService {
   ) {}
 
   /**
-   * The {@link TypeFieldResolver} to resolve a `types[]` set through: scoped to `worldId` when one
-   * is in play (so a World's user-defined types resolve too, #191), else the bare instance-wide
-   * plugin registry.
+   * The {@link TypeFieldResolver} for a `types[]` set: World-scoped when a `worldId` is in play, so
+   * that World's user-defined types resolve too; else the instance-wide plugin registry alone.
    */
   private typeResolver(worldId: string | undefined): TypeFieldResolver {
     return worldId ? this.worldTypeFields.resolverFor(worldId) : this.typeFields.resolver;
@@ -209,13 +208,11 @@ export class EntitiesService {
   }
 
   /**
-   * A type's facetable Field facets, surfaced **contextually** (ADR-0048, #188): resolved across the
-   * *active* Type filter (`opts.type`), so a Field facet is absent until its type is the active
-   * filter, and the universal facets are unaffected. Each Field's values drill down like the
-   * universal facets — counted against every other constraint but that Field's own filter.
+   * A type's facetable Field facets, resolved across the *active* Type filter (`opts.type`) — a
+   * Field facet is absent until its type is the active filter. Values drill down like the universal
+   * facets: counted against every other constraint but that Field's own filter.
    *
-   * A **Structured Field** is never offered, whatever its flag says ({@link isFacetableField}) — the
-   * rail does not offer to filter a World by a grid (ADR-0050).
+   * A **Structured Field** is never offered, whatever its flag says ({@link isFacetableField}).
    */
   private countFieldFacets(opts: FacetOptions, filter: SQL): FieldFacet[] {
     const fields = resolveFields(this.typeResolver(opts.worldId), opts.type ?? []).filter(isFacetableField);
@@ -266,8 +263,7 @@ export class EntitiesService {
   /**
    * Count one facetable Field's distinct values under `opts`, off the denormalised
    * `entity_field_facets` index. `(entityId, key, value)` is unique, so `count(*)` per value is the
-   * number of Entities carrying it; `GROUP BY` omits zero-count values, exactly like the universal
-   * facets.
+   * number of Entities carrying it; `GROUP BY` omits zero-count values.
    */
   private countFieldValues(opts: FacetOptions, key: string, filter: SQL): FacetCount[] {
     const match = opts.q ? toFtsMatch(opts.q) : null;
@@ -310,8 +306,7 @@ export class EntitiesService {
   /**
    * Count a multi-valued JSON-array column's values (`types`/`tags`) under `opts`. The array lives
    * in one JSON column, so `json_each` unrolls each entity's array before grouping — an entity with
-   * two types (or two tags) counts toward both values. This is the multi-valued path the Type facet
-   * moved onto when `type` became the `types` set (ADR-0048), shared with the Tag facet it mirrors.
+   * two types (or two tags) counts toward both values.
    */
   private countJsonArray(
     opts: FacetOptions,
@@ -354,11 +349,11 @@ export class EntitiesService {
    * Both directions of an Entity's links, off the derived edge index (ADR-0046). null when the
    * Entity itself is unreachable (404) — the same existence-preserving gate as {@link load}.
    *
-   * The two directions have deliberately different rules. **Outbound** needs no hiding: the caller
-   * already reads this Entity, and a target it may not read (or that no longer exists) resolves to
-   * `null` and renders as a dangling label. **Inbound** is gated on the viewer's access to the
-   * *source*, because an edge names its source — so a `private` Entity linking a `shared` one would
-   * otherwise leak its name and existence to everyone who can reach that `shared` one.
+   * The two directions have different rules. **Outbound** is ungated: a target the caller may not
+   * read (or that no longer exists) resolves to `null` and renders as a dangling label. **Inbound**
+   * is gated on the viewer's access to the *source*, because an edge names its source — a `private`
+   * Entity linking a `shared` one would otherwise leak its name and existence to everyone who can
+   * reach that `shared` one.
    */
   references(userId: string, id: string): EntityReferences | null {
     const access = entityAccess(this.db, userId);
@@ -436,7 +431,7 @@ export class EntitiesService {
 
   /**
    * Every Entity in a World, bodies included, for the vault export. Owner-scoped —
-   * a member never reaches another owner's bodies. Pulls the full `document` column.
+   * a member never reaches another owner's bodies.
    */
   listByWorld(userId: string, worldId: string): EntityDetail[] {
     return this.db
@@ -454,10 +449,8 @@ export class EntitiesService {
     const worldId = this.resolveWorldId(ownerId, req.worldId);
     const fields = resolveFields(this.typeResolver(worldId), req.types);
     const minted = emptyEntityBody(fields, this.typeFields.structuredDataTypes);
-    // Seed it with the create dialog's initial Metadata (a picked type's required Field values),
-    // over the minted defaults rather than in place of them. Not gated: like import, a create
-    // establishes at-rest data — the gate is save-only (#187), and the create dialog runs the
-    // forward-only check client-side before it sends.
+    // Initial Metadata seeds *over* the minted defaults, not in place of them. Ungated: like an
+    // import, a create establishes at-rest data — the Field gate is save-only.
     const body: EntityBody = req.metadata ? { ...minted, metadata: { ...minted.metadata, ...req.metadata } } : minted;
     const row = this.writes.insert({
       ownerId,
@@ -474,8 +467,8 @@ export class EntitiesService {
    * Insert a fully-built Entity for the vault import path: body, metadata, and Type set come
    * pre-converted, and the target World is the caller's fresh import World.
    *
-   * The `types` are inserted unresolved (#203) — an unregistered one still lands, and degrades to
-   * the generic Field view. The Fields are unvalidated: an import establishes data at rest, and the
+   * The `types` are inserted unresolved — an unregistered one still lands, and degrades to the
+   * generic Field view. The Fields are unvalidated: an import establishes data at rest, and the
    * Field gate is forward-only (ADR-0048).
    */
   importEntity(input: InsertEntityInput): void {
@@ -511,14 +504,11 @@ export class EntitiesService {
   }
 
   /**
-   * The forward-only Field gate on the write path (ADR-0048). A save that carries an explicit
-   * `types` set is an **active typed edit** — the generic Field view (or a plugin form) asserting
-   * the Entity's type set — so its Metadata must satisfy those types' Fields: every required Field
-   * present, every present value well-typed. A save that omits `types` is a plain body edit and is
-   * left untouched, so an already-stored (or imported) document with malformed Fields is never
-   * *retroactively* invalidated by an unrelated edit — the gate only bites data the caller actively
-   * types. The vault import ({@link importEntity}) never routes here, and reads / reindex never
-   * validate, so data at rest stays tolerated end to end.
+   * The forward-only Field gate on the write path (ADR-0048). A save carrying an explicit `types`
+   * set is an **active typed edit**, so its Metadata must satisfy those types' Fields: every
+   * required Field present, every present value well-typed. A save that omits `types` is a plain
+   * body edit and is left untouched — an already-stored (or imported) document with malformed
+   * Fields is never *retroactively* invalidated by an unrelated edit.
    */
   private gateTypedEdit(userId: string, id: string, req: SaveEntityRequest): void {
     if (req.types === undefined) return;
@@ -535,9 +525,8 @@ export class EntitiesService {
   /**
    * Resolve `types` to their Fields and reject (400 {@link EntityErrorCode.InvalidFields}) when the
    * Metadata leaves a required Field unmet, ill-types a present value, or an Entity-Link Field
-   * points at a *resolvable* Entity whose types miss its target-type constraint (#190) — the
-   * forward-only check {@link gateTypedEdit} runs for a typed save. A missing or inaccessible
-   * link target stays inert (never an error), so graceful degradation is preserved end to end.
+   * points at a *resolvable* Entity whose types miss its target-type constraint. A missing or
+   * inaccessible link target stays inert — never an error.
    */
   private assertTypedFieldsValid(
     userId: string,
@@ -558,9 +547,9 @@ export class EntitiesService {
   }
 
   /**
-   * The Entity-Link Field target-type check (#190): flag a `type` error when a constrained link
-   * points at a *resolvable* Entity whose types miss the constraint. Resolution runs through the
-   * caller's read filter, so a deleted or inaccessible target resolves to no row and stays inert.
+   * The Entity-Link Field target-type check: flag a `type` error when a constrained link points at
+   * a *resolvable* Entity whose types miss the constraint. Resolution runs through the caller's
+   * read filter, so a deleted or inaccessible target resolves to no row and stays inert.
    */
   private linkTargetTypeErrors(
     userId: string,
@@ -589,8 +578,7 @@ export class EntitiesService {
   /**
    * Metadata patch: a rename (substance, so an entity-level Editor may make it) or a Visibility
    * flip (exposure, so it needs full write rights). Exactly one of the two rides a request
-   * ({@link patchEntityRequestSchema}), which is what lets the kind name the change and the kind
-   * pick the gate. Unreachable → null (404); reachable but not permitted → 403.
+   * ({@link patchEntityRequestSchema}). Unreachable → null (404); reachable but not permitted → 403.
    */
   patch(userId: string, id: string, changes: { name?: string; visibility?: Visibility }): EntityDetail | null {
     const result = this.writes.mutate(
@@ -945,10 +933,9 @@ function fieldFilters(fields: readonly FieldFilter[]): SQL[] {
 
 /**
  * One `gte`/`lte` range bound. The materialised `num` column *is* the numeric-ness signal (set only
- * for a `number` Field), so a row with `num` compares numerically and one without compares its
- * `value` lexically (ISO dates sort correctly as text) — no need to know the Field's data-type at
- * filter time, so a stale URL that omits the active type still compares a number as a number. A
- * non-finite numeric bound (a hand-edited URL) matches no numeric row rather than binding NaN.
+ * for a `number` Field): a row with `num` compares numerically, one without compares its `value`
+ * lexically (ISO dates sort correctly as text) — so the Field's data-type need not be known at
+ * filter time. A non-finite numeric bound matches no numeric row rather than binding NaN.
  */
 function rangeBound(value: string, op: '>=' | '<='): SQL {
   const n = Number(value);
@@ -957,18 +944,14 @@ function rangeBound(value: string, op: '>=' | '<='): SQL {
   return sql`(CASE WHEN f.num IS NOT NULL THEN ${numeric} ELSE ${lexical} END)`;
 }
 
-/**
- * The same predicates {@link EntitiesService.list} applies, minus paging, so a
- * facet count and the page it annotates always agree on the filtered set.
- */
+/** The same predicates {@link EntitiesService.list} applies, minus paging. */
 function facetWhere(opts: FacetOptions, match: string | null, filter: SQL) {
   return and(filter, ...filters(opts), match ? sql`entities_fts MATCH ${match}` : undefined);
 }
 
 /**
  * A row matches if its JSON-array `column` (`types` or `tags`) contains any of `values`:
- * `json_each` unrolls the stored array so `value IN (...)` tests array membership. Shared by the
- * Type and Tag filters, both multi-valued since the `type` → `types` flip (ADR-0048).
+ * `json_each` unrolls the stored array so `value IN (...)` tests array membership.
  */
 function hasAny(column: typeof entities.types | typeof entities.tags, values: readonly string[]) {
   const list = sql.join(
@@ -991,11 +974,7 @@ function toFtsMatch(q: string): string {
 
 type SummaryRow = Omit<typeof entities.$inferSelect, 'document'>;
 
-/**
- * Exactly the columns {@link toSummary} reads — narrower than {@link SummaryRow}, so the `list`
- * projection (which skips `contentText` for weight, and `seq` because a summary carries no
- * freshness key — only the detail a follower holds does) satisfies it.
- */
+/** Exactly the columns {@link toSummary} reads, so the narrower `list` projection satisfies it. */
 type SummaryColumns = Omit<SummaryRow, 'contentText' | 'seq'>;
 
 function toSummary(row: SummaryColumns): EntitySummary {

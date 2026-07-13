@@ -5,13 +5,10 @@ import { WorldStore, ActiveWorld, worldDashboardRoute } from '@hexly/web-core';
 import { Icon, Rule, MenuGroup, MenuItem, MenuItemRadio, MenuPanel, MenuTrigger } from '@hexly/web-ui';
 
 /**
- * The World Switcher (ADR-0028): a compact quick-hop dropdown that sits at the
- * nav-rail masthead (under the brand), at both rail widths. It is pure navigation
- * — the trigger shows the current World as a square gilt crest tile (its name
- * beside the tile when expanded, the tile alone when collapsed),
- * the menu lists every reachable World and switches by URL (the active World is a
- * URL fact, {@link ActiveWorld}), and offers a path to the World Index. It does
- * not manage Worlds — create/rename/delete live on the Index (#121).
+ * The World Switcher (ADR-0028): a quick-hop dropdown at the nav-rail masthead.
+ * Pure navigation — it lists every reachable World and switches by URL (the active
+ * World is a URL fact, {@link ActiveWorld}), and offers a path to the World Index.
+ * It does not manage Worlds: create/rename/delete live on the Index.
  */
 @Component({
   selector: 'app-world-switcher',

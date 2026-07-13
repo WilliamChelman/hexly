@@ -4,16 +4,12 @@ import { GenericFieldView } from './generic-field-view';
 
 /**
  * The core View registrations, bound to the {@link ViewRegistry} the same way a bundled plugin
- * registers its own (ADR-0048, *Views* amendment). Kept here beside {@link ContentView} — not in the
- * root `ViewRegistry` — so the heavy view bodies (TipTap) load with the lazy entity chunk and never
+ * registers its own (ADR-0048). Kept here beside {@link ContentView} — not in the root
+ * `ViewRegistry` — so the heavy view bodies (TipTap) load with the lazy entity chunk and never
  * reach the initial bundle. {@link EntityPage} registers these on construct.
  *
  * Neither belongs to a Type: {@link ContentView} renders the base body every Entity has, and
- * {@link GenericFieldView} is the fallback for a type with no registered view. The map View is a
- * plugin's, and registers through `providePluginHexmap()` (#199) — nothing here knows what a hex is.
- *
- * The toggle label keys are carried verbatim from the old inline `VIEWS` list so the Note button
- * reads identically (`editorShell.view.note` labels the content view).
+ * {@link GenericFieldView} is the fallback for a type with no registered view.
  */
 export const CORE_VIEW_DEFINITIONS: readonly ViewDefinition[] = [
   {

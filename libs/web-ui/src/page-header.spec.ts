@@ -2,12 +2,6 @@ import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { PageHeader } from './page-header';
 
-/**
- * The reuse contract every page-owned header depends on (ADR-0022): content
- * tagged for a slot lands in that slot. Plain pages and the rich editor share
- * this one frame, so the projection is the seam worth pinning down here — the
- * rest (rail, navigation, per-page content) is asserted end-to-end.
- */
 describe('PageHeader', () => {
   @Component({
     imports: [PageHeader],

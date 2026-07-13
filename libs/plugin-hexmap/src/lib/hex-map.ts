@@ -1,9 +1,7 @@
 /**
  * The Hex Map document: the sparse, infinite plane a user paints (CONTEXT.md).
- * A Hex exists *only* where painted, so the document stores hexes in a Record
- * keyed by coordinate — an absent key is Void, costing no storage. The Zod
- * schema here is the single source of truth: the document types are inferred
- * from it, and it validates on the way in and out.
+ * A Hex exists *only* where painted: hexes live in a Record keyed by coordinate,
+ * and an absent key is Void.
  */
 
 import { z } from 'zod';
@@ -32,9 +30,7 @@ export interface Terrain {
 
 /**
  * The built-in terrain palette. Ids are stable (stored in documents); labels
- * and fills are presentation. `as const satisfies` keeps the ids as literals —
- * so {@link TerrainId} is a real union, not `string` — while still checking
- * each entry against {@link Terrain}.
+ * and fills are presentation.
  */
 export const terrainPalette = [
   { id: 'grass', label: 'Grassland', fill: '--color-terrain-grass' },
@@ -45,10 +41,7 @@ export const terrainPalette = [
   { id: 'sky', label: 'Sky', fill: '--color-terrain-sky' },
 ] as const satisfies readonly Terrain[];
 
-/**
- * Build a Zod enum from a palette's ids, isolating the non-empty-tuple cast Zod
- * requires while preserving the inferred literal types.
- */
+/** Build a Zod enum from a palette's ids, isolating the non-empty-tuple cast Zod requires. */
 function idEnum<Id extends string>(ids: readonly Id[]) {
   return z.enum(ids as [Id, ...Id[]]);
 }
@@ -62,17 +55,13 @@ export interface Feature {
   readonly id: string;
   /** Human-facing name for the palette (CONTEXT.md → Feature). */
   readonly label: string;
-  /**
-   * The SVG path (`d`) of the marker, drawn in a 24×24 box. The single source
-   * of truth for both the canvas Path2D and the palette/icon component.
-   */
+  /** The SVG path (`d`) of the marker, drawn in a 24×24 box. */
   readonly path: string;
 }
 
 /**
  * The built-in Feature library. Ids are stable (stored in documents); labels
- * and paths are presentation. `as const satisfies` keeps the ids as literals so
- * {@link FeatureId} is a real union, not `string`.
+ * and paths are presentation.
  */
 export const featureLibrary = [
   {
@@ -88,8 +77,7 @@ export const featureIdSchema = idEnum(featureLibrary.map((f) => f.id));
 
 /**
  * A feature placed on a Hex: a reference to a built-in library id, plus an
- * optional Entity Link of its own — distinct from the host Hex's link, so a
- * settlement icon can point at a different Entity than its tile.
+ * optional Entity Link of its own — distinct from the host Hex's link.
  */
 export const featureRefSchema = z.object({
   ref: featureIdSchema,
@@ -98,9 +86,7 @@ export const featureRefSchema = z.object({
 
 /**
  * A painted Hex. Carries exactly one Terrain, plus at most one Feature and an
- * optional name (CONTEXT.md → Hex). `feature` and `name` are optional and
- * absent unless set, so a document saved before either existed parses
- * unchanged. The name is structured metadata bound to the coordinate — it
+ * optional name (CONTEXT.md → Hex). The name is bound to the coordinate — it
  * travels with the Hex on move/swap — distinct from a free-positioned Label.
  */
 export const hexSchema = z.object({
@@ -156,10 +142,8 @@ export const labelSchema = z.object({
 });
 
 /**
- * The Hex Map document. `hexes` is sparse: a coordinate key (`coordKey`) is
- * present only where the user painted, absent everywhere else (Void). `regions`
- * and `labels` default to empty so documents saved before they existed still
- * parse and gain the fields on load.
+ * The Hex Map document. `hexes` is sparse: a coordinate key ({@link coordKey})
+ * is present only where the user painted, absent everywhere else (Void).
  */
 export const hexMapSchema = z.object({
   hexes: z.record(z.string(), hexSchema),

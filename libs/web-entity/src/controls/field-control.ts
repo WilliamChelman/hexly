@@ -4,10 +4,8 @@ import { EntityLinkValue, entityLinkValueSchema, EntitySummary, FieldSchema } fr
 import { EntitySearchPicker } from '@hexly/web-ui';
 
 /**
- * One data-type-appropriate control for a typed Field (ADR-0048), shared by {@link GenericFieldView}
- * and the add-type prompt (#189). Presentational: reads a raw Metadata `value`, emits the edited one
- * coerced to the Field's data-type (a `list` splits on commas, a `number` empties to `undefined`, an
- * `entityLink` an `{ entityId, label }` picked through a target-type-constrained Entity search, #190).
+ * One data-type-appropriate control for a typed Field (ADR-0048). Reads a raw Metadata `value`, emits
+ * the edited one coerced to the Field's data-type.
  */
 @Component({
   selector: 'app-field-control',

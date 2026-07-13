@@ -3,10 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { NudgeBusClient } from './nudge-bus.client';
 
-/**
- * Stand-in for the browser's EventSource (absent in jsdom). Captures listeners so a test can
- * fire the server's `ready`/`nudge` frames, and records `close()` so idle-close is observable.
- */
+/** Stand-in for the browser's EventSource, which is absent in jsdom. */
 class FakeEventSource {
   static instances: FakeEventSource[] = [];
   readonly listeners = new Map<string, (e: { data: string }) => void>();

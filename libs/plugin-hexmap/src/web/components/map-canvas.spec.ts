@@ -7,11 +7,10 @@ import { HexMapStore } from '../services/hexmap-store';
 import { MapCanvas } from './map-canvas';
 
 /**
- * The keyboard contract of the map surface (issue #27): letters arm top-level
- * Tools, `1`–`9` pick the armed Tool's nth Subtool, undo/redo stay on Cmd/Ctrl+Z,
- * and every binding is suppressed while a text field is focused. The handler is a
- * `window:keydown` host listener, so the tests dispatch real keydown events that
- * bubble to the window once the canvas is mounted.
+ * The keyboard contract of the map surface: letters arm top-level Tools, `1`–`9` pick the armed
+ * Tool's nth Subtool, undo/redo stay on Cmd/Ctrl+Z, and every binding is suppressed while a text
+ * field is focused. The handler is a `window:keydown` host listener, so the events are dispatched
+ * on the window.
  */
 describe('MapCanvas keyboard', () => {
   let store: HexMapStore;

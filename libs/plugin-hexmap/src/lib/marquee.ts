@@ -6,8 +6,7 @@ import { hexToPixel, Layout, Point } from './layout';
 /**
  * What a marquee box-selection contains (CONTEXT.md → Marquee): the painted Hex
  * coordinates and the Label ids whose anchor point falls inside the rectangle.
- * Regions are deliberately absent — a Region has no single position, so it is
- * never marquee-selectable.
+ * Regions are never included — a Region has no single position.
  */
 export interface MarqueeHits {
   readonly hexes: Axial[];
@@ -22,9 +21,8 @@ function inRect(rect: Rect, point: Point): boolean {
 /**
  * The painted Hexes and Labels a world-space marquee `rect` selects under
  * `layout`. A Hex counts when its pixel centre falls inside the rect; a Label
- * when its anchor `position` does. Walks only the hexes the `rect` could
- * contain ({@link hexesInRect}), so a live marquee drag costs the box's area
- * rather than the whole (possibly huge) document. Regions are never returned.
+ * when its anchor `position` does. Regions are never returned. Costs the box's
+ * area, not the document's size ({@link hexesInRect}).
  */
 export function marqueeHits(layout: Layout, doc: HexMap, rect: Rect): MarqueeHits {
   const hexes: Axial[] = [];

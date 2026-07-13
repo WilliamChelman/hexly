@@ -7,9 +7,9 @@ import { Eyebrow, PageHeader, Panel } from '@hexly/web-ui';
 import { GraphCanvas, GraphOpen } from './graph-canvas';
 
 /**
- * The World Graph page at `/w/:worldId/graph` (#181): the World's readable Entities as nodes, their
- * Entity Links as edges. A read-only *derived* view — it authors nothing, and the endpoint has
- * already dropped every Entity and every edge this viewer may not see, so nothing here filters.
+ * The World Graph page at `/w/:worldId/graph`: the World's readable Entities as nodes, their Entity
+ * Links as edges. The endpoint has already dropped every Entity and every edge this viewer may not
+ * see, so nothing here filters.
  *
  * The whole World arrives in one payload and stays in memory for the life of the page; a `world`
  * nudge says nothing about whether an Entity's links moved, so the graph refreshes on open only.
@@ -75,10 +75,7 @@ export class WorldGraph {
     });
   }
 
-  /**
-   * A click on a node opens the Entity it draws — the graph is a way *into* the World. A Ctrl/Cmd
-   * (or middle) click opens it in a new tab, matching how the same modifier behaves on any link.
-   */
+  /** A Ctrl/Cmd (or middle) click opens the Entity in a new tab, as the modifier does on any link. */
   protected openEntity({ id, newTab }: GraphOpen): void {
     const worldId = this.activeWorld.worldId();
     if (!worldId) return;

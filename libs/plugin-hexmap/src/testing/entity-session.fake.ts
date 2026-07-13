@@ -5,20 +5,15 @@ import { applyPatches as immerApplyPatches, Draft, Patch, produceWithPatches } f
 import { ENTITY_SESSION, EntitySession, VIEW_FIELD_KEY } from '@hexly/web-entity';
 import { HexMapStore } from '../web/services/hexmap-store';
 
-/**
- * Wrap a bare grid as a full body for the fake to hold: the grid is a Metadata value at the
- * `core.hexmap` type's `grid` Field, like any other Field's (ADR-0050).
- */
+/** The grid is a Metadata value at the `core.hexmap` type's `grid` Field (ADR-0050). */
 function bodyWithGrid(grid: HexMap): EntityBody {
   return { content: emptyContent(), metadata: { [HEX_GRID_FIELD.key]: grid } };
 }
 
 /**
- * A minimal in-memory {@link EntitySession} for the map plugin's specs: a body the store edits
- * through {@link mutate}/{@link applyPatches}, plus test-only {@link load}/{@link setWritable}
- * standing in for the app's concrete session. {@link load} mirrors the real reset contract —
- * it bumps {@link loadGeneration}, which drives `HexMapStore`'s reset effect (flush the
- * effects after calling it to observe the reset).
+ * A minimal in-memory {@link EntitySession} for the map plugin's specs. {@link load} bumps
+ * {@link loadGeneration}, which drives `HexMapStore`'s reset effect — flush the effects after
+ * calling it to observe the reset.
  */
 export class FakeEntitySession implements EntitySession {
   private readonly _body = signal<EntityBody>(bodyWithGrid(emptyHexMap()));
@@ -65,21 +60,18 @@ export class FakeEntitySession implements EntitySession {
 }
 
 /**
- * Providers binding {@link ENTITY_SESSION} to a fresh {@link FakeEntitySession} for a spec's
- * TestBed. Provided under both keys so a spec can `TestBed.inject(FakeEntitySession)` to reach
- * the test-only helpers and the store resolves the same instance through the token.
+ * Provided under both keys so a spec can `TestBed.inject(FakeEntitySession)` to reach the
+ * test-only helpers and the store resolves the same instance through {@link ENTITY_SESSION}.
  */
 export function provideFakeEntitySession(): Provider[] {
   return [FakeEntitySession, { provide: ENTITY_SESSION, useExisting: FakeEntitySession }];
 }
 
 /**
- * Providers for a component spec that injects {@link HexMapStore}: the route-scoped store
- * (no longer `providedIn: 'root'`) bound to a fresh fake session, over `core.hexmap`'s own `grid`
- * Field. Inject {@link FakeEntitySession} to reach its test helpers when a spec needs to seed the body.
- *
- * The Field key is explicit because the store requires one; in the app it comes from the entity page's
- * outlet. A spec exercising a second grid overrides {@link VIEW_FIELD_KEY} with its own key.
+ * Providers for a component spec that injects the route-scoped {@link HexMapStore}, over
+ * `core.hexmap`'s own `grid` Field. The Field key is explicit because the store requires one; in
+ * the app it comes from the entity page's outlet. A spec exercising a second grid overrides
+ * {@link VIEW_FIELD_KEY} with its own key.
  */
 export function provideHexMapStoreTesting(): Provider[] {
   return [HexMapStore, { provide: VIEW_FIELD_KEY, useValue: HEX_GRID_FIELD.key }, ...provideFakeEntitySession()];

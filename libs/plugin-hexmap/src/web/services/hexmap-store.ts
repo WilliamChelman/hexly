@@ -59,11 +59,7 @@ export interface RegionSubtool {
   readonly mode: 'add' | 'remove';
 }
 
-/**
- * Draft-mutation recipes shared by the single deletes and the batched
- * {@link HexMapStore.deleteSelected} so they can't drift apart; callers wrap them
- * in a `commit`.
- */
+/** Draft-mutation recipes; callers must wrap them in a `commit`. */
 function removeLabelFrom(draft: HexMap, id: string): void {
   const at = draft.labels.findIndex((l) => l.id === id);
   if (at !== -1) draft.labels.splice(at, 1);
@@ -83,8 +79,7 @@ function eraseHexFrom(draft: HexMap, coord: Axial): void {
 }
 
 /**
- * Set `target.entityId`, or delete it when `entityId` is undefined — a cleared
- * link is absent, not blank. A missing target (stale coordinate) is left untouched.
+ * A cleared link is absent, not blank. A missing target (stale coordinate) is left untouched.
  */
 function setOrClearLink(target: { entityId?: string } | undefined, entityId: string | undefined): void {
   if (!target) return;
@@ -92,17 +87,10 @@ function setOrClearLink(target: { entityId?: string } | undefined, entityId: str
   else delete target.entityId;
 }
 
-/**
- * The Feature Tool's Subtools in palette/keyboard order: each library feature,
- * then Clear last. Single source of the index→Subtool mapping shared by the
- * keyboard and the palette keycaps.
- */
+/** The Feature Tool's Subtools in palette/keyboard order: each library feature, then Clear last. */
 export const featureSubtools: readonly FeatureSubtool[] = [...featureLibrary.map((f) => f.id), 'clear'];
 
-/**
- * Colours a fresh Region cycles through, so two new Regions look distinct.
- * Keyed by the "Region N" number so the colour tracks the name.
- */
+/** Colours a fresh Region cycles through, keyed by the "Region N" number so the colour tracks the name. */
 const NEW_REGION_COLORS = ['#7c9b86', '#b08a4e', '#6f7fae', '#a8674f', '#5f8c8c'];
 
 /** Cold-start Subtool defaults — the state a fresh map and a reloaded map share. */
@@ -119,19 +107,17 @@ export const DEFAULT_LABEL_SIZE = 28;
 export type MoveOutcome = 'moved' | 'blocked' | 'noop';
 
 /**
- * The Hex Map editor: tools, selection, and undo/redo over the grid — but no longer the
- * owner of the grid. The document is the value of a `core.hex-grid` **Structured Field**
- * (ADR-0050), at that Field's key in the central {@link EntitySession}'s Metadata map: reads project
- * off `session.body`, edits go through `session.mutate` (Immer, patches captured), and undo pushes
- * those inverse patches back through `session.applyPatches`. Nothing mutates the document directly,
- * or undo breaks.
+ * The Hex Map editor: tools, selection, and undo/redo over the grid. The document is the value of a
+ * `core.hex-grid` Structured Field (ADR-0050), at that Field's key in the central
+ * {@link EntitySession}'s Metadata map: reads project off `session.body`, edits go through
+ * `session.mutate` (Immer, patches captured), and undo pushes those inverse patches back through
+ * `session.applyPatches`. Nothing may mutate the document directly, or undo breaks.
  *
  * *Which* Field is {@link VIEW_FIELD_KEY}, provided by the entity page — not necessarily
- * `core.hexmap`'s `grid`. An Entity carrying two grids affords two map Views, each with one of these
- * over its own slice of the body, so painting one never touches the other.
+ * `core.hexmap`'s `grid`; one store drives one View over its own slice of the body.
  *
- * Route-scoped, bound beside the session it drives (not `providedIn: 'root'`): it injects
- * the route-scoped {@link ENTITY_SESSION}, so it lives and dies with the open Entity.
+ * Route-scoped (not `providedIn: 'root'`): it injects the route-scoped {@link ENTITY_SESSION}, so it
+ * lives and dies with the open Entity.
  */
 @Injectable()
 export class HexMapStore {
@@ -139,11 +125,10 @@ export class HexMapStore {
 
   /**
    * The Field this store's grid lives at — the grid data-type's Field schema, re-keyed to whichever
-   * Field the active map View renders. Only the key varies: every other property (the `core.hex-grid`
-   * kind, never-facetable, not required) belongs to the data-type, not to the declaring Field.
+   * Field the active map View renders. Only the key varies.
    *
-   * Required, with no default. A host that outlets the map View without a key is a wiring bug, and
-   * falling back to `core.hexmap`'s `grid` would make it *paint the wrong map* rather than fail.
+   * Required, with no default: falling back to `core.hexmap`'s `grid` would make a mis-wired host
+   * *paint the wrong map* rather than fail.
    */
   private readonly field: FieldSchema = { ...HEX_GRID_FIELD, key: inject(VIEW_FIELD_KEY) };
 
@@ -173,16 +158,12 @@ export class HexMapStore {
     return { map: parsed.data, stored: complete };
   });
 
-  /**
-   * The live document — the Entity's grid, recomputed once per grid edit. Read-only to everyone
-   * (the store writes through {@link commit}, never here).
-   */
+  /** The live document — the Entity's grid. Read-only: the store writes through {@link commit}, never here. */
   readonly document = computed<HexMap>(() => this.grid().map);
 
   /**
-   * The transient Selection: owns the reference set and click-cycle anchor,
-   * resolved against the live document. The store projects its UI side effects
-   * (Inspector opening, stale-brush disarm) from here.
+   * The transient Selection: owns the reference set and click-cycle anchor, resolved against the
+   * live document.
    */
   private readonly sel = new MapSelection(this.document);
 
@@ -224,11 +205,8 @@ export class HexMapStore {
   readonly region = this._region.asReadonly();
 
   /**
-   * The membership-paint direction the Inspector's Add ⇄ Remove toggle reflects,
-   * derived from the armed Region's `mode` — the same state {@link applyAt} paints
-   * by, so the toggle can't disagree with a stroke. An armed-but-not-selected
-   * Region falls back to `add` so a freshly-selected Region never inherits the
-   * previous direction.
+   * The membership-paint direction, derived from the armed Region's `mode`. An armed-but-not-selected
+   * Region falls back to `add`, so a freshly-selected Region never inherits the previous direction.
    */
   readonly regionDirection = computed<'add' | 'remove'>(() => {
     const armed = this._region();
@@ -277,19 +255,12 @@ export class HexMapStore {
   readonly canRedo = this._canRedo.asReadonly();
 
   constructor() {
-    // Reset on a *fresh* load, not on our own edits (ADR-0048, *Central store*): the
-    // session bumps loadGeneration only when a new Entity is adopted or the canvas is
-    // cleared for a route swap. The undo patches and selection refs are tied to the old
-    // body — undoing after a load would corrupt the new grid — so both are cleared here,
-    // while an edit (which never bumps the counter) leaves history intact. The document
-    // itself needs no reset: it is derived from the session's body, so it already tracks
-    // the load.
+    // Reset on a *fresh* load, not on our own edits (ADR-0048): the session bumps loadGeneration
+    // only when a new Entity is adopted or the canvas is cleared for a route swap. Undo patches and
+    // selection refs are tied to the old body — undoing after a load would corrupt the new grid.
     //
-    // Reset on a *change* in the counter, compared against the value observed so far —
-    // not merely on the effect running — so the reset is tied to a real load and not to
-    // when effects happen to flush. The store is born clean, so its construction-time
-    // generation needs no reset; only a later bump (or a bump between construction and
-    // the first flush) triggers one.
+    // Gated on a *change* in the counter, not merely on the effect running, so the reset is tied to
+    // a real load and not to when effects happen to flush.
     let seenGeneration = this.session.loadGeneration();
     effect(() => {
       const generation = this.session.loadGeneration();
@@ -379,11 +350,9 @@ export class HexMapStore {
   }
 
   /**
-   * Reset the transient editor state a fresh load invalidates: undo/redo history (its
-   * patches target the old body), the selection and its brush, the armed Tool, and the
-   * dock. Driven by the session's {@link ENTITY_SESSION.loadGeneration} bump, not a
-   * direct call — the document is derived from the session's body, so a load is a fresh
-   * start with no map to set here (ADR-0048).
+   * Reset the transient editor state a fresh load invalidates: undo/redo history (its patches target
+   * the old body), the selection and its brush, the armed Tool, and the dock. The document itself is
+   * derived from the session's body, so there is no map to set here.
    */
   private resetForLoad(): void {
     this.undoStack.length = 0;
@@ -516,9 +485,8 @@ export class HexMapStore {
   }
 
   /**
-   * Each selected label's destination after nudging by `delta`, keyed by id —
-   * shared by the preview and the {@link moveSelection commit} so they can't
-   * drift. Empty for a zero `delta`, so no spurious label write.
+   * Each selected label's destination after nudging by `delta`, keyed by id. Empty for a zero
+   * `delta`, so no spurious label write.
    */
   private movedLabelPositions(labelIds: readonly string[], delta: Point): ReadonlyMap<string, Point> {
     const moved = new Map<string, Point>();
@@ -532,10 +500,8 @@ export class HexMapStore {
   }
 
   /**
-   * What moving the live Selection by `offset`/`labelDelta` *would* produce,
-   * without committing. The canvas reads this each drag frame, and
-   * {@link moveSelection} derives its commit from it, so preview and landed move
-   * can't disagree. Touches no signal, records no edit.
+   * What moving the live Selection by `offset`/`labelDelta` *would* produce, without committing.
+   * Touches no signal, records no edit.
    */
   previewSelectionMove(
     offset: Axial,
@@ -648,10 +614,7 @@ export class HexMapStore {
     });
   }
 
-  /**
-   * Delete the region `id` and its membership, clearing the selection if it
-   * pointed at it — single-step undo for every caller.
-   */
+  /** Delete the region `id` and its membership, clearing the selection if it pointed at it. */
   deleteRegion(id: string): void {
     const committed = this.commit((draft) => removeRegionFrom(draft, id));
     this.sel.dropWhere((ref) => ref.kind === 'region' && ref.id === id);
@@ -747,8 +710,7 @@ export class HexMapStore {
   }
 
   /**
-   * Clear the selection — the one canonical clear every path routes through
-   * (Escape, teardown, a plain click on Void). Closes the Inspector but leaves a
+   * Clear the selection (Escape, teardown, a plain click on Void). Closes the Inspector but leaves a
    * rail-opened Regions list.
    */
   deselect(): void {
@@ -909,16 +871,15 @@ export class HexMapStore {
   }
 
   /**
-   * Run `recipe` through the session's {@link ENTITY_SESSION.mutate}, recording the
-   * returned patches for undo/redo. Returns whether a step was recorded — callers that
-   * re-point the selection use it to know an edit exists to
-   * {@link trackSelectionOnLastEdit stamp}. The recipe touches only the `grid` Metadata key —
-   * every other Field, and the Content, pass through untouched.
+   * Run `recipe` through the session's {@link ENTITY_SESSION.mutate}, recording the returned patches
+   * for undo/redo. Returns whether a step was recorded — callers that re-point the selection use it
+   * to know an edit exists to {@link trackSelectionOnLastEdit stamp}. The recipe touches only the
+   * `grid` Metadata key; every other Field, and the Content, pass through untouched.
    *
    * An unstored grid (absent, or garbage the editor is showing as an empty plane) is *replaced* by
-   * the plane on screen, inside the same mutation as the edit that provoked it — so the recipe always
-   * writes to a well-formed grid, and the repair is one undoable step with its edit rather than
-   * something the user cannot take back. At most once per document.
+   * the plane on screen, inside the same mutation as the edit that provoked it: the recipe always
+   * writes to a well-formed grid, and the repair is one undoable step with its edit. At most once
+   * per document.
    */
   private commit(recipe: (draft: HexMap) => void): boolean {
     const selectionBefore = this.sel.snapshot();

@@ -1,9 +1,6 @@
 import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtures';
 
-/**
- * Full-stack note round-trip: real TipTap keyboard input → versioned save → reload
- * re-renders stored Content. Verifies the opaque snapshot via the API (ADR-0009/0019).
- */
+/** Full-stack note round-trip; the persisted snapshot is opaque (ADR-0009/0019). */
 test('types into a note, saves, and the Content survives a reload', async ({ page, request }) => {
   await enterLibrary(page);
   await page.getByTestId('new-note').click();

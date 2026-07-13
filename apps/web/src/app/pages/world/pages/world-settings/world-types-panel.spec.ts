@@ -12,9 +12,9 @@ import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { WorldTypesPanel } from './world-types-panel';
 
 /**
- * The type-authoring form's draft editing (#191). The Field rows are the crux: every draft edit goes
- * through an immer recipe, and a recipe that *returns* a value (a bare `push(…)`/`Object.assign(…)`)
- * makes immer throw instead of mutating — which silently broke "Add field".
+ * The type-authoring form's draft editing. Every draft edit goes through an immer recipe, and a
+ * recipe that *returns* a value (a bare `push(…)`/`Object.assign(…)`) makes immer throw instead of
+ * mutating.
  */
 describe('WorldTypesPanel', () => {
   let worlds: MockWorldsClient;
@@ -276,10 +276,7 @@ describe('WorldTypesPanel', () => {
   });
 });
 
-/**
- * An Instance that does **not** bundle the map plugin — composed one provider short of the app's, as
- * `type-registry.spec` does it (ADR-0048).
- */
+/** An Instance that does **not** bundle the map plugin — composed one provider short of the app's. */
 describe('WorldTypesPanel without the Hex Map plugin', () => {
   let fixture: ComponentFixture<WorldTypesPanel>;
 

@@ -1,17 +1,16 @@
 /**
  * The World domain: a lightweight container record that groups Entities for one
  * campaign or setting. Not an Entity type — it lives outside the entity model
- * in its own table. The single Zod source of truth for the World model and its
- * REST payloads.
+ * in its own table.
  */
 
 import { z } from 'zod';
 import { ENTITY_LIST_MAX_LIMIT, nameSchema } from './entity';
 
 /**
- * A World container (CONTEXT.md → World): a `name` and its `owners`. The landing
- * page is a derived World Dashboard, not a stored Entity, so a World never
- * points back at an Entity (no circular FK).
+ * A World container (CONTEXT.md → World): a `name` and its `owners`. A World
+ * never points back at an Entity (no circular FK) — the landing page is a
+ * derived World Dashboard, not a stored Entity.
  */
 export const worldSchema = z.object({
   id: z.string(),
@@ -30,9 +29,8 @@ export type WorldRole = z.infer<typeof worldRoleSchema>;
 
 /**
  * The closed set of actions a caller may exercise on a World (CONTEXT.md →
- * Rights): `read` (reachable) and `manage` (World Owner). Reported with the
- * World so surfaces gate on what the server enforces — a World has no substance
- * to `edit`.
+ * Rights): `read` (reachable) and `manage` (World Owner). A World has no
+ * substance to `edit`.
  */
 export const worldVerbSchema = z.enum(['read', 'manage']);
 
@@ -92,10 +90,7 @@ export const updateWorldRequestSchema = z.object({
 
 export type UpdateWorldRequest = z.infer<typeof updateWorldRequestSchema>;
 
-/**
- * Add an Owner to a World or Entity's ownership set; the target must be an
- * existing Instance user. Shared by the Worlds and Entities owner-set endpoints.
- */
+/** Add an Owner to a World or Entity's ownership set; the target must be an existing Instance user. */
 export const addOwnerRequestSchema = z.object({ userId: z.string().min(1) });
 
 export type AddOwnerRequest = z.infer<typeof addOwnerRequestSchema>;
@@ -108,8 +103,7 @@ export interface WorldSummary {
   readonly owners: readonly string[];
   /**
    * The caller's Rights: always present and non-empty — a reachable World
-   * carries at least `read`, an Owner also `manage`. Surfaces gate on this,
-   * not on scanning `owners`.
+   * carries at least `read`, an Owner also `manage`.
    */
   readonly rights: readonly WorldVerb[];
   readonly createdAt: number;
@@ -134,10 +128,10 @@ export interface WorldDetail extends WorldSummary {
 }
 
 /**
- * The result of a vault import — the "what did we lose" instrument. Unreadable
- * files are skipped (never abort the import) and tallied. `constructsDegraded`
- * sums the per-file degradation tallies from the markdown converter;
- * `assetsStored` counts unique embedded images, deduped by content.
+ * The result of a vault import. Unreadable files are skipped (never abort the
+ * import) and tallied. `constructsDegraded` sums the per-file degradation
+ * tallies from the markdown converter; `assetsStored` counts unique embedded
+ * images, deduped by content.
  */
 export interface ImportSummary {
   readonly worldId: string;

@@ -233,9 +233,8 @@ describe('EntityPage layout', () => {
   });
 
   /**
-   * Open the page on a Hex Map and let the map View's chunk land. The View is the plugin's, declared
-   * with `loadComponent` so the canvas never reaches the initial bundle (#199) — so a spec that wants
-   * to see the canvas awaits the very fetch the page kicked off on activation.
+   * Open the page on a Hex Map and await the map View's lazy chunk — the canvas is only in the DOM
+   * once the `loadComponent` fetch the page kicked off on activation resolves (#199).
    */
   async function mountMap() {
     TestBed.inject(EntitySession).adopt(hexmapWithContent('The reach lies north.'));
@@ -266,11 +265,7 @@ describe('EntityPage layout', () => {
     expect(el.querySelector('app-regions-panel')).toBeNull();
   });
 
-  /**
-   * The right dock holds one panel and a rail of toggles (ADR-0013). The Outline and References
-   * share the slot, so opening either closes the other — the reading column reflows once, never
-   * twice, and neither panel can be orphaned behind the other.
-   */
+  /** The Outline and References share the dock's single panel slot (ADR-0013): opening either closes the other. */
   it('swaps the dock between the Outline and References, never showing both', () => {
     TestBed.inject(EntitySession).adopt(noteDetail('Lady Mara'));
     const fixture = TestBed.createComponent(EntityPage);
@@ -299,11 +294,7 @@ describe('EntityPage layout', () => {
     expect(el.querySelector('app-references-panel')).toBeNull();
   });
 
-  /**
-   * Both panels are the same width and float over the same corner, so the reading column must
-   * reflow for either. Reserving room only for the Outline lets the References panel sit on top
-   * of the last inch of every line of prose.
-   */
+  /** Both panels are the same width and float over the same corner: the column reserves room for either. */
   it('reflows the reading column for whichever panel is open', () => {
     TestBed.inject(EntitySession).adopt(noteDetail('Lady Mara'));
     const fixture = TestBed.createComponent(EntityPage);

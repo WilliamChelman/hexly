@@ -45,11 +45,10 @@ describe('selectLabels', () => {
   });
 
   /**
-   * The bug this module exists for. cosmos.gl's sampling grid is anchored to the *screen*, so a pan
-   * slides every node across cell boundaries, re-elects every cell, and labels flicker in and out.
-   * Anchoring the grid in graph space makes the chosen set a property of the World, not the camera:
-   * pan by any amount — including a half cell, which is exactly where a screen grid re-elects — and
-   * the same Entities stay labelled.
+   * cosmos.gl's own sampling grid is anchored to the *screen*, so a pan slides every node across
+   * cell boundaries, re-elects every cell, and labels flicker. This grid is anchored in graph space:
+   * the chosen set is a property of the World, not the camera. A half-cell pan is exactly where a
+   * screen grid re-elects.
    */
   it('chooses the same labels no matter where the viewport is panned', () => {
     const payload = graphPayload(
@@ -90,11 +89,7 @@ describe('selectLabels', () => {
     }
   });
 
-  /**
-   * Culling is the one thing that *may* change with a pan, and it is not flicker: a node scrolling
-   * out of frame takes its label with it. Crucially it does not hand its cell to a loser — `Spoke`
-   * stays unlabelled when `Hub` leaves, because election runs over every node, visible or not.
-   */
+  /** Election runs over every node, visible or not; only the draw is culled to the viewport. */
   it('drops labels that pan off screen without promoting the node that lost their cell', () => {
     const payload = graphPayload(world(['Hub', 'Spoke', 'Far'], ['Hub>Far', 'Hub>Spoke']));
     const positions = positionsOf(payload, {
@@ -121,11 +116,7 @@ describe('selectLabels', () => {
       expect(links.map((i) => payload.descriptors[i])).toEqual(['spouse']);
     });
 
-    /**
-     * Most links carry no descriptor, and a descriptor-less link has nothing to draw. If it still
-     * contended for a cell it would win one on weight alone and silently blank out the labelled
-     * link beside it — a cell spent on nothing.
-     */
+    /** A descriptor-less link has nothing to draw, so it must not contend for a cell at all. */
     it('never lets a descriptor-less link take a cell from one that has a label', () => {
       const payload = graphPayload(
         world(['Hub', 'A', 'B'], ['Hub>A', 'Hub-rules>B']), // Hub>A is bare, and Hub is the heavier end

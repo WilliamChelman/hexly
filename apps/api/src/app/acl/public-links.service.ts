@@ -6,12 +6,10 @@ import { worldLinks, worlds } from '../db/schema';
 import { EntitiesService } from '../entities/entities.service';
 
 /**
- * The unauthenticated read surface for Public Links (ADR-0037, #162): resolves a shared
- * token to exactly its scope and nothing more. A per-entity link yields one Entity
- * (piercing `private`, since the token is an anonymous Viewer grant); a World link yields
- * only that World's `shared` Entities. Every method is strictly read-only — the whole
- * `/public` surface exposes GET routes only, so possession of a URL grants nothing beyond
- * its scope. A revoked (or never-minted) token resolves to null → 404.
+ * The unauthenticated, read-only surface for Public Links (ADR-0037): a token resolves to exactly
+ * its scope. A per-entity link yields one Entity (piercing `private` — the token is an anonymous
+ * Viewer grant); a World link yields only that World's `shared` Entities. A revoked (or
+ * never-minted) token resolves to null → 404.
  */
 @Injectable()
 export class PublicLinksService {
@@ -26,9 +24,9 @@ export class PublicLinksService {
   }
 
   /**
-   * The World behind a World Public Link: its identity plus its `shared` Entity summaries,
-   * or null if the token doesn't resolve (revoked/never minted). A reader opens any listed
-   * Entity through {@link readWorldEntity}. Token → World identity is one join.
+   * The World behind a World Public Link: its identity plus its `shared` Entity summaries, or null
+   * if the token doesn't resolve (revoked/never minted). A reader opens any listed Entity through
+   * {@link readWorldEntity}.
    */
   readWorld(token: string): PublicWorldView | null {
     const world = this.db
@@ -46,9 +44,8 @@ export class PublicLinksService {
   }
 
   /**
-   * One `shared` Entity's read-only body behind a World Public Link — scoped to the token's
-   * World *and* `shared`, so the link reaches that World's shared surface and nothing else.
-   * null (→ 404) for a `private` or out-of-World id: the reader renders a dangling label.
+   * One `shared` Entity's read-only body behind a World Public Link — scoped to the token's World
+   * *and* `shared`. A `private` or out-of-World id yields null (→ 404).
    */
   readWorldEntity(token: string, id: string): EntityDetail | null {
     const worldId = this.resolveWorldToken(token);

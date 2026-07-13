@@ -7,10 +7,7 @@ import { AdminService } from './admin.service';
 
 /**
  * The Superadmin operator surface (ADR-0037, ADR-0046, ADR-0047): the `/admin` repair
- * routes (Reindex today). Imports {@link AuthModule} for the session guard and
- * {@link DbModule} for the DB token, plus {@link EntitiesModule} for the write handle the
- * Reindex walk drives. Reaches all content — the repair tier — unlike the sibling
- * {@link UsersModule}, whose `manage-users` surface reaches none of it.
+ * routes (Reindex today). Reaches all content — the repair tier.
  */
 @Module({
   imports: [AuthModule, DbModule, EntitiesModule],

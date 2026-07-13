@@ -4,8 +4,7 @@ import { ViewPlacement } from './view-definition';
 
 /**
  * The transloco *keys* a type contributes to its page chrome (resolved live by
- * language, ADR-0014). Consolidates what the scattered branches used to hard-code
- * in `TYPE_LABELS` and inline ternaries.
+ * language, ADR-0014).
  */
 export interface TypeLabels {
   /** The header eyebrow tag. */
@@ -24,13 +23,8 @@ export interface TypeLabels {
 
 /**
  * One Entity Type's UI behaviour, registered with the {@link TypeRegistry}
- * (ADR-0048). It gathers everything the `type === 'hexmap'` / `type === 'note'`
- * branches and the ad-hoc `TYPE_LABELS` / `typeIcon` maps used to spread across
- * the entity page, header, card, dashboard, graph, and create surfaces.
- *
- * This prefactor keeps the single-valued `type` and registers only the two core
- * types; the later `types[]` flip and plugin / user-defined types build on this
- * seam.
+ * (ADR-0048) and read by the entity page, header, card, dashboard, graph, and
+ * create surfaces.
  */
 export interface TypeDefinition {
   readonly id: EntityType;
@@ -43,36 +37,32 @@ export interface TypeDefinition {
    */
   readonly labels?: TypeLabels;
   /**
-   * The **authored** display name of a **user-defined type** (#191) — data, not a transloco key, so
-   * it is never translated. Read every type's name through {@link TypeRegistry.name} (or the
-   * `typeName` pipe), which returns this verbatim when present and falls back to a code type's
-   * translated copy otherwise. A core/plugin type omits it.
+   * The **authored** display name of a **user-defined type** — data, not a transloco key, so it is
+   * never translated. Read every type's name through {@link TypeRegistry.name} (or the `typeName`
+   * pipe), which returns this verbatim when present and falls back to a code type's translated copy
+   * otherwise. A core/plugin type omits it.
    */
   readonly labelText?: string;
   /**
    * The Views this type contributes, in header display order (ADR-0048, *Views* amendment). The
    * header toggles the *union* an Entity's types afford, defaulting to the primary type's first View.
    *
-   * An entry is either a {@link ViewId} the type contributes outright — a plain note contributes only
-   * `core.view.content` — or a reference to one of the type's own {@link fields}, whose **Structured
-   * Field** data-type contributes the View: `core.hexmap` declares `[{ field: 'grid' },
-   * CORE_VIEW_CONTENT]`, so it opens on its map with its lore one toggle away (ADR-0050, #200). A
-   * `{ field }` entry naming a Field this type does not declare, or one whose data-type this build
-   * does not register (its plugin is absent), contributes nothing.
+   * An entry is either a {@link ViewId} the type contributes outright, or a reference to one of the
+   * type's own {@link fields}, whose **Structured Field** data-type contributes the View (ADR-0050):
+   * `core.hexmap` declares `[{ field: 'grid' }, CORE_VIEW_CONTENT]`. A `{ field }` entry naming a
+   * Field this type does not declare, or one whose data-type this build does not register (its
+   * plugin is absent), contributes nothing.
    */
   readonly views: readonly ViewPlacement[];
   /**
-   * The type's **Field schema** (ADR-0048, #187): the Metadata keys it types, each
-   * with a data-type and required-ness. A typing *lens* over Metadata — values stay
-   * in the one Metadata map. Which View renders them is the type's own choice, made
-   * in {@link views}: a user-defined type (and any plugin shipping no code) lists
-   * `core.view.fields`; a plugin that ships a bespoke view (`dnd.monster`) lists that
-   * instead. The core types declare no Fields at all, so this is optional.
+   * The type's **Field schema** (ADR-0048): the Metadata keys it types, each with a data-type and
+   * required-ness. A typing *lens* over Metadata — values stay in the one Metadata map. Which View
+   * renders them is the type's own choice, made in {@link views}. The core types declare no Fields.
    */
   readonly fields?: readonly FieldSchema[];
   /**
    * The CSS custom property the World Graph paints this type's nodes with
-   * (resolved to RGBA per theme, ADR-0007). The one type-specific graph knob.
+   * (resolved to RGBA per theme, ADR-0007).
    */
   readonly graphColorToken: string;
 }

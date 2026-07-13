@@ -4,10 +4,8 @@ import { Observable } from 'rxjs';
 import { ReindexJob } from '@hexly/domain';
 
 /**
- * HTTP client for the Superadmin `/api/admin` repair surface (ADR-0046): the Reindex.
- * Stateless — the admin panel starts a walk and polls it. This is the operator's
- * repair tier, outside the collaboration model; the server refuses it for anyone but
- * a Superadmin. Account management lives in the separate {@link UsersClient}.
+ * HTTP client for the `/api/admin` repair surface (ADR-0046): the Reindex. The server
+ * refuses it for anyone but a Superadmin. Account management lives in {@link UsersClient}.
  */
 @Injectable({ providedIn: 'root' })
 export class AdminClient {

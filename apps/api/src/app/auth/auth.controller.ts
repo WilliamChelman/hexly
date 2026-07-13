@@ -28,9 +28,8 @@ import { CurrentUser } from './current-user.decorator';
 export const SESSION_COOKIE = 'hexly_session';
 
 /**
- * Cookie options for the session: HttpOnly, same-site, app-wide, with a
- * lifetime matching the server session (so it survives a browser restart up to
- * the TTL) and `secure` in production only — left off so local http dev works.
+ * `maxAge` matches the server session TTL, so the cookie survives a browser restart up to it.
+ * `secure` is production-only: setting it would break local http dev.
  */
 const COOKIE_OPTS = {
   httpOnly: true,

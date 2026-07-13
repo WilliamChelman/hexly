@@ -1,15 +1,12 @@
 import { Node, mergeAttributes } from '@tiptap/core';
 
 /**
- * A `callout` block (ADR-0033): an Obsidian `[!type]` admonition — a coloured box
- * with a `type` ("note", "warning", …) and an optional `title`. Its content is
- * **block** (`group: 'block'`, `content: 'block+'`), not an atom, so links and
- * other nodes inside stay live and editable — the key requirement for keeping
- * inner `entityLink`s clickable.
+ * A `callout` block (ADR-0033): an Obsidian `[!type]` admonition — a coloured box with a `type`
+ * ("note", "warning", …) and an optional `title`. Its content is **block** (`content: 'block+'`),
+ * not an atom, so nodes inside stay live and editable — notably, inner `entityLink`s stay clickable.
  *
- * Schema only: the Angular node view (type/title chrome + editable body) attaches
- * at the editor via `.extend({ addNodeView })`, so this stays framework-free and
- * loads in a bare `new Editor({ extensions: CONTENT_EXTENSIONS })` spec.
+ * Schema only: the Angular node view (type/title chrome + editable body) attaches at the editor
+ * via `.extend({ addNodeView })`.
  */
 export const calloutNode = Node.create({
   name: 'callout',

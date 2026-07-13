@@ -16,8 +16,7 @@ export interface ListboxProps<T> {
  * Keyboard-driven listbox behaviour (ARIA active-descendant): open/update/close plus
  * ArrowUp/Down/Enter/Tab/Escape over a signal-backed item list, calling back `command` on
  * pick. Driver-agnostic — a `@tiptap/suggestion` plugin or a plain text input feeds it the
- * same {@link ListboxProps}. Subclasses supply only how each row renders and the option-id
- * prefix; all state and key handling live here.
+ * same {@link ListboxProps}. Subclasses supply row rendering and the option-id prefix.
  */
 export abstract class ListboxController<T extends { id: string }> {
   protected readonly visible = signal(false);

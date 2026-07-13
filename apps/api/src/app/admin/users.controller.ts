@@ -26,14 +26,11 @@ import { UsersService } from './users.service';
 
 /**
  * The account-management REST surface (ADR-0037, ADR-0047): the `/users` routes,
- * gated by {@link ManageUsersGuard} behind the session guard. Bodies are validated
- * against the shared Zod schema (ADR-0001) so an invalid payload is a 400 here,
- * never a 500 deeper down. Deliberately holds no route that reaches a World or
- * Entity — the `manage-users` role has zero content powers.
+ * gated by {@link ManageUsersGuard} behind the session guard. Holds no route that
+ * reaches a World or Entity — the `manage-users` role has zero content powers.
  *
  * The public user *directory* (id + displayName, for pickers) is a separate
- * controller at `/users/directory`; this surface carries the email, an account
- * concern.
+ * controller at `/users/directory`; this surface carries the email.
  */
 @Controller('users')
 @UseGuards(SessionAuthGuard, ManageUsersGuard)

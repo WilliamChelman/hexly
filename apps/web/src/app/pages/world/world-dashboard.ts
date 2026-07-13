@@ -24,11 +24,9 @@ const RECENTS_LIMIT = 8;
 const MAPS_LIMIT = 8;
 
 /**
- * The World Dashboard: the per-World landing at `/w/:worldId`. A read-only
- * *derived* view — it authors nothing, only queries the list/facets endpoints:
- * pins, recents, Hex Maps, and at-a-glance Type counts. Creating is the shared
- * {@link NewEntityButton}'s job — from the header, or from an empty World's
- * purposeful empty state — so the first Entity can be of any registered Type (#195).
+ * The World Dashboard: the per-World landing at `/w/:worldId`. Read-only — it authors
+ * nothing, only queries the list/facets endpoints for pins, recents, Hex Maps and Type
+ * counts. Creating is {@link NewEntityButton}'s job.
  */
 @Component({
   selector: 'app-world-dashboard',

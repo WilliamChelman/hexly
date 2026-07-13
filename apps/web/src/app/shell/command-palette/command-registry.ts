@@ -29,9 +29,7 @@ export class CommandRegistry {
 
   /**
    * Sections for every Provider bound to `prefix`, in registration order — a
-   * slower Provider filling in late never reorders the others. Each stream is
-   * seeded with that Provider's previous results, so switching queries shows
-   * the last-known rows until the new ones arrive rather than blanking.
+   * slower Provider filling in late never reorders the others.
    */
   search(prefix: string, query: string): Observable<readonly CommandSection[]> {
     const matching = this.providers().filter((p) => p.prefix === prefix);

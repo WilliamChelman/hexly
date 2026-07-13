@@ -1,10 +1,8 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 
 /**
- * Joins child {@link Button}s into a single segmented control: one shared border,
- * rounded ends, segments sitting flush. Pair with `appButton [active]` for an
- * exclusive choice — the consumer owns `aria-pressed`/`aria-label` and selection.
- * See ADR-0007.
+ * Joins child {@link Button}s into a single segmented control. The consumer owns
+ * `aria-pressed`/`aria-label` and the selection state. See ADR-0007.
  *
  *   <div appButtonGroup [attr.aria-label]="'View' | transloco">
  *     <button appButton variant="ghost" size="sm" [active]="…" aria-pressed="…">Map</button>

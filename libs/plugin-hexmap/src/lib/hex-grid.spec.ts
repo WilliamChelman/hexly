@@ -17,9 +17,7 @@ describe('the core.hex-grid Structured Field (ADR-0050)', () => {
 
   /**
    * A Hex, a Feature, and a Region each carry their own Entity Link (a Label cannot). A map placement
-   * expresses no relationship, so it never carries a Link Descriptor. This harvester is the only place
-   * that knows a link can hang off any of the three — the domain's edge index takes what it returns
-   * without learning what a grid holds.
+   * expresses no relationship, so it never carries a Link Descriptor.
    */
   it('harvests a hex, a feature, and a region link as descriptor-less edges', () => {
     const edges = HEX_GRID_DATA_TYPE.harvestEdges?.(

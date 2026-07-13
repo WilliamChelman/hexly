@@ -16,19 +16,17 @@ import { FieldControl } from '@hexly/web-entity/controls';
 /**
  * The **generic Field View** (`core.view.fields`, ADR-0048, #187): renders an Entity's
  * declared Fields as a typing lens over its one Metadata map, and edits them straight
- * back into it. It does double duty (CONTEXT.md → Type Definition, View):
+ * back into it. It does double duty:
  *
  * - the renderer for a type that declares Fields (a World-defined type, or a plugin
- *   type that ships no bespoke view) — a labelled, data-type-appropriate control per
- *   Field, writing values into Metadata via {@link EntitySession.mutate}; and
- * - the graceful fallback for an Entity whose type has **no registered view** (a
- *   missing plugin): the unknown type shows as an inert chip and its values fall
- *   through to the plain-Metadata display, nothing lost.
+ *   type that ships no bespoke view); and
+ * - the fallback for an Entity whose type has **no registered view** (a missing plugin):
+ *   the unknown type shows as an inert chip and its values fall through to the
+ *   plain-Metadata display.
  *
- * It never forks storage: a Field value lives in the same Metadata map Obsidian
- * import/export round-trips (ADR-0033), so removing a type leaves the values intact
- * as plain Metadata. Editing is gated on {@link EntitySession.writable}; a read-only
- * opener sees the same values as static text.
+ * A Field value lives in the same Metadata map Obsidian import/export round-trips
+ * (ADR-0033), so removing a type leaves the values intact as plain Metadata. Editing is
+ * gated on {@link EntitySession.writable}; a read-only opener sees static text.
  */
 @Component({
   selector: 'app-generic-field-view',
@@ -152,9 +150,8 @@ export class GenericFieldView {
   }
 
   /**
-   * Write a value into the Metadata map through the central store (ADR-0048): a Field is a lens,
-   * so an edit writes the one map every View shares, and {@link writeField} clears the key when the
-   * value is emptied rather than leaving a blank behind. No-op for a read-only opener.
+   * Write a value into the one Metadata map every View shares (ADR-0048). {@link writeField} clears
+   * the key when the value is emptied rather than leaving a blank behind. No-op for a read-only opener.
    */
   protected set(field: FieldSchema, value: unknown): void {
     if (!this.session.writable()) return;

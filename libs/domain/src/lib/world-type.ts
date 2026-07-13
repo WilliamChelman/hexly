@@ -1,8 +1,7 @@
 /**
  * User-defined Type Definitions (CONTEXT.md → Type Definition, ADR-0048): an Entity Type a World
  * Owner authors as data, scoped to one World, rendered by the generic Field view — the data twin of
- * a code-registered Plugin type. The Zod source of truth for the model and its REST payloads; a type
- * carries an `id`, a `label`, and the same {@link fieldSchemaSchema} a plugin declares.
+ * a code-registered Plugin type.
  */
 
 import { z } from 'zod';
@@ -11,9 +10,9 @@ import { FieldSchema, fieldSchemaSchema } from './field';
 import { isFieldViewPlacement, ViewPlacement, viewPlacementSchema } from './view-placement';
 
 /**
- * The namespace a user-defined type id lives under (`world.deity`). Fixing it to `world.` keeps a
- * World Owner from shadowing a plugin id (`core.note`, `dnd.monster`), so the keyspaces never
- * collide. World *scoping* is by storage (`worldId`), not this namespace.
+ * The namespace a user-defined type id lives under (`world.deity`). Reserved, so a World Owner can
+ * never shadow a plugin id (`core.note`, `dnd.monster`). World *scoping* is by storage (`worldId`),
+ * not this namespace.
  */
 export const USER_TYPE_NAMESPACE = 'world';
 
@@ -32,16 +31,14 @@ export const uniqueFieldsSchema = z
   );
 
 /**
- * A user-defined type's ordered **View** list (ADR-0050, #201) — the same {@link ViewPlacement} list a
- * plugin type declares in code, so both run one view-resolution path. Which View an id resolves to is
- * the web's business: a well-formed id this build does not register contributes no toggle.
+ * A user-defined type's ordered {@link ViewPlacement} list (ADR-0050). A well-formed id this build
+ * does not register is valid here — it simply contributes no toggle.
  */
 const typeViewsSchema = z.array(viewPlacementSchema);
 
 /**
- * The refinement both payloads carry: every `{ field }` placement names a Field the same declaration
- * makes. Passed as `.refine(...)` arguments because the two schemas differ in their optionality, not
- * in this rule — so a patch placing a Field must send that Field with it.
+ * Every `{ field }` placement must name a Field the same declaration makes — so a patch placing a
+ * Field must send that Field with it.
  */
 const placesOnlyItsOwnFields = [
   (type: { fields?: readonly FieldSchema[]; views?: readonly ViewPlacement[] }) => {
@@ -52,10 +49,8 @@ const placesOnlyItsOwnFields = [
 ] as const;
 
 /**
- * A stored user-defined type: its `world.`-namespaced `id`, a display `label`, its `fields`, and the
- * ordered `views` they afford. `views` is optional, and **absent is not empty**: a type that named no
- * order falls back to Fields, Content, then its Structured Fields — defaulted by the host, the only
- * half that knows what a View is.
+ * A stored user-defined type. `views` **absent is not empty**: a type that named no order falls back
+ * to Fields, Content, then its Structured Fields — defaulted by the host.
  */
 export const userDefinedTypeSchema = z
   .object({
@@ -74,12 +69,12 @@ export const createUserDefinedTypeRequestSchema = userDefinedTypeSchema;
 export type CreateUserDefinedTypeRequest = z.infer<typeof createUserDefinedTypeRequestSchema>;
 
 /**
- * PATCH /worlds/:id/types/:typeId — rename and/or replace an existing type's `fields` and `views`. The
- * id is a path param (immutable); every body field is optional and each list is sent wholesale.
+ * PATCH /worlds/:id/types/:typeId. The id is a path param (immutable); every body field is optional
+ * and each list is sent wholesale.
  *
- * A `views` patch is checked against the `fields` in the same patch — all a payload schema can see —
- * so placing a Field means sending it too, as the editor always does. Re-Fielding a type *without*
- * re-placing its Views is checked against the stored type instead, by `WorldTypesService`.
+ * A `views` patch is checked against the `fields` in the same patch — all a payload schema can see.
+ * Re-Fielding a type *without* re-placing its Views is checked against the stored type instead, by
+ * `WorldTypesService`.
  */
 export const updateUserDefinedTypeRequestSchema = z
   .object({
@@ -108,9 +103,8 @@ export interface AvailableType {
   readonly source: AvailableTypeSource;
   readonly fields: readonly FieldSchema[];
   /**
-   * A **user-defined** type's ordered View list, as authored (#201). Absent on a plugin type, which
-   * declares its own in code and never round-trips it through the API — and absent on a user-defined
-   * type that has never named an order, which the host defaults for it.
+   * A **user-defined** type's ordered View list, as authored. Absent on a plugin type, which declares
+   * its own in code, and on a user-defined type that never named an order (the host defaults it).
    */
   readonly views?: readonly ViewPlacement[];
 }

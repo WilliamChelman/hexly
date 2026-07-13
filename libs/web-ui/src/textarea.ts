@@ -1,10 +1,8 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 
 /**
- * A multi-line text input — the shared sunken-well field styling plus the
- * textarea-only sizing. Uses an attribute selector on the native `<textarea>`,
- * so it keeps its value, form participation and a11y, and projects its content.
- * See ADR-0007.
+ * A multi-line text input. Attribute selector on the native `<textarea>`, so
+ * value, form participation and a11y stay with the host element. See ADR-0007.
  *
  *   <textarea appTextarea>A walled town…</textarea>
  */

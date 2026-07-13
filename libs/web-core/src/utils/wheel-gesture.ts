@@ -1,8 +1,7 @@
 /**
  * Reading a `wheel` event across mice and trackpads: normalising its delta to pixels, and guessing
- * whether it came from a trackpad. Shared by every pan/zoom surface — the World Graph, the hexmap —
- * so they agree on feel. These are primitives, not a policy: each surface decides for itself what a
- * scroll versus a pinch should *do*, and layers that decision on top of these.
+ * whether it came from a trackpad. Primitives, not a policy — each surface decides for itself what
+ * a scroll versus a pinch should *do*.
  */
 
 /** Pixels assumed per wheel line, to normalise line-mode deltas — a mouse wheel rarely reports pixels. */
@@ -12,10 +11,10 @@ const WHEEL_LINE_PX = 16;
 const MOUSE_NOTCH_THRESHOLD = 40;
 
 /**
- * A wheel delta normalised to pixels, whatever the `deltaMode`. A mouse notch commonly arrives in
- * lines and a page-mode delta in pages, so the raw number is meaningless as a pixel shift until
- * scaled. `pageExtent` is the viewport size along the delta's axis — width for `deltaX`, height for
- * `deltaY` — and is consulted only to resolve the rare page-mode delta.
+ * A wheel delta normalised to pixels, whatever the `deltaMode` (a mouse notch commonly arrives in
+ * lines, so the raw number is meaningless as a pixel shift until scaled). `pageExtent` is the
+ * viewport size along the delta's axis — width for `deltaX`, height for `deltaY` — and is consulted
+ * only to resolve the rare page-mode delta.
  */
 export function wheelDeltaPixels(delta: number, event: WheelEvent, pageExtent: number): number {
   if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) return delta * WHEEL_LINE_PX;

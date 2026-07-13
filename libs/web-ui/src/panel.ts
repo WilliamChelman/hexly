@@ -2,10 +2,8 @@ import { ChangeDetectionStrategy, Component, booleanAttribute, input } from '@an
 
 /**
  * Turns a semantic container (`<section>`, `<figure>`, `<aside>`…) into a Hexly
- * panel via its own scoped, token-driven styles. It uses an attribute selector
- * on the native element, so the real element keeps its semantics and composes
- * freely with layout classes — and `<ng-content/>` projects its children — while
- * the component owns its visual definition. See ADR-0007.
+ * panel. Attribute selector on the native element, so the host keeps its own
+ * semantics and layout classes. See ADR-0007.
  *
  *   <section class="group regions" appPanel raised>…</section>
  *   <figure class="typelist" appPanel>…</figure>

@@ -32,10 +32,7 @@ function validate(
   return validateFields(fields, metadata, dataTypes);
 }
 
-/**
- * A stand-in for a plugin's structured data-type. The spec declares its own rather than borrowing a
- * real one: that it can is the point of threading the set instead of globalising it (ADR-0050).
- */
+/** A stand-in for a plugin's structured data-type. */
 const BOARD = defineStructuredDataType({
   id: 'test.board',
   valueSchema: z.object({ tiles: z.array(z.object({ entityId: z.string() })) }),
@@ -513,11 +510,8 @@ describe('Structured Field data-types (ADR-0050)', () => {
       ]);
     });
 
-    /**
-     * The absent-plugin path (ADR-0050): a build that drops the plugin owning a data-type opens the
-     * Entities carrying it as lore plus an unrendered Field, so a Field whose data-type went missing
-     * stays saveable — its value is plain Metadata. Dropping a plugin degrades; it never corrupts.
-     */
+    // The absent-plugin path (ADR-0050): a Field whose data-type went missing stays saveable, its
+    // value plain Metadata.
     it('is inert for an unregistered kind — never blocking the save of an Entity whose plugin is absent', () => {
       // The empty set stands for the build without the plugin: nothing resolves `test.board`.
       expect(validate([boardField], { board: { tiles: [{ entityId: 'riverbend' }] } }).ok).toBe(true);

@@ -18,10 +18,9 @@ describe('LocaleService', () => {
 
   afterEach(() => {
     localStorage.clear();
-    // `navigator.language` is a prototype accessor, so there's no *own*
-    // descriptor to capture — `setBrowserLang` shadows it with an own property.
-    // Delete that shadow (or restore a captured own descriptor) so the leak
-    // never crosses into another spec file sharing this jsdom environment.
+    // `navigator.language` is a prototype accessor, so there is usually no *own*
+    // descriptor to restore — `setBrowserLang` shadows it with one, which must be
+    // deleted or it leaks into other specs sharing this jsdom environment.
     if (originalLanguage) {
       Object.defineProperty(navigator, 'language', originalLanguage);
     } else {
@@ -117,11 +116,10 @@ describe('LocaleService', () => {
   });
 
   /**
-   * The real app has no preload (only the test harness does), so the first
-   * synchronous translate would render a raw key before the catalog arrived.
-   * `init()` is wired to `provideAppInitializer` to close that race; this drives
-   * the genuine HTTP loader — deliberately NOT the preloading harness — so the
-   * gap can't regress behind a preloaded TestBed.
+   * The real app has no preload (only the test harness does), so a first synchronous
+   * translate before the catalog arrives renders a raw key; `init()` runs in
+   * `provideAppInitializer` to close that race. These specs use the genuine HTTP loader,
+   * not the preloading harness, so the gap cannot hide behind a preloaded TestBed.
    */
   describe('init (real HTTP loader, no preload)', () => {
     it('loads the active catalog so a later synchronous translate resolves', async () => {
@@ -156,12 +154,11 @@ describe('LocaleService', () => {
     });
 
     /**
-     * A lib's scope is loaded by Transloco only when a pipe or directive that can see its provider
-     * renders — too late for copy read imperatively or carried as data across libs (a toast, a route
-     * title, a plugin's `TypeDefinition.labels`), which is why those scopes are registered eagerly
-     * (ADR-0049). `init()` must therefore load them alongside the root catalog, or the very first
-     * synchronous translate of a lib's key renders the raw key — and the pipe would memoize that
-     * miss.
+     * Transloco loads a lib's scope only when a pipe or directive that can see its provider renders
+     * — too late for copy read imperatively (a toast, a route title, a plugin's
+     * `TypeDefinition.labels`), so those scopes are registered eagerly (ADR-0049) and `init()` must
+     * load them alongside the root catalog. Otherwise the first synchronous translate of a lib's key
+     * renders the raw key, and the pipe memoizes that miss.
      */
     it('loads an eagerly-registered scope with the language, not on first render', async () => {
       TestBed.configureTestingModule({
@@ -194,10 +191,9 @@ describe('LocaleService', () => {
     });
 
     /**
-     * The switch's other half. A pipe with no scope of its own re-resolves the moment the *root*
-     * catalog lands — so an eager scope arriving after it would render raw keys for good, since
-     * nothing re-emits. `set()` re-announces the language once every catalog is in, which is what a
-     * plugin's chrome (a Hex Map's header eyebrow, a Monster's) rides on after a switch (#199).
+     * A pipe with no scope of its own re-resolves the moment the *root* catalog lands, so an eager
+     * scope arriving after it would render raw keys for good — nothing re-emits. `set()` re-announces
+     * the language once every catalog is in.
      */
     it('re-announces the language once an eager scope has landed, so its copy follows the switch', async () => {
       const langChanges: string[] = [];

@@ -2,10 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { gate, removeOwnerOutcome } from './owner-set';
 
 /**
- * `gate` is the shared owner-management outcome (ADR-0037, #163): the one place the
- * no-existence-leak split lives. An unreachable resource is indistinguishable from a
- * missing one (404, ADR-0004); a reachable one the caller doesn't own is a 403;
- * otherwise the caller may proceed (`undefined`, composing with `return gate ?? ok`).
+ * The owner-management gate (ADR-0037). An unreachable resource is indistinguishable from a
+ * missing one (404, ADR-0004); a reachable one the caller doesn't own is a 403; otherwise the
+ * caller may proceed (`undefined`, composing with `return gate ?? ok`).
  */
 describe('gate', () => {
   it('is not-found when the resource is unreachable', () => {
@@ -31,11 +30,7 @@ describe('gate', () => {
   });
 });
 
-/**
- * The ≥1-Owner invariant for `removeOwner` (ADR-0037), as a pure decision over the current
- * owner set — shared by the World and Entity services so the rule can't diverge, and reused for
- * the member-removal last-owner guard.
- */
+/** The ≥1-Owner invariant for `removeOwner` (ADR-0037), as a pure decision over the owner set. */
 describe('removeOwnerOutcome', () => {
   it('is not-found when the target is not an Owner', () => {
     expect(removeOwnerOutcome(['ada', 'bob'], 'carol')).toEqual({

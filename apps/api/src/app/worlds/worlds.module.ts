@@ -16,15 +16,11 @@ import { WorldTypesService } from './world-types.service';
 import { WorldWrites } from './world-writes';
 
 /**
- * World feature module (ADR-0024). Imports DbModule (shared DB, ADR-0002),
- * AuthModule (SessionAuthGuard on routes), EntitiesModule so the vault import
- * (ADR-0033) can insert notes through EntitiesService, and EventsModule so a
- * World-link revoke can emit live eviction into the nudge bus (ADR-0044, #175).
+ * World feature module (ADR-0024).
  *
- * `MulterModule.registerAsync` sets the upload `fileSize` from the Instance
- * Configuration (ADR-0036), which the import route's bare `FileInterceptor('file')`
- * inherits — the factory runs at boot, so the config-driven limit needs no
- * decorator argument (which would evaluate before DI exists).
+ * `MulterModule.registerAsync` sets the upload `fileSize` from the Instance Configuration
+ * (ADR-0036), which the import route's bare `FileInterceptor('file')` inherits: a decorator
+ * argument would evaluate before DI exists.
  */
 @Module({
   imports: [

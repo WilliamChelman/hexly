@@ -5,17 +5,14 @@ import { ReferencesStore } from '../services/references-store';
 import { ReferenceRow } from './reference-row';
 
 /**
- * The References panel (ADR-0046, #179): the open Entity's own links (**References**) above the
- * Entities that link to it (**Referenced by**), read from the derived edge index. Sibling to the
- * Outline, sharing its dock.
+ * The References panel (ADR-0046): the open Entity's own links (**References**) above the Entities
+ * that link to it (**Referenced by**), read from the derived edge index.
  *
  * It hides nothing of its own. *Referenced by* arrives already filtered by the viewer's access to
- * each source — a `private` Entity linking a `shared` one never reaches this component — and an
- * outbound target the viewer cannot read (or that no longer exists) arrives as `target: null`,
- * which {@link ReferenceRow} renders as the usual non-navigable dangling label (#78).
+ * each source; an outbound target the viewer cannot read (or that no longer exists) arrives as
+ * `target: null`, which {@link ReferenceRow} renders as the non-navigable dangling label.
  *
- * Empty states are gated on `loaded()`: asserting "nothing links here" against an in-flight fetch
- * would show a false empty state indistinguishable from a real one.
+ * Empty states are gated on `loaded()`: an in-flight fetch would otherwise show a false empty state.
  */
 @Component({
   selector: 'app-references-panel',

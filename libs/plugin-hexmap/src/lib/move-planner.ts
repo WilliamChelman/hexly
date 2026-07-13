@@ -2,9 +2,9 @@ import { addAxial, Axial, subAxial } from './coordinates';
 import { coordKey, Hex, HexMap, parseCoordKey, regionById } from './hex-map';
 
 /**
- * The Map elements a move picks up and translates together (CONTEXT.md →
- * Selection). Labels are deliberately absent — they are free-positioned pixels
- * that never collide; the *caller* translates them by the equivalent pixels.
+ * The Map elements a move picks up and translates together. Labels are absent:
+ * they are free-positioned pixels that never collide, so the *caller* translates
+ * them by the equivalent pixels.
  */
 export interface MoveSelection {
   readonly hexes: Axial[];
@@ -26,19 +26,15 @@ export interface HexWrite {
 }
 
 /**
- * One region's translated membership footprint: the new `(q,r) → true` set after
- * shifting every member by the move's offset. Replaces the region's whole
- * `hexes` map, so the caller writes it wholesale rather than diffing.
+ * One region's translated membership footprint. Replaces the region's whole
+ * `hexes` map — the caller writes it wholesale rather than diffing.
  */
 export interface RegionWrite {
   readonly id: string;
   readonly hexes: Record<string, true>;
 }
 
-/**
- * A resolved move: the hex writes/clears and region-footprint shifts that,
- * applied together in one step, carry the selection by the offset.
- */
+/** A resolved move; the writes must be applied together, in order, as one step. */
 export interface ResolvedMovePlan {
   readonly blocked: false;
   readonly hexes: HexWrite[];
@@ -47,7 +43,7 @@ export interface ResolvedMovePlan {
 
 /**
  * A move the planner refuses: the destination `cells` that can't take their
- * content, so the caller leaves the document untouched. Single-hex moves never
+ * content. The caller must leave the document untouched. Single-hex moves never
  * block (a drop onto an occupant swaps).
  */
 export interface BlockedMovePlan {
@@ -59,16 +55,15 @@ export interface BlockedMovePlan {
 export type MovePlan = ResolvedMovePlan | BlockedMovePlan;
 
 /**
- * Plan a move of `selection` by `offset` over `document` — the pure seam every
- * move routes through, single hex or whole group. Rigid translation: each
- * painted source is snapshotted, cleared, and rewritten at `source + offset`;
- * intra-group overlap writes rather than clears, so a cluster keeps its shape.
- * A destination occupied by a non-selected hex displaces that occupant to
- * `d − offset` (the single-hex swap is this with one member); the cell blocks
- * when another moving member is also landing there, and any blocked cell
- * refuses the whole move. Selected region footprints translate by the offset
- * and never block. A move carrying nothing resolves to an empty plan rather
- * than emitting destructive clears.
+ * Plan a rigid translation of `selection` by `offset` over `document`, without
+ * mutating it. Each painted source is snapshotted, cleared, and rewritten at
+ * `source + offset`; intra-group overlap writes rather than clears, so a cluster
+ * keeps its shape. A destination occupied by a non-selected hex displaces that
+ * occupant to `d − offset` (the single-hex swap is this with one member); the
+ * cell blocks when another moving member is also landing there, and any blocked
+ * cell refuses the whole move. Selected region footprints translate by the offset
+ * and never block. A move carrying nothing resolves to an empty plan rather than
+ * emitting destructive clears.
  */
 export function planMove({ document, selection, offset }: MoveRequest): MovePlan {
   const sourceKeys = new Set(selection.hexes.map(coordKey));

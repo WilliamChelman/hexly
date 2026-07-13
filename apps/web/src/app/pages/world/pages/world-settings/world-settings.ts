@@ -6,12 +6,10 @@ import { Eyebrow, Panel, OwnerSet, MemberSet, PublicLinkControl } from '@hexly/w
 import { WorldTypesPanel } from './world-types-panel';
 
 /**
- * The World settings page (#158, #159): the World's symmetric owner set (view, add,
- * remove, resign) and, below it, the non-owner membership set (add/change-role/remove
- * Contributors and World Viewers). The active World id comes from {@link ActiveWorld},
- * pinned by the `w/:worldId` resolver (ADR-0028). Both surfaces are Owner-only, so a
- * non-Owner who reaches this page sees load errors rather than management controls.
- * Resigning can cost the user reach to this World, so it drops back to the World Index.
+ * The World settings page. The active World id comes from {@link ActiveWorld}, pinned by the
+ * `w/:worldId` resolver (ADR-0028). Every surface here is Owner-only: a non-Owner who reaches
+ * this page sees load errors rather than management controls. Resigning can cost the user reach
+ * to this World, so it drops back to the World Index.
  */
 @Component({
   selector: 'app-world-settings',

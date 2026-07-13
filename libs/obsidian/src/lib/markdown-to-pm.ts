@@ -97,15 +97,11 @@ function blockToPM(node: RootContent, degraded: Record<string, number>): PMNode[
 }
 
 /**
- * Maps an mdast paragraph to PM blocks. The editor's `image` is a block node, so a
- * paragraph is split around any image node — a standard-markdown `![](…)` (an mdast image
- * child) or an Obsidian `![[media]]` embed (surfaced as an image node by the inline
- * tokenizer, {@link tokenToPM}). Text runs become paragraphs; each image becomes its own
- * block, in order.
+ * Maps an mdast paragraph to PM blocks. The editor's `image` is a block node, so a paragraph
+ * is split around any image node — a standard-markdown `![](…)` (an mdast image child) or an
+ * Obsidian `![[media]]` embed (surfaced as an image node by {@link tokenToPM}).
  */
 function paragraphToPM(node: Extract<RootContent, { type: 'paragraph' }>, degraded: Record<string, number>): PMNode[] {
-  // Assemble the full inline sequence first (mdast images become image nodes here; embed
-  // images come from inlineToPM), then hoist every image node out to block level.
   const seq = node.children.flatMap((child) =>
     child.type === 'image'
       ? [
@@ -298,10 +294,9 @@ function inlineChildren(
 }
 
 /**
- * Coerce a node into valid inline content. Only {@link paragraphToPM} hoists a block `image`
- * node to block level; reached here (a heading, a table cell, or inside a mark) an `![[media]]`
- * embed can't be a block image without breaking the editor schema, so it degrades to a plain
- * link — the same fallback a non-media `![[…]]` embed already takes. Everything else passes through.
+ * Coerce a node into valid inline content. Only {@link paragraphToPM} hoists an `image` to block
+ * level; one reached here (in a heading, a table cell, or inside a mark) can't be a block image
+ * without breaking the editor schema, so it degrades to a plain link.
  */
 function inlineOnly(node: PMNode, marks: Mark[], degraded: Record<string, number>): PMNode[] {
   if (node.type !== 'image') return [node];
@@ -340,10 +335,8 @@ function sameMarks(a: Mark[] | undefined, b: Mark[] | undefined): boolean {
 }
 
 /**
- * Obsidian's non-standard inline constructs have no mdast node, so they survive in
- * plain-text values. This scanner splits a text value around them: `==x==` becomes a
- * highlight-marked run; the surrounding text stays plain. Wikilinks and the degrading
- * constructs (comments, math) extend the same token regex.
+ * Obsidian's non-standard inline constructs (wikilinks, `==highlight==`, comments, math) have no
+ * mdast node, so they survive in plain-text values; this token regex is what splits them back out.
  */
 // Inline `$…$` requires non-space at both ends and no trailing digit, per Obsidian —
 // so ordinary prose with two dollar amounts (`$5 and $10`) isn't mistaken for math.
@@ -367,10 +360,9 @@ function splitInlineText(value: string, marks: Mark[], degraded: Record<string, 
 }
 
 /**
- * Extensions Obsidian embeds as media rather than as a note transclusion. An
- * `![[X]]` whose target ends in one of these is an Asset the importer stores; anything else
- * (a bare note name) stays a degraded link. This is the source of truth the API's asset MIME
- * map must cover — a parity test in the API asserts the two lists agree, so drift fails CI.
+ * Extensions Obsidian embeds as media rather than as a note transclusion. An `![[X]]` whose
+ * target ends in one of these is an Asset the importer stores; anything else (a bare note name)
+ * stays a degraded link. The API's asset MIME map must cover every extension listed here.
  */
 export const ASSET_EMBED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'avif', 'pdf'];
 const ASSET_EMBED_EXT = new RegExp(`\\.(${ASSET_EMBED_EXTENSIONS.join('|')})$`, 'i');

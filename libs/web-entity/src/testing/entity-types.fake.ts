@@ -5,14 +5,8 @@ import { ENTITY_TYPES, EntityTypes } from '../lib/entity-types';
 import { TypeDefinition, TypeLabels } from '../lib/type-definition';
 
 /**
- * A minimal {@link EntityTypes} for a spec that renders a control reading the type registry — the
- * {@link EntityLinkPicker} and its hosts. It stands in for the app's `TypeRegistry` exactly as
- * `FakeEntitySession` stands in for its concrete session: a spec declares the types it wants to see
- * and never boots the app to get them.
- *
- * Names and chrome resolve the way the real registry's do — a user-defined type's authored name
- * verbatim, a code type's through its transloco keys — so a spec asserting translated copy exercises
- * the real path.
+ * A minimal {@link EntityTypes} over a spec-declared set of types. Names and chrome resolve as the real
+ * registry's do: a user-defined type's authored name verbatim, a code type's through its transloco keys.
  */
 export class FakeEntityTypes implements EntityTypes {
   private readonly definitions = signal<readonly TypeDefinition[]>([]);

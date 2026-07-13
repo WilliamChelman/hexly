@@ -11,15 +11,12 @@ import { EntitySession } from '../services/entity-session';
 import { RightDock } from '../services/right-dock';
 
 /**
- * The `core.view.content` renderer (ADR-0048, *Views* amendment): the Content body
- * in a centred reading column with its Outline / References dock. The registered
- * View the {@link EntityPage} host outlets for the base every Entity affords — a
- * note, or a hexmap on its content view. Its dock stores (`RightDock` and friends)
- * are provided by the host, so a hexmap flipping between map and content keeps one
- * dock instance.
+ * The `core.view.content` renderer (ADR-0048, *Views* amendment): the Content body in a centred
+ * reading column with its Outline / References dock. Its dock stores (`RightDock` and friends)
+ * are provided by the host, so a hexmap flipping between map and content keeps one dock instance.
  *
- * `display:contents` (host `class: contents`) so the scroll column and the floating
- * dock position against the page's `<main>` exactly as the old inline branch did.
+ * `display:contents` (host `class: contents`) so the scroll column and the floating dock position
+ * against the page's `<main>`.
  */
 @Component({
   selector: 'app-content-view',
@@ -93,8 +90,8 @@ export class ContentView {
   protected readonly linksToggleLabel = translateSignal('noteView.links.toggle');
 
   /**
-   * The Content editor's accessible name, from the primary type (ADR-0014, #75) — already resolved,
-   * so a user-defined type contributes its authored name rather than a translated key (#191).
+   * The Content editor's accessible name, from the primary type (ADR-0014) — resolved, so a
+   * user-defined type contributes its authored name rather than a translated key.
    */
   protected readonly editorLabel = computed(() => {
     this.transloco.activeLang(); // reactive dependency: re-resolve on a language switch

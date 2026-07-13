@@ -1,15 +1,13 @@
 // @ts-check
 /**
- * Boots the app the way a production deploy does — one Nest process serving both
- * the API and the built SPA on a single origin (ADR-0008) — but pointed at a
- * throwaway database seeded with the one e2e user. Playwright's `webServer` runs
- * this and waits for the port; the api/web builds are produced beforehand by the
- * `e2e` target's `dependsOn` (ADR-0009).
+ * Boots one Nest process serving both the API and the built SPA on a single origin
+ * (ADR-0008), against a throwaway database seeded with the e2e users. Run by
+ * Playwright's `webServer`; the api/web builds must exist beforehand.
  *
- * Why `NODE_ENV` is not `production`: the session cookie is `secure` only in
- * production, and a `secure` cookie is never set over plain http — which would
- * silently break every login. The built bundle reads `NODE_ENV` at runtime, so
- * launching it as `test` keeps the cookie usable over http://localhost.
+ * `NODE_ENV` is never `production`: the session cookie is `secure` only in production,
+ * and a `secure` cookie is never set over plain http — every login would silently fail.
+ * The built bundle reads `NODE_ENV` at runtime, so `test` keeps the cookie usable over
+ * http://localhost.
  */
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, rmSync } from 'node:fs';
@@ -76,11 +74,9 @@ const childEnv = {
 };
 
 // Seed the e2e users before serving (synchronous: the server must not accept logins
-// before the users exist). The grantee is optional — only present when the config
-// passes it — so the loop skips it if unset, keeping single-user runs working.
+// before the users exist). The grantee is optional — the loop skips it if unset.
 // Only the login user gets a starter World: `enterLibrary` reaches its library by
-// clicking a World card on the Index, so the suite is dead without one. The grantee
-// is never logged in as — it only populates the directory for share specs (#161).
+// clicking a World card on the Index, so the suite is dead without one.
 const toSeed = [{ ...user, withWorld: true }, ...(grantee.email ? [grantee] : [])];
 for (const u of toSeed) {
   const seeded = spawnSync(

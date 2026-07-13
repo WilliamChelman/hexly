@@ -19,21 +19,17 @@ import { Button, Field, Icon, EntitySearchPicker } from '@hexly/web-ui';
 import { ENTITY_TYPES } from '../lib/entity-types';
 
 /**
- * The **Entity Link** control (issue #76, CONTEXT.md → Entity Link) for one link-carrying slot: pick
- * an Entity to link, follow it, or remove it. The picker searches server-side via `list({ q })` and
- * resolves the linked name via `list({ ids: [id] })` (ADR-0025), never holding the whole owner list.
- * A link to a deleted/inaccessible target renders non-navigable rather than a dead link (issue #78);
- * the id stays in the document.
+ * The **Entity Link** control (CONTEXT.md → Entity Link) for one link-carrying slot: pick an Entity to
+ * link, follow it, or remove it. Searches server-side via `list({ q })` and resolves the linked name
+ * via `list({ ids: [id] })` (ADR-0025), never holding the whole owner list. A link to a
+ * deleted/inaccessible target renders non-navigable rather than a dead link; the id stays in the
+ * document.
  *
- * The host owns the link — a Map element's, and any other slot that comes to carry one — and this
- * component only reads the current value and emits the next one.
+ * The host owns the link: this component only reads the current value and emits the next one.
  *
- * It names no type id. Create-and-link (issue #77) offers every Type the {@link ENTITY_TYPES} registry
- * knows, so a plugin's type and a World's own are as reachable as a Note, and a created Entity's
- * fallback name is that type's own untitled label. A type declaring a **required** Field is left out:
- * it cannot be minted blind (the write gate, #187), and there is no room mid-pick for the dialog that
- * would collect one — the same rule the New split button applies, and a rule about a type's *schema*,
- * never about an id.
+ * Create-and-link offers every Type the {@link ENTITY_TYPES} registry knows, except a type declaring a
+ * **required** Field: it cannot be minted blind (the write gate), and there is no room mid-pick for the
+ * dialog that would collect one.
  */
 @Component({
   selector: 'app-entity-link-picker',
@@ -140,11 +136,7 @@ export class EntityLinkPicker {
   private readonly transloco = inject(TranslocoService);
   private readonly destroyRef = inject(DestroyRef);
 
-  /**
-   * Entities created via create-and-link (issue #77), resolved locally so their
-   * name shows at once without a server round trip. The display-resolve still
-   * goes to the server for everything else.
-   */
+  /** Entities created via create-and-link, resolved locally so their name shows without a round trip. */
   private readonly created = signal<EntitySummary[]>([]);
 
   /** The linked Entity's summary, or null when unset or unresolvable (dangling). */
@@ -156,8 +148,8 @@ export class EntityLinkPicker {
   protected readonly query = signal('');
 
   /**
-   * The Types create-and-link offers, each with the name to print on its button. Re-resolves on a
-   * language switch (`activeLang` is the reactive dependency) and as a World's own types arrive.
+   * The Types create-and-link offers, each with the name to print on its button. `activeLang` is read
+   * as the reactive dependency, so the names re-resolve on a language switch.
    */
   protected readonly creatable = computed(() => {
     this.transloco.activeLang();
@@ -214,9 +206,8 @@ export class EntityLinkPicker {
   }
 
   /**
-   * Create a World-scoped Entity of `type` and link it in one flow (issue #77). The typed query names
-   * it; an empty one falls back to the type's own untitled label — the same default the New button
-   * mints with, resolved through the registry rather than branched on an id.
+   * Create a World-scoped Entity of `type` and link it in one flow. The typed query names it; an empty
+   * one falls back to the type's own untitled label.
    */
   protected create(type: EntityType): void {
     const name = this.query().trim() || this.types.chromeLabel(type, 'untitled');

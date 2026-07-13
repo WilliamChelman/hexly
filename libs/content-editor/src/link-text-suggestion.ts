@@ -7,14 +7,11 @@ import { VocabItem } from './vocab-items';
 
 /**
  * The `|` display (`[[Target|text]]`) and `#` heading (`[[Target#Heading]]`) triggers on an
- * `entityLink` (ADR-0033) — the free-text siblings of the `::` descriptor trigger. Like
- * {@link descriptorSuggestion} it's a non-schema extension (a ProseMirror plugin, no
- * node/mark), so it stays out of {@link CONTENT_EXTENSIONS} and changes no format contract
- * (ADR-0019). It **arms only when the node immediately before the cursor is an `entityLink`**
- * ({@link entityLinkPosBefore}); everywhere else the char is literal text. There is no
- * vocabulary — {@link linkTextRows} offers just the typed text — and picking it sets the
- * `attr` on that link via {@link setLinkAttr}. When the attr is already set, an empty query
- * offers a "Remove" row (blank value, which clears) — the only way to un-set it short of
+ * `entityLink` (ADR-0033). It **arms only when the node immediately before the cursor is an
+ * `entityLink`** ({@link entityLinkPosBefore}); everywhere else the char is literal text.
+ * There is no vocabulary — {@link linkTextRows} offers just the typed text — and picking it
+ * sets the `attr` on that link via {@link setLinkAttr}. When the attr is already set, an empty
+ * query offers a "Remove" row (blank value, which clears) — the only way to un-set it short of
  * deleting the link. `getPicker` is deferred so the editor builds before the picker
  * `viewChild` resolves.
  */

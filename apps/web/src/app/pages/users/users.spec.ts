@@ -7,12 +7,6 @@ import { UsersClient, AuthClient, ToasterService } from '@hexly/web-core';
 import { MockUsersClient, MockAuthClient } from '@hexly/web-core/testing';
 import { Users } from './users';
 
-/**
- * The user-management panel (ADR-0047): asserts the observable behaviour — the accounts
- * render with their role state, the Superadmin-only control shows only for a Superadmin, the
- * mutations call the client and reload, and a server refusal (409) leaves an error toast. The
- * server stays the source of truth; this covers the panel's wiring.
- */
 describe('Users panel', () => {
   let users: MockUsersClient;
   let auth: MockAuthClient;

@@ -3,11 +3,10 @@ import { EntityDetail, PublicWorldView } from '@hexly/domain';
 import { PublicLinksService } from './public-links.service';
 
 /**
- * The unauthenticated Public Link read surface (ADR-0037, #162). Deliberately unguarded —
- * no {@link SessionAuthGuard} — and GET-only: possession of the token is the sole credential,
- * and the whole surface is strictly read-only, so any write verb hits no route (a 404).
- * Every route is scoped exactly to its token; an unresolved (revoked/never-minted) token
- * is a 404, indistinguishable from a bad token — no existence leak (ADR-0004).
+ * The unauthenticated Public Link read surface (ADR-0037). Unguarded — no
+ * {@link SessionAuthGuard} — and GET-only: possession of the token is the sole credential, so any
+ * write verb hits no route (404). An unresolved (revoked/never-minted) token is a 404,
+ * indistinguishable from a bad token — no existence leak (ADR-0004).
  */
 @Controller('public')
 export class PublicLinksController {

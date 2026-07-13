@@ -41,8 +41,8 @@ import { IconHost } from './icon-host';
 const LUCIDE_ATTRS = 'stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"';
 
 /**
- * Serialize a Lucide icon's node list (`[tag, attrs]` pairs) to SVG inner markup.
- * `key` is React-reconciliation metadata Lucide ships in the data — dropped here.
+ * Serialize a Lucide icon's node list (`[tag, attrs]` pairs) to SVG inner markup. `key` is
+ * React-reconciliation metadata Lucide ships in the data, and is dropped.
  */
 function lucideBody(data: LucideIconData): string {
   return data.node
@@ -60,9 +60,6 @@ function lucideBody(data: LucideIconData): string {
  * The two bespoke glyphs that aren't Lucide: the app's hexagon `logo` and the organic
  * `region` blob. Each is the `<svg>` inner markup plus the root attrs that vary per
  * glyph (ADR-0007). Everything else is Lucide — see {@link LUCIDE}.
- *
- * A plugin's art stays with the plugin — a Feature's marker is drawn from its own library through
- * {@link IconPath} — so this vocabulary never depends on one (ADR-0050).
  */
 const CUSTOM = {
   logo: {
@@ -76,10 +73,9 @@ const CUSTOM = {
 } as const;
 
 /**
- * Our stable, domain-facing glyph name → the Lucide icon data it renders. We read
- * the icon's `node` data (not Lucide's `<svg lucideIcon>` directive) and draw it
- * ourselves — the same trusted-inline-SVG path the bespoke glyphs use — so the
- * dependency is honest and tree-shaken while call sites keep our vocabulary.
+ * Our stable, domain-facing glyph name → the Lucide icon data it renders. We read the icon's `node`
+ * data (not Lucide's `<svg lucideIcon>` directive) and draw it ourselves, on the same
+ * trusted-inline-SVG path the bespoke glyphs use.
  */
 const LUCIDE: Record<string, LucideIconData> = {
   check: LucideCheck.icon,

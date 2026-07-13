@@ -10,11 +10,9 @@ import { ConfigModule } from '../config/config.module';
 import { WorldsModule } from '../worlds/worlds.module';
 
 /**
- * Entity-level grants (ADR-0037, #161): surgical per-Entity sharing on top of the
- * World model. An Owner hands a named Instance user an Editor or Viewer grant on one
- * Entity — World membership is not a precondition, and the grant pierces `private`
- * (per-user visibility). These specs assert the externally observable authorization
- * lifecycle across seeded users: who reads/writes what after a grant or a revoke.
+ * Entity-level grants (ADR-0037): an Owner hands a named Instance user an Editor or Viewer grant
+ * on one Entity. World membership is not a precondition, and the grant pierces `private`
+ * (per-user visibility).
  */
 describe('Entity grants', () => {
   let app: INestApplication;

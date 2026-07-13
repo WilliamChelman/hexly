@@ -5,11 +5,9 @@ import { VocabItem } from './vocab-items';
 
 /**
  * The keyboard-driven Link Descriptor picker that opens on `::` directly after an
- * `entityLink` (issue #96, ADR-0023). Same open/update/close/keyboard behaviour as the
- * {@link EntityPicker} — both share {@link ListboxController} and {@link Listbox}
- * — over the owner's last-saved descriptor vocabulary. A row flagged `isNew` is the typed
- * free text offered as a brand-new descriptor (never boxed into the suggestions); picking
- * it sets that text.
+ * `entityLink` (ADR-0023), over the owner's last-saved descriptor vocabulary. A row
+ * flagged `isNew` is the typed free text offered as a brand-new descriptor; picking it
+ * sets that text.
  */
 @Component({
   selector: 'app-descriptor-picker',

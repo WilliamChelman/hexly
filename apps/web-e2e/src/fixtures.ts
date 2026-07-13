@@ -1,26 +1,20 @@
 import { test as base, expect, type APIRequestContext, type Page, type Response } from '@playwright/test';
-// Reuse the app's own pretty-URL codec (ADR-0042): URL segments are `slug-base62(id)`,
-// so specs decode a segment back to the canonical id and build loose matchers from it.
-// A direct file import (not the @hexly/web-core barrel) keeps the Playwright process off the
-// Angular services layer the barrel re-exports — pretty-id is a pure util. The nx
-// module-boundary rule is waived for these pure utils via eslint.config.mjs `allow`.
+// The app's own pretty-URL codec (ADR-0042). Imported by file path, not via the @hexly/web-core
+// barrel: the barrel re-exports the Angular services layer, which must stay out of the Playwright
+// process. The nx module-boundary rule is waived for these pure utils via eslint.config.mjs `allow`.
 import { idFromSegment, segment } from '../../../libs/web-core/src/utils/pretty-id';
-// Same waiver: the View-instance codec is framework-free, and a View's key is what a toggle's testid
-// and the `?view=` param carry — so a spec shares the encoder rather than re-spelling it.
+// Same waiver: the View-instance codec is framework-free.
 import { viewInstanceKey } from '../../../libs/web-entity/src/lib/view-instance';
 
 /**
- * The base test for the authenticated suite. An auto fixture resets the database
- * to a clean slate (maps only) before each test via the e2e-only reset endpoint,
- * so no test ever sees another test's maps (ADR-0009). The reset keeps users and
- * sessions, so the shared login from `auth.setup.ts` survives it.
+ * The base test for the authenticated suite. An auto fixture resets the database before each test
+ * (ADR-0009); the reset keeps users and sessions, so the shared login from `auth.setup.ts` survives.
  *
- * This is a fixture, not a top-level `beforeEach`: a shared module is evaluated
- * once, so a top-level hook would register against only the first importer's
- * suite — an auto fixture runs per test regardless.
+ * A fixture, not a top-level `beforeEach`: a shared module is evaluated once, so a top-level hook
+ * would register against only the first importer's suite — an auto fixture runs per test regardless.
  *
- * The reset POST is intentionally unauthenticated and relies on `TestController`
- * having no guard, so it works even for the logged-out auth journey.
+ * The reset POST is unauthenticated (`TestController` has no guard), so it also works for the
+ * logged-out auth journey.
  */
 export const test = base.extend<{ resetDb: void }>({
   resetDb: [
@@ -35,11 +29,7 @@ export const test = base.extend<{ resetDb: void }>({
 
 export { expect };
 
-/**
- * The open Entity's canonical id, decoded from the pretty URL segment (ADR-0042).
- * The last path segment is `slug-base62(id)`; specs need the raw id for testid
- * selectors (`open-<id>`) and `/api/entities/<id>` calls.
- */
+/** The open Entity's canonical id, decoded from the last pretty URL segment `slug-base62(id)` (ADR-0042). */
 export function entityIdFromUrl(page: Page): string {
   return idFromSegment(page.url().split('/').pop()!);
 }
@@ -61,13 +51,10 @@ interface SavedGrid {
 }
 
 /**
- * The grid a Hex Map has actually persisted, fetched from the API — what a map spec checks after a
- * save, beyond what the reloaded canvas already shows.
- *
- * The one place a test knows *where* the grid is stored (a **Structured Field**'s value in the
- * Entity's one Metadata map, ADR-0050), so moving it again is a one-line change rather than a sweep.
- * `core.hexmap` declares its grid at `grid`; a World Owner's own type declares its at whatever key
- * its author chose, which is what `fieldKey` is for (#201).
+ * The grid a Hex Map has actually persisted, fetched from the API. The one place a test knows *where*
+ * the grid is stored: a **Structured Field**'s value in the Entity's one Metadata map (ADR-0050).
+ * `core.hexmap` declares its grid at `grid`; a user-defined type declares its at whatever key its
+ * author chose — that is `fieldKey`.
  */
 export async function savedGrid(request: APIRequestContext, entityId: string, fieldKey = 'grid'): Promise<SavedGrid> {
   const res = await request.get(`/api/entities/${entityId}`);
@@ -77,19 +64,14 @@ export async function savedGrid(request: APIRequestContext, entityId: string, fi
 }
 
 /**
- * A map View toggle's testid — the View id plus the **Structured Field** it renders (ADR-0050).
- * `core.hexmap` declares its grid at `grid`; a user-defined type declares its own at whatever key its
- * author chose. Composed through the app's own {@link viewInstanceKey}, so a spec can never disagree
- * with the header about how a View instance is spelled.
+ * A map View toggle's testid — the View id plus the **Structured Field** it renders (ADR-0050),
+ * composed through the app's own {@link viewInstanceKey}.
  */
 export function mapViewToggle(fieldKey = 'grid'): string {
   return viewInstanceKey({ viewId: 'core.view.map', fieldKey });
 }
 
-/**
- * Wait for a successful entity PUT. Since the Save button is gone (ADR-0026),
- * this is used with Cmd/Ctrl+S to flush autosave immediately.
- */
+/** Wait for a successful entity PUT. There is no Save button (ADR-0026): pair this with Cmd/Ctrl+S. */
 export function waitForSave(page: Page): Promise<Response> {
   return page.waitForResponse(
     (res) => res.request().method() === 'PUT' && /\/api\/entities\/[\w-]+$/.test(res.url()) && res.ok(),
@@ -97,9 +79,8 @@ export function waitForSave(page: Page): Promise<Response> {
 }
 
 /**
- * Flush a pending autosave and wait for it to commit (ADR-0026 — no Save button): press
- * Cmd/Ctrl+S, await the PUT, and confirm the status chip settles on 'Saved'. Returns the
- * PUT Response for the specs that read the saved payload straight off it.
+ * Flush a pending autosave and wait for it to commit: Cmd/Ctrl+S, await the PUT, and confirm the
+ * status chip settles on 'Saved'. Returns the PUT Response, whose body carries the saved payload.
  */
 export async function flushSave(page: Page): Promise<Response> {
   const saved = waitForSave(page);
@@ -109,22 +90,15 @@ export async function flushSave(page: Page): Promise<Response> {
   return res;
 }
 
-/**
- * Enter a reachable World's Entity browser via the World Index (ADR-0028). The
- * active World is a URL fact now (`/w/:worldId/entities`), not a remembered
- * selection, so a test reaches its library by choosing a World from the Index at
- * `/`. The seeded World always survives the entities-only reset (only Entities are
- * cleared, never Worlds), so the Index is never empty here. Returns the entered
- * World's id for specs that want to assert the URL scope.
- */
-/**
- * Open the entity header's actions overflow menu (Visibility, Pin, Share). The three
- * are gathered behind one trigger, so a spec opens the menu before addressing an item.
- */
+/** Open the entity header's actions overflow menu (Visibility, Pin, Share). */
 export async function openEntityActions(page: Page): Promise<void> {
   await page.getByTestId('entity-actions').click();
 }
 
+/**
+ * Enter a reachable World's Entity browser via the World Index at `/` (ADR-0028), and return the
+ * entered World's id. The reset clears Entities only, never Worlds, so the Index is never empty here.
+ */
 export async function enterLibrary(page: Page): Promise<string> {
   await page.goto('/');
   // The card lands on the World Dashboard — the World root (ADR-0043); the rail's
@@ -139,14 +113,10 @@ export async function enterLibrary(page: Page): Promise<string> {
 }
 
 /**
- * Create an Entity of `typeId` through the "New" split button's type menu, and open it (#195).
- * The menu lists every registered Entity Type and derives each item's testid from the type id,
- * so the next plugin's create affordance is reachable here with no new helper. Returns the new
- * Entity's canonical id.
- *
- * The caller must already be on a surface carrying the button — `enterLibrary`, or an empty
- * World Dashboard. A Type declaring a *required* Field opens the create dialog instead, so it
- * is created through that (see `dnd-monster.spec.ts`), not through this helper.
+ * Create an Entity of `typeId` through the "New" split button's type menu, open it, and return its
+ * canonical id. The caller must already be on a surface carrying the button — `enterLibrary`, or an
+ * empty World Dashboard. A Type declaring a *required* Field opens the create dialog instead, and is
+ * not creatable through this helper (see `dnd-monster.spec.ts`).
  */
 export async function createEntity(page: Page, typeId: string): Promise<string> {
   await page.getByTestId('new-entity-menu').click();
@@ -164,9 +134,7 @@ export interface AuthoredField {
 }
 
 /**
- * Author a user-defined type in a World's settings (#191, #201), and land back on the types list with
- * it saved. Navigates to the settings page itself, so a caller reaches it from anywhere.
- *
+ * Author a user-defined type in a World's settings, and land back on the types list with it saved.
  * `id` is the bare id the form takes; the World's namespace makes it `world.<id>`.
  */
 export async function authorWorldType(
@@ -192,8 +160,8 @@ export async function authorWorldType(
 }
 
 /**
- * Add `typeId` to the open Entity through the header's Edit-types dialog (#189), minting the defaults
- * its Fields declare. For a type whose Fields are all optional: one declaring a *required* Field
+ * Add `typeId` to the open Entity through the header's Edit-types dialog, minting the defaults its
+ * Fields declare. Only for a type whose Fields are all optional: one declaring a *required* Field
  * prompts for it before the add commits, which a spec drives itself.
  */
 export async function addType(page: Page, typeId: string): Promise<void> {

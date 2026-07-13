@@ -1,9 +1,9 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 
 /**
- * The positioned `<ul role="listbox">` box a picker projects its rows into: it owns the
- * chrome (fixed position, size, border, aria wiring) so each caller supplies only its own
- * `<li>` option template. Pairs with {@link ListboxController} for keyboard behaviour.
+ * The positioned `<ul role="listbox">` box a picker projects its `<li>` rows into; owns the
+ * chrome (fixed position, size, border, aria wiring). Pairs with {@link ListboxController}
+ * for keyboard behaviour.
  */
 @Component({
   selector: 'app-listbox',

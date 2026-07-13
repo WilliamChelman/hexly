@@ -3,15 +3,10 @@ import { extractOutline, OutlineHeading } from '@hexly/domain';
 import { EntitySession } from './entity-session';
 
 /**
- * Route-scoped UI state for the Outline — the heading-navigation panel beside the
- * Content editor (CONTEXT.md). DOM-free by design: headings derive from the
- * session's live Content via {@link extractOutline}, so every keystroke refreshes
- * them without this store ever parsing Content itself; the panel owns the scroll
- * and scrollspy DOM work. Distinct from {@link EntitySession} (the document) and
- * the map's HexMapStore.
- *
- * Whether the panel *shows* is not this store's business — the dock holds one panel slot for
- * the Outline and the References between them, so {@link RightDock} owns that single choice.
+ * Route-scoped UI state for the Outline — the heading-navigation panel beside the Content
+ * editor (CONTEXT.md). Headings derive from the session's live Content via
+ * {@link extractOutline}; the panel owns the scroll and scrollspy DOM work. Whether the panel
+ * *shows* is {@link RightDock}'s state, not this store's.
  */
 @Injectable()
 export class OutlineStore {
@@ -19,10 +14,9 @@ export class OutlineStore {
 
   private readonly _contentRoot = signal<HTMLElement | null>(null);
   /**
-   * The Content editor element whose headings the Outline navigates, bridged in by
-   * the OutlineSource directive. The panel scopes its DOM queries to this exact
-   * element instead of a document-wide `.ProseMirror` lookup, so a second editor on
-   * the page can never be picked up by mistake.
+   * The Content editor element whose headings the Outline navigates, bridged in by the
+   * OutlineSource directive. The panel must scope its DOM queries to this exact element rather
+   * than a document-wide `.ProseMirror` lookup, which could pick up a second editor.
    */
   readonly contentRoot = this._contentRoot.asReadonly();
 

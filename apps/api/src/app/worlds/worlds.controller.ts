@@ -75,9 +75,9 @@ export class WorldsController {
   }
 
   /**
-   * Import an Obsidian vault `.zip` into a fresh World (ADR-0033, #146). Hexly's
-   * first multipart endpoint: multer buffers the upload in memory, the import runs
-   * synchronously, and the {@link ImportSummary} reports what landed and what was lost.
+   * Import an Obsidian vault `.zip` into a fresh World (ADR-0033). Multer buffers the upload in
+   * memory, the import runs synchronously, and the {@link ImportSummary} reports what landed and
+   * what was lost.
    */
   @Post('import')
   // Import mints a World, so it needs the World Creation capability too (ADR-0040).
@@ -128,14 +128,11 @@ export class WorldsController {
   }
 
   /**
-   * The World Graph (ADR-0046, #181): the World's readable Entities as nodes, their Entity Links
-   * as edges. Reachable to anyone who can reach the World — the Entity-level filter inside decides
-   * what they actually see, so a World Viewer gets a graph of the `shared` Entities alone.
+   * The World Graph (ADR-0046): the World's readable Entities as nodes, their Entity Links as edges.
+   * Reachable to anyone who can reach the World — the Entity-level filter inside decides what they
+   * actually see, so a World Viewer gets a graph of the `shared` Entities alone.
    *
-   * ponytail: one unbounded full-World payload, no windowing — a human-authored World sits in the
-   * low thousands of nodes and a client force-graph handles that. The upgrade path, when one
-   * doesn't: a node cap here, and a single-Entity-neighbourhood mode (`?focus=<entityId>&depth=n`)
-   * that ships the subgraph around one Entity instead of the whole World.
+   * ponytail: one unbounded full-World payload, no windowing or node cap.
    */
   @Get(':id/graph')
   graph(@CurrentUser() user: AuthUser, @Param('id') id: string): WorldGraph {

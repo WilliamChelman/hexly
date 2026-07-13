@@ -39,12 +39,10 @@ import { FormattingMenu } from './formatting-menu';
 import { BubbleMenuDirective } from './bubble-menu.directive';
 
 /**
- * The Content editing surface every Entity shares (ADR-0019): mounts TipTap,
- * seeds from the Entity's stored snapshot, streams edits back to the session's
- * live Content via `getJSON()` — carrying the snapshot load-to-save, never
- * parsing it. {@link EntityPage} mounts it as the body of a `note`, or of a
- * `hexmap` on its Note view (#75). Host is the framed box; callers add only
- * outer placement.
+ * The Content editing surface every Entity shares (ADR-0019): mounts TipTap, seeds from the
+ * Entity's stored snapshot, streams edits back to the session's live Content via `getJSON()` —
+ * carrying the snapshot load-to-save, never parsing it. Host is the framed box; callers add
+ * only outer placement.
  */
 @Component({
   selector: 'app-content-editor',

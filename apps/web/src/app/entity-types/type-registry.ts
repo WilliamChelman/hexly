@@ -17,29 +17,20 @@ import { CORE_TYPE_DEFINITIONS } from './core-types';
 import { ViewRegistry } from './view-registry';
 
 /**
- * Root registry where Entity Types make themselves known to the type-specific UI
- * — modelled on {@link CommandRegistry} (ADR-0032): a `providedIn: 'root'`
- * singleton whose `register()` returns an unregister fn. It is the one place the
- * entity page, header, card, dashboard, graph, and create surfaces read
- * per-type icon, labels, and afforded view surfaces, replacing the scattered
- * `type === 'hexmap'` / `type === 'note'` branches (ADR-0048).
+ * Root registry where Entity Types make themselves known to the type-specific UI: the one place the
+ * entity page, header, card, dashboard, graph, and create surfaces read per-type icon, labels, and
+ * afforded view surfaces. `register()` returns an unregister fn.
  *
- * `core.note` registers through the same path a bundled plugin does — the two seedings below are one
- * call with different data (ADR-0048) — and it is the only type the app itself seeds: the Hex Map's
- * chrome arrives from `providePluginHexmap()` like any other plugin's (ADR-0050, #199). A World's
- * user-defined types join the same registry at runtime, projected by {@link WorldTypesLoader} (#191).
+ * `core.note` is the only type the app itself seeds; plugin types arrive through {@link PLUGIN_TYPES},
+ * and a World's user-defined types join at runtime, projected by {@link WorldTypesLoader}.
  *
- * It implements {@link EntityTypes}, the read contract a lib injects (the app binds it to
- * {@link ENTITY_TYPES} in `app.config.ts`), so a shared control can ask what types exist without
- * depending on `apps/web`.
+ * Implements {@link EntityTypes}, the read contract a lib injects (bound to {@link ENTITY_TYPES} in
+ * `app.config.ts`), so a shared control can ask what types exist without depending on `apps/web`.
  */
 @Injectable({ providedIn: 'root' })
 export class TypeRegistry implements EntityTypes {
   private readonly transloco = inject(TranslocoService);
-  /**
-   * Read only from {@link viewsFor}, to resolve a placed Field's data-type to the View that renders it.
-   * The dependency runs one way — the View registry never asks about types.
-   */
+  /** Read only from {@link viewsFor}, to resolve a placed Field's data-type to the View that renders it. */
   private readonly views = inject(ViewRegistry);
   private readonly definitions = signal<readonly TypeDefinition[]>([]);
 
@@ -48,18 +39,14 @@ export class TypeRegistry implements EntityTypes {
 
   constructor() {
     for (const def of CORE_TYPE_DEFINITIONS) this.register(def);
-    // The bundled plugins' types (`core.hexmap`, `dnd.monster`): instance-wide, through the call the
-    // core just used. They arrive from whichever `providePluginX()` the app provided, so the registry
-    // never learns a plugin's name — and a spec gets a plugin's types by providing that plugin,
-    // nothing else. Drop one, and its Entities degrade to the generic Field view (see `viewsFor`).
+    // Bundled plugin types (`core.hexmap`, `dnd.monster`). Drop a plugin, and its Entities degrade to
+    // the generic Field view (see `viewsFor`).
     for (const def of inject(PLUGIN_TYPES, { optional: true }) ?? []) this.register(def);
   }
 
   /**
-   * The **Structured Field** data-types this build carries (ADR-0050) — the web twin of the API's
-   * `BUNDLED_STRUCTURED_DATA_TYPES`, threaded into the domain to validate a Field and mint its
-   * default. Composed from the plugins the app provided (#199), so the grid arrives with the Hex Map
-   * rather than being named here: the web registers a data-type exactly as the API does, in one place.
+   * The **Structured Field** data-types this build carries, composed from the provided plugins, and
+   * threaded into the domain to validate a Field and mint its default.
    */
   readonly structuredDataTypes = structuredDataTypeSet(inject(PLUGIN_DATA_TYPES, { optional: true }) ?? []);
 
@@ -75,11 +62,9 @@ export class TypeRegistry implements EntityTypes {
   }
 
   /**
-   * The definition for `type`, falling back to the core `core.note` for an absent
-   * or unregistered id — for the chrome (icon, labels) that must always resolve to
-   * *something*, mirroring the old `?? TYPE_LABELS['note']` default. Non-optional:
-   * `core.note` is always registered. Callers pass an Entity's *primary* type
-   * (`types[0]`) here, which drives its icon, headline, and default view.
+   * The definition for `type`, falling back to `core.note` for an absent or unregistered id, so chrome
+   * (icon, labels) always resolves to *something*. Callers pass an Entity's *primary* type (`types[0]`),
+   * which drives its icon, headline, and default view.
    */
   resolve(type: string | null | undefined): TypeDefinition {
     // `core.note` is seeded in the constructor, so the fallback is always present.
@@ -88,29 +73,22 @@ export class TypeRegistry implements EntityTypes {
 
   /**
    * The ordered, de-duplicated {@link ViewInstance}s an Entity carrying `types` affords — the union of
-   * every type's placed views, in `types` order, primary type first (ADR-0048, *Views* amendment).
-   * Drives the header view toggle: a note yields `[core.view.content]` (one view, no toggle); a hexmap
-   * yields `[core.view.map:grid, core.view.content]`; a `[dnd.monster, core.hexmap]` composes all
-   * three (stat block, Note, and Map). `types[0]`'s first view is the default.
+   * every type's placed views, in `types` order, primary type first. `types[0]`'s first view is the
+   * default. Drives the header view toggle.
    *
-   * A View is an **instance**, not a bare id (ADR-0050): a Type's own View names no Field, while a
-   * **Structured Field**'s View is bound to the Field it renders. A type places a Field's View by
-   * listing `{ field: key }` among its views, and the placement resolves Field → data-type `kind` → the
-   * View the {@link ViewRegistry} holds for that kind — so two grids afford two map Views.
+   * A View is an **instance**, not a bare id: a Type's own View names no Field, while a **Structured
+   * Field**'s View is bound to the Field it renders. A type places a Field's View by listing
+   * `{ field: key }` among its views, resolving Field → data-type `kind` → the View the
+   * {@link ViewRegistry} holds for that kind — so two grids afford two map Views.
    *
    * A placement that cannot resolve — a Field the type never declared, a built-in data-type (which has
    * a form row, not a View), or a structured one whose plugin this build omits — contributes nothing,
    * rather than a toggle to a view that cannot render.
    *
-   * A registered type affords exactly the Views it declares: a plugin shipping a bespoke view does not
-   * also get the generic Field View, while a fields-only type (every user-defined one, #191) declares
-   * `core.view.fields` outright.
-   *
-   * An **unregistered** type — a plugin this build does not bundle — affords the Content view and
-   * the generic Field view instead (#199). Both, and in that order: the Entity opens on the lore it
-   * has always had, and one toggle away its type shows as an inert chip over its values as plain
-   * Metadata (#187) — a Hex Map on an Instance without the map plugin, exactly as ADR-0048 promised.
-   * Nothing is hidden by a missing plugin; the Metadata, grid and all, is still there to read.
+   * A registered type affords exactly the Views it declares; a fields-only type declares
+   * `core.view.fields` outright. An **unregistered** type — a plugin this build does not bundle —
+   * affords the Content view and the generic Field view instead, in that order, so its values remain
+   * readable as plain Metadata.
    */
   viewsFor(types: readonly string[] | null | undefined): ViewInstance[] {
     const seen = new Map<string, ViewInstance>();
@@ -140,10 +118,8 @@ export class TypeRegistry implements EntityTypes {
   }
 
   /**
-   * The union of Field schemas an Entity carrying `types` affords (ADR-0048, #187) — every
-   * registered type's declared Fields, primary type first, deduped by Metadata key. Delegates to
-   * the pure domain {@link resolveFields}; the generic Field View reads it to render and edit a
-   * typed Entity's Fields as a lens over its one Metadata map.
+   * The union of Field schemas an Entity carrying `types` affords — every registered type's declared
+   * Fields, primary type first, deduped by Metadata key.
    */
   resolveFields(types: readonly string[] | null | undefined): FieldSchema[] {
     return resolveFields((type) => this.get(type)?.fields, types ?? []);
@@ -151,10 +127,8 @@ export class TypeRegistry implements EntityTypes {
 
   /**
    * A type's **display name** — the noun every surface shows for it ("Note", "Hex Map", "Deity").
-   * The single home of the rule that a **user-defined type's name is authored data, never a
-   * transloco key** (#191): its `labelText` is returned verbatim, and only a code-registered type's
-   * name is looked up as `entityBrowser.type.<id>` copy. An unregistered id falls back to the raw
-   * key lookup, as it did before.
+   * A **user-defined type's name is authored data, never a transloco key**: its `labelText` is
+   * returned verbatim, while a code-registered type's name is looked up as `entityBrowser.type.<id>`.
    *
    * Read it through the `typeName` pipe in a template; call it directly from a `computed` that also
    * tracks `transloco.activeLang()`, so the name re-resolves on a language switch.

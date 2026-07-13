@@ -1,8 +1,7 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 
 /**
- * A keycap — renders a `<kbd>` with the app's mono keycap styling. Projects its
- * content. See ADR-0007.
+ * A keycap — renders a `<kbd>` with the app's mono keycap styling. See ADR-0007.
  *
  *   <kbd appKbd>⌘ Z</kbd>
  */

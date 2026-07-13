@@ -5,18 +5,15 @@ import { translocoAppConfig } from './transloco.config';
 
 /**
  * Catalogs keyed the way Transloco caches them: a bare language (`en`) for the app's root catalog,
- * `scope/lang` (`map/en`) for a lib's scoped one (ADR-0049). Each project exports its own set from
- * its `testing` entry point, so a spec loads the real copy of the libs it renders — and only those.
+ * `scope/lang` (`map/en`) for a lib's scoped one (ADR-0049).
  */
 export type TestCatalogs = Record<string, Translation>;
 
 /**
- * Loads real catalogs into a TestBed so specs assert against the same English copy users see
- * (ADR-0014), which doubles as proof that the keys they exercise resolve.
+ * Loads real catalogs into a TestBed (ADR-0014).
  *
  * Pass every project whose copy the spec renders: its own, plus any lib whose components it mounts.
- * Later sets win on collision, so a spec can override one catalog to prove a behaviour — a French
- * tree with a key removed, to exercise the English fallback.
+ * Later sets win on collision, so a spec can override one catalog to exercise a fallback.
  */
 export function provideTranslocoTesting(
   ...catalogs: readonly TestCatalogs[]

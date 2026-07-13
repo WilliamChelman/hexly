@@ -43,12 +43,10 @@ import type { ContentEditorSession } from '@hexly/content-editor';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 
 /**
- * The central mutable store for the open Entity (ADR-0048, *Central store* amendment):
- * the concrete {@link EntitySessionPort}. Owns the working body every View edits through
- * {@link mutate}, and bridges it to {@link EntitiesClient} for `/entities/:id` — load,
- * autosave, conflict, live-follow. `HexMapStore` and the other Views bind to it through
- * the {@link ENTITY_SESSION} token, so the map lib plugs into the session rather than the
- * session reaching into it (the inversion this ADR set up).
+ * The central mutable store for the open Entity (ADR-0048): the concrete
+ * {@link EntitySessionPort}. Owns the working body every View edits through {@link mutate},
+ * and bridges it to {@link EntitiesClient} for `/entities/:id` — load, autosave, conflict,
+ * live-follow. Views bind to it through the {@link ENTITY_SESSION} token.
  *
  * Route-scoped (`providers`), not root: leaving the route destroys it, so
  * open-Entity state resets implicitly.
@@ -57,9 +55,8 @@ import { TypeRegistry } from '../../../entity-types/type-registry';
 const AUTOSAVE_DELAY_MS = 800;
 
 /**
- * Ceiling on how long a leave-flush blocks navigation — only bites a hung
- * network, where we stop waiting and let the route change proceed (the edit is
- * best-effort lost, same as the `beforeunload` path).
+ * Ceiling on how long a leave-flush blocks navigation — on timeout the route change proceeds
+ * and the edit is best-effort lost, same as the `beforeunload` path.
  */
 const FLUSH_TIMEOUT_MS = 10_000;
 
@@ -88,11 +85,9 @@ export class EntitySession implements ContentEditorSession, EntitySessionPort {
   readonly current = this._current.asReadonly();
 
   /**
-   * The working Entity body — `{ content, metadata }`, the one shape every Entity has, and the
-   * source every View edits. Owned here (ADR-0048): a View reads its slice off {@link body} — a
-   * Field's value, the map editor's grid among them — and writes it through {@link mutate}. Content
-   * is the one exception, still tracked in {@link _content} (TipTap owns its own live doc) and
-   * folded back in at save; `mutate` covers the rest.
+   * The working Entity body — `{ content, metadata }`. A View reads its slice off {@link body}
+   * and writes it through {@link mutate}. Content is the one exception: tracked in
+   * {@link _content} (TipTap owns its own live doc) and folded back in at save.
    */
   private readonly _body = signal<EntityBody>(emptyEntityBody());
   readonly body = this._body.asReadonly();
@@ -128,16 +123,13 @@ export class EntitySession implements ContentEditorSession, EntitySessionPort {
 
   /**
    * Whether the load-time Rights carry the `edit` verb (ADR-0037). False → a read-only
-   * opener: {@link save} no-ops so no autosave ever hits a 403 wall. Exposed straight off
-   * the `ENTITY_SESSION` token so a View gates its own tools without the session pushing
-   * edit-ability into it — a visibility flip that revokes write updates it live.
+   * opener: {@link save} no-ops so no autosave ever hits a 403 wall.
    */
   readonly writable = computed(() => !!this._current()?.rights?.includes('edit'));
 
   /**
-   * Whether the caller may manage this Entity's sharing (the `manage` verb) —
-   * gates the owner-only Share surface; a writer who isn't an Owner carries
-   * `edit` but not `manage`.
+   * Whether the caller may manage this Entity's sharing (the `manage` verb): a writer who
+   * isn't an Owner carries `edit` but not `manage`.
    */
   readonly manageable = computed(() => !!this._current()?.rights?.includes('manage'));
 
@@ -150,17 +142,11 @@ export class EntitySession implements ContentEditorSession, EntitySessionPort {
    */
   readonly content = this._content.asReadonly();
 
-  /**
-   * Live Tags: span every Entity type and ride the version-checked save, so a
-   * body-only save never silently drops them.
-   */
+  /** Live Tags: ride the version-checked save alongside the body. */
   private readonly _tags = signal<readonly string[]>([]);
   readonly tags = this._tags.asReadonly();
 
-  /**
-   * The live, ordered type set every type-driven surface reads, so the header, view toggle, and
-   * Field View re-primary the moment a type is added/removed/reordered, before any save (#189).
-   */
+  /** The live, ordered type set (`types[0]` primary), updated before any save. */
   private readonly _types = signal<readonly EntityType[]>([]);
   readonly types = this._types.asReadonly();
 
@@ -189,9 +175,8 @@ export class EntitySession implements ContentEditorSession, EntitySessionPort {
   );
 
   /**
-   * The open Entity's id, or `null` with none open / a public reader. Drives
-   * live-follow: the reconciler switches its server subscription to this id, so a
-   * swap unfollows the old and follows the new without manual bookkeeping.
+   * The open Entity's id, or `null` with none open / a public reader. Drives live-follow:
+   * the reconciler switches its server subscription to this id.
    */
   private readonly _followedId = computed(() => (this.externallyDriven ? null : (this._current()?.id ?? null)));
 
@@ -257,10 +242,9 @@ export class EntitySession implements ContentEditorSession, EntitySessionPort {
       onCleanup(() => clearTimeout(timer));
     });
 
-    // Live-follow reconciler: the client's write-through store owns the source (shared follow +
-    // debounced refetch + freshness dedup, fed by our own saves too); we only decide what to *apply*.
-    // `switchMap` off the followed id makes it subscription-scoped — swapping Entity tears down the
-    // old follow, `takeUntilDestroyed` withdraws on route leave.
+    // Live-follow reconciler: the client's write-through store owns the source; we only decide
+    // what to *apply*. `switchMap` off the followed id makes the follow subscription-scoped —
+    // swapping Entity tears down the old follow, `takeUntilDestroyed` withdraws on route leave.
     toObservable(this._followedId)
       .pipe(
         // A computed already dedupes on ===, so toObservable only emits on a real id change.
@@ -283,11 +267,7 @@ export class EntitySession implements ContentEditorSession, EntitySessionPort {
       });
   }
 
-  /**
-   * Caller passes its ActivatedRoute in — a route-scoped service would get the
-   * root injector's route. switchMap keeps a stale A response off B's canvas;
-   * 404 → the World's library; other load errors set the reload-error state.
-   */
+  /** {@link watchRoute}: the caller passes its ActivatedRoute in — a route-scoped service would get the root injector's route. */
   /**
    * A Public Link page fetches its Entity through the token-scoped public read
    * surface and {@link adopt}s it directly. Marking the session externally driven
@@ -417,10 +397,9 @@ export class EntitySession implements ContentEditorSession, EntitySessionPort {
   }
 
   /**
-   * Run `recipe` against a draft of the body through Immer, adopting the result and
-   * returning the forward/inverse patches (ADR-0048). The universal write-channel every
-   * View shares; a View that owns undo/redo (the map editor) keeps the patches to replay.
-   * Bumps no load generation — an edit must not reset a View's history.
+   * Run `recipe` against a draft of the body through Immer, adopting the result and returning
+   * the forward/inverse patches (ADR-0048) — a View that owns undo/redo keeps them to replay.
+   * Bumps no load generation: an edit must not reset a View's history.
    */
   mutate(recipe: (draft: EntityBody) => void): {
     redo: Patch[];
@@ -482,11 +461,10 @@ export class EntitySession implements ContentEditorSession, EntitySessionPort {
   }
 
   /**
-   * The shared metadata PATCH behind {@link rename} and {@link setVisibility} — both hit
-   * the same endpoint and share the same bookkeeping, so the guard lives in one place. Exactly one
-   * of the two rides a request (ADR-0045), which is what lets the kind pick the server's gate.
+   * The shared metadata PATCH behind {@link rename} and {@link setVisibility}. Exactly one of
+   * the two rides a request (ADR-0045), which is what lets the kind pick the server's gate.
    * None open, or one loading under navigation → no-op (not a throw), so a stale patch
-   * can't write to the Entity the user navigated away from (#4).
+   * can't write to the Entity the user navigated away from.
    */
   private patch(changes: { name: string } | { visibility: Visibility }): Observable<EntityDetail> {
     const open = this._current();

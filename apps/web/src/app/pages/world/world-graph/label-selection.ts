@@ -105,11 +105,9 @@ function selectLinks(payload: GraphPayload, positions: Float32Array, view: Label
 const ZOOM_STEP = Math.SQRT2;
 
 /**
- * Snap the live zoom to {@link ZOOM_STEP} before it sizes the grid cells. The cell is `pointCell /
- * scale`, so a continuously-varying scale continuously reshapes the graph-space grid — every node
- * drifts across cell boundaries as you zoom, winners flip, and labels blink in and out for no
- * reason a reader can see. Quantizing pins the grid between thresholds: the elected set changes
- * only at a deliberate step, never mid-pinch.
+ * Snap the live zoom to {@link ZOOM_STEP} before it sizes the grid cells: the cell is `pointCell /
+ * scale`, so an unquantized scale reshapes the graph-space grid on every frame — nodes drift across
+ * cell boundaries and winners flip mid-pinch.
  */
 function quantizeScale(scale: number): number {
   if (!(scale > 0)) return 1;

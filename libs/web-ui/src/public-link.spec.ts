@@ -5,11 +5,6 @@ import { MockEntitiesClient, MockWorldsClient, provideTranslocoTesting } from '@
 import { WEB_UI_TEST_CATALOGS } from './i18n/test-catalogs';
 import { PublicLinkControl, PublicLinkKind } from './public-link';
 
-/**
- * The Public Link control (ADR-0037, #162): mint / show / revoke the one anonymous read-only
- * link for a World or Entity. These specs assert the observable behaviour — which client the
- * `kind` targets, the shareable URL shown, and that a revoke returns to the create state.
- */
 describe('PublicLinkControl', () => {
   let entities: MockEntitiesClient;
   let worlds: MockWorldsClient;

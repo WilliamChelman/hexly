@@ -10,11 +10,9 @@ import { ConfigModule } from '../config/config.module';
 import { WorldsModule } from '../worlds/worlds.module';
 
 /**
- * World membership & roles (ADR-0037, #159): a World Owner curates who is in their
- * World by picking existing Instance users as Contributors or World Viewers, changes
- * a member's role, or removes them; a member may leave. Access is derived on every
- * read — these specs assert the externally observable lifecycle (who reaches the
- * World after add/remove/set-role/leave), never the predicate internals.
+ * World membership & roles (ADR-0037): a World Owner adds/removes members and sets a
+ * member's role (Contributor or World Viewer); a member may leave. Access is derived on
+ * every read, so these specs assert who reaches the World, not the predicate internals.
  */
 describe('World members', () => {
   let app: INestApplication;

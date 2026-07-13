@@ -1,19 +1,15 @@
 /**
- * CI key-sync gate (issue #50): fail when the locale catalogs drift, or when two projects claim the
- * same slice of the key space. Every project owns its own catalogs (ADR-0049) — the app's root one,
- * and one scoped catalog per lib.
+ * CI key-sync gate: fail when the locale catalogs drift, or when two projects claim the same slice
+ * of the key space. Every project owns its own catalogs (ADR-0049) — the app's root one, and one
+ * scoped catalog per lib. Compares key sets and owners only. Run via the `web:i18n-sync` Nx target.
  *
- * **Parity.** English is the source of truth and fallback (ADR-0014). A missing translation degrades
- * gracefully at runtime, but in CI we are strict: a key present in one locale of a catalog and absent
- * from another (missing *or* orphaned) fails the build, so translations can never silently rot. Each
- * locale is compared against its catalog's `en.json`, so a third locale is guarded automatically.
+ * **Parity.** Each locale is compared against its catalog's `en.json` (ADR-0014); a key missing
+ * *or* orphaned relative to the reference fails the build.
  *
- * **Ownership.** A loaded scope is flattened into the active language under its scope name, so scopes
- * and the root namespaces share one key space: a `map` scope and a root `map.*` namespace would
- * answer the same key, and load order would decide the winner. No two projects may claim one prefix.
- *
- * A guardrail, not a "no hardcoded string" lint rule: it compares key sets and owners only. Run via
- * the `web:i18n-sync` Nx target (which type-checks then jiti-executes this TS).
+ * **Ownership.** A loaded scope is flattened into the active language under its scope name, so
+ * scopes and the root namespaces share one key space: a `map` scope and a root `map.*` namespace
+ * would answer the same key, and load order would decide the winner. No two projects may claim one
+ * prefix.
  */
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -38,8 +34,7 @@ interface Catalog {
 }
 
 /**
- * A lib declares its scope in the `TranslationScope` beside its catalogs, so that declaration — not
- * a list maintained here — is the source of truth for who owns what. A catalog with no scope
+ * A lib declares its scope in the `TranslationScope` beside its catalogs. A catalog with no scope
  * declaration is a bug: its copy could never be loaded.
  */
 function readScope(i18nDir: string, project: string): string {

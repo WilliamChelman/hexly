@@ -1,10 +1,6 @@
 import { createEntity, enterLibrary, expect, openEntityActions, test } from './fixtures';
 
-/**
- * The persistent nav rail and page-owned headers (ADR-0022, #89), driven as a
- * signed-in user. The rail is the only persistent chrome; each page renders its
- * own header. Responsive push-vs-overlay is exercised by setting the viewport.
- */
+/** The persistent nav rail and page-owned headers (ADR-0022), driven as a signed-in user. */
 test('the rail navigates, exposes account controls, and pages own their headers', async ({ page }) => {
   await enterLibrary(page);
 

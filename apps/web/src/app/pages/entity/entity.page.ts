@@ -15,30 +15,22 @@ import { ViewRegistry } from '../../entity-types/view-registry';
 import { CORE_VIEW_DEFINITIONS } from './views/core-views';
 
 /**
- * The open-Entity route (`/entities/:id`, #70): the routed page that loads the
- * Entity into {@link EntitySession} and lays out its editor — one frame for every
- * Entity type (ADR-0022).
+ * The open-Entity route (`/entities/:id`): loads the Entity into {@link EntitySession} and
+ * lays out its editor — one frame for every Entity type (ADR-0022). The {@link EntityHeader}
+ * docks above; the body is a single `NgComponentOutlet` over the active View's component,
+ * resolved from the {@link ViewRegistry} by {@link EntityViewStore.activeView} (ADR-0048).
  *
- * A thin host (ADR-0048, *Views* amendment): the {@link EntityHeader} docks above,
- * and the body is a single `NgComponentOutlet` over the active View's component,
- * resolved from the {@link ViewRegistry} by {@link EntityViewStore.activeView}. There
- * is no `isHexmap` branch — the page dispatches on the active View id, and the core
- * Views (`MapView`, `ContentView`) register themselves the way a plugin would.
- *
- * Staying the routed component across `:id` changes keeps the editor mounted as the
- * open Entity swaps — only the outletted body changes, never the frame.
+ * Stays the routed component across `:id` changes: only the outletted body changes, never the frame.
  */
 @Component({
   selector: 'app-entity-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block h-full overflow-hidden' },
-  // The Content view's dock stores, scoped to the page that shows them. Provided *here*
-  // rather than beside EntitySession on the route, because every context that mounts this
-  // component needs them and none overrides them: a Public Link page reuses EntityPage, and
-  // mirroring the route's provider list by hand is a contract nothing enforces (it silently
-  // broke the public page once, #179). ContentView, outletted below, injects them from here.
-  // EntityViewStore joins them: page-scoped, it reads the open Entity's types off the session
-  // (provided above the page in both mounts) to derive the afforded Views and the active one.
+  // The Content view's dock stores, scoped to the page that shows them. Provided *here* rather
+  // than on the route, because every mount of this component needs them (the Public Link page
+  // reuses EntityPage) and none overrides them. ContentView, outletted below, injects them from
+  // here. EntityViewStore is page-scoped too: it reads the open Entity's types off the session,
+  // provided above the page in both mounts.
   providers: [RightDock, OutlineStore, ReferencesStore, EntityViewStore],
   imports: [EntityHeader, NgComponentOutlet, TranslocoPipe],
   template: `
@@ -85,7 +77,7 @@ export class EntityPage {
 
   /**
    * The injector the active View's component is created in — the page's own, plus {@link VIEW_FIELD_KEY}
-   * when the View renders a **Structured Field**. A Type's own View (Content, a stat block) renders no
+   * when the View renders a Structured Field. A Type's own View (Content, a stat block) renders no
    * particular Field and is handed nothing.
    *
    * Keyed on {@link EntityViewStore.activeFieldKey}, which settles: `NgComponentOutlet` rebuilds the
@@ -101,10 +93,9 @@ export class EntityPage {
   });
 
   constructor() {
-    // Register the core Views from the lazy entity chunk, dropping them when the page is torn down
-    // (ADR-0048). Kept out of the root ViewRegistry so the heavy view bodies (the map, TipTap) stay
-    // off the initial bundle. A bundled plugin's Views are already there, seeded by its
-    // `providePluginX()`, so the page names no plugin.
+    // Register the core Views from the lazy entity chunk, dropping them when the page is torn down.
+    // Kept out of the root ViewRegistry so the heavy view bodies (the map, TipTap) stay off the
+    // initial bundle.
     const unregister = CORE_VIEW_DEFINITIONS.map((d) => this.views.register(d));
     inject(DestroyRef).onDestroy(() => unregister.forEach((u) => u()));
 

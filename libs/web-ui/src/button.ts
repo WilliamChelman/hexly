@@ -5,11 +5,8 @@ export type ButtonVariant = 'default' | 'primary' | 'ghost';
 export type ButtonSize = 'md' | 'sm';
 
 /**
- * Turns a native `<button>`/`<a>` into a Hexly button by mapping typed inputs
- * onto its own scoped, token-driven styles. It uses an attribute selector on the
- * native element, so the real element keeps its type, focus, form participation
- * and a11y — and `<ng-content/>` projects its children — while the component
- * owns its visual definition. See ADR-0007.
+ * Turns a native `<button>`/`<a>` into a Hexly button. The attribute selector keeps
+ * the real element, so its type, focus, form participation and a11y survive (ADR-0007).
  *
  *   <button appButton variant="primary" size="sm">Share</button>
  *   <a appButton variant="ghost" routerLink="/styleguide">Design system</a>
@@ -127,9 +124,8 @@ export class Button {
   /** Destructive tone; composes with any variant. */
   readonly danger = input(false, { transform: booleanAttribute });
   /**
-   * Selected/pressed highlight for a toggle or segmented choice. The consumer
-   * sets this and owns the matching `aria-pressed`/`aria-current` — this only
-   * paints the sticky highlight (gold-soft fill, ink-strong text).
+   * Selected/pressed highlight for a toggle or segmented choice. Paint only — the
+   * consumer owns the matching `aria-pressed`/`aria-current`.
    */
   readonly active = input(false, { transform: booleanAttribute });
 }

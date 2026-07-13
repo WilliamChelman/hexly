@@ -43,10 +43,8 @@ describe('EntitiesClient', () => {
 
   afterEach(() => http.verify());
 
-  // watch() fronts the write-through store for one Entity (ADR-0044): a nudge newer than held →
-  // debounced refetch, an unavailable eviction → EVICTED, and a save/load write-through dedups the
-  // server's own echo. Locks that watch() wires the store to the right ref and read (store internals
-  // are covered in entity-store.spec).
+  // watch() fronts the write-through store for one Entity (ADR-0044); store internals are covered
+  // in entity-store.spec.
   describe('watch (live-follow)', () => {
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => vi.useRealTimers());

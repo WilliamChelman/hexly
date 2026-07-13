@@ -7,14 +7,14 @@ import { Button } from './button';
 import { Select } from './select';
 
 /**
- * A World's non-owner membership set (ADR-0037, #159): the layer below the owner set.
- * A World Owner adds an Instance user as a Contributor or World Viewer, changes a
- * member's role between the two, or removes them. All writes are Owner-only server-side;
- * a refusal surfaces as an error toast, leaving the list untouched.
+ * A World's non-owner membership set (ADR-0037): a World Owner adds an Instance user as a
+ * Contributor or World Viewer, changes a member's role between the two, or removes them.
+ * Writes are Owner-only server-side; a refusal surfaces as an error toast, leaving the list
+ * untouched.
  *
  * Membership is stored as user ids + roles; names come from the {@link UserDirectoryClient}
- * directory, which carries no email (ADR-0004). Owners are excluded from the add
- * candidates — promoting to Owner belongs to the owner-set surface, not here.
+ * directory, which carries no email (ADR-0004). Owners are excluded from the add candidates
+ * — promoting to Owner belongs to the owner-set surface.
  */
 @Component({
   selector: 'app-member-set',
@@ -183,10 +183,9 @@ export class MemberSet implements OnInit {
   }
 
   /**
-   * Run a member-set mutation, applying its result on success or surfacing the failure
-   * as an error toast. The list is only ever mutated inside `onOk`, so a refusal leaves
-   * it exactly as it was; `onErr` runs first on failure for any DOM the signal can't
-   * revert on its own (the row role `<select>`).
+   * Run a member-set mutation, applying its result on success or surfacing the failure as an
+   * error toast. The list is mutated only inside `onOk`; `onErr` runs first on failure, for
+   * DOM the signal can't revert on its own (the row role `<select>`).
    */
   private mutate(
     op$: Observable<WorldMember[]>,

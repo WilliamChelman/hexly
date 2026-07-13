@@ -135,11 +135,6 @@ describe('FollowStore', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
-  /**
-   * The whole point of one `seq` on every resource kind (ADR-0045): a World store is the *same*
-   * store with a different ref kind. There is no per-kind freshness adapter left to configure —
-   * `FollowStoreConfig.isNewer` is gone, and the comparison lives in one place.
-   */
   it('gates a World exactly as it gates an Entity — one comparison, no per-kind adapter', () => {
     const worlds = new FollowStore<Doc>(bus as unknown as NudgeBusClient, {
       kind: 'world',

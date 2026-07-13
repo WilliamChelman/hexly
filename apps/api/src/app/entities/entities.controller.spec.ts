@@ -19,8 +19,7 @@ import { WorldsService } from '../worlds/worlds.service';
 
 /**
  * A Hex Map body: Content plus its grid at the `grid` Metadata key — the `core.hex-grid`
- * **Structured Field** `core.hexmap` declares (ADR-0050). One body shape for every Entity, so a map
- * is a note that carries one more Field value.
+ * **Structured Field** `core.hexmap` declares (ADR-0050).
  */
 function hexmapBody(hexes: Record<string, unknown> = {}) {
   return {
@@ -59,10 +58,8 @@ describe('Entities endpoints', () => {
   });
 
   /**
-   * Seed a user and give them a World — the precondition for creating Entities
-   * (ADR-0024). Seeding alone no longer mints a World; the future World-creation
-   * UI does, which this stands in for. The World is empty — its landing is a
-   * derived Dashboard (ADR-0043), so nothing surfaces in the owner's Entity list.
+   * Seed a user and give them a World — the precondition for creating Entities (ADR-0024). The World
+   * is empty (ADR-0043), so nothing surfaces in the owner's Entity list.
    */
   async function seedUserWithWorld(email: string, password: string, name: string) {
     const userId = await app.get(AuthService).seedUser(email, password, name, { roles: ['create-worlds'] });
@@ -1664,9 +1661,8 @@ describe('Entities endpoints', () => {
   });
 
   /**
-   * The bundled `dnd.monster` plugin (#192). Nothing here registers a type: the plugin declares it in
-   * code and {@link TypeFieldRegistry} seeds it at startup. The API never sees the stat-block view —
-   * the Fields alone are enough to validate and facet a monster.
+   * The bundled `dnd.monster` plugin. Nothing here registers a type: the plugin declares it in code and
+   * {@link TypeFieldRegistry} seeds it at startup.
    */
   describe('the bundled dnd.monster plugin type', () => {
     /** Typed-save a monster with the given Metadata — an active typed edit, so the gate applies. */

@@ -6,11 +6,11 @@ import { TypeRegistry } from '../../../entity-types/type-registry';
 import { FieldControl } from '@hexly/web-entity/controls';
 
 /**
- * Pick, add, remove, and reorder an Entity's ordered Entity Type set, `types[0]` primary (ADR-0048,
- * #189). Presentational: reads `types`/`metadata`, emits the authored set — so the create dialog and
- * the header's Edit-types dialog share one editor. Adding a type with unmet required Fields opens an
- * inline prompt ({@link FieldControl} + {@link validateFields}) and holds the type back until they
- * are supplied; removing only drops the lens, leaving its Metadata behind (CONTEXT.md → Field).
+ * Pick, add, remove, and reorder an Entity's ordered Entity Type set, `types[0]` primary (ADR-0048).
+ * Presentational: reads `types`/`metadata`, emits the authored set. Adding a type with unmet required
+ * Fields opens an inline prompt ({@link FieldControl} + {@link validateFields}) and holds the type
+ * back until they are supplied; removing only drops the lens, leaving its Metadata behind
+ * (CONTEXT.md → Field).
  */
 @Component({
   selector: 'app-entity-types-editor',
@@ -138,7 +138,7 @@ export class EntityTypesEditor {
   /**
    * Whether adding a type with unmet required Fields opens the inline prompt. The header binds `true`
    * so a live autosave never fires an unmet type; the create dialog binds `false` and collects the
-   * Fields in its own gated form (which also covers the seeded primary type).
+   * Fields in its own gated form.
    */
   readonly promptOnAdd = input(true);
 

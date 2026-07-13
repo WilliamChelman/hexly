@@ -1,15 +1,10 @@
 import { createEntity, enterLibrary, expect, flushSave, test, savedGrid } from './fixtures';
 
 /**
- * The hex-name journey (issue #60, ADR-0016): a painted Hex is named in the
- * Inspector — structured metadata bound to its coordinate, distinct from a free
- * Label — and the name survives a save and reload. Like the other entity journeys
- * it crosses every seam: canvas paint and selection, the Inspector edit, a
- * versioned save, and a load on reload. We prove the round trip with a direct API
- * read of the persisted document (ADR-0009) and confirm the Inspector re-renders
- * the name after re-selecting the hex, so it stays editable. The renderer's
- * drawing of the name is covered by the FakeContext unit tests; canvas pixels are
- * opaque to Playwright (ADR-0003), so this spec proves persistence and re-editing.
+ * A hex name is structured metadata bound to its coordinate (ADR-0016), distinct from a
+ * free Label. Canvas pixels are opaque to Playwright (ADR-0003), so this spec proves
+ * persistence via a direct API read (ADR-0009) plus re-editing after re-selection; the
+ * renderer's drawing of the name is covered by the FakeContext unit tests.
  */
 test('names a painted hex in the Inspector, and the name survives a reload', async ({ page, request }) => {
   await enterLibrary(page);
