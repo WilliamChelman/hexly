@@ -47,4 +47,35 @@ describe('the core.hex-grid Structured Field (ADR-0050)', () => {
     // Forward-only (ADR-0048): a document this build cannot parse yields no edges rather than throwing.
     expect(HEX_GRID_DATA_TYPE.harvestEdges?.('garbage')).toEqual([]);
   });
+
+  /** The searchable text a grid carries (#205). */
+  describe('extractText', () => {
+    it('yields its Hex names, Region names, and Labels', () => {
+      const text = HEX_GRID_DATA_TYPE.extractText?.(
+        grid({
+          hexes: {
+            '0,0': { terrain: 'grass', name: 'Ashford' },
+            '1,0': { terrain: 'ocean', name: 'Harbour' },
+          },
+          regions: [{ id: 'r1', name: 'The Kingdom of Avalon', color: '#aabbcc', hexes: {} }],
+          labels: [{ id: 'l1', text: 'The Whisperwood', position: { x: 0, y: 0 }, size: 12 }],
+        }),
+      );
+
+      expect(text).toBe('Ashford Harbour The Kingdom of Avalon The Whisperwood');
+    });
+
+    it('yields nothing for a painted but unnamed plane, and never a terrain or feature id', () => {
+      expect(
+        HEX_GRID_DATA_TYPE.extractText?.(
+          grid({ hexes: { '0,0': { terrain: 'grass', feature: { ref: 'settlement' } } } }),
+        ),
+      ).toBe('');
+      expect(HEX_GRID_DATA_TYPE.extractText?.(emptyHexMap())).toBe('');
+    });
+
+    it('yields nothing from a malformed value at rest, rather than throwing (forward-only)', () => {
+      expect(HEX_GRID_DATA_TYPE.extractText?.('garbage')).toBe('');
+    });
+  });
 });

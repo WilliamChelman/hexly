@@ -2,7 +2,7 @@
  * The **Structured Field**'s data-type — the plugin-contributed member of the Field data-type set
  * (CONTEXT.md → Structured Field, ADR-0050). Unlike a built-in data-type (`string`, `number`,
  * `entityLink`…), which is a form control over a small value, a structured one is a *document*: a
- * value with its own schema and its own link-edge harvesting.
+ * value with its own schema, its own link-edge harvesting, and its own searchable text.
  *
  * A data-type is structured _iff_ its kind is a `namespace.id` id — no boolean flag declares it. The
  * *shape* of a kind is validated in the domain; its *membership* is resolved in the host, so a
@@ -47,13 +47,18 @@ export interface StructuredDataType {
    * index alongside the Content's. Absent when the data-type carries no links.
    */
   harvestEdges?(value: unknown): readonly EntityEdge[];
+  /**
+   * The searchable text this value carries (a grid's Hex and Region names), concatenated into the
+   * Entity's full-text index alongside the Content's. Absent when the data-type carries no text.
+   */
+  extractText?(value: unknown): string;
 }
 
 /**
  * Declare a structured data-type. A malformed id (`strig` — no namespace) throws at module load.
  *
- * The declared `harvestEdges` sees a *parsed* value; a value that does not inhabit `valueSchema`
- * yields no edges rather than throwing — the forward-only tolerance the write path needs for a
+ * The declared capabilities see a *parsed* value; a value that does not inhabit `valueSchema` yields
+ * no edges and no text rather than throwing — the forward-only tolerance the write path needs for a
  * document at rest this build cannot parse.
  */
 export function defineStructuredDataType<T>(definition: {
@@ -61,9 +66,10 @@ export function defineStructuredDataType<T>(definition: {
   readonly valueSchema: z.ZodType<T>;
   readonly empty: () => T;
   readonly harvestEdges?: (value: T) => readonly EntityEdge[];
+  readonly extractText?: (value: T) => string;
 }): StructuredDataType {
   const id = structuredDataTypeIdSchema.parse(definition.id);
-  const { valueSchema, empty, harvestEdges } = definition;
+  const { valueSchema, empty, harvestEdges, extractText } = definition;
   return Object.freeze<StructuredDataType>({
     id,
     valueSchema: valueSchema as z.ZodType,
@@ -72,6 +78,12 @@ export function defineStructuredDataType<T>(definition: {
       harvestEdges: (value: unknown) => {
         const parsed = valueSchema.safeParse(value);
         return parsed.success ? harvestEdges(parsed.data) : [];
+      },
+    }),
+    ...(extractText && {
+      extractText: (value: unknown) => {
+        const parsed = valueSchema.safeParse(value);
+        return parsed.success ? extractText(parsed.data) : '';
       },
     }),
   });

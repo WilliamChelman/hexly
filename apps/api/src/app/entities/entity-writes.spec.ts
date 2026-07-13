@@ -132,6 +132,13 @@ describe('EntityWrites', () => {
   });
 
   describe('derived indexes', () => {
+    /** A grid carrying every named thing it can: one Hex, one Region, one Label. */
+    const GRID = {
+      hexes: { '0,0': { terrain: 'grass', name: 'Ashford' } },
+      regions: [{ id: 'r1', name: 'The Kingdom of Avalon', color: '#aabbcc', hexes: {} }],
+      labels: [{ id: 'l1', text: 'The Whisperwood', position: { x: 0, y: 0 }, size: 12 }],
+    };
+
     const CONTENT = tiptapContent({
       type: 'doc',
       content: [
@@ -160,6 +167,20 @@ describe('EntityWrites', () => {
 
       expect(descriptorsOf('Ealdred')).toEqual(['spouse']);
       expect(contentTextOf('Ealdred')).toBe('Married to');
+    });
+
+    /** The search text is the whole document's, not the Content's (#205): the grid contributes too. */
+    it('an inserted Hex Map indexes its grid’s Hex and Region names beside its prose', () => {
+      writes.insert({
+        ownerId: ADA,
+        worldId: WORLD,
+        name: 'The Reach',
+        types: ['core.hexmap'],
+        tags: [],
+        body: { content: CONTENT, metadata: { grid: GRID } },
+      });
+
+      expect(contentTextOf('The Reach')).toBe('Married to Ashford The Kingdom of Avalon The Whisperwood');
     });
 
     /**
@@ -345,6 +366,25 @@ describe('EntityWrites', () => {
       });
 
       /**
+       * A **Structured Field**'s text is derived state like any other (#205): a Hex Map saved before
+       * the grid declared an `extractText`, its `content_text` holding the prose alone, is findable
+       * by its Hex names after a reindex — no backfill migration.
+       */
+      it('recomputes a Structured Field’s searchable text from the stored document', () => {
+        seedRaw(
+          'the-reach',
+          WORLD,
+          JSON.stringify({ content: CONTENT, metadata: { grid: GRID } }),
+          'hexmap',
+          'Married to', // What the old, Content-only derivation left behind.
+        );
+
+        reindexAll();
+
+        expect(rowOf('the-reach').contentText).toBe('Married to Ashford The Kingdom of Avalon The Whisperwood');
+      });
+
+      /**
        * The one write here that lands without a nudge *and* without a `seq` bump: recomputing from
        * an unchanged document writes back what it read. Only just after a deploy adds a derivation
        * does it yield new state, and that stale window closes on the reader's next navigation.
@@ -476,7 +516,13 @@ describe('EntityWrites', () => {
         seedRaw(id, worldId, '{ not json', 'note');
       }
 
-      function seedRaw(id: string, worldId: string, document: string, type: string): void {
+      function seedRaw(
+        id: string,
+        worldId: string,
+        document: string,
+        type: string,
+        contentText: string | null = null,
+      ): void {
         const now = Date.now();
         db.insert(entities)
           .values({
@@ -489,7 +535,7 @@ describe('EntityWrites', () => {
             version: 1,
             seq: 1,
             document,
-            contentText: null,
+            contentText,
             createdAt: now,
             updatedAt: now,
           })

@@ -4,7 +4,13 @@
  * one Metadata map.
  */
 
-import { defineStructuredDataType, type EntityEdge, type FieldSchema, type StructuredDataTypeId } from '@hexly/domain';
+import {
+  defineStructuredDataType,
+  joinSearchText,
+  type EntityEdge,
+  type FieldSchema,
+  type StructuredDataTypeId,
+} from '@hexly/domain';
 import { emptyHexMap, HexMap, hexMapSchema } from './hex-map';
 
 /** The `namespace.id` kind naming the grid data-type — what marks the `grid` Field structured. */
@@ -13,6 +19,9 @@ export const CORE_HEX_GRID: StructuredDataTypeId = 'core.hex-grid';
 /**
  * The grid data-type. A link can hang off a Hex, a Feature, or a Region; a map placement expresses
  * no relationship, so it carries no Link Descriptor.
+ *
+ * Its searchable text is what the user typed: Hex names, Region names, Labels (#205). A terrain or
+ * feature id is a palette reference, not text — indexing it would match every grassland on "grass".
  */
 export const HEX_GRID_DATA_TYPE = defineStructuredDataType({
   id: CORE_HEX_GRID,
@@ -30,6 +39,12 @@ export const HEX_GRID_DATA_TYPE = defineStructuredDataType({
     for (const region of grid.regions) link(region.entityId);
     return edges;
   },
+  extractText: (grid: HexMap) =>
+    joinSearchText([
+      ...Object.values(grid.hexes).map((hex) => hex.name),
+      ...grid.regions.map((region) => region.name),
+      ...grid.labels.map((label) => label.text),
+    ]),
 });
 
 /**

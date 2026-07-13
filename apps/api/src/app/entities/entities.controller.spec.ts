@@ -830,6 +830,30 @@ describe('Entities endpoints', () => {
       expect(names(res)).toEqual(['Lady A']);
     });
 
+    /**
+     * A **Structured Field**'s text feeds the same index the prose does (#205), so `core.hex-grid`
+     * makes a Hex Map findable by what is painted on it — under the `q` the Browser already sends.
+     */
+    it('matches a Hex Map by one of its Hex names, and by one of its Region names', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const created = await ada.post('/entities').send({ name: 'The Reach', types: ['core.hexmap'] });
+      await noteWithProse(ada, 'Decoy', 'A note that names no place at all.');
+      const document = {
+        content: emptyContent(),
+        metadata: {
+          grid: {
+            hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'grass', name: 'Ashford' } },
+            regions: [{ id: 'r1', name: 'The Kingdom of Avalon', color: '#aabbcc', hexes: {} }],
+            labels: [],
+          },
+        },
+      };
+      await ada.put(`/entities/${created.body.id}`).send({ document, version: 1, tags: [] }).expect(200);
+
+      expect(names(await ada.get('/entities').query({ q: 'Ashford' }).expect(200))).toEqual(['The Reach']);
+      expect(names(await ada.get('/entities').query({ q: 'avalon' }).expect(200))).toEqual(['The Reach']);
+    });
+
     it('matches by name, by tag, and by prose — all case-insensitively', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       // Distinct match surfaces: one hit per query word, no cross-contamination.

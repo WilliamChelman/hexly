@@ -9,7 +9,7 @@ import {
   Visibility,
   descriptorsSchema,
   deriveFieldFacets,
-  extractText,
+  deriveSearchText,
   harvestEdges,
   resolveFields,
 } from '@hexly/domain';
@@ -26,7 +26,8 @@ const INITIAL_VERSION = 1;
 
 /** Everything one save derives from the Entity's document (and its types), in one pass. */
 interface Derived {
-  contentText: string;
+  /** The Entity's searchable text — the Content's prose and every Structured Field's (#205). */
+  searchText: string;
   descriptors: string[];
   edges: EntityEdge[];
   /** The denormalised facetable Field values (ADR-0048, #188) — depends on `types` *and* Metadata. */
@@ -185,7 +186,7 @@ export class EntityWrites {
       version: INITIAL_VERSION,
       seq: INITIAL_SEQ,
       document: JSON.stringify(input.body),
-      contentText: derived.contentText,
+      contentText: derived.searchText,
       createdAt: now,
       updatedAt: now,
     };
@@ -323,7 +324,7 @@ export class EntityWrites {
     if (derived.length > 0)
       this.transact(() => {
         for (const { row, derived: d } of derived) {
-          this.db.update(entities).set({ contentText: d.contentText }).where(eq(entities.id, row.id)).run();
+          this.db.update(entities).set({ contentText: d.searchText }).where(eq(entities.id, row.id)).run();
           this.replaceDerived(row.id, row.worldId, d);
         }
       });
@@ -340,7 +341,10 @@ export class EntityWrites {
   /**
    * The one derivation of the Entity's document. It takes the whole body, not just the Content: a
    * Hex Map's Entity Links live on its Hexes, Features, and Regions as well as in its prose
-   * (ADR-0046).
+   * (ADR-0046), and so do the names it is searchable by (#205).
+   *
+   * It names no extractor of its own: a **Structured Field** offers its own edges and its own text
+   * through the host-composed data-type set, so a new plugin needs no change here.
    *
    * The `::` vocabulary is a *projection* of the edge set, not a second walk: only a
    * `content → entity` edge carries a descriptor, so the non-null ones are exactly the descriptors
@@ -349,9 +353,10 @@ export class EntityWrites {
   private derive(body: EntityBody, types: readonly string[], worldId: string): Derived {
     // Scoped to the Entity's World so a user-defined type's Fields resolve too.
     const fields = resolveFields(this.worldTypeFields.resolverFor(worldId), types);
-    const edges = harvestEdges(body, fields, this.typeFields.structuredDataTypes);
+    const dataTypes = this.typeFields.structuredDataTypes;
+    const edges = harvestEdges(body, fields, dataTypes);
     return {
-      contentText: extractText(body.content),
+      searchText: deriveSearchText(body, fields, dataTypes),
       descriptors: descriptorsSchema.parse(edges.flatMap((e) => e.descriptor ?? [])),
       edges,
       fieldFacets: deriveFieldFacets(fields, body.metadata),
@@ -491,7 +496,7 @@ export class EntityWrites {
       ...(change.types !== undefined && { types: [...change.types] }),
       ...(change.document !== undefined && {
         document: JSON.stringify(change.document),
-        contentText: derived?.contentText,
+        contentText: derived?.searchText,
       }),
       ...(change.version !== undefined && { version: change.version + 1 }),
       updatedAt: Date.now(),
