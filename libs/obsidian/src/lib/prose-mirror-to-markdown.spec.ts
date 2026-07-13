@@ -1,5 +1,5 @@
-import { proseMirrorToMarkdown } from './pm-to-markdown';
-import { markdownToProseMirror, type PMNode } from './markdown-to-pm';
+import { proseMirrorToMarkdown } from './prose-mirror-to-markdown';
+import { markdownToProseMirror, type PMNode } from './markdown-to-prose-mirror';
 
 const doc = (...content: PMNode[]): PMNode => ({ type: 'doc', content });
 

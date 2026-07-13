@@ -1,5 +1,5 @@
-import { markdownToProseMirror } from './markdown-to-pm';
-import { proseMirrorToMarkdown } from './pm-to-markdown';
+import { markdownToProseMirror } from './markdown-to-prose-mirror';
+import { proseMirrorToMarkdown } from './prose-mirror-to-markdown';
 
 /**
  * Mark order within a text node is not semantic (`**_x_**` ≡ `_**x**_`), and remark

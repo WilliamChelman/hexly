@@ -8,4 +8,4 @@
  * `loadComponent` inside the provider, and so live in the map View's own chunk. A spec wanting the real
  * store takes it from `@hexly/plugin-hexmap/testing`.
  */
-export { providePluginHexmap } from './provide';
+export { providePluginHexmap } from './provide-plugin-hexmap';

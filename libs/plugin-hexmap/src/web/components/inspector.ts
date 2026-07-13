@@ -5,7 +5,7 @@ import { coordKey, Label, TerrainId } from '../../lib';
 import { Button, Coord, Eyebrow, Field, Input } from '@hexly/web-ui';
 import { EntityLinkPicker } from '@hexly/web-entity/entity-link';
 import { featureKey, terrainKey } from '../utils/catalog-keys';
-import { inputValue } from '../utils/dom';
+import { inputValue } from '../utils/input-value';
 import { HexMapStore, Selection } from '../services/hexmap-store';
 import { RegionFields } from './region-fields';
 

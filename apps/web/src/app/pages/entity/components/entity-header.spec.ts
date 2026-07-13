@@ -17,7 +17,7 @@ import { CORE_VIEW_DEFINITIONS } from '../views/core-views';
 import { OwnerSet } from '@hexly/web-ui';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { EntityHeader } from './entity-header';
-import { noteDetail } from './entity-detail.fixtures';
+import { noteDetail } from './note-detail.fixtures';
 
 /** The Hex Map's map View, as the toggle keys it: the View id plus the Field it renders. */
 const MAP_VIEW_KEY = viewInstanceKey({ viewId: CORE_VIEW_MAP, fieldKey: HEX_GRID_FIELD.key });

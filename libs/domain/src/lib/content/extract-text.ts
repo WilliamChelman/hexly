@@ -1,7 +1,7 @@
 /** Plain-text extraction from an Entity's Content, for full-text search (ADR-0035). */
 
 import { Content } from '../entity';
-import { joinSearchText } from '../search-text';
+import { joinSearchText } from '../join-search-text';
 import { visit } from './content-node';
 
 /** The Content's searchable prose. An unknown format tag yields `''`. */
