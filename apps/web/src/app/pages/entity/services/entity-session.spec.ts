@@ -1,8 +1,17 @@
 import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { of, Subject, throwError } from 'rxjs';
-import { CONTENT_FORMAT, CORE_NOTE, emptyContent, EntityDetail, EntitySaveOutcome } from '@hexly/domain';
+import {
+  CONTENT_FORMAT,
+  CORE_NOTE,
+  emptyContent,
+  EntityBody,
+  EntityDetail,
+  EntitySaveOutcome,
+  tiptapContent,
+} from '@hexly/domain';
 import { coordKey, CORE_HEXMAP, emptyHexMap, HEX_GRID_FIELD, HexMap } from '@hexly/plugin-hexmap';
 import { MockEntitiesClient, MockNudgeBusClient } from '@hexly/web-core/testing';
 import { EntitiesClient, NudgeBusClient, EVICTED, Watched } from '@hexly/web-core';
@@ -71,6 +80,33 @@ describe('EntitySession', () => {
     session = TestBed.inject(EntitySession);
     editor = TestBed.inject(HexMapStore);
   });
+
+  /**
+   * A stand-in for the prose editor (a {@link LiveEditor}): it holds an uncommitted doc — the
+   * debounce window a real TipTap editor lives in — until the session flushes it, whereupon it folds
+   * the doc into the body through `mutate`, exactly as {@link ContentEditor} does.
+   */
+  function proseEditor() {
+    const pending = signal(false);
+    let doc: unknown = null;
+    session.registerEditor({
+      hasPendingCommit: pending,
+      flushPendingCommit: () => {
+        if (!pending()) return;
+        session.mutate((body) => {
+          body.content = tiptapContent(doc);
+        });
+        pending.set(false);
+      },
+    });
+    return {
+      /** Type `snapshot` into the editor, leaving it uncommitted until the next flush. */
+      type(snapshot: unknown) {
+        doc = snapshot;
+        pending.set(true);
+      },
+    };
+  }
 
   it('opens an entity by id and loads its hex grid into the editor', () => {
     entities.load.mockReturnValue(of(aldermoor));
@@ -277,41 +313,49 @@ describe('EntitySession', () => {
     expect(session.dirty()).toBe(false);
   });
 
-  it('stays clean when a re-wrapped value-equal snapshot is pushed on load (#164)', () => {
-    // TipTap fires an `update` on load/normalization; the editor re-pushes the loaded
-    // snapshot through setContent, which mints a new Content each call. A value-equal push
-    // must collapse to the baseline reference — else reference-equality dirty trips an
-    // autosave PUT with no user edit.
+  it('flushes a live editor’s pending prose into the body before the save snapshot (ADR-0051)', () => {
+    // The one hazard e2e cannot observe without a race: a save must fold the prose still inside the
+    // editor's debounce window into the body first, or the last keystrokes are eaten.
     openAldermoor();
-    session.setContent({ type: 'doc', content: [] }); // same value as the loaded content
-    expect(session.dirty()).toBe(false);
-
-    session.setContent({ type: 'doc', content: [{ type: 'paragraph' }] }); // a real edit
+    const snapshot = {
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'last keystrokes' }] }],
+    };
+    const prose = proseEditor();
+    prose.type(snapshot);
+    // The editor holds an uncommitted doc, so the session reads dirty — the save chip stays honest.
     expect(session.dirty()).toBe(true);
+
+    entities.save.mockReturnValue(of({ status: 'saved', entity: { ...aldermoor, version: 4 } }));
+    session.save().subscribe();
+
+    // The PUT body carries the flushed prose: the debounce window could not eat the last keystrokes.
+    const sentBody = entities.save.mock.calls[0][1] as EntityBody;
+    expect(sentBody.content.snapshot).toEqual(snapshot);
   });
 
   it('keeps a mid-flight Content edit dirty across a clean save (linchpin, ADR-0026)', () => {
     openAldermoor();
-    const first = {
+    const prose = proseEditor();
+    prose.type({
       type: 'doc',
       content: [{ type: 'paragraph', content: [{ type: 'text', text: 'first' }] }],
-    };
-    session.setContent(first);
+    });
 
-    // Save captures `first`, then the user keeps typing before the response lands.
+    // Save flushes `first` into the body and captures it, then the user keeps typing before the
+    // response lands.
     const save$ = new Subject<EntitySaveOutcome>();
     entities.save.mockReturnValue(save$);
     session.save().subscribe();
-    const second = {
+    prose.type({
       type: 'doc',
       content: [{ type: 'paragraph', content: [{ type: 'text', text: 'second' }] }],
-    };
-    session.setContent(second);
+    });
 
     save$.next({ status: 'saved', entity: { ...aldermoor, version: 4 } });
     save$.complete();
 
-    // Baseline advanced to the sent `first`, not the live `second`, so the
+    // Baseline advanced to the sent `first`, but the editor holds an uncommitted `second`, so the
     // mid-flight keystrokes are still pending — not silently dropped.
     expect(session.dirty()).toBe(true);
   });
@@ -357,7 +401,7 @@ describe('EntitySession', () => {
       session.open('m1').subscribe();
 
       // An edit would arm the scheduler for a writable entity; here every debounce is a no-op.
-      session.setContent({ type: 'doc', content: [{ type: 'paragraph' }] });
+      proseEditor().type({ type: 'doc', content: [{ type: 'paragraph' }] });
       settle();
       settle();
 
@@ -618,7 +662,7 @@ describe('EntitySession', () => {
     session.open('m1').subscribe();
     expect(session.writable()).toBe(false);
 
-    session.setContent({ type: 'doc', content: [{ type: 'paragraph' }] });
+    proseEditor().type({ type: 'doc', content: [{ type: 'paragraph' }] });
     session.save(true).subscribe();
 
     expect(entities.save).not.toHaveBeenCalled();
@@ -718,12 +762,13 @@ describe('EntitySession', () => {
         },
       ],
     };
-    session.setContent(snapshot);
+    proseEditor().type(snapshot);
 
     entities.save.mockReturnValue(of({ status: 'saved', entity: { ...note, version: 4 } }));
     session.save().subscribe();
 
-    // Snapshot wrapped in format envelope, never parsed (ADR-0019).
+    // Snapshot wrapped in format envelope, never parsed (ADR-0019): the editor commits it into the
+    // body on flush, and the body rides the save as-is.
     expect(entities.save).toHaveBeenCalledWith('n1', { content: { format: CONTENT_FORMAT, snapshot } }, 3, []);
   });
 
@@ -740,7 +785,7 @@ describe('EntitySession', () => {
         },
       ],
     };
-    session.setContent(snapshot);
+    proseEditor().type(snapshot);
 
     entities.save.mockReturnValue(of({ status: 'saved', entity: { ...aldermoor, version: 4 } }));
     session.save().subscribe();
@@ -798,6 +843,23 @@ describe('EntitySession', () => {
     expect(dirty.defaultPrevented).toBe(true);
   });
 
+  it('flushes a live editor’s pending prose into the body on beforeunload (ADR-0051)', () => {
+    openAldermoor();
+    const snapshot = {
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'unsaved keystrokes' }] }],
+    };
+    proseEditor().type(snapshot);
+
+    const event = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(event);
+
+    // The guard folds the pending doc into the body and warns — the last keystrokes aren't stranded
+    // in the editor's debounce window.
+    expect(session.body().content.snapshot).toEqual(snapshot);
+    expect(event.defaultPrevented).toBe(true);
+  });
+
   it('flushes a save immediately on Cmd/Ctrl+S, bypassing the debounce', () => {
     openAldermoor();
     editor.paintAt({ q: 5, r: 5 }, 'ocean');
@@ -821,6 +883,22 @@ describe('EntitySession', () => {
 
     expect(event.defaultPrevented).toBe(true); // suppresses the browser "save page" dialog
     expect(entities.save).toHaveBeenCalledWith('m1', expect.anything(), 3, []);
+  });
+
+  it('flushes a live editor’s pending prose into the save on Cmd/Ctrl+S (ADR-0051)', () => {
+    openAldermoor();
+    const snapshot = {
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'saved by shortcut' }] }],
+    };
+    proseEditor().type(snapshot);
+
+    entities.save.mockReturnValue(of({ status: 'saved', entity: { ...aldermoor, version: 4 } }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', metaKey: true, cancelable: true }));
+
+    // Cmd/Ctrl+S goes through save(), which flushes the editor first: the debounced prose rides the PUT.
+    const sentBody = entities.save.mock.calls[0][1] as EntityBody;
+    expect(sentBody.content.snapshot).toEqual(snapshot);
   });
 
   it('is a safe no-op with no entity open (no request, no throw)', () => {

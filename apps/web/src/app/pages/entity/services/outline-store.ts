@@ -26,16 +26,10 @@ export class OutlineStore {
   }
 
   /** Headings of the open Entity's Content, in document order (empty ones skipped). */
-  readonly headings = computed<OutlineHeading[]>(
-    () => {
-      const content = this.session.content();
-      return content ? extractOutline(content) : [];
-    },
-    {
-      // content() is a fresh object every keystroke, so re-emit only when the heading
-      // set truly changes — otherwise the panel rebuilds its scrollspy and flashes the
-      // active highlight back to the top on every key pressed anywhere in the document.
-      equal: (a, b) => a.length === b.length && a.every((h, i) => h.text === b[i].text && h.level === b[i].level),
-    },
-  );
+  readonly headings = computed<OutlineHeading[]>(() => extractOutline(this.session.body().content), {
+    // body().content is a fresh object on every commit, so re-emit only when the heading
+    // set truly changes — otherwise the panel rebuilds its scrollspy and flashes the
+    // active highlight back to the top on every key pressed anywhere in the document.
+    equal: (a, b) => a.length === b.length && a.every((h, i) => h.text === b[i].text && h.level === b[i].level),
+  });
 }

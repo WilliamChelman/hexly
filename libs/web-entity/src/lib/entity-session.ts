@@ -6,6 +6,19 @@ import { Patch } from '@hexly/immer';
 export type { Patch } from '@hexly/immer';
 
 /**
+ * A View that owns a *live* document — a TipTap editor with its own cursor and history — and commits
+ * into the body on a debounce (ADR-0051), so between keystrokes it holds edits the body lacks. It
+ * registers ({@link EntitySession.registerEditor}) so a save flushes those first and dirty reflects
+ * them. A render-from-body View (the Hex Map) commits synchronously and never registers.
+ */
+export interface LiveEditor {
+  /** True while the editor holds edits not yet committed into the body. */
+  readonly hasPendingCommit: Signal<boolean>;
+  /** Commit the pending document into the body now — called before a save snapshot. */
+  flushPendingCommit(): void;
+}
+
+/**
  * The central mutable store every View of the open Entity edits (ADR-0048, *Central
  * store* amendment). One Entity body lives here; each View reads its slice off
  * {@link body} and writes through {@link mutate}, the universal write-channel. `mutate`
@@ -31,6 +44,12 @@ export interface EntitySession {
    * intact.
    */
   readonly loadGeneration: Signal<number>;
+  /**
+   * Register a {@link LiveEditor} so a save flushes its pending edits into the body first and dirty
+   * counts them (ADR-0051). Returns an unregister callback for teardown; a render-from-body View
+   * need not register.
+   */
+  registerEditor(editor: LiveEditor): () => void;
 }
 
 /** DI token for the {@link EntitySession}; the composition root binds the concrete session to it. */

@@ -7,7 +7,7 @@ import { EntityNudge, StaleNudge } from '@hexly/domain';
 import { PublicClient, PublicEntityMode, AppShellStore, EVICTED } from '@hexly/web-core';
 import { ENTITY_SESSION } from '@hexly/web-entity';
 import { EntitySession } from '../entity/services/entity-session';
-import { EntityNameResolver, CONTENT_EDITOR_SESSION } from '@hexly/plugin-content/web';
+import { EntityNameResolver } from '@hexly/plugin-content/web';
 import { PublicEntityNameResolver } from './public-entity-name-resolver';
 import { RIGHT_DOCK_PANELS } from '../entity/services/right-dock';
 import { EntityPage } from '../entity/entity.page';
@@ -33,7 +33,6 @@ interface Followed {
   providers: [
     EntitySession,
     { provide: ENTITY_SESSION, useExisting: EntitySession },
-    { provide: CONTENT_EDITOR_SESSION, useExisting: EntitySession },
     { provide: EntityNameResolver, useClass: PublicEntityNameResolver },
     // The dock offers the Outline alone: References would need `/entities/:id/references`, which
     // answers an authenticated user, and this Entity's Public Link grants no scope beyond itself.

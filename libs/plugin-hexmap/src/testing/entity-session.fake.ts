@@ -1,47 +1,29 @@
-import { Provider, signal } from '@angular/core';
+import { Provider } from '@angular/core';
 import { emptyContent, EntityBody } from '@hexly/domain';
+import { ENTITY_SESSION, VIEW_FIELD_KEY } from '@hexly/web-entity';
+import { FakeEntitySession as BaseFakeEntitySession } from '@hexly/web-entity/testing';
 import { emptyHexMap, HEX_GRID_FIELD, HexMap } from '../lib';
-import { applyPatches as immerApplyPatches, Draft, Patch, produceWithPatches } from '@hexly/immer';
-import { ENTITY_SESSION, EntitySession, VIEW_FIELD_KEY } from '@hexly/web-entity';
 import { HexMapStore } from '../web/services/hexmap-store';
 
-/** The grid is a Metadata value at the `core.hexmap` type's `grid` Field (ADR-0050). */
-function bodyWithGrid(grid: HexMap): EntityBody {
+/** The grid is a Metadata value at the `core.hexmap` type's `grid` Field (ADR-0050). `unknown`, not
+ * `HexMap`, so {@link FakeEntitySession.loadRawGrid} can seed a document at rest this build can't parse. */
+function bodyWithGrid(grid: unknown): EntityBody {
   return { content: emptyContent(), metadata: { [HEX_GRID_FIELD.key]: grid } };
 }
 
 /**
- * A minimal in-memory {@link EntitySession} for the map plugin's specs. {@link load} bumps
- * {@link loadGeneration}, which drives `HexMapStore`'s reset effect — flush the effects after
- * calling it to observe the reset.
+ * A grid-flavoured {@link BaseFakeEntitySession} for the map plugin's specs: it opens on an empty
+ * plane and adds grid-shaped {@link load} helpers over the generic {@link BaseFakeEntitySession.loadBody}.
  */
-export class FakeEntitySession implements EntitySession {
-  private readonly _body = signal<EntityBody>(bodyWithGrid(emptyHexMap()));
-  readonly body = this._body.asReadonly();
-
-  private readonly _writable = signal(true);
-  readonly writable = this._writable.asReadonly();
-
-  private readonly _loadGeneration = signal(0);
-  readonly loadGeneration = this._loadGeneration.asReadonly();
-
-  mutate(recipe: (draft: EntityBody) => void): {
-    redo: Patch[];
-    undo: Patch[];
-  } {
-    const [next, redo, undo] = produceWithPatches(this._body(), recipe as (draft: Draft<EntityBody>) => void);
-    this._body.set(next as EntityBody);
-    return { redo, undo };
-  }
-
-  applyPatches(patches: Patch[]): void {
-    this._body.set(immerApplyPatches(this._body(), patches));
+export class FakeEntitySession extends BaseFakeEntitySession {
+  constructor() {
+    super();
+    this.seedBody(bodyWithGrid(emptyHexMap()));
   }
 
   /** Test helper: adopt a fresh grid as the working body and bump the load generation (a fresh load). */
   load(grid: HexMap): void {
-    this._body.set(bodyWithGrid(grid));
-    this._loadGeneration.update((n) => n + 1);
+    this.loadBody(bodyWithGrid(grid));
   }
 
   /**
@@ -49,13 +31,7 @@ export class FakeEntitySession implements EntitySession {
    * this build cannot parse, which Field validation tolerates rather than rejecting (ADR-0050).
    */
   loadRawGrid(grid: unknown): void {
-    this._body.set({ content: emptyContent(), metadata: { [HEX_GRID_FIELD.key]: grid } });
-    this._loadGeneration.update((n) => n + 1);
-  }
-
-  /** Test helper: flip edit-ability (ADR-0037), the gate {@link EntitySession.writable} exposes. */
-  setWritable(writable: boolean): void {
-    this._writable.set(writable);
+    this.loadBody(bodyWithGrid(grid));
   }
 }
 

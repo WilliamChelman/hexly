@@ -17,9 +17,10 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import { Editor, JSONContent } from '@tiptap/core';
 import { catchError, firstValueFrom, of } from 'rxjs';
+import { tiptapContent } from '@hexly/domain';
 import { EntitiesClient } from '@hexly/web-core';
+import { ENTITY_SESSION } from '@hexly/web-entity';
 import { TiptapDirective } from './tiptap.directive';
-import { CONTENT_EDITOR_SESSION } from './content-editor-session';
 import { EntityNameResolver } from './entity-name-resolver';
 import { CONTENT_EXTENSIONS } from './content-extensions';
 import { entityLinkNode } from './entity-link-node';
@@ -38,11 +39,15 @@ import { createEntityLinkNodeView } from './entity-link-view';
 import { FormattingMenu } from './formatting-menu';
 import { BubbleMenuDirective } from './bubble-menu.directive';
 
+/** Debounce before folding the doc into the body: well under the autosave window, so a `mutate` (a
+ * full-doc undo patch) fires ~per pause, not per key. A save flushes it regardless (ADR-0051). */
+const COMMIT_DEBOUNCE_MS = 250;
+
 /**
- * The Content editing surface every Entity shares (ADR-0019): mounts TipTap, seeds from the
- * Entity's stored snapshot, streams edits back to the session's live Content via `getJSON()` —
- * carrying the snapshot load-to-save, never parsing it. Host is the framed box; callers add
- * only outer placement.
+ * The Content editing surface every Entity shares (ADR-0019): mounts TipTap, which owns the live doc,
+ * cursor, and history. Seeds from {@link ENTITY_SESSION}'s body when {@link EntitySession.loadGeneration}
+ * ticks — not on an edit echo, so the cursor holds — and commits `getJSON()` back through `session.mutate`
+ * on a debounce, discarding the patches (ADR-0051). Carries the snapshot load-to-save, never parsing it.
  */
 @Component({
   selector: 'app-content-editor',
@@ -242,7 +247,7 @@ import { BubbleMenuDirective } from './bubble-menu.directive';
   `,
 })
 export class ContentEditor {
-  private readonly session = inject(CONTENT_EDITOR_SESSION);
+  private readonly session = inject(ENTITY_SESSION);
   private readonly destroyRef = inject(DestroyRef);
   // The shared id→name resolver backs both the `@` picker (its entity list) and
   // every entityLink node view; provided at the entities/:id route so navigating
@@ -279,13 +284,23 @@ export class ContentEditor {
   // via their signal inputs. Null until the first seed, so mount doesn't double-construct.
   protected readonly editor = signal<Editor | null>(null);
 
+  /** True while the live doc holds edits not yet committed into the body — the {@link LiveEditor} flag. */
+  private readonly _hasPendingCommit = signal(false);
+
+  /** The doc last committed (or seeded), stringified: an `update` re-serialising to this is normalisation, not an edit (#164). */
+  private committed = '';
+
+  /** The latest uncommitted doc awaiting the debounce, or null when in sync with the body. */
+  private pendingDoc: JSONContent | null = null;
+  private commitTimer: ReturnType<typeof setTimeout> | null = null;
+
   constructor() {
     effect((onCleanup) => {
       const editor = this.editor();
       if (!editor) return;
-      const push = ({ editor }: { editor: Editor }) => this.session.setContent(editor.getJSON());
-      editor.on('update', push);
-      onCleanup(() => editor.off('update', push));
+      const onDocChanged = ({ editor }: { editor: Editor }) => this.onDocChanged(editor.getJSON());
+      editor.on('update', onDocChanged);
+      onCleanup(() => editor.off('update', onDocChanged));
     });
 
     // Label .ProseMirror (not the wrapper) — TipTap sets role="textbox" on it.
@@ -306,22 +321,24 @@ export class ContentEditor {
       editor.setEditable(this.session.writable(), false);
     });
 
-    // Seed on load/swap/conflict-reload, keyed off seed() so a keystroke never
-    // recreates the editor. Snapshot comes from the *live* Content, not the seed
-    // detail: a clean save advances live Content but not seed, so a mid-session
-    // remount (hexmap Map↔Note toggle, #75) restores the latest prose, not the loaded one.
+    // Seed only when loadGeneration ticks (fresh load, reload, swap) — and on first mount. Never on
+    // an edit echo: a commit bumps no generation, so it can't rebuild the editor or jump the cursor.
+    // A remount within one load (the Map↔Note toggle, #75) re-seeds from the destroy-flushed body.
+    let seededGeneration = -1;
     effect(() => {
-      const detail = this.session.seed();
-      if (!detail) return;
-      // untracked: react to seed() and own editor swap, never to live Content —
-      // every keystroke updates it and tracking it would thrash the editor.
-      const content = untracked(this.session.content);
-      if (content === null) return; // mid-load
-      // Empty placeholder snapshot ({}) yields an empty editor — correct after a
-      // conflict reload where the server has no stored prose.
+      const generation = this.session.loadGeneration();
+      if (generation === seededGeneration) return;
+      seededGeneration = generation;
+      // untracked: sample the body once; tracking it would rebuild the editor on every commit.
+      const content = untracked(() => this.session.body().content);
+      // A placeholder snapshot ({}) yields an empty editor — a fresh note, or a prose-less reload.
       const snapshot = isDocSnapshot(content.snapshot) ? content.snapshot : undefined;
       const previous = untracked(this.editor);
-      this.editor.set(this.createEditor(snapshot));
+      const next = this.createEditor(snapshot);
+      // Baseline against the parsed doc, so a load-time normalisation `update` reads value-equal (#164).
+      this.committed = JSON.stringify(next.getJSON());
+      this.clearPending();
+      this.editor.set(next);
       // Destroy after TiptapDirective mounts the new surface (next render) so there's
       // no blank frame between old DOM out and new DOM in.
       queueMicrotask(() => previous?.destroy());
@@ -342,7 +359,58 @@ export class ContentEditor {
       scrollToHeading(editor.view.dom, fragment);
     });
 
-    this.destroyRef.onDestroy(() => this.editor()?.destroy());
+    // Register so a save flushes the pending doc first, and dirty accounts for it (ADR-0051).
+    this.destroyRef.onDestroy(
+      this.session.registerEditor({
+        hasPendingCommit: this._hasPendingCommit,
+        flushPendingCommit: () => this.commit(),
+      }),
+    );
+
+    // Flush into the body first so a remount re-seeds the latest prose (#75), then destroy.
+    this.destroyRef.onDestroy(() => {
+      this.commit();
+      this.editor()?.destroy();
+    });
+  }
+
+  /** Buffer a TipTap `update` and arm the debounce; a doc value-equal to the baseline is normalisation, not an edit (#164). */
+  private onDocChanged(json: JSONContent): void {
+    // ponytail: JSON.stringify equality — ProseMirror JSON has deterministic key order, so this is
+    // sound for doc snapshots; swap for a deep-equal if a snapshot ever holds non-PM data.
+    if (JSON.stringify(json) === this.committed) {
+      this.clearPending();
+      return;
+    }
+    this.pendingDoc = json;
+    this._hasPendingCommit.set(true);
+    if (this.commitTimer !== null) clearTimeout(this.commitTimer);
+    this.commitTimer = setTimeout(() => this.commit(), COMMIT_DEBOUNCE_MS);
+  }
+
+  /**
+   * Fold the pending doc into the body through `mutate`, discarding the patches — TipTap keeps its
+   * own history (ADR-0051). Runs on the debounce, and synchronously on flush-before-save and
+   * teardown. A no-op when already in sync.
+   */
+  private commit(): void {
+    if (this.commitTimer !== null) {
+      clearTimeout(this.commitTimer);
+      this.commitTimer = null;
+    }
+    const doc = this.pendingDoc;
+    if (doc === null) return;
+    this.session.mutate((body) => {
+      body.content = tiptapContent(doc);
+    });
+    this.committed = JSON.stringify(doc);
+    this.clearPending();
+  }
+
+  /** Drop the pending doc and clear the dirty flag — after a commit, a re-seed, or a no-op update. */
+  private clearPending(): void {
+    this.pendingDoc = null;
+    this._hasPendingCommit.set(false);
   }
 
   // slashCommands and entityMention are UI chrome, not persisted schema, so they
