@@ -27,6 +27,8 @@ describe('StatBlockView', () => {
         return { redo, undo };
       },
       applyPatches: () => undefined,
+      // The stat block renders from the body and never holds a live doc, so it registers no editor.
+      registerEditor: () => () => undefined,
     };
   }
 

@@ -12,7 +12,7 @@ import { MockEntitiesClient, MockNudgeBusClient } from '@hexly/web-core/testing'
 import { EntitySession } from './services/entity-session';
 import { CORE_VIEW_CONTENT, CORE_VIEW_MAP, ENTITY_SESSION, viewInstanceKey } from '@hexly/web-entity';
 import { ViewRegistry } from '../../entity-types/view-registry';
-import { EntityNameResolver, CONTENT_EDITOR_SESSION } from '@hexly/plugin-content/web';
+import { EntityNameResolver } from '@hexly/plugin-content/web';
 import { noteDetail } from './components/note-detail.fixtures';
 import { EntityPage } from './entity.page';
 import { EntityViewStore } from './services/entity-view-store';
@@ -78,7 +78,6 @@ describe('EntityPage routing', () => {
       providers: [
         providePluginHexmap(),
         EntitySession,
-        { provide: CONTENT_EDITOR_SESSION, useExisting: EntitySession },
         { provide: ENTITY_SESSION, useExisting: EntitySession },
         EntityNameResolver,
         { provide: EntitiesClient, useValue: entities },
@@ -215,7 +214,6 @@ describe('EntityPage layout', () => {
       providers: [
         providePluginHexmap(),
         EntitySession,
-        { provide: CONTENT_EDITOR_SESSION, useExisting: EntitySession },
         { provide: ENTITY_SESSION, useExisting: EntitySession },
         EntityNameResolver,
         provideHttpClient(),

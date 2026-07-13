@@ -1,0 +1,65 @@
+import { Provider, signal } from '@angular/core';
+import { emptyContent, EntityBody } from '@hexly/domain';
+import { applyPatches as immerApplyPatches, Draft, Patch, produceWithPatches } from '@hexly/immer';
+import { ENTITY_SESSION, EntitySession, LiveEditor } from '../lib/entity-session';
+
+/**
+ * A minimal in-memory {@link EntitySession} for a View lib's specs: it carries only an
+ * {@link EntityBody}, so a spec seeds whatever slice its View reads. {@link loadBody} bumps
+ * {@link loadGeneration}, the reset seam a live View watches.
+ */
+export class FakeEntitySession implements EntitySession {
+  private readonly _body = signal<EntityBody>({ content: emptyContent() });
+  readonly body = this._body.asReadonly();
+
+  private readonly _writable = signal(true);
+  readonly writable = this._writable.asReadonly();
+
+  private readonly _loadGeneration = signal(0);
+  readonly loadGeneration = this._loadGeneration.asReadonly();
+
+  /** Live editors registered for flush-before-save (ADR-0051); exposed so a spec can drive them. */
+  readonly editors = new Set<LiveEditor>();
+
+  /** Seed the opening body without a load tick — for a subclass to open on its slice. No ctor param, so DI can build it. */
+  protected seedBody(body: EntityBody): void {
+    this._body.set(body);
+  }
+
+  mutate(recipe: (draft: EntityBody) => void): {
+    redo: Patch[];
+    undo: Patch[];
+  } {
+    const [next, redo, undo] = produceWithPatches(this._body(), recipe as (draft: Draft<EntityBody>) => void);
+    this._body.set(next as EntityBody);
+    return { redo, undo };
+  }
+
+  applyPatches(patches: Patch[]): void {
+    this._body.set(immerApplyPatches(this._body(), patches));
+  }
+
+  registerEditor(editor: LiveEditor): () => void {
+    this.editors.add(editor);
+    return () => this.editors.delete(editor);
+  }
+
+  /** Test helper: adopt `body` as a fresh load and bump the load generation (a new Entity). */
+  loadBody(body: EntityBody): void {
+    this._body.set(body);
+    this._loadGeneration.update((n) => n + 1);
+  }
+
+  /** Test helper: flip edit-ability (ADR-0037), the gate {@link EntitySession.writable} exposes. */
+  setWritable(writable: boolean): void {
+    this._writable.set(writable);
+  }
+}
+
+/**
+ * Provided under both keys so a spec can `TestBed.inject(FakeEntitySession)` to reach the
+ * test-only helpers and the View resolves the same instance through {@link ENTITY_SESSION}.
+ */
+export function provideFakeEntitySession(): Provider[] {
+  return [FakeEntitySession, { provide: ENTITY_SESSION, useExisting: FakeEntitySession }];
+}

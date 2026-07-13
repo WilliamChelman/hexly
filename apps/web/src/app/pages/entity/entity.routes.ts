@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { EntityNameResolver, CONTENT_EDITOR_SESSION } from '@hexly/plugin-content/web';
+import { EntityNameResolver } from '@hexly/plugin-content/web';
 import { ENTITY_SESSION } from '@hexly/web-entity';
 import { flushOnLeave } from './flush-on-leave.guard';
 import { EntitySession } from './services/entity-session';
@@ -20,10 +20,9 @@ export const ENTITY_ROUTES: Routes = [
     // component-scoped on EntityPage, which is the only thing that shows them.
     providers: [
       EntitySession,
-      // The session is the central store every View edits; bind the token to it so the map lib
-      // (and future Views) reach it without importing the app (ADR-0048).
+      // The session is the central store every View edits; bind the token to it so the map and
+      // content plugins (and future Views) reach it without importing the app (ADR-0048/0051).
       { provide: ENTITY_SESSION, useExisting: EntitySession },
-      { provide: CONTENT_EDITOR_SESSION, useExisting: EntitySession },
       EntityNameResolver,
     ],
     // documentTitleKey composes the Entity name with the brand; `title` is the
