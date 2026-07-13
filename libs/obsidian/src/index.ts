@@ -1,2 +1,2 @@
-export * from './lib/markdown-to-pm';
-export * from './lib/pm-to-markdown';
+export * from './lib/markdown-to-prose-mirror';
+export * from './lib/prose-mirror-to-markdown';

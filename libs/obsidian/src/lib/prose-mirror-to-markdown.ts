@@ -4,7 +4,7 @@ import remarkGfm from 'remark-gfm';
 import remarkFrontmatter from 'remark-frontmatter';
 import { stringify as stringifyYaml } from 'yaml';
 import type { Root, RootContent, PhrasingContent, ListItem, BlockContent } from 'mdast';
-import type { PMNode } from './markdown-to-pm';
+import type { PMNode } from './markdown-to-prose-mirror';
 
 const stringifier = unified()
   .use(remarkStringify, { bullet: '-', fences: true, rule: '-' })

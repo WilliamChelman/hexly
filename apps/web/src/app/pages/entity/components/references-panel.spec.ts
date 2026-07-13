@@ -9,7 +9,7 @@ import { EntitySession } from '../services/entity-session';
 import { ENTITY_SESSION } from '@hexly/web-entity';
 import { ReferencesStore } from '../services/references-store';
 import { RightDock } from '../services/right-dock';
-import { noteDetail } from './entity-detail.fixtures';
+import { noteDetail } from './note-detail.fixtures';
 import { ReferencesPanel } from './references-panel';
 
 /**

@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Region } from '../../lib';
 import { Field, Input } from '@hexly/web-ui';
-import { inputValue } from '../utils/dom';
+import { inputValue } from '../utils/input-value';
 import { HexMapStore } from '../services/hexmap-store';
 
 /** Name + colour editor for a single {@link Region}. */

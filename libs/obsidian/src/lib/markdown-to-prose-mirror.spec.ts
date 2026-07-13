@@ -1,4 +1,4 @@
-import { markdownToProseMirror, type PMNode } from './markdown-to-pm';
+import { markdownToProseMirror, type PMNode } from './markdown-to-prose-mirror';
 
 describe('markdownToProseMirror', () => {
   it('parses YAML frontmatter into metadata and drops it from the body', () => {

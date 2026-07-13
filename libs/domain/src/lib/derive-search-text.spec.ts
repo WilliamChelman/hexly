@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { emptyContent, EntityBody, tiptapContent } from './entity';
-import { deriveSearchText } from './entity-search-text';
+import { deriveSearchText } from './derive-search-text';
 import { fieldSchemaSchema } from './field';
 import { defineStructuredDataType, NO_STRUCTURED_DATA_TYPES, structuredDataTypeSet } from './structured-data-type';
 

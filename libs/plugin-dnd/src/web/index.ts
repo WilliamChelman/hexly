@@ -3,5 +3,5 @@
  * {@link providePluginDnd}, so importing this barrel from the app's bootstrap cannot pull the view
  * body onto the initial bundle.
  */
-export { providePluginDnd } from './provide';
+export { providePluginDnd } from './provide-plugin-dnd';
 export { DND_VIEW_STAT_BLOCK } from './dnd-types';

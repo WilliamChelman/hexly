@@ -13,7 +13,7 @@ import { EntitySession } from './services/entity-session';
 import { CORE_VIEW_CONTENT, CORE_VIEW_MAP, ENTITY_SESSION, viewInstanceKey } from '@hexly/web-entity';
 import { ViewRegistry } from '../../entity-types/view-registry';
 import { EntityNameResolver, CONTENT_EDITOR_SESSION } from '@hexly/content-editor';
-import { noteDetail } from './components/entity-detail.fixtures';
+import { noteDetail } from './components/note-detail.fixtures';
 import { EntityPage } from './entity.page';
 import { EntityViewStore } from './services/entity-view-store';
 

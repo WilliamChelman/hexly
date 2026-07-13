@@ -6,7 +6,7 @@
 import { extractText } from './content/extract-text';
 import { EntityBody } from './entity';
 import { FieldSchema, readField, resolvedStructuredFields } from './field';
-import { joinSearchText } from './search-text';
+import { joinSearchText } from './join-search-text';
 import type { StructuredDataTypeSet } from './structured-data-type';
 
 /**
