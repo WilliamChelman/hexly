@@ -1,6 +1,6 @@
 import { Editor } from '@tiptap/core';
 import { EditorState } from '@tiptap/pm/state';
-import { VocabItem, vocabItems } from './vocab-items';
+import { VocabItem, vocabItems } from '../vocab-items';
 
 // Link Descriptors are harvested server-side from the saved Content (`harvestEdges` in
 // @hexly/domain, run by the write path on every save), so this module only sets attrs on

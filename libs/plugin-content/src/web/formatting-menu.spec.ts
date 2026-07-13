@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { Editor } from '@tiptap/core';
 import { TextSelection } from '@tiptap/pm/state';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
-import { CONTENT_EDITOR_TEST_CATALOGS } from './i18n/test-catalogs';
+import { CONTENT_EDITOR_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { CONTENT_EXTENSIONS } from './content-extensions';
 import { FormattingMenu } from './formatting-menu';
 

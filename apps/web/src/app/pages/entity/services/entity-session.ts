@@ -39,7 +39,7 @@ import {
 } from '@hexly/web-core';
 import { applyPatches as immerApplyPatches, Draft, Patch, produceWithPatches } from '@hexly/immer';
 import type { EntitySession as EntitySessionPort } from '@hexly/web-entity';
-import type { ContentEditorSession } from '@hexly/content-editor';
+import type { ContentEditorSession } from '@hexly/plugin-content/web';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 
 /**

@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { EntitySummary } from '@hexly/domain';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
-import { CONTENT_EDITOR_TEST_CATALOGS } from './i18n/test-catalogs';
+import { CONTENT_EDITOR_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { EntityNameResolver, EntityResolution } from './entity-name-resolver';
 import { EntityLinkView } from './entity-link-view';
 

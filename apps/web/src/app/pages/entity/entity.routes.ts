@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { EntityNameResolver, CONTENT_EDITOR_SESSION } from '@hexly/content-editor';
+import { EntityNameResolver, CONTENT_EDITOR_SESSION } from '@hexly/plugin-content/web';
 import { ENTITY_SESSION } from '@hexly/web-entity';
 import { flushOnLeave } from './flush-on-leave.guard';
 import { EntitySession } from './services/entity-session';

@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
-import { ContentEditor } from '@hexly/content-editor';
+import { ContentEditor } from '@hexly/plugin-content/web';
 import { Icon, IconButton } from '@hexly/web-ui';
 import { TranslocoService, translateSignal } from '@jsverse/transloco';
 import { TypeRegistry } from '../../../entity-types/type-registry';

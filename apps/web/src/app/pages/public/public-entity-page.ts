@@ -7,7 +7,7 @@ import { EntityNudge, StaleNudge } from '@hexly/domain';
 import { PublicClient, PublicEntityMode, AppShellStore, EVICTED } from '@hexly/web-core';
 import { ENTITY_SESSION } from '@hexly/web-entity';
 import { EntitySession } from '../entity/services/entity-session';
-import { EntityNameResolver, CONTENT_EDITOR_SESSION } from '@hexly/content-editor';
+import { EntityNameResolver, CONTENT_EDITOR_SESSION } from '@hexly/plugin-content/web';
 import { PublicEntityNameResolver } from './public-entity-name-resolver';
 import { RIGHT_DOCK_PANELS } from '../entity/services/right-dock';
 import { EntityPage } from '../entity/entity.page';

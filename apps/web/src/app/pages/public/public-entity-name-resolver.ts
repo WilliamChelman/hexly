@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Observable, of } from 'rxjs';
 import { EntitySummary } from '@hexly/domain';
-import { EntityNameResolver } from '@hexly/content-editor';
+import { EntityNameResolver } from '@hexly/plugin-content/web';
 
 /**
  * The {@link EntityNameResolver} for a Public Link page (ADR-0037): resolves nothing.
