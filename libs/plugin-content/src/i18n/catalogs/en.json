@@ -1,4 +1,7 @@
 {
+  "view": {
+    "content": "Content"
+  },
   "slashMenu": {
     "label": "Insert block",
     "empty": "No matching blocks",

@@ -53,7 +53,7 @@ async function pathsToIds(agent: request.Agent, worldId: string): Promise<Record
   const out: Record<string, string> = {};
   for (const item of list.body.items as { id: string }[]) {
     const detail = await agent.get(`/entities/${item.id}`).expect(200);
-    const path = detail.body.document.metadata?.['hexly.sourcePath'];
+    const path = detail.body.document?.['hexly.sourcePath'];
     if (path) out[path] = item.id;
   }
   return out;
@@ -205,12 +205,14 @@ describe('Vault import endpoint', () => {
     expect(mara.body.document.content.snapshot.type).toBe('doc');
 
     // Folder path preserved under the reserved namespace; frontmatter (incl. aliases)
-    // passes through as Metadata; `tags` moved out to Hexly Tags (not left in Metadata).
-    expect(mara.body.document.metadata).toEqual({
+    // passes through as Metadata; `tags` moved out to Hexly Tags (not left in Metadata). The body IS
+    // the Metadata map now (ADR-0051), so the prose sits at `content` beside these keys.
+    expect(mara.body.document).toMatchObject({
       'hexly.sourcePath': 'Characters/Lady Mara.md',
       aliases: ['Mara', 'The Ranger'],
       status: 'alive',
     });
+    expect(mara.body.document).not.toHaveProperty('tags');
   });
 
   /** The read half of the export's generic `hexly.type` stamp (#203, ADR-0050). */
@@ -233,9 +235,9 @@ describe('Vault import endpoint', () => {
 
       // Primary type first, as stamped.
       expect(summary.types).toEqual(['core.note', 'dnd.monster']);
-      expect(detail.document.metadata).toMatchObject({ challenge_rating: 3, size: 'Large' });
+      expect(detail.document).toMatchObject({ challenge_rating: 3, size: 'Large' });
       // Reserved provenance: consumed, never stored back as author Metadata.
-      expect(detail.document.metadata).not.toHaveProperty('hexly.type');
+      expect(detail.document).not.toHaveProperty('hexly.type');
     });
 
     it('applies a type this build has never heard of — nothing is resolved on the import path', async () => {
@@ -250,7 +252,7 @@ describe('Vault import endpoint', () => {
       const { summary, detail } = await entityNamed(ada, res.body.worldId, 'Vela');
 
       expect(summary.types).toEqual(['world.deity']);
-      expect(detail.document.metadata).toMatchObject({ domain: 'dusk' });
+      expect(detail.document).toMatchObject({ domain: 'dusk' });
     });
 
     it('falls back to a plain Note when the stamp is malformed — a stranger’s vault never breaks a World', async () => {
@@ -280,7 +282,7 @@ describe('Vault import endpoint', () => {
       const { summary, detail } = await entityNamed(ada, res.body.worldId, 'Chart');
 
       expect(summary.types).toEqual(['core.hexmap']);
-      expect(detail.document.metadata).toMatchObject({ grid: 'hand-drawn, 12 squares' });
+      expect(detail.document).toMatchObject({ grid: 'hand-drawn, 12 squares' });
     });
   });
 
@@ -587,7 +589,7 @@ describe('Vault import endpoint', () => {
     const note = await ada.get(`/entities/${aldermoor.id}`).expect(200);
     // It carries its lore, and the reserved `hexly.*` key isn't persisted as author Metadata.
     expect(JSON.stringify(note.body.document.content.snapshot)).toContain('The frontier realm.');
-    expect(note.body.document.metadata ?? {}).not.toHaveProperty('hexly.isHome');
+    expect(note.body.document).not.toHaveProperty('hexly.isHome');
   });
 
   it('refuses the import route without a session cookie', async () => {

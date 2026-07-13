@@ -222,8 +222,9 @@ describe('TypeRegistry', () => {
     // The bundled plugin's schema resolves through the same path — the web twin of what the API's
     // write gate and facet build read (#192).
     expect(registry.resolveFields([DND_MONSTER]).map((f) => f.key)).toContain('challenge_rating');
-    // A set of types that declare no Fields resolves to none — values stay plain Metadata.
-    expect(registry.resolveFields(['core.note'])).toEqual([]);
+    // `core.note` declares exactly the canonical prose Field now (ADR-0051).
+    expect(registry.resolveFields(['core.note']).map((f) => f.key)).toEqual(['content']);
+    // No types at all resolves to no Fields.
     expect(registry.resolveFields(undefined)).toEqual([]);
   });
 

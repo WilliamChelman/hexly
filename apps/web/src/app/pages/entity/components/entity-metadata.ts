@@ -50,7 +50,7 @@ export class EntityMetadata {
 
   /** The open Entity's Metadata as displayable key/value rows; empty when there is none. */
   protected readonly entries = computed(() => {
-    const metadata = this.session.current()?.document.metadata ?? {};
+    const metadata = this.session.current()?.document ?? {};
     const structured = this.structuredKeys();
     return Object.entries(metadata)
       .filter(([key]) => !structured.has(key))

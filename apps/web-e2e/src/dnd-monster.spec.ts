@@ -54,13 +54,13 @@ test('creates a dnd.monster, fills its required Fields, and reads the stat block
   await expect(page.getByTestId('stat-strength').locator('input')).toHaveValue('30');
   await expect(page.getByTestId('stat-size').locator('select')).toHaveValue('Huge');
 
-  // A Field is a lens over the one Metadata map, not a store of its own: the stat block's values are
-  // the Entity's Metadata, so an instance without the plugin loses nothing.
+  // A Field is a lens over the one Metadata map — which is the body itself now (ADR-0051): the stat
+  // block's values sit at the body root, so an instance without the plugin loses nothing.
   const res = await request.get(`/api/entities/${id}`);
   expect(res.ok()).toBeTruthy();
   const body = await res.json();
   expect(body.types).toEqual(['dnd.monster']);
-  expect(body.document.metadata).toMatchObject({ challenge_rating: 24, strength: 30, size: 'Huge' });
+  expect(body.document).toMatchObject({ challenge_rating: 24, strength: 30, size: 'Huge' });
 });
 
 test('a dnd.monster carrying core.hexmap offers the stat block, Note, and Map views', async ({ page }) => {

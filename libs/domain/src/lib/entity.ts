@@ -5,30 +5,7 @@
  */
 
 import { z } from 'zod';
-import { FieldDataType } from './field';
-
-/** The format tag new saves write; a schema-affecting extension change is a bump + migration. */
-export const CONTENT_FORMAT = 'tiptap-v3';
-
-/**
- * Formats a reader loads losslessly. Each bump is additive, so every earlier
- * version's docs round-trip untouched with no transform. Saves always write
- * CONTENT_FORMAT.
- */
-export const READABLE_CONTENT_FORMATS = ['tiptap-v1', 'tiptap-v2', 'tiptap-v3'] as const;
-
-/** Format-tagged Content; `snapshot` is `z.unknown()` so persistence stays format-agnostic — see ADR-0019. */
-export const contentSchema = z.object({
-  format: z.enum(READABLE_CONTENT_FORMATS),
-  snapshot: z.unknown(),
-});
-
-export type Content = z.infer<typeof contentSchema>;
-
-/** The one place a snapshot becomes Content — keeps callers from hand-stamping the format tag. */
-export function tiptapContent(snapshot: unknown): Content {
-  return { format: CONTENT_FORMAT, snapshot };
-}
+import { FieldDataType, Metadata } from './field';
 
 /**
  * A single Entity Type identity (CONTEXT.md → Entity Type): an **open**,
@@ -43,12 +20,6 @@ export const entityTypeSchema = z
 
 /** CONTEXT.md → Entity Type. Open set, so widened to `string`. */
 export type EntityType = z.infer<typeof entityTypeSchema>;
-
-/**
- * The one Entity Type the core itself declares; it adds no Field — a Note is nothing but its body.
- * Every other type ships from a plugin (ADR-0050).
- */
-export const CORE_NOTE = 'core.note';
 
 /**
  * The ordered, deduped set of Entity Types an Entity carries (CONTEXT.md → Entity
@@ -68,27 +39,16 @@ export const typesSchema = z
 export const metadataSchema = z.record(z.string(), z.unknown()).optional();
 
 /**
- * The Entity body — what the `document` column holds. One shape for every Entity: Content plus
- * Metadata (ADR-0050). Everything a Type adds to an Entity's substance is a **Field** over a
- * Metadata key, a plugin's **Structured Field** value included.
+ * The Entity body — what the `document` column holds. The body **is** the Metadata map (ADR-0051):
+ * an open record the body root interprets no key of. Everything a Type adds to an Entity's substance
+ * is a **Field** over one of its keys — a plugin's **Structured Field** value (a grid, prose) included.
  *
- * The body root is closed (`.strict()`): an unknown key there is a document this build cannot
- * represent, and must fail loudly rather than be read as a note that silently lost that value.
- * Tolerance lives one level down, in the data: a Field value that does not inhabit its data-type
- * is left alone, never rejected.
+ * A record of `unknown`, never closed: a Field value that does not inhabit its data-type is left
+ * alone, never rejected, so a document at rest this build cannot parse opens rather than 500ing.
+ * Forward-only validation ({@link validateFields}) is the only gate, and it runs on active typed
+ * edits alone.
  */
-export const entityBodySchema = z
-  .object({
-    content: contentSchema,
-    metadata: metadataSchema,
-  })
-  .strict();
-
-export type EntityBody = z.infer<typeof entityBodySchema>;
-
-export function emptyContent(): Content {
-  return tiptapContent({ type: 'doc', content: [] });
-}
+export const entityBodySchema = z.record(z.string(), z.unknown());
 
 /** The reserved Metadata namespace: Hexly provenance keys (`hexly.*`) that drive placement/typing on export and are stripped from author-facing frontmatter. */
 export const HEXLY_METADATA_PREFIX = 'hexly.';
@@ -103,7 +63,7 @@ export const HEXLY_TYPE_KEY = `${HEXLY_METADATA_PREFIX}type`;
  * `.trim()` before `.min(1)` rejects whitespace-only names. Shared with the World
  * name. Bounded to 255 chars and free of control characters and path separators:
  * names flow unescaped into filesystem paths, zip entry keys, and the vault-export
- * `Content-Disposition` header, where a newline or slash corrupts the output.
+ * download-disposition header, where a newline or slash corrupts the output.
  */
 export const nameSchema = z
   .string()
@@ -125,8 +85,8 @@ export const tagsSchema = dedupedTags.default([]);
 
 /**
  * A single Link Descriptor ("spouse", "Capital Of") **as authored**: trimmed, blanks
- * rejected, case preserved. Not folded — a Content link renders this exact string in the
- * prose, so the edge index that mirrors it must too, or one link would show two spellings
+ * rejected, case preserved. Not folded — a prose link renders this exact string in the
+ * document, so the edge index that mirrors it must too, or one link would show two spellings
  * of its descriptor on one screen. Folding is a property of the vocabulary
  * ({@link descriptorsSchema}), not of the descriptor itself.
  */
@@ -139,7 +99,7 @@ export const descriptorSchema = z.string().trim().min(1);
  */
 export const descriptorsSchema = dedupedTags.default([]);
 
-/** POST /entities: the body is minted server-side from `types` — blank Content plus their Fields' defaults. */
+/** POST /entities: the body is minted server-side from `types` — the defaults their Fields declare. */
 export const createEntityRequestSchema = z.object({
   name: nameSchema,
   // The ordered type set; `types[0]` is primary. One or more per creation (ADR-0048).
@@ -175,7 +135,7 @@ export type Visibility = z.infer<typeof visibilitySchema>;
 
 /**
  * The closed set of actions a caller may exercise on an Entity (CONTEXT.md →
- * Rights): `read`, `edit` (substance — content/name/tags/metadata), `delete` and
+ * Rights): `read`, `edit` (substance — body/name/tags), `delete` and
  * `set-visibility` (the lifecycle gate — Owner or World Owner of a shared Entity),
  * `manage` (owners/grants/Public Link — Owner only).
  */
@@ -346,7 +306,8 @@ export interface EntitySummary {
 
 /** What `GET /entities/:id` and saves return. */
 export interface EntityDetail extends EntitySummary {
-  readonly document: EntityBody;
+  /** The Entity body — the Metadata map itself (ADR-0051). */
+  readonly document: Metadata;
   /**
    * The live-follow freshness key (ADR-0045): bumped by every committed change. A follower keeps
    * the highest `seq` it has seen and refetches only on a nudge that exceeds it. Distinct from

@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import {
-  EntityBody,
   EntityEdge,
   FieldFacetValue,
   GrantRole,
+  Metadata,
   ReindexFailure,
   Visibility,
   descriptorsSchema,
@@ -75,7 +75,7 @@ export interface InsertEntityInput {
   /** The ordered Entity Type set; `types[0]` is primary. Carried alongside `tags`, not in the body. */
   types: readonly string[];
   tags: readonly string[];
-  body: EntityBody;
+  body: Metadata;
 }
 
 /** A stored `entities` row. */
@@ -122,7 +122,7 @@ export type EntityChange =
       tags?: readonly string[];
       /** Present → the type set fully replaces the stored one; omitted → left untouched (ADR-0048). */
       types?: readonly string[];
-      document?: EntityBody;
+      document?: Metadata;
       /** Present → the base version rides the atomic WHERE and is bumped. */
       version?: number;
     }
@@ -309,7 +309,7 @@ export class EntityWrites {
       try {
         derived.push({
           row,
-          derived: this.derive(JSON.parse(row.document) as EntityBody, row.types, row.worldId),
+          derived: this.derive(JSON.parse(row.document) as Metadata, row.types, row.worldId),
         });
       } catch (err) {
         failures.push({
@@ -350,7 +350,7 @@ export class EntityWrites {
    * `content → entity` edge carries a descriptor, so the non-null ones are exactly the descriptors
    * the Content uses.
    */
-  private derive(body: EntityBody, types: readonly string[], worldId: string): Derived {
+  private derive(body: Metadata, types: readonly string[], worldId: string): Derived {
     // Scoped to the Entity's World so a user-defined type's Fields resolve too.
     const fields = resolveFields(this.worldTypeFields.resolverFor(worldId), types);
     const dataTypes = this.typeFields.structuredDataTypes;
@@ -359,7 +359,7 @@ export class EntityWrites {
       searchText: deriveSearchText(body, fields, dataTypes),
       descriptors: descriptorsSchema.parse(edges.flatMap((e) => e.descriptor ?? [])),
       edges,
-      fieldFacets: deriveFieldFacets(fields, body.metadata),
+      fieldFacets: deriveFieldFacets(fields, body),
     };
   }
 

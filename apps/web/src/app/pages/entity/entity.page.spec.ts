@@ -4,7 +4,8 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
-import { CONTENT_FORMAT, EntityDetail, EntityType } from '@hexly/domain';
+import { EntityDetail, EntityType } from '@hexly/domain';
+import { CONTENT_FORMAT } from '@hexly/plugin-content';
 import { CORE_HEXMAP, HEX_GRID_FIELD } from '@hexly/plugin-hexmap';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { EntitiesClient, NudgeBusClient, ActiveWorld, TitleService, EVICTED, Watched } from '@hexly/web-core';
@@ -44,7 +45,7 @@ const hexmapWithContent = (text: string): EntityDetail => ({
         content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
       },
     },
-    metadata: { grid: { hexes: {}, regions: [], labels: [] } },
+    grid: { hexes: {}, regions: [], labels: [] },
   },
 });
 

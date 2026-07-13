@@ -1,16 +1,19 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { emptyContent, EntityBody, EntityDetail, EntitySummary } from '@hexly/domain';
+import { EntityDetail, EntitySummary, Metadata } from '@hexly/domain';
 import { EntitiesClient, ENTITY_NUDGE_DEBOUNCE_MS } from './entities.client';
 import { NudgeBusClient } from './nudge-bus.client';
 import { MockNudgeBusClient } from '../testing/nudge-bus.mock';
 import { EVICTED } from './live-follow';
 
-/** The shape the editor round-trips through the client: a Hex Map's grid is its `grid` Field value. */
-const emptyHexmapBody: EntityBody = {
+/** A blank prose value, inlined: web-core cannot depend on the content plugin (a project cycle). */
+const emptyContent = () => ({ format: 'tiptap-v3' as const, snapshot: { type: 'doc', content: [] } });
+
+/** The body IS the Metadata map (ADR-0051): a Hex Map's grid and its prose are both Field values in it. */
+const emptyHexmapBody: Metadata = {
   content: emptyContent(),
-  metadata: { grid: { hexes: {}, regions: [], labels: [] } },
+  grid: { hexes: {}, regions: [], labels: [] },
 };
 
 describe('EntitiesClient', () => {
@@ -265,10 +268,10 @@ describe('EntitiesClient', () => {
   });
 
   it('saves the body against its base version and reports the saved outcome', () => {
-    const painted: EntityBody = {
+    const painted: Metadata = {
       content: emptyContent(),
       // A plugin's structured value, spelled out: web-core carries no dependency on the map plugin.
-      metadata: { grid: { hexes: { '0,0': { terrain: 'forest' } }, regions: [], labels: [] } },
+      grid: { hexes: { '0,0': { terrain: 'forest' } }, regions: [], labels: [] },
     };
 
     let outcome: unknown;

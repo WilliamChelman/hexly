@@ -10,7 +10,8 @@ import {
   viewChild,
 } from '@angular/core';
 import type { Graph } from '@cosmos.gl/graph';
-import { CORE_NOTE, LinkedEntity, WorldGraph } from '@hexly/domain';
+import { LinkedEntity, WorldGraph } from '@hexly/domain';
+import { CORE_NOTE } from '@hexly/plugin-content';
 import { Logger, ThemeService, isTrackpadWheel, wheelDeltaPixels } from '@hexly/web-core';
 import { GraphPayload, graphPayload } from './graph-payload';
 import { LabelGrid, selectLabels } from './label-selection';

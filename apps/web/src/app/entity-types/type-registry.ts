@@ -1,6 +1,7 @@
 import { inject, Injectable, signal } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
-import { CORE_NOTE, EntityType, FieldSchema, resolveFields, structuredDataTypeSet } from '@hexly/domain';
+import { EntityType, FieldSchema, resolveFields, structuredDataTypeSet } from '@hexly/domain';
+import { CORE_NOTE } from '@hexly/plugin-content';
 import {
   CORE_VIEW_CONTENT,
   CORE_VIEW_FIELDS,

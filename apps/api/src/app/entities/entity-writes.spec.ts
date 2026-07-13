@@ -1,4 +1,5 @@
-import { EntityBody, ReindexFailure, emptyContent, emptyEntityBody, tiptapContent } from '@hexly/domain';
+import { Metadata, ReindexFailure, emptyEntityBody } from '@hexly/domain';
+import { emptyContent, tiptapContent } from '@hexly/plugin-content';
 import { eq } from 'drizzle-orm';
 import { createDb, Db } from '../db/db';
 import {
@@ -177,7 +178,7 @@ describe('EntityWrites', () => {
         name: 'The Reach',
         types: ['core.hexmap'],
         tags: [],
-        body: { content: CONTENT, metadata: { grid: GRID } },
+        body: { content: CONTENT, grid: GRID },
       });
 
       expect(contentTextOf('The Reach')).toBe('Married to Ashford The Kingdom of Avalon The Whisperwood');
@@ -374,7 +375,7 @@ describe('EntityWrites', () => {
         seedRaw(
           'the-reach',
           WORLD,
-          JSON.stringify({ content: CONTENT, metadata: { grid: GRID } }),
+          JSON.stringify({ content: CONTENT, grid: GRID }),
           'hexmap',
           'Married to', // What the old, Content-only derivation left behind.
         );
@@ -507,7 +508,7 @@ describe('EntityWrites', () => {
        * A document with no derived rows at all. Seeded raw, so the walk is observed independently
        * of `insert`, which would have derived them on the way in.
        */
-      function seedUnindexed(id: string, worldId: string, body: EntityBody): void {
+      function seedUnindexed(id: string, worldId: string, body: Metadata): void {
         seedRaw(id, worldId, JSON.stringify(body), 'note');
       }
 
@@ -562,7 +563,7 @@ describe('EntityWrites', () => {
           name: 'Aboleth',
           types: ['test.monster'],
           tags: [],
-          body: { content: emptyContent(), metadata: { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } } },
+          body: { content: emptyContent(), lair: { entityId: 'whisperwood', label: 'The Whisperwood' } },
         });
 
         expect(edgesOf('Aboleth')).toEqual([
@@ -578,14 +579,14 @@ describe('EntityWrites', () => {
           name: 'Aboleth',
           types: ['test.monster'],
           tags: [],
-          body: { content: emptyContent(), metadata: { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } } },
+          body: { content: emptyContent(), lair: { entityId: 'whisperwood', label: 'The Whisperwood' } },
         });
 
         writes.mutate(ADA, row.id, {
           kind: 'edit',
           version: row.version,
           types: ['test.monster'],
-          document: { content: emptyContent(), metadata: { lair: { entityId: 'sunken-keep', label: 'Sunken Keep' } } },
+          document: { content: emptyContent(), lair: { entityId: 'sunken-keep', label: 'Sunken Keep' } },
         });
 
         expect(edgesOf('Aboleth')).toEqual([
@@ -675,7 +676,7 @@ describe('EntityWrites', () => {
         name: 'The Reach',
         types: ['core.hexmap'],
         tags: [],
-        body: { content: emptyContent(), metadata: { grid: { hexes, regions: [], labels: [] } } },
+        body: { content: emptyContent(), grid: { hexes, regions: [], labels: [] } },
       });
 
       expect(edgesFrom(row.id)).toHaveLength(7000);

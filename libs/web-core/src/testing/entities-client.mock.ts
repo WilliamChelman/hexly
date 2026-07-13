@@ -1,6 +1,5 @@
 import { NEVER, Observable, of } from 'rxjs';
 import {
-  EntityBody,
   EntityDetail,
   EntityFacets,
   EntityGrant,
@@ -43,7 +42,7 @@ export class MockEntitiesClient {
     vi.fn<
       (
         id: string,
-        body: EntityBody,
+        body: Metadata,
         version: number,
         tags: readonly string[],
         types?: readonly EntityType[],

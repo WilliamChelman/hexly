@@ -1,3 +1,4 @@
+import { CONTENT_FIELD } from '@hexly/plugin-content';
 import { emptyHexMap, HexMap } from './hex-map';
 import { CORE_HEX_GRID, HEX_GRID_DATA_TYPE, HEX_GRID_FIELD } from './hex-grid';
 import { CORE_HEXMAP_TYPE } from './hexmap-type';
@@ -10,8 +11,9 @@ describe('the core.hex-grid Structured Field (ADR-0050)', () => {
     expect(HEX_GRID_DATA_TYPE.empty()).toEqual({ hexes: {}, regions: [], labels: [] });
   });
 
-  it('is what core.hexmap declares, at the `grid` key — the whole of what makes an Entity a Hex Map', () => {
-    expect(CORE_HEXMAP_TYPE.fields).toEqual([HEX_GRID_FIELD]);
+  it('declares the grid at the `grid` key, beside the canonical prose Field (ADR-0051)', () => {
+    // The grid is what makes an Entity a Hex Map; the prose Field rides alongside so a map carries lore.
+    expect(CORE_HEXMAP_TYPE.fields).toEqual([CONTENT_FIELD, HEX_GRID_FIELD]);
     expect(HEX_GRID_FIELD).toMatchObject({ key: 'grid', dataType: { kind: CORE_HEX_GRID }, facetable: false });
   });
 

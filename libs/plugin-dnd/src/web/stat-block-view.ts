@@ -1,6 +1,13 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { FieldSchema, Metadata, NO_STRUCTURED_DATA_TYPES, readField, validateFields, writeField } from '@hexly/domain';
+import {
+  FieldSchema,
+  Metadata,
+  NO_STRUCTURED_DATA_TYPES,
+  readField,
+  validateFields,
+  writeFieldInPlace,
+} from '@hexly/domain';
 import { ENTITY_SESSION } from '@hexly/web-entity';
 import {
   abilityModifier,
@@ -110,8 +117,8 @@ export class StatBlockView {
 
   protected readonly writable = this.session.writable;
 
-  /** The live working Metadata — the one map the stat block is a lens over. */
-  private readonly metadata = computed<Metadata>(() => this.session.body().metadata ?? {});
+  /** The live working Metadata — the body IS the map now (ADR-0051), and the stat block is a lens over it. */
+  private readonly metadata = computed<Metadata>(() => this.session.body());
 
   private readonly invalidKeys = computed(
     () =>
@@ -147,9 +154,7 @@ export class StatBlockView {
   /** Write a stat back into the Metadata map through the central store, the channel every View uses. */
   protected set(field: FieldSchema, value: unknown): void {
     if (!this.session.writable()) return;
-    this.session.mutate((draft) => {
-      draft.metadata = writeField(draft.metadata, field, value);
-    });
+    this.session.mutate((draft) => writeFieldInPlace(draft, field, value));
   }
 
   /** The slots for the given Metadata keys, in stat-block order — one per Field the type declares. */

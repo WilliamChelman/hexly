@@ -49,7 +49,8 @@ describe('GenericFieldView', () => {
     createdAt: 1,
     updatedAt: 1,
     rights,
-    document: { content: { format: 'tiptap-v1', snapshot: {} }, metadata },
+    // These synthetic types declare no prose Field, so the body carries none.
+    document: { ...metadata },
   });
 
   let session: EntitySession;
@@ -98,7 +99,7 @@ describe('GenericFieldView', () => {
     fixture.detectChanges();
 
     // The value lands in the one Metadata map — no separate store (CONTEXT.md → Field).
-    expect(session.body().metadata).toMatchObject({ name: 'Kraken' });
+    expect(session.body()).toMatchObject({ name: 'Kraken' });
   });
 
   it('renders a read-only opener’s controls disabled', () => {

@@ -7,7 +7,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import request from 'supertest';
-import { emptyEntityBody, tiptapContent } from '@hexly/domain';
+import { emptyEntityBody } from '@hexly/domain';
+import { tiptapContent } from '@hexly/plugin-content';
 import { DB, Db, createDb } from '../db/db';
 import { worldMembers } from '../db/schema';
 import { EntitiesService } from '../entities/entities.service';
@@ -213,7 +214,7 @@ describe('Vault export endpoint', () => {
             },
           ],
         }),
-        metadata: { grid: { hexes: { '0,0': { terrain: 'forest', name: 'Rivertown' } }, regions: [], labels: [] } },
+        grid: { hexes: { '0,0': { terrain: 'forest', name: 'Rivertown' } }, regions: [], labels: [] },
       },
     });
 
@@ -304,7 +305,8 @@ describe('Vault export endpoint', () => {
       descriptors: [],
       document: {
         content: tiptapContent({ type: 'doc', content: [] }),
-        metadata: { challenge_rating: 3, size: 'Large' },
+        challenge_rating: 3,
+        size: 'Large',
       },
     });
 
@@ -314,7 +316,7 @@ describe('Vault export endpoint', () => {
       version: vela.version,
       tags: [],
       descriptors: [],
-      document: { content: tiptapContent({ type: 'doc', content: [] }), metadata: { domain: 'dusk' } },
+      document: { content: tiptapContent({ type: 'doc', content: [] }), domain: 'dusk' },
     });
 
     // A Hex Map (plugin type, a Structured Field) — terrain, a feature, a region, and a label.
@@ -331,7 +333,7 @@ describe('Vault export endpoint', () => {
       version: map.version,
       tags: [],
       descriptors: [],
-      document: { content: tiptapContent({ type: 'doc', content: [] }), metadata: { grid } },
+      document: { content: tiptapContent({ type: 'doc', content: [] }), grid },
     });
 
     // Export the World, then import the export back as a fresh World.
@@ -345,15 +347,15 @@ describe('Vault export endpoint', () => {
 
     // Primary type first, Fields intact.
     expect(byName('Owlbear')?.types).toEqual(['core.note', 'dnd.monster']);
-    expect(byName('Owlbear')?.document.metadata).toMatchObject({ challenge_rating: 3, size: 'Large' });
+    expect(byName('Owlbear')?.document).toMatchObject({ challenge_rating: 3, size: 'Large' });
 
     // The user-defined type on the same footing — neither was resolved.
     expect(byName('Vela')?.types).toEqual(['world.deity']);
-    expect(byName('Vela')?.document.metadata).toMatchObject({ domain: 'dusk' });
+    expect(byName('Vela')?.document).toMatchObject({ domain: 'dusk' });
 
     // Terrain, feature, region, and label all survive.
     expect(byName('Aldermoor Map')?.types).toEqual(['core.hexmap']);
-    expect(byName('Aldermoor Map')?.document.metadata?.['grid']).toEqual(grid);
+    expect(byName('Aldermoor Map')?.document['grid']).toEqual(grid);
   });
 
   it('re-emits a wikilink with the target entity’s CURRENT name after a rename', async () => {

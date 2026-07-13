@@ -2,19 +2,16 @@ import { basename, posix } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import {
-  CORE_NOTE,
-  ContentNode,
-  EntityBody,
   EntityType,
   HEXLY_METADATA_PREFIX,
   HEXLY_TYPE_KEY,
   ImportSummary,
+  Metadata,
   nameSchema,
   tagsSchema,
-  tiptapContent,
   typesSchema,
-  visit,
 } from '@hexly/domain';
+import { CONTENT_FIELD, ContentNode, CORE_NOTE, tiptapContent, visit } from '@hexly/plugin-content';
 import { markdownToProseMirror } from '@hexly/obsidian';
 import { AssetsService } from '../assets/assets.service';
 import { DB, type Db } from '../db/db';
@@ -99,13 +96,12 @@ export class VaultImportService {
         const passThrough = Object.fromEntries(
           Object.entries(rest).filter(([key]) => !key.startsWith(HEXLY_METADATA_PREFIX)),
         );
-        const content = tiptapContent(note.doc);
-        // Folder path recorded under the reserved namespace so export can rebuild the tree.
-        // Frontmatter lands as Metadata whatever the types: a Field only types a key that map already
-        // holds, a Structured Field's nested value (a Hex Map's grid) included (ADR-0050).
-        const body: EntityBody = {
-          content,
-          metadata: { ...passThrough, 'hexly.sourcePath': note.path },
+        // The prose sits at the `content` Field key, still named directly (Vault Projection is #211);
+        // the folder path is recorded under the reserved namespace so export can rebuild the tree.
+        const body: Metadata = {
+          ...passThrough,
+          [CONTENT_FIELD.key]: tiptapContent(note.doc),
+          'hexly.sourcePath': note.path,
         };
         this.entities.importEntity({
           ownerId,

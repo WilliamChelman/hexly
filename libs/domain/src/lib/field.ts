@@ -435,6 +435,17 @@ export function writeField(metadata: Metadata | undefined, field: FieldSchema, v
   return next;
 }
 
+/**
+ * {@link writeField}'s set-or-clear semantics applied *in place* on a draft of the Metadata map — for a
+ * View editing the body through Immer's `mutate`, where the body **is** the map (ADR-0051) and the draft
+ * root cannot be reassigned. An emptied value deletes the key; else it sets it.
+ */
+export function writeFieldInPlace(draft: Metadata, field: FieldSchema, value: unknown): void {
+  const next = writeField(draft, field, value);
+  if (field.key in next) draft[field.key] = next[field.key];
+  else delete draft[field.key];
+}
+
 /** Absent for the *required* check: `undefined`/`null` (an absent key), not a present-but-empty value. */
 function isAbsent(value: unknown): boolean {
   return value === undefined || value === null;

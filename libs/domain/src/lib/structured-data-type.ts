@@ -43,13 +43,13 @@ export interface StructuredDataType {
   /** A fresh empty value — a map plugin's untouched plane, an empty timeline. */
   empty(): unknown;
   /**
-   * The Entity Links this value expresses (a map's placements, a timeline's entries), harvested into the edge
-   * index alongside the Content's. Absent when the data-type carries no links.
+   * The Entity Links this value expresses (a map's placements, a timeline's entries, a document's
+   * inline links), harvested into the edge index. Absent when the data-type carries no links.
    */
   harvestEdges?(value: unknown): readonly EntityEdge[];
   /**
-   * The searchable text this value carries (a grid's Hex and Region names), concatenated into the
-   * Entity's full-text index alongside the Content's. Absent when the data-type carries no text.
+   * The searchable text this value carries (a grid's Hex and Region names, a document's prose),
+   * concatenated into the Entity's full-text index. Absent when the data-type carries no text.
    */
   extractText?(value: unknown): string;
 }

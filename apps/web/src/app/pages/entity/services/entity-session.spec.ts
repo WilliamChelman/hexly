@@ -3,15 +3,8 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { of, Subject, throwError } from 'rxjs';
-import {
-  CONTENT_FORMAT,
-  CORE_NOTE,
-  emptyContent,
-  EntityBody,
-  EntityDetail,
-  EntitySaveOutcome,
-  tiptapContent,
-} from '@hexly/domain';
+import { EntityDetail, EntitySaveOutcome, Metadata } from '@hexly/domain';
+import { CONTENT_FORMAT, CORE_NOTE, emptyContent, tiptapContent } from '@hexly/plugin-content';
 import { coordKey, CORE_HEXMAP, emptyHexMap, HEX_GRID_FIELD, HexMap } from '@hexly/plugin-hexmap';
 import { MockEntitiesClient, MockNudgeBusClient } from '@hexly/web-core/testing';
 import { EntitiesClient, NudgeBusClient, EVICTED, Watched } from '@hexly/web-core';
@@ -28,7 +21,7 @@ describe('EntitySession', () => {
 
   const content = emptyContent();
   /** Wrap a hex grid into the hexmap body the store carries end to end: its `grid` Field value. */
-  const bodyOf = (grid: HexMap) => ({ content, metadata: { grid } });
+  const bodyOf = (grid: HexMap) => ({ content, grid });
 
   const forestAt00: HexMap = {
     hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'forest' } },
@@ -94,7 +87,7 @@ describe('EntitySession', () => {
       flushPendingCommit: () => {
         if (!pending()) return;
         session.mutate((body) => {
-          body.content = tiptapContent(doc);
+          body['content'] = tiptapContent(doc);
         });
         pending.set(false);
       },
@@ -196,7 +189,7 @@ describe('EntitySession', () => {
     session.setTypes([CORE_NOTE, CORE_HEXMAP]);
 
     // The body gained an empty grid so the map View has a plane to render; Content is preserved.
-    expect(session.body()).toEqual({ ...noteBody, metadata: { grid: emptyHexMap() } });
+    expect(session.body()).toEqual({ ...noteBody, grid: emptyHexMap() });
     expect(session.dirty()).toBe(true);
   });
 
@@ -330,8 +323,8 @@ describe('EntitySession', () => {
     session.save().subscribe();
 
     // The PUT body carries the flushed prose: the debounce window could not eat the last keystrokes.
-    const sentBody = entities.save.mock.calls[0][1] as EntityBody;
-    expect(sentBody.content.snapshot).toEqual(snapshot);
+    const sentBody = entities.save.mock.calls[0][1] as Metadata;
+    expect((sentBody['content'] as { snapshot: unknown }).snapshot).toEqual(snapshot);
   });
 
   it('keeps a mid-flight Content edit dirty across a clean save (linchpin, ADR-0026)', () => {
@@ -796,7 +789,7 @@ describe('EntitySession', () => {
       'm1',
       {
         content: { format: CONTENT_FORMAT, snapshot },
-        metadata: { grid: editor.document() },
+        grid: editor.document(),
       },
       3,
       [],
@@ -856,7 +849,7 @@ describe('EntitySession', () => {
 
     // The guard folds the pending doc into the body and warns — the last keystrokes aren't stranded
     // in the editor's debounce window.
-    expect(session.body().content.snapshot).toEqual(snapshot);
+    expect((session.body()['content'] as { snapshot: unknown }).snapshot).toEqual(snapshot);
     expect(event.defaultPrevented).toBe(true);
   });
 
@@ -897,8 +890,8 @@ describe('EntitySession', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', metaKey: true, cancelable: true }));
 
     // Cmd/Ctrl+S goes through save(), which flushes the editor first: the debounced prose rides the PUT.
-    const sentBody = entities.save.mock.calls[0][1] as EntityBody;
-    expect(sentBody.content.snapshot).toEqual(snapshot);
+    const sentBody = entities.save.mock.calls[0][1] as Metadata;
+    expect((sentBody['content'] as { snapshot: unknown }).snapshot).toEqual(snapshot);
   });
 
   it('is a safe no-op with no entity open (no request, no throw)', () => {

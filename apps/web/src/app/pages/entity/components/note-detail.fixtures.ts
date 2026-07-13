@@ -1,4 +1,5 @@
-import { CONTENT_FORMAT, CORE_NOTE, EntityDetail } from '@hexly/domain';
+import { EntityDetail } from '@hexly/domain';
+import { CONTENT_FORMAT, CORE_NOTE } from '@hexly/plugin-content';
 
 export const noteDetail = (name: string): EntityDetail => ({
   id: 'n1',

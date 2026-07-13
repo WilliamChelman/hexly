@@ -283,7 +283,7 @@ export const entityEdges = sqliteTable(
  * The denormalised **Field-facet** index (ADR-0048, #188): one row per distinct facetable Field
  * value an Entity's Metadata carries — the Field peer of the `types`/`tags` columns, pulled out so a
  * Field facet can be counted and filtered without loading each body. Like {@link entityEdges} it is
- * an **index, never a source of truth**: `EntityWrites` derives it from `document.metadata` on every
+ * an **index, never a source of truth**: `EntityWrites` derives it from the document body on every
  * save and Reindex rebuilds it, wholesale-replacing an Entity's rows (self-pruning). Deleting the
  * Entity cascades them away.
  *

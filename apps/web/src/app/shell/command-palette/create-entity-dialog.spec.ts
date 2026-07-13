@@ -2,7 +2,8 @@ import { provideTranslocoTesting } from '../../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { of } from 'rxjs';
-import { emptyContent, EntityDetail, WorldSummary } from '@hexly/domain';
+import { EntityDetail, WorldSummary } from '@hexly/domain';
+import { emptyContent } from '@hexly/plugin-content';
 import { ActiveWorld, EntitiesClient, WorldStore } from '@hexly/web-core';
 import { MockEntitiesClient } from '@hexly/web-core/testing';
 import { CreateEntityDialogState } from './create-entity-dialog.state';
@@ -175,7 +176,7 @@ describe('CreateEntityDialog', () => {
         seq: 1,
         createdAt: 1,
         updatedAt: 1,
-        document: { content: emptyContent(), metadata: { lair: 'Sunken keep' } },
+        document: { content: emptyContent(), lair: 'Sunken keep' },
       } as EntityDetail),
     );
 

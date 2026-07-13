@@ -2,7 +2,8 @@ import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { CORE_NOTE, EntityDetail } from '@hexly/domain';
+import { EntityDetail } from '@hexly/domain';
+import { CORE_NOTE } from '@hexly/plugin-content';
 import { CORE_HEXMAP, emptyHexMap } from '@hexly/plugin-hexmap';
 import { EntitySession } from '../services/entity-session';
 import { ENTITY_SESSION } from '@hexly/web-entity';
@@ -23,7 +24,7 @@ describe('EntityMetadata', () => {
     updatedAt: 1,
     document: {
       content: { format: 'tiptap-v1', snapshot: {} },
-      metadata,
+      ...metadata,
     },
   });
 
@@ -121,7 +122,8 @@ describe('EntityMetadata without the Hex Map plugin', () => {
       updatedAt: 1,
       document: {
         content: { format: 'tiptap-v1', snapshot: {} },
-        metadata: { grid: emptyHexMap(), status: 'canon' },
+        grid: emptyHexMap(),
+        status: 'canon',
       },
     });
     const fixture = TestBed.createComponent(EntityMetadata);

@@ -1,5 +1,5 @@
 import { InjectionToken, Signal } from '@angular/core';
-import { EntityBody } from '@hexly/domain';
+import { Metadata } from '@hexly/domain';
 import { Patch } from '@hexly/immer';
 
 /** Re-exported so a View lib (e.g. the Hex Map plugin) reads the undo/redo currency from one place. */
@@ -26,13 +26,13 @@ export interface LiveEditor {
  * can replay them through {@link applyPatches}.
  */
 export interface EntitySession {
-  /** The working Entity body; a View reads its own slice (grid now, Fields/Metadata later). */
-  readonly body: Signal<EntityBody>;
+  /** The working Entity body — the Metadata map (ADR-0051); a View reads its own slice (grid, prose, a Field). */
+  readonly body: Signal<Metadata>;
   /**
    * Run `recipe` against an Immer draft of the body, adopting the result and returning the
    * forward/inverse patches for a View that owns its undo/redo stack.
    */
-  mutate(recipe: (draft: EntityBody) => void): { redo: Patch[]; undo: Patch[] };
+  mutate(recipe: (draft: Metadata) => void): { redo: Patch[]; undo: Patch[] };
   /** Apply raw patches to the body — the undo/redo channel for a View replaying its own stack. */
   applyPatches(patches: Patch[]): void;
   /** Whether the caller may edit (ADR-0037); a View gates its editing affordances on it. */

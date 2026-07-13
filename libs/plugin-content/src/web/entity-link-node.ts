@@ -1,5 +1,5 @@
 import { Node, mergeAttributes } from '@tiptap/core';
-import { EntityLinkAttrs, entityLinkText } from '@hexly/domain';
+import { EntityLinkAttrs, entityLinkText } from '../lib';
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {

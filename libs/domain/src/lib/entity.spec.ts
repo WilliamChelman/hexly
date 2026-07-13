@@ -1,112 +1,38 @@
 import {
-  contentSchema,
   createEntityRequestSchema,
   entityBodySchema,
   entityListQuerySchema,
   patchEntityRequestSchema,
   saveEntityRequestSchema,
-  tiptapContent,
   visibilitySchema,
 } from './entity';
 
-const content = {
-  format: 'tiptap-v1' as const,
-  snapshot: { type: 'doc', content: [] },
-};
+/** The body is the Metadata map itself (ADR-0051): an open record the schema interprets no key of. */
+const body = { alignment: 'lawful-good', armor_class: 15 };
 
-describe('contentSchema', () => {
-  it('round-trips an arbitrary snapshot untouched — the domain never inspects it', () => {
-    // ADR-0019: Content is opaque behind the format tag; parse/serialize must round-trip it exactly.
-    const snapshot = {
-      type: 'doc',
-      content: [{ type: 'weirdFutureBlock', attrs: { x: [1, 2, { y: true }] } }],
-    };
-    const envelope = { format: 'tiptap-v1' as const, snapshot };
-
-    const parsed = contentSchema.parse(envelope);
-
-    expect(parsed).toEqual(envelope);
-    expect(JSON.parse(JSON.stringify(parsed))).toEqual(envelope);
-  });
-
-  it('round-trips a tiptap-v2 snapshot untouched — dual-read across the format bump (ADR-0023)', () => {
-    // v2 is additive over v1; a reader loads either losslessly with no transform.
-    const envelope = {
-      format: 'tiptap-v2' as const,
-      snapshot: {
-        type: 'doc',
-        content: [{ type: 'entityLink', attrs: { entityId: 'e1' } }],
-      },
-    };
-
-    const parsed = contentSchema.parse(envelope);
-
-    expect(parsed).toEqual(envelope);
-  });
-
-  it('round-trips a tiptap-v3 snapshot untouched — the Obsidian-import schema bump (ADR-0033)', () => {
-    // v3 is additive over v2 (callout/image/table/taskList/highlight, entityLink display/heading).
-    const envelope = {
-      format: 'tiptap-v3' as const,
-      snapshot: {
-        type: 'doc',
-        content: [
-          {
-            type: 'callout',
-            attrs: { type: 'note', title: 'Beware' },
-            content: [],
-          },
-        ],
-      },
-    };
-
-    expect(contentSchema.parse(envelope)).toEqual(envelope);
-  });
-
-  it('stamps new Content with the tiptap-v3 write format (ADR-0033)', () => {
-    expect(tiptapContent({ type: 'doc', content: [] }).format).toBe('tiptap-v3');
-  });
-
-  it('rejects a Content envelope tagged with an unknown format', () => {
-    expect(() => contentSchema.parse({ format: 'markdown-v9', snapshot: {} })).toThrow();
-  });
-});
-
-describe('entityBodySchema', () => {
-  it('accepts the one body shape — Content and Metadata, for every Entity (ADR-0050)', () => {
-    const body = { content, metadata: { alignment: 'lawful-good' } };
+describe('entityBodySchema (the body is the Metadata map, ADR-0051)', () => {
+  it('accepts any record of keys — the body root interprets none of them', () => {
+    // A prose value, a grid, a scalar Field all sit at their own key with no wrapper and no union.
+    const body = { alignment: 'lawful-good', grid: { hexes: {}, regions: [] } };
 
     expect(entityBodySchema.parse(body)).toEqual(body);
   });
 
-  it('accepts a body with no Metadata at all', () => {
-    expect(entityBodySchema.parse({ content })).toEqual({ content });
+  it('accepts the empty map — a bodyless placeholder a load clears the canvas to', () => {
+    expect(entityBodySchema.parse({})).toEqual({});
   });
 
-  it("carries a plugin's Structured Field value as Metadata like any other Field's (ADR-0050)", () => {
-    // The collapse: nothing about a structured value is special to the body schema — it is a value at
-    // a Metadata key, so the body needs no union and no registry to parse it.
-    const body = { content, metadata: { grid: { tiles: {}, zones: [] } } };
-
-    expect(entityBodySchema.parse(body)).toEqual(body);
-  });
-
-  it('tolerates a malformed structured value at rest — a Metadata value is never type-checked here', () => {
-    // Forward-only (CONTEXT.md → Field): garbage at `grid` parses, so a corrupt document opens (as an
+  it('tolerates a malformed structured value at rest — a body value is never type-checked here', () => {
+    // Forward-only (CONTEXT.md → Field): garbage at a key parses, so a corrupt document opens (as an
     // empty value) rather than 500ing on read. The first edit overwrites it.
-    const body = { content, metadata: { grid: 'not-a-grid' } };
+    const body = { grid: 'not-a-grid' };
 
     expect(entityBodySchema.parse(body)).toEqual(body);
   });
 
-  it('rejects a body missing its Content', () => {
-    expect(() => entityBodySchema.parse({ metadata: { note: 'orphan' } })).toThrow();
-  });
-
-  it("rejects a pre-collapse body carrying a plugin's value at the root, rather than reading it as a note", () => {
-    // The body root is closed (`.strict()`): an unknown key there is a document this build cannot
-    // represent, and silently dropping it would read such a body as a note that has lost its substance.
-    expect(() => entityBodySchema.parse({ content, tiles: {}, zones: [] })).toThrow();
+  it('rejects a non-object body — the document column always holds a map', () => {
+    expect(() => entityBodySchema.parse('a string')).toThrow();
+    expect(() => entityBodySchema.parse([1, 2])).toThrow();
   });
 });
 
@@ -262,8 +188,6 @@ describe('patchEntityRequestSchema', () => {
 
 describe('saveEntityRequestSchema', () => {
   it('carries the whole body, the base version, and the tags the save replaces', () => {
-    const body = { content, metadata: { armor_class: 15 } };
-
     expect(saveEntityRequestSchema.parse({ document: body, version: 3, tags: [] })).toEqual({
       document: body,
       version: 3,
@@ -272,8 +196,6 @@ describe('saveEntityRequestSchema', () => {
   });
 
   it('accepts an optional type set the save replaces, and omits it when absent', () => {
-    const body = { content };
-
     expect(
       saveEntityRequestSchema.parse({
         document: body,
@@ -286,10 +208,8 @@ describe('saveEntityRequestSchema', () => {
   });
 
   it('ignores a descriptors field a stale client still sends (server harvests them now, #96)', () => {
-    const body = { content };
-
     // The wire no longer carries descriptors — the server derives them from the
-    // saved Content — so an old client's field is a stripped unknown key.
+    // saved document — so an old client's field is a stripped unknown key.
     const parsed = saveEntityRequestSchema.parse({
       document: body,
       version: 1,
@@ -300,14 +220,10 @@ describe('saveEntityRequestSchema', () => {
   });
 
   it('requires tags on save — the save always carries the full current set', () => {
-    const body = { content };
-
     expect(() => saveEntityRequestSchema.parse({ document: body, version: 3 })).toThrow();
   });
 
   it('normalizes tags on save: trims, lower-cases, dedupes, rejects blanks (#88)', () => {
-    const body = { content };
-
     expect(
       saveEntityRequestSchema.parse({
         document: body,
@@ -325,15 +241,13 @@ describe('saveEntityRequestSchema', () => {
   });
 
   it('rejects a save that omits the base version', () => {
-    const body = { content };
-
     expect(() => saveEntityRequestSchema.parse({ document: body })).toThrow();
   });
 
-  it('rejects a save whose body fails the Entity schema', () => {
+  it('rejects a save whose body is not a map — the document column always holds a record', () => {
     expect(() =>
       saveEntityRequestSchema.parse({
-        document: { metadata: { orphan: true } },
+        document: 'not a map',
         version: 1,
       }),
     ).toThrow();

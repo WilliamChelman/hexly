@@ -2,7 +2,7 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { EntityBody, Metadata } from '@hexly/domain';
+import { Metadata } from '@hexly/domain';
 import { produceWithPatches } from '@hexly/immer';
 import { ENTITY_SESSION, EntitySession } from '@hexly/web-entity';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
@@ -16,7 +16,7 @@ import { StatBlockView } from './stat-block-view';
 describe('StatBlockView', () => {
   /** A stand-in for the app's central store: the one body every View reads its slice off. */
   function fakeSession(metadata: Metadata, writable = true): EntitySession {
-    const body = signal<EntityBody>({ content: { format: 'tiptap-v1', snapshot: {} }, metadata });
+    const body = signal<Metadata>({ content: { format: 'tiptap-v1', snapshot: {} }, ...metadata });
     return {
       body: body.asReadonly(),
       writable: signal(writable).asReadonly(),
@@ -71,7 +71,7 @@ describe('StatBlockView', () => {
     fixture.detectChanges();
 
     // A Field is a lens: the stat block writes the same Metadata the Browser facets on (#188).
-    expect(session.body().metadata).toMatchObject({ challenge_rating: 13 });
+    expect(session.body()).toMatchObject({ challenge_rating: 13 });
   });
 
   // The block is the only surface a monster's optional Fields have (the create dialog collects the
@@ -89,7 +89,7 @@ describe('StatBlockView', () => {
     alignment.dispatchEvent(new Event('input'));
     fixture.detectChanges();
 
-    expect(session.body().metadata).toMatchObject({ size: 'Huge', alignment: 'chaotic evil' });
+    expect(session.body()).toMatchObject({ size: 'Huge', alignment: 'chaotic evil' });
     // The subtitle is derived, so it re-reads the moment its Fields are edited.
     expect(el.querySelector('[data-testid=stat-block-subtitle]')?.textContent).toContain('Huge, chaotic evil');
   });
