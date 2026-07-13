@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
-import { CONTENT_EDITOR_TEST_CATALOGS } from './i18n/test-catalogs';
+import { CONTENT_EDITOR_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { SLASH_ITEMS, SlashItem } from './slash-menu-items';
 import { SlashMenu } from './slash-menu';
 

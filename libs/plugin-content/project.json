@@ -1,7 +1,7 @@
 {
-  "name": "content-editor",
+  "name": "plugin-content",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "libs/content-editor/src",
+  "sourceRoot": "libs/plugin-content/src",
   "prefix": "app",
   "projectType": "library",
   "tags": ["scope:web", "type:feature"],
@@ -11,8 +11,8 @@
       "options": {
         "watch": false,
         "buildTarget": "web:build:development",
-        "tsConfig": "libs/content-editor/tsconfig.spec.json",
-        "setupFiles": ["libs/content-editor/src/test-setup.ts"]
+        "tsConfig": "libs/plugin-content/tsconfig.spec.json",
+        "setupFiles": ["libs/plugin-content/src/test-setup.ts"]
       }
     }
   }

@@ -1,4 +1,4 @@
-import { CONTENT_EDITOR_TEST_CATALOGS } from '@hexly/content-editor/testing';
+import { CONTENT_EDITOR_TEST_CATALOGS } from '@hexly/plugin-content/testing';
 import { DND_TEST_CATALOGS } from '@hexly/plugin-dnd/testing';
 import {
   TestCatalogs,

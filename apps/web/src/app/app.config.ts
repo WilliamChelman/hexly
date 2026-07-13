@@ -20,7 +20,7 @@ import {
 // would pull Tiptap out of the lazy entity chunk).
 import { WEB_UI_TRANSLATIONS } from '@hexly/web-ui/i18n';
 import { WEB_ENTITY_TRANSLATIONS } from '@hexly/web-entity/i18n';
-import { CONTENT_EDITOR_TRANSLATIONS } from '@hexly/content-editor/i18n';
+import { CONTENT_EDITOR_TRANSLATIONS } from '@hexly/plugin-content/i18n';
 import { ENTITY_TYPES } from '@hexly/web-entity';
 import { providePluginDnd } from '@hexly/plugin-dnd/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';

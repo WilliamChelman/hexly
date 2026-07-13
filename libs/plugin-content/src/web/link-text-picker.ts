@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ListboxController, Listbox, ListboxEmpty, ListboxOption } from '@hexly/web-ui';
-import { VocabItem } from './vocab-items';
+import { VocabItem } from '../vocab-items';
 
 /** Which wikilink attr this picker edits — drives its testid and i18n only. */
 export type LinkTextKind = 'display' | 'heading';

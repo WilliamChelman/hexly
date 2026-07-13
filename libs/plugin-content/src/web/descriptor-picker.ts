@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ListboxController, Listbox, ListboxEmpty, ListboxOption } from '@hexly/web-ui';
-import { VocabItem } from './vocab-items';
+import { VocabItem } from '../vocab-items';
 
 /**
  * The keyboard-driven Link Descriptor picker that opens on `::` directly after an

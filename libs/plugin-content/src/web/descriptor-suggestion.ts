@@ -3,7 +3,7 @@ import { PluginKey } from '@tiptap/pm/state';
 import Suggestion, { SuggestionKeyDownProps, SuggestionProps } from '@tiptap/suggestion';
 import { DescriptorPicker } from './descriptor-picker';
 import { entityLinkPosBefore, setLinkAttr } from './descriptors';
-import { VocabItem, vocabItems } from './vocab-items';
+import { VocabItem, vocabItems } from '../vocab-items';
 
 /**
  * The `::` trigger that characterises a Content Entity Link (ADR-0023). A non-schema

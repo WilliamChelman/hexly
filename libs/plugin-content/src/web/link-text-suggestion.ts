@@ -3,7 +3,7 @@ import { PluginKey } from '@tiptap/pm/state';
 import Suggestion, { SuggestionKeyDownProps, SuggestionProps } from '@tiptap/suggestion';
 import { LinkTextPicker } from './link-text-picker';
 import { entityLinkPosBefore, linkTextRows, setLinkAttr } from './descriptors';
-import { VocabItem } from './vocab-items';
+import { VocabItem } from '../vocab-items';
 
 /**
  * The `|` display (`[[Target|text]]`) and `#` heading (`[[Target#Heading]]`) triggers on an
