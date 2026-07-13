@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
   AvailableType,
-  CORE_TYPES,
   FieldSchema,
   fieldSchemaSchema,
   StructuredDataTypeSet,
@@ -18,20 +17,18 @@ interface RegisteredType {
 
 /**
  * The API-side registry of every code-registered Entity Type — its Field schema and label (ADR-0048).
- * Seeded at startup from the core types and the bundled plugins.
+ * Seeded at startup from the bundled plugins; the domain declares no Entity Type of its own now, so
+ * even `core.note` arrives as a bundled plugin type (ADR-0051).
  *
- * The core types declare no Fields; they are registered so a World's available-types list reports the
- * whole code-registered set. An unregistered type resolves to `undefined` ("no Fields", never a throw).
- *
- * A World's user-defined types are not here — they are stored per-World and merged in by
- * {@link WorldTypeFields}.
+ * An unregistered type resolves to `undefined` ("no Fields", never a throw). A World's user-defined
+ * types are not here — they are stored per-World and merged in by {@link WorldTypeFields}.
  */
 @Injectable()
 export class TypeFieldRegistry {
   private readonly byType = new Map<string, RegisteredType>();
 
   constructor() {
-    for (const type of [...CORE_TYPES, ...BUNDLED_PLUGIN_TYPES]) this.register(type.id, type.fields, type.label);
+    for (const type of BUNDLED_PLUGIN_TYPES) this.register(type.id, type.fields, type.label);
   }
 
   /**

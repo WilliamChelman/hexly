@@ -4,7 +4,8 @@ import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/route
 import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { BehaviorSubject, EMPTY, Observable, of, throwError } from 'rxjs';
-import { CONTENT_FORMAT, CORE_NOTE, EntityDetail } from '@hexly/domain';
+import { EntityDetail } from '@hexly/domain';
+import { CONTENT_FORMAT, CORE_NOTE } from '@hexly/plugin-content';
 import { EntitiesClient, PublicClient, Watched } from '@hexly/web-core';
 import { MockEntitiesClient } from '@hexly/web-core/testing';
 import { PublicEntityPage } from './public-entity-page';

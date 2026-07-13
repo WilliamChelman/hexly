@@ -1,9 +1,10 @@
-import { CORE_NOTE_TYPE } from '@hexly/domain';
+import { CORE_NOTE_TYPE } from '@hexly/plugin-content';
 import { CORE_VIEW_CONTENT, TypeDefinition } from '@hexly/web-entity';
 
 /**
- * The one Entity Type the app registers itself. `core.note` declares no Fields, so an Entity
- * carrying it is nothing but its body: it contributes only `core.view.content`.
+ * `core.note`'s chrome, registered by the app. Its Fields come from the plugin now — the canonical
+ * prose `CONTENT_FIELD` (ADR-0051) — while the icon, labels, and `core.view.content` View stay here
+ * until they move into the plugin (the next ticket).
  *
  * The label values are transloco keys (see `libs/web-core/src/i18n/catalogs`).
  */

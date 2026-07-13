@@ -2,7 +2,8 @@ import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
-import { emptyContent, EntityBody, tiptapContent } from '@hexly/domain';
+import { Metadata } from '@hexly/domain';
+import { emptyContent, tiptapContent } from '@hexly/plugin-content';
 import { AuthModule } from '../auth/auth.module';
 import { AuthService } from '../auth/auth.service';
 import { ConfigModule } from '../config/config.module';
@@ -126,15 +127,13 @@ describe('Entity references', () => {
           tags: [],
           document: {
             content: emptyContent(),
-            metadata: {
-              grid: {
-                hexes: {
-                  '0,0': { terrain: 'grass', entityId: harbour },
-                  '1,0': { terrain: 'grass', feature: { ref: 'settlement', entityId: riverbend } },
-                },
-                regions: [{ id: 'r1', name: 'Avalon', color: '#aabbcc', hexes: {}, entityId: avalon }],
-                labels: [],
+            grid: {
+              hexes: {
+                '0,0': { terrain: 'grass', entityId: harbour },
+                '1,0': { terrain: 'grass', feature: { ref: 'settlement', entityId: riverbend } },
               },
+              regions: [{ id: 'r1', name: 'Avalon', color: '#aabbcc', hexes: {}, entityId: avalon }],
+              labels: [],
             },
           },
         })
@@ -309,7 +308,7 @@ describe('Entity references', () => {
   /** Save `id`'s Content as prose holding one `entityLink` per entry. */
   async function link(owner: Agent, id: string, links: Record<string, unknown>[]): Promise<void> {
     const current = (await owner.get(`/entities/${id}`).expect(200)).body;
-    const document: EntityBody = {
+    const document: Metadata = {
       content: tiptapContent({
         type: 'doc',
         content: [

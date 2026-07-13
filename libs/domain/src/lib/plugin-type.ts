@@ -7,7 +7,7 @@
  */
 
 import { z } from 'zod';
-import { CORE_NOTE, entityTypeSchema, nameSchema } from './entity';
+import { entityTypeSchema, nameSchema } from './entity';
 import { FieldSchema } from './field';
 import { uniqueFieldsSchema } from './world-type';
 
@@ -39,12 +39,3 @@ export function defineType(definition: {
 }): PluginTypeDefinition {
   return Object.freeze(pluginTypeSchema.parse(definition));
 }
-
-/**
- * `core.note` declares no Fields at all — a Note is nothing but its body. `label` is the untranslated
- * fallback; the web resolves the name through transloco.
- */
-export const CORE_NOTE_TYPE = defineType({ id: CORE_NOTE, label: 'Note' });
-
-/** Every core type, for the registries that seed themselves from the code-registered set. */
-export const CORE_TYPES: readonly PluginTypeDefinition[] = [CORE_NOTE_TYPE];

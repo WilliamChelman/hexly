@@ -4,10 +4,19 @@ import remarkGfm from 'remark-gfm';
 import remarkFrontmatter from 'remark-frontmatter';
 import { parse as parseYaml } from 'yaml';
 import type { Root, RootContent } from 'mdast';
-import type { ContentNode } from '@hexly/domain';
 
-/** The `tiptap-v3` snapshot node shape — owned by @hexly/domain (ADR-0019); aliased here for the converters' internal use. */
-export type PMNode = ContentNode;
+/**
+ * The `tiptap-v3` snapshot node shape the converters build against — structurally the plugin-content
+ * `ContentNode` (ADR-0019). Kept local so this converter drags in no plugin dependency until it moves
+ * into `@hexly/plugin-content` (ADR-0051, #211).
+ */
+export interface PMNode {
+  type: string;
+  attrs?: Record<string, unknown>;
+  content?: PMNode[];
+  marks?: { type: string; attrs?: Record<string, unknown> }[];
+  text?: string;
+}
 
 export interface MarkdownToProseMirror {
   doc: PMNode;

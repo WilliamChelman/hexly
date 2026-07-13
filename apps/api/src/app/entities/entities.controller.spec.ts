@@ -2,7 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
-import { emptyContent, tiptapContent } from '@hexly/domain';
+import { emptyContent, tiptapContent } from '@hexly/plugin-content';
 import { coordKey } from '@hexly/plugin-hexmap';
 import { and, eq } from 'drizzle-orm';
 import { DB, Db, createDb } from '../db/db';
@@ -17,14 +17,11 @@ import { ConfigModule } from '../config/config.module';
 import { WorldsModule } from '../worlds/worlds.module';
 import { WorldsService } from '../worlds/worlds.service';
 
-/**
- * A Hex Map body: Content plus its grid at the `grid` Metadata key — the `core.hex-grid`
- * **Structured Field** `core.hexmap` declares (ADR-0050).
- */
+/** A Hex Map body: prose at `content`, grid at `grid` — the body is the Metadata map (ADR-0051). */
 function hexmapBody(hexes: Record<string, unknown> = {}) {
   return {
     content: emptyContent(),
-    metadata: { grid: { hexes, regions: [], labels: [] } },
+    grid: { hexes, regions: [], labels: [] },
   };
 }
 
@@ -139,11 +136,12 @@ describe('Entities endpoints', () => {
       .expect(201);
 
     expect(res.body.types).toEqual(['core.note', 'core.hexmap']);
-    // The collected Metadata is seeded *over* the defaults the picked types' Fields mint, not in
-    // place of them — so Balthazar keeps his blank plane as well as his role (ADR-0050).
+    // The collected Metadata seeds over the minted defaults, not in place of them. `core.note` and
+    // `core.hexmap` both declare the prose Field, but `resolveFields` dedupes it to one (ADR-0051).
     expect(res.body.document).toEqual({
       content: emptyContent(),
-      metadata: { grid: { hexes: {}, regions: [], labels: [] }, role: 'lich' },
+      grid: { hexes: {}, regions: [], labels: [] },
+      role: 'lich',
     });
   });
 
@@ -451,7 +449,7 @@ describe('Entities endpoints', () => {
 
     const bodyWith = (metadata?: Record<string, unknown>) => ({
       content: emptyContent(),
-      metadata,
+      ...metadata,
     });
 
     it('rejects a typed edit that omits a required Field', async () => {
@@ -504,7 +502,7 @@ describe('Entities endpoints', () => {
         })
         .expect(200);
       expect(res.body.types).toEqual(['test.beast']);
-      expect(res.body.document.metadata).toEqual({ name: 'Aboleth', cr: 10 });
+      expect(res.body.document).toEqual({ content: emptyContent(), name: 'Aboleth', cr: 10 });
     });
 
     it('accepts a plain body save that omits types — data at rest is never retroactively invalidated', async () => {
@@ -547,7 +545,7 @@ describe('Entities endpoints', () => {
         .where(eq(entities.id, created.body.id))
         .run();
       const loaded = await ada.get(`/entities/${created.body.id}`).expect(200);
-      expect(loaded.body.document.metadata).toEqual({ cr: 'wrong at rest' });
+      expect(loaded.body.document).toEqual({ content: emptyContent(), cr: 'wrong at rest' });
     });
   });
 
@@ -840,12 +838,10 @@ describe('Entities endpoints', () => {
       await noteWithProse(ada, 'Decoy', 'A note that names no place at all.');
       const document = {
         content: emptyContent(),
-        metadata: {
-          grid: {
-            hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'grass', name: 'Ashford' } },
-            regions: [{ id: 'r1', name: 'The Kingdom of Avalon', color: '#aabbcc', hexes: {} }],
-            labels: [],
-          },
+        grid: {
+          hexes: { [coordKey({ q: 0, r: 0 })]: { terrain: 'grass', name: 'Ashford' } },
+          regions: [{ id: 'r1', name: 'The Kingdom of Avalon', color: '#aabbcc', hexes: {} }],
+          labels: [],
         },
       };
       await ada.put(`/entities/${created.body.id}`).send({ document, version: 1, tags: [] }).expect(200);
@@ -1298,7 +1294,7 @@ describe('Entities endpoints', () => {
       await agent
         .put(`/entities/${created.body.id}`)
         .send({
-          document: { content: emptyContent(), metadata },
+          document: { content: emptyContent(), ...metadata },
           version: 1,
           tags: [],
           types: ['test.beast'],
@@ -1537,7 +1533,8 @@ describe('Entities endpoints', () => {
         .send({
           document: {
             content: emptyContent(),
-            metadata: { alignment: 'chaotic-evil', cr: 7 },
+            alignment: 'chaotic-evil',
+            cr: 7,
           },
           version: 2,
           tags: [],
@@ -1588,7 +1585,7 @@ describe('Entities endpoints', () => {
         .send({ name, types: ['core.note'] })
         .expect(201);
       const res = await agent.put(`/entities/${created.body.id}`).send({
-        document: { content: emptyContent(), metadata: link ? { lair: link } : {} },
+        document: { content: emptyContent(), ...(link ? { lair: link } : {}) },
         version: 1,
         tags: [],
         types: ['test.monster'],
@@ -1696,7 +1693,7 @@ describe('Entities endpoints', () => {
         .send({ name: 'Aboleth', types: ['core.note'] })
         .expect(201);
       const res = await agent.put(`/entities/${created.body.id}`).send({
-        document: { content: emptyContent(), metadata },
+        document: { content: emptyContent(), ...metadata },
         version: 1,
         tags: [],
         types: ['dnd.monster'],
@@ -1828,11 +1825,27 @@ describe('Entities endpoints', () => {
 
     await ada
       .put(`/entities/${id}`)
-      .send({ document: { content: emptyContent(), metadata: { grid: 'not-a-grid' } }, version: 1, tags: [] })
+      .send({ document: { content: emptyContent(), grid: 'not-a-grid' }, version: 1, tags: [] })
       .expect(200);
 
     const reloaded = await ada.get(`/entities/${id}`).expect(200);
-    expect(reloaded.body.document.metadata).toEqual({ grid: 'not-a-grid' });
+    expect(reloaded.body.document).toEqual({ content: emptyContent(), grid: 'not-a-grid' });
+  });
+
+  it('tolerates a malformed prose value at rest on an untyped save, rather than 500ing on read (ADR-0051)', async () => {
+    // Prose is a Structured Field like the grid now: a plain body edit (no `types`) stores garbage at
+    // `content` as-is, and a read never 500s — the editor opens it as an empty document.
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const created = await ada.post('/entities').send({ name: 'Lady Aldermoor', types: ['core.note'] });
+    const id = created.body.id;
+
+    await ada
+      .put(`/entities/${id}`)
+      .send({ document: { content: 'not-a-doc' }, version: 1, tags: [] })
+      .expect(200);
+
+    const reloaded = await ada.get(`/entities/${id}`).expect(200);
+    expect(reloaded.body.document).toEqual({ content: 'not-a-doc' });
   });
 
   describe('Entity Visibility & read access (ADR-0037, #160)', () => {

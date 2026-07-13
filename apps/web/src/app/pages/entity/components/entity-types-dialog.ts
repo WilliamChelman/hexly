@@ -40,12 +40,15 @@ export class EntityTypesDialog {
   readonly closed = output<void>();
 
   /** The live Metadata the editor validates required Fields against and the prompt seeds from. */
-  protected readonly metadata = computed<Metadata>(() => this.session.body().metadata ?? {});
+  protected readonly metadata = computed<Metadata>(() => this.session.body());
 
   /** Fold the add-type prompt's collected Field values into the one Metadata map through the store. */
   protected onMetadata(metadata: Metadata): void {
     this.session.mutate((draft) => {
-      draft.metadata = metadata;
+      // The body IS the Metadata map now (ADR-0051); the prompt emits the full merged map (existing
+      // values, prose and grid among them, plus the new type's Fields), so replace the body wholesale.
+      for (const key of Object.keys(draft)) delete draft[key];
+      Object.assign(draft, metadata);
     });
   }
 }

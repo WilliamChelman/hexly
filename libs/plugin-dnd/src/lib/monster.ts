@@ -1,12 +1,12 @@
 /**
- * The `dnd.monster` bundled Plugin type (CONTEXT.md → Type Definition). A monster's stat block
- * lives entirely in the Metadata map, so an instance opened without this plugin still shows its
- * Content plus the generic Field view.
+ * The `dnd.monster` bundled Plugin type (CONTEXT.md → Type Definition). A monster's stat block lives
+ * in the Metadata map beside its prose, both Fields in the Entity's one body (ADR-0051).
  *
  * The framework-free half, which the API reads. The Angular half is `@hexly/plugin-dnd/web`.
  */
 
 import { defineType, FieldSchema } from '@hexly/domain';
+import { CONTENT_FIELD } from '@hexly/plugin-content';
 
 /** The Entity Type id — the namespaced key an Entity carries in its `types[]`. */
 export const DND_MONSTER = 'dnd.monster';
@@ -72,6 +72,9 @@ export const DND_MONSTER_TYPE = defineType({
   id: DND_MONSTER,
   label: 'Monster',
   fields: [
+    // The canonical prose Field beside the thirteen stats — a monster carries lore like any Entity
+    // (ADR-0051). `resolveFields` dedupes by key, so a monster that is also a Note resolves one.
+    CONTENT_FIELD,
     {
       key: 'size',
       label: 'Size',

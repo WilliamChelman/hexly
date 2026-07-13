@@ -1,12 +1,14 @@
 /**
- * `core.hexmap` — the Hex Map Entity Type. One **Structured Field**, the grid, at the `grid` key, is
- * the *only* thing that makes an Entity a Hex Map.
+ * `core.hexmap` — the Hex Map Entity Type. Its grid **Structured Field** at the `grid` key is what
+ * makes an Entity a Hex Map; it declares the canonical prose {@link CONTENT_FIELD} beside it, so a Hex
+ * Map carries lore like any other Entity (ADR-0051).
  *
  * The id keeps the `core.` namespace though the code ships from a plugin lib: a namespace names who
  * owns the vocabulary, not which lib ships it, and `core.` means "in the box" (ADR-0050).
  */
 
 import { defineType, PluginTypeDefinition } from '@hexly/domain';
+import { CONTENT_FIELD } from '@hexly/plugin-content';
 import { HEX_GRID_FIELD } from './hex-grid';
 
 /** The Hex Map's Entity Type id. */
@@ -16,5 +18,5 @@ export const CORE_HEXMAP = 'core.hexmap';
 export const CORE_HEXMAP_TYPE: PluginTypeDefinition = defineType({
   id: CORE_HEXMAP,
   label: 'Map',
-  fields: [HEX_GRID_FIELD],
+  fields: [CONTENT_FIELD, HEX_GRID_FIELD],
 });

@@ -1,4 +1,7 @@
 {
+  "view": {
+    "content": "Contenu"
+  },
   "slashMenu": {
     "label": "Insérer un bloc",
     "empty": "Aucun bloc correspondant",

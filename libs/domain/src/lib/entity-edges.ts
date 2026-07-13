@@ -3,10 +3,8 @@
  * path derives this on every save and materializes it into the derived edge index.
  */
 
-import { assetHashFromUrl } from './asset';
-import { visit } from './content/content-node';
-import { descriptorSchema, EntityBody, EntityType } from './entity';
-import { entityLinkFieldValues, FieldSchema, readField, resolvedStructuredFields } from './field';
+import { EntityType } from './entity';
+import { entityLinkFieldValues, FieldSchema, Metadata, readField, resolvedStructuredFields } from './field';
 import type { StructuredDataTypeSet } from './structured-data-type';
 
 /** What an edge points at: another Entity, or an Asset (CONTEXT.md → Asset). */
@@ -14,7 +12,7 @@ export type EdgeTargetKind = 'entity' | 'asset';
 
 /**
  * One link the source Entity's document expresses. An edge only names its target; the source is the
- * caller's to supply. `descriptor` is the Link Descriptor, set on Content links alone.
+ * caller's to supply. `descriptor` is the Link Descriptor, set on a document's inline links alone.
  */
 export interface EntityEdge {
   readonly targetKind: EdgeTargetKind;
@@ -61,18 +59,18 @@ export interface EntityReferences {
 }
 
 /**
- * Every edge the body expresses, deduplicated on `(targetKind, targetId, descriptor)`: the
- * Content's inline links, and — resolved against the Entity's `fields` — each typed **Entity-Link
- * Field** value (#190) and each **Structured Field**'s own harvest (a map's placements, ADR-0050).
- * Nothing records *where* a link was expressed, so a prose mention, a map placement, and a Field link
- * to the same target collapse to one edge, while two descriptors to that target stay two.
+ * Every edge the body expresses, deduplicated on `(targetKind, targetId, descriptor)`: resolved
+ * against the Entity's `fields`, each typed **Entity-Link Field** value (#190) and each **Structured
+ * Field**'s own harvest (a map's placements, a document's inline links and image Assets, ADR-0050,
+ * ADR-0051). Nothing records *where* a link was expressed, so a prose mention, a map placement, and a
+ * Field link to the same target collapse to one edge, while two descriptors to that target stay two.
  *
- * `fields` is the Entity's resolved Field schema set ({@link resolveFields}) and `dataTypes` the
- * host-composed **Structured Field** set (ADR-0050). A caller with no type context passes `[]` and
- * the empty set, and harvests the Content's edges alone — every Field edge needs the type set.
+ * `body` is the Metadata map, `fields` its resolved Field schema set ({@link resolveFields}) and
+ * `dataTypes` the host-composed **Structured Field** set (ADR-0050). The domain names no extractor of
+ * its own: prose reaches this loop as the `core.rich-content` data-type, exactly as a grid does.
  */
 export function harvestEdges(
-  body: EntityBody,
+  body: Metadata,
   fields: readonly FieldSchema[],
   dataTypes: StructuredDataTypeSet,
 ): EntityEdge[] {
@@ -88,33 +86,14 @@ export function harvestEdges(
     if (targetId) add({ targetKind: 'entity', targetId, descriptor });
   };
 
-  // Only a format this build knows is walkable, as in `extractText`. The Field edges below are
-  // format-independent, so a map's placements survive a Content format we cannot read.
-  if (body.content.format.startsWith('tiptap-')) {
-    visit(body.content.snapshot, (node) => {
-      if (node.type === 'entityLink') {
-        const entityId = node.attrs?.['entityId'];
-        if (typeof entityId !== 'string') return;
-        // A blank or absent descriptor is no descriptor — the same edge as an unadorned link.
-        entityEdge(entityId, descriptorSchema.safeParse(node.attrs?.['descriptor']).data ?? null);
-        return;
-      }
-      if (node.type === 'image') {
-        const src = node.attrs?.['src'];
-        const hash = typeof src === 'string' ? assetHashFromUrl(src) : null;
-        if (hash) add({ targetKind: 'asset', targetId: hash, descriptor: null });
-      }
-    });
-  }
-
-  // A typed Entity-Link Field value is a descriptor-less edge to its target (#190), read off the
-  // Metadata map rather than the Content snapshot — so it is format-independent, unlike the above.
-  for (const { value } of entityLinkFieldValues(fields, body.metadata)) entityEdge(value.entityId, null);
+  // A typed Entity-Link Field value is a descriptor-less edge to its target (#190).
+  for (const { value } of entityLinkFieldValues(fields, body)) entityEdge(value.entityId, null);
 
   // A Structured Field harvests its own (ADR-0050): the value goes to the data-type the host
-  // registered, and the edges come back — the domain never learns what is inside it.
+  // registered, and the edges come back — the domain never learns what is inside it. Prose's inline
+  // links and image Assets arrive this way now too, through `core.rich-content` (ADR-0051).
   for (const { field, dataType } of resolvedStructuredFields(fields, dataTypes))
-    for (const edge of dataType.harvestEdges?.(readField(body.metadata, field)) ?? []) add(edge);
+    for (const edge of dataType.harvestEdges?.(readField(body, field)) ?? []) add(edge);
 
   return [...edges.values()];
 }

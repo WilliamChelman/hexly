@@ -1,5 +1,5 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { extractOutline, OutlineHeading } from '@hexly/domain';
+import { CONTENT_FIELD, Content, extractOutline, OutlineHeading } from '@hexly/plugin-content';
 import { EntitySession } from './entity-session';
 
 /**
@@ -25,11 +25,18 @@ export class OutlineStore {
     this._contentRoot.set(element);
   }
 
-  /** Headings of the open Entity's Content, in document order (empty ones skipped). */
-  readonly headings = computed<OutlineHeading[]>(() => extractOutline(this.session.body().content), {
-    // body().content is a fresh object on every commit, so re-emit only when the heading
-    // set truly changes — otherwise the panel rebuilds its scrollspy and flashes the
-    // active highlight back to the top on every key pressed anywhere in the document.
-    equal: (a, b) => a.length === b.length && a.every((h, i) => h.text === b[i].text && h.level === b[i].level),
-  });
+  /** Headings of the open Entity's prose, in document order (empty ones skipped). */
+  readonly headings = computed<OutlineHeading[]>(
+    () => {
+      // The prose lives at the `content` Field key now (ADR-0051); a prose-less body has no headings.
+      const content = this.session.body()[CONTENT_FIELD.key] as Content | undefined;
+      return content ? extractOutline(content) : [];
+    },
+    {
+      // The content value is a fresh object on every commit, so re-emit only when the heading
+      // set truly changes — otherwise the panel rebuilds its scrollspy and flashes the
+      // active highlight back to the top on every key pressed anywhere in the document.
+      equal: (a, b) => a.length === b.length && a.every((h, i) => h.text === b[i].text && h.level === b[i].level),
+    },
+  );
 }

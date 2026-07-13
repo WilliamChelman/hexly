@@ -1,14 +1,15 @@
 import { Provider } from '@angular/core';
-import { emptyContent, EntityBody } from '@hexly/domain';
+import { Metadata } from '@hexly/domain';
 import { ENTITY_SESSION, VIEW_FIELD_KEY } from '@hexly/web-entity';
 import { FakeEntitySession as BaseFakeEntitySession } from '@hexly/web-entity/testing';
 import { emptyHexMap, HEX_GRID_FIELD, HexMap } from '../lib';
 import { HexMapStore } from '../web/services/hexmap-store';
 
-/** The grid is a Metadata value at the `core.hexmap` type's `grid` Field (ADR-0050). `unknown`, not
- * `HexMap`, so {@link FakeEntitySession.loadRawGrid} can seed a document at rest this build can't parse. */
-function bodyWithGrid(grid: unknown): EntityBody {
-  return { content: emptyContent(), metadata: { [HEX_GRID_FIELD.key]: grid } };
+/** The grid is a Metadata value at the `core.hexmap` type's `grid` Field (ADR-0050); the body **is**
+ * the Metadata map (ADR-0051). `unknown`, not `HexMap`, so {@link FakeEntitySession.loadRawGrid} can
+ * seed a document at rest this build can't parse. */
+function bodyWithGrid(grid: unknown): Metadata {
+  return { [HEX_GRID_FIELD.key]: grid };
 }
 
 /**

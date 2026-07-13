@@ -3,9 +3,9 @@ import {
   ApiError,
   CreateEntityRequest,
   emptyEntityBody,
-  EntityBody,
   entityBodySchema,
   EntityDetail,
+  Metadata,
   EntityErrorCode,
   EntityFacets,
   EntityReferences,
@@ -444,14 +444,13 @@ export class EntitiesService {
 
   create(ownerId: string, req: CreateEntityRequest): EntityDetail {
     // The World comes first: a user-defined type's Fields resolve only within their World (#191),
-    // and the minted body is exactly the defaults those Fields declare — a fresh Hex Map's blank
-    // plane among them (ADR-0050).
+    // and the minted body is exactly the defaults those Fields declare (ADR-0050).
     const worldId = this.resolveWorldId(ownerId, req.worldId);
     const fields = resolveFields(this.typeResolver(worldId), req.types);
     const minted = emptyEntityBody(fields, this.typeFields.structuredDataTypes);
-    // Initial Metadata seeds *over* the minted defaults, not in place of them. Ungated: like an
-    // import, a create establishes at-rest data — the Field gate is save-only.
-    const body: EntityBody = req.metadata ? { ...minted, metadata: { ...minted.metadata, ...req.metadata } } : minted;
+    // Initial Metadata seeds over the minted defaults. Ungated: like an import, a create establishes
+    // at-rest data (the Field gate is save-only).
+    const body: Metadata = req.metadata ? { ...minted, ...req.metadata } : minted;
     const row = this.writes.insert({
       ownerId,
       worldId,
@@ -519,7 +518,7 @@ export class EntitiesService {
       .from(entities)
       .where(eq(entities.id, id))
       .get()?.worldId;
-    this.assertTypedFieldsValid(userId, worldId, req.types, req.document.metadata);
+    this.assertTypedFieldsValid(userId, worldId, req.types, req.document);
   }
 
   /**
@@ -532,7 +531,7 @@ export class EntitiesService {
     userId: string,
     worldId: string | undefined,
     types: readonly EntityType[],
-    metadata: EntityBody['metadata'],
+    metadata: Metadata,
   ): void {
     const fields = resolveFields(this.typeResolver(worldId), types);
     const errors: FieldError[] = [
@@ -551,11 +550,7 @@ export class EntitiesService {
    * a *resolvable* Entity whose types miss the constraint. Resolution runs through the caller's
    * read filter, so a deleted or inaccessible target resolves to no row and stays inert.
    */
-  private linkTargetTypeErrors(
-    userId: string,
-    fields: readonly FieldSchema[],
-    metadata: EntityBody['metadata'],
-  ): FieldError[] {
+  private linkTargetTypeErrors(userId: string, fields: readonly FieldSchema[], metadata: Metadata): FieldError[] {
     const constraints = entityLinkConstraints(fields, metadata);
     if (constraints.length === 0) return [];
     const { filter } = entityAccess(this.db, userId);
@@ -996,7 +991,7 @@ function toDetail(row: typeof entities.$inferSelect): EntityDetail {
 }
 
 // Write paths pass valid body; only toDetail re-parses.
-function detailOf(row: SummaryRow, document: EntityBody): EntityDetail {
+function detailOf(row: SummaryRow, document: Metadata): EntityDetail {
   // `seq` rides the detail, not the summary: it is the freshness key a live-follower holds and
   // compares each incoming nudge against (ADR-0045).
   return { ...toSummary(row), seq: row.seq, document };
@@ -1006,7 +1001,7 @@ function detailOf(row: SummaryRow, document: EntityBody): EntityDetail {
  * Parse and validate the stored body. Failure is corruption — throw a descriptive
  * Error naming the row (clear 500).
  */
-function parseDocument(id: string, document: string): EntityBody {
+function parseDocument(id: string, document: string): Metadata {
   let parsed: unknown;
   try {
     parsed = JSON.parse(document);

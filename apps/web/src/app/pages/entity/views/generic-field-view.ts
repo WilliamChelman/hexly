@@ -7,7 +7,7 @@ import {
   NO_STRUCTURED_DATA_TYPES,
   readField,
   validateFields,
-  writeField,
+  writeFieldInPlace,
 } from '@hexly/domain';
 import { EntitySession } from '../services/entity-session';
 import { TypeRegistry } from '../../../entity-types/type-registry';
@@ -118,8 +118,8 @@ export class GenericFieldView {
    */
   protected readonly fields = computed(() => this.declared().filter((f) => !isStructuredDataType(f.dataType)));
 
-  /** The live working Metadata — read off the central store's body, written back through mutate. */
-  private readonly metadata = computed<Metadata>(() => this.session.body().metadata ?? {});
+  /** The live working Metadata — the body IS the map now (ADR-0051), read off the store, written through mutate. */
+  private readonly metadata = computed<Metadata>(() => this.session.body());
 
   /** Types with no registered definition: the missing-plugin fallback, shown as inert chips. */
   protected readonly unknownTypes = computed(() => this.session.types().filter((type) => !this.types.get(type)));
@@ -150,14 +150,12 @@ export class GenericFieldView {
   }
 
   /**
-   * Write a value into the one Metadata map every View shares (ADR-0048). {@link writeField} clears
-   * the key when the value is emptied rather than leaving a blank behind. No-op for a read-only opener.
+   * Write a value into the one Metadata map every View shares (ADR-0048). {@link writeFieldInPlace}
+   * clears the key when the value is emptied rather than leaving a blank behind. No-op for a read-only opener.
    */
   protected set(field: FieldSchema, value: unknown): void {
     if (!this.session.writable()) return;
-    this.session.mutate((draft) => {
-      draft.metadata = writeField(draft.metadata, field, value);
-    });
+    this.session.mutate((draft) => writeFieldInPlace(draft, field, value));
   }
 }
 

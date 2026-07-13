@@ -3,7 +3,8 @@ import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import { eq } from 'drizzle-orm';
 import request from 'supertest';
-import { assetUrl, EntityBody, LinkedEntity, tiptapContent, WorldGraph } from '@hexly/domain';
+import { assetUrl, LinkedEntity, Metadata, WorldGraph } from '@hexly/domain';
+import { tiptapContent } from '@hexly/plugin-content';
 import { AuthModule } from '../auth/auth.module';
 import { AuthService } from '../auth/auth.service';
 import { ConfigModule } from '../config/config.module';
@@ -280,7 +281,7 @@ describe('World Graph', () => {
     await owner
       .put(`/entities/${id}`)
       .send({
-        document: { content: tiptapContent({ type: 'doc', content: [] }), metadata: { lair: link } },
+        document: { content: tiptapContent({ type: 'doc', content: [] }), lair: link },
         version: current.version,
         tags: [],
         types: ['test.monster'],
@@ -290,7 +291,7 @@ describe('World Graph', () => {
 
   async function save(owner: Agent, id: string, inline: unknown[]): Promise<void> {
     const current = (await owner.get(`/entities/${id}`).expect(200)).body;
-    const document: EntityBody = {
+    const document: Metadata = {
       content: tiptapContent({
         type: 'doc',
         content: [{ type: 'paragraph', content: inline }],

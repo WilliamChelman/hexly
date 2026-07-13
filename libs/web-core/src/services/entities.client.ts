@@ -2,12 +2,10 @@ import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http'
 import { Injectable, inject } from '@angular/core';
 import { catchError, map, Observable, of, tap, throwError } from 'rxjs';
 import {
-  EntityBody,
   EntityDetail,
   EntityFacets,
   EntityGrant,
   EntityListQuery,
-  EntityNudge,
   EntityPage,
   EntityReferences,
   EntitySaveOutcome,
@@ -187,7 +185,7 @@ export class EntitiesClient {
    */
   save(
     id: string,
-    body: EntityBody,
+    body: Metadata,
     version: number,
     tags: readonly string[],
     types?: readonly EntityType[],

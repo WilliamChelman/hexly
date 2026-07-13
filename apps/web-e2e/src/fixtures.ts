@@ -52,15 +52,15 @@ interface SavedGrid {
 
 /**
  * The grid a Hex Map has actually persisted, fetched from the API. The one place a test knows *where*
- * the grid is stored: a **Structured Field**'s value in the Entity's one Metadata map (ADR-0050).
- * `core.hexmap` declares its grid at `grid`; a user-defined type declares its at whatever key its
- * author chose — that is `fieldKey`.
+ * the grid is stored: a **Structured Field**'s value in the Entity's body, which **is** the Metadata
+ * map (ADR-0050, ADR-0051). `core.hexmap` declares its grid at `grid`; a user-defined type declares
+ * its at whatever key its author chose — that is `fieldKey`.
  */
 export async function savedGrid(request: APIRequestContext, entityId: string, fieldKey = 'grid'): Promise<SavedGrid> {
   const res = await request.get(`/api/entities/${entityId}`);
   expect(res.ok()).toBeTruthy();
   const detail = await res.json();
-  return detail.document.metadata[fieldKey] as SavedGrid;
+  return detail.document[fieldKey] as SavedGrid;
 }
 
 /**

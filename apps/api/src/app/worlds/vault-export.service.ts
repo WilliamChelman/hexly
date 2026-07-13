@@ -1,6 +1,7 @@
 import { posix } from 'node:path';
 import { Injectable } from '@nestjs/common';
-import { ContentNode, CORE_NOTE, EntityDetail, HEXLY_METADATA_PREFIX, HEXLY_TYPE_KEY, visit } from '@hexly/domain';
+import { EntityDetail, HEXLY_METADATA_PREFIX, HEXLY_TYPE_KEY } from '@hexly/domain';
+import { Content, CONTENT_FIELD, ContentNode, CORE_NOTE, visit } from '@hexly/plugin-content';
 import { proseMirrorToMarkdown } from '@hexly/obsidian';
 import { strToU8, zipSync, type Zippable } from 'fflate';
 import { AssetsService } from '../assets/assets.service';
@@ -53,10 +54,12 @@ export class VaultExportService {
     return { filename: `${world.name}.zip`, zip: Buffer.from(zipSync(files)) };
   }
 
-  /** Serialize one Entity's Content body to Obsidian markdown (ProseMirror JSON → mdast → markdown). */
+  /** Serialize one Entity's prose to Obsidian markdown (ProseMirror JSON → mdast → markdown). */
   private toMarkdown(entity: EntityDetail, srcMap: Map<string, string>, nameById: Map<string, string>): string {
-    // One boundary narrow for the serializer, which needs a typed doc root.
-    const doc = entity.document.content.snapshot as ContentNode;
+    // The prose lives at the `content` Field key now (ADR-0051); a prose-less body serializes to an
+    // empty doc. One boundary narrow for the serializer, which needs a typed doc root.
+    const content = entity.document[CONTENT_FIELD.key] as Content | undefined;
+    const doc = (content?.snapshot ?? { type: 'doc', content: [] }) as ContentNode;
     // In-place on the throwaway parsed snapshot: repoint asset srcs, and refresh each wikilink's
     // label to its target's CURRENT name so a post-import rename still round-trips.
     rewriteAssetSrcs(doc, srcMap);
@@ -109,8 +112,11 @@ function rewriteAssetSrcs(snapshot: unknown, srcMap: Map<string, string>): void 
  */
 function frontmatter(entity: EntityDetail): Record<string, unknown> | undefined {
   const meta: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(entity.document.metadata ?? {})) {
-    if (!key.startsWith(HEXLY_METADATA_PREFIX)) meta[key] = value;
+  for (const [key, value] of Object.entries(entity.document)) {
+    // The prose becomes the markdown body, never frontmatter; reserved `hexly.*` keys drive
+    // placement/typing. Everything else the body holds — a grid included, until the Vault Projection
+    // lands (#211) — is author Metadata, exactly as before the collapse (ADR-0051).
+    if (key !== CONTENT_FIELD.key && !key.startsWith(HEXLY_METADATA_PREFIX)) meta[key] = value;
   }
   if (entity.tags.length) meta['tags'] = [...entity.tags];
   const isBareNote = entity.types.length === 1 && entity.types[0] === CORE_NOTE;
@@ -124,7 +130,7 @@ function frontmatter(entity: EntityDetail): Record<string, unknown> | undefined 
  * recorded source path (created in Hexly, not imported) lands at the zip root.
  */
 function filePath(entity: EntityDetail): string {
-  const source = entity.document.metadata?.['hexly.sourcePath'];
+  const source = entity.document['hexly.sourcePath'];
   const dir = typeof source === 'string' ? posix.dirname(source) : '.';
   const name = `${entity.name}.md`;
   return dir === '.' ? name : posix.join(dir, name);

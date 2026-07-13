@@ -2487,7 +2487,7 @@ describe('HexMapStore central-store seam (ADR-0048)', () => {
 
     // A different View edits the shared body directly; the map's document tracks it live.
     session.mutate((body) => {
-      (body.metadata?.[HEX_GRID_FIELD.key] as HexMap).hexes['0,0'] = { terrain: 'grass' };
+      (body[HEX_GRID_FIELD.key] as HexMap).hexes['0,0'] = { terrain: 'grass' };
     });
 
     expect(store.document().hexes['0,0']).toEqual({ terrain: 'grass' });
@@ -2565,7 +2565,7 @@ describe('HexMapStore forward-only grid (ADR-0050)', () => {
     expect(store.canUndo()).toBe(true);
     store.undo();
     expect(store.document()).toEqual(emptyHexMap());
-    expect(session.body().metadata?.[HEX_GRID_FIELD.key]).toBe('not-a-grid');
+    expect(session.body()[HEX_GRID_FIELD.key]).toBe('not-a-grid');
   });
 
   it('re-parses on undo, so an undo back onto a malformed grid still shows an empty plane', () => {
@@ -2580,7 +2580,7 @@ describe('HexMapStore forward-only grid (ADR-0050)', () => {
     store.undo();
 
     expect(store.document()).toEqual(emptyHexMap());
-    expect(session.body().metadata?.[HEX_GRID_FIELD.key]).toEqual({ hexes: { '0,0': 7 }, regions: [], labels: [] });
+    expect(session.body()[HEX_GRID_FIELD.key]).toEqual({ hexes: { '0,0': 7 }, regions: [], labels: [] });
   });
 
   it('mints a plane the recipe can push onto when the stored grid predates regions/labels', () => {
@@ -2621,9 +2621,9 @@ describe('HexMapStore bound to a Field', () => {
     store.paintAt({ q: 1, r: 1 }, 'forest');
 
     // The stroke lands at `battlemap`…
-    expect((session.body().metadata?.['battlemap'] as HexMap).hexes).toEqual({ '1,1': { terrain: 'forest' } });
+    expect((session.body()['battlemap'] as HexMap).hexes).toEqual({ '1,1': { terrain: 'forest' } });
     // …and the grid it is not bound to is exactly as it was.
-    expect((session.body().metadata?.[HEX_GRID_FIELD.key] as HexMap).hexes).toEqual({
+    expect((session.body()[HEX_GRID_FIELD.key] as HexMap).hexes).toEqual({
       '0,0': { terrain: 'ocean' },
     });
   });

@@ -1,17 +1,27 @@
 import { PluginTypeDefinition, structuredDataTypeSet, StructuredDataTypeSet } from '@hexly/domain';
+import { CORE_NOTE_TYPE, RICH_CONTENT_DATA_TYPE } from '@hexly/plugin-content';
 import { DND_MONSTER_TYPE } from '@hexly/plugin-dnd';
 import { CORE_HEXMAP_TYPE, HEX_GRID_DATA_TYPE } from '@hexly/plugin-hexmap';
 
 /**
- * Which plugins this build bundles, API side (ADR-0048). "Bundled" means compiled-in — a plugin
- * joins by shipping a lib and being named here. Only a plugin's framework-free half is imported:
- * its id, label, and Field schema, never its view.
+ * Which plugins this build bundles, API side (ADR-0048, ADR-0051). "Bundled" means compiled-in — a
+ * plugin joins by shipping a lib and being named here. Only a plugin's framework-free half is
+ * imported: its id, label, and Field schema, never its view. `core.note` is a bundled type like any
+ * other now — the domain declares no Entity Type (ADR-0051).
  */
-export const BUNDLED_PLUGIN_TYPES: readonly PluginTypeDefinition[] = [CORE_HEXMAP_TYPE, DND_MONSTER_TYPE];
+export const BUNDLED_PLUGIN_TYPES: readonly PluginTypeDefinition[] = [
+  CORE_NOTE_TYPE,
+  CORE_HEXMAP_TYPE,
+  DND_MONSTER_TYPE,
+];
 
 /**
- * The **Structured Field** data-types this build bundles (ADR-0050): the set the domain resolves a
- * Field's `namespace.id` kind against, threaded into `validateFields` / `harvestEdges` /
- * `withFieldDefaults`. One joins by being named here, as a plugin type does above.
+ * The **Structured Field** data-types this build bundles (ADR-0050, ADR-0051): the set the domain
+ * resolves a Field's `namespace.id` kind against, threaded into `validateFields` / `harvestEdges` /
+ * `deriveSearchText` / `withFieldDefaults`. `core.rich-content` — prose — is one of them now, so the
+ * derive pass has no Content special case left. One joins by being named here, as a plugin type does.
  */
-export const BUNDLED_STRUCTURED_DATA_TYPES: StructuredDataTypeSet = structuredDataTypeSet([HEX_GRID_DATA_TYPE]);
+export const BUNDLED_STRUCTURED_DATA_TYPES: StructuredDataTypeSet = structuredDataTypeSet([
+  RICH_CONTENT_DATA_TYPE,
+  HEX_GRID_DATA_TYPE,
+]);

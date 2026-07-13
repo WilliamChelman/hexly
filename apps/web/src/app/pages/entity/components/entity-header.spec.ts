@@ -5,7 +5,8 @@ import { By } from '@angular/platform-browser';
 import { provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { of, throwError } from 'rxjs';
-import { emptyContent, EntityDetail, WorldDetail, WorldVerb } from '@hexly/domain';
+import { EntityDetail, WorldDetail, WorldVerb } from '@hexly/domain';
+import { emptyContent } from '@hexly/plugin-content';
 import { CORE_HEXMAP, HEX_GRID_FIELD } from '@hexly/plugin-hexmap';
 import { MockEntitiesClient, MockWorldsClient, MockUserDirectoryClient, MockAuthClient } from '@hexly/web-core/testing';
 import { EntitiesClient, WorldsClient, ActiveWorld, UserDirectoryClient, AuthClient } from '@hexly/web-core';
@@ -56,7 +57,7 @@ describe('EntityHeader', () => {
     updatedAt: 1,
     // The default opener is an Owner — full Rights (ADR-0039): writable and can manage sharing.
     rights: ['read', 'edit', 'delete', 'set-visibility', 'manage'],
-    document: { content: emptyContent(), metadata: { grid: { hexes: {}, regions: [], labels: [] } } },
+    document: { content: emptyContent(), grid: { hexes: {}, regions: [], labels: [] } },
   };
 
   /** Open an entity through the real session so the header has one to show/save. */

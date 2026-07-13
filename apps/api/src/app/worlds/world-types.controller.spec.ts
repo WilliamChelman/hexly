@@ -2,7 +2,6 @@ import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
-import { emptyContent } from '@hexly/domain';
 import { DB, Db, createDb } from '../db/db';
 import { AuthService } from '../auth/auth.service';
 import { AuthModule } from '../auth/auth.module';
@@ -216,7 +215,7 @@ describe('World user-defined types endpoints', () => {
       const res = await ada
         .put(`/entities/${created.body.id}`)
         .send({
-          document: { content: emptyContent(), metadata: { domain: 42 } },
+          document: { domain: 42 },
           version: 1,
           tags: [],
           types: ['world.deity'],
@@ -238,7 +237,7 @@ describe('World user-defined types endpoints', () => {
       await ada
         .put(`/entities/${created.body.id}`)
         .send({
-          document: { content: emptyContent(), metadata: { domain: 'sun' } },
+          document: { domain: 'sun' },
           version: 1,
           tags: [],
           types: ['world.deity'],
@@ -269,7 +268,7 @@ describe('World user-defined types endpoints', () => {
       await ada
         .put(`/entities/${created.body.id}`)
         .send({
-          document: { content: emptyContent(), metadata: { domain: 'sun' } },
+          document: { domain: 'sun' },
           version: 1,
           tags: [],
           types: ['world.deity'],
@@ -280,7 +279,7 @@ describe('World user-defined types endpoints', () => {
 
       // The Entity still reads back, its Metadata untouched — a Field is a lens, not a store.
       const read = await ada.get(`/entities/${created.body.id}`).expect(200);
-      expect(read.body.document.metadata).toEqual({ domain: 'sun' });
+      expect(read.body.document).toEqual({ domain: 'sun' });
     });
   });
 
@@ -371,7 +370,7 @@ describe('World user-defined types endpoints', () => {
       const bad = await ada
         .put(`/entities/${pelor.body.id}`)
         .send({
-          document: { content: emptyContent(), metadata: { battlemap: 'not a grid' } },
+          document: { battlemap: 'not a grid' },
           version: 1,
           tags: [],
           types: ['world.deity'],
@@ -384,11 +383,8 @@ describe('World user-defined types endpoints', () => {
         .put(`/entities/${pelor.body.id}`)
         .send({
           document: {
-            content: emptyContent(),
-            metadata: {
-              domain: 'sun',
-              battlemap: { ...paintedGrid, hexes: { '0,0': { terrain: 'ocean', entityId: lair.body.id } } },
-            },
+            domain: 'sun',
+            battlemap: { ...paintedGrid, hexes: { '0,0': { terrain: 'ocean', entityId: lair.body.id } } },
           },
           version: 1,
           tags: [],
@@ -397,7 +393,7 @@ describe('World user-defined types endpoints', () => {
         .expect(200);
 
       const read = await ada.get(`/entities/${pelor.body.id}`).expect(200);
-      expect(read.body.document.metadata.battlemap.hexes['0,0'].terrain).toBe('ocean');
+      expect(read.body.document.battlemap.hexes['0,0'].terrain).toBe('ocean');
 
       // The data-type owns its edges, so a World Owner's map feeds References and the World Graph.
       const refs = await ada.get(`/entities/${lair.body.id}/references`).expect(200);
@@ -424,7 +420,7 @@ describe('World user-defined types endpoints', () => {
       await ada
         .put(`/entities/${pelor.body.id}`)
         .send({
-          document: { content: emptyContent(), metadata: { battlemap: paintedGrid } },
+          document: { battlemap: paintedGrid },
           version: 1,
           tags: [],
           types: ['world.deity'],

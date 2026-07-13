@@ -2,7 +2,8 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { CORE_NOTE, EntityType } from '@hexly/domain';
+import { EntityType } from '@hexly/domain';
+import { CORE_NOTE } from '@hexly/plugin-content';
 import { ActiveWorld, EntitiesClient, ToasterService, entityRoute } from '@hexly/web-core';
 import { Button, ButtonGroup, Icon, MenuItem, MenuPanel, MenuTrigger } from '@hexly/web-ui';
 import { TypeRegistry } from './type-registry';

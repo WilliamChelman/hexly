@@ -4,7 +4,8 @@ import { ComponentRef } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
-import { CONTENT_FORMAT, EntityDetail, tiptapContent } from '@hexly/domain';
+import { EntityDetail } from '@hexly/domain';
+import { Content, CONTENT_FORMAT, tiptapContent } from '../lib';
 import { Editor } from '@tiptap/core';
 import { FakeEntitySession, provideFakeEntitySession } from '@hexly/web-entity/testing';
 import { EntityNameResolver } from './entity-name-resolver';
@@ -254,7 +255,7 @@ describe('ContentEditor', () => {
 
     // The user edits: the editor commits the new prose into the body (no loadGeneration tick).
     session.mutate((body) => {
-      body.content = tiptapContent({
+      body['content'] = tiptapContent({
         type: 'doc',
         content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Edited prose.' }] }],
       });
@@ -299,6 +300,6 @@ describe('ContentEditor', () => {
     session.editors.forEach((editor) => editor.flushPendingCommit());
 
     expect(spy).toHaveBeenCalled();
-    expect(JSON.stringify(session.body().content.snapshot)).toContain('!');
+    expect(JSON.stringify((session.body()['content'] as Content).snapshot)).toContain('!');
   });
 });

@@ -19,10 +19,10 @@ import {
 } from 'rxjs';
 import {
   emptyEntityBody,
-  EntityBody,
   EntityDetail,
   EntitySaveOutcome,
   EntityType,
+  Metadata,
   Visibility,
   withFieldDefaults,
 } from '@hexly/domain';
@@ -59,7 +59,7 @@ const FLUSH_TIMEOUT_MS = 10_000;
 
 /** The savable payload references captured at one instant. */
 interface SaveSnapshot {
-  body: EntityBody;
+  body: Metadata;
   tags: readonly string[];
   types: readonly EntityType[];
   /** True when the type set was authored this session — only then does the save carry `types`. */
@@ -81,11 +81,11 @@ export class EntitySession implements EntitySessionPort {
   readonly current = this._current.asReadonly();
 
   /**
-   * The working Entity body — `{ content, metadata }` — the one store every View writes to (ADR-0051):
+   * The working Entity body — the Metadata map itself (ADR-0051) — the one store every View writes to:
    * read a slice off {@link body}, write through {@link mutate}. The prose editor is no exception,
-   * committing its live doc into `content` on a debounce, so there is no separate content buffer.
+   * committing its live doc into its `content` Field key on a debounce, so there is no separate buffer.
    */
-  private readonly _body = signal<EntityBody>(emptyEntityBody());
+  private readonly _body = signal<Metadata>(emptyEntityBody());
   readonly body = this._body.asReadonly();
 
   /**
@@ -147,7 +147,7 @@ export class EntitySession implements EntitySessionPort {
    * snapshot after a clean save. {@link dirty} derives by reference equality against these — sound
    * because immer only yields a new body reference on a real edit.
    */
-  private readonly _baseBody = signal<EntityBody | null>(null);
+  private readonly _baseBody = signal<Metadata | null>(null);
   private readonly _baseTags = signal<readonly string[]>([]);
   private readonly _baseTypes = signal<readonly EntityType[]>([]);
 
@@ -374,12 +374,12 @@ export class EntitySession implements EntitySessionPort {
    * the forward/inverse patches (ADR-0048) — a View that owns undo/redo keeps them to replay.
    * Bumps no load generation: an edit must not reset a View's history.
    */
-  mutate(recipe: (draft: EntityBody) => void): {
+  mutate(recipe: (draft: Metadata) => void): {
     redo: Patch[];
     undo: Patch[];
   } {
-    const [next, redo, undo] = produceWithPatches(this._body(), recipe as (draft: Draft<EntityBody>) => void);
-    this._body.set(next as EntityBody);
+    const [next, redo, undo] = produceWithPatches(this._body(), recipe as (draft: Draft<Metadata>) => void);
+    this._body.set(next as Metadata);
     return { redo, undo };
   }
 

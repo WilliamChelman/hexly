@@ -1,4 +1,4 @@
-import { tiptapContent } from '../entity';
+import { tiptapContent } from './content';
 import { extractText } from './extract-text';
 
 describe('extractText (ADR-0035)', () => {

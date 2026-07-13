@@ -1,4 +1,5 @@
 import { defineType, NO_STRUCTURED_DATA_TYPES, resolveFields, validateFields } from '@hexly/domain';
+import { CONTENT_FIELD } from '@hexly/plugin-content';
 import {
   abilityModifier,
   DND_ABILITY_KEYS,
@@ -58,8 +59,12 @@ describe('dnd.monster', () => {
    * The stat-block view skips any key the schema doesn't declare (forward-only), so a Field renamed
    * here would vanish from the block in silence unless the two lists are pinned together.
    */
-  it('declares a Field for every key the stat block prints, and prints every Field it declares', () => {
-    const declared = new Set(DND_MONSTER_TYPE.fields.map((field) => field.key));
+  it('declares a Field for every key the stat block prints, and prints every stat Field it declares', () => {
+    // The canonical prose Field is declared beside the stats (ADR-0051) but rendered by the content
+    // editor, not the stat block — so it is the one declared Field the block does not print.
+    const declared = new Set(
+      DND_MONSTER_TYPE.fields.map((field) => field.key).filter((key) => key !== CONTENT_FIELD.key),
+    );
     const printed = [...DND_IDENTITY_KEYS, ...DND_DEFENCE_KEYS, ...DND_ABILITY_KEYS, DND_CHALLENGE_KEY];
 
     expect(printed.filter((key) => !declared.has(key))).toEqual([]);

@@ -1,5 +1,5 @@
 import { computed, effect, inject, Injectable, signal } from '@angular/core';
-import { FieldSchema, Metadata, readField } from '@hexly/domain';
+import { FieldSchema, readField } from '@hexly/domain';
 import {
   addPoint,
   Axial,
@@ -150,7 +150,7 @@ export class HexMapStore {
    * the document does not carry.
    */
   private readonly grid = computed<{ map: HexMap; stored: boolean }>(() => {
-    const raw = readField(this.session.body().metadata, this.field);
+    const raw = readField(this.session.body(), this.field);
     if (isObject(raw) && this.minted.has(raw)) return { map: raw as HexMap, stored: true };
     const parsed = hexMapSchema.safeParse(raw);
     if (!parsed.success) return { map: emptyHexMap(), stored: false };
@@ -866,7 +866,7 @@ export class HexMapStore {
    * pays one parse; it is a keystroke, not a drag.
    */
   private rememberMintedGrid(): void {
-    const raw = readField(this.session.body().metadata, this.field);
+    const raw = readField(this.session.body(), this.field);
     if (isObject(raw)) this.minted.add(raw);
   }
 
@@ -874,7 +874,7 @@ export class HexMapStore {
    * Run `recipe` through the session's {@link ENTITY_SESSION.mutate}, recording the returned patches
    * for undo/redo. Returns whether a step was recorded — callers that re-point the selection use it
    * to know an edit exists to {@link trackSelectionOnLastEdit stamp}. The recipe touches only the
-   * `grid` Metadata key; every other Field, and the Content, pass through untouched.
+   * `grid` Metadata key; every other Field, prose included, passes through untouched.
    *
    * An unstored grid (absent, or garbage the editor is showing as an empty plane) is *replaced* by
    * the plane on screen, inside the same mutation as the edit that provoked it: the recipe always
@@ -885,16 +885,16 @@ export class HexMapStore {
     const selectionBefore = this.sel.snapshot();
     const { map, stored } = this.grid();
     const { redo, undo } = this.session.mutate((body) => {
-      const metadata: Metadata = (body.metadata ??= {});
+      // The body IS the Metadata map now (ADR-0051), so the grid sits at its own key on the draft.
       if (stored) {
-        recipe(metadata[this.field.key] as HexMap);
+        recipe(body[this.field.key] as HexMap);
         return;
       }
       // Cloned first: an assigned value is not a draft, so a recipe run over `map` would mutate the
       // object {@link grid} is still holding.
       const fresh = structuredClone(map);
       recipe(fresh);
-      metadata[this.field.key] = fresh;
+      body[this.field.key] = fresh;
     });
     // No patches → the recipe changed nothing; recording it would leave empty undo
     // steps and discard the redo branch.

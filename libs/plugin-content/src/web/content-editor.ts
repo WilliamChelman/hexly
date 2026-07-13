@@ -17,7 +17,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute } from '@angular/router';
 import { Editor, JSONContent } from '@tiptap/core';
 import { catchError, firstValueFrom, of } from 'rxjs';
-import { tiptapContent } from '@hexly/domain';
+import { Content, CONTENT_FIELD, tiptapContent } from '../lib';
 import { EntitiesClient } from '@hexly/web-core';
 import { ENTITY_SESSION } from '@hexly/web-entity';
 import { TiptapDirective } from './tiptap.directive';
@@ -330,9 +330,11 @@ export class ContentEditor {
       if (generation === seededGeneration) return;
       seededGeneration = generation;
       // untracked: sample the body once; tracking it would rebuild the editor on every commit.
-      const content = untracked(() => this.session.body().content);
-      // A placeholder snapshot ({}) yields an empty editor — a fresh note, or a prose-less reload.
-      const snapshot = isDocSnapshot(content.snapshot) ? content.snapshot : undefined;
+      const content = untracked(() => this.session.body()[CONTENT_FIELD.key]) as Content | undefined;
+      // A placeholder body ({}) or malformed snapshot yields an empty editor — a fresh note, a
+      // prose-less reload, or a document at rest this build cannot parse.
+      const rawSnapshot = content?.snapshot;
+      const snapshot = isDocSnapshot(rawSnapshot) ? rawSnapshot : undefined;
       const previous = untracked(this.editor);
       const next = this.createEditor(snapshot);
       // Baseline against the parsed doc, so a load-time normalisation `update` reads value-equal (#164).
@@ -401,7 +403,7 @@ export class ContentEditor {
     const doc = this.pendingDoc;
     if (doc === null) return;
     this.session.mutate((body) => {
-      body.content = tiptapContent(doc);
+      body[CONTENT_FIELD.key] = tiptapContent(doc);
     });
     this.committed = JSON.stringify(doc);
     this.clearPending();

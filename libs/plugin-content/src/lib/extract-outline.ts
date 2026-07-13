@@ -1,6 +1,6 @@
 /** The heading Outline of an Entity's Content — derived, never stored. */
 
-import { Content } from '../entity';
+import { Content } from './content';
 import { ContentNode, visit } from './content-node';
 import { entityLinkText } from './entity-link';
 
