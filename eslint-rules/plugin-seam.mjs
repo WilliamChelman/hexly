@@ -15,12 +15,9 @@
  *                                 plugin's. `apps/web/entity-types/core-types.ts` — the last
  *                                 `TypeDefinition[]` the app authored — is gone.
  *
- * The seam has closed silently before: ADR-0050's "zero hex in `apps/web`" was a prose claim, and
- * nothing stopped it drifting. These rules turn drift into a build failure.
- *
- * Scope is set by the consuming config (`libs/domain/eslint.config.mjs`, `apps/web/eslint.config.mjs`),
- * which exempts specs — they seed fixtures directly (a spec may hand-build a `TypeDefinition` fake or
- * import the very converter under test), exactly as the other repo rules exempt them.
+ * The seam has drifted shut before as a prose-only claim (ADR-0050's "zero hex in `apps/web`"); these
+ * rules make drift a build failure. Scope is set by the consuming config, which exempts specs (they
+ * hand-build fakes and import the converter under test), as the other repo rules do.
  */
 
 /** The literal text of a string, or a template literal with no interpolation. */
