@@ -9,3 +9,4 @@ export * from './asset-extensions';
 // them by relative path instead (ADR-0051).
 export * from './rich-content';
 export * from './note-type';
+export * from './plugin-id';

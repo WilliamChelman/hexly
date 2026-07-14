@@ -7,3 +7,4 @@ export * from './move-planner';
 export * from './hex-map';
 export * from './hex-grid';
 export * from './hexmap-type';
+export * from './plugin-id';

@@ -266,6 +266,10 @@ _Avoid_: Date format, regional settings, locale (bare — that means the UI lang
 
 ## Self-hosting
 
+**Plugin**:
+A bundled, compiled-in unit that contributes **Entity Types**, their **Views**, and **Structured Field** data-types (and its own copy) to an Instance — the delivery mechanism behind every code Type, `core.note` and `core.hexmap` included. Identified by a canonical `id` (`content`, `hexmap`, `dnd`) its own framework-free half declares, kept distinct from any type namespace because the `core` namespace is shared by two Plugins (content and hexmap). "Bundled" means shipped in the build, not installed at runtime — there are no third-party Plugins. Enabled by default; an operator disables one in **Instance Configuration** (`features.plugin.<id>.enabled: false`), and a disabled Plugin is indistinguishable from one this build never bundled — on both server and client its Types degrade to the generic **View**, values intact.
+_Avoid_: Extension, addon, module, package
+
 **Instance**:
 A single self-hosted deployment of Hexly, over one Instance Directory. The unit an operator runs, configures, and backs up.
 _Avoid_: Server, deployment, tenant

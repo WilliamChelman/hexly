@@ -9,6 +9,8 @@ import { ViewDefinition } from './view-definition';
  * afford, the **Structured Field** data-types those types declare (ADR-0050), and its own copy (ADR-0049).
  */
 export interface WebPlugin {
+  /** This plugin's canonical `PLUGIN_ID` (ADR-0052); the server twin `ServerPlugin` carries the same value. */
+  readonly id: string;
   readonly types?: readonly TypeDefinition[];
   /**
    * Declare these with `loadComponent`, not `component`: they register in the root injector, so an
@@ -23,6 +25,9 @@ export interface WebPlugin {
   /** Eager, because a type's chrome labels are transloco keys (ADR-0049). */
   readonly translations?: TranslationScope;
 }
+
+/** The bundled plugins' ids (ADR-0052), one multi-provider entry per `providePlugin()`. */
+export const PLUGIN_IDS = new InjectionToken<readonly string[]>('hexly.plugin.ids');
 
 /** The bundled plugins' {@link TypeDefinition}s, read by the root `TypeRegistry`. */
 export const PLUGIN_TYPES = new InjectionToken<readonly TypeDefinition[]>('hexly.plugin.types');
@@ -44,12 +49,14 @@ export const PLUGIN_DATA_TYPES = new InjectionToken<readonly StructuredDataType[
  * being provided here.
  */
 export function providePlugin({
+  id,
   types = [],
   views = [],
   dataTypes = [],
   translations,
 }: WebPlugin): EnvironmentProviders {
   return makeEnvironmentProviders([
+    { provide: PLUGIN_IDS, useValue: id, multi: true },
     types.map((type) => ({ provide: PLUGIN_TYPES, useValue: type, multi: true })),
     views.map((view) => ({ provide: PLUGIN_VIEWS, useValue: view, multi: true })),
     dataTypes.map((dataType) => ({ provide: PLUGIN_DATA_TYPES, useValue: dataType, multi: true })),

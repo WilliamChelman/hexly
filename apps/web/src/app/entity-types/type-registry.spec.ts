@@ -1,11 +1,18 @@
 import { provideTranslocoTesting } from '../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { FieldSchema } from '@hexly/domain';
-import { CORE_HEX_GRID } from '@hexly/plugin-hexmap';
-import { CORE_RICH_CONTENT } from '@hexly/plugin-content';
-import { DND_MONSTER } from '@hexly/plugin-dnd';
+import { CORE_HEX_GRID, PLUGIN_ID as HEXMAP_PLUGIN_ID } from '@hexly/plugin-hexmap';
+import { CORE_RICH_CONTENT, PLUGIN_ID as CONTENT_PLUGIN_ID } from '@hexly/plugin-content';
+import { DND_MONSTER, PLUGIN_ID as DND_PLUGIN_ID } from '@hexly/plugin-dnd';
 import { TypeRegistry } from './type-registry';
-import { CORE_VIEW_FIELDS, CORE_VIEW_MAP, TypeDefinition, ViewInstance, viewInstanceKey } from '@hexly/web-entity';
+import {
+  CORE_VIEW_FIELDS,
+  CORE_VIEW_MAP,
+  PLUGIN_IDS,
+  TypeDefinition,
+  ViewInstance,
+  viewInstanceKey,
+} from '@hexly/web-entity';
 import { CORE_VIEW_CONTENT, providePluginContent } from '@hexly/plugin-content/web';
 import { DND_VIEW_STAT_BLOCK, providePluginDnd } from '@hexly/plugin-dnd/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
@@ -110,6 +117,10 @@ describe('TypeRegistry', () => {
       { viewId: CORE_VIEW_MAP, fieldKey: 'grid' },
       { viewId: CORE_VIEW_CONTENT },
     ]);
+  });
+
+  it('each composed plugin records its canonical id under PLUGIN_IDS (ADR-0052, #215)', () => {
+    expect(TestBed.inject(PLUGIN_IDS)).toEqual([CONTENT_PLUGIN_ID, HEXMAP_PLUGIN_ID, DND_PLUGIN_ID]);
   });
 
   /** One View per surface the Entity's types afford — the header's whole rule (#192). */

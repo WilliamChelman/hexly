@@ -1,5 +1,6 @@
 import { EnvironmentProviders } from '@angular/core';
 import { providePlugin } from '@hexly/web-entity';
+import { PLUGIN_ID } from '../lib/plugin-id';
 import { DND_TRANSLATIONS } from '../i18n/dnd-translations';
 import { DND_TYPE_DEFINITIONS, DND_VIEW_STAT_BLOCK } from './dnd-types';
 
@@ -12,6 +13,7 @@ import { DND_TYPE_DEFINITIONS, DND_VIEW_STAT_BLOCK } from './dnd-types';
  */
 export function providePluginDnd(): EnvironmentProviders {
   return providePlugin({
+    id: PLUGIN_ID,
     types: DND_TYPE_DEFINITIONS,
     views: [
       {

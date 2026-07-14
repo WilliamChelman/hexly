@@ -4,9 +4,10 @@
  * **Structured Field** data-type the API resolves a grid Field against, never the Angular map view.
  */
 import { serverPlugin, ServerPlugin } from '@hexly/domain';
+import { PLUGIN_ID } from '../lib/plugin-id';
 import { CORE_HEXMAP_TYPE } from '../lib/hexmap-type';
 import { HEX_GRID_DATA_TYPE } from '../lib/hex-grid';
 
 export function serverPluginHexmap(): ServerPlugin {
-  return serverPlugin({ types: [CORE_HEXMAP_TYPE], dataTypes: [HEX_GRID_DATA_TYPE] });
+  return serverPlugin({ id: PLUGIN_ID, types: [CORE_HEXMAP_TYPE], dataTypes: [HEX_GRID_DATA_TYPE] });
 }

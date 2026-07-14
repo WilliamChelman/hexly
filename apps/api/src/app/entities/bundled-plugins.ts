@@ -30,6 +30,16 @@ export const BUNDLED_STRUCTURED_DATA_TYPES: StructuredDataTypeSet = structuredDa
   BUNDLED_PLUGINS.flatMap((plugin) => plugin.dataTypes ?? []),
 );
 
+/** Which bundled Plugin owns each contributed Entity Type, keyed by Type id (ADR-0052). */
+export const BUNDLED_PLUGIN_TYPE_OWNERS: ReadonlyMap<string, string> = new Map(
+  BUNDLED_PLUGINS.flatMap((plugin) => (plugin.types ?? []).map((type) => [type.id, plugin.id] as const)),
+);
+
+/** Which bundled Plugin owns each **Structured Field** data-type, keyed by its `namespace.id` kind (ADR-0052). */
+export const BUNDLED_STRUCTURED_DATA_TYPE_OWNERS: ReadonlyMap<string, string> = new Map(
+  BUNDLED_PLUGINS.flatMap((plugin) => (plugin.dataTypes ?? []).map((dataType) => [dataType.id, plugin.id] as const)),
+);
+
 /**
  * The Entity Type a vault import assigns a Markdown file with no `hexly.type` stamp, and the one whose
  * lone presence marks an Entity a "bare Note" the export leaves unstamped (ADR-0051). Exactly one

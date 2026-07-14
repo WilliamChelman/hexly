@@ -16,6 +16,8 @@ import { StructuredDataType } from './structured-data-type';
 
 /** What a bundled plugin contributes to the API (ADR-0053). The web twin is `WebPlugin`. */
 export interface ServerPlugin {
+  /** This plugin's canonical `PLUGIN_ID` (ADR-0052); the web twin `WebPlugin` carries the same value. */
+  readonly id: string;
   /** The code-registered Entity Types this plugin declares (ADR-0048). */
   readonly types?: readonly PluginTypeDefinition[];
   /**
@@ -39,6 +41,7 @@ export interface ServerPlugin {
  */
 export function serverPlugin(plugin: ServerPlugin): ServerPlugin {
   return Object.freeze({
+    id: plugin.id,
     types: plugin.types ?? [],
     dataTypes: plugin.dataTypes ?? [],
     defaultType: plugin.defaultType,
