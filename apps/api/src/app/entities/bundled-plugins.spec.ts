@@ -4,7 +4,12 @@ import { DND_MONSTER, PLUGIN_ID as DND_PLUGIN_ID } from '@hexly/plugin-dnd';
 import { serverPluginContent } from '@hexly/plugin-content/server';
 import { serverPluginHexmap } from '@hexly/plugin-hexmap/server';
 import { serverPluginDnd } from '@hexly/plugin-dnd/server';
-import { BUNDLED_PLUGIN_TYPE_OWNERS, BUNDLED_STRUCTURED_DATA_TYPE_OWNERS } from './bundled-plugins';
+import { loadConfig } from '../config/config';
+import {
+  BUNDLED_PLUGIN_CONFIGS,
+  BUNDLED_PLUGIN_TYPE_OWNERS,
+  BUNDLED_STRUCTURED_DATA_TYPE_OWNERS,
+} from './bundled-plugins';
 
 /** Plugin identity at the API composition root (ADR-0052, #215) — the owner associations, not filtering. */
 describe('bundled plugin identity', () => {
@@ -30,5 +35,21 @@ describe('bundled plugin identity', () => {
     expect(BUNDLED_STRUCTURED_DATA_TYPE_OWNERS.get(CORE_HEX_GRID)).toBe(HEXMAP_PLUGIN_ID);
     // dnd contributes a Type but no data-type, so it owns none.
     expect([...BUNDLED_STRUCTURED_DATA_TYPE_OWNERS.values()]).not.toContain(DND_PLUGIN_ID);
+  });
+});
+
+/** The bundled config contributions compose `features.plugin` (ADR-0052, #216). */
+describe('bundled plugin config', () => {
+  it('contributes one config schema per bundled Plugin, keyed by canonical id', () => {
+    expect(BUNDLED_PLUGIN_CONFIGS.map((p) => p.id).sort()).toEqual(
+      [CONTENT_PLUGIN_ID, DND_PLUGIN_ID, HEXMAP_PLUGIN_ID].sort(),
+    );
+  });
+
+  it('resolves every bundled Plugin enabled on a :memory: Instance — content included, none privileged', () => {
+    const plugin = loadConfig(':memory:', BUNDLED_PLUGIN_CONFIGS).features.plugin;
+    expect(plugin[CONTENT_PLUGIN_ID].enabled).toBe(true);
+    expect(plugin[HEXMAP_PLUGIN_ID].enabled).toBe(true);
+    expect(plugin[DND_PLUGIN_ID].enabled).toBe(true);
   });
 });
