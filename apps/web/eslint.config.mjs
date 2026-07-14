@@ -1,6 +1,7 @@
 import nx from '@nx/eslint-plugin';
 import baseConfig from '../../eslint.config.mjs';
 import hexlyDesignTokens from '../../eslint-rules/design-tokens.mjs';
+import hexlyPluginSeam from '../../eslint-rules/plugin-seam.mjs';
 
 export default [
   ...nx.configs['flat/angular'],
@@ -32,6 +33,18 @@ export default [
           { type: 'attribute', prefix: 'app', style: 'camelCase' },
         ],
       ],
+    },
+  },
+  {
+    files: ['**/*.ts'],
+    // Specs hand-build TypeDefinition fakes to drive the registry and views under test — nothing
+    // ships them, so a fixture Type is no seam breach. This exemption matches the other repo rules.
+    ignores: ['**/*.spec.ts'],
+    plugins: { 'hexly-seam': hexlyPluginSeam },
+    rules: {
+      // ADR-0051 — the app declares no Entity Type and calls no `defineType()`; it names no View
+      // but the generic `core.view.fields`. Every other Type and View is a plugin's.
+      'hexly-seam/no-type-definition-declaration': 'error',
     },
   },
   {
