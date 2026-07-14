@@ -1,8 +1,8 @@
 /**
  * The prose data-type *with* its Markdown converter — the registration only the **API** bundles (ADR-0051).
- * Its own module, off the framework-free barrel and behind `@hexly/plugin-content/vault`, because the
- * converter drags in the `unified`/`remark`/`yaml` toolchain (~160 kB) that only a vault import/export
- * runs; the web registers the converter-free {@link RICH_CONTENT_DATA_TYPE} instead.
+ * Its own module, off the framework-free barrel and reached only through `@hexly/plugin-content/server`
+ * (ADR-0053), because the converter drags in the `unified`/`remark`/`yaml` toolchain (~160 kB) that only a
+ * vault import/export runs; the web registers the converter-free {@link RICH_CONTENT_DATA_TYPE} instead.
  */
 
 import { defineStructuredDataType, type VaultExportContext, type VaultImportContext } from '@hexly/domain';

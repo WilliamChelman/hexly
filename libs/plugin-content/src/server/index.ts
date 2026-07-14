@@ -4,8 +4,8 @@
  * variant with the Markdown converter the API's vault I/O runs — ADR-0051), and declares `core.note`
  * the default Entity Type for an unstamped import.
  *
- * Pulling the vault variant here means the ~160 kB converter toolchain loads through `/server` — as it
- * does through `/vault` today — and never through the framework-free base barrel or `/web`.
+ * Pulling the vault variant here means the ~160 kB converter toolchain loads through `/server` — the one
+ * public door to it — and never through the framework-free base barrel or `/web`.
  */
 import { serverPlugin, ServerPlugin } from '@hexly/domain';
 import { CORE_NOTE_TYPE } from '../lib/note-type';
