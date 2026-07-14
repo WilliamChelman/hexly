@@ -9,6 +9,8 @@ import { MockWorldsClient } from '@hexly/web-core/testing';
 import { CORE_VIEW_FIELDS } from '@hexly/web-entity';
 import { CORE_HEX_GRID } from '@hexly/plugin-hexmap';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
+import { CORE_RICH_CONTENT } from '@hexly/plugin-content';
+import { providePluginContent } from '@hexly/plugin-content/web';
 import { WorldTypesPanel } from './world-types-panel';
 
 /**
@@ -273,6 +275,94 @@ describe('WorldTypesPanel', () => {
 
       const toggle = fixture.debugElement.query(By.css('[data-testid="field-show-as-view"]'));
       expect(toggle.nativeElement.checked).toBe(false);
+    });
+  });
+});
+
+/**
+ * With the content plugin composed, `core.rich-content` is offerable on the kind picker (#210): a World
+ * Owner authors prose as a Structured Field like the grid, and two of them coexist as two Fields.
+ */
+describe('WorldTypesPanel with the content plugin', () => {
+  let worlds: MockWorldsClient;
+  let fixture: ComponentFixture<WorldTypesPanel>;
+
+  const created: UserDefinedType = { id: 'world.saint', label: 'Saint', fields: [] };
+
+  beforeEach(async () => {
+    worlds = new MockWorldsClient();
+    worlds.availableTypes.mockReturnValue(of<AvailableType[]>([]));
+    worlds.createType.mockReturnValue(of(created));
+    await TestBed.configureTestingModule({
+      imports: [WorldTypesPanel, provideTranslocoTesting()],
+      providers: [provideRouter([]), providePluginContent(), { provide: WorldsClient, useValue: worlds }],
+    }).compileComponents();
+    TestBed.inject(ActiveWorld).set('w1');
+
+    fixture = TestBed.createComponent(WorldTypesPanel);
+    fixture.componentRef.setInput('id', 'w1');
+    fixture.detectChanges();
+  });
+
+  function query(testid: string): HTMLElement {
+    return fixture.debugElement.query(By.css(`[data-testid="${testid}"]`)).nativeElement;
+  }
+  function click(testid: string): void {
+    query(testid).click();
+    fixture.detectChanges();
+  }
+  function type(testid: string, value: string): void {
+    const input = query(testid) as HTMLInputElement;
+    input.value = value;
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+  }
+  function fill(index: number, key: string, label: string): void {
+    click('add-field');
+    const row = fixture.debugElement.query(By.css(`[data-testid="field-${index}"]`));
+    const keyInput = row.query(By.css('[data-testid="field-key"]')).nativeElement as HTMLInputElement;
+    const labelInput = row.query(By.css('[data-testid="field-label"]')).nativeElement as HTMLInputElement;
+    const kind = row.query(By.css('[data-testid="field-kind"]')).nativeElement as HTMLSelectElement;
+    keyInput.value = key;
+    keyInput.dispatchEvent(new Event('input'));
+    labelInput.value = label;
+    labelInput.dispatchEvent(new Event('input'));
+    kind.value = CORE_RICH_CONTENT;
+    kind.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+  }
+  function submit(): void {
+    fixture.debugElement
+      .query(By.css('[data-testid="type-editor"]'))
+      .triggerEventHandler('submit', new Event('submit'));
+  }
+
+  it('offers prose as a data-type beside the built-ins', () => {
+    click('type-new');
+    click('add-field');
+    const kinds = fixture.debugElement
+      .queryAll(By.css('[data-testid="field-kind"] option'))
+      .map((option) => (option.nativeElement as HTMLOptionElement).value);
+    expect(kinds).toContain(CORE_RICH_CONTENT);
+  });
+
+  it('authors two prose Fields, each placing its own View — two prose Fields coexist', () => {
+    click('type-new');
+    type('type-id-input', 'saint');
+    type('type-name-input', 'Saint');
+    fill(0, 'content', 'Content');
+    fill(1, 'secrets', 'Secrets');
+    submit();
+
+    expect(worlds.createType).toHaveBeenCalledWith('w1', {
+      id: 'world.saint',
+      label: 'Saint',
+      fields: [
+        { key: 'content', label: 'Content', dataType: { kind: CORE_RICH_CONTENT }, required: false, facetable: false },
+        { key: 'secrets', label: 'Secrets', dataType: { kind: CORE_RICH_CONTENT }, required: false, facetable: false },
+      ],
+      // Each prose Field's View is placed after the generic Field view, in declaration order.
+      views: [CORE_VIEW_FIELDS, { field: 'content' }, { field: 'secrets' }],
     });
   });
 });

@@ -71,6 +71,16 @@ export function mapViewToggle(fieldKey = 'grid'): string {
   return viewInstanceKey({ viewId: 'core.view.map', fieldKey });
 }
 
+/**
+ * A content View toggle's testid (ADR-0051). A prose Field's View is bound to the Field it renders, so
+ * an Entity with two prose Fields affords two content Views, each keyed by its Field (`content`,
+ * `secrets`) — exactly as a second grid keys the map View. A Type placing the View by id (the Note)
+ * keys plain, so `fieldKey` is optional.
+ */
+export function contentViewToggle(fieldKey?: string): string {
+  return viewInstanceKey({ viewId: 'core.view.content', fieldKey });
+}
+
 /** Wait for a successful entity PUT. There is no Save button (ADR-0026): pair this with Cmd/Ctrl+S. */
 export function waitForSave(page: Page): Promise<Response> {
   return page.waitForResponse(
