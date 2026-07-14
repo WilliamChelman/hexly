@@ -23,9 +23,8 @@ export const BUNDLED_PLUGIN_TYPES: readonly PluginTypeDefinition[] = [
  * derive pass has no Content special case left. One joins by being named here, as a plugin type does.
  */
 export const BUNDLED_STRUCTURED_DATA_TYPES: StructuredDataTypeSet = structuredDataTypeSet([
-  // The vault-enabled variant — the API resolves both the derive pass (edges/text) and the vault
-  // import/export projection off this set, and vault I/O needs the Markdown converter (ADR-0051). The
-  // web registers the converter-free `RICH_CONTENT_DATA_TYPE` instead, so the toolchain stays server-side.
+  // The vault-enabled variant: the API resolves both the derive pass and the vault projection off this
+  // set, and vault I/O needs the Markdown converter the web variant drops (ADR-0051).
   RICH_CONTENT_DATA_TYPE_VAULT,
   HEX_GRID_DATA_TYPE,
 ]);

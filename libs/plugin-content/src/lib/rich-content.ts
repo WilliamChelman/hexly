@@ -24,15 +24,11 @@ import { extractText } from './extract-text';
 export const CORE_RICH_CONTENT: StructuredDataTypeId = 'core.rich-content';
 
 /**
- * The prose data-type's base capabilities — schema, edge harvest, and searchable text — shared by both
- * its registrations. Its edges are the Content's inline **Entity Links** (each carrying its `::` **Link
- * Descriptor**) and the Assets its images embed; its searchable text is the prose the {@link extractText}
- * walk collects. A Content format this build cannot read harvests nothing rather than throwing — the
- * forward-only tolerance a document at rest needs.
- *
- * Kept as a plain definition so `rich-content-vault.ts` can reuse it without re-listing the schema and
- * the two walks: the Markdown converter is the *only* thing the two registrations differ by, and it is a
- * ~160 kB `unified`/`remark` toolchain the browser never runs (ADR-0051 — see {@link RICH_CONTENT_DATA_TYPE}).
+ * The prose data-type's base capabilities, shared by both registrations. Its edges are the Content's
+ * inline **Entity Links** (each carrying its `::` **Link Descriptor**) and the Assets its images embed;
+ * its searchable text is the prose {@link extractText} collects. A format this build cannot read harvests
+ * nothing rather than throwing — the forward-only tolerance a document at rest needs. Kept plain so
+ * `rich-content-vault.ts` reuses it without re-listing the schema and walks (ADR-0051).
  */
 export const richContentBase = {
   id: CORE_RICH_CONTENT,
@@ -65,12 +61,9 @@ export const richContentBase = {
 } as const;
 
 /**
- * The prose data-type as the **web** registers it (ADR-0051): the base above plus its `body` projection
- * *slot*, but **no Markdown converter**. Markdown↔ProseMirror conversion is a vault import/export concern
- * the browser never runs, and its `unified`/`remark`/`yaml` toolchain (~160 kB) would otherwise ride the
- * initial bundle through the eagerly-registered plugin. The converter lives on
- * {@link RICH_CONTENT_DATA_TYPE_VAULT} (`rich-content-vault.ts`) — the same base, plus the converter —
- * which only the API bundles, so the toolchain code-splits out of the web entirely.
+ * The prose data-type the **web** registers: the base plus its `body` projection slot, but no Markdown
+ * converter — that toolchain rides the eager web bundle for no reason, since only a vault import/export
+ * runs it. The converter lives on {@link RICH_CONTENT_DATA_TYPE_VAULT}, which only the API bundles (ADR-0051).
  */
 export const RICH_CONTENT_DATA_TYPE = defineStructuredDataType({
   ...richContentBase,

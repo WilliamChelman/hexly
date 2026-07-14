@@ -1,15 +1,8 @@
 /**
- * The prose data-type *with* its Markdown converter — the registration the **API** bundles (ADR-0051).
- *
- * The `core.rich-content` **Vault Projection** (CONTEXT.md) lives here rather than beside the base
- * data-type because its Markdown↔ProseMirror converter drags in the `unified`/`remark`/`yaml` toolchain
- * (~160 kB), and only a vault import/export ever runs it — `libs/obsidian` reaches these converters off
- * the data-type set the API hands it, and the browser has no vault layer at all. Splitting the converter
- * onto this variant, which only `apps/api` registers, keeps that toolchain out of the initial web
- * bundle, where the converter-free {@link RICH_CONTENT_DATA_TYPE} (the same base) is registered instead.
- *
- * The `@__PURE__` marker lets the bundler drop this registration wherever it is unused (the web), so the
- * converter and its toolchain tree-shake away rather than riding a shared barrel into the app.
+ * The prose data-type *with* its Markdown converter — the registration only the **API** bundles (ADR-0051).
+ * Its own module, off the framework-free barrel and behind `@hexly/plugin-content/vault`, because the
+ * converter drags in the `unified`/`remark`/`yaml` toolchain (~160 kB) that only a vault import/export
+ * runs; the web registers the converter-free {@link RICH_CONTENT_DATA_TYPE} instead.
  */
 
 import { defineStructuredDataType, type VaultExportContext, type VaultImportContext } from '@hexly/domain';
@@ -19,11 +12,7 @@ import { markdownToProseMirror } from './markdown-to-prose-mirror';
 import { proseMirrorToMarkdown } from './prose-mirror-to-markdown';
 import { richContentBase } from './rich-content';
 
-/**
- * The prose data-type carrying its `body` **Vault Projection** and its converter. The converters that
- * used to live in `libs/obsidian` are this projection now, so the vault layer reaches Markdown↔ProseMirror
- * through the data-type instead of importing the plugin.
- */
+/** The base capabilities plus the `body` **Vault Projection** and its Markdown converter. */
 export const RICH_CONTENT_DATA_TYPE_VAULT = /* @__PURE__ */ defineStructuredDataType({
   ...richContentBase,
   vault: {

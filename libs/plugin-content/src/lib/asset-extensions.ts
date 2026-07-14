@@ -1,10 +1,7 @@
 /**
- * The media extensions an `![[target]]` embeds as an Asset rather than a note transclusion (ADR-0033).
- *
- * A standalone module — not a member of the Markdown converter — precisely because it is a light
- * constant the barrel can re-export to the API (whose asset MIME map must cover every extension here)
- * without dragging the converter's `unified`/`remark` toolchain onto whoever imports the barrel. The
- * converter itself reads {@link ASSET_EMBED_EXT} from here (ADR-0051).
+ * The media extensions an `![[target]]` embeds as an Asset rather than a note transclusion. A standalone
+ * module, not part of the converter, so the barrel can re-export this light constant to the API (whose
+ * asset MIME map must cover every extension here) without the converter's toolchain (ADR-0033, ADR-0051).
  */
 
 /** Extensions Obsidian embeds as media; anything else in an `![[…]]` stays a degraded link. */
