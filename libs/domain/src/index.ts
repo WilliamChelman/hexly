@@ -14,6 +14,7 @@ export * from './lib/asset';
 export * from './lib/world';
 export * from './lib/world-type';
 export * from './lib/plugin-type';
+export * from './lib/server-plugin';
 export * from './lib/world-graph';
 export * from './lib/public-link';
 export * from './lib/nudge';
