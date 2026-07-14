@@ -11,6 +11,7 @@
  */
 
 import { EntityType } from './entity';
+import { basePluginConfigSchema, PluginConfigSchema } from './plugin-config';
 import { PluginTypeDefinition } from './plugin-type';
 import { StructuredDataType } from './structured-data-type';
 
@@ -18,6 +19,13 @@ import { StructuredDataType } from './structured-data-type';
 export interface ServerPlugin {
   /** This plugin's canonical `PLUGIN_ID` (ADR-0052); the web twin `WebPlugin` carries the same value. */
   readonly id: string;
+  /**
+   * This plugin's `features.plugin.<id>` config schema (ADR-0052), extending the base `{ enabled }`.
+   * Optional to declare — a plugin with no knobs beyond `enabled` inherits {@link basePluginConfigSchema}
+   * — so a new bundled plugin becomes toggleable just by shipping an id. `config.ts` merges the bundled
+   * plugins' schemas to build `features.plugin`.
+   */
+  readonly configSchema?: PluginConfigSchema;
   /** The code-registered Entity Types this plugin declares (ADR-0048). */
   readonly types?: readonly PluginTypeDefinition[];
   /**
@@ -45,5 +53,6 @@ export function serverPlugin(plugin: ServerPlugin): ServerPlugin {
     types: plugin.types ?? [],
     dataTypes: plugin.dataTypes ?? [],
     defaultType: plugin.defaultType,
+    configSchema: plugin.configSchema ?? basePluginConfigSchema,
   });
 }

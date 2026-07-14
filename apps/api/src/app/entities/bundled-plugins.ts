@@ -1,4 +1,11 @@
-import { EntityType, ServerPlugin, structuredDataTypeSet, StructuredDataTypeSet } from '@hexly/domain';
+import {
+  basePluginConfigSchema,
+  EntityType,
+  ServerPlugin,
+  structuredDataTypeSet,
+  StructuredDataTypeSet,
+} from '@hexly/domain';
+import { PluginConfigContribution } from '../config/config';
 import { serverPluginContent } from '@hexly/plugin-content/server';
 import { serverPluginDnd } from '@hexly/plugin-dnd/server';
 import { serverPluginHexmap } from '@hexly/plugin-hexmap/server';
@@ -29,6 +36,16 @@ export const BUNDLED_PLUGIN_TYPES = BUNDLED_PLUGINS.flatMap((plugin) => plugin.t
 export const BUNDLED_STRUCTURED_DATA_TYPES: StructuredDataTypeSet = structuredDataTypeSet(
   BUNDLED_PLUGINS.flatMap((plugin) => plugin.dataTypes ?? []),
 );
+
+/**
+ * Each bundled Plugin's `features.plugin.<id>` config contribution (ADR-0052): its id and config
+ * schema, folded from the same `BUNDLED_PLUGINS` list. `config.ts` merges these to compose
+ * `features.plugin` — adding a new bundled Plugin makes it toggleable with no `config.ts` edit.
+ */
+export const BUNDLED_PLUGIN_CONFIGS: readonly PluginConfigContribution[] = BUNDLED_PLUGINS.map((plugin) => ({
+  id: plugin.id,
+  configSchema: plugin.configSchema ?? basePluginConfigSchema,
+}));
 
 /** Which bundled Plugin owns each contributed Entity Type, keyed by Type id (ADR-0052). */
 export const BUNDLED_PLUGIN_TYPE_OWNERS: ReadonlyMap<string, string> = new Map(

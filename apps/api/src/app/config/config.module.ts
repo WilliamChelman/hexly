@@ -1,5 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { resolveInstanceDir } from '../db/db';
+import { BUNDLED_PLUGIN_CONFIGS } from '../entities/bundled-plugins';
 import { HexlyConfig, loadConfig } from './config';
 
 /** DI token for the loaded Instance Configuration (ADR-0036). */
@@ -15,7 +16,7 @@ export const HEXLY_CONFIG = Symbol('HEXLY_CONFIG');
   providers: [
     {
       provide: HEXLY_CONFIG,
-      useFactory: () => loadConfig(resolveInstanceDir()),
+      useFactory: () => loadConfig(resolveInstanceDir(), BUNDLED_PLUGIN_CONFIGS),
     },
   ],
   exports: [HEXLY_CONFIG],
