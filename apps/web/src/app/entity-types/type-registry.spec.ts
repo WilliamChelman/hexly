@@ -206,6 +206,33 @@ describe('TypeRegistry', () => {
     });
   });
 
+  describe('a user-defined type carrying two prose Fields (#210)', () => {
+    const prose = (key: string, label: string): FieldSchema => ({
+      key,
+      label,
+      dataType: { kind: CORE_RICH_CONTENT },
+      required: false,
+      facetable: false,
+    });
+
+    it('affords a content View per prose Field, each bound to its own key — two prose Fields coexist', () => {
+      // Prose is a Structured Field like the grid, so two `core.rich-content` Fields afford two content
+      // Views, each bound to the Field it renders — the twin of two grids affording two map Views (#202).
+      registry.register({
+        ...definition('world.saint', [prose('content', 'Content'), prose('secrets', 'Secrets')]),
+        views: [CORE_VIEW_FIELDS, { field: 'content' }, { field: 'secrets' }],
+      });
+
+      expect(viewKeys(registry.viewsFor(['world.saint']))).toEqual([
+        CORE_VIEW_FIELDS,
+        `${CORE_VIEW_CONTENT}:content`,
+        `${CORE_VIEW_CONTENT}:secrets`,
+      ]);
+      // Both Fields are declared and resolve — neither shadows the other.
+      expect(registry.resolveFields(['world.saint']).map((f) => f.key)).toEqual(['content', 'secrets']);
+    });
+  });
+
   it('affords the generic Field View *alone* for an unregistered type — the missing-plugin case', () => {
     // No definition registered for `pathfinder.monster`: #199's content floor is withdrawn (ADR-0051),
     // so the Entity opens on the generic View alone — its type an inert chip, its values (prose
