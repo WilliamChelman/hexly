@@ -14,10 +14,10 @@ export const CORE_VIEW_CONTENT = 'core.view.content';
 /** The hex-grid View a `hex-grid`-carrying Entity additionally affords. */
 export const CORE_VIEW_MAP = 'core.view.map';
 /**
- * The **generic Field View**: renders a type's declared Fields off the Entity's Metadata and edits
+ * The **generic Field View**: renders a type's declared Fields off the Entity's EntityDocument and edits
  * them back into it. Contributed by any type that declares Fields, and the fallback for an Entity
  * whose type has no registered view (a missing plugin, a World-defined type) — where it shows the
- * type as an inert chip and the values as plain Metadata.
+ * type as an inert chip and the values as plain EntityDocument.
  */
 export const CORE_VIEW_FIELDS = 'core.view.fields';
 
@@ -33,7 +33,7 @@ export const CORE_VIEW_FIELDS = 'core.view.fields';
 export type { ViewPlacement };
 
 /**
- * The Metadata key of the **Structured Field** the active View renders — provided by {@link EntityPage}
+ * The EntityDocument key of the **Structured Field** the active View renders — provided by {@link EntityPage}
  * into the injector it outlets that View's component with, so two grids on one Entity get one store each.
  *
  * A token rather than an `@Input`, because a Structured Field's View provides its store in `providers`,

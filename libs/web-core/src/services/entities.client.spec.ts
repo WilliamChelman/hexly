@@ -1,7 +1,7 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { EntityDetail, EntitySummary, Metadata } from '@hexly/domain';
+import { EntityDetail, EntitySummary, EntityDocument } from '@hexly/domain';
 import { EntitiesClient, ENTITY_NUDGE_DEBOUNCE_MS } from './entities.client';
 import { NudgeBusClient } from './nudge-bus.client';
 import { MockNudgeBusClient } from '../testing/nudge-bus.mock';
@@ -10,8 +10,8 @@ import { EVICTED } from './live-follow';
 /** A blank prose value, inlined: web-core cannot depend on the content plugin (a project cycle). */
 const emptyContent = () => ({ format: 'tiptap-v3' as const, snapshot: { type: 'doc', content: [] } });
 
-/** The body IS the Metadata map (ADR-0051): a Hex Map's grid and its prose are both Field values in it. */
-const emptyHexmapBody: Metadata = {
+/** The body IS the EntityDocument map (ADR-0051): a Hex Map's grid and its prose are both Field values in it. */
+const emptyHexmapBody: EntityDocument = {
   content: emptyContent(),
   grid: { hexes: {}, regions: [], labels: [] },
 };
@@ -204,7 +204,7 @@ describe('EntitiesClient', () => {
     expect(created).toEqual(aldermoor);
   });
 
-  it('scopes a create to a World and carries initial Metadata when given (#189)', () => {
+  it('scopes a create to a World and carries initial EntityDocument when given (#189)', () => {
     client.create('Aldermoor', ['core.hexmap'], 'w9', { cr: 5 }).subscribe();
 
     const req = http.expectOne('/api/entities');
@@ -212,7 +212,7 @@ describe('EntitiesClient', () => {
       name: 'Aldermoor',
       types: ['core.hexmap'],
       worldId: 'w9',
-      metadata: { cr: 5 },
+      document: { cr: 5 },
     });
     req.flush(aldermoor);
   });
@@ -268,7 +268,7 @@ describe('EntitiesClient', () => {
   });
 
   it('saves the body against its base version and reports the saved outcome', () => {
-    const painted: Metadata = {
+    const painted: EntityDocument = {
       content: emptyContent(),
       // A plugin's structured value, spelled out: web-core carries no dependency on the map plugin.
       grid: { hexes: { '0,0': { terrain: 'forest' } }, regions: [], labels: [] },

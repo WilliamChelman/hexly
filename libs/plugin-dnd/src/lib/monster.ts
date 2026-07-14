@@ -1,6 +1,6 @@
 /**
  * The `dnd.monster` bundled Plugin type (CONTEXT.md → Type Definition). A monster's stat block lives
- * in the Metadata map beside its prose, both Fields in the Entity's one body (ADR-0051).
+ * in the EntityDocument map beside its prose, both Fields in the Entity's one body (ADR-0051).
  *
  * The framework-free half, which the API reads. The Angular half is `@hexly/plugin-dnd/web`.
  */
@@ -12,7 +12,7 @@ import { CONTENT_FIELD } from '@hexly/plugin-content';
 export const DND_MONSTER = 'dnd.monster';
 
 /**
- * The Metadata keys the stat block prints, grouped as it prints them. `monster.spec.ts` pins these
+ * The EntityDocument keys the stat block prints, grouped as it prints them. `monster.spec.ts` pins these
  * to the Field schema below: the view silently skips a key it can't resolve, so a renamed Field
  * would otherwise drop its row without a word.
  */

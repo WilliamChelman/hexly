@@ -15,7 +15,7 @@ import {
   EntityType,
   FieldSchema,
   isStructuredDataType,
-  Metadata,
+  EntityDocument,
   NO_STRUCTURED_DATA_TYPES,
   validateFields,
   writeField,
@@ -138,8 +138,8 @@ export class CreateEntityDialog {
   protected readonly worldId = signal<string | null>(null);
   /** The working ordered type set the author builds through the embedded editor. */
   protected readonly types = signal<readonly EntityType[]>([]);
-  /** The Metadata collected for a picked type's required Fields, sent with the create. */
-  protected readonly metadata = signal<Metadata>({});
+  /** The EntityDocument collected for a picked type's required Fields, sent with the create. */
+  protected readonly metadata = signal<EntityDocument>({});
 
   /** The union of Field schemas the picked types afford (primary first, deduped) — via the registry. */
   private readonly fields = computed(() => this.typeRegistry.resolveFields(this.types()));
@@ -197,7 +197,7 @@ export class CreateEntityDialog {
     this.worldId.set((event.target as HTMLSelectElement).value);
   }
 
-  /** Collect a required Field's value into the initial Metadata, clearing an emptied key (#189). */
+  /** Collect a required Field's value into the initial EntityDocument, clearing an emptied key (#189). */
   protected setField(field: FieldSchema, value: unknown): void {
     this.metadata.update((meta) => writeField(meta, field, value));
   }

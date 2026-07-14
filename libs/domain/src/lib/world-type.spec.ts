@@ -41,7 +41,7 @@ describe('userDefinedTypeSchema', () => {
     expect(parsed.fields).toEqual([{ ...domainField, required: false, facetable: true }]);
   });
 
-  it('rejects two Fields typing the same Metadata key', () => {
+  it('rejects two Fields typing the same EntityDocument key', () => {
     const dup = userDefinedTypeSchema.safeParse({
       id: 'world.deity',
       label: 'Deity',

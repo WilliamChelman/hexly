@@ -11,7 +11,7 @@ import {
   EntitySaveOutcome,
   EntityType,
   GrantRole,
-  Metadata,
+  EntityDocument,
   PublicLink,
   Visibility,
 } from '@hexly/domain';
@@ -75,7 +75,7 @@ export class EntitiesClient {
 
   /**
    * Patch an Entity's metadata — the `name` **or** the Visibility, never both (ADR-0045): they have
-   * different write gates, and sending both is a 400. Metadata never conflicts with an in-progress save.
+   * different write gates, and sending both is a 400. EntityDocument never conflicts with an in-progress save.
    */
   patch(id: string, changes: { name: string } | { visibility: Visibility }): Observable<EntityDetail> {
     // Write-through: the patched detail feeds the store, so other watchers see the rename/visibility
@@ -136,15 +136,15 @@ export class EntitiesClient {
   }
 
   /**
-   * Create an Entity with an ordered `types` set, `types[0]` primary (ADR-0048). `metadata` seeds a
+   * Create an Entity with an ordered `types` set, `types[0]` primary (ADR-0048). `doc` seeds a
    * picked type's required Fields into the minted body. worldId omitted → the caller's first World.
    */
-  create(name: string, types: readonly EntityType[], worldId?: string, metadata?: Metadata): Observable<EntityDetail> {
+  create(name: string, types: readonly EntityType[], worldId?: string, doc?: EntityDocument): Observable<EntityDetail> {
     return this.http.post<EntityDetail>('/api/entities', {
       name,
       types,
       ...(worldId ? { worldId } : {}),
-      ...(metadata ? { metadata } : {}),
+      ...(doc ? { document: doc } : {}),
     });
   }
 
@@ -181,18 +181,18 @@ export class EntitiesClient {
   /**
    * Stale base → `conflict` outcome, not a thrown error; caller branches, not catches. `types` is
    * sent only when the session authored the type set (an active typed edit the server gates its
-   * Fields forward-only); a plain body edit omits it, so data at rest is never re-typed (ADR-0048).
+   * Fields forward-only); a plain document edit omits it, so data at rest is never re-typed (ADR-0048).
    */
   save(
     id: string,
-    body: Metadata,
+    doc: EntityDocument,
     version: number,
     tags: readonly string[],
     types?: readonly EntityType[],
   ): Observable<EntitySaveOutcome> {
     return this.http
       .put<EntityDetail>(`/api/entities/${id}`, {
-        document: body,
+        document: doc,
         version,
         tags,
         ...(types !== undefined && { types }),

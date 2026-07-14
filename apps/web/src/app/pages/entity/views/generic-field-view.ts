@@ -3,7 +3,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import {
   FieldSchema,
   isStructuredDataType,
-  Metadata,
+  EntityDocument,
   NO_STRUCTURED_DATA_TYPES,
   readField,
   validateFields,
@@ -15,17 +15,17 @@ import { FieldControl } from '@hexly/web-entity/controls';
 
 /**
  * The **generic Field View** (`core.view.fields`, ADR-0048, #187): renders an Entity's
- * declared Fields as a typing lens over its one Metadata map, and edits them straight
+ * declared Fields as a typing lens over its one EntityDocument map, and edits them straight
  * back into it. It does double duty:
  *
  * - the renderer for a type that declares Fields (a World-defined type, or a plugin
  *   type that ships no bespoke view); and
  * - the fallback for an Entity whose type has **no registered view** (a missing plugin):
  *   the unknown type shows as an inert chip and its values fall through to the
- *   plain-Metadata display.
+ *   plain-EntityDocument display.
  *
- * A Field value lives in the same Metadata map Obsidian import/export round-trips
- * (ADR-0033), so removing a type leaves the values intact as plain Metadata. Editing is
+ * A Field value lives in the same EntityDocument map Obsidian import/export round-trips
+ * (ADR-0033), so removing a type leaves the values intact as plain EntityDocument. Editing is
  * gated on {@link EntitySession.writable}; a read-only opener sees static text.
  */
 @Component({
@@ -77,7 +77,7 @@ import { FieldControl } from '@hexly/web-entity/controls';
           </dl>
         }
 
-        <!-- Whatever Metadata the declared Fields don't type: the plain-Metadata display, so an
+        <!-- Whatever EntityDocument the declared Fields don't type: the plain-EntityDocument display, so an
              absent plugin's values are never hidden — the same read-only rows as EntityMetadata. -->
         @if (plainEntries().length > 0) {
           <div>
@@ -114,17 +114,17 @@ export class GenericFieldView {
   /**
    * The Fields this view renders a control for: every declared Field except a **Structured** one
    * (ADR-0050), which is edited on its own View, not typed into a form row. Being declared, it is
-   * kept out of the plain-Metadata rows below too.
+   * kept out of the plain-EntityDocument rows below too.
    */
   protected readonly fields = computed(() => this.declared().filter((f) => !isStructuredDataType(f.dataType)));
 
-  /** The live working Metadata — the body IS the map now (ADR-0051), read off the store, written through mutate. */
-  private readonly metadata = computed<Metadata>(() => this.session.body());
+  /** The live working EntityDocument — the body IS the map now (ADR-0051), read off the store, written through mutate. */
+  private readonly metadata = computed<EntityDocument>(() => this.session.doc());
 
   /** Types with no registered definition: the missing-plugin fallback, shown as inert chips. */
   protected readonly unknownTypes = computed(() => this.session.types().filter((type) => !this.types.get(type)));
 
-  /** Metadata keys no declared Field types — shown read-only as plain Metadata. */
+  /** EntityDocument keys no declared Field types — shown read-only as plain EntityDocument. */
   protected readonly plainEntries = computed(() => {
     const declared = new Set(this.declared().map((field) => field.key));
     return Object.entries(this.metadata())
@@ -132,7 +132,7 @@ export class GenericFieldView {
       .map(([key, value]) => ({ key, value: displayPlain(value) }));
   });
 
-  /** The forward-only validation of the live Metadata, so an invalid control can flag itself. */
+  /** The forward-only validation of the live EntityDocument, so an invalid control can flag itself. */
   private readonly invalidKeys = computed(
     () =>
       new Set(
@@ -144,13 +144,13 @@ export class GenericFieldView {
     return this.invalidKeys().has(field.key);
   }
 
-  /** The Field's raw value straight off the live Metadata map — the lens the control reads. */
+  /** The Field's raw value straight off the live EntityDocument map — the lens the control reads. */
   protected rawValue(field: FieldSchema): unknown {
     return readField(this.metadata(), field);
   }
 
   /**
-   * Write a value into the one Metadata map every View shares (ADR-0048). {@link writeFieldInPlace}
+   * Write a value into the one EntityDocument map every View shares (ADR-0048). {@link writeFieldInPlace}
    * clears the key when the value is emptied rather than leaving a blank behind. No-op for a read-only opener.
    */
   protected set(field: FieldSchema, value: unknown): void {
@@ -159,7 +159,7 @@ export class GenericFieldView {
   }
 }
 
-/** Flatten a plain Metadata value to a string for read-only display (the domain never interprets it). */
+/** Flatten a plain EntityDocument value to a string for read-only display (the domain never interprets it). */
 function displayPlain(value: unknown): string {
   if (typeof value === 'string') return value;
   if (Array.isArray(value)) return value.map(displayPlain).join(', ');

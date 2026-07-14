@@ -3,7 +3,7 @@ import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import { eq } from 'drizzle-orm';
 import request from 'supertest';
-import { assetUrl, LinkedEntity, Metadata, WorldGraph } from '@hexly/domain';
+import { assetUrl, LinkedEntity, EntityDocument, WorldGraph } from '@hexly/domain';
 import { tiptapContent } from '@hexly/plugin-content';
 import { AuthModule } from '../auth/auth.module';
 import { AuthService } from '../auth/auth.service';
@@ -291,7 +291,7 @@ describe('World Graph', () => {
 
   async function save(owner: Agent, id: string, inline: unknown[]): Promise<void> {
     const current = (await owner.get(`/entities/${id}`).expect(200)).body;
-    const document: Metadata = {
+    const document: EntityDocument = {
       content: tiptapContent({
         type: 'doc',
         content: [{ type: 'paragraph', content: inline }],

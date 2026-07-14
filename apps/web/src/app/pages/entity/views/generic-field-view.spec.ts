@@ -77,11 +77,11 @@ describe('GenericFieldView', () => {
     return { fixture, el: fixture.nativeElement as HTMLElement };
   }
 
-  it('renders a type’s declared Fields off Metadata, labelled and typed', () => {
+  it('renders a type’s declared Fields off EntityDocument, labelled and typed', () => {
     registry.register(definitionWithFields('test.beast', beastFields));
     const { el } = render(detail(['test.beast'], { name: 'Aboleth', size: 'large' }, ['edit']));
 
-    // The string Field shows its Metadata value; the enum Field renders its options as a <select>.
+    // The string Field shows its EntityDocument value; the enum Field renders its options as a <select>.
     const name = el.querySelector('[data-testid=field-name] input') as HTMLInputElement;
     expect(name.value).toBe('Aboleth');
     const size = el.querySelector('[data-testid=field-size] select') as HTMLSelectElement;
@@ -89,7 +89,7 @@ describe('GenericFieldView', () => {
     expect(Array.from(size.options).map((o) => o.value)).toEqual(['', 'small', 'large']);
   });
 
-  it('writes an edited Field value back into the Metadata map', () => {
+  it('writes an edited Field value back into the EntityDocument map', () => {
     registry.register(definitionWithFields('test.beast', beastFields));
     const { fixture, el } = render(detail(['test.beast'], { name: 'Aboleth' }, ['edit']));
 
@@ -98,8 +98,8 @@ describe('GenericFieldView', () => {
     name.dispatchEvent(new Event('input'));
     fixture.detectChanges();
 
-    // The value lands in the one Metadata map — no separate store (CONTEXT.md → Field).
-    expect(session.body()).toMatchObject({ name: 'Kraken' });
+    // The value lands in the one EntityDocument map — no separate store (CONTEXT.md → Field).
+    expect(session.doc()).toMatchObject({ name: 'Kraken' });
   });
 
   it('renders a read-only opener’s controls disabled', () => {
@@ -147,14 +147,14 @@ describe('GenericFieldView', () => {
     expect(el.querySelector('[data-testid=entity-link-clear]')).toBeNull();
   });
 
-  it('falls back to an inert chip + plain Metadata for a type with no registered view', () => {
+  it('falls back to an inert chip + plain EntityDocument for a type with no registered view', () => {
     // No definition registered for `pathfinder.monster` — the graceful-absence path an Entity takes
     // when the plugin that typed it isn't compiled into *this* instance (#192).
     const { el } = render(detail(['pathfinder.monster'], { lore: 'ancient', power: 9 }, ['edit']));
 
     const chip = el.querySelector('[data-testid=type-chip]');
     expect(chip?.textContent).toContain('pathfinder.monster');
-    // Its values fall through to the plain-Metadata display — nothing hidden, nothing editable.
+    // Its values fall through to the plain-EntityDocument display — nothing hidden, nothing editable.
     const plain = el.querySelector('[data-testid=field-plain-metadata]');
     expect(plain?.textContent).toContain('lore');
     expect(plain?.textContent).toContain('ancient');
@@ -162,9 +162,9 @@ describe('GenericFieldView', () => {
     expect(el.querySelector('input')).toBeNull();
   });
 
-  it('shows a Structured Field neither as a control nor as plain Metadata (ADR-0050)', () => {
+  it('shows a Structured Field neither as a control nor as plain EntityDocument (ADR-0050)', () => {
     // A Structured Field's value is a document with its own View (the grid is edited on the map),
-    // and being *declared* it does not fall through to the plain-Metadata display either.
+    // and being *declared* it does not fall through to the plain-EntityDocument display either.
     const grid: FieldSchema = {
       key: 'grid',
       label: 'Grid',

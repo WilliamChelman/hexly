@@ -48,7 +48,7 @@ describe('AssetsService', () => {
     expect(existsSync(onDisk)).toBe(true);
     expect(new Uint8Array(readFileSync(onDisk))).toEqual(PNG_A);
 
-    // Metadata is rowed (original filename kept for export, ADR-0034).
+    // EntityDocument is rowed (original filename kept for export, ADR-0034).
     const rows = db.$client.prepare('SELECT * FROM assets WHERE world_id = ?').all('world-1');
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({

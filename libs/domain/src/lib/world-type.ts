@@ -22,7 +22,7 @@ export const userDefinedTypeIdSchema = entityTypeSchema.refine(
   `A user-defined type id must be in the \`${USER_TYPE_NAMESPACE}.\` namespace`,
 );
 
-/** A Field schema list with distinct keys — two Fields typing the same Metadata key are a mistake. */
+/** A Field schema list with distinct keys — two Fields typing the same EntityDocument key are a mistake. */
 export const uniqueFieldsSchema = z
   .array(fieldSchemaSchema)
   .refine(

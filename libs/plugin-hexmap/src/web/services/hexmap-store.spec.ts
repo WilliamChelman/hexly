@@ -2565,7 +2565,7 @@ describe('HexMapStore forward-only grid (ADR-0050)', () => {
     expect(store.canUndo()).toBe(true);
     store.undo();
     expect(store.document()).toEqual(emptyHexMap());
-    expect(session.body()[HEX_GRID_FIELD.key]).toBe('not-a-grid');
+    expect(session.doc()[HEX_GRID_FIELD.key]).toBe('not-a-grid');
   });
 
   it('re-parses on undo, so an undo back onto a malformed grid still shows an empty plane', () => {
@@ -2580,7 +2580,7 @@ describe('HexMapStore forward-only grid (ADR-0050)', () => {
     store.undo();
 
     expect(store.document()).toEqual(emptyHexMap());
-    expect(session.body()[HEX_GRID_FIELD.key]).toEqual({ hexes: { '0,0': 7 }, regions: [], labels: [] });
+    expect(session.doc()[HEX_GRID_FIELD.key]).toEqual({ hexes: { '0,0': 7 }, regions: [], labels: [] });
   });
 
   it('mints a plane the recipe can push onto when the stored grid predates regions/labels', () => {
@@ -2611,7 +2611,7 @@ describe('HexMapStore bound to a Field', () => {
     session = TestBed.inject(FakeEntitySession);
   });
 
-  it('reads and writes the Metadata slice its Field key names, leaving every other grid alone', () => {
+  it('reads and writes the EntityDocument slice its Field key names, leaving every other grid alone', () => {
     const store = makeStore();
     // The body carries a painted grid at `core.hexmap`'s own `grid` key; this store renders a
     // *different* Field, so it sees none of it — an unpainted plane, not the world map.
@@ -2621,9 +2621,9 @@ describe('HexMapStore bound to a Field', () => {
     store.paintAt({ q: 1, r: 1 }, 'forest');
 
     // The stroke lands at `battlemap`…
-    expect((session.body()['battlemap'] as HexMap).hexes).toEqual({ '1,1': { terrain: 'forest' } });
+    expect((session.doc()['battlemap'] as HexMap).hexes).toEqual({ '1,1': { terrain: 'forest' } });
     // …and the grid it is not bound to is exactly as it was.
-    expect((session.body()[HEX_GRID_FIELD.key] as HexMap).hexes).toEqual({
+    expect((session.doc()[HEX_GRID_FIELD.key] as HexMap).hexes).toEqual({
       '0,0': { terrain: 'ocean' },
     });
   });

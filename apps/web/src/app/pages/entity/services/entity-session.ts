@@ -18,11 +18,11 @@ import {
   timeout,
 } from 'rxjs';
 import {
-  emptyEntityBody,
+  emptyEntityDocument,
   EntityDetail,
   EntitySaveOutcome,
   EntityType,
-  Metadata,
+  EntityDocument,
   Visibility,
   withFieldDefaults,
 } from '@hexly/domain';
@@ -41,7 +41,7 @@ import { TypeRegistry } from '../../../entity-types/type-registry';
 
 /**
  * The central mutable store for the open Entity (ADR-0048): the concrete
- * {@link EntitySessionPort}. Owns the working body every View edits through {@link mutate},
+ * {@link EntitySessionPort}. Owns the working document every View edits through {@link mutate},
  * and bridges it to {@link EntitiesClient} for `/entities/:id` — load, autosave, conflict,
  * live-follow. Views bind to it through the {@link ENTITY_SESSION} token.
  *
@@ -59,7 +59,7 @@ const FLUSH_TIMEOUT_MS = 10_000;
 
 /** The savable payload references captured at one instant. */
 interface SaveSnapshot {
-  body: Metadata;
+  doc: EntityDocument;
   tags: readonly string[];
   types: readonly EntityType[];
   /** True when the type set was authored this session — only then does the save carry `types`. */
@@ -81,17 +81,17 @@ export class EntitySession implements EntitySessionPort {
   readonly current = this._current.asReadonly();
 
   /**
-   * The working Entity body — the Metadata map itself (ADR-0051) — the one store every View writes to:
-   * read a slice off {@link body}, write through {@link mutate}. The prose editor is no exception,
+   * The working **Entity Document** (ADR-0051) — the one store every View writes to:
+   * read a slice off {@link doc}, write through {@link mutate}. The prose editor is no exception,
    * committing its live doc into its `content` Field key on a debounce, so there is no separate buffer.
    */
-  private readonly _body = signal<Metadata>(emptyEntityBody());
-  readonly body = this._body.asReadonly();
+  private readonly _doc = signal<EntityDocument>(emptyEntityDocument());
+  readonly doc = this._doc.asReadonly();
 
   /**
    * Bumped on a *fresh* load — a new Entity adopted, or the canvas cleared for a route
    * swap — never on a {@link mutate}. A View watches it to reset the transient state tied
-   * to the old body (a map editor's undo history and selection); an edit leaves it be.
+   * to the old document (a map editor's undo history and selection); an edit leaves it be.
    */
   private readonly _loadGeneration = signal(0);
   readonly loadGeneration = this._loadGeneration.asReadonly();
@@ -131,7 +131,7 @@ export class EntitySession implements EntitySessionPort {
    */
   private readonly _editors = signal<readonly LiveEditor[]>([]);
 
-  /** Live Tags: ride the version-checked save alongside the body. */
+  /** Live Tags: ride the version-checked save alongside the document. */
   private readonly _tags = signal<readonly string[]>([]);
   readonly tags = this._tags.asReadonly();
 
@@ -145,9 +145,9 @@ export class EntitySession implements EntitySessionPort {
   /**
    * The last-persisted reference of each savable input, captured on load and reset to the *sent*
    * snapshot after a clean save. {@link dirty} derives by reference equality against these — sound
-   * because immer only yields a new body reference on a real edit.
+   * because immer only yields a new document reference on a real edit.
    */
-  private readonly _baseBody = signal<Metadata | null>(null);
+  private readonly _baseDoc = signal<EntityDocument | null>(null);
   private readonly _baseTags = signal<readonly string[]>([]);
   private readonly _baseTypes = signal<readonly EntityType[]>([]);
 
@@ -158,7 +158,7 @@ export class EntitySession implements EntitySessionPort {
   readonly dirty = computed(
     () =>
       this._current() !== null &&
-      (this._body() !== this._baseBody() ||
+      (this._doc() !== this._baseDoc() ||
         this.anyEditorPending() ||
         this._tags() !== this._baseTags() ||
         this._types() !== this._baseTypes()),
@@ -224,7 +224,7 @@ export class EntitySession implements EntitySessionPort {
     // conflict, during route load, and after a failed save until the payload
     // changes — else _saving flipping false would retry the same failing PUT.
     effect((onCleanup) => {
-      this._body();
+      this._doc();
       this.anyEditorPending();
       this._tags();
       this._types();
@@ -325,14 +325,14 @@ export class EntitySession implements EntitySessionPort {
     this._evicted.set(false);
     this.failed = null;
     this._current.set(detail);
-    this._body.set(detail.document); // the working body — prose, grid, and all — is the loaded body
+    this._doc.set(detail.document); // the working document — prose, grid, and all — is the loaded document
     this._tags.set(detail.tags);
     this._types.set(detail.types);
     // Baseline = exactly the references now live, so a load never reads as dirty.
-    this._baseBody.set(this._body());
+    this._baseDoc.set(this._doc());
     this._baseTags.set(this._tags());
     this._baseTypes.set(this._types());
-    // A fresh Entity: reset every View's body-tied transient state (a map's undo/selection, the
+    // A fresh Entity: reset every View's document-tied transient state (a map's undo/selection, the
     // prose editor's live doc) — the loadGeneration tick a live editor watches to re-seed.
     this._loadGeneration.update((n) => n + 1);
     // Live-follow tracks the open Entity reactively off _current (see the reconciler), so adopt
@@ -365,27 +365,27 @@ export class EntitySession implements EntitySessionPort {
   setTypes(types: readonly EntityType[]): void {
     this._types.set([...types]);
     const fields = this.typeRegistry.resolveFields(types);
-    const reconciled = withFieldDefaults(this._body(), fields, this.typeRegistry.structuredDataTypes);
-    if (reconciled !== this._body()) this._body.set(reconciled);
+    const reconciled = withFieldDefaults(this._doc(), fields, this.typeRegistry.structuredDataTypes);
+    if (reconciled !== this._doc()) this._doc.set(reconciled);
   }
 
   /**
-   * Run `recipe` against a draft of the body through Immer, adopting the result and returning
+   * Run `recipe` against a draft of the document through Immer, adopting the result and returning
    * the forward/inverse patches (ADR-0048) — a View that owns undo/redo keeps them to replay.
    * Bumps no load generation: an edit must not reset a View's history.
    */
-  mutate(recipe: (draft: Metadata) => void): {
+  mutate(recipe: (draft: EntityDocument) => void): {
     redo: Patch[];
     undo: Patch[];
   } {
-    const [next, redo, undo] = produceWithPatches(this._body(), recipe as (draft: Draft<Metadata>) => void);
-    this._body.set(next as Metadata);
+    const [next, redo, undo] = produceWithPatches(this._doc(), recipe as (draft: Draft<EntityDocument>) => void);
+    this._doc.set(next as EntityDocument);
     return { redo, undo };
   }
 
-  /** Apply raw patches to the body — the undo/redo channel a View replays its own stack through. */
+  /** Apply raw patches to the document — the undo/redo channel a View replays its own stack through. */
   applyPatches(patches: Patch[]): void {
-    this._body.set(immerApplyPatches(this._body(), patches));
+    this._doc.set(immerApplyPatches(this._doc(), patches));
   }
 
   /**
@@ -397,7 +397,7 @@ export class EntitySession implements EntitySessionPort {
     return () => this._editors.update((editors) => editors.filter((e) => e !== editor));
   }
 
-  /** Fold every live editor's pending doc into the working body — before a save snapshot is taken. */
+  /** Fold every live editor's pending doc into the working document — before a save snapshot is taken. */
   private flushEditors(): void {
     for (const editor of this._editors()) editor.flushPendingCommit();
   }
@@ -411,17 +411,17 @@ export class EntitySession implements EntitySessionPort {
     return concat(
       this.flush().pipe(ignoreElements()),
       defer(() => {
-        this._body.set(emptyEntityBody()); // clear the previous canvas and prose during load (#7)
+        this._doc.set(emptyEntityDocument()); // clear the previous canvas and prose during load (#7)
         this._tags.set([]); // and the previous Entity's tags, which ride the same load (#88)
         this._types.set([]); // and its type set, re-baselined below so the blank load isn't dirty
-        // A cleared canvas is a fresh start: reset the Views' body-tied state (#7) — the same
+        // A cleared canvas is a fresh start: reset the Views' document-tied state (#7) — the same
         // bump adopt() makes, so a load that never resolves still leaves no stale map state, and
-        // the prose editor re-seeds off the emptied body.
+        // the prose editor re-seeds off the emptied document.
         this._loadGeneration.update((n) => n + 1);
         // Re-baseline onto the cleared placeholder so the load window isn't dirty — else a
         //404 redirect (which clears then leaves) would flush this empty state over the
         // Entity the user just left (ADR-0026).
-        this._baseBody.set(this._body());
+        this._baseDoc.set(this._doc());
         this._baseTags.set(this._tags());
         this._baseTypes.set(this._types());
         // Eviction belongs to the Entity just left (#174): clear it as the new load starts —
@@ -436,7 +436,7 @@ export class EntitySession implements EntitySessionPort {
     );
   }
 
-  /** Rename the open Entity (metadata only — does not affect the body save). */
+  /** Rename the open Entity (metadata only — does not affect the document save). */
   rename(name: string): Observable<EntityDetail> {
     return this.patch({ name });
   }
@@ -479,7 +479,7 @@ export class EntitySession implements EntitySessionPort {
     // Read-only opener → no write is ever attempted (the root of the stuck-banner bug):
     // gating here covers every path (autosave scheduler, Cmd/Ctrl+S, leave flush).
     if (!this.writable()) return EMPTY;
-    // Flush every live editor into the body *before* snapshotting, so keystrokes still in the
+    // Flush every live editor into the document *before* snapshotting, so keystrokes still in the
     // debounce window ride this save instead of being eaten by it (ADR-0051).
     this.flushEditors();
     // Snapshot the exact references being sent. A clean save advances the baseline to
@@ -488,7 +488,7 @@ export class EntitySession implements EntitySessionPort {
     return this.runSave(
       open,
       {
-        body: this._body(),
+        doc: this._doc(),
         tags: this._tags(),
         types: this._types(),
         typesChanged: this._types() !== this._baseTypes(),
@@ -502,13 +502,13 @@ export class EntitySession implements EntitySessionPort {
     this._saving.set(true);
     this._error.set(null);
     this.failed = null;
-    const { body, tags, types, typesChanged } = snapshot;
-    // The body already carries every edit — prose, grid, metadata — since every View writes through
+    const { doc, tags, types, typesChanged } = snapshot;
+    // The document already carries every edit — prose, grid, and all — since every View writes through
     // `mutate` (ADR-0051). Send it as-is.
-    // Send `types` only when this edit authored them, so a plain body save never re-types data at rest.
+    // Send `types` only when this edit authored them, so a plain document save never re-types data at rest.
     const request$ = typesChanged
-      ? this.entities.save(open.id, body, open.version, tags, types)
-      : this.entities.save(open.id, body, open.version, tags);
+      ? this.entities.save(open.id, doc, open.version, tags, types)
+      : this.entities.save(open.id, doc, open.version, tags);
     const save$ = request$.pipe(
       tap((outcome) => {
         // Drop a late response if the user has since navigated to another Entity — it
@@ -521,7 +521,7 @@ export class EntitySession implements EntitySessionPort {
         } else {
           this._conflict.set(null);
           this._current.set(this.withPermissions(outcome.entity, open));
-          this._baseBody.set(body);
+          this._baseDoc.set(doc);
           this._baseTags.set(tags);
           this._baseTypes.set(types);
         }
@@ -569,7 +569,7 @@ export class EntitySession implements EntitySessionPort {
   private unsavedFailure(): boolean {
     const failed = this.failed;
     return (
-      failed !== null && this._body() === failed.body && this._tags() === failed.tags && this._types() === failed.types
+      failed !== null && this._doc() === failed.doc && this._tags() === failed.tags && this._types() === failed.types
     );
   }
 

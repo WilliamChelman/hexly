@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { Metadata } from '@hexly/domain';
+import { EntityDocument } from '@hexly/domain';
 import { Button, Dialog } from '@hexly/web-ui';
 import { EntitySession } from '../services/entity-session';
 import { EntityTypesEditor } from './entity-types-editor';
@@ -39,13 +39,13 @@ export class EntityTypesDialog {
   readonly open = input(false);
   readonly closed = output<void>();
 
-  /** The live Metadata the editor validates required Fields against and the prompt seeds from. */
-  protected readonly metadata = computed<Metadata>(() => this.session.body());
+  /** The live EntityDocument the editor validates required Fields against and the prompt seeds from. */
+  protected readonly metadata = computed<EntityDocument>(() => this.session.doc());
 
-  /** Fold the add-type prompt's collected Field values into the one Metadata map through the store. */
-  protected onMetadata(metadata: Metadata): void {
+  /** Fold the add-type prompt's collected Field values into the one EntityDocument map through the store. */
+  protected onMetadata(metadata: EntityDocument): void {
     this.session.mutate((draft) => {
-      // The body IS the Metadata map now (ADR-0051); the prompt emits the full merged map (existing
+      // The body IS the EntityDocument map now (ADR-0051); the prompt emits the full merged map (existing
       // values, prose and grid among them, plus the new type's Fields), so replace the body wholesale.
       for (const key of Object.keys(draft)) delete draft[key];
       Object.assign(draft, metadata);

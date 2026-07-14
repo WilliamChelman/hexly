@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { FieldSchema, Metadata, NO_STRUCTURED_DATA_TYPES, validateFields, writeField } from '@hexly/domain';
+import { FieldSchema, EntityDocument, NO_STRUCTURED_DATA_TYPES, validateFields, writeField } from '@hexly/domain';
 import { Button, Chip } from '@hexly/web-ui';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 import { FieldControl } from '@hexly/web-entity/controls';
@@ -9,7 +9,7 @@ import { FieldControl } from '@hexly/web-entity/controls';
  * Pick, add, remove, and reorder an Entity's ordered Entity Type set, `types[0]` primary (ADR-0048).
  * Presentational: reads `types`/`metadata`, emits the authored set. Adding a type with unmet required
  * Fields opens an inline prompt ({@link FieldControl} + {@link validateFields}) and holds the type
- * back until they are supplied; removing only drops the lens, leaving its Metadata behind
+ * back until they are supplied; removing only drops the lens, leaving its EntityDocument behind
  * (CONTEXT.md → Field).
  */
 @Component({
@@ -132,8 +132,8 @@ export class EntityTypesEditor {
 
   /** The current ordered type set — `types[0]` primary. */
   readonly types = input.required<readonly string[]>();
-  /** Current Metadata — a re-added type whose values already persist skips the prompt. */
-  readonly metadata = input<Metadata>({});
+  /** Current EntityDocument — a re-added type whose values already persist skips the prompt. */
+  readonly metadata = input<EntityDocument>({});
   readonly writable = input(true);
   /**
    * Whether adding a type with unmet required Fields opens the inline prompt. The header binds `true`
@@ -143,12 +143,12 @@ export class EntityTypesEditor {
   readonly promptOnAdd = input(true);
 
   readonly typesChange = output<readonly string[]>();
-  readonly metadataChange = output<Metadata>();
+  readonly metadataChange = output<EntityDocument>();
 
   /** The type awaiting its required Fields before it is added, or `null` when none is pending. */
   protected readonly pendingType = signal<string | null>(null);
   protected readonly pendingFields = signal<readonly FieldSchema[]>([]);
-  protected readonly pendingMetadata = signal<Metadata>({});
+  protected readonly pendingMetadata = signal<EntityDocument>({});
 
   /** The registered types not already carried — the add picker's options. */
   protected readonly addable = computed(() =>
@@ -192,7 +192,7 @@ export class EntityTypesEditor {
     this.typesChange.emit(next);
   }
 
-  /** Drop a type — the lens only; its Metadata persists (CONTEXT.md → Field). Never the last one. */
+  /** Drop a type — the lens only; its EntityDocument persists (CONTEXT.md → Field). Never the last one. */
   protected remove(type: string): void {
     if (this.types().length <= 1) return;
     this.typesChange.emit(this.types().filter((t) => t !== type));
@@ -219,7 +219,7 @@ export class EntityTypesEditor {
     this.pendingMetadata.update((meta) => writeField(meta, field, value));
   }
 
-  /** Commit the pending add once its Fields validate: emit the Metadata, then the new set. */
+  /** Commit the pending add once its Fields validate: emit the EntityDocument, then the new set. */
   protected confirmAdd(): void {
     const type = this.pendingType();
     if (!type || !this.pendingValid()) return;

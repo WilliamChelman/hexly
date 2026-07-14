@@ -4,7 +4,7 @@ import {
   EntityEdge,
   FieldFacetValue,
   GrantRole,
-  Metadata,
+  EntityDocument,
   ReindexFailure,
   Visibility,
   descriptorsSchema,
@@ -30,7 +30,7 @@ interface Derived {
   searchText: string;
   descriptors: string[];
   edges: EntityEdge[];
-  /** The denormalised facetable Field values (ADR-0048, #188) — depends on `types` *and* Metadata. */
+  /** The denormalised facetable Field values (ADR-0048, #188) — depends on `types` *and* EntityDocument. */
   fieldFacets: FieldFacetValue[];
 }
 
@@ -72,10 +72,10 @@ export interface InsertEntityInput {
   ownerId: string;
   worldId: string;
   name: string;
-  /** The ordered Entity Type set; `types[0]` is primary. Carried alongside `tags`, not in the body. */
+  /** The ordered Entity Type set; `types[0]` is primary. Carried alongside `tags`, not in the document. */
   types: readonly string[];
   tags: readonly string[];
-  body: Metadata;
+  document: EntityDocument;
 }
 
 /** A stored `entities` row. */
@@ -122,7 +122,7 @@ export type EntityChange =
       tags?: readonly string[];
       /** Present → the type set fully replaces the stored one; omitted → left untouched (ADR-0048). */
       types?: readonly string[];
-      document?: Metadata;
+      document?: EntityDocument;
       /** Present → the base version rides the atomic WHERE and is bumped. */
       version?: number;
     }
@@ -175,7 +175,7 @@ export class EntityWrites {
    */
   insert(input: InsertEntityInput): EntityRow {
     const now = Date.now();
-    const derived = this.derive(input.body, input.types, input.worldId);
+    const derived = this.derive(input.document, input.types, input.worldId);
     const row: EntityRow = {
       id: input.id ?? randomUUID(),
       worldId: input.worldId,
@@ -185,7 +185,7 @@ export class EntityWrites {
       visibility: 'private',
       version: INITIAL_VERSION,
       seq: INITIAL_SEQ,
-      document: JSON.stringify(input.body),
+      document: JSON.stringify(input.document),
       contentText: derived.searchText,
       createdAt: now,
       updatedAt: now,
@@ -309,7 +309,7 @@ export class EntityWrites {
       try {
         derived.push({
           row,
-          derived: this.derive(JSON.parse(row.document) as Metadata, row.types, row.worldId),
+          derived: this.derive(JSON.parse(row.document) as EntityDocument, row.types, row.worldId),
         });
       } catch (err) {
         failures.push({
@@ -339,7 +339,7 @@ export class EntityWrites {
   }
 
   /**
-   * The one derivation of the Entity's document. It takes the whole body, not just the Content: a
+   * The one derivation of the Entity's document. It takes the whole document, not just the Content: a
    * Hex Map's Entity Links live on its Hexes, Features, and Regions as well as in its prose
    * (ADR-0046), and so do the names it is searchable by (#205).
    *
@@ -350,22 +350,22 @@ export class EntityWrites {
    * `content → entity` edge carries a descriptor, so the non-null ones are exactly the descriptors
    * the Content uses.
    */
-  private derive(body: Metadata, types: readonly string[], worldId: string): Derived {
+  private derive(doc: EntityDocument, types: readonly string[], worldId: string): Derived {
     // Scoped to the Entity's World so a user-defined type's Fields resolve too.
     const fields = resolveFields(this.worldTypeFields.resolverFor(worldId), types);
     const dataTypes = this.typeFields.structuredDataTypes;
-    const edges = harvestEdges(body, fields, dataTypes);
+    const edges = harvestEdges(doc, fields, dataTypes);
     return {
-      searchText: deriveSearchText(body, fields, dataTypes),
+      searchText: deriveSearchText(doc, fields, dataTypes),
       descriptors: descriptorsSchema.parse(edges.flatMap((e) => e.descriptor ?? [])),
       edges,
-      fieldFacets: deriveFieldFacets(fields, body),
+      fieldFacets: deriveFieldFacets(fields, doc),
     };
   }
 
   /**
    * Replace the Entity's derived index rows with the freshly harvested sets — wholesale, no
-   * diffing, so they are self-pruning. Must run in the same transaction as the body write, so the
+   * diffing, so they are self-pruning. Must run in the same transaction as the document write, so the
    * indexes reflect the last *successful* save and never a rejected one.
    */
   private replaceDerived(id: string, worldId: string, derived: Derived): void {
@@ -515,7 +515,7 @@ export class EntityWrites {
       )
       .run();
     if (res.changes > 0) {
-      // Same transaction as the body write, so the indexes always reflect the last *successful*
+      // Same transaction as the document write, so the indexes always reflect the last *successful*
       // save, never a rejected one.
       if (derived) this.replaceDerived(id, row.worldId, derived);
       return { status: 'ok', row: { ...row, ...set } };

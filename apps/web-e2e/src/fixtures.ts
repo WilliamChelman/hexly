@@ -52,7 +52,7 @@ interface SavedGrid {
 
 /**
  * The grid a Hex Map has actually persisted, fetched from the API. The one place a test knows *where*
- * the grid is stored: a **Structured Field**'s value in the Entity's body, which **is** the Metadata
+ * the grid is stored: a **Structured Field**'s value in the Entity's body, which **is** the EntityDocument
  * map (ADR-0050, ADR-0051). `core.hexmap` declares its grid at `grid`; a user-defined type declares
  * its at whatever key its author chose — that is `fieldKey`.
  */

@@ -54,7 +54,7 @@ test('creates a dnd.monster, fills its required Fields, and reads the stat block
   await expect(page.getByTestId('stat-strength').locator('input')).toHaveValue('30');
   await expect(page.getByTestId('stat-size').locator('select')).toHaveValue('Huge');
 
-  // A Field is a lens over the one Metadata map — which is the body itself now (ADR-0051): the stat
+  // A Field is a lens over the one EntityDocument map — which is the body itself now (ADR-0051): the stat
   // block's values sit at the body root, so an instance without the plugin loses nothing.
   const res = await request.get(`/api/entities/${id}`);
   expect(res.ok()).toBeTruthy();

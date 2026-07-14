@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { TranslocoPipe } from '@jsverse/transloco';
 import {
   FieldSchema,
-  Metadata,
+  EntityDocument,
   NO_STRUCTURED_DATA_TYPES,
   readField,
   validateFields,
@@ -26,11 +26,11 @@ interface Slot {
   readonly value: unknown;
 }
 
-/** The plugin's declared Fields, by Metadata key. The block renders its own type, so it needs no registry. */
+/** The plugin's declared Fields, by EntityDocument key. The block renders its own type, so it needs no registry. */
 const FIELDS_BY_KEY = new Map(DND_MONSTER_TYPE.fields.map((field) => [field.key, field]));
 
 /**
- * The `dnd.monster` bespoke View (`dnd.view.stat-block`): edits the same Metadata map every other
+ * The `dnd.monster` bespoke View (`dnd.view.stat-block`): edits the same EntityDocument map every other
  * View reads, through {@link ENTITY_SESSION}.
  *
  * It must render every Field the type declares: it is a monster's only authoring surface (the create
@@ -117,8 +117,8 @@ export class StatBlockView {
 
   protected readonly writable = this.session.writable;
 
-  /** The live working Metadata — the body IS the map now (ADR-0051), and the stat block is a lens over it. */
-  private readonly metadata = computed<Metadata>(() => this.session.body());
+  /** The live working EntityDocument — the body IS the map now (ADR-0051), and the stat block is a lens over it. */
+  private readonly metadata = computed<EntityDocument>(() => this.session.doc());
 
   private readonly invalidKeys = computed(
     () =>
@@ -151,13 +151,13 @@ export class StatBlockView {
     return this.invalidKeys().has(field.key);
   }
 
-  /** Write a stat back into the Metadata map through the central store, the channel every View uses. */
+  /** Write a stat back into the EntityDocument map through the central store, the channel every View uses. */
   protected set(field: FieldSchema, value: unknown): void {
     if (!this.session.writable()) return;
     this.session.mutate((draft) => writeFieldInPlace(draft, field, value));
   }
 
-  /** The slots for the given Metadata keys, in stat-block order — one per Field the type declares. */
+  /** The slots for the given EntityDocument keys, in stat-block order — one per Field the type declares. */
   private slots(keys: readonly string[]): Slot[] {
     return keys.flatMap((key) => {
       const field = FIELDS_BY_KEY.get(key);

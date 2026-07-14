@@ -27,7 +27,7 @@ import { FieldControl } from '@hexly/web-entity/controls';
 })
 export class StatSlot {
   readonly field = input.required<FieldSchema>();
-  /** The Field's raw value straight off the Metadata map — the lens, never a copy. */
+  /** The Field's raw value straight off the EntityDocument map — the lens, never a copy. */
   readonly value = input<unknown>();
   readonly writable = input(false);
   readonly invalid = input(false);

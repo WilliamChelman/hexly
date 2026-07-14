@@ -89,7 +89,7 @@ export class TypeRegistry implements EntityTypes {
    * A registered type affords exactly the Views it declares; a fields-only type declares
    * `core.view.fields` outright. An **unregistered** type — a plugin this build does not bundle —
    * affords the Content view and the generic Field view instead, in that order, so its values remain
-   * readable as plain Metadata.
+   * readable as plain EntityDocument.
    */
   viewsFor(types: readonly string[] | null | undefined): ViewInstance[] {
     const seen = new Map<string, ViewInstance>();
@@ -120,7 +120,7 @@ export class TypeRegistry implements EntityTypes {
 
   /**
    * The union of Field schemas an Entity carrying `types` affords — every registered type's declared
-   * Fields, primary type first, deduped by Metadata key.
+   * Fields, primary type first, deduped by EntityDocument key.
    */
   resolveFields(types: readonly string[] | null | undefined): FieldSchema[] {
     return resolveFields((type) => this.get(type)?.fields, types ?? []);

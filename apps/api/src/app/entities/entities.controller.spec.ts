@@ -17,7 +17,7 @@ import { ConfigModule } from '../config/config.module';
 import { WorldsModule } from '../worlds/worlds.module';
 import { WorldsService } from '../worlds/worlds.service';
 
-/** A Hex Map body: prose at `content`, grid at `grid` — the body is the Metadata map (ADR-0051). */
+/** A Hex Map Entity Document: prose at `content`, grid at `grid` (ADR-0051). */
 function hexmapBody(hexes: Record<string, unknown> = {}) {
   return {
     content: emptyContent(),
@@ -113,7 +113,7 @@ describe('Entities endpoints', () => {
     });
   });
 
-  it('creates a note as Content-only — it declares no Fields, so it mints no Metadata', async () => {
+  it('creates a note as Content-only — it declares no Fields, so it mints no EntityDocument', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
 
     const res = await ada
@@ -125,18 +125,18 @@ describe('Entities endpoints', () => {
     expect(res.body.document).toEqual({ content: emptyContent() });
   });
 
-  it('seeds a multi-type create’s initial Metadata into the minted body (#189)', async () => {
+  it('seeds a multi-type create’s initial EntityDocument into the minted body (#189)', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
 
     // Creating with more than one type, carrying the values the create dialog collected for a
-    // picked type's required Fields — seeded straight into the body's Metadata map.
+    // picked type's required Fields — seeded straight into the body's EntityDocument map.
     const res = await ada
       .post('/entities')
-      .send({ name: 'Balthazar', types: ['core.note', 'core.hexmap'], metadata: { role: 'lich' } })
+      .send({ name: 'Balthazar', types: ['core.note', 'core.hexmap'], document: { role: 'lich' } })
       .expect(201);
 
     expect(res.body.types).toEqual(['core.note', 'core.hexmap']);
-    // The collected Metadata seeds over the minted defaults, not in place of them. `core.note` and
+    // The collected EntityDocument seeds over the minted defaults, not in place of them. `core.note` and
     // `core.hexmap` both declare the prose Field, but `resolveFields` dedupes it to one (ADR-0051).
     expect(res.body.document).toEqual({
       content: emptyContent(),
@@ -488,7 +488,7 @@ describe('Entities endpoints', () => {
       expect(res.body.data.fields).toContainEqual({ key: 'cr', code: 'type' });
     });
 
-    it('accepts a typed edit that satisfies the type’s Fields, keeping values in the Metadata map', async () => {
+    it('accepts a typed edit that satisfies the type’s Fields, keeping values in the EntityDocument map', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const created = await ada.post('/entities').send({ name: 'Aboleth', types: ['core.note'] });
 
@@ -507,7 +507,7 @@ describe('Entities endpoints', () => {
 
     it('accepts a plain body save that omits types — data at rest is never retroactively invalidated', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      // A typed Entity carrying Metadata that would fail the gate; a plain edit (no `types`) is
+      // A typed Entity carrying EntityDocument that would fail the gate; a plain edit (no `types`) is
       // tolerated, so an unrelated body change never strands the Entity on its malformed Fields.
       const created = await ada.post('/entities').send({ name: 'Aboleth', types: ['test.beast'] });
 
@@ -526,7 +526,7 @@ describe('Entities endpoints', () => {
       const created = await ada.post('/entities').send({ name: 'Aboleth', types: ['test.beast'] });
       const worldId = created.body.worldId;
 
-      // Import: bulk-inserted Metadata never faces the gate (ADR-0033), whatever it holds — a typed
+      // Import: bulk-inserted EntityDocument never faces the gate (ADR-0033), whatever it holds — a typed
       // import (#203) included.
       app.get(EntitiesService).importEntity({
         ownerId: adaId,
@@ -535,11 +535,11 @@ describe('Entities endpoints', () => {
         name: 'Kraken',
         types: ['test.beast'],
         tags: [],
-        body: bodyWith({ cr: 'wrong' }),
+        document: bodyWith({ cr: 'wrong' }),
       });
       await ada.get('/entities/imported-beast').expect(200);
 
-      // At rest: corrupt the stored Metadata directly, then confirm a read never validates it.
+      // At rest: corrupt the stored EntityDocument directly, then confirm a read never validates it.
       db.update(entities)
         .set({ document: JSON.stringify(bodyWith({ cr: 'wrong at rest' })) })
         .where(eq(entities.id, created.body.id))
@@ -1287,7 +1287,7 @@ describe('Entities endpoints', () => {
       ]);
     });
 
-    // Create a beast Entity carrying typed Metadata: a typed save (`types: ['test.beast']`) is the
+    // Create a beast Entity carrying typed EntityDocument: a typed save (`types: ['test.beast']`) is the
     // active edit that both satisfies the forward-only gate and materialises the Field facets.
     async function beast(agent: Awaited<ReturnType<typeof signIn>>, name: string, metadata: Record<string, unknown>) {
       const created = await agent.post('/entities').send({ name, types: ['core.note'] });
@@ -1686,7 +1686,7 @@ describe('Entities endpoints', () => {
    * {@link TypeFieldRegistry} seeds it at startup.
    */
   describe('the bundled dnd.monster plugin type', () => {
-    /** Typed-save a monster with the given Metadata — an active typed edit, so the gate applies. */
+    /** Typed-save a monster with the given EntityDocument — an active typed edit, so the gate applies. */
     async function saveMonster(agent: Awaited<ReturnType<typeof signIn>>, metadata: Record<string, unknown>) {
       const created = await agent
         .post('/entities')

@@ -6,7 +6,7 @@ import {
   FieldSchema,
   fieldSchemaSchema,
   FieldValidation,
-  Metadata,
+  EntityDocument,
   parseFieldFilter,
   parseFieldFilters,
   readField,
@@ -26,7 +26,7 @@ function field(partial: Partial<FieldSchema> & Pick<FieldSchema, 'key' | 'dataTy
 /** `validateFields` takes the data-type set explicitly, and the built-in data-types need none of it. */
 function validate(
   fields: readonly FieldSchema[],
-  metadata: Metadata | undefined,
+  metadata: EntityDocument | undefined,
   dataTypes = NO_STRUCTURED_DATA_TYPES,
 ): FieldValidation {
   return validateFields(fields, metadata, dataTypes);
@@ -149,8 +149,8 @@ describe('resolveFields', () => {
     expect(resolved[0].label).toBe('A name');
   });
 
-  it('returns no fields for a types[] set whose types declare none — values stay plain Metadata', () => {
-    // A missing/absent type resolves to nothing, so its Metadata is never surfaced as a Field.
+  it('returns no fields for a types[] set whose types declare none — values stay plain EntityDocument', () => {
+    // A missing/absent type resolves to nothing, so its EntityDocument is never surfaced as a Field.
     expect(resolveFields(resolver, ['core.note'])).toEqual([]);
     expect(resolveFields(resolver, [])).toEqual([]);
   });
@@ -224,7 +224,7 @@ describe('validateFields (forward-only)', () => {
   });
 });
 
-describe('deriveFieldFacets (the write-time denormalisation, a lens over Metadata)', () => {
+describe('deriveFieldFacets (the write-time denormalisation, a lens over EntityDocument)', () => {
   const fields: FieldSchema[] = [
     field({ key: 'cr', dataType: { kind: 'number' }, facetable: true }),
     field({
@@ -375,15 +375,15 @@ describe('parseFieldFilter (`key:op:value`)', () => {
   });
 });
 
-describe('readField / writeField (a lens over the one Metadata map)', () => {
+describe('readField / writeField (a lens over the one EntityDocument map)', () => {
   const cr = field({ key: 'cr', dataType: { kind: 'number' } });
 
-  it('reads a Field’s value straight off the Metadata map', () => {
+  it('reads a Field’s value straight off the EntityDocument map', () => {
     expect(readField({ cr: 7, other: 'x' }, cr)).toBe(7);
     expect(readField(undefined, cr)).toBeUndefined();
   });
 
-  it('writes a value back into a fresh Metadata map, leaving sibling keys intact', () => {
+  it('writes a value back into a fresh EntityDocument map, leaving sibling keys intact', () => {
     const next = writeField({ other: 'x' }, cr, 9);
     expect(next).toEqual({ other: 'x', cr: 9 });
   });
@@ -395,7 +395,7 @@ describe('readField / writeField (a lens over the one Metadata map)', () => {
     expect(after).not.toBe(before);
   });
 
-  it('clears the key when the value is emptied, leaving other Metadata untouched', () => {
+  it('clears the key when the value is emptied, leaving other EntityDocument untouched', () => {
     expect(writeField({ cr: 1, other: 'x' }, cr, undefined)).toEqual({
       other: 'x',
     });
@@ -511,7 +511,7 @@ describe('Structured Field data-types (ADR-0050)', () => {
     });
 
     // The absent-plugin path (ADR-0050): a Field whose data-type went missing stays saveable, its
-    // value plain Metadata.
+    // value plain EntityDocument.
     it('is inert for an unregistered kind — never blocking the save of an Entity whose plugin is absent', () => {
       // The empty set stands for the build without the plugin: nothing resolves `test.board`.
       expect(validate([boardField], { board: { tiles: [{ entityId: 'riverbend' }] } }).ok).toBe(true);

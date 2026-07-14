@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Metadata } from './field';
+import { EntityDocument } from './field';
 import { deriveSearchText } from './derive-search-text';
 import { fieldSchemaSchema } from './field';
 import { defineStructuredDataType, NO_STRUCTURED_DATA_TYPES, structuredDataTypeSet } from './structured-data-type';
@@ -32,8 +32,8 @@ const proseField = fieldSchemaSchema.parse({ key: 'prose', label: 'Prose', dataT
 const boardField = fieldSchemaSchema.parse({ key: 'board', label: 'Board', dataType: { kind: 'test.board' } });
 const sealField = fieldSchemaSchema.parse({ key: 'seal', label: 'Seal', dataType: { kind: 'test.seal' } });
 
-/** A body whose `board` Field holds two named tiles. */
-const board = (extra: Metadata = {}): Metadata => ({
+/** A doc whose `board` Field holds two named tiles. */
+const board = (extra: EntityDocument = {}): EntityDocument => ({
   board: { tiles: [{ name: 'Riverbend' }, { name: 'Harbour' }] },
   ...extra,
 });
@@ -48,8 +48,8 @@ describe('deriveSearchText (#205, ADR-0051)', () => {
   });
 
   it('concatenates every structured contribution, single-spaced', () => {
-    const body = board({ prose: { text: 'A ruined keep.' } });
-    expect(deriveSearchText(body, [proseField, boardField], DATA_TYPES)).toBe('A ruined keep. Riverbend Harbour');
+    const doc = board({ prose: { text: 'A ruined keep.' } });
+    expect(deriveSearchText(doc, [proseField, boardField], DATA_TYPES)).toBe('A ruined keep. Riverbend Harbour');
   });
 
   it('reads no structured text without the Field resolved — an Entity is its Fields, always', () => {
@@ -70,8 +70,8 @@ describe('deriveSearchText (#205, ADR-0051)', () => {
   });
 
   it('takes no text from a malformed value at rest, rather than throwing (forward-only)', () => {
-    const body: Metadata = { prose: { text: 'Still findable.' }, board: 'garbage' };
+    const doc: EntityDocument = { prose: { text: 'Still findable.' }, board: 'garbage' };
 
-    expect(deriveSearchText(body, [proseField, boardField], DATA_TYPES)).toBe('Still findable.');
+    expect(deriveSearchText(doc, [proseField, boardField], DATA_TYPES)).toBe('Still findable.');
   });
 });

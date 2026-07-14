@@ -4,7 +4,7 @@ import { EntityLinkValue, entityLinkValueSchema, EntitySummary, FieldSchema } fr
 import { EntitySearchPicker } from '@hexly/web-ui';
 
 /**
- * One data-type-appropriate control for a typed Field (ADR-0048). Reads a raw Metadata `value`, emits
+ * One data-type-appropriate control for a typed Field (ADR-0048). Reads a raw EntityDocument `value`, emits
  * the edited one coerced to the Field's data-type.
  */
 @Component({
@@ -117,7 +117,7 @@ import { EntitySearchPicker } from '@hexly/web-ui';
 })
 export class FieldControl {
   readonly field = input.required<FieldSchema>();
-  /** The Field's current raw Metadata value (a lens, never copied — CONTEXT.md → Field). */
+  /** The Field's current raw EntityDocument value (a lens, never copied — CONTEXT.md → Field). */
   readonly value = input<unknown>();
   readonly disabled = input(false);
   /** Flags the control invalid (forward-only validation), driving `aria-invalid`. */
@@ -131,7 +131,7 @@ export class FieldControl {
   /** The Entity-Link picker's controlled search query (the picker owns nothing itself). */
   protected readonly query = signal('');
 
-  /** The current Entity-Link value parsed off the raw Metadata, or `null` for an unset/ill-typed one. */
+  /** The current Entity-Link value parsed off the raw EntityDocument, or `null` for an unset/ill-typed one. */
   protected readonly link = computed<EntityLinkValue | null>(
     () => entityLinkValueSchema.safeParse(this.value()).data ?? null,
   );

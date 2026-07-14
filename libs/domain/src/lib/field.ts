@@ -1,9 +1,9 @@
 /**
- * Typed **Fields** as a lens over **Metadata** (CONTEXT.md → Field, ADR-0048).
+ * Typed **Fields** as a lens over **EntityDocument** (CONTEXT.md → Field, ADR-0048).
  *
- * A Field is not a store: it gives one Metadata key a name, a data-type, and facet-ability, while the
- * value stays in the Entity's one Metadata map. An absent Type Definition (a missing plugin) leaves
- * the value as plain Metadata, and Obsidian import/export (ADR-0033) is untouched — the Field only
+ * A Field is not a store: it gives one EntityDocument key a name, a data-type, and facet-ability, while the
+ * value stays in the Entity's one EntityDocument map. An absent Type Definition (a missing plugin) leaves
+ * the value as plain EntityDocument, and Obsidian import/export (ADR-0033) is untouched — the Field only
  * *types and surfaces* a key it never owns.
  */
 
@@ -16,8 +16,8 @@ import {
   StructuredDataTypeSet,
 } from './structured-data-type';
 
-/** The Metadata map a Field reads from and writes to — the one store, never forked (CONTEXT.md → Metadata). */
-export type Metadata = Record<string, unknown>;
+/** The **Entity Document** a Field reads from and writes to — the one store, never forked (CONTEXT.md → Entity Document). */
+export type EntityDocument = Record<string, unknown>;
 
 /** The scalar Field data-types — the item types a `list` may hold, and Fields in their own right. */
 const stringType = z.object({ kind: z.literal('string') });
@@ -139,7 +139,7 @@ export function isFacetableField(field: FieldSchema): field is FieldSchema & { d
 }
 
 /**
- * One Field's declaration in a Type Definition's schema: the Metadata `key` it types, a human `label`,
+ * One Field's declaration in a Type Definition's schema: the EntityDocument `key` it types, a human `label`,
  * its `dataType`, whether it is `required`, and whether it is `facetable` (surfaced as a per-type facet
  * in the Entity Browser, ADR-0035).
  */
@@ -167,7 +167,7 @@ export type TypeFieldResolver = (typeId: string) => readonly FieldSchema[] | und
 
 /**
  * The union of Field schemas an Entity carrying `types` affords — every type's declared Fields, in
- * `types` order (primary type first), deduped by `key`. When two types type the same Metadata key,
+ * `types` order (primary type first), deduped by `key`. When two types type the same EntityDocument key,
  * the primary type's declaration wins.
  */
 export function resolveFields(resolver: TypeFieldResolver, types: readonly string[]): FieldSchema[] {
@@ -197,28 +197,28 @@ export interface FieldValidation {
 
 /**
  * The **forward-only** validation gate (CONTEXT.md → Field, ADR-0048): validate a resolved Field set
- * against an Entity's Metadata. A required Field must be present; a *present* value — required or not
- * — must match its data-type. An absent optional Field is fine, and any Metadata key with no Field is
+ * against an Entity's EntityDocument. A required Field must be present; a *present* value — required or not
+ * — must match its data-type. An absent optional Field is fine, and any EntityDocument key with no Field is
  * ignored entirely (a Field is a lens, not a whitelist).
  *
  * The caller decides *when* to enforce it — active typed edits only, never on import or data at rest,
- * so already stored Metadata is never retroactively invalidated.
+ * so already stored EntityDocument is never retroactively invalidated.
  *
  * A **Structured Field** validates against its data-type's own `valueSchema`, resolved from the
  * host-composed `dataTypes` (ADR-0050). One whose kind that set does not carry is *inert* — skipped,
- * its value left as plain Metadata, exactly as an absent plugin's Fields are; the unregistered kind is
+ * its value left as plain EntityDocument, exactly as an absent plugin's Fields are; the unregistered kind is
  * rejected where the Type is declared instead ({@link unresolvedDataTypeErrors}).
  */
 export function validateFields(
   fields: readonly FieldSchema[],
-  metadata: Metadata | undefined,
+  doc: EntityDocument | undefined,
   dataTypes: StructuredDataTypeSet,
 ): FieldValidation {
   const errors: FieldError[] = [];
   for (const field of fields) {
     const matches = valueMatcher(field.dataType, dataTypes);
     if (!matches) continue;
-    const value = metadata?.[field.key];
+    const value = doc?.[field.key];
     if (isAbsent(value)) {
       if (field.required) errors.push({ key: field.key, code: 'required' });
       continue;
@@ -245,7 +245,7 @@ function valueMatcher(
 /**
  * The **declaration** gate (ADR-0050): every Field naming a structured data-type the host's set does
  * not carry. Run where a Type is declared (a plugin type at startup, a **User-defined type** as a
- * World Owner saves it), never against an Entity's Metadata.
+ * World Owner saves it), never against an Entity's EntityDocument.
  */
 export function unresolvedDataTypeErrors(
   fields: readonly FieldSchema[],
@@ -259,7 +259,7 @@ export function unresolvedDataTypeErrors(
 }
 
 /**
- * One denormalised **facetable** Field value (ADR-0048): the Metadata `key` it types, its canonical
+ * One denormalised **facetable** Field value (ADR-0048): the EntityDocument `key` it types, its canonical
  * string `value`, and a `num` — the numeric form of a `number` Field, else `null`. `num` lets a range
  * filter compare a number *as a number* (`cr >= 5`), while an enum/date/string compares its `value`
  * lexically (ISO dates sort correctly as text). Materialised on write and rebuilt by Reindex.
@@ -271,18 +271,18 @@ export interface FieldFacetValue {
 }
 
 /**
- * The pure Field-facet derivation (ADR-0048): a resolved Field set + an Entity's Metadata → the
+ * The pure Field-facet derivation (ADR-0048): a resolved Field set + an Entity's EntityDocument → the
  * denormalised facet values to materialise. Only **facetable** Fields contribute (never a
  * **Structured Field**, ADR-0050), only a *present, well-typed* value is indexed (an ill-typed value
  * at rest is tolerated, never faceted), a `list` explodes to one value per item, and values repeated
  * within one Entity collapse so a facet count is per-Entity rather than per-occurrence.
  */
-export function deriveFieldFacets(fields: readonly FieldSchema[], metadata: Metadata | undefined): FieldFacetValue[] {
+export function deriveFieldFacets(fields: readonly FieldSchema[], doc: EntityDocument | undefined): FieldFacetValue[] {
   const seen = new Set<string>();
   const out: FieldFacetValue[] = [];
   for (const field of fields) {
     if (!isFacetableField(field)) continue;
-    const raw = readField(metadata, field);
+    const raw = readField(doc, field);
     if (raw === undefined || raw === null) continue;
     for (const item of facetItems(field.dataType, raw)) {
       // Dedup on the (key, value) pair so a value repeated within one Entity (a list with dupes)
@@ -318,18 +318,18 @@ function scalarFacet(dataType: ScalarDataType, raw: unknown): { value: string; n
 }
 
 /**
- * Every Entity-Link Field value an Entity's Metadata carries, keyed by the Field. Only an `entityLink`
+ * Every Entity-Link Field value an Entity's EntityDocument carries, keyed by the Field. Only an `entityLink`
  * Field with a present, shape-valid value contributes (a blank or ill-typed one is skipped,
  * forward-only). Feeds {@link harvestEdges}.
  */
 export function entityLinkFieldValues(
   fields: readonly FieldSchema[],
-  metadata: Metadata | undefined,
+  doc: EntityDocument | undefined,
 ): { key: string; value: EntityLinkValue }[] {
   const out: { key: string; value: EntityLinkValue }[] = [];
   for (const field of fields) {
     if (field.dataType.kind !== 'entityLink') continue;
-    const parsed = entityLinkValueSchema.safeParse(readField(metadata, field));
+    const parsed = entityLinkValueSchema.safeParse(readField(doc, field));
     if (parsed.success) out.push({ key: field.key, value: parsed.data });
   }
   return out;
@@ -366,14 +366,14 @@ export interface EntityLinkConstraint {
 
 export function entityLinkConstraints(
   fields: readonly FieldSchema[],
-  metadata: Metadata | undefined,
+  doc: EntityDocument | undefined,
 ): EntityLinkConstraint[] {
   const out: EntityLinkConstraint[] = [];
   for (const field of fields) {
     if (field.dataType.kind !== 'entityLink') continue;
     const targetTypes = field.dataType.targetTypes ?? [];
     if (targetTypes.length === 0) continue;
-    const parsed = entityLinkValueSchema.safeParse(readField(metadata, field));
+    const parsed = entityLinkValueSchema.safeParse(readField(doc, field));
     if (parsed.success) out.push({ key: field.key, entityId: parsed.data.entityId, targetTypes });
   }
   return out;
@@ -385,7 +385,7 @@ export type FieldFilterOp = 'eq' | 'gte' | 'lte';
 const FIELD_FILTER_OPS: ReadonlySet<string> = new Set<FieldFilterOp>(['eq', 'gte', 'lte']);
 
 /**
- * One filter-by-Field constraint (ADR-0048): the Metadata `key`, an `op`, and the compared `value`.
+ * One filter-by-Field constraint (ADR-0048): the EntityDocument `key`, an `op`, and the compared `value`.
  * `eq` on the same key OR together (enum/list membership); `gte`/`lte` on the same key form a range;
  * different keys AND. Wire form is `key:op:value`.
  */
@@ -419,28 +419,28 @@ export function parseFieldFilters(raw: readonly string[] | undefined): FieldFilt
   });
 }
 
-/** Read a Field's value straight off the Metadata map — the lens, so it never copies or coerces. */
-export function readField(metadata: Metadata | undefined, field: FieldSchema): unknown {
-  return metadata?.[field.key];
+/** Read a Field's value straight off the EntityDocument map — the lens, so it never copies or coerces. */
+export function readField(doc: EntityDocument | undefined, field: FieldSchema): unknown {
+  return doc?.[field.key];
 }
 
 /**
- * Write a Field's value back into the Metadata map, returning a fresh map. An emptied value clears the
- * key — a cleared Field is absent, not blank — leaving every sibling Metadata entry untouched.
+ * Write a Field's value back into the EntityDocument map, returning a fresh map. An emptied value clears the
+ * key — a cleared Field is absent, not blank — leaving every sibling EntityDocument entry untouched.
  */
-export function writeField(metadata: Metadata | undefined, field: FieldSchema, value: unknown): Metadata {
-  const next: Metadata = { ...(metadata ?? {}) };
+export function writeField(doc: EntityDocument | undefined, field: FieldSchema, value: unknown): EntityDocument {
+  const next: EntityDocument = { ...(doc ?? {}) };
   if (isEmpty(value)) delete next[field.key];
   else next[field.key] = value;
   return next;
 }
 
 /**
- * {@link writeField}'s set-or-clear semantics applied *in place* on a draft of the Metadata map — for a
+ * {@link writeField}'s set-or-clear semantics applied *in place* on a draft of the EntityDocument map — for a
  * View editing the body through Immer's `mutate`, where the body **is** the map (ADR-0051) and the draft
  * root cannot be reassigned. An emptied value deletes the key; else it sets it.
  */
-export function writeFieldInPlace(draft: Metadata, field: FieldSchema, value: unknown): void {
+export function writeFieldInPlace(draft: EntityDocument, field: FieldSchema, value: unknown): void {
   const next = writeField(draft, field, value);
   if (field.key in next) draft[field.key] = next[field.key];
   else delete draft[field.key];
@@ -484,7 +484,7 @@ function matchesBuiltInDataType(dataType: BuiltInDataType, value: unknown): bool
 }
 
 /**
- * An ISO-8601 date (`YYYY-MM-DD`) with an optional time part. Metadata dates arrive as strings
+ * An ISO-8601 date (`YYYY-MM-DD`) with an optional time part. EntityDocument dates arrive as strings
  * (frontmatter YAML re-serialized to JSON, ADR-0033), so a Field date is a string, not a `Date`. The
  * regex fences out garbage; the parse then rejects an impossible calendar date the shape would admit.
  */

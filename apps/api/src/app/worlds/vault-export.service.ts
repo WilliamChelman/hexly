@@ -104,7 +104,7 @@ function rewriteAssetSrcs(snapshot: unknown, srcMap: Map<string, string>): void 
 }
 
 /**
- * The YAML frontmatter for an Entity: its pass-through Metadata with every reserved `hexly.*` key
+ * The YAML frontmatter for an Entity: its pass-through EntityDocument with every reserved `hexly.*` key
  * stripped (they drive placement/typing, not frontmatter), plus its Tags re-emitted as `tags`
  * (ADR-0033) and its ordered Type set under `hexly.type` — written whole and in order, so the
  * primary type stays first (ADR-0050). A bare note (types are exactly the import default) goes
@@ -115,7 +115,7 @@ function frontmatter(entity: EntityDetail): Record<string, unknown> | undefined 
   for (const [key, value] of Object.entries(entity.document)) {
     // The prose becomes the markdown body, never frontmatter; reserved `hexly.*` keys drive
     // placement/typing. Everything else the body holds — a grid included, until the Vault Projection
-    // lands (#211) — is author Metadata, exactly as before the collapse (ADR-0051).
+    // lands (#211) — is author EntityDocument, exactly as before the collapse (ADR-0051).
     if (key !== CONTENT_FIELD.key && !key.startsWith(HEXLY_METADATA_PREFIX)) meta[key] = value;
   }
   if (entity.tags.length) meta['tags'] = [...entity.tags];

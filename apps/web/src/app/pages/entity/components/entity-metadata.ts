@@ -5,9 +5,9 @@ import { EntitySession } from '../services/entity-session';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 
 /**
- * Read-only view of the open Entity's Metadata map (CONTEXT.md → Metadata, ADR-0033): the
+ * Read-only view of the open Entity's EntityDocument map (CONTEXT.md → EntityDocument, ADR-0033): the
  * frontmatter keys and Hexly provenance (`hexly.sourcePath`) an import brought across. Read-only,
- * not an editor. Renders nothing when the Entity carries no Metadata.
+ * not an editor. Renders nothing when the Entity carries no EntityDocument.
  *
  * A **Structured Field**'s value is skipped (ADR-0050): it is a document with its own View.
  */
@@ -37,7 +37,7 @@ export class EntityMetadata {
   private readonly session = inject(EntitySession);
   private readonly types = inject(TypeRegistry);
 
-  /** The Metadata keys a Structured Field types — a document, shown on its own View, never here. */
+  /** The EntityDocument keys a Structured Field types — a document, shown on its own View, never here. */
   private readonly structuredKeys = computed(
     () =>
       new Set(
@@ -48,7 +48,7 @@ export class EntityMetadata {
       ),
   );
 
-  /** The open Entity's Metadata as displayable key/value rows; empty when there is none. */
+  /** The open Entity's EntityDocument as displayable key/value rows; empty when there is none. */
   protected readonly entries = computed(() => {
     const metadata = this.session.current()?.document ?? {};
     const structured = this.structuredKeys();
@@ -61,7 +61,7 @@ export class EntityMetadata {
   });
 }
 
-/** Flatten a Metadata value to a string for read-only display (the domain never interprets it). */
+/** Flatten a EntityDocument value to a string for read-only display (the domain never interprets it). */
 function display(value: unknown): string {
   if (typeof value === 'string') return value;
   if (Array.isArray(value)) return value.map(display).join(', ');

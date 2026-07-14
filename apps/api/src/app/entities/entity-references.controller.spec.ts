@@ -2,7 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
-import { Metadata } from '@hexly/domain';
+import { EntityDocument } from '@hexly/domain';
 import { emptyContent, tiptapContent } from '@hexly/plugin-content';
 import { AuthModule } from '../auth/auth.module';
 import { AuthService } from '../auth/auth.service';
@@ -308,7 +308,7 @@ describe('Entity references', () => {
   /** Save `id`'s Content as prose holding one `entityLink` per entry. */
   async function link(owner: Agent, id: string, links: Record<string, unknown>[]): Promise<void> {
     const current = (await owner.get(`/entities/${id}`).expect(200)).body;
-    const document: Metadata = {
+    const document: EntityDocument = {
       content: tiptapContent({
         type: 'doc',
         content: [

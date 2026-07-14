@@ -1,16 +1,16 @@
 import { Provider, signal } from '@angular/core';
-import { Metadata } from '@hexly/domain';
+import { EntityDocument } from '@hexly/domain';
 import { applyPatches as immerApplyPatches, Draft, Patch, produceWithPatches } from '@hexly/immer';
 import { ENTITY_SESSION, EntitySession, LiveEditor } from '../lib/entity-session';
 
 /**
- * A minimal in-memory {@link EntitySession} for a View lib's specs: it carries only the body — the
- * Metadata map (ADR-0051) — so a spec seeds whatever slice its View reads. {@link loadBody} bumps
+ * A minimal in-memory {@link EntitySession} for a View lib's specs: it carries only the **Entity
+ * Document** (ADR-0051) — so a spec seeds whatever slice its View reads. {@link loadDoc} bumps
  * {@link loadGeneration}, the reset seam a live View watches.
  */
 export class FakeEntitySession implements EntitySession {
-  private readonly _body = signal<Metadata>({});
-  readonly body = this._body.asReadonly();
+  private readonly _doc = signal<EntityDocument>({});
+  readonly doc = this._doc.asReadonly();
 
   private readonly _writable = signal(true);
   readonly writable = this._writable.asReadonly();
@@ -21,22 +21,22 @@ export class FakeEntitySession implements EntitySession {
   /** Live editors registered for flush-before-save (ADR-0051); exposed so a spec can drive them. */
   readonly editors = new Set<LiveEditor>();
 
-  /** Seed the opening body without a load tick — for a subclass to open on its slice. No ctor param, so DI can build it. */
-  protected seedBody(body: Metadata): void {
-    this._body.set(body);
+  /** Seed the opening document without a load tick — for a subclass to open on its slice. No ctor param, so DI can build it. */
+  protected seedDoc(doc: EntityDocument): void {
+    this._doc.set(doc);
   }
 
-  mutate(recipe: (draft: Metadata) => void): {
+  mutate(recipe: (draft: EntityDocument) => void): {
     redo: Patch[];
     undo: Patch[];
   } {
-    const [next, redo, undo] = produceWithPatches(this._body(), recipe as (draft: Draft<Metadata>) => void);
-    this._body.set(next as Metadata);
+    const [next, redo, undo] = produceWithPatches(this._doc(), recipe as (draft: Draft<EntityDocument>) => void);
+    this._doc.set(next as EntityDocument);
     return { redo, undo };
   }
 
   applyPatches(patches: Patch[]): void {
-    this._body.set(immerApplyPatches(this._body(), patches));
+    this._doc.set(immerApplyPatches(this._doc(), patches));
   }
 
   registerEditor(editor: LiveEditor): () => void {
@@ -44,9 +44,9 @@ export class FakeEntitySession implements EntitySession {
     return () => this.editors.delete(editor);
   }
 
-  /** Test helper: adopt `body` as a fresh load and bump the load generation (a new Entity). */
-  loadBody(body: Metadata): void {
-    this._body.set(body);
+  /** Test helper: adopt `doc` as a fresh load and bump the load generation (a new Entity). */
+  loadDoc(doc: EntityDocument): void {
+    this._doc.set(doc);
     this._loadGeneration.update((n) => n + 1);
   }
 
