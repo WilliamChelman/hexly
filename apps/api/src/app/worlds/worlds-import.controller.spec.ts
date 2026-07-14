@@ -176,7 +176,7 @@ describe('Vault import endpoint', () => {
     expect(found.body.items.map((e: { name: string }) => e.name)).toEqual(['Lady Mara']);
   });
 
-  it('preserves the folder path as hexly.sourcePath, frontmatter as Metadata, and tags as Hexly Tags', async () => {
+  it('preserves the folder path as hexly.sourcePath, frontmatter as EntityDocument, and tags as Hexly Tags', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const zip = vaultZip({
       'Characters/Lady Mara.md': [
@@ -205,8 +205,8 @@ describe('Vault import endpoint', () => {
     expect(mara.body.document.content.snapshot.type).toBe('doc');
 
     // Folder path preserved under the reserved namespace; frontmatter (incl. aliases)
-    // passes through as Metadata; `tags` moved out to Hexly Tags (not left in Metadata). The body IS
-    // the Metadata map now (ADR-0051), so the prose sits at `content` beside these keys.
+    // passes through as EntityDocument; `tags` moved out to Hexly Tags (not left in EntityDocument). The body IS
+    // the EntityDocument map now (ADR-0051), so the prose sits at `content` beside these keys.
     expect(mara.body.document).toMatchObject({
       'hexly.sourcePath': 'Characters/Lady Mara.md',
       aliases: ['Mara', 'The Ranger'],
@@ -217,7 +217,7 @@ describe('Vault import endpoint', () => {
 
   /** The read half of the export's generic `hexly.type` stamp (#203, ADR-0050). */
   describe('hexly.type', () => {
-    it("applies the stamped types to the imported Entity, in order, and doesn't leave them in Metadata", async () => {
+    it("applies the stamped types to the imported Entity, in order, and doesn't leave them in EntityDocument", async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const zip = vaultZip({
         'Bestiary/Owlbear.md': [
@@ -236,7 +236,7 @@ describe('Vault import endpoint', () => {
       // Primary type first, as stamped.
       expect(summary.types).toEqual(['core.note', 'dnd.monster']);
       expect(detail.document).toMatchObject({ challenge_rating: 3, size: 'Large' });
-      // Reserved provenance: consumed, never stored back as author Metadata.
+      // Reserved provenance: consumed, never stored back as author EntityDocument.
       expect(detail.document).not.toHaveProperty('hexly.type');
     });
 
@@ -587,7 +587,7 @@ describe('Vault import endpoint', () => {
     const list = await ada.get(`/entities?worldId=${worldId}`).expect(200);
     const aldermoor = list.body.items.find((e: { name: string }) => e.name === 'Aldermoor');
     const note = await ada.get(`/entities/${aldermoor.id}`).expect(200);
-    // It carries its lore, and the reserved `hexly.*` key isn't persisted as author Metadata.
+    // It carries its lore, and the reserved `hexly.*` key isn't persisted as author EntityDocument.
     expect(JSON.stringify(note.body.document.content.snapshot)).toContain('The frontier realm.');
     expect(note.body.document).not.toHaveProperty('hexly.isHome');
   });

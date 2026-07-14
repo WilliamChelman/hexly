@@ -7,7 +7,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import request from 'supertest';
-import { emptyEntityBody } from '@hexly/domain';
+import { emptyEntityDocument } from '@hexly/domain';
 import { tiptapContent } from '@hexly/plugin-content';
 import { DB, Db, createDb } from '../db/db';
 import { worldMembers } from '../db/schema';
@@ -122,7 +122,7 @@ describe('Vault export endpoint', () => {
     expect(text(files, 'Characters/Heroes/Lady Mara.md')).not.toContain('hexly.');
   });
 
-  it('re-emits non-reserved Metadata and Tags as YAML frontmatter', async () => {
+  it('re-emits non-reserved EntityDocument and Tags as YAML frontmatter', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const worldId = await importVault(ada, {
       'Characters/Lady Mara.md': [
@@ -138,14 +138,14 @@ describe('Vault export endpoint', () => {
     const { files } = await exportZip(ada, worldId);
     const fm = frontmatter(text(files, 'Characters/Lady Mara.md'));
 
-    // Pass-through Metadata round-trips; Tags come back as frontmatter `tags` (ADR-0033).
+    // Pass-through EntityDocument round-trips; Tags come back as frontmatter `tags` (ADR-0033).
     expect(fm.status).toBe('alive');
     expect(fm.aliases).toEqual(['Mara', 'The Ranger']);
     expect(fm.tags).toEqual(['deity', 'ruined']);
     // The reserved placement key is still consumed, not written back.
     expect(fm['hexly.sourcePath']).toBeUndefined();
     // An imported note carries the default type alone, which the import mints anyway — so it goes
-    // unstamped, and a note with no Metadata and no Tags still exports with no `---` block at all.
+    // unstamped, and a note with no EntityDocument and no Tags still exports with no `---` block at all.
     expect(fm['hexly.type']).toBeUndefined();
   });
 
@@ -222,12 +222,12 @@ describe('Vault export endpoint', () => {
     const md = text(files, 'Aldermoor Map.md');
     const fm = frontmatter(md);
 
-    // Lore round-trips as prose, and the map's type is flagged — no Metadata key records it.
+    // Lore round-trips as prose, and the map's type is flagged — no EntityDocument key records it.
     expect(fm['hexly.type']).toEqual(['core.hexmap']);
     expect(md).toContain('The Aldermoor');
     expect(md).toContain('A wild frontier.');
     // The grid rides the frontmatter as a nested Field value, so the map survives the round-trip
-    // (ADR-0050 amends ADR-0033's lossy export) — and it does so through the generic Metadata path,
+    // (ADR-0050 amends ADR-0033's lossy export) — and it does so through the generic EntityDocument path,
     // which knows nothing of hexes.
     expect(fm['grid']).toEqual({
       hexes: { '0,0': { terrain: 'forest', name: 'Rivertown' } },
@@ -261,7 +261,7 @@ describe('Vault export endpoint', () => {
     // Assets kept byte-for-byte under their human-readable name.
     expect(files['assets/portrait.png']).toEqual(png);
 
-    // Metadata + tags round-trip; the image src points back at the exported asset.
+    // EntityDocument + tags round-trip; the image src points back at the exported asset.
     const mara = text(files, 'Characters/Lady Mara.md');
     expect(frontmatter(mara)).toMatchObject({
       tags: ['deity'],
@@ -404,7 +404,7 @@ describe('Vault export endpoint', () => {
       name: 'Bob Secret',
       types: ['core.note'],
       tags: [],
-      body: emptyEntityBody(),
+      document: emptyEntityDocument(),
     });
     entities.patch(bobId, bobNoteId, { visibility: 'shared' });
 

@@ -1,15 +1,15 @@
 import { z } from 'zod';
-import { fieldSchemaSchema, FieldSchema, Metadata } from './field';
+import { fieldSchemaSchema, FieldSchema, EntityDocument } from './field';
 import { harvestEdges } from './entity-edges';
 import { defineStructuredDataType, NO_STRUCTURED_DATA_TYPES, structuredDataTypeSet } from './structured-data-type';
 
 /** `harvestEdges` takes the resolved Fields and the data-type set explicitly; most cases need neither. */
 function harvest(
-  body: Metadata,
+  doc: EntityDocument,
   fields: readonly FieldSchema[] = [],
   dataTypes = NO_STRUCTURED_DATA_TYPES,
 ): ReturnType<typeof harvestEdges> {
-  return harvestEdges(body, fields, dataTypes);
+  return harvestEdges(doc, fields, dataTypes);
 }
 
 /**
@@ -42,14 +42,14 @@ const DATA_TYPES = structuredDataTypeSet([BOARD, LINKS]);
 const boardField = fieldSchemaSchema.parse({ key: 'board', label: 'Board', dataType: { kind: 'test.board' } });
 const linksField = fieldSchemaSchema.parse({ key: 'links', label: 'Links', dataType: { kind: 'test.links' } });
 
-/** A body whose `board` Field holds two placements. */
-const board = (): Metadata => ({ board: { tiles: [{ entityId: 'riverbend' }, { entityId: 'harbour' }] } });
+/** A doc whose `board` Field holds two placements. */
+const board = (): EntityDocument => ({ board: { tiles: [{ entityId: 'riverbend' }, { entityId: 'harbour' }] } });
 /** Harvest a structured value exactly as the write path does: through the Field its type declares. */
-const harvestBoard = (body: Metadata) => harvest(body, [boardField], DATA_TYPES);
+const harvestBoard = (doc: EntityDocument) => harvest(doc, [boardField], DATA_TYPES);
 
-/** A body whose `links` Field holds the given descriptor-bearing links. */
-const links = (...ls: { entityId: string; descriptor?: string | null }[]): Metadata => ({ links: ls });
-const harvestLinks = (body: Metadata) => harvest(body, [linksField], DATA_TYPES);
+/** A doc whose `links` Field holds the given descriptor-bearing links. */
+const links = (...ls: { entityId: string; descriptor?: string | null }[]): EntityDocument => ({ links: ls });
+const harvestLinks = (doc: EntityDocument) => harvest(doc, [linksField], DATA_TYPES);
 
 describe('harvestEdges (#179, ADR-0046, ADR-0051)', () => {
   /**
@@ -91,32 +91,32 @@ describe('harvestEdges (#179, ADR-0046, ADR-0051)', () => {
 
   /**
    * A typed Entity-Link Field value (#190) is an edge to its target, descriptor-less like a map
-   * placement — harvested against the Entity's resolved `fields`, straight off the Metadata map.
+   * placement — harvested against the Entity's resolved `fields`, straight off the EntityDocument map.
    */
   describe('Entity-Link Field edges (#190)', () => {
     const lair = fieldSchemaSchema.parse({ key: 'lair', label: 'Lair', dataType: { kind: 'entityLink' } });
 
     it('emits an edge per Entity-Link Field value, resolved against the Entity fields', () => {
-      const body: Metadata = { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } };
-      expect(harvest(body, [lair])).toEqual([{ targetKind: 'entity', targetId: 'whisperwood', descriptor: null }]);
+      const doc: EntityDocument = { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } };
+      expect(harvest(doc, [lair])).toEqual([{ targetKind: 'entity', targetId: 'whisperwood', descriptor: null }]);
     });
 
     it('reads no Field edge without the resolved fields (the default)', () => {
-      const body: Metadata = { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } };
-      expect(harvest(body)).toEqual([]);
+      const doc: EntityDocument = { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } };
+      expect(harvest(doc)).toEqual([]);
     });
 
     it('collapses a Field link and a structured-field link to the same target into one edge', () => {
-      const body: Metadata = { lair: { entityId: 'riverbend', label: 'Riverbend' }, board: board().board };
-      expect(harvest(body, [lair, boardField], DATA_TYPES)).toEqual([
+      const doc: EntityDocument = { lair: { entityId: 'riverbend', label: 'Riverbend' }, board: board().board };
+      expect(harvest(doc, [lair, boardField], DATA_TYPES)).toEqual([
         { targetKind: 'entity', targetId: 'riverbend', descriptor: null },
         { targetKind: 'entity', targetId: 'harbour', descriptor: null },
       ]);
     });
 
     it('ignores a blank or ill-typed Field value — inert, never an edge', () => {
-      const body: Metadata = { lair: { label: 'Ghost' } };
-      expect(harvest(body, [lair])).toEqual([]);
+      const doc: EntityDocument = { lair: { label: 'Ghost' } };
+      expect(harvest(doc, [lair])).toEqual([]);
     });
   });
 
@@ -142,8 +142,8 @@ describe('harvestEdges (#179, ADR-0046, ADR-0051)', () => {
     });
 
     it('harvests nothing from a malformed value at rest, rather than throwing', () => {
-      const body: Metadata = { board: 'garbage' };
-      expect(harvestBoard(body)).toEqual([]);
+      const doc: EntityDocument = { board: 'garbage' };
+      expect(harvestBoard(doc)).toEqual([]);
     });
   });
 });

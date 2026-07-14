@@ -82,7 +82,7 @@ export class WorldTypesService {
   }
 
   /**
-   * Delete a user-defined type (Owner-only). Entities carrying it keep their Metadata as plain
+   * Delete a user-defined type (Owner-only). Entities carrying it keep their EntityDocument as plain
    * values (a Field is a lens) — the drop de-types them without touching their bodies.
    */
   delete(userId: string, worldId: string, typeId: string): TypeResult<null> {

@@ -6,7 +6,7 @@ import {
   HEXLY_METADATA_PREFIX,
   HEXLY_TYPE_KEY,
   ImportSummary,
-  Metadata,
+  EntityDocument,
   nameSchema,
   tagsSchema,
   typesSchema,
@@ -92,13 +92,13 @@ export class VaultImportService {
         assetsStored += this.storeImages(note.doc, posix.dirname(note.path), assetIndex, assetFiles, worldId);
         const { tags, ...rest } = note.metadata;
         // Reserved `hexly.*` frontmatter is provenance a Hexly export writes (type/sourcePath),
-        // consumed here and re-derived on the next export — never stored back as author Metadata (ADR-0033).
+        // consumed here and re-derived on the next export — never stored back as author EntityDocument (ADR-0033).
         const passThrough = Object.fromEntries(
           Object.entries(rest).filter(([key]) => !key.startsWith(HEXLY_METADATA_PREFIX)),
         );
         // The prose sits at the `content` Field key, still named directly (Vault Projection is #211);
         // the folder path is recorded under the reserved namespace so export can rebuild the tree.
-        const body: Metadata = {
+        const doc: EntityDocument = {
           ...passThrough,
           [CONTENT_FIELD.key]: tiptapContent(note.doc),
           'hexly.sourcePath': note.path,
@@ -110,7 +110,7 @@ export class VaultImportService {
           name: note.name,
           types: toTypes(note.metadata[HEXLY_TYPE_KEY]),
           tags: toTags(tags),
-          body,
+          document: doc,
         });
       }
     });

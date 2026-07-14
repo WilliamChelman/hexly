@@ -1,30 +1,30 @@
 import { Provider } from '@angular/core';
-import { Metadata } from '@hexly/domain';
+import { EntityDocument } from '@hexly/domain';
 import { ENTITY_SESSION, VIEW_FIELD_KEY } from '@hexly/web-entity';
 import { FakeEntitySession as BaseFakeEntitySession } from '@hexly/web-entity/testing';
 import { emptyHexMap, HEX_GRID_FIELD, HexMap } from '../lib';
 import { HexMapStore } from '../web/services/hexmap-store';
 
-/** The grid is a Metadata value at the `core.hexmap` type's `grid` Field (ADR-0050); the body **is**
- * the Metadata map (ADR-0051). `unknown`, not `HexMap`, so {@link FakeEntitySession.loadRawGrid} can
- * seed a document at rest this build can't parse. */
-function bodyWithGrid(grid: unknown): Metadata {
+/** The grid is an EntityDocument value at the `core.hexmap` type's `grid` Field (ADR-0050); the grid
+ * lives in the one EntityDocument map (ADR-0051). `unknown`, not `HexMap`, so {@link FakeEntitySession.loadRawGrid}
+ * can seed a document at rest this build can't parse. */
+function docWithGrid(grid: unknown): EntityDocument {
   return { [HEX_GRID_FIELD.key]: grid };
 }
 
 /**
  * A grid-flavoured {@link BaseFakeEntitySession} for the map plugin's specs: it opens on an empty
- * plane and adds grid-shaped {@link load} helpers over the generic {@link BaseFakeEntitySession.loadBody}.
+ * plane and adds grid-shaped {@link load} helpers over the generic {@link BaseFakeEntitySession.loadDoc}.
  */
 export class FakeEntitySession extends BaseFakeEntitySession {
   constructor() {
     super();
-    this.seedBody(bodyWithGrid(emptyHexMap()));
+    this.seedDoc(docWithGrid(emptyHexMap()));
   }
 
-  /** Test helper: adopt a fresh grid as the working body and bump the load generation (a fresh load). */
+  /** Test helper: adopt a fresh grid as the working document and bump the load generation (a fresh load). */
   load(grid: HexMap): void {
-    this.loadBody(bodyWithGrid(grid));
+    this.loadDoc(docWithGrid(grid));
   }
 
   /**
@@ -32,7 +32,7 @@ export class FakeEntitySession extends BaseFakeEntitySession {
    * this build cannot parse, which Field validation tolerates rather than rejecting (ADR-0050).
    */
   loadRawGrid(grid: unknown): void {
-    this.loadBody(bodyWithGrid(grid));
+    this.loadDoc(docWithGrid(grid));
   }
 }
 

@@ -16,14 +16,14 @@ export type ViewId = string;
  */
 export interface ViewInstance {
   readonly viewId: ViewId;
-  /** The Metadata key of the **Structured Field** this View renders; absent on a Type's own View. */
+  /** The EntityDocument key of the **Structured Field** this View renders; absent on a Type's own View. */
   readonly fieldKey?: string;
 }
 
 /**
  * A View instance as one string: `core.view.content`, `core.view.map:grid`, `core.view.map:battlemap`.
  *
- * A `:` cannot occur in either half (a View id is `namespace.id`; a Field key is a Metadata key), so
+ * A `:` cannot occur in either half (a View id is `namespace.id`; a Field key is a EntityDocument key), so
  * the split is unambiguous. A Type's own View keys to its bare id.
  */
 export function viewInstanceKey({ viewId, fieldKey }: ViewInstance): string {

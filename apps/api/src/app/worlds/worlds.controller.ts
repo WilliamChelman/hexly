@@ -190,7 +190,7 @@ export class WorldsController {
     return this.typeResult(this.types.update(user.id, id, typeId, parsed.data));
   }
 
-  // Delete a user-defined type (#191): Owner-only. Entities keep their Metadata (a Field is a lens).
+  // Delete a user-defined type (#191): Owner-only. Entities keep their EntityDocument (a Field is a lens).
   @Delete(':id/types/:typeId')
   @HttpCode(204)
   removeType(@CurrentUser() user: AuthUser, @Param('id') id: string, @Param('typeId') typeId: string): void {

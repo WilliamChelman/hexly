@@ -7,7 +7,7 @@ import {
   EntitySaveOutcome,
   EntityType,
   GrantRole,
-  Metadata,
+  EntityDocument,
   PublicLink,
 } from '@hexly/domain';
 import { EntityFacetParams, EntityListParams } from '../services/entities.client';
@@ -31,7 +31,7 @@ export class MockEntitiesClient {
   delete = vi.fn<(id: string) => Observable<void>>();
   create =
     vi.fn<
-      (name: string, types: readonly EntityType[], worldId?: string, metadata?: Metadata) => Observable<EntityDetail>
+      (name: string, types: readonly EntityType[], worldId?: string, doc?: EntityDocument) => Observable<EntityDetail>
     >();
   load = vi.fn<(id: string) => Observable<EntityDetail>>();
   listDescriptors = vi.fn<() => Observable<string[]>>();
@@ -42,7 +42,7 @@ export class MockEntitiesClient {
     vi.fn<
       (
         id: string,
-        body: Metadata,
+        doc: EntityDocument,
         version: number,
         tags: readonly string[],
         types?: readonly EntityType[],

@@ -4,7 +4,7 @@ import cookieParser from 'cookie-parser';
 import request from 'supertest';
 import type { Agent } from 'supertest';
 import { eq } from 'drizzle-orm';
-import { InstanceRole, Metadata } from '@hexly/domain';
+import { InstanceRole, EntityDocument } from '@hexly/domain';
 import { tiptapContent } from '@hexly/plugin-content';
 import { DB, Db, createDb } from '../db/db';
 import { entityEdges } from '../db/schema';
@@ -137,7 +137,7 @@ describe('Superadmin repair surface', () => {
   /** Save `id`'s Content as prose holding one `entityLink` to `targetId`. */
   async function link(owner: Agent, id: string, targetId: string): Promise<void> {
     const current = (await owner.get(`/entities/${id}`).expect(200)).body;
-    const document: Metadata = {
+    const document: EntityDocument = {
       content: tiptapContent({
         type: 'doc',
         content: [

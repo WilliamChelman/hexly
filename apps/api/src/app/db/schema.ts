@@ -57,10 +57,10 @@ export const sessions = sqliteTable(
 export const INITIAL_SEQ = 1;
 
 /**
- * An Entity stored as a single JSON document. The columns are the metadata the
- * list view and access checks need; `document` holds the whole body — `{ content, metadata }`, one
- * shape for every Entity (ADR-0050). `types`/`tags` are denormalized out — each
- * a multi-valued JSON array — so a list can group/filter without loading each body.
+ * An Entity stored as a single JSON document. The columns are the light attributes the
+ * list view and access checks need; `document` holds the whole **Entity Document** — one open
+ * key→value map, one shape for every Entity (ADR-0050, ADR-0051). `types`/`tags` are denormalized
+ * out — each a multi-valued JSON array — so a list can group/filter without loading each document.
  * `version` is the optimistic-concurrency counter (a stale save is a 409). Ownership
  * is not a column — it is an `owner`-role row in `entityGrants`.
  */
@@ -85,7 +85,7 @@ export const entities = sqliteTable(
     // Distinct from `version` (a concurrency token that must not move on a sharing
     // change) and `updatedAt` (a user-visible timestamp that must not either).
     seq: integer('seq').notNull().default(INITIAL_SEQ),
-    // Serialized Entity body (entityBodySchema), validated at the edge.
+    // The serialized Entity Document (entityDocumentSchema), validated at the edge.
     document: text('document').notNull(),
     // The Entity's searchable text: the Content's prose *and* the text each Structured Field's value
     // carries (a grid's Hex and Region names, #205). EntityWrites derives it on every write
@@ -281,9 +281,9 @@ export const entityEdges = sqliteTable(
 
 /**
  * The denormalised **Field-facet** index (ADR-0048, #188): one row per distinct facetable Field
- * value an Entity's Metadata carries — the Field peer of the `types`/`tags` columns, pulled out so a
- * Field facet can be counted and filtered without loading each body. Like {@link entityEdges} it is
- * an **index, never a source of truth**: `EntityWrites` derives it from the document body on every
+ * value an Entity's EntityDocument carries — the Field peer of the `types`/`tags` columns, pulled out so a
+ * Field facet can be counted and filtered without loading each document. Like {@link entityEdges} it is
+ * an **index, never a source of truth**: `EntityWrites` derives it from the Entity Document on every
  * save and Reindex rebuilds it, wholesale-replacing an Entity's rows (self-pruning). Deleting the
  * Entity cascades them away.
  *
@@ -300,7 +300,7 @@ export const entityFieldFacets = sqliteTable(
       .notNull()
       .references(() => entities.id, { onDelete: 'cascade' }),
     worldId: text('world_id').notNull(),
-    // The Metadata key the Field types.
+    // The EntityDocument key the Field types.
     key: text('key').notNull(),
     // The canonical string form of the value; the facet value the rail lists and eq/date filters match.
     value: text('value').notNull(),

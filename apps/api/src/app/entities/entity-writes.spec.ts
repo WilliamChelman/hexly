@@ -1,4 +1,4 @@
-import { Metadata, ReindexFailure, emptyEntityBody } from '@hexly/domain';
+import { EntityDocument, ReindexFailure, emptyEntityDocument } from '@hexly/domain';
 import { emptyContent, tiptapContent } from '@hexly/plugin-content';
 import { eq } from 'drizzle-orm';
 import { createDb, Db } from '../db/db';
@@ -163,7 +163,7 @@ describe('EntityWrites', () => {
         name: 'Ealdred',
         types: ['core.note'],
         tags: [],
-        body: { content: CONTENT },
+        document: { content: CONTENT },
       });
 
       expect(descriptorsOf('Ealdred')).toEqual(['spouse']);
@@ -178,7 +178,7 @@ describe('EntityWrites', () => {
         name: 'The Reach',
         types: ['core.hexmap'],
         tags: [],
-        body: { content: CONTENT, grid: GRID },
+        document: { content: CONTENT, grid: GRID },
       });
 
       expect(contentTextOf('The Reach')).toBe('Married to Ashford The Kingdom of Avalon The Whisperwood');
@@ -196,7 +196,7 @@ describe('EntityWrites', () => {
         name: 'Ealdred',
         types: ['core.note'],
         tags: [],
-        body: { content: CONTENT },
+        document: { content: CONTENT },
       });
 
       expect(edgesOf('Ealdred')).toEqual([
@@ -220,7 +220,7 @@ describe('EntityWrites', () => {
         name: 'Aldermoor',
         types: ['core.note'],
         tags: [],
-        body: {
+        document: {
           content: tiptapContent({
             type: 'doc',
             content: [
@@ -256,7 +256,7 @@ describe('EntityWrites', () => {
         name: 'Ealdred',
         types: ['core.note'],
         tags: [],
-        body: { content: CONTENT },
+        document: { content: CONTENT },
       });
 
       writes.mutate(ADA, row.id, {
@@ -276,7 +276,7 @@ describe('EntityWrites', () => {
         name: 'Ealdred',
         types: ['core.note'],
         tags: [],
-        body: { content: CONTENT },
+        document: { content: CONTENT },
       });
 
       writes.mutate(ADA, row.id, {
@@ -299,7 +299,7 @@ describe('EntityWrites', () => {
         name: 'Ealdred',
         types: ['core.note'],
         tags: [],
-        body: { content: CONTENT },
+        document: { content: CONTENT },
       });
       writes.mutate(ADA, row.id, {
         kind: 'edit',
@@ -508,8 +508,8 @@ describe('EntityWrites', () => {
        * A document with no derived rows at all. Seeded raw, so the walk is observed independently
        * of `insert`, which would have derived them on the way in.
        */
-      function seedUnindexed(id: string, worldId: string, body: Metadata): void {
-        seedRaw(id, worldId, JSON.stringify(body), 'note');
+      function seedUnindexed(id: string, worldId: string, doc: EntityDocument): void {
+        seedRaw(id, worldId, JSON.stringify(doc), 'note');
       }
 
       /** An Entity whose stored document this build cannot read at all. */
@@ -563,7 +563,7 @@ describe('EntityWrites', () => {
           name: 'Aboleth',
           types: ['test.monster'],
           tags: [],
-          body: { content: emptyContent(), lair: { entityId: 'whisperwood', label: 'The Whisperwood' } },
+          document: { content: emptyContent(), lair: { entityId: 'whisperwood', label: 'The Whisperwood' } },
         });
 
         expect(edgesOf('Aboleth')).toEqual([
@@ -579,7 +579,7 @@ describe('EntityWrites', () => {
           name: 'Aboleth',
           types: ['test.monster'],
           tags: [],
-          body: { content: emptyContent(), lair: { entityId: 'whisperwood', label: 'The Whisperwood' } },
+          document: { content: emptyContent(), lair: { entityId: 'whisperwood', label: 'The Whisperwood' } },
         });
 
         writes.mutate(ADA, row.id, {
@@ -636,7 +636,7 @@ describe('EntityWrites', () => {
         name: 'Ealdred',
         types: ['core.note'],
         tags: [],
-        body: { content: CONTENT }, // Ealdred → e2
+        document: { content: CONTENT }, // Ealdred → e2
       });
       const mira = writes.insert({
         ownerId: ADA,
@@ -644,7 +644,7 @@ describe('EntityWrites', () => {
         name: 'Mira',
         types: ['core.note'],
         tags: [],
-        body: { content: linkTo(ealdred.id) }, // Mira → Ealdred
+        document: { content: linkTo(ealdred.id) }, // Mira → Ealdred
       });
 
       writes.mutate(ADA, ealdred.id, { kind: 'delete' });
@@ -676,7 +676,7 @@ describe('EntityWrites', () => {
         name: 'The Reach',
         types: ['core.hexmap'],
         tags: [],
-        body: { content: emptyContent(), grid: { hexes, regions: [], labels: [] } },
+        document: { content: emptyContent(), grid: { hexes, regions: [], labels: [] } },
       });
 
       expect(edgesFrom(row.id)).toHaveLength(7000);
@@ -979,7 +979,7 @@ describe('EntityWrites', () => {
         visibility,
         version: 1,
         seq: 1,
-        document: JSON.stringify(emptyEntityBody()),
+        document: JSON.stringify(emptyEntityDocument()),
         contentText: '',
         createdAt: now,
         updatedAt: now,

@@ -3,7 +3,7 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { of, Subject, throwError } from 'rxjs';
-import { EntityDetail, EntitySaveOutcome, Metadata } from '@hexly/domain';
+import { EntityDetail, EntitySaveOutcome, EntityDocument } from '@hexly/domain';
 import { CONTENT_FORMAT, CORE_NOTE, emptyContent, tiptapContent } from '@hexly/plugin-content';
 import { coordKey, CORE_HEXMAP, emptyHexMap, HEX_GRID_FIELD, HexMap } from '@hexly/plugin-hexmap';
 import { MockEntitiesClient, MockNudgeBusClient } from '@hexly/web-core/testing';
@@ -184,12 +184,12 @@ describe('EntitySession', () => {
     const note: EntityDetail = { ...aldermoor, id: 'n1', types: [CORE_NOTE], document: noteBody };
     entities.load.mockReturnValue(of(note));
     session.open('n1').subscribe();
-    expect(session.body()).toEqual(noteBody);
+    expect(session.doc()).toEqual(noteBody);
 
     session.setTypes([CORE_NOTE, CORE_HEXMAP]);
 
     // The body gained an empty grid so the map View has a plane to render; Content is preserved.
-    expect(session.body()).toEqual({ ...noteBody, grid: emptyHexMap() });
+    expect(session.doc()).toEqual({ ...noteBody, grid: emptyHexMap() });
     expect(session.dirty()).toBe(true);
   });
 
@@ -323,7 +323,7 @@ describe('EntitySession', () => {
     session.save().subscribe();
 
     // The PUT body carries the flushed prose: the debounce window could not eat the last keystrokes.
-    const sentBody = entities.save.mock.calls[0][1] as Metadata;
+    const sentBody = entities.save.mock.calls[0][1] as EntityDocument;
     expect((sentBody['content'] as { snapshot: unknown }).snapshot).toEqual(snapshot);
   });
 
@@ -784,7 +784,7 @@ describe('EntitySession', () => {
     session.save().subscribe();
 
     // Body carries both edits; neither surface drops the other's (ADR-0019). The grid rides the
-    // Metadata map as the `grid` Field's value, beside whatever other Fields the Entity carries.
+    // EntityDocument map as the `grid` Field's value, beside whatever other Fields the Entity carries.
     expect(entities.save).toHaveBeenCalledWith(
       'm1',
       {
@@ -849,7 +849,7 @@ describe('EntitySession', () => {
 
     // The guard folds the pending doc into the body and warns — the last keystrokes aren't stranded
     // in the editor's debounce window.
-    expect((session.body()['content'] as { snapshot: unknown }).snapshot).toEqual(snapshot);
+    expect((session.doc()['content'] as { snapshot: unknown }).snapshot).toEqual(snapshot);
     expect(event.defaultPrevented).toBe(true);
   });
 
@@ -890,7 +890,7 @@ describe('EntitySession', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', metaKey: true, cancelable: true }));
 
     // Cmd/Ctrl+S goes through save(), which flushes the editor first: the debounced prose rides the PUT.
-    const sentBody = entities.save.mock.calls[0][1] as Metadata;
+    const sentBody = entities.save.mock.calls[0][1] as EntityDocument;
     expect((sentBody['content'] as { snapshot: unknown }).snapshot).toEqual(snapshot);
   });
 

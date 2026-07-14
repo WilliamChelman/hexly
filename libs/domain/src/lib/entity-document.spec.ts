@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { emptyEntityBody, withFieldDefaults } from './entity-body';
-import { entityBodySchema } from './entity';
+import { emptyEntityDocument, withFieldDefaults } from './entity-document';
+import { entityDocumentSchema } from './entity';
 import { fieldSchemaSchema, resolveFields } from './field';
 import { defineType } from './plugin-type';
 import { defineStructuredDataType, structuredDataTypeSet } from './structured-data-type';
@@ -29,30 +29,30 @@ const fieldsOf = (...types: readonly string[]) =>
 const plainFields = fieldsOf(PLAIN_TYPE.id);
 const atlasFields = fieldsOf(ATLAS_TYPE.id);
 
-describe('emptyEntityBody', () => {
+describe('emptyEntityDocument', () => {
   it('mints the empty map for a type that declares no Fields', () => {
-    const body = emptyEntityBody(plainFields, dataTypes);
+    const body = emptyEntityDocument(plainFields, dataTypes);
 
-    expect(entityBodySchema.parse(body)).toEqual(body);
+    expect(entityDocumentSchema.parse(body)).toEqual(body);
     expect(body).toEqual({});
   });
 
   it('mints the empty map with no arguments — a caller with no type context', () => {
-    expect(emptyEntityBody()).toEqual({});
+    expect(emptyEntityDocument()).toEqual({});
   });
 
   it("opens a fresh Structured Field on its data-type's empty value, at its own key", () => {
     // The minter knows nothing of what the value holds: the default comes from the registered
     // data-type. A fresh map opens on a blank plane this way — and prose on an empty document.
-    const body = emptyEntityBody(atlasFields, dataTypes);
+    const body = emptyEntityDocument(atlasFields, dataTypes);
 
-    expect(entityBodySchema.parse(body)).toEqual(body);
+    expect(entityDocumentSchema.parse(body)).toEqual(body);
     expect(body).toEqual({ board: emptyBoard() });
   });
 
   it('leaves a Structured Field unminted when the host has not registered its data-type', () => {
-    // An absent plugin: the Field is inert, its value stays plain Metadata, nothing throws.
-    expect(emptyEntityBody(atlasFields, structuredDataTypeSet([]))).toEqual({});
+    // An absent plugin: the Field is inert, its value stays plain EntityDocument, nothing throws.
+    expect(emptyEntityDocument(atlasFields, structuredDataTypeSet([]))).toEqual({});
   });
 });
 
@@ -61,10 +61,10 @@ describe('withFieldDefaults', () => {
     const reconciled = withFieldDefaults({}, atlasFields, dataTypes);
 
     expect(reconciled).toEqual({ board: emptyBoard() });
-    expect(entityBodySchema.parse(reconciled)).toEqual(reconciled);
+    expect(entityDocumentSchema.parse(reconciled)).toEqual(reconciled);
   });
 
-  it("preserves the Entity's other Metadata when it mints a default", () => {
+  it("preserves the Entity's other EntityDocument when it mints a default", () => {
     const monster = { armor_class: 15 };
 
     expect(withFieldDefaults(monster, atlasFields, dataTypes)).toEqual({
@@ -74,7 +74,7 @@ describe('withFieldDefaults', () => {
   });
 
   it('returns the same body reference when every declared Field already has a value', () => {
-    const atlas = emptyEntityBody(atlasFields, dataTypes);
+    const atlas = emptyEntityDocument(atlasFields, dataTypes);
 
     // Reference equality is what a caller's dirty check rides on — minting nothing must not
     // fabricate a new body and read as an edit.
@@ -89,14 +89,14 @@ describe('withFieldDefaults', () => {
   });
 
   it('never strips a Field value when its type is dropped — the data outlives the lens', () => {
-    const atlas = emptyEntityBody(atlasFields, dataTypes);
+    const atlas = emptyEntityDocument(atlasFields, dataTypes);
 
     expect(withFieldDefaults(atlas, plainFields, dataTypes)).toBe(atlas);
     expect(atlas).toEqual({ board: emptyBoard() });
   });
 
   it("mints a data-type whose empty value is itself empty — a blank timeline's []", () => {
-    // The Metadata writer clears a key whose value reads as emptied, so minting must not go through
+    // The EntityDocument writer clears a key whose value reads as emptied, so minting must not go through
     // it: a plugin whose `empty()` is `[]` still gets its default.
     const timeline = defineStructuredDataType({
       id: 'test.timeline',
@@ -109,7 +109,7 @@ describe('withFieldDefaults', () => {
       dataType: { kind: 'test.timeline' },
     });
 
-    const body = emptyEntityBody([events], structuredDataTypeSet([timeline]));
+    const body = emptyEntityDocument([events], structuredDataTypeSet([timeline]));
 
     expect(body).toEqual({ events: [] });
   });

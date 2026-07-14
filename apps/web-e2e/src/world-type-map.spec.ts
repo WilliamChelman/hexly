@@ -69,7 +69,7 @@ test('a World Owner gives a user-defined type a map, and painting it persists', 
   await expect(page.getByTestId('hex-count')).toHaveText('1 hex');
   await expect(page.getByTestId(BATTLEMAP_VIEW)).toHaveAttribute('aria-pressed', 'true');
 
-  // And it persisted where a Field's value lives: the Entity's Metadata, at the key its author chose.
+  // And it persisted where a Field's value lives: the Entity's EntityDocument, at the key its author chose.
   const grid = await savedGrid(request, deityId, 'battlemap');
   expect(Object.values(grid.hexes)).toEqual([{ terrain: 'ocean' }]);
 });

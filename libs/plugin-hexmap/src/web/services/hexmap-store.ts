@@ -109,7 +109,7 @@ export type MoveOutcome = 'moved' | 'blocked' | 'noop';
 /**
  * The Hex Map editor: tools, selection, and undo/redo over the grid. The document is the value of a
  * `core.hex-grid` Structured Field (ADR-0050), at that Field's key in the central
- * {@link EntitySession}'s Metadata map: reads project off `session.body`, edits go through
+ * {@link EntitySession}'s EntityDocument map: reads project off `session.body`, edits go through
  * `session.mutate` (Immer, patches captured), and undo pushes those inverse patches back through
  * `session.applyPatches`. Nothing may mutate the document directly, or undo breaks.
  *
@@ -150,7 +150,7 @@ export class HexMapStore {
    * the document does not carry.
    */
   private readonly grid = computed<{ map: HexMap; stored: boolean }>(() => {
-    const raw = readField(this.session.body(), this.field);
+    const raw = readField(this.session.doc(), this.field);
     if (isObject(raw) && this.minted.has(raw)) return { map: raw as HexMap, stored: true };
     const parsed = hexMapSchema.safeParse(raw);
     if (!parsed.success) return { map: emptyHexMap(), stored: false };
@@ -866,7 +866,7 @@ export class HexMapStore {
    * pays one parse; it is a keystroke, not a drag.
    */
   private rememberMintedGrid(): void {
-    const raw = readField(this.session.body(), this.field);
+    const raw = readField(this.session.doc(), this.field);
     if (isObject(raw)) this.minted.add(raw);
   }
 
@@ -874,7 +874,7 @@ export class HexMapStore {
    * Run `recipe` through the session's {@link ENTITY_SESSION.mutate}, recording the returned patches
    * for undo/redo. Returns whether a step was recorded — callers that re-point the selection use it
    * to know an edit exists to {@link trackSelectionOnLastEdit stamp}. The recipe touches only the
-   * `grid` Metadata key; every other Field, prose included, passes through untouched.
+   * `grid` EntityDocument key; every other Field, prose included, passes through untouched.
    *
    * An unstored grid (absent, or garbage the editor is showing as an empty plane) is *replaced* by
    * the plane on screen, inside the same mutation as the edit that provoked it: the recipe always
@@ -885,7 +885,7 @@ export class HexMapStore {
     const selectionBefore = this.sel.snapshot();
     const { map, stored } = this.grid();
     const { redo, undo } = this.session.mutate((body) => {
-      // The body IS the Metadata map now (ADR-0051), so the grid sits at its own key on the draft.
+      // The body IS the EntityDocument map now (ADR-0051), so the grid sits at its own key on the draft.
       if (stored) {
         recipe(body[this.field.key] as HexMap);
         return;

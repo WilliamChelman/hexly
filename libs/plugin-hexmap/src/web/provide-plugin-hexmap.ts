@@ -10,7 +10,7 @@ import { HEXMAP_TYPE_DEFINITIONS } from './hexmap-types';
  *
  * An Instance that omits it still opens existing Hex Maps: `core.hexmap` becomes an unregistered
  * type, so the Entity affords its Content and the generic Field view, and the grid stays put as plain
- * Metadata (the absent-plugin degradation of ADR-0048).
+ * EntityDocument (the absent-plugin degradation of ADR-0048).
  *
  * The canvas is deferred because this provider runs in the root injector, where naming `MapView`
  * eagerly would drag the renderer, the tool palette, and the docks onto the initial bundle. The View's

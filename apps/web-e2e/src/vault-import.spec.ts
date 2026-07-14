@@ -8,7 +8,7 @@ import { expect, segRe, test } from './fixtures';
 function vaultZip(): Buffer {
   return Buffer.from(
     zipSync({
-      // Frontmatter → Metadata; the [[Keep]] wikilink resolves to the other note.
+      // Frontmatter → EntityDocument; the [[Keep]] wikilink resolves to the other note.
       'Mara.md': strToU8(
         [
           '---',
@@ -51,7 +51,7 @@ test('imports a vault from the World Index, landing in the new World with a reso
   await expect(page.getByRole('link', { name: 'Keep' })).toBeVisible();
 
   // Open the note carrying the wikilink; its frontmatter came across as read-only
-  // Metadata, including the provenance key hexly.sourcePath.
+  // EntityDocument, including the provenance key hexly.sourcePath.
   await page.getByRole('link', { name: 'Mara' }).click();
   await expect(page.getByTestId('title')).toHaveText('Mara');
   await expect(page.getByTestId('entity-metadata')).toContainText('hexly.sourcePath');

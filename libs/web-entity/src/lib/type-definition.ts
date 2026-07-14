@@ -55,8 +55,8 @@ export interface TypeDefinition {
    */
   readonly views: readonly ViewPlacement[];
   /**
-   * The type's **Field schema** (ADR-0048): the Metadata keys it types, each with a data-type and
-   * required-ness. A typing *lens* over Metadata — values stay in the one Metadata map. Which View
+   * The type's **Field schema** (ADR-0048): the EntityDocument keys it types, each with a data-type and
+   * required-ness. A typing *lens* over EntityDocument — values stay in the one EntityDocument map. Which View
    * renders them is the type's own choice, made in {@link views}. The core types declare no Fields.
    */
   readonly fields?: readonly FieldSchema[];

@@ -5,7 +5,7 @@
  */
 
 import { z } from 'zod';
-import { FieldDataType, Metadata } from './field';
+import { FieldDataType, EntityDocument } from './field';
 
 /**
  * A single Entity Type identity (CONTEXT.md → Entity Type): an **open**,
@@ -32,30 +32,25 @@ export const typesSchema = z
   .transform((types) => [...new Set(types)]);
 
 /**
- * The Entity's Metadata map (CONTEXT.md → Metadata), stored inside the document JSON.
- * Mirrors Obsidian frontmatter on import; Hexly provenance lives under the reserved
- * `hexly.` namespace. The domain never interprets the values.
- */
-export const metadataSchema = z.record(z.string(), z.unknown()).optional();
-
-/**
- * The Entity body — what the `document` column holds. The body **is** the Metadata map (ADR-0051):
- * an open record the body root interprets no key of. Everything a Type adds to an Entity's substance
- * is a **Field** over one of its keys — a plugin's **Structured Field** value (a grid, prose) included.
+ * The **Entity Document** (CONTEXT.md → Entity Document): the one open key→value map that is an
+ * Entity's whole authored substance — what the `document` column holds. There is no wrapper and no
+ * second store (ADR-0051): everything a Type adds is a **Field** over one of its keys, a plugin's
+ * **Structured Field** value (a grid, prose) included. Mirrors Obsidian frontmatter on import;
+ * Hexly provenance lives under the reserved `hexly.` namespace.
  *
  * A record of `unknown`, never closed: a Field value that does not inhabit its data-type is left
  * alone, never rejected, so a document at rest this build cannot parse opens rather than 500ing.
  * Forward-only validation ({@link validateFields}) is the only gate, and it runs on active typed
  * edits alone.
  */
-export const entityBodySchema = z.record(z.string(), z.unknown());
+export const entityDocumentSchema = z.record(z.string(), z.unknown());
 
-/** The reserved Metadata namespace: Hexly provenance keys (`hexly.*`) that drive placement/typing on export and are stripped from author-facing frontmatter. */
+/** The reserved Entity Document namespace: Hexly provenance keys (`hexly.*`) that drive placement/typing on export and are stripped from author-facing frontmatter. */
 export const HEXLY_METADATA_PREFIX = 'hexly.';
 
 /**
  * The reserved key a vault export stamps an Entity's ordered Type set under, and import reads back
- * — no author Metadata key records the types.
+ * — no author document key records the types.
  */
 export const HEXLY_TYPE_KEY = `${HEXLY_METADATA_PREFIX}type`;
 
@@ -105,9 +100,9 @@ export const createEntityRequestSchema = z.object({
   // The ordered type set; `types[0]` is primary. One or more per creation (ADR-0048).
   types: typesSchema,
   tags: tagsSchema,
-  // Initial Metadata seeded into the minted body — the values the create dialog collected for a
-  // picked type's required Fields. Omitted → a blank map.
-  metadata: metadataSchema,
+  // Initial Entity Document values seeded into the minted body — what the create dialog collected for
+  // a picked type's required Fields. Merged over the server-minted defaults; omitted → a blank map.
+  document: entityDocumentSchema.optional(),
   // Optional target World; omitted, the server defaults to the owner's World.
   worldId: z.string().optional(),
 });
@@ -116,7 +111,7 @@ export type CreateEntityRequest = z.infer<typeof createEntityRequestSchema>;
 
 /** PUT /entities/:id: stale `version` is rejected with 409. */
 export const saveEntityRequestSchema = z.object({
-  document: entityBodySchema,
+  document: entityDocumentSchema,
   version: z.number().int().nonnegative(),
   // Always the full current set — a save replaces the stored tags; an empty array clears them.
   tags: dedupedTags,
@@ -259,7 +254,7 @@ export interface FacetCount {
 }
 
 /**
- * One type's facetable **Field** as a facet: the Metadata `key` it types, its human `label` and
+ * One type's facetable **Field** as a facet: the EntityDocument `key` it types, its human `label` and
  * `dataType` (the rail picks a data-type-appropriate control — value toggles for enum/list/string,
  * a range for number/date), and its live `values` with counts. Surfaced **contextually** — a Field
  * facet appears only once its type is in the active Type filter.
@@ -306,8 +301,8 @@ export interface EntitySummary {
 
 /** What `GET /entities/:id` and saves return. */
 export interface EntityDetail extends EntitySummary {
-  /** The Entity body — the Metadata map itself (ADR-0051). */
-  readonly document: Metadata;
+  /** The Entity body — the EntityDocument map itself (ADR-0051). */
+  readonly document: EntityDocument;
   /**
    * The live-follow freshness key (ADR-0045): bumped by every committed change. A follower keeps
    * the highest `seq` it has seen and refetches only on a nudge that exceeds it. Distinct from

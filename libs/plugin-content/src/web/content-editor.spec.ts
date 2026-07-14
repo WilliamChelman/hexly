@@ -32,7 +32,7 @@ const noteDetail = (name: string): EntityDetail => ({
 
 // Drives ContentEditor via ENTITY_SESSION — the same central store the app binds (ADR-0051): a load
 // bumps loadGeneration to (re)seed the editor, which commits its doc back through mutate.
-const adopt = (session: FakeEntitySession, detail: EntityDetail) => session.loadBody(detail.document);
+const adopt = (session: FakeEntitySession, detail: EntityDetail) => session.loadDoc(detail.document);
 
 describe('ContentEditor', () => {
   const note = noteDetail;
@@ -300,6 +300,6 @@ describe('ContentEditor', () => {
     session.editors.forEach((editor) => editor.flushPendingCommit());
 
     expect(spy).toHaveBeenCalled();
-    expect(JSON.stringify((session.body()['content'] as Content).snapshot)).toContain('!');
+    expect(JSON.stringify((session.doc()['content'] as Content).snapshot)).toContain('!');
   });
 });

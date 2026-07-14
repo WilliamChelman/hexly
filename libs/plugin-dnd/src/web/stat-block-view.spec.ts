@@ -2,7 +2,7 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { Metadata } from '@hexly/domain';
+import { EntityDocument } from '@hexly/domain';
 import { produceWithPatches } from '@hexly/immer';
 import { ENTITY_SESSION, EntitySession } from '@hexly/web-entity';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
@@ -14,25 +14,25 @@ import { StatBlockView } from './stat-block-view';
  * minimal fake session stands in for the app's.
  */
 describe('StatBlockView', () => {
-  /** A stand-in for the app's central store: the one body every View reads its slice off. */
-  function fakeSession(metadata: Metadata, writable = true): EntitySession {
-    const body = signal<Metadata>({ content: { format: 'tiptap-v1', snapshot: {} }, ...metadata });
+  /** A stand-in for the app's central store: the one Entity Document every View reads its slice off. */
+  function fakeSession(metadata: EntityDocument, writable = true): EntitySession {
+    const doc = signal<EntityDocument>({ content: { format: 'tiptap-v1', snapshot: {} }, ...metadata });
     return {
-      body: body.asReadonly(),
+      doc: doc.asReadonly(),
       writable: signal(writable).asReadonly(),
       loadGeneration: signal(0).asReadonly(),
       mutate: (recipe) => {
-        const [next, redo, undo] = produceWithPatches(body(), recipe);
-        body.set(next);
+        const [next, redo, undo] = produceWithPatches(doc(), recipe);
+        doc.set(next);
         return { redo, undo };
       },
       applyPatches: () => undefined,
-      // The stat block renders from the body and never holds a live doc, so it registers no editor.
+      // The stat block renders from the document and never holds a live doc, so it registers no editor.
       registerEditor: () => () => undefined,
     };
   }
 
-  function render(metadata: Metadata, writable = true) {
+  function render(metadata: EntityDocument, writable = true) {
     const session = fakeSession(metadata, writable);
     TestBed.configureTestingModule({
       imports: [StatBlockView, provideTranslocoTesting(DND_TEST_CATALOGS)],
@@ -43,7 +43,7 @@ describe('StatBlockView', () => {
     return { fixture, session, el: fixture.nativeElement as HTMLElement };
   }
 
-  it('prints the monster as a stat block, not as raw Metadata', () => {
+  it('prints the monster as a stat block, not as raw EntityDocument', () => {
     const { el } = render({
       size: 'Huge',
       creature_type: 'dragon',
@@ -61,7 +61,7 @@ describe('StatBlockView', () => {
     expect(el.textContent).toContain('Switch to the Note view');
   });
 
-  it('edits a stat straight into the one Metadata map every other View reads', () => {
+  it('edits a stat straight into the one EntityDocument map every other View reads', () => {
     const { fixture, session, el } = render({ challenge_rating: 5 });
 
     const cr = el.querySelector('[data-testid=stat-challenge_rating] input') as HTMLInputElement;
@@ -70,8 +70,8 @@ describe('StatBlockView', () => {
     cr.dispatchEvent(new Event('input'));
     fixture.detectChanges();
 
-    // A Field is a lens: the stat block writes the same Metadata the Browser facets on (#188).
-    expect(session.body()).toMatchObject({ challenge_rating: 13 });
+    // A Field is a lens: the stat block writes the same EntityDocument the Browser facets on (#188).
+    expect(session.doc()).toMatchObject({ challenge_rating: 13 });
   });
 
   // The block is the only surface a monster's optional Fields have (the create dialog collects the
@@ -89,7 +89,7 @@ describe('StatBlockView', () => {
     alignment.dispatchEvent(new Event('input'));
     fixture.detectChanges();
 
-    expect(session.body()).toMatchObject({ size: 'Huge', alignment: 'chaotic evil' });
+    expect(session.doc()).toMatchObject({ size: 'Huge', alignment: 'chaotic evil' });
     // The subtitle is derived, so it re-reads the moment its Fields are edited.
     expect(el.querySelector('[data-testid=stat-block-subtitle]')?.textContent).toContain('Huge, chaotic evil');
   });

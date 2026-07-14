@@ -2,10 +2,10 @@ import { BadRequestException, ForbiddenException, Inject, Injectable, NotFoundEx
 import {
   ApiError,
   CreateEntityRequest,
-  emptyEntityBody,
-  entityBodySchema,
+  emptyEntityDocument,
+  entityDocumentSchema,
   EntityDetail,
-  Metadata,
+  EntityDocument,
   EntityErrorCode,
   EntityFacets,
   EntityReferences,
@@ -447,23 +447,23 @@ export class EntitiesService {
     // and the minted body is exactly the defaults those Fields declare (ADR-0050).
     const worldId = this.resolveWorldId(ownerId, req.worldId);
     const fields = resolveFields(this.typeResolver(worldId), req.types);
-    const minted = emptyEntityBody(fields, this.typeFields.structuredDataTypes);
-    // Initial Metadata seeds over the minted defaults. Ungated: like an import, a create establishes
+    const minted = emptyEntityDocument(fields, this.typeFields.structuredDataTypes);
+    // Initial document seeds over the minted defaults. Ungated: like an import, a create establishes
     // at-rest data (the Field gate is save-only).
-    const body: Metadata = req.metadata ? { ...minted, ...req.metadata } : minted;
+    const doc: EntityDocument = req.document ? { ...minted, ...req.document } : minted;
     const row = this.writes.insert({
       ownerId,
       worldId,
       name: req.name,
       types: req.types,
       tags: req.tags,
-      body,
+      document: doc,
     });
-    return detailOf(row, body);
+    return detailOf(row, doc);
   }
 
   /**
-   * Insert a fully-built Entity for the vault import path: body, metadata, and Type set come
+   * Insert a fully-built Entity for the vault import path: document, metadata, and Type set come
    * pre-converted, and the target World is the caller's fresh import World.
    *
    * The `types` are inserted unresolved — an unregistered one still lands, and degrades to the
@@ -504,7 +504,7 @@ export class EntitiesService {
 
   /**
    * The forward-only Field gate on the write path (ADR-0048). A save carrying an explicit `types`
-   * set is an **active typed edit**, so its Metadata must satisfy those types' Fields: every
+   * set is an **active typed edit**, so its EntityDocument must satisfy those types' Fields: every
    * required Field present, every present value well-typed. A save that omits `types` is a plain
    * body edit and is left untouched — an already-stored (or imported) document with malformed
    * Fields is never *retroactively* invalidated by an unrelated edit.
@@ -523,7 +523,7 @@ export class EntitiesService {
 
   /**
    * Resolve `types` to their Fields and reject (400 {@link EntityErrorCode.InvalidFields}) when the
-   * Metadata leaves a required Field unmet, ill-types a present value, or an Entity-Link Field
+   * EntityDocument leaves a required Field unmet, ill-types a present value, or an Entity-Link Field
    * points at a *resolvable* Entity whose types miss its target-type constraint. A missing or
    * inaccessible link target stays inert — never an error.
    */
@@ -531,7 +531,7 @@ export class EntitiesService {
     userId: string,
     worldId: string | undefined,
     types: readonly EntityType[],
-    metadata: Metadata,
+    metadata: EntityDocument,
   ): void {
     const fields = resolveFields(this.typeResolver(worldId), types);
     const errors: FieldError[] = [
@@ -550,7 +550,7 @@ export class EntitiesService {
    * a *resolvable* Entity whose types miss the constraint. Resolution runs through the caller's
    * read filter, so a deleted or inaccessible target resolves to no row and stays inert.
    */
-  private linkTargetTypeErrors(userId: string, fields: readonly FieldSchema[], metadata: Metadata): FieldError[] {
+  private linkTargetTypeErrors(userId: string, fields: readonly FieldSchema[], metadata: EntityDocument): FieldError[] {
     const constraints = entityLinkConstraints(fields, metadata);
     if (constraints.length === 0) return [];
     const { filter } = entityAccess(this.db, userId);
@@ -571,7 +571,7 @@ export class EntitiesService {
   }
 
   /**
-   * Metadata patch: a rename (substance, so an entity-level Editor may make it) or a Visibility
+   * EntityDocument patch: a rename (substance, so an entity-level Editor may make it) or a Visibility
    * flip (exposure, so it needs full write rights). Exactly one of the two rides a request
    * ({@link patchEntityRequestSchema}). Unreachable → null (404); reachable but not permitted → 403.
    */
@@ -890,7 +890,7 @@ function filters(opts: FilterOptions) {
 }
 
 /**
- * Filter-by-Field predicates (ADR-0048, #188), grouped by Metadata key: `eq` values OR (enum/list
+ * Filter-by-Field predicates (ADR-0048, #188), grouped by EntityDocument key: `eq` values OR (enum/list
  * membership), `gte`/`lte` bounds AND (a range), and one `EXISTS` over the denormalised
  * `entity_field_facets` index per key — so different keys AND, matching the universal facets. A
  * range on a `number` Field compares the numeric `num` column; a date/string compares `value`
@@ -991,7 +991,7 @@ function toDetail(row: typeof entities.$inferSelect): EntityDetail {
 }
 
 // Write paths pass valid body; only toDetail re-parses.
-function detailOf(row: SummaryRow, document: Metadata): EntityDetail {
+function detailOf(row: SummaryRow, document: EntityDocument): EntityDetail {
   // `seq` rides the detail, not the summary: it is the freshness key a live-follower holds and
   // compares each incoming nudge against (ADR-0045).
   return { ...toSummary(row), seq: row.seq, document };
@@ -1001,14 +1001,14 @@ function detailOf(row: SummaryRow, document: Metadata): EntityDetail {
  * Parse and validate the stored body. Failure is corruption — throw a descriptive
  * Error naming the row (clear 500).
  */
-function parseDocument(id: string, document: string): Metadata {
+function parseDocument(id: string, document: string): EntityDocument {
   let parsed: unknown;
   try {
     parsed = JSON.parse(document);
   } catch (cause) {
     throw new Error(`Stored entity ${id} has a document that is not valid JSON`, { cause });
   }
-  const result = entityBodySchema.safeParse(parsed);
+  const result = entityDocumentSchema.safeParse(parsed);
   if (!result.success) {
     throw new Error(`Stored entity ${id} has a document that fails the Entity schema`, { cause: result.error });
   }

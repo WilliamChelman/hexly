@@ -1,25 +1,25 @@
 import {
   createEntityRequestSchema,
-  entityBodySchema,
+  entityDocumentSchema,
   entityListQuerySchema,
   patchEntityRequestSchema,
   saveEntityRequestSchema,
   visibilitySchema,
 } from './entity';
 
-/** The body is the Metadata map itself (ADR-0051): an open record the schema interprets no key of. */
+/** The body is the EntityDocument map itself (ADR-0051): an open record the schema interprets no key of. */
 const body = { alignment: 'lawful-good', armor_class: 15 };
 
-describe('entityBodySchema (the body is the Metadata map, ADR-0051)', () => {
+describe('entityDocumentSchema (the body is the EntityDocument map, ADR-0051)', () => {
   it('accepts any record of keys — the body root interprets none of them', () => {
     // A prose value, a grid, a scalar Field all sit at their own key with no wrapper and no union.
     const body = { alignment: 'lawful-good', grid: { hexes: {}, regions: [] } };
 
-    expect(entityBodySchema.parse(body)).toEqual(body);
+    expect(entityDocumentSchema.parse(body)).toEqual(body);
   });
 
   it('accepts the empty map — a bodyless placeholder a load clears the canvas to', () => {
-    expect(entityBodySchema.parse({})).toEqual({});
+    expect(entityDocumentSchema.parse({})).toEqual({});
   });
 
   it('tolerates a malformed structured value at rest — a body value is never type-checked here', () => {
@@ -27,12 +27,12 @@ describe('entityBodySchema (the body is the Metadata map, ADR-0051)', () => {
     // empty value) rather than 500ing on read. The first edit overwrites it.
     const body = { grid: 'not-a-grid' };
 
-    expect(entityBodySchema.parse(body)).toEqual(body);
+    expect(entityDocumentSchema.parse(body)).toEqual(body);
   });
 
   it('rejects a non-object body — the document column always holds a map', () => {
-    expect(() => entityBodySchema.parse('a string')).toThrow();
-    expect(() => entityBodySchema.parse([1, 2])).toThrow();
+    expect(() => entityDocumentSchema.parse('a string')).toThrow();
+    expect(() => entityDocumentSchema.parse([1, 2])).toThrow();
   });
 });
 
@@ -141,15 +141,15 @@ describe('createEntityRequestSchema', () => {
     expect(createEntityRequestSchema.parse({ name: 'x', types: ['core.note'] }).worldId).toBeUndefined();
   });
 
-  it('carries an optional initial Metadata map for a picked type’s required Fields (#189)', () => {
+  it('carries an optional initial EntityDocument map for a picked type’s required Fields (#189)', () => {
     const parsed = createEntityRequestSchema.parse({
       name: 'Balthazar',
       types: ['dnd.monster'],
-      metadata: { cr: 5 },
+      document: { cr: 5 },
     });
-    expect(parsed.metadata).toEqual({ cr: 5 });
-    // Omitted metadata parses to undefined (a blank map, minted server-side).
-    expect(createEntityRequestSchema.parse({ name: 'x', types: ['core.note'] }).metadata).toBeUndefined();
+    expect(parsed.document).toEqual({ cr: 5 });
+    // Omitted document parses to undefined (a blank map, minted server-side).
+    expect(createEntityRequestSchema.parse({ name: 'x', types: ['core.note'] }).document).toBeUndefined();
   });
 });
 
@@ -164,7 +164,7 @@ describe('visibilitySchema', () => {
 
 describe('patchEntityRequestSchema', () => {
   it('accepts a name change or a visibility change — and rejects an empty patch', () => {
-    // Metadata-only (no body, no base version) — never races with the save's optimistic-concurrency check.
+    // EntityDocument-only (no body, no base version) — never races with the save's optimistic-concurrency check.
     expect(patchEntityRequestSchema.parse({ name: 'Aldermoor' }).name).toBe('Aldermoor');
     expect(patchEntityRequestSchema.parse({ visibility: 'shared' }).visibility).toBe('shared');
     expect(() => patchEntityRequestSchema.parse({ name: '   ' })).toThrow();

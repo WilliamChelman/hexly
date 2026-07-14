@@ -51,7 +51,7 @@ describe('EntityMetadata', () => {
     return fixture.nativeElement as HTMLElement;
   }
 
-  it('lists the open entity’s Metadata keys and values, including hexly.sourcePath', () => {
+  it('lists the open entity’s EntityDocument keys and values, including hexly.sourcePath', () => {
     const el = render({
       status: 'canon',
       aliases: ['Mara', 'Lady Mara'],
@@ -74,13 +74,13 @@ describe('EntityMetadata', () => {
     expect(el.querySelector('[contenteditable]')).toBeNull();
   });
 
-  it('renders nothing when the entity has no Metadata', () => {
+  it('renders nothing when the entity has no EntityDocument', () => {
     expect(render(undefined).querySelector('[data-testid=entity-metadata]')).toBeNull();
     expect(render({}).querySelector('[data-testid=entity-metadata]')).toBeNull();
   });
 
-  it('skips a Structured Field’s value — a Hex Map’s grid is not a Metadata row (ADR-0050)', () => {
-    // The grid lives at a Metadata key like every other Field value, but it is a document with its
+  it('skips a Structured Field’s value — a Hex Map’s grid is not a EntityDocument row (ADR-0050)', () => {
+    // The grid lives at a EntityDocument key like every other Field value, but it is a document with its
     // own View: dumping it here as a line of JSON would tell the reader nothing. A Hex Map carrying
     // nothing else therefore shows no disclosure at all, exactly as before the grid moved.
     session.adopt({ ...noteWith({ grid: emptyHexMap() }), types: [CORE_HEXMAP] });
@@ -93,7 +93,7 @@ describe('EntityMetadata', () => {
 
 /**
  * With no map plugin, `core.hexmap` types no key: the grid is not a Field at all, so it falls through
- * to plain Metadata and is shown rather than skipped as a Structured Field's value (ADR-0048).
+ * to plain EntityDocument and is shown rather than skipped as a Structured Field's value (ADR-0048).
  */
 describe('EntityMetadata without the Hex Map plugin', () => {
   beforeEach(async () => {
@@ -108,7 +108,7 @@ describe('EntityMetadata without the Hex Map plugin', () => {
     }).compileComponents();
   });
 
-  it('shows a Hex Map’s grid as plain Metadata — an unrendered value, never a lost one', () => {
+  it('shows a Hex Map’s grid as plain EntityDocument — an unrendered value, never a lost one', () => {
     TestBed.inject(EntitySession).adopt({
       id: 'm1',
       worldId: 'w1',

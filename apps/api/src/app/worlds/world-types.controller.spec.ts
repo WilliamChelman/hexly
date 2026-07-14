@@ -233,7 +233,7 @@ describe('World user-defined types endpoints', () => {
         .send({ name: 'Pelor', types: ['core.note'] })
         .expect(201);
 
-      // A typed save that carries the type + its Metadata — the facetable `domain` value materialises.
+      // A typed save that carries the type + its EntityDocument — the facetable `domain` value materialises.
       await ada
         .put(`/entities/${created.body.id}`)
         .send({
@@ -258,7 +258,7 @@ describe('World user-defined types endpoints', () => {
       expect(filtered.body.items.map((e: { id: string }) => e.id)).toContain(created.body.id);
     });
 
-    it('drops the type’s lens on delete, leaving the Entity’s Metadata intact', async () => {
+    it('drops the type’s lens on delete, leaving the Entity’s EntityDocument intact', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const world = await worldWithDeity(ada);
       const created = await ada
@@ -277,7 +277,7 @@ describe('World user-defined types endpoints', () => {
 
       await ada.delete(`/worlds/${world}/types/world.deity`).expect(204);
 
-      // The Entity still reads back, its Metadata untouched — a Field is a lens, not a store.
+      // The Entity still reads back, its EntityDocument untouched — a Field is a lens, not a store.
       const read = await ada.get(`/entities/${created.body.id}`).expect(200);
       expect(read.body.document).toEqual({ domain: 'sun' });
     });

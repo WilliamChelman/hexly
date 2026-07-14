@@ -112,7 +112,7 @@ describe('EntityTypesEditor', () => {
     // Confirm is inert while the required Field is empty.
     expect((q('type-add-confirm') as HTMLElement).getAttribute('aria-disabled')).toBe('true');
 
-    // Fill the required Field, then confirm: the Metadata rides metadataChange and the type is added.
+    // Fill the required Field, then confirm: the EntityDocument rides metadataChange and the type is added.
     const input = q('pending-field-lair').querySelector('input') as HTMLInputElement;
     input.value = 'Sunken keep';
     input.dispatchEvent(new Event('input'));
@@ -124,8 +124,8 @@ describe('EntityTypesEditor', () => {
     expect(emittedTypes.at(-1)).toEqual(['core.note', 'test.monster']);
   });
 
-  it('skips the prompt when the required Field is already satisfied by existing Metadata (#189)', () => {
-    // A re-added type whose values persist as free Metadata (CONTEXT.md → Field) needs no prompt.
+  it('skips the prompt when the required Field is already satisfied by existing EntityDocument (#189)', () => {
+    // A re-added type whose values persist as free EntityDocument (CONTEXT.md → Field) needs no prompt.
     render(['core.note'], { lair: 'Sunken keep' });
     const add = q('type-add') as HTMLSelectElement;
     add.value = 'test.monster';

@@ -211,7 +211,7 @@ describe('TypeRegistry', () => {
 
   it('falls back to Content plus the generic Field View for an unregistered type — the missing-plugin case', () => {
     // No definition registered for `pathfinder.monster`: the Entity still opens on the lore every
-    // Entity has, and the generic View renders its type as an inert chip over its plain Metadata —
+    // Entity has, and the generic View renders its type as an inert chip over its plain EntityDocument —
     // never a blank screen, and never a hidden value (#187, #199).
     expect(viewKeys(registry.viewsFor(['pathfinder.monster']))).toEqual([CORE_VIEW_CONTENT, CORE_VIEW_FIELDS]);
   });
@@ -300,7 +300,7 @@ describe('TypeRegistry without the Hex Map plugin', () => {
 
   it('opens an existing Hex Map on its Content, with the generic Field view one toggle away', () => {
     // The Entity opens, and nothing is hidden: the lore renders as it always did, and the grid — a
-    // Metadata value like any other — is still there, under an unrendered Field rather than a canvas.
+    // EntityDocument value like any other — is still there, under an unrendered Field rather than a canvas.
     expect(viewKeys(registry.viewsFor(['core.hexmap']))).toEqual([CORE_VIEW_CONTENT, CORE_VIEW_FIELDS]);
     // No map View is afforded by anything, so the header offers no toggle to a canvas that isn't here.
     expect(registry.typeIdsForView(CORE_VIEW_MAP)).toEqual([]);
@@ -308,7 +308,7 @@ describe('TypeRegistry without the Hex Map plugin', () => {
 
   it('drops a *registered* type’s placed grid Field too, when the data-type’s plugin is absent', () => {
     // The type itself is here — it is World data, not the plugin's — but `core.hex-grid` resolves
-    // against an empty set, so its placement contributes no View. The Field's value stays in Metadata,
+    // against an empty set, so its placement contributes no View. The Field's value stays in EntityDocument,
     // unrendered, rather than offering a toggle to a canvas this build cannot draw.
     registry.register({
       id: 'world.deity' as TypeDefinition['id'],

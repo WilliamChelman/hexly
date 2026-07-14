@@ -1,20 +1,19 @@
 /**
- * Minting an Entity body from the **Fields** its Entity Types declare (ADR-0050, ADR-0051). The body
- * **is** the Metadata map, so minting adds keys to it directly — there is no wrapper and no Content
- * base to seed.
+ * Minting an **Entity Document** from the **Fields** its Entity Types declare (ADR-0050, ADR-0051):
+ * minting adds keys to the one map directly — there is no wrapper and no Content base to seed.
  */
 
-import { FieldSchema, Metadata, readField, resolvedStructuredFields } from './field';
+import { FieldSchema, EntityDocument, readField, resolvedStructuredFields } from './field';
 import { NO_STRUCTURED_DATA_TYPES, StructuredDataTypeSet } from './structured-data-type';
 
 /**
- * An empty body for a fresh Entity: the defaults `fields` declare and nothing else. With no arguments
- * it yields the empty map — a bodyless placeholder a load clears the canvas to.
+ * An empty Entity Document for a fresh Entity: the defaults `fields` declare and nothing else. With no
+ * arguments it yields the empty map — an empty placeholder a load clears the canvas to.
  */
-export function emptyEntityBody(
+export function emptyEntityDocument(
   fields: readonly FieldSchema[] = [],
   dataTypes: StructuredDataTypeSet = NO_STRUCTURED_DATA_TYPES,
-): Metadata {
+): EntityDocument {
   return withFieldDefaults({}, fields, dataTypes);
 }
 
@@ -28,16 +27,16 @@ export function emptyEntityBody(
  * so a caller's dirty-check by reference stays sound.
  */
 export function withFieldDefaults(
-  body: Metadata,
+  doc: EntityDocument,
   fields: readonly FieldSchema[],
   dataTypes: StructuredDataTypeSet,
-): Metadata {
-  let next: Metadata | undefined;
+): EntityDocument {
+  let next: EntityDocument | undefined;
   for (const { field, dataType } of resolvedStructuredFields(fields, dataTypes)) {
-    if (readField(next ?? body, field) !== undefined) continue;
+    if (readField(next ?? doc, field) !== undefined) continue;
     // Not `writeField`: it clears a key whose value reads as emptied, so a data-type whose `empty()`
     // is `[]` (a blank timeline) would mint nothing.
-    next = { ...(next ?? body), [field.key]: dataType.empty() };
+    next = { ...(next ?? doc), [field.key]: dataType.empty() };
   }
-  return next ?? body;
+  return next ?? doc;
 }

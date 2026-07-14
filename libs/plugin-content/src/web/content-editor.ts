@@ -39,7 +39,7 @@ import { createEntityLinkNodeView } from './entity-link-view';
 import { FormattingMenu } from './formatting-menu';
 import { BubbleMenuDirective } from './bubble-menu.directive';
 
-/** Debounce before folding the doc into the body: well under the autosave window, so a `mutate` (a
+/** Debounce before folding the doc into the Entity Document: well under the autosave window, so a `mutate` (a
  * full-doc undo patch) fires ~per pause, not per key. A save flushes it regardless (ADR-0051). */
 const COMMIT_DEBOUNCE_MS = 250;
 
@@ -330,7 +330,7 @@ export class ContentEditor {
       if (generation === seededGeneration) return;
       seededGeneration = generation;
       // untracked: sample the body once; tracking it would rebuild the editor on every commit.
-      const content = untracked(() => this.session.body()[CONTENT_FIELD.key]) as Content | undefined;
+      const content = untracked(() => this.session.doc()[CONTENT_FIELD.key]) as Content | undefined;
       // A placeholder body ({}) or malformed snapshot yields an empty editor — a fresh note, a
       // prose-less reload, or a document at rest this build cannot parse.
       const rawSnapshot = content?.snapshot;

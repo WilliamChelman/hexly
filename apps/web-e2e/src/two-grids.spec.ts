@@ -84,7 +84,7 @@ test('an Entity with two grids affords two map Views, each with its own paint an
   await page.getByTestId(MAP_VIEW).click();
   await expect(page.getByTestId('hex-count')).toHaveText('3 hexes');
 
-  // Two Fields of the one Metadata map, each holding the terrain painted on its own View (ADR-0050).
+  // Two Fields of the one EntityDocument map, each holding the terrain painted on its own View (ADR-0050).
   const worldMap = await savedGrid(request, entityId);
   const battlemap = await savedGrid(request, entityId, 'battlemap');
   expect(Object.values(worldMap.hexes)).toEqual([{ terrain: 'ocean' }, { terrain: 'ocean' }, { terrain: 'ocean' }]);

@@ -122,7 +122,7 @@ describe('CreateEntityDialog', () => {
     (q(fixture, 'create-entity-submit') as HTMLButtonElement).click();
     fixture.detectChanges();
 
-    // The seeded type rides as a one-element ordered set; no Metadata (core types declare no Fields).
+    // The seeded type rides as a one-element ordered set; no EntityDocument (core types declare no Fields).
     expect(entitiesClient.create).toHaveBeenCalledWith('The Reach', ['core.note'], 'w1', undefined);
     expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'e1']);
     expect(fixture.nativeElement.querySelector('dialog')?.open).toBeFalsy();
@@ -205,7 +205,7 @@ describe('CreateEntityDialog', () => {
 
     submit.click();
     fixture.detectChanges();
-    // The collected value rides the create as initial Metadata.
+    // The collected value rides the create as initial EntityDocument.
     expect(entitiesClient.create).toHaveBeenCalledWith('Balthazar', ['test.monster'], 'w1', { lair: 'Sunken keep' });
   });
 

@@ -59,7 +59,7 @@ function canWriteEntity(userId: string, superadmin: boolean) {
 
 /**
  * The substance predicate: `canWrite ∨ grant(editor)`. Governs the autosave surface
- * (Content, name, Tags, Metadata) — an entity-level Editor edits substance without
+ * (Content, name, Tags, EntityDocument) — an entity-level Editor edits substance without
  * the lifecycle/exposure powers {@link canWriteEntity} keeps.
  */
 function canEditSubstanceEntity(userId: string, superadmin: boolean) {

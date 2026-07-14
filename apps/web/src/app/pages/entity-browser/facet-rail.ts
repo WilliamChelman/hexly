@@ -21,7 +21,7 @@ export interface ActiveFacets {
   readonly type: readonly string[];
   readonly tag: readonly string[];
   readonly visibility: readonly string[];
-  /** The active Field filters, keyed by Metadata key — the contextual dimension (ADR-0048, #188). */
+  /** The active Field filters, keyed by EntityDocument key — the contextual dimension (ADR-0048, #188). */
   readonly fields: Readonly<Record<string, FieldSelection>>;
 }
 
