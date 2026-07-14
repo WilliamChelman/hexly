@@ -1,5 +1,6 @@
 import { tiptapContent } from './content';
 import { CONTENT_FIELD, CORE_RICH_CONTENT, RICH_CONTENT_DATA_TYPE } from './rich-content';
+import { RICH_CONTENT_DATA_TYPE_VAULT } from './rich-content-vault';
 
 /** The prose value holding the given `entityLink` attrs, wrapped in a paragraph. */
 function prose(...links: Record<string, unknown>[]) {
@@ -89,10 +90,18 @@ describe('core.rich-content data-type (ADR-0051)', () => {
   });
 
   describe('vault projection — the body converters (ADR-0051)', () => {
-    const vault = RICH_CONTENT_DATA_TYPE.vault!;
+    // The converters live on the vault variant (the API's registration); the converter-free web variant
+    // carries only the `body` slot, so the initial web bundle skips the ~160 kB Markdown toolchain.
+    const vault = RICH_CONTENT_DATA_TYPE_VAULT.vault!;
 
     it('projects to the Markdown body', () => {
       expect(vault.slot).toBe('body');
+    });
+
+    it('the web variant declares the body slot but carries no converter — the toolchain stays server-side', () => {
+      expect(RICH_CONTENT_DATA_TYPE.vault?.slot).toBe('body');
+      expect(RICH_CONTENT_DATA_TYPE.vault?.toMarkdown).toBeUndefined();
+      expect(RICH_CONTENT_DATA_TYPE.vault?.fromMarkdown).toBeUndefined();
     });
 
     it('toMarkdown refreshes a wikilink label to the target’s current name and repoints an asset src', () => {
