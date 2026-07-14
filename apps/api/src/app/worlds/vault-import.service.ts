@@ -8,24 +8,31 @@ import {
   ImportSummary,
   EntityDocument,
   nameSchema,
+  resolveFields,
   tagsSchema,
   typesSchema,
+  VaultImportContext,
 } from '@hexly/domain';
-import { CONTENT_FIELD, ContentNode, CORE_NOTE, tiptapContent, visit } from '@hexly/plugin-content';
-import { markdownToProseMirror } from '@hexly/obsidian';
+import { bodyToFields, splitFrontmatter } from '@hexly/obsidian';
 import { AssetsService } from '../assets/assets.service';
 import { DB, type Db } from '../db/db';
 import { EntitiesService } from '../entities/entities.service';
+import { DEFAULT_ENTITY_TYPE } from '../entities/bundled-plugins';
+import { TypeFieldRegistry } from '../entities/type-field-registry';
 import { VaultUnzipper } from './vault-unzipper';
 import { WorldsService } from './worlds.service';
 
 /**
- * Vault import (ADR-0033): unzip a `.zip` server-side and turn each markdown file into an Entity in
- * a brand-new World named after the upload — a plain Note, unless its frontmatter stamps the types
- * ({@link toTypes}). Runs synchronously. Two-pass: pass 1 converts every file and assigns it an id;
- * pass 2 resolves each `[[wikilink]]` to the id of the note it names (dangling when none matches)
- * before persisting. Continue-on-error: a file that can't be read or named is skipped and tallied,
- * never aborting the import.
+ * Vault import (ADR-0033, ADR-0051): unzip a `.zip` server-side and turn each markdown file into an
+ * Entity in a brand-new World named after the upload — a plain Note, unless its frontmatter stamps the
+ * types ({@link toTypes}). Each Field's value is read from where its **Vault Projection** put it — the
+ * body below the frontmatter, or the frontmatter YAML — resolved off the type/data-type registry the API
+ * composes; the converter lives behind the data-type, so this service imports no content plugin.
+ *
+ * Runs synchronously. Two-pass: pass 1 splits every file's frontmatter from its body and assigns it an
+ * id; pass 2 converts each body Field, resolving each `[[wikilink]]` to the id of the note it names
+ * (dangling when none matches) before persisting. Continue-on-error: a file that can't be read or named
+ * is skipped and tallied, never aborting the import.
  */
 @Injectable()
 export class VaultImportService {
@@ -35,6 +42,7 @@ export class VaultImportService {
     private readonly entities: EntitiesService,
     private readonly unzipper: VaultUnzipper,
     private readonly assets: AssetsService,
+    private readonly typeFields: TypeFieldRegistry,
   ) {}
 
   import(ownerId: string, filename: string, archive: Buffer): ImportSummary {
@@ -50,57 +58,83 @@ export class VaultImportService {
 
     let filesSkipped = 0;
     const constructsDegraded: Record<string, number> = {};
+    const degrade = (construct: string, count = 1) => {
+      constructsDegraded[construct] = (constructsDegraded[construct] ?? 0) + count;
+    };
 
-    // Pass 1: convert every file and assign it an id, so wikilinks can be resolved against
-    // the full set before anything is persisted (#147). A file that can't be read or named
-    // is skipped here and never enters the index.
+    // Pass 1: split every file's frontmatter from its body and assign it an id, so wikilinks can be
+    // resolved against the full set before anything is persisted (#147). A file that can't be read or
+    // named is skipped here and never enters the index. Body conversion waits for pass 2, when the link
+    // index exists.
     const notes: ImportNote[] = [];
     for (const [path, bytes] of Object.entries(files)) {
       try {
         const text = decodeUtf8(bytes);
         const name = nameSchema.parse(basename(path, '.md'));
-        const { doc, metadata, degraded } = markdownToProseMirror(text);
+        const { frontmatter, body, degraded } = splitFrontmatter(text);
         // Every file imports as a top-level Entity — there is no Home Entity to route to (ADR-0043).
         // A legacy `hexly.isHome` flag is just reserved frontmatter, stripped below like any `hexly.*`.
-        notes.push({ id: randomUUID(), path, name, doc, metadata });
-        for (const [key, n] of Object.entries(degraded)) {
-          constructsDegraded[key] = (constructsDegraded[key] ?? 0) + n;
-        }
+        notes.push({ id: randomUUID(), path, name, frontmatter, body });
+        for (const [key, n] of Object.entries(degraded)) degrade(key, n);
       } catch {
         // Broken/unreadable file: skip and report, never abort the whole import.
         filesSkipped++;
       }
     }
 
-    // Pass 2: resolve each note's wikilinks against the index (mutating the docs in place),
-    // store any embedded images content-addressed and rewrite their src to the capability URL
-    // (ADR-0034), then persist with the resolved content.
+    // Pass 2: convert each note's body Fields with a context bound to the indices — resolving each
+    // `[[wikilink]]` to a note id (ADR-0046), storing each embedded image content-addressed and
+    // rewriting its src to the capability URL (ADR-0034) — then persist. The registry is instance-wide:
+    // a brand-new World has no user-defined types yet, so the bundled resolver covers every file.
     const index = new NoteIndex(notes);
     const assetIndex = new AssetIndex(assetFiles);
+    const dataTypes = this.typeFields.structuredDataTypes;
     let linksResolved = 0;
     let linksDangling = 0;
     let assetsStored = 0;
     // One transaction for the whole persist pass: SQLite runs at synchronous=FULL (WAL), so a
     // per-note implicit transaction would fsync once each. Makes the *notes* all-or-nothing, but
-    // not the import: the World was already committed by mintWorld, and storeImages' writeFileSync
+    // not the import: the World was already committed by mintWorld, and the asset store's writeFileSync
     // isn't transactional — a throw here leaves an empty World and written asset files behind.
     this.db.transaction(() => {
       for (const note of notes) {
-        const { resolved, dangling } = resolveLinks(note.doc, index);
-        linksResolved += resolved;
-        linksDangling += dangling;
-        assetsStored += this.storeImages(note.doc, posix.dirname(note.path), assetIndex, assetFiles, worldId);
-        const { tags, ...rest } = note.metadata;
-        // Reserved `hexly.*` frontmatter is provenance a Hexly export writes (type/sourcePath),
-        // consumed here and re-derived on the next export — never stored back as author EntityDocument (ADR-0033).
+        const noteDir = posix.dirname(note.path);
+        const context: VaultImportContext = {
+          resolveLink: (label) => {
+            const id = index.resolve(label);
+            if (id) linksResolved++;
+            else linksDangling++;
+            return id;
+          },
+          storeAsset: (src) => {
+            if (!src || isExternalUrl(src)) return null;
+            const assetPath = assetIndex.resolve(src, noteDir);
+            if (!assetPath) return null;
+            const result = this.assets.store(worldId, assetPath, assetFiles[assetPath]);
+            if (!result.deduped) assetsStored++;
+            return result.url;
+          },
+          degrade,
+        };
+
+        const types = toTypes(note.frontmatter[HEXLY_TYPE_KEY]);
+        // Resolve body Fields from the stamped types, with the default type appended as the lowest-
+        // priority fallback: a foreign or unregistered-type note still lands its prose in `content`
+        // rather than losing it, while a type that declares `content` itself keeps its own projection
+        // (resolveFields dedupes by key, primary type first).
+        const fields = resolveFields(this.typeFields.resolver, [...types, DEFAULT_ENTITY_TYPE]);
+        const bodyValues = bodyToFields({ body: note.body, fields, dataTypes, context });
+
+        const { tags, ...rest } = note.frontmatter;
+        // Reserved `hexly.*` frontmatter is provenance a Hexly export writes (type/sourcePath), consumed
+        // here and re-derived on the next export — never stored back as author EntityDocument (ADR-0033).
+        // A frontmatter key a body Field also fills is dropped: the body is authoritative for it.
         const passThrough = Object.fromEntries(
-          Object.entries(rest).filter(([key]) => !key.startsWith(HEXLY_METADATA_PREFIX)),
+          Object.entries(rest).filter(([key]) => !key.startsWith(HEXLY_METADATA_PREFIX) && !(key in bodyValues)),
         );
-        // The prose sits at the `content` Field key, still named directly (Vault Projection is #211);
-        // the folder path is recorded under the reserved namespace so export can rebuild the tree.
         const doc: EntityDocument = {
           ...passThrough,
-          [CONTENT_FIELD.key]: tiptapContent(note.doc),
+          ...bodyValues,
           'hexly.sourcePath': note.path,
         };
         this.entities.importEntity({
@@ -108,7 +142,7 @@ export class VaultImportService {
           worldId,
           id: note.id,
           name: note.name,
-          types: toTypes(note.metadata[HEXLY_TYPE_KEY]),
+          types,
           tags: toTags(tags),
           document: doc,
         });
@@ -125,46 +159,15 @@ export class VaultImportService {
       constructsDegraded,
     };
   }
-
-  /**
-   * Walk a converted doc's `image` nodes (mutating in place): a vault-relative src is resolved
-   * against the vault's asset files, stored content-addressed (ADR-0034), and its src rewritten
-   * to the served `/assets/...` capability URL. External URLs (`https://…`, `data:`) and images
-   * that resolve to no vault file are left untouched. Returns how many *new* assets it stored — a
-   * deduped repeat reference does not count.
-   */
-  private storeImages(
-    doc: ContentNode,
-    noteDir: string,
-    index: AssetIndex,
-    assetFiles: Record<string, Uint8Array>,
-    worldId: string,
-  ): number {
-    let stored = 0;
-    visit(doc, (n) => {
-      if (n.type === 'image' && n.attrs) {
-        const src = String(n.attrs['src'] ?? '');
-        if (src && !isExternalUrl(src)) {
-          const path = index.resolve(src, noteDir);
-          if (path) {
-            const result = this.assets.store(worldId, path, assetFiles[path]);
-            n.attrs['src'] = result.url;
-            if (!result.deduped) stored++;
-          }
-        }
-      }
-    });
-    return stored;
-  }
 }
 
-/** A converted-but-not-yet-persisted note carried between the two import passes (#147). */
+/** A split-but-not-yet-persisted note carried between the two import passes (#147). */
 interface ImportNote {
   readonly id: string;
   readonly path: string;
   readonly name: string;
-  readonly doc: ContentNode;
-  readonly metadata: Record<string, unknown>;
+  readonly frontmatter: Record<string, unknown>;
+  readonly body: string;
 }
 
 /**
@@ -255,38 +258,12 @@ function isExternalUrl(src: string): boolean {
 }
 
 /**
- * Walks a converted doc, resolving each `entityLink`'s `label` to an `entityId` via the index
- * (mutating in place) and tallying resolved vs. dangling. An unresolved link keeps `entityId: null`
- * so its intent survives as a dangling link (#147). Only `entityLink` nodes count — a `![[X]]`
- * embed is already a plain link, so it never reaches here.
- */
-function resolveLinks(node: ContentNode, index: NoteIndex): { resolved: number; dangling: number } {
-  let resolved = 0;
-  let dangling = 0;
-  visit(node, (n) => {
-    if (n.type !== 'entityLink' || !n.attrs) return;
-    const label = String(n.attrs['label'] ?? '');
-    // An empty label is a same-note anchor (`[[#heading]]`) — it names no note, so it is
-    // neither resolved nor dangling.
-    if (label === '') return;
-    const id = index.resolve(label);
-    if (id) {
-      n.attrs['entityId'] = id;
-      resolved++;
-    } else {
-      dangling++;
-    }
-  });
-  return { resolved, dangling };
-}
-
-/**
  * Frontmatter `hexly.type` → the Entity's ordered Type set. Ids are validated for shape only; none
  * is resolved against a registry. Anything not a well-formed set degrades the *whole* set to a plain
  * Note rather than failing the file — never half-applied.
  */
 function toTypes(raw: unknown): readonly EntityType[] {
-  return typesSchema.catch([CORE_NOTE]).parse(Array.isArray(raw) ? raw : []);
+  return typesSchema.catch([DEFAULT_ENTITY_TYPE]).parse(Array.isArray(raw) ? raw : []);
 }
 
 /**

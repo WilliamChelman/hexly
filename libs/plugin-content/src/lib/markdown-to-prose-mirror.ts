@@ -6,9 +6,10 @@ import { parse as parseYaml } from 'yaml';
 import type { Root, RootContent } from 'mdast';
 
 /**
- * The `tiptap-v3` snapshot node shape the converters build against — structurally the plugin-content
- * `ContentNode` (ADR-0019). Kept local so this converter drags in no plugin dependency until it moves
- * into `@hexly/plugin-content` (ADR-0051, #211).
+ * The `tiptap-v3` snapshot node shape the converters build against — structurally the sibling
+ * `ContentNode` (ADR-0019). Kept as its own name because the converter is the *edge* of the
+ * content seam: it works purely with mdast on one side and this shape on the other, so it stays
+ * independent of the richer node vocabulary the rest of the plugin walks.
  */
 export interface PMNode {
   type: string;

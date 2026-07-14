@@ -45,6 +45,10 @@ export const HEX_GRID_DATA_TYPE = defineStructuredDataType({
       ...grid.regions.map((region) => region.name),
       ...grid.labels.map((label) => label.text),
     ]),
+  // The grid projects to **frontmatter** (CONTEXT.md → Vault Projection, ADR-0051): it rides the YAML
+  // as a nested Field value, which the vault layer serializes and re-reads generically — no `toMarkdown`
+  // needed, and ADR-0050's map round-trip is preserved through the ordinary EntityDocument path.
+  vault: { slot: 'frontmatter' },
 });
 
 /**

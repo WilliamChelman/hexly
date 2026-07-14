@@ -14,6 +14,8 @@ import {
   StructuredDataTypeId,
   structuredDataTypeIdSchema,
   StructuredDataTypeSet,
+  VaultSlot,
+  vaultSlotSchema,
 } from './structured-data-type';
 
 /** The **Entity Document** a Field reads from and writes to — the one store, never forked (CONTEXT.md → Entity Document). */
@@ -155,6 +157,12 @@ export const fieldSchemaSchema = z.object({
   dataType: fieldDataTypeSchema,
   required: z.boolean().default(false),
   facetable: z.boolean().default(false),
+  /**
+   * An optional **Vault Projection** override (CONTEXT.md → Vault Projection, ADR-0051): a Field may
+   * force its value's slot away from the data-type's default — a second prose Field kept out of the
+   * body, say. Absent means "take the data-type's default"; see {@link vaultSlotOf}.
+   */
+  vault: z.object({ slot: vaultSlotSchema }).optional(),
 });
 
 export type FieldSchema = z.infer<typeof fieldSchemaSchema>;
@@ -350,6 +358,15 @@ export function resolvedStructuredFields(
     if (dataType) out.push({ field, dataType });
   }
   return out;
+}
+
+/**
+ * A Field's effective **Vault Projection** slot (CONTEXT.md → Vault Projection, ADR-0051): the Field's
+ * own override if it declares one, else the data-type's default. `undefined` when neither has an opinion
+ * — a built-in Field with no override — which the vault layer treats as ordinary frontmatter.
+ */
+export function vaultSlotOf(field: FieldSchema, dataType: StructuredDataType | undefined): VaultSlot | undefined {
+  return field.vault?.slot ?? dataType?.vault?.slot;
 }
 
 /**

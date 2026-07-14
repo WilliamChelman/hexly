@@ -16,6 +16,7 @@ import {
   writeField,
 } from './field';
 import { defineStructuredDataType, NO_STRUCTURED_DATA_TYPES, structuredDataTypeSet } from './structured-data-type';
+import { vaultSlotOf } from './field';
 import { defineType } from './plugin-type';
 
 /** A terse FieldSchema builder for the specs — required/facetable default to false. */
@@ -453,6 +454,53 @@ describe('Structured Field data-types (ADR-0050)', () => {
 
     it('refuses to compose a set with a duplicate id', () => {
       expect(() => structuredDataTypeSet([BOARD, BOARD])).toThrow(/test\.board/);
+    });
+
+    it('carries an optional Vault Projection whose body converters see the raw value', () => {
+      const prose = defineStructuredDataType({
+        id: 'test.prose',
+        valueSchema: z.object({ text: z.string() }),
+        empty: () => ({ text: '' }),
+        vault: {
+          slot: 'body',
+          // The value is passed unparsed (forward-only): a converter tolerates an off-shape value
+          // rather than dropping it, so it narrows defensively itself.
+          toMarkdown: (value) => String((value as { text?: unknown })?.text ?? ''),
+          fromMarkdown: (markdown) => ({ text: markdown }),
+        },
+      });
+      expect(prose.vault?.slot).toBe('body');
+      const ctx = { entityName: () => undefined, assetPath: () => undefined };
+      expect(prose.vault?.toMarkdown?.({ text: 'hi' }, ctx)).toBe('hi');
+      expect(prose.vault?.toMarkdown?.('not the shape', ctx)).toBe('');
+      const importCtx = { resolveLink: () => null, storeAsset: () => null, degrade: () => undefined };
+      expect(prose.vault?.fromMarkdown?.('body text', importCtx)).toEqual({ text: 'body text' });
+    });
+
+    it('leaves the projection absent when the data-type declares none', () => {
+      expect(BOARD.vault).toBeUndefined();
+    });
+  });
+
+  describe('vaultSlotOf — a Field override wins over the data-type default', () => {
+    const framed = defineStructuredDataType({
+      id: 'test.framed',
+      valueSchema: z.unknown(),
+      empty: () => null,
+      vault: { slot: 'frontmatter' },
+    });
+
+    it("takes the data-type's default when the Field declares no override", () => {
+      expect(vaultSlotOf(field({ key: 'g', dataType: { kind: 'test.framed' } }), framed)).toBe('frontmatter');
+    });
+
+    it('honours a Field override', () => {
+      const overridden = field({ key: 'g', dataType: { kind: 'test.framed' }, vault: { slot: 'omit' } });
+      expect(vaultSlotOf(overridden, framed)).toBe('omit');
+    });
+
+    it('is undefined when neither Field nor data-type has an opinion', () => {
+      expect(vaultSlotOf(field({ key: 'name', dataType: { kind: 'string' } }), undefined)).toBeUndefined();
     });
   });
 

@@ -286,6 +286,44 @@ describe('Vault import endpoint', () => {
     });
   });
 
+  it('splits a two-body-Field file on its markers, landing each block in the Field it names (ADR-0051)', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    // A file a Hexly export wrote for an Entity with two prose Fields: markers name each block. The type
+    // is unknown to this fresh World, so the marker keys — not a resolved schema — route the blocks.
+    const zip = vaultZip({
+      'Vela.md': [
+        '---',
+        'hexly.type: [core.note, world.deity]',
+        '---',
+        '<!-- hexly:field content -->',
+        'Public lore.',
+        '',
+        '<!-- hexly:field secrets -->',
+        'Hidden truth.',
+      ].join('\n'),
+    });
+
+    const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
+    const { detail } = await entityNamed(ada, res.body.worldId, 'Vela');
+
+    // Each marked block lands at its own key, converted to prose; the marker comment itself is gone.
+    expect(JSON.stringify(detail.document.content.snapshot)).toContain('Public lore.');
+    expect(JSON.stringify(detail.document.secrets.snapshot)).toContain('Hidden truth.');
+    expect(JSON.stringify(detail.document)).not.toContain('hexly:field');
+  });
+
+  it('lands an unmarked body in the first body Field (a plain Obsidian note just works)', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const zip = vaultZip({ 'Keep.md': '# Keep\n\nThe northern keep guards the pass.' });
+
+    const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
+    const { detail } = await entityNamed(ada, res.body.worldId, 'Keep');
+
+    // No markers → the whole body converts into the canonical `content` Field.
+    expect(detail.document.content.format).toBe('tiptap-v3');
+    expect(JSON.stringify(detail.document.content.snapshot)).toContain('The northern keep guards the pass.');
+  });
+
   it('reports dangling links, degraded constructs, and zero assets in the summary', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const zip = vaultZip({

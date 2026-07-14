@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ASSET_EMBED_EXTENSIONS } from '@hexly/obsidian';
+import { ASSET_EMBED_EXTENSIONS } from '@hexly/plugin-content';
 import { createDb, Db } from '../db/db';
 import { ASSET_EXTENSIONS, AssetsService } from './assets.service';
 
