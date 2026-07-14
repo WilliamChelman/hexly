@@ -4,7 +4,8 @@ import { ComponentRef } from '@angular/core';
 import { FieldSchema } from '@hexly/domain';
 import { EntityTypesEditor } from './entity-types-editor';
 import { TypeRegistry } from '../../../entity-types/type-registry';
-import { CORE_VIEW_CONTENT, TypeDefinition } from '@hexly/web-entity';
+import { TypeDefinition } from '@hexly/web-entity';
+import { CORE_VIEW_CONTENT, providePluginContent } from '@hexly/plugin-content/web';
 
 function definition(id: string, fields?: readonly FieldSchema[]): TypeDefinition {
   return {
@@ -39,7 +40,10 @@ describe('EntityTypesEditor', () => {
   let emittedMetadata: Record<string, unknown>[];
 
   function render(types: string[], metadata: Record<string, unknown> = {}, writable = true) {
-    TestBed.configureTestingModule({ imports: [EntityTypesEditor, provideTranslocoTesting()] });
+    TestBed.configureTestingModule({
+      imports: [EntityTypesEditor, provideTranslocoTesting()],
+      providers: [providePluginContent()],
+    });
     TestBed.inject(TypeRegistry).register(definition('test.monster', [lairField]));
     const fixture = TestBed.createComponent(EntityTypesEditor);
     ref = fixture.componentRef;

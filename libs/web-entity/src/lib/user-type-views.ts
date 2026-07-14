@@ -1,10 +1,11 @@
 import { FieldSchema, isFieldViewPlacement, isStructuredDataType, ViewPlacement } from '@hexly/domain';
-import { CORE_VIEW_CONTENT, CORE_VIEW_FIELDS } from './view-definition';
+import { CORE_VIEW_FIELDS } from './view-definition';
 
 /**
- * The **View** order a user-defined type affords (ADR-0050): its Fields, then its Content, then each
- * **Structured Field** its author chose to show, in declaration order. A type shipping no code
- * resolves nothing else.
+ * The **View** order a user-defined type affords (ADR-0050, ADR-0051): its generic Field view, then
+ * each **Structured Field** its author chose to show, in declaration order — prose among them, since
+ * the `core.rich-content` Content Field is a Structured Field like any other now. A type shipping no
+ * code resolves nothing else.
  *
  * Structured Views go last, so adding a battlemap to a `world.deity` does not change what a deity
  * opens on. A plugin type places its Fields' Views by hand and may choose otherwise: `core.hexmap`
@@ -16,7 +17,6 @@ export function userTypeViews(
 ): ViewPlacement[] {
   return [
     CORE_VIEW_FIELDS,
-    CORE_VIEW_CONTENT,
     ...fields
       .filter((field) => isStructuredDataType(field.dataType) && isShownAsView(field))
       .map((field) => ({ field: field.key })),

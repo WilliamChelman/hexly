@@ -1,6 +1,6 @@
 import { Injectable, Type, inject, signal } from '@angular/core';
 import { StructuredDataTypeId } from '@hexly/domain';
-import { CORE_VIEW_CONTENT, PLUGIN_VIEWS, ViewDefinition, ViewId } from '@hexly/web-entity';
+import { CORE_VIEW_FIELDS, PLUGIN_VIEWS, ViewDefinition, ViewId } from '@hexly/web-entity';
 
 /**
  * Root registry mapping a {@link ViewId} to the component that renders it, the sibling of
@@ -59,11 +59,12 @@ export class ViewRegistry {
   }
 
   /**
-   * The definition for `id`, falling back to the always-present `core.view.content` for an
-   * absent/unregistered View (mirrors {@link TypeRegistry.resolve}).
+   * The definition for `id`, falling back to the always-present generic `core.view.fields` for an
+   * absent/unregistered View (ADR-0051; mirrors {@link TypeRegistry.resolve}). The content View is a
+   * plugin's now, so the app-owned fallback is the one View genuinely always present.
    */
   resolve(id: ViewId | null | undefined): ViewDefinition {
-    return this.get(id) ?? this.get(CORE_VIEW_CONTENT)!;
+    return this.get(id) ?? this.get(CORE_VIEW_FIELDS)!;
   }
 
   /**

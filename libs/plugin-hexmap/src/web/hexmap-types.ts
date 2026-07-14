@@ -1,4 +1,5 @@
-import { CORE_VIEW_CONTENT, TypeDefinition } from '@hexly/web-entity';
+import { TypeDefinition } from '@hexly/web-entity';
+import { CORE_VIEW_CONTENT } from '@hexly/plugin-content/web';
 import { CORE_HEXMAP_TYPE, HEX_GRID_FIELD } from '../lib';
 
 /**
@@ -6,9 +7,8 @@ import { CORE_HEXMAP_TYPE, HEX_GRID_FIELD } from '../lib';
  * declaration — the id and the grid **Structured Field** the API reads too — plus the chrome only the
  * web has: the icon, the transloco copy, the graph colour, and the Views it affords.
  *
- * Views are ordered grid Field first, Content second, so a Hex Map opens on its map. The map View
- * belongs to the grid data-type, not to this type (ADR-0050); the type says only where in its order
- * that Field's View sits.
+ * Views are ordered grid first, Content second, so a Hex Map opens on its map with a lore toggle beside
+ * it. The map View is placed by its grid Field; the content View by id (ADR-0050, ADR-0051).
  *
  * Must import no component: {@link providePluginHexmap} seeds the root registry at startup, and the
  * canvas hangs off that provider's `loadComponent`.

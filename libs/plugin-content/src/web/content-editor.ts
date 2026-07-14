@@ -19,7 +19,7 @@ import { Editor, JSONContent } from '@tiptap/core';
 import { catchError, firstValueFrom, of } from 'rxjs';
 import { Content, CONTENT_FIELD, tiptapContent } from '../lib';
 import { EntitiesClient } from '@hexly/web-core';
-import { ENTITY_SESSION } from '@hexly/web-entity';
+import { ENTITY_SESSION, VIEW_FIELD_KEY } from '@hexly/web-entity';
 import { TiptapDirective } from './tiptap.directive';
 import { EntityNameResolver } from './entity-name-resolver';
 import { CONTENT_EXTENSIONS } from './content-extensions';
@@ -248,6 +248,12 @@ const COMMIT_DEBOUNCE_MS = 250;
 })
 export class ContentEditor {
   private readonly session = inject(ENTITY_SESSION);
+  /**
+   * The EntityDocument key of the prose Field this editor renders (ADR-0051): {@link VIEW_FIELD_KEY} when
+   * a Field placed the View (so `content` and `secrets` each get their own editor), else the canonical
+   * `content` key when placed by id or mounted bare (a spec).
+   */
+  private readonly fieldKey = inject(VIEW_FIELD_KEY, { optional: true }) ?? CONTENT_FIELD.key;
   private readonly destroyRef = inject(DestroyRef);
   // The shared id→name resolver backs both the `@` picker (its entity list) and
   // every entityLink node view; provided at the entities/:id route so navigating
@@ -330,7 +336,7 @@ export class ContentEditor {
       if (generation === seededGeneration) return;
       seededGeneration = generation;
       // untracked: sample the body once; tracking it would rebuild the editor on every commit.
-      const content = untracked(() => this.session.doc()[CONTENT_FIELD.key]) as Content | undefined;
+      const content = untracked(() => this.session.doc()[this.fieldKey]) as Content | undefined;
       // A placeholder body ({}) or malformed snapshot yields an empty editor — a fresh note, a
       // prose-less reload, or a document at rest this build cannot parse.
       const rawSnapshot = content?.snapshot;
@@ -403,7 +409,7 @@ export class ContentEditor {
     const doc = this.pendingDoc;
     if (doc === null) return;
     this.session.mutate((body) => {
-      body[CONTENT_FIELD.key] = tiptapContent(doc);
+      body[this.fieldKey] = tiptapContent(doc);
     });
     this.committed = JSON.stringify(doc);
     this.clearPending();

@@ -8,7 +8,7 @@ import { EntitiesClient } from '@hexly/web-core';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { WEB_ENTITY_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { provideEntityTypesTesting } from '../testing/entity-types.fake';
-import { CORE_VIEW_CONTENT, CORE_VIEW_FIELDS } from '../lib/view-definition';
+import { CORE_VIEW_FIELDS } from '../lib/view-definition';
 import { TypeDefinition } from '../lib/type-definition';
 import { EntityLinkPicker } from './entity-link-picker';
 
@@ -17,7 +17,7 @@ function codeType(id: string, fields?: readonly FieldSchema[]): TypeDefinition {
   return {
     id: id as TypeDefinition['id'],
     icon: 'label',
-    views: [CORE_VIEW_CONTENT],
+    views: [CORE_VIEW_FIELDS],
     fields,
     graphColorToken: '--color-ink-muted',
     labels: {

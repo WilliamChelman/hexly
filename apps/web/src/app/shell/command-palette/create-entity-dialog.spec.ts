@@ -9,7 +9,8 @@ import { MockEntitiesClient } from '@hexly/web-core/testing';
 import { CreateEntityDialogState } from './create-entity-dialog.state';
 import { CreateEntityDialog } from './create-entity-dialog';
 import { TypeRegistry } from '../../entity-types/type-registry';
-import { CORE_VIEW_CONTENT, TypeDefinition } from '@hexly/web-entity';
+import { TypeDefinition } from '@hexly/web-entity';
+import { CORE_VIEW_CONTENT, providePluginContent } from '@hexly/plugin-content/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 
 /** A plugin-style type declaring one required Field — to exercise the create-time required-Fields form. */
@@ -50,6 +51,7 @@ describe('CreateEntityDialog', () => {
     TestBed.configureTestingModule({
       imports: [CreateEntityDialog, provideTranslocoTesting()],
       providers: [
+        providePluginContent(),
         providePluginHexmap(),
         provideRouter([]),
         { provide: EntitiesClient, useValue: entitiesClient },

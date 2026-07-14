@@ -6,7 +6,7 @@ import { of } from 'rxjs';
 import { AvailableType, UserDefinedType } from '@hexly/domain';
 import { ActiveWorld, WorldsClient } from '@hexly/web-core';
 import { MockWorldsClient } from '@hexly/web-core/testing';
-import { CORE_VIEW_CONTENT, CORE_VIEW_FIELDS } from '@hexly/web-entity';
+import { CORE_VIEW_FIELDS } from '@hexly/web-entity';
 import { CORE_HEX_GRID } from '@hexly/plugin-hexmap';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { WorldTypesPanel } from './world-types-panel';
@@ -115,8 +115,9 @@ describe('WorldTypesPanel', () => {
       id: 'world.deity',
       label: 'Deity',
       fields: [{ key: 'domain', label: 'Domain', dataType: { kind: 'string' }, required: false, facetable: true }],
-      // A type with no Structured Field still names its order: its Fields, then its Content.
-      views: [CORE_VIEW_FIELDS, CORE_VIEW_CONTENT],
+      // A type with no Structured Field affords its generic Field view alone (ADR-0051): prose is a
+      // Structured Field now, so a content View comes only from declaring one.
+      views: [CORE_VIEW_FIELDS],
     });
   });
 
@@ -165,7 +166,7 @@ describe('WorldTypesPanel', () => {
           facetable: true,
         },
       ],
-      views: [CORE_VIEW_FIELDS, CORE_VIEW_CONTENT],
+      views: [CORE_VIEW_FIELDS],
     });
   });
 
@@ -209,8 +210,8 @@ describe('WorldTypesPanel', () => {
             facetable: false,
           },
         ],
-        // "Show as a view" defaults on, and the grid's View sits *after* the Fields and the Content.
-        views: [CORE_VIEW_FIELDS, CORE_VIEW_CONTENT, { field: 'battlemap' }],
+        // "Show as a view" defaults on, and the grid's View sits *after* the generic Field view.
+        views: [CORE_VIEW_FIELDS, { field: 'battlemap' }],
       });
     });
 
@@ -241,7 +242,7 @@ describe('WorldTypesPanel', () => {
       const [, req] = worlds.createType.mock.calls[0];
       // The Field is declared as ever — the toggle authors the *view* list, never the Field.
       expect(req.fields).toHaveLength(1);
-      expect(req.views).toEqual([CORE_VIEW_FIELDS, CORE_VIEW_CONTENT]);
+      expect(req.views).toEqual([CORE_VIEW_FIELDS]);
     });
 
     it('reads the toggle back off an existing type’s view order', () => {
@@ -261,7 +262,7 @@ describe('WorldTypesPanel', () => {
               },
             ],
             // Authored with the toggle off: the Field is declared, but places no View.
-            views: [CORE_VIEW_FIELDS, CORE_VIEW_CONTENT],
+            views: [CORE_VIEW_FIELDS],
           },
         ]),
       );

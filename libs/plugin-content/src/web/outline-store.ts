@@ -1,6 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { CONTENT_FIELD, Content, extractOutline, OutlineHeading } from '@hexly/plugin-content';
-import { EntitySession } from './entity-session';
+import { ENTITY_SESSION } from '@hexly/web-entity';
+import { CONTENT_FIELD, Content, extractOutline, OutlineHeading } from '../lib';
 
 /**
  * Route-scoped UI state for the Outline — the heading-navigation panel beside the Content
@@ -10,7 +10,7 @@ import { EntitySession } from './entity-session';
  */
 @Injectable()
 export class OutlineStore {
-  private readonly session = inject(EntitySession);
+  private readonly session = inject(ENTITY_SESSION);
 
   private readonly _contentRoot = signal<HTMLElement | null>(null);
   /**

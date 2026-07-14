@@ -6,6 +6,7 @@ import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 import { EntityPage, EntitySummary } from '@hexly/domain';
 import { EntitiesClient, ActiveWorld, ToasterService, LocaleService } from '@hexly/web-core';
 import { MockEntitiesClient } from '@hexly/web-core/testing';
+import { providePluginContent } from '@hexly/plugin-content/web';
 import { EntityBrowser } from './entity-browser';
 
 describe('EntityBrowser', () => {
@@ -41,6 +42,7 @@ describe('EntityBrowser', () => {
     await TestBed.configureTestingModule({
       imports: [EntityBrowser, provideTranslocoTesting()],
       providers: [
+        providePluginContent(),
         { provide: EntitiesClient, useValue: client },
         provideRouter([]),
         // Stub the route's query-param stream so tests can seed `?q=` and step

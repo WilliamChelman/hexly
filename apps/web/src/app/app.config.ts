@@ -20,8 +20,8 @@ import {
 // would pull Tiptap out of the lazy entity chunk).
 import { WEB_UI_TRANSLATIONS } from '@hexly/web-ui/i18n';
 import { WEB_ENTITY_TRANSLATIONS } from '@hexly/web-entity/i18n';
-import { CONTENT_EDITOR_TRANSLATIONS } from '@hexly/plugin-content/i18n';
 import { ENTITY_TYPES } from '@hexly/web-entity';
+import { providePluginContent } from '@hexly/plugin-content/web';
 import { providePluginDnd } from '@hexly/plugin-dnd/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { TypeRegistry } from './entity-types/type-registry';
@@ -41,13 +41,9 @@ export const appConfig: ApplicationConfig = {
     }),
     // These scopes load at bootstrap because their keys are read where no pipe of the
     // declaring lib can trigger a load — from services, and from a type's label keys
-    // (ADR-0049). A plugin's scope is not listed here: it rides on its `providePluginX()`.
-    provideEagerTranslations(
-      CORE_TRANSLATIONS,
-      WEB_UI_TRANSLATIONS,
-      WEB_ENTITY_TRANSLATIONS,
-      CONTENT_EDITOR_TRANSLATIONS,
-    ),
+    // (ADR-0049). A plugin's scope is not listed here: it rides on its `providePluginX()`
+    // (the content plugin's `editor` scope arrives with `providePluginContent()`).
+    provideEagerTranslations(CORE_TRANSLATIONS, WEB_UI_TRANSLATIONS, WEB_ENTITY_TRANSLATIONS),
     // ICU MessageFormat transpiler: count-aware plural keys (e.g. the hex count)
     // resolve per the active locale's plural rules. It delegates {{…}} to the
     // default transpiler, so existing double-brace interpolation is unaffected.
@@ -69,6 +65,7 @@ export const appConfig: ApplicationConfig = {
     // Which plugins this build bundles, web side (ADR-0048, ADR-0050) — the twin of the API's list
     // in `bundled-plugins.ts`. Bundled means compiled-in: a plugin joins by shipping a lib and being
     // named here. Each provider carries that plugin's types, views, structured data-types, and copy.
+    providePluginContent(),
     providePluginHexmap(),
     providePluginDnd(),
   ],

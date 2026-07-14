@@ -1,19 +1,24 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
-import { ContentEditor } from '@hexly/plugin-content/web';
+import { ENTITY_SESSION, ENTITY_TYPES } from '@hexly/web-entity';
 import { Icon, IconButton } from '@hexly/web-ui';
 import { TranslocoService, translateSignal } from '@jsverse/transloco';
-import { TypeRegistry } from '../../../entity-types/type-registry';
-import { EntityMetadata } from '../components/entity-metadata';
-import { OutlinePanel } from '../components/outline-panel';
-import { OutlineSource } from '../components/outline-source';
-import { ReferencesPanel } from '../components/references-panel';
-import { EntitySession } from '../services/entity-session';
-import { RightDock } from '../services/right-dock';
+import { ContentEditor } from './content-editor';
+import { EntityMetadata } from './entity-metadata';
+import { OutlinePanel } from './outline-panel';
+import { OutlineSource } from './outline-source';
+import { OutlineStore } from './outline-store';
+import { ReferencesPanel } from './references-panel';
+import { ReferencesStore } from './references-store';
+import { RightDock } from './right-dock';
 
 /**
- * The `core.view.content` renderer (ADR-0048, *Views* amendment): the Content body in a centred
- * reading column with its Outline / References dock. Its dock stores (`RightDock` and friends)
- * are provided by the host, so a hexmap flipping between map and content keeps one dock instance.
+ * The `core.view.content` renderer (ADR-0048, *Views* amendment; ADR-0051): the Content body in a
+ * centred reading column with its Outline / References dock. It renders whichever prose Field placed
+ * it, reading that Field's key from `VIEW_FIELD_KEY` (the {@link ContentEditor} it hosts does the read).
+ *
+ * The View owns its dock stores in `providers` — as the Map View owns its `HexMapStore` (ADR-0050) —
+ * so the whole dock lives and dies with the content View's chunk and never reaches the initial bundle.
+ * `RIGHT_DOCK_PANELS` is left to an ancestor (a Public Link page narrows it to the Outline alone).
  *
  * `display:contents` (host `class: contents`) so the scroll column and the floating dock position
  * against the page's `<main>`.
@@ -22,6 +27,7 @@ import { RightDock } from '../services/right-dock';
   selector: 'app-content-view',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'contents' },
+  providers: [RightDock, OutlineStore, ReferencesStore],
   imports: [ContentEditor, EntityMetadata, OutlinePanel, OutlineSource, ReferencesPanel, IconButton, Icon],
   template: `
     <!-- Content body in a centred reading column. Opening either dock panel reflows
@@ -79,15 +85,15 @@ import { RightDock } from '../services/right-dock';
   `,
 })
 export class ContentView {
-  private readonly session = inject(EntitySession);
-  private readonly types = inject(TypeRegistry);
+  private readonly session = inject(ENTITY_SESSION);
+  private readonly types = inject(ENTITY_TYPES);
   private readonly transloco = inject(TranslocoService);
   /** Which panel the Content body's right dock is showing — one slot, so one discriminant. */
   protected readonly dock = inject(RightDock);
 
   /** Accessible names / tooltips for the dock's toggles (ADR-0014). */
-  protected readonly outlineToggleLabel = translateSignal('noteView.outline.toggle');
-  protected readonly linksToggleLabel = translateSignal('noteView.links.toggle');
+  protected readonly outlineToggleLabel = translateSignal('editor.outline.toggle');
+  protected readonly linksToggleLabel = translateSignal('editor.links.toggle');
 
   /**
    * The Content editor's accessible name, from the primary type (ADR-0014) — resolved, so a

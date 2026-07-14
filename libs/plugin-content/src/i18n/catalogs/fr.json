@@ -2,6 +2,9 @@
   "view": {
     "content": "Contenu"
   },
+  "dataType": {
+    "richContent": "Prose"
+  },
   "slashMenu": {
     "label": "Insérer un bloc",
     "empty": "Aucun bloc correspondant",
@@ -55,5 +58,28 @@
   },
   "entityLink": {
     "dangling": "Cette entité est indisponible"
+  },
+  "note": {
+    "eyebrow": "Note",
+    "titleLabel": "Titre de la note",
+    "rename": "Renommer la note",
+    "editorLabel": "Contenu de la note",
+    "create": "Créer une note",
+    "untitled": "Note sans titre"
+  },
+  "outline": {
+    "title": "Plan",
+    "toggle": "Afficher/masquer le plan",
+    "empty": "Aucun titre pour l’instant"
+  },
+  "links": {
+    "toggle": "Afficher/masquer les liens",
+    "references": "Références",
+    "referencedBy": "Référencé par",
+    "referencesEmpty": "Cette entité ne renvoie à rien",
+    "referencedByEmpty": "Rien ne renvoie ici"
+  },
+  "metadata": {
+    "heading": "Métadonnées"
   }
 }

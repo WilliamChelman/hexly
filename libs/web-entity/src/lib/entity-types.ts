@@ -1,4 +1,5 @@
 import { InjectionToken, Signal } from '@angular/core';
+import { FieldSchema } from '@hexly/domain';
 import { TypeDefinition, TypeLabels } from './type-definition';
 
 /**
@@ -16,6 +17,11 @@ export interface EntityTypes {
   name(type: string | null | undefined): string;
   /** One of a type's **chrome** labels — its create heading, the default name a blank create takes. */
   chromeLabel(type: string | null | undefined, key: keyof TypeLabels): string;
+  /**
+   * The union of Field schemas an Entity carrying `types` affords — primary type first, deduped by
+   * EntityDocument key. A View reads it to tell a **Structured Field**'s key from a plain value.
+   */
+  resolveFields(types: readonly string[] | null | undefined): FieldSchema[];
 }
 
 /** DI token for the {@link EntityTypes}; the composition root binds the concrete registry to it. */

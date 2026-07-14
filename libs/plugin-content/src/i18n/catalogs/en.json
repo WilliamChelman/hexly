@@ -2,6 +2,9 @@
   "view": {
     "content": "Content"
   },
+  "dataType": {
+    "richContent": "Prose"
+  },
   "slashMenu": {
     "label": "Insert block",
     "empty": "No matching blocks",
@@ -55,5 +58,28 @@
   },
   "entityLink": {
     "dangling": "This entity is unavailable"
+  },
+  "note": {
+    "eyebrow": "Note",
+    "titleLabel": "Note title",
+    "rename": "Rename note",
+    "editorLabel": "Note content",
+    "create": "Create Note",
+    "untitled": "Untitled note"
+  },
+  "outline": {
+    "title": "Outline",
+    "toggle": "Toggle outline",
+    "empty": "No headings yet"
+  },
+  "links": {
+    "toggle": "Toggle links",
+    "references": "References",
+    "referencedBy": "Referenced by",
+    "referencesEmpty": "This entity links to nothing",
+    "referencedByEmpty": "Nothing links here"
+  },
+  "metadata": {
+    "heading": "Metadata"
   }
 }

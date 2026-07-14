@@ -14,6 +14,7 @@ import {
 } from '@hexly/domain';
 import { EntitiesClient, WorldsClient, ActiveWorld } from '@hexly/web-core';
 import { MockEntitiesClient, MockWorldsClient } from '@hexly/web-core/testing';
+import { providePluginContent } from '@hexly/plugin-content/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { WorldDashboard } from './world-dashboard';
 
@@ -65,6 +66,7 @@ describe('WorldDashboard', () => {
     await TestBed.configureTestingModule({
       imports: [WorldDashboard, provideTranslocoTesting()],
       providers: [
+        providePluginContent(),
         providePluginHexmap(),
         provideRouter([]),
         { provide: EntitiesClient, useValue: entities },

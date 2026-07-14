@@ -1,5 +1,5 @@
 import { InjectionToken, Signal } from '@angular/core';
-import { EntityDocument } from '@hexly/domain';
+import { EntityDetail, EntityDocument } from '@hexly/domain';
 import { Patch } from '@hexly/immer';
 
 /** Re-exported so a View lib (e.g. the Hex Map plugin) reads the undo/redo currency from one place. */
@@ -27,6 +27,11 @@ export interface LiveEditor {
  * can replay them through {@link applyPatches}.
  */
 export interface EntitySession {
+  /**
+   * The open Entity's loaded detail, or `null` with none open — the Entity-level facts a View's chrome
+   * needs (a References panel's `(id, seq)`, the declared type set). The working slice is {@link doc}.
+   */
+  readonly current: Signal<EntityDetail | null>;
   /** The working **Entity Document** (ADR-0051); a View reads its own slice (grid, prose, a Field). */
   readonly doc: Signal<EntityDocument>;
   /**

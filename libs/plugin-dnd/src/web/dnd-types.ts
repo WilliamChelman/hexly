@@ -1,4 +1,5 @@
-import { CORE_VIEW_CONTENT, TypeDefinition, ViewId } from '@hexly/web-entity';
+import { TypeDefinition, ViewId } from '@hexly/web-entity';
+import { CORE_VIEW_CONTENT } from '@hexly/plugin-content/web';
 import { DND_MONSTER_TYPE } from '../lib/monster';
 
 /**
