@@ -26,9 +26,11 @@ this plugin give the app?" in one place; the API made you reconstruct it.
 
 - **Each plugin gets a `/server` subpath**, symmetric with `/web` — `@hexly/plugin-{content,hexmap,dnd}/server`,
   each exporting one `serverPluginX()`. The subpath is the honest mirror of `/web`: one import surface per
-  host per plugin. It also scopes weight the way `/vault` does today — the content plugin's `/server`
-  pulls the vault-enabled `core.rich-content` variant, so the ~160 kB Markdown converter toolchain loads
-  through `/server` (which only the API bundles) and never through the framework-free base barrel or `/web`.
+  host per plugin. It also scopes weight the way the former `/vault` subpath did — the content plugin's
+  `/server` pulls the vault-enabled `core.rich-content` variant, so the ~160 kB Markdown converter toolchain
+  loads through `/server` (which only the API bundles) and never through the framework-free base barrel or
+  `/web`. This subsumes `/vault`: it was a one-consumer door to the same variant, and `/server` — its only
+  consumer once this lands — now carries it (plus the type and default), so `/vault` is removed.
 
 - **The composition root becomes a list + a fold.** `bundled-plugins.ts` names
   `[serverPluginContent(), serverPluginHexmap(), serverPluginDnd()]` once; `BUNDLED_PLUGIN_TYPES` is their
@@ -59,8 +61,9 @@ this plugin give the app?" in one place; the API made you reconstruct it.
   `providePlugin({ id })`; a `PLUGIN_ID` and `configSchema` now have a single symmetric seam to land on
   (`serverPlugin({ id, configSchema, ... })`), instead of the composition root re-deriving per-plugin
   identity from loose exports.
-- **A new `/server` subpath per plugin** joins the existing `/web`, `/vault`, `/testing`, `/i18n` seams —
-  three `tsconfig.base.json` paths and three one-function `index.ts` files. No new dependency edges: the
-  entry points import only their own lib's framework-free half and `@hexly/domain`.
+- **A new `/server` subpath per plugin** joins the existing `/web`, `/testing`, `/i18n` seams — three
+  `tsconfig.base.json` paths and three one-function `index.ts` files. No new dependency edges: the entry
+  points import only their own lib's framework-free half and `@hexly/domain`. The content plugin's now-dead
+  `/vault` subpath is removed in the same change, `/server` having subsumed it.
 - **CONTEXT.md:** no vocabulary change — **Plugin** already names its "one entry point (`providePluginX`)";
   this simply gives it one on the API side too.
