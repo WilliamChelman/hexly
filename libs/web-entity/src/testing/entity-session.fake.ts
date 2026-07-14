@@ -1,5 +1,5 @@
 import { Provider, signal } from '@angular/core';
-import { EntityDocument } from '@hexly/domain';
+import { EntityDetail, EntityDocument } from '@hexly/domain';
 import { applyPatches as immerApplyPatches, Draft, Patch, produceWithPatches } from '@hexly/immer';
 import { ENTITY_SESSION, EntitySession, LiveEditor } from '../lib/entity-session';
 
@@ -9,6 +9,9 @@ import { ENTITY_SESSION, EntitySession, LiveEditor } from '../lib/entity-session
  * {@link loadGeneration}, the reset seam a live View watches.
  */
 export class FakeEntitySession implements EntitySession {
+  private readonly _current = signal<EntityDetail | null>(null);
+  readonly current = this._current.asReadonly();
+
   private readonly _doc = signal<EntityDocument>({});
   readonly doc = this._doc.asReadonly();
 
@@ -48,6 +51,16 @@ export class FakeEntitySession implements EntitySession {
   loadDoc(doc: EntityDocument): void {
     this._doc.set(doc);
     this._loadGeneration.update((n) => n + 1);
+  }
+
+  /**
+   * Test helper: adopt a full {@link EntityDetail} as a fresh load — sets {@link current} and seeds
+   * {@link doc} from `detail.document`, bumping the load generation. For a View whose chrome reads
+   * Entity-level facts (types, id) off {@link current}, not just the document slice.
+   */
+  loadDetail(detail: EntityDetail): void {
+    this._current.set(detail);
+    this.loadDoc(detail.document);
   }
 
   /** Test helper: flip edit-ability (ADR-0037), the gate {@link EntitySession.writable} exposes. */

@@ -63,9 +63,6 @@
       "empty": "Type a tag"
     }
   },
-  "entityMetadata": {
-    "heading": "Metadata"
-  },
   "entityTypes": {
     "primary": "Primary",
     "addLabel": "Add type…",
@@ -78,26 +75,6 @@
     "requiredHeading": "{{type}} needs these fields before it can be added:",
     "confirmAdd": "Add type",
     "requiredFieldsHeading": "Required fields"
-  },
-  "noteView": {
-    "eyebrow": "Note",
-    "titleLabel": "Note title",
-    "renameNote": "Rename note",
-    "backToLibrary": "Back to library",
-    "editorLabel": "Note content",
-    "outline": {
-      "title": "Outline",
-      "toggle": "Toggle outline",
-      "empty": "No headings yet"
-    },
-    "links": {
-      "title": "Links",
-      "toggle": "Toggle links",
-      "references": "References",
-      "referencedBy": "Referenced by",
-      "referencesEmpty": "This entity links to nothing",
-      "referencedByEmpty": "Nothing links here"
-    }
   },
   "editorShell": {
     "tabTitle": "Hexly",
@@ -194,9 +171,7 @@
     "fieldTerrain": "Terrain",
     "footerTokens": "Design tokens"
   },
-  "domain": {
-    "untitledNote": "Untitled note"
-  },
+  "domain": {},
   "common": {
     "language": "Language",
     "userMenu": "Open user menu",
@@ -239,7 +214,6 @@
     "entities": "Entities",
     "worlds": "Worlds",
     "commands": "Commands",
-    "createNote": "Create Note",
     "goToUsers": "Go to Users",
     "goToAdmin": "Go to Admin",
     "goToStyleguide": "Go to Styleguide",

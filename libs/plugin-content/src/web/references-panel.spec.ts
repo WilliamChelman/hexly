@@ -1,16 +1,14 @@
-import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { EntityReferences } from '@hexly/domain';
-import { CORE_NOTE } from '@hexly/plugin-content';
-import { CORE_HEXMAP } from '@hexly/plugin-hexmap';
-import { EntitySession } from '../services/entity-session';
-import { ENTITY_SESSION } from '@hexly/web-entity';
-import { ReferencesStore } from '../services/references-store';
-import { RightDock } from '../services/right-dock';
-import { noteDetail } from './note-detail.fixtures';
+import { EntityDetail, EntityReferences } from '@hexly/domain';
+import { FakeEntitySession, provideFakeEntitySession } from '@hexly/web-entity/testing';
+import { provideTranslocoTesting } from '@hexly/web-core/testing';
+import { CONTENT_EDITOR_TEST_CATALOGS } from '../i18n/test-catalogs';
+import { CORE_NOTE } from '../lib';
+import { ReferencesStore } from './references-store';
+import { RightDock } from './right-dock';
 import { ReferencesPanel } from './references-panel';
 
 /**
@@ -18,21 +16,38 @@ import { ReferencesPanel } from './references-panel';
  * that link to it (*Referenced by*), read from the derived edge index. The server has already
  * dropped every inbound edge whose source this viewer may not read, so the panel renders what it
  * is given.
+ *
+ * Driven through `ENTITY_SESSION` + `RightDock` — the same seam the app binds (ADR-0051) — so the
+ * panel's specs never reach for `apps/web`'s concrete session or the map plugin's testing barrel.
  */
 describe('ReferencesPanel', () => {
   const NONE: EntityReferences = { references: [], referencedBy: [] };
 
+  /** A minimal note detail — the panel reads only the Entity's id/seq off `current` (ADR-0045). */
+  const noteDetail = (name: string, id = 'n1'): EntityDetail => ({
+    id,
+    worldId: 'w1',
+    name,
+    types: [CORE_NOTE],
+    tags: [],
+    visibility: 'private',
+    version: 1,
+    seq: 1,
+    createdAt: 1,
+    updatedAt: 1,
+    document: {},
+  });
+
   let store: ReferencesStore;
-  let session: EntitySession;
+  let session: FakeEntitySession;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [ReferencesPanel, provideTranslocoTesting()],
+      imports: [ReferencesPanel, provideTranslocoTesting(CONTENT_EDITOR_TEST_CATALOGS)],
       providers: [
         // The store is route-scoped and reads the open Entity off the session; no Entity is
         // adopted here, so its fetch effect never fires and `adopt` is the only source.
-        EntitySession,
-        { provide: ENTITY_SESSION, useExisting: EntitySession },
+        provideFakeEntitySession(),
         RightDock,
         ReferencesStore,
         provideRouter([]),
@@ -40,13 +55,13 @@ describe('ReferencesPanel', () => {
         provideHttpClientTesting(),
       ],
     }).compileComponents();
-    session = TestBed.inject(EntitySession);
+    session = TestBed.inject(FakeEntitySession);
     store = TestBed.inject(ReferencesStore);
   });
 
   function render(references: Partial<EntityReferences>): HTMLElement {
     // The panel is closed by default, so the store's fetch never fires; `adopt` is the only source.
-    session.adopt(noteDetail('Ealdred'));
+    session.loadDetail(noteDetail('Ealdred'));
     store.adopt('n1', { ...NONE, ...references });
     const fixture = TestBed.createComponent(ReferencesPanel);
     fixture.detectChanges();
@@ -86,7 +101,7 @@ describe('ReferencesPanel', () => {
       referencedBy: [
         {
           descriptor: 'capital of',
-          source: { id: 'avalon', name: 'Avalon', types: [CORE_HEXMAP] },
+          source: { id: 'avalon', name: 'Avalon', types: [CORE_NOTE] },
         },
       ],
     });
@@ -98,7 +113,7 @@ describe('ReferencesPanel', () => {
 
   /** "Nothing links here" is a claim about the edge index, not about the fetch: it must not appear before the list lands. */
   it('claims nothing until the list has landed', () => {
-    session.adopt(noteDetail('Ealdred'));
+    session.loadDetail(noteDetail('Ealdred'));
     const fixture = TestBed.createComponent(ReferencesPanel);
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
@@ -137,7 +152,7 @@ describe('ReferencesPanel', () => {
     });
     expect(el.querySelector('[data-testid=reference-out]')).not.toBeNull();
 
-    session.adopt({ ...noteDetail('Mira'), id: 'n2' });
+    session.loadDetail(noteDetail('Mira', 'n2'));
     TestBed.tick();
 
     // Blanks to *nothing* — not to "this entity links to nothing", which would be a claim about

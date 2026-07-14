@@ -1,6 +1,7 @@
 import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { providePluginDnd } from '@hexly/plugin-dnd/web';
+import { providePluginContent } from '@hexly/plugin-content/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { firstValueFrom } from 'rxjs';
 import { CreateEntityDialogState } from '../create-entity-dialog.state';
@@ -13,7 +14,7 @@ describe('CreateCommands', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [provideTranslocoTesting()],
-      providers: [providePluginHexmap(), providePluginDnd()],
+      providers: [providePluginContent(), providePluginHexmap(), providePluginDnd()],
     });
     provider = TestBed.inject(CreateCommands);
     state = TestBed.inject(CreateEntityDialogState);

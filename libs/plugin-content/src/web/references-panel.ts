@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Eyebrow } from '@hexly/web-ui';
-import { ReferencesStore } from '../services/references-store';
+import { ReferencesStore } from './references-store';
 import { ReferenceRow } from './reference-row';
 
 /**
@@ -20,7 +20,7 @@ import { ReferenceRow } from './reference-row';
   imports: [Eyebrow, ReferenceRow, TranslocoPipe],
   host: { class: 'flex flex-col gap-1 p-3 overflow-y-auto bg-surface' },
   template: `
-    <span appEyebrow mark class="mb-1">{{ 'noteView.links.references' | transloco }}</span>
+    <span appEyebrow mark class="mb-1">{{ 'editor.links.references' | transloco }}</span>
 
     <!-- Tracked positionally: the list is replaced wholesale on each fetch and no row holds
          state, so identity buys nothing (as in the Outline). -->
@@ -29,19 +29,19 @@ import { ReferenceRow } from './reference-row';
     } @empty {
       @if (store.loaded()) {
         <p class="text-sm leading-normal text-ink-muted" data-testid="references-out-empty">
-          {{ 'noteView.links.referencesEmpty' | transloco }}
+          {{ 'editor.links.referencesEmpty' | transloco }}
         </p>
       }
     }
 
-    <span appEyebrow mark class="mt-3 mb-1">{{ 'noteView.links.referencedBy' | transloco }}</span>
+    <span appEyebrow mark class="mt-3 mb-1">{{ 'editor.links.referencedBy' | transloco }}</span>
 
     @for (ref of store.referencedBy(); track $index) {
       <app-reference-row data-testid="reference-in" [entity]="ref.source" [descriptor]="ref.descriptor" />
     } @empty {
       @if (store.loaded()) {
         <p class="text-sm leading-normal text-ink-muted" data-testid="references-in-empty">
-          {{ 'noteView.links.referencedByEmpty' | transloco }}
+          {{ 'editor.links.referencedByEmpty' | transloco }}
         </p>
       }
     }

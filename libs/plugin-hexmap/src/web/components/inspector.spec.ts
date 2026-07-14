@@ -5,7 +5,8 @@ import { of } from 'rxjs';
 import { EntityDetail, EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient } from '@hexly/web-core';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
-import { CORE_VIEW_CONTENT, TypeDefinition } from '@hexly/web-entity';
+import { TypeDefinition } from '@hexly/web-entity';
+import { CORE_VIEW_CONTENT } from '@hexly/plugin-content/web';
 import { provideEntityTypesTesting } from '@hexly/web-entity/testing';
 import { HEXMAP_TEST_CATALOGS } from '../../i18n/test-catalogs';
 import { HexMapStore } from '../services/hexmap-store';
@@ -20,12 +21,12 @@ const NOTE_TYPE: TypeDefinition = {
   views: [CORE_VIEW_CONTENT],
   graphColorToken: '--color-ink-muted',
   labels: {
-    eyebrow: 'noteView.eyebrow',
-    titleLabel: 'noteView.titleLabel',
-    rename: 'noteView.renameNote',
-    editorLabel: 'noteView.editorLabel',
-    create: 'commandPalette.createNote',
-    untitled: 'domain.untitledNote',
+    eyebrow: 'editor.note.eyebrow',
+    titleLabel: 'editor.note.titleLabel',
+    rename: 'editor.note.rename',
+    editorLabel: 'editor.note.editorLabel',
+    create: 'editor.note.create',
+    untitled: 'editor.note.untitled',
   },
 };
 

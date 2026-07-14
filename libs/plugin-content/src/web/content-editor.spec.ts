@@ -8,6 +8,7 @@ import { EntityDetail } from '@hexly/domain';
 import { Content, CONTENT_FORMAT, tiptapContent } from '../lib';
 import { Editor } from '@tiptap/core';
 import { FakeEntitySession, provideFakeEntitySession } from '@hexly/web-entity/testing';
+import { VIEW_FIELD_KEY } from '@hexly/web-entity';
 import { EntityNameResolver } from './entity-name-resolver';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { CONTENT_EDITOR_TEST_CATALOGS } from '../i18n/test-catalogs';
@@ -74,12 +75,19 @@ describe('ContentEditor', () => {
     return fixture;
   }
 
+  // The EntityDocument key the editor renders, read from VIEW_FIELD_KEY (ADR-0051). `undefined` (the
+  // default, and what most tests use) leaves the editor on its canonical `content` fallback; a test
+  // exercising a second prose Field sets it before create().
+  let viewFieldKey: string | undefined;
+
   beforeEach(async () => {
     fragment$.next(null);
+    viewFieldKey = undefined;
     await TestBed.configureTestingModule({
       imports: [ContentEditor, provideTranslocoTesting(CONTENT_EDITOR_TEST_CATALOGS)],
       providers: [
         provideFakeEntitySession(),
+        { provide: VIEW_FIELD_KEY, useFactory: () => viewFieldKey },
         EntityNameResolver,
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -301,5 +309,30 @@ describe('ContentEditor', () => {
 
     expect(spy).toHaveBeenCalled();
     expect(JSON.stringify((session.doc()['content'] as Content).snapshot)).toContain('!');
+  });
+
+  it('reads and writes the Field named by VIEW_FIELD_KEY, not the canonical content key (ADR-0051)', () => {
+    // A World type's second prose Field (`secrets`) is edited by this same component, placed by
+    // `{ field: 'secrets' }` — so the editor seeds from and commits to that key, leaving `content` be.
+    viewFieldKey = 'secrets';
+    const session = TestBed.inject(FakeEntitySession);
+    session.loadDoc({
+      secrets: {
+        format: CONTENT_FORMAT,
+        snapshot: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'GM only.' }] }] },
+      },
+    });
+
+    const fixture = create();
+
+    // Seeded from `secrets`, not from an absent `content`.
+    const surface = fixture.nativeElement.querySelector('[data-testid=note-content]') as HTMLElement;
+    expect(surface.textContent).toContain('GM only.');
+
+    // An edit commits back into `secrets`; `content` is never touched.
+    editorOf(fixture).commands.insertContent('!');
+    session.editors.forEach((editor) => editor.flushPendingCommit());
+    expect(JSON.stringify((session.doc()['secrets'] as Content).snapshot)).toContain('!');
+    expect(session.doc()['content']).toBeUndefined();
   });
 });

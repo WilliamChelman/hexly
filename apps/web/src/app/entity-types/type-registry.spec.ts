@@ -2,16 +2,11 @@ import { provideTranslocoTesting } from '../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { FieldSchema } from '@hexly/domain';
 import { CORE_HEX_GRID } from '@hexly/plugin-hexmap';
+import { CORE_RICH_CONTENT } from '@hexly/plugin-content';
 import { DND_MONSTER } from '@hexly/plugin-dnd';
 import { TypeRegistry } from './type-registry';
-import {
-  CORE_VIEW_CONTENT,
-  CORE_VIEW_FIELDS,
-  CORE_VIEW_MAP,
-  TypeDefinition,
-  ViewInstance,
-  viewInstanceKey,
-} from '@hexly/web-entity';
+import { CORE_VIEW_FIELDS, CORE_VIEW_MAP, TypeDefinition, ViewInstance, viewInstanceKey } from '@hexly/web-entity';
+import { CORE_VIEW_CONTENT, providePluginContent } from '@hexly/plugin-content/web';
 import { DND_VIEW_STAT_BLOCK, providePluginDnd } from '@hexly/plugin-dnd/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 
@@ -55,21 +50,23 @@ describe('TypeRegistry', () => {
     // `dnd.monster`.
     TestBed.configureTestingModule({
       imports: [provideTranslocoTesting()],
-      providers: [providePluginHexmap(), providePluginDnd()],
+      providers: [providePluginContent(), providePluginHexmap(), providePluginDnd()],
     });
     registry = TestBed.inject(TypeRegistry);
   });
 
-  it('seeds the core type, then the bundled plugins — all through one register()', () => {
-    // `core.note` and the two plugins' types arrive by the same `register()` (ADR-0048): the app seeds
-    // only the base body's type, and every other type in the build is a plugin's.
+  it('seeds every code type from a bundled plugin — all through one register()', () => {
+    // The app seeds no type of its own now (ADR-0051): `core.note` arrives from the content plugin,
+    // `core.hexmap` from the map plugin, `dnd.monster` from the dnd plugin — all by the same
+    // `register()`, in provider order.
     expect(registry.all().map((d) => d.id)).toEqual(['core.note', 'core.hexmap', DND_MONSTER]);
   });
 
-  it('composes its Structured Field data-types from the plugins provided (ADR-0050, #199)', () => {
-    // The web twin of the API's `BUNDLED_STRUCTURED_DATA_TYPES`: the grid arrives with the Hex Map
-    // plugin, so the app names no data-type — and a build without it resolves none.
-    expect([...registry.structuredDataTypes.keys()]).toEqual([CORE_HEX_GRID]);
+  it('composes its Structured Field data-types from the plugins provided (ADR-0050, ADR-0051)', () => {
+    // The web twin of the API's `BUNDLED_STRUCTURED_DATA_TYPES`: prose arrives with the content plugin,
+    // the grid with the Hex Map plugin, so the app names no data-type — and a build without one resolves
+    // none of its kind.
+    expect([...registry.structuredDataTypes.keys()]).toEqual([CORE_RICH_CONTENT, CORE_HEX_GRID]);
     expect(registry.structuredDataTypes.get(CORE_HEX_GRID)?.empty()).toEqual({
       hexes: {},
       regions: [],
@@ -209,11 +206,12 @@ describe('TypeRegistry', () => {
     });
   });
 
-  it('falls back to Content plus the generic Field View for an unregistered type — the missing-plugin case', () => {
-    // No definition registered for `pathfinder.monster`: the Entity still opens on the lore every
-    // Entity has, and the generic View renders its type as an inert chip over its plain EntityDocument —
-    // never a blank screen, and never a hidden value (#187, #199).
-    expect(viewKeys(registry.viewsFor(['pathfinder.monster']))).toEqual([CORE_VIEW_CONTENT, CORE_VIEW_FIELDS]);
+  it('affords the generic Field View *alone* for an unregistered type — the missing-plugin case', () => {
+    // No definition registered for `pathfinder.monster`: #199's content floor is withdrawn (ADR-0051),
+    // so the Entity opens on the generic View alone — its type an inert chip, its values (prose
+    // included) shown there as plain EntityDocument. No data-type is privileged: no content View is
+    // afforded for a Field the absent plugin never declared.
+    expect(viewKeys(registry.viewsFor(['pathfinder.monster']))).toEqual([CORE_VIEW_FIELDS]);
   });
 
   it('resolves the union of Field schemas a types[] set declares, primary type first', () => {
@@ -287,21 +285,26 @@ describe('TypeRegistry without the Hex Map plugin', () => {
   let registry: TypeRegistry;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({ imports: [provideTranslocoTesting()], providers: [providePluginDnd()] });
+    TestBed.configureTestingModule({
+      imports: [provideTranslocoTesting()],
+      providers: [providePluginContent(), providePluginDnd()],
+    });
     registry = TestBed.inject(TypeRegistry);
   });
 
   it('knows nothing of core.hexmap — it was the plugin’s, and the plugin is gone', () => {
     expect(registry.all().map((d) => d.id)).toEqual(['core.note', DND_MONSTER]);
     expect(registry.get('core.hexmap')).toBeUndefined();
-    // Nor its grid: a Field naming `core.hex-grid` resolves against an empty set (ADR-0050).
-    expect(registry.structuredDataTypes.size).toBe(0);
+    // Nor its grid: a Field naming `core.hex-grid` resolves against a set holding only prose (ADR-0050).
+    expect(registry.structuredDataTypes.has(CORE_HEX_GRID)).toBe(false);
+    expect(registry.structuredDataTypes.has(CORE_RICH_CONTENT)).toBe(true);
   });
 
-  it('opens an existing Hex Map on its Content, with the generic Field view one toggle away', () => {
-    // The Entity opens, and nothing is hidden: the lore renders as it always did, and the grid — a
-    // EntityDocument value like any other — is still there, under an unrendered Field rather than a canvas.
-    expect(viewKeys(registry.viewsFor(['core.hexmap']))).toEqual([CORE_VIEW_CONTENT, CORE_VIEW_FIELDS]);
+  it('opens an existing Hex Map on the generic Field view alone — the withdrawn content floor', () => {
+    // The Entity opens, and nothing is hidden: `core.hexmap` is unregistered, so it affords the generic
+    // View alone (ADR-0051), and the grid — a EntityDocument value like any other — is still there,
+    // under an unrendered Field rather than a canvas. Its prose is shown there too, unrendered.
+    expect(viewKeys(registry.viewsFor(['core.hexmap']))).toEqual([CORE_VIEW_FIELDS]);
     // No map View is afforded by anything, so the header offers no toggle to a canvas that isn't here.
     expect(registry.typeIdsForView(CORE_VIEW_MAP)).toEqual([]);
   });

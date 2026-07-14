@@ -9,8 +9,6 @@ import { ViewId } from './view-instance';
  */
 export type { ViewId };
 
-/** The Content-body View every Entity affords (the `rich-content` base's renderer). */
-export const CORE_VIEW_CONTENT = 'core.view.content';
 /** The hex-grid View a `hex-grid`-carrying Entity additionally affords. */
 export const CORE_VIEW_MAP = 'core.view.map';
 /**
@@ -27,8 +25,8 @@ export const CORE_VIEW_FIELDS = 'core.view.fields';
  * View (ADR-0050).
  *
  * A Type thereby **places** a Structured Field's View in its own order — `core.hexmap` declares
- * `[{ field: 'grid' }, CORE_VIEW_CONTENT]` and opens on its map. A User-defined type's list is data:
- * persisted, and validated at the trust boundary.
+ * `[{ field: 'grid' }, CORE_VIEW_CONTENT]`, placing its grid by `{ field }` and the content View by id
+ * (ADR-0051). A User-defined type's list is data: persisted, and validated at the trust boundary.
  */
 export type { ViewPlacement };
 
@@ -67,18 +65,23 @@ export type ViewDefinition = {
       readonly dataType?: never;
     }
   | {
-      readonly labelKey?: never;
       /**
-       * The **Structured Field** data-type this View renders (`core.hex-grid`): a Type places one of
-       * its Fields, the Field names its data-type by `kind`, and the kind resolves here. The web half
-       * of a data-type's declaration; the framework-free half ({@link StructuredDataType}) carries no
-       * View.
+       * The toggle label when a Type places this View by *id* rather than by a Field — the content View
+       * over a type's one canonical prose Field (ADR-0051). A `{ field }` placement uses the Field's
+       * label instead, so it is absent for a View only ever placed that way (the map).
+       */
+      readonly labelKey?: string;
+      /**
+       * The **Structured Field** data-type this View renders (`core.hex-grid`, `core.rich-content`): a
+       * Type places one of its Fields, the Field names its data-type by `kind`, and the kind resolves
+       * here. The web half of a data-type's declaration; the framework-free half
+       * ({@link StructuredDataType}) carries no View.
        */
       readonly dataType: StructuredDataTypeId;
       /**
-       * The transloco key naming the **data-type** ("Hex grid") where the World Types editor offers
-       * it, beside `string` and `enum`. Distinct from the toggle label, which a structured View takes
-       * from the Field that placed it ("Battlemap").
+       * The transloco key naming the **data-type** ("Hex grid", "Prose") where the World Types editor
+       * offers it, beside `string` and `enum`. Distinct from the toggle label, which a structured View
+       * takes from the Field that placed it ("Battlemap").
        */
       readonly dataTypeLabelKey: string;
     }

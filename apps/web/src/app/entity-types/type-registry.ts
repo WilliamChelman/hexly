@@ -3,7 +3,6 @@ import { TranslocoService } from '@jsverse/transloco';
 import { EntityType, FieldSchema, resolveFields, structuredDataTypeSet } from '@hexly/domain';
 import { CORE_NOTE } from '@hexly/plugin-content';
 import {
-  CORE_VIEW_CONTENT,
   CORE_VIEW_FIELDS,
   EntityTypes,
   PLUGIN_DATA_TYPES,
@@ -14,7 +13,6 @@ import {
   ViewInstance,
   viewInstanceKey,
 } from '@hexly/web-entity';
-import { CORE_TYPE_DEFINITIONS } from './core-types';
 import { ViewRegistry } from './view-registry';
 
 /**
@@ -22,8 +20,9 @@ import { ViewRegistry } from './view-registry';
  * entity page, header, card, dashboard, graph, and create surfaces read per-type icon, labels, and
  * afforded view surfaces. `register()` returns an unregister fn.
  *
- * `core.note` is the only type the app itself seeds; plugin types arrive through {@link PLUGIN_TYPES},
- * and a World's user-defined types join at runtime, projected by {@link WorldTypesLoader}.
+ * The app seeds **no** type of its own (ADR-0051): every code type arrives through {@link PLUGIN_TYPES}
+ * — `core.note` from the content plugin, `core.hexmap` from the map plugin — and a World's user-defined
+ * types join at runtime, projected by {@link WorldTypesLoader}.
  *
  * Implements {@link EntityTypes}, the read contract a lib injects (bound to {@link ENTITY_TYPES} in
  * `app.config.ts`), so a shared control can ask what types exist without depending on `apps/web`.
@@ -39,9 +38,8 @@ export class TypeRegistry implements EntityTypes {
   readonly all = this.definitions.asReadonly();
 
   constructor() {
-    for (const def of CORE_TYPE_DEFINITIONS) this.register(def);
-    // Bundled plugin types (`core.hexmap`, `dnd.monster`). Drop a plugin, and its Entities degrade to
-    // the generic Field view (see `viewsFor`).
+    // Every code type is a bundled plugin's (`core.note`, `core.hexmap`, `dnd.monster`) — ADR-0051.
+    // Drop a plugin, and its Entities degrade to the generic Field view alone (see `viewsFor`).
     for (const def of inject(PLUGIN_TYPES, { optional: true }) ?? []) this.register(def);
   }
 
@@ -68,7 +66,8 @@ export class TypeRegistry implements EntityTypes {
    * which drives its icon, headline, and default view.
    */
   resolve(type: string | null | undefined): TypeDefinition {
-    // `core.note` is seeded in the constructor, so the fallback is always present.
+    // The content plugin is bundled in every real build (ADR-0051), so `core.note` is registered
+    // through `PLUGIN_TYPES` and the chrome fallback is always present.
     return this.get(type) ?? this.get(CORE_NOTE)!;
   }
 
@@ -86,10 +85,9 @@ export class TypeRegistry implements EntityTypes {
    * a form row, not a View), or a structured one whose plugin this build omits — contributes nothing,
    * rather than a toggle to a view that cannot render.
    *
-   * A registered type affords exactly the Views it declares; a fields-only type declares
-   * `core.view.fields` outright. An **unregistered** type — a plugin this build does not bundle —
-   * affords the Content view and the generic Field view instead, in that order, so its values remain
-   * readable as plain EntityDocument.
+   * A registered type affords exactly the Views it declares. An **unregistered** type — a plugin this
+   * build does not bundle — affords the generic Field view **alone** (ADR-0051): #199's content floor
+   * is withdrawn, and its values (prose included) stay readable there as plain EntityDocument.
    */
   viewsFor(types: readonly string[] | null | undefined): ViewInstance[] {
     const seen = new Map<string, ViewInstance>();
@@ -101,7 +99,6 @@ export class TypeRegistry implements EntityTypes {
     for (const type of types ?? []) {
       const def = this.get(type);
       if (!def) {
-        afford({ viewId: CORE_VIEW_CONTENT });
         afford({ viewId: CORE_VIEW_FIELDS });
         continue;
       }

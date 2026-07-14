@@ -3,7 +3,7 @@ import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { EMPTY, catchError, distinctUntilChanged, map, switchMap } from 'rxjs';
 import { EntityReferences } from '@hexly/domain';
 import { EntitiesClient } from '@hexly/web-core';
-import { EntitySession } from './entity-session';
+import { ENTITY_SESSION } from '@hexly/web-entity';
 import { RightDock } from './right-dock';
 
 /** A fetched list, tagged with the Entity it describes. */
@@ -33,7 +33,7 @@ interface Loaded {
  */
 @Injectable()
 export class ReferencesStore {
-  private readonly session = inject(EntitySession);
+  private readonly session = inject(ENTITY_SESSION);
   private readonly entities = inject(EntitiesClient);
   private readonly dock = inject(RightDock);
 

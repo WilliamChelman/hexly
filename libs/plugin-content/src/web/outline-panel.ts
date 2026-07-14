@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Eyebrow } from '@hexly/web-ui';
-import { OutlineStore } from '../services/outline-store';
+import { OutlineStore } from './outline-store';
 
 /**
  * The Outline panel (CONTEXT.md): a nested, click-to-jump list of the Content's
@@ -27,7 +27,7 @@ import { OutlineStore } from '../services/outline-store';
   imports: [Eyebrow, TranslocoPipe],
   host: { class: 'flex flex-col gap-1 p-3 overflow-y-auto bg-surface' },
   template: `
-    <span appEyebrow mark class="mb-1">{{ 'noteView.outline.title' | transloco }}</span>
+    <span appEyebrow mark class="mb-1">{{ 'editor.outline.title' | transloco }}</span>
 
     @for (row of rows(); track $index) {
       <button
@@ -42,7 +42,7 @@ import { OutlineStore } from '../services/outline-store';
       </button>
     } @empty {
       <p class="text-sm leading-normal text-ink-muted" data-testid="outline-empty">
-        {{ 'noteView.outline.empty' | transloco }}
+        {{ 'editor.outline.empty' | transloco }}
       </p>
     }
   `,

@@ -7,6 +7,7 @@ import { EntityDetail } from '@hexly/domain';
 import { ActiveWorld, EntitiesClient } from '@hexly/web-core';
 import { MockEntitiesClient } from '@hexly/web-core/testing';
 import { providePluginDnd } from '@hexly/plugin-dnd/web';
+import { providePluginContent } from '@hexly/plugin-content/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { CORE_VIEW_FIELDS } from '@hexly/web-entity';
 import { NewEntityButton } from './new-entity-button';
@@ -41,6 +42,7 @@ describe('NewEntityButton', () => {
       providers: [
         provideRouter([]),
         { provide: EntitiesClient, useValue: entities },
+        providePluginContent(),
         providePluginHexmap(),
         providePluginDnd(),
       ],

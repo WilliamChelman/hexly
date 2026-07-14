@@ -1,5 +1,6 @@
 import { inject, Provider, signal } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
+import { FieldSchema, resolveFields } from '@hexly/domain';
 import { ENTITY_TYPES, EntityTypes } from '../lib/entity-types';
 import { TypeDefinition, TypeLabels } from '../lib/type-definition';
 
@@ -37,6 +38,10 @@ export class FakeEntityTypes implements EntityTypes {
     if (!def) return this.name(type);
     if (def.labelText) return def.labelText;
     return def.labels ? this.translate(def.labels[key]) : this.name(type);
+  }
+
+  resolveFields(types: readonly string[] | null | undefined): FieldSchema[] {
+    return resolveFields((type) => this.get(type)?.fields, types ?? []);
   }
 
   private get(type: string | null | undefined): TypeDefinition | undefined {

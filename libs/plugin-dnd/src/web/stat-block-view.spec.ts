@@ -18,6 +18,8 @@ describe('StatBlockView', () => {
   function fakeSession(metadata: EntityDocument, writable = true): EntitySession {
     const doc = signal<EntityDocument>({ content: { format: 'tiptap-v1', snapshot: {} }, ...metadata });
     return {
+      // The stat block reads its slice off `doc`; it needs no Entity-level facts, so `current` is null.
+      current: signal(null).asReadonly(),
       doc: doc.asReadonly(),
       writable: signal(writable).asReadonly(),
       loadGeneration: signal(0).asReadonly(),

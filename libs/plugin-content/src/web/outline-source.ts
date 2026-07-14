@@ -1,5 +1,5 @@
 import { DestroyRef, Directive, ElementRef, inject } from '@angular/core';
-import { OutlineStore } from '../services/outline-store';
+import { OutlineStore } from './outline-store';
 
 /**
  * Registers a Content editor element with the {@link OutlineStore}, so the panel scopes its heading

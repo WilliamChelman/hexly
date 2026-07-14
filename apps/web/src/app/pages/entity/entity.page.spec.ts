@@ -11,7 +11,9 @@ import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { EntitiesClient, NudgeBusClient, ActiveWorld, TitleService, EVICTED, Watched } from '@hexly/web-core';
 import { MockEntitiesClient, MockNudgeBusClient } from '@hexly/web-core/testing';
 import { EntitySession } from './services/entity-session';
-import { CORE_VIEW_CONTENT, CORE_VIEW_MAP, ENTITY_SESSION, viewInstanceKey } from '@hexly/web-entity';
+import { CORE_VIEW_MAP, ENTITY_SESSION, ENTITY_TYPES, viewInstanceKey } from '@hexly/web-entity';
+import { TypeRegistry } from '../../entity-types/type-registry';
+import { CORE_VIEW_CONTENT, providePluginContent } from '@hexly/plugin-content/web';
 import { ViewRegistry } from '../../entity-types/view-registry';
 import { EntityNameResolver } from '@hexly/plugin-content/web';
 import { noteDetail } from './components/note-detail.fixtures';
@@ -77,9 +79,11 @@ describe('EntityPage routing', () => {
     await TestBed.configureTestingModule({
       imports: [EntityPage, provideTranslocoTesting()],
       providers: [
+        providePluginContent(),
         providePluginHexmap(),
         EntitySession,
         { provide: ENTITY_SESSION, useExisting: EntitySession },
+        { provide: ENTITY_TYPES, useExisting: TypeRegistry },
         EntityNameResolver,
         { provide: EntitiesClient, useValue: entities },
         { provide: NudgeBusClient, useValue: bus },
@@ -117,6 +121,8 @@ describe('EntityPage routing', () => {
     await configure('n1');
     entities.load.mockReturnValue(of(detail('n1', 'note')));
     const fixture = mount();
+    // The content View is the content plugin's now, fetched by the page rather than named (ADR-0051).
+    await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_CONTENT);
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
@@ -142,6 +148,7 @@ describe('EntityPage routing', () => {
     await configure('m1', { view: CORE_VIEW_CONTENT });
     entities.load.mockReturnValue(of(detail('m1', 'hexmap')));
     const fixture = mount();
+    await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_CONTENT);
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
@@ -213,9 +220,11 @@ describe('EntityPage layout', () => {
     await TestBed.configureTestingModule({
       imports: [EntityPage, provideTranslocoTesting()],
       providers: [
+        providePluginContent(),
         providePluginHexmap(),
         EntitySession,
         { provide: ENTITY_SESSION, useExisting: EntitySession },
+        { provide: ENTITY_TYPES, useExisting: TypeRegistry },
         EntityNameResolver,
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -244,6 +253,19 @@ describe('EntityPage layout', () => {
     return fixture;
   }
 
+  /**
+   * Open the page on a note and await the content View's lazy chunk — the editor and its dock are the
+   * content plugin's now, fetched by the page on activation rather than named (ADR-0051).
+   */
+  async function mountNote() {
+    TestBed.inject(EntitySession).adopt(noteDetail('Lady Mara'));
+    const fixture = TestBed.createComponent(EntityPage);
+    fixture.detectChanges();
+    await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_CONTENT);
+    fixture.detectChanges();
+    return fixture;
+  }
+
   it('arms the non-destructive Select tool by default', async () => {
     const fixture = await mountMap();
 
@@ -265,10 +287,8 @@ describe('EntityPage layout', () => {
   });
 
   /** The Outline and References share the dock's single panel slot (ADR-0013): opening either closes the other. */
-  it('swaps the dock between the Outline and References, never showing both', () => {
-    TestBed.inject(EntitySession).adopt(noteDetail('Lady Mara'));
-    const fixture = TestBed.createComponent(EntityPage);
-    fixture.detectChanges();
+  it('swaps the dock between the Outline and References, never showing both', async () => {
+    const fixture = await mountNote();
     const el = fixture.nativeElement as HTMLElement;
     const click = (testid: string) => {
       el.querySelector<HTMLButtonElement>(`[data-testid=${testid}]`)?.click();
@@ -294,10 +314,8 @@ describe('EntityPage layout', () => {
   });
 
   /** Both panels are the same width and float over the same corner: the column reserves room for either. */
-  it('reflows the reading column for whichever panel is open', () => {
-    TestBed.inject(EntitySession).adopt(noteDetail('Lady Mara'));
-    const fixture = TestBed.createComponent(EntityPage);
-    fixture.detectChanges();
+  it('reflows the reading column for whichever panel is open', async () => {
+    const fixture = await mountNote();
     const el = fixture.nativeElement as HTMLElement;
     const column = () => el.querySelector<HTMLElement>('[data-content-scroll]')!;
     const click = (testid: string) => {
@@ -332,6 +350,7 @@ describe('EntityPage layout', () => {
     const fixture = await mountMap(); // mounts on the grid (the empty route leaves the default map view)
     // Flip to the Content view after mount, as the header's toggle would.
     fixture.debugElement.injector.get(EntityViewStore).setView(CORE_VIEW_CONTENT);
+    await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_CONTENT);
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
@@ -367,7 +386,7 @@ describe('EntityPage layout', () => {
     expect(el.querySelector('app-map-canvas')).toBeNull();
   });
 
-  it('mounts the shared Content editor for a note, seeded with its stored Content', () => {
+  it('mounts the shared Content editor for a note, seeded with its stored Content', async () => {
     TestBed.inject(EntitySession).adopt({
       ...noteDetail('Lady Mara'),
       document: {
@@ -386,6 +405,8 @@ describe('EntityPage layout', () => {
       },
     });
     const fixture = TestBed.createComponent(EntityPage);
+    fixture.detectChanges();
+    await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_CONTENT);
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;

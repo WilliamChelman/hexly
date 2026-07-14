@@ -7,9 +7,6 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { Observable, concat, distinctUntilChanged, ignoreElements, map, of } from 'rxjs';
 import { EntitySession } from './services/entity-session';
 import { EntityViewStore } from './services/entity-view-store';
-import { OutlineStore } from './services/outline-store';
-import { ReferencesStore } from './services/references-store';
-import { RightDock } from './services/right-dock';
 import { EntityHeader } from './components/entity-header';
 import { ViewRegistry } from '../../entity-types/view-registry';
 import { CORE_VIEW_DEFINITIONS } from './views/core-views';
@@ -26,12 +23,10 @@ import { CORE_VIEW_DEFINITIONS } from './views/core-views';
   selector: 'app-entity-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block h-full overflow-hidden' },
-  // The Content view's dock stores, scoped to the page that shows them. Provided *here* rather
-  // than on the route, because every mount of this component needs them (the Public Link page
-  // reuses EntityPage) and none overrides them. ContentView, outletted below, injects them from
-  // here. EntityViewStore is page-scoped too: it reads the open Entity's types off the session,
-  // provided above the page in both mounts.
-  providers: [RightDock, OutlineStore, ReferencesStore, EntityViewStore],
+  // EntityViewStore is page-scoped: it reads the open Entity's types off the session, provided above
+  // the page in both the routed and Public Link mounts. The content View's dock stores are the
+  // View's own now (ADR-0051) — provided in `ContentView`, as the map's store is in `MapView`.
+  providers: [EntityViewStore],
   imports: [EntityHeader, NgComponentOutlet, TranslocoPipe],
   template: `
     @if (session.current()) {

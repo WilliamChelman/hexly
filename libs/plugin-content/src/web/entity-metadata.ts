@@ -1,8 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { isStructuredDataType } from '@hexly/domain';
-import { EntitySession } from '../services/entity-session';
-import { TypeRegistry } from '../../../entity-types/type-registry';
+import { ENTITY_SESSION, ENTITY_TYPES } from '@hexly/web-entity';
 
 /**
  * Read-only view of the open Entity's EntityDocument map (CONTEXT.md → EntityDocument, ADR-0033): the
@@ -19,7 +18,7 @@ import { TypeRegistry } from '../../../entity-types/type-registry';
     @if (entries().length > 0) {
       <details class="mb-4 rounded-md border border-line bg-surface-sunken" data-testid="entity-metadata">
         <summary class="cursor-pointer select-none px-3 py-2 text-2xs uppercase tracking-wider text-ink-muted">
-          {{ 'entityMetadata.heading' | transloco }} ({{ entries().length }})
+          {{ 'editor.metadata.heading' | transloco }} ({{ entries().length }})
         </summary>
         <dl class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 border-t border-line px-3 py-2 m-0 text-sm">
           @for (entry of entries(); track entry.key) {
@@ -34,15 +33,15 @@ import { TypeRegistry } from '../../../entity-types/type-registry';
   `,
 })
 export class EntityMetadata {
-  private readonly session = inject(EntitySession);
-  private readonly types = inject(TypeRegistry);
+  private readonly session = inject(ENTITY_SESSION);
+  private readonly types = inject(ENTITY_TYPES);
 
   /** The EntityDocument keys a Structured Field types — a document, shown on its own View, never here. */
   private readonly structuredKeys = computed(
     () =>
       new Set(
         this.types
-          .resolveFields(this.session.types())
+          .resolveFields(this.session.current()?.types)
           .filter((field) => isStructuredDataType(field.dataType))
           .map((field) => field.key),
       ),

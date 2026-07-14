@@ -6,6 +6,10 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { BehaviorSubject, EMPTY, Observable, of, throwError } from 'rxjs';
 import { EntityDetail } from '@hexly/domain';
 import { CONTENT_FORMAT, CORE_NOTE } from '@hexly/plugin-content';
+import { ENTITY_TYPES } from '@hexly/web-entity';
+import { CORE_VIEW_CONTENT, providePluginContent } from '@hexly/plugin-content/web';
+import { ViewRegistry } from '../../entity-types/view-registry';
+import { TypeRegistry } from '../../entity-types/type-registry';
 import { EntitiesClient, PublicClient, Watched } from '@hexly/web-core';
 import { MockEntitiesClient } from '@hexly/web-core/testing';
 import { PublicEntityPage } from './public-entity-page';
@@ -40,8 +44,11 @@ describe('PublicEntityPage', () => {
   let fixture: ComponentFixture<PublicEntityPage>;
   const params$ = new BehaviorSubject(convertToParamMap({ token: TOKEN }));
 
-  function render(): HTMLElement {
+  async function render(): Promise<HTMLElement> {
     fixture = TestBed.createComponent(PublicEntityPage);
+    fixture.detectChanges();
+    // The reused EntityPage outlets the content plugin's View, fetched on activation (ADR-0051).
+    await TestBed.inject(ViewRegistry).fetch(CORE_VIEW_CONTENT);
     fixture.detectChanges();
     return fixture.nativeElement as HTMLElement;
   }
@@ -53,6 +60,8 @@ describe('PublicEntityPage', () => {
     await TestBed.configureTestingModule({
       imports: [PublicEntityPage, provideTranslocoTesting()],
       providers: [
+        providePluginContent(),
+        { provide: ENTITY_TYPES, useExisting: TypeRegistry },
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -75,8 +84,8 @@ describe('PublicEntityPage', () => {
    * The Public Link page mounts the shared {@link EntityPage}, so every route-scoped dependency
    * that component acquires must resolve here too, or construction throws NullInjectorError.
    */
-  it('renders the reused editor for an anonymous reader', () => {
-    const el = render();
+  it('renders the reused editor for an anonymous reader', async () => {
+    const el = await render();
 
     expect(el.querySelector('[data-testid=public-banner]')).not.toBeNull();
     expect(el.querySelector('[data-testid=note-content]')).not.toBeNull();
@@ -87,17 +96,17 @@ describe('PublicEntityPage', () => {
    * References is not a panel this context can serve: the endpoint answers a `CurrentUser`, and a
    * Public Link grants no scope beyond its own Entity — the fetch could only ever 403.
    */
-  it('offers the Outline but not References', () => {
-    const el = render();
+  it('offers the Outline but not References', async () => {
+    const el = await render();
 
     expect(el.querySelector('[data-testid=outline-toggle]')).not.toBeNull();
     expect(el.querySelector('[data-testid=references-toggle]')).toBeNull();
   });
 
-  it('shows the dead-link panel when the token does not resolve', () => {
+  it('shows the dead-link panel when the token does not resolve', async () => {
     client.entity.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
 
-    const el = render();
+    const el = await render();
 
     expect(el.querySelector('[data-testid=public-notfound]')).not.toBeNull();
     expect(el.querySelector('[data-testid=note-content]')).toBeNull();

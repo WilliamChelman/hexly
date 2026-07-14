@@ -6,7 +6,8 @@ import { ActiveWorld, WorldsClient } from '@hexly/web-core';
 import { AvailableType, FieldSchema } from '@hexly/domain';
 import { WorldTypesLoader } from './world-types-loader';
 import { TypeRegistry } from './type-registry';
-import { CORE_VIEW_CONTENT, CORE_VIEW_FIELDS } from '@hexly/web-entity';
+import { CORE_VIEW_FIELDS } from '@hexly/web-entity';
+import { CORE_VIEW_CONTENT } from '@hexly/plugin-content/web';
 
 describe('WorldTypesLoader', () => {
   const deity: AvailableType = {
@@ -53,8 +54,9 @@ describe('WorldTypesLoader', () => {
 
     const def = registry.get('world.deity');
     expect(def?.labelText).toBe('Deity');
-    // No authored order: the type falls back to its Fields, then its Content (#201).
-    expect(def?.views).toEqual([CORE_VIEW_FIELDS, CORE_VIEW_CONTENT]);
+    // No authored order, and no prose Field: the type affords its generic Field view alone (ADR-0051).
+    // Prose is a Structured Field now, so a deity gets a content View only when it declares one.
+    expect(def?.views).toEqual([CORE_VIEW_FIELDS]);
     // Its Fields resolve, so the generic view and facets pick them up.
     expect(registry.resolveFields(['world.deity']).map((f) => f.key)).toEqual(['domain']);
   });
@@ -64,7 +66,7 @@ describe('WorldTypesLoader', () => {
     worldId.set('w1');
     TestBed.flushEffects();
 
-    expect(registry.get('world.deity')?.views).toEqual([CORE_VIEW_FIELDS, CORE_VIEW_CONTENT, { field: 'battlemap' }]);
+    expect(registry.get('world.deity')?.views).toEqual([CORE_VIEW_FIELDS, { field: 'battlemap' }]);
   });
 
   it('projects the author’s own View order verbatim, so "Show as a view" can drop one', () => {

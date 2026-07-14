@@ -11,7 +11,8 @@ import { CORE_HEXMAP, HEX_GRID_FIELD } from '@hexly/plugin-hexmap';
 import { MockEntitiesClient, MockWorldsClient, MockUserDirectoryClient, MockAuthClient } from '@hexly/web-core/testing';
 import { EntitiesClient, WorldsClient, ActiveWorld, UserDirectoryClient, AuthClient } from '@hexly/web-core';
 import { EntitySession } from '../services/entity-session';
-import { CORE_VIEW_CONTENT, CORE_VIEW_MAP, ENTITY_SESSION, viewInstanceKey } from '@hexly/web-entity';
+import { CORE_VIEW_MAP, ENTITY_SESSION, viewInstanceKey } from '@hexly/web-entity';
+import { CORE_VIEW_CONTENT, providePluginContent } from '@hexly/plugin-content/web';
 import { EntityViewStore } from '../services/entity-view-store';
 import { ViewRegistry } from '../../../entity-types/view-registry';
 import { CORE_VIEW_DEFINITIONS } from '../views/core-views';
@@ -74,6 +75,7 @@ describe('EntityHeader', () => {
     await TestBed.configureTestingModule({
       imports: [EntityHeader, provideTranslocoTesting()],
       providers: [
+        providePluginContent(),
         providePluginHexmap(),
         EntitySession,
         { provide: ENTITY_SESSION, useExisting: EntitySession },

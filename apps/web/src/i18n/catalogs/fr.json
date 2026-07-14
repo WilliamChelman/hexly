@@ -63,9 +63,6 @@
       "empty": "Saisir un tag"
     }
   },
-  "entityMetadata": {
-    "heading": "Métadonnées"
-  },
   "entityTypes": {
     "primary": "Principal",
     "addLabel": "Ajouter un type…",
@@ -78,26 +75,6 @@
     "requiredHeading": "{{type}} nécessite ces champs avant de pouvoir être ajouté :",
     "confirmAdd": "Ajouter le type",
     "requiredFieldsHeading": "Champs requis"
-  },
-  "noteView": {
-    "eyebrow": "Note",
-    "titleLabel": "Titre de la note",
-    "renameNote": "Renommer la note",
-    "backToLibrary": "Retour à la bibliothèque",
-    "editorLabel": "Contenu de la note",
-    "outline": {
-      "title": "Plan",
-      "toggle": "Afficher/masquer le plan",
-      "empty": "Aucun titre pour l’instant"
-    },
-    "links": {
-      "title": "Liens",
-      "toggle": "Afficher/masquer les liens",
-      "references": "Références",
-      "referencedBy": "Référencé par",
-      "referencesEmpty": "Cette entité ne renvoie à rien",
-      "referencedByEmpty": "Rien ne renvoie ici"
-    }
   },
   "editorShell": {
     "tabTitle": "Hexly",
@@ -194,9 +171,7 @@
     "fieldTerrain": "Terrain",
     "footerTokens": "Jetons de design"
   },
-  "domain": {
-    "untitledNote": "Note sans titre"
-  },
+  "domain": {},
   "common": {
     "language": "Langue",
     "userMenu": "Ouvrir le menu utilisateur",
@@ -239,7 +214,6 @@
     "entities": "Entités",
     "worlds": "Mondes",
     "commands": "Commandes",
-    "createNote": "Créer une note",
     "goToUsers": "Aller aux utilisateurs",
     "goToAdmin": "Aller à l'administration",
     "goToStyleguide": "Aller au guide de style",

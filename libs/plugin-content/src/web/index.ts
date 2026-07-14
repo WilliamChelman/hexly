@@ -1,12 +1,16 @@
 /**
- * The Content plugin's Angular half (ADR-0051): the {@link ContentEditor} and its chrome, and the
- * shared {@link EntityNameResolver}. The editor drives against the host's central store through
- * `@hexly/web-entity`'s `ENTITY_SESSION`, the same seam the Hex Map plugin uses — it declares no port
- * of its own. Kept behind its own entry point so the framework-free half — `@hexly/plugin-content` —
- * drags in no Angular or TipTap.
+ * The Content plugin's Angular half (ADR-0051): its one composition entry point,
+ * {@link providePluginContent} (the twin of `providePluginHexmap`), plus the light symbols the app and
+ * the Public Link page bind eagerly — the shared {@link EntityNameResolver} and the right dock's panel
+ * set. The editor drives the host's central store through `@hexly/web-entity`'s `ENTITY_SESSION`, the
+ * same seam the Hex Map plugin uses; it declares no port of its own.
  *
- * The editor's translation scope stays behind `@hexly/plugin-content/i18n` (ADR-0049): `app.config.ts`
- * registers it eagerly, and reaching it through this barrel would pull TipTap onto the initial bundle.
+ * Export nothing TipTap-bound: `app.config.ts` imports this barrel to compose the plugin, so anything
+ * re-exported here ships on the initial bundle. The editor, its chrome, the content View, and its dock
+ * are reachable only through the View's `loadComponent`, and so live in the content View's own chunk
+ * (mirrors `@hexly/plugin-hexmap/web`). A spec wanting a dock component takes it from its own file.
  */
-export * from './content-editor';
-export * from './entity-name-resolver';
+export { providePluginContent } from './provide-plugin-content';
+export { CORE_VIEW_CONTENT } from './content-types';
+export { EntityNameResolver } from './entity-name-resolver';
+export { RIGHT_DOCK_PANELS, type RightPanel } from './right-dock';
