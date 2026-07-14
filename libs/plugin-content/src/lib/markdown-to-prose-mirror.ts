@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm';
 import remarkFrontmatter from 'remark-frontmatter';
 import { parse as parseYaml } from 'yaml';
 import type { Root, RootContent } from 'mdast';
+import { ASSET_EMBED_EXT } from './asset-extensions';
 
 /**
  * The `tiptap-v3` snapshot node shape the converters build against — structurally the sibling
@@ -368,14 +369,6 @@ function splitInlineText(value: string, marks: Mark[], degraded: Record<string, 
   if (rest) out.push(withMarks({ type: 'text', text: rest }, marks));
   return out;
 }
-
-/**
- * Extensions Obsidian embeds as media rather than as a note transclusion. An `![[X]]` whose
- * target ends in one of these is an Asset the importer stores; anything else (a bare note name)
- * stays a degraded link. The API's asset MIME map must cover every extension listed here.
- */
-export const ASSET_EMBED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'avif', 'pdf'];
-const ASSET_EMBED_EXT = new RegExp(`\\.(${ASSET_EMBED_EXTENSIONS.join('|')})$`, 'i');
 
 /** Is this `![[target]]` an embedded media Asset (vs. a note transclusion)? */
 function isAssetEmbed(target: string): boolean {

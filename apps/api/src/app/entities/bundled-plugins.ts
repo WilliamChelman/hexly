@@ -1,5 +1,6 @@
 import { EntityType, PluginTypeDefinition, structuredDataTypeSet, StructuredDataTypeSet } from '@hexly/domain';
-import { CORE_NOTE_TYPE, RICH_CONTENT_DATA_TYPE } from '@hexly/plugin-content';
+import { CORE_NOTE_TYPE } from '@hexly/plugin-content';
+import { RICH_CONTENT_DATA_TYPE_VAULT } from '@hexly/plugin-content/vault';
 import { DND_MONSTER_TYPE } from '@hexly/plugin-dnd';
 import { CORE_HEXMAP_TYPE, HEX_GRID_DATA_TYPE } from '@hexly/plugin-hexmap';
 
@@ -22,7 +23,10 @@ export const BUNDLED_PLUGIN_TYPES: readonly PluginTypeDefinition[] = [
  * derive pass has no Content special case left. One joins by being named here, as a plugin type does.
  */
 export const BUNDLED_STRUCTURED_DATA_TYPES: StructuredDataTypeSet = structuredDataTypeSet([
-  RICH_CONTENT_DATA_TYPE,
+  // The vault-enabled variant — the API resolves both the derive pass (edges/text) and the vault
+  // import/export projection off this set, and vault I/O needs the Markdown converter (ADR-0051). The
+  // web registers the converter-free `RICH_CONTENT_DATA_TYPE` instead, so the toolchain stays server-side.
+  RICH_CONTENT_DATA_TYPE_VAULT,
   HEX_GRID_DATA_TYPE,
 ]);
 

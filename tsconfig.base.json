@@ -21,6 +21,7 @@
       "@hexly/plugin-content": ["./libs/plugin-content/src/index.ts"],
       "@hexly/plugin-content/i18n": ["./libs/plugin-content/src/i18n/index.ts"],
       "@hexly/plugin-content/testing": ["./libs/plugin-content/src/testing/index.ts"],
+      "@hexly/plugin-content/vault": ["./libs/plugin-content/src/vault/index.ts"],
       "@hexly/plugin-content/web": ["./libs/plugin-content/src/web/index.ts"],
       "@hexly/plugin-dnd": ["./libs/plugin-dnd/src/index.ts"],
       "@hexly/plugin-dnd/testing": ["./libs/plugin-dnd/src/testing/index.ts"],
