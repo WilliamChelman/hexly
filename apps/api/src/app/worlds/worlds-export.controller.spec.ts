@@ -105,6 +105,56 @@ describe('Vault export endpoint', () => {
     expect(files).toHaveProperty('Lady Mara.md');
     expect(text(files, 'Lady Mara.md')).toContain('# Lady Mara');
     expect(text(files, 'Lady Mara.md')).toContain('A ranger of the north.');
+    // One body Field → a plain Markdown file, with no field marker comment (ADR-0051).
+    expect(text(files, 'Lady Mara.md')).not.toContain('hexly:field');
+  });
+
+  it('writes two body Fields with markers in Field order and re-imports each losslessly (ADR-0051)', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    const worldId = await importVault(ada, { 'Note.md': '# Note' });
+    const entities = app.get(EntitiesService);
+
+    // A World-scoped type declaring a SECOND prose Field beside the canonical `content`.
+    await ada
+      .post(`/worlds/${worldId}/types`)
+      .send({
+        id: 'world.deity',
+        label: 'Deity',
+        fields: [{ key: 'secrets', label: 'Secrets', dataType: { kind: 'core.rich-content' } }],
+      })
+      .expect(201);
+
+    // An Entity carrying both prose Fields — `content` (core.note) and `secrets` (world.deity).
+    const paragraph = (t: string) => ({ type: 'paragraph', content: [{ type: 'text', text: t }] });
+    const vela = entities.create(adaId, { types: ['core.note', 'world.deity'], name: 'Vela', worldId, tags: [] });
+    entities.save(adaId, vela.id, {
+      version: vela.version,
+      tags: [],
+      descriptors: [],
+      document: {
+        content: tiptapContent({ type: 'doc', content: [paragraph('Public lore.')] }),
+        secrets: tiptapContent({ type: 'doc', content: [paragraph('Hidden truth.')] }),
+      },
+    });
+
+    const { res, files } = await exportZip(ada, worldId);
+    const md = text(files, 'Vela.md');
+
+    // Both blocks are marked, content before secrets (resolved Field order), each rendering its prose.
+    expect(md).toContain('<!-- hexly:field content -->');
+    expect(md.indexOf('<!-- hexly:field content -->')).toBeLessThan(md.indexOf('<!-- hexly:field secrets -->'));
+    expect(md).toContain('Public lore.');
+    expect(md).toContain('Hidden truth.');
+
+    // Re-import lands each block back in the Field it came from, even though `world.deity` is unknown to
+    // the fresh World — the marker key carries it, converted as prose (ADR-0051).
+    const reimport = await ada
+      .post('/worlds/import')
+      .attach('file', Buffer.from(res.body), 'Aldermoor.zip')
+      .expect(201);
+    const reimported = entities.listByWorld(adaId, reimport.body.worldId).find((e) => e.name === 'Vela');
+    expect(JSON.stringify(reimported?.document['content'])).toContain('Public lore.');
+    expect(JSON.stringify(reimported?.document['secrets'])).toContain('Hidden truth.');
   });
 
   it('rebuilds the folder tree from hexly.sourcePath and never emits hexly.* as frontmatter', async () => {

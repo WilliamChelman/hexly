@@ -1,20 +1,24 @@
 import { posix } from 'node:path';
 import { Injectable } from '@nestjs/common';
-import { EntityDetail, HEXLY_METADATA_PREFIX, HEXLY_TYPE_KEY } from '@hexly/domain';
-import { Content, CONTENT_FIELD, ContentNode, CORE_NOTE, visit } from '@hexly/plugin-content';
-import { proseMirrorToMarkdown } from '@hexly/obsidian';
+import { EntityDetail, HEXLY_TYPE_KEY, resolveFields, VaultExportContext } from '@hexly/domain';
+import { entityToMarkdown } from '@hexly/obsidian';
 import { strToU8, zipSync, type Zippable } from 'fflate';
 import { AssetsService } from '../assets/assets.service';
 import { EntitiesService } from '../entities/entities.service';
+import { DEFAULT_ENTITY_TYPE } from '../entities/bundled-plugins';
+import { TypeFieldRegistry } from '../entities/type-field-registry';
+import { WorldTypeFields } from '../entities/world-type-fields';
 import { WorldsService } from './worlds.service';
 
 /** Not the World Owner (or it doesn't exist) — the export route maps these to 403/404. */
 export type ExportResult = { filename: string; zip: Buffer } | 'not-found' | 'forbidden';
 
 /**
- * Serialize a World back to a `.zip` of markdown + assets in its original folder shape (ADR-0033).
- * Owner-only: entities are stored under the World Owner's id, so a member's owner-scoped read
- * returns nothing anyway (ADR-0004, ADR-0024).
+ * Serialize a World back to a `.zip` of markdown + assets in its original folder shape (ADR-0033,
+ * ADR-0051). Each Field's **Vault Projection** decides where its value lands — prose to the body, a grid
+ * to frontmatter — resolved off the type/data-type registry the API composes; the serializer itself
+ * (`@hexly/obsidian`) imports no content plugin. Owner-only: entities are stored under the World Owner's
+ * id, so a member's owner-scoped read returns nothing anyway (ADR-0004, ADR-0024).
  */
 @Injectable()
 export class VaultExportService {
@@ -22,6 +26,8 @@ export class VaultExportService {
     private readonly worlds: WorldsService,
     private readonly entities: EntitiesService,
     private readonly assets: AssetsService,
+    private readonly typeFields: TypeFieldRegistry,
+    private readonly worldTypeFields: WorldTypeFields,
   ) {}
 
   export(ownerId: string, worldId: string): ExportResult {
@@ -47,24 +53,37 @@ export class VaultExportService {
     // would overwrite each other in `files`; uniquePath keeps both (#150).
     const entities = this.entities.listByWorld(ownerId, worldId);
     const nameById = new Map(entities.map((e) => [e.id, e.name]));
+    // A World's own user-defined types resolve too, so a Field they declare projects correctly.
+    const resolver = this.worldTypeFields.resolverFor(worldId);
     for (const entity of entities) {
-      files[uniquePath(files, filePath(entity))] = strToU8(this.toMarkdown(entity, srcMap, nameById));
+      files[uniquePath(files, filePath(entity))] = strToU8(this.toMarkdown(entity, srcMap, nameById, resolver));
     }
 
     return { filename: `${world.name}.zip`, zip: Buffer.from(zipSync(files)) };
   }
 
-  /** Serialize one Entity's prose to Obsidian markdown (ProseMirror JSON → mdast → markdown). */
-  private toMarkdown(entity: EntityDetail, srcMap: Map<string, string>, nameById: Map<string, string>): string {
-    // The prose lives at the `content` Field key now (ADR-0051); a prose-less body serializes to an
-    // empty doc. One boundary narrow for the serializer, which needs a typed doc root.
-    const content = entity.document[CONTENT_FIELD.key] as Content | undefined;
-    const doc = (content?.snapshot ?? { type: 'doc', content: [] }) as ContentNode;
-    // In-place on the throwaway parsed snapshot: repoint asset srcs, and refresh each wikilink's
-    // label to its target's CURRENT name so a post-import rename still round-trips.
-    rewriteAssetSrcs(doc, srcMap);
-    rewriteEntityLinks(doc, nameById);
-    return proseMirrorToMarkdown(doc, frontmatter(entity));
+  /** Serialize one Entity to Obsidian markdown, each Field going where its Vault Projection says (ADR-0051). */
+  private toMarkdown(
+    entity: EntityDetail,
+    srcMap: Map<string, string>,
+    nameById: Map<string, string>,
+    resolver: ReturnType<WorldTypeFields['resolverFor']>,
+  ): string {
+    const context: VaultExportContext = {
+      // A wikilink's label refreshes to its target's CURRENT name so a post-import rename round-trips;
+      // a target outside this World keeps its stored label (undefined → the converter leaves it).
+      entityName: (id) => nameById.get(id),
+      // An image's capability-URL src repoints at its exported `assets/<name>` copy; an external src is
+      // absent from the map and passes through untouched.
+      assetPath: (url) => srcMap.get(url),
+    };
+    return entityToMarkdown({
+      doc: entity.document,
+      fields: resolveFields(resolver, entity.types),
+      dataTypes: this.typeFields.structuredDataTypes,
+      frontmatter: frontmatterAdditions(entity),
+      context,
+    });
   }
 }
 
@@ -80,48 +99,17 @@ function uniquePath(files: Zippable, path: string): string {
 }
 
 /**
- * Point each `entityLink`'s wikilink label at its target's CURRENT name, so a renamed entity still
- * exports a `[[name]]` that resolves on re-import. A link whose target isn't in this World
- * (deleted/cross-World) keeps its stored label.
+ * The Entity-level frontmatter the vault layer merges after stripping `hexly.*`: the Tags re-emitted as
+ * `tags` (ADR-0033), and the ordered Type set under `hexly.type` — written whole and in order so the
+ * primary type stays first (ADR-0050). A bare Note (types are exactly the import default) goes
+ * unstamped, so an ordinary note with no other EntityDocument keys exports with no `---` block at all.
  */
-function rewriteEntityLinks(snapshot: unknown, nameById: Map<string, string>): void {
-  visit(snapshot, (node) => {
-    if (node.type === 'entityLink' && node.attrs) {
-      const current = nameById.get(String(node.attrs['entityId'] ?? ''));
-      if (current) node.attrs['label'] = current;
-    }
-  });
-}
-
-/** Rewrite each `image` node's capability-URL src to its exported `assets/<name>` path; external srcs are absent from the map and pass through untouched. */
-function rewriteAssetSrcs(snapshot: unknown, srcMap: Map<string, string>): void {
-  visit(snapshot, (node) => {
-    if (node.type === 'image' && node.attrs) {
-      const mapped = srcMap.get(String(node.attrs['src'] ?? ''));
-      if (mapped) node.attrs['src'] = mapped;
-    }
-  });
-}
-
-/**
- * The YAML frontmatter for an Entity: its pass-through EntityDocument with every reserved `hexly.*` key
- * stripped (they drive placement/typing, not frontmatter), plus its Tags re-emitted as `tags`
- * (ADR-0033) and its ordered Type set under `hexly.type` — written whole and in order, so the
- * primary type stays first (ADR-0050). A bare note (types are exactly the import default) goes
- * unstamped; undefined when nothing remains, so it exports without an empty `---` block.
- */
-function frontmatter(entity: EntityDetail): Record<string, unknown> | undefined {
-  const meta: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(entity.document)) {
-    // The prose becomes the markdown body, never frontmatter; reserved `hexly.*` keys drive
-    // placement/typing. Everything else the body holds — a grid included, until the Vault Projection
-    // lands (#211) — is author EntityDocument, exactly as before the collapse (ADR-0051).
-    if (key !== CONTENT_FIELD.key && !key.startsWith(HEXLY_METADATA_PREFIX)) meta[key] = value;
-  }
-  if (entity.tags.length) meta['tags'] = [...entity.tags];
-  const isBareNote = entity.types.length === 1 && entity.types[0] === CORE_NOTE;
-  if (!isBareNote) meta[HEXLY_TYPE_KEY] = [...entity.types];
-  return Object.keys(meta).length ? meta : undefined;
+function frontmatterAdditions(entity: EntityDetail): Record<string, unknown> {
+  const additions: Record<string, unknown> = {};
+  if (entity.tags.length) additions['tags'] = [...entity.tags];
+  const isBareNote = entity.types.length === 1 && entity.types[0] === DEFAULT_ENTITY_TYPE;
+  if (!isBareNote) additions[HEXLY_TYPE_KEY] = [...entity.types];
+  return additions;
 }
 
 /**

@@ -1,4 +1,4 @@
-import { PluginTypeDefinition, structuredDataTypeSet, StructuredDataTypeSet } from '@hexly/domain';
+import { EntityType, PluginTypeDefinition, structuredDataTypeSet, StructuredDataTypeSet } from '@hexly/domain';
 import { CORE_NOTE_TYPE, RICH_CONTENT_DATA_TYPE } from '@hexly/plugin-content';
 import { DND_MONSTER_TYPE } from '@hexly/plugin-dnd';
 import { CORE_HEXMAP_TYPE, HEX_GRID_DATA_TYPE } from '@hexly/plugin-hexmap';
@@ -25,3 +25,11 @@ export const BUNDLED_STRUCTURED_DATA_TYPES: StructuredDataTypeSet = structuredDa
   RICH_CONTENT_DATA_TYPE,
   HEX_GRID_DATA_TYPE,
 ]);
+
+/**
+ * The Entity Type a vault import assigns a Markdown file with no `hexly.type` stamp, and the one whose
+ * lone presence marks an Entity a "bare Note" the export leaves unstamped (ADR-0051). Named here — the
+ * composition root that already knows the bundled plugins — so the vault services need not import
+ * `@hexly/plugin-content` to learn which type is the default (`core.note`).
+ */
+export const DEFAULT_ENTITY_TYPE: EntityType = CORE_NOTE_TYPE.id;
