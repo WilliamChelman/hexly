@@ -1,6 +1,6 @@
 import { EnvironmentProviders } from '@angular/core';
 import { providePlugin } from '@hexly/web-entity';
-import { CORE_RICH_CONTENT, RICH_CONTENT_DATA_TYPE } from '../lib';
+import { CORE_RICH_CONTENT, PLUGIN_ID, RICH_CONTENT_DATA_TYPE } from '../lib';
 import { CONTENT_EDITOR_TRANSLATIONS } from '../i18n/content-editor-translations';
 import { CONTENT_TYPE_DEFINITIONS, CORE_VIEW_CONTENT } from './content-types';
 
@@ -15,6 +15,7 @@ import { CONTENT_TYPE_DEFINITIONS, CORE_VIEW_CONTENT } from './content-types';
  */
 export function providePluginContent(): EnvironmentProviders {
   return providePlugin({
+    id: PLUGIN_ID,
     types: CONTENT_TYPE_DEFINITIONS,
     views: [
       {
