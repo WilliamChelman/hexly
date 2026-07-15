@@ -71,18 +71,6 @@ describe('TypeRegistry', () => {
     expect(registry.all().map((d) => d.id)).toEqual(['core.note', 'core.hexmap', DND_MONSTER]);
   });
 
-  it('composes its Structured Field data-types from the plugins provided (ADR-0050, ADR-0051)', () => {
-    // The web twin of the API's `BUNDLED_STRUCTURED_DATA_TYPES`: prose arrives with the content plugin,
-    // the grid with the Hex Map plugin, so the app names no data-type — and a build without one resolves
-    // none of its kind.
-    expect([...registry.structuredDataTypes.keys()]).toEqual([CORE_RICH_CONTENT, CORE_HEX_GRID]);
-    expect(registry.structuredDataTypes.get(CORE_HEX_GRID)?.empty()).toEqual({
-      hexes: {},
-      regions: [],
-      labels: [],
-    });
-  });
-
   it('resolves a registered definition by its type id', () => {
     expect(registry.get('core.hexmap')?.icon).toBe('terrain');
     expect(registry.get('core.note')?.icon).toBe('label');
@@ -341,9 +329,6 @@ describe('TypeRegistry without the Hex Map plugin', () => {
   it('knows nothing of core.hexmap — it was the plugin’s, and the plugin is gone', () => {
     expect(registry.all().map((d) => d.id)).toEqual(['core.note', DND_MONSTER]);
     expect(registry.get('core.hexmap')).toBeUndefined();
-    // Nor its grid: a Field naming `core.hex-grid` resolves against a set holding only prose (ADR-0050).
-    expect(registry.structuredDataTypes.has(CORE_HEX_GRID)).toBe(false);
-    expect(registry.structuredDataTypes.has(CORE_RICH_CONTENT)).toBe(true);
   });
 
   it('opens an existing Hex Map on the generic Field view alone — the withdrawn content floor', () => {

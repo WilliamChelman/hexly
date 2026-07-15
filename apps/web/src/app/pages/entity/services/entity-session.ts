@@ -37,6 +37,7 @@ import {
 } from '@hexly/web-core';
 import { applyPatches as immerApplyPatches, Draft, Patch, produceWithPatches } from '@hexly/immer';
 import type { EntitySession as EntitySessionPort, LiveEditor } from '@hexly/web-entity';
+import { PluginRegistry } from '../../../entity-types/plugin-registry';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 
 /**
@@ -76,6 +77,7 @@ export class EntitySession implements EntitySessionPort {
   private readonly destroyRef = inject(DestroyRef);
   private readonly injector = inject(Injector);
   private readonly typeRegistry = inject(TypeRegistry);
+  private readonly plugins = inject(PluginRegistry);
 
   private readonly _current = signal<EntityDetail | null>(null);
   readonly current = this._current.asReadonly();
@@ -365,7 +367,7 @@ export class EntitySession implements EntitySessionPort {
   setTypes(types: readonly EntityType[]): void {
     this._types.set([...types]);
     const fields = this.typeRegistry.resolveFields(types);
-    const reconciled = withFieldDefaults(this._doc(), fields, this.typeRegistry.structuredDataTypes);
+    const reconciled = withFieldDefaults(this._doc(), fields, this.plugins.structuredDataTypes);
     if (reconciled !== this._doc()) this._doc.set(reconciled);
   }
 

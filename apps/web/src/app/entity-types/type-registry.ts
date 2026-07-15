@@ -1,13 +1,10 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
-import { EntityType, FieldSchema, resolveFields, structuredDataTypeSet } from '@hexly/domain';
-import { ClientConfigStore } from '@hexly/web-core';
+import { EntityType, FieldSchema, resolveFields } from '@hexly/domain';
 import {
   CORE_VIEW_FIELDS,
   EntityTypes,
   GENERIC_TYPE_DEFINITION,
-  PLUGIN_DATA_TYPES,
-  PLUGIN_TYPE_OWNERS,
   PLUGIN_TYPES,
   TypeDefinition,
   TypeLabels,
@@ -15,6 +12,7 @@ import {
   ViewInstance,
   viewInstanceKey,
 } from '@hexly/web-entity';
+import { PluginRegistry } from './plugin-registry';
 import { ViewRegistry } from './view-registry';
 
 /**
@@ -34,37 +32,17 @@ export class TypeRegistry implements EntityTypes {
   private readonly transloco = inject(TranslocoService);
   /** Read only from {@link viewsFor}, to resolve a placed Field's data-type to the View that renders it. */
   private readonly views = inject(ViewRegistry);
+  /** Owns the enablement predicate (`isTypeActive`) the reactive outputs filter through (ADR-0052, Seam 3). */
+  private readonly plugins = inject(PluginRegistry);
   private readonly definitions = signal<readonly TypeDefinition[]>([]);
 
-  /** Type id → owning Plugin id (ADR-0052); a Type absent from it (a World's user-defined one) is never Plugin-gated. */
-  private readonly typeOwners = new Map<string, string>(inject(PLUGIN_TYPE_OWNERS, { optional: true }) ?? []);
-
-  /** Owns the enablement predicate the reactive outputs filter through (ADR-0052, Seam 3). */
-  private readonly clientConfig = inject(ClientConfigStore);
-
   /** Every *enabled* definition, in registration order (the bundled plugins', then World types). */
-  readonly all = computed(() => this.definitions().filter((def) => this.isActive(def.id)));
+  readonly all = computed(() => this.definitions().filter((def) => this.plugins.isTypeActive(def.id)));
 
   constructor() {
     // Every code type is a bundled plugin's (ADR-0051); a disabled one drops from every output here.
     for (const def of inject(PLUGIN_TYPES, { optional: true }) ?? []) this.register(def);
   }
-
-  /**
-   * Whether the Plugin owning `type` is enabled — the predicate the reactive outputs filter through.
-   * Reading the signal here is what makes `all` / `get` / `viewsFor` / `resolve` / `typeIdsForView`
-   * recompute against a changing enabled set (ADR-0052).
-   */
-  private isActive(type: string): boolean {
-    const owner = this.typeOwners.get(type);
-    return owner == null || this.clientConfig.isPluginEnabled(owner);
-  }
-
-  /**
-   * The **Structured Field** data-types this build carries, composed from the provided plugins, and
-   * threaded into the domain to validate a Field and mint its default.
-   */
-  readonly structuredDataTypes = structuredDataTypeSet(inject(PLUGIN_DATA_TYPES, { optional: true }) ?? []);
 
   register(definition: TypeDefinition): () => void {
     this.definitions.update((list) => [...list, definition]);
@@ -78,7 +56,7 @@ export class TypeRegistry implements EntityTypes {
   get(type: string | null | undefined): TypeDefinition | undefined {
     if (type == null) return undefined;
     const def = this.definitions().find((d) => d.id === type);
-    return def && this.isActive(def.id) ? def : undefined;
+    return def && this.plugins.isTypeActive(def.id) ? def : undefined;
   }
 
   /**
