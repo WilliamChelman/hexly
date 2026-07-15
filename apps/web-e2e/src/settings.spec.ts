@@ -26,7 +26,7 @@ test('Format Locale roams via the account and reflows the entity browser date', 
   await page.getByTestId('create-world').click();
   const world = await (await created).json();
   await page.goto(`/w/${world.id}/entities`);
-  await page.getByTestId('new-note').click();
+  await page.getByTestId('new-default-entity').click();
   await page.waitForURL(new RegExp(`/w/[\\w-]+/entities/[\\w-]+$`));
 
   await page.goto('/settings');

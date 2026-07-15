@@ -6,7 +6,7 @@ test('links a Hex to an Entity in the Inspector; the link survives a reload and 
   request,
 }) => {
   await enterLibrary(page);
-  await page.getByTestId('new-note').click();
+  await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const noteId = entityIdFromUrl(page);
 

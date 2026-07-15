@@ -6,7 +6,7 @@ import type { Page } from '@playwright/test';
 /** Create a fresh note and land on its editor surface, returning the content locator. */
 async function newNote(page: Page) {
   await enterLibrary(page);
-  await page.getByTestId('new-note').click();
+  await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const surface = page.getByTestId('note-content');
   await surface.click();

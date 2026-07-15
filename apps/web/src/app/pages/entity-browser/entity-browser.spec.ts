@@ -91,9 +91,9 @@ describe('EntityBrowser', () => {
     fixture.detectChanges();
 
     expect(el.querySelector('h1')?.textContent).toContain('Votre bibliothèque');
-    const newNote = el.querySelector('[data-testid=new-note]') as HTMLElement;
-    expect(newNote.textContent).toContain('Nouvelle note');
-    expect(newNote.textContent).not.toContain('New note');
+    const newEntity = el.querySelector('[data-testid=new-default-entity]') as HTMLElement;
+    expect(newEntity.textContent).toContain('Créer une note');
+    expect(newEntity.textContent).not.toContain('Create Note');
     expect(el.querySelector('[data-testid=empty]')?.textContent).toContain('Votre bibliothèque est vide.');
     expect(el.textContent).toContain('Créez votre première entité pour commencer.');
   });
@@ -342,7 +342,7 @@ describe('EntityBrowser', () => {
     expect(fixture.nativeElement.querySelector('[data-testid=tags-m1]')).toBeNull();
   });
 
-  it('renders the new-note action and type labels in French when French is active', () => {
+  it('renders the primary create action and type labels in French when French is active', () => {
     const fixture = renderWith([
       summary({ id: 'm1', name: 'Aldermoor', types: ['core.hexmap'] }),
       summary({ id: 'n1', name: 'Lady Mara', types: ['core.note'] }),
@@ -352,7 +352,9 @@ describe('EntityBrowser', () => {
     TestBed.inject(TranslocoService).setActiveLang('fr');
     fixture.detectChanges();
 
-    expect((el.querySelector('[data-testid=new-note]') as HTMLElement).textContent).toContain('Nouvelle note');
+    expect((el.querySelector('[data-testid=new-default-entity]') as HTMLElement).textContent).toContain(
+      'Créer une note',
+    );
     expect((el.querySelector('[data-testid=type-m1]') as HTMLElement).textContent?.trim()).toBe('Carte');
     expect((el.querySelector('[data-testid=type-n1]') as HTMLElement).textContent?.trim()).toBe('Note');
     // The rename action is an icon button — its label lives in aria-label/title.
@@ -614,7 +616,7 @@ describe('EntityBrowser', () => {
         document: { content: { format: 'tiptap-v1', snapshot: {} } },
       }),
     );
-    (fixture.nativeElement.querySelector('[data-testid=new-note]') as HTMLButtonElement).click();
+    (fixture.nativeElement.querySelector('[data-testid=new-default-entity]') as HTMLButtonElement).click();
 
     expect(client.create).toHaveBeenCalledWith('Untitled note', ['core.note'], 'w1');
     expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'created']);

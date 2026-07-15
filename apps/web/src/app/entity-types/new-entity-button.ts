@@ -1,18 +1,17 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntityType } from '@hexly/domain';
-import { CORE_NOTE } from '@hexly/plugin-content';
-import { ActiveWorld, EntitiesClient, ToasterService, entityRoute } from '@hexly/web-core';
+import { ActiveWorld, ClientConfigStore, EntitiesClient, ToasterService, entityRoute } from '@hexly/web-core';
 import { Button, ButtonGroup, Icon, MenuItem, MenuPanel, MenuTrigger } from '@hexly/web-ui';
 import { TypeRegistry } from './type-registry';
 import { TypeNamePipe } from './type-name.pipe';
 import { CreateEntityDialogState } from '../shell/command-palette/create-entity-dialog.state';
 
 /**
- * A split button: the primary action creates a **Note**, the arrowhead lists *every* Type the
- * {@link TypeRegistry} knows.
+ * A split button: the primary action creates the Instance's default Type (`entities.defaultType`),
+ * the arrowhead lists *every* enabled Type the {@link TypeRegistry} knows.
  *
  * A type declaring a **required** Field can't be minted blind, so it opens the create dialog,
  * which collects those Fields first. That is a rule about a type's *schema*: nothing here branches
@@ -26,17 +25,19 @@ import { CreateEntityDialogState } from '../shell/command-palette/create-entity-
   imports: [Button, ButtonGroup, Icon, MenuTrigger, MenuPanel, MenuItem, TranslocoPipe, TypeNamePipe],
   template: `
     <div appButtonGroup>
-      <button
-        type="button"
-        appButton
-        variant="primary"
-        data-testid="new-note"
-        [disabled]="creating()"
-        (click)="create(defaultType)"
-      >
-        <app-icon name="plus" [size]="16" />
-        {{ (creating() ? 'entityBrowser.creating' : 'entityBrowser.newNote') | transloco }}
-      </button>
+      @if (defaultType(); as type) {
+        <button
+          type="button"
+          appButton
+          variant="primary"
+          data-testid="new-default-entity"
+          [disabled]="creating()"
+          (click)="create(type)"
+        >
+          <app-icon name="plus" [size]="16" />
+          {{ creating() ? ('entityBrowser.creating' | transloco) : defaultLabel() }}
+        </button>
+      }
       <button
         type="button"
         appButton
@@ -72,12 +73,27 @@ export class NewEntityButton {
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
   private readonly registry = inject(TypeRegistry);
+  private readonly clientConfig = inject(ClientConfigStore);
   private readonly dialog = inject(CreateEntityDialogState);
 
-  /** The primary action's type — the base body every Entity has, so a blank create is a Note. */
-  protected readonly defaultType = CORE_NOTE;
+  /**
+   * The primary action's Type, resolved softly against the enabled registry (ADR-0052): the
+   * configured `entities.defaultType` if registered → else the first enabled Type → else `undefined`,
+   * which drops the primary button (an all-Plugins-off Instance).
+   */
+  protected readonly defaultType = computed<EntityType | undefined>(() => {
+    const configured = this.clientConfig.defaultType();
+    return this.registry.get(configured)?.id ?? this.registry.all()[0]?.id;
+  });
 
-  /** Every registered Type, in registration order: core, the bundled plugins, then the World's own. */
+  /** The primary button's copy — the resolved Type's own create chrome, not a static string (ADR-0052). */
+  protected readonly defaultLabel = computed(() => {
+    this.transloco.activeLang(); // reactive dependency: re-resolve on a language switch
+    const type = this.defaultType();
+    return type ? this.registry.chromeLabel(type, 'create') : '';
+  });
+
+  /** Every enabled Type, in registration order: the bundled plugins', then the World's own. */
   protected readonly types = this.registry.all;
 
   protected readonly creating = signal(false);

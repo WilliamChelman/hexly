@@ -22,7 +22,7 @@ async function createWorldFromIndex(page: Page): Promise<{ id: string }> {
 /** Create a fresh note in a World's Library and return its entity id. */
 async function createNote(page: Page, worldId: string): Promise<string> {
   await page.goto(`/w/${worldId}/entities`);
-  await page.getByTestId('new-note').click();
+  await page.getByTestId('new-default-entity').click();
   await page.waitForURL(new RegExp(`/w/${segRe(worldId)}/entities/[\\w-]+$`));
   return entityIdFromUrl(page);
 }
@@ -91,7 +91,7 @@ test('the entity browser is scoped by the URL World; switching Worlds filters it
   const worldA = await createWorldFromIndex(page);
   await page.getByRole('link', { name: 'Library' }).click();
   await expect(page).toHaveURL(new RegExp(`/w/${segRe(worldA.id)}/entities$`));
-  await page.getByTestId('new-note').click();
+  await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(new RegExp(`/w/${segRe(worldA.id)}/entities/[\\w-]+$`));
   const noteId = entityIdFromUrl(page);
   await page.getByRole('link', { name: 'Library' }).click();

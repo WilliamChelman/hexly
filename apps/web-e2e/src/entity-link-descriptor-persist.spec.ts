@@ -6,12 +6,12 @@ test('characterises a Content Entity Link via :: , persists the descriptor, and 
   request,
 }) => {
   await enterLibrary(page);
-  await page.getByTestId('new-note').click();
+  await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const targetId = entityIdFromUrl(page);
 
   await enterLibrary(page);
-  await page.getByTestId('new-note').click();
+  await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const sourceId = entityIdFromUrl(page);
 

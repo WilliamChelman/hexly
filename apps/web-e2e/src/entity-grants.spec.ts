@@ -8,7 +8,7 @@ import { TEST_GRANTEE } from './test-user';
  */
 test('an Owner shares an Entity with a named user, then revokes it', async ({ page }) => {
   await enterLibrary(page);
-  await page.getByTestId('new-note').click();
+  await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
 
   // Open the Share dialog (from the actions menu) and share this note with Gwen as a Viewer.

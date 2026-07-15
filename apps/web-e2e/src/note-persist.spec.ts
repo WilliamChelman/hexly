@@ -3,7 +3,7 @@ import { enterLibrary, entityIdFromUrl, expect, flushSave, test } from './fixtur
 /** Full-stack note round-trip; the persisted snapshot is opaque (ADR-0009/0019). */
 test('types into a note, saves, and the Content survives a reload', async ({ page, request }) => {
   await enterLibrary(page);
-  await page.getByTestId('new-note').click();
+  await page.getByTestId('new-default-entity').click();
 
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const noteId = entityIdFromUrl(page);

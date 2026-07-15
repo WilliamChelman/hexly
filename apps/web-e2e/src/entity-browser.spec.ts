@@ -4,7 +4,7 @@ test('a note round-trips: create → appears → open → rename → delete', as
   await enterLibrary(page);
   await expect(page.getByTestId('empty')).toBeVisible();
 
-  await page.getByTestId('new-note').click();
+  await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const id = entityIdFromUrl(page);
   await expect(page.getByTestId('title')).toHaveText('Untitled note');
@@ -33,7 +33,7 @@ test('a note round-trips: create → appears → open → rename → delete', as
 test('an owner toggles a note to shared and the Visibility facet reflects it', async ({ page }) => {
   await enterLibrary(page);
 
-  await page.getByTestId('new-note').click();
+  await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const id = entityIdFromUrl(page);
 
