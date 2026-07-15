@@ -2,7 +2,7 @@ import { basename, extname } from 'node:path';
 import { BadRequestException, Inject, Injectable, PayloadTooLargeException } from '@nestjs/common';
 import { ApiError, ImportErrorCode } from '@hexly/domain';
 import { Unzip, UnzipInflate, unzipSync } from 'fflate';
-import { HEXLY_CONFIG, type HexlyConfig } from '../config/config.module';
+import { HEXLY_CONFIG, type HexlyConfig } from '../config';
 import { ASSET_EXTENSIONS } from '../assets/assets.service';
 
 /** Feed the archive in 64 KB slices so a single bomb file trips the ceiling mid-inflate, before it fully materializes. */

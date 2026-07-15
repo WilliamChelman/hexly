@@ -1,6 +1,6 @@
 import type { MessageEvent } from '@nestjs/common';
 import { createDb } from '../db/db';
-import { loadConfig } from '../config/config';
+import { loadConfig } from '../config';
 import { NudgeBus, Principal } from './nudge-bus';
 
 describe('NudgeBus connection layer', () => {

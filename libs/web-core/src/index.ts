@@ -16,6 +16,7 @@ export * from './services/admin.client';
 export * from './services/app-shell.store';
 export * from './services/auth-scoped-storage';
 export * from './services/auth.client';
+export * from './services/client-config.store';
 export * from './services/entities.client';
 export * from './services/live-follow';
 export * from './services/logger';

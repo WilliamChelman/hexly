@@ -1,10 +1,8 @@
 import { Global, Module } from '@nestjs/common';
 import { resolveInstanceDir } from '../db/db';
 import { BUNDLED_PLUGIN_CONFIGS } from '../entities/bundled-plugins';
-import { HexlyConfig, loadConfig } from './config';
-
-/** DI token for the loaded Instance Configuration (ADR-0036). */
-export const HEXLY_CONFIG = Symbol('HEXLY_CONFIG');
+import { ClientConfigController } from './client-config.controller';
+import { HEXLY_CONFIG, loadConfig } from './config';
 
 /**
  * Loads `hexly.yml` from the Data Directory once at boot and exposes it under
@@ -19,8 +17,8 @@ export const HEXLY_CONFIG = Symbol('HEXLY_CONFIG');
       useFactory: () => loadConfig(resolveInstanceDir(), BUNDLED_PLUGIN_CONFIGS),
     },
   ],
+  // The client config channel (ADR-0052) projects HEXLY_CONFIG, so it lives here.
+  controllers: [ClientConfigController],
   exports: [HEXLY_CONFIG],
 })
 export class ConfigModule {}
-
-export type { HexlyConfig };

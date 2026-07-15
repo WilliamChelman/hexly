@@ -13,6 +13,7 @@ import {
   provideLocale,
   provideTheme,
   providePreferencesSync,
+  provideClientConfig,
   CORE_TRANSLATIONS,
 } from '@hexly/web-core';
 // The `/i18n` entry points carry the scope declaration and nothing else: importing a lib's
@@ -32,6 +33,9 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideRouter(appRoutes),
     provideHttpClient(withInterceptors([withCredentialsInterceptor])),
+    // Fetch the client config (ADR-0052) before stabilisation, ahead of the plugin providers below, so
+    // the enabled-Plugin set is settled before any registry reads it.
+    provideClientConfig(),
     // Runtime i18n (ADR-0014): one bundle ships every language; LocaleService
     // picks the active one on boot and the switcher flips it live. The loader
     // fetches the app's own catalog — the copy of its pages and shell (ADR-0049).
