@@ -106,6 +106,16 @@ export async function openEntityActions(page: Page): Promise<void> {
 }
 
 /**
+ * Open an Entity by id through the World-agnostic `/entities/:id` link, which the redirect guard
+ * heals into its canonical `/w/:worldId/entities/:id` route (ADR-0025, ADR-0042). Lets a spec that
+ * seeded an Entity over the API land on its page without threading the World id through.
+ */
+export async function openEntity(page: Page, entityId: string): Promise<void> {
+  await page.goto(`/entities/${segment(entityId)}`);
+  await page.waitForURL(/\/w\/[\w-]+\/entities\/[^/]+$/);
+}
+
+/**
  * Enter a reachable World's Entity browser via the World Index at `/` (ADR-0028), and return the
  * entered World's id. The reset clears Entities only, never Worlds, so the Index is never empty here.
  */
