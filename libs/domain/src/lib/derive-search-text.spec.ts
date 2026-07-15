@@ -5,7 +5,7 @@ import { fieldSchemaSchema } from './field';
 import { defineStructuredDataType, NO_STRUCTURED_DATA_TYPES, structuredDataTypeSet } from './structured-data-type';
 
 /**
- * Stand-ins for a plugin's **Structured Field** data-types: the domain bundles none of its own
+ * Stand-ins for a plugin's **Structured Data Type**s: the domain bundles none of its own
  * (ADR-0050), so a spec declares them and threads them in as a host does. `PROSE` stands for
  * `core.rich-content`, which contributes a document's text through this same generic path (ADR-0051).
  */
@@ -43,7 +43,7 @@ describe('deriveSearchText (#205, ADR-0051)', () => {
     expect(deriveSearchText({ prose: { text: 'unseen' } }, [], NO_STRUCTURED_DATA_TYPES)).toBe('');
   });
 
-  it("asks each resolved Structured Field's data-type for the text its value carries", () => {
+  it("asks each resolved Structured Data Type for the text its Field's value carries", () => {
     expect(deriveSearchText(board(), [boardField], DATA_TYPES)).toBe('Riverbend Harbour');
   });
 

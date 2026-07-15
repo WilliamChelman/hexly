@@ -8,7 +8,7 @@ import { EntitySession } from './entity-session';
  * with the {@link EntityHeader}; reads the open Entity's types off {@link EntitySession}, provided
  * above the page in both the routed and Public Link mounts.
  *
- * A View is a {@link ViewInstance} — an id, plus the **Structured Field** it renders when it is a
+ * A View is a {@link ViewInstance} — an id, plus the **Field of a Structured Data Type** it renders when it is a
  * Field's View rather than a Type's (ADR-0050). The selection is carried as that instance's
  * {@link viewInstanceKey}.
  *
@@ -50,7 +50,7 @@ export class EntityViewStore {
    */
   readonly activeKey = computed(() => viewInstanceKey(this.activeView()));
 
-  /** The **Structured Field** the active View renders, or `undefined` for a Type's own View. */
+  /** The **Field of a Structured Data Type** the active View renders, or `undefined` for a Type's own View. */
   readonly activeFieldKey = computed(() => parseViewInstanceKey(this.activeKey())?.fieldKey);
 
   /** Select a View by its key; `null` (no `?view=` param) falls back to the default. */

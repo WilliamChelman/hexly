@@ -13,7 +13,7 @@ function harvest(
 }
 
 /**
- * A stand-in for a plugin's **Structured Field** data-type: the domain bundles none of its own
+ * A stand-in for a plugin's **Structured Data Type**: the domain bundles none of its own
  * (ADR-0050), so a spec declares one and threads it in as a host does. A placement expresses no
  * relationship, so it carries no Link Descriptor.
  */
@@ -120,8 +120,8 @@ describe('harvestEdges (#179, ADR-0046, ADR-0051)', () => {
     });
   });
 
-  /** A **Structured Field** harvests its own edges (ADR-0050) — a placement on a plugin's board. */
-  describe('Structured Field edges (ADR-0050)', () => {
+  /** A Field of a **Structured Data Type** harvests its own edges (ADR-0050) — a placement on a plugin's board. */
+  describe('Structured Data Type edges (ADR-0050)', () => {
     it('takes the edges the data-type harvests from its own value', () => {
       expect(harvestBoard(board())).toEqual([
         { targetKind: 'entity', targetId: 'riverbend', descriptor: null },

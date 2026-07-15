@@ -285,7 +285,7 @@ describe('World user-defined types endpoints', () => {
     });
   });
 
-  describe('a user-defined type carrying a Structured Field', () => {
+  describe('a user-defined type carrying a Field of a Structured Data Type', () => {
     /** `world.deity`, plus a `battlemap` grid placed *after* its Fields — a deity opens on its Fields. */
     const deityWithMap = {
       id: 'world.deity',

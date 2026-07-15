@@ -16,7 +16,7 @@ import {
   readField,
   resolveEffectiveFields,
   resolveFields,
-  resolvedStructuredFields,
+  resolvedStructuredDataTypeFields,
   unresolvedDataTypeErrors,
   validateFields,
   writeField,
@@ -328,7 +328,7 @@ describe('resolveEffectiveFields — the effective-set resolver (ADR-0054)', () 
     // Facets: only the facetable built-in (`cr` here is not facetable) — a structured Field never facets.
     expect(deriveFieldFacets(effective, { cr: 3 })).toEqual([]);
     // Structured-field resolution: the attached `battleMap` resolves against the host set.
-    expect(resolvedStructuredFields(effective, DATA_TYPES).map((r) => r.field.key)).toEqual(['battleMap']);
+    expect(resolvedStructuredDataTypeFields(effective, DATA_TYPES).map((r) => r.field.key)).toEqual(['battleMap']);
     // Link-edge harvest: the attached `lair` link is harvested from the effective set like a type default.
     expect(entityLinkFieldValues(effective, { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } })).toEqual([
       { key: 'lair', value: { entityId: 'whisperwood', label: 'The Whisperwood' } },
@@ -359,7 +359,7 @@ describe('resolveEffectiveFields — the effective-set resolver (ADR-0054)', () 
       fieldResolver: (id) => (id === 'core.map' ? map : undefined),
       typeFieldRefs,
     });
-    const [structured] = resolvedStructuredFields([resolved], dataTypes);
+    const [structured] = resolvedStructuredDataTypeFields([resolved], dataTypes);
     expect(vaultSlotOf(resolved, structured.dataType)).toBe('omit');
   });
 });
@@ -622,11 +622,11 @@ describe('readField / writeField (a lens over the one EntityDocument map)', () =
 });
 
 /**
- * The **Structured Field** — a Field whose data-type a plugin contributes (CONTEXT.md → Structured
- * Field, ADR-0050). The set is open: a data-type is structured *iff* its kind is a `namespace.id` id,
+ * The **Structured Data Type** — a data-type a plugin contributes (CONTEXT.md → Structured Data Type,
+ * ADR-0050/0054). The set is open: a data-type is structured *iff* its kind is a `namespace.id` id,
  * so the domain validates the *shape* of a kind and the host resolves its *membership*.
  */
-describe('Structured Field data-types (ADR-0050)', () => {
+describe('Structured Data Type (ADR-0050)', () => {
   describe('defineStructuredDataType — the framework-free declaration', () => {
     it('declares an id, a value schema, an empty value, and an optional edge harvester', () => {
       expect(BOARD.id).toBe('test.board');
@@ -775,7 +775,7 @@ describe('Structured Field data-types (ADR-0050)', () => {
     });
   });
 
-  describe('deriveFieldFacets and a Structured Field', () => {
+  describe('deriveFieldFacets and a Field of a Structured Data Type', () => {
     it('never facets one, whatever its facetable flag says — a document has no values to count', () => {
       const facetable = field({ key: 'board', dataType: { kind: 'test.board' }, facetable: true });
       expect(deriveFieldFacets([facetable], { board: { tiles: [{ entityId: 'riverbend' }] } })).toEqual([]);

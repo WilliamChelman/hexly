@@ -26,7 +26,7 @@ const INITIAL_VERSION = 1;
 
 /** Everything one save derives from the Entity's document (and its types), in one pass. */
 interface Derived {
-  /** The Entity's searchable text — the Content's prose and every Structured Field's (#205). */
+  /** The Entity's searchable text — the Content's prose and every Field of a Structured Data Type's (#205). */
   searchText: string;
   descriptors: string[];
   edges: EntityEdge[];
@@ -156,7 +156,7 @@ export class EntityWrites {
     // Resolves a `types[]` set to its Field schema **scoped to the Entity's World**, so a World's
     // user-defined types resolve too.
     private readonly worldTypeFields: WorldTypeFields,
-    // The instance-wide Structured Field data-types (ADR-0050), from which a structured value
+    // The instance-wide Structured Data Types (ADR-0050), from which a structured value
     // harvests its own edges in the same derive pass.
     private readonly typeFields: TypeFieldRegistry,
   ) {}
@@ -343,7 +343,7 @@ export class EntityWrites {
    * Hex Map's Entity Links live on its Hexes, Features, and Regions as well as in its prose
    * (ADR-0046), and so do the names it is searchable by (#205).
    *
-   * It names no extractor of its own: a **Structured Field** offers its own edges and its own text
+   * It names no extractor of its own: a **Field of a Structured Data Type** offers its own edges and its own text
    * through the host-composed data-type set, so a new plugin needs no change here.
    *
    * The `::` vocabulary is a *projection* of the edge set, not a second walk: only a

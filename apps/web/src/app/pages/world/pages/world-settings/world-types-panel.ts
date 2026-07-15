@@ -24,7 +24,7 @@ interface DraftField {
   key: string;
   label: string;
   /**
-   * The picked data-type's kind: a built-in, or a plugin's **Structured Field** data-type by its
+   * The picked data-type's kind: a built-in, or a plugin's **Structured Data Type** by its
    * `namespace.id` id (`core.hex-grid`). A bare string — a `<select>` value over both keyspaces.
    */
   kind: string;
@@ -162,7 +162,7 @@ interface Draft {
                 (input)="patchField($index, { options: value($event) })"
               />
             }
-            <!-- A Structured Field is edited on its own View, so it is never required (nothing
+            <!-- A Field of a Structured Data Type is edited on its own View, so it is never required (nothing
                  collects it) and never a facet (no discrete values to count) — it carries where its
                  View sits instead. -->
             @if (isStructured(f)) {
@@ -294,7 +294,7 @@ export class WorldTypesPanel implements OnInit {
   protected readonly draft = signal<Draft | null>(null);
 
   /**
-   * The **Structured Field** data-types this build offers, beside the built-ins. Read off the
+   * The **Structured Data Types** this build offers, beside the built-ins. Read off the
    * registered Views, so the picker offers exactly the kinds this build can render.
    */
   protected readonly structuredKinds = computed(() => this.views.offerableDataTypes());
@@ -462,7 +462,7 @@ function toDraftField(field: FieldSchema, showAsView: boolean): DraftField {
 }
 
 /**
- * The form model → a Field schema for the request. A **Structured Field** is neither required nor
+ * The form model → a Field schema for the request. A **Field of a Structured Data Type** is neither required nor
  * facetable, whatever a stale draft carries (ADR-0050).
  */
 function toFieldSchema(f: DraftField): FieldSchema {

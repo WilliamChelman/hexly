@@ -11,7 +11,7 @@ import {
   EntityDocument,
   FieldSchema,
   HEXLY_METADATA_PREFIX,
-  resolvedStructuredFields,
+  resolvedStructuredDataTypeFields,
   StructuredDataType,
   StructuredDataTypeSet,
   VaultExportContext,
@@ -37,7 +37,7 @@ interface BodyField {
 }
 
 /**
- * The body Fields among an already-resolved Structured Field set, in Field order: those whose Vault
+ * The body Fields among an already-resolved set of Fields of a Structured Data Type, in Field order: those whose Vault
  * Projection slot is `body` *and* whose data-type carries a body converter. An unresolved kind, or one
  * with no converter, contributes no body block.
  */
@@ -71,7 +71,7 @@ export function entityToMarkdown(input: {
   context: VaultExportContext;
 }): string {
   const { doc, fields, dataTypes, context } = input;
-  const resolved = resolvedStructuredFields(fields, dataTypes) as BodyField[];
+  const resolved = resolvedStructuredDataTypeFields(fields, dataTypes) as BodyField[];
   const bodyFields = bodyFieldsOf(resolved);
   const present = bodyFields.filter(({ field }) => hasValue(doc, field.key));
   // A marker is needed unless the only present body block is the first body Field — then the file is a
@@ -175,7 +175,7 @@ export function bodyToFields(input: {
   context: VaultImportContext;
 }): Record<string, unknown> {
   const { body, fields, dataTypes, context } = input;
-  const resolved = resolvedStructuredFields(fields, dataTypes) as BodyField[];
+  const resolved = resolvedStructuredDataTypeFields(fields, dataTypes) as BodyField[];
   const bodyFields = bodyFieldsOf(resolved).filter(({ dataType }) => !!dataType.vault?.fromMarkdown);
   if (bodyFields.length === 0) return {};
 

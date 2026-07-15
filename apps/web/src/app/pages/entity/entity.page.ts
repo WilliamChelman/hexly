@@ -37,7 +37,7 @@ import { CORE_VIEW_DEFINITIONS } from './views/core-views';
           <!-- The active View's component (MapView / ContentView / a plugin view),
                resolved from the ViewRegistry — no type sniffing (ADR-0048). The frame
                around it is already drawn, so a deferred body arrives into a live page.
-               The injector carries down the Field key of a Structured Field's View. -->
+               The injector carries down the Field key of a View rendering a Field of a Structured Data Type. -->
           @if (activeComponent(); as component) {
             <ng-container *ngComponentOutlet="component; injector: viewInjector()" />
           }
@@ -72,7 +72,7 @@ export class EntityPage {
 
   /**
    * The injector the active View's component is created in — the page's own, plus {@link VIEW_FIELD_KEY}
-   * when the View renders a Structured Field. A Type's own View (Content, a stat block) renders no
+   * when the View renders a Field of a Structured Data Type. A Type's own View (Content, a stat block) renders no
    * particular Field and is handed nothing.
    *
    * Keyed on {@link EntityViewStore.activeFieldKey}, which settles: `NgComponentOutlet` rebuilds the

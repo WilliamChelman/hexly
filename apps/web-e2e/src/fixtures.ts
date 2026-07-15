@@ -52,7 +52,7 @@ interface SavedGrid {
 
 /**
  * The grid a Hex Map has actually persisted, fetched from the API. The one place a test knows *where*
- * the grid is stored: a **Structured Field**'s value in the Entity's body, which **is** the EntityDocument
+ * the grid is stored: a **Field of a Structured Data Type**'s value in the Entity's body, which **is** the EntityDocument
  * map (ADR-0050, ADR-0051). `core.hexmap` declares its grid at `grid`; a user-defined type declares
  * its at whatever key its author chose — that is `fieldKey`.
  */
@@ -64,7 +64,7 @@ export async function savedGrid(request: APIRequestContext, entityId: string, fi
 }
 
 /**
- * A map View toggle's testid — the View id plus the **Structured Field** it renders (ADR-0050),
+ * A map View toggle's testid — the View id plus the **Field of a Structured Data Type** it renders (ADR-0050),
  * composed through the app's own {@link viewInstanceKey}.
  */
 export function mapViewToggle(fieldKey = 'grid'): string {
@@ -149,7 +149,7 @@ export async function createEntity(page: Page, typeId: string): Promise<string> 
 export interface AuthoredField {
   readonly key: string;
   readonly label: string;
-  /** A **Structured Field**'s data-type (`core.hex-grid`, #201); absent leaves the form's `string`. */
+  /** A **Structured Data Type** (`core.hex-grid`, #201); absent leaves the form's `string`. */
   readonly kind?: string;
 }
 

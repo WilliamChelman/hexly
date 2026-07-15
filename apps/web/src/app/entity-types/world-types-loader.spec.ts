@@ -19,7 +19,7 @@ describe('WorldTypesLoader', () => {
   // A plugin-source type as the API reports it. The web already knows its plugin types from code, so
   // the loader must ignore these rows rather than re-register a view-less copy over the real one.
   const monster: AvailableType = { id: 'test.monster', label: 'Monster', source: 'plugin', fields: [] };
-  /** A World Owner's own **Structured Field**: a grid on the type they defined, no code (#201). */
+  /** A World Owner's own **Field of a Structured Data Type**: a grid on the type they defined, no code (#201). */
   const battlemapField: FieldSchema = {
     key: 'battlemap',
     label: 'Battlemap',
@@ -55,13 +55,13 @@ describe('WorldTypesLoader', () => {
     const def = registry.get('world.deity');
     expect(def?.labelText).toBe('Deity');
     // No authored order, and no prose Field: the type affords its generic Field view alone (ADR-0051).
-    // Prose is a Structured Field now, so a deity gets a content View only when it declares one.
+    // Prose is a Field of a Structured Data Type now, so a deity gets a content View only when it declares one.
     expect(def?.views).toEqual([CORE_VIEW_FIELDS]);
     // Its Fields resolve, so the generic view and facets pick them up.
     expect(registry.resolveFields(['world.deity']).map((f) => f.key)).toEqual(['domain']);
   });
 
-  it('defaults a Structured Field’s View to *last*, so a deity with a battlemap still opens on its Fields', () => {
+  it('defaults the View of a Field of a Structured Data Type to *last*, so a deity with a battlemap still opens on its Fields', () => {
     availableTypes.mockReturnValue(of([{ ...deity, fields: [...deity.fields, battlemapField] }]));
     worldId.set('w1');
     TestBed.flushEffects();

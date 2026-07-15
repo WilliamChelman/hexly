@@ -74,7 +74,7 @@ export class TypeRegistry implements EntityTypes {
    * default. Drives the header view toggle.
    *
    * A View is an **instance**, not a bare id: a Type's own View names no Field, while a **Structured
-   * Field**'s View is bound to the Field it renders. A type places a Field's View by listing
+   * Data Type**'s View is bound to the Field it renders. A type places a Field's View by listing
    * `{ field: key }` among its views, resolving Field → data-type `kind` → the View the
    * {@link ViewRegistry} holds for that kind — so two grids afford two map Views.
    *

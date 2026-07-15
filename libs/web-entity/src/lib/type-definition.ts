@@ -48,7 +48,7 @@ export interface TypeDefinition {
    * header toggles the *union* an Entity's types afford, defaulting to the primary type's first View.
    *
    * An entry is either a {@link ViewId} the type contributes outright, or a reference to one of the
-   * type's own {@link fields}, whose **Structured Field** data-type contributes the View (ADR-0050):
+   * type's own {@link fields}, whose **Structured Data Type** contributes the View (ADR-0050):
    * `core.hexmap` declares `[{ field: 'grid' }, CORE_VIEW_CONTENT]` — its grid placed by Field, its
    * prose View by id (ADR-0051). A `{ field }` entry naming a
    * Field this type does not declare, or one whose data-type this build does not register (its

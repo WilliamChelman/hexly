@@ -35,8 +35,8 @@ export const typesSchema = z
 /**
  * The **Entity Document** (CONTEXT.md → Entity Document): the one open key→value map that is an
  * Entity's whole authored substance — what the `document` column holds. There is no wrapper and no
- * second store (ADR-0051): everything a Type adds is a **Field** over one of its keys, a plugin's
- * **Structured Field** value (a grid, prose) included. Mirrors Obsidian frontmatter on import;
+ * second store (ADR-0051): everything a Type adds is a **Field** over one of its keys, a Field of a
+ * plugin's **Structured Data Type** (a grid, prose) included. Mirrors Obsidian frontmatter on import;
  * Hexly provenance lives under the reserved `hexly.` namespace.
  *
  * A record of `unknown`, never closed: a Field value that does not inhabit its data-type is left

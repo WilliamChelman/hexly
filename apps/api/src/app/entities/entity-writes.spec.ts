@@ -370,11 +370,11 @@ describe('EntityWrites', () => {
       });
 
       /**
-       * A **Structured Field**'s text is derived state like any other (#205): a Hex Map saved before
+       * A **Field of a Structured Data Type**'s text is derived state like any other (#205): a Hex Map saved before
        * the grid declared an `extractText`, its `content_text` holding the prose alone, is findable
        * by its Hex names after a reindex — no backfill migration.
        */
-      it('recomputes a Structured Field’s searchable text from the stored document', () => {
+      it('recomputes a Field of a Structured Data Type’s searchable text from the stored document', () => {
         seedRaw(
           'the-reach',
           WORLD,

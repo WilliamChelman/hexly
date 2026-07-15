@@ -43,7 +43,7 @@ const NOTE_TYPE: TypeDefinition = {
   },
 };
 
-/** A grid-carrying type — prose beside a Structured Field, both of which the panel skips. */
+/** A grid-carrying type — prose beside a Field of a Structured Data Type, both of which the panel skips. */
 const MAP_TYPE: TypeDefinition = { ...NOTE_TYPE, id: 'core.hexmap', fields: [CONTENT_FIELD, GRID_FIELD] };
 
 const noteWith = (types: readonly string[], metadata?: Record<string, unknown>): EntityDetail => ({
@@ -105,15 +105,15 @@ describe('EntityMetadata', () => {
   });
 
   it('renders nothing when the entity has no EntityDocument', () => {
-    // Only the prose Field's value sits in the document, and it is skipped as a Structured Field's.
+    // Only the prose Field's value sits in the document, and it is skipped as a Structured Data Type's.
     expect(render(undefined).querySelector('[data-testid=entity-metadata]')).toBeNull();
     expect(render({}).querySelector('[data-testid=entity-metadata]')).toBeNull();
   });
 
-  it('skips a Structured Field’s value — a grid is not a EntityDocument row (ADR-0050)', () => {
+  it('skips a Structured Data Type’s value — a grid is not a EntityDocument row (ADR-0050)', () => {
     // The grid lives at a EntityDocument key like every other Field value, but it is a document with
     // its own View: dumping it here as a line of JSON would tell the reader nothing. A type carrying
-    // nothing but Structured Fields therefore shows no disclosure at all.
+    // nothing but Fields of a Structured Data Type therefore shows no disclosure at all.
     session.loadDetail(noteWith(['core.hexmap'], { grid: { hexes: {} } }));
     const fixture = TestBed.createComponent(EntityMetadata);
     fixture.detectChanges();

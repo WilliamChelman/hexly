@@ -369,7 +369,7 @@ describe('Vault export endpoint', () => {
       document: { content: tiptapContent({ type: 'doc', content: [] }), domain: 'dusk' },
     });
 
-    // A Hex Map (plugin type, a Structured Field) — terrain, a feature, a region, and a label.
+    // A Hex Map (plugin type, a Structured Data Type) — terrain, a feature, a region, and a label.
     const grid = {
       hexes: {
         '0,0': { terrain: 'forest', name: 'Rivertown', feature: { ref: 'settlement' } },

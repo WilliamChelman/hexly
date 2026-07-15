@@ -5,7 +5,7 @@ import { ViewId } from './view-instance';
 /**
  * A **View** id — an open, `core.view.*`-style namespaced key identifying a togglable renderer+editor
  * an Entity affords (ADR-0048). Its own keyspace, distinct from Entity Type ids (`core.note`) and from
- * the Field data-type ids a **Structured Field** names (`core.hex-grid`).
+ * the Field data-type ids a **Field of a Structured Data Type** names (`core.hex-grid`).
  */
 export type { ViewId };
 
@@ -24,17 +24,17 @@ export const CORE_VIEW_FIELDS = 'core.view.fields';
  * contributes outright, or a reference to one of *its own* Fields, whose data-type contributes the
  * View (ADR-0050).
  *
- * A Type thereby **places** a Structured Field's View in its own order — `core.hexmap` declares
+ * A Type thereby **places** a Structured Data Type's View in its own order — `core.hexmap` declares
  * `[{ field: 'grid' }, CORE_VIEW_CONTENT]`, placing its grid by `{ field }` and the content View by id
  * (ADR-0051). A User-defined type's list is data: persisted, and validated at the trust boundary.
  */
 export type { ViewPlacement };
 
 /**
- * The EntityDocument key of the **Structured Field** the active View renders — provided by {@link EntityPage}
+ * The EntityDocument key of the **Field of a Structured Data Type** the active View renders — provided by {@link EntityPage}
  * into the injector it outlets that View's component with, so two grids on one Entity get one store each.
  *
- * A token rather than an `@Input`, because a Structured Field's View provides its store in `providers`,
+ * A token rather than an `@Input`, because a Structured Data Type's View provides its store in `providers`,
  * which Angular constructs before it sets any input. The page mints a fresh injector per View instance,
  * so switching grids rebuilds the component and its store rather than re-pointing a live one — and its
  * undo stack — at a different Field.
@@ -45,7 +45,7 @@ export const VIEW_FIELD_KEY = new InjectionToken<string>('hexly.view.fieldKey');
  * One View's registration in the {@link ViewRegistry}: the id, what labels its header-toggle button,
  * and the component the entity page outlets when this View is active.
  *
- * A View is contributed **either by a Type or by a Structured Field's data-type**, and that decides
+ * A View is contributed **either by a Type or by a Structured Data Type**, and that decides
  * how it is labelled: a Type's View carries its own translated `labelKey`; a data-type's View takes
  * the label of the **Field** that placed it, which is the only thing that tells one grid from another.
  *
@@ -72,7 +72,7 @@ export type ViewDefinition = {
        */
       readonly labelKey?: string;
       /**
-       * The **Structured Field** data-type this View renders (`core.hex-grid`, `core.rich-content`): a
+       * The **Structured Data Type** this View renders (`core.hex-grid`, `core.rich-content`): a
        * Type places one of its Fields, the Field names its data-type by `kind`, and the kind resolves
        * here. The web half of a data-type's declaration; the framework-free half
        * ({@link StructuredDataType}) carries no View.

@@ -10,13 +10,13 @@
 export type ViewId = string;
 
 /**
- * One View an Entity affords. A View that renders a **Structured Field** is bound to the Field it
+ * One View an Entity affords. A View that renders a **Structured Data Type** is bound to the Field it
  * renders, so an Entity carrying two grids affords two map Views; a Type's own View (a plugin's stat
  * block, the Content view, the generic Field view) renders no particular Field and carries no key.
  */
 export interface ViewInstance {
   readonly viewId: ViewId;
-  /** The EntityDocument key of the **Structured Field** this View renders; absent on a Type's own View. */
+  /** The EntityDocument key of the **Field of a Structured Data Type** this View renders; absent on a Type's own View. */
   readonly fieldKey?: string;
 }
 

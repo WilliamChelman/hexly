@@ -79,7 +79,7 @@ import { EntityViewStore } from '../services/entity-view-store';
       @if (viewToggle().length > 1) {
         <!-- View toggle (#75, ADR-0048): one button per View the Entity's types afford
              (a hexmap: Map + Note), flipping the outletted body via the active View. A
-             Structured Field's View is one button per *Field*, so an Entity with two grids
+             View of a Field of a Structured Data Type is one button per *Field*, so an Entity with two grids
              toggles between them by name (ADR-0050). -->
         <div pageHeaderActions appButtonGroup [attr.aria-label]="'editorShell.view.switchLabel' | transloco">
           @for (v of viewToggle(); track v.key) {
@@ -154,7 +154,7 @@ export class EntityHeader {
    * The Views the open Entity affords, as toggle buttons: the key (click target, URL value, testid)
    * and the label to print.
    *
-   * A Structured Field's View is labelled from the *Field* it renders — "Map", "Battlemap" — since a
+   * The View of a Field of a Structured Data Type is labelled from the *Field* it renders — "Map", "Battlemap" — since a
    * View id cannot tell one grid from another (ADR-0050). A `labelKey` is translated; a World Owner's
    * authored `label` is printed verbatim rather than looked up as a key they never wrote.
    */

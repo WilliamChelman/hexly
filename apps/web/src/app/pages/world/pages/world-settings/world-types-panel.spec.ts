@@ -118,8 +118,8 @@ describe('WorldTypesPanel', () => {
       label: 'Deity',
       fields: [{ key: 'domain', label: 'Domain', dataType: { kind: 'string' }, required: false, facetable: true }],
       fieldRefs: [],
-      // A type with no Structured Field affords its generic Field view alone (ADR-0051): prose is a
-      // Structured Field now, so a content View comes only from declaring one.
+      // A type with no Field of a Structured Data Type affords its generic Field view alone (ADR-0051): prose is a
+      // Field of a Structured Data Type now, so a content View comes only from declaring one.
       views: [CORE_VIEW_FIELDS],
     });
   });
@@ -174,7 +174,7 @@ describe('WorldTypesPanel', () => {
   });
 
   /** A World Owner gives a type they defined a map by picking a data-type, as they pick `enum` (#201). */
-  describe('a Structured Field', () => {
+  describe('a Field of a Structured Data Type', () => {
     /** The kinds the picker offers, in order — the built-ins, then this build's plugin data-types. */
     function kindOptions(): string[] {
       return fixture.debugElement
@@ -283,7 +283,7 @@ describe('WorldTypesPanel', () => {
 
 /**
  * With the content plugin composed, `core.rich-content` is offerable on the kind picker (#210): a World
- * Owner authors prose as a Structured Field like the grid, and two of them coexist as two Fields.
+ * Owner authors prose as a Field of a Structured Data Type like the grid, and two of them coexist as two Fields.
  */
 describe('WorldTypesPanel with the content plugin', () => {
   let worlds: MockWorldsClient;

@@ -103,7 +103,7 @@ describe('Entity references', () => {
 
     /**
      * A Hex, a Feature, and a Region each carry an Entity Link, harvested through the Structured
-     * Field `core.hexmap` declares (ADR-0050). Covers the generic path end to end: the Entity's
+     * Data Type `core.hexmap` declares (ADR-0050). Covers the generic path end to end: the Entity's
      * types must resolve to the `grid` Field and `core.hex-grid` must be registered, or a map's
      * placements harvest to nothing at all.
      */

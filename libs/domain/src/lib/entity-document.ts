@@ -3,7 +3,7 @@
  * minting adds keys to the one map directly — there is no wrapper and no Content base to seed.
  */
 
-import { FieldSchema, EntityDocument, readField, resolvedStructuredFields } from './field';
+import { FieldSchema, EntityDocument, readField, resolvedStructuredDataTypeFields } from './field';
 import { NO_STRUCTURED_DATA_TYPES, StructuredDataTypeSet } from './structured-data-type';
 
 /**
@@ -19,7 +19,7 @@ export function emptyEntityDocument(
 
 /**
  * Mint the default value of every declared Field that has none — the reconcile a *type change* runs.
- * Only a **Structured Field** declares a default ({@link StructuredDataType.empty}); for a `string`
+ * Only a **Structured Data Type** declares a default ({@link StructuredDataType.empty}); for a `string`
  * or a `number`, absent *is* unset. Prose (`core.rich-content`) mints through this same path.
  *
  * Adds, never overwrites: a present value stays, however malformed (validation is forward-only), and
@@ -32,7 +32,7 @@ export function withFieldDefaults(
   dataTypes: StructuredDataTypeSet,
 ): EntityDocument {
   let next: EntityDocument | undefined;
-  for (const { field, dataType } of resolvedStructuredFields(fields, dataTypes)) {
+  for (const { field, dataType } of resolvedStructuredDataTypeFields(fields, dataTypes)) {
     if (readField(next ?? doc, field) !== undefined) continue;
     // Not `writeField`: it clears a key whose value reads as emptied, so a data-type whose `empty()`
     // is `[]` (a blank timeline) would mint nothing.

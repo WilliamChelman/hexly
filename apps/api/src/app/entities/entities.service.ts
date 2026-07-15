@@ -212,7 +212,7 @@ export class EntitiesService {
    * Field facet is absent until its type is the active filter. Values drill down like the universal
    * facets: counted against every other constraint but that Field's own filter.
    *
-   * A **Structured Field** is never offered, whatever its flag says ({@link isFacetableField}).
+   * A **Field of a Structured Data Type** is never offered, whatever its flag says ({@link isFacetableField}).
    */
   private countFieldFacets(opts: FacetOptions, filter: SQL): FieldFacet[] {
     const fields = resolveFields(this.typeResolver(opts.worldId), opts.type ?? []).filter(isFacetableField);

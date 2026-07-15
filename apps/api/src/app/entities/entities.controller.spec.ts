@@ -829,7 +829,7 @@ describe('Entities endpoints', () => {
     });
 
     /**
-     * A **Structured Field**'s text feeds the same index the prose does (#205), so `core.hex-grid`
+     * A **Field of a Structured Data Type**'s text feeds the same index the prose does (#205), so `core.hex-grid`
      * makes a Hex Map findable by what is painted on it — under the `q` the Browser already sends.
      */
     it('matches a Hex Map by one of its Hex names, and by one of its Region names', async () => {
@@ -1833,7 +1833,7 @@ describe('Entities endpoints', () => {
   });
 
   it('tolerates a malformed prose value at rest on an untyped save, rather than 500ing on read (ADR-0051)', async () => {
-    // Prose is a Structured Field like the grid now: a plain body edit (no `types`) stores garbage at
+    // Prose is a Structured Data Type like the grid now: a plain body edit (no `types`) stores garbage at
     // `content` as-is, and a read never 500s — the editor opens it as an empty document.
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const created = await ada.post('/entities').send({ name: 'Lady Aldermoor', types: ['core.note'] });

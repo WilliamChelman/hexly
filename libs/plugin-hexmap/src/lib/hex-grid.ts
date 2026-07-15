@@ -1,6 +1,6 @@
 /**
- * `core.hex-grid` — the Hex Map's grid as a **Structured Field** data-type (CONTEXT.md → Structured
- * Field, ADR-0050). `core.hexmap` declares it at the `grid` key, so a Hex Map's plane lives in the
+ * `core.hex-grid` — the Hex Map's grid as a **Structured Data Type** (CONTEXT.md → Structured Data
+ * Type, ADR-0050). `core.hexmap` declares it at the `grid` key, so a Hex Map's plane lives in the
  * one EntityDocument map.
  */
 
@@ -54,7 +54,7 @@ export const HEX_GRID_DATA_TYPE = defineStructuredDataType({
 /**
  * The Field `core.hexmap` declares, and the EntityDocument slice the map editor reads and writes.
  *
- * The header's View toggle reads its label, a Structured Field's View being bound to the Field it
+ * The header's View toggle reads its label, a Structured Data Type's View being bound to the Field it
  * renders (ADR-0050); `labelKey` keeps that toggle translated. A World Owner's own grid Field has no
  * key, and shows its authored name verbatim.
  *

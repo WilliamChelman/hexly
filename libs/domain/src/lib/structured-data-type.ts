@@ -1,6 +1,6 @@
 /**
- * The **Structured Field**'s data-type — the plugin-contributed member of the Field data-type set
- * (CONTEXT.md → Structured Field, ADR-0050). Unlike a built-in data-type (`string`, `number`,
+ * The **Structured Data Type** — the plugin-contributed member of the Field data-type set
+ * (CONTEXT.md → Structured Data Type, ADR-0050/0054). Unlike a built-in data-type (`string`, `number`,
  * `entityLink`…), which is a form control over a small value, a structured one is a *document*: a
  * value with its own schema, its own link-edge harvesting, and its own searchable text.
  *

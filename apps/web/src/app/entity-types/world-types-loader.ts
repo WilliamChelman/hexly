@@ -69,8 +69,8 @@ function toDefinition(type: AvailableType): TypeDefinition {
     id: type.id,
     icon: 'label',
     labelText: type.label,
-    // Absent is not empty: an author who named no order gets Fields, Content, then their Structured
-    // Fields (#201).
+    // Absent is not empty: an author who named no order gets Fields, Content, then their Fields of a
+    // Structured Data Type (#201).
     views: type.views ?? userTypeViews(type.fields),
     fields: type.fields,
     graphColorToken: '--color-ink-muted',

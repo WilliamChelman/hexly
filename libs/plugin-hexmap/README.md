@@ -1,7 +1,7 @@
 # plugin-hexmap
 
 The bundled Hex Map plugin (CONTEXT.md → Hex Map, ADR-0050, #198): the `core.hexmap` Entity Type, the
-`core.hex-grid` **Structured Field** data-type that _is_ its grid, and the canvas that edits it. The
+`core.hex-grid` **Structured Data Type** that _is_ its grid, and the canvas that edits it. The
 first plugin with a **server half** — which is what makes the plugin seam load-bearing rather than
 decorative, and what let `libs/domain` stop knowing what a hex is.
 

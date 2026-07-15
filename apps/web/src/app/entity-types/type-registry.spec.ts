@@ -106,7 +106,7 @@ describe('TypeRegistry', () => {
     expect(registry.viewsFor(undefined)).toEqual([]);
   });
 
-  it('binds a Structured Field’s View to the Field it renders, and a Type’s View to nothing', () => {
+  it('binds the View of a Field of a Structured Data Type to the Field it renders, and a Type’s View to nothing', () => {
     // `core.hexmap` places its `grid` Field's View first, so the Map opens by default — and the
     // instance names the Field, which is what lets a second grid afford a second map View.
     expect(registry.viewsFor(['core.hexmap'])).toEqual([
@@ -163,7 +163,7 @@ describe('TypeRegistry', () => {
     expect(viewKeys(registry.viewsFor(['dnd.beast']))).toEqual([CORE_VIEW_CONTENT]);
   });
 
-  describe('a user-defined type carrying a Structured Field', () => {
+  describe('a user-defined type carrying a Field of a Structured Data Type', () => {
     const battlemap: FieldSchema = {
       key: 'battlemap',
       label: 'Battlemap',
@@ -223,7 +223,7 @@ describe('TypeRegistry', () => {
     });
 
     it('affords a content View per prose Field, each bound to its own key — two prose Fields coexist', () => {
-      // Prose is a Structured Field like the grid, so two `core.rich-content` Fields afford two content
+      // Prose is a Field of a Structured Data Type like the grid, so two `core.rich-content` Fields afford two content
       // Views, each bound to the Field it renders — the twin of two grids affording two map Views (#202).
       registry.register({
         ...definition('world.saint', [prose('content', 'Content'), prose('secrets', 'Secrets')]),

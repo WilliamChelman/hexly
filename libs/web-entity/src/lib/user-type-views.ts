@@ -3,8 +3,8 @@ import { CORE_VIEW_FIELDS } from './view-definition';
 
 /**
  * The **View** order a user-defined type affords (ADR-0050, ADR-0051): its generic Field view, then
- * each **Structured Field** its author chose to show, in declaration order — prose among them, since
- * the `core.rich-content` Content Field is a Structured Field like any other now. A type shipping no
+ * each **Field of a Structured Data Type** its author chose to show, in declaration order — prose among them, since
+ * the `core.rich-content` Content Field is a Field of a Structured Data Type like any other now. A type shipping no
  * code resolves nothing else.
  *
  * Structured Views go last, so adding a battlemap to a `world.deity` does not change what a deity

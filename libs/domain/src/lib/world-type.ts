@@ -51,7 +51,7 @@ const placesOnlyItsOwnFields = [
 
 /**
  * A stored user-defined type. `views` **absent is not empty**: a type that named no order falls back
- * to Fields, Content, then its Structured Fields — defaulted by the host.
+ * to Fields, Content, then its Fields of a **Structured Data Type** — defaulted by the host.
  */
 export const userDefinedTypeSchema = z
   .object({

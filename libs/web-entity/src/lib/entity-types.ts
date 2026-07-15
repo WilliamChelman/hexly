@@ -19,7 +19,7 @@ export interface EntityTypes {
   chromeLabel(type: string | null | undefined, key: keyof TypeLabels): string;
   /**
    * The union of Field schemas an Entity carrying `types` affords — primary type first, deduped by
-   * EntityDocument key. A View reads it to tell a **Structured Field**'s key from a plain value.
+   * EntityDocument key. A View reads it to tell a **Structured Data Type**'s key from a plain value.
    */
   resolveFields(types: readonly string[] | null | undefined): FieldSchema[];
 }
