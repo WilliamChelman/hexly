@@ -11,10 +11,18 @@ describe('the core.hex-grid Structured Data Type (ADR-0050)', () => {
     expect(HEX_GRID_DATA_TYPE.empty()).toEqual({ hexes: {}, regions: [], labels: [] });
   });
 
-  it('declares the grid at the `grid` key, beside the canonical prose Field (ADR-0051)', () => {
+  it('references the grid Field beside the canonical prose Field by id (ADR-0051, ADR-0054)', () => {
     // The grid is what makes an Entity a Hex Map; the prose Field rides alongside so a map carries lore.
-    expect(CORE_HEXMAP_TYPE.fields).toEqual([CONTENT_FIELD, HEX_GRID_FIELD]);
-    expect(HEX_GRID_FIELD).toMatchObject({ key: 'grid', dataType: { kind: CORE_HEX_GRID }, facetable: false });
+    // The type references both by id (`fieldRefs`); the inline `fields` keep the id-less schema the web
+    // still reads (`defineType` parses through the base FieldSchema, so the reuse `id` lives on `fieldRefs`).
+    expect(CORE_HEXMAP_TYPE.fieldRefs).toEqual([CONTENT_FIELD.id, HEX_GRID_FIELD.id]);
+    expect(CORE_HEXMAP_TYPE.fields.map((field) => field.key)).toEqual([CONTENT_FIELD.key, HEX_GRID_FIELD.key]);
+    expect(HEX_GRID_FIELD).toMatchObject({
+      id: 'core.grid',
+      key: 'grid',
+      dataType: { kind: CORE_HEX_GRID },
+      facetable: false,
+    });
   });
 
   /**

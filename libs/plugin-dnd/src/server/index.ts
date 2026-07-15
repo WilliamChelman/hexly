@@ -5,8 +5,10 @@
  */
 import { serverPlugin, ServerPlugin } from '@hexly/domain';
 import { PLUGIN_ID } from '../lib/plugin-id';
-import { DND_MONSTER_TYPE } from '../lib/monster';
+import { DND_MONSTER_FIELDS, DND_MONSTER_TYPE } from '../lib/monster';
 
 export function serverPluginDnd(): ServerPlugin {
-  return serverPlugin({ id: PLUGIN_ID, types: [DND_MONSTER_TYPE] });
+  // Declares the stat-block Fields (ADR-0054); the prose `core.content` it references is the content
+  // plugin's, folded from there.
+  return serverPlugin({ id: PLUGIN_ID, types: [DND_MONSTER_TYPE], fields: [...DND_MONSTER_FIELDS] });
 }

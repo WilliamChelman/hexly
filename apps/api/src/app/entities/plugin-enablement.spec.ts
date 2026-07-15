@@ -48,6 +48,37 @@ describe('plugin enablement — uniform absence on the server', () => {
     });
   });
 
+  /**
+   * The instance-wide id→Field resolver (ADR-0054): the composition an Entity's directly-attached
+   * `fields[]` and a Type's `fieldRefs` resolve against. A disabled Plugin's Fields drop from it, so a
+   * reference to one degrades to a plain **Entity Document** value — the ADR-0052 uniform-absence rule.
+   */
+  describe('the registry composes the Plugin Field resolver', () => {
+    it('resolves a Plugin Field id → its definition when its Plugin is enabled', () => {
+      const registry = new TypeFieldRegistry(allEnabled());
+      expect(registry.fieldResolver('core.grid')).toMatchObject({
+        id: 'core.grid',
+        key: 'grid',
+        dataType: { kind: CORE_HEX_GRID },
+      });
+      // The content plugin owns the prose Field; the hexmap and dnd types reference it by id.
+      expect(registry.fieldResolver('core.content')?.key).toBe('content');
+      expect(registry.fieldResolver('dnd.challenge_rating')?.key).toBe('challenge_rating');
+    });
+
+    it('drops a disabled Plugin’s Fields — a reference degrades to a plain value', () => {
+      const registry = new TypeFieldRegistry(withDisabled(HEXMAP_PLUGIN_ID));
+      expect(registry.fieldResolver('core.grid')).toBeUndefined();
+      // `core.content` is owned by the (still-enabled) content plugin, so the hexmap type's other
+      // reference still resolves.
+      expect(registry.fieldResolver('core.content')?.key).toBe('content');
+    });
+
+    it('resolves nothing for an unknown id', () => {
+      expect(new TypeFieldRegistry(allEnabled()).fieldResolver('world.nope')).toBeUndefined();
+    });
+  });
+
   describe('derive over an Entity carrying a disabled Plugin’s Field of a Structured Data Type', () => {
     // A grid value with a Hex Entity Link and a Hex name — the edge and text a Hex Map contributes.
     const doc = {

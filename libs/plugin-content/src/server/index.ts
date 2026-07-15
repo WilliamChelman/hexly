@@ -10,12 +10,15 @@
 import { serverPlugin, ServerPlugin } from '@hexly/domain';
 import { PLUGIN_ID } from '../lib/plugin-id';
 import { CORE_NOTE_TYPE } from '../lib/note-type';
+import { CONTENT_FIELD } from '../lib/rich-content';
 import { RICH_CONTENT_DATA_TYPE_VAULT } from '../lib/rich-content-vault';
 
 export function serverPluginContent(): ServerPlugin {
   return serverPlugin({
     id: PLUGIN_ID,
     types: [CORE_NOTE_TYPE],
+    // Owns the prose Field (ADR-0054); other plugins' types reference it by id.
+    fields: [CONTENT_FIELD],
     dataTypes: [RICH_CONTENT_DATA_TYPE_VAULT],
     defaultType: CORE_NOTE_TYPE.id,
   });

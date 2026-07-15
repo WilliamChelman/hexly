@@ -156,6 +156,66 @@ describe('Entities endpoints', () => {
     expect(res.body.name).toBe('The Whisperwood');
   });
 
+  /**
+   * A directly-attached Field (`fields[]`, ADR-0054) round-trips through create → load → save. The dnd
+   * `size` Field rides a plain Note the note type never names (story 2).
+   */
+  it('round-trips an Entity’s directly-attached fields[] through create, load, and save', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+
+    const created = await ada
+      .post('/entities')
+      .send({ name: 'Ealdred', types: ['core.note'], fields: ['dnd.size'] })
+      .expect(201);
+    // `size` is a plain enum Field, so it mints no default — the note still opens as Content-only.
+    expect(created.body.fields).toEqual(['dnd.size']);
+    expect(created.body.document).toEqual({ content: emptyContent() });
+
+    const loaded = await ada.get(`/entities/${created.body.id}`).expect(200);
+    expect(loaded.body.fields).toEqual(['dnd.size']);
+
+    // A save replaces the attached-Field set and fills the Field's value; validation runs over the
+    // effective set, so the enum value is checked though no type declares `size`.
+    const saved = await ada
+      .put(`/entities/${created.body.id}`)
+      .send({
+        document: { content: emptyContent(), size: 'Large' },
+        version: created.body.version,
+        tags: [],
+        fields: ['dnd.size'],
+      })
+      .expect(200);
+    expect(saved.body.fields).toEqual(['dnd.size']);
+
+    const reloaded = await ada.get(`/entities/${created.body.id}`).expect(200);
+    expect(reloaded.body.fields).toEqual(['dnd.size']);
+    expect(reloaded.body.document.size).toBe('Large');
+  });
+
+  /**
+   * The forward-only Field gate runs over the *effective* set (ADR-0054): an ill-typed value for a
+   * directly-attached Field is rejected on an active typed save, even when no type names it (story 15).
+   */
+  it('rejects a save whose attached Field value is ill-typed, though no type declares it', async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+
+    const created = await ada
+      .post('/entities')
+      .send({ name: 'Ealdred', types: ['core.note'], fields: ['dnd.size'] })
+      .expect(201);
+
+    // `size` is an enum; a value outside its options fails the effective-set validation.
+    await ada
+      .put(`/entities/${created.body.id}`)
+      .send({
+        document: { content: emptyContent(), size: 'Colossal' },
+        version: created.body.version,
+        tags: [],
+        fields: ['dnd.size'],
+      })
+      .expect(400);
+  });
+
   it('lets a Contributor create an Entity in a World they do not own (CONTEXT.md → Contributor)', async () => {
     const ada = await signIn('ada@hexly.test', 'correct horse');
     const bobId = await seedUser('bob@hexly.test', 'correct horse', 'Bob');

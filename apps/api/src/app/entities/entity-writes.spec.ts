@@ -1,4 +1,4 @@
-import { EntityDocument, ReindexFailure, emptyEntityDocument } from '@hexly/domain';
+import { defineField, EntityDocument, ReindexFailure, emptyEntityDocument } from '@hexly/domain';
 import { emptyContent, tiptapContent } from '@hexly/plugin-content';
 import { eq } from 'drizzle-orm';
 import { createDb, Db } from '../db/db';
@@ -597,13 +597,103 @@ describe('EntityWrites', () => {
         ]);
         expect(facetsOf('Aboleth')).toEqual([{ key: 'lair', value: 'sunken-keep', num: null }]);
       });
+    });
 
-      function facetsOf(name: string) {
-        return db
-          .select({ key: entityFieldFacets.key, value: entityFieldFacets.value, num: entityFieldFacets.num })
-          .from(entityFieldFacets)
-          .where(eq(entityFieldFacets.entityId, idOf(name)))
-          .all();
+    /**
+     * A Field attached *directly* to an Entity — one its types never named (ADR-0054, #226). The derive
+     * pass runs over the **effective** Field set (types' defaults ∪ attached `fields[]`), so an
+     * instance-attached link Field becomes a graph edge (story 20) and an attached facetable Field a
+     * facet (story 18) — and Reindex rebuilds both from the stored `fields[]` column (story 21).
+     */
+    describe('directly-attached Plugin Fields (ADR-0054, #226)', () => {
+      // A facetable Entity-Link Plugin Field, registered instance-wide and attached by id — `core.note`
+      // (the only type below) declares nothing but its prose, so `ally` rides the Entity alone.
+      const ALLY = defineField({
+        id: 'test.ally',
+        key: 'ally',
+        label: 'Ally',
+        dataType: { kind: 'entityLink' },
+        facetable: true,
+      });
+
+      beforeEach(() => {
+        typeFields.registerField(ALLY);
+      });
+
+      it('harvests an edge and a facet from an attached link Field its types never named', () => {
+        writes.insert({
+          ownerId: ADA,
+          worldId: WORLD,
+          name: 'Ealdred',
+          types: ['core.note'],
+          fields: ['test.ally'],
+          tags: [],
+          document: { content: emptyContent(), ally: { entityId: 'mira', label: 'Mira' } },
+        });
+
+        expect(edgesOf('Ealdred')).toEqual([
+          { worldId: WORLD, targetKind: 'entity', targetId: 'mira', descriptor: null },
+        ]);
+        expect(facetsOf('Ealdred')).toEqual([{ key: 'ally', value: 'mira', num: null }]);
+      });
+
+      it('round-trips the attached `fields[]` set through the row', () => {
+        const row = writes.insert({
+          ownerId: ADA,
+          worldId: WORLD,
+          name: 'Ealdred',
+          types: ['core.note'],
+          fields: ['test.ally'],
+          tags: [],
+          document: { content: emptyContent(), ally: { entityId: 'mira', label: 'Mira' } },
+        });
+
+        expect(rowOf(row.id).fields).toEqual(['test.ally']);
+      });
+
+      it('rebuilds the attached Field’s edge and facet from the stored fields[] column on reindex', () => {
+        // Seeded raw with the `fields[]` column set and no derived rows, so the rebuild is observed
+        // independently of `insert` — the reindex must resolve the effective set from `types` + `fields`.
+        seedAttachedRaw('ealdred', WORLD, ['core.note'], ['test.ally'], {
+          content: emptyContent(),
+          ally: { entityId: 'mira', label: 'Mira' },
+        });
+
+        expect(writes.reindexChunk(null, 100)).toMatchObject({ walked: expect.any(Number), reindexed: 2 });
+
+        expect(edgesFrom('ealdred')).toEqual([
+          { worldId: WORLD, targetKind: 'entity', targetId: 'mira', descriptor: null },
+        ]);
+        expect(facetsOf('ealdred')).toEqual([{ key: 'ally', value: 'mira', num: null }]);
+      });
+
+      /** An Entity seeded raw with its `fields[]` column and no derived rows, for a reindex to rebuild. */
+      function seedAttachedRaw(
+        id: string,
+        worldId: string,
+        types: readonly string[],
+        fields: readonly string[],
+        doc: EntityDocument,
+      ): void {
+        const now = Date.now();
+        db.insert(entities)
+          .values({
+            id,
+            worldId,
+            name: id,
+            types: [...types],
+            fields: [...fields],
+            tags: [],
+            visibility: 'private',
+            version: 1,
+            seq: 1,
+            document: JSON.stringify(doc),
+            contentText: null,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .run();
+        db.insert(entityGrants).values({ entityId: id, userId: ADA, role: 'owner' }).run();
       }
     });
 
@@ -611,6 +701,15 @@ describe('EntityWrites', () => {
       const row = db.select().from(entities).where(eq(entities.name, name)).get();
       if (!row) throw new Error(`no entity named ${name}`);
       return row.id;
+    }
+
+    /** The denormalised Field-facet rows an Entity carries, by name. */
+    function facetsOf(name: string) {
+      return db
+        .select({ key: entityFieldFacets.key, value: entityFieldFacets.value, num: entityFieldFacets.num })
+        .from(entityFieldFacets)
+        .where(eq(entityFieldFacets.entityId, idOf(name)))
+        .all();
     }
 
     function descriptorsOf(name: string): string[] {
