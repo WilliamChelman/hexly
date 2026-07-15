@@ -1,7 +1,7 @@
 import { Injectable, Type, computed, inject, signal } from '@angular/core';
 import { StructuredDataTypeId } from '@hexly/domain';
-import { ClientConfigStore } from '@hexly/web-core';
-import { CORE_VIEW_FIELDS, PLUGIN_VIEW_OWNERS, PLUGIN_VIEWS, ViewDefinition, ViewId } from '@hexly/web-entity';
+import { CORE_VIEW_FIELDS, PLUGIN_VIEWS, ViewDefinition, ViewId } from '@hexly/web-entity';
+import { PluginRegistry } from './plugin-registry';
 
 /**
  * Root registry mapping a {@link ViewId} to the component that renders it, the sibling of
@@ -18,25 +18,16 @@ export class ViewRegistry {
   private readonly fetched = signal<ReadonlyMap<ViewId, Type<unknown>>>(new Map());
   private readonly inFlight = new Map<ViewId, Promise<void>>();
 
-  /** View id → owning Plugin id (ADR-0052, Seam 3); a View absent from it is app-owned and never Plugin-gated. */
-  private readonly viewOwners = new Map<ViewId, string>(inject(PLUGIN_VIEW_OWNERS, { optional: true }) ?? []);
-
-  /** Owns the enablement predicate the reactive outputs filter through (ADR-0052, Seam 3). */
-  private readonly clientConfig = inject(ClientConfigStore);
+  /** Owns the enablement predicate (`isViewActive`) the reactive outputs filter through (ADR-0052, Seam 3). */
+  private readonly plugins = inject(PluginRegistry);
 
   /** Every *enabled* View, in registration order (the bundled plugins' first, then core). */
-  readonly all = computed(() => this.definitions().filter((def) => this.isActive(def.id)));
+  readonly all = computed(() => this.definitions().filter((def) => this.plugins.isViewActive(def.id)));
 
   constructor() {
     // Seeded at startup, unlike the core views: the header must know a View to draw its toggle, and
     // only the *body* of a plugin view is deferred.
     for (const def of inject(PLUGIN_VIEWS, { optional: true }) ?? []) this.register(def);
-  }
-
-  /** Whether the Plugin owning `id` is enabled — the predicate the reactive outputs filter through (ADR-0052). */
-  private isActive(id: ViewId): boolean {
-    const owner = this.viewOwners.get(id);
-    return owner == null || this.clientConfig.isPluginEnabled(owner);
   }
 
   register(definition: ViewDefinition): () => void {
@@ -51,7 +42,7 @@ export class ViewRegistry {
   get(id: ViewId | null | undefined): ViewDefinition | undefined {
     if (id == null) return undefined;
     const def = this.definitions().find((d) => d.id === id);
-    return def && this.isActive(def.id) ? def : undefined;
+    return def && this.plugins.isViewActive(def.id) ? def : undefined;
   }
 
   /**
@@ -61,7 +52,7 @@ export class ViewRegistry {
    */
   forDataType(kind: string | null | undefined): ViewDefinition | undefined {
     if (kind == null) return undefined;
-    return this.definitions().find((d) => d.dataType === kind && this.isActive(d.id));
+    return this.definitions().find((d) => d.dataType === kind && this.plugins.isViewActive(d.id));
   }
 
   /**
