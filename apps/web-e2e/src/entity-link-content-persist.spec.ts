@@ -7,13 +7,13 @@ test('inserts a Content Entity Link via @, persists it, navigates it, and dangle
 }) => {
   // Seed the link target: a note the picker can list and a click can jump to.
   await enterLibrary(page);
-  await page.getByTestId('new-note').click();
+  await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const targetId = entityIdFromUrl(page);
 
   // The source note that will carry the link in its prose.
   await enterLibrary(page);
-  await page.getByTestId('new-note').click();
+  await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const sourceId = entityIdFromUrl(page);
   // The source's full world-scoped path (ADR-0028) — reused to reopen it later.

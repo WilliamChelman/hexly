@@ -10,7 +10,7 @@ test('an anonymous Public Link viewer live-follows a GM edit, then evicts on rev
   browser,
 }) => {
   await enterLibrary(page);
-  await page.getByTestId('new-note').click();
+  await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
 
   // Author some Content so the public page has something to render, then persist it.

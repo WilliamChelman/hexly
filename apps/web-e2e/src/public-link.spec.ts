@@ -9,7 +9,7 @@ test('an Owner mints a public link; an anonymous visitor reads it, then loses it
   browser,
 }) => {
   await enterLibrary(page);
-  await page.getByTestId('new-note').click();
+  await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
 
   // Author some Content so the public page has something to render read-only.

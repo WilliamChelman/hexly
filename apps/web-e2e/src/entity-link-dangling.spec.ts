@@ -12,7 +12,7 @@ test('a link whose target is deleted renders non-navigable, and the map opens wi
   request,
 }) => {
   await enterLibrary(page);
-  await page.getByTestId('new-note').click();
+  await page.getByTestId('new-default-entity').click();
   await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
   const noteId = entityIdFromUrl(page);
 

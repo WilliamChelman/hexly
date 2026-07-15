@@ -2,17 +2,36 @@ import { provideTranslocoTesting } from '../../testing/transloco-testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
+import { signal, WritableSignal } from '@angular/core';
 import { of } from 'rxjs';
 import { EntityDetail } from '@hexly/domain';
-import { ActiveWorld, EntitiesClient } from '@hexly/web-core';
+import { ActiveWorld, ClientConfigStore, EntitiesClient } from '@hexly/web-core';
 import { MockEntitiesClient } from '@hexly/web-core/testing';
 import { providePluginDnd } from '@hexly/plugin-dnd/web';
 import { providePluginContent } from '@hexly/plugin-content/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
+import { PLUGIN_ID as CONTENT_PLUGIN_ID } from '@hexly/plugin-content';
+import { PLUGIN_ID as HEXMAP_PLUGIN_ID } from '@hexly/plugin-hexmap';
 import { CORE_VIEW_FIELDS } from '@hexly/web-entity';
 import { NewEntityButton } from './new-entity-button';
 import { TypeRegistry } from './type-registry';
 import { CreateEntityDialogState } from '../shell/command-palette/create-entity-dialog.state';
+
+/**
+ * A {@link ClientConfigStore} whose default Type and enabled set the test drives (ADR-0052, Seam 4):
+ * a `null` enabled set is "config not yet loaded" — every Plugin reads enabled, today's behaviour.
+ */
+function fakeClientConfig(
+  defaultType: WritableSignal<string | undefined>,
+  enabled: WritableSignal<ReadonlySet<string> | null>,
+): ClientConfigStore {
+  return {
+    defaultType,
+    enabledPlugins: enabled,
+    isPluginEnabled: (id: string) => enabled() === null || enabled()!.has(id),
+    init: async () => undefined,
+  } as unknown as ClientConfigStore;
+}
 
 const created = (id: string, name: string, types: string[]) =>
   ({
@@ -32,9 +51,15 @@ const created = (id: string, name: string, types: string[]) =>
 describe('NewEntityButton', () => {
   let entities: MockEntitiesClient;
   let navigate: ReturnType<typeof vi.spyOn>;
+  let defaultType: WritableSignal<string | undefined>;
+  let enabled: WritableSignal<ReadonlySet<string> | null>;
 
   beforeEach(async () => {
     entities = new MockEntitiesClient();
+    // Unset default + unloaded enabled set: the pre-config-fetch state, where the button resolves
+    // to the first enabled Type (core.note) — today's "New Note" behaviour, unchanged (ADR-0052).
+    defaultType = signal<string | undefined>(undefined);
+    enabled = signal<ReadonlySet<string> | null>(null);
     await TestBed.configureTestingModule({
       imports: [NewEntityButton, provideTranslocoTesting()],
       // The D&D plugin is composed exactly as `app.config.ts` does, so `dnd.monster` reaches the
@@ -42,6 +67,7 @@ describe('NewEntityButton', () => {
       providers: [
         provideRouter([]),
         { provide: EntitiesClient, useValue: entities },
+        { provide: ClientConfigStore, useValue: fakeClientConfig(defaultType, enabled) },
         providePluginContent(),
         providePluginHexmap(),
         providePluginDnd(),
@@ -72,14 +98,68 @@ describe('NewEntityButton', () => {
   const menuItem = (typeId: string) =>
     document.querySelector<HTMLButtonElement>(`[data-testid="new-entity-${typeId}"]`);
 
-  it('creates a Note from the primary action and opens it', () => {
+  const primaryButton = (fixture: ComponentFixture<NewEntityButton>) =>
+    fixture.nativeElement.querySelector('[data-testid=new-default-entity]') as HTMLButtonElement | null;
+
+  it('creates the first enabled Type by default — today’s Note — and opens it', () => {
     const fixture = render();
     entities.create.mockReturnValueOnce(of(created('new1', 'Untitled note', ['core.note'])));
 
-    (fixture.nativeElement.querySelector('[data-testid=new-note]') as HTMLButtonElement).click();
+    expect(primaryButton(fixture)?.textContent).toContain('Create Note');
+    primaryButton(fixture)!.click();
 
     expect(entities.create).toHaveBeenCalledWith('Untitled note', ['core.note'], 'w1');
     expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'new1']);
+  });
+
+  it('creates the configured default Type and labels the button after it', () => {
+    // `entities.defaultType` names an enabled Type: the primary button mints *that* Type, and its
+    // copy follows the Type's own create chrome — no hardcoded Note anywhere (ADR-0052, story 24/26).
+    defaultType.set('core.hexmap');
+    const fixture = render();
+    entities.create.mockReturnValueOnce(of(created('m1', 'Untitled map', ['core.hexmap'])));
+
+    expect(primaryButton(fixture)?.textContent).toContain('Create Map');
+    primaryButton(fixture)!.click();
+
+    expect(entities.create).toHaveBeenCalledWith('Untitled map', ['core.hexmap'], 'w1');
+    expect(navigate).toHaveBeenCalledWith(['/w', 'w1', 'entities', 'm1']);
+  });
+
+  it('falls back to the first enabled Type when the configured default is unregistered', () => {
+    // A typo or a Type from a Plugin this build never bundled reads as absent: the button degrades
+    // to the first enabled Type rather than showing nothing (ADR-0052, story 27).
+    defaultType.set('pathfinder.dragon');
+    const fixture = render();
+    entities.create.mockReturnValueOnce(of(created('new1', 'Untitled note', ['core.note'])));
+
+    expect(primaryButton(fixture)?.textContent).toContain('Create Note');
+    primaryButton(fixture)!.click();
+
+    expect(entities.create).toHaveBeenCalledWith('Untitled note', ['core.note'], 'w1');
+  });
+
+  it('falls back to the first enabled Type when the configured default names a disabled Plugin', () => {
+    // The default resolves against the *enabled* registry: a disabled Plugin's Type reads as absent,
+    // so the button falls to the first still-enabled Type — the knob stays independent of enablement.
+    defaultType.set('dnd.monster');
+    enabled.set(new Set([CONTENT_PLUGIN_ID, HEXMAP_PLUGIN_ID])); // dnd off
+    const fixture = render();
+    entities.create.mockReturnValueOnce(of(created('new1', 'Untitled note', ['core.note'])));
+
+    expect(primaryButton(fixture)?.textContent).toContain('Create Note');
+    primaryButton(fixture)!.click();
+
+    expect(entities.create).toHaveBeenCalledWith('Untitled note', ['core.note'], 'w1');
+  });
+
+  it('renders no primary create button when every Plugin is disabled — an empty registry', () => {
+    // An all-Plugins-off Instance has no Type to mint: the primary button disappears rather than
+    // creating a phantom Type or throwing (ADR-0052, story 5/27).
+    enabled.set(new Set());
+    const fixture = render();
+
+    expect(primaryButton(fixture)).toBeNull();
   });
 
   it('lists every registered Type in the menu — core, plugin, and user-defined alike', () => {
@@ -140,9 +220,8 @@ describe('NewEntityButton', () => {
     TestBed.inject(TranslocoService).setActiveLang('fr');
     fixture.detectChanges();
 
-    expect((fixture.nativeElement.querySelector('[data-testid=new-note]') as HTMLElement).textContent).toContain(
-      'Nouvelle note',
-    );
+    // The primary button's copy is the resolved Type's create chrome, so it re-resolves on a switch.
+    expect(primaryButton(fixture)?.textContent).toContain('Créer une note');
     openMenu(fixture);
     expect(menuItem('core.hexmap')?.textContent).toContain('Carte');
   });
