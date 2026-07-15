@@ -30,7 +30,7 @@ describe('bundled plugin identity', () => {
     expect(BUNDLED_PLUGIN_TYPE_OWNERS.get(DND_MONSTER)).toBe(DND_PLUGIN_ID);
   });
 
-  it('associates each Structured Field data-type with the Plugin that owns it', () => {
+  it('associates each Structured Data Type with the Plugin that owns it', () => {
     expect(BUNDLED_STRUCTURED_DATA_TYPE_OWNERS.get(CORE_RICH_CONTENT)).toBe(CONTENT_PLUGIN_ID);
     expect(BUNDLED_STRUCTURED_DATA_TYPE_OWNERS.get(CORE_HEX_GRID)).toBe(HEXMAP_PLUGIN_ID);
     // dnd contributes a Type but no data-type, so it owns none.

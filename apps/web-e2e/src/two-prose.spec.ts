@@ -21,7 +21,7 @@ test('an Entity with two prose Fields affords two content Views, each with its o
   const worldId = await enterLibrary(page);
   // A distinct type id (`world.saint`, not `two-grids`' `world.deity`): the reset clears Entities but
   // not a World's authored types, so a type this spec shares with another would carry that one's Fields.
-  // Prose is a Structured Field like the grid — added from the kind picker, at the key and under the
+  // Prose is a Field of a Structured Data Type like the grid — added from the kind picker, at the key and under the
   // name the World Owner chose; two of them coexist as two Fields of the one EntityDocument.
   await authorWorldType(page, worldId, {
     id: 'saint',

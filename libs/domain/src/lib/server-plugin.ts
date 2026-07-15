@@ -5,9 +5,9 @@
  * so a plugin's server contribution is stated once, in the plugin, instead of scattered across the
  * composition root's imports.
  *
- * Only a plugin's framework-free half is ever named here: its Type declarations, the **Structured
- * Field** data-types those types resolve against (the vault-enabled variant, since the API runs vault
- * I/O — ADR-0051), and, for the one plugin that owns it, the default Entity Type.
+ * Only a plugin's framework-free half is ever named here: its Type declarations, the **Structured Data
+ * Types** those types resolve against (the vault-enabled variant, since the API runs vault I/O —
+ * ADR-0051), and, for the one plugin that owns it, the default Entity Type.
  */
 
 import { EntityType } from './entity';
@@ -29,7 +29,7 @@ export interface ServerPlugin {
   /** The code-registered Entity Types this plugin declares (ADR-0048). */
   readonly types?: readonly PluginTypeDefinition[];
   /**
-   * The **Structured Field** data-types this plugin's types name by `kind` (ADR-0050). The API bundles
+   * The **Structured Data Type**s this plugin's types name by `kind` (ADR-0050). The API bundles
    * the vault-enabled variant, since it resolves both the derive pass and the vault projection off this
    * set (ADR-0051).
    */

@@ -5,7 +5,7 @@ import { fieldSchemaSchema, resolveFields } from './field';
 import { defineType } from './plugin-type';
 import { defineStructuredDataType, structuredDataTypeSet } from './structured-data-type';
 
-/** A stand-in for a plugin's Structured Field data-type — the domain bundles none of its own. */
+/** A stand-in for a plugin's Structured Data Type — the domain bundles none of its own. */
 const BOARD = defineStructuredDataType({
   id: 'test.board',
   valueSchema: z.object({ tiles: z.record(z.string(), z.string()) }),
@@ -41,7 +41,7 @@ describe('emptyEntityDocument', () => {
     expect(emptyEntityDocument()).toEqual({});
   });
 
-  it("opens a fresh Structured Field on its data-type's empty value, at its own key", () => {
+  it("opens a fresh Field of a Structured Data Type on its data-type's empty value, at its own key", () => {
     // The minter knows nothing of what the value holds: the default comes from the registered
     // data-type. A fresh map opens on a blank plane this way — and prose on an empty document.
     const body = emptyEntityDocument(atlasFields, dataTypes);
@@ -50,14 +50,14 @@ describe('emptyEntityDocument', () => {
     expect(body).toEqual({ board: emptyBoard() });
   });
 
-  it('leaves a Structured Field unminted when the host has not registered its data-type', () => {
+  it('leaves a Field of a Structured Data Type unminted when the host has not registered it', () => {
     // An absent plugin: the Field is inert, its value stays plain EntityDocument, nothing throws.
     expect(emptyEntityDocument(atlasFields, structuredDataTypeSet([]))).toEqual({});
   });
 });
 
 describe('withFieldDefaults', () => {
-  it('mints the empty value when a type declaring a Structured Field is added (#189)', () => {
+  it('mints the empty value when a type declaring a Field of a Structured Data Type is added (#189)', () => {
     const reconciled = withFieldDefaults({}, atlasFields, dataTypes);
 
     expect(reconciled).toEqual({ board: emptyBoard() });

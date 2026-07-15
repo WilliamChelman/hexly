@@ -6,7 +6,7 @@ import { CORE_HEXMAP_TYPE } from './hexmap-type';
 /** A grid: an empty plane plus the test's overrides. */
 const grid = (overrides: Partial<HexMap> = {}): HexMap => ({ ...emptyHexMap(), ...overrides });
 
-describe('the core.hex-grid Structured Field (ADR-0050)', () => {
+describe('the core.hex-grid Structured Data Type (ADR-0050)', () => {
   it('mints a blank plane — every coordinate Void, no regions, no labels', () => {
     expect(HEX_GRID_DATA_TYPE.empty()).toEqual({ hexes: {}, regions: [], labels: [] });
   });

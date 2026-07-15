@@ -67,7 +67,7 @@ describe('userDefinedTypeSchema', () => {
   });
 
   it('leaves `views` absent rather than empty when the author named no order (#201)', () => {
-    // Absent is what the host defaults for — Fields, then Content, then the Structured Fields — so a
+    // Absent is what the host defaults for — Fields, then Content, then the Structured Data Type Fields — so a
     // deity that grows a battlemap still opens on its Fields. An *empty* list would mean "no views".
     expect(userDefinedTypeSchema.parse({ id: 'world.faction', label: 'Faction' }).views).toBeUndefined();
   });
@@ -132,7 +132,7 @@ describe('updateUserDefinedTypeRequestSchema', () => {
     expect(updateUserDefinedTypeRequestSchema.safeParse({ fields: [domainField, domainField] }).success).toBe(false);
   });
 
-  it('accepts a fields + views patch placing the type’s own Structured Field (#201)', () => {
+  it('accepts a fields + views patch placing the type’s own Structured Data Type Field (#201)', () => {
     const patch = updateUserDefinedTypeRequestSchema.parse({
       fields: [battlemapField],
       views: ['core.view.fields', { field: 'battlemap' }],

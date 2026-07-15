@@ -100,7 +100,7 @@ export class WorldTypesService {
   }
 
   /**
-   * A user-defined type's Fields may name a plugin's **Structured Field** data-type (`core.hex-grid`),
+   * A user-defined type's Fields may name a plugin's **Structured Data Type** (`core.hex-grid`),
    * so authoring one is where an unregistered kind is rejected (ADR-0050) — against the composed set,
    * since no schema could enumerate a kind a plugin registers at module load.
    */

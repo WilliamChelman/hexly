@@ -1,5 +1,5 @@
 /**
- * `core.rich-content` — prose as a **Structured Field** data-type (CONTEXT.md → Structured Field,
+ * `core.rich-content` — prose as a **Structured Data Type** (CONTEXT.md → Structured Data Type,
  * ADR-0051). Every Type that means to carry prose declares the canonical {@link CONTENT_FIELD} at the
  * `content` key; a multi-type Entity resolves exactly one, since `resolveFields` dedupes by key.
  *
@@ -75,7 +75,7 @@ export const RICH_CONTENT_DATA_TYPE = defineStructuredDataType({
  * else, `core.hexmap` beside its grid, `dnd.monster` beside its stats. `resolveFields` dedupes by key,
  * so a multi-type Entity resolves exactly one — no rule, no enforcement.
  *
- * The header's View toggle reads its `labelKey` (a Structured Field's View being bound to the Field it
+ * The header's View toggle reads its `labelKey` (a Structured Data Type's View being bound to the Field it
  * renders); the toggle moving onto the Field is the next ticket. Not `required`: an absent value opens
  * as an empty document and the first edit mints one. Never facetable — a document has no discrete
  * values to count.

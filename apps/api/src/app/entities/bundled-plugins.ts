@@ -40,23 +40,23 @@ export function enabledPluginTypes(config: HexlyConfig): readonly PluginTypeDefi
 }
 
 /**
- * The enabled **Structured Field** data-types (ADR-0050, ADR-0052): the set the derive and vault passes
+ * The enabled **Structured Data Types** (ADR-0050, ADR-0052): the set the derive and vault passes
  * resolve a Field's `namespace.id` kind against. A disabled Plugin's data-types are absent, leaving its
- * **Structured Fields** as opaque **Entity Document** values.
+ * **Fields of a Structured Data Type** as opaque **Entity Document** values.
  */
 export function enabledStructuredDataTypes(config: HexlyConfig): StructuredDataTypeSet {
   return structuredDataTypesOf(enabledPlugins(config));
 }
 
 /**
- * Every bundled **Structured Field** data-type, regardless of enablement (ADR-0052) — the register-time
+ * Every bundled **Structured Data Type**, regardless of enablement (ADR-0052) — the register-time
  * guard that a bundled Type names only data-types the build ships. Unlike {@link enabledStructuredDataTypes},
  * it tolerates a Type naming a disabled Plugin's data-type (`core.hexmap`'s `content` Field when content
  * is off): that degrades at derive/vault time; a kind no Plugin bundles is still a build error.
  */
 export const BUNDLED_STRUCTURED_DATA_TYPES: StructuredDataTypeSet = structuredDataTypesOf(BUNDLED_PLUGINS);
 
-/** Fold a plugin set's contributed **Structured Field** data-types into one resolved set (ADR-0050). */
+/** Fold a plugin set's contributed **Structured Data Types** into one resolved set (ADR-0050). */
 function structuredDataTypesOf(plugins: readonly ServerPlugin[]): StructuredDataTypeSet {
   return structuredDataTypeSet(plugins.flatMap((plugin) => plugin.dataTypes ?? []));
 }
@@ -76,7 +76,7 @@ export const BUNDLED_PLUGIN_TYPE_OWNERS: ReadonlyMap<string, string> = new Map(
   BUNDLED_PLUGINS.flatMap((plugin) => (plugin.types ?? []).map((type) => [type.id, plugin.id] as const)),
 );
 
-/** Which bundled Plugin owns each **Structured Field** data-type, keyed by its `namespace.id` kind (ADR-0052). */
+/** Which bundled Plugin owns each **Structured Data Type**, keyed by its `namespace.id` kind (ADR-0052). */
 export const BUNDLED_STRUCTURED_DATA_TYPE_OWNERS: ReadonlyMap<string, string> = new Map(
   BUNDLED_PLUGINS.flatMap((plugin) => (plugin.dataTypes ?? []).map((dataType) => [dataType.id, plugin.id] as const)),
 );

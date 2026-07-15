@@ -147,7 +147,7 @@ export class CreateEntityDialog {
   /**
    * The required Fields the author must supply before creating.
    *
-   * A **Structured Field** is never among them, whatever it was flagged: it is edited on its own
+   * A **Field of a Structured Data Type** is never among them, whatever it was flagged: it is edited on its own
    * View, not typed into a form row (ADR-0050). Its value is minted empty at create instead.
    */
   protected readonly requiredFields = computed(() =>

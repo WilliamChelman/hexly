@@ -6,7 +6,7 @@ import { ViewDefinition, ViewId } from './view-definition';
 
 /**
  * What a bundled plugin contributes to the web app (ADR-0048): its Entity Types, the Views those types
- * afford, the **Structured Field** data-types those types declare (ADR-0050), and its own copy (ADR-0049).
+ * afford, the **Structured Data Types** those types declare (ADR-0050), and its own copy (ADR-0049).
  */
 export interface WebPlugin {
   /** This plugin's canonical `PLUGIN_ID` (ADR-0052); the server twin `ServerPlugin` carries the same value. */
@@ -18,7 +18,7 @@ export interface WebPlugin {
    */
   readonly views?: readonly ViewDefinition[];
   /**
-   * The data-types a **Structured Field** of this plugin's types names by `kind` — the grid behind
+   * The data-types a **Field of a Structured Data Type** of this plugin's types names by `kind` — the grid behind
    * `core.hexmap`'s `grid` Field (ADR-0050). The web composes its resolved set from these.
    */
   readonly dataTypes?: readonly StructuredDataType[];

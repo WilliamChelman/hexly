@@ -8,7 +8,7 @@ import { TypeFieldRegistry } from './type-field-registry';
 
 /**
  * "Disabled" is "never bundled" on the server (ADR-0052, Seam 2): a Plugin the enabled set omits is
- * filtered out of the bundled Type set and the bundled **Structured Field** data-type set before they
+ * filtered out of the bundled Type set and the bundled **Structured Data Type** set before they
  * thread into derive (edges + search text) and the **Vault Projection**. These cover a bundled set with
  * one Plugin omitted, against the same registry the real derive/vault passes resolve off.
  */
@@ -37,7 +37,7 @@ describe('plugin enablement — uniform absence on the server', () => {
   });
 
   describe('the registry filters the bundled sets by the enabled set', () => {
-    it('drops a disabled Plugin’s Structured Field data-type', () => {
+    it('drops a disabled Plugin’s Structured Data Type', () => {
       expect(new TypeFieldRegistry(allEnabled()).structuredDataTypes.has(CORE_HEX_GRID)).toBe(true);
       expect(new TypeFieldRegistry(withDisabled(HEXMAP_PLUGIN_ID)).structuredDataTypes.has(CORE_HEX_GRID)).toBe(false);
     });
@@ -48,7 +48,7 @@ describe('plugin enablement — uniform absence on the server', () => {
     });
   });
 
-  describe('derive over an Entity carrying a disabled Plugin’s Structured Field', () => {
+  describe('derive over an Entity carrying a disabled Plugin’s Field of a Structured Data Type', () => {
     // A grid value with a Hex Entity Link and a Hex name — the edge and text a Hex Map contributes.
     const doc = {
       grid: {
@@ -77,7 +77,7 @@ describe('plugin enablement — uniform absence on the server', () => {
     });
   });
 
-  describe('vault export of an Entity carrying a disabled Plugin’s Structured Field', () => {
+  describe('vault export of an Entity carrying a disabled Plugin’s Field of a Structured Data Type', () => {
     const doc = {
       content: tiptapContent({
         type: 'doc',

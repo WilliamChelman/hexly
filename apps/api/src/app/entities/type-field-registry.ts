@@ -36,9 +36,9 @@ export class TypeFieldRegistry {
   private readonly byType = new Map<string, RegisteredType>();
 
   /**
-   * The enabled **Structured Field** data-types (ADR-0050, ADR-0052) — instance-wide and code-known, so
-   * a World never contributes one. A disabled Plugin's data-type is unknown here, leaving its **Structured
-   * Fields** as opaque **Entity Document** values.
+   * The enabled **Structured Data Types** (ADR-0050, ADR-0052) — instance-wide and code-known, so
+   * a World never contributes one. A disabled Plugin's data-type is unknown here, leaving its **Fields
+   * of a Structured Data Type** as opaque **Entity Document** values.
    */
   readonly structuredDataTypes: StructuredDataTypeSet;
 
@@ -53,7 +53,7 @@ export class TypeFieldRegistry {
 
   /**
    * Register (or replace) a plugin type's Field schema and optional `label`. A malformed Field — or a
-   * **Structured Field** naming a data-type this build does not bundle — throws rather than degrading.
+   * **Field of a Structured Data Type** naming a data-type this build does not bundle — throws rather than degrading.
    * The guard is the full bundled set, not the enabled one (ADR-0052): a Type may name a disabled
    * Plugin's data-type (`core.hexmap`'s `content` Field when content is off), which degrades to an opaque
    * value at derive/vault time via {@link structuredDataTypes}, not a boot failure. Returns an unregister fn.

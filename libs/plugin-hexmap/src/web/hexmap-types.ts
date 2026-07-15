@@ -4,7 +4,7 @@ import { CORE_HEXMAP_TYPE, HEX_GRID_FIELD } from '../lib';
 
 /**
  * The Hex Map's Type as the web registers it (ADR-0050): the shared {@link CORE_HEXMAP_TYPE}
- * declaration — the id and the grid **Structured Field** the API reads too — plus the chrome only the
+ * declaration — the id and the grid **Field of a Structured Data Type** the API reads too — plus the chrome only the
  * web has: the icon, the transloco copy, the graph colour, and the Views it affords.
  *
  * Views are ordered grid first, Content second, so a Hex Map opens on its map with a lore toggle beside

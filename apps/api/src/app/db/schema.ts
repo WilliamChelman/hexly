@@ -87,7 +87,7 @@ export const entities = sqliteTable(
     seq: integer('seq').notNull().default(INITIAL_SEQ),
     // The serialized Entity Document (entityDocumentSchema), validated at the edge.
     document: text('document').notNull(),
-    // The Entity's searchable text: the Content's prose *and* the text each Structured Field's value
+    // The Entity's searchable text: the Content's prose *and* the text each Field of a Structured Data Type's value
     // carries (a grid's Hex and Region names, #205). EntityWrites derives it on every write
     // (ADR-0045). Nullable: pre-FTS rows predate the column. The FTS table and its sync triggers are
     // raw SQL, outside Drizzle's typed API.

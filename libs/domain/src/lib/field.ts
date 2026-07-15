@@ -76,7 +76,7 @@ export const builtInDataTypeSchema = z.discriminatedUnion('kind', [
 
 export type BuiltInDataType = z.infer<typeof builtInDataTypeSchema>;
 
-/** A **Structured Field**'s data-type, named by a plugin's `namespace.id` id — see `structured-data-type.ts`. */
+/** A reference to a **Structured Data Type**, named by a plugin's `namespace.id` id — see `structured-data-type.ts`. */
 const structuredDataTypeRefSchema = z.object({ kind: structuredDataTypeIdSchema });
 
 export type StructuredDataTypeRef = z.infer<typeof structuredDataTypeRefSchema>;
@@ -104,7 +104,7 @@ export function isStructuredDataType(dataType: FieldDataType): dataType is Struc
 }
 
 /**
- * Resolve a structured Field's data-type against the host-composed set. `undefined` for an
+ * Resolve a Field's **Structured Data Type** against the host-composed set. `undefined` for an
  * unregistered kind — an absent plugin, or a typo — which is an error where a Type is declared
  * ({@link unresolvedDataTypeErrors}) but inert where a value is validated ({@link validateFields}).
  */
@@ -134,8 +134,8 @@ export function isEntityLinkDataType(dataType: FieldDataType): boolean {
 }
 
 /**
- * Whether a Field is offered as a **Facet**. A **Structured Field** never is, whatever its `facetable`
- * flag says (ADR-0050): a document has no discrete values to count.
+ * Whether a Field is offered as a **Facet**. A Field of a **Structured Data Type** never is, whatever
+ * its `facetable` flag says (ADR-0050): a document has no discrete values to count.
  */
 export function isFacetableField(field: FieldSchema): field is FieldSchema & { dataType: BuiltInDataType } {
   return field.facetable && !isStructuredDataType(field.dataType);
@@ -184,7 +184,7 @@ export type Field = z.infer<typeof fieldSchema>;
  * malformed field — a bare `id` (no namespace), or an unknown `dataType` kind (neither a built-in nor
  * `namespace.id`-shaped) — throws at module load rather than at runtime. Membership of a structured
  * data-type is *not* checked here (no schema could enumerate the plugin registering it); an unregistered
- * kind is caught at resolution, as with a Structured Field.
+ * kind is caught at resolution, as with any **Structured Data Type**.
  */
 export function defineField(definition: {
   readonly id: string;
@@ -265,7 +265,7 @@ export function resolveEffectiveFields(args: {
 
 /**
  * Why one Field failed validation: `required` (absent), `type` (present but ill-typed), or
- * `unknown-data-type` — a **Structured Field** naming a data-type the host has not registered
+ * `unknown-data-type` — a Field naming a **Structured Data Type** the host has not registered
  * (ADR-0050). The last is a broken *declaration*, not a bad value: raised by
  * {@link unresolvedDataTypeErrors} where a Type is declared, never by the value gate.
  */
@@ -289,8 +289,8 @@ export interface FieldValidation {
  * The caller decides *when* to enforce it — active typed edits only, never on import or data at rest,
  * so already stored EntityDocument is never retroactively invalidated.
  *
- * A **Structured Field** validates against its data-type's own `valueSchema`, resolved from the
- * host-composed `dataTypes` (ADR-0050). One whose kind that set does not carry is *inert* — skipped,
+ * A Field of a **Structured Data Type** validates against that data-type's own `valueSchema`, resolved
+ * from the host-composed `dataTypes` (ADR-0050). One whose kind that set does not carry is *inert* — skipped,
  * its value left as plain EntityDocument, exactly as an absent plugin's Fields are; the unregistered kind is
  * rejected where the Type is declared instead ({@link unresolvedDataTypeErrors}).
  */
@@ -357,8 +357,8 @@ export interface FieldFacetValue {
 
 /**
  * The pure Field-facet derivation (ADR-0048): a resolved Field set + an Entity's EntityDocument → the
- * denormalised facet values to materialise. Only **facetable** Fields contribute (never a
- * **Structured Field**, ADR-0050), only a *present, well-typed* value is indexed (an ill-typed value
+ * denormalised facet values to materialise. Only **facetable** Fields contribute (never a Field of a
+ * **Structured Data Type**, ADR-0050), only a *present, well-typed* value is indexed (an ill-typed value
  * at rest is tolerated, never faceted), a `list` explodes to one value per item, and values repeated
  * within one Entity collapse so a facet count is per-Entity rather than per-occurrence.
  */
@@ -421,10 +421,10 @@ export function entityLinkFieldValues(
 }
 
 /**
- * Every **Structured Field** in a resolved set, paired with the data-type it resolves to (ADR-0050).
- * An unregistered kind drops out rather than throwing — nothing can render or harvest it.
+ * Every Field of a **Structured Data Type** in a resolved set, paired with the data-type it resolves
+ * to (ADR-0050). An unregistered kind drops out rather than throwing — nothing can render or harvest it.
  */
-export function resolvedStructuredFields(
+export function resolvedStructuredDataTypeFields(
   fields: readonly FieldSchema[],
   dataTypes: StructuredDataTypeSet,
 ): { field: FieldSchema; dataType: StructuredDataType }[] {

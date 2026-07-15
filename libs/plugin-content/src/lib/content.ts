@@ -1,6 +1,6 @@
 /**
  * The Content value — format-tagged TipTap/ProseMirror JSON (ADR-0019, ADR-0051). Once the base body
- * shape, now the value of the `core.rich-content` **Structured Field**: a document with its own
+ * shape, now the value of the `core.rich-content` **Structured Data Type**: a document with its own
  * schema, its own edges, and its own searchable text, stored at whatever key a Type declares it under.
  */
 

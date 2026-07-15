@@ -8,7 +8,7 @@ import { ENTITY_SESSION, ENTITY_TYPES } from '@hexly/web-entity';
  * frontmatter keys and Hexly provenance (`hexly.sourcePath`) an import brought across. Read-only,
  * not an editor. Renders nothing when the Entity carries no EntityDocument.
  *
- * A **Structured Field**'s value is skipped (ADR-0050): it is a document with its own View.
+ * A **Structured Data Type**'s value is skipped (ADR-0050): it is a document with its own View.
  */
 @Component({
   selector: 'app-entity-metadata',
@@ -36,7 +36,7 @@ export class EntityMetadata {
   private readonly session = inject(ENTITY_SESSION);
   private readonly types = inject(ENTITY_TYPES);
 
-  /** The EntityDocument keys a Structured Field types — a document, shown on its own View, never here. */
+  /** The EntityDocument keys a Structured Data Type types — a document, shown on its own View, never here. */
   private readonly structuredKeys = computed(
     () =>
       new Set(

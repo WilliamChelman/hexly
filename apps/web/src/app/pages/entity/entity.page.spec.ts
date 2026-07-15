@@ -156,7 +156,7 @@ describe('EntityPage routing', () => {
     expect(el.querySelector('app-map-canvas')).toBeNull();
   });
 
-  it('restores a Structured Field’s View — Field key and all — from ?view (ADR-0050)', async () => {
+  it('restores the View of a Field of a Structured Data Type — Field key and all — from ?view (ADR-0050)', async () => {
     // A map View is bound to the Field it renders, so the param carries both: a reload or a shared link
     // has to land on *this* grid, not merely on "a map".
     await configure('m1', { view: viewInstanceKey({ viewId: CORE_VIEW_MAP, fieldKey: HEX_GRID_FIELD.key }) });

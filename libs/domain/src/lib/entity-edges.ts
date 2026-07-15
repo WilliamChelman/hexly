@@ -4,7 +4,13 @@
  */
 
 import { EntityType } from './entity';
-import { entityLinkFieldValues, FieldSchema, EntityDocument, readField, resolvedStructuredFields } from './field';
+import {
+  entityLinkFieldValues,
+  FieldSchema,
+  EntityDocument,
+  readField,
+  resolvedStructuredDataTypeFields,
+} from './field';
 import type { StructuredDataTypeSet } from './structured-data-type';
 
 /** What an edge points at: another Entity, or an Asset (CONTEXT.md → Asset). */
@@ -61,13 +67,13 @@ export interface EntityReferences {
 /**
  * Every edge the doc expresses, deduplicated on `(targetKind, targetId, descriptor)`: resolved
  * against the Entity's `fields`, each typed **Entity-Link Field** value (#190) and each **Structured
- * Field**'s own harvest (a map's placements, a document's inline links and image Assets, ADR-0050,
+ * Data Type** Field's own harvest (a map's placements, a document's inline links and image Assets, ADR-0050,
  * ADR-0051). Nothing records *where* a link was expressed, so a prose mention, a map placement, and a
  * Field link to the same target collapse to one edge, while two descriptors to that target stay two.
  *
  * `doc` is the EntityDocument map, `fields` its resolved Field schema set ({@link resolveFields}) and
- * `dataTypes` the host-composed **Structured Field** set (ADR-0050). The domain names no extractor of
- * its own: prose reaches this loop as the `core.rich-content` data-type, exactly as a grid does.
+ * `dataTypes` the host-composed **Structured Data Type** set (ADR-0050). The domain names no extractor
+ * of its own: prose reaches this loop as the `core.rich-content` data-type, exactly as a grid does.
  */
 export function harvestEdges(
   doc: EntityDocument,
@@ -89,10 +95,10 @@ export function harvestEdges(
   // A typed Entity-Link Field value is a descriptor-less edge to its target (#190).
   for (const { value } of entityLinkFieldValues(fields, doc)) entityEdge(value.entityId, null);
 
-  // A Structured Field harvests its own (ADR-0050): the value goes to the data-type the host
-  // registered, and the edges come back — the domain never learns what is inside it. Prose's inline
+  // A Field of a Structured Data Type harvests its own (ADR-0050): the value goes to the data-type the
+  // host registered, and the edges come back — the domain never learns what is inside it. Prose's inline
   // links and image Assets arrive this way now too, through `core.rich-content` (ADR-0051).
-  for (const { field, dataType } of resolvedStructuredFields(fields, dataTypes))
+  for (const { field, dataType } of resolvedStructuredDataTypeFields(fields, dataTypes))
     for (const edge of dataType.harvestEdges?.(readField(doc, field)) ?? []) add(edge);
 
   return [...edges.values()];
