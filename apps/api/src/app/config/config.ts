@@ -51,7 +51,7 @@ function isValidSize(input: string): boolean {
 
 /**
  * Compose the `features.plugin` schema from the bundled Plugins' own schemas (ADR-0052) — mirroring how
- * `BUNDLED_PLUGIN_TYPES` composes from the bundled set. Each Plugin's block is `prefault`ed so an absent
+ * `enabledPluginTypes` composes from the bundled set. Each Plugin's block is `prefault`ed so an absent
  * one resolves to its field defaults (a Plugin the file never names is **enabled**), and the map itself
  * is `prefault`ed so an absent `features.plugin` yields every Plugin enabled. An unknown Plugin id is
  * stripped (no key in the shape) and an unknown sub-key is stripped by the Plugin's own object schema —

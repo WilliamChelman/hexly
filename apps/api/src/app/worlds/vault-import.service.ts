@@ -17,7 +17,6 @@ import { bodyToFields, splitFrontmatter } from '@hexly/obsidian';
 import { AssetsService } from '../assets/assets.service';
 import { DB, type Db } from '../db/db';
 import { EntitiesService } from '../entities/entities.service';
-import { DEFAULT_ENTITY_TYPE } from '../entities/bundled-plugins';
 import { TypeFieldRegistry } from '../entities/type-field-registry';
 import { VaultUnzipper } from './vault-unzipper';
 import { WorldsService } from './worlds.service';
@@ -89,6 +88,9 @@ export class VaultImportService {
     const index = new NoteIndex(notes);
     const assetIndex = new AssetIndex(assetFiles);
     const dataTypes = this.typeFields.structuredDataTypes;
+    // The "bare Note" default (ADR-0051); `undefined` when content is disabled (ADR-0052), so an
+    // unstamped file lands typeless.
+    const defaultType = this.typeFields.defaultType;
     let linksResolved = 0;
     let linksDangling = 0;
     let assetsStored = 0;
@@ -117,12 +119,12 @@ export class VaultImportService {
           degrade,
         };
 
-        const types = toTypes(note.frontmatter[HEXLY_TYPE_KEY]);
+        const types = toTypes(note.frontmatter[HEXLY_TYPE_KEY], defaultType);
         // Resolve body Fields from the stamped types, with the default type appended as the lowest-
         // priority fallback: a foreign or unregistered-type note still lands its prose in `content`
         // rather than losing it, while a type that declares `content` itself keeps its own projection
-        // (resolveFields dedupes by key, primary type first).
-        const fields = resolveFields(this.typeFields.resolver, [...types, DEFAULT_ENTITY_TYPE]);
+        // (resolveFields dedupes by key, primary type first). No default type → no fallback.
+        const fields = resolveFields(this.typeFields.resolver, defaultType ? [...types, defaultType] : [...types]);
         const bodyValues = bodyToFields({ body: note.body, fields, dataTypes, context });
 
         const { tags, ...rest } = note.frontmatter;
@@ -259,11 +261,12 @@ function isExternalUrl(src: string): boolean {
 
 /**
  * Frontmatter `hexly.type` → the Entity's ordered Type set. Ids are validated for shape only; none
- * is resolved against a registry. Anything not a well-formed set degrades the *whole* set to a plain
- * Note rather than failing the file — never half-applied.
+ * is resolved against a registry. Anything not a well-formed set degrades the *whole* set to the
+ * default rather than failing the file — never half-applied. No default type (content disabled,
+ * ADR-0052) falls back to an empty set, so an unstamped file imports typeless.
  */
-function toTypes(raw: unknown): readonly EntityType[] {
-  return typesSchema.catch([DEFAULT_ENTITY_TYPE]).parse(Array.isArray(raw) ? raw : []);
+function toTypes(raw: unknown, defaultType: EntityType | undefined): readonly EntityType[] {
+  return typesSchema.catch(defaultType ? [defaultType] : []).parse(Array.isArray(raw) ? raw : []);
 }
 
 /**
