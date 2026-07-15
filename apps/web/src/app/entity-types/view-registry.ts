@@ -18,17 +18,10 @@ export class ViewRegistry {
   private readonly fetched = signal<ReadonlyMap<ViewId, Type<unknown>>>(new Map());
   private readonly inFlight = new Map<ViewId, Promise<void>>();
 
-  /**
-   * Which bundled Plugin owns each View id (ADR-0052, Seam 3) — the seam that drops a disabled Plugin's
-   * Views (and, through {@link forDataType}, the data-types they render). A View absent from this map is
-   * app-owned (the generic Field View, registered from the entity chunk) and never Plugin-gated.
-   */
+  /** View id → owning Plugin id (ADR-0052, Seam 3); a View absent from it is app-owned and never Plugin-gated. */
   private readonly viewOwners = new Map<ViewId, string>(inject(PLUGIN_VIEW_OWNERS, { optional: true }) ?? []);
 
-  /**
-   * The enabled-Plugin set signal, or `null` when no config channel is wired (nothing filtered). Read
-   * through {@link isActive} so the derived outputs recompute against a changing enabled set (ADR-0052).
-   */
+  /** The enabled-Plugin set (ADR-0052, Seam 3), or `null` when no config channel is wired (nothing filtered). */
   private readonly enabledPlugins = inject(ENABLED_PLUGINS, { optional: true });
 
   /** Every *enabled* View, in registration order (the bundled plugins' first, then core). */
@@ -40,10 +33,7 @@ export class ViewRegistry {
     for (const def of inject(PLUGIN_VIEWS, { optional: true }) ?? []) this.register(def);
   }
 
-  /**
-   * Whether the Plugin owning `id` is enabled — the predicate the reactive outputs filter through. An
-   * app-owned View (no owner) is always active; with no config channel wired nothing is filtered.
-   */
+  /** Whether the Plugin owning `id` is enabled — the predicate the reactive outputs filter through (ADR-0052). */
   private isActive(id: ViewId): boolean {
     const owner = this.viewOwners.get(id);
     if (owner == null) return true;
@@ -67,10 +57,8 @@ export class ViewRegistry {
 
   /**
    * The View that renders a **Structured Field** of data-type `kind` (`core.hex-grid` → the map View),
-   * or `undefined` when this build registers none — or the Plugin that ships it is **disabled**. The
-   * Plugin that ships the data-type ships the View, so the two are absent together (ADR-0050); disabling
-   * that Plugin makes even an *enabled* Type's placed Field of that kind degrade to a plain value
-   * (ADR-0052), since `viewsFor` reaches its View through here.
+   * or `undefined` when this build registers none — or ships it from a **disabled** Plugin. So even an
+   * enabled Type's placed Field of a disabled kind degrades to a plain value (ADR-0050, ADR-0052).
    */
   forDataType(kind: string | null | undefined): ViewDefinition | undefined {
     if (kind == null) return undefined;
@@ -78,12 +66,9 @@ export class ViewRegistry {
   }
 
   /**
-   * The **Structured Field** data-types a World Owner may declare a Field of, each with the copy
-   * naming it in the World Types editor's picker.
-   *
-   * Derived from the *enabled* Views, not the data-type set: a data-type with no View is a Field whose
-   * value has no editor, and a disabled Plugin's data-type is not offerable — a World Owner cannot
-   * declare a Field this Instance cannot render (ADR-0052).
+   * The **Structured Field** data-types a World Owner may declare a Field of, named for the picker.
+   * Derived from the *enabled* Views: a disabled Plugin's data-type is not offerable — a World Owner
+   * cannot declare a Field this Instance cannot render (ADR-0052).
    */
   offerableDataTypes(): { kind: StructuredDataTypeId; labelKey: string }[] {
     return this.all().flatMap((d) => (d.dataType ? [{ kind: d.dataType, labelKey: d.dataTypeLabelKey }] : []));

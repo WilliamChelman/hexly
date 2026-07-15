@@ -43,18 +43,12 @@ export const PLUGIN_VIEWS = new InjectionToken<readonly ViewDefinition[]>('hexly
 export const PLUGIN_DATA_TYPES = new InjectionToken<readonly StructuredDataType[]>('hexly.plugin.dataTypes');
 
 /**
- * Which bundled Plugin owns each contributed Entity Type, as `[typeId, PLUGIN_ID]` tuples (ADR-0052,
- * Seam 3) — the web mirror of the server's `BUNDLED_PLUGIN_TYPE_OWNERS`. The `TypeRegistry` folds these
- * into a map so it can drop a *disabled* Plugin's Types against the enabled-set signal, while a Type with
- * no owner (a World's user-defined one, registered at runtime) is never Plugin-gated.
+ * `[typeId, PLUGIN_ID]` tuples the `TypeRegistry` folds into a map to drop a disabled Plugin's Types
+ * (ADR-0052, Seam 3) — the web mirror of the server's `BUNDLED_PLUGIN_TYPE_OWNERS`.
  */
 export const PLUGIN_TYPE_OWNERS = new InjectionToken<readonly (readonly [string, string])[]>('hexly.plugin.typeOwners');
 
-/**
- * Which bundled Plugin owns each contributed {@link ViewDefinition}, as `[viewId, PLUGIN_ID]` tuples
- * (ADR-0052, Seam 3). The `ViewRegistry` folds these into a map so a disabled Plugin's Views — and the
- * data-types they render — fall away, while the app-owned core Views (registered with no owner) stay.
- */
+/** `[viewId, PLUGIN_ID]` tuples the `ViewRegistry` folds into a map to drop a disabled Plugin's Views (ADR-0052, Seam 3). */
 export const PLUGIN_VIEW_OWNERS = new InjectionToken<readonly (readonly [ViewId, string])[]>('hexly.plugin.viewOwners');
 
 /**

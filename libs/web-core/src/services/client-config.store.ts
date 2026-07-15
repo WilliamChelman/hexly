@@ -50,15 +50,11 @@ export class ClientConfigStore {
 }
 
 /**
- * The enabled-Plugin set as a bare reactive signal (ADR-0052, Seam 3) — the seam the Type/View
- * registries filter their contributions against. Deliberately *not* the whole {@link ClientConfigStore}:
- * the registries need only the signal, and depending on the store would drag its `HttpClient` into every
- * registry test. Provided by {@link provideClientConfig}; **absent means "no config channel wired"**, at
- * which the registries filter nothing (today's behaviour, and every test that composes plugins without
- * booting the channel). A *present* signal is authoritative for the registries: they filter by exactly
- * the ids it holds. What an *empty* present set means is the store's concern, not theirs — a genuine
- * all-Plugins-off config, or (per {@link ClientConfigStore.init}) a fetch that failed or has not yet run,
- * degrading to the boot defaults.
+ * The enabled-Plugin set as a bare reactive signal (ADR-0052, Seam 3) — what the Type/View registries
+ * filter against. A signal, not the whole {@link ClientConfigStore}, so the registries need not drag its
+ * `HttpClient` into every test. Provided by {@link provideClientConfig}; absent means "no config channel
+ * wired", at which the registries filter nothing (today's behaviour). What an empty present set means —
+ * all-Plugins-off, or a failed/not-yet-run fetch — is the store's concern (see {@link ClientConfigStore.init}).
  */
 export const ENABLED_PLUGINS = new InjectionToken<Signal<ReadonlySet<string>>>('hexly.config.enabledPlugins');
 
