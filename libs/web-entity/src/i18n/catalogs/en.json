@@ -8,5 +8,13 @@
     "search": "Search entities…",
     "empty": "No entities",
     "unavailable": "Unavailable"
+  },
+  "generic": {
+    "eyebrow": "Entity",
+    "titleLabel": "Entity name",
+    "rename": "Rename",
+    "editorLabel": "Entity content",
+    "create": "New entity",
+    "untitled": "Untitled entity"
   }
 }

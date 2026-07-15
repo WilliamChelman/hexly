@@ -1,6 +1,6 @@
 import { EntityType, FieldSchema } from '@hexly/domain';
 import { IconName } from '@hexly/web-ui';
-import { ViewPlacement } from './view-definition';
+import { CORE_VIEW_FIELDS, ViewPlacement } from './view-definition';
 
 /**
  * The transloco *keys* a type contributes to its page chrome (resolved live by
@@ -67,3 +67,29 @@ export interface TypeDefinition {
    */
   readonly graphColorToken: string;
 }
+
+/**
+ * The **synthetic generic default** the `TypeRegistry.resolve()` returns for an absent, unregistered, or
+ * **disabled** primary type (ADR-0052): a neutral icon and generic `fields`-scope labels, so chrome
+ * (icon, headline, the create/rename copy) always resolves to *something* — never `undefined`, never a
+ * throw. It lives here, framework-side, rather than in the app, because content is a disableable Plugin
+ * now and `core.note` is no longer a guaranteed anchor — and the app authors no Type of its own (ADR-0051).
+ *
+ * It deliberately does **not** read `entities.defaultType`: an unregistered Type must read as *absent*,
+ * not masquerade as whatever this Instance creates by default. Its lone View is the generic Field View,
+ * the same floor `viewsFor` gives an unregistered type.
+ */
+export const GENERIC_TYPE_DEFINITION: TypeDefinition = {
+  id: '' as EntityType,
+  icon: 'label',
+  views: [CORE_VIEW_FIELDS],
+  graphColorToken: '--color-ink-muted',
+  labels: {
+    eyebrow: 'fields.generic.eyebrow',
+    titleLabel: 'fields.generic.titleLabel',
+    rename: 'fields.generic.rename',
+    editorLabel: 'fields.generic.editorLabel',
+    create: 'fields.generic.create',
+    untitled: 'fields.generic.untitled',
+  },
+};

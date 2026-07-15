@@ -8,5 +8,13 @@
     "search": "Rechercher des entités…",
     "empty": "Aucune entité",
     "unavailable": "Indisponible"
+  },
+  "generic": {
+    "eyebrow": "Entité",
+    "titleLabel": "Nom de l’entité",
+    "rename": "Renommer",
+    "editorLabel": "Contenu de l’entité",
+    "create": "Nouvelle entité",
+    "untitled": "Entité sans titre"
   }
 }

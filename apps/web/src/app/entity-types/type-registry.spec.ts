@@ -1,6 +1,8 @@
 import { provideTranslocoTesting } from '../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
+import { signal, WritableSignal } from '@angular/core';
 import { FieldSchema } from '@hexly/domain';
+import { ENABLED_PLUGINS } from '@hexly/web-core';
 import { CORE_HEX_GRID, PLUGIN_ID as HEXMAP_PLUGIN_ID } from '@hexly/plugin-hexmap';
 import { CORE_RICH_CONTENT, PLUGIN_ID as CONTENT_PLUGIN_ID } from '@hexly/plugin-content';
 import { DND_MONSTER, PLUGIN_ID as DND_PLUGIN_ID } from '@hexly/plugin-dnd';
@@ -92,10 +94,16 @@ describe('TypeRegistry', () => {
     expect(registry.get(undefined)).toBeUndefined();
   });
 
-  it('resolves an unregistered or absent type to the core note fallback', () => {
+  it('resolves an unregistered or absent type to synthetic generic chrome — never the note, never a throw', () => {
+    // The `?? core.note` crutch is gone (ADR-0052): content is disableable now, so no Type is
+    // guaranteed present. A registered type resolves to itself; anything else to the generic default —
+    // its own View list the generic Field View, and its labels generic keys, not `core.note`'s.
     expect(registry.resolve('core.hexmap').id).toBe('core.hexmap');
-    expect(registry.resolve('pathfinder.monster').id).toBe('core.note');
-    expect(registry.resolve(undefined).id).toBe('core.note');
+    expect(registry.resolve('pathfinder.monster').id).not.toBe('core.note');
+    expect(registry.resolve('pathfinder.monster').views).toEqual([CORE_VIEW_FIELDS]);
+    expect(registry.resolve(undefined).views).toEqual([CORE_VIEW_FIELDS]);
+    // The generic keys resolve through the app catalog, so chrome reads as a sensible noun, not broken.
+    expect(registry.chromeLabel('pathfinder.monster', 'create')).toBe('New entity');
   });
 
   it('unions the ordered Views a type set affords — primary first, deduped', () => {
@@ -365,9 +373,100 @@ describe('TypeRegistry without the Hex Map plugin', () => {
     expect(viewKeys(registry.viewsFor(['world.deity']))).toEqual([CORE_VIEW_FIELDS]);
   });
 
-  it('still renders a Hex Map’s chrome — the core note’s, the always-registered fallback', () => {
+  it('still renders a Hex Map’s chrome — the synthetic generic default, no longer the note’s', () => {
     // `resolve()` never returns undefined, so the header, card, and dashboard have an icon and labels
-    // to draw for an Entity whose primary type this build cannot name.
-    expect(registry.resolve('core.hexmap').id).toBe('core.note');
+    // to draw for an Entity whose primary type this build cannot name. The fallback is generic chrome
+    // now, not `core.note` (ADR-0052): content is a disableable Plugin, no longer a guaranteed anchor.
+    const chrome = registry.resolve('core.hexmap');
+    expect(chrome.id).not.toBe('core.note');
+    expect(chrome.icon).toBe('label');
+    expect(chrome.views).toEqual([CORE_VIEW_FIELDS]);
+  });
+});
+
+/**
+ * ADR-0052, Seam 3: every bundled plugin is composed, but the enabled-set signal disables some — the
+ * runtime "disabled = never bundled" that a real Instance's `hexly.yml` drives. "Disabled" must read
+ * identically to "never compiled in" (the describe above), and it must recompute reactively.
+ */
+describe('TypeRegistry filtering by the enabled-Plugin set', () => {
+  let registry: TypeRegistry;
+  let enabled: WritableSignal<ReadonlySet<string>>;
+
+  beforeEach(() => {
+    // Content + hexmap enabled, dnd disabled — the whole build composed, the signal turning dnd off.
+    enabled = signal<ReadonlySet<string>>(new Set([CONTENT_PLUGIN_ID, HEXMAP_PLUGIN_ID]));
+    TestBed.configureTestingModule({
+      imports: [provideTranslocoTesting()],
+      providers: [
+        providePluginContent(),
+        providePluginHexmap(),
+        providePluginDnd(),
+        { provide: ENABLED_PLUGINS, useValue: enabled },
+      ],
+    });
+    registry = TestBed.inject(TypeRegistry);
+  });
+
+  it('omits a disabled Plugin’s Types from `all`, `get`, and the View-toggle inputs', () => {
+    // `all` drops dnd.monster; the enabled Types stay in registration order.
+    expect(registry.all().map((d) => d.id)).toEqual(['core.note', 'core.hexmap']);
+    // A disabled Type reads as absent — never registered — so every caller degrades with no branch.
+    expect(registry.get(DND_MONSTER)).toBeUndefined();
+    // Its Entity affords the generic Field View alone (its values readable there), not the stat block.
+    expect(viewKeys(registry.viewsFor([DND_MONSTER]))).toEqual([CORE_VIEW_FIELDS]);
+    // The maps filter and the content-view type list omit it too.
+    expect(registry.typeIdsForView(CORE_VIEW_CONTENT)).toEqual(['core.note', 'core.hexmap']);
+  });
+
+  it('resolves a disabled Type to synthetic generic chrome — never a throw, never the note', () => {
+    const chrome = registry.resolve(DND_MONSTER);
+    expect(chrome.id).not.toBe('core.note');
+    expect(chrome.views).toEqual([CORE_VIEW_FIELDS]);
+    expect(registry.chromeLabel(DND_MONSTER, 'eyebrow')).toBe('Entity');
+  });
+
+  it('recomputes reactively when the enabled set changes after construction', () => {
+    // dnd off at boot…
+    expect(registry.all().map((d) => d.id)).not.toContain(DND_MONSTER);
+    // …a late-arriving set (initializer timing, or a future live push) turns it on with no re-register.
+    enabled.set(new Set([CONTENT_PLUGIN_ID, HEXMAP_PLUGIN_ID, DND_PLUGIN_ID]));
+    expect(registry.all().map((d) => d.id)).toContain(DND_MONSTER);
+    expect(viewKeys(registry.viewsFor([DND_MONSTER]))).toEqual([DND_VIEW_STAT_BLOCK, CORE_VIEW_CONTENT]);
+    // …and turning content off drops core.note, the once-privileged Type, like any other.
+    enabled.set(new Set([HEXMAP_PLUGIN_ID, DND_PLUGIN_ID]));
+    expect(registry.get('core.note')).toBeUndefined();
+  });
+
+  it('leaves a World’s user-defined Type untouched — it has no owning Plugin to disable', () => {
+    // A user-defined Type is data, not a Plugin's; it is never in the owner map, so the enabled set
+    // never gates it — even when it places a disabled Plugin's data-type (that Field just degrades).
+    registry.register({
+      id: 'world.deity' as TypeDefinition['id'],
+      icon: 'label',
+      labelText: 'Deity',
+      views: [CORE_VIEW_FIELDS],
+      graphColorToken: '--color-ink-muted',
+    });
+    enabled.set(new Set()); // every Plugin off — the coherent generic-everywhere state
+    expect(registry.get('world.deity')?.labelText).toBe('Deity');
+    expect(registry.all().map((d) => d.id)).toEqual(['world.deity']);
+  });
+
+  it('degrades a disabled Plugin’s placed Field to no View — even on an enabled Type', () => {
+    // With hexmap disabled, an *enabled* user-defined Type placing `core.hex-grid` resolves its grid
+    // View against the disabled Plugin's data-type: no View, so the Field is a plain value (ADR-0052).
+    enabled.set(new Set([CONTENT_PLUGIN_ID])); // hexmap off, its View gone from the ViewRegistry
+    registry.register({
+      id: 'world.realm' as TypeDefinition['id'],
+      icon: 'label',
+      labelText: 'Realm',
+      views: [CORE_VIEW_FIELDS, { field: 'battlemap' }],
+      fields: [
+        { key: 'battlemap', label: 'Battlemap', dataType: { kind: CORE_HEX_GRID }, required: false, facetable: false },
+      ],
+      graphColorToken: '--color-ink-muted',
+    });
+    expect(viewKeys(registry.viewsFor(['world.realm']))).toEqual([CORE_VIEW_FIELDS]);
   });
 });
