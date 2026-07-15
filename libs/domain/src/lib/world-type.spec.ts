@@ -24,12 +24,28 @@ describe('userDefinedTypeIdSchema', () => {
 });
 
 describe('userDefinedTypeSchema', () => {
-  it('parses an id + label + fields, defaulting an omitted fields to empty', () => {
+  it('parses an id + label + fields, defaulting an omitted fields and fieldRefs to empty', () => {
     expect(userDefinedTypeSchema.parse({ id: 'world.faction', label: 'Faction' })).toEqual({
       id: 'world.faction',
       label: 'Faction',
       fields: [],
+      fieldRefs: [],
     });
+  });
+
+  it('references default Fields by id (fieldRefs, ADR-0054), deduping and preserving order', () => {
+    const parsed = userDefinedTypeSchema.parse({
+      id: 'world.deity',
+      label: 'Deity',
+      fieldRefs: ['world.element', 'world.domain', 'world.element'],
+    });
+    expect(parsed.fieldRefs).toEqual(['world.element', 'world.domain']);
+  });
+
+  it('rejects a fieldRef that is not a `namespace.id` key', () => {
+    expect(userDefinedTypeSchema.safeParse({ id: 'world.deity', label: 'Deity', fieldRefs: ['element'] }).success).toBe(
+      false,
+    );
   });
 
   it('carries a facetable Field through unchanged', () => {
@@ -88,15 +104,23 @@ describe('createUserDefinedTypeRequestSchema', () => {
     expect(createUserDefinedTypeRequestSchema.safeParse({ id: 'x.deity', label: 'Deity' }).success).toBe(false);
     expect(
       createUserDefinedTypeRequestSchema.parse({ id: 'world.deity', label: 'Deity', fields: [domainField] }),
-    ).toEqual({ id: 'world.deity', label: 'Deity', fields: [{ ...domainField, required: false, facetable: false }] });
+    ).toEqual({
+      id: 'world.deity',
+      label: 'Deity',
+      fields: [{ ...domainField, required: false, facetable: false }],
+      fieldRefs: [],
+    });
   });
 });
 
 describe('updateUserDefinedTypeRequestSchema', () => {
-  it('accepts a lone label or a lone fields patch', () => {
+  it('accepts a lone label, fields, or fieldRefs patch', () => {
     expect(updateUserDefinedTypeRequestSchema.parse({ label: 'Renamed' })).toEqual({ label: 'Renamed' });
     expect(updateUserDefinedTypeRequestSchema.parse({ fields: [alignmentField] })).toEqual({
       fields: [{ ...alignmentField, required: false, facetable: false }],
+    });
+    expect(updateUserDefinedTypeRequestSchema.parse({ fieldRefs: ['world.element'] })).toEqual({
+      fieldRefs: ['world.element'],
     });
   });
 

@@ -7,6 +7,7 @@
 import { z } from 'zod';
 import { entityTypeSchema, nameSchema } from './entity';
 import { FieldSchema, fieldSchemaSchema } from './field';
+import { dedupedFieldIdsSchema, fieldRefsSchema } from './field-id';
 import { isFieldViewPlacement, ViewPlacement, viewPlacementSchema } from './view-placement';
 
 /**
@@ -57,6 +58,8 @@ export const userDefinedTypeSchema = z
     id: userDefinedTypeIdSchema,
     label: nameSchema,
     fields: uniqueFieldsSchema.default([]),
+    // Default Fields referenced by id (ADR-0054), additive beside the inline `fields`.
+    fieldRefs: fieldRefsSchema,
     views: typeViewsSchema.optional(),
   })
   .refine(...placesOnlyItsOwnFields);
@@ -80,10 +83,12 @@ export const updateUserDefinedTypeRequestSchema = z
   .object({
     label: nameSchema.optional(),
     fields: uniqueFieldsSchema.optional(),
+    fieldRefs: dedupedFieldIdsSchema.optional(),
     views: typeViewsSchema.optional(),
   })
   .refine(
-    (body) => body.label !== undefined || body.fields !== undefined || body.views !== undefined,
+    (body) =>
+      body.label !== undefined || body.fields !== undefined || body.fieldRefs !== undefined || body.views !== undefined,
     'A type update must change something',
   )
   .refine(...placesOnlyItsOwnFields);
@@ -102,6 +107,11 @@ export interface AvailableType {
   readonly label: string;
   readonly source: AvailableTypeSource;
   readonly fields: readonly FieldSchema[];
+  /**
+   * The default Fields this type references by id (`fieldRefs`, ADR-0054), additive beside inline
+   * `fields`. Optional through the expand step, while consumers still read `fields`.
+   */
+  readonly fieldRefs?: readonly string[];
   /**
    * A **user-defined** type's ordered View list, as authored. Absent on a plugin type, which declares
    * its own in code, and on a user-defined type that never named an order (the host defaults it).

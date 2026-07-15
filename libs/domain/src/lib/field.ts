@@ -9,6 +9,7 @@
 
 import { z } from 'zod';
 import { entityTypeSchema } from './entity';
+import { fieldIdSchema } from './field-id';
 import {
   StructuredDataType,
   StructuredDataTypeId,
@@ -168,6 +169,50 @@ export const fieldSchemaSchema = z.object({
 export type FieldSchema = z.infer<typeof fieldSchemaSchema>;
 
 /**
+ * A first-class, reusable **Field** (CONTEXT.md → Field, ADR-0054): a {@link FieldSchema} promoted with a
+ * `namespace.id` {@link fieldIdSchema} `id`, its reuse handle. A Type Definition references one by id
+ * (`fieldRefs`) and an Entity attaches one by id (`fields`), so the same Field is a default of many types
+ * or rides an Entity whose types never named it. Structurally a superset of `FieldSchema`, so every
+ * downstream pure function that already takes a `FieldSchema[]` runs over a resolved `Field[]` unchanged.
+ */
+export const fieldSchema = fieldSchemaSchema.extend({ id: fieldIdSchema });
+
+export type Field = z.infer<typeof fieldSchema>;
+
+/**
+ * Declare a code-registered **Plugin field** (CONTEXT.md → Field, ADR-0054), mirroring `defineType`. A
+ * malformed field — a bare `id` (no namespace), or an unknown `dataType` kind (neither a built-in nor
+ * `namespace.id`-shaped) — throws at module load rather than at runtime. Membership of a structured
+ * data-type is *not* checked here (no schema could enumerate the plugin registering it); an unregistered
+ * kind is caught at resolution, as with a Structured Field.
+ */
+export function defineField(definition: {
+  readonly id: string;
+  readonly key: string;
+  readonly label: string;
+  readonly labelKey?: string;
+  readonly dataType: FieldDataType;
+  readonly required?: boolean;
+  readonly facetable?: boolean;
+  readonly vault?: { slot: VaultSlot };
+}): Field {
+  return Object.freeze(fieldSchema.parse(definition));
+}
+
+/**
+ * Resolve a Field by its `id` → its definition (CONTEXT.md → Field, ADR-0054). `undefined` for an
+ * unregistered id — a disabled plugin's Field, a deleted World-defined Field — which the effective-set
+ * resolver drops (forward-only), leaving the document value as plain EntityDocument.
+ */
+export type FieldResolver = (id: string) => Field | undefined;
+
+/**
+ * The default Field ids (`fieldRefs`) an Entity Type declares, keyed by type id. `undefined` for a type
+ * that declares none (a core type, an absent plugin) — it contributes nothing rather than throwing.
+ */
+export type TypeFieldRefsResolver = (typeId: string) => readonly string[] | undefined;
+
+/**
  * The Field schemas a single Entity Type declares, keyed by type id. `undefined` for a type that
  * declares no Fields (a core type, or an absent plugin) — it resolves to nothing rather than throwing.
  */
@@ -183,6 +228,38 @@ export function resolveFields(resolver: TypeFieldResolver, types: readonly strin
   for (const type of types)
     for (const fieldSchema of resolver(type) ?? [])
       if (!byKey.has(fieldSchema.key)) byKey.set(fieldSchema.key, fieldSchema);
+  return [...byKey.values()];
+}
+
+/**
+ * The **effective Field set** of an Entity (CONTEXT.md → Entity, ADR-0054): its directly-attached Fields
+ * (`fieldIds`) unioned with its types' default Fields (each type's `fieldRefs`, primary type first),
+ * every id resolved to a {@link Field} and the whole deduped by document `key`.
+ *
+ * Precedence, when two Fields resolve to one `key`: **instance > primary type > later types** — the
+ * most-specific source wins the key, the loser simply drops from the set (its document value is left
+ * untouched, forward-only tolerance). An id that resolves to nothing is skipped, so a disabled plugin or
+ * a deleted World Field degrades to a plain document value rather than erroring. Generalizes
+ * {@link resolveFields}' primary-wins rule.
+ *
+ * The returned order encodes that precedence (instance-attached first, then types primary→later); display
+ * and View ordering is a concern of the layer that consumes the set, not of resolution.
+ */
+export function resolveEffectiveFields(args: {
+  readonly types: readonly string[];
+  readonly fieldIds: readonly string[];
+  readonly fieldResolver: FieldResolver;
+  readonly typeFieldRefs: TypeFieldRefsResolver;
+}): Field[] {
+  const { types, fieldIds, fieldResolver, typeFieldRefs } = args;
+  const byKey = new Map<string, Field>();
+  const consider = (id: string) => {
+    const field = fieldResolver(id);
+    if (field && !byKey.has(field.key)) byKey.set(field.key, field);
+  };
+  // Instance attachments first (most specific), then each type's defaults in `types` order.
+  for (const id of fieldIds) consider(id);
+  for (const type of types) for (const id of typeFieldRefs(type) ?? []) consider(id);
   return [...byKey.values()];
 }
 
