@@ -4,6 +4,7 @@ export * from './lib/admin';
 export * from './lib/errors';
 export * from './lib/entity';
 export * from './lib/entity-document';
+export * from './lib/field-id';
 export * from './lib/field';
 export * from './lib/structured-data-type';
 export * from './lib/view-placement';

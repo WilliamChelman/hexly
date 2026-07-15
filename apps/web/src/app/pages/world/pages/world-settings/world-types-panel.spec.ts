@@ -22,7 +22,7 @@ describe('WorldTypesPanel', () => {
   let worlds: MockWorldsClient;
   let fixture: ComponentFixture<WorldTypesPanel>;
 
-  const created: UserDefinedType = { id: 'world.deity', label: 'Deity', fields: [] };
+  const created: UserDefinedType = { id: 'world.deity', label: 'Deity', fields: [], fieldRefs: [] };
 
   beforeEach(async () => {
     worlds = new MockWorldsClient();
@@ -117,6 +117,7 @@ describe('WorldTypesPanel', () => {
       id: 'world.deity',
       label: 'Deity',
       fields: [{ key: 'domain', label: 'Domain', dataType: { kind: 'string' }, required: false, facetable: true }],
+      fieldRefs: [],
       // A type with no Structured Field affords its generic Field view alone (ADR-0051): prose is a
       // Structured Field now, so a content View comes only from declaring one.
       views: [CORE_VIEW_FIELDS],
@@ -212,6 +213,7 @@ describe('WorldTypesPanel', () => {
             facetable: false,
           },
         ],
+        fieldRefs: [],
         // "Show as a view" defaults on, and the grid's View sits *after* the generic Field view.
         views: [CORE_VIEW_FIELDS, { field: 'battlemap' }],
       });
@@ -287,7 +289,7 @@ describe('WorldTypesPanel with the content plugin', () => {
   let worlds: MockWorldsClient;
   let fixture: ComponentFixture<WorldTypesPanel>;
 
-  const created: UserDefinedType = { id: 'world.saint', label: 'Saint', fields: [] };
+  const created: UserDefinedType = { id: 'world.saint', label: 'Saint', fields: [], fieldRefs: [] };
 
   beforeEach(async () => {
     worlds = new MockWorldsClient();
@@ -361,6 +363,7 @@ describe('WorldTypesPanel with the content plugin', () => {
         { key: 'content', label: 'Content', dataType: { kind: CORE_RICH_CONTENT }, required: false, facetable: false },
         { key: 'secrets', label: 'Secrets', dataType: { kind: CORE_RICH_CONTENT }, required: false, facetable: false },
       ],
+      fieldRefs: [],
       // Each prose Field's View is placed after the generic Field view, in declaration order.
       views: [CORE_VIEW_FIELDS, { field: 'content' }, { field: 'secrets' }],
     });

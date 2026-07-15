@@ -77,6 +77,8 @@ describe('World user-defined types endpoints', () => {
           { key: 'domain', label: 'Domain', dataType: { kind: 'string' }, required: false, facetable: true },
           { key: 'alignment', label: 'Alignment', dataType: { kind: 'string' }, required: false, facetable: false },
         ],
+        // `fieldRefs` (ADR-0054) echoes back defaulted-empty — accepted, not yet persisted (expand step).
+        fieldRefs: [],
       });
 
       // The available-types read carries it back (source `user`).

@@ -29,6 +29,9 @@ export class WorldTypeFields {
         id: row.id,
         label: row.label,
         fields: row.fields ?? [],
+        // `fieldRefs` (ADR-0054) has no stored column yet — the expand step keeps the inline `fields`
+        // path; persisting referenced Field ids is a later migrate step.
+        fieldRefs: [],
         // A stored `null` is "the author named no order", which the web defaults — so it stays absent
         // rather than becoming an empty list, which would mean "this type affords no View at all".
         ...(row.views ? { views: row.views } : {}),

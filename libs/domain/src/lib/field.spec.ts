@@ -1,16 +1,22 @@
 import { z } from 'zod';
 import {
+  defineField,
   deriveFieldFacets,
   entityLinkConstraints,
   entityLinkFieldValues,
+  Field,
+  FieldResolver,
   FieldSchema,
+  fieldSchema,
   fieldSchemaSchema,
   FieldValidation,
   EntityDocument,
   parseFieldFilter,
   parseFieldFilters,
   readField,
+  resolveEffectiveFields,
   resolveFields,
+  resolvedStructuredFields,
   unresolvedDataTypeErrors,
   validateFields,
   writeField,
@@ -131,6 +137,60 @@ describe('fieldSchemaSchema', () => {
   });
 });
 
+describe('Field — first-class, reusable (ADR-0054)', () => {
+  it('round-trips an `id` distinct from the `key` it lenses', () => {
+    const parsed = fieldSchema.parse({
+      id: 'world.element',
+      key: 'element',
+      label: 'Element',
+      dataType: { kind: 'enum', options: ['fire', 'ice'] },
+    });
+    // id (the reuse handle) and key (the document key) are deliberately two things (ADR-0033/0054).
+    expect(parsed.id).toBe('world.element');
+    expect(parsed.key).toBe('element');
+    expect({ required: parsed.required, facetable: parsed.facetable }).toEqual({ required: false, facetable: false });
+  });
+
+  describe('defineField — the code-registered Plugin field', () => {
+    it('returns a frozen Field mirroring defineType', () => {
+      const element = defineField({
+        id: 'core.element',
+        key: 'element',
+        label: 'Element',
+        labelKey: 'field.element',
+        dataType: { kind: 'enum', options: ['fire', 'ice'] },
+        facetable: true,
+      });
+      expect(element).toEqual({
+        id: 'core.element',
+        key: 'element',
+        label: 'Element',
+        labelKey: 'field.element',
+        dataType: { kind: 'enum', options: ['fire', 'ice'] },
+        required: false,
+        facetable: true,
+      });
+      expect(Object.isFrozen(element)).toBe(true);
+    });
+
+    it('throws at load on a bare id (no namespace)', () => {
+      expect(() =>
+        defineField({ id: 'element', key: 'element', label: 'Element', dataType: { kind: 'string' } }),
+      ).toThrow();
+    });
+
+    it('throws at load on an unknown data-type kind — but not on a well-formed structured one (membership is resolved later)', () => {
+      expect(() => defineField({ id: 'core.k', key: 'k', label: 'K', dataType: { kind: 'geo' } as never })).toThrow();
+      // A `namespace.id` kind is shape-valid here; an unregistered one dies at resolution, not load.
+      expect(
+        defineField({ id: 'core.map', key: 'grid', label: 'Grid', dataType: { kind: 'core.hex-grid' } }).dataType,
+      ).toEqual({
+        kind: 'core.hex-grid',
+      });
+    });
+  });
+});
+
 describe('resolveFields', () => {
   const beast = [field({ key: 'cr', dataType: { kind: 'number' } })];
   const place = [field({ key: 'region', dataType: { kind: 'string' } })];
@@ -154,6 +214,153 @@ describe('resolveFields', () => {
     // A missing/absent type resolves to nothing, so its EntityDocument is never surfaced as a Field.
     expect(resolveFields(resolver, ['core.note'])).toEqual([]);
     expect(resolveFields(resolver, [])).toEqual([]);
+  });
+});
+
+describe('resolveEffectiveFields — the effective-set resolver (ADR-0054)', () => {
+  // A small registry of first-class Fields, resolved by id.
+  const element = defineField({ id: 'world.element', key: 'element', label: 'Element', dataType: { kind: 'string' } });
+  const cr = defineField({ id: 'dnd.cr', key: 'cr', label: 'CR', dataType: { kind: 'number' } });
+  const region = defineField({ id: 'world.region', key: 'region', label: 'Region', dataType: { kind: 'string' } });
+  const registry = new Map<string, Field>([element, cr, region].map((f) => [f.id, f]));
+  const fieldResolver: FieldResolver = (id) => registry.get(id);
+
+  // The default `fieldRefs` of each type.
+  const typeFieldRefs = (type: string) =>
+    (({ 'dnd.beast': ['dnd.cr'], 'world.place': ['world.region'] }) as Record<string, string[]>)[type];
+
+  it('unions an Entity’s attached Fields with its types’ default Fields (types primary-first)', () => {
+    const effective = resolveEffectiveFields({
+      types: ['dnd.beast', 'world.place'],
+      fieldIds: ['world.element'],
+      fieldResolver,
+      typeFieldRefs,
+    });
+    // Instance attachment first, then each type's defaults in order.
+    expect(effective.map((f) => f.key)).toEqual(['element', 'cr', 'region']);
+  });
+
+  it('drops an id that resolves to nothing — a disabled plugin / deleted World Field degrades to a plain value', () => {
+    const effective = resolveEffectiveFields({
+      types: ['dnd.beast'],
+      fieldIds: ['world.gone'],
+      fieldResolver,
+      typeFieldRefs,
+    });
+    expect(effective.map((f) => f.id)).toEqual(['dnd.cr']);
+  });
+
+  describe('precedence on a shared key: instance > primary type > later types', () => {
+    // Three Fields that all lens the same document key `k`.
+    const instanceK = defineField({ id: 'world.k-inst', key: 'k', label: 'Instance', dataType: { kind: 'string' } });
+    const primaryK = defineField({ id: 'a.k-primary', key: 'k', label: 'Primary', dataType: { kind: 'string' } });
+    const laterK = defineField({ id: 'b.k-later', key: 'k', label: 'Later', dataType: { kind: 'string' } });
+    const kRegistry = new Map<string, Field>([instanceK, primaryK, laterK].map((f) => [f.id, f]));
+    const kResolver: FieldResolver = (id) => kRegistry.get(id);
+    const kTypeRefs = (t: string) =>
+      (({ 'a.type': ['a.k-primary'], 'b.type': ['b.k-later'] }) as Record<string, string[]>)[t];
+
+    it('keeps the primary type’s Field over a later type’s on the same key', () => {
+      const effective = resolveEffectiveFields({
+        types: ['a.type', 'b.type'],
+        fieldIds: [],
+        fieldResolver: kResolver,
+        typeFieldRefs: kTypeRefs,
+      });
+      expect(effective).toHaveLength(1);
+      expect(effective[0].id).toBe('a.k-primary');
+    });
+
+    it('lets an instance attachment win the key over both types — the loser drops, its value untouched', () => {
+      const effective = resolveEffectiveFields({
+        types: ['a.type', 'b.type'],
+        fieldIds: ['world.k-inst'],
+        fieldResolver: kResolver,
+        typeFieldRefs: kTypeRefs,
+      });
+      expect(effective).toHaveLength(1);
+      expect(effective[0].id).toBe('world.k-inst');
+      // The resolver never touches a document: it produces the set, and a losing Field's value stays put.
+      const doc = { k: 'a value the dropped type-default would have lensed' };
+      expect(doc.k).toBe('a value the dropped type-default would have lensed');
+    });
+  });
+
+  // The whole point of the expand step: every downstream pure function already takes a `FieldSchema[]`,
+  // and a resolved `Field[]` is a structural superset, so each runs over the effective set unchanged in
+  // spirit (AC: validation, facet derivation, link-edge harvest, structured-field resolution, vault
+  // projection over the effective set). A structured Field attached directly to an Entity — a deity's
+  // `battleMap` — and an instance-attached link both flow through as a type default would.
+  const battleMap = defineField({
+    id: 'core.battle-map',
+    key: 'battleMap',
+    label: 'Battle Map',
+    dataType: { kind: 'test.board' },
+  });
+  const lair = defineField({
+    id: 'world.lair',
+    key: 'lair',
+    label: 'Lair',
+    dataType: { kind: 'entityLink', targetTypes: ['world.place'] },
+  });
+  const richRegistry = new Map<string, Field>([...registry, [battleMap.id, battleMap], [lair.id, lair]]);
+  const effective = resolveEffectiveFields({
+    types: ['dnd.beast'],
+    fieldIds: ['core.battle-map', 'world.lair'],
+    fieldResolver: (id) => richRegistry.get(id),
+    typeFieldRefs,
+  });
+
+  it('runs forward-only validation over the effective set — required-if-required, tolerant at rest', () => {
+    // `cr` (a type default) present and well-typed passes; a missing required attached Field fails; an
+    // ill-typed value at rest is tolerated (never retroactively invalidated).
+    expect(validate(effective, { cr: 3 }, DATA_TYPES).ok).toBe(true);
+    const required = resolveEffectiveFields({
+      types: [],
+      fieldIds: ['world.element'],
+      fieldResolver: (id) => (id === 'world.element' ? { ...element, required: true } : undefined),
+      typeFieldRefs,
+    });
+    expect(validate(required, {}).errors).toEqual([{ key: 'element', code: 'required' }]);
+  });
+
+  it('derives facets, resolves structured Fields, and harvests link edges over the effective set', () => {
+    // Facets: only the facetable built-in (`cr` here is not facetable) — a structured Field never facets.
+    expect(deriveFieldFacets(effective, { cr: 3 })).toEqual([]);
+    // Structured-field resolution: the attached `battleMap` resolves against the host set.
+    expect(resolvedStructuredFields(effective, DATA_TYPES).map((r) => r.field.key)).toEqual(['battleMap']);
+    // Link-edge harvest: the attached `lair` link is harvested from the effective set like a type default.
+    expect(entityLinkFieldValues(effective, { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } })).toEqual([
+      { key: 'lair', value: { entityId: 'whisperwood', label: 'The Whisperwood' } },
+    ]);
+    expect(entityLinkConstraints(effective, { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } })).toEqual([
+      { key: 'lair', entityId: 'whisperwood', targetTypes: ['world.place'] },
+    ]);
+  });
+
+  it('resolves a Vault Projection slot over the effective set (a Field override wins the data-type default)', () => {
+    const framed = defineStructuredDataType({
+      id: 'test.framed',
+      valueSchema: z.unknown(),
+      empty: () => null,
+      vault: { slot: 'frontmatter' },
+    });
+    const dataTypes = structuredDataTypeSet([framed]);
+    const map = defineField({
+      id: 'core.map',
+      key: 'map',
+      label: 'Map',
+      dataType: { kind: 'test.framed' },
+      vault: { slot: 'omit' },
+    });
+    const [resolved] = resolveEffectiveFields({
+      types: [],
+      fieldIds: ['core.map'],
+      fieldResolver: (id) => (id === 'core.map' ? map : undefined),
+      typeFieldRefs,
+    });
+    const [structured] = resolvedStructuredFields([resolved], dataTypes);
+    expect(vaultSlotOf(resolved, structured.dataType)).toBe('omit');
   });
 });
 

@@ -399,6 +399,9 @@ export class WorldTypesPanel implements OnInit {
             id: `${USER_TYPE_NAMESPACE}.${d.slug.trim()}`,
             label,
             fields,
+            // The World Fields editor that authors `fieldRefs` (ADR-0054) is a later step; the inline
+            // `fields` path stays the one this panel drives.
+            fieldRefs: [],
             views,
           } satisfies CreateUserDefinedTypeRequest)
         : this.worlds.updateType(this.id(), d.editingId, { label, fields, views });

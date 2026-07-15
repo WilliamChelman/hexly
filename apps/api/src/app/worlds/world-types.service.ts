@@ -43,7 +43,15 @@ export class WorldTypesService {
     if (gate) return gate;
     if (this.types.list(worldId).some((type) => type.id === req.id)) return { status: 'conflict' };
     this.assertDataTypesResolve(req.fields);
-    const type: UserDefinedType = { id: req.id, label: req.label, fields: req.fields, views: req.views };
+    // `fieldRefs` (ADR-0054) is accepted but not yet persisted (no stored column — a later migrate step);
+    // it echoes back on the created value, then re-reads as empty until then.
+    const type: UserDefinedType = {
+      id: req.id,
+      label: req.label,
+      fields: req.fields,
+      fieldRefs: req.fieldRefs,
+      views: req.views,
+    };
     this.writes.createType(worldId, type);
     return { status: 'ok', value: type };
   }
