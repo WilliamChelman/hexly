@@ -1,8 +1,8 @@
 import { provideTranslocoTesting } from '../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
-import { signal, WritableSignal } from '@angular/core';
+import { Signal, signal, WritableSignal } from '@angular/core';
 import { FieldSchema } from '@hexly/domain';
-import { ENABLED_PLUGINS } from '@hexly/web-core';
+import { ClientConfigStore } from '@hexly/web-core';
 import { CORE_HEX_GRID, PLUGIN_ID as HEXMAP_PLUGIN_ID } from '@hexly/plugin-hexmap';
 import { CORE_RICH_CONTENT, PLUGIN_ID as CONTENT_PLUGIN_ID } from '@hexly/plugin-content';
 import { DND_MONSTER, PLUGIN_ID as DND_PLUGIN_ID } from '@hexly/plugin-dnd';
@@ -384,17 +384,27 @@ describe('TypeRegistry without the Hex Map plugin', () => {
   });
 });
 
+/** A loaded {@link ClientConfigStore} reporting exactly `enabled` — mutate the signal to drive reactivity. */
+function fakeClientConfig(enabled: Signal<ReadonlySet<string>>): ClientConfigStore {
+  return {
+    enabledPlugins: enabled,
+    defaultType: signal(undefined),
+    isPluginEnabled: (id: string) => enabled().has(id),
+    init: async () => undefined,
+  } as unknown as ClientConfigStore;
+}
+
 /**
- * ADR-0052, Seam 3: every bundled plugin is composed, but the enabled-set signal disables some — the
- * runtime "disabled = never bundled" that a real Instance's `hexly.yml` drives. "Disabled" must read
- * identically to "never compiled in" (the describe above), and it must recompute reactively.
+ * ADR-0052, Seam 3: every bundled plugin is composed, but the enabled set disables some — the runtime
+ * "disabled = never bundled" that a real Instance's `hexly.yml` drives. "Disabled" must read identically
+ * to "never compiled in" (the describe above), and it must recompute reactively.
  */
 describe('TypeRegistry filtering by the enabled-Plugin set', () => {
   let registry: TypeRegistry;
   let enabled: WritableSignal<ReadonlySet<string>>;
 
   beforeEach(() => {
-    // Content + hexmap enabled, dnd disabled — the whole build composed, the signal turning dnd off.
+    // Content + hexmap enabled, dnd disabled — the whole build composed, the loaded config turning dnd off.
     enabled = signal<ReadonlySet<string>>(new Set([CONTENT_PLUGIN_ID, HEXMAP_PLUGIN_ID]));
     TestBed.configureTestingModule({
       imports: [provideTranslocoTesting()],
@@ -402,7 +412,7 @@ describe('TypeRegistry filtering by the enabled-Plugin set', () => {
         providePluginContent(),
         providePluginHexmap(),
         providePluginDnd(),
-        { provide: ENABLED_PLUGINS, useValue: enabled },
+        { provide: ClientConfigStore, useValue: fakeClientConfig(enabled) },
       ],
     });
     registry = TestBed.inject(TypeRegistry);
