@@ -6,7 +6,7 @@ import {
   structuredDataTypeSet,
   StructuredDataTypeSet,
 } from '@hexly/domain';
-import { HexlyConfig, PluginConfigContribution } from '../config/config';
+import { HexlyConfig, PluginConfigContribution } from '../config';
 import { serverPluginContent } from '@hexly/plugin-content/server';
 import { serverPluginDnd } from '@hexly/plugin-dnd/server';
 import { serverPluginHexmap } from '@hexly/plugin-hexmap/server';

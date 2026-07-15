@@ -14,7 +14,7 @@ import {
 } from '../db/schema';
 import { NudgeBus } from '../events/nudge-bus';
 import { WriteOutbox } from '../events/write-outbox';
-import { loadConfig } from '../config/config';
+import { loadConfig } from '../config';
 import { BUNDLED_PLUGIN_CONFIGS } from './bundled-plugins';
 import { EntityChange, EntityWrites, MutateResult } from './entity-writes';
 import { TypeFieldRegistry } from './type-field-registry';

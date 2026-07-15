@@ -4,7 +4,7 @@ import { DND_MONSTER, PLUGIN_ID as DND_PLUGIN_ID } from '@hexly/plugin-dnd';
 import { serverPluginContent } from '@hexly/plugin-content/server';
 import { serverPluginHexmap } from '@hexly/plugin-hexmap/server';
 import { serverPluginDnd } from '@hexly/plugin-dnd/server';
-import { loadConfig } from '../config/config';
+import { loadConfig } from '../config';
 import {
   BUNDLED_PLUGIN_CONFIGS,
   BUNDLED_PLUGIN_TYPE_OWNERS,

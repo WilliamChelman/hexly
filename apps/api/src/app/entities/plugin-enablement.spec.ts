@@ -2,7 +2,7 @@ import { deriveSearchText, harvestEdges, resolveFields, VaultExportContext } fro
 import { entityToMarkdown } from '@hexly/obsidian';
 import { CORE_NOTE, PLUGIN_ID as CONTENT_PLUGIN_ID, tiptapContent } from '@hexly/plugin-content';
 import { CORE_HEX_GRID, PLUGIN_ID as HEXMAP_PLUGIN_ID } from '@hexly/plugin-hexmap';
-import { HexlyConfig, loadConfig } from '../config/config';
+import { HexlyConfig, loadConfig } from '../config';
 import { BUNDLED_PLUGIN_CONFIGS } from './bundled-plugins';
 import { TypeFieldRegistry } from './type-field-registry';
 

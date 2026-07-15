@@ -5,6 +5,12 @@ import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
 
 /**
+ * DI token for the loaded Instance Configuration (ADR-0036). Defined here, not in `config.module.ts`, so
+ * a controller the module registers (the `GET /api/config` channel) can inject it without a cycle.
+ */
+export const HEXLY_CONFIG = Symbol('HEXLY_CONFIG');
+
+/**
  * A bundled Plugin's contribution to config parsing (ADR-0052): its canonical id and its
  * `features.plugin.<id>` schema. The composition root folds the bundled set into this shape and hands
  * it to {@link loadConfig}, which merges the schemas — config.ts stays Plugin-aware without importing

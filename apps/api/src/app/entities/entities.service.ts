@@ -49,7 +49,7 @@ import {
   entityLinks,
   worlds,
 } from '../db/schema';
-import { HEXLY_CONFIG, HexlyConfig } from '../config/config.module';
+import { HEXLY_CONFIG, HexlyConfig } from '../config';
 import { EntityWrites, InsertEntityInput } from './entity-writes';
 import { TypeFieldRegistry } from './type-field-registry';
 import { WorldTypeFields } from './world-type-fields';

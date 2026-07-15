@@ -8,8 +8,7 @@ import {
   TypeFieldResolver,
   unresolvedDataTypeErrors,
 } from '@hexly/domain';
-import { HEXLY_CONFIG } from '../config/config.module';
-import { HexlyConfig } from '../config/config';
+import { HEXLY_CONFIG, HexlyConfig } from '../config';
 import {
   BUNDLED_STRUCTURED_DATA_TYPES,
   defaultEntityType,

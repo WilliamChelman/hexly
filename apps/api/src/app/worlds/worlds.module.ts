@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { MulterModule } from '@nestjs/platform-express';
 import { AssetsModule } from '../assets/assets.module';
 import { AuthModule } from '../auth/auth.module';
-import { HEXLY_CONFIG, type HexlyConfig } from '../config/config.module';
+import { HEXLY_CONFIG, type HexlyConfig } from '../config';
 import { DbModule } from '../db/db.module';
 import { EntitiesModule } from '../entities/entities.module';
 import { EventsModule } from '../events/events.module';

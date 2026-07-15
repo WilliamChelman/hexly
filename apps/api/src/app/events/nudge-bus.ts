@@ -7,7 +7,7 @@ import { entityAccess, tokenReachesEntity } from '../acl/entity-access';
 import { worldAccess, tokenReachesWorld } from '../acl/world-access';
 import { entities, worlds } from '../db/schema';
 import { DB, Db } from '../db/db';
-import { HEXLY_CONFIG, HexlyConfig } from '../config/config.module';
+import { HEXLY_CONFIG, HexlyConfig } from '../config';
 
 /**
  * The principal that opened a connection: either a signed-in user (cookie) or an anonymous
