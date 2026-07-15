@@ -143,6 +143,7 @@ export class EntitiesService {
         worldId: entities.worldId,
         name: entities.name,
         types: entities.types,
+        fields: entities.fields,
         tags: entities.tags,
         visibility: entities.visibility,
         version: entities.version,
@@ -443,10 +444,10 @@ export class EntitiesService {
   }
 
   create(ownerId: string, req: CreateEntityRequest): EntityDetail {
-    // The World comes first: a user-defined type's Fields resolve only within their World (#191),
-    // and the minted body is exactly the defaults those Fields declare (ADR-0050).
+    // The World comes first: a user-defined type's Fields resolve only within their World (#191), and the
+    // minted body is the defaults the effective Field set declares (ADR-0050, ADR-0054).
     const worldId = this.resolveWorldId(ownerId, req.worldId);
-    const fields = resolveFields(this.typeResolver(worldId), req.types);
+    const fields = this.worldTypeFields.effectiveFields(worldId, req.types, req.fields);
     const minted = emptyEntityDocument(fields, this.typeFields.structuredDataTypes);
     // Initial document seeds over the minted defaults. Ungated: like an import, a create establishes
     // at-rest data (the Field gate is save-only).
@@ -456,6 +457,7 @@ export class EntitiesService {
       worldId,
       name: req.name,
       types: req.types,
+      fields: req.fields,
       tags: req.tags,
       document: doc,
     });
@@ -486,8 +488,10 @@ export class EntitiesService {
       document: req.document,
       // Tags always fully replace (a save carries the full set).
       tags: req.tags,
-      // Types replace only when the save carries them; the current client omits them (ADR-0048).
+      // Types / attached Fields replace only when the save carries them; omitted leaves each
+      // untouched (ADR-0048, ADR-0054).
       types: req.types,
+      fields: req.fields,
       version: req.version,
     });
     switch (result.status) {
@@ -503,26 +507,27 @@ export class EntitiesService {
   }
 
   /**
-   * The forward-only Field gate on the write path (ADR-0048). A save carrying an explicit `types`
-   * set is an **active typed edit**, so its EntityDocument must satisfy those types' Fields: every
-   * required Field present, every present value well-typed. A save that omits `types` is a plain
-   * body edit and is left untouched — an already-stored (or imported) document with malformed
-   * Fields is never *retroactively* invalidated by an unrelated edit.
+   * The forward-only Field gate (ADR-0048, ADR-0054). A save carrying an explicit `types` or attached
+   * `fields` set is an active typed edit, so its EntityDocument must satisfy the *effective* set — an
+   * attached Field validates even when its types never named it (story 15). A save carrying neither is a
+   * plain body edit, left untouched, so a document at rest is never retroactively invalidated.
    */
   private gateTypedEdit(userId: string, id: string, req: SaveEntityRequest): void {
-    if (req.types === undefined) return;
-    // Resolve the Entity's World so its user-defined types' Fields resolve (#191). A missing row
-    // leaves `worldId` undefined — the save 404s in `mutate` regardless.
-    const worldId = this.db
-      .select({ worldId: entities.worldId })
+    if (req.types === undefined && req.fields === undefined) return;
+    // Read the stored World/types/fields so a partial save (types xor fields) validates against the
+    // effective set the row would hold. A missing row 404s in `mutate` regardless.
+    const stored = this.db
+      .select({ worldId: entities.worldId, types: entities.types, fields: entities.fields })
       .from(entities)
       .where(eq(entities.id, id))
-      .get()?.worldId;
-    this.assertTypedFieldsValid(userId, worldId, req.types, req.document);
+      .get();
+    const types = req.types ?? stored?.types ?? [];
+    const fieldIds = req.fields ?? stored?.fields ?? [];
+    this.assertTypedFieldsValid(userId, stored?.worldId, types, fieldIds, req.document);
   }
 
   /**
-   * Resolve `types` to their Fields and reject (400 {@link EntityErrorCode.InvalidFields}) when the
+   * Resolve the effective Field set and reject (400 {@link EntityErrorCode.InvalidFields}) when the
    * EntityDocument leaves a required Field unmet, ill-types a present value, or an Entity-Link Field
    * points at a *resolvable* Entity whose types miss its target-type constraint. A missing or
    * inaccessible link target stays inert — never an error.
@@ -531,9 +536,10 @@ export class EntitiesService {
     userId: string,
     worldId: string | undefined,
     types: readonly EntityType[],
+    fieldIds: readonly string[],
     metadata: EntityDocument,
   ): void {
-    const fields = resolveFields(this.typeResolver(worldId), types);
+    const fields = this.worldTypeFields.effectiveFields(worldId, types, fieldIds);
     const errors: FieldError[] = [
       ...validateFields(fields, metadata, this.typeFields.structuredDataTypes).errors,
       ...this.linkTargetTypeErrors(userId, fields, metadata),
@@ -978,6 +984,9 @@ function toSummary(row: SummaryColumns): EntitySummary {
     worldId: row.worldId,
     name: row.name,
     types: typesSchema.parse(row.types),
+    // Emitted only when non-empty (ADR-0054): an Entity attaching none stays `fields`-free, the optional
+    // interface shape the not-yet-migrated web tolerates.
+    ...(row.fields.length ? { fields: [...row.fields] } : {}),
     tags: tagsSchema.parse(row.tags),
     visibility: visibilitySchema.parse(row.visibility),
     version: row.version,

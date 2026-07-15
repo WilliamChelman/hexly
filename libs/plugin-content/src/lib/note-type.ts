@@ -12,9 +12,13 @@ import { CONTENT_FIELD } from './rich-content';
 /** The Note's Entity Type id. */
 export const CORE_NOTE = 'core.note';
 
-/** The Note type. `label` is the untranslated fallback; the web resolves the name through transloco. */
+/**
+ * The Note type. `label` is the untranslated fallback; the web resolves the name through transloco.
+ * References the prose Field by id (`fieldRefs`, ADR-0054); inline `fields` remain for the web.
+ */
 export const CORE_NOTE_TYPE: PluginTypeDefinition = defineType({
   id: CORE_NOTE,
   label: 'Note',
   fields: [CONTENT_FIELD],
+  fieldRefs: [CONTENT_FIELD.id],
 });

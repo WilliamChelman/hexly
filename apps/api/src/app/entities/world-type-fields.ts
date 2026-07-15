@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { AvailableType, TypeFieldResolver, UserDefinedType } from '@hexly/domain';
+import { AvailableType, FieldSchema, TypeFieldResolver, UserDefinedType } from '@hexly/domain';
 import { eq } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
 import { worldTypes } from '../db/schema';
@@ -54,5 +54,31 @@ export class WorldTypeFields {
       ...this.plugins.plugins(),
       ...this.list(worldId).map((type): AvailableType => ({ ...type, source: 'user' })),
     ];
+  }
+
+  /**
+   * An Entity's **effective Field set** (CONTEXT.md → Entity, ADR-0054): its attached Fields (`fieldIds`)
+   * unioned with its types' defaults, deduped by document `key` with precedence instance > primary type
+   * > later types. What every downstream pure function runs over, so an attached Field is validated,
+   * faceted, and edge-harvested like a type default. An id resolving to nothing (a disabled/absent
+   * plugin's Field, ADR-0052) is skipped, its value left untouched (forward-only).
+   */
+  effectiveFields(worldId: string | undefined, types: readonly string[], fieldIds: readonly string[]): FieldSchema[] {
+    const byKey = new Map<string, FieldSchema>();
+    const consider = (field: FieldSchema | undefined) => {
+      if (field && !byKey.has(field.key)) byKey.set(field.key, field);
+    };
+    // World-scoped when a `worldId` is in play so its user-defined types resolve too; else the plugin
+    // registry alone (a gate that runs before a row's World is known).
+    const inlineResolver = worldId ? this.resolverFor(worldId) : this.plugins.resolver;
+    // Attached Fields first (most specific), then each type's defaults primary-first — first-wins per key.
+    for (const id of fieldIds ?? []) consider(this.plugins.fieldResolver(id));
+    for (const type of types) {
+      // Plugin type: defaults via `fieldRefs` → the id resolver (ADR-0054). Inline fallback covers a
+      // User-defined type's Fields (no id until the World Fields step) and anything the resolver can't reach.
+      for (const id of this.plugins.typeFieldRefs(type) ?? []) consider(this.plugins.fieldResolver(id));
+      for (const field of inlineResolver(type) ?? []) consider(field);
+    }
+    return [...byKey.values()];
   }
 }

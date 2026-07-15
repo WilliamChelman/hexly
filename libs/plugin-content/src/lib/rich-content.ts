@@ -10,10 +10,11 @@
 
 import {
   assetHashFromUrl,
+  defineField,
   defineStructuredDataType,
   descriptorSchema,
   type EntityEdge,
-  type FieldSchema,
+  type Field,
   type StructuredDataTypeId,
 } from '@hexly/domain';
 import { visit } from './content-node';
@@ -70,17 +71,21 @@ export const RICH_CONTENT_DATA_TYPE = defineStructuredDataType({
   vault: { slot: 'body' },
 });
 
+/** The prose Field's reuse handle (ADR-0054) — its `id`, distinct from the `content` key it lenses. */
+export const CONTENT_FIELD_ID = 'core.content';
+
 /**
- * The canonical prose Field every Type that carries prose declares (ADR-0051): `core.note` and nothing
- * else, `core.hexmap` beside its grid, `dnd.monster` beside its stats. `resolveFields` dedupes by key,
- * so a multi-type Entity resolves exactly one — no rule, no enforcement.
+ * The canonical prose Field every Type that carries prose references by id (ADR-0051, ADR-0054):
+ * `core.note`, `core.hexmap` beside its grid, `dnd.monster` beside its stats. The effective-set
+ * resolver dedupes by `key`, so a multi-type Entity resolves exactly one.
  *
  * The header's View toggle reads its `labelKey` (a Structured Data Type's View being bound to the Field it
  * renders); the toggle moving onto the Field is the next ticket. Not `required`: an absent value opens
  * as an empty document and the first edit mints one. Never facetable — a document has no discrete
  * values to count.
  */
-export const CONTENT_FIELD: FieldSchema = Object.freeze({
+export const CONTENT_FIELD: Field = defineField({
+  id: CONTENT_FIELD_ID,
   key: 'content',
   // The untranslated fallback; the web resolves `labelKey` through transloco.
   label: 'Content',

@@ -1,6 +1,17 @@
-import { CORE_NOTE, CORE_RICH_CONTENT, PLUGIN_ID as CONTENT_PLUGIN_ID } from '@hexly/plugin-content';
-import { CORE_HEX_GRID, PLUGIN_ID as HEXMAP_PLUGIN_ID } from '@hexly/plugin-hexmap';
-import { DND_MONSTER, PLUGIN_ID as DND_PLUGIN_ID } from '@hexly/plugin-dnd';
+import {
+  CONTENT_FIELD_ID,
+  CORE_NOTE,
+  CORE_NOTE_TYPE,
+  CORE_RICH_CONTENT,
+  PLUGIN_ID as CONTENT_PLUGIN_ID,
+} from '@hexly/plugin-content';
+import {
+  CORE_HEX_GRID,
+  CORE_HEXMAP_TYPE,
+  HEX_GRID_FIELD_ID,
+  PLUGIN_ID as HEXMAP_PLUGIN_ID,
+} from '@hexly/plugin-hexmap';
+import { DND_MONSTER, DND_MONSTER_TYPE, PLUGIN_ID as DND_PLUGIN_ID } from '@hexly/plugin-dnd';
 import { serverPluginContent } from '@hexly/plugin-content/server';
 import { serverPluginHexmap } from '@hexly/plugin-hexmap/server';
 import { serverPluginDnd } from '@hexly/plugin-dnd/server';
@@ -9,6 +20,7 @@ import {
   BUNDLED_PLUGIN_CONFIGS,
   BUNDLED_PLUGIN_TYPE_OWNERS,
   BUNDLED_STRUCTURED_DATA_TYPE_OWNERS,
+  enabledPluginFields,
 } from './bundled-plugins';
 
 /** Plugin identity at the API composition root (ADR-0052, #215) — the owner associations, not filtering. */
@@ -35,6 +47,36 @@ describe('bundled plugin identity', () => {
     expect(BUNDLED_STRUCTURED_DATA_TYPE_OWNERS.get(CORE_HEX_GRID)).toBe(HEXMAP_PLUGIN_ID);
     // dnd contributes a Type but no data-type, so it owns none.
     expect([...BUNDLED_STRUCTURED_DATA_TYPE_OWNERS.values()]).not.toContain(DND_PLUGIN_ID);
+  });
+});
+
+/**
+ * The bundled **Plugin Fields** compose into the instance-wide id→Field set (ADR-0054, #226): the set
+ * an Entity's directly-attached `fields[]` and a Type's `fieldRefs` resolve against, folded from the
+ * plugins' `defineField` declarations exactly as the type and data-type sets are.
+ */
+describe('bundled Plugin Fields', () => {
+  const fields = () => enabledPluginFields(loadConfig(':memory:', BUNDLED_PLUGIN_CONFIGS));
+
+  it('folds each enabled Plugin’s registered Fields into one id-keyed set', () => {
+    const ids = fields().map((field) => field.id);
+    // content owns the prose Field; hexmap owns the grid Field; dnd owns the stat block.
+    expect(ids).toContain(CONTENT_FIELD_ID);
+    expect(ids).toContain(HEX_GRID_FIELD_ID);
+    expect(ids).toContain('dnd.challenge_rating');
+  });
+
+  it('declares each Field id exactly once — a plugin references another’s Field by id, never re-declares it', () => {
+    // The hexmap and dnd types both reference `core.content`, but only the content plugin declares it.
+    const ids = fields().map((field) => field.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids.filter((id) => id === CONTENT_FIELD_ID)).toHaveLength(1);
+  });
+
+  it('resolves every `fieldRef` a bundled Type references to a bundled Field', () => {
+    const byId = new Set(fields().map((field) => field.id));
+    for (const type of [CORE_NOTE_TYPE, CORE_HEXMAP_TYPE, DND_MONSTER_TYPE])
+      for (const ref of type.fieldRefs) expect(byId.has(ref)).toBe(true);
   });
 });
 

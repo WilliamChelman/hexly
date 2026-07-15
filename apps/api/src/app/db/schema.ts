@@ -76,6 +76,9 @@ export const entities = sqliteTable(
     // JSON array mirroring `tags`, unrolled with `json_each` for the Type facet and array-membership
     // filtering (ADR-0048).
     types: text('types', { mode: 'json' }).$type<string[]>().notNull(),
+    // The ids of Fields attached directly to this Entity (CONTEXT.md → Field, ADR-0054): the
+    // effective-set resolver unions these (instance precedence) with the types' default Fields.
+    fields: text('fields', { mode: 'json' }).$type<string[]>().notNull().default([]),
     tags: text('tags', { mode: 'json' }).$type<string[]>().notNull(),
     // private | shared.
     visibility: text('visibility').notNull().default('private'),

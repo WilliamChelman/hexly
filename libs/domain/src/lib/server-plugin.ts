@@ -11,6 +11,7 @@
  */
 
 import { EntityType } from './entity';
+import { Field } from './field';
 import { basePluginConfigSchema, PluginConfigSchema } from './plugin-config';
 import { PluginTypeDefinition } from './plugin-type';
 import { StructuredDataType } from './structured-data-type';
@@ -28,6 +29,12 @@ export interface ServerPlugin {
   readonly configSchema?: PluginConfigSchema;
   /** The code-registered Entity Types this plugin declares (ADR-0048). */
   readonly types?: readonly PluginTypeDefinition[];
+  /**
+   * The code-registered **Plugin Fields** this plugin declares (`defineField`, ADR-0054), folded into
+   * the instance-wide id→Field resolver like {@link types} and {@link dataTypes}. A plugin may reference
+   * another's Field by id without re-declaring it here.
+   */
+  readonly fields?: readonly Field[];
   /**
    * The **Structured Data Type**s this plugin's types name by `kind` (ADR-0050). The API bundles
    * the vault-enabled variant, since it resolves both the derive pass and the vault projection off this
@@ -51,6 +58,7 @@ export function serverPlugin(plugin: ServerPlugin): ServerPlugin {
   return Object.freeze({
     id: plugin.id,
     types: plugin.types ?? [],
+    fields: plugin.fields ?? [],
     dataTypes: plugin.dataTypes ?? [],
     defaultType: plugin.defaultType,
     configSchema: plugin.configSchema ?? basePluginConfigSchema,

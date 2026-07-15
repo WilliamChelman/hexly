@@ -1,6 +1,7 @@
 import {
   basePluginConfigSchema,
   EntityType,
+  Field,
   PluginTypeDefinition,
   ServerPlugin,
   structuredDataTypeSet,
@@ -37,6 +38,15 @@ function enabledPlugins(config: HexlyConfig): readonly ServerPlugin[] {
  */
 export function enabledPluginTypes(config: HexlyConfig): readonly PluginTypeDefinition[] {
   return enabledPlugins(config).flatMap((plugin) => plugin.types ?? []);
+}
+
+/**
+ * The enabled bundled Plugins' code-registered **Fields** (`defineField`, ADR-0054), folded into the
+ * id→Field resolver like the type and data-type sets. A disabled Plugin's Fields are absent, so a
+ * reference to one degrades to a plain **Entity Document** value (ADR-0052).
+ */
+export function enabledPluginFields(config: HexlyConfig): readonly Field[] {
+  return enabledPlugins(config).flatMap((plugin) => plugin.fields ?? []);
 }
 
 /**

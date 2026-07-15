@@ -5,10 +5,11 @@
  */
 
 import {
+  defineField,
   defineStructuredDataType,
   joinSearchText,
   type EntityEdge,
-  type FieldSchema,
+  type Field,
   type StructuredDataTypeId,
 } from '@hexly/domain';
 import { emptyHexMap, HexMap, hexMapSchema } from './hex-map';
@@ -51,8 +52,12 @@ export const HEX_GRID_DATA_TYPE = defineStructuredDataType({
   vault: { slot: 'frontmatter' },
 });
 
+/** The grid Field's reuse handle (ADR-0054) — its `id`, distinct from the `grid` key and the `core.hex-grid` Data Type. */
+export const HEX_GRID_FIELD_ID = 'core.grid';
+
 /**
- * The Field `core.hexmap` declares, and the EntityDocument slice the map editor reads and writes.
+ * The Field `core.hexmap` references, and the EntityDocument slice the map editor reads and writes — a
+ * first-class **Plugin Field** ({@link defineField}, ADR-0054).
  *
  * The header's View toggle reads its label, a Structured Data Type's View being bound to the Field it
  * renders (ADR-0050); `labelKey` keeps that toggle translated. A World Owner's own grid Field has no
@@ -61,7 +66,8 @@ export const HEX_GRID_DATA_TYPE = defineStructuredDataType({
  * Not `required`: an absent grid opens as an empty plane and the first edit mints one. Never
  * facetable — a document has no discrete values to count (ADR-0050).
  */
-export const HEX_GRID_FIELD: FieldSchema = Object.freeze({
+export const HEX_GRID_FIELD: Field = defineField({
+  id: HEX_GRID_FIELD_ID,
   key: 'grid',
   // The untranslated fallback the API's available-types list reports; the web resolves `labelKey`.
   label: 'Map',

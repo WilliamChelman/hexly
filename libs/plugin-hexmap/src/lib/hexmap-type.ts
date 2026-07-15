@@ -14,9 +14,14 @@ import { HEX_GRID_FIELD } from './hex-grid';
 /** The Hex Map's Entity Type id. */
 export const CORE_HEXMAP = 'core.hexmap';
 
-/** The Hex Map type. `label` is the untranslated fallback; the web resolves the name through transloco. */
+/**
+ * The Hex Map type. `label` is the untranslated fallback; the web resolves the name through transloco.
+ * References the prose (`core.content`) and grid Fields by id (`fieldRefs`, ADR-0054); inline `fields`
+ * remain for the web.
+ */
 export const CORE_HEXMAP_TYPE: PluginTypeDefinition = defineType({
   id: CORE_HEXMAP,
   label: 'Map',
   fields: [CONTENT_FIELD, HEX_GRID_FIELD],
+  fieldRefs: [CONTENT_FIELD.id, HEX_GRID_FIELD.id],
 });
