@@ -69,15 +69,10 @@ export interface TypeDefinition {
 }
 
 /**
- * The **synthetic generic default** the `TypeRegistry.resolve()` returns for an absent, unregistered, or
- * **disabled** primary type (ADR-0052): a neutral icon and generic `fields`-scope labels, so chrome
- * (icon, headline, the create/rename copy) always resolves to *something* — never `undefined`, never a
- * throw. It lives here, framework-side, rather than in the app, because content is a disableable Plugin
- * now and `core.note` is no longer a guaranteed anchor — and the app authors no Type of its own (ADR-0051).
- *
- * It deliberately does **not** read `entities.defaultType`: an unregistered Type must read as *absent*,
- * not masquerade as whatever this Instance creates by default. Its lone View is the generic Field View,
- * the same floor `viewsFor` gives an unregistered type.
+ * The synthetic generic default `TypeRegistry.resolve()` returns for an absent, unregistered, or disabled
+ * primary type (ADR-0052) — so chrome always resolves, never `undefined`, never a throw. Framework-side,
+ * not app-side, because the app authors no Type of its own (ADR-0051). Deliberately *not* fed by
+ * `entities.defaultType`: an unregistered Type must read as absent, not masquerade as the default.
  */
 export const GENERIC_TYPE_DEFINITION: TypeDefinition = {
   id: '' as EntityType,
