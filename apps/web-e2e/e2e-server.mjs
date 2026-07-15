@@ -10,7 +10,7 @@
  * http://localhost.
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -20,9 +20,12 @@ const mainJs = join(apiDist, 'main.js');
 const seedJs = join(apiDist, 'seed.js');
 const webIndex = join(workspaceRoot, 'dist', 'apps', 'web', 'browser', 'index.html');
 // A throwaway Instance Directory (ADR-0036): the API derives hexly.db inside it, and
-// with no hexly.yml present the Instance Configuration falls back to defaults.
-const instanceDir = join(workspaceRoot, 'tmp', 'web-e2e');
+// with no hexly.yml present the Instance Configuration falls back to defaults. A per-config
+// e2e run (ADR-0052, #221) points E2E_INSTANCE_DIR at its own throwaway dir so its written
+// hexly.yml — and DB — never collide with the default suite's.
+const instanceDir = process.env.E2E_INSTANCE_DIR ?? join(workspaceRoot, 'tmp', 'web-e2e');
 const dbPath = join(instanceDir, 'hexly.db');
+const configPath = join(instanceDir, 'hexly.yml');
 
 const user = {
   email: process.env.E2E_USER_EMAIL,
@@ -65,6 +68,15 @@ if (!user.email || !user.password || !user.name) {
 // (and never touches the real hexly.db).
 mkdirSync(dirname(dbPath), { recursive: true });
 for (const suffix of ['', '-wal', '-shm']) rmSync(dbPath + suffix, { force: true });
+
+// The Instance Configuration this run boots against (ADR-0052, #221): write the given hexly.yml
+// into the Instance Directory, or clear a stale one so an absent config means default-everything.
+// This is the harness capability #221 adds — a server booted against a real, written hexly.yml.
+if (process.env.E2E_CONFIG_YAML) {
+  writeFileSync(configPath, process.env.E2E_CONFIG_YAML);
+} else {
+  rmSync(configPath, { force: true });
+}
 
 const childEnv = {
   ...process.env,
