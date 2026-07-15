@@ -1,5 +1,14 @@
 import { HttpClient } from '@angular/common/http';
-import { EnvironmentProviders, inject, Injectable, provideAppInitializer, signal, Signal } from '@angular/core';
+import {
+  EnvironmentProviders,
+  inject,
+  Injectable,
+  InjectionToken,
+  makeEnvironmentProviders,
+  provideAppInitializer,
+  signal,
+  Signal,
+} from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { ClientConfig } from '@hexly/domain';
 
@@ -40,7 +49,23 @@ export class ClientConfigStore {
   }
 }
 
+/**
+ * The enabled-Plugin set as a bare reactive signal (ADR-0052, Seam 3) — the seam the Type/View
+ * registries filter their contributions against. Deliberately *not* the whole {@link ClientConfigStore}:
+ * the registries need only the signal, and depending on the store would drag its `HttpClient` into every
+ * registry test. Provided by {@link provideClientConfig}; **absent means "no config channel wired"**, at
+ * which the registries filter nothing (today's behaviour, and every test that composes plugins without
+ * booting the channel). A *present* signal is authoritative for the registries: they filter by exactly
+ * the ids it holds. What an *empty* present set means is the store's concern, not theirs — a genuine
+ * all-Plugins-off config, or (per {@link ClientConfigStore.init}) a fetch that failed or has not yet run,
+ * degrading to the boot defaults.
+ */
+export const ENABLED_PLUGINS = new InjectionToken<Signal<ReadonlySet<string>>>('hexly.config.enabledPlugins');
+
 /** Fetch the client config before bootstrap, so registries read a settled enabled set (ADR-0052). */
 export function provideClientConfig(): EnvironmentProviders {
-  return provideAppInitializer(() => inject(ClientConfigStore).init());
+  return makeEnvironmentProviders([
+    provideAppInitializer(() => inject(ClientConfigStore).init()),
+    { provide: ENABLED_PLUGINS, useFactory: () => inject(ClientConfigStore).enabledPlugins },
+  ]);
 }

@@ -1,6 +1,7 @@
-import { Injectable, Type, inject, signal } from '@angular/core';
+import { Injectable, Type, computed, inject, signal } from '@angular/core';
 import { StructuredDataTypeId } from '@hexly/domain';
-import { CORE_VIEW_FIELDS, PLUGIN_VIEWS, ViewDefinition, ViewId } from '@hexly/web-entity';
+import { ENABLED_PLUGINS } from '@hexly/web-core';
+import { CORE_VIEW_FIELDS, PLUGIN_VIEW_OWNERS, PLUGIN_VIEWS, ViewDefinition, ViewId } from '@hexly/web-entity';
 
 /**
  * Root registry mapping a {@link ViewId} to the component that renders it, the sibling of
@@ -17,8 +18,21 @@ export class ViewRegistry {
   private readonly fetched = signal<ReadonlyMap<ViewId, Type<unknown>>>(new Map());
   private readonly inFlight = new Map<ViewId, Promise<void>>();
 
-  /** Every registered View, in registration order (the bundled plugins' first, then core). */
-  readonly all = this.definitions.asReadonly();
+  /**
+   * Which bundled Plugin owns each View id (ADR-0052, Seam 3) — the seam that drops a disabled Plugin's
+   * Views (and, through {@link forDataType}, the data-types they render). A View absent from this map is
+   * app-owned (the generic Field View, registered from the entity chunk) and never Plugin-gated.
+   */
+  private readonly viewOwners = new Map<ViewId, string>(inject(PLUGIN_VIEW_OWNERS, { optional: true }) ?? []);
+
+  /**
+   * The enabled-Plugin set signal, or `null` when no config channel is wired (nothing filtered). Read
+   * through {@link isActive} so the derived outputs recompute against a changing enabled set (ADR-0052).
+   */
+  private readonly enabledPlugins = inject(ENABLED_PLUGINS, { optional: true });
+
+  /** Every *enabled* View, in registration order (the bundled plugins' first, then core). */
+  readonly all = computed(() => this.definitions().filter((def) => this.isActive(def.id)));
 
   constructor() {
     // Seeded at startup, unlike the core views: the header must know a View to draw its toggle, and
@@ -26,36 +40,53 @@ export class ViewRegistry {
     for (const def of inject(PLUGIN_VIEWS, { optional: true }) ?? []) this.register(def);
   }
 
+  /**
+   * Whether the Plugin owning `id` is enabled — the predicate the reactive outputs filter through. An
+   * app-owned View (no owner) is always active; with no config channel wired nothing is filtered.
+   */
+  private isActive(id: ViewId): boolean {
+    const owner = this.viewOwners.get(id);
+    if (owner == null) return true;
+    return this.enabledPlugins == null || this.enabledPlugins().has(owner);
+  }
+
   register(definition: ViewDefinition): () => void {
     this.definitions.update((list) => [...list, definition]);
     return () => this.definitions.update((list) => list.filter((d) => d !== definition));
   }
 
-  /** The definition registered for `id`, or `undefined` for an unregistered View. */
+  /**
+   * The definition registered for `id`, or `undefined` for an unregistered **or disabled** View — so a
+   * disabled Plugin's View reads as absent, and {@link resolve} falls to the generic Field View.
+   */
   get(id: ViewId | null | undefined): ViewDefinition | undefined {
     if (id == null) return undefined;
-    return this.definitions().find((d) => d.id === id);
+    const def = this.definitions().find((d) => d.id === id);
+    return def && this.isActive(def.id) ? def : undefined;
   }
 
   /**
    * The View that renders a **Structured Field** of data-type `kind` (`core.hex-grid` → the map View),
-   * or `undefined` when this build registers none: the plugin that ships the data-type ships the View,
-   * so the two are absent together (ADR-0050).
+   * or `undefined` when this build registers none — or the Plugin that ships it is **disabled**. The
+   * Plugin that ships the data-type ships the View, so the two are absent together (ADR-0050); disabling
+   * that Plugin makes even an *enabled* Type's placed Field of that kind degrade to a plain value
+   * (ADR-0052), since `viewsFor` reaches its View through here.
    */
   forDataType(kind: string | null | undefined): ViewDefinition | undefined {
     if (kind == null) return undefined;
-    return this.definitions().find((d) => d.dataType === kind);
+    return this.definitions().find((d) => d.dataType === kind && this.isActive(d.id));
   }
 
   /**
    * The **Structured Field** data-types a World Owner may declare a Field of, each with the copy
    * naming it in the World Types editor's picker.
    *
-   * Derived from the registered Views, not the data-type set: a data-type with no View is a Field
-   * whose value has no editor.
+   * Derived from the *enabled* Views, not the data-type set: a data-type with no View is a Field whose
+   * value has no editor, and a disabled Plugin's data-type is not offerable — a World Owner cannot
+   * declare a Field this Instance cannot render (ADR-0052).
    */
   offerableDataTypes(): { kind: StructuredDataTypeId; labelKey: string }[] {
-    return this.definitions().flatMap((d) => (d.dataType ? [{ kind: d.dataType, labelKey: d.dataTypeLabelKey }] : []));
+    return this.all().flatMap((d) => (d.dataType ? [{ kind: d.dataType, labelKey: d.dataTypeLabelKey }] : []));
   }
 
   /**

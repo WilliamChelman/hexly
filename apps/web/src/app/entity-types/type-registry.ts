@@ -1,11 +1,13 @@
-import { inject, Injectable, signal } from '@angular/core';
+import { computed, inject, Injectable, signal } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
 import { EntityType, FieldSchema, resolveFields, structuredDataTypeSet } from '@hexly/domain';
-import { CORE_NOTE } from '@hexly/plugin-content';
+import { ENABLED_PLUGINS } from '@hexly/web-core';
 import {
   CORE_VIEW_FIELDS,
   EntityTypes,
+  GENERIC_TYPE_DEFINITION,
   PLUGIN_DATA_TYPES,
+  PLUGIN_TYPE_OWNERS,
   PLUGIN_TYPES,
   TypeDefinition,
   TypeLabels,
@@ -34,13 +36,40 @@ export class TypeRegistry implements EntityTypes {
   private readonly views = inject(ViewRegistry);
   private readonly definitions = signal<readonly TypeDefinition[]>([]);
 
-  /** Every registered definition, in registration order (core, then the bundled plugins). */
-  readonly all = this.definitions.asReadonly();
+  /**
+   * Which bundled Plugin owns each Type id (ADR-0052) — the seam that lets a disabled Plugin's Types be
+   * dropped. A Type absent from this map has no owning Plugin (a World's user-defined one) and so is
+   * never Plugin-gated. Static: which Plugin ships a Type is a build fact; only the *enabled* set moves.
+   */
+  private readonly typeOwners = new Map<string, string>(inject(PLUGIN_TYPE_OWNERS, { optional: true }) ?? []);
+
+  /**
+   * The enabled-Plugin set signal (ADR-0052, Seam 3), or `null` when no config channel is wired — in
+   * which case nothing is filtered (today's behaviour). Read through {@link isActive} so every derived
+   * output recomputes when a late-arriving set lands (initializer timing) or a future live path pushes one.
+   */
+  private readonly enabledPlugins = inject(ENABLED_PLUGINS, { optional: true });
+
+  /** Every *enabled* definition, in registration order (the bundled plugins', then World types). */
+  readonly all = computed(() => this.definitions().filter((def) => this.isActive(def.id)));
 
   constructor() {
     // Every code type is a bundled plugin's (`core.note`, `core.hexmap`, `dnd.monster`) — ADR-0051.
-    // Drop a plugin, and its Entities degrade to the generic Field view alone (see `viewsFor`).
+    // Disable a plugin, and its Types drop from every output here; its Entities degrade to the generic
+    // Field view alone (see `viewsFor`), their values readable as plain EntityDocument.
     for (const def of inject(PLUGIN_TYPES, { optional: true }) ?? []) this.register(def);
+  }
+
+  /**
+   * Whether the Plugin owning `type` is enabled — the one predicate the reactive outputs filter through.
+   * A Type with no owner (a World's user-defined one) is always active; with no config channel wired
+   * ({@link enabledPlugins} `null`) nothing is filtered. Reading the signal here is what makes `all`,
+   * `get`, `viewsFor`, `resolve`, and `typeIdsForView` recompute against a changing enabled set.
+   */
+  private isActive(type: string): boolean {
+    const owner = this.typeOwners.get(type);
+    if (owner == null) return true;
+    return this.enabledPlugins == null || this.enabledPlugins().has(owner);
   }
 
   /**
@@ -54,21 +83,26 @@ export class TypeRegistry implements EntityTypes {
     return () => this.definitions.update((list) => list.filter((d) => d !== definition));
   }
 
-  /** The definition registered for `type`, or `undefined` for an absent/unregistered id. */
+  /**
+   * The definition registered for `type`, or `undefined` for an absent, unregistered, **or disabled**
+   * id. A disabled Plugin's Type reads as absent — never registered — so every caller (create surfaces,
+   * `viewsFor`, `resolveFields`) sees uniform absence with no branch of its own.
+   */
   get(type: string | null | undefined): TypeDefinition | undefined {
     if (type == null) return undefined;
-    return this.definitions().find((d) => d.id === type);
+    const def = this.definitions().find((d) => d.id === type);
+    return def && this.isActive(def.id) ? def : undefined;
   }
 
   /**
-   * The definition for `type`, falling back to `core.note` for an absent or unregistered id, so chrome
-   * (icon, labels) always resolves to *something*. Callers pass an Entity's *primary* type (`types[0]`),
-   * which drives its icon, headline, and default view.
+   * The definition for `type`, falling back to a **synthetic generic default** for an absent,
+   * unregistered, or disabled id (ADR-0052), so chrome (icon, labels, headline) always resolves to
+   * *something* — never `undefined`, never a throw. The `core.note` fallback is gone: content is a
+   * disableable Plugin like any other now, so it is no longer guaranteed present. Callers pass an
+   * Entity's *primary* type (`types[0]`), which drives its icon, headline, and default view.
    */
   resolve(type: string | null | undefined): TypeDefinition {
-    // The content plugin is bundled in every real build (ADR-0051), so `core.note` is registered
-    // through `PLUGIN_TYPES` and the chrome fallback is always present.
-    return this.get(type) ?? this.get(CORE_NOTE)!;
+    return this.get(type) ?? GENERIC_TYPE_DEFINITION;
   }
 
   /**
@@ -154,7 +188,7 @@ export class TypeRegistry implements EntityTypes {
    * the map View by *placing a grid Field*, which is the only way any type does.
    */
   typeIdsForView(view: ViewId): EntityType[] {
-    return this.definitions()
+    return this.all()
       .filter((d) => this.viewsFor([d.id]).some((v) => v.viewId === view))
       .map((d) => d.id);
   }
