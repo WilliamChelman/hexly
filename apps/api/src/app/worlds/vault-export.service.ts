@@ -1,11 +1,10 @@
 import { posix } from 'node:path';
 import { Injectable } from '@nestjs/common';
-import { EntityDetail, HEXLY_TYPE_KEY, resolveFields, VaultExportContext } from '@hexly/domain';
+import { EntityDetail, EntityType, HEXLY_TYPE_KEY, resolveFields, VaultExportContext } from '@hexly/domain';
 import { entityToMarkdown } from '@hexly/obsidian';
 import { strToU8, zipSync, type Zippable } from 'fflate';
 import { AssetsService } from '../assets/assets.service';
 import { EntitiesService } from '../entities/entities.service';
-import { DEFAULT_ENTITY_TYPE } from '../entities/bundled-plugins';
 import { TypeFieldRegistry } from '../entities/type-field-registry';
 import { WorldTypeFields } from '../entities/world-type-fields';
 import { WorldsService } from './worlds.service';
@@ -81,7 +80,7 @@ export class VaultExportService {
       doc: entity.document,
       fields: resolveFields(resolver, entity.types),
       dataTypes: this.typeFields.structuredDataTypes,
-      frontmatter: frontmatterAdditions(entity),
+      frontmatter: frontmatterAdditions(entity, this.typeFields.defaultType),
       context,
     });
   }
@@ -103,11 +102,12 @@ function uniquePath(files: Zippable, path: string): string {
  * `tags` (ADR-0033), and the ordered Type set under `hexly.type` — written whole and in order so the
  * primary type stays first (ADR-0050). A bare Note (types are exactly the import default) goes
  * unstamped, so an ordinary note with no other EntityDocument keys exports with no `---` block at all.
+ * With no default type (content disabled, ADR-0052) nothing is "bare", so every Entity's types are stamped.
  */
-function frontmatterAdditions(entity: EntityDetail): Record<string, unknown> {
+function frontmatterAdditions(entity: EntityDetail, defaultType: EntityType | undefined): Record<string, unknown> {
   const additions: Record<string, unknown> = {};
   if (entity.tags.length) additions['tags'] = [...entity.tags];
-  const isBareNote = entity.types.length === 1 && entity.types[0] === DEFAULT_ENTITY_TYPE;
+  const isBareNote = defaultType !== undefined && entity.types.length === 1 && entity.types[0] === defaultType;
   if (!isBareNote) additions[HEXLY_TYPE_KEY] = [...entity.types];
   return additions;
 }

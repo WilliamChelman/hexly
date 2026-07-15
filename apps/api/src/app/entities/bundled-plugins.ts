@@ -1,11 +1,12 @@
 import {
   basePluginConfigSchema,
   EntityType,
+  PluginTypeDefinition,
   ServerPlugin,
   structuredDataTypeSet,
   StructuredDataTypeSet,
 } from '@hexly/domain';
-import { PluginConfigContribution } from '../config/config';
+import { HexlyConfig, PluginConfigContribution } from '../config/config';
 import { serverPluginContent } from '@hexly/plugin-content/server';
 import { serverPluginDnd } from '@hexly/plugin-dnd/server';
 import { serverPluginHexmap } from '@hexly/plugin-hexmap/server';
@@ -19,23 +20,46 @@ import { serverPluginHexmap } from '@hexly/plugin-hexmap/server';
  */
 const BUNDLED_PLUGINS: readonly ServerPlugin[] = [serverPluginContent(), serverPluginHexmap(), serverPluginDnd()];
 
-/**
- * The bundled plugins' Type declarations — only their framework-free half: id, label, and Field
- * schema, never a view. `core.note` is a bundled type like any other now — the domain declares no
- * Entity Type (ADR-0051).
- */
-export const BUNDLED_PLUGIN_TYPES = BUNDLED_PLUGINS.flatMap((plugin) => plugin.types ?? []);
+/** Whether the Plugin owning `pluginId` is enabled (ADR-0052); absent from `features.plugin` → enabled. */
+function pluginEnabled(config: HexlyConfig, pluginId: string): boolean {
+  return config.features.plugin[pluginId]?.enabled ?? true;
+}
+
+/** The bundled Plugins this Instance enables — the set every derived contribution filters through (ADR-0052). */
+function enabledPlugins(config: HexlyConfig): readonly ServerPlugin[] {
+  return BUNDLED_PLUGINS.filter((plugin) => pluginEnabled(config, plugin.id));
+}
 
 /**
- * The **Structured Field** data-types this build bundles (ADR-0050, ADR-0051): the set the domain
- * resolves a Field's `namespace.id` kind against, threaded into `validateFields` / `harvestEdges` /
- * `deriveSearchText` / `withFieldDefaults`. `core.rich-content` — prose — is one of them now, so the
- * derive pass has no Content special case left. The plugins supply the vault-enabled variants, since
- * the API resolves both the derive pass and the vault projection off this set (ADR-0051).
+ * The enabled bundled Plugins' Type declarations — framework-free half only (id, label, Field schema),
+ * never a view. `core.note` is a bundled type like any other, so a disabled content Plugin drops it
+ * (ADR-0051, ADR-0052). Seeds {@link TypeFieldRegistry}.
  */
-export const BUNDLED_STRUCTURED_DATA_TYPES: StructuredDataTypeSet = structuredDataTypeSet(
-  BUNDLED_PLUGINS.flatMap((plugin) => plugin.dataTypes ?? []),
-);
+export function enabledPluginTypes(config: HexlyConfig): readonly PluginTypeDefinition[] {
+  return enabledPlugins(config).flatMap((plugin) => plugin.types ?? []);
+}
+
+/**
+ * The enabled **Structured Field** data-types (ADR-0050, ADR-0052): the set the derive and vault passes
+ * resolve a Field's `namespace.id` kind against. A disabled Plugin's data-types are absent, leaving its
+ * **Structured Fields** as opaque **Entity Document** values.
+ */
+export function enabledStructuredDataTypes(config: HexlyConfig): StructuredDataTypeSet {
+  return structuredDataTypesOf(enabledPlugins(config));
+}
+
+/**
+ * Every bundled **Structured Field** data-type, regardless of enablement (ADR-0052) — the register-time
+ * guard that a bundled Type names only data-types the build ships. Unlike {@link enabledStructuredDataTypes},
+ * it tolerates a Type naming a disabled Plugin's data-type (`core.hexmap`'s `content` Field when content
+ * is off): that degrades at derive/vault time; a kind no Plugin bundles is still a build error.
+ */
+export const BUNDLED_STRUCTURED_DATA_TYPES: StructuredDataTypeSet = structuredDataTypesOf(BUNDLED_PLUGINS);
+
+/** Fold a plugin set's contributed **Structured Field** data-types into one resolved set (ADR-0050). */
+function structuredDataTypesOf(plugins: readonly ServerPlugin[]): StructuredDataTypeSet {
+  return structuredDataTypeSet(plugins.flatMap((plugin) => plugin.dataTypes ?? []));
+}
 
 /**
  * Each bundled Plugin's `features.plugin.<id>` config contribution (ADR-0052): its id and config
@@ -59,16 +83,22 @@ export const BUNDLED_STRUCTURED_DATA_TYPE_OWNERS: ReadonlyMap<string, string> = 
 
 /**
  * The Entity Type a vault import assigns a Markdown file with no `hexly.type` stamp, and the one whose
- * lone presence marks an Entity a "bare Note" the export leaves unstamped (ADR-0051). Exactly one
- * bundled plugin declares it (content → `core.note`), so the vault services need not import
+ * lone presence marks an Entity a "bare Note" the export leaves unstamped (ADR-0051, ADR-0052). Exactly
+ * one bundled plugin declares it (content → `core.note`), so the vault services need not import
  * `@hexly/plugin-content` to learn the default.
+ *
+ * Relaxed since content became disableable (ADR-0052): with no enabled Plugin declaring a default it
+ * returns `undefined` rather than throwing, and the vault services then stamp every Entity's types.
+ * More than one enabled declarer is still a build error.
  */
-export const DEFAULT_ENTITY_TYPE: EntityType = defaultEntityType();
-
-function defaultEntityType(): EntityType {
-  const declared = BUNDLED_PLUGINS.map((plugin) => plugin.defaultType).filter((type): type is EntityType => !!type);
-  if (declared.length !== 1) {
-    throw new Error(`Expected exactly one bundled plugin to declare a default Entity Type, found ${declared.length}`);
+export function defaultEntityType(config: HexlyConfig): EntityType | undefined {
+  const declared = enabledPlugins(config)
+    .map((plugin) => plugin.defaultType)
+    .filter((type): type is EntityType => !!type);
+  if (declared.length > 1) {
+    throw new Error(
+      `Expected at most one enabled bundled plugin to declare a default Entity Type, found ${declared.length}`,
+    );
   }
   return declared[0];
 }
