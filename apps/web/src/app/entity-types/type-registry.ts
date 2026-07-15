@@ -1,7 +1,7 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
 import { EntityType, FieldSchema, resolveFields, structuredDataTypeSet } from '@hexly/domain';
-import { ENABLED_PLUGINS } from '@hexly/web-core';
+import { ClientConfigStore } from '@hexly/web-core';
 import {
   CORE_VIEW_FIELDS,
   EntityTypes,
@@ -39,8 +39,8 @@ export class TypeRegistry implements EntityTypes {
   /** Type id → owning Plugin id (ADR-0052); a Type absent from it (a World's user-defined one) is never Plugin-gated. */
   private readonly typeOwners = new Map<string, string>(inject(PLUGIN_TYPE_OWNERS, { optional: true }) ?? []);
 
-  /** The enabled-Plugin set (ADR-0052, Seam 3), or `null` when no config channel is wired (nothing filtered). */
-  private readonly enabledPlugins = inject(ENABLED_PLUGINS, { optional: true });
+  /** Owns the enablement predicate the reactive outputs filter through (ADR-0052, Seam 3). */
+  private readonly clientConfig = inject(ClientConfigStore);
 
   /** Every *enabled* definition, in registration order (the bundled plugins', then World types). */
   readonly all = computed(() => this.definitions().filter((def) => this.isActive(def.id)));
@@ -57,8 +57,7 @@ export class TypeRegistry implements EntityTypes {
    */
   private isActive(type: string): boolean {
     const owner = this.typeOwners.get(type);
-    if (owner == null) return true;
-    return this.enabledPlugins == null || this.enabledPlugins().has(owner);
+    return owner == null || this.clientConfig.isPluginEnabled(owner);
   }
 
   /**

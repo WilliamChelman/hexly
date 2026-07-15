@@ -1,6 +1,6 @@
 import { Injectable, Type, computed, inject, signal } from '@angular/core';
 import { StructuredDataTypeId } from '@hexly/domain';
-import { ENABLED_PLUGINS } from '@hexly/web-core';
+import { ClientConfigStore } from '@hexly/web-core';
 import { CORE_VIEW_FIELDS, PLUGIN_VIEW_OWNERS, PLUGIN_VIEWS, ViewDefinition, ViewId } from '@hexly/web-entity';
 
 /**
@@ -21,8 +21,8 @@ export class ViewRegistry {
   /** View id → owning Plugin id (ADR-0052, Seam 3); a View absent from it is app-owned and never Plugin-gated. */
   private readonly viewOwners = new Map<ViewId, string>(inject(PLUGIN_VIEW_OWNERS, { optional: true }) ?? []);
 
-  /** The enabled-Plugin set (ADR-0052, Seam 3), or `null` when no config channel is wired (nothing filtered). */
-  private readonly enabledPlugins = inject(ENABLED_PLUGINS, { optional: true });
+  /** Owns the enablement predicate the reactive outputs filter through (ADR-0052, Seam 3). */
+  private readonly clientConfig = inject(ClientConfigStore);
 
   /** Every *enabled* View, in registration order (the bundled plugins' first, then core). */
   readonly all = computed(() => this.definitions().filter((def) => this.isActive(def.id)));
@@ -36,8 +36,7 @@ export class ViewRegistry {
   /** Whether the Plugin owning `id` is enabled — the predicate the reactive outputs filter through (ADR-0052). */
   private isActive(id: ViewId): boolean {
     const owner = this.viewOwners.get(id);
-    if (owner == null) return true;
-    return this.enabledPlugins == null || this.enabledPlugins().has(owner);
+    return owner == null || this.clientConfig.isPluginEnabled(owner);
   }
 
   register(definition: ViewDefinition): () => void {

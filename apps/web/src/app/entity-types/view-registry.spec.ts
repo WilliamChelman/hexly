@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
-import { signal, WritableSignal } from '@angular/core';
-import { ENABLED_PLUGINS } from '@hexly/web-core';
+import { Signal, signal, WritableSignal } from '@angular/core';
+import { ClientConfigStore } from '@hexly/web-core';
 import { CORE_HEX_GRID, PLUGIN_ID as HEXMAP_PLUGIN_ID } from '@hexly/plugin-hexmap';
 import { CORE_RICH_CONTENT, PLUGIN_ID as CONTENT_PLUGIN_ID } from '@hexly/plugin-content';
 import { PLUGIN_ID as DND_PLUGIN_ID } from '@hexly/plugin-dnd';
@@ -13,24 +13,34 @@ import { ViewRegistry } from './view-registry';
 /** A stand-in for the generic Field View the entity chunk registers at runtime, with no owning Plugin. */
 class FieldsViewStub {}
 
+/** A loaded {@link ClientConfigStore} reporting exactly `enabled` — mutate the signal to drive reactivity. */
+function fakeClientConfig(enabled: Signal<ReadonlySet<string>>): ClientConfigStore {
+  return {
+    enabledPlugins: enabled,
+    defaultType: signal(undefined),
+    isPluginEnabled: (id: string) => enabled().has(id),
+    init: async () => undefined,
+  } as unknown as ClientConfigStore;
+}
+
 /**
  * ADR-0052, Seam 3: a disabled Plugin's Views fall away with its Types, and so do the data-types they
  * render — so the World Types editor cannot offer a Field this Instance cannot draw, and a placed Field
- * of a disabled kind resolves to no View. Reactive against the enabled-set signal.
+ * of a disabled kind resolves to no View. Reactive against the enabled set.
  */
 describe('ViewRegistry filtering by the enabled-Plugin set', () => {
   let registry: ViewRegistry;
   let enabled: WritableSignal<ReadonlySet<string>>;
 
   beforeEach(() => {
-    // The whole build's Views composed; the signal decides which are live. Content + dnd on, hexmap off.
+    // The whole build's Views composed; the loaded config decides which are live. Content + dnd on, hexmap off.
     enabled = signal<ReadonlySet<string>>(new Set([CONTENT_PLUGIN_ID, DND_PLUGIN_ID]));
     TestBed.configureTestingModule({
       providers: [
         providePluginContent(),
         providePluginHexmap(),
         providePluginDnd(),
-        { provide: ENABLED_PLUGINS, useValue: enabled },
+        { provide: ClientConfigStore, useValue: fakeClientConfig(enabled) },
       ],
     });
     registry = TestBed.inject(ViewRegistry);
