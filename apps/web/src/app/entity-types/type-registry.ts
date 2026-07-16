@@ -36,6 +36,14 @@ export class TypeRegistry implements EntityTypes {
   private readonly plugins = inject(PluginRegistry);
   private readonly definitions = signal<readonly TypeDefinition[]>([]);
 
+  /**
+   * The active World's user-defined **Fields** (ADR-0054, #230), projected by {@link WorldFieldsLoader}
+   * and composed over the Plugin fields by {@link resolveField}. A World Field is always active — it is
+   * data, owned by no Plugin — so it never rides the enablement gate.
+   */
+  private readonly worldFields = signal<readonly Field[]>([]);
+  private readonly worldFieldsById = computed(() => new Map(this.worldFields().map((field) => [field.id, field])));
+
   /** Every *enabled* definition, in registration order (the bundled plugins', then World types). */
   readonly all = computed(() => this.definitions().filter((def) => this.plugins.isTypeActive(def.id)));
 
@@ -47,6 +55,23 @@ export class TypeRegistry implements EntityTypes {
   register(definition: TypeDefinition): () => void {
     this.definitions.update((list) => [...list, definition]);
     return () => this.definitions.update((list) => list.filter((d) => d !== definition));
+  }
+
+  /**
+   * Swap the active World's user-defined Field set (ADR-0054, #230) — called by {@link WorldFieldsLoader}
+   * on a World change or an authoring reload, so one World's Fields never linger into another.
+   */
+  setWorldFields(fields: readonly Field[]): void {
+    this.worldFields.set(fields);
+  }
+
+  /**
+   * Resolve one Field id → its definition, composing the active World's user-defined Fields over the
+   * Plugin fields (ADR-0054, #230). A World Field wins its id (its namespace is reserved), and is always
+   * active; a Plugin field rides the enablement gate, so a disabled Plugin's Field degrades to `undefined`.
+   */
+  private resolveField(id: string): Field | undefined {
+    return this.worldFieldsById().get(id) ?? this.plugins.fieldResolver(id);
   }
 
   /**
@@ -118,7 +143,7 @@ export class TypeRegistry implements EntityTypes {
     }
     // Attached Fields append their View after the types' (CONTEXT.md → View); dedup drops a re-placed one.
     for (const id of fieldIds ?? []) {
-      const field = this.plugins.fieldResolver(id);
+      const field = this.resolveField(id);
       if (!field) continue;
       // A Field of a Structured Data Type appends its own bound View; a built-in Field has no View of
       // its own, so it rides the generic Field view — its control's home (CONTEXT.md → View, ADR-0054).
@@ -150,36 +175,42 @@ export class TypeRegistry implements EntityTypes {
     const consider = (field: FieldSchema | undefined) => {
       if (field && !byKey.has(field.key)) byKey.set(field.key, field);
     };
-    for (const id of fieldIds ?? []) consider(this.plugins.fieldResolver(id));
+    for (const id of fieldIds ?? []) consider(this.resolveField(id));
     for (const type of types ?? []) {
       const def = this.get(type);
       // `fieldRefs` → resolver, with the inline `fields` fallback for a user-defined type (no id yet).
-      for (const id of def?.fieldRefs ?? []) consider(this.plugins.fieldResolver(id));
+      for (const id of def?.fieldRefs ?? []) consider(this.resolveField(id));
       for (const field of def?.fields ?? []) consider(field);
     }
     return [...byKey.values()];
   }
 
   /**
-   * Resolve one registered Field by its `id` (ADR-0054) — a **Plugin Field**, or `undefined` for an
-   * unknown or disabled one. What the fields editor reads to label an Entity's attached Field chips.
+   * Resolve one registered Field by its `id` (ADR-0054) — a **World Field** or a **Plugin Field**, or
+   * `undefined` for an unknown or disabled one. What the fields editor reads to label an Entity's
+   * attached Field chips.
    */
   field(id: string): Field | undefined {
-    return this.plugins.fieldResolver(id);
+    return this.resolveField(id);
   }
 
   /**
    * The registered Fields an Entity carrying `types`/`fieldIds` may still **attach directly** (ADR-0054):
-   * every enabled Plugin Field whose document `key` its effective set does not already cover — so the
-   * attach picker never offers a Field a type default already places, or one already attached. A disabled
-   * Plugin's Fields drop out (they would only degrade to a plain value); World-defined Fields join later.
+   * every World-defined Field and enabled Plugin Field whose document `key` its effective set does not
+   * already cover — so the attach picker never offers a Field a type default already places, or one
+   * already attached. World Fields come first (always active); a disabled Plugin's Fields drop out (they
+   * would only degrade to a plain value).
    */
   attachableFields(
     types: readonly string[] | null | undefined,
     fieldIds: readonly string[] | null | undefined,
   ): Field[] {
     const present = new Set(this.effectiveFields(types, fieldIds).map((field) => field.key));
-    return this.plugins.fields.filter((field) => this.plugins.isFieldActive(field.id) && !present.has(field.key));
+    const composed = [
+      ...this.worldFields(),
+      ...this.plugins.fields.filter((field) => this.plugins.isFieldActive(field.id)),
+    ];
+    return composed.filter((field) => !present.has(field.key));
   }
 
   /**

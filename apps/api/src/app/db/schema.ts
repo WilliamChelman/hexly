@@ -189,6 +189,28 @@ export const worldTypes = sqliteTable(
 );
 
 /**
+ * A World's user-defined **Fields** (CONTEXT.md → Field, ADR-0054): a first-class Field a World Owner
+ * authors as data, scoped to this World. Keyed by `(worldId, fieldId)`; `fieldId` is the immutable
+ * `world.`-namespaced reuse handle, split out so the id-less Field body rides in `definition` (a
+ * FieldSchema, validated at the trust boundary). A JSON bag, never DB-queried — the resolver loads it
+ * whole and composes it beside the Plugin fields. Rows cascade with the World; writes route through
+ * {@link WorldWrites}.
+ */
+export const worldFields = sqliteTable(
+  'world_fields',
+  {
+    worldId: text('world_id')
+      .notNull()
+      .references(() => worlds.id, { onDelete: 'cascade' }),
+    fieldId: text('field_id').notNull(),
+    definition: text('definition', { mode: 'json' }).$type<FieldSchema>().notNull(),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.worldId, table.fieldId] })],
+);
+
+/**
  * A World Public Link: an unguessable token granting anonymous Viewer access to
  * all `shared` Entities in a World. `id` is the token.
  */

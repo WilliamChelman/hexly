@@ -3,6 +3,7 @@ import { RouterOutlet } from '@angular/router';
 import { ActiveWorld, worldDashboardRoute, worldGraphRoute, worldRoute, worldSettingsRoute } from '@hexly/web-core';
 import { NavRailStore } from '../../shell/nav-rail.store';
 import { WorldTypesLoader } from '../../entity-types/world-types-loader';
+import { WorldFieldsLoader } from '../../entity-types/world-fields-loader';
 
 /**
  * The World scope's layout: owner of the `w/:worldId` subtree. The World — not the nav
@@ -20,9 +21,10 @@ export class WorldLayout {
   constructor() {
     const activeWorld = inject(ActiveWorld);
     const rail = inject(NavRailStore);
-    // Project the active World's user-defined types into the TypeRegistry for as long as a World is
-    // open (#191) — injecting it here is what brings the reactive loader to life.
+    // Project the active World's user-defined types and Fields into the TypeRegistry for as long as a
+    // World is open (#191, #230) — injecting them here is what brings the reactive loaders to life.
     inject(WorldTypesLoader);
+    inject(WorldFieldsLoader);
 
     effect(() => {
       const worldId = activeWorld.worldId();

@@ -340,6 +340,38 @@
     "updateError": "Couldn't save that type. Please try again.",
     "removeError": "Couldn't delete that type. Please try again."
   },
+  "worldFields": {
+    "heading": "Custom fields",
+    "subhead": "Define reusable fields once, then attach them to any entity or type in this world.",
+    "empty": "No custom fields yet.",
+    "add": "New field",
+    "edit": "Edit",
+    "remove": "Delete",
+    "idLabel": "Id",
+    "idPrefix": "world.",
+    "idHint": "A short key like element.",
+    "keyLabel": "Key",
+    "keyHint": "The document key its value is stored under.",
+    "nameLabel": "Label",
+    "typeLabel": "Type",
+    "required": "Required",
+    "facetable": "Filterable",
+    "options": "Options",
+    "optionsHint": "Comma-separated",
+    "save": "Save",
+    "cancel": "Cancel",
+    "dataType": {
+      "string": "Text",
+      "number": "Number",
+      "boolean": "Yes / No",
+      "date": "Date",
+      "enum": "Choice"
+    },
+    "loadError": "Couldn't load this world's custom fields.",
+    "createError": "Couldn't create that field. Please try again.",
+    "updateError": "Couldn't save that field. Please try again.",
+    "removeError": "Couldn't delete that field. Please try again."
+  },
   "publicView": {
     "tabTitle": "Shared — Hexly",
     "banner": "You're viewing a read-only shared page.",

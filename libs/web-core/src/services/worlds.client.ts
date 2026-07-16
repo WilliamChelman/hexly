@@ -4,11 +4,14 @@ import { Observable, merge, tap } from 'rxjs';
 import {
   AvailableType,
   CreateUserDefinedTypeRequest,
+  CreateWorldFieldRequest,
+  Field,
   FollowSignal,
   ImportSummary,
   MemberRole,
   PublicLink,
   UpdateUserDefinedTypeRequest,
+  UpdateWorldFieldRequest,
   UserDefinedType,
   WorldDetail,
   WorldGraph,
@@ -183,6 +186,26 @@ export class WorldsClient {
   /** Delete a user-defined type. World-Owner-only server-side. */
   deleteType(id: string, typeId: string): Observable<void> {
     return this.http.delete<void>(`/api/worlds/${id}/types/${typeId}`);
+  }
+
+  /** The World's user-defined Fields (#230): the resolver and attach picker source. Reachable-gated server-side. */
+  fields(id: string): Observable<Field[]> {
+    return this.http.get<Field[]>(`/api/worlds/${id}/fields`);
+  }
+
+  /** Author a new World-defined Field; returns the created Field. World-Owner-only server-side. */
+  createField(id: string, req: CreateWorldFieldRequest): Observable<Field> {
+    return this.http.post<Field>(`/api/worlds/${id}/fields`, req);
+  }
+
+  /** Re-body a World-defined Field; returns the updated Field. World-Owner-only server-side. */
+  updateField(id: string, fieldId: string, patch: UpdateWorldFieldRequest): Observable<Field> {
+    return this.http.patch<Field>(`/api/worlds/${id}/fields/${fieldId}`, patch);
+  }
+
+  /** Delete a World-defined Field. World-Owner-only server-side. */
+  deleteField(id: string, fieldId: string): Observable<void> {
+    return this.http.delete<void>(`/api/worlds/${id}/fields/${fieldId}`);
   }
 
   /** The World's Public Link — the active token or null. Owner-only server-side. */

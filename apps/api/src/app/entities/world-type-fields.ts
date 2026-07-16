@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
 import { worldTypes } from '../db/schema';
 import { TypeFieldRegistry } from './type-field-registry';
+import { WorldFields } from './world-fields';
 
 /**
  * The World-scoped view of the Entity Type set (ADR-0048): a World's user-defined types layered over
@@ -15,6 +16,7 @@ export class WorldTypeFields {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly plugins: TypeFieldRegistry,
+    private readonly worldFields: WorldFields,
   ) {}
 
   /** A World's stored user-defined types, in a stable id order (the CRUD read + the merge source). */
@@ -68,15 +70,18 @@ export class WorldTypeFields {
     const consider = (field: FieldSchema | undefined) => {
       if (field && !byKey.has(field.key)) byKey.set(field.key, field);
     };
-    // World-scoped when a `worldId` is in play so its user-defined types resolve too; else the plugin
-    // registry alone (a gate that runs before a row's World is known).
+    // World-scoped when a `worldId` is in play so its user-defined types/Fields resolve too; else the
+    // plugin registry alone (a gate that runs before a row's World is known).
     const inlineResolver = worldId ? this.resolverFor(worldId) : this.plugins.resolver;
+    // The composed Field resolver: World-defined Fields over Plugin fields (ADR-0054), so a deleted
+    // World Field simply stops resolving and its values degrade to plain — forward-only.
+    const fieldResolver = worldId ? this.worldFields.resolverFor(worldId) : this.plugins.fieldResolver;
     // Attached Fields first (most specific), then each type's defaults primary-first — first-wins per key.
-    for (const id of fieldIds ?? []) consider(this.plugins.fieldResolver(id));
+    for (const id of fieldIds ?? []) consider(fieldResolver(id));
     for (const type of types) {
       // Plugin type: defaults via `fieldRefs` → the id resolver (ADR-0054). Inline fallback covers a
       // User-defined type's Fields (no id until the World Fields step) and anything the resolver can't reach.
-      for (const id of this.plugins.typeFieldRefs(type) ?? []) consider(this.plugins.fieldResolver(id));
+      for (const id of this.plugins.typeFieldRefs(type) ?? []) consider(fieldResolver(id));
       for (const field of inlineResolver(type) ?? []) consider(field);
     }
     return [...byKey.values()];

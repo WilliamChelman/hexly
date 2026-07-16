@@ -110,12 +110,12 @@ const noDirectEntityWrites = chokePoint({
 });
 
 const noDirectWorldWrites = chokePoint({
-  tables: ['worlds', 'worldMembers', 'worldTypes'],
-  sqlTables: ['worlds', 'world_members', 'world_types'],
+  tables: ['worlds', 'worldMembers', 'worldTypes', 'worldFields'],
+  sqlTables: ['worlds', 'world_members', 'world_types', 'world_fields'],
   ownerFile: 'world-writes.ts',
   handle: 'WorldWrites',
   entryPoints:
-    '`WorldWrites.mint`, `update`, `delete`, `membership`, `purgeMembershipsOf`, `createType`, `updateType`, or `deleteType`',
+    '`WorldWrites.mint`, `update`, `delete`, `membership`, `purgeMembershipsOf`, `createType`, `updateType`, `deleteType`, `createField`, `updateField`, or `deleteField`',
 });
 
 export default {

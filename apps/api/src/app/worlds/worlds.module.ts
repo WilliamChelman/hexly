@@ -13,6 +13,7 @@ import { WorldGraphService } from './world-graph.service';
 import { WorldsController } from './worlds.controller';
 import { WorldsService } from './worlds.service';
 import { WorldTypesService } from './world-types.service';
+import { WorldFieldsService } from './world-fields.service';
 import { WorldWrites } from './world-writes';
 
 /**
@@ -40,6 +41,7 @@ import { WorldWrites } from './world-writes';
   providers: [
     WorldsService,
     WorldTypesService,
+    WorldFieldsService,
     WorldWrites,
     WorldGraphService,
     VaultImportService,
