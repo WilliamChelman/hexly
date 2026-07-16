@@ -141,6 +141,13 @@ export class EntitySession implements EntitySessionPort {
   private readonly _types = signal<readonly EntityType[]>([]);
   readonly types = this._types.asReadonly();
 
+  /**
+   * The Entity's attached Field ids (`fields[]`, ADR-0054), read into the effective set. No authoring
+   * surface mints one yet, so it only round-trips a load and is never re-sent on save.
+   */
+  private readonly _fields = signal<readonly string[]>([]);
+  readonly fields = this._fields.asReadonly();
+
   private readonly _saving = signal(false);
   readonly saving = this._saving.asReadonly();
 
@@ -330,6 +337,7 @@ export class EntitySession implements EntitySessionPort {
     this._doc.set(detail.document); // the working document — prose, grid, and all — is the loaded document
     this._tags.set(detail.tags);
     this._types.set(detail.types);
+    this._fields.set(detail.fields ?? []); // attached Fields ride the load into the effective set (ADR-0054)
     // Baseline = exactly the references now live, so a load never reads as dirty.
     this._baseDoc.set(this._doc());
     this._baseTags.set(this._tags());
@@ -366,7 +374,8 @@ export class EntitySession implements EntitySessionPort {
    */
   setTypes(types: readonly EntityType[]): void {
     this._types.set([...types]);
-    const fields = this.typeRegistry.resolveFields(types);
+    // Over the effective set (ADR-0054), so an attached Field's default is minted like a type default.
+    const fields = this.typeRegistry.effectiveFields(types, this._fields());
     const reconciled = withFieldDefaults(this._doc(), fields, this.plugins.structuredDataTypes);
     if (reconciled !== this._doc()) this._doc.set(reconciled);
   }
@@ -416,6 +425,7 @@ export class EntitySession implements EntitySessionPort {
         this._doc.set(emptyEntityDocument()); // clear the previous canvas and prose during load (#7)
         this._tags.set([]); // and the previous Entity's tags, which ride the same load (#88)
         this._types.set([]); // and its type set, re-baselined below so the blank load isn't dirty
+        this._fields.set([]); // and its attached Fields, which ride the same load (ADR-0054)
         // A cleared canvas is a fresh start: reset the Views' document-tied state (#7) — the same
         // bump adopt() makes, so a load that never resolves still leaves no stale map state, and
         // the prose editor re-seeds off the emptied document.

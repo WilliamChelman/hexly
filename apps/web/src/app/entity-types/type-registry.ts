@@ -1,6 +1,6 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
-import { EntityType, FieldSchema, resolveFields } from '@hexly/domain';
+import { EntityType, FieldSchema } from '@hexly/domain';
 import {
   CORE_VIEW_FIELDS,
   EntityTypes,
@@ -69,28 +69,37 @@ export class TypeRegistry implements EntityTypes {
   }
 
   /**
-   * The ordered, de-duplicated {@link ViewInstance}s an Entity carrying `types` affords — the union of
-   * every type's placed views, in `types` order, primary type first. `types[0]`'s first view is the
+   * The ordered, de-duplicated {@link ViewInstance}s an Entity affords, resolved over its **effective
+   * Field set** (`types`' defaults + attached `fieldIds`, ADR-0054): every type's placed views in
+   * `types` order (primary first), then any attached Fields' Views. `types[0]`'s first view is the
    * default. Drives the header view toggle.
    *
    * A View is an **instance**, not a bare id: a Type's own View names no Field, while a **Structured
    * Data Type**'s View is bound to the Field it renders. A type places a Field's View by listing
-   * `{ field: key }` among its views, resolving Field → data-type `kind` → the View the
-   * {@link ViewRegistry} holds for that kind — so two grids afford two map Views.
+   * `{ field: key }` among its views, resolved against the effective set → data-type `kind` → the View
+   * the {@link ViewRegistry} holds for that kind — so two grids afford two map Views.
    *
-   * A placement that cannot resolve — a Field the type never declared, a built-in data-type (which has
-   * a form row, not a View), or a structured one whose plugin this build omits — contributes nothing,
-   * rather than a toggle to a view that cannot render.
+   * A placement that cannot resolve — a Field the effective set lacks, a built-in data-type (a form
+   * row, not a View), or a structured one whose plugin this build omits — contributes nothing.
    *
    * A registered type affords exactly the Views it declares. An **unregistered** type — a plugin this
    * build does not bundle — affords the generic Field view **alone** (ADR-0051): #199's content floor
    * is withdrawn, and its values (prose included) stay readable there as plain EntityDocument.
    */
-  viewsFor(types: readonly string[] | null | undefined): ViewInstance[] {
+  viewsFor(
+    types: readonly string[] | null | undefined,
+    fieldIds?: readonly string[] | null | undefined,
+  ): ViewInstance[] {
     const seen = new Map<string, ViewInstance>();
     const afford = (instance: ViewInstance) => {
       const key = viewInstanceKey(instance);
       if (!seen.has(key)) seen.set(key, instance);
+    };
+    // A placement resolves its Field against the whole effective set (a type default or an attachment).
+    const byKey = new Map(this.effectiveFields(types, fieldIds).map((field) => [field.key, field] as const));
+    const affordField = (field: FieldSchema | undefined) => {
+      const view = this.views.forDataType(field?.dataType.kind);
+      if (field && view) afford({ viewId: view.id, fieldKey: field.key });
     };
 
     for (const type of types ?? []) {
@@ -104,20 +113,44 @@ export class TypeRegistry implements EntityTypes {
           afford({ viewId: placement });
           continue;
         }
-        const field = def.fields?.find((f) => f.key === placement.field);
-        const view = this.views.forDataType(field?.dataType.kind);
-        if (field && view) afford({ viewId: view.id, fieldKey: field.key });
+        affordField(byKey.get(placement.field));
       }
     }
+    // Attached Fields append their View after the types' (CONTEXT.md → View); dedup drops a re-placed one.
+    for (const id of fieldIds ?? []) affordField(this.plugins.fieldResolver(id));
     return [...seen.values()];
   }
 
   /**
-   * The union of Field schemas an Entity carrying `types` affords — every registered type's declared
-   * Fields, primary type first, deduped by EntityDocument key.
+   * The union of Field schemas an Entity carrying `types` affords — every registered type's default
+   * Fields, primary type first, deduped by EntityDocument key. The type-only projection of
+   * {@link effectiveFields} (no attachments), for the create and type-authoring surfaces.
    */
   resolveFields(types: readonly string[] | null | undefined): FieldSchema[] {
-    return resolveFields((type) => this.get(type)?.fields, types ?? []);
+    return this.effectiveFields(types, []);
+  }
+
+  /**
+   * An Entity's **effective Field set** (CONTEXT.md → Entity, ADR-0054): its attached Fields (`fieldIds`)
+   * unioned with its types' defaults, deduped by `key` with precedence instance > primary type > later
+   * types. Mirrors the server's `WorldTypeFields.effectiveFields`.
+   */
+  effectiveFields(
+    types: readonly string[] | null | undefined,
+    fieldIds: readonly string[] | null | undefined,
+  ): FieldSchema[] {
+    const byKey = new Map<string, FieldSchema>();
+    const consider = (field: FieldSchema | undefined) => {
+      if (field && !byKey.has(field.key)) byKey.set(field.key, field);
+    };
+    for (const id of fieldIds ?? []) consider(this.plugins.fieldResolver(id));
+    for (const type of types ?? []) {
+      const def = this.get(type);
+      // `fieldRefs` → resolver, with the inline `fields` fallback for a user-defined type (no id yet).
+      for (const id of def?.fieldRefs ?? []) consider(this.plugins.fieldResolver(id));
+      for (const field of def?.fields ?? []) consider(field);
+    }
+    return [...byKey.values()];
   }
 
   /**

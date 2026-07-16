@@ -160,7 +160,8 @@ export class EntityHeader {
    */
   protected readonly viewToggle = computed(() => {
     this.transloco.activeLang(); // reactive dependency: re-resolve the labels on a language switch
-    const fields = this.types.resolveFields(this.session.types());
+    // Over the effective set (ADR-0054), so an attached structured Field's toggle is labelled from its Field.
+    const fields = this.types.effectiveFields(this.session.types(), this.session.fields());
     return this.viewStore.views().map((view) => {
       const field = fields.find((f) => f.key === view.fieldKey);
       const labelKey = field ? field.labelKey : this.views.resolve(view.viewId).labelKey;

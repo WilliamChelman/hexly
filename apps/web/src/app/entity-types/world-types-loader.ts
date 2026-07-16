@@ -73,6 +73,9 @@ function toDefinition(type: AvailableType): TypeDefinition {
     // Structured Data Type (#201).
     views: type.views ?? userTypeViews(type.fields),
     fields: type.fields,
+    // Referenced default Fields by id (ADR-0054); usually empty until the World Fields step, where a
+    // user-defined type's Fields gain ids — its inline `fields` resolve meanwhile.
+    ...(type.fieldRefs?.length ? { fieldRefs: type.fieldRefs } : {}),
     graphColorToken: '--color-ink-muted',
   };
 }

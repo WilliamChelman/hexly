@@ -1,6 +1,7 @@
 import { EnvironmentProviders } from '@angular/core';
 import { providePlugin } from '@hexly/web-entity';
 import { PLUGIN_ID } from '../lib/plugin-id';
+import { DND_MONSTER_FIELDS } from '../lib/monster';
 import { DND_TRANSLATIONS } from '../i18n/dnd-translations';
 import { DND_TYPE_DEFINITIONS, DND_VIEW_STAT_BLOCK } from './dnd-types';
 
@@ -15,6 +16,8 @@ export function providePluginDnd(): EnvironmentProviders {
   return providePlugin({
     id: PLUGIN_ID,
     types: DND_TYPE_DEFINITIONS,
+    // The stat-block Fields (ADR-0054); the prose `core.content` it also references is the content plugin's.
+    fields: DND_MONSTER_FIELDS,
     views: [
       {
         id: DND_VIEW_STAT_BLOCK,

@@ -1,6 +1,6 @@
 import { inject, Provider, signal } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
-import { FieldSchema, resolveFields } from '@hexly/domain';
+import { Field, FieldSchema } from '@hexly/domain';
 import { ENTITY_TYPES, EntityTypes } from '../lib/entity-types';
 import { TypeDefinition, TypeLabels } from '../lib/type-definition';
 
@@ -41,7 +41,33 @@ export class FakeEntityTypes implements EntityTypes {
   }
 
   resolveFields(types: readonly string[] | null | undefined): FieldSchema[] {
-    return resolveFields((type) => this.get(type)?.fields, types ?? []);
+    return this.effectiveFields(types, []);
+  }
+
+  effectiveFields(
+    types: readonly string[] | null | undefined,
+    fieldIds: readonly string[] | null | undefined,
+  ): FieldSchema[] {
+    // A spec's registered Fields, by id — what an attached `fieldIds` and a type's `fieldRefs` resolve
+    // against, mirroring the real registry's composed Plugin-Field resolver.
+    const byId = new Map<string, FieldSchema>();
+    for (const def of this.definitions())
+      for (const field of def.fields ?? []) {
+        const id = (field as Field).id;
+        if (typeof id === 'string') byId.set(id, field);
+      }
+    const byKey = new Map<string, FieldSchema>();
+    const consider = (field: FieldSchema | undefined) => {
+      if (field && !byKey.has(field.key)) byKey.set(field.key, field);
+    };
+    // Attached Fields first (instance precedence), then each type's defaults primary-first.
+    for (const id of fieldIds ?? []) consider(byId.get(id));
+    for (const type of types ?? []) {
+      const def = this.get(type);
+      for (const id of def?.fieldRefs ?? []) consider(byId.get(id));
+      for (const field of def?.fields ?? []) consider(field);
+    }
+    return [...byKey.values()];
   }
 
   private get(type: string | null | undefined): TypeDefinition | undefined {

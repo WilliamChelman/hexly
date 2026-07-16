@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
-import { structuredDataTypeSet } from '@hexly/domain';
+import { FieldResolver, structuredDataTypeSet } from '@hexly/domain';
 import { ClientConfigStore } from '@hexly/web-core';
-import { PLUGIN_DATA_TYPES, PLUGIN_TYPE_OWNERS, PLUGIN_VIEW_OWNERS, ViewId } from '@hexly/web-entity';
+import { PLUGIN_DATA_TYPES, PLUGIN_FIELDS, PLUGIN_TYPE_OWNERS, PLUGIN_VIEW_OWNERS, ViewId } from '@hexly/web-entity';
 
 /**
  * The one home for what the bundled plugins contributed and which are enabled (ADR-0052, Seam 3): the
@@ -18,6 +18,18 @@ export class PluginRegistry {
 
   /** The Structured Data Types this build carries, one resolved set threaded into the domain (ADR-0050). */
   readonly structuredDataTypes = structuredDataTypeSet(inject(PLUGIN_DATA_TYPES, { optional: true }) ?? []);
+
+  /** Every composed **Plugin Field** by `id` (ADR-0054), what `fieldRefs` and an Entity's attached `fields[]` resolve against. */
+  private readonly fieldsById = new Map(
+    (inject(PLUGIN_FIELDS, { optional: true }) ?? []).map((field) => [field.id, field] as const),
+  );
+
+  /**
+   * The instance-wide {@link FieldResolver} (ADR-0054): a Plugin Field id → its definition, `undefined`
+   * for an unregistered id. Composed from the whole build like {@link structuredDataTypes}, not
+   * enablement-filtered — a disabled Plugin's Field degrades at the Type and View layers instead (ADR-0052).
+   */
+  readonly fieldResolver: FieldResolver = (id) => this.fieldsById.get(id);
 
   /** Whether the Plugin owning Type `id` is enabled; a Type with no owner (a World's user-defined one) is always active. */
   isTypeActive(id: string): boolean {

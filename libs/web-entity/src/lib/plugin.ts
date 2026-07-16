@@ -1,5 +1,5 @@
 import { EnvironmentProviders, InjectionToken, makeEnvironmentProviders } from '@angular/core';
-import { StructuredDataType } from '@hexly/domain';
+import { Field, StructuredDataType } from '@hexly/domain';
 import { TranslationScope, provideEagerTranslations } from '@hexly/web-core';
 import { TypeDefinition } from './type-definition';
 import { ViewDefinition, ViewId } from './view-definition';
@@ -12,6 +12,8 @@ export interface WebPlugin {
   /** This plugin's canonical `PLUGIN_ID` (ADR-0052); the server twin `ServerPlugin` carries the same value. */
   readonly id: string;
   readonly types?: readonly TypeDefinition[];
+  /** The code-registered **Plugin Fields** this plugin declares (`defineField`, ADR-0054), folded into the instance-wide id→Field resolver like {@link dataTypes}. */
+  readonly fields?: readonly Field[];
   /**
    * Declare these with `loadComponent`, not `component`: they register in the root injector, so an
    * eager class reference would put the view body on the initial bundle.
@@ -31,6 +33,9 @@ export const PLUGIN_IDS = new InjectionToken<readonly string[]>('hexly.plugin.id
 
 /** The bundled plugins' {@link TypeDefinition}s, read by the root `TypeRegistry`. */
 export const PLUGIN_TYPES = new InjectionToken<readonly TypeDefinition[]>('hexly.plugin.types');
+
+/** The bundled plugins' **Plugin Fields** (ADR-0054), composed into one id→Field resolver by the root `PluginRegistry`. */
+export const PLUGIN_FIELDS = new InjectionToken<readonly Field[]>('hexly.plugin.fields');
 
 /** The bundled plugins' {@link ViewDefinition}s, read by the root `ViewRegistry`. */
 export const PLUGIN_VIEWS = new InjectionToken<readonly ViewDefinition[]>('hexly.plugin.views');
@@ -60,6 +65,7 @@ export const PLUGIN_VIEW_OWNERS = new InjectionToken<readonly (readonly [ViewId,
 export function providePlugin({
   id,
   types = [],
+  fields = [],
   views = [],
   dataTypes = [],
   translations,
@@ -67,6 +73,7 @@ export function providePlugin({
   return makeEnvironmentProviders([
     { provide: PLUGIN_IDS, useValue: id, multi: true },
     types.map((type) => ({ provide: PLUGIN_TYPES, useValue: type, multi: true })),
+    fields.map((field) => ({ provide: PLUGIN_FIELDS, useValue: field, multi: true })),
     views.map((view) => ({ provide: PLUGIN_VIEWS, useValue: view, multi: true })),
     dataTypes.map((dataType) => ({ provide: PLUGIN_DATA_TYPES, useValue: dataType, multi: true })),
     // The ownership tuples the registries filter enablement by (ADR-0052): each contribution's id
