@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
-import { MemberRole, UserDefinedType } from '@hexly/domain';
+import { FieldSchema, MemberRole, UserDefinedType } from '@hexly/domain';
 import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
-import { INITIAL_SEQ, worldMembers, worlds, worldTypes } from '../db/schema';
+import { INITIAL_SEQ, worldFields, worldMembers, worlds, worldTypes } from '../db/schema';
 import { SyncOnly, WriteOutbox } from '../events/write-outbox';
 import { EntityWrites } from '../entities/entity-writes';
 
@@ -209,6 +209,52 @@ export class WorldWrites {
       const deleted = this.db
         .delete(worldTypes)
         .where(and(eq(worldTypes.worldId, worldId), eq(worldTypes.typeId, typeId)))
+        .run();
+      if (deleted.changes === 0) return false;
+      this.bumpAndNudge(worldId);
+      return true;
+    });
+  }
+
+  /**
+   * Author a new World-defined Field (ADR-0054). Bumps `seq` alone, like {@link createType}. The
+   * service has already checked the id is free, so the insert never conflicts. The Field's body rides
+   * in `definition` (id-less); `fieldId` is the `world.`-namespaced reuse handle.
+   */
+  createField(worldId: string, fieldId: string, definition: FieldSchema, now: number = Date.now()): void {
+    this.transact(() => {
+      this.db.insert(worldFields).values({ worldId, fieldId, definition, createdAt: now, updatedAt: now }).run();
+      this.bumpAndNudge(worldId);
+    });
+  }
+
+  /**
+   * Re-body a World-defined Field. Returns whether a row matched — an unknown id leaves the World
+   * untouched, so the bump and nudge are skipped and the caller can 404. The id is immutable (followers
+   * key off it); re-keying the Field simply orphans its old document values, forward-only (ADR-0054).
+   */
+  updateField(worldId: string, fieldId: string, definition: FieldSchema): boolean {
+    return this.transact(() => {
+      const updated = this.db
+        .update(worldFields)
+        .set({ definition, updatedAt: Date.now() })
+        .where(and(eq(worldFields.worldId, worldId), eq(worldFields.fieldId, fieldId)))
+        .run();
+      if (updated.changes === 0) return false;
+      this.bumpAndNudge(worldId);
+      return true;
+    });
+  }
+
+  /**
+   * Delete a World-defined Field. Returns whether a row matched, so an unknown id 404s. Entities
+   * referencing it degrade to plain document values — the id simply stops resolving (ADR-0054).
+   */
+  deleteField(worldId: string, fieldId: string): boolean {
+    return this.transact(() => {
+      const deleted = this.db
+        .delete(worldFields)
+        .where(and(eq(worldFields.worldId, worldId), eq(worldFields.fieldId, fieldId)))
         .run();
       if (deleted.changes === 0) return false;
       this.bumpAndNudge(worldId);

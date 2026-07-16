@@ -180,6 +180,39 @@ export async function authorWorldType(
 }
 
 /**
+ * Author a reusable World-defined Field in a World's settings (ADR-0054, #230), and land back on the
+ * Fields list with it saved. `id` is the bare slug the form takes; the World's namespace makes it
+ * `world.<id>`. `kind` defaults to the form's `string`; `options` fills an enum's comma-separated list.
+ */
+export async function authorWorldField(
+  page: Page,
+  worldId: string,
+  field: { id: string; key: string; label: string; kind?: string; options?: string },
+): Promise<void> {
+  await page.goto(`/w/${worldId}/settings`);
+  await page.getByTestId('field-new').click();
+  await page.getByTestId('field-id-input').fill(field.id);
+  await page.getByTestId('field-key-input').fill(field.key);
+  await page.getByTestId('field-name-input').fill(field.label);
+  if (field.kind) await page.getByTestId('field-kind').selectOption(field.kind);
+  if (field.options !== undefined) await page.getByTestId('field-options').fill(field.options);
+  await page.getByTestId('field-save').click();
+  await expect(page.getByTestId(`field-world.${field.id}`)).toBeVisible();
+}
+
+/**
+ * Attach the registered Field `fieldId` to the open Entity through the header's Edit-fields dialog,
+ * and close it. The Field must be attachable — not already on the Entity's effective set.
+ */
+export async function attachField(page: Page, fieldId: string): Promise<void> {
+  await openEntityActions(page);
+  await page.getByTestId('edit-fields').click();
+  await page.getByTestId('field-add').selectOption(fieldId);
+  await expect(page.getByTestId(`field-chip-${fieldId}`)).toBeVisible();
+  await page.getByTestId('fields-close').click();
+}
+
+/**
  * Add `typeId` to the open Entity through the header's Edit-types dialog, minting the defaults its
  * Fields declare. Only for a type whose Fields are all optional: one declaring a *required* Field
  * prompts for it before the add commits, which a spec drives itself.

@@ -23,11 +23,14 @@ import {
   AuthUser,
   AvailableType,
   createUserDefinedTypeRequestSchema,
+  createWorldFieldRequestSchema,
   createWorldRequestSchema,
+  Field,
   ImportSummary,
   PublicLink,
   setMemberRoleRequestSchema,
   updateUserDefinedTypeRequestSchema,
+  updateWorldFieldRequestSchema,
   updateWorldRequestSchema,
   UserDefinedType,
   WorldDetail,
@@ -45,6 +48,7 @@ import { VaultImportService } from './vault-import.service';
 import { WorldGraphService } from './world-graph.service';
 import { WorldsService } from './worlds.service';
 import { TypeResult, WorldTypesService } from './world-types.service';
+import { WorldFieldsService } from './world-fields.service';
 
 /** The subset of multer's uploaded-file shape this controller uses (no @types/multer dep). */
 interface UploadedZip {
@@ -64,6 +68,7 @@ export class WorldsController {
   constructor(
     private readonly worlds: WorldsService,
     private readonly types: WorldTypesService,
+    private readonly fields: WorldFieldsService,
     private readonly importer: VaultImportService,
     private readonly exporter: VaultExportService,
     private readonly graphs: WorldGraphService,
@@ -195,6 +200,42 @@ export class WorldsController {
   @HttpCode(204)
   removeType(@CurrentUser() user: AuthUser, @Param('id') id: string, @Param('typeId') typeId: string): void {
     this.typeResult(this.types.delete(user.id, id, typeId));
+  }
+
+  // The World-defined Fields (#230, ADR-0054): the resolver and attach picker source. Reachable-gated.
+  @Get(':id/fields')
+  fieldsFor(@CurrentUser() user: AuthUser, @Param('id') id: string): Field[] {
+    const result = this.fields.list(user.id, id);
+    if (result === 'not-found') throw new NotFoundException();
+    return result;
+  }
+
+  // Author a new World-defined Field (#230): Owner-only, id unique in the World (else 409).
+  @Post(':id/fields')
+  createField(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() body: unknown): Field {
+    const parsed = createWorldFieldRequestSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException();
+    return this.typeResult(this.fields.create(user.id, id, parsed.data));
+  }
+
+  // Re-body a World-defined Field (#230): Owner-only. The id is immutable, so it is a path param.
+  @Patch(':id/fields/:fieldId')
+  updateField(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Param('fieldId') fieldId: string,
+    @Body() body: unknown,
+  ): Field {
+    const parsed = updateWorldFieldRequestSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException();
+    return this.typeResult(this.fields.update(user.id, id, fieldId, parsed.data));
+  }
+
+  // Delete a World-defined Field (#230): Owner-only. Entities referencing it degrade to plain values.
+  @Delete(':id/fields/:fieldId')
+  @HttpCode(204)
+  removeField(@CurrentUser() user: AuthUser, @Param('id') id: string, @Param('fieldId') fieldId: string): void {
+    this.typeResult(this.fields.delete(user.id, id, fieldId));
   }
 
   /** Map a {@link TypeResult} to its HTTP outcome: `ok` unwraps, else the status's exception. */

@@ -4,6 +4,7 @@ import { TranslocoPipe } from '@jsverse/transloco';
 import { ActiveWorld } from '@hexly/web-core';
 import { Eyebrow, Panel, OwnerSet, MemberSet, PublicLinkControl } from '@hexly/web-ui';
 import { WorldTypesPanel } from './world-types-panel';
+import { WorldFieldsPanel } from './world-fields-panel';
 
 /**
  * The World settings page. The active World id comes from {@link ActiveWorld}, pinned by the
@@ -14,7 +15,7 @@ import { WorldTypesPanel } from './world-types-panel';
 @Component({
   selector: 'app-world-settings',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, Eyebrow, Panel, OwnerSet, MemberSet, PublicLinkControl, WorldTypesPanel],
+  imports: [TranslocoPipe, Eyebrow, Panel, OwnerSet, MemberSet, PublicLinkControl, WorldTypesPanel, WorldFieldsPanel],
   template: `
     @if (worldId(); as id) {
       <section class="world-settings">
@@ -47,6 +48,16 @@ import { WorldTypesPanel } from './world-types-panel';
         </p>
         <div appPanel>
           <app-world-types [id]="id" />
+        </div>
+
+        <h2 class="world-settings-heading">
+          {{ 'worldFields.heading' | transloco }}
+        </h2>
+        <p class="world-settings-subhead">
+          {{ 'worldFields.subhead' | transloco }}
+        </p>
+        <div appPanel>
+          <app-world-fields [id]="id" />
         </div>
 
         <h2 class="world-settings-heading">

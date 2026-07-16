@@ -2,11 +2,14 @@ import { NEVER, Observable, of } from 'rxjs';
 import {
   AvailableType,
   CreateUserDefinedTypeRequest,
+  CreateWorldFieldRequest,
+  Field,
   FollowSignal,
   ImportSummary,
   MemberRole,
   PublicLink,
   UpdateUserDefinedTypeRequest,
+  UpdateWorldFieldRequest,
   UserDefinedType,
   WorldDetail,
   WorldMember,
@@ -51,4 +54,10 @@ export class MockWorldsClient {
   updateType =
     vi.fn<(id: string, typeId: string, patch: UpdateUserDefinedTypeRequest) => Observable<UserDefinedType>>();
   deleteType = vi.fn<(id: string, typeId: string) => Observable<void>>();
+  // Defaults to no World-defined Fields so a spec mounting a Field-consuming surface (#230) without
+  // caring about it still renders; override per test as needed.
+  fields = vi.fn<(id: string) => Observable<Field[]>>(() => of<Field[]>([]));
+  createField = vi.fn<(id: string, req: CreateWorldFieldRequest) => Observable<Field>>();
+  updateField = vi.fn<(id: string, fieldId: string, patch: UpdateWorldFieldRequest) => Observable<Field>>();
+  deleteField = vi.fn<(id: string, fieldId: string) => Observable<void>>();
 }

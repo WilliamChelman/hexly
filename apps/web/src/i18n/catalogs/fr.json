@@ -340,6 +340,38 @@
     "updateError": "Impossible d'enregistrer ce type. Veuillez réessayer.",
     "removeError": "Impossible de supprimer ce type. Veuillez réessayer."
   },
+  "worldFields": {
+    "heading": "Champs personnalisés",
+    "subhead": "Définissez des champs réutilisables une fois, puis attachez-les à n'importe quelle entité ou type de ce monde.",
+    "empty": "Aucun champ personnalisé pour l'instant.",
+    "add": "Nouveau champ",
+    "edit": "Modifier",
+    "remove": "Supprimer",
+    "idLabel": "Identifiant",
+    "idPrefix": "world.",
+    "idHint": "Une clé courte comme element.",
+    "keyLabel": "Clé",
+    "keyHint": "La clé de document sous laquelle sa valeur est stockée.",
+    "nameLabel": "Libellé",
+    "typeLabel": "Type",
+    "required": "Requis",
+    "facetable": "Filtrable",
+    "options": "Options",
+    "optionsHint": "Séparées par des virgules",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "dataType": {
+      "string": "Texte",
+      "number": "Nombre",
+      "boolean": "Oui / Non",
+      "date": "Date",
+      "enum": "Choix"
+    },
+    "loadError": "Impossible de charger les champs personnalisés de ce monde.",
+    "createError": "Impossible de créer ce champ. Veuillez réessayer.",
+    "updateError": "Impossible d'enregistrer ce champ. Veuillez réessayer.",
+    "removeError": "Impossible de supprimer ce champ. Veuillez réessayer."
+  },
   "publicView": {
     "tabTitle": "Partagé — Hexly",
     "banner": "Vous consultez une page partagée en lecture seule.",

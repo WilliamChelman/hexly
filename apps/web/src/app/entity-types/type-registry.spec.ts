@@ -308,6 +308,49 @@ describe('TypeRegistry', () => {
     });
   });
 
+  describe('World-defined Fields composed over the Plugin fields (ADR-0054, #230)', () => {
+    const element: FieldSchema & { id: string } = {
+      id: 'world.element',
+      key: 'element',
+      label: 'Element',
+      dataType: { kind: 'enum', options: ['fire', 'ice', 'water'] },
+      required: false,
+      facetable: true,
+    };
+
+    it('resolves a World Field by id, and unions an attached one into the effective set', () => {
+      registry.setWorldFields([element]);
+      expect(registry.field('world.element')?.label).toBe('Element');
+      expect(registry.effectiveFields(['core.note'], ['world.element']).map((f) => f.key)).toEqual([
+        'element',
+        'content',
+      ]);
+    });
+
+    it('offers a World Field in the attach picker, alongside the Plugin fields', () => {
+      registry.setWorldFields([element]);
+      const ids = registry.attachableFields(['core.note'], []).map((f) => f.id);
+      expect(ids).toContain('world.element');
+      expect(ids).toContain('dnd.size');
+    });
+
+    it('degrades to a plain document value once the World Field is gone — the delete/rename case', () => {
+      registry.setWorldFields([element]);
+      registry.setWorldFields([]); // deleted (or re-keyed under a new id) — its old id stops resolving
+      expect(registry.field('world.element')).toBeUndefined();
+      // The attached id resolves to nothing, so it drops from the set (its value left as plain document).
+      expect(registry.effectiveFields(['core.note'], ['world.element']).map((f) => f.key)).toEqual(['content']);
+    });
+
+    it('reuses one World Field across two unrelated types via instance attachment', () => {
+      registry.setWorldFields([element]);
+      registry.register({ ...definition('world.deity', []), views: [CORE_VIEW_FIELDS] });
+      // Attached to a plain note and to a world.deity — one Field, two unrelated types.
+      expect(registry.effectiveFields(['core.note'], ['world.element']).map((f) => f.key)).toContain('element');
+      expect(registry.effectiveFields(['world.deity'], ['world.element']).map((f) => f.key)).toContain('element');
+    });
+  });
+
   describe('viewsFor over the effective set', () => {
     it('appends an attached structured Field’s View after the types’ (CONTEXT.md → View)', () => {
       // A note with a grid Field attached affords its Content View, then the attached grid’s Map View.

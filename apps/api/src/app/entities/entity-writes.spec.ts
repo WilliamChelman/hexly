@@ -18,6 +18,7 @@ import { loadConfig } from '../config';
 import { BUNDLED_PLUGIN_CONFIGS } from './bundled-plugins';
 import { EntityChange, EntityWrites, MutateResult } from './entity-writes';
 import { TypeFieldRegistry } from './type-field-registry';
+import { WorldFields } from './world-fields';
 import { WorldTypeFields } from './world-type-fields';
 
 /**
@@ -47,9 +48,14 @@ describe('EntityWrites', () => {
     // asserts, so only the bus at the far end of it is a recorder.
     // Every bundled Plugin enabled (the default), so the derive pass sees the full data-type set.
     typeFields = new TypeFieldRegistry(loadConfig(':memory:', BUNDLED_PLUGIN_CONFIGS));
-    // The world-scoped resolver over the same registry — no World-defined types are seeded here, so
-    // it resolves through to the plugin registry (#191).
-    writes = new EntityWrites(db, new WriteOutbox(db, bus), new WorldTypeFields(db, typeFields), typeFields);
+    // The world-scoped resolver over the same registry — no World-defined types or Fields are seeded
+    // here, so it resolves through to the plugin registry (#191, ADR-0054).
+    writes = new EntityWrites(
+      db,
+      new WriteOutbox(db, bus),
+      new WorldTypeFields(db, typeFields, new WorldFields(db, typeFields)),
+      typeFields,
+    );
 
     seedUser(ADA);
     seedWorld(WORLD, ADA);
