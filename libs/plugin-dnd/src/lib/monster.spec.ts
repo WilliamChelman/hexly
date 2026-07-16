@@ -1,4 +1,4 @@
-import { defineType, NO_STRUCTURED_DATA_TYPES, resolveFields, validateFields } from '@hexly/domain';
+import { defineType, NO_STRUCTURED_DATA_TYPES, resolveEffectiveFields, validateFields } from '@hexly/domain';
 import { CONTENT_FIELD } from '@hexly/plugin-content';
 import {
   abilityModifier,
@@ -7,6 +7,7 @@ import {
   DND_DEFENCE_KEYS,
   DND_IDENTITY_KEYS,
   DND_MONSTER,
+  DND_MONSTER_FIELDS,
   DND_MONSTER_TYPE,
   formatModifier,
 } from './monster';
@@ -15,17 +16,8 @@ describe('defineType', () => {
   it('rejects a malformed plugin at declaration time, not at runtime', () => {
     // A bare id (no namespace) would collide with a future plugin's.
     expect(() => defineType({ id: 'monster', label: 'Monster' })).toThrow();
-    // Two Fields typing one EntityDocument key is a plugin bug: the key can only mean one thing.
-    expect(() =>
-      defineType({
-        id: 'dnd.beast',
-        label: 'Beast',
-        fields: [
-          { key: 'cr', label: 'CR', dataType: { kind: 'number' }, required: false, facetable: false },
-          { key: 'cr', label: 'Challenge', dataType: { kind: 'string' }, required: false, facetable: false },
-        ],
-      }),
-    ).toThrow();
+    // A `fieldRef` is a Field id, not a bare key — a malformed reference is a plugin bug, caught here.
+    expect(() => defineType({ id: 'dnd.beast', label: 'Beast', fieldRefs: ['cr'] })).toThrow();
   });
 });
 
@@ -33,13 +25,18 @@ describe('dnd.monster', () => {
   it('is namespaced, and declares challenge_rating as a required number', () => {
     expect(DND_MONSTER).toBe('dnd.monster');
 
-    const cr = DND_MONSTER_TYPE.fields.find((field) => field.key === DND_CHALLENGE_KEY);
+    const cr = DND_MONSTER_FIELDS.find((field) => field.key === DND_CHALLENGE_KEY);
     expect(cr).toMatchObject({ dataType: { kind: 'number' }, required: true, facetable: true });
   });
 
   it('resolves through the shared types[] → Fields path both sides ride', () => {
-    const resolver = (id: string) => (id === DND_MONSTER ? DND_MONSTER_TYPE.fields : undefined);
-    const fields = resolveFields(resolver, [DND_MONSTER]);
+    const byId = new Map(DND_MONSTER_FIELDS.map((field) => [field.id, field]));
+    const fields = resolveEffectiveFields({
+      types: [DND_MONSTER],
+      fieldIds: [],
+      fieldResolver: (id) => byId.get(id),
+      typeFieldRefs: () => DND_MONSTER_TYPE.fieldRefs,
+    });
 
     expect(fields.map((field) => field.key)).toContain(DND_CHALLENGE_KEY);
     // The forward-only gate: a monster without its required Field is rejected on an active typed edit…
@@ -51,7 +48,7 @@ describe('dnd.monster', () => {
   });
 
   it('exposes exactly the facetable Fields the Browser unfolds under the type filter', () => {
-    const facetable = DND_MONSTER_TYPE.fields.filter((field) => field.facetable).map((field) => field.key);
+    const facetable = DND_MONSTER_FIELDS.filter((field) => field.facetable).map((field) => field.key);
     expect(facetable).toEqual(['size', 'creature_type', 'challenge_rating']);
   });
 
@@ -62,9 +59,7 @@ describe('dnd.monster', () => {
   it('declares a Field for every key the stat block prints, and prints every stat Field it declares', () => {
     // The canonical prose Field is declared beside the stats (ADR-0051) but rendered by the content
     // editor, not the stat block — so it is the one declared Field the block does not print.
-    const declared = new Set(
-      DND_MONSTER_TYPE.fields.map((field) => field.key).filter((key) => key !== CONTENT_FIELD.key),
-    );
+    const declared = new Set(DND_MONSTER_FIELDS.map((field) => field.key).filter((key) => key !== CONTENT_FIELD.key));
     const printed = [...DND_IDENTITY_KEYS, ...DND_DEFENCE_KEYS, ...DND_ABILITY_KEYS, DND_CHALLENGE_KEY];
 
     expect(printed.filter((key) => !declared.has(key))).toEqual([]);

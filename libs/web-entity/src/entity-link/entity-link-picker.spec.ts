@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { TranslocoService } from '@jsverse/transloco';
 import { of } from 'rxjs';
-import { EntityDetail, EntitySummary, EntityType, FieldSchema } from '@hexly/domain';
+import { defineField, EntityDetail, EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient } from '@hexly/web-core';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { WEB_ENTITY_TEST_CATALOGS } from '../i18n/test-catalogs';
@@ -12,13 +12,13 @@ import { CORE_VIEW_FIELDS } from '../lib/view-definition';
 import { TypeDefinition } from '../lib/type-definition';
 import { EntityLinkPicker } from './entity-link-picker';
 
-/** A code-registered type, chrome and all — the shape the picker reads its create row off. */
-function codeType(id: string, fields?: readonly FieldSchema[]): TypeDefinition {
+/** A code-registered type, chrome and all — the shape the picker reads its create row off. It declares its default Fields by id (`fieldRefs`, ADR-0054). */
+function codeType(id: string, fieldRefs: readonly string[] = []): TypeDefinition {
   return {
     id: id as TypeDefinition['id'],
     icon: 'label',
     views: [CORE_VIEW_FIELDS],
-    fields,
+    fieldRefs,
     graphColorToken: '--color-ink-muted',
     labels: {
       eyebrow: `${id}.eyebrow`,
@@ -40,10 +40,18 @@ const deity: TypeDefinition = {
   graphColorToken: '--color-ink-muted',
 };
 
-/** A type whose Field is **required**: it cannot be minted blind, so create-and-link never offers it. */
-const monster: TypeDefinition = codeType('dnd.monster', [
-  { key: 'cr', label: 'Challenge Rating', dataType: { kind: 'number' }, required: true, facetable: true },
-]);
+/** A required Field the monster references — it cannot be minted blind, so create-and-link never offers the type. */
+const crField = defineField({
+  id: 'dnd.cr',
+  key: 'cr',
+  label: 'Challenge Rating',
+  dataType: { kind: 'number' },
+  required: true,
+  facetable: true,
+});
+
+/** A type whose referenced Field is **required**: create-and-link never offers it. */
+const monster: TypeDefinition = codeType('dnd.monster', [crField.id]);
 
 function summary(id: string, name: string): EntitySummary {
   return {
@@ -85,7 +93,7 @@ describe('EntityLinkPicker', () => {
         provideRouter([]),
         // Note, Map, a World's own Deity, and a Monster whose CR is required — the registry the app
         // composes, as a lib reads it. The picker never learns which of these is which.
-        ...provideEntityTypesTesting([codeType('core.note'), codeType('core.hexmap'), deity, monster]),
+        ...provideEntityTypesTesting([codeType('core.note'), codeType('core.hexmap'), deity, monster], [crField]),
         {
           provide: EntitiesClient,
           useValue: {

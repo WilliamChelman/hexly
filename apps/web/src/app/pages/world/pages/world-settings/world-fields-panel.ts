@@ -13,10 +13,7 @@ import { produce } from '@hexly/immer';
 import { Button, Input, Select } from '@hexly/web-ui';
 import { WorldFieldsLoader } from '../../../../entity-types/world-fields-loader';
 import { ViewRegistry } from '../../../../entity-types/view-registry';
-
-/** The built-in data-types the authoring UI offers — the subset a code-less Field needs (#230). */
-const BUILT_IN_KINDS = ['string', 'number', 'boolean', 'date', 'enum'] as const;
-type BuiltInKind = (typeof BUILT_IN_KINDS)[number];
+import { BUILT_IN_KINDS, dataTypeLabel, toFieldDataType } from './field-data-type';
 
 /** The open editor: creating (`editingId === null`) or editing an existing Field by id. */
 interface Draft {
@@ -352,12 +349,9 @@ export class WorldFieldsPanel implements OnInit {
     });
   }
 
-  /** A Data Type's display name: a built-in's translated label, a structured one's labelKey, else the raw kind. */
-  private dataTypeLabel(kind: string, structured: Map<string, string>): string {
-    if ((BUILT_IN_KINDS as readonly string[]).includes(kind))
-      return this.transloco.translate(`worldFields.dataType.${kind}`);
-    const labelKey = structured.get(kind);
-    return labelKey ? this.transloco.translate(labelKey) : kind;
+  /** A Data Type's display name, shared with the World Types editor — built-ins under the `worldFields` catalog. */
+  private dataTypeLabel(kind: string, structured: ReadonlyMap<string, string>): string {
+    return dataTypeLabel(kind, structured, (key) => this.transloco.translate(key), 'worldFields.dataType');
   }
 
   private error(key: string): void {
@@ -374,23 +368,8 @@ function toFieldSchema(d: Draft): FieldSchema {
   return {
     key: d.key.trim(),
     label: d.label.trim(),
-    dataType: toDataType(d),
+    dataType: toFieldDataType(d.kind, d.options, d.stored),
     required: !structured && d.required,
     facetable: !structured && d.facetable,
   };
-}
-
-/** The picked kind → a data-type. An untouched kind hands back the stored one verbatim (item/target types intact). */
-function toDataType(d: Draft): FieldDataType {
-  if (d.kind === 'enum')
-    return {
-      kind: 'enum',
-      options: d.options
-        .split(',')
-        .map((option) => option.trim())
-        .filter(Boolean),
-    };
-  if (d.stored?.kind === d.kind) return d.stored;
-  if (isStructuredKind(d.kind)) return { kind: d.kind };
-  return { kind: d.kind as Exclude<BuiltInKind, 'enum'> };
 }

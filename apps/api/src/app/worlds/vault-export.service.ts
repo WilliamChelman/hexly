@@ -1,6 +1,6 @@
 import { posix } from 'node:path';
 import { Injectable } from '@nestjs/common';
-import { EntityDetail, EntityType, HEXLY_TYPE_KEY, resolveFields, VaultExportContext } from '@hexly/domain';
+import { EntityDetail, EntityType, HEXLY_TYPE_KEY, VaultExportContext } from '@hexly/domain';
 import { entityToMarkdown } from '@hexly/obsidian';
 import { strToU8, zipSync, type Zippable } from 'fflate';
 import { AssetsService } from '../assets/assets.service';
@@ -52,10 +52,8 @@ export class VaultExportService {
     // would overwrite each other in `files`; uniquePath keeps both (#150).
     const entities = this.entities.listByWorld(ownerId, worldId);
     const nameById = new Map(entities.map((e) => [e.id, e.name]));
-    // A World's own user-defined types resolve too, so a Field they declare projects correctly.
-    const resolver = this.worldTypeFields.resolverFor(worldId);
     for (const entity of entities) {
-      files[uniquePath(files, filePath(entity))] = strToU8(this.toMarkdown(entity, srcMap, nameById, resolver));
+      files[uniquePath(files, filePath(entity))] = strToU8(this.toMarkdown(entity, srcMap, nameById, worldId));
     }
 
     return { filename: `${world.name}.zip`, zip: Buffer.from(zipSync(files)) };
@@ -66,7 +64,7 @@ export class VaultExportService {
     entity: EntityDetail,
     srcMap: Map<string, string>,
     nameById: Map<string, string>,
-    resolver: ReturnType<WorldTypeFields['resolverFor']>,
+    worldId: string,
   ): string {
     const context: VaultExportContext = {
       // A wikilink's label refreshes to its target's CURRENT name so a post-import rename round-trips;
@@ -78,7 +76,9 @@ export class VaultExportService {
     };
     return entityToMarkdown({
       doc: entity.document,
-      fields: resolveFields(resolver, entity.types),
+      // The Entity's effective Field set — its types' defaults plus its own attachments (ADR-0054) —
+      // so a directly-attached Field's Vault Projection lands correctly too, not just a type default's.
+      fields: this.worldTypeFields.effectiveFields(worldId, entity.types, entity.fields ?? []),
       dataTypes: this.typeFields.structuredDataTypes,
       frontmatter: frontmatterAdditions(entity, this.typeFields.defaultType),
       context,

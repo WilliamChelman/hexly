@@ -213,25 +213,6 @@ export type FieldResolver = (id: string) => Field | undefined;
 export type TypeFieldRefsResolver = (typeId: string) => readonly string[] | undefined;
 
 /**
- * The Field schemas a single Entity Type declares, keyed by type id. `undefined` for a type that
- * declares no Fields (a core type, or an absent plugin) — it resolves to nothing rather than throwing.
- */
-export type TypeFieldResolver = (typeId: string) => readonly FieldSchema[] | undefined;
-
-/**
- * The union of Field schemas an Entity carrying `types` affords — every type's declared Fields, in
- * `types` order (primary type first), deduped by `key`. When two types type the same EntityDocument key,
- * the primary type's declaration wins.
- */
-export function resolveFields(resolver: TypeFieldResolver, types: readonly string[]): FieldSchema[] {
-  const byKey = new Map<string, FieldSchema>();
-  for (const type of types)
-    for (const fieldSchema of resolver(type) ?? [])
-      if (!byKey.has(fieldSchema.key)) byKey.set(fieldSchema.key, fieldSchema);
-  return [...byKey.values()];
-}
-
-/**
  * The **effective Field set** of an Entity (CONTEXT.md → Entity, ADR-0054): its directly-attached Fields
  * (`fieldIds`) unioned with its types' default Fields (each type's `fieldRefs`, primary type first),
  * every id resolved to a {@link Field} and the whole deduped by document `key`.
@@ -239,8 +220,8 @@ export function resolveFields(resolver: TypeFieldResolver, types: readonly strin
  * Precedence, when two Fields resolve to one `key`: **instance > primary type > later types** — the
  * most-specific source wins the key, the loser simply drops from the set (its document value is left
  * untouched, forward-only tolerance). An id that resolves to nothing is skipped, so a disabled plugin or
- * a deleted World Field degrades to a plain document value rather than erroring. Generalizes
- * {@link resolveFields}' primary-wins rule.
+ * a deleted World Field degrades to a plain document value rather than erroring. The one resolution
+ * path (id → Field): a Type Definition names its default Fields by id (`fieldRefs`), never inline.
  *
  * The returned order encodes that precedence (instance-attached first, then types primary→later); display
  * and View ordering is a concern of the layer that consumes the set, not of resolution.

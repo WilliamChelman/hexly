@@ -2,7 +2,7 @@ import { DestroyRef, Injectable, inject } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { catchError, map, merge, of, Subject, switchMap } from 'rxjs';
 import { ActiveWorld, Logger, WorldsClient } from '@hexly/web-core';
-import { AvailableType } from '@hexly/domain';
+import { AvailableType, Field } from '@hexly/domain';
 import { TypeDefinition, userTypeViews } from '@hexly/web-entity';
 import { TypeRegistry } from './type-registry';
 
@@ -55,27 +55,27 @@ export class WorldTypesLoader {
     for (const off of this.unregister) off();
     this.unregister = types
       .filter((type) => type.source === 'user')
-      .map((type) => this.registry.register(toDefinition(type)));
+      .map((type) => this.registry.register(toDefinition(type, (id) => this.registry.field(id))));
   }
 }
 
 /**
- * Project a user-defined {@link AvailableType} onto a {@link TypeDefinition}. It declares **no**
- * transloco `labels` — a user-defined type ships no copy, so every label it shows is its authored
- * name, resolved through {@link TypeRegistry.name}/`chromeLabel`.
+ * Project a user-defined {@link AvailableType} onto a {@link TypeDefinition}. A type declares its
+ * default Fields by id (`fieldRefs`, ADR-0054); the ids resolve through the registry to Fields, so a
+ * default view order can place each **Structured Data Type** Field. It declares **no** transloco
+ * `labels` — a user-defined type ships no copy, so every label it shows is its authored name, resolved
+ * through {@link TypeRegistry.name}/`chromeLabel`.
  */
-function toDefinition(type: AvailableType): TypeDefinition {
+function toDefinition(type: AvailableType, resolveField: (id: string) => Field | undefined): TypeDefinition {
+  const fields = type.fieldRefs.map(resolveField).filter((field): field is Field => !!field);
   return {
     id: type.id,
     icon: 'label',
     labelText: type.label,
     // Absent is not empty: an author who named no order gets Fields, Content, then their Fields of a
-    // Structured Data Type (#201).
-    views: type.views ?? userTypeViews(type.fields),
-    fields: type.fields,
-    // Referenced default Fields by id (ADR-0054); usually empty until the World Fields step, where a
-    // user-defined type's Fields gain ids — its inline `fields` resolve meanwhile.
-    ...(type.fieldRefs?.length ? { fieldRefs: type.fieldRefs } : {}),
+    // Structured Data Type (#201), derived from the referenced Fields.
+    views: type.views ?? userTypeViews(fields),
+    fieldRefs: type.fieldRefs,
     graphColorToken: '--color-ink-muted',
   };
 }

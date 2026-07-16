@@ -16,7 +16,6 @@ import { CORE_HEXMAP_TYPE, HEX_GRID_FIELD } from '../lib';
 export const HEXMAP_TYPE_DEFINITIONS: readonly TypeDefinition[] = [
   {
     id: CORE_HEXMAP_TYPE.id,
-    fields: CORE_HEXMAP_TYPE.fields,
     // References the prose and grid Fields by id (ADR-0054); `fields` kept for the World Types editor.
     fieldRefs: CORE_HEXMAP_TYPE.fieldRefs,
     icon: 'terrain',

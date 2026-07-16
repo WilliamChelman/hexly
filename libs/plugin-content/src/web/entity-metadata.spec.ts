@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { EntityDetail, FieldSchema } from '@hexly/domain';
+import { EntityDetail, Field } from '@hexly/domain';
 import { TypeDefinition } from '@hexly/web-entity';
 import { FakeEntitySession, provideFakeEntitySession, provideEntityTypesTesting } from '@hexly/web-entity/testing';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
@@ -18,7 +18,8 @@ import { EntityMetadata } from './entity-metadata';
  * for a registered structured Field the panel must skip — its value is a document with its own View —
  * without pulling in the map plugin.
  */
-const GRID_FIELD: FieldSchema = {
+const GRID_FIELD: Field = {
+  id: 'test.grid',
   key: 'grid',
   label: 'Grid',
   dataType: { kind: 'test.grid' },
@@ -26,12 +27,12 @@ const GRID_FIELD: FieldSchema = {
   facetable: false,
 };
 
-/** `core.note`, as the plugin registers it: its one canonical prose Field. */
+/** `core.note`, as the plugin registers it: its one canonical prose Field, referenced by id. */
 const NOTE_TYPE: TypeDefinition = {
   id: CORE_NOTE,
   icon: 'label',
   views: [{ field: CONTENT_FIELD.key }],
-  fields: [CONTENT_FIELD],
+  fieldRefs: [CONTENT_FIELD.id],
   graphColorToken: '--color-ink-muted',
   labels: {
     eyebrow: 'x',
@@ -44,7 +45,7 @@ const NOTE_TYPE: TypeDefinition = {
 };
 
 /** A grid-carrying type — prose beside a Field of a Structured Data Type, both of which the panel skips. */
-const MAP_TYPE: TypeDefinition = { ...NOTE_TYPE, id: 'core.hexmap', fields: [CONTENT_FIELD, GRID_FIELD] };
+const MAP_TYPE: TypeDefinition = { ...NOTE_TYPE, id: 'core.hexmap', fieldRefs: [CONTENT_FIELD.id, GRID_FIELD.id] };
 
 const noteWith = (types: readonly string[], metadata?: Record<string, unknown>): EntityDetail => ({
   id: 'n1',
@@ -69,7 +70,10 @@ describe('EntityMetadata', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [EntityMetadata, provideTranslocoTesting(CONTENT_EDITOR_TEST_CATALOGS)],
-      providers: [provideFakeEntitySession(), provideEntityTypesTesting([NOTE_TYPE, MAP_TYPE])],
+      providers: [
+        provideFakeEntitySession(),
+        provideEntityTypesTesting([NOTE_TYPE, MAP_TYPE], [CONTENT_FIELD, GRID_FIELD]),
+      ],
     }).compileComponents();
     session = TestBed.inject(FakeEntitySession);
   });
@@ -131,7 +135,7 @@ describe('EntityMetadata without the Hex Map plugin', () => {
     await TestBed.configureTestingModule({
       imports: [EntityMetadata, provideTranslocoTesting(CONTENT_EDITOR_TEST_CATALOGS)],
       // Only `core.note` is registered; `core.hexmap` resolves no Fields.
-      providers: [provideFakeEntitySession(), provideEntityTypesTesting([NOTE_TYPE])],
+      providers: [provideFakeEntitySession(), provideEntityTypesTesting([NOTE_TYPE], [CONTENT_FIELD])],
     }).compileComponents();
   });
 

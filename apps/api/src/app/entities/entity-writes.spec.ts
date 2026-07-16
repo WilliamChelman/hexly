@@ -560,9 +560,17 @@ describe('EntityWrites', () => {
      */
     describe('Entity-Link Field edges + facets (#190)', () => {
       beforeEach(() => {
-        typeFields.register('test.monster', [
-          { key: 'lair', label: 'Lair', dataType: { kind: 'entityLink' }, facetable: true },
-        ]);
+        // The type references its link Field by id (ADR-0054); the Field itself is registered instance-wide.
+        typeFields.registerField(
+          defineField({
+            id: 'test.lair',
+            key: 'lair',
+            label: 'Lair',
+            dataType: { kind: 'entityLink' },
+            facetable: true,
+          }),
+        );
+        typeFields.register('test.monster', ['test.lair']);
       });
 
       it('materialises an edge and a target-id facet from an Entity-Link Field value', () => {

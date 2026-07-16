@@ -15,7 +15,6 @@ import {
   parseFieldFilters,
   readField,
   resolveEffectiveFields,
-  resolveFields,
   resolvedStructuredDataTypeFields,
   unresolvedDataTypeErrors,
   validateFields,
@@ -23,7 +22,6 @@ import {
 } from './field';
 import { defineStructuredDataType, NO_STRUCTURED_DATA_TYPES, structuredDataTypeSet } from './structured-data-type';
 import { vaultSlotOf } from './field';
-import { defineType } from './plugin-type';
 
 /** A terse FieldSchema builder for the specs — required/facetable default to false. */
 function field(partial: Partial<FieldSchema> & Pick<FieldSchema, 'key' | 'dataType'>): FieldSchema {
@@ -188,32 +186,6 @@ describe('Field — first-class, reusable (ADR-0054)', () => {
         kind: 'core.hex-grid',
       });
     });
-  });
-});
-
-describe('resolveFields', () => {
-  const beast = [field({ key: 'cr', dataType: { kind: 'number' } })];
-  const place = [field({ key: 'region', dataType: { kind: 'string' } })];
-  const resolver = (type: string) =>
-    (({ 'dnd.beast': beast, 'world.place': place }) as Record<string, FieldSchema[]>)[type];
-
-  it('unions the resolved Field schemas of a types[] set, primary type first', () => {
-    expect(resolveFields(resolver, ['dnd.beast', 'world.place']).map((f) => f.key)).toEqual(['cr', 'region']);
-  });
-
-  it('dedupes by key, keeping the primary type’s declaration when two types share a key', () => {
-    const a = [field({ key: 'name', dataType: { kind: 'string' }, label: 'A name' })];
-    const b = [field({ key: 'name', dataType: { kind: 'number' }, label: 'B name' })];
-    const both = (t: string) => (({ 'a.type': a, 'b.type': b }) as Record<string, FieldSchema[]>)[t];
-    const resolved = resolveFields(both, ['a.type', 'b.type']);
-    expect(resolved).toHaveLength(1);
-    expect(resolved[0].label).toBe('A name');
-  });
-
-  it('returns no fields for a types[] set whose types declare none — values stay plain EntityDocument', () => {
-    // A missing/absent type resolves to nothing, so its EntityDocument is never surfaced as a Field.
-    expect(resolveFields(resolver, ['core.note'])).toEqual([]);
-    expect(resolveFields(resolver, [])).toEqual([]);
   });
 });
 
@@ -721,12 +693,9 @@ describe('Structured Data Type (ADR-0050)', () => {
 
     it('rejects a kind that is neither a built-in nor `namespace.id`-shaped', () => {
       expect(() => field({ key: 'name', dataType: { kind: 'strig' } as never })).toThrow();
+      // A code-registered Field carries the same guard: a malformed kind throws at `defineField`.
       expect(() =>
-        defineType({
-          id: 'test.thing',
-          label: 'Thing',
-          fields: [{ key: 'name', label: 'Name', dataType: { kind: 'strig' } } as never],
-        }),
+        defineField({ id: 'test.name', key: 'name', label: 'Name', dataType: { kind: 'strig' } as never }),
       ).toThrow();
     });
   });

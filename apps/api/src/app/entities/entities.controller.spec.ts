@@ -2,6 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
+import { defineField, Field } from '@hexly/domain';
 import { emptyContent, tiptapContent } from '@hexly/plugin-content';
 import { coordKey } from '@hexly/plugin-hexmap';
 import { and, eq } from 'drizzle-orm';
@@ -16,6 +17,19 @@ import * as entityAccessModule from '../acl/entity-access';
 import { ConfigModule } from '../config/config.module';
 import { WorldsModule } from '../worlds/worlds.module';
 import { WorldsService } from '../worlds/worlds.service';
+
+/**
+ * Register a code-style type whose Fields are registered by id, then referenced by `fieldRefs`
+ * (ADR-0054) — mirroring how a real bundled plugin declares a type over its `defineField` Fields.
+ */
+function registerType(registry: TypeFieldRegistry, typeId: string, fields: readonly Field[], label?: string): void {
+  for (const field of fields) registry.registerField(field);
+  registry.register(
+    typeId,
+    fields.map((field) => field.id),
+    label,
+  );
+}
 
 /** A Hex Map Entity Document: prose at `content`, grid at `grid` (ADR-0051). */
 function hexmapBody(hexes: Record<string, unknown> = {}) {
@@ -137,7 +151,7 @@ describe('Entities endpoints', () => {
 
     expect(res.body.types).toEqual(['core.note', 'core.hexmap']);
     // The collected EntityDocument seeds over the minted defaults, not in place of them. `core.note` and
-    // `core.hexmap` both declare the prose Field, but `resolveFields` dedupes it to one (ADR-0051).
+    // `core.hexmap` both reference the prose Field, but the effective set dedupes it to one (ADR-0051).
     expect(res.body.document).toEqual({
       content: emptyContent(),
       grid: { hexes: {}, regions: [], labels: [] },
@@ -496,14 +510,9 @@ describe('Entities endpoints', () => {
   describe('the forward-only Field gate on active typed edits', () => {
     // A plugin-style type declaring a required string Field and an optional number Field.
     beforeEach(() => {
-      app.get(TypeFieldRegistry).register('test.beast', [
-        {
-          key: 'name',
-          label: 'Name',
-          dataType: { kind: 'string' },
-          required: true,
-        },
-        { key: 'cr', label: 'Challenge Rating', dataType: { kind: 'number' } },
+      registerType(app.get(TypeFieldRegistry), 'test.beast', [
+        defineField({ id: 'test.name', key: 'name', label: 'Name', dataType: { kind: 'string' }, required: true }),
+        defineField({ id: 'test.cr', key: 'cr', label: 'Challenge Rating', dataType: { kind: 'number' } }),
       ]);
     });
 
@@ -1312,38 +1321,43 @@ describe('Entities endpoints', () => {
     // A plugin-style type declaring two facetable Fields — an enum and a number — plus a
     // non-facetable one, registered the same way a bundled plugin (or a World-defined type) would.
     beforeEach(() => {
-      app.get(TypeFieldRegistry).register('test.beast', [
-        {
+      registerType(app.get(TypeFieldRegistry), 'test.beast', [
+        defineField({
+          id: 'test.alignment',
           key: 'alignment',
           label: 'Alignment',
           dataType: { kind: 'enum', options: ['lawful-good', 'chaotic-evil'] },
           facetable: true,
-        },
-        {
+        }),
+        defineField({
+          id: 'test.cr',
           key: 'cr',
           label: 'Challenge Rating',
           dataType: { kind: 'number' },
           facetable: true,
-        },
-        {
+        }),
+        defineField({
+          id: 'test.discovered',
           key: 'discovered',
           label: 'Discovered',
           dataType: { kind: 'date' },
           facetable: true,
-        },
-        {
+        }),
+        defineField({
+          id: 'test.senses',
           key: 'senses',
           label: 'Senses',
           dataType: { kind: 'list', of: { kind: 'string' } },
           facetable: true,
-        },
+        }),
         // Declared but not facetable — never surfaces as a Field facet.
-        {
+        defineField({
+          id: 'test.secret',
           key: 'secret',
           label: 'Secret',
           dataType: { kind: 'string' },
           facetable: false,
-        },
+        }),
       ]);
     });
 
@@ -1613,13 +1627,14 @@ describe('Entities endpoints', () => {
   describe('Entity-Link Fields (#190)', () => {
     // A monster type whose `lair` is a facetable, target-type-constrained Entity Link at a place.
     beforeEach(() => {
-      app.get(TypeFieldRegistry).register('test.monster', [
-        {
+      registerType(app.get(TypeFieldRegistry), 'test.monster', [
+        defineField({
+          id: 'test.lair',
           key: 'lair',
           label: 'Lair',
           dataType: { kind: 'entityLink', targetTypes: ['world.place'] },
           facetable: true,
-        },
+        }),
       ]);
     });
 

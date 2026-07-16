@@ -165,7 +165,7 @@ export class WorldWrites {
           worldId,
           typeId: type.id,
           label: type.label,
-          fields: [...type.fields],
+          fieldRefs: [...type.fieldRefs],
           views: type.views ? [...type.views] : null,
           createdAt: now,
           updatedAt: now,
@@ -182,15 +182,15 @@ export class WorldWrites {
   updateType(
     worldId: string,
     typeId: string,
-    patch: { label?: string; fields?: UserDefinedType['fields']; views?: UserDefinedType['views'] },
+    patch: { label?: string; fieldRefs?: UserDefinedType['fieldRefs']; views?: UserDefinedType['views'] },
   ): boolean {
     return this.transact(() => {
       const updated = this.db
         .update(worldTypes)
         .set({
           ...(patch.label !== undefined ? { label: patch.label } : {}),
-          ...(patch.fields !== undefined ? { fields: [...patch.fields] } : {}),
-          // A `fields` patch without `views` re-Fields a type that never named a view order: the
+          ...(patch.fieldRefs !== undefined ? { fieldRefs: [...patch.fieldRefs] } : {}),
+          // A `fieldRefs` patch without `views` re-references a type that never named a view order: the
           // stored `null` stays, and the web defaults the order over the new Fields.
           ...(patch.views !== undefined ? { views: [...patch.views] } : {}),
           updatedAt: Date.now(),

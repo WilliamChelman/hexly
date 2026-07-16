@@ -3,7 +3,7 @@ import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import { eq } from 'drizzle-orm';
 import request from 'supertest';
-import { assetUrl, LinkedEntity, EntityDocument, WorldGraph } from '@hexly/domain';
+import { assetUrl, defineField, LinkedEntity, EntityDocument, WorldGraph } from '@hexly/domain';
 import { tiptapContent } from '@hexly/plugin-content';
 import { AuthModule } from '../auth/auth.module';
 import { AuthService } from '../auth/auth.service';
@@ -63,9 +63,11 @@ describe('World Graph', () => {
 
   /** A typed Entity-Link Field relation feeds the same edge index as a Content or map link. */
   it('renders an Entity-Link Field relation as a graph edge, hidden when an endpoint is private', async () => {
-    app
-      .get(TypeFieldRegistry)
-      .register('test.monster', [{ key: 'lair', label: 'Lair', dataType: { kind: 'entityLink' }, facetable: false }]);
+    const registry = app.get(TypeFieldRegistry);
+    registry.registerField(
+      defineField({ id: 'test.lair', key: 'lair', label: 'Lair', dataType: { kind: 'entityLink' }, facetable: false }),
+    );
+    registry.register('test.monster', ['test.lair']);
     const ada = await signIn('ada@hexly.test');
     const bob = await signIn('bob@hexly.test');
     const world = await makeWorld(ada);

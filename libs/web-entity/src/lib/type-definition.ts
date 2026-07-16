@@ -1,4 +1,4 @@
-import { EntityType, FieldSchema } from '@hexly/domain';
+import { EntityType } from '@hexly/domain';
 import { IconName } from '@hexly/web-ui';
 import { CORE_VIEW_FIELDS, ViewPlacement } from './view-definition';
 
@@ -48,20 +48,18 @@ export interface TypeDefinition {
    * header toggles the *union* an Entity's types afford, defaulting to the primary type's first View.
    *
    * An entry is either a {@link ViewId} the type contributes outright, or a reference to one of the
-   * type's own {@link fields}, whose **Structured Data Type** contributes the View (ADR-0050):
-   * `core.hexmap` declares `[{ field: 'grid' }, CORE_VIEW_CONTENT]` — its grid placed by Field, its
-   * prose View by id (ADR-0051). A `{ field }` entry naming a
-   * Field this type does not declare, or one whose data-type this build does not register (its
-   * plugin is absent), contributes nothing.
+   * type's referenced {@link fieldRefs} Fields, whose **Structured Data Type** contributes the View
+   * (ADR-0050) — named by the EntityDocument `key` that Field lenses: `core.hexmap` declares
+   * `[{ field: 'grid' }, CORE_VIEW_CONTENT]`, its grid placed by Field, its prose View by id (ADR-0051).
+   * A `{ field }` entry naming a Field the type's effective set lacks, or one whose data-type this build
+   * does not register (its plugin is absent), contributes nothing.
    */
   readonly views: readonly ViewPlacement[];
   /**
-   * The type's **Field schema** (ADR-0048): the EntityDocument keys it types, each with a data-type and
-   * required-ness. A typing *lens* over EntityDocument — values stay in the one EntityDocument map. Which View
-   * renders them is the type's own choice, made in {@link views}. The core types declare no Fields.
+   * The default Fields this type references by id (`fieldRefs`, ADR-0054) — the sole way a Type
+   * declares its Fields, a typing *lens* over EntityDocument resolved through the registry (id → Field).
+   * Which View renders each is the type's own choice, made in {@link views}.
    */
-  readonly fields?: readonly FieldSchema[];
-  /** The default Fields this type references by id (`fieldRefs`, ADR-0054), additive beside inline {@link fields}. */
   readonly fieldRefs?: readonly string[];
   /**
    * The CSS custom property the World Graph paints this type's nodes with

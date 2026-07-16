@@ -1,18 +1,18 @@
 import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { ComponentRef } from '@angular/core';
-import { FieldSchema } from '@hexly/domain';
+import { defineField } from '@hexly/domain';
 import { EntityTypesEditor } from './entity-types-editor';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 import { TypeDefinition } from '@hexly/web-entity';
 import { CORE_VIEW_CONTENT, providePluginContent } from '@hexly/plugin-content/web';
 
-function definition(id: string, fields?: readonly FieldSchema[]): TypeDefinition {
+function definition(id: string, fieldRefs?: readonly string[]): TypeDefinition {
   return {
     id: id as TypeDefinition['id'],
     icon: 'label',
     views: [CORE_VIEW_CONTENT],
-    fields,
+    fieldRefs,
     graphColorToken: '--color-ink-muted',
     labels: {
       eyebrow: `${id}.eyebrow`,
@@ -25,13 +25,13 @@ function definition(id: string, fields?: readonly FieldSchema[]): TypeDefinition
   };
 }
 
-const lairField: FieldSchema = {
+const lairField = defineField({
+  id: 'test.lair',
   key: 'lair',
   label: 'Lair',
   dataType: { kind: 'string' },
   required: true,
-  facetable: false,
-};
+});
 
 describe('EntityTypesEditor', () => {
   let ref: ComponentRef<EntityTypesEditor>;
@@ -44,7 +44,9 @@ describe('EntityTypesEditor', () => {
       imports: [EntityTypesEditor, provideTranslocoTesting()],
       providers: [providePluginContent()],
     });
-    TestBed.inject(TypeRegistry).register(definition('test.monster', [lairField]));
+    const registry = TestBed.inject(TypeRegistry);
+    registry.setWorldFields([lairField]);
+    registry.register(definition('test.monster', ['test.lair']));
     const fixture = TestBed.createComponent(EntityTypesEditor);
     ref = fixture.componentRef;
     ref.setInput('types', types);

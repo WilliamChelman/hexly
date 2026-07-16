@@ -1,8 +1,7 @@
 import { z } from 'zod';
 import { emptyEntityDocument, withFieldDefaults } from './entity-document';
 import { entityDocumentSchema } from './entity';
-import { fieldSchemaSchema, resolveFields } from './field';
-import { defineType } from './plugin-type';
+import { fieldSchemaSchema } from './field';
 import { defineStructuredDataType, structuredDataTypeSet } from './structured-data-type';
 
 /** A stand-in for a plugin's Structured Data Type — the domain bundles none of its own. */
@@ -17,17 +16,10 @@ const emptyBoard = () => BOARD.empty();
 const dataTypes = structuredDataTypeSet([BOARD]);
 
 const BOARD_FIELD = fieldSchemaSchema.parse({ key: 'board', label: 'Board', dataType: { kind: BOARD.id } });
-/** A plugin type that declares no Fields — a bodyless Note, before any prose plugin joins. */
-const PLAIN_TYPE = defineType({ id: 'test.plain', label: 'Plain' });
-/** A plugin type whose one Field is that structured value — the shape the Map plugin's type has. */
-const ATLAS_TYPE = defineType({ id: 'test.atlas', label: 'Atlas', fields: [BOARD_FIELD] });
 
-/** Resolve a type set's Fields exactly as a host does, off its registered types. */
-const fieldsOf = (...types: readonly string[]) =>
-  resolveFields((id) => [PLAIN_TYPE, ATLAS_TYPE].find((t) => t.id === id)?.fields, types);
-
-const plainFields = fieldsOf(PLAIN_TYPE.id);
-const atlasFields = fieldsOf(ATLAS_TYPE.id);
+/** The resolved effective Field sets a host threads in — a bodyless type declares none; an atlas its grid. */
+const plainFields: ReturnType<typeof fieldSchemaSchema.parse>[] = [];
+const atlasFields = [BOARD_FIELD];
 
 describe('emptyEntityDocument', () => {
   it('mints the empty map for a type that declares no Fields', () => {

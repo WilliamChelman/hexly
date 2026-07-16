@@ -55,17 +55,35 @@ describe('World user-defined types endpoints', () => {
     return res.body.id;
   }
 
-  const deityType = {
-    id: 'world.deity',
-    label: 'Deity',
-    fields: [
-      { key: 'domain', label: 'Domain', dataType: { kind: 'string' }, facetable: true },
-      { key: 'alignment', label: 'Alignment', dataType: { kind: 'string' } },
-    ],
+  /** POST a World Field so a type can reference it by id (ADR-0054); the type carries `fieldRefs`, never a schema. */
+  async function makeField(agent: request.Agent, world: string, field: Record<string, unknown>): Promise<void> {
+    await agent.post(`/worlds/${world}/fields`).send(field).expect(201);
+  }
+
+  // World-defined Fields a deity type references — the schema lives on the Field, not the type.
+  const domainField = {
+    id: 'world.domain',
+    key: 'domain',
+    label: 'Domain',
+    dataType: { kind: 'string' },
+    facetable: true,
   };
+  const alignmentField = { id: 'world.alignment', key: 'alignment', label: 'Alignment', dataType: { kind: 'string' } };
+
+  /** A user-defined type referencing its default Fields by id (ADR-0054). */
+  const deityType = { id: 'world.deity', label: 'Deity', fieldRefs: ['world.domain', 'world.alignment'] };
+
+  /** Author `world.domain` + `world.alignment`, then the deity type referencing them, in a fresh World. */
+  async function seedDeity(agent: request.Agent): Promise<string> {
+    const world = await makeWorld(agent);
+    await makeField(agent, world, domainField);
+    await makeField(agent, world, alignmentField);
+    await agent.post(`/worlds/${world}/types`).send(deityType).expect(201);
+    return world;
+  }
 
   describe('Owner-gated CRUD', () => {
-    it('lets a World Owner create, list, rename, re-Field, and delete a user-defined type', async () => {
+    it('lets a World Owner create, list, rename, re-reference, and delete a user-defined type', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const world = await makeWorld(ada);
 
@@ -73,12 +91,8 @@ describe('World user-defined types endpoints', () => {
       expect(created.body).toEqual({
         id: 'world.deity',
         label: 'Deity',
-        fields: [
-          { key: 'domain', label: 'Domain', dataType: { kind: 'string' }, required: false, facetable: true },
-          { key: 'alignment', label: 'Alignment', dataType: { kind: 'string' }, required: false, facetable: false },
-        ],
-        // `fieldRefs` (ADR-0054) echoes back defaulted-empty — accepted, not yet persisted (expand step).
-        fieldRefs: [],
+        // A type declares its default Fields by id only (ADR-0054) — no inline schema echoed back.
+        fieldRefs: ['world.domain', 'world.alignment'],
       });
 
       // The available-types read carries it back (source `user`).
@@ -87,36 +101,28 @@ describe('World user-defined types endpoints', () => {
         expect.objectContaining({ id: 'world.deity', label: 'Deity', source: 'user' }),
       );
 
-      // Rename + replace the Field set wholesale.
+      // Rename + replace the referenced Field set wholesale.
       const renamed = await ada
         .patch(`/worlds/${world}/types/world.deity`)
-        .send({ label: 'God', fields: [{ key: 'domain', label: 'Portfolio', dataType: { kind: 'string' } }] })
+        .send({ label: 'God', fieldRefs: ['world.domain'] })
         .expect(200);
       expect(renamed.body.label).toBe('God');
-      expect(renamed.body.fields).toEqual([
-        { key: 'domain', label: 'Portfolio', dataType: { kind: 'string' }, required: false, facetable: false },
-      ]);
+      expect(renamed.body.fieldRefs).toEqual(['world.domain']);
 
       await ada.delete(`/worlds/${world}/types/world.deity`).expect(204);
       const empty = await ada.get(`/worlds/${world}/types`).expect(200);
       expect(empty.body.some((t: { id: string }) => t.id === 'world.deity')).toBe(false);
     });
 
-    it('rejects a non-`world.`-namespaced id and a duplicate-key Field set (400)', async () => {
+    it('rejects a non-`world.`-namespaced id and a malformed fieldRef (400)', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const world = await makeWorld(ada);
 
       await ada.post(`/worlds/${world}/types`).send({ id: 'dnd.monster', label: 'Monster' }).expect(400);
+      // A `fieldRef` must be a `namespace.id` reuse handle, not a bare key.
       await ada
         .post(`/worlds/${world}/types`)
-        .send({
-          id: 'world.thing',
-          label: 'Thing',
-          fields: [
-            { key: 'x', label: 'X', dataType: { kind: 'string' } },
-            { key: 'x', label: 'X2', dataType: { kind: 'string' } },
-          ],
-        })
+        .send({ id: 'world.thing', label: 'Thing', fieldRefs: ['x'] })
         .expect(400);
     });
 
@@ -180,10 +186,9 @@ describe('World user-defined types endpoints', () => {
     });
 
     it('lists the instance-wide plugin types alongside a World’s user-defined types', async () => {
-      // A bundled plugin registers an instance-wide type at startup (stand-in for a real plugin).
-      app
-        .get(TypeFieldRegistry)
-        .register('test.monster', [{ key: 'cr', label: 'CR', dataType: { kind: 'number' } }], 'Monster');
+      // A bundled plugin registers an instance-wide type at startup (stand-in for a real plugin) —
+      // by id, with its default Field ids (ADR-0054); none needed for the merge assertion here.
+      app.get(TypeFieldRegistry).register('test.monster', [], 'Monster');
 
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const world = await makeWorld(ada);
@@ -198,22 +203,16 @@ describe('World user-defined types endpoints', () => {
   });
 
   describe('an Entity carrying a user-defined type', () => {
-    /** Author the deity type in a fresh World and return the World id. */
-    async function worldWithDeity(ada: request.Agent): Promise<string> {
-      const world = await makeWorld(ada);
-      await ada.post(`/worlds/${world}/types`).send(deityType).expect(201);
-      return world;
-    }
-
-    it('applies the forward-only gate against the user-defined type’s Fields on a typed edit', async () => {
+    it('applies the forward-only gate against the user-defined type’s referenced Fields on a typed edit', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      await worldWithDeity(ada);
+      await seedDeity(ada);
       const created = await ada
         .post('/entities')
         .send({ name: 'Nameless', types: ['core.note'] })
         .expect(201);
 
-      // A typed edit ill-types the string `domain` Field — rejected by the world-scoped resolver.
+      // A typed edit ill-types the string `domain` Field — rejected by the world-scoped resolver, which
+      // resolves `world.deity`'s `fieldRefs` (→ the World Field `world.domain`) to a string data-type.
       const res = await ada
         .put(`/entities/${created.body.id}`)
         .send({
@@ -227,9 +226,9 @@ describe('World user-defined types endpoints', () => {
       expect(res.body.data.fields).toContainEqual({ key: 'domain', code: 'type' });
     });
 
-    it('facets and filters by the user-defined type’s facetable Field', async () => {
+    it('facets and filters by the user-defined type’s facetable referenced Field', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      const world = await worldWithDeity(ada);
+      const world = await seedDeity(ada);
       const created = await ada
         .post('/entities')
         .send({ name: 'Pelor', types: ['core.note'] })
@@ -262,7 +261,7 @@ describe('World user-defined types endpoints', () => {
 
     it('drops the type’s lens on delete, leaving the Entity’s EntityDocument intact', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      const world = await worldWithDeity(ada);
+      const world = await seedDeity(ada);
       const created = await ada
         .post('/entities')
         .send({ name: 'Pelor', types: ['world.deity'] })
@@ -285,29 +284,42 @@ describe('World user-defined types endpoints', () => {
     });
   });
 
-  describe('a user-defined type carrying a Field of a Structured Data Type', () => {
-    /** `world.deity`, plus a `battlemap` grid placed *after* its Fields — a deity opens on its Fields. */
+  describe('a user-defined type referencing a Field of a Structured Data Type', () => {
+    // The World-defined grid Field, plus a deity type placing it *after* its Fields — a deity opens on
+    // its Fields, then its map. The grid schema lives on the Field; the type only references it by id.
+    const battlemapField = {
+      id: 'world.battlemap',
+      key: 'battlemap',
+      label: 'Battlemap',
+      dataType: { kind: 'core.hex-grid' },
+    };
     const deityWithMap = {
       id: 'world.deity',
       label: 'Deity',
-      fields: [
-        { key: 'domain', label: 'Domain', dataType: { kind: 'string' }, facetable: true },
-        { key: 'battlemap', label: 'Battlemap', dataType: { kind: 'core.hex-grid' } },
-      ],
+      fieldRefs: ['world.domain', 'world.battlemap'],
       views: ['core.view.fields', 'core.view.content', { field: 'battlemap' }],
     };
 
     /** One painted hex — the smallest grid that proves the value survived the round trip. */
     const paintedGrid = { hexes: { '0,0': { terrain: 'ocean' } }, regions: [], labels: [] };
 
-    it('stores a hex-grid Field and its View placement, and hands both back', async () => {
+    /** Author the two World Fields, then the deity type referencing them, in a fresh World. */
+    async function seedDeityWithMap(agent: request.Agent): Promise<string> {
+      const world = await makeWorld(agent);
+      await makeField(agent, world, domainField);
+      await makeField(agent, world, battlemapField);
+      await agent.post(`/worlds/${world}/types`).send(deityWithMap).expect(201);
+      return world;
+    }
+
+    it('stores the referenced Field ids and its View placement, and hands both back', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const world = await makeWorld(ada);
+      await makeField(ada, world, domainField);
+      await makeField(ada, world, battlemapField);
 
       const created = await ada.post(`/worlds/${world}/types`).send(deityWithMap).expect(201);
-      expect(created.body.fields).toContainEqual(
-        expect.objectContaining({ key: 'battlemap', dataType: { kind: 'core.hex-grid' } }),
-      );
+      expect(created.body.fieldRefs).toEqual(['world.domain', 'world.battlemap']);
       // The View list round-trips verbatim: the API stores an order it does not resolve.
       expect(created.body.views).toEqual(['core.view.fields', 'core.view.content', { field: 'battlemap' }]);
 
@@ -321,42 +333,27 @@ describe('World user-defined types endpoints', () => {
       );
     });
 
-    it('prunes a stored View placement whose Field a re-Fielding patch dropped', async () => {
+    it('keeps a stored View placement whose Field a re-referencing patch drops — inert, not pruned (ADR-0054)', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const world = await makeWorld(ada);
+      await makeField(ada, world, domainField);
+      await makeField(ada, world, battlemapField);
       await ada.post(`/worlds/${world}/types`).send(deityWithMap).expect(201);
 
-      // A caller may legally re-Field a type without re-placing its Views — a patch no payload schema
-      // can self-check, since the dropped Field is named only in the *stored* list.
+      // A caller re-references the type without re-placing its Views. The `battlemap` placement no
+      // longer resolves (the type no longer references it), but it is left in the stored list — inert
+      // at resolution rather than eagerly pruned.
       const patched = await ada
         .patch(`/worlds/${world}/types/world.deity`)
-        .send({ fields: [{ key: 'domain', label: 'Domain', dataType: { kind: 'string' } }] })
+        .send({ fieldRefs: ['world.domain'] })
         .expect(200);
-
-      // The battlemap's placement goes with its Field; the type's own Views survive.
-      expect(patched.body.views).toEqual(['core.view.fields', 'core.view.content']);
+      expect(patched.body.fieldRefs).toEqual(['world.domain']);
+      expect(patched.body.views).toEqual(['core.view.fields', 'core.view.content', { field: 'battlemap' }]);
     });
 
-    it('refuses a Field naming a data-type this build does not register', async () => {
+    it('validates and persists the grid the referenced Field types, and harvests its links', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      const world = await makeWorld(ada);
-
-      // Well-formed, but no plugin ships it — caught at *declaration*, against the composed set.
-      const res = await ada
-        .post(`/worlds/${world}/types`)
-        .send({
-          id: 'world.deity',
-          label: 'Deity',
-          fields: [{ key: 'battlemap', label: 'Battlemap', dataType: { kind: 'core.hex-gird' } }],
-        })
-        .expect(400);
-      expect(res.body.data.fields).toContainEqual({ key: 'battlemap', code: 'unknown-data-type' });
-    });
-
-    it('validates and persists the grid the user-defined Field types, and harvests its links', async () => {
-      const ada = await signIn('ada@hexly.test', 'correct horse');
-      const world = await makeWorld(ada);
-      await ada.post(`/worlds/${world}/types`).send(deityWithMap).expect(201);
+      await seedDeityWithMap(ada);
 
       const lair = await ada
         .post('/entities')
@@ -405,14 +402,11 @@ describe('World user-defined types endpoints', () => {
     it('never offers the grid Field as a facet, however it was flagged', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
       const world = await makeWorld(ada);
-      // Ticking `facetable` on a grid buys no facet: a document has no discrete values to count.
+      // Ticking `facetable` on a grid Field buys no facet: a document has no discrete values to count.
+      await makeField(ada, world, { ...battlemapField, facetable: true });
       await ada
         .post(`/worlds/${world}/types`)
-        .send({
-          id: 'world.deity',
-          label: 'Deity',
-          fields: [{ key: 'battlemap', label: 'Battlemap', dataType: { kind: 'core.hex-grid' }, facetable: true }],
-        })
+        .send({ id: 'world.deity', label: 'Deity', fieldRefs: ['world.battlemap'] })
         .expect(201);
 
       const pelor = await ada

@@ -167,12 +167,15 @@ export async function authorWorldType(
   await page.getByTestId('type-id-input').fill(type.id);
   await page.getByTestId('type-name-input').fill(type.name);
 
-  for (const [index, field] of type.fields.entries()) {
-    await page.getByTestId('add-field').click();
-    const row = page.getByTestId(`field-${index}`);
-    await row.getByTestId('field-key').fill(field.key);
-    await row.getByTestId('field-label').fill(field.label);
-    if (field.kind) await row.getByTestId('field-kind').selectOption(field.kind);
+  // A type *references* Fields by id (ADR-0054): mint each inline from the new-Field modal, which
+  // creates a `world.<key>` Field and references it. The reference checkbox confirms it landed.
+  for (const field of type.fields) {
+    await page.getByTestId('new-field').click();
+    await page.getByTestId('newfield-key').fill(field.key);
+    await page.getByTestId('newfield-name').fill(field.label);
+    if (field.kind) await page.getByTestId('newfield-kind').selectOption(field.kind);
+    await page.getByTestId('newfield-save').click();
+    await expect(page.getByTestId(`field-ref-checkbox-world.${field.key}`)).toBeChecked();
   }
 
   await page.getByTestId('type-save').click();

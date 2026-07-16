@@ -2,7 +2,7 @@ import { provideTranslocoTesting } from '../../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { of } from 'rxjs';
-import { EntityDetail, WorldSummary } from '@hexly/domain';
+import { defineField, EntityDetail, WorldSummary } from '@hexly/domain';
 import { emptyContent } from '@hexly/plugin-content';
 import { ActiveWorld, EntitiesClient, WorldStore } from '@hexly/web-core';
 import { MockEntitiesClient } from '@hexly/web-core/testing';
@@ -13,12 +13,21 @@ import { TypeDefinition } from '@hexly/web-entity';
 import { CORE_VIEW_CONTENT, providePluginContent } from '@hexly/plugin-content/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 
+/** The required Field the monster type references by id (ADR-0054); set on the registry where it registers. */
+const lairField = defineField({
+  id: 'test.lair',
+  key: 'lair',
+  label: 'Lair',
+  dataType: { kind: 'string' },
+  required: true,
+});
+
 /** A plugin-style type declaring one required Field — to exercise the create-time required-Fields form. */
 const monster: TypeDefinition = {
   id: 'test.monster',
   icon: 'label',
   views: [CORE_VIEW_CONTENT],
-  fields: [{ key: 'lair', label: 'Lair', dataType: { kind: 'string' }, required: true, facetable: false }],
+  fieldRefs: ['test.lair'],
   graphColorToken: '--color-ink-muted',
   labels: {
     eyebrow: 'monster.eyebrow',
@@ -165,7 +174,9 @@ describe('CreateEntityDialog', () => {
 
   it('collects a seeded required-Field type’s Fields, gating Create until supplied (#189)', () => {
     const fixture = render([world('w1', 'Aldermoor')], 'w1');
-    TestBed.inject(TypeRegistry).register(monster);
+    const registry = TestBed.inject(TypeRegistry);
+    registry.setWorldFields([lairField]);
+    registry.register(monster);
     entitiesClient.create.mockReturnValue(
       of({
         id: 'e1',

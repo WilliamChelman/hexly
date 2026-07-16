@@ -153,10 +153,14 @@ export class EntityLinkPicker {
    */
   protected readonly creatable = computed(() => {
     this.transloco.activeLang();
-    return this.types
-      .all()
-      .filter((def) => !def.fields?.some((field) => field.required))
-      .map((def) => ({ id: def.id, name: this.types.name(def.id) }));
+    return (
+      this.types
+        .all()
+        // Offer only Types whose effective Fields are all optional — a required Field a bare create
+        // can't satisfy would bounce off the forward-only gate (resolved by id now, ADR-0054).
+        .filter((def) => !this.types.resolveFields([def.id]).some((field) => field.required))
+        .map((def) => ({ id: def.id, name: this.types.name(def.id) }))
+    );
   });
 
   constructor() {

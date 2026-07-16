@@ -11,7 +11,7 @@ import type { StructuredDataTypeSet } from './structured-data-type';
  * The text each **Structured Data Type** Field's value carries — a document's prose, a grid's Hex and
  * Region names — asked of the data-type the host registered.
  *
- * `doc` is the EntityDocument map, `fields` the Entity's resolved Field schema set ({@link resolveFields})
+ * `doc` is the EntityDocument map, `fields` the Entity's resolved Field schema set ({@link resolveEffectiveFields})
  * and `dataTypes` the host-composed **Structured Data Type** set. A caller with no type context passes
  * `[]` and the empty set, and gets nothing. A data-type declaring no `extractText` — or a value at
  * rest it cannot parse — contributes nothing, never a throw. Prose is no special case: it reaches

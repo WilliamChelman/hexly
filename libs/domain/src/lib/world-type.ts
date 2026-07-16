@@ -6,9 +6,8 @@
 
 import { z } from 'zod';
 import { entityTypeSchema, nameSchema } from './entity';
-import { FieldSchema, fieldSchemaSchema } from './field';
 import { dedupedFieldIdsSchema, fieldRefsSchema } from './field-id';
-import { isFieldViewPlacement, ViewPlacement, viewPlacementSchema } from './view-placement';
+import { ViewPlacement, viewPlacementSchema } from './view-placement';
 
 /**
  * The namespace a user-defined type id lives under (`world.deity`). Reserved, so a World Owner can
@@ -23,46 +22,27 @@ export const userDefinedTypeIdSchema = entityTypeSchema.refine(
   `A user-defined type id must be in the \`${USER_TYPE_NAMESPACE}.\` namespace`,
 );
 
-/** A Field schema list with distinct keys — two Fields typing the same EntityDocument key are a mistake. */
-export const uniqueFieldsSchema = z
-  .array(fieldSchemaSchema)
-  .refine(
-    (fields) => new Set(fields.map((f) => f.key)).size === fields.length,
-    'Field keys must be unique within a type',
-  );
-
 /**
  * A user-defined type's ordered {@link ViewPlacement} list (ADR-0050). A well-formed id this build
- * does not register is valid here — it simply contributes no toggle.
+ * does not register is valid here — it simply contributes no toggle. A `{ field }` placement names
+ * the EntityDocument key of a Field the type references; one the effective set can't resolve is inert,
+ * not rejected (ADR-0054, forward-only), so the domain checks only its shape, never key membership —
+ * the type carries Field *ids* (`fieldRefs`), not the keys a placement names.
  */
 const typeViewsSchema = z.array(viewPlacementSchema);
 
 /**
- * Every `{ field }` placement must name a Field the same declaration makes — so a patch placing a
- * Field must send that Field with it.
+ * A stored user-defined type (ADR-0054): its default Fields are referenced by id (`fieldRefs`) only —
+ * no inline schema, one resolution path (id → Field). `views` **absent is not empty**: a type that
+ * named no order falls back to Fields, Content, then its Fields of a **Structured Data Type** —
+ * defaulted by the host.
  */
-const placesOnlyItsOwnFields = [
-  (type: { fields?: readonly FieldSchema[]; views?: readonly ViewPlacement[] }) => {
-    const keys = new Set((type.fields ?? []).map((field) => field.key));
-    return (type.views ?? []).every((view) => !isFieldViewPlacement(view) || keys.has(view.field));
-  },
-  'A View placement must name one of the type’s own Fields',
-] as const;
-
-/**
- * A stored user-defined type. `views` **absent is not empty**: a type that named no order falls back
- * to Fields, Content, then its Fields of a **Structured Data Type** — defaulted by the host.
- */
-export const userDefinedTypeSchema = z
-  .object({
-    id: userDefinedTypeIdSchema,
-    label: nameSchema,
-    fields: uniqueFieldsSchema.default([]),
-    // Default Fields referenced by id (ADR-0054), additive beside the inline `fields`.
-    fieldRefs: fieldRefsSchema,
-    views: typeViewsSchema.optional(),
-  })
-  .refine(...placesOnlyItsOwnFields);
+export const userDefinedTypeSchema = z.object({
+  id: userDefinedTypeIdSchema,
+  label: nameSchema,
+  fieldRefs: fieldRefsSchema,
+  views: typeViewsSchema.optional(),
+});
 
 export type UserDefinedType = z.infer<typeof userDefinedTypeSchema>;
 
@@ -73,25 +53,19 @@ export type CreateUserDefinedTypeRequest = z.infer<typeof createUserDefinedTypeR
 
 /**
  * PATCH /worlds/:id/types/:typeId. The id is a path param (immutable); every body field is optional
- * and each list is sent wholesale.
- *
- * A `views` patch is checked against the `fields` in the same patch — all a payload schema can see.
- * Re-Fielding a type *without* re-placing its Views is checked against the stored type instead, by
- * `WorldTypesService`.
+ * and each list is sent wholesale. A `views` placement naming a Field the type no longer references
+ * is inert at resolution (ADR-0054), so no cross-list check is needed here.
  */
 export const updateUserDefinedTypeRequestSchema = z
   .object({
     label: nameSchema.optional(),
-    fields: uniqueFieldsSchema.optional(),
     fieldRefs: dedupedFieldIdsSchema.optional(),
     views: typeViewsSchema.optional(),
   })
   .refine(
-    (body) =>
-      body.label !== undefined || body.fields !== undefined || body.fieldRefs !== undefined || body.views !== undefined,
+    (body) => body.label !== undefined || body.fieldRefs !== undefined || body.views !== undefined,
     'A type update must change something',
-  )
-  .refine(...placesOnlyItsOwnFields);
+  );
 
 export type UpdateUserDefinedTypeRequest = z.infer<typeof updateUserDefinedTypeRequestSchema>;
 
@@ -106,12 +80,8 @@ export interface AvailableType {
   readonly id: string;
   readonly label: string;
   readonly source: AvailableTypeSource;
-  readonly fields: readonly FieldSchema[];
-  /**
-   * The default Fields this type references by id (`fieldRefs`, ADR-0054), additive beside inline
-   * `fields`. Optional through the expand step, while consumers still read `fields`.
-   */
-  readonly fieldRefs?: readonly string[];
+  /** The default Fields this type references by id (`fieldRefs`, ADR-0054) — the sole Field declaration. */
+  readonly fieldRefs: readonly string[];
   /**
    * A **user-defined** type's ordered View list, as authored. Absent on a plugin type, which declares
    * its own in code, and on a user-defined type that never named an order (the host defaults it).

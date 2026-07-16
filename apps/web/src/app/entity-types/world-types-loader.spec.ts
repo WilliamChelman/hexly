@@ -3,30 +3,33 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { ActiveWorld, WorldsClient } from '@hexly/web-core';
-import { AvailableType, FieldSchema } from '@hexly/domain';
+import { AvailableType, defineField } from '@hexly/domain';
 import { WorldTypesLoader } from './world-types-loader';
 import { TypeRegistry } from './type-registry';
 import { CORE_VIEW_FIELDS } from '@hexly/web-entity';
 import { CORE_VIEW_CONTENT } from '@hexly/plugin-content/web';
 
 describe('WorldTypesLoader', () => {
-  const deity: AvailableType = {
-    id: 'world.deity',
-    label: 'Deity',
-    source: 'user',
-    fields: [{ key: 'domain', label: 'Domain', dataType: { kind: 'string' }, required: false, facetable: true }],
-  };
-  // A plugin-source type as the API reports it. The web already knows its plugin types from code, so
-  // the loader must ignore these rows rather than re-register a view-less copy over the real one.
-  const monster: AvailableType = { id: 'test.monster', label: 'Monster', source: 'plugin', fields: [] };
+  // A World's own Fields, resolved through the registry by the ids a type references (ADR-0054).
+  const domainField = defineField({
+    id: 'world.domain',
+    key: 'domain',
+    label: 'Domain',
+    dataType: { kind: 'string' },
+    facetable: true,
+  });
   /** A World Owner's own **Field of a Structured Data Type**: a grid on the type they defined, no code (#201). */
-  const battlemapField: FieldSchema = {
+  const battlemapField = defineField({
+    id: 'world.battlemap',
     key: 'battlemap',
     label: 'Battlemap',
     dataType: { kind: 'core.hex-grid' },
-    required: false,
-    facetable: false,
-  };
+  });
+
+  const deity: AvailableType = { id: 'world.deity', label: 'Deity', source: 'user', fieldRefs: ['world.domain'] };
+  // A plugin-source type as the API reports it. The web already knows its plugin types from code, so
+  // the loader must ignore these rows rather than re-register a view-less copy over the real one.
+  const monster: AvailableType = { id: 'test.monster', label: 'Monster', source: 'plugin', fieldRefs: [] };
 
   let worldId: ReturnType<typeof signal<string | null>>;
   let availableTypes: ReturnType<typeof vi.fn>;
@@ -43,6 +46,9 @@ describe('WorldTypesLoader', () => {
       ],
     });
     registry = TestBed.inject(TypeRegistry);
+    // The World's Fields resolve by id (ADR-0054) — projected by WorldFieldsLoader in prod; set here
+    // directly so a type's `fieldRefs` resolve when the types loader projects.
+    registry.setWorldFields([domainField, battlemapField]);
     TestBed.inject(WorldTypesLoader); // instantiate the reactive singleton
     TestBed.flushEffects(); // flush the initial `null` world emission
   });
@@ -62,7 +68,7 @@ describe('WorldTypesLoader', () => {
   });
 
   it('defaults the View of a Field of a Structured Data Type to *last*, so a deity with a battlemap still opens on its Fields', () => {
-    availableTypes.mockReturnValue(of([{ ...deity, fields: [...deity.fields, battlemapField] }]));
+    availableTypes.mockReturnValue(of([{ ...deity, fieldRefs: ['world.domain', 'world.battlemap'] }]));
     worldId.set('w1');
     TestBed.flushEffects();
 
@@ -70,9 +76,9 @@ describe('WorldTypesLoader', () => {
   });
 
   it('projects the author’s own View order verbatim, so "Show as a view" can drop one', () => {
-    // The toggle, off: the `battlemap` Field is still declared, but places no View.
+    // The toggle, off: the `battlemap` Field is still referenced, but places no View.
     availableTypes.mockReturnValue(
-      of([{ ...deity, fields: [battlemapField], views: [CORE_VIEW_FIELDS, CORE_VIEW_CONTENT] }]),
+      of([{ ...deity, fieldRefs: ['world.battlemap'], views: [CORE_VIEW_FIELDS, CORE_VIEW_CONTENT] }]),
     );
     worldId.set('w1');
     TestBed.flushEffects();

@@ -178,9 +178,8 @@ export class TypeRegistry implements EntityTypes {
     for (const id of fieldIds ?? []) consider(this.resolveField(id));
     for (const type of types ?? []) {
       const def = this.get(type);
-      // `fieldRefs` → resolver, with the inline `fields` fallback for a user-defined type (no id yet).
+      // A type declares its default Fields by id only (`fieldRefs`, ADR-0054) — one resolution path.
       for (const id of def?.fieldRefs ?? []) consider(this.resolveField(id));
-      for (const field of def?.fields ?? []) consider(field);
     }
     return [...byKey.values()];
   }
@@ -195,6 +194,15 @@ export class TypeRegistry implements EntityTypes {
   }
 
   /**
+   * Every registered Field a World Owner may reference (ADR-0054): its World-defined Fields (always
+   * active) plus the enabled Plugin Fields — the offer the World Types editor's reference picker reads.
+   * A disabled Plugin's Fields drop out; a reference to one would only degrade to a plain value.
+   */
+  availableFields(): Field[] {
+    return [...this.worldFields(), ...this.plugins.fields.filter((field) => this.plugins.isFieldActive(field.id))];
+  }
+
+  /**
    * The registered Fields an Entity carrying `types`/`fieldIds` may still **attach directly** (ADR-0054):
    * every World-defined Field and enabled Plugin Field whose document `key` its effective set does not
    * already cover — so the attach picker never offers a Field a type default already places, or one
@@ -206,11 +214,7 @@ export class TypeRegistry implements EntityTypes {
     fieldIds: readonly string[] | null | undefined,
   ): Field[] {
     const present = new Set(this.effectiveFields(types, fieldIds).map((field) => field.key));
-    const composed = [
-      ...this.worldFields(),
-      ...this.plugins.fields.filter((field) => this.plugins.isFieldActive(field.id)),
-    ];
-    return composed.filter((field) => !present.has(field.key));
+    return this.availableFields().filter((field) => !present.has(field.key));
   }
 
   /**

@@ -71,7 +71,7 @@ export interface EntityReferences {
  * ADR-0051). Nothing records *where* a link was expressed, so a prose mention, a map placement, and a
  * Field link to the same target collapse to one edge, while two descriptors to that target stay two.
  *
- * `doc` is the EntityDocument map, `fields` its resolved Field schema set ({@link resolveFields}) and
+ * `doc` is the EntityDocument map, `fields` its resolved Field schema set ({@link resolveEffectiveFields}) and
  * `dataTypes` the host-composed **Structured Data Type** set (ADR-0050). The domain names no extractor
  * of its own: prose reaches this loop as the `core.rich-content` data-type, exactly as a grid does.
  */

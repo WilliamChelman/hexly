@@ -122,11 +122,10 @@ export const DND_MONSTER_FIELDS: readonly Field[] = [
 /**
  * The bundled `dnd.monster` type. Facetable Fields unfold in the Entity Browser's rail once
  * `dnd.monster` is the active Type filter (ADR-0035). References its Fields — the prose `core.content`
- * beside the thirteen stats — by id (`fieldRefs`, ADR-0054); inline `fields` remain for the web.
+ * beside the thirteen stats — by id (`fieldRefs`, ADR-0054), the sole Field declaration.
  */
 export const DND_MONSTER_TYPE = defineType({
   id: DND_MONSTER,
   label: 'Monster',
-  fields: [CONTENT_FIELD, ...DND_MONSTER_FIELDS],
   fieldRefs: [CONTENT_FIELD.id, ...DND_MONSTER_FIELDS.map((field) => field.id)],
 });

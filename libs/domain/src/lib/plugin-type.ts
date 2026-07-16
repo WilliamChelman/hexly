@@ -8,39 +8,35 @@
 
 import { z } from 'zod';
 import { entityTypeSchema, nameSchema } from './entity';
-import { FieldSchema } from './field';
 import { fieldRefsSchema } from './field-id';
-import { uniqueFieldsSchema } from './world-type';
 
 /**
  * One code-registered Entity Type: its `namespace.id`, the display `label` used where the type is
- * named without translated copy (the API's available-types list), the inline Field schema it declares
- * (ADR-0048, retained), and the default Field ids it references (`fieldRefs`, ADR-0054). Distinct from
- * the web's `TypeDefinition`, which adds the icon, transloco chrome, and Views.
+ * named without translated copy (the API's available-types list), and the default Field ids it
+ * references (`fieldRefs`, ADR-0054). A Type Definition owns no inline Field schema — one field
+ * concept, one resolution path (id → Field). Distinct from the web's `TypeDefinition`, which adds the
+ * icon, transloco chrome, and Views.
  */
 export interface PluginTypeDefinition {
   readonly id: string;
   readonly label: string;
-  readonly fields: readonly FieldSchema[];
-  /** Default Fields this type references by id (ADR-0054). The additive successor to inline `fields`. */
+  /** The default Fields this type references by id (ADR-0054) — the sole way a Type declares its Fields. */
   readonly fieldRefs: readonly string[];
 }
 
 const pluginTypeSchema = z.object({
   id: entityTypeSchema,
   label: nameSchema,
-  fields: uniqueFieldsSchema.default([]),
   fieldRefs: fieldRefsSchema,
 });
 
 /**
- * Declare a code-registered Entity Type. A malformed type (a bare id, a duplicate Field key, an
- * unknown data-type, a malformed `fieldRef` id) throws at module load rather than at runtime.
+ * Declare a code-registered Entity Type. A malformed type (a bare id, a malformed `fieldRef` id)
+ * throws at module load rather than at runtime.
  */
 export function defineType(definition: {
   readonly id: string;
   readonly label: string;
-  readonly fields?: readonly FieldSchema[];
   readonly fieldRefs?: readonly string[];
 }): PluginTypeDefinition {
   return Object.freeze(pluginTypeSchema.parse(definition));

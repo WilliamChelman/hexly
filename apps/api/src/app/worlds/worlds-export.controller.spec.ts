@@ -114,14 +114,14 @@ describe('Vault export endpoint', () => {
     const worldId = await importVault(ada, { 'Note.md': '# Note' });
     const entities = app.get(EntitiesService);
 
-    // A World-scoped type declaring a SECOND prose Field beside the canonical `content`.
+    // A World-defined SECOND prose Field beside the canonical `content`, referenced by a World type.
+    await ada
+      .post(`/worlds/${worldId}/fields`)
+      .send({ id: 'world.secrets', key: 'secrets', label: 'Secrets', dataType: { kind: 'core.rich-content' } })
+      .expect(201);
     await ada
       .post(`/worlds/${worldId}/types`)
-      .send({
-        id: 'world.deity',
-        label: 'Deity',
-        fields: [{ key: 'secrets', label: 'Secrets', dataType: { kind: 'core.rich-content' } }],
-      })
+      .send({ id: 'world.deity', label: 'Deity', fieldRefs: ['world.secrets'] })
       .expect(201);
 
     // An Entity carrying both prose Fields — `content` (core.note) and `secrets` (world.deity).

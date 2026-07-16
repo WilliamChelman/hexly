@@ -1,5 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { AvailableType, FieldSchema, TypeFieldResolver, UserDefinedType } from '@hexly/domain';
+import {
+  AvailableType,
+  FieldSchema,
+  resolveEffectiveFields,
+  TypeFieldRefsResolver,
+  UserDefinedType,
+} from '@hexly/domain';
 import { eq } from 'drizzle-orm';
 import { DB, Db } from '../db/db';
 import { worldTypes } from '../db/schema';
@@ -22,7 +28,12 @@ export class WorldTypeFields {
   /** A World's stored user-defined types, in a stable id order (the CRUD read + the merge source). */
   list(worldId: string): UserDefinedType[] {
     return this.db
-      .select({ id: worldTypes.typeId, label: worldTypes.label, fields: worldTypes.fields, views: worldTypes.views })
+      .select({
+        id: worldTypes.typeId,
+        label: worldTypes.label,
+        fieldRefs: worldTypes.fieldRefs,
+        views: worldTypes.views,
+      })
       .from(worldTypes)
       .where(eq(worldTypes.worldId, worldId))
       .orderBy(worldTypes.typeId)
@@ -30,10 +41,8 @@ export class WorldTypeFields {
       .map((row) => ({
         id: row.id,
         label: row.label,
-        fields: row.fields ?? [],
-        // `fieldRefs` (ADR-0054) has no stored column yet — the expand step keeps the inline `fields`
-        // path; persisting referenced Field ids is a later migrate step.
-        fieldRefs: [],
+        // Default Fields referenced by id (ADR-0054) — the sole Field declaration a type carries.
+        fieldRefs: row.fieldRefs ?? [],
         // A stored `null` is "the author named no order", which the web defaults — so it stays absent
         // rather than becoming an empty list, which would mean "this type affords no View at all".
         ...(row.views ? { views: row.views } : {}),
@@ -41,13 +50,14 @@ export class WorldTypeFields {
   }
 
   /**
-   * A {@link TypeFieldResolver} scoped to one World: user-defined Fields first, else the plugin
-   * registry. The World's types are loaded once and closed over — resolving is a map lookup, not a
-   * query per type.
+   * A {@link TypeFieldRefsResolver} scoped to one World: a user-defined type's default Field ids
+   * (`fieldRefs`) first, else the plugin registry's. The World's types are loaded once and closed
+   * over — resolving is a map lookup, not a query per type.
    */
-  resolverFor(worldId: string): TypeFieldResolver {
-    const userFields = new Map(this.list(worldId).map((type) => [type.id, type.fields]));
-    return (typeId) => userFields.get(typeId) ?? this.plugins.resolver(typeId);
+  private typeFieldRefsFor(worldId: string | undefined): TypeFieldRefsResolver {
+    if (!worldId) return this.plugins.typeFieldRefs;
+    const userRefs = new Map(this.list(worldId).map((type) => [type.id, type.fieldRefs]));
+    return (typeId) => userRefs.get(typeId) ?? this.plugins.typeFieldRefs(typeId);
   }
 
   /** The Entity Types available in a World: the instance-wide plugin types plus this World's own. */
@@ -63,27 +73,18 @@ export class WorldTypeFields {
    * unioned with its types' defaults, deduped by document `key` with precedence instance > primary type
    * > later types. What every downstream pure function runs over, so an attached Field is validated,
    * faceted, and edge-harvested like a type default. An id resolving to nothing (a disabled/absent
-   * plugin's Field, ADR-0052) is skipped, its value left untouched (forward-only).
+   * plugin's Field, or a deleted World Field, ADR-0052/0054) is skipped, its value left untouched
+   * (forward-only) — one resolution path, id → Field, with no inline schema.
    */
   effectiveFields(worldId: string | undefined, types: readonly string[], fieldIds: readonly string[]): FieldSchema[] {
-    const byKey = new Map<string, FieldSchema>();
-    const consider = (field: FieldSchema | undefined) => {
-      if (field && !byKey.has(field.key)) byKey.set(field.key, field);
-    };
-    // World-scoped when a `worldId` is in play so its user-defined types/Fields resolve too; else the
-    // plugin registry alone (a gate that runs before a row's World is known).
-    const inlineResolver = worldId ? this.resolverFor(worldId) : this.plugins.resolver;
-    // The composed Field resolver: World-defined Fields over Plugin fields (ADR-0054), so a deleted
-    // World Field simply stops resolving and its values degrade to plain — forward-only.
+    // World-scoped when a `worldId` is in play so its user-defined Fields resolve too; else the Plugin
+    // fields alone (a gate that runs before a row's World is known).
     const fieldResolver = worldId ? this.worldFields.resolverFor(worldId) : this.plugins.fieldResolver;
-    // Attached Fields first (most specific), then each type's defaults primary-first — first-wins per key.
-    for (const id of fieldIds ?? []) consider(fieldResolver(id));
-    for (const type of types) {
-      // Plugin type: defaults via `fieldRefs` → the id resolver (ADR-0054). Inline fallback covers a
-      // User-defined type's Fields (no id until the World Fields step) and anything the resolver can't reach.
-      for (const id of this.plugins.typeFieldRefs(type) ?? []) consider(fieldResolver(id));
-      for (const field of inlineResolver(type) ?? []) consider(field);
-    }
-    return [...byKey.values()];
+    return resolveEffectiveFields({
+      types,
+      fieldIds: fieldIds ?? [],
+      fieldResolver,
+      typeFieldRefs: this.typeFieldRefsFor(worldId),
+    });
   }
 }

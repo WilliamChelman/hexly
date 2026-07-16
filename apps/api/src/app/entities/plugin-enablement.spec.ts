@@ -1,4 +1,4 @@
-import { deriveSearchText, harvestEdges, resolveFields, VaultExportContext } from '@hexly/domain';
+import { deriveSearchText, harvestEdges, resolveEffectiveFields, VaultExportContext } from '@hexly/domain';
 import { entityToMarkdown } from '@hexly/obsidian';
 import { CORE_NOTE, PLUGIN_ID as CONTENT_PLUGIN_ID, tiptapContent } from '@hexly/plugin-content';
 import { CORE_HEX_GRID, PLUGIN_ID as HEXMAP_PLUGIN_ID } from '@hexly/plugin-hexmap';
@@ -42,11 +42,20 @@ describe('plugin enablement — uniform absence on the server', () => {
       expect(new TypeFieldRegistry(withDisabled(HEXMAP_PLUGIN_ID)).structuredDataTypes.has(CORE_HEX_GRID)).toBe(false);
     });
 
-    it('drops a disabled Plugin’s Types from the resolver', () => {
-      expect(new TypeFieldRegistry(allEnabled()).resolver('core.hexmap')).toBeDefined();
-      expect(new TypeFieldRegistry(withDisabled(HEXMAP_PLUGIN_ID)).resolver('core.hexmap')).toBeUndefined();
+    it('drops a disabled Plugin’s Types — its default Field ids no longer resolve', () => {
+      expect(new TypeFieldRegistry(allEnabled()).typeFieldRefs('core.hexmap')).toBeDefined();
+      expect(new TypeFieldRegistry(withDisabled(HEXMAP_PLUGIN_ID)).typeFieldRefs('core.hexmap')).toBeUndefined();
     });
   });
+
+  /** Resolve a type set's effective Field schemas off the registry, exactly as the derive/vault passes do. */
+  const fieldsFor = (registry: TypeFieldRegistry, types: readonly string[]) =>
+    resolveEffectiveFields({
+      types,
+      fieldIds: [],
+      fieldResolver: registry.fieldResolver,
+      typeFieldRefs: registry.typeFieldRefs,
+    });
 
   /**
    * The instance-wide id→Field resolver (ADR-0054): the composition an Entity's directly-attached
@@ -91,7 +100,7 @@ describe('plugin enablement — uniform absence on the server', () => {
 
     it('harvests the grid’s edges and search text when hexmap is enabled', () => {
       const registry = new TypeFieldRegistry(allEnabled());
-      const fields = resolveFields(registry.resolver, ['core.hexmap']);
+      const fields = fieldsFor(registry, ['core.hexmap']);
       expect(harvestEdges(doc, fields, registry.structuredDataTypes)).toContainEqual({
         targetKind: 'entity',
         targetId: 'ashford-note',
@@ -102,7 +111,7 @@ describe('plugin enablement — uniform absence on the server', () => {
 
     it('harvests no edges and no derived search text when hexmap is disabled', () => {
       const registry = new TypeFieldRegistry(withDisabled(HEXMAP_PLUGIN_ID));
-      const fields = resolveFields(registry.resolver, ['core.hexmap']);
+      const fields = fieldsFor(registry, ['core.hexmap']);
       expect(harvestEdges(doc, fields, registry.structuredDataTypes)).toEqual([]);
       expect(deriveSearchText(doc, fields, registry.structuredDataTypes)).toBe('');
     });
@@ -120,7 +129,7 @@ describe('plugin enablement — uniform absence on the server', () => {
     const toMarkdown = (registry: TypeFieldRegistry) =>
       entityToMarkdown({
         doc,
-        fields: resolveFields(registry.resolver, [CORE_NOTE]),
+        fields: fieldsFor(registry, [CORE_NOTE]),
         dataTypes: registry.structuredDataTypes,
         frontmatter: {},
         context,
