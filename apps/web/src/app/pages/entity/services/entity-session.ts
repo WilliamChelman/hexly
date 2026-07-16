@@ -25,6 +25,7 @@ import {
   EntityDocument,
   Visibility,
   withFieldDefaults,
+  writeField,
 } from '@hexly/domain';
 import {
   EntitiesClient,
@@ -65,6 +66,10 @@ interface SaveSnapshot {
   types: readonly EntityType[];
   /** True when the type set was authored this session — only then does the save carry `types`. */
   typesChanged: boolean;
+  /** The directly-attached Field ids (ADR-0054). */
+  fields: readonly string[];
+  /** True when an attach/detach happened this session — only then does the save carry `fields`. */
+  fieldsChanged: boolean;
 }
 
 @Injectable()
@@ -142,8 +147,9 @@ export class EntitySession implements EntitySessionPort {
   readonly types = this._types.asReadonly();
 
   /**
-   * The Entity's attached Field ids (`fields[]`, ADR-0054), read into the effective set. No authoring
-   * surface mints one yet, so it only round-trips a load and is never re-sent on save.
+   * The Entity's directly-attached Field ids (`fields[]`, ADR-0054), read into the effective set and
+   * authored live by {@link attachField}/{@link detachField}. Rides the version-checked save when it
+   * has moved off {@link _baseFields}, mirroring the type set.
    */
   private readonly _fields = signal<readonly string[]>([]);
   readonly fields = this._fields.asReadonly();
@@ -159,6 +165,7 @@ export class EntitySession implements EntitySessionPort {
   private readonly _baseDoc = signal<EntityDocument | null>(null);
   private readonly _baseTags = signal<readonly string[]>([]);
   private readonly _baseTypes = signal<readonly EntityType[]>([]);
+  private readonly _baseFields = signal<readonly string[]>([]);
 
   /** Whether any live editor holds an uncommitted doc — ORed into {@link dirty} so the save chip stays honest mid-typing (ADR-0051). */
   private readonly anyEditorPending = computed(() => this._editors().some((e) => e.hasPendingCommit()));
@@ -170,7 +177,8 @@ export class EntitySession implements EntitySessionPort {
       (this._doc() !== this._baseDoc() ||
         this.anyEditorPending() ||
         this._tags() !== this._baseTags() ||
-        this._types() !== this._baseTypes()),
+        this._types() !== this._baseTypes() ||
+        this._fields() !== this._baseFields()),
   );
 
   /**
@@ -237,6 +245,7 @@ export class EntitySession implements EntitySessionPort {
       this.anyEditorPending();
       this._tags();
       this._types();
+      this._fields();
       const armed = this.dirty() && !this._conflict() && !this._saving() && !this._loading() && !this.unsavedFailure();
       if (!armed) return;
       const timer = setTimeout(() => this.save().subscribe(), AUTOSAVE_DELAY_MS);
@@ -342,6 +351,7 @@ export class EntitySession implements EntitySessionPort {
     this._baseDoc.set(this._doc());
     this._baseTags.set(this._tags());
     this._baseTypes.set(this._types());
+    this._baseFields.set(this._fields());
     // A fresh Entity: reset every View's document-tied transient state (a map's undo/selection, the
     // prose editor's live doc) — the loadGeneration tick a live editor watches to re-seed.
     this._loadGeneration.update((n) => n + 1);
@@ -374,8 +384,45 @@ export class EntitySession implements EntitySessionPort {
    */
   setTypes(types: readonly EntityType[]): void {
     this._types.set([...types]);
-    // Over the effective set (ADR-0054), so an attached Field's default is minted like a type default.
-    const fields = this.typeRegistry.effectiveFields(types, this._fields());
+    this.mintFieldDefaults(types, this._fields());
+  }
+
+  /**
+   * Attach a registered **Field** directly to the open Entity (`fields[]`, ADR-0054, #229) — the
+   * additive instance layer that lets one Entity carry a Field its types never named. A no-op if
+   * already attached. Mints the new Field's default so its View has something to open on (a Field of a
+   * Structured Data Type gets its empty plane); a built-in Field renders as an empty control. The next
+   * save persists the set version-checked.
+   */
+  attachField(id: string): void {
+    if (this._fields().includes(id)) return;
+    const next = [...this._fields(), id];
+    this._fields.set(next);
+    this.mintFieldDefaults(this._types(), next);
+  }
+
+  /**
+   * Detach a directly-attached Field (#229), clearing its value from the one EntityDocument map — a
+   * directly-attached Field owns its key, unlike a removed type (which leaves its values behind,
+   * CONTEXT.md → Field). A no-op if not attached. The next save persists the set version-checked.
+   */
+  detachField(id: string): void {
+    if (!this._fields().includes(id)) return;
+    // The key comes from the raw definition, not the enablement-gated resolver, so a *disabled*
+    // plugin's degraded Field still clears its value; only a plugin this build never bundled leaves
+    // an orphan (there is no lens to say which key it owned).
+    const field = this.plugins.fieldDefinition(id);
+    this._fields.set(this._fields().filter((f) => f !== id));
+    if (field) this._doc.set(writeField(this._doc(), field, undefined));
+  }
+
+  /**
+   * Mint the defaults the effective Field set declares into the working document (ADR-0050/0054): a
+   * Field of a Structured Data Type gets its empty plane, so the map View opens on a plane not a blank
+   * frame. Additive — it never strips a value, so dropping a type or detaching a Field leaves the rest.
+   */
+  private mintFieldDefaults(types: readonly EntityType[], fieldIds: readonly string[]): void {
+    const fields = this.typeRegistry.effectiveFields(types, fieldIds);
     const reconciled = withFieldDefaults(this._doc(), fields, this.plugins.structuredDataTypes);
     if (reconciled !== this._doc()) this._doc.set(reconciled);
   }
@@ -436,6 +483,7 @@ export class EntitySession implements EntitySessionPort {
         this._baseDoc.set(this._doc());
         this._baseTags.set(this._tags());
         this._baseTypes.set(this._types());
+        this._baseFields.set(this._fields());
         // Eviction belongs to the Entity just left (#174): clear it as the new load starts —
         // waiting for a successful adopt() would let it mask this load's own failure state.
         this._evicted.set(false);
@@ -504,6 +552,8 @@ export class EntitySession implements EntitySessionPort {
         tags: this._tags(),
         types: this._types(),
         typesChanged: this._types() !== this._baseTypes(),
+        fields: this._fields(),
+        fieldsChanged: this._fields() !== this._baseFields(),
       },
       showLoading,
     );
@@ -514,13 +564,15 @@ export class EntitySession implements EntitySessionPort {
     this._saving.set(true);
     this._error.set(null);
     this.failed = null;
-    const { doc, tags, types, typesChanged } = snapshot;
+    const { doc, tags, types, typesChanged, fields, fieldsChanged } = snapshot;
     // The document already carries every edit — prose, grid, and all — since every View writes through
-    // `mutate` (ADR-0051). Send it as-is.
-    // Send `types` only when this edit authored them, so a plain document save never re-types data at rest.
-    const request$ = typesChanged
-      ? this.entities.save(open.id, doc, open.version, tags, types)
-      : this.entities.save(open.id, doc, open.version, tags);
+    // `mutate` (ADR-0051). Send `types`/`fields` only when this edit authored them, so a plain document
+    // save never re-types data at rest nor re-sends an at-rest attachment set (ADR-0048/0054).
+    const request$ = fieldsChanged
+      ? this.entities.save(open.id, doc, open.version, tags, typesChanged ? types : undefined, fields)
+      : typesChanged
+        ? this.entities.save(open.id, doc, open.version, tags, types)
+        : this.entities.save(open.id, doc, open.version, tags);
     const save$ = request$.pipe(
       tap((outcome) => {
         // Drop a late response if the user has since navigated to another Entity — it
@@ -536,6 +588,7 @@ export class EntitySession implements EntitySessionPort {
           this._baseDoc.set(doc);
           this._baseTags.set(tags);
           this._baseTypes.set(types);
+          this._baseFields.set(fields);
         }
       }),
       catchError((err: unknown) => {
@@ -581,7 +634,11 @@ export class EntitySession implements EntitySessionPort {
   private unsavedFailure(): boolean {
     const failed = this.failed;
     return (
-      failed !== null && this._doc() === failed.doc && this._tags() === failed.tags && this._types() === failed.types
+      failed !== null &&
+      this._doc() === failed.doc &&
+      this._tags() === failed.tags &&
+      this._types() === failed.types &&
+      this._fields() === failed.fields
     );
   }
 

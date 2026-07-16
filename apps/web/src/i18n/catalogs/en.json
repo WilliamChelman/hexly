@@ -75,6 +75,14 @@
     "confirmAdd": "Add type",
     "requiredFieldsHeading": "Required fields"
   },
+  "entityFields": {
+    "editFields": "Edit fields",
+    "heading": "Attached fields",
+    "hint": "Attach a reusable field to this entity alone — beyond the ones its types already give it.",
+    "addLabel": "Attach field…",
+    "removeLabel": "Detach field: {{field}}",
+    "empty": "No fields attached directly to this entity."
+  },
   "editorShell": {
     "tabTitle": "Hexly",
     "tabTitleNamed": "{{name}} — Hexly",

@@ -1,6 +1,6 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
-import { EntityType, FieldSchema } from '@hexly/domain';
+import { EntityType, Field, FieldSchema, isStructuredDataType } from '@hexly/domain';
 import {
   CORE_VIEW_FIELDS,
   EntityTypes,
@@ -117,7 +117,14 @@ export class TypeRegistry implements EntityTypes {
       }
     }
     // Attached Fields append their View after the types' (CONTEXT.md → View); dedup drops a re-placed one.
-    for (const id of fieldIds ?? []) affordField(this.plugins.fieldResolver(id));
+    for (const id of fieldIds ?? []) {
+      const field = this.plugins.fieldResolver(id);
+      if (!field) continue;
+      // A Field of a Structured Data Type appends its own bound View; a built-in Field has no View of
+      // its own, so it rides the generic Field view — its control's home (CONTEXT.md → View, ADR-0054).
+      if (isStructuredDataType(field.dataType)) affordField(field);
+      else afford({ viewId: CORE_VIEW_FIELDS });
+    }
     return [...seen.values()];
   }
 
@@ -151,6 +158,28 @@ export class TypeRegistry implements EntityTypes {
       for (const field of def?.fields ?? []) consider(field);
     }
     return [...byKey.values()];
+  }
+
+  /**
+   * Resolve one registered Field by its `id` (ADR-0054) — a **Plugin Field**, or `undefined` for an
+   * unknown or disabled one. What the fields editor reads to label an Entity's attached Field chips.
+   */
+  field(id: string): Field | undefined {
+    return this.plugins.fieldResolver(id);
+  }
+
+  /**
+   * The registered Fields an Entity carrying `types`/`fieldIds` may still **attach directly** (ADR-0054):
+   * every enabled Plugin Field whose document `key` its effective set does not already cover — so the
+   * attach picker never offers a Field a type default already places, or one already attached. A disabled
+   * Plugin's Fields drop out (they would only degrade to a plain value); World-defined Fields join later.
+   */
+  attachableFields(
+    types: readonly string[] | null | undefined,
+    fieldIds: readonly string[] | null | undefined,
+  ): Field[] {
+    const present = new Set(this.effectiveFields(types, fieldIds).map((field) => field.key));
+    return this.plugins.fields.filter((field) => this.plugins.isFieldActive(field.id) && !present.has(field.key));
   }
 
   /**

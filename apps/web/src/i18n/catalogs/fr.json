@@ -75,6 +75,14 @@
     "confirmAdd": "Ajouter le type",
     "requiredFieldsHeading": "Champs requis"
   },
+  "entityFields": {
+    "editFields": "Modifier les champs",
+    "heading": "Champs attachés",
+    "hint": "Attachez un champ réutilisable à cette entité seule — au-delà de ceux que ses types lui donnent déjà.",
+    "addLabel": "Attacher un champ…",
+    "removeLabel": "Détacher le champ : {{field}}",
+    "empty": "Aucun champ attaché directement à cette entité."
+  },
   "editorShell": {
     "tabTitle": "Hexly",
     "tabTitleNamed": "{{name}} — Hexly",

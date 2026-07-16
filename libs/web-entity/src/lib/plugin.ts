@@ -57,6 +57,16 @@ export const PLUGIN_TYPE_OWNERS = new InjectionToken<readonly (readonly [string,
 export const PLUGIN_VIEW_OWNERS = new InjectionToken<readonly (readonly [ViewId, string])[]>('hexly.plugin.viewOwners');
 
 /**
+ * `[fieldId, PLUGIN_ID]` tuples the `PluginRegistry` folds into a map to drop a disabled Plugin's
+ * **Fields** (ADR-0052, Seam 3). A Field reached through a Type already degrades when its Type does,
+ * but a Field an Entity **attaches directly** (ADR-0054) bypasses the Type layer, so the resolver
+ * needs its own by-owner filter to degrade an attached disabled-Plugin Field to a plain document value.
+ */
+export const PLUGIN_FIELD_OWNERS = new InjectionToken<readonly (readonly [string, string])[]>(
+  'hexly.plugin.fieldOwners',
+);
+
+/**
  * A bundled plugin's single entry point into the app (ADR-0048): a plugin exports one
  * `providePluginX()` built from this, and the app names it in `app.config.ts`. "Bundled" means
  * compiled-in — there are no runtime third-party plugins — so a plugin joins by shipping a lib and
@@ -80,6 +90,7 @@ export function providePlugin({
     // paired with this Plugin's id, so a disabled Plugin's Types and Views can be dropped by owner.
     types.map((type) => ({ provide: PLUGIN_TYPE_OWNERS, useValue: [type.id, id] as const, multi: true })),
     views.map((view) => ({ provide: PLUGIN_VIEW_OWNERS, useValue: [view.id, id] as const, multi: true })),
+    fields.map((field) => ({ provide: PLUGIN_FIELD_OWNERS, useValue: [field.id, id] as const, multi: true })),
     translations ? provideEagerTranslations(translations) : [],
   ]);
 }

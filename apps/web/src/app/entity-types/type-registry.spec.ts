@@ -293,6 +293,21 @@ describe('TypeRegistry', () => {
     });
   });
 
+  describe('attachableFields — the attach picker’s offer (ADR-0054)', () => {
+    it('offers a registered Plugin Field a note’s types never named', () => {
+      const ids = registry.attachableFields(['core.note'], []).map((f) => f.id);
+      expect(ids).toContain('dnd.size');
+      expect(ids).toContain('dnd.alignment');
+    });
+
+    it('never offers a Field whose key the effective set already covers (a default or an attachment)', () => {
+      // `content` is a note default, so its Field is never offered; an already-attached `dnd.size` drops too.
+      const offered = registry.attachableFields(['core.note'], ['dnd.size']);
+      expect(offered.map((f) => f.key)).not.toContain('content');
+      expect(offered.map((f) => f.id)).not.toContain('dnd.size');
+    });
+  });
+
   describe('viewsFor over the effective set', () => {
     it('appends an attached structured Field’s View after the types’ (CONTEXT.md → View)', () => {
       // A note with a grid Field attached affords its Content View, then the attached grid’s Map View.
@@ -302,9 +317,18 @@ describe('TypeRegistry', () => {
       ]);
     });
 
-    it('affords no extra View for an attached built-in Field — it is a form row, not a View', () => {
-      // `dnd.size` is an enum: it renders in the generic Field view, contributing no toggle.
-      expect(viewKeys(registry.viewsFor(['core.note'], ['dnd.size']))).toEqual([CORE_VIEW_CONTENT]);
+    it('affords the generic Field view for an attached built-in Field — its control needs a home (ADR-0054)', () => {
+      // `dnd.size` is an enum with no View of its own; attaching it to a note appends the generic Field
+      // view so its control has a surface to render on (CONTEXT.md → View, #229).
+      expect(viewKeys(registry.viewsFor(['core.note'], ['dnd.size']))).toEqual([CORE_VIEW_CONTENT, CORE_VIEW_FIELDS]);
+    });
+
+    it('affords the generic Field view once for several attached built-in Fields', () => {
+      // Two built-in attachments share the one generic Field view — dedup keeps a single toggle.
+      expect(viewKeys(registry.viewsFor(['core.note'], ['dnd.size', 'dnd.alignment']))).toEqual([
+        CORE_VIEW_CONTENT,
+        CORE_VIEW_FIELDS,
+      ]);
     });
 
     it('surfaces an attached grid’s View even on an unregistered type — the missing-plugin floor plus the attachment', () => {

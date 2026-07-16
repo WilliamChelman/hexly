@@ -182,6 +182,8 @@ export class EntitiesClient {
    * Stale base → `conflict` outcome, not a thrown error; caller branches, not catches. `types` is
    * sent only when the session authored the type set (an active typed edit the server gates its
    * Fields forward-only); a plain document edit omits it, so data at rest is never re-typed (ADR-0048).
+   * `fields` — the directly-attached Field ids (ADR-0054) — rides the same rule: sent only when the
+   * session authored an attach/detach, omitted otherwise so the stored set is left untouched.
    */
   save(
     id: string,
@@ -189,6 +191,7 @@ export class EntitiesClient {
     version: number,
     tags: readonly string[],
     types?: readonly EntityType[],
+    fields?: readonly string[],
   ): Observable<EntitySaveOutcome> {
     return this.http
       .put<EntityDetail>(`/api/entities/${id}`, {
@@ -196,6 +199,7 @@ export class EntitiesClient {
         version,
         tags,
         ...(types !== undefined && { types }),
+        ...(fields !== undefined && { fields }),
       })
       .pipe(
         // Write-through: a clean save is the freshest state — feed it to the store so other watchers
