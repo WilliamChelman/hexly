@@ -15,7 +15,7 @@ import {
   DND_CHALLENGE_KEY,
   DND_DEFENCE_KEYS,
   DND_IDENTITY_KEYS,
-  DND_MONSTER_TYPE,
+  DND_MONSTER_FIELDS,
   formatModifier,
 } from '../lib/monster';
 import { StatSlot } from './stat-slot';
@@ -27,7 +27,7 @@ interface Slot {
 }
 
 /** The plugin's declared Fields, by EntityDocument key. The block renders its own type, so it needs no registry. */
-const FIELDS_BY_KEY = new Map(DND_MONSTER_TYPE.fields.map((field) => [field.key, field]));
+const FIELDS_BY_KEY = new Map(DND_MONSTER_FIELDS.map((field) => [field.key, field]));
 
 /**
  * The `dnd.monster` bespoke View (`dnd.view.stat-block`): edits the same EntityDocument map every other
@@ -123,9 +123,7 @@ export class StatBlockView {
   private readonly invalidKeys = computed(
     () =>
       new Set(
-        validateFields(DND_MONSTER_TYPE.fields, this.metadata(), NO_STRUCTURED_DATA_TYPES).errors.map(
-          (error) => error.key,
-        ),
+        validateFields(DND_MONSTER_FIELDS, this.metadata(), NO_STRUCTURED_DATA_TYPES).errors.map((error) => error.key),
       ),
   );
 

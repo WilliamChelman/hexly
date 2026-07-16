@@ -175,12 +175,13 @@ export const worldTypes = sqliteTable(
       .references(() => worlds.id, { onDelete: 'cascade' }),
     typeId: text('type_id').notNull(),
     label: text('label').notNull(),
-    // The type's Field schema (FieldSchema[]), validated at the trust boundary against the shared Zod
-    // schema. A JSON bag, never DB-queried — the write-path resolver loads it whole and unions it.
-    fields: text('fields', { mode: 'json' }).$type<FieldSchema[]>().notNull().default([]),
+    // The type's default Fields, referenced by id (`fieldRefs`, ADR-0054) — the sole Field declaration
+    // now that inline schemas are gone. A JSON bag of `namespace.id` ids, never DB-queried; the
+    // effective-set resolver loads it whole and composes it with the Entity's attached Fields.
+    fieldRefs: text('field_refs', { mode: 'json' }).$type<string[]>().notNull().default([]),
     // The type's ordered View list (ViewPlacement[], ADR-0050, #201), what the "Show as a view" toggle
     // writes. Null is *not* an empty list: it means the author named no order, and the web defaults
-    // it. The API stores and shape-validates the list, as it does `fields`; it never resolves a View.
+    // it. The API stores and shape-validates the list, as it does `field_refs`; it never resolves a View.
     views: text('views', { mode: 'json' }).$type<ViewPlacement[]>(),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),

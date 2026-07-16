@@ -3,9 +3,11 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import {
   AvailableType,
   CreateUserDefinedTypeRequest,
-  FieldDataType,
+  CreateWorldFieldRequest,
+  Field,
   FieldSchema,
-  isStructuredKind,
+  isStructuredDataType,
+  USER_FIELD_NAMESPACE,
   USER_TYPE_NAMESPACE,
 } from '@hexly/domain';
 import { ToasterService, WorldsClient } from '@hexly/web-core';
@@ -13,54 +15,40 @@ import { produce } from '@hexly/immer';
 import { isShownAsView, userTypeViews } from '@hexly/web-entity';
 import { Button, Input, Select } from '@hexly/web-ui';
 import { WorldTypesLoader } from '../../../../entity-types/world-types-loader';
+import { WorldFieldsLoader } from '../../../../entity-types/world-fields-loader';
+import { TypeRegistry } from '../../../../entity-types/type-registry';
 import { ViewRegistry } from '../../../../entity-types/view-registry';
+import { BUILT_IN_KINDS, dataTypeLabel, toFieldDataType } from './field-data-type';
 
-/** The built-in data-types the authoring UI offers — the subset a code-less type needs (#191). */
-const BUILT_IN_KINDS = ['string', 'number', 'boolean', 'date', 'enum'] as const;
-type BuiltInKind = (typeof BUILT_IN_KINDS)[number];
-
-/** One Field as the form edits it — flattened so an enum's `options` bind to a single text input. */
-interface DraftField {
-  key: string;
-  label: string;
-  /**
-   * The picked data-type's kind: a built-in, or a plugin's **Structured Data Type** by its
-   * `namespace.id` id (`core.hex-grid`). A bare string — a `<select>` value over both keyspaces.
-   */
-  kind: string;
-  /** Comma-separated enum options; ignored for non-enum kinds. */
-  options: string;
-  required: boolean;
-  facetable: boolean;
-  /**
-   * **Structured** Fields only: whether this Field's View is placed in the type's view list (on by
-   * default, ADR-0050). Off leaves the Field and its value untouched. Ignored for a built-in kind,
-   * which has a form row, not a View.
-   */
-  showAsView: boolean;
-  /**
-   * The data-type this Field was loaded with, kept whole. The form authors only a `kind` (and an
-   * enum's options), so a data-type carrying more — a `list`'s item type, an `entityLink`'s
-   * target-type constraint — survives a round trip only by being handed back verbatim. Absent on a
-   * Field the author just added.
-   */
-  stored?: FieldDataType;
-}
-
-/** The open editor: creating (`editingId === null`) or editing an existing type by id. */
+/** The open type editor: creating (`editingId === null`) or editing an existing type by id. */
 interface Draft {
   editingId: string | null;
   /** The `world.`-less id slug (creating only; immutable when editing). */
   slug: string;
   label: string;
-  fields: DraftField[];
+  /** The referenced default Field ids (`fieldRefs`, ADR-0054), in reference order. */
+  fieldRefs: string[];
+  /** Per referenced **Structured Data Type** Field id: whether its View is placed (on by default, ADR-0050). */
+  shownAsView: Record<string, boolean>;
+}
+
+/** The inline "new Field" sub-form — authors a World Field the type can then reference (ADR-0054). */
+interface FieldDraft {
+  slug: string;
+  key: string;
+  label: string;
+  kind: string;
+  /** Comma-separated enum options; ignored for non-enum kinds. */
+  options: string;
 }
 
 /**
- * The World-Owner surface for authoring user-defined types (ADR-0048): list, create, rename /
- * re-Field, and delete a World's custom types. Writes are Owner-gated server-side; a refusal toasts
- * and leaves the list untouched. On success it reloads its list and asks {@link WorldTypesLoader} to
- * re-project.
+ * The World-Owner surface for authoring user-defined types (ADR-0048, ADR-0054): a type is a *semantic
+ * bag* that **references** reusable Fields by id (`fieldRefs`), never owns inline schemas. The editor
+ * picks from the World's registered Fields (its own, authored in the World Fields editor, plus the
+ * enabled plugins') and can mint a new World Field inline. Writes are Owner-gated server-side; a refusal
+ * toasts and leaves the list untouched. On success it reloads its list and asks {@link WorldTypesLoader}
+ * to re-project.
  */
 @Component({
   selector: 'app-world-types',
@@ -74,7 +62,7 @@ interface Draft {
             <span class="type-name">{{ t.label }}</span>
             <span class="type-id">{{ t.id }}</span>
           </div>
-          <span class="type-fieldcount">{{ t.fields.length }}</span>
+          <span class="type-fieldcount">{{ t.fieldRefs.length }}</span>
           <button appButton size="sm" [attr.data-testid]="'edit-' + t.id" (click)="startEdit(t)">
             {{ 'worldTypes.edit' | transloco }}
           </button>
@@ -113,102 +101,100 @@ interface Draft {
           (input)="patch({ label: value($event) })"
         />
 
-        <h3 class="type-fields-heading">{{ 'worldTypes.fieldsHeading' | transloco }}</h3>
-        @for (f of d.fields; track $index) {
-          <div class="type-field" [attr.data-testid]="'field-' + $index">
-            <input
-              appInput
-              [attr.aria-label]="'worldTypes.fieldKey' | transloco"
-              [placeholder]="'worldTypes.fieldKey' | transloco"
-              [value]="f.key"
-              data-testid="field-key"
-              (input)="patchField($index, { key: value($event) })"
-            />
-            <input
-              appInput
-              [attr.aria-label]="'worldTypes.fieldName' | transloco"
-              [placeholder]="'worldTypes.fieldName' | transloco"
-              [value]="f.label"
-              data-testid="field-label"
-              (input)="patchField($index, { label: value($event) })"
-            />
-            <!-- The kind is marked on the option, not bound as the select's [value]: the options are
-                 rendered by @for/@if, so a [value] naming one of them runs before it exists and the
-                 browser falls back to the first. -->
-            <select
-              appSelect
-              [attr.aria-label]="'worldTypes.fieldType' | transloco"
-              data-testid="field-kind"
-              (change)="patchField($index, { kind: value($event) })"
-            >
-              @for (k of builtInKinds; track k) {
-                <option [value]="k" [selected]="k === f.kind">{{ 'worldTypes.dataType.' + k | transloco }}</option>
-              }
-              @for (d of structuredKinds(); track d.kind) {
-                <option [value]="d.kind" [selected]="d.kind === f.kind">{{ d.labelKey | transloco }}</option>
-              }
-              <!-- A kind this form cannot author names itself, rather than leaving the row blank. -->
-              @if (unofferedKind(f); as kind) {
-                <option [value]="kind" selected>{{ kind }}</option>
-              }
-            </select>
-            @if (f.kind === 'enum') {
+        <h3 class="type-fields-heading">{{ 'worldTypes.referenceHeading' | transloco }}</h3>
+        <p class="type-hint">{{ 'worldTypes.referenceHint' | transloco }}</p>
+        @for (f of available(); track f.id) {
+          <div class="type-field" [attr.data-testid]="'field-ref-' + f.id">
+            <label class="type-flag">
               <input
-                appInput
-                [attr.aria-label]="'worldTypes.fieldOptions' | transloco"
-                [placeholder]="'worldTypes.fieldOptionsHint' | transloco"
-                [value]="f.options"
-                data-testid="field-options"
-                (input)="patchField($index, { options: value($event) })"
+                type="checkbox"
+                [attr.data-testid]="'field-ref-checkbox-' + f.id"
+                [checked]="d.fieldRefs.includes(f.id)"
+                (change)="toggleRef(f.id, checked($event))"
               />
-            }
-            <!-- A Field of a Structured Data Type is edited on its own View, so it is never required (nothing
-                 collects it) and never a facet (no discrete values to count) — it carries where its
-                 View sits instead. -->
-            @if (isStructured(f)) {
+              <span class="type-field-name">{{ f.label }}</span>
+              <span class="type-field-id">{{ f.key }} · {{ f.typeLabel }}</span>
+            </label>
+            <!-- A referenced Field of a Structured Data Type places a View; the toggle authors where. -->
+            @if (d.fieldRefs.includes(f.id) && f.structured) {
               <label class="type-flag">
                 <input
                   type="checkbox"
-                  data-testid="field-show-as-view"
-                  [checked]="f.showAsView"
-                  (change)="patchField($index, { showAsView: checked($event) })"
+                  [attr.data-testid]="'field-show-as-view-' + f.id"
+                  [checked]="d.shownAsView[f.id] ?? true"
+                  (change)="setShowAsView(f.id, checked($event))"
                 />
                 {{ 'worldTypes.fieldShowAsView' | transloco }}
               </label>
-            } @else {
-              <label class="type-flag">
-                <input
-                  type="checkbox"
-                  [checked]="f.required"
-                  (change)="patchField($index, { required: checked($event) })"
-                />
-                {{ 'worldTypes.fieldRequired' | transloco }}
-              </label>
-              <label class="type-flag">
-                <input
-                  type="checkbox"
-                  [checked]="f.facetable"
-                  (change)="patchField($index, { facetable: checked($event) })"
-                />
-                {{ 'worldTypes.fieldFacetable' | transloco }}
-              </label>
             }
-            <button
-              appButton
-              size="sm"
-              type="button"
-              [attr.aria-label]="'worldTypes.removeField' | transloco"
-              (click)="removeField($index)"
-            >
-              ×
-            </button>
           </div>
         } @empty {
-          <p class="type-hint">{{ 'worldTypes.noFields' | transloco }}</p>
+          <p class="type-hint" data-testid="no-fields-available">{{ 'worldTypes.noFieldsAvailable' | transloco }}</p>
         }
-        <button appButton size="sm" type="button" data-testid="add-field" (click)="addField()">
-          {{ 'worldTypes.addField' | transloco }}
-        </button>
+
+        @if (fieldDraft(); as fd) {
+          <fieldset class="newfield" data-testid="newfield-editor">
+            <input
+              appInput
+              [attr.aria-label]="'worldFields.keyLabel' | transloco"
+              [placeholder]="'worldFields.keyLabel' | transloco"
+              [value]="fd.key"
+              data-testid="newfield-key"
+              (input)="patchFieldDraft({ key: value($event), slug: fd.slug || value($event) })"
+            />
+            <input
+              appInput
+              [attr.aria-label]="'worldFields.nameLabel' | transloco"
+              [placeholder]="'worldFields.nameLabel' | transloco"
+              [value]="fd.label"
+              data-testid="newfield-name"
+              (input)="patchFieldDraft({ label: value($event) })"
+            />
+            <select
+              appSelect
+              [attr.aria-label]="'worldFields.typeLabel' | transloco"
+              data-testid="newfield-kind"
+              (change)="patchFieldDraft({ kind: value($event) })"
+            >
+              @for (k of builtInKinds; track k) {
+                <option [value]="k" [selected]="k === fd.kind">{{ 'worldTypes.dataType.' + k | transloco }}</option>
+              }
+              @for (s of structuredKinds(); track s.kind) {
+                <option [value]="s.kind" [selected]="s.kind === fd.kind">{{ s.labelKey | transloco }}</option>
+              }
+            </select>
+            @if (fd.kind === 'enum') {
+              <input
+                appInput
+                [attr.aria-label]="'worldFields.options' | transloco"
+                [placeholder]="'worldFields.optionsHint' | transloco"
+                [value]="fd.options"
+                data-testid="newfield-options"
+                (input)="patchFieldDraft({ options: value($event) })"
+              />
+            }
+            <div class="type-actions">
+              <button
+                appButton
+                size="sm"
+                variant="primary"
+                type="button"
+                data-testid="newfield-save"
+                [disabled]="!canSaveField()"
+                (click)="saveField()"
+              >
+                {{ 'worldFields.save' | transloco }}
+              </button>
+              <button appButton size="sm" type="button" data-testid="newfield-cancel" (click)="fieldDraft.set(null)">
+                {{ 'worldFields.cancel' | transloco }}
+              </button>
+            </div>
+          </fieldset>
+        } @else {
+          <button appButton size="sm" type="button" data-testid="new-field" (click)="startNewField()">
+            {{ 'worldTypes.newField' | transloco }}
+          </button>
+        }
 
         <div class="type-actions">
           <button appButton variant="primary" type="submit" data-testid="type-save" [disabled]="!canSave()">
@@ -267,10 +253,19 @@ interface Draft {
       @apply mt-2 text-sm font-semibold text-ink-muted;
     }
     .type-field {
-      @apply flex flex-wrap items-center gap-2;
+      @apply flex flex-wrap items-center gap-3;
     }
     .type-flag {
-      @apply flex items-center gap-1 text-sm text-ink-muted;
+      @apply flex items-center gap-2 text-sm text-ink-muted;
+    }
+    .type-field-name {
+      @apply text-ink;
+    }
+    .type-field-id {
+      @apply font-mono text-2xs text-ink-muted;
+    }
+    .newfield {
+      @apply mt-1 flex flex-col gap-2 rounded-md border border-line p-3;
     }
     .type-actions {
       @apply mt-2 flex items-center gap-2;
@@ -287,17 +282,30 @@ export class WorldTypesPanel implements OnInit {
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);
   private readonly loader = inject(WorldTypesLoader);
+  private readonly fieldsLoader = inject(WorldFieldsLoader);
+  private readonly registry = inject(TypeRegistry);
   private readonly views = inject(ViewRegistry);
 
   protected readonly builtInKinds = BUILT_IN_KINDS;
   protected readonly types = signal<readonly AvailableType[]>([]);
   protected readonly draft = signal<Draft | null>(null);
+  protected readonly fieldDraft = signal<FieldDraft | null>(null);
 
-  /**
-   * The **Structured Data Types** this build offers, beside the built-ins. Read off the
-   * registered Views, so the picker offers exactly the kinds this build can render.
-   */
+  /** The Structured Data Types this build offers in the new-Field sub-form, beside the built-ins. */
   protected readonly structuredKinds = computed(() => this.views.offerableDataTypes());
+
+  /** The registered Fields the type may reference (ADR-0054), each with a human Data-Type label. */
+  protected readonly available = computed(() => {
+    this.transloco.activeLang(); // re-resolve labels on a language switch
+    const structured = new Map(this.structuredKinds().map((s) => [s.kind, s.labelKey]));
+    return this.registry.availableFields().map((field) => ({
+      id: field.id,
+      key: field.key,
+      label: field.labelKey ? this.transloco.translate(field.labelKey) : field.label,
+      structured: isStructuredDataType(field.dataType),
+      typeLabel: this.dataTypeLabel(field.dataType.kind, structured),
+    }));
+  });
 
   /** Save is enabled once the type has a name and (when creating) an id slug. */
   protected readonly canSave = computed(() => {
@@ -305,11 +313,16 @@ export class WorldTypesPanel implements OnInit {
     return !!d && d.label.trim().length > 0 && (d.editingId !== null || d.slug.trim().length > 0);
   });
 
+  /** The new-Field sub-form saves once it has a key, a label, and an id slug. */
+  protected readonly canSaveField = computed(() => {
+    const fd = this.fieldDraft();
+    return !!fd && fd.key.trim().length > 0 && fd.label.trim().length > 0 && fd.slug.trim().length > 0;
+  });
+
   ngOnInit(): void {
     this.load();
   }
 
-  /** The value / checked read helpers for the template's event bindings. */
   protected value(event: Event): string {
     return (event.target as HTMLInputElement | HTMLSelectElement).value;
   }
@@ -318,42 +331,32 @@ export class WorldTypesPanel implements OnInit {
   }
 
   protected startCreate(): void {
-    this.draft.set({ editingId: null, slug: '', label: '', fields: [] });
+    this.draft.set({ editingId: null, slug: '', label: '', fieldRefs: [], shownAsView: {} });
+    this.fieldDraft.set(null);
   }
 
   protected startEdit(type: AvailableType): void {
+    // A referenced structured Field's toggle reads back off the type's own view order (ADR-0050).
+    const shownAsView: Record<string, boolean> = {};
+    for (const id of type.fieldRefs) {
+      const field = this.registry.field(id);
+      if (field && isStructuredDataType(field.dataType)) shownAsView[id] = isShownAsView(type.views, field);
+    }
     this.draft.set({
       editingId: type.id,
-      // The id is immutable when editing; the slug is shown for reference but not sent.
       slug: type.id.slice(`${USER_TYPE_NAMESPACE}.`.length),
       label: type.label,
-      // Each structured Field's toggle reads back off the type's own view order.
-      fields: type.fields.map((field) => toDraftField(field, isShownAsView(type.views, field))),
+      fieldRefs: [...type.fieldRefs],
+      shownAsView,
     });
-  }
-
-  /** Whether a draft row names a plugin's data-type — the mark being the dot (ADR-0050). */
-  protected isStructured(field: DraftField): boolean {
-    return isStructuredKind(field.kind);
+    this.fieldDraft.set(null);
   }
 
   /**
-   * A row's `kind` when the picker offers no option for it — a `list` or an `entityLink` (authored
-   * through the API), or a structured kind whose plugin this build dropped. `null` for a kind on the
-   * menu. Such a Field still shows, and round-trips untouched ({@link DraftField.stored}).
-   */
-  protected unofferedKind(field: DraftField): string | null {
-    const offered =
-      (BUILT_IN_KINDS as readonly string[]).includes(field.kind) ||
-      this.structuredKinds().some((d) => d.kind === field.kind);
-    return offered ? null : field.kind;
-  }
-
-  /**
-   * Every draft edit runs through immer, so a nested change reads as a plain mutation of the draft.
-   * Each recipe must return *nothing*: immer reads a returned value as a replacement state and throws
-   * when the draft was also mutated — hence the block bodies below, never a bare `Object.assign(…)`
-   * or `push(…)` expression (both return a value).
+   * Every draft edit runs through immer, so a nested change reads as a plain mutation. Each recipe must
+   * return *nothing*: immer reads a returned value as a replacement state and throws when the draft was
+   * also mutated — hence the block bodies in {@link toggleRef}/{@link setShowAsView}, never a bare
+   * `push(…)`/`Object.assign(…)` expression (both return a value).
    */
   private mutate(recipe: (draft: Draft) => void): void {
     this.draft.update((d) => (d ? produce(d, recipe) : d));
@@ -365,21 +368,21 @@ export class WorldTypesPanel implements OnInit {
     });
   }
 
-  protected patchField(index: number, patch: Partial<DraftField>): void {
+  /** Reference or unreference a Field by id; a referenced structured Field defaults its View on. */
+  protected toggleRef(id: string, on: boolean): void {
     this.mutate((d) => {
-      Object.assign(d.fields[index], patch);
+      if (on) {
+        if (!d.fieldRefs.includes(id)) d.fieldRefs.push(id);
+        if (d.shownAsView[id] === undefined) d.shownAsView[id] = true;
+      } else {
+        d.fieldRefs = d.fieldRefs.filter((ref) => ref !== id);
+      }
     });
   }
 
-  protected addField(): void {
+  protected setShowAsView(id: string, on: boolean): void {
     this.mutate((d) => {
-      d.fields.push(blankField());
-    });
-  }
-
-  protected removeField(index: number): void {
-    this.mutate((d) => {
-      d.fields.splice(index, 1);
+      d.shownAsView[id] = on;
     });
   }
 
@@ -387,10 +390,9 @@ export class WorldTypesPanel implements OnInit {
     event.preventDefault();
     const d = this.draft();
     if (!d || !this.canSave()) return;
-    const fields = d.fields.map(toFieldSchema);
-    // Fields and view order are always sent together, so a placement never outlives the Field it
-    // names. Zipped against the *mapped* Fields, so both agree on a key the form has yet to trim.
-    const shown = new Set(fields.filter((_, i) => d.fields[i].showAsView).map((field) => field.key));
+    // Resolve the referenced Fields to derive the default View order (a structured Field places a View).
+    const fields = d.fieldRefs.map((id) => this.registry.field(id)).filter((field): field is Field => !!field);
+    const shown = new Set(fields.filter((field) => d.shownAsView[field.id] ?? true).map((field) => field.key));
     const views = userTypeViews(fields, (field) => shown.has(field.key));
     const label = d.label.trim();
     const op$ =
@@ -398,13 +400,10 @@ export class WorldTypesPanel implements OnInit {
         ? this.worlds.createType(this.id(), {
             id: `${USER_TYPE_NAMESPACE}.${d.slug.trim()}`,
             label,
-            fields,
-            // The World Fields editor that authors `fieldRefs` (ADR-0054) is a later step; the inline
-            // `fields` path stays the one this panel drives.
-            fieldRefs: [],
+            fieldRefs: d.fieldRefs,
             views,
           } satisfies CreateUserDefinedTypeRequest)
-        : this.worlds.updateType(this.id(), d.editingId, { label, fields, views });
+        : this.worlds.updateType(this.id(), d.editingId, { label, fieldRefs: d.fieldRefs, views });
     op$.subscribe({
       next: () => {
         this.draft.set(null);
@@ -412,6 +411,31 @@ export class WorldTypesPanel implements OnInit {
         this.loader.reload();
       },
       error: () => this.error(d.editingId === null ? 'worldTypes.createError' : 'worldTypes.updateError'),
+    });
+  }
+
+  // ── The inline "new Field" sub-form: mint a World Field, then reference it (ADR-0054). ──
+
+  protected startNewField(): void {
+    this.fieldDraft.set({ slug: '', key: '', label: '', kind: 'string', options: '' });
+  }
+
+  protected patchFieldDraft(patch: Partial<FieldDraft>): void {
+    this.fieldDraft.update((fd) => (fd ? { ...fd, ...patch } : fd));
+  }
+
+  protected saveField(): void {
+    const fd = this.fieldDraft();
+    if (!fd || !this.canSaveField()) return;
+    const id = `${USER_FIELD_NAMESPACE}.${fd.slug.trim()}`;
+    this.worlds.createField(this.id(), { id, ...toFieldSchema(fd) } satisfies CreateWorldFieldRequest).subscribe({
+      next: () => {
+        this.fieldDraft.set(null);
+        // Re-project the World's Fields so the registry offers the new one, then reference it.
+        this.fieldsLoader.reload();
+        this.toggleRef(id, true);
+      },
+      error: () => this.error('worldFields.createError'),
     });
   }
 
@@ -433,64 +457,23 @@ export class WorldTypesPanel implements OnInit {
     });
   }
 
+  /** A Data Type's display name, shared with the World Fields editor — built-ins under the `worldTypes` catalog. */
+  private dataTypeLabel(kind: string, structured: ReadonlyMap<string, string>): string {
+    return dataTypeLabel(kind, structured, (key) => this.transloco.translate(key), 'worldTypes.dataType');
+  }
+
   private error(key: string): void {
     this.toaster.show(this.transloco.translate(key), 'error');
   }
 }
 
-/** A fresh, empty Field row — an optional string with no key yet, and shown as a View if made one. */
-function blankField(): DraftField {
-  return { key: '', label: '', kind: 'string', options: '', required: false, facetable: false, showAsView: true };
-}
-
-/**
- * An existing Field schema → the flattened form model. Keeps the whole `dataType` in
- * {@link DraftField.stored}, so a data-type this form cannot rebuild survives an edit of the Field
- * beside it.
- */
-function toDraftField(field: FieldSchema, showAsView: boolean): DraftField {
+/** The new-Field sub-form → a Field body (id-less {@link FieldSchema}). A structured Field is neither required nor facetable. */
+function toFieldSchema(fd: FieldDraft): FieldSchema {
   return {
-    key: field.key,
-    label: field.label,
-    kind: field.dataType.kind,
-    options: field.dataType.kind === 'enum' ? field.dataType.options.join(', ') : '',
-    required: field.required,
-    facetable: field.facetable,
-    showAsView,
-    stored: field.dataType,
+    key: fd.key.trim(),
+    label: fd.label.trim(),
+    dataType: toFieldDataType(fd.kind, fd.options),
+    required: false,
+    facetable: false,
   };
-}
-
-/**
- * The form model → a Field schema for the request. A **Field of a Structured Data Type** is neither required nor
- * facetable, whatever a stale draft carries (ADR-0050).
- */
-function toFieldSchema(f: DraftField): FieldSchema {
-  const structured = isStructuredKind(f.kind);
-  return {
-    key: f.key.trim(),
-    label: f.label.trim(),
-    dataType: toDataType(f),
-    required: !structured && f.required,
-    facetable: !structured && f.facetable,
-  };
-}
-
-/**
- * The picked kind → a data-type. A kind the author left untouched hands back the stored data-type
- * verbatim, item type and target-type constraint intact.
- */
-function toDataType(f: DraftField): FieldDataType {
-  if (f.kind === 'enum')
-    return {
-      kind: 'enum',
-      options: f.options
-        .split(',')
-        .map((option) => option.trim())
-        .filter(Boolean),
-    };
-  if (f.stored?.kind === f.kind) return f.stored;
-  if (isStructuredKind(f.kind)) return { kind: f.kind };
-  // The remaining built-ins the picker offers are the scalars — one literal kind each, no payload.
-  return { kind: f.kind as Exclude<BuiltInKind, 'enum'> };
 }

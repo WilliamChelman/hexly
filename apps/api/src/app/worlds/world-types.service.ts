@@ -1,19 +1,12 @@
-import { BadRequestException, Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import {
-  ApiError,
   AvailableType,
   CreateUserDefinedTypeRequest,
-  EntityErrorCode,
-  FieldSchema,
-  isFieldViewPlacement,
   UpdateUserDefinedTypeRequest,
-  unresolvedDataTypeErrors,
   UserDefinedType,
-  ViewPlacement,
 } from '@hexly/domain';
 import { DB, Db } from '../db/db';
 import { worldAccess } from '../acl/world-access';
-import { TypeFieldRegistry } from '../entities/type-field-registry';
 import { WorldTypeFields } from '../entities/world-type-fields';
 import { WorldWrites } from './world-writes';
 
@@ -28,7 +21,6 @@ export class WorldTypesService {
     @Inject(DB) private readonly db: Db,
     private readonly types: WorldTypeFields,
     private readonly writes: WorldWrites,
-    private readonly plugins: TypeFieldRegistry,
   ) {}
 
   /** The types available in a World (plugin + user-defined). Reachable-gated; unreachable → `not-found`. */
@@ -42,18 +34,10 @@ export class WorldTypesService {
     const gate = this.gateOwner(userId, worldId);
     if (gate) return gate;
     if (this.types.list(worldId).some((type) => type.id === req.id)) return { status: 'conflict' };
-    this.assertDataTypesResolve(req.fields);
-    // `fieldRefs` (ADR-0054) is accepted but not yet persisted (no stored column — a later migrate step);
-    // it echoes back on the created value, then re-reads as empty until then.
-    const type: UserDefinedType = {
-      id: req.id,
-      label: req.label,
-      fields: req.fields,
-      fieldRefs: req.fieldRefs,
-      views: req.views,
-    };
-    this.writes.createType(worldId, type);
-    return { status: 'ok', value: type };
+    // The create payload *is* the type shape (id + label + `fieldRefs` + optional `views`, ADR-0054):
+    // a type references its Fields by id, so there is no inline schema to validate here.
+    this.writes.createType(worldId, req);
+    return { status: 'ok', value: req };
   }
 
   /**
@@ -68,25 +52,13 @@ export class WorldTypesService {
   ): TypeResult<UserDefinedType> {
     const gate = this.gateOwner(userId, worldId);
     if (gate) return gate;
-    if (patch.fields) this.assertDataTypesResolve(patch.fields);
     const stored = this.types.list(worldId).find((type) => type.id === typeId);
     if (!stored) return { status: 'not-found' };
-    if (!this.writes.updateType(worldId, typeId, { ...patch, views: this.survivingViews(stored, patch) }))
-      return { status: 'not-found' };
+    // A `views` placement naming a Field the type no longer references is inert at resolution
+    // (ADR-0054), so the patch is written as sent — no stored-placement pruning to do.
+    if (!this.writes.updateType(worldId, typeId, patch)) return { status: 'not-found' };
     // Just written in the same synchronous transaction, so it always resolves.
     return { status: 'ok', value: this.types.list(worldId).find((type) => type.id === typeId)! };
-  }
-
-  /**
-   * The View list to write, so a placement never outlives the Field it names (ADR-0050). A patch
-   * that re-Fields a type without re-placing its Views is beyond the payload schema's reach, so its
-   * stored placements are pruned here. `undefined` leaves the stored list alone.
-   */
-  private survivingViews(stored: UserDefinedType, patch: UpdateUserDefinedTypeRequest): ViewPlacement[] | undefined {
-    if (patch.views) return patch.views;
-    if (!patch.fields || !stored.views) return undefined;
-    const keys = new Set(patch.fields.map((field) => field.key));
-    return stored.views.filter((view) => !isFieldViewPlacement(view) || keys.has(view.field));
   }
 
   /**
@@ -97,20 +69,6 @@ export class WorldTypesService {
     const gate = this.gateOwner(userId, worldId);
     if (gate) return gate;
     return this.writes.deleteType(worldId, typeId) ? { status: 'ok', value: null } : { status: 'not-found' };
-  }
-
-  /**
-   * A user-defined type's Fields may name a plugin's **Structured Data Type** (`core.hex-grid`),
-   * so authoring one is where an unregistered kind is rejected (ADR-0050) — against the composed set,
-   * since no schema could enumerate a kind a plugin registers at module load.
-   */
-  private assertDataTypesResolve(fields: readonly FieldSchema[]): void {
-    const errors = unresolvedDataTypeErrors(fields, this.plugins.structuredDataTypes);
-    if (errors.length > 0)
-      throw new BadRequestException({
-        code: EntityErrorCode.InvalidFields,
-        data: { fields: errors },
-      } satisfies ApiError);
   }
 
   /** Gate a mutation: undefined when Owner, else unreachable → `not-found`, non-Owner → `forbidden`. */

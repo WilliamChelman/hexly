@@ -1,7 +1,7 @@
 import { provideTranslocoTesting } from '../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { Signal, signal, WritableSignal } from '@angular/core';
-import { FieldSchema } from '@hexly/domain';
+import { defineField } from '@hexly/domain';
 import { ClientConfigStore } from '@hexly/web-core';
 import { CORE_HEX_GRID, HEX_GRID_FIELD, PLUGIN_ID as HEXMAP_PLUGIN_ID } from '@hexly/plugin-hexmap';
 import { CONTENT_FIELD, CORE_RICH_CONTENT, PLUGIN_ID as CONTENT_PLUGIN_ID } from '@hexly/plugin-content';
@@ -24,12 +24,12 @@ function viewKeys(instances: readonly ViewInstance[]): string[] {
   return instances.map(viewInstanceKey);
 }
 
-function definition(id: string, fields?: readonly FieldSchema[]): TypeDefinition {
+function definition(id: string, fieldRefs: readonly string[] = []): TypeDefinition {
   return {
     id: id as TypeDefinition['id'],
     icon: 'label',
     views: [CORE_VIEW_CONTENT],
-    fields,
+    fieldRefs,
     graphColorToken: '--color-ink-muted',
     labels: {
       eyebrow: `${id}.eyebrow`,
@@ -42,13 +42,26 @@ function definition(id: string, fields?: readonly FieldSchema[]): TypeDefinition
   };
 }
 
-const crField: FieldSchema = {
-  key: 'cr',
-  label: 'Challenge Rating',
-  dataType: { kind: 'number' },
-  required: false,
-  facetable: false,
-};
+// World-defined Fields a spec type references by id (ADR-0054); set on the registry in `beforeEach`.
+const crField = defineField({ id: 'world.cr', key: 'cr', label: 'Challenge Rating', dataType: { kind: 'number' } });
+const battlemapField = defineField({
+  id: 'world.battlemap',
+  key: 'battlemap',
+  label: 'Battlemap',
+  dataType: { kind: CORE_HEX_GRID },
+});
+const proseContent = defineField({
+  id: 'world.content',
+  key: 'content',
+  label: 'Content',
+  dataType: { kind: CORE_RICH_CONTENT },
+});
+const proseSecrets = defineField({
+  id: 'world.secrets',
+  key: 'secrets',
+  label: 'Secrets',
+  dataType: { kind: CORE_RICH_CONTENT },
+});
 
 describe('TypeRegistry', () => {
   let registry: TypeRegistry;
@@ -62,6 +75,9 @@ describe('TypeRegistry', () => {
       providers: [providePluginContent(), providePluginHexmap(), providePluginDnd()],
     });
     registry = TestBed.inject(TypeRegistry);
+    // A spec type references these World Fields by id; the registry resolves them like the real
+    // WorldFieldsLoader's projection (ADR-0054).
+    registry.setWorldFields([crField, battlemapField, proseContent, proseSecrets]);
   });
 
   it('seeds every code type from a bundled plugin — all through one register()', () => {
@@ -146,7 +162,7 @@ describe('TypeRegistry', () => {
 
   it('affords exactly the Views a registered type declares', () => {
     // A fields-only type (every user-defined one) declares the generic Field View outright…
-    registry.register({ ...definition('dnd.beast', [crField]), views: [CORE_VIEW_FIELDS] });
+    registry.register({ ...definition('dnd.beast', ['world.cr']), views: [CORE_VIEW_FIELDS] });
     expect(viewKeys(registry.viewsFor(['dnd.beast']))).toEqual([CORE_VIEW_FIELDS]);
     // …and a core type declaring no Fields never surfaces it.
     expect(viewKeys(registry.viewsFor(['core.note']))).toEqual([CORE_VIEW_CONTENT]);
@@ -157,24 +173,16 @@ describe('TypeRegistry', () => {
     // Neither a Field the type never declared nor a built-in data-type (which has a form row, not a
     // View) resolves to one — so the type affords only the Views that can actually render.
     registry.register({
-      ...definition('dnd.beast', [crField]),
+      ...definition('dnd.beast', ['world.cr']),
       views: [{ field: 'cr' }, { field: 'nonesuch' }, CORE_VIEW_CONTENT],
     });
     expect(viewKeys(registry.viewsFor(['dnd.beast']))).toEqual([CORE_VIEW_CONTENT]);
   });
 
   describe('a user-defined type carrying a Field of a Structured Data Type', () => {
-    const battlemap: FieldSchema = {
-      key: 'battlemap',
-      label: 'Battlemap',
-      dataType: { kind: CORE_HEX_GRID },
-      required: false,
-      facetable: false,
-    };
-
     it('affords the grid’s map View, bound to the Field — and still opens on its Fields', () => {
       registry.register({
-        ...definition('world.deity', [battlemap]),
+        ...definition('world.deity', ['world.battlemap']),
         views: [CORE_VIEW_FIELDS, CORE_VIEW_CONTENT, { field: 'battlemap' }],
       });
 
@@ -188,7 +196,7 @@ describe('TypeRegistry', () => {
 
     it('affords *two* map Views when it also carries core.hexmap — one per grid', () => {
       registry.register({
-        ...definition('world.deity', [battlemap]),
+        ...definition('world.deity', ['world.battlemap']),
         views: [CORE_VIEW_FIELDS, { field: 'battlemap' }],
       });
 
@@ -204,7 +212,7 @@ describe('TypeRegistry', () => {
     it('drops the Field’s View when "Show as a view" is off, leaving the Field itself alone', () => {
       // The toggle authors the *views* list, never the Field: the value stays, and stays declared.
       registry.register({
-        ...definition('world.deity', [battlemap]),
+        ...definition('world.deity', ['world.battlemap']),
         views: [CORE_VIEW_FIELDS, CORE_VIEW_CONTENT],
       });
 
@@ -214,19 +222,11 @@ describe('TypeRegistry', () => {
   });
 
   describe('a user-defined type carrying two prose Fields (#210)', () => {
-    const prose = (key: string, label: string): FieldSchema => ({
-      key,
-      label,
-      dataType: { kind: CORE_RICH_CONTENT },
-      required: false,
-      facetable: false,
-    });
-
     it('affords a content View per prose Field, each bound to its own key — two prose Fields coexist', () => {
       // Prose is a Field of a Structured Data Type like the grid, so two `core.rich-content` Fields afford two content
       // Views, each bound to the Field it renders — the twin of two grids affording two map Views (#202).
       registry.register({
-        ...definition('world.saint', [prose('content', 'Content'), prose('secrets', 'Secrets')]),
+        ...definition('world.saint', ['world.content', 'world.secrets']),
         views: [CORE_VIEW_FIELDS, { field: 'content' }, { field: 'secrets' }],
       });
 
@@ -249,7 +249,7 @@ describe('TypeRegistry', () => {
   });
 
   it('resolves the union of Field schemas a types[] set declares, primary type first', () => {
-    registry.register(definition('dnd.beast', [crField]));
+    registry.register(definition('dnd.beast', ['world.cr']));
     expect(registry.resolveFields(['dnd.beast']).map((f) => f.key)).toEqual(['cr']);
     // The bundled plugin's schema resolves through the same path — the web twin of what the API's
     // write gate and facet build read (#192).
@@ -309,14 +309,13 @@ describe('TypeRegistry', () => {
   });
 
   describe('World-defined Fields composed over the Plugin fields (ADR-0054, #230)', () => {
-    const element: FieldSchema & { id: string } = {
+    const element = defineField({
       id: 'world.element',
       key: 'element',
       label: 'Element',
       dataType: { kind: 'enum', options: ['fire', 'ice', 'water'] },
-      required: false,
       facetable: true,
-    };
+    });
 
     it('resolves a World Field by id, and unions an attached one into the effective set', () => {
       registry.setWorldFields([element]);
@@ -462,14 +461,13 @@ describe('TypeRegistry without the Hex Map plugin', () => {
     // The type itself is here — it is World data, not the plugin's — but `core.hex-grid` resolves
     // against an empty set, so its placement contributes no View. The Field's value stays in EntityDocument,
     // unrendered, rather than offering a toggle to a canvas this build cannot draw.
+    registry.setWorldFields([battlemapField]);
     registry.register({
       id: 'world.deity' as TypeDefinition['id'],
       icon: 'label',
       labelText: 'Deity',
       views: [CORE_VIEW_FIELDS, { field: 'battlemap' }],
-      fields: [
-        { key: 'battlemap', label: 'Battlemap', dataType: { kind: CORE_HEX_GRID }, required: false, facetable: false },
-      ],
+      fieldRefs: ['world.battlemap'],
       graphColorToken: '--color-ink-muted',
     });
 
@@ -570,14 +568,13 @@ describe('TypeRegistry filtering by the enabled-Plugin set', () => {
     // With hexmap disabled, an *enabled* user-defined Type placing `core.hex-grid` resolves its grid
     // View against the disabled Plugin's data-type: no View, so the Field is a plain value (ADR-0052).
     enabled.set(new Set([CONTENT_PLUGIN_ID])); // hexmap off, its View gone from the ViewRegistry
+    registry.setWorldFields([battlemapField]); // a World Field is always active, whatever its data-type's Plugin
     registry.register({
       id: 'world.realm' as TypeDefinition['id'],
       icon: 'label',
       labelText: 'Realm',
       views: [CORE_VIEW_FIELDS, { field: 'battlemap' }],
-      fields: [
-        { key: 'battlemap', label: 'Battlemap', dataType: { kind: CORE_HEX_GRID }, required: false, facetable: false },
-      ],
+      fieldRefs: ['world.battlemap'],
       graphColorToken: '--color-ink-muted',
     });
     expect(viewKeys(registry.viewsFor(['world.realm']))).toEqual([CORE_VIEW_FIELDS]);

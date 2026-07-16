@@ -19,7 +19,6 @@ export const DND_VIEW_STAT_BLOCK: ViewId = 'dnd.view.stat-block';
 export const DND_TYPE_DEFINITIONS: readonly TypeDefinition[] = [
   {
     id: DND_MONSTER_TYPE.id,
-    fields: DND_MONSTER_TYPE.fields,
     // References the prose and stat-block Fields by id (ADR-0054); `fields` kept for the World Types editor.
     fieldRefs: DND_MONSTER_TYPE.fieldRefs,
     icon: 'skull',

@@ -2,36 +2,41 @@ import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { EntityDetail, EntityVerb, FieldSchema } from '@hexly/domain';
+import { EntityDetail, EntityVerb, defineField } from '@hexly/domain';
 import { ENTITY_SESSION } from '@hexly/web-entity';
 import { providePluginDnd } from '@hexly/plugin-dnd/web';
 import { EntitySession } from '../services/entity-session';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 import { GenericFieldView } from './generic-field-view';
 
-const beastFields: FieldSchema[] = [
-  {
+// World Fields a spec type references by id (ADR-0054); set on the registry before each register().
+const beastFields = [
+  defineField({
+    id: 'test.name',
     key: 'name',
     label: 'Name',
     dataType: { kind: 'string' },
     required: true,
     facetable: false,
-  },
-  {
+  }),
+  defineField({
+    id: 'test.size',
     key: 'size',
     label: 'Size',
     dataType: { kind: 'enum', options: ['small', 'large'] },
     required: false,
     facetable: false,
-  },
-  {
+  }),
+  defineField({
+    id: 'test.cr',
     key: 'cr',
     label: 'CR',
     dataType: { kind: 'number' },
     required: false,
     facetable: false,
-  },
+  }),
 ];
+const beastFieldRefs = beastFields.map((f) => f.id);
 
 describe('GenericFieldView', () => {
   const detail = (
@@ -79,7 +84,8 @@ describe('GenericFieldView', () => {
   }
 
   it('renders a type’s declared Fields off EntityDocument, labelled and typed', () => {
-    registry.register(definitionWithFields('test.beast', beastFields));
+    registry.setWorldFields(beastFields);
+    registry.register(definitionWithFields('test.beast', beastFieldRefs));
     const { el } = render(detail(['test.beast'], { name: 'Aboleth', size: 'large' }, ['edit']));
 
     // The string Field shows its EntityDocument value; the enum Field renders its options as a <select>.
@@ -91,7 +97,8 @@ describe('GenericFieldView', () => {
   });
 
   it('writes an edited Field value back into the EntityDocument map', () => {
-    registry.register(definitionWithFields('test.beast', beastFields));
+    registry.setWorldFields(beastFields);
+    registry.register(definitionWithFields('test.beast', beastFieldRefs));
     const { fixture, el } = render(detail(['test.beast'], { name: 'Aboleth' }, ['edit']));
 
     const name = el.querySelector('[data-testid=field-name] input') as HTMLInputElement;
@@ -104,21 +111,24 @@ describe('GenericFieldView', () => {
   });
 
   it('renders a read-only opener’s controls disabled', () => {
-    registry.register(definitionWithFields('test.beast', beastFields));
+    registry.setWorldFields(beastFields);
+    registry.register(definitionWithFields('test.beast', beastFieldRefs));
     const { el } = render(detail(['test.beast'], { name: 'Aboleth' }, ['read']));
 
     expect((el.querySelector('[data-testid=field-name] input') as HTMLInputElement).disabled).toBe(true);
   });
 
   it('renders an Entity-Link Field by its last-known name, with a picker toggle when editable (#190)', () => {
-    const lair: FieldSchema = {
+    const lair = defineField({
+      id: 'test.lair',
       key: 'lair',
       label: 'Lair',
       dataType: { kind: 'entityLink', targetTypes: ['world.place'] },
       required: false,
       facetable: false,
-    };
-    registry.register(definitionWithFields('test.monster', [lair]));
+    });
+    registry.setWorldFields([lair]);
+    registry.register(definitionWithFields('test.monster', [lair.id]));
     const value = { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } };
 
     // Editable: the link shows its last-known name and offers a "change entity" toggle + a clear.
@@ -131,14 +141,16 @@ describe('GenericFieldView', () => {
   });
 
   it('renders an Entity-Link Field inert (name only, no controls) for a read-only opener (#190)', () => {
-    const lair: FieldSchema = {
+    const lair = defineField({
+      id: 'test.lair',
       key: 'lair',
       label: 'Lair',
       dataType: { kind: 'entityLink' },
       required: false,
       facetable: false,
-    };
-    registry.register(definitionWithFields('test.monster', [lair]));
+    });
+    registry.setWorldFields([lair]);
+    registry.register(definitionWithFields('test.monster', [lair.id]));
     const { el } = render(
       detail(['test.monster'], { lair: { entityId: 'whisperwood', label: 'The Whisperwood' } }, ['read']),
     );
@@ -166,14 +178,16 @@ describe('GenericFieldView', () => {
   it('shows a Field of a Structured Data Type neither as a control nor as plain EntityDocument (ADR-0050)', () => {
     // The value of a Field of a Structured Data Type is a document with its own View (the grid is edited on the map),
     // and being *declared* it does not fall through to the plain-EntityDocument display either.
-    const grid: FieldSchema = {
+    const grid = defineField({
+      id: 'test.grid',
       key: 'grid',
       label: 'Grid',
       dataType: { kind: 'core.hex-grid' },
       required: false,
       facetable: false,
-    };
-    registry.register(definitionWithFields('world.realm', [...beastFields, grid]));
+    });
+    registry.setWorldFields([...beastFields, grid]);
+    registry.register(definitionWithFields('world.realm', [...beastFieldRefs, grid.id]));
 
     const { el } = render(
       detail(['world.realm'], { name: 'Aldermoor', grid: { hexes: {}, regions: [], labels: [] } }, ['edit']),
@@ -236,13 +250,13 @@ describe('GenericFieldView over the effective Field set', () => {
   });
 });
 
-/** A TypeDefinition carrying a Field schema — the rest of the shape is irrelevant to this view. */
-function definitionWithFields(id: string, fields: FieldSchema[]) {
+/** A TypeDefinition referencing its Fields by id (ADR-0054) — the rest of the shape is irrelevant to this view. */
+function definitionWithFields(id: string, fieldRefs: string[]) {
   return {
     id: id as `${string}.${string}`,
     icon: 'label' as const,
     views: [],
-    fields,
+    fieldRefs,
     graphColorToken: '--color-ink-muted',
     labels: {
       eyebrow: `${id}.eyebrow`,

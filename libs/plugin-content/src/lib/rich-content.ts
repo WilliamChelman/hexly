@@ -1,7 +1,7 @@
 /**
  * `core.rich-content` — prose as a **Structured Data Type** (CONTEXT.md → Structured Data Type,
  * ADR-0051). Every Type that means to carry prose declares the canonical {@link CONTENT_FIELD} at the
- * `content` key; a multi-type Entity resolves exactly one, since `resolveFields` dedupes by key.
+ * `content` key; a multi-type Entity resolves exactly one, since the effective set dedupes by key.
  *
  * The seam ADR-0019 named — the single place that knows the snapshot shape — has simply moved here: a
  * value's edges (its inline **Entity Links** and image Assets) and its searchable text come back

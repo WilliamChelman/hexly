@@ -338,7 +338,12 @@
     "loadError": "Impossible de charger les types personnalisés de ce monde.",
     "createError": "Impossible de créer ce type. Veuillez réessayer.",
     "updateError": "Impossible d'enregistrer ce type. Veuillez réessayer.",
-    "removeError": "Impossible de supprimer ce type. Veuillez réessayer."
+    "removeError": "Impossible de supprimer ce type. Veuillez réessayer.",
+    "referenceHeading": "Champs",
+    "referenceHint": "Choisissez les champs que ce type porte par défaut. Créez-en un nouveau au besoin.",
+    "noFieldsAvailable": "Aucun champ pour l’instant — créez-en un pour le référencer.",
+    "newField": "Nouveau champ",
+    "fieldKeyHint": "La clé de document où il écrit, p. ex. domain."
   },
   "worldFields": {
     "heading": "Champs personnalisés",

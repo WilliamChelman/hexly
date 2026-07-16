@@ -34,7 +34,7 @@ test('a World Owner gives a user-defined type a map, and painting it persists', 
   // "Show as a view" defaulted to on, and stayed on through the save — which is what affords the
   // View toggled below.
   await page.getByTestId('edit-world.deity').click();
-  await expect(page.getByTestId('field-1').getByTestId('field-show-as-view')).toBeChecked();
+  await expect(page.getByTestId('field-show-as-view-world.battlemap')).toBeChecked();
   await page.getByTestId('type-cancel').click();
 
   // The type reaches the "New" menu like a plugin's: the registry does not care who authored one.

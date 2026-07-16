@@ -27,10 +27,8 @@ import {
   isFacetableField,
   PublicLink,
   entityLinkConstraints,
-  resolveFields,
   SaveEntityRequest,
   tagsSchema,
-  TypeFieldResolver,
   validateFields,
   visibilitySchema,
 } from '@hexly/domain';
@@ -118,14 +116,6 @@ export class EntitiesService {
     private readonly typeFields: TypeFieldRegistry,
     private readonly worldTypeFields: WorldTypeFields,
   ) {}
-
-  /**
-   * The {@link TypeFieldResolver} for a `types[]` set: World-scoped when a `worldId` is in play, so
-   * that World's user-defined types resolve too; else the instance-wide plugin registry alone.
-   */
-  private typeResolver(worldId: string | undefined): TypeFieldResolver {
-    return worldId ? this.worldTypeFields.resolverFor(worldId) : this.typeFields.resolver;
-  }
 
   /**
    * One reader-scoped page of summaries, metadata only. Stable sort (newest first,
@@ -216,7 +206,7 @@ export class EntitiesService {
    * A **Field of a Structured Data Type** is never offered, whatever its flag says ({@link isFacetableField}).
    */
   private countFieldFacets(opts: FacetOptions, filter: SQL): FieldFacet[] {
-    const fields = resolveFields(this.typeResolver(opts.worldId), opts.type ?? []).filter(isFacetableField);
+    const fields = this.worldTypeFields.effectiveFields(opts.worldId, opts.type ?? [], []).filter(isFacetableField);
     return fields.map((field) => {
       const values = this.countFieldValues(
         // Drill-down: drop this Field's own filters, keep every sibling constraint.

@@ -18,11 +18,16 @@ export class FakeEntityTypes implements EntityTypes {
   private readonly definitions = signal<readonly TypeDefinition[]>([]);
   readonly all = this.definitions.asReadonly();
 
+  /** The spec's registered Fields by id (ADR-0054) — what a type's `fieldRefs` and an attached `fieldIds` resolve against. */
+  private readonly fieldsById: Map<string, Field>;
+
   constructor(
     definitions: readonly TypeDefinition[],
     private readonly translate: (key: string) => string,
+    fields: readonly Field[] = [],
   ) {
     this.definitions.set(definitions);
+    this.fieldsById = new Map(fields.map((field) => [field.id, field]));
   }
 
   name(type: string | null | undefined): string {
@@ -48,24 +53,16 @@ export class FakeEntityTypes implements EntityTypes {
     types: readonly string[] | null | undefined,
     fieldIds: readonly string[] | null | undefined,
   ): FieldSchema[] {
-    // A spec's registered Fields, by id — what an attached `fieldIds` and a type's `fieldRefs` resolve
-    // against, mirroring the real registry's composed Plugin-Field resolver.
-    const byId = new Map<string, FieldSchema>();
-    for (const def of this.definitions())
-      for (const field of def.fields ?? []) {
-        const id = (field as Field).id;
-        if (typeof id === 'string') byId.set(id, field);
-      }
     const byKey = new Map<string, FieldSchema>();
-    const consider = (field: FieldSchema | undefined) => {
+    const consider = (id: string) => {
+      const field = this.fieldsById.get(id);
       if (field && !byKey.has(field.key)) byKey.set(field.key, field);
     };
-    // Attached Fields first (instance precedence), then each type's defaults primary-first.
-    for (const id of fieldIds ?? []) consider(byId.get(id));
+    // Attached Fields first (instance precedence), then each type's `fieldRefs` primary-first (ADR-0054).
+    for (const id of fieldIds ?? []) consider(id);
     for (const type of types ?? []) {
       const def = this.get(type);
-      for (const id of def?.fieldRefs ?? []) consider(byId.get(id));
-      for (const field of def?.fields ?? []) consider(field);
+      for (const id of def?.fieldRefs ?? []) consider(id);
     }
     return [...byKey.values()];
   }
@@ -75,14 +72,20 @@ export class FakeEntityTypes implements EntityTypes {
   }
 }
 
-/** Bind a {@link FakeEntityTypes} over `definitions` to the {@link ENTITY_TYPES} token. */
-export function provideEntityTypesTesting(definitions: readonly TypeDefinition[]): Provider[] {
+/**
+ * Bind a {@link FakeEntityTypes} over `definitions` to the {@link ENTITY_TYPES} token. `fields` are the
+ * registered Fields a type's `fieldRefs` (and an attached `fieldIds`) resolve against (ADR-0054).
+ */
+export function provideEntityTypesTesting(
+  definitions: readonly TypeDefinition[],
+  fields: readonly Field[] = [],
+): Provider[] {
   return [
     {
       provide: ENTITY_TYPES,
       useFactory: () => {
         const transloco = inject(TranslocoService);
-        return new FakeEntityTypes(definitions, (key) => transloco.translate(key));
+        return new FakeEntityTypes(definitions, (key) => transloco.translate(key), fields);
       },
     },
   ];

@@ -338,7 +338,12 @@
     "loadError": "Couldn't load this world's custom types.",
     "createError": "Couldn't create that type. Please try again.",
     "updateError": "Couldn't save that type. Please try again.",
-    "removeError": "Couldn't delete that type. Please try again."
+    "removeError": "Couldn't delete that type. Please try again.",
+    "referenceHeading": "Fields",
+    "referenceHint": "Pick the Fields this type carries by default. Create a new one if you need it.",
+    "noFieldsAvailable": "No Fields yet — create one to reference it.",
+    "newField": "New field",
+    "fieldKeyHint": "The document key it writes to, e.g. domain."
   },
   "worldFields": {
     "heading": "Custom fields",
