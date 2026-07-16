@@ -14,6 +14,7 @@ import { Button, ButtonGroup, Eyebrow, PageHeader } from '@hexly/web-ui';
 import { EntityActionsMenu } from './entity-actions-menu';
 import { EntityShareDialog } from './entity-share-dialog';
 import { EntityTypesDialog } from './entity-types-dialog';
+import { EntityFieldsDialog } from './entity-fields-dialog';
 import { EntityTags } from './entity-tags';
 import { SaveStatus } from './save-status';
 import { EntitySession } from '../services/entity-session';
@@ -40,6 +41,7 @@ import { EntityViewStore } from '../services/entity-view-store';
     EntityActionsMenu,
     EntityShareDialog,
     EntityTypesDialog,
+    EntityFieldsDialog,
     TranslocoPipe,
     EntityTags,
     SaveStatus,
@@ -102,11 +104,17 @@ import { EntityViewStore } from '../services/entity-view-store';
       <!-- The Entity's actions — Edit types, Visibility, Pin, and Share — gathered behind one
            overflow menu. Share and Edit types are this header's dialog surfaces, so the menu emits
            and we open them. -->
-      <app-entity-actions-menu pageHeaderActions (share)="ownersOpen.set(true)" (editTypes)="typesOpen.set(true)" />
+      <app-entity-actions-menu
+        pageHeaderActions
+        (share)="ownersOpen.set(true)"
+        (editTypes)="typesOpen.set(true)"
+        (editFields)="fieldsOpen.set(true)"
+      />
     </app-page-header>
 
     <app-entity-share-dialog [open]="ownersOpen()" (closed)="ownersOpen.set(false)" (resigned)="onResigned()" />
     <app-entity-types-dialog [open]="typesOpen()" (closed)="typesOpen.set(false)" />
+    <app-entity-fields-dialog [open]="fieldsOpen()" (closed)="fieldsOpen.set(false)" />
   `,
 })
 export class EntityHeader {
@@ -136,6 +144,9 @@ export class EntityHeader {
 
   /** Whether the Edit-types dialog (#189) is open — toggled by the actions menu's Edit types item. */
   protected readonly typesOpen = signal(false);
+
+  /** Whether the Edit-fields dialog (ADR-0054, #229) is open — toggled by the actions menu's Edit fields item. */
+  protected readonly fieldsOpen = signal(false);
 
   /** Resigning can cost reach to this Entity, so drop back to the World Index. */
   protected onResigned(): void {

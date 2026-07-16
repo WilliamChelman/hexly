@@ -44,6 +44,15 @@ import { ActiveWorld } from '@hexly/web-core';
             </span>
           </button>
 
+          <!-- Edit fields (ADR-0054, #229): attach/detach a Field directly on this Entity — substance,
+             like the type set, so any writer may. -->
+          <button type="button" appMenuItem data-testid="edit-fields" (triggered)="editFields.emit()">
+            <span class="flex items-center gap-2">
+              <app-icon name="label" [size]="16" />
+              {{ 'entityFields.editFields' | transloco }}
+            </span>
+          </button>
+
           <!-- Visibility toggle (ADR-0037, #160): an Owner flips the Entity between
              private and shared. A non-Owner's flip is refused server-side (403). -->
           <button
@@ -100,6 +109,9 @@ export class EntityActionsMenu {
 
   /** Open the Edit-types dialog (#189) — likewise owned by the header. */
   readonly editTypes = output<void>();
+
+  /** Open the Edit-fields dialog (ADR-0054, #229) — the header's dialog surface. */
+  readonly editFields = output<void>();
 
   /** Visibility and rename are gated on write access (ADR-0037): a read-only opener sees neither. */
   protected readonly editable = this.session.writable;

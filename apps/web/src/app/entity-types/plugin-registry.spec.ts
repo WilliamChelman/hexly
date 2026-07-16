@@ -98,6 +98,27 @@ describe('PluginRegistry', () => {
       expect(plugins.isTypeActive(DND_MONSTER)).toBe(true);
       expect(plugins.isViewActive(DND_VIEW_STAT_BLOCK)).toBe(true);
     });
+
+    it('degrades an attached Field of a disabled Plugin: the resolver drops it, leaving its value plain (ADR-0054)', () => {
+      // A `dnd.size` an Entity attached directly bypasses the Type layer, so the Field resolver
+      // must gate it by its owning Plugin — else a disabled dnd would still type the value.
+      expect(plugins.isFieldActive('dnd.size')).toBe(false);
+      expect(plugins.fieldResolver('dnd.size')).toBeUndefined();
+      // A still-enabled Plugin's Field resolves as ever; an ownerless (World-defined) id is never gated.
+      expect(plugins.fieldResolver('core.content')?.key).toBe('content');
+      expect(plugins.isFieldActive('world.element')).toBe(true);
+
+      enabled.set(new Set([CONTENT_PLUGIN_ID, HEXMAP_PLUGIN_ID, DND_PLUGIN_ID]));
+      expect(plugins.fieldResolver('dnd.size')?.key).toBe('size');
+    });
+
+    it('fieldDefinition resolves a disabled Plugin’s Field regardless of enablement — so a detach can still clear its key (#229)', () => {
+      // The enablement-gated resolver drops it, but detach needs the key to clear the value even
+      // when the owning Plugin is off — only a build that never bundled the Field leaves an orphan.
+      expect(plugins.fieldResolver('dnd.size')).toBeUndefined();
+      expect(plugins.fieldDefinition('dnd.size')?.key).toBe('size');
+      expect(plugins.fieldDefinition('pathfinder.nonesuch')).toBeUndefined();
+    });
   });
 
   describe('with no loaded config (not-yet-booted / failed-fetch)', () => {

@@ -46,6 +46,7 @@ export class MockEntitiesClient {
         version: number,
         tags: readonly string[],
         types?: readonly EntityType[],
+        fields?: readonly string[],
       ) => Observable<EntitySaveOutcome>
     >();
   // Defaults to an empty set so a spec that mounts the owner-set panel without

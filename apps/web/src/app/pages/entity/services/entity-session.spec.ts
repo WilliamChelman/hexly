@@ -193,6 +193,83 @@ describe('EntitySession', () => {
     expect(session.dirty()).toBe(true);
   });
 
+  it('attaches a Field, minting its default, and sends the authored fields[] on save (ADR-0054, #229)', () => {
+    const noteBody = { content };
+    const note: EntityDetail = { ...aldermoor, id: 'n1', types: [CORE_NOTE], document: noteBody };
+    entities.load.mockReturnValue(of(note));
+    session.open('n1').subscribe();
+    expect(session.fields()).toEqual([]);
+    expect(session.dirty()).toBe(false);
+
+    // Attach the grid Field a note's type never named — of a Structured Data Type, so its empty plane is minted.
+    session.attachField(HEX_GRID_FIELD.id);
+    expect(session.fields()).toEqual([HEX_GRID_FIELD.id]);
+    expect(session.doc()).toEqual({ ...noteBody, grid: emptyHexMap() });
+    expect(session.dirty()).toBe(true);
+
+    const saved: EntityDetail = { ...note, version: 4, fields: [HEX_GRID_FIELD.id], document: session.doc() };
+    entities.save.mockReturnValue(of({ status: 'saved', entity: saved }));
+    session.save().subscribe();
+
+    // fields ride as the 6th arg (types unchanged → the 5th is omitted as undefined), an authored attach.
+    expect(entities.save).toHaveBeenCalledWith('n1', session.doc(), 3, [], undefined, [HEX_GRID_FIELD.id]);
+    expect(session.current()?.fields).toEqual([HEX_GRID_FIELD.id]);
+    expect(session.dirty()).toBe(false);
+  });
+
+  it('attaching an already-attached Field is a no-op — no duplicate, no dirty', () => {
+    const withGrid: EntityDetail = {
+      ...aldermoor,
+      id: 'n1',
+      types: [CORE_NOTE],
+      fields: [HEX_GRID_FIELD.id],
+      document: bodyOf(forestAt00),
+    };
+    entities.load.mockReturnValue(of(withGrid));
+    session.open('n1').subscribe();
+
+    session.attachField(HEX_GRID_FIELD.id);
+    expect(session.fields()).toEqual([HEX_GRID_FIELD.id]);
+    expect(session.dirty()).toBe(false);
+  });
+
+  it('detaches a directly-attached Field, clearing its value from the document (#229)', () => {
+    const note: EntityDetail = {
+      ...aldermoor,
+      id: 'n1',
+      types: [CORE_NOTE],
+      fields: [HEX_GRID_FIELD.id],
+      document: bodyOf(forestAt00),
+    };
+    entities.load.mockReturnValue(of(note));
+    session.open('n1').subscribe();
+    expect(session.fields()).toEqual([HEX_GRID_FIELD.id]);
+
+    session.detachField(HEX_GRID_FIELD.id);
+    expect(session.fields()).toEqual([]);
+    // Unlike removing a type (which leaves its values behind), a detach clears the attached Field's key.
+    expect(session.doc()).toEqual({ content });
+    expect(session.dirty()).toBe(true);
+
+    const saved: EntityDetail = { ...note, version: 4, fields: [], document: { content } };
+    entities.save.mockReturnValue(of({ status: 'saved', entity: saved }));
+    session.save().subscribe();
+
+    expect(entities.save).toHaveBeenCalledWith('n1', { content }, 3, [], undefined, []);
+    expect(session.current()?.fields).toEqual([]);
+  });
+
+  it('never sends fields on a plain body edit — an at-rest attachment set is not re-sent (ADR-0054)', () => {
+    openAldermoor();
+    editor.paintAt({ q: 5, r: 5 }, 'ocean'); // body edit, no attach/detach
+
+    entities.save.mockReturnValue(of({ status: 'saved', entity: { ...aldermoor, version: 4 } }));
+    session.save().subscribe();
+
+    // Four args: fields (like types) is omitted, so the server leaves the stored attachment set untouched.
+    expect(entities.save.mock.calls[0]).toHaveLength(4);
+  });
+
   it('never sends types on a plain body edit — data at rest is not re-typed (#189)', () => {
     openAldermoor();
     editor.paintAt({ q: 5, r: 5 }, 'ocean'); // body edit, no type change
