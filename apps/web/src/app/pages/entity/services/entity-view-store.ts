@@ -28,7 +28,7 @@ export class EntityViewStore {
    * The ordered Views the open Entity affords (primary type first) — the header
    * toggles these, and shows no toggle when there is only one.
    */
-  readonly views = computed(() => this.types.viewsFor(this.session.types()));
+  readonly views = computed(() => this.types.viewsFor(this.session.types(), this.session.fields()));
 
   /**
    * The effective active View: the selection when the Entity affords it, else the

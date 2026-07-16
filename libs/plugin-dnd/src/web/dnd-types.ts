@@ -20,6 +20,8 @@ export const DND_TYPE_DEFINITIONS: readonly TypeDefinition[] = [
   {
     id: DND_MONSTER_TYPE.id,
     fields: DND_MONSTER_TYPE.fields,
+    // References the prose and stat-block Fields by id (ADR-0054); `fields` kept for the World Types editor.
+    fieldRefs: DND_MONSTER_TYPE.fieldRefs,
     icon: 'skull',
     views: [DND_VIEW_STAT_BLOCK, CORE_VIEW_CONTENT],
     // The tertiary role from the palette (docs/design/identity.md). Not `--color-ember`, which is

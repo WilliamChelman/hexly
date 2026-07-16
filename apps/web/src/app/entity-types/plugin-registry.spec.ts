@@ -41,6 +41,27 @@ describe('PluginRegistry', () => {
     });
   });
 
+  describe('Plugin-Field resolver composed from the plugins provided (ADR-0054)', () => {
+    it('resolves a Field by id — the prose Field from content, a stat Field from dnd', () => {
+      TestBed.configureTestingModule({
+        providers: [providePluginContent(), providePluginHexmap(), providePluginDnd()],
+      });
+      const plugins = TestBed.inject(PluginRegistry);
+
+      expect(plugins.fieldResolver('core.content')?.key).toBe('content');
+      expect(plugins.fieldResolver('core.grid')?.key).toBe('grid');
+      expect(plugins.fieldResolver('dnd.challenge_rating')?.key).toBe('challenge_rating');
+    });
+
+    it('resolves nothing for an absent plugin’s Field — dropped from the effective set, value left intact', () => {
+      TestBed.configureTestingModule({ providers: [providePluginContent(), providePluginDnd()] });
+      const plugins = TestBed.inject(PluginRegistry);
+
+      expect(plugins.fieldResolver('core.content')).toBeDefined();
+      expect(plugins.fieldResolver('core.grid')).toBeUndefined(); // hexmap not composed
+    });
+  });
+
   describe('enablement predicates', () => {
     let plugins: PluginRegistry;
     let enabled: WritableSignal<ReadonlySet<string>>;

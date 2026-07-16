@@ -108,8 +108,8 @@ export class GenericFieldView {
   /** The open Entity's World, scoping an Entity-Link Field picker to same-World targets (#190). */
   protected readonly worldId = computed(() => this.session.current()?.worldId);
 
-  /** The union of Field schemas the open Entity's live types declare (primary first, deduped by key). */
-  private readonly declared = computed(() => this.types.resolveFields(this.session.types()));
+  /** The open Entity's **effective Field set** (ADR-0054): its types' defaults unioned with its attached Fields, deduped by key. */
+  private readonly declared = computed(() => this.types.effectiveFields(this.session.types(), this.session.fields()));
 
   /**
    * The Fields this view renders a control for: every declared Field except a **Structured** one

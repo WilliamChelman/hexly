@@ -36,12 +36,12 @@ export class EntityMetadata {
   private readonly session = inject(ENTITY_SESSION);
   private readonly types = inject(ENTITY_TYPES);
 
-  /** The EntityDocument keys a Structured Data Type types — a document, shown on its own View, never here. */
+  /** The EntityDocument keys a Structured Data Type types — a document, shown on its own View, never here. Over the effective set (ADR-0054). */
   private readonly structuredKeys = computed(
     () =>
       new Set(
         this.types
-          .resolveFields(this.session.current()?.types)
+          .effectiveFields(this.session.current()?.types, this.session.current()?.fields)
           .filter((field) => isStructuredDataType(field.dataType))
           .map((field) => field.key),
       ),

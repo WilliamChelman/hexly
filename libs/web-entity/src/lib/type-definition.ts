@@ -61,6 +61,8 @@ export interface TypeDefinition {
    * renders them is the type's own choice, made in {@link views}. The core types declare no Fields.
    */
   readonly fields?: readonly FieldSchema[];
+  /** The default Fields this type references by id (`fieldRefs`, ADR-0054), additive beside inline {@link fields}. */
+  readonly fieldRefs?: readonly string[];
   /**
    * The CSS custom property the World Graph paints this type's nodes with
    * (resolved to RGBA per theme, ADR-0007).

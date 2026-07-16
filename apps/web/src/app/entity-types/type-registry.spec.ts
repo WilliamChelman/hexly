@@ -3,8 +3,8 @@ import { TestBed } from '@angular/core/testing';
 import { Signal, signal, WritableSignal } from '@angular/core';
 import { FieldSchema } from '@hexly/domain';
 import { ClientConfigStore } from '@hexly/web-core';
-import { CORE_HEX_GRID, PLUGIN_ID as HEXMAP_PLUGIN_ID } from '@hexly/plugin-hexmap';
-import { CORE_RICH_CONTENT, PLUGIN_ID as CONTENT_PLUGIN_ID } from '@hexly/plugin-content';
+import { CORE_HEX_GRID, HEX_GRID_FIELD, PLUGIN_ID as HEXMAP_PLUGIN_ID } from '@hexly/plugin-hexmap';
+import { CONTENT_FIELD, CORE_RICH_CONTENT, PLUGIN_ID as CONTENT_PLUGIN_ID } from '@hexly/plugin-content';
 import { DND_MONSTER, PLUGIN_ID as DND_PLUGIN_ID } from '@hexly/plugin-dnd';
 import { TypeRegistry } from './type-registry';
 import {
@@ -263,6 +263,57 @@ describe('TypeRegistry', () => {
   it('lists the type ids contributing a View — backing the maps filter', () => {
     expect(registry.typeIdsForView(CORE_VIEW_MAP)).toEqual(['core.hexmap']);
     expect(registry.typeIdsForView(CORE_VIEW_CONTENT)).toEqual(['core.note', 'core.hexmap', DND_MONSTER]);
+  });
+
+  /**
+   * The effective Field set (ADR-0054): a plugin type resolves its defaults through `fieldRefs` → the
+   * composed Plugin-Field resolver, and an Entity's directly-attached `fields[]` union in with them.
+   */
+  describe('effective Field set', () => {
+    it('resolves a plugin type’s defaults through fieldRefs → the composed Plugin-Field resolver', () => {
+      // Not from the inline `fields` mirror: the reuse handles drive resolution now, like the server.
+      expect(registry.effectiveFields([DND_MONSTER], []).map((f) => f.key)).toContain('challenge_rating');
+      expect(registry.effectiveFields(['core.note'], []).map((f) => f.key)).toEqual(['content']);
+    });
+
+    it('unions an Entity’s attached Fields with its types’ defaults, deduped by key', () => {
+      // A `core.note` carrying one attached stat Field — a Field its type never named (CONTEXT.md → Entity).
+      const keys = registry.effectiveFields(['core.note'], ['dnd.size']).map((f) => f.key);
+      expect(keys).toEqual(['size', 'content']); // attachment first (instance precedence), then the type default
+    });
+
+    it('drops an attached id that resolves to nothing — an absent plugin’s Field left as plain document', () => {
+      expect(registry.effectiveFields(['core.note'], ['pathfinder.nonesuch']).map((f) => f.key)).toEqual(['content']);
+    });
+
+    it('lets an attachment win the key over a type default — instance precedence', () => {
+      // Both resolve to the `content` key; the attached one is considered first, so it wins the set.
+      const resolved = registry.effectiveFields(['core.note'], [CONTENT_FIELD.id]);
+      expect(resolved.map((f) => f.key)).toEqual(['content']);
+    });
+  });
+
+  describe('viewsFor over the effective set', () => {
+    it('appends an attached structured Field’s View after the types’ (CONTEXT.md → View)', () => {
+      // A note with a grid Field attached affords its Content View, then the attached grid’s Map View.
+      expect(viewKeys(registry.viewsFor(['core.note'], [HEX_GRID_FIELD.id]))).toEqual([
+        CORE_VIEW_CONTENT,
+        `${CORE_VIEW_MAP}:grid`,
+      ]);
+    });
+
+    it('affords no extra View for an attached built-in Field — it is a form row, not a View', () => {
+      // `dnd.size` is an enum: it renders in the generic Field view, contributing no toggle.
+      expect(viewKeys(registry.viewsFor(['core.note'], ['dnd.size']))).toEqual([CORE_VIEW_CONTENT]);
+    });
+
+    it('surfaces an attached grid’s View even on an unregistered type — the missing-plugin floor plus the attachment', () => {
+      // The type affords the generic Field view alone; the attached grid still surfaces its Map View.
+      expect(viewKeys(registry.viewsFor(['pathfinder.monster'], [HEX_GRID_FIELD.id]))).toEqual([
+        CORE_VIEW_FIELDS,
+        `${CORE_VIEW_MAP}:grid`,
+      ]);
+    });
   });
 
   it('registers a new definition and drops it via the returned unregister fn', () => {

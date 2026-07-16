@@ -1,6 +1,6 @@
 import { EnvironmentProviders } from '@angular/core';
 import { CORE_VIEW_MAP, providePlugin } from '@hexly/web-entity';
-import { CORE_HEX_GRID, HEX_GRID_DATA_TYPE, PLUGIN_ID } from '../lib';
+import { CORE_HEX_GRID, HEX_GRID_DATA_TYPE, HEX_GRID_FIELD, PLUGIN_ID } from '../lib';
 import { HEXMAP_TRANSLATIONS } from '../i18n/hexmap-translations';
 import { HEXMAP_TYPE_DEFINITIONS } from './hexmap-types';
 
@@ -20,6 +20,8 @@ export function providePluginHexmap(): EnvironmentProviders {
   return providePlugin({
     id: PLUGIN_ID,
     types: HEXMAP_TYPE_DEFINITIONS,
+    // Declares the grid Field (ADR-0054); the prose `core.content` it references is the content plugin's.
+    fields: [HEX_GRID_FIELD],
     views: [
       {
         id: CORE_VIEW_MAP,

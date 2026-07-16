@@ -16,6 +16,8 @@ export const CONTENT_TYPE_DEFINITIONS: readonly TypeDefinition[] = [
   {
     id: CORE_NOTE_TYPE.id,
     fields: CORE_NOTE_TYPE.fields,
+    // References the prose Field by id (ADR-0054); `fields` kept for the World Types editor.
+    fieldRefs: CORE_NOTE_TYPE.fieldRefs,
     icon: 'label',
     views: [CORE_VIEW_CONTENT],
     graphColorToken: '--color-ink-muted',

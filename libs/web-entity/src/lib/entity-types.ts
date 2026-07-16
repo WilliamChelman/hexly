@@ -19,9 +19,18 @@ export interface EntityTypes {
   chromeLabel(type: string | null | undefined, key: keyof TypeLabels): string;
   /**
    * The union of Field schemas an Entity carrying `types` affords — primary type first, deduped by
-   * EntityDocument key. A View reads it to tell a **Structured Data Type**'s key from a plain value.
+   * EntityDocument key. The type-only projection of {@link effectiveFields}, for the create and
+   * type-authoring surfaces (no attachments in play).
    */
   resolveFields(types: readonly string[] | null | undefined): FieldSchema[];
+  /**
+   * An Entity's **effective Field set** (CONTEXT.md → Entity, ADR-0054): its attached Fields (`fieldIds`)
+   * unioned with its types' defaults, deduped by `key` with precedence instance > primary type > later types.
+   */
+  effectiveFields(
+    types: readonly string[] | null | undefined,
+    fieldIds: readonly string[] | null | undefined,
+  ): FieldSchema[];
 }
 
 /** DI token for the {@link EntityTypes}; the composition root binds the concrete registry to it. */
