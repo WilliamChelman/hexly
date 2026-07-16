@@ -63,6 +63,33 @@ test('creates a dnd.monster, fills its required Fields, and reads the stat block
   expect(body.document).toMatchObject({ challenge_rating: 24, strength: 30, size: 'Huge' });
 });
 
+test('a facetable Field surfaces in the browser rail by presence, no active Type filter (#231)', async ({ page }) => {
+  await enterLibrary(page);
+
+  // A monster carrying a value for the facetable `size` Field.
+  await page.keyboard.press('ControlOrMeta+k');
+  await page.getByTestId('command-palette-input').fill('>monster');
+  await page.getByTestId('command-palette-option-create-dnd.monster').click();
+  await page.getByTestId('create-entity-name').fill('Ancient Red Dragon');
+  await page.getByTestId('create-field-challenge_rating').locator('input').fill('24');
+  await page.getByTestId('create-entity-submit').click();
+  await expect(page).toHaveURL(/\/entities\/[\w-]+$/);
+  const id = entityIdFromUrl(page);
+
+  await page.getByTestId('stat-size').locator('select').selectOption('Huge');
+  await flushSave(page);
+
+  // Back in the Library with no Type filter selected: the `size` facet surfaces because the result set
+  // carries a value for it — the ADR-0054 presence rule, not the retired type-gated unfold.
+  await page.getByRole('link', { name: 'Library' }).click();
+  await expect(page).toHaveURL(/\/entities$/);
+  await expect(page.getByTestId('facet-field-size')).toBeVisible();
+
+  // And it filters the list like any facet: the Huge value narrows to the dragon.
+  await page.getByTestId('facet-field-size-Huge').click();
+  await expect(page.getByTestId(`open-${id}`)).toBeVisible();
+});
+
 test('a dnd.monster carrying core.hexmap offers the stat block, Note, and Map views', async ({ page }) => {
   await enterLibrary(page);
 

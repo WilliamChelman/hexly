@@ -24,7 +24,6 @@ import {
   EntityGrant,
   GrantRole,
   isEntityLinkDataType,
-  isFacetableField,
   PublicLink,
   entityLinkConstraints,
   SaveEntityRequest,
@@ -193,35 +192,79 @@ export class EntitiesService {
       type: this.countJsonArray({ ...opts, type: undefined }, entities.types, filter),
       visibility: this.countColumn({ ...opts, visibility: undefined }, entities.visibility, filter),
       tag: this.countJsonArray({ ...opts, tags: undefined }, entities.tags, filter),
-      // A type's Field facets, contextually — only the active types' facetable Fields (ADR-0048, #188).
+      // Field facets by presence in the result set — no longer gated on the active Type (ADR-0054, #231).
       fields: this.countFieldFacets(opts, filter),
     };
   }
 
   /**
-   * A type's facetable Field facets, resolved across the *active* Type filter (`opts.type`) — a
-   * Field facet is absent until its type is the active filter. Values drill down like the universal
-   * facets: counted against every other constraint but that Field's own filter.
+   * Facetable Field facets surfaced **by presence in the result set** (ADR-0054, #231): a Field is
+   * offered whenever the current browse carries entities with values for it, whatever types they hold —
+   * not gated on the active Type filter (the retired ADR-0035/0048 rule). Candidate keys come off the
+   * denormalised `entity_field_facets` index (which reindex already keys by document key over the
+   * effective set, #226), then resolve to their Field for label/data-type.
    *
-   * A **Field of a Structured Data Type** is never offered, whatever its flag says ({@link isFacetableField}).
+   * Both the candidate scan and the value counts drill down like the universal facets — counted against
+   * every sibling constraint but the Field's own — so an actively-filtered Field stays on the rail to be
+   * unselected even when its selected value matches nothing. A Field the sibling constraints leave
+   * value-less is dropped.
+   *
+   * A **Field of a Structured Data Type** is never offered (it has no discrete values to count): the
+   * index only ever carries facetable Fields, so a candidate key is always facetable to begin with.
    */
   private countFieldFacets(opts: FacetOptions, filter: SQL): FieldFacet[] {
-    const fields = this.worldTypeFields.effectiveFields(opts.worldId, opts.type ?? [], []).filter(isFacetableField);
-    return fields.map((field) => {
-      const values = this.countFieldValues(
-        // Drill-down: drop this Field's own filters, keep every sibling constraint.
-        { ...opts, fields: (opts.fields ?? []).filter((ff) => ff.key !== field.key) },
-        field.key,
-        filter,
-      );
-      return {
-        key: field.key,
-        label: field.label,
-        dataType: field.dataType,
-        // An Entity-Link facet's values are target ids; resolve each to its name for the rail (#190).
-        values: isEntityLinkDataType(field.dataType) ? this.labelLinkValues(values, filter) : values,
-      };
-    });
+    // Discover candidates with all field filters dropped, so a Field's own selection never hides it;
+    // each Field's value count then re-applies its siblings and drops it if they leave it empty.
+    const candidates = new Set(this.presentFieldKeys({ ...opts, fields: [] }, filter));
+    if (candidates.size === 0) return [];
+    // Iterate the registry-ordered Field set, not the index keys, so the rail keeps a stable declaration
+    // order; a candidate key with no resolvable Field (a deleted World Field, ADR-0052/0054) isn't in
+    // the map, so it drops — it can't be labelled.
+    const byKey = this.worldTypeFields.facetableFieldsByKey(opts.worldId);
+    return (
+      [...byKey.values()]
+        .filter((field) => candidates.has(field.key))
+        .map((field) => {
+          const values = this.countFieldValues(
+            // Drill-down: drop this Field's own filters, keep every sibling constraint.
+            { ...opts, fields: (opts.fields ?? []).filter((ff) => ff.key !== field.key) },
+            field.key,
+            filter,
+          );
+          return {
+            key: field.key,
+            label: field.label,
+            dataType: field.dataType,
+            // An Entity-Link facet's values are target ids; resolve each to its name for the rail (#190).
+            values: isEntityLinkDataType(field.dataType) ? this.labelLinkValues(values, filter) : values,
+          };
+        })
+        // Drill-down: a Field the sibling constraints narrowed to nothing drops off the rail.
+        .filter((facet) => facet.values.length > 0)
+    );
+  }
+
+  /**
+   * The distinct facetable-Field document keys carried by the result set under `opts` — the presence
+   * signal that seeds the per-Field facets. Reads the denormalised `entity_field_facets` index; the
+   * caller passes the drill-down `opts` (its own field filters dropped) so a Field's own selection can't
+   * hide it. The result is a membership set; the rail's order comes from the Field registry, not here.
+   */
+  private presentFieldKeys(opts: FacetOptions, filter: SQL): string[] {
+    const match = opts.q ? toFtsMatch(opts.q) : null;
+    const query = this.db
+      .select({ key: entityFieldFacets.key })
+      .from(entities)
+      .innerJoin(entityFieldFacets, eq(entityFieldFacets.entityId, entities.id))
+      .$dynamic();
+    if (match) {
+      query.innerJoin(sql`entities_fts`, sql`entities_fts.rowid = entities.rowid`);
+    }
+    return query
+      .where(facetWhere(opts, match, filter))
+      .groupBy(entityFieldFacets.key)
+      .all()
+      .map((r) => r.key);
   }
 
   /**

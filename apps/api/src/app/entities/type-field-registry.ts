@@ -84,6 +84,15 @@ export class TypeFieldRegistry {
   /** A plugin type's default Field ids (`fieldRefs`, ADR-0054), so the reuse handles drive derivation. */
   readonly typeFieldRefs: TypeFieldRefsResolver = (typeId) => this.byType.get(typeId)?.fieldRefs;
 
+  /**
+   * Every code-registered **Plugin Field** (ADR-0054) — the instance-wide half of the World's Field
+   * set, enumerated for presence-based Field faceting (#231) where a key is resolved without going
+   * through a type's `fieldRefs`.
+   */
+  fields(): Field[] {
+    return [...this.fieldsById.values()];
+  }
+
   /** Every registered plugin type as an {@link AvailableType} — label defaults to the id. */
   plugins(): AvailableType[] {
     return [...this.byType.entries()].map(([id, { fieldRefs, label }]) => ({

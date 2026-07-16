@@ -1317,7 +1317,7 @@ describe('Entities endpoints', () => {
     });
   });
 
-  describe('contextual Field facets + filter-by-Field (#188)', () => {
+  describe('Field facets by presence + filter-by-Field (#188, #231)', () => {
     // A plugin-style type declaring two facetable Fields — an enum and a number — plus a
     // non-facetable one, registered the same way a bundled plugin (or a World-defined type) would.
     beforeEach(() => {
@@ -1381,46 +1381,82 @@ describe('Entities endpoints', () => {
       [...facet].sort((a, b) => a.value.localeCompare(b.value));
     const names = (res: { body: { items: { name: string }[] } }) => res.body.items.map((e) => e.name).sort();
 
-    it('surfaces a type’s Field facets only when that type is the active filter; universal facets always', async () => {
+    type FieldFacetBody = {
+      key: string;
+      label: string;
+      dataType: { kind: string };
+      values: { value: string; count: number }[];
+    };
+
+    it('surfaces a facetable Field by presence in the result set, no active Type filter needed (#231)', async () => {
       const ada = await signIn('ada@hexly.test', 'correct horse');
-      const kobold = await beast(ada, 'Kobold', {
-        alignment: 'lawful-good',
-        cr: 1,
-      });
+      const kobold = await beast(ada, 'Kobold', { alignment: 'lawful-good', cr: 1, secret: 'hidden' });
       await beast(ada, 'Aboleth', { alignment: 'chaotic-evil', cr: 10 });
       const worldId = (await ada.get(`/entities/${kobold}`)).body.worldId;
 
-      // No active Type filter: the Field facets stay folded away, but the universal facets are present.
-      const universal = await ada.get('/entities/facets').query({ worldId }).expect(200);
-      expect(universal.body.fields).toEqual([]);
-      expect(universal.body.type.length).toBeGreaterThan(0);
-      expect(universal.body).toHaveProperty('tag');
-      expect(universal.body).toHaveProperty('visibility');
-
-      // With the type active: its facetable Fields unfold, each with live value counts.
-      const contextual = await ada.get('/entities/facets').query({ worldId, type: 'test.beast' }).expect(200);
-      const fields = contextual.body.fields as {
-        key: string;
-        label: string;
-        dataType: { kind: string };
-        values: { value: string; count: number }[];
-      }[];
-      // Every facetable Field of the active type unfolds (contextually); the non-facetable one never does.
-      expect(fields.map((f) => f.key).sort()).toEqual(['alignment', 'cr', 'discovered', 'senses']);
+      // No active Type filter: Field facets surface by presence, universal facets present as always.
+      const res = await ada.get('/entities/facets').query({ worldId }).expect(200);
+      const fields = res.body.fields as FieldFacetBody[];
+      // Only Fields the result set carries values for surface — `discovered`/`senses` are declared
+      // facetable but unset, so they never appear; the non-facetable `secret` never appears either.
+      expect(fields.map((f) => f.key).sort()).toEqual(['alignment', 'cr']);
       const alignment = fields.find((f) => f.key === 'alignment')!;
       expect(alignment.label).toBe('Alignment');
-      expect(alignment.dataType).toEqual({
-        kind: 'enum',
-        options: ['lawful-good', 'chaotic-evil'],
-      });
+      expect(alignment.dataType).toEqual({ kind: 'enum', options: ['lawful-good', 'chaotic-evil'] });
       expect(byValue(alignment.values)).toEqual([
         { value: 'chaotic-evil', count: 1 },
         { value: 'lawful-good', count: 1 },
       ]);
-      // The non-facetable Field never surfaces.
-      expect(fields.some((f) => f.key === 'secret')).toBe(false);
-      // Universal facets are unchanged by the contextual unfold.
-      expect(contextual.body.type.length).toBeGreaterThan(0);
+      expect(res.body.type.length).toBeGreaterThan(0);
+      expect(res.body).toHaveProperty('tag');
+      expect(res.body).toHaveProperty('visibility');
+    });
+
+    it('surfaces one Field facet across the whole browse, whatever types its entities hold (#231)', async () => {
+      // A second type reusing the same `alignment` Field (ADR-0054): its Entities carry the key too.
+      registerType(app.get(TypeFieldRegistry), 'test.spirit', [
+        defineField({
+          id: 'test.alignment',
+          key: 'alignment',
+          label: 'Alignment',
+          dataType: { kind: 'enum', options: ['lawful-good', 'chaotic-evil'] },
+          facetable: true,
+        }),
+      ]);
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const kobold = await beast(ada, 'Kobold', { alignment: 'lawful-good', cr: 1 });
+      const worldId = (await ada.get(`/entities/${kobold}`)).body.worldId;
+      // A spirit (a different type) carrying the same Field, saved as an active typed edit.
+      const spirit = await ada.post('/entities').send({ name: 'Wisp', types: ['core.note'] });
+      await ada
+        .put(`/entities/${spirit.body.id}`)
+        .send({
+          document: { content: emptyContent(), alignment: 'lawful-good' },
+          version: 1,
+          tags: [],
+          types: ['test.spirit'],
+        })
+        .expect(200);
+
+      // No Type filter: the single `alignment` facet counts both types' Entities together.
+      const res = await ada.get('/entities/facets').query({ worldId }).expect(200);
+      const alignment = (res.body.fields as FieldFacetBody[]).find((f) => f.key === 'alignment')!;
+      expect(alignment).toBeDefined();
+      expect(byValue(alignment.values)).toEqual([{ value: 'lawful-good', count: 2 }]);
+    });
+
+    it('keeps an actively-filtered Field on the rail even when its selected value matches nothing (drill-down)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const kobold = await beast(ada, 'Kobold', { alignment: 'lawful-good', cr: 1 });
+      await beast(ada, 'Sphinx', { alignment: 'lawful-good', cr: 11 });
+      const worldId = (await ada.get(`/entities/${kobold}`)).body.worldId;
+
+      // Filter to a value no Entity carries: like the universal facets, `alignment` drops its own filter
+      // when counting, so it stays on the rail listing the value you *could* switch to — not vanishing.
+      const res = await ada.get('/entities/facets').query({ worldId, field: 'alignment:eq:chaotic-evil' }).expect(200);
+      const alignment = (res.body.fields as FieldFacetBody[]).find((f) => f.key === 'alignment')!;
+      expect(alignment).toBeDefined();
+      expect(byValue(alignment.values)).toEqual([{ value: 'lawful-good', count: 2 }]);
     });
 
     it('filters the list by an enum Field value (membership)', async () => {
