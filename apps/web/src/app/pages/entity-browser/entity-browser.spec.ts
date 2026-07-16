@@ -915,9 +915,9 @@ describe('EntityBrowser', () => {
       });
     });
 
-    describe('contextual Field facets (#188)', () => {
-      // A facets response carrying one enum Field facet — the contextual dimension the server
-      // returns only when a type is the active filter.
+    describe('Field facets by presence (#188, #231)', () => {
+      // A facets response carrying one enum Field facet — the server surfaces it by presence in the
+      // result set, whatever types those entities hold (ADR-0054, #231).
       const withEnumField = () =>
         client.facets.mockReturnValue(
           of({

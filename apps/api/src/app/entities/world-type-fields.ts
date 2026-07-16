@@ -1,7 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
   AvailableType,
+  BuiltInDataType,
   FieldSchema,
+  isFacetableField,
   resolveEffectiveFields,
   TypeFieldRefsResolver,
   UserDefinedType,
@@ -86,5 +88,20 @@ export class WorldTypeFields {
       fieldResolver,
       typeFieldRefs: this.typeFieldRefsFor(worldId),
     });
+  }
+
+  /**
+   * Every facetable Field resolvable in a World, indexed by the EntityDocument `key` it lenses — the
+   * label/data-type source a presence-based Field facet resolves a present key against (#231, ADR-0054),
+   * with no type in play. A World-defined Field wins a key over a Plugin Field, mirroring the effective-set
+   * resolver's precedence (ADR-0054). A Field of a **Structured Data Type** is excluded — never facetable.
+   */
+  facetableFieldsByKey(worldId: string | undefined): Map<string, FieldSchema & { dataType: BuiltInDataType }> {
+    const byKey = new Map<string, FieldSchema & { dataType: BuiltInDataType }>();
+    // Plugin fields first, then World fields overwrite — World-defined wins the key (ADR-0054).
+    for (const field of this.plugins.fields()) if (isFacetableField(field)) byKey.set(field.key, field);
+    if (worldId)
+      for (const field of this.worldFields.list(worldId)) if (isFacetableField(field)) byKey.set(field.key, field);
+    return byKey;
   }
 }

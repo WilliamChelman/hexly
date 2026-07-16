@@ -101,9 +101,9 @@ export interface FieldRangeChange {
         </section>
       }
 
-      <!-- Contextual Field facets: unfold only when a type is the active filter (ADR-0048, #188).
-           The Field's data-type picks the control — value toggles for enum/list/string, a range for
-           number/date. -->
+      <!-- Field facets, surfaced by presence in the result set — the server offers a Field whenever the
+           current browse carries values for it, whatever types those entities hold (ADR-0054, #231). The
+           Field's data-type picks the control — value toggles for enum/list/string, a range for number/date. -->
       @for (field of fieldFacets(); track field.key) {
         <section class="mb-4 last:mb-0" [attr.data-testid]="'facet-field-' + field.key">
           <h3 class="font-sans text-xs font-semibold text-ink-strong m-0 mb-2">
