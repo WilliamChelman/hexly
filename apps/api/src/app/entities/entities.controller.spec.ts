@@ -2,7 +2,8 @@ import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import cookieParser from 'cookie-parser';
 import request from 'supertest';
-import { defineField, Field } from '@hexly/domain';
+import { defineField, defineStructuredDataType, Field } from '@hexly/domain';
+import { z } from 'zod';
 import { emptyContent, tiptapContent } from '@hexly/plugin-content';
 import { coordKey } from '@hexly/plugin-hexmap';
 import { and, eq } from 'drizzle-orm';
@@ -1657,6 +1658,163 @@ describe('Entities endpoints', () => {
         (f) => f.key === 'alignment',
       )!;
       expect(alignment.values.map((v) => v.value)).toEqual(['chaotic-evil']);
+    });
+  });
+
+  describe('Harvested facet dimensions surface as Facets (#235, ADR-0055)', () => {
+    // A fixture harvesting Structured Data Type — no D&D dependency, so this ticket verifies on its own.
+    // Its dimension keys are fixture-only (`fx_*`) so they claim keys no bundled plugin Field holds: a
+    // dimension surfaces where no scalar Field is behind it. The `fx_disposition` key deliberately
+    // collides with a scalar enum Field the type also declares, to prove scalar-wins for the label/control.
+    const STAT_BLOCK = defineStructuredDataType({
+      id: 'fixture.stat-block',
+      valueSchema: z.object({ size: z.string(), threat: z.number(), disposition: z.string() }).partial(),
+      empty: () => ({}),
+      facetDimensions: [
+        { key: 'fx_size', labelKey: 'fixture.facets.size', dataType: { kind: 'enum', options: ['tiny', 'huge'] } },
+        { key: 'fx_threat', labelKey: 'fixture.facets.threat', dataType: { kind: 'number' } },
+        // Shares the `fx_disposition` key with the scalar Field below — the scalar wins the label/control.
+        { key: 'fx_disposition', labelKey: 'fixture.facets.disposition', dataType: { kind: 'string' } },
+      ],
+      harvestFacets: (v: { size?: string; threat?: number; disposition?: string }) => {
+        const rows: { key: string; value: string; num: number | null }[] = [];
+        if (v.size !== undefined) rows.push({ key: 'fx_size', value: v.size, num: null });
+        if (v.threat !== undefined) rows.push({ key: 'fx_threat', value: String(v.threat), num: v.threat });
+        if (v.disposition !== undefined) rows.push({ key: 'fx_disposition', value: v.disposition, num: null });
+        return rows;
+      },
+    });
+
+    beforeEach(() => {
+      const registry = app.get(TypeFieldRegistry);
+      registry.registerStructuredDataType(STAT_BLOCK);
+      // A type carrying the structured `stat` Field plus a scalar `fx_disposition` Field sharing that key.
+      registerType(registry, 'fixture.creature', [
+        defineField({
+          id: 'fixture.stat',
+          key: 'stat',
+          label: 'Stat Block',
+          dataType: { kind: 'fixture.stat-block' },
+          facetable: false,
+        }),
+        defineField({
+          id: 'fixture.disposition',
+          key: 'fx_disposition',
+          label: 'Disposition',
+          dataType: { kind: 'enum', options: ['friendly', 'hostile'] },
+          facetable: true,
+        }),
+      ]);
+    });
+
+    // Create a creature carrying a stat block (and optionally a scalar `fx_disposition`) via a typed save
+    // — the active edit that both passes the forward-only gate and materialises the harvested facets.
+    async function creature(
+      agent: Awaited<ReturnType<typeof signIn>>,
+      name: string,
+      stat: { size?: string; threat?: number; disposition?: string },
+      extra: Record<string, unknown> = {},
+    ) {
+      const created = await agent.post('/entities').send({ name, types: ['core.note'] });
+      await agent
+        .put(`/entities/${created.body.id}`)
+        .send({
+          document: { content: emptyContent(), stat, ...extra },
+          version: 1,
+          tags: [],
+          types: ['fixture.creature'],
+        })
+        .expect(200);
+      return created.body.id as string;
+    }
+
+    const byValue = (facet: { value: string; count: number }[]) =>
+      [...facet].sort((a, b) => a.value.localeCompare(b.value));
+
+    type FieldFacetBody = {
+      key: string;
+      label: string;
+      labelKey?: string;
+      dataType: { kind: string; options?: string[] };
+      values: { value: string; count: number }[];
+    };
+
+    it('surfaces a present harvested dimension with no scalar Field as its labelKey + control (#235)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const kobold = await creature(ada, 'Kobold', { size: 'tiny', threat: 1 });
+      await creature(ada, 'Tarrasque', { size: 'huge', threat: 30 });
+      const worldId = (await ada.get(`/entities/${kobold}`)).body.worldId;
+
+      const res = await ada.get('/entities/facets').query({ worldId }).expect(200);
+      const fields = res.body.fields as FieldFacetBody[];
+      const size = fields.find((f) => f.key === 'fx_size')!;
+      // A harvested string dimension with no scalar Field resolves to its declared i18n key + toggle control.
+      expect(size.labelKey).toBe('fixture.facets.size');
+      expect(size.dataType).toEqual({ kind: 'enum', options: ['tiny', 'huge'] });
+      expect(byValue(size.values)).toEqual([
+        { value: 'huge', count: 1 },
+        { value: 'tiny', count: 1 },
+      ]);
+    });
+
+    it('resolves a key claimed by both a scalar Field and a dimension to the scalar (scalar wins, #235)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      // The scalar `fx_disposition` value and the stat block both feed the `fx_disposition` key.
+      const kobold = await creature(ada, 'Kobold', { disposition: 'hostile' }, { fx_disposition: 'friendly' });
+      const worldId = (await ada.get(`/entities/${kobold}`)).body.worldId;
+
+      const res = await ada.get('/entities/facets').query({ worldId }).expect(200);
+      const disposition = (res.body.fields as FieldFacetBody[]).find((f) => f.key === 'fx_disposition')!;
+      // Scalar wins the label/control: its authored label and enum data-type, and no i18n key.
+      expect(disposition.label).toBe('Disposition');
+      expect(disposition.labelKey).toBeUndefined();
+      expect(disposition.dataType).toEqual({ kind: 'enum', options: ['friendly', 'hostile'] });
+      // Both sources merge into the one bucket (deliberate key reuse, ADR-0055).
+      expect(byValue(disposition.values)).toEqual([
+        { value: 'friendly', count: 1 },
+        { value: 'hostile', count: 1 },
+      ]);
+    });
+
+    it('offers a numeric dimension as a range and drills its counts down against siblings (#235)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      const kobold = await creature(ada, 'Kobold', { size: 'tiny', threat: 1 });
+      await creature(ada, 'Sphinx', { size: 'huge', threat: 11 });
+      await creature(ada, 'Tarrasque', { size: 'huge', threat: 30 });
+      const worldId = (await ada.get(`/entities/${kobold}`)).body.worldId;
+
+      // The numeric `fx_threat` dimension carries a number control (the rail picks a range from it).
+      const facets = await ada.get('/entities/facets').query({ worldId }).expect(200);
+      const threat = (facets.body.fields as FieldFacetBody[]).find((f) => f.key === 'fx_threat')!;
+      expect(threat.dataType).toEqual({ kind: 'number' });
+      expect(threat.labelKey).toBe('fixture.facets.threat');
+
+      // A numeric range filter narrows the list, comparing the harvested `num` (not lexically).
+      const listed = await ada.get('/entities').query({ worldId, field: 'fx_threat:gte:5' }).expect(200);
+      expect((listed.body.items as { name: string }[]).map((e) => e.name).sort()).toEqual(['Sphinx', 'Tarrasque']);
+
+      // Drill-down: `fx_size` is narrowed by the active `fx_threat >= 5`, while `fx_threat` drops its own filter.
+      const drilled = await ada.get('/entities/facets').query({ worldId, field: 'fx_threat:gte:5' }).expect(200);
+      const drilledFields = drilled.body.fields as FieldFacetBody[];
+      expect(byValue(drilledFields.find((f) => f.key === 'fx_size')!.values)).toEqual([{ value: 'huge', count: 2 }]);
+      expect(byValue(drilledFields.find((f) => f.key === 'fx_threat')!.values)).toEqual([
+        { value: '1', count: 1 },
+        { value: '11', count: 1 },
+        { value: '30', count: 1 },
+      ]);
+    });
+
+    it('surfaces a harvested dimension by presence, dropping it when the browse carries no value (#231, #235)', async () => {
+      const ada = await signIn('ada@hexly.test', 'correct horse');
+      // A creature whose stat block carries `size` but no `threat`.
+      const kobold = await creature(ada, 'Kobold', { size: 'tiny' });
+      const worldId = (await ada.get(`/entities/${kobold}`)).body.worldId;
+
+      const res = await ada.get('/entities/facets').query({ worldId }).expect(200);
+      const keys = (res.body.fields as FieldFacetBody[]).map((f) => f.key);
+      expect(keys).toContain('fx_size');
+      // `fx_threat` is a declared dimension but the result set carries no value for it — so it never surfaces.
+      expect(keys).not.toContain('fx_threat');
     });
   });
 

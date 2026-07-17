@@ -4,6 +4,7 @@ import {
   EntityType,
   Field,
   FieldResolver,
+  StructuredDataType,
   StructuredDataTypeSet,
   TypeFieldRefsResolver,
 } from '@hexly/domain';
@@ -40,18 +41,36 @@ export class TypeFieldRegistry {
   /**
    * The enabled **Structured Data Types** (ADR-0050, ADR-0052) — instance-wide and code-known, so
    * a World never contributes one. A disabled Plugin's data-type is unknown here, leaving its **Fields
-   * of a Structured Data Type** as opaque **Entity Document** values.
+   * of a Structured Data Type** as opaque **Entity Document** values. Backs the read-only
+   * {@link structuredDataTypes} view; a plugin (or a test) may {@link registerStructuredDataType} more.
    */
-  readonly structuredDataTypes: StructuredDataTypeSet;
+  private readonly structuredDataTypesById = new Map<string, StructuredDataType>();
 
   /** The "bare Note" default Entity Type (ADR-0051); `undefined` when content is disabled (ADR-0052). */
   readonly defaultType: EntityType | undefined;
 
   constructor(@Inject(HEXLY_CONFIG) config: HexlyConfig) {
-    this.structuredDataTypes = enabledStructuredDataTypes(config);
+    for (const [id, dataType] of enabledStructuredDataTypes(config)) this.structuredDataTypesById.set(id, dataType);
     this.defaultType = defaultEntityType(config);
     for (const field of enabledPluginFields(config)) this.fieldsById.set(field.id, field);
     for (const type of enabledPluginTypes(config)) this.register(type.id, type.fieldRefs, type.label);
+  }
+
+  /**
+   * The registered **Structured Data Types** (ADR-0050) keyed by `namespace.id` kind — what the derive,
+   * vault, and facet passes resolve a Field's structured kind against.
+   */
+  get structuredDataTypes(): StructuredDataTypeSet {
+    return this.structuredDataTypesById;
+  }
+
+  /**
+   * Register a code-registered **Structured Data Type** (ADR-0050), for a plugin (or a test) that
+   * contributes one outside the boot-time fold. Returns an unregister fn.
+   */
+  registerStructuredDataType(dataType: StructuredDataType): () => void {
+    this.structuredDataTypesById.set(dataType.id, dataType);
+    return () => this.structuredDataTypesById.delete(dataType.id);
   }
 
   /**

@@ -209,34 +209,38 @@ export class EntitiesService {
    * unselected even when its selected value matches nothing. A Field the sibling constraints leave
    * value-less is dropped.
    *
-   * A **Field of a Structured Data Type** is never offered (it has no discrete values to count): the
-   * index only ever carries facetable Fields, so a candidate key is always facetable to begin with.
+   * A **Field of a Structured Data Type** is never offered *directly* (its blob has no discrete values),
+   * but its Data Type's harvested **dimensions** are a second label/control source alongside scalar
+   * Fields (#235, ADR-0055): a present key resolves to a scalar Field *or* a dimension, the scalar
+   * winning a shared key. Both feed the same denormalised index, so counts and drill-down are identical.
    */
   private countFieldFacets(opts: FacetOptions, filter: SQL): FieldFacet[] {
     // Discover candidates with all field filters dropped, so a Field's own selection never hides it;
     // each Field's value count then re-applies its siblings and drops it if they leave it empty.
     const candidates = new Set(this.presentFieldKeys({ ...opts, fields: [] }, filter));
     if (candidates.size === 0) return [];
-    // Iterate the registry-ordered Field set, not the index keys, so the rail keeps a stable declaration
-    // order; a candidate key with no resolvable Field (a deleted World Field, ADR-0052/0054) isn't in
-    // the map, so it drops — it can't be labelled.
-    const byKey = this.worldTypeFields.facetableFieldsByKey(opts.worldId);
+    // Iterate the registry-ordered source set (scalar Fields, then harvested dimensions), not the index
+    // keys, so the rail keeps a stable declaration order; a candidate key with no resolvable source (a
+    // deleted World Field, ADR-0052/0054) isn't in the map, so it drops — it can't be labelled.
+    const byKey = this.worldTypeFields.facetSourcesByKey(opts.worldId);
     return (
       [...byKey.values()]
-        .filter((field) => candidates.has(field.key))
-        .map((field) => {
+        .filter((source) => candidates.has(source.key))
+        .map((source): FieldFacet => {
           const values = this.countFieldValues(
             // Drill-down: drop this Field's own filters, keep every sibling constraint.
-            { ...opts, fields: (opts.fields ?? []).filter((ff) => ff.key !== field.key) },
-            field.key,
+            { ...opts, fields: (opts.fields ?? []).filter((ff) => ff.key !== source.key) },
+            source.key,
             filter,
           );
           return {
-            key: field.key,
-            label: field.label,
-            dataType: field.dataType,
+            key: source.key,
+            label: source.label,
+            // A harvested dimension carries an i18n key the rail translates; a scalar Field none (ADR-0055).
+            ...(source.labelKey ? { labelKey: source.labelKey } : {}),
+            dataType: source.dataType,
             // An Entity-Link facet's values are target ids; resolve each to its name for the rail (#190).
-            values: isEntityLinkDataType(field.dataType) ? this.labelLinkValues(values, filter) : values,
+            values: isEntityLinkDataType(source.dataType) ? this.labelLinkValues(values, filter) : values,
           };
         })
         // Drill-down: a Field the sibling constraints narrowed to nothing drops off the rail.

@@ -266,10 +266,15 @@ export interface FacetCount {
  * control — value toggles for enum/list/string, a range for number/date), and its live `values` with
  * counts. Surfaced **by presence** (#231) — a Field facet appears whenever the current result set
  * carries values for its key, whatever types those Entities hold.
+ *
+ * `labelKey` is set only when the facet comes from a harvested dimension (ADR-0055): its i18n key, so
+ * the rail renders the label translated in the active Locale. A scalar Field leaves it unset — its
+ * `label` is an authored string, not a translation key.
  */
 export interface FieldFacet {
   readonly key: string;
   readonly label: string;
+  readonly labelKey?: string;
   readonly dataType: FieldDataType;
   readonly values: readonly FacetCount[];
 }

@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
   AvailableType,
-  BuiltInDataType,
+  FieldDataType,
   FieldSchema,
   isFacetableField,
   resolveEffectiveFields,
@@ -91,17 +91,48 @@ export class WorldTypeFields {
   }
 
   /**
-   * Every facetable Field resolvable in a World, indexed by the EntityDocument `key` it lenses — the
-   * label/data-type source a presence-based Field facet resolves a present key against (#231, ADR-0054),
-   * with no type in play. A World-defined Field wins a key over a Plugin Field, mirroring the effective-set
-   * resolver's precedence (ADR-0054). A Field of a **Structured Data Type** is excluded — never facetable.
+   * The label/control source a presence-based Field facet resolves a present `key` against (#231,
+   * #235, ADR-0054, ADR-0055), indexed by EntityDocument `key`, with no type in play. Two sources share
+   * the flat key space: every facetable **scalar Field** (a World-defined Field wins a Plugin Field,
+   * mirroring the effective-set resolver's precedence), then each enabled **Structured Data Type**'s
+   * harvested facet dimensions. A scalar Field wins a key claimed by both — it is the direct lens
+   * over an actual document key (ADR-0055) — so dimensions only fill keys no scalar Field claims. The
+   * insertion order is the rail's stable declaration order: scalars, then dimensions.
    */
-  facetableFieldsByKey(worldId: string | undefined): Map<string, FieldSchema & { dataType: BuiltInDataType }> {
-    const byKey = new Map<string, FieldSchema & { dataType: BuiltInDataType }>();
-    // Plugin fields first, then World fields overwrite — World-defined wins the key (ADR-0054).
-    for (const field of this.plugins.fields()) if (isFacetableField(field)) byKey.set(field.key, field);
+  facetSourcesByKey(worldId: string | undefined): Map<string, FacetSource> {
+    const byKey = new Map<string, FacetSource>();
+    // Scalar Fields first — Plugin then World, so a World-defined Field wins the key (ADR-0054).
+    for (const field of this.plugins.fields()) if (isFacetableField(field)) byKey.set(field.key, scalarSource(field));
     if (worldId)
-      for (const field of this.worldFields.list(worldId)) if (isFacetableField(field)) byKey.set(field.key, field);
+      for (const field of this.worldFields.list(worldId))
+        if (isFacetableField(field)) byKey.set(field.key, scalarSource(field));
+    // Then harvested dimensions — the scalar walk ran first, so a shared key keeps its scalar (ADR-0055).
+    for (const dataType of this.plugins.structuredDataTypes.values())
+      for (const dimension of dataType.facetDimensions ?? [])
+        if (!byKey.has(dimension.key))
+          byKey.set(dimension.key, {
+            key: dimension.key,
+            label: dimension.labelKey,
+            labelKey: dimension.labelKey,
+            dataType: dimension.dataType,
+          });
     return byKey;
   }
+}
+
+/**
+ * The label/control metadata a presence-based Field facet is built from (#235, ADR-0055) — a scalar
+ * **Field** or a harvested **FacetDimension**, unified to one shape. `labelKey` is set only for a
+ * dimension (its i18n key, which the rail translates); a scalar's `label` is its authored string.
+ */
+export interface FacetSource {
+  readonly key: string;
+  readonly label: string;
+  readonly labelKey?: string;
+  readonly dataType: FieldDataType;
+}
+
+/** A scalar Field as a {@link FacetSource}: its authored `label`, no `labelKey` (nothing to translate). */
+function scalarSource(field: FieldSchema): FacetSource {
+  return { key: field.key, label: field.label, dataType: field.dataType };
 }
