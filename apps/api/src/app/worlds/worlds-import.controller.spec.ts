@@ -215,6 +215,38 @@ describe('Vault import endpoint', () => {
     expect(mara.body.document).not.toHaveProperty('tags');
   });
 
+  it("keeps a foreign note's bare frontmatter keys as plain untyped values, never coerced into a namespaced Field (ADR-0056)", async () => {
+    const ada = await signIn('ada@hexly.test', 'correct horse');
+    // A stranger's Obsidian note, unstamped: a bare `content` key whose leaf collides with the namespaced
+    // `core.content` Field, and a bare `element` matched by nothing (ADR-0056's own worry, its lines 5-8).
+    const zip = vaultZip({
+      'Fireheart.md': [
+        '---',
+        'element: fire',
+        'content: A bare content string, not Hexly prose.',
+        '---',
+        '# Fireheart',
+        '',
+        'The mountain burns.',
+      ].join('\n'),
+    });
+
+    const res = await ada.post('/worlds/import').attach('file', zip, 'Aldermoor.zip').expect(201);
+    const { detail } = await entityNamed(ada, res.body.worldId, 'Fireheart');
+
+    // A plain Note — no type was stamped, so nothing typed it.
+    expect(detail.types).toEqual(['core.note']);
+    // Both bare keys land verbatim under their own names — data preserved, lensed by no Field.
+    expect(detail.document).toMatchObject({
+      element: 'fire',
+      content: 'A bare content string, not Hexly prose.',
+    });
+    // The bare `content` and the namespaced `core.content` coexist as two distinct predicates sharing a
+    // leaf: the body's prose lives at `core.content` while the frontmatter string stays at bare `content`.
+    expect(typeof detail.document['content']).toBe('string');
+    expect(JSON.stringify(detail.document['core.content'].snapshot)).toContain('The mountain burns.');
+  });
+
   /** The read half of the export's generic `hexly.type` stamp (#203, ADR-0050). */
   describe('hexly.type', () => {
     it("applies the stamped types to the imported Entity, in order, and doesn't leave them in EntityDocument", async () => {
