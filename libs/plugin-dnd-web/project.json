@@ -1,0 +1,18 @@
+{
+  "name": "plugin-dnd-web",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/plugin-dnd-web/src",
+  "prefix": "dnd",
+  "projectType": "library",
+  "tags": ["scope:web", "type:feature"],
+  "targets": {
+    "test": {
+      "executor": "@angular/build:unit-test",
+      "options": {
+        "watch": false,
+        "buildTarget": "web:build:development",
+        "tsConfig": "libs/plugin-dnd-web/tsconfig.spec.json"
+      }
+    }
+  }
+}

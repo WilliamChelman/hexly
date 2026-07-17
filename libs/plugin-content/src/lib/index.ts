@@ -4,9 +4,9 @@ export * from './extract-text';
 export * from './extract-outline';
 export * from './content';
 export * from './asset-extensions';
-// The Markdown converters are NOT re-exported here: this barrel feeds the eager web app, and they pull
-// in the `unified`/`remark`/`yaml` toolchain. Their consumers (the `/vault` data-type, the specs) reach
-// them by relative path instead (ADR-0051).
+// The base `core.rich-content` data-type only; the vault variant and its `unified`/`remark`/`yaml`
+// converter toolchain live in `plugin-content-server` so that weight loads through `/server` alone,
+// never the eager web app (ADR-0051, ADR-0058).
 export * from './rich-content';
 export * from './note-type';
 export * from './plugin-id';

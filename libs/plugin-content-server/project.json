@@ -1,0 +1,8 @@
+{
+  "name": "plugin-content-server",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/plugin-content-server/src",
+  "projectType": "library",
+  "tags": [],
+  "targets": {}
+}
