@@ -91,14 +91,12 @@ test('an attached grid Field affords its own map View, with its own paint and un
   await expect(page.getByTestId('hex-count')).toHaveText('3 hexes');
 
   // Two Fields of the one EntityDocument map, each holding the terrain painted on its own View
-  // (ADR-0050) — and the attachment persists in `fields[]`.
+  // (ADR-0050). The `world.battlemap` grid's presence as a document key *is* the attachment (ADR-0057) —
+  // there is no separate `fields[]` to check.
   const worldMap = await savedGrid(request, entityId);
   const battlemap = await savedGrid(request, entityId, 'world.battlemap');
   expect(Object.values(worldMap.hexes)).toEqual([{ terrain: 'ocean' }, { terrain: 'ocean' }, { terrain: 'ocean' }]);
   expect(Object.values(battlemap.hexes)).toEqual([{ terrain: 'mountain' }, { terrain: 'mountain' }]);
-
-  const res = await request.get(`/api/entities/${entityId}`);
-  expect((await res.json()).fields).toEqual(['world.battlemap']);
 });
 
 /**
