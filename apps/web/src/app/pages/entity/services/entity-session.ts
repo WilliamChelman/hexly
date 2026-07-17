@@ -408,10 +408,11 @@ export class EntitySession implements EntitySessionPort {
    */
   detachField(id: string): void {
     if (!this._fields().includes(id)) return;
-    // The key comes from the raw definition, not the enablement-gated resolver, so a *disabled*
-    // plugin's degraded Field still clears its value; only a plugin this build never bundled leaves
-    // an orphan (there is no lens to say which key it owned).
-    const field = this.plugins.fieldDefinition(id);
+    // Resolve the key from the World-Field-aware registry first (a `world.*` Field is owned by no
+    // Plugin, so `PluginRegistry` alone cannot clear it), falling back to the raw plugin definition so
+    // a *disabled* plugin's degraded Field still clears its value. Only a plugin this build never
+    // bundled leaves an orphan (there is no lens to say which key it owned).
+    const field = this.typeRegistry.field(id) ?? this.plugins.fieldDefinition(id);
     this._fields.set(this._fields().filter((f) => f !== id));
     if (field) this._doc.set(writeField(this._doc(), field, undefined));
   }
