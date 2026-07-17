@@ -5,8 +5,8 @@ import { provideRouter, Router } from '@angular/router';
 import { of } from 'rxjs';
 import { WorldsClient, EntitiesClient, UserDirectoryClient, AuthClient, ActiveWorld } from '@hexly/web-core';
 import { MockWorldsClient, MockEntitiesClient, MockUserDirectoryClient, MockAuthClient } from '@hexly/web-core/testing';
-import { OwnerSet } from '@hexly/web-ui';
-import { WorldSettings } from './world-settings.page';
+import { OwnerSetComponent } from '@hexly/web-ui';
+import { WorldSettingsPage } from './world-settings.page';
 
 describe('WorldSettings', () => {
   let worlds: MockWorldsClient;
@@ -15,7 +15,7 @@ describe('WorldSettings', () => {
     worlds = new MockWorldsClient();
     worlds.owners.mockReturnValue(of([]));
     await TestBed.configureTestingModule({
-      imports: [WorldSettings, provideTranslocoTesting()],
+      imports: [WorldSettingsPage, provideTranslocoTesting()],
       providers: [
         provideRouter([]),
         { provide: WorldsClient, useValue: worlds },
@@ -31,20 +31,20 @@ describe('WorldSettings', () => {
   });
 
   it('renders the World owner set for the active World', () => {
-    const fixture = TestBed.createComponent(WorldSettings);
+    const fixture = TestBed.createComponent(WorldSettingsPage);
     fixture.detectChanges();
 
-    const set = fixture.debugElement.query(By.directive(OwnerSet)).componentInstance as OwnerSet;
+    const set = fixture.debugElement.query(By.directive(OwnerSetComponent)).componentInstance as OwnerSetComponent;
     expect(set.kind()).toBe('world');
     expect(set.id()).toBe('w1');
   });
 
   it('leaves for the World Index once the user resigns', () => {
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
-    const fixture = TestBed.createComponent(WorldSettings);
+    const fixture = TestBed.createComponent(WorldSettingsPage);
     fixture.detectChanges();
 
-    const set = fixture.debugElement.query(By.directive(OwnerSet)).componentInstance as OwnerSet;
+    const set = fixture.debugElement.query(By.directive(OwnerSetComponent)).componentInstance as OwnerSetComponent;
     set.resigned.emit();
 
     expect(navigate).toHaveBeenCalledWith(['/']);

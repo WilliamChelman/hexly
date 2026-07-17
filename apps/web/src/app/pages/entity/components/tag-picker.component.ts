@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { ListboxController, Listbox, ListboxEmpty, ListboxOption } from '@hexly/web-ui';
+import { ListboxController, ListboxComponent, ListboxEmptyComponent, ListboxOptionComponent } from '@hexly/web-ui';
 import { TagItem } from './tag-suggestions';
 
 /**
@@ -12,7 +12,7 @@ import { TagItem } from './tag-suggestions';
 @Component({
   selector: 'app-tag-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, Listbox, ListboxOption, ListboxEmpty],
+  imports: [TranslocoPipe, ListboxComponent, ListboxOptionComponent, ListboxEmptyComponent],
   template: `
     @if (visible()) {
       <app-listbox
@@ -42,7 +42,7 @@ import { TagItem } from './tag-suggestions';
     }
   `,
 })
-export class TagPicker extends ListboxController<TagItem> {
+export class TagPickerComponent extends ListboxController<TagItem> {
   protected readonly optionIdPrefix = 'tag-opt-';
 
   /** A row was picked (click or keyboard) — the parent adds this tag. */

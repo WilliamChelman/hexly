@@ -32,7 +32,7 @@ import { ENTITY_SESSION, ENTITY_TYPES } from '@hexly/web-entity';
     }
   `,
 })
-export class EntityMetadata {
+export class EntityMetadataComponent {
   private readonly session = inject(ENTITY_SESSION);
   private readonly types = inject(ENTITY_TYPES);
 

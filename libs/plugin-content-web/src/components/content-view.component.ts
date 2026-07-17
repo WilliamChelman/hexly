@@ -1,20 +1,20 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { ENTITY_SESSION, ENTITY_TYPES } from '@hexly/web-entity';
-import { Icon, IconButton } from '@hexly/web-ui';
+import { IconComponent, IconButtonComponent } from '@hexly/web-ui';
 import { TranslocoService, translateSignal } from '@jsverse/transloco';
-import { ContentEditor } from './content-editor.component';
-import { EntityMetadata } from './entity-metadata.component';
-import { OutlinePanel } from './outline-panel.component';
-import { OutlineSource } from '../directives/outline-source';
+import { ContentEditorComponent } from './content-editor.component';
+import { EntityMetadataComponent } from './entity-metadata.component';
+import { OutlinePanelComponent } from './outline-panel.component';
+import { OutlineSourceDirective } from '../directives/outline-source.directive';
 import { OutlineStore } from '../services/outline-store';
-import { ReferencesPanel } from './references-panel.component';
+import { ReferencesPanelComponent } from './references-panel.component';
 import { ReferencesStore } from '../services/references-store';
 import { RightDock } from '../services/right-dock';
 
 /**
  * The `core.view.content` renderer (ADR-0048, *Views* amendment; ADR-0051): the Content body in a
  * centred reading column with its Outline / References dock. It renders whichever prose Field placed
- * it, reading that Field's key from `VIEW_FIELD_KEY` (the {@link ContentEditor} it hosts does the read).
+ * it, reading that Field's key from `VIEW_FIELD_KEY` (the {@link ContentEditorComponent} it hosts does the read).
  *
  * The View owns its dock stores in `providers` — as the Map View owns its `HexMapStore` (ADR-0050) —
  * so the whole dock lives and dies with the content View's chunk and never reaches the initial bundle.
@@ -28,7 +28,15 @@ import { RightDock } from '../services/right-dock';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'contents' },
   providers: [RightDock, OutlineStore, ReferencesStore],
-  imports: [ContentEditor, EntityMetadata, OutlinePanel, OutlineSource, ReferencesPanel, IconButton, Icon],
+  imports: [
+    ContentEditorComponent,
+    EntityMetadataComponent,
+    OutlinePanelComponent,
+    OutlineSourceDirective,
+    ReferencesPanelComponent,
+    IconButtonComponent,
+    IconComponent,
+  ],
   template: `
     <!-- Content body in a centred reading column. Opening either dock panel reflows
          this column left (extra right padding) so the panel never overlaps prose —
@@ -84,7 +92,7 @@ import { RightDock } from '../services/right-dock';
     </div>
   `,
 })
-export class ContentView {
+export class ContentViewComponent {
   private readonly session = inject(ENTITY_SESSION);
   private readonly types = inject(ENTITY_TYPES);
   private readonly transloco = inject(TranslocoService);

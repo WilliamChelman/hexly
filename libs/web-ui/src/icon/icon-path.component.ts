@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
-import { IconHost } from './icon-host';
+import { IconHostDirective } from './icon-host.directive';
 
 /**
  * Renders an arbitrary SVG path (`d`) as one `<svg>` glyph in `currentColor` — for
@@ -12,7 +12,7 @@ import { IconHost } from './icon-host';
 @Component({
   selector: 'app-icon-path',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  hostDirectives: [IconHost],
+  hostDirectives: [IconHostDirective],
   template: `
     <svg
       [attr.width]="size()"
@@ -28,7 +28,7 @@ import { IconHost } from './icon-host';
     </svg>
   `,
 })
-export class IconPath {
+export class IconPathComponent {
   readonly d = input.required<string>();
   readonly size = input(18);
 }

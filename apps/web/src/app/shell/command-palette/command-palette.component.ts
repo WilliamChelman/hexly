@@ -18,7 +18,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { of, switchMap } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { Button, Dialog, Input } from '@hexly/web-ui';
+import { ButtonComponent, DialogComponent, InputComponent } from '@hexly/web-ui';
 import { Command, CommandProvider, parseCommandQuery } from './command';
 import { CommandRegistry, CommandSection } from './command-registry';
 import { EntityQuickOpen } from './providers/entity-quick-open';
@@ -47,7 +47,7 @@ export function provideBuiltInCommands(): Provider[] {
 @Component({
   selector: 'app-command-palette',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Dialog, Input, TranslocoPipe, RouterLink, NgTemplateOutlet],
+  imports: [ButtonComponent, DialogComponent, InputComponent, TranslocoPipe, RouterLink, NgTemplateOutlet],
   template: `
     <app-dialog [open]="open()" align="top" (closed)="onDialogClosed()">
       <input
@@ -129,7 +129,7 @@ export function provideBuiltInCommands(): Provider[] {
     </ng-template>
   `,
 })
-export class CommandPalette {
+export class CommandPaletteComponent {
   private readonly registry = inject(CommandRegistry);
   private readonly router = inject(Router);
   private readonly builtIns = inject(COMMAND_PROVIDERS, { optional: true }) ?? [];

@@ -55,7 +55,7 @@ import { NodeView } from '@tiptap/pm/view';
     </div>
   `,
 })
-export class CalloutView {
+export class CalloutViewComponent {
   readonly type = input.required<string>();
   readonly title = input<string | null>(null);
   /** The reader edited the type; the bridge writes it back to the node attr. */
@@ -94,7 +94,7 @@ export function focusCalloutTypeAtTop(editor: Editor): boolean {
 }
 
 /**
- * Bridge a ProseMirror `callout` node to a {@link CalloutView}. Returns a `contentDOM` (the
+ * Bridge a ProseMirror `callout` node to a {@link CalloutViewComponent}. Returns a `contentDOM` (the
  * `[data-callout-body]` element) because a callout has editable children, so `stopEvent` /
  * `ignoreMutation` may not blanket-block: `ignoreMutation` shields only Angular's chrome re-renders
  * (the header) from ProseMirror's mutation observer, leaving the body to PM.
@@ -110,7 +110,7 @@ export function createCalloutNodeView(
   environmentInjector: EnvironmentInjector,
   appRef: ApplicationRef,
 ): NodeView {
-  const ref = createComponent(CalloutView, { environmentInjector });
+  const ref = createComponent(CalloutViewComponent, { environmentInjector });
   const apply = (n: ProseMirrorNode) => {
     ref.setInput('type', n.attrs['type'] ?? 'note');
     ref.setInput('title', n.attrs['title'] ?? null);

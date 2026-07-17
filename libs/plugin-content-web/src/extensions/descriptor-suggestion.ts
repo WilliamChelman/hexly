@@ -1,7 +1,7 @@
 import { Extension } from '@tiptap/core';
 import { PluginKey } from '@tiptap/pm/state';
 import Suggestion, { SuggestionKeyDownProps, SuggestionProps } from '@tiptap/suggestion';
-import { DescriptorPicker } from '../components/descriptor-picker.component';
+import { DescriptorPickerComponent } from '../components/descriptor-picker.component';
 import { entityLinkPosBefore, setLinkAttr } from '../utils/descriptors';
 import { VocabItem, vocabItems } from '@hexly/plugin-content';
 
@@ -15,7 +15,7 @@ import { VocabItem, vocabItems } from '@hexly/plugin-content';
  * the picker `viewChild` and the client resolve.
  */
 export function descriptorSuggestion(
-  getPicker: () => DescriptorPicker | undefined,
+  getPicker: () => DescriptorPickerComponent | undefined,
   loadVocab: () => Promise<string[]>,
 ): Extension {
   return Extension.create({

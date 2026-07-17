@@ -5,7 +5,7 @@ import { EMPTY, catchError, of, switchMap } from 'rxjs';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { PublicWorldView } from '@hexly/domain';
 import { PublicClient, AppShellStore, EVICTED } from '@hexly/web-core';
-import { Eyebrow } from '@hexly/web-ui';
+import { EyebrowComponent } from '@hexly/web-ui';
 
 /**
  * A World Public Link landing page: lists the World's `shared` Entities — and nothing else — as
@@ -16,7 +16,7 @@ import { Eyebrow } from '@hexly/web-ui';
 @Component({
   selector: 'app-public-world-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, RouterLink, Eyebrow],
+  imports: [TranslocoPipe, RouterLink, EyebrowComponent],
   template: `
     <main class="public-world">
       <p class="public-banner" data-testid="public-banner">

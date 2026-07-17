@@ -20,7 +20,7 @@ import {
   DND_STAT_FIELDS_BY_KEY,
   formatModifier,
 } from '@hexly/plugin-dnd';
-import { StatSlot } from './stat-slot.component';
+import { StatSlotComponent } from './stat-slot.component';
 
 /** One rendered slot of the stat block: the stat descriptor to edit through, plus its live value. */
 interface Slot {
@@ -44,7 +44,7 @@ interface Slot {
   // Fills the page's body cell and scrolls within it, so the header and nav around it never scroll
   // away. `h-full` resolves against that cell, which the page's grid row sizes.
   host: { class: 'block h-full overflow-y-auto bg-surface-sunken', 'data-testid': 'stat-block-view' },
-  imports: [TranslocoPipe, StatSlot],
+  imports: [TranslocoPipe, StatSlotComponent],
   template: `
     <article
       class="max-w-[42rem] mx-auto my-6 rounded-md border border-line border-t-4 border-t-astra bg-surface px-6 py-5 shadow-1"
@@ -112,7 +112,7 @@ interface Slot {
     </article>
   `,
 })
-export class StatBlockView {
+export class StatBlockViewComponent {
   /** The central store every View of the open Entity reads its slice off and writes back through. */
   private readonly session = inject(ENTITY_SESSION);
 

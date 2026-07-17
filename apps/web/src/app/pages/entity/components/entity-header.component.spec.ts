@@ -16,9 +16,9 @@ import { CORE_VIEW_CONTENT, providePluginContent } from '@hexly/plugin-content/w
 import { EntityViewStore } from '../services/entity-view-store';
 import { ViewRegistry } from '../../../entity-types/view-registry';
 import { CORE_VIEW_DEFINITIONS } from '../views/core-views';
-import { OwnerSet } from '@hexly/web-ui';
+import { OwnerSetComponent } from '@hexly/web-ui';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
-import { EntityHeader } from './entity-header.component';
+import { EntityHeaderComponent } from './entity-header.component';
 import { noteDetail } from './note-detail.fixtures';
 
 /** The Hex Map's map View, as the toggle keys it: the View id plus the Field it renders. */
@@ -73,7 +73,7 @@ describe('EntityHeader', () => {
     world = signal<WorldDetail | null>(worldDetail());
     activeWorldSet = vi.fn((w: WorldDetail | null) => world.set(w));
     await TestBed.configureTestingModule({
-      imports: [EntityHeader, provideTranslocoTesting()],
+      imports: [EntityHeaderComponent, provideTranslocoTesting()],
       providers: [
         providePluginContent(),
         providePluginHexmap(),
@@ -121,7 +121,7 @@ describe('EntityHeader', () => {
   });
 
   /** Open the entity actions overflow menu; its items render into the overlay. */
-  function openActions(fixture: ComponentFixture<EntityHeader>): void {
+  function openActions(fixture: ComponentFixture<EntityHeaderComponent>): void {
     (fixture.nativeElement.querySelector('[data-testid=entity-actions]') as HTMLButtonElement).click();
     fixture.detectChanges();
   }
@@ -133,23 +133,23 @@ describe('EntityHeader', () => {
 
   it('opens the entity owner set from the Share action', () => {
     open(aldermoor);
-    const fixture = TestBed.createComponent(EntityHeader);
+    const fixture = TestBed.createComponent(EntityHeaderComponent);
     fixture.detectChanges();
 
-    expect(fixture.debugElement.query(By.directive(OwnerSet))).toBeNull();
+    expect(fixture.debugElement.query(By.directive(OwnerSetComponent))).toBeNull();
 
     openActions(fixture);
     menuItem('manage-owners')!.click();
     fixture.detectChanges();
 
-    const set = fixture.debugElement.query(By.directive(OwnerSet))?.componentInstance as OwnerSet;
+    const set = fixture.debugElement.query(By.directive(OwnerSetComponent))?.componentInstance as OwnerSetComponent;
     expect(set.kind()).toBe('entity');
     expect(set.id()).toBe('m1');
   });
 
   it('closes the owner set from its Close action', () => {
     open(aldermoor);
-    const fixture = TestBed.createComponent(EntityHeader);
+    const fixture = TestBed.createComponent(EntityHeaderComponent);
     fixture.detectChanges();
     openActions(fixture);
     menuItem('manage-owners')!.click();
@@ -158,14 +158,14 @@ describe('EntityHeader', () => {
     fixture.nativeElement.querySelector('[data-testid=owners-close]').click();
     fixture.detectChanges();
 
-    expect(fixture.debugElement.query(By.directive(OwnerSet))).toBeNull();
+    expect(fixture.debugElement.query(By.directive(OwnerSetComponent))).toBeNull();
   });
 
   it('hides the Share action for a read-only opener (no manage Right)', () => {
     // A Viewer grant / read-only member / Public Link reader (ADR-0039): content shows,
     // but Share (owner/grant/link management) is owner-only and must be withheld.
     open({ ...aldermoor, rights: ['read'] });
-    const fixture = TestBed.createComponent(EntityHeader);
+    const fixture = TestBed.createComponent(EntityHeaderComponent);
     fixture.detectChanges();
 
     openActions(fixture);
@@ -176,7 +176,7 @@ describe('EntityHeader', () => {
     // An entity-level Editor or a World Owner opens writable (has `edit`) but can't manage
     // sharing — the dialog is owner-only, so the item must stay hidden or it opens onto 403s.
     open({ ...aldermoor, rights: ['read', 'edit'] });
-    const fixture = TestBed.createComponent(EntityHeader);
+    const fixture = TestBed.createComponent(EntityHeaderComponent);
     fixture.detectChanges();
 
     openActions(fixture);
@@ -186,7 +186,7 @@ describe('EntityHeader', () => {
   it('shows the open entity name', () => {
     open({ ...aldermoor, name: 'The Whisperwood' });
 
-    const fixture = TestBed.createComponent(EntityHeader);
+    const fixture = TestBed.createComponent(EntityHeaderComponent);
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('The Whisperwood');
@@ -195,7 +195,7 @@ describe('EntityHeader', () => {
   it('mounts the tag editor for the open entity', () => {
     open(aldermoor);
 
-    const fixture = TestBed.createComponent(EntityHeader);
+    const fixture = TestBed.createComponent(EntityHeaderComponent);
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('[data-testid=entity-tags]')).not.toBeNull();
@@ -203,7 +203,7 @@ describe('EntityHeader', () => {
 
   it('renames the open entity when the title is edited', () => {
     open(aldermoor);
-    const fixture = TestBed.createComponent(EntityHeader);
+    const fixture = TestBed.createComponent(EntityHeaderComponent);
     fixture.detectChanges();
 
     // Edit in place (contenteditable), commit on blur.
@@ -222,7 +222,7 @@ describe('EntityHeader', () => {
 
   it('does not call the API when the title is left unchanged', () => {
     open(aldermoor);
-    const fixture = TestBed.createComponent(EntityHeader);
+    const fixture = TestBed.createComponent(EntityHeaderComponent);
     fixture.detectChanges();
 
     (fixture.nativeElement.querySelector('[data-testid=title]') as HTMLElement).dispatchEvent(new Event('blur'));
@@ -232,7 +232,7 @@ describe('EntityHeader', () => {
 
   it('toggles the open entity’s visibility from the actions menu', () => {
     open(aldermoor); // private
-    const fixture = TestBed.createComponent(EntityHeader);
+    const fixture = TestBed.createComponent(EntityHeaderComponent);
     fixture.detectChanges();
 
     openActions(fixture);
@@ -257,7 +257,7 @@ describe('EntityHeader', () => {
     vi.useFakeTimers();
     try {
       open(aldermoor); // private
-      const fixture = TestBed.createComponent(EntityHeader);
+      const fixture = TestBed.createComponent(EntityHeaderComponent);
       fixture.detectChanges();
 
       entities.patch.mockReturnValue(throwError(() => new Error('403')));
@@ -280,7 +280,7 @@ describe('EntityHeader', () => {
   // the title is read-only and the owner-only visibility toggle is absent from the menu.
   it('renders a read-only entity’s title non-editable, with no visibility toggle', () => {
     open({ ...aldermoor, rights: ['read'] });
-    const fixture = TestBed.createComponent(EntityHeader);
+    const fixture = TestBed.createComponent(EntityHeaderComponent);
     fixture.detectChanges();
 
     const title = fixture.nativeElement.querySelector('[data-testid=title]') as HTMLElement;
@@ -292,7 +292,7 @@ describe('EntityHeader', () => {
 
   it('no longer carries app-level navigation — that lives in the rail (ADR-0022)', () => {
     open(aldermoor);
-    const fixture = TestBed.createComponent(EntityHeader);
+    const fixture = TestBed.createComponent(EntityHeaderComponent);
     fixture.detectChanges();
 
     // All Maps / Design System are rail destinations, not header buttons.
@@ -305,7 +305,7 @@ describe('EntityHeader', () => {
 
   it('renders its chrome and actions in French when French is the active language', () => {
     open(aldermoor);
-    const fixture = TestBed.createComponent(EntityHeader);
+    const fixture = TestBed.createComponent(EntityHeaderComponent);
     fixture.detectChanges();
 
     // No reload: flipping the active language re-renders the live component.
@@ -323,7 +323,7 @@ describe('EntityHeader', () => {
 
   it('keeps the user’s entity name verbatim — never translated — under French', () => {
     open({ ...aldermoor, name: 'Save' }); // collides with a UI action label
-    const fixture = TestBed.createComponent(EntityHeader);
+    const fixture = TestBed.createComponent(EntityHeaderComponent);
     fixture.detectChanges();
 
     TestBed.inject(TranslocoService).setActiveLang('fr');
@@ -338,7 +338,7 @@ describe('EntityHeader', () => {
   // labelled by that Field (ADR-0050).
   it('offers a Map/Note view toggle for a hexmap, with the Map active by default', () => {
     open(aldermoor);
-    const fixture = TestBed.createComponent(EntityHeader);
+    const fixture = TestBed.createComponent(EntityHeaderComponent);
     fixture.detectChanges();
 
     const map = fixture.nativeElement.querySelector(`[data-testid="${MAP_VIEW_KEY}"]`) as HTMLButtonElement;
@@ -355,7 +355,7 @@ describe('EntityHeader', () => {
 
   it('omits the view toggle for a note — it has no grid surface to switch to', () => {
     open(noteDetail('Lady Mara'));
-    const fixture = TestBed.createComponent(EntityHeader);
+    const fixture = TestBed.createComponent(EntityHeaderComponent);
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector(`[data-testid="${MAP_VIEW_KEY}"]`)).toBeNull();
@@ -366,7 +366,7 @@ describe('EntityHeader', () => {
 
   it('switches to the Content view when Note is clicked', () => {
     open(aldermoor);
-    const fixture = TestBed.createComponent(EntityHeader);
+    const fixture = TestBed.createComponent(EntityHeaderComponent);
     fixture.detectChanges();
 
     (fixture.nativeElement.querySelector('[data-testid="core.view.content"]') as HTMLButtonElement).click();
@@ -386,7 +386,7 @@ describe('EntityHeader', () => {
   it('shows the Pin toggle to a World Owner, reflecting the not-yet-pinned state', () => {
     world.set(worldDetail([])); // Owner (manage), 'm1' not pinned
     open(aldermoor);
-    const fixture = TestBed.createComponent(EntityHeader);
+    const fixture = TestBed.createComponent(EntityHeaderComponent);
     fixture.detectChanges();
 
     openActions(fixture);
@@ -398,7 +398,7 @@ describe('EntityHeader', () => {
   it('hides the Pin toggle for a non-Owner of the World (no manage Right)', () => {
     world.set(worldDetail([], ['read'])); // a Contributor/Viewer of the World
     open(aldermoor);
-    const fixture = TestBed.createComponent(EntityHeader);
+    const fixture = TestBed.createComponent(EntityHeaderComponent);
     fixture.detectChanges();
 
     openActions(fixture);
@@ -408,7 +408,7 @@ describe('EntityHeader', () => {
   it('reflects that the open Entity is already pinned', () => {
     world.set(worldDetail(['m1'])); // 'm1' is in the shared pin set
     open(aldermoor);
-    const fixture = TestBed.createComponent(EntityHeader);
+    const fixture = TestBed.createComponent(EntityHeaderComponent);
     fixture.detectChanges();
 
     openActions(fixture);
@@ -419,7 +419,7 @@ describe('EntityHeader', () => {
     world.set(worldDetail(['p1']));
     worlds.setPins.mockReturnValue(of(worldDetail(['p1', 'm1'])));
     open(aldermoor);
-    const fixture = TestBed.createComponent(EntityHeader);
+    const fixture = TestBed.createComponent(EntityHeaderComponent);
     fixture.detectChanges();
 
     openActions(fixture);
@@ -439,7 +439,7 @@ describe('EntityHeader', () => {
     world.set(worldDetail(['p1', 'm1']));
     worlds.setPins.mockReturnValue(of(worldDetail(['p1'])));
     open(aldermoor);
-    const fixture = TestBed.createComponent(EntityHeader);
+    const fixture = TestBed.createComponent(EntityHeaderComponent);
     fixture.detectChanges();
 
     openActions(fixture);
@@ -450,7 +450,7 @@ describe('EntityHeader', () => {
 
   it('mirrors the chosen view to the URL so a refresh keeps it (#75)', () => {
     open(aldermoor);
-    const fixture = TestBed.createComponent(EntityHeader);
+    const fixture = TestBed.createComponent(EntityHeaderComponent);
     fixture.detectChanges();
 
     const nav = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);

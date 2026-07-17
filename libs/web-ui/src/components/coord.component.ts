@@ -14,4 +14,4 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
   },
   template: `<ng-content />`,
 })
-export class Coord {}
+export class CoordComponent {}

@@ -1,12 +1,12 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { EntityDocument } from '@hexly/domain';
-import { Button, Dialog } from '@hexly/web-ui';
+import { ButtonComponent, DialogComponent } from '@hexly/web-ui';
 import { EntitySession } from '../services/entity-session';
-import { EntityTypesEditor } from './entity-types-editor.component';
+import { EntityTypesEditorComponent } from './entity-types-editor.component';
 
 /**
- * The open Entity's Edit-types dialog: binds {@link EntityTypesEditor} to the {@link EntitySession}
+ * The open Entity's Edit-types dialog: binds {@link EntityTypesEditorComponent} to the {@link EntitySession}
  * — a type-set edit lands on `setTypes`, the add-type prompt's Field values on `mutate`, so both
  * ride the version-checked autosave.
  */
@@ -14,7 +14,7 @@ import { EntityTypesEditor } from './entity-types-editor.component';
   selector: 'app-entity-types-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'contents' },
-  imports: [Button, Dialog, EntityTypesEditor, TranslocoPipe],
+  imports: [ButtonComponent, DialogComponent, EntityTypesEditorComponent, TranslocoPipe],
   template: `
     @if (open()) {
       <app-dialog [open]="true" [heading]="'entityTypes.heading' | transloco" (closed)="closed.emit()">
@@ -33,7 +33,7 @@ import { EntityTypesEditor } from './entity-types-editor.component';
     }
   `,
 })
-export class EntityTypesDialog {
+export class EntityTypesDialogComponent {
   protected readonly session = inject(EntitySession);
 
   readonly open = input(false);

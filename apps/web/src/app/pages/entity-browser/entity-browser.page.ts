@@ -5,14 +5,14 @@ import { Subject, Subscription, debounceTime, distinctUntilChanged, finalize, ma
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntityFacets, EntityPage, EntitySummary, EntityType, parseFieldFilters, Visibility } from '@hexly/domain';
 import { EntitiesClient, EntityFacetParams, ActiveWorld, ToasterService, AppShellStore } from '@hexly/web-core';
-import { Button, Eyebrow, PageHeader } from '@hexly/web-ui';
-import { NewEntityButton } from '../../entity-types/new-entity-button.component';
-import { EntityCard } from './components/entity-card.component';
-import { EntitySearch } from './components/entity-search.component';
-import { EmptyState } from './components/empty-state.component';
+import { ButtonComponent, EyebrowComponent, PageHeaderComponent } from '@hexly/web-ui';
+import { NewEntityButtonComponent } from '../../entity-types/new-entity-button.component';
+import { EntityCardComponent } from './components/entity-card.component';
+import { EntitySearchComponent } from './components/entity-search.component';
+import { EmptyStateComponent } from './components/empty-state.component';
 import {
   ActiveFacets,
-  FacetRail,
+  FacetRailComponent,
   FacetToggle,
   FieldRangeChange,
   FieldSelection,
@@ -82,15 +82,15 @@ const FIRST_PAGE_CACHE_LIMIT = 50;
   selector: 'app-entity-browser',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    Button,
-    Eyebrow,
-    PageHeader,
+    ButtonComponent,
+    EyebrowComponent,
+    PageHeaderComponent,
     TranslocoPipe,
-    EntityCard,
-    EntitySearch,
-    EmptyState,
-    FacetRail,
-    NewEntityButton,
+    EntityCardComponent,
+    EntitySearchComponent,
+    EmptyStateComponent,
+    FacetRailComponent,
+    NewEntityButtonComponent,
   ],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
@@ -171,7 +171,7 @@ const FIRST_PAGE_CACHE_LIMIT = 50;
     </main>
   `,
 })
-export class EntityBrowser {
+export class EntityBrowserPage {
   private readonly entitiesClient = inject(EntitiesClient);
   private readonly activeWorld = inject(ActiveWorld);
   private readonly router = inject(Router);

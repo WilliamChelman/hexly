@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { Eyebrow } from '@hexly/web-ui';
+import { EyebrowComponent } from '@hexly/web-ui';
 import { ReferencesStore } from '../services/references-store';
-import { ReferenceRow } from './reference-row.component';
+import { ReferenceRowComponent } from './reference-row.component';
 
 /**
  * The References panel (ADR-0046): the open Entity's own links (**References**) above the Entities
@@ -10,14 +10,14 @@ import { ReferenceRow } from './reference-row.component';
  *
  * It hides nothing of its own. *Referenced by* arrives already filtered by the viewer's access to
  * each source; an outbound target the viewer cannot read (or that no longer exists) arrives as
- * `target: null`, which {@link ReferenceRow} renders as the non-navigable dangling label.
+ * `target: null`, which {@link ReferenceRowComponent} renders as the non-navigable dangling label.
  *
  * Empty states are gated on `loaded()`: an in-flight fetch would otherwise show a false empty state.
  */
 @Component({
   selector: 'app-references-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Eyebrow, ReferenceRow, TranslocoPipe],
+  imports: [EyebrowComponent, ReferenceRowComponent, TranslocoPipe],
   host: { class: 'flex flex-col gap-1 p-3 overflow-y-auto bg-surface' },
   template: `
     <span appEyebrow mark class="mb-1">{{ 'editor.links.references' | transloco }}</span>
@@ -47,6 +47,6 @@ import { ReferenceRow } from './reference-row.component';
     }
   `,
 })
-export class ReferencesPanel {
+export class ReferencesPanelComponent {
   protected readonly store = inject(ReferencesStore);
 }

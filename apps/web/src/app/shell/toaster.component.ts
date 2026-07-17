@@ -57,7 +57,7 @@ import { ToasterService } from '@hexly/web-core';
     }
   `,
 })
-export class Toaster {
+export class ToasterComponent {
   protected readonly toaster = inject(ToasterService);
   private readonly liveAnnouncer = inject(LiveAnnouncer);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);

@@ -12,7 +12,7 @@ import { VIEW_FIELD_KEY } from '@hexly/web-entity';
 import { EntityNameResolver } from '../services/entity-name-resolver';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { CONTENT_EDITOR_TEST_CATALOGS } from '../i18n/test-catalogs';
-import { ContentEditor } from './content-editor.component';
+import { ContentEditorComponent } from './content-editor.component';
 
 // A minimal note EntityDetail — the lib owns its own fixture rather than the entity
 // page's (owner Rights keep the editor writable, ADR-0039).
@@ -69,8 +69,8 @@ describe('ContentEditor', () => {
     });
 
   function create() {
-    const fixture = TestBed.createComponent(ContentEditor);
-    (fixture.componentRef as ComponentRef<ContentEditor>).setInput('ariaLabel', 'Content');
+    const fixture = TestBed.createComponent(ContentEditorComponent);
+    (fixture.componentRef as ComponentRef<ContentEditorComponent>).setInput('ariaLabel', 'Content');
     fixture.detectChanges();
     return fixture;
   }
@@ -84,7 +84,7 @@ describe('ContentEditor', () => {
     fragment$.next(null);
     viewFieldKey = undefined;
     await TestBed.configureTestingModule({
-      imports: [ContentEditor, provideTranslocoTesting(CONTENT_EDITOR_TEST_CATALOGS)],
+      imports: [ContentEditorComponent, provideTranslocoTesting(CONTENT_EDITOR_TEST_CATALOGS)],
       providers: [
         provideFakeEntitySession(),
         { provide: VIEW_FIELD_KEY, useFactory: () => viewFieldKey },

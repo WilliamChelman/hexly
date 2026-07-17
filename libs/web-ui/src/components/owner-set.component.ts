@@ -4,8 +4,8 @@ import { Observable } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { UserSummary } from '@hexly/domain';
 import { WorldsClient, EntitiesClient, UserDirectoryClient, AuthClient, ToasterService } from '@hexly/web-core';
-import { Button } from './button.component';
-import { Select } from './select.component';
+import { ButtonComponent } from './button.component';
+import { SelectComponent } from './select.component';
 
 /**
  * The symmetric ownership set of a World or Entity (ADR-0037): view, add, remove, or
@@ -18,7 +18,7 @@ import { Select } from './select.component';
 @Component({
   selector: 'app-owner-set',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, Button, Select],
+  imports: [TranslocoPipe, ButtonComponent, SelectComponent],
   template: `
     <ul class="owner-list">
       @for (o of rows(); track o.id) {
@@ -90,7 +90,7 @@ import { Select } from './select.component';
     }
   `,
 })
-export class OwnerSet implements OnInit {
+export class OwnerSetComponent implements OnInit {
   /** Which resource this set belongs to — routes reads/writes to the right client. */
   readonly kind = input.required<'world' | 'entity'>();
   readonly id = input.required<string>();

@@ -22,7 +22,7 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
     </ul>
   `,
 })
-export class Listbox {
+export class ListboxComponent {
   readonly testid = input.required<string>();
   readonly ariaLabel = input.required<string | null>();
   readonly activeItemId = input.required<string | null>();

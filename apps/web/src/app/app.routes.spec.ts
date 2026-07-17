@@ -80,14 +80,18 @@ describe('appRoutes structure (ADR-0028)', () => {
     // Angular's compiler prefixes the emitted class name with an underscore.
     const dashboard = await index!.loadComponent!();
     const settingsPage = await settings!.loadComponent!();
-    expect((dashboard as { name: string }).name).toMatch(/WorldDashboard$/);
-    expect((settingsPage as { name: string }).name).toMatch(/WorldSettings$/);
+    expect((dashboard as { name: string }).name).toMatch(/WorldDashboardPage$/);
+    expect((settingsPage as { name: string }).name).toMatch(/WorldSettingsPage$/);
   }, 20_000);
 
-  it('serves the World Index at the root and renders the error page for unmatched URLs', () => {
+  it('redirects the root to the World Index and renders the error page for unmatched URLs', () => {
     const root = appRoutes.find((r) => r.path === '');
-    expect(root?.loadComponent).toBeDefined();
-    expect(root?.redirectTo).toBeUndefined();
+    expect(root?.redirectTo).toBe('worlds');
+    expect(root?.loadComponent).toBeUndefined();
+
+    const index = appRoutes.find((r) => r.path === 'worlds');
+    expect(index?.redirectTo).toBeUndefined();
+    expect(index?.loadComponent).toBeDefined();
 
     const wildcard = appRoutes.find((r) => r.path === '**');
     expect(wildcard?.redirectTo).toBeUndefined();

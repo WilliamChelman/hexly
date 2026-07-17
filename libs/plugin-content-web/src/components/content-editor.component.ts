@@ -26,17 +26,17 @@ import { CONTENT_EXTENSIONS } from '../extensions/content-extensions';
 import { entityLinkNode } from '../extensions/entity-link-node';
 import { calloutNode } from '../extensions/callout-node';
 import { createCalloutNodeView, focusCalloutTypeAtTop } from './callout-view.component';
-import { SlashMenu } from './slash-menu.component';
+import { SlashMenuComponent } from './slash-menu.component';
 import { slashCommands } from '../extensions/slash-commands';
 import { SLASH_ITEMS } from '../models/slash-menu-items';
-import { EntityPicker } from './entity-picker.component';
+import { EntityPickerComponent } from './entity-picker.component';
 import { entityMention } from '../extensions/entity-mention';
-import { DescriptorPicker } from './descriptor-picker.component';
+import { DescriptorPickerComponent } from './descriptor-picker.component';
 import { descriptorSuggestion } from '../extensions/descriptor-suggestion';
-import { LinkTextPicker } from './link-text-picker.component';
+import { LinkTextPickerComponent } from './link-text-picker.component';
 import { linkTextSuggestion } from '../extensions/link-text-suggestion';
 import { createEntityLinkNodeView } from './entity-link-view.component';
-import { FormattingMenu } from './formatting-menu.component';
+import { FormattingMenuComponent } from './formatting-menu.component';
 import { BubbleMenuDirective } from '../directives/bubble-menu.directive';
 
 /** Debounce before folding the doc into the Entity Document: well under the autosave window, so a `mutate` (a
@@ -53,11 +53,11 @@ const COMMIT_DEBOUNCE_MS = 250;
   selector: 'app-content-editor',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    SlashMenu,
-    EntityPicker,
-    DescriptorPicker,
-    LinkTextPicker,
-    FormattingMenu,
+    SlashMenuComponent,
+    EntityPickerComponent,
+    DescriptorPickerComponent,
+    LinkTextPickerComponent,
+    FormattingMenuComponent,
     BubbleMenuDirective,
     TiptapDirective,
   ],
@@ -246,7 +246,7 @@ const COMMIT_DEBOUNCE_MS = 250;
     }
   `,
 })
-export class ContentEditor {
+export class ContentEditorComponent {
   private readonly session = inject(ENTITY_SESSION);
   /**
    * The EntityDocument key of the prose Field this editor renders (ADR-0051): {@link VIEW_FIELD_KEY} when
@@ -274,15 +274,15 @@ export class ContentEditor {
   /** The editor's accessible name, localized by the caller (ADR-0014). */
   readonly ariaLabel = input.required<string>();
 
-  private readonly slashMenu = viewChild(SlashMenu);
-  private readonly entityPicker = viewChild(EntityPicker);
-  private readonly descriptorPicker = viewChild(DescriptorPicker);
+  private readonly slashMenu = viewChild(SlashMenuComponent);
+  private readonly entityPicker = viewChild(EntityPickerComponent);
+  private readonly descriptorPicker = viewChild(DescriptorPickerComponent);
   // Two instances of the one free-text picker, keyed by template ref (ADR-0033).
   private readonly displayPicker = viewChild('displayPicker', {
-    read: LinkTextPicker,
+    read: LinkTextPickerComponent,
   });
   private readonly headingPicker = viewChild('headingPicker', {
-    read: LinkTextPicker,
+    read: LinkTextPickerComponent,
   });
 
   // Recreated on every seed rather than reset: a fresh Editor gets empty undo

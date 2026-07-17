@@ -8,7 +8,7 @@ import { of } from 'rxjs';
 import { EntitySession } from '../services/entity-session';
 import { ENTITY_SESSION } from '@hexly/web-entity';
 import { EntitiesClient } from '@hexly/web-core';
-import { EntityTags } from './entity-tags.component';
+import { EntityTagsComponent } from './entity-tags.component';
 
 describe('EntityTags', () => {
   const noteWith = (tags: string[]): EntityDetail => ({
@@ -33,7 +33,7 @@ describe('EntityTags', () => {
   beforeEach(async () => {
     vocab = ['deity', 'demigod', 'ruined'];
     await TestBed.configureTestingModule({
-      imports: [EntityTags, provideTranslocoTesting()],
+      imports: [EntityTagsComponent, provideTranslocoTesting()],
       providers: [
         EntitySession,
         { provide: ENTITY_SESSION, useExisting: EntitySession },
@@ -48,7 +48,7 @@ describe('EntityTags', () => {
 
   function render(tags: string[]) {
     session.adopt(noteWith(tags));
-    const fixture = TestBed.createComponent(EntityTags);
+    const fixture = TestBed.createComponent(EntityTagsComponent);
     fixture.detectChanges();
     return fixture;
   }
@@ -56,7 +56,7 @@ describe('EntityTags', () => {
   it('hides the add input and remove buttons for a read-only opener (no edit Right)', () => {
     // A Viewer grant / Public Link reader (ADR-0039) sees the tags but can't edit them.
     session.adopt({ ...noteWith(['deity']), rights: ['read'] });
-    const fixture = TestBed.createComponent(EntityTags);
+    const fixture = TestBed.createComponent(EntityTagsComponent);
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
 

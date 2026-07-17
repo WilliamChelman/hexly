@@ -2,7 +2,7 @@ import { Extension } from '@tiptap/core';
 import { PluginKey } from '@tiptap/pm/state';
 import Suggestion, { SuggestionKeyDownProps, SuggestionProps } from '@tiptap/suggestion';
 import { EntitySummary } from '@hexly/domain';
-import { EntityPicker } from '../components/entity-picker.component';
+import { EntityPickerComponent } from '../components/entity-picker.component';
 
 /**
  * The `@` trigger for inserting a Content Entity Link (ADR-0023). A non-schema extension
@@ -16,7 +16,7 @@ import { EntityPicker } from '../components/entity-picker.component';
  * `onExit` then removes the stray `@` if the user escaped instead of picking.
  */
 export function entityMention(
-  getPicker: () => EntityPicker | undefined,
+  getPicker: () => EntityPickerComponent | undefined,
   search: (query: string) => Promise<EntitySummary[]>,
 ): { extension: Extension; setProgrammatic: () => void } {
   let programmatic = false;

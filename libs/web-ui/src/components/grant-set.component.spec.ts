@@ -4,7 +4,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { EntityGrant } from '@hexly/domain';
 import { EntitiesClient, UserDirectoryClient, ToasterService } from '@hexly/web-core';
 import { MockEntitiesClient, MockUserDirectoryClient, provideTranslocoTesting } from '@hexly/web-core/testing';
-import { GrantSet } from './grant-set.component';
+import { GrantSetComponent } from './grant-set.component';
 import { WEB_UI_TEST_CATALOGS } from '../i18n/test-catalogs';
 
 describe('GrantSet', () => {
@@ -16,7 +16,7 @@ describe('GrantSet', () => {
     entities = new MockEntitiesClient();
     users = new MockUserDirectoryClient();
     await TestBed.configureTestingModule({
-      imports: [GrantSet, provideTranslocoTesting(WEB_UI_TEST_CATALOGS)],
+      imports: [GrantSetComponent, provideTranslocoTesting(WEB_UI_TEST_CATALOGS)],
       providers: [
         { provide: EntitiesClient, useValue: entities },
         { provide: UserDirectoryClient, useValue: users },
@@ -35,7 +35,7 @@ describe('GrantSet', () => {
   function render(id: string, grants: EntityGrant[], owners: string[] = ['u1']) {
     entities.grants.mockReturnValue(of(grants));
     entities.owners.mockReturnValue(of(owners));
-    const fixture = TestBed.createComponent(GrantSet);
+    const fixture = TestBed.createComponent(GrantSetComponent);
     fixture.componentRef.setInput('id', id);
     fixture.detectChanges();
     return fixture;
@@ -124,7 +124,7 @@ describe('GrantSet', () => {
     const show = vi.spyOn(toaster, 'show');
     entities.grants.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
     entities.owners.mockReturnValue(of([]));
-    const fixture = TestBed.createComponent(GrantSet);
+    const fixture = TestBed.createComponent(GrantSetComponent);
     fixture.componentRef.setInput('id', 'e1');
     fixture.detectChanges();
 

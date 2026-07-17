@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Region } from '@hexly/plugin-hexmap';
-import { Field, Input } from '@hexly/web-ui';
+import { FieldComponent, InputComponent } from '@hexly/web-ui';
 import { inputValue } from '../utils/input-value';
 import { HexMapStore } from '../services/hexmap-store';
 
@@ -10,7 +10,7 @@ import { HexMapStore } from '../services/hexmap-store';
   selector: 'app-region-fields',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'contents' },
-  imports: [Field, Input, TranslocoPipe],
+  imports: [FieldComponent, InputComponent, TranslocoPipe],
   template: `
     @let r = region();
     <div appField [label]="'map.inspector.name' | transloco">
@@ -22,7 +22,7 @@ import { HexMapStore } from '../services/hexmap-store';
     </div>
   `,
 })
-export class RegionFields {
+export class RegionFieldsComponent {
   private readonly store = inject(HexMapStore);
 
   readonly region = input.required<Region>();

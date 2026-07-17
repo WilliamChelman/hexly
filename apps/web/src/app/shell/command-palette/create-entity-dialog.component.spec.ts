@@ -7,7 +7,7 @@ import { emptyContent } from '@hexly/plugin-content';
 import { ActiveWorld, EntitiesClient, WorldStore } from '@hexly/web-core';
 import { MockEntitiesClient } from '@hexly/web-core/testing';
 import { CreateEntityDialogState } from './create-entity-dialog.state';
-import { CreateEntityDialog } from './create-entity-dialog.component';
+import { CreateEntityDialogComponent } from './create-entity-dialog.component';
 import { TypeRegistry } from '../../entity-types/type-registry';
 import { TypeDefinition } from '@hexly/web-entity';
 import { CORE_VIEW_CONTENT, providePluginContent } from '@hexly/plugin-content/web';
@@ -57,7 +57,7 @@ describe('CreateEntityDialog', () => {
   function render(worlds: WorldSummary[], activeWorldId: string | null) {
     entitiesClient = new MockEntitiesClient();
     TestBed.configureTestingModule({
-      imports: [CreateEntityDialog, provideTranslocoTesting()],
+      imports: [CreateEntityDialogComponent, provideTranslocoTesting()],
       providers: [
         providePluginContent(),
         providePluginHexmap(),
@@ -69,7 +69,7 @@ describe('CreateEntityDialog', () => {
     navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     TestBed.inject(ActiveWorld).set(activeWorldId);
     state = TestBed.inject(CreateEntityDialogState);
-    const fixture = TestBed.createComponent(CreateEntityDialog);
+    const fixture = TestBed.createComponent(CreateEntityDialogComponent);
     fixture.detectChanges();
     return fixture;
   }

@@ -14,13 +14,13 @@ import {
 } from '@hexly/web-core';
 import { ImportSummary } from '@hexly/domain';
 import {
-  Button,
-  Eyebrow,
-  Panel,
-  Icon,
-  Autofocus,
-  Input,
-  Dialog,
+  ButtonComponent,
+  EyebrowComponent,
+  PanelComponent,
+  IconComponent,
+  AutofocusDirective,
+  InputComponent,
+  DialogComponent,
   ACCENT_SIGIL,
   accentFor,
   monogram,
@@ -33,7 +33,18 @@ import {
 @Component({
   selector: 'app-worlds',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Eyebrow, Panel, Icon, TranslocoPipe, Autofocus, Input, Dialog, RouterLink, NgTemplateOutlet],
+  imports: [
+    ButtonComponent,
+    EyebrowComponent,
+    PanelComponent,
+    IconComponent,
+    TranslocoPipe,
+    AutofocusDirective,
+    InputComponent,
+    DialogComponent,
+    RouterLink,
+    NgTemplateOutlet,
+  ],
   host: { class: 'block min-h-full bg-surface-sunken' },
   template: `
     <!-- One hidden picker, shared by every Import affordance. -->

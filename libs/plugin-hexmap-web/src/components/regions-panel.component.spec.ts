@@ -4,18 +4,18 @@ import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { HEXMAP_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { provideHexMapStoreTesting } from '../testing/entity-session.fake';
 import { HexMapStore } from '../services/hexmap-store';
-import { RegionsPanel } from './regions-panel.component';
+import { RegionsPanelComponent } from './regions-panel.component';
 
 describe('RegionsPanel', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [RegionsPanel, provideTranslocoTesting(HEXMAP_TEST_CATALOGS)],
+      imports: [RegionsPanelComponent, provideTranslocoTesting(HEXMAP_TEST_CATALOGS)],
       providers: provideHexMapStoreTesting(),
     }).compileComponents();
   });
 
   function render() {
-    const fixture = TestBed.createComponent(RegionsPanel);
+    const fixture = TestBed.createComponent(RegionsPanelComponent);
     fixture.detectChanges();
     return fixture;
   }

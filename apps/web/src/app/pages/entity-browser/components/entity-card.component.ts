@@ -3,7 +3,16 @@ import { RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntityType, EntityVerb } from '@hexly/domain';
 import { HexlyDatePipe } from '@hexly/web-core';
-import { Autofocus, Button, Panel, Icon, IconName, ACCENT_BAR, ACCENT_SIGIL, accentFor } from '@hexly/web-ui';
+import {
+  AutofocusDirective,
+  ButtonComponent,
+  PanelComponent,
+  IconComponent,
+  IconName,
+  ACCENT_BAR,
+  ACCENT_SIGIL,
+  accentFor,
+} from '@hexly/web-ui';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 
 /** A row of the Entity browser grid — the parent owns list/order, the card owns
@@ -28,7 +37,15 @@ export interface EntityCardVm {
 @Component({
   selector: 'app-entity-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Panel, Icon, Autofocus, TranslocoPipe, RouterLink, HexlyDatePipe],
+  imports: [
+    ButtonComponent,
+    PanelComponent,
+    IconComponent,
+    AutofocusDirective,
+    TranslocoPipe,
+    RouterLink,
+    HexlyDatePipe,
+  ],
   host: { class: 'contents' },
   template: `
     <section
@@ -128,7 +145,7 @@ export interface EntityCardVm {
     </section>
   `,
 })
-export class EntityCard {
+export class EntityCardComponent {
   readonly card = input.required<EntityCardVm>();
   /** The active World, so the tile links to `/w/:worldId/entities/:id`. */
   readonly worldId = input.required<string | null>();

@@ -21,11 +21,11 @@ import {
   writeField,
 } from '@hexly/domain';
 import { ActiveWorld, EntitiesClient, WorldStore, entityRoute } from '@hexly/web-core';
-import { Button, Field, Input, Dialog } from '@hexly/web-ui';
+import { ButtonComponent, FieldComponent, InputComponent, DialogComponent } from '@hexly/web-ui';
 import { CreateEntityDialogState } from './create-entity-dialog.state';
 import { TypeRegistry } from '../../entity-types/type-registry';
-import { EntityTypesEditor } from '../../pages/entity/components/entity-types-editor.component';
-import { FieldControl } from '@hexly/web-entity';
+import { EntityTypesEditorComponent } from '../../pages/entity/components/entity-types-editor.component';
+import { FieldControlComponent } from '@hexly/web-entity';
 
 /**
  * The create-Entity flow behind the `>`-prefix Create Note / Create Map Commands (ADR-0032): name +
@@ -33,13 +33,21 @@ import { FieldControl } from '@hexly/web-entity';
  * {@link CommandPalette} and driven by {@link CreateEntityDialogState}, so a Command's `run()` can
  * open it without a reference to this component.
  *
- * The Command seeds one primary type; the embedded {@link EntityTypesEditor} lets the author pick
+ * The Command seeds one primary type; the embedded {@link EntityTypesEditorComponent} lets the author pick
  * more (ADR-0048), and required Fields are collected below, gating Create until they validate.
  */
 @Component({
   selector: 'app-create-entity-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Dialog, Field, Input, TranslocoPipe, EntityTypesEditor, FieldControl],
+  imports: [
+    ButtonComponent,
+    DialogComponent,
+    FieldComponent,
+    InputComponent,
+    TranslocoPipe,
+    EntityTypesEditorComponent,
+    FieldControlComponent,
+  ],
   template: `
     @if (dialogState.types(); as seeded) {
       <app-dialog [open]="true" [heading]="createLabel(types())" (closed)="cancel()">
@@ -123,7 +131,7 @@ import { FieldControl } from '@hexly/web-entity';
     }
   `,
 })
-export class CreateEntityDialog {
+export class CreateEntityDialogComponent {
   protected readonly dialogState = inject(CreateEntityDialogState);
   private readonly typeRegistry = inject(TypeRegistry);
   private readonly entitiesClient = inject(EntitiesClient);

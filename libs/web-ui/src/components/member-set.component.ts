@@ -3,8 +3,8 @@ import { Observable } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { MemberRole, UserSummary, WorldMember } from '@hexly/domain';
 import { WorldsClient, UserDirectoryClient, ToasterService } from '@hexly/web-core';
-import { Button } from './button.component';
-import { Select } from './select.component';
+import { ButtonComponent } from './button.component';
+import { SelectComponent } from './select.component';
 
 /**
  * A World's non-owner membership set (ADR-0037): a World Owner adds an Instance user as a
@@ -19,7 +19,7 @@ import { Select } from './select.component';
 @Component({
   selector: 'app-member-set',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, Button, Select],
+  imports: [TranslocoPipe, ButtonComponent, SelectComponent],
   template: `
     <ul class="member-list">
       @for (m of rows(); track m.userId) {
@@ -109,7 +109,7 @@ import { Select } from './select.component';
     }
   `,
 })
-export class MemberSet implements OnInit {
+export class MemberSetComponent implements OnInit {
   readonly id = input.required<string>();
 
   private readonly worlds = inject(WorldsClient);

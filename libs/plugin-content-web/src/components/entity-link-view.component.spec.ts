@@ -5,7 +5,7 @@ import { EntitySummary } from '@hexly/domain';
 import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { CONTENT_EDITOR_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { EntityNameResolver, EntityResolution } from '../services/entity-name-resolver';
-import { EntityLinkView } from './entity-link-view.component';
+import { EntityLinkViewComponent } from './entity-link-view.component';
 
 /** A resolver stub that reports a fixed live name for every id (no HTTP). */
 class StubResolver {
@@ -22,8 +22,8 @@ const found = (name: string): EntityResolution => ({
 
 describe('EntityLinkView', () => {
   function mount(inputs: { entityId: string; label: string; display?: string | null; heading?: string | null }) {
-    const fixture = TestBed.createComponent(EntityLinkView);
-    const ref = fixture.componentRef as ComponentRef<EntityLinkView>;
+    const fixture = TestBed.createComponent(EntityLinkViewComponent);
+    const ref = fixture.componentRef as ComponentRef<EntityLinkViewComponent>;
     ref.setInput('entityId', inputs.entityId);
     ref.setInput('label', inputs.label);
     if ('display' in inputs) ref.setInput('display', inputs.display ?? null);
@@ -34,7 +34,7 @@ describe('EntityLinkView', () => {
 
   function configure(resolution: EntityResolution) {
     TestBed.configureTestingModule({
-      imports: [EntityLinkView, provideTranslocoTesting(CONTENT_EDITOR_TEST_CATALOGS)],
+      imports: [EntityLinkViewComponent, provideTranslocoTesting(CONTENT_EDITOR_TEST_CATALOGS)],
       providers: [{ provide: EntityNameResolver, useValue: new StubResolver(resolution) }, provideRouter([])],
     });
   }

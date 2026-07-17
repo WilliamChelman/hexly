@@ -2,9 +2,17 @@ import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/cor
 import { Router } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ActiveWorld } from '@hexly/web-core';
-import { Eyebrow, Panel, Icon, IconName, OwnerSet, MemberSet, PublicLinkControl } from '@hexly/web-ui';
-import { WorldTypesPanel } from './components/world-types-panel.component';
-import { WorldFieldsPanel } from './components/world-fields-panel.component';
+import {
+  EyebrowComponent,
+  PanelComponent,
+  IconComponent,
+  IconName,
+  OwnerSetComponent,
+  MemberSetComponent,
+  PublicLinkComponent,
+} from '@hexly/web-ui';
+import { WorldTypesPanelComponent } from './components/world-types-panel.component';
+import { WorldFieldsPanelComponent } from './components/world-fields-panel.component';
 
 type Section = 'access' | 'schema' | 'sharing';
 
@@ -20,14 +28,14 @@ type Section = 'access' | 'schema' | 'sharing';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     TranslocoPipe,
-    Eyebrow,
-    Panel,
-    Icon,
-    OwnerSet,
-    MemberSet,
-    PublicLinkControl,
-    WorldTypesPanel,
-    WorldFieldsPanel,
+    EyebrowComponent,
+    PanelComponent,
+    IconComponent,
+    OwnerSetComponent,
+    MemberSetComponent,
+    PublicLinkComponent,
+    WorldTypesPanelComponent,
+    WorldFieldsPanelComponent,
   ],
   template: `
     @if (worldId(); as id) {
@@ -123,7 +131,7 @@ type Section = 'access' | 'schema' | 'sharing';
     }
   `,
 })
-export class WorldSettings {
+export class WorldSettingsPage {
   private readonly router = inject(Router);
   readonly worldId = inject(ActiveWorld).worldId;
   readonly active = signal<Section>('access');

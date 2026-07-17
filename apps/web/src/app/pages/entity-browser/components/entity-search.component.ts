@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { Icon } from '@hexly/web-ui';
+import { IconComponent } from '@hexly/web-ui';
 
 /**
  * The Entity browser's full-text search box (#154). Controlled: the parent owns
@@ -10,7 +10,7 @@ import { Icon } from '@hexly/web-ui';
 @Component({
   selector: 'app-entity-search',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, TranslocoPipe],
+  imports: [IconComponent, TranslocoPipe],
   host: { class: 'relative block mb-8' },
   template: `
     <app-icon
@@ -29,7 +29,7 @@ import { Icon } from '@hexly/web-ui';
     />
   `,
 })
-export class EntitySearch {
+export class EntitySearchComponent {
   /** The active query to display (the parent's debounced, URL-mirrored source of truth). */
   readonly value = input('');
   /** Every raw keystroke, undebounced — the parent debounces and commits it. */

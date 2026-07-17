@@ -7,7 +7,7 @@ import { EntityPage, EntitySummary } from '@hexly/domain';
 import { EntitiesClient, ActiveWorld, ToasterService, LocaleService } from '@hexly/web-core';
 import { MockEntitiesClient } from '@hexly/web-core/testing';
 import { providePluginContent } from '@hexly/plugin-content/web';
-import { EntityBrowser } from './entity-browser.page';
+import { EntityBrowserPage } from './entity-browser.page';
 
 describe('EntityBrowser', () => {
   let client: MockEntitiesClient;
@@ -40,7 +40,7 @@ describe('EntityBrowser', () => {
     client = new MockEntitiesClient();
     queryParams$ = new BehaviorSubject<ParamMap>(convertToParamMap({}));
     await TestBed.configureTestingModule({
-      imports: [EntityBrowser, provideTranslocoTesting()],
+      imports: [EntityBrowserPage, provideTranslocoTesting()],
       providers: [
         providePluginContent(),
         { provide: EntitiesClient, useValue: client },
@@ -63,7 +63,7 @@ describe('EntityBrowser', () => {
   /** Create the library and resolve its first page; `nextCursor` defaults to null (single page). */
   function renderWith(items: EntitySummary[], nextCursor: string | null = null) {
     client.list.mockReturnValueOnce(of({ items, nextCursor }));
-    const fixture = TestBed.createComponent(EntityBrowser);
+    const fixture = TestBed.createComponent(EntityBrowserPage);
     fixture.detectChanges(); // active-World effect -> list()
     fixture.detectChanges();
     return fixture;
@@ -109,7 +109,7 @@ describe('EntityBrowser', () => {
 
   it('scopes the entity list to the World in the URL (ADR-0028)', () => {
     client.list.mockReturnValueOnce(of({ items: [], nextCursor: null }));
-    const fixture = TestBed.createComponent(EntityBrowser);
+    const fixture = TestBed.createComponent(EntityBrowserPage);
     fixture.detectChanges();
 
     expect(client.list).toHaveBeenCalledWith({
@@ -215,7 +215,7 @@ describe('EntityBrowser', () => {
         nextCursor: null,
       }),
     );
-    const fixture = TestBed.createComponent(EntityBrowser);
+    const fixture = TestBed.createComponent(EntityBrowserPage);
     fixture.detectChanges();
     fixture.detectChanges();
 
@@ -579,7 +579,7 @@ describe('EntityBrowser', () => {
 
   it('renders the load-error state in French when French is the active language', () => {
     client.list.mockReturnValueOnce(throwError(() => new Error('boom')));
-    const fixture = TestBed.createComponent(EntityBrowser);
+    const fixture = TestBed.createComponent(EntityBrowserPage);
     fixture.detectChanges(); // active-World effect -> list()
     TestBed.inject(TranslocoService).setActiveLang('fr');
     fixture.detectChanges();
@@ -591,7 +591,7 @@ describe('EntityBrowser', () => {
 
   it('shows an error state when the entity list fails to load', () => {
     client.list.mockReturnValueOnce(throwError(() => new Error('boom')));
-    const fixture = TestBed.createComponent(EntityBrowser);
+    const fixture = TestBed.createComponent(EntityBrowserPage);
     fixture.detectChanges(); // active-World effect -> list()
     fixture.detectChanges();
 
@@ -886,7 +886,7 @@ describe('EntityBrowser', () => {
     it('seeds active Facets from the URL and carries them into the first fetch', () => {
       queryParams$.next(convertToParamMap({ type: 'core.note', tag: ['deity', 'ruined'] }));
       client.list.mockReturnValueOnce(of({ items: [], nextCursor: null }));
-      const fixture = TestBed.createComponent(EntityBrowser);
+      const fixture = TestBed.createComponent(EntityBrowserPage);
       fixture.detectChanges();
       fixture.detectChanges();
 
@@ -1021,7 +1021,7 @@ describe('EntityBrowser', () => {
           }),
         );
         client.list.mockReturnValueOnce(of({ items: [], nextCursor: null }));
-        const fixture = TestBed.createComponent(EntityBrowser);
+        const fixture = TestBed.createComponent(EntityBrowserPage);
         fixture.detectChanges();
         fixture.detectChanges();
 

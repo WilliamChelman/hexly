@@ -4,7 +4,7 @@ import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { Command, CommandProvider } from './command';
 import { CommandRegistry } from './command-registry';
-import { COMMAND_PROVIDERS, CommandPalette } from './command-palette.component';
+import { COMMAND_PROVIDERS, CommandPaletteComponent } from './command-palette.component';
 
 function dispatchCmdK(): void {
   window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }));
@@ -18,7 +18,7 @@ function typeQuery(fixture: ReturnType<typeof render>, value: string): void {
 }
 
 function render() {
-  const fixture = TestBed.createComponent(CommandPalette);
+  const fixture = TestBed.createComponent(CommandPaletteComponent);
   fixture.detectChanges();
   return fixture;
 }
@@ -30,7 +30,7 @@ function dialogEl(fixture: ReturnType<typeof render>): HTMLDialogElement {
 describe('CommandPalette', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [CommandPalette, provideTranslocoTesting()],
+      imports: [CommandPaletteComponent, provideTranslocoTesting()],
     });
   });
 

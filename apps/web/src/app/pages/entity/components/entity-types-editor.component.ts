@@ -1,21 +1,21 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { Field, EntityDocument, NO_STRUCTURED_DATA_TYPES, validateFields, writeField } from '@hexly/domain';
-import { Button, Chip } from '@hexly/web-ui';
+import { ButtonComponent, ChipComponent } from '@hexly/web-ui';
 import { TypeRegistry } from '../../../entity-types/type-registry';
-import { FieldControl } from '@hexly/web-entity';
+import { FieldControlComponent } from '@hexly/web-entity';
 
 /**
  * Pick, add, remove, and reorder an Entity's ordered Entity Type set, `types[0]` primary (ADR-0048).
  * Presentational: reads `types`/`metadata`, emits the authored set. Adding a type with unmet required
- * Fields opens an inline prompt ({@link FieldControl} + {@link validateFields}) and holds the type
+ * Fields opens an inline prompt ({@link FieldControlComponent} + {@link validateFields}) and holds the type
  * back until they are supplied; removing only drops the lens, leaving its EntityDocument behind
  * (CONTEXT.md → Field).
  */
 @Component({
   selector: 'app-entity-types-editor',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, Chip, Button, FieldControl],
+  imports: [TranslocoPipe, ChipComponent, ButtonComponent, FieldControlComponent],
   template: `
     <div class="flex flex-col gap-3" data-testid="entity-types-editor">
       <div class="flex flex-wrap items-center gap-2">
@@ -126,7 +126,7 @@ import { FieldControl } from '@hexly/web-entity';
     </div>
   `,
 })
-export class EntityTypesEditor {
+export class EntityTypesEditorComponent {
   private readonly registry = inject(TypeRegistry);
   private readonly transloco = inject(TranslocoService);
 

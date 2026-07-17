@@ -4,7 +4,7 @@ import { provideTranslocoTesting } from '@hexly/web-core/testing';
 import { HEXMAP_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { provideHexMapStoreTesting } from '../testing/entity-session.fake';
 import { HexMapStore } from '../services/hexmap-store';
-import { MapCanvas } from './map-canvas.component';
+import { MapCanvasComponent } from './map-canvas.component';
 
 /**
  * The keyboard contract of the map surface: letters arm top-level Tools, `1`–`9` pick the armed
@@ -17,10 +17,10 @@ describe('MapCanvas keyboard', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [MapCanvas, provideTranslocoTesting(HEXMAP_TEST_CATALOGS)],
+      imports: [MapCanvasComponent, provideTranslocoTesting(HEXMAP_TEST_CATALOGS)],
       providers: provideHexMapStoreTesting(),
     }).compileComponents();
-    const fixture = TestBed.createComponent(MapCanvas);
+    const fixture = TestBed.createComponent(MapCanvasComponent);
     fixture.detectChanges();
     store = TestBed.inject(HexMapStore);
   });
@@ -166,13 +166,13 @@ describe('MapCanvas keyboard', () => {
 describe('MapCanvas localization', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [MapCanvas, provideTranslocoTesting(HEXMAP_TEST_CATALOGS)],
+      imports: [MapCanvasComponent, provideTranslocoTesting(HEXMAP_TEST_CATALOGS)],
       providers: provideHexMapStoreTesting(),
     }).compileComponents();
   });
 
   it('renders the readout and chrome in French when French is the active language', () => {
-    const fixture = TestBed.createComponent(MapCanvas);
+    const fixture = TestBed.createComponent(MapCanvasComponent);
     fixture.detectChanges();
     TestBed.inject(TranslocoService).setActiveLang('fr');
     fixture.detectChanges();

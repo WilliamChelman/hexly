@@ -1,4 +1,4 @@
-import { provideTranslocoTesting } from '../../../testing/transloco-testing';
+import { provideTranslocoTesting } from '../../../../../testing/transloco-testing';
 import { signal, WritableSignal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
@@ -16,7 +16,7 @@ import { EntitiesClient, WorldsClient, ActiveWorld } from '@hexly/web-core';
 import { MockEntitiesClient, MockWorldsClient } from '@hexly/web-core/testing';
 import { providePluginContent } from '@hexly/plugin-content/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
-import { WorldDashboard } from './world-dashboard.page';
+import { WorldDashboardPage } from './world-dashboard.page';
 
 function summary(id: string, name = id, type: EntityType = 'core.note', updatedAt = 1): EntitySummary {
   return {
@@ -56,7 +56,7 @@ describe('WorldDashboard', () => {
   let worlds: MockWorldsClient;
   let world: WritableSignal<WorldDetail | null>;
   let activeWorldSet: ReturnType<typeof vi.fn>;
-  let fixture: ComponentFixture<WorldDashboard>;
+  let fixture: ComponentFixture<WorldDashboardPage>;
 
   beforeEach(async () => {
     entities = new MockEntitiesClient();
@@ -64,7 +64,7 @@ describe('WorldDashboard', () => {
     world = signal<WorldDetail | null>(worldDetail());
     activeWorldSet = vi.fn((w: WorldDetail | null) => world.set(w));
     await TestBed.configureTestingModule({
-      imports: [WorldDashboard, provideTranslocoTesting()],
+      imports: [WorldDashboardPage, provideTranslocoTesting()],
       providers: [
         providePluginContent(),
         providePluginHexmap(),
@@ -111,7 +111,7 @@ describe('WorldDashboard', () => {
       return of(page(o?.type?.includes('core.hexmap') ? (opts.maps ?? []) : (opts.recents ?? [])));
     });
     entities.facets.mockReturnValue(of(opts.facets ?? { type: [], tag: [], visibility: [], fields: [] }));
-    fixture = TestBed.createComponent(WorldDashboard);
+    fixture = TestBed.createComponent(WorldDashboardPage);
     fixture.detectChanges();
     return fixture.nativeElement as HTMLElement;
   }

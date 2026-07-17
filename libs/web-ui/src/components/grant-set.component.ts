@@ -3,8 +3,8 @@ import { Observable } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntityGrant, GrantRole, UserSummary } from '@hexly/domain';
 import { EntitiesClient, UserDirectoryClient, ToasterService } from '@hexly/web-core';
-import { Button } from './button.component';
-import { Select } from './select.component';
+import { ButtonComponent } from './button.component';
+import { SelectComponent } from './select.component';
 
 /**
  * An Entity's named grant set (ADR-0037): the Editor or Viewer grants an Owner hands any
@@ -19,7 +19,7 @@ import { Select } from './select.component';
 @Component({
   selector: 'app-grant-set',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, Button, Select],
+  imports: [TranslocoPipe, ButtonComponent, SelectComponent],
   template: `
     <ul class="grant-list">
       @for (g of rows(); track g.userId) {
@@ -105,7 +105,7 @@ import { Select } from './select.component';
     }
   `,
 })
-export class GrantSet implements OnInit {
+export class GrantSetComponent implements OnInit {
   readonly id = input.required<string>();
 
   private readonly entities = inject(EntitiesClient);

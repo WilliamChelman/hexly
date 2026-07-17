@@ -15,7 +15,7 @@ import { RouterLink } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntitySummary, EntityType } from '@hexly/domain';
 import { EntitiesClient, ActiveWorld } from '@hexly/web-core';
-import { Button, Field, Icon, EntitySearchPicker } from '@hexly/web-ui';
+import { ButtonComponent, FieldComponent, IconComponent, EntitySearchPickerComponent } from '@hexly/web-ui';
 import { ENTITY_TYPES } from '../models/entity-types';
 
 /**
@@ -34,7 +34,7 @@ import { ENTITY_TYPES } from '../models/entity-types';
 @Component({
   selector: 'app-entity-link-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Button, Field, Icon, EntitySearchPicker, RouterLink, TranslocoPipe],
+  imports: [ButtonComponent, FieldComponent, IconComponent, EntitySearchPickerComponent, RouterLink, TranslocoPipe],
   template: `
     <div appField [label]="'fields.entityLink.linkedEntity' | transloco">
       @let id = entityId();
@@ -118,7 +118,7 @@ import { ENTITY_TYPES } from '../models/entity-types';
     </div>
   `,
 })
-export class EntityLinkPicker {
+export class EntityLinkPickerComponent {
   /** The linked Entity's id, as the host holds it — `null` when the slot carries no link. */
   readonly entityId = input<string | null>(null);
   /**

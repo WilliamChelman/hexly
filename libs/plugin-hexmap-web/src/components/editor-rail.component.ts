@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { IconButton, Icon, IconName } from '@hexly/web-ui';
+import { IconButtonComponent, IconComponent, IconName } from '@hexly/web-ui';
 import { HexMapStore } from '../services/hexmap-store';
 
 /** The right panel's identity a rail entry can open (mirrors {@link HexMapStore.rightPanel}). */
@@ -29,7 +29,7 @@ interface RailEntry {
     class:
       'flex flex-col items-center gap-2 p-2 bg-linear-[180deg] from-surface to-bg-deep border border-line rounded-lg shadow-2',
   },
-  imports: [IconButton, Icon, TranslocoPipe],
+  imports: [IconButtonComponent, IconComponent, TranslocoPipe],
   template: `
     @for (entry of entries; track entry.id) {
       <button
@@ -46,7 +46,7 @@ interface RailEntry {
     }
   `,
 })
-export class EditorRail {
+export class EditorRailComponent {
   protected readonly store = inject(HexMapStore);
 
   /** Rail entries, rendered top-to-bottom. */

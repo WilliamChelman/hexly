@@ -2,20 +2,20 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, OnInit, si
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { AvailableType } from '@hexly/domain';
 import { ToasterService, WorldsClient } from '@hexly/web-core';
-import { Button, Dialog } from '@hexly/web-ui';
+import { ButtonComponent, DialogComponent } from '@hexly/web-ui';
 import { WorldTypesLoader } from '../../../../../entity-types/world-types-loader';
-import { WorldTypeForm } from './world-type-form.component';
+import { WorldTypeFormComponent } from './world-type-form.component';
 
 /**
  * The World-Owner surface for authoring user-defined types (ADR-0048, ADR-0054): it lists a World's
- * types and hosts the {@link WorldTypeForm} in a dialog to create/edit one. The form persists; this
+ * types and hosts the {@link WorldTypeFormComponent} in a dialog to create/edit one. The form persists; this
  * panel owns the list and re-projects on success via {@link WorldTypesLoader}. Deletes are Owner-gated
  * server-side; a refusal toasts and leaves the list untouched.
  */
 @Component({
   selector: 'app-world-types',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, Button, Dialog, WorldTypeForm],
+  imports: [TranslocoPipe, ButtonComponent, DialogComponent, WorldTypeFormComponent],
   template: `
     <ul class="type-list">
       @for (t of types(); track t.id) {
@@ -75,7 +75,7 @@ import { WorldTypeForm } from './world-type-form.component';
     }
   `,
 })
-export class WorldTypesPanel implements OnInit {
+export class WorldTypesPanelComponent implements OnInit {
   readonly id = input.required<string>();
 
   private readonly worlds = inject(WorldsClient);

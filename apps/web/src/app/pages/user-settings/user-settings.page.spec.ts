@@ -4,7 +4,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
 import { MockAuthClient } from '@hexly/web-core/testing';
 import { LocaleService, ThemeService, AuthClient } from '@hexly/web-core';
-import { UserSettings } from './user-settings.page';
+import { UserSettingsPage } from './user-settings.page';
 
 describe('Settings page (ADR-0038)', () => {
   let auth: MockAuthClient;
@@ -23,7 +23,7 @@ describe('Settings page (ADR-0038)', () => {
       imports: [provideTranslocoTesting()],
       providers: [{ provide: AuthClient, useValue: auth }],
     });
-    const fixture = TestBed.createComponent(UserSettings);
+    const fixture = TestBed.createComponent(UserSettingsPage);
     fixture.detectChanges();
     return fixture;
   }

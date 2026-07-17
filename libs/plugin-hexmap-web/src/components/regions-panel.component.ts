@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { Region } from '@hexly/plugin-hexmap';
-import { Button, Eyebrow, Swatch } from '@hexly/web-ui';
+import { ButtonComponent, EyebrowComponent, SwatchComponent } from '@hexly/web-ui';
 import { HexMapStore } from '../services/hexmap-store';
 
 /**
@@ -14,7 +14,7 @@ import { HexMapStore } from '../services/hexmap-store';
   host: {
     class: 'flex flex-col gap-2 p-4 overflow-y-auto bg-surface',
   },
-  imports: [Button, Eyebrow, Swatch, TranslocoPipe],
+  imports: [ButtonComponent, EyebrowComponent, SwatchComponent, TranslocoPipe],
   template: `
     <header class="flex items-center justify-between gap-3">
       <span appEyebrow mark>{{ 'map.regionsPanel.title' | transloco }}</span>
@@ -61,7 +61,7 @@ import { HexMapStore } from '../services/hexmap-store';
     }
   `,
 })
-export class RegionsPanel {
+export class RegionsPanelComponent {
   protected readonly store = inject(HexMapStore);
 
   // Reads the selection set (not single selection view) to stay in sync during multi-selection.

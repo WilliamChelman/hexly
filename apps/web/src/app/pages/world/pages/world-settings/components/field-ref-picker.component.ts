@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import { form, FormField } from '@angular/forms/signals';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { Chip, Input, Select } from '@hexly/web-ui';
+import { ChipComponent, InputComponent, SelectComponent } from '@hexly/web-ui';
 import { activeLangLabel, matchesSearchAndSource } from '../utils/picker-support';
 
 /** One Field the picker offers: its `id`, display `label`, its data-type `typeLabel`, and its `source`. */
@@ -22,7 +22,7 @@ export interface FieldChoice {
 @Component({
   selector: 'app-field-ref-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, Chip, Input, Select, FormField],
+  imports: [TranslocoPipe, ChipComponent, InputComponent, SelectComponent, FormField],
   template: `
     <div class="fp-chips">
       @for (f of selectedFields(); track f.id) {
@@ -131,7 +131,7 @@ export interface FieldChoice {
     }
   `,
 })
-export class FieldRefPicker {
+export class FieldRefPickerComponent {
   private readonly transloco = inject(TranslocoService);
 
   readonly fields = input.required<readonly FieldChoice[]>();

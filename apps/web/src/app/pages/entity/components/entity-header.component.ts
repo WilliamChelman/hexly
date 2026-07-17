@@ -10,13 +10,13 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { Button, ButtonGroup, Eyebrow, PageHeader } from '@hexly/web-ui';
-import { EntityActionsMenu } from './entity-actions-menu.component';
-import { EntityShareDialog } from './entity-share-dialog.component';
-import { EntityTypesDialog } from './entity-types-dialog.component';
-import { EntityFieldsDialog } from './entity-fields-dialog.component';
-import { EntityTags } from './entity-tags.component';
-import { SaveStatus } from './save-status.component';
+import { ButtonComponent, ButtonGroupComponent, EyebrowComponent, PageHeaderComponent } from '@hexly/web-ui';
+import { EntityActionsMenuComponent } from './entity-actions-menu.component';
+import { EntityShareDialogComponent } from './entity-share-dialog.component';
+import { EntityTypesDialogComponent } from './entity-types-dialog.component';
+import { EntityFieldsDialogComponent } from './entity-fields-dialog.component';
+import { EntityTagsComponent } from './entity-tags.component';
+import { SaveStatusComponent } from './save-status.component';
 import { EntitySession } from '../services/entity-session';
 import { TypeRegistry } from '../../../entity-types/type-registry';
 import { TypeLabels, viewInstanceKey } from '@hexly/web-entity';
@@ -25,7 +25,7 @@ import { EntityViewStore } from '../services/entity-view-store';
 
 /**
  * The open Entity's page-owned header (ADR-0022), rendered by {@link EntityPage} for every
- * Entity type: eyebrow tag, editable title, autosave status chip ({@link SaveStatus}), Tags
+ * Entity type: eyebrow tag, editable title, autosave status chip ({@link SaveStatusComponent}), Tags
  * and Share. Driven by {@link EntitySession.current}; the view toggle shows one button per
  * View the Entity's types afford (ADR-0048), only when there is more than one.
  */
@@ -34,17 +34,17 @@ import { EntityViewStore } from '../services/entity-view-store';
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'contents' },
   imports: [
-    Button,
-    ButtonGroup,
-    Eyebrow,
-    PageHeader,
-    EntityActionsMenu,
-    EntityShareDialog,
-    EntityTypesDialog,
-    EntityFieldsDialog,
+    ButtonComponent,
+    ButtonGroupComponent,
+    EyebrowComponent,
+    PageHeaderComponent,
+    EntityActionsMenuComponent,
+    EntityShareDialogComponent,
+    EntityTypesDialogComponent,
+    EntityFieldsDialogComponent,
     TranslocoPipe,
-    EntityTags,
-    SaveStatus,
+    EntityTagsComponent,
+    SaveStatusComponent,
   ],
   template: `
     <app-page-header>
@@ -117,7 +117,7 @@ import { EntityViewStore } from '../services/entity-view-store';
     <app-entity-fields-dialog [open]="fieldsOpen()" (closed)="fieldsOpen.set(false)" />
   `,
 })
-export class EntityHeader {
+export class EntityHeaderComponent {
   private readonly session = inject(EntitySession);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);

@@ -5,7 +5,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { UserAccount } from '@hexly/domain';
 import { UsersClient, AuthClient, ToasterService } from '@hexly/web-core';
 import { MockUsersClient, MockAuthClient } from '@hexly/web-core/testing';
-import { Users } from './users.page';
+import { UsersPage } from './users.page';
 
 describe('Users panel', () => {
   let users: MockUsersClient;
@@ -25,7 +25,7 @@ describe('Users panel', () => {
     users = new MockUsersClient();
     auth = new MockAuthClient();
     await TestBed.configureTestingModule({
-      imports: [Users, provideTranslocoTesting()],
+      imports: [UsersPage, provideTranslocoTesting()],
       providers: [
         { provide: UsersClient, useValue: users },
         { provide: AuthClient, useValue: auth },
@@ -45,7 +45,7 @@ describe('Users panel', () => {
 
   function render(accounts: UserAccount[]) {
     users.list.mockReturnValue(of(accounts));
-    const fixture = TestBed.createComponent(Users);
+    const fixture = TestBed.createComponent(UsersPage);
     fixture.detectChanges();
     return fixture;
   }

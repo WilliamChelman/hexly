@@ -2,11 +2,11 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { TranslocoPipe } from '@jsverse/transloco';
 import { ENTITY_SESSION } from '@hexly/web-entity';
 import { HexMapStore } from '../services/hexmap-store';
-import { MapCanvas } from './map-canvas.component';
-import { ToolPalette } from './tool-palette.component';
-import { Inspector } from './inspector.component';
-import { RegionsPanel } from './regions-panel.component';
-import { EditorRail } from './editor-rail.component';
+import { MapCanvasComponent } from './map-canvas.component';
+import { ToolPaletteComponent } from './tool-palette.component';
+import { InspectorComponent } from './inspector.component';
+import { RegionsPanelComponent } from './regions-panel.component';
+import { EditorRailComponent } from './editor-rail.component';
 
 /**
  * The `core.view.map` renderer (ADR-0048, *Views* amendment): the full-bleed hex
@@ -28,7 +28,14 @@ import { EditorRail } from './editor-rail.component';
   // header, browser, and command palette render, where no pipe of this lib exists to trigger a lazy
   // load.
   providers: [HexMapStore],
-  imports: [MapCanvas, ToolPalette, Inspector, RegionsPanel, EditorRail, TranslocoPipe],
+  imports: [
+    MapCanvasComponent,
+    ToolPaletteComponent,
+    InspectorComponent,
+    RegionsPanelComponent,
+    EditorRailComponent,
+    TranslocoPipe,
+  ],
   template: `
     <!-- Full-bleed canvas; all side chrome floats over it (ADR-0013). -->
     <app-map-canvas class="absolute inset-0" />
@@ -75,7 +82,7 @@ import { EditorRail } from './editor-rail.component';
     }
   `,
 })
-export class MapView {
+export class MapViewComponent {
   /** Drives the Inspector / Regions dock and holds the grid document. */
   protected readonly store = inject(HexMapStore);
   /** The central store; `writable()` gates the editing chrome (ADR-0037/0048). */

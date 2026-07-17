@@ -116,7 +116,7 @@ export type ButtonSize = 'md' | 'sm';
     }
   `,
 })
-export class Button {
+export class ButtonComponent {
   readonly variant = input<ButtonVariant>('default');
   readonly size = input<ButtonSize>('md');
   /** Square, padding-only button sized for a single glyph. */

@@ -10,7 +10,7 @@ import { EntitiesClient } from '@hexly/web-core';
 import { EntitySession } from '../services/entity-session';
 import { HexMapStore } from '@hexly/plugin-hexmap/testing';
 import { ENTITY_SESSION, VIEW_FIELD_KEY } from '@hexly/web-entity';
-import { SaveStatus } from './save-status.component';
+import { SaveStatusComponent } from './save-status.component';
 
 // Autosave feedback chip that replaced the Save button (ADR-0026):
 // one aria-live surface over the session's saving/dirty/error/conflict state.
@@ -18,7 +18,7 @@ describe('SaveStatus', () => {
   let session: EntitySession;
   let editor: HexMapStore;
   let entities: MockEntitiesClient;
-  let fixture: ComponentFixture<SaveStatus>;
+  let fixture: ComponentFixture<SaveStatusComponent>;
 
   const content = emptyContent();
   const bodyOf = (grid: HexMap) => ({ content, grid });
@@ -46,7 +46,7 @@ describe('SaveStatus', () => {
   beforeEach(() => {
     entities = new MockEntitiesClient();
     TestBed.configureTestingModule({
-      imports: [SaveStatus, provideTranslocoTesting()],
+      imports: [SaveStatusComponent, provideTranslocoTesting()],
       providers: [
         EntitySession,
         HexMapStore,
@@ -59,7 +59,7 @@ describe('SaveStatus', () => {
     });
     session = TestBed.inject(EntitySession);
     editor = TestBed.inject(HexMapStore);
-    fixture = TestBed.createComponent(SaveStatus);
+    fixture = TestBed.createComponent(SaveStatusComponent);
   });
 
   function open() {

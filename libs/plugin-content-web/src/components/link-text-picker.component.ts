@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { ListboxController, Listbox, ListboxEmpty, ListboxOption } from '@hexly/web-ui';
+import { ListboxController, ListboxComponent, ListboxEmptyComponent, ListboxOptionComponent } from '@hexly/web-ui';
 import { VocabItem } from '@hexly/plugin-content';
 
 /** Which wikilink attr this picker edits — drives its testid and i18n only. */
@@ -16,7 +16,7 @@ export type LinkTextKind = 'display' | 'heading';
 @Component({
   selector: 'app-link-text-picker',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, Listbox, ListboxOption, ListboxEmpty],
+  imports: [TranslocoPipe, ListboxComponent, ListboxOptionComponent, ListboxEmptyComponent],
   template: `
     @if (visible()) {
       <app-listbox
@@ -47,7 +47,7 @@ export type LinkTextKind = 'display' | 'heading';
     }
   `,
 })
-export class LinkTextPicker extends ListboxController<VocabItem> {
+export class LinkTextPickerComponent extends ListboxController<VocabItem> {
   readonly kind = input.required<LinkTextKind>();
   protected readonly optionIdPrefix = 'link-text-opt-';
 

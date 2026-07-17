@@ -2,7 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { TranslocoService } from '@jsverse/transloco';
 import { EntityFacets } from '@hexly/domain';
 import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
-import { FacetRail } from './facet-rail.component';
+import { FacetRailComponent } from './facet-rail.component';
 
 /**
  * A harvested facet dimension carries a `labelKey` the rail translates in the active Locale (#235,
@@ -43,15 +43,15 @@ describe('FacetRail — harvested dimension labels (#235)', () => {
     };
   }
 
-  function render(): ComponentFixture<FacetRail> {
-    TestBed.configureTestingModule({ imports: [FacetRail, provideTranslocoTesting(CATALOGS)] });
-    const fixture = TestBed.createComponent(FacetRail);
+  function render(): ComponentFixture<FacetRailComponent> {
+    TestBed.configureTestingModule({ imports: [FacetRailComponent, provideTranslocoTesting(CATALOGS)] });
+    const fixture = TestBed.createComponent(FacetRailComponent);
     fixture.componentRef.setInput('facetCounts', facets());
     fixture.detectChanges();
     return fixture;
   }
 
-  const heading = (fixture: ComponentFixture<FacetRail>, key: string) =>
+  const heading = (fixture: ComponentFixture<FacetRailComponent>, key: string) =>
     (fixture.nativeElement as HTMLElement).querySelector(`[data-testid="facet-field-${key}"] h3`)?.textContent?.trim();
 
   it('renders a harvested dimension label translated in the active Locale, not the raw key', () => {

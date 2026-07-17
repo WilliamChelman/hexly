@@ -68,7 +68,7 @@ import { EntityNameResolver } from '../services/entity-name-resolver';
     }
   `,
 })
-export class EntityLinkView {
+export class EntityLinkViewComponent {
   readonly entityId = input.required<string>();
   readonly label = input.required<string>();
   readonly descriptor = input<string | null>(null);
@@ -98,7 +98,7 @@ export class EntityLinkView {
 }
 
 /**
- * Bridge a ProseMirror node to an {@link EntityLinkView}.
+ * Bridge a ProseMirror node to an {@link EntityLinkViewComponent}.
  *
  * `environmentInjector` must be the route-level injector where {@link EntityNameResolver}
  * is provided. `elementInjector` must be ContentEditor's node injector, which lives inside
@@ -111,7 +111,7 @@ export function createEntityLinkNodeView(
   elementInjector: Injector,
   appRef: ApplicationRef,
 ): NodeView {
-  const ref = createComponent(EntityLinkView, {
+  const ref = createComponent(EntityLinkViewComponent, {
     environmentInjector,
     elementInjector,
   });

@@ -1,24 +1,24 @@
 import { provideTranslocoTesting } from '../../../../testing/transloco-testing';
 import { TestBed } from '@angular/core/testing';
 import { ComponentRef } from '@angular/core';
-import { EntityFieldsEditor } from './entity-fields-editor.component';
+import { EntityFieldsEditorComponent } from './entity-fields-editor.component';
 import { providePluginContent } from '@hexly/plugin-content/web';
 import { providePluginDnd } from '@hexly/plugin-dnd/web';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 
 describe('EntityFieldsEditor', () => {
-  let ref: ComponentRef<EntityFieldsEditor>;
+  let ref: ComponentRef<EntityFieldsEditorComponent>;
   let el: HTMLElement;
   let attached: string[];
   let detached: string[];
 
   function render(types: string[], fields: string[], writable = true) {
     TestBed.configureTestingModule({
-      imports: [EntityFieldsEditor, provideTranslocoTesting()],
+      imports: [EntityFieldsEditorComponent, provideTranslocoTesting()],
       // Hexmap composed too, so `core.grid` stays attachable to a note once the one dnd Field is on.
       providers: [providePluginContent(), providePluginDnd(), providePluginHexmap()],
     });
-    const fixture = TestBed.createComponent(EntityFieldsEditor);
+    const fixture = TestBed.createComponent(EntityFieldsEditorComponent);
     ref = fixture.componentRef;
     ref.setInput('types', types);
     ref.setInput('fields', fields);

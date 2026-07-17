@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, model, signal } from '@angular/core';
 import { form, FormField } from '@angular/forms/signals';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
-import { Input, Select } from '@hexly/web-ui';
+import { InputComponent, SelectComponent } from '@hexly/web-ui';
 import { activeLangLabel, matchesSearchAndSource } from '../utils/picker-support';
 import { DataTypeChoice } from '../utils/datatype-choices';
 
@@ -58,7 +58,7 @@ import { DataTypeChoice } from '../utils/datatype-choices';
       }
     </div>
   `,
-  imports: [TranslocoPipe, Input, Select, FormField],
+  imports: [TranslocoPipe, InputComponent, SelectComponent, FormField],
   styles: `
     @reference '#app-styles.css';
     .dp-controls {
@@ -97,7 +97,7 @@ import { DataTypeChoice } from '../utils/datatype-choices';
     }
   `,
 })
-export class DatatypePicker {
+export class DatatypePickerComponent {
   private readonly transloco = inject(TranslocoService);
 
   readonly options = input.required<readonly DataTypeChoice[]>();

@@ -5,7 +5,7 @@ import { Directive, ElementRef, afterNextRender, inject } from '@angular/core';
  * on page load, not when an element is revealed by a `@if` block.
  */
 @Directive({ selector: '[appAutofocus]' })
-export class Autofocus {
+export class AutofocusDirective {
   constructor() {
     const el = inject<ElementRef<HTMLElement>>(ElementRef);
     afterNextRender(() => el.nativeElement.focus());

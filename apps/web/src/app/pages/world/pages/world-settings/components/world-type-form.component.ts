@@ -25,14 +25,14 @@ import {
 } from '@hexly/domain';
 import { ToasterService, WorldsClient } from '@hexly/web-core';
 import { isShownAsView, userTypeViews } from '@hexly/web-entity';
-import { Button, Input } from '@hexly/web-ui';
+import { ButtonComponent, InputComponent } from '@hexly/web-ui';
 import { WorldFieldsLoader } from '../../../../../entity-types/world-fields-loader';
 import { TypeRegistry } from '../../../../../entity-types/type-registry';
 import { ViewRegistry } from '../../../../../entity-types/view-registry';
 import { dataTypeLabel, toFieldDataType } from '../utils/field-data-type';
-import { DatatypePicker } from './datatype-picker.component';
+import { DatatypePickerComponent } from './datatype-picker.component';
 import { dataTypeChoices } from '../utils/datatype-choices';
-import { FieldRefPicker, FieldChoice } from './field-ref-picker.component';
+import { FieldRefPickerComponent, FieldChoice } from './field-ref-picker.component';
 import { namespaceOf, pluginSourceLabel } from '../utils/source-label';
 
 /** The open type editor's working copy: creating (`editingId === null`) or editing an existing type by id. */
@@ -72,7 +72,14 @@ const BLANK_FIELD: FieldDraft = { segment: '', segmentEdited: false, label: '', 
 @Component({
   selector: 'app-world-type-form',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, Button, Input, DatatypePicker, FieldRefPicker, FormField],
+  imports: [
+    TranslocoPipe,
+    ButtonComponent,
+    InputComponent,
+    DatatypePickerComponent,
+    FieldRefPickerComponent,
+    FormField,
+  ],
   template: `
     @let d = typeModel();
     <form id="type-editor-form" class="type-editor" data-testid="type-editor" (submit)="onSubmit($event)">
@@ -225,7 +232,7 @@ const BLANK_FIELD: FieldDraft = { segment: '', segmentEdited: false, label: '', 
     }
   `,
 })
-export class WorldTypeForm {
+export class WorldTypeFormComponent {
   readonly worldId = input.required<string>();
   /** The type to edit, or `null` to author a new one. */
   readonly type = input<AvailableType | null>(null);

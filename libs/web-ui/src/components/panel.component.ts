@@ -30,7 +30,7 @@ import { ChangeDetectionStrategy, Component, booleanAttribute, input } from '@an
     }
   `,
 })
-export class Panel {
+export class PanelComponent {
   /** A lifted surface with a stronger shadow. */
   readonly raised = input(false, { transform: booleanAttribute });
   /** Square corners, for a panel that meets an edge. */

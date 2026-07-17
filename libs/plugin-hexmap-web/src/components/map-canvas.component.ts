@@ -30,8 +30,8 @@ import { ThemeService, ToasterService, isTrackpadWheel, wheelDeltaPixels } from 
 import { terrainKey } from '../utils/catalog-keys';
 import { HexMapStore, SelectMode } from '../services/hexmap-store';
 import { toolForHotkey } from './tools';
-import { CoordReadout } from './coord-readout.component';
-import { ZoomControl } from './zoom-control.component';
+import { CoordReadoutComponent } from './coord-readout.component';
+import { ZoomControlComponent } from './zoom-control.component';
 import { Camera } from '../utils/camera';
 import { Canvas2dMapRenderer } from '../services/map-renderer';
 import { MapRenderer, MarqueeOverride } from '../models/map-renderer';
@@ -62,7 +62,7 @@ const HEX_DRAG_THRESHOLD = 4;
 @Component({
   selector: 'app-map-canvas',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CoordReadout, ZoomControl, TranslocoPipe],
+  imports: [CoordReadoutComponent, ZoomControlComponent, TranslocoPipe],
   template: `
     <canvas
       #canvas
@@ -130,7 +130,7 @@ const HEX_DRAG_THRESHOLD = 4;
     }
   `,
 })
-export class MapCanvas {
+export class MapCanvasComponent {
   private readonly canvasRef = viewChild<ElementRef<HTMLCanvasElement>>('canvas');
 
   /** Pointy-top hexes, origin at world 0. */

@@ -8,7 +8,7 @@ import {
   signal,
 } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { Eyebrow } from '@hexly/web-ui';
+import { EyebrowComponent } from '@hexly/web-ui';
 import { OutlineStore } from '../services/outline-store';
 
 /**
@@ -24,7 +24,7 @@ import { OutlineStore } from '../services/outline-store';
 @Component({
   selector: 'app-outline-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Eyebrow, TranslocoPipe],
+  imports: [EyebrowComponent, TranslocoPipe],
   host: { class: 'flex flex-col gap-1 p-3 overflow-y-auto bg-surface' },
   template: `
     <span appEyebrow mark class="mb-1">{{ 'editor.outline.title' | transloco }}</span>
@@ -47,7 +47,7 @@ import { OutlineStore } from '../services/outline-store';
     }
   `,
 })
-export class OutlinePanel {
+export class OutlinePanelComponent {
   protected readonly store = inject(OutlineStore);
   private readonly destroyRef = inject(DestroyRef);
 

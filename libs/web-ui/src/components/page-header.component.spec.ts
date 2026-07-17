@@ -1,10 +1,10 @@
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { PageHeader } from './page-header.component';
+import { PageHeaderComponent } from './page-header.component';
 
 describe('PageHeader', () => {
   @Component({
-    imports: [PageHeader],
+    imports: [PageHeaderComponent],
     template: `
       <app-page-header>
         <span pageHeaderLeading data-testid="L">lead</span>
@@ -16,13 +16,13 @@ describe('PageHeader', () => {
   class Host {}
 
   @Component({
-    imports: [PageHeader],
+    imports: [PageHeaderComponent],
     template: `<app-page-header><span pageHeaderTitle>title</span></app-page-header>`,
   })
   class TitleOnlyHost {}
 
   @Component({
-    imports: [PageHeader],
+    imports: [PageHeaderComponent],
     template: `<app-page-header sticky><span pageHeaderTitle>title</span></app-page-header>`,
   })
   class StickyHost {}

@@ -2,20 +2,20 @@ import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import {
-  Button,
-  Cartouche,
-  Chip,
-  Coord,
-  Eyebrow,
-  Field,
-  IconButton,
-  Icon,
-  Input,
-  Kbd,
-  Panel,
-  Select,
-  Swatch,
-  Textarea,
+  ButtonComponent,
+  CartoucheComponent,
+  ChipComponent,
+  CoordComponent,
+  EyebrowComponent,
+  FieldComponent,
+  IconButtonComponent,
+  IconComponent,
+  InputComponent,
+  KbdComponent,
+  PanelComponent,
+  SelectComponent,
+  SwatchComponent,
+  TextareaComponent,
 } from '@hexly/web-ui';
 
 interface SwatchRow {
@@ -35,20 +35,20 @@ interface TypeRow {
   imports: [
     RouterLink,
     TranslocoPipe,
-    Button,
-    Cartouche,
-    Chip,
-    Coord,
-    Select,
-    Eyebrow,
-    Field,
-    Input,
-    IconButton,
-    Icon,
-    Swatch,
-    Kbd,
-    Panel,
-    Textarea,
+    ButtonComponent,
+    CartoucheComponent,
+    ChipComponent,
+    CoordComponent,
+    SelectComponent,
+    EyebrowComponent,
+    FieldComponent,
+    InputComponent,
+    IconButtonComponent,
+    IconComponent,
+    SwatchComponent,
+    KbdComponent,
+    PanelComponent,
+    TextareaComponent,
   ],
   host: { class: 'block' },
   template: `
@@ -368,7 +368,7 @@ interface TypeRow {
     }
   `,
 })
-export class Styleguide {
+export class StyleguidePage {
   protected readonly semantic: SwatchRow[] = [
     { token: '--color-bg', nameKey: 'styleguide.swatch.table' },
     { token: '--color-surface', nameKey: 'styleguide.swatch.paper' },

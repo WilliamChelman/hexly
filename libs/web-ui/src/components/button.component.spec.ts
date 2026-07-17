@@ -1,10 +1,10 @@
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { Button, ButtonSize, ButtonVariant } from './button.component';
+import { ButtonComponent, ButtonSize, ButtonVariant } from './button.component';
 
 /** A host that drives the attribute-selector primitive from typed inputs. */
 @Component({
-  imports: [Button],
+  imports: [ButtonComponent],
   template: ` <button appButton [variant]="variant" [size]="size" [icon]="icon" [danger]="danger">Label</button> `,
 })
 class Host {

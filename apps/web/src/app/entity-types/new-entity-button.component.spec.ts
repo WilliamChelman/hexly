@@ -13,7 +13,7 @@ import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { PLUGIN_ID as CONTENT_PLUGIN_ID } from '@hexly/plugin-content';
 import { PLUGIN_ID as HEXMAP_PLUGIN_ID } from '@hexly/plugin-hexmap';
 import { CORE_VIEW_FIELDS, TypeDefinition } from '@hexly/web-entity';
-import { NewEntityButton } from './new-entity-button.component';
+import { NewEntityButtonComponent } from './new-entity-button.component';
 import { TypeRegistry } from './type-registry';
 import { CreateEntityDialogState } from '../shell/command-palette/create-entity-dialog.state';
 
@@ -80,7 +80,7 @@ describe('NewEntityButton', () => {
     defaultType = signal<string | undefined>(undefined);
     enabled = signal<ReadonlySet<string> | null>(null);
     await TestBed.configureTestingModule({
-      imports: [NewEntityButton, provideTranslocoTesting()],
+      imports: [NewEntityButtonComponent, provideTranslocoTesting()],
       // The D&D plugin is composed exactly as `app.config.ts` does, so `dnd.monster` reaches the
       // registry — and this component — without the app naming it (#192).
       providers: [
@@ -102,14 +102,14 @@ describe('NewEntityButton', () => {
     document.querySelectorAll('.cdk-overlay-container').forEach((el) => el.remove());
   });
 
-  function render(): ComponentFixture<NewEntityButton> {
-    const fixture = TestBed.createComponent(NewEntityButton);
+  function render(): ComponentFixture<NewEntityButtonComponent> {
+    const fixture = TestBed.createComponent(NewEntityButtonComponent);
     fixture.detectChanges();
     return fixture;
   }
 
   /** Open the arrowhead's type menu; its items render into the document, not the fixture. */
-  function openMenu(fixture: ComponentFixture<NewEntityButton>): void {
+  function openMenu(fixture: ComponentFixture<NewEntityButtonComponent>): void {
     (fixture.nativeElement.querySelector('[data-testid=new-entity-menu]') as HTMLButtonElement).click();
     fixture.detectChanges();
   }
@@ -117,7 +117,7 @@ describe('NewEntityButton', () => {
   const menuItem = (typeId: string) =>
     document.querySelector<HTMLButtonElement>(`[data-testid="new-entity-${typeId}"]`);
 
-  const primaryButton = (fixture: ComponentFixture<NewEntityButton>) =>
+  const primaryButton = (fixture: ComponentFixture<NewEntityButtonComponent>) =>
     fixture.nativeElement.querySelector('[data-testid=new-default-entity]') as HTMLButtonElement | null;
 
   it('creates the first enabled Type by default — today’s Note — and opens it', () => {

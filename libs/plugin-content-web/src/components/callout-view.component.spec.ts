@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { Editor } from '@tiptap/core';
 import { CONTENT_EXTENSIONS } from '../extensions/content-extensions';
 import { calloutNode } from '../extensions/callout-node';
-import { CalloutView, createCalloutNodeView } from './callout-view.component';
+import { CalloutViewComponent, createCalloutNodeView } from './callout-view.component';
 
 describe('CalloutView node view', () => {
   function nodeViewFor(attrs: Record<string, unknown>) {
@@ -177,6 +177,6 @@ describe('CalloutView node view', () => {
   it('is the same component the schema stays free of (framework-free node)', () => {
     // calloutNode carries no node view; the Angular view is attached at the editor.
     expect((calloutNode as { config?: { addNodeView?: unknown } }).config?.addNodeView).toBeFalsy();
-    expect(CalloutView).toBeDefined();
+    expect(CalloutViewComponent).toBeDefined();
   });
 });

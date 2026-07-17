@@ -11,7 +11,7 @@ import {
 } from '@hexly/domain';
 import { EntitySession } from '../services/entity-session';
 import { TypeRegistry } from '../../../entity-types/type-registry';
-import { FieldControl } from '@hexly/web-entity';
+import { FieldControlComponent } from '@hexly/web-entity';
 
 /**
  * The **generic Field View** (`core.view.fields`, ADR-0048, #187): renders an Entity's
@@ -32,7 +32,7 @@ import { FieldControl } from '@hexly/web-entity';
   selector: 'app-generic-field-view',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'contents' },
-  imports: [TranslocoPipe, FieldControl],
+  imports: [TranslocoPipe, FieldControlComponent],
   template: `
     <div class="absolute inset-0 overflow-y-auto bg-surface-sunken" data-testid="generic-field-view">
       <div class="max-w-[60rem] mx-auto py-6 px-6 flex flex-col gap-6">
@@ -98,7 +98,7 @@ import { FieldControl } from '@hexly/web-entity';
     </div>
   `,
 })
-export class GenericFieldView {
+export class GenericFieldViewComponent {
   private readonly session = inject(EntitySession);
   private readonly types = inject(TypeRegistry);
 

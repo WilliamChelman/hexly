@@ -10,7 +10,7 @@ import { CORE_VIEW_FIELDS } from '@hexly/web-entity';
 import { CORE_HEX_GRID } from '@hexly/plugin-hexmap';
 import { providePluginHexmap } from '@hexly/plugin-hexmap/web';
 import { TypeRegistry } from '../../../../../entity-types/type-registry';
-import { WorldTypesPanel } from './world-types-panel.component';
+import { WorldTypesPanelComponent } from './world-types-panel.component';
 
 /**
  * The type-authoring form: a type *references* reusable Fields by id (ADR-0054), so the editor is a
@@ -20,7 +20,7 @@ import { WorldTypesPanel } from './world-types-panel.component';
 describe('WorldTypesPanel', () => {
   let worlds: MockWorldsClient;
   let registry: TypeRegistry;
-  let fixture: ComponentFixture<WorldTypesPanel>;
+  let fixture: ComponentFixture<WorldTypesPanelComponent>;
 
   // The World's registered Fields the picker offers, resolved by id through the registry.
   const domainField = defineField({
@@ -42,7 +42,7 @@ describe('WorldTypesPanel', () => {
     worlds.updateType.mockReturnValue(of({ id: 'world.deity', label: 'Deity', fieldRefs: [] }));
     worlds.fields.mockReturnValue(of([domainField, battlemapField]));
     await TestBed.configureTestingModule({
-      imports: [WorldTypesPanel, provideTranslocoTesting()],
+      imports: [WorldTypesPanelComponent, provideTranslocoTesting()],
       // The map plugin, composed as `app.config.ts` does — its grid data-type reaches the new-Field
       // modal's kind picker (#199), and its Plugin Field the reference checklist.
       providers: [provideRouter([]), providePluginHexmap(), { provide: WorldsClient, useValue: worlds }],
@@ -53,7 +53,7 @@ describe('WorldTypesPanel', () => {
     // the reference picker offers them.
     registry.setWorldFields([domainField, battlemapField]);
 
-    fixture = TestBed.createComponent(WorldTypesPanel);
+    fixture = TestBed.createComponent(WorldTypesPanelComponent);
     fixture.componentRef.setInput('id', 'w1');
     fixture.detectChanges();
   });

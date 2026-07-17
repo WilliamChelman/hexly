@@ -3,9 +3,9 @@ import { of, throwError } from 'rxjs';
 import { EntitiesClient, WorldsClient, ToasterService } from '@hexly/web-core';
 import { MockEntitiesClient, MockWorldsClient, provideTranslocoTesting } from '@hexly/web-core/testing';
 import { WEB_UI_TEST_CATALOGS } from '../i18n/test-catalogs';
-import { PublicLinkControl, PublicLinkKind } from './public-link.component';
+import { PublicLinkComponent, PublicLinkKind } from './public-link.component';
 
-describe('PublicLinkControl', () => {
+describe('PublicLinkComponent', () => {
   let entities: MockEntitiesClient;
   let worlds: MockWorldsClient;
 
@@ -13,7 +13,7 @@ describe('PublicLinkControl', () => {
     entities = new MockEntitiesClient();
     worlds = new MockWorldsClient();
     await TestBed.configureTestingModule({
-      imports: [PublicLinkControl, provideTranslocoTesting(WEB_UI_TEST_CATALOGS)],
+      imports: [PublicLinkComponent, provideTranslocoTesting(WEB_UI_TEST_CATALOGS)],
       providers: [
         { provide: EntitiesClient, useValue: entities },
         { provide: WorldsClient, useValue: worlds },
@@ -22,7 +22,7 @@ describe('PublicLinkControl', () => {
   });
 
   function render(kind: PublicLinkKind, id: string) {
-    const fixture = TestBed.createComponent(PublicLinkControl);
+    const fixture = TestBed.createComponent(PublicLinkComponent);
     fixture.componentRef.setInput('kind', kind);
     fixture.componentRef.setInput('id', id);
     fixture.detectChanges();

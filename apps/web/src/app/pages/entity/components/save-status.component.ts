@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { Chip, Icon, IconName } from '@hexly/web-ui';
+import { ChipComponent, IconComponent, IconName } from '@hexly/web-ui';
 import { EntitySession } from '../services/entity-session';
 
 /** The routine autosave states, in the order the ladder falls through them. */
@@ -25,7 +25,7 @@ const QUIET: Record<QuietState, { icon: IconName; key: string }> = {
 @Component({
   selector: 'app-save-status',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Chip, Icon, TranslocoPipe],
+  imports: [ChipComponent, IconComponent, TranslocoPipe],
   template: `
     <span aria-live="polite" class="inline-flex items-center">
       @if (conflict()) {
@@ -79,7 +79,7 @@ const QUIET: Record<QuietState, { icon: IconName; key: string }> = {
     </span>
   `,
 })
-export class SaveStatus {
+export class SaveStatusComponent {
   private readonly session = inject(EntitySession);
   protected readonly saving = this.session.saving;
   protected readonly dirty = this.session.dirty;

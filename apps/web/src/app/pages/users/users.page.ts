@@ -4,7 +4,7 @@ import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { CreateUserRequest, InstanceRole, MIN_PASSWORD_LENGTH, UserAccount, UsersError } from '@hexly/domain';
 import { Observable } from 'rxjs';
 import { UsersClient, ToasterService, AuthClient } from '@hexly/web-core';
-import { Eyebrow, Field, Input, Panel, Button } from '@hexly/web-ui';
+import { EyebrowComponent, FieldComponent, InputComponent, PanelComponent, ButtonComponent } from '@hexly/web-ui';
 
 /**
  * The user-management panel (ADR-0047): account management with zero content powers. Every action
@@ -15,7 +15,7 @@ import { Eyebrow, Field, Input, Panel, Button } from '@hexly/web-ui';
 @Component({
   selector: 'app-users',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslocoPipe, Eyebrow, Field, Input, Panel, Button],
+  imports: [TranslocoPipe, EyebrowComponent, FieldComponent, InputComponent, PanelComponent, ButtonComponent],
   template: `
     <section class="users">
       <span appEyebrow>{{ 'users.heading' | transloco }}</span>
@@ -289,7 +289,7 @@ import { Eyebrow, Field, Input, Panel, Button } from '@hexly/web-ui';
     }
   `,
 })
-export class Users {
+export class UsersPage {
   private readonly users = inject(UsersClient);
   private readonly toaster = inject(ToasterService);
   private readonly transloco = inject(TranslocoService);

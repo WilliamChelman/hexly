@@ -10,7 +10,7 @@ import {
   provideTranslocoTesting,
 } from '@hexly/web-core/testing';
 import { WEB_UI_TEST_CATALOGS } from '../i18n/test-catalogs';
-import { OwnerSet } from './owner-set.component';
+import { OwnerSetComponent } from './owner-set.component';
 
 describe('OwnerSet', () => {
   let worlds: MockWorldsClient;
@@ -25,7 +25,7 @@ describe('OwnerSet', () => {
     users = new MockUserDirectoryClient();
     auth = new MockAuthClient();
     await TestBed.configureTestingModule({
-      imports: [OwnerSet, provideTranslocoTesting(WEB_UI_TEST_CATALOGS)],
+      imports: [OwnerSetComponent, provideTranslocoTesting(WEB_UI_TEST_CATALOGS)],
       providers: [
         { provide: WorldsClient, useValue: worlds },
         { provide: EntitiesClient, useValue: entities },
@@ -53,7 +53,7 @@ describe('OwnerSet', () => {
 
   function render(kind: 'world' | 'entity', id: string, owners: string[]) {
     (kind === 'world' ? worlds : entities).owners.mockReturnValue(of(owners));
-    const fixture = TestBed.createComponent(OwnerSet);
+    const fixture = TestBed.createComponent(OwnerSetComponent);
     fixture.componentRef.setInput('kind', kind);
     fixture.componentRef.setInput('id', id);
     fixture.detectChanges();
@@ -73,7 +73,7 @@ describe('OwnerSet', () => {
   it('warns instead of throwing when the owner set fails to load', () => {
     const show = vi.spyOn(toaster, 'show');
     worlds.owners.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
-    const fixture = TestBed.createComponent(OwnerSet);
+    const fixture = TestBed.createComponent(OwnerSetComponent);
     fixture.componentRef.setInput('kind', 'world');
     fixture.componentRef.setInput('id', 'w1');
     fixture.detectChanges();

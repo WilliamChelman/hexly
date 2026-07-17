@@ -1,10 +1,10 @@
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { Select } from './select.component';
+import { SelectComponent } from './select.component';
 
 /** A host driving the attribute-selector primitive on a native select. */
 @Component({
-  imports: [Select],
+  imports: [SelectComponent],
   template: `
     <select appSelect>
       <option value="a">Alpha</option>

@@ -4,7 +4,14 @@ import { finalize } from 'rxjs';
 import { TranslocoPipe, TranslocoService } from '@jsverse/transloco';
 import { EntityType } from '@hexly/domain';
 import { ActiveWorld, ClientConfigStore, EntitiesClient, ToasterService, entityRoute } from '@hexly/web-core';
-import { Button, ButtonGroup, Icon, MenuItem, MenuPanel, MenuTrigger } from '@hexly/web-ui';
+import {
+  ButtonComponent,
+  ButtonGroupComponent,
+  IconComponent,
+  MenuItemDirective,
+  MenuPanelDirective,
+  MenuTriggerDirective,
+} from '@hexly/web-ui';
 import { TypeRegistry } from './type-registry';
 import { TypeNamePipe } from './type-name.pipe';
 import { CreateEntityDialogState } from '../shell/command-palette/create-entity-dialog.state';
@@ -22,7 +29,16 @@ import { CreateEntityDialogState } from '../shell/command-palette/create-entity-
   changeDetection: ChangeDetectionStrategy.OnPush,
   // `display:contents` so the split button sits directly in a page header's action row.
   host: { class: 'contents' },
-  imports: [Button, ButtonGroup, Icon, MenuTrigger, MenuPanel, MenuItem, TranslocoPipe, TypeNamePipe],
+  imports: [
+    ButtonComponent,
+    ButtonGroupComponent,
+    IconComponent,
+    MenuTriggerDirective,
+    MenuPanelDirective,
+    MenuItemDirective,
+    TranslocoPipe,
+    TypeNamePipe,
+  ],
   template: `
     <div appButtonGroup>
       @if (defaultType(); as type) {
@@ -66,7 +82,7 @@ import { CreateEntityDialogState } from '../shell/command-palette/create-entity-
     </ng-template>
   `,
 })
-export class NewEntityButton {
+export class NewEntityButtonComponent {
   private readonly entitiesClient = inject(EntitiesClient);
   private readonly activeWorld = inject(ActiveWorld);
   private readonly router = inject(Router);

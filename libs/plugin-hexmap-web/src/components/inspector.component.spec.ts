@@ -12,7 +12,7 @@ import { HEXMAP_TEST_CATALOGS } from '../i18n/test-catalogs';
 import { HexMapStore } from '../services/hexmap-store';
 import { provideHexMapStoreTesting } from '../testing/entity-session.fake';
 import { HEXMAP_TYPE_DEFINITIONS } from '../hexmap-types';
-import { Inspector } from './inspector.component';
+import { InspectorComponent } from './inspector.component';
 
 /** The Note, as the app registers it. */
 const NOTE_TYPE: TypeDefinition = {
@@ -91,7 +91,7 @@ describe('Inspector label editing', () => {
   beforeEach(async () => {
     stubEntities = [];
     await TestBed.configureTestingModule({
-      imports: [Inspector, provideTranslocoTesting(HEXMAP_TEST_CATALOGS)],
+      imports: [InspectorComponent, provideTranslocoTesting(HEXMAP_TEST_CATALOGS)],
       providers: inspectorProviders(),
     }).compileComponents();
   });
@@ -101,7 +101,7 @@ describe('Inspector label editing', () => {
     const store = TestBed.inject(HexMapStore);
     const id = store.addLabel(text, { x: 40, y: -20 });
     store.selectLabel(id);
-    const fixture = TestBed.createComponent(Inspector);
+    const fixture = TestBed.createComponent(InspectorComponent);
     fixture.detectChanges();
     return { store, id, fixture };
   }
@@ -131,7 +131,7 @@ describe('Inspector label editing', () => {
   });
 
   it('renders the empty-state hint in French when nothing is selected', () => {
-    const fixture = TestBed.createComponent(Inspector);
+    const fixture = TestBed.createComponent(InspectorComponent);
     fixture.detectChanges();
     TestBed.inject(TranslocoService).setActiveLang('fr');
     fixture.detectChanges();
@@ -190,7 +190,7 @@ describe('Inspector label editing', () => {
   });
 
   it('shows no label editor when nothing is selected', () => {
-    const fixture = TestBed.createComponent(Inspector);
+    const fixture = TestBed.createComponent(InspectorComponent);
     fixture.detectChanges();
 
     expect(fixture.nativeElement.querySelector('[data-testid=label-text]')).toBeNull();
@@ -201,13 +201,13 @@ describe('Inspector hex and feature selection', () => {
   beforeEach(async () => {
     stubEntities = [];
     await TestBed.configureTestingModule({
-      imports: [Inspector, provideTranslocoTesting(HEXMAP_TEST_CATALOGS)],
+      imports: [InspectorComponent, provideTranslocoTesting(HEXMAP_TEST_CATALOGS)],
       providers: inspectorProviders(),
     }).compileComponents();
   });
 
   function render() {
-    const fixture = TestBed.createComponent(Inspector);
+    const fixture = TestBed.createComponent(InspectorComponent);
     fixture.detectChanges();
     return fixture;
   }
@@ -360,7 +360,7 @@ describe('Inspector multi-selection', () => {
   beforeEach(async () => {
     stubEntities = [];
     await TestBed.configureTestingModule({
-      imports: [Inspector, provideTranslocoTesting(HEXMAP_TEST_CATALOGS)],
+      imports: [InspectorComponent, provideTranslocoTesting(HEXMAP_TEST_CATALOGS)],
       providers: inspectorProviders(),
     }).compileComponents();
   });
@@ -374,7 +374,7 @@ describe('Inspector multi-selection', () => {
     store.select({ q: 0, r: 0 }, null);
     store.select({ q: 1, r: 0 }, null, 'toggle-top');
     store.select({ q: 0, r: 0 }, labelId, 'toggle-top');
-    const fixture = TestBed.createComponent(Inspector);
+    const fixture = TestBed.createComponent(InspectorComponent);
     fixture.detectChanges();
     return { store, fixture, labelId };
   }
@@ -434,7 +434,7 @@ describe('Inspector region editing', () => {
   beforeEach(async () => {
     stubEntities = [];
     await TestBed.configureTestingModule({
-      imports: [Inspector, provideTranslocoTesting(HEXMAP_TEST_CATALOGS)],
+      imports: [InspectorComponent, provideTranslocoTesting(HEXMAP_TEST_CATALOGS)],
       providers: inspectorProviders(),
     }).compileComponents();
   });
@@ -446,7 +446,7 @@ describe('Inspector region editing', () => {
     const id = store.createRegion(name, color);
     store.addHexToRegion(id, { q: 0, r: 0 });
     store.select({ q: 0, r: 0 }, null);
-    const fixture = TestBed.createComponent(Inspector);
+    const fixture = TestBed.createComponent(InspectorComponent);
     fixture.detectChanges();
     return { store, id, fixture };
   }
@@ -586,13 +586,13 @@ describe('Inspector Entity Link control', () => {
     createdCalls = [];
     nextCreatedId = 'created-1';
     await TestBed.configureTestingModule({
-      imports: [Inspector, provideTranslocoTesting(HEXMAP_TEST_CATALOGS)],
+      imports: [InspectorComponent, provideTranslocoTesting(HEXMAP_TEST_CATALOGS)],
       providers: inspectorProviders(),
     }).compileComponents();
   });
 
   function render() {
-    const fixture = TestBed.createComponent(Inspector);
+    const fixture = TestBed.createComponent(InspectorComponent);
     fixture.detectChanges();
     return fixture;
   }

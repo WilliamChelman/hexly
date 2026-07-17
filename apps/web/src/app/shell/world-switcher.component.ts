@@ -2,7 +2,15 @@ import { ChangeDetectionStrategy, Component, computed, inject, input } from '@an
 import { Router, RouterLink } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { WorldStore, ActiveWorld, worldDashboardRoute } from '@hexly/web-core';
-import { Icon, Rule, MenuGroup, MenuItem, MenuItemRadio, MenuPanel, MenuTrigger } from '@hexly/web-ui';
+import {
+  IconComponent,
+  RuleComponent,
+  MenuGroupDirective,
+  MenuItemDirective,
+  MenuItemRadioDirective,
+  MenuPanelDirective,
+  MenuTriggerDirective,
+} from '@hexly/web-ui';
 
 /**
  * The World Switcher (ADR-0028): a quick-hop dropdown at the nav-rail masthead.
@@ -13,7 +21,17 @@ import { Icon, Rule, MenuGroup, MenuItem, MenuItemRadio, MenuPanel, MenuTrigger 
 @Component({
   selector: 'app-world-switcher',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MenuTrigger, MenuPanel, MenuItem, MenuItemRadio, MenuGroup, RouterLink, Icon, Rule, TranslocoPipe],
+  imports: [
+    MenuTriggerDirective,
+    MenuPanelDirective,
+    MenuItemDirective,
+    MenuItemRadioDirective,
+    MenuGroupDirective,
+    RouterLink,
+    IconComponent,
+    RuleComponent,
+    TranslocoPipe,
+  ],
   template: `
     <button
       type="button"
@@ -75,7 +93,7 @@ import { Icon, Rule, MenuGroup, MenuItem, MenuItemRadio, MenuPanel, MenuTrigger 
     </ng-template>
   `,
 })
-export class WorldSwitcher {
+export class WorldSwitcherComponent {
   private readonly store = inject(WorldStore);
   private readonly activeWorld = inject(ActiveWorld);
   private readonly router = inject(Router);
